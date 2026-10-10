@@ -11,8 +11,7 @@
 
 namespace
 {
-	// The plane of the Milky Way: a great circle tipped so it arches high across the sky
-	const FVector GalaxyNormal = FVector(0.80f, 0.45f, 0.40f).GetSafeNormal();
+	const FLinearColor CometBlue(0.45f, 0.70f, 1.0f), CometRed(1.0f, 0.42f, 0.30f);
 }
 
 // A flat 100 x 100 card in XY (normal +Z), UVs 0..1 with U running along +X
@@ -61,7 +60,7 @@ ANightSky::ANightSky()
 	Rand.Initialize(8128);
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 
-	auto MakeISM = [&](const TCHAR* Name)
+	auto MakeISM = [&](const TCHAR* Name, int32 Sort)
 	{
 		UInstancedStaticMeshComponent* C = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
 		C->SetupAttachment(RootComponent);
@@ -69,20 +68,20 @@ ANightSky::ANightSky()
 		C->SetCastShadow(false);
 		C->bAffectDynamicIndirectLighting = false;
 		C->bAffectDistanceFieldLighting = false;
-		C->SetTranslucentSortPriority(-10);   // behind the moon
+		C->SetTranslucentSortPriority(Sort);   // stars behind the moon, the comet in front of the stars
 		C->bNeverDistanceCull = true;
 		return C;
 	};
-	Stars = MakeISM(TEXT("Stars"));
-	Streaks = MakeISM(TEXT("Streaks"));
-	CometTail = MakeISM(TEXT("CometTail"));
-	CometHead = MakeISM(TEXT("CometHead"));
-	MilkyWay = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("MilkyWay"));
-	MilkyWay->SetupAttachment(RootComponent);
-	MilkyWay->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MilkyWay->SetCastShadow(false);
-	MilkyWay->SetTranslucentSortPriority(-11);
-	MilkyWay->bNeverDistanceCull = true;
+	Stars = MakeISM(TEXT("Stars"), -10);
+	Streaks = MakeISM(TEXT("Streaks"), -9);
+	CometTail = MakeISM(TEXT("CometTail"), -8);
+	CometHead = MakeISM(TEXT("CometHead"), -7);
+	Clouds = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Clouds"));
+	Clouds->SetupAttachment(RootComponent);
+	Clouds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Clouds->SetCastShadow(false);
+	Clouds->SetTranslucentSortPriority(5);   // in front of the moon and stars
+	Clouds->bNeverDistanceCull = true;
 }
 
 FTransform ANightSky::StreakTransform(const FVector& HeadDir, const FVector& TailDir, float Length, float Width) const
@@ -100,27 +99,26 @@ void ANightSky::BeginPlay()
 	Super::BeginPlay();
 	UMaterialInterface* StarMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Star.M_Star"));
 	UMaterialInterface* StreakMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Streak.M_Streak"));
-	UMaterialInterface* MilkyMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_MilkyWay.M_MilkyWay"));
-	if (!StarMat || !StreakMat || !MilkyMat)
+	UMaterialInterface* CloudMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cirrus.M_Cirrus"));
+	if (!StarMat || !StreakMat)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Night sky materials missing: run Tools/BuildMaterials.ps1. No stars tonight."));
+		UE_LOG(LogTemp, Warning, TEXT("Sky materials missing: run Tools/BuildMaterials.ps1. No stars or comets."));
 		SetActorTickEnabled(false);
 		return;
 	}
-	auto Mid = [&](UMaterialInterface* M) { UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(M, this); Mids.Add(D); return D; };
+	auto Mid = [&](UMaterialInterface* M) { UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(M, this); StarMids.Add(D); return D; };
 
-	// ---- Stars: thousands of soft points, thicker toward the Milky Way, a few much brighter than the rest ----
+	// ---- Stars: soft points scattered over the sky, a few much brighter than the rest ----
 	{
 		UMaterialInstanceDynamic* M = Mid(StarMat);
+		M->SetScalarParameterValue(TEXT("Boost"), 9.f);   // bright enough to show in a dusky, not-quite-dark sky
 		Stars->SetStaticMesh(MakeCard(this, StarMat));
 		Stars->SetMaterial(0, M);
 		TArray<FTransform> Xf;
-		while (Xf.Num() < 2600)
+		while (Xf.Num() < 2200)
 		{
 			FVector D = Rand.GetUnitVector();
-			if (D.Z < -0.05f) D.Z = -D.Z;                                   // only the upper half of the sky (and a sliver below)
-			const float Band = FMath::Abs(FVector::DotProduct(D, GalaxyNormal));
-			if (Rand.FRand() > 0.35f + 0.65f * FMath::Exp(-FMath::Square(Band / 0.22f))) continue;
+			if (D.Z < -0.05f) D.Z = -D.Z;   // only the upper half of the sky (and a sliver below)
 			const float S = Rand.FRandRange(55.f, 95.f) * (Rand.FRand() < 0.04f ? 1.8f : 1.f);
 			Xf.Add(FTransform(FRotationMatrix::MakeFromZ(-D).ToQuat(), D * Radius, FVector(S / 100.f)));
 		}
@@ -137,56 +135,71 @@ void ANightSky::BeginPlay()
 		Streaks->AddInstances(Xf, false, false, false);
 	}
 
-	// ---- The comet: a long soft tail and a bright head ----
+	// ---- The comet: a fanned tail and a soft round head, tinted blue or red each time one appears ----
 	{
-		UMaterialInstanceDynamic* T = Mid(StreakMat);
-		T->SetScalarParameterValue(TEXT("Intensity"), 0.9f);
+		TailMid = Mid(StreakMat);
+		TailMid->SetScalarParameterValue(TEXT("Intensity"), 1.6f);
+		TailMid->SetScalarParameterValue(TEXT("Fan"), 1.f);
 		CometTail->SetStaticMesh(MakeCard(this, StreakMat));
-		CometTail->SetMaterial(0, T);
+		CometTail->SetMaterial(0, TailMid);
 		CometTail->AddInstance(FTransform(FQuat::Identity, FVector(0, 0, -Radius), FVector(0.001f)));
-		UMaterialInstanceDynamic* H = Mid(StarMat);
-		H->SetScalarParameterValue(TEXT("Twinkle"), 0.f);
-		H->SetScalarParameterValue(TEXT("Boost"), 14.f);
+		HeadMid = Mid(StarMat);
+		HeadMid->SetScalarParameterValue(TEXT("Twinkle"), 0.f);
+		HeadMid->SetScalarParameterValue(TEXT("BrightMin"), 1.f);
+		HeadMid->SetScalarParameterValue(TEXT("Boost"), 10.f);
+		HeadMid->SetScalarParameterValue(TEXT("Soft"), 1.f);
 		CometHead->SetStaticMesh(MakeCard(this, StarMat));
-		CometHead->SetMaterial(0, H);
+		CometHead->SetMaterial(0, HeadMid);
 		CometHead->AddInstance(FTransform(FQuat::Identity, FVector(0, 0, -Radius), FVector(0.001f)));
 	}
 
-	// ---- The Milky Way: a painted band across the sky ----
-	BuildMilkyWay();
-	MilkyWay->SetMaterial(0, Mid(MilkyMat));
+	// ---- High streaky clouds ----
+	if (CloudMat)
+	{
+		BuildClouds();
+		CloudMid = UMaterialInstanceDynamic::Create(CloudMat, this);
+		Clouds->SetMaterial(0, CloudMid);
+	}
 }
 
-void ANightSky::BuildMilkyWay()
+// A handful of long, thin bands of cirrus on a dome: each a curved strip with the streaky picture stretched along it
+void ANightSky::BuildClouds()
 {
-	// Two axes in the galactic plane, and the band runs ±16 degrees either side of it
-	const FVector U = FVector::CrossProduct(GalaxyNormal, FVector::UpVector).GetSafeNormal();
-	const FVector V = FVector::CrossProduct(GalaxyNormal, U).GetSafeNormal();
-	const int32 Around = 120, Across = 8;
-	const float HalfWidth = FMath::DegreesToRadians(16.f);
 	TArray<FVector> Verts, Normals;
 	TArray<FVector2D> UV;
+	TArray<FLinearColor> Fade;
 	TArray<int32> Tris;
-	for (int32 i = 0; i <= Around; ++i)
+	const int32 Along = 24, Across = 4;
+	for (int32 b = 0; b < 7; ++b)
 	{
-		const float T = 2.f * PI * i / Around;
-		const FVector OnCircle = U * FMath::Cos(T) + V * FMath::Sin(T);
-		for (int32 j = 0; j <= Across; ++j)
+		const float Az0 = Rand.FRandRange(0.f, 360.f);
+		const float Span = Rand.FRandRange(50.f, 85.f);              // degrees of sky each band crosses
+		const float El = Rand.FRandRange(14.f, 42.f);
+		const float Tilt = Rand.FRandRange(-10.f, 10.f);             // bands drift up or down a little along their length
+		const float Wd = Rand.FRandRange(3.5f, 7.f);                  // degrees wide
+		const float V0 = Rand.FRand();                                // which part of the picture this band uses
+		const int32 First = Verts.Num();
+		for (int32 i = 0; i <= Along; ++i)
 		{
-			const float W = FMath::Lerp(-HalfWidth, HalfWidth, float(j) / Across);
-			const FVector D = (OnCircle * FMath::Cos(W) + GalaxyNormal * FMath::Sin(W)).GetSafeNormal();
-			Verts.Add(D * (Radius - 200.f));
-			Normals.Add(-D);
-			UV.Add(FVector2D(float(i) / Around, float(j) / Across));
+			const float T = float(i) / Along;
+			for (int32 j = 0; j <= Across; ++j)
+			{
+				const float S = float(j) / Across - 0.5f;
+				const FVector D = FRotator(El + Tilt * (T - 0.5f) + S * Wd, Az0 + Span * T, 0.f).Vector();
+				Verts.Add(D * CloudRadius);
+				Normals.Add(-D);
+				UV.Add(FVector2D(T * 2.f + b * 0.37f, V0 + (S + 0.5f) * 0.25f));
+				Fade.Add(FLinearColor(1.f, 1.f, 1.f, FMath::Pow(FMath::Sin(PI * T), 0.8f) * (1.f - FMath::Square(2.f * S))));   // thin out at the ends and edges
+			}
 		}
+		for (int32 i = 0; i < Along; ++i)
+			for (int32 j = 0; j < Across; ++j)
+			{
+				const int32 A = First + i * (Across + 1) + j, B = A + 1, C = A + (Across + 1), D = C + 1;
+				Tris.Append({ A, C, B, B, C, D });
+			}
 	}
-	for (int32 i = 0; i < Around; ++i)
-		for (int32 j = 0; j < Across; ++j)
-		{
-			const int32 A = i * (Across + 1) + j, B = A + 1, C = A + (Across + 1), D = C + 1;
-			Tris.Append({ A, C, B, B, C, D });
-		}
-	MilkyWay->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+	Clouds->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Fade, TArray<FProcMeshTangent>(), false);
 }
 
 void ANightSky::Tick(float DeltaSeconds)
@@ -195,13 +208,23 @@ void ANightSky::Tick(float DeltaSeconds)
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (PC && PC->PlayerCameraManager) SetActorLocation(PC->PlayerCameraManager->GetCameraLocation());
 
-	const float N = ADayNight::Night;
-	for (UMaterialInstanceDynamic* M : Mids) M->SetScalarParameterValue(TEXT("Night"), N);
-	const bool bShow = N > 0.01f;
-	Stars->SetVisibility(bShow);
-	MilkyWay->SetVisibility(bShow);
+	// Stars come out as the sun sinks toward the horizon
+	const float N = ADayNight::Dusk;
+	for (UMaterialInstanceDynamic* M : StarMids) M->SetScalarParameterValue(TEXT("Night"), N);
+	Stars->SetVisibility(N > 0.01f);
 
-	// ---- Shooting stars: every few seconds in a dark sky, one streaks down and burns out ----
+	// Clouds: white in the high sun, flushed orange and pink as it sinks, slowly drifting round
+	if (CloudMid)
+	{
+		const float E = ADayNight::SunElevation;
+		const float Sunset = 1.f - FMath::SmoothStep(8.f, 24.f, E);
+		const FLinearColor Day(1.0f, 1.0f, 1.0f), Glow(1.0f, 0.55f, 0.42f);
+		CloudMid->SetVectorParameterValue(TEXT("Tint"), FMath::Lerp(Day, Glow, Sunset));
+		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.4f, 1.6f, Sunset));
+		Clouds->AddLocalRotation(FRotator(0.f, DeltaSeconds * 0.15f, 0.f));
+	}
+
+	// ---- Shooting stars: every few seconds while the sun is low, one streaks down and burns out ----
 	NextShooting -= DeltaSeconds;
 	if (N > 0.6f && NextShooting <= 0.f)
 	{
@@ -240,32 +263,37 @@ void ANightSky::Tick(float DeltaSeconds)
 		Streaks->UpdateInstanceTransform(i, T, false, i == NumShooting - 1, true);
 	}
 
-	// ---- A comet on some nights: hangs in the sky all night, drifting slowly, tail pointing away from the sun ----
-	if (N > 0.7f && !bNightCounted)
+	// ---- A comet on some evenings: one at a time, blue or red, drifting slowly with its tail away from the sun ----
+	if (N > 0.7f && !bDuskCounted)
 	{
-		bNightCounted = true;
+		bDuskCounted = true;
 		bComet = Rand.FRand() < 0.5f;
 		if (bComet)
 		{
+			const FLinearColor Col = Rand.FRand() < 0.5f ? CometBlue : CometRed;
+			TailMid->SetVectorParameterValue(TEXT("Tint"), Col);
+			HeadMid->SetVectorParameterValue(TEXT("Tint"), FMath::Lerp(Col, FLinearColor::White, 0.45f));
 			CometDir = FRotator(Rand.FRandRange(25.f, 45.f), Rand.FRandRange(0.f, 360.f), 0.f).Vector();
 			CometDrift = FVector::CrossProduct(CometDir, FVector::UpVector).GetSafeNormal() * FMath::DegreesToRadians(0.25f);
 		}
 	}
-	if (N < 0.3f) bNightCounted = false;
+	if (N < 0.3f) { bDuskCounted = false; bComet = false; }
 	CometFade = FMath::FInterpTo(CometFade, (bComet && N > 0.5f) ? 1.f : 0.f, DeltaSeconds, 0.5f);
 	if (CometFade > 0.01f)
 	{
 		CometDir = (CometDir + CometDrift * DeltaSeconds).GetSafeNormal();
 		FVector Away = (CometDir - ADayNight::SunDir * FVector::DotProduct(CometDir, ADayNight::SunDir)).GetSafeNormal();
-		Away = (Away + FVector::UpVector * 0.6f).GetSafeNormal();                          // tails stream up and away from the sun below
-		const FVector TailEnd = (CometDir + Away * FMath::DegreesToRadians(12.f)).GetSafeNormal();
-		CometTail->UpdateInstanceTransform(0, StreakTransform(CometDir, TailEnd, Radius * FMath::DegreesToRadians(12.f), 650.f * CometFade), false, true, true);
-		CometHead->UpdateInstanceTransform(0, FTransform(FRotationMatrix::MakeFromZ(-CometDir).ToQuat(), CometDir * (Radius - 50.f), FVector(2.6f * CometFade)), false, true, true);
+		Away = (Away + FVector::UpVector * 0.6f).GetSafeNormal();
+		const float Len = FMath::DegreesToRadians(12.f);
+		const FVector TailEnd = (CometDir + Away * Len).GetSafeNormal();
+		// the tail starts a little inside the head, so the round glowing head is the comet's front
+		const FVector TailStart = (CometDir + Away * Len * 0.04f).GetSafeNormal();
+		CometTail->UpdateInstanceTransform(0, StreakTransform(TailStart, TailEnd, Radius * Len, 900.f * CometFade), false, true, true);
+		CometHead->UpdateInstanceTransform(0, FTransform(FRotationMatrix::MakeFromZ(-CometDir).ToQuat(), CometDir * (Radius - 50.f), FVector(5.f * CometFade)), false, true, true);
 	}
-	else if (bComet || CometFade > 0.f)
+	else
 	{
 		CometTail->UpdateInstanceTransform(0, FTransform(FQuat::Identity, FVector(0, 0, -Radius), FVector(0.001f)), false, true, true);
 		CometHead->UpdateInstanceTransform(0, FTransform(FQuat::Identity, FVector(0, 0, -Radius), FVector(0.001f)), false, true, true);
-		if (!bComet) CometFade = 0.f;
 	}
 }

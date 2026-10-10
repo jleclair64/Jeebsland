@@ -8,8 +8,8 @@
 class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 
-// Stars, the Milky Way, shooting stars and the odd comet. Everything sits on a huge dome that travels with the camera,
-// fades in as the sun goes down (ADayNight::Night) and twinkles in the material.
+// The sky dressing that travels with the camera: stars, shooting stars and the odd comet (they come out as the sun
+// sinks toward the horizon, ADayNight::Dusk), and a few long streaks of high cloud that turn sunset colours.
 UCLASS()
 class ANightSky : public AActor
 {
@@ -27,23 +27,28 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* Streaks = nullptr;     // shooting stars
 	UPROPERTY() UInstancedStaticMeshComponent* CometTail = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* CometHead = nullptr;
-	UPROPERTY() UProceduralMeshComponent* MilkyWay = nullptr;
-	UPROPERTY() TArray<UMaterialInstanceDynamic*> Mids;              // every material here has a "Night" parameter
+	UPROPERTY() UProceduralMeshComponent* Clouds = nullptr;
+	UPROPERTY() TArray<UMaterialInstanceDynamic*> StarMids;          // every star-like material has a "Night" parameter
+	UPROPERTY() UMaterialInstanceDynamic* TailMid = nullptr;
+	UPROPERTY() UMaterialInstanceDynamic* HeadMid = nullptr;
+	UPROPERTY() UMaterialInstanceDynamic* CloudMid = nullptr;
 
 	static constexpr float Radius = 21000.f;   // beyond the moon (20000), so the moon sits in front of the stars
+	static constexpr float CloudRadius = 19000.f;
 	static constexpr int32 NumShooting = 3;
 
 	struct FShooting { FVector Start; FVector Dir; float Speed = 0.f; float Age = 0.f; float Life = 0.f; bool bLive = false; };
 	FShooting Shooting[NumShooting];
 	float NextShooting = 4.f;
 
+	// One comet at a time, blue or red
 	bool bComet = false;
-	bool bNightCounted = false;
+	bool bDuskCounted = false;
 	FVector CometDir = FVector::UpVector;
 	FVector CometDrift = FVector::ZeroVector;
 	float CometFade = 0.f;
 
 	FRandomStream Rand;
-	void BuildMilkyWay();
+	void BuildClouds();
 	FTransform StreakTransform(const FVector& HeadDir, const FVector& TailDir, float Length, float Width) const;
 };

@@ -34,6 +34,7 @@ private:
 	bool bJob = false;
 	FIntPoint JobId;
 	int32 JobTier = 0, JobCount = 0, JobDone = 0;
+	bool bJobNearRoad = true;
 	FRandomStream JobRand;
 	TArray<FTransform> JobXf;
 	void StartJob(const FIntPoint& Id, int32 Tier);

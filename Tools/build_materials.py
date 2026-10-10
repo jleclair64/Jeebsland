@@ -269,7 +269,10 @@ def build_star():
     uv = g.node(unreal.MaterialExpressionTextureCoordinate)
     centre = g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5)
     dist = g.node(unreal.MaterialExpressionDistance); g.link(uv, dist, "A"); g.link(centre, dist, "B")
-    core = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0))), 3.0)
+    falloff = g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0)))
+    soft = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=3.0, const_b=1.4)   # Soft = 1: a wide fuzzy glow (comet heads)
+    g.link(g.scalar("Soft", 0.0), soft, "Alpha")
+    core = g.node(unreal.MaterialExpressionPower); g.link(falloff, core, "Base"); g.link(soft, core, "Exponent")
     rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
     bright = g.addn(g.scalar("BrightMin", 0.22), g.mul(g.power(rnd, 4.0), 2.6))      # most faint, a few very bright
     rate = g.add(g.mul(g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 13.7)), 0.9), 0.3)
@@ -281,7 +284,7 @@ def build_star():
     g.link(g.const3((0.72, 0.84, 1.0)), hue, "A"); g.link(g.const3((1.0, 0.86, 0.66)), hue, "B")
     g.link(g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 7.31)), hue, "Alpha")
     e = g.muln(g.muln(g.muln(hue, core), g.muln(bright, twinkle)), g.muln(g.scalar("Night", 1.0), g.scalar("Boost", 5.0)))
-    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.muln(e, g.vector("Tint", (1.0, 1.0, 1.0))), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Star")
 
 
@@ -289,29 +292,37 @@ def build_streak():
     # A streak of light, brightest at the head (+U end) and fading along the tail and toward its edges
     mat, g = unlit("M_Streak", unreal.BlendMode.BLEND_ADDITIVE)
     uv = g.node(unreal.MaterialExpressionTextureCoordinate)
-    head = g.power(g.mask(uv, True, False), 2.5)
-    across = g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, False, True), -0.5), 2.0))
+    x = g.mask(uv, True, False)
+    head = g.muln(g.power(x, 2.5), g.one(unreal.MaterialExpressionSaturate, g.mul(g.one(unreal.MaterialExpressionOneMinus, x), 8.0)))   # fades out right at the head: no hard edge
+    # Fan = 1: narrow at the head, spreading out along the tail (comets)
+    width = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=1.0)
+    narrow = g.add(g.mul(x, -0.75), 1.0)
+    g.link(narrow, width, "B"); g.link(g.scalar("Fan", 0.0), width, "Alpha")
+    across = g.node(unreal.MaterialExpressionDivide)
+    g.link(g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, False, True), -0.5), 2.0)), across, "A"); g.link(width, across, "B")
     prof = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, across)), 2.0)
-    e = g.muln(g.muln(g.const3((0.95, 0.93, 1.0)), g.muln(head, prof)), g.muln(g.scalar("Night", 1.0), g.scalar("Intensity", 4.0)))
+    e = g.muln(g.muln(g.vector("Tint", (0.95, 0.93, 1.0)), g.muln(head, prof)), g.muln(g.scalar("Night", 1.0), g.scalar("Intensity", 4.0)))
     g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Streak")
-
-
-def build_milky_way(tex):
-    mat, g = unlit("M_MilkyWay", unreal.BlendMode.BLEND_ADDITIVE)
-    t = g.tex(tex)
-    e = g.muln(t, g.muln(g.scalar("Night", 1.0), g.scalar("Strength", 1.0)), "RGB")
-    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    finish(mat, "M_MilkyWay")
 
 
 def build_moon(tex):
     # The lit part of the moon: its painted face, glowing (added on top of the sky so it looks right by day too)
     mat, g = unlit("M_Moon", unreal.BlendMode.BLEND_ADDITIVE)
     t = g.tex(tex)
-    e = g.muln(g.muln(t, g.vector("Tint", (1.0, 0.8, 0.45)), "RGB"), g.muln(g.scalar("Bright", 3.0), t, "", "A"))
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    e = g.muln(g.muln(t, g.vector("Tint", (1.0, 0.8, 0.45)), "RGB"), g.muln(g.muln(g.scalar("Bright", 3.0), t, "", "A"), vc, "", "A"))
     g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Moon")
+    # The glow round it: brightest at the rim, fading out to nothing
+    mat, g = unlit("M_MoonHalo", unreal.BlendMode.BLEND_ADDITIVE)
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    centre = g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5)
+    dist = g.node(unreal.MaterialExpressionDistance); g.link(uv, dist, "A"); g.link(centre, dist, "B")
+    glow = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0))), 3.5)
+    e = g.muln(g.muln(g.vector("Tint", (1.0, 0.8, 0.45)), g.scalar("Bright", 3.0)), g.mul(glow, 0.22))
+    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_MoonHalo")
     # The unlit part: a dark disc, faintly earth-lit, that hides the stars behind it at night and vanishes by day
     mat, g = unlit("M_MoonDark", unreal.BlendMode.BLEND_TRANSLUCENT)
     t = g.tex(tex)
@@ -320,9 +331,21 @@ def build_moon(tex):
     finish(mat, "M_MoonDark")
 
 
+def build_cirrus(tex):
+    # Thin high cloud: the streaky picture, faded toward the ends and edges of each band (vertex alpha)
+    mat, g = unlit("M_Cirrus", unreal.BlendMode.BLEND_TRANSLUCENT)
+    t = g.tex(tex)
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    g.out(g.muln(g.muln(g.vector("Tint", (1.0, 1.0, 1.0)), g.scalar("Bright", 2.0)), t, "", "R"), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.mul(g.muln(t, vc, "R", "A"), 0.75), unreal.MaterialProperty.MP_OPACITY)
+    finish(mat, "M_Cirrus")
+
+
 def build_dirt(tex):
     # Packed earth laid in world space (no stretching along curves); a second, much larger sampling breaks up the tiling
     mat = fresh_material("M_Dirt")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    mat.set_editor_property("opacity_mask_clip_value", 0.5)
     g = Graph(mat)
     xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
     near = g.tex(tex, g.mul(xy, 1.0 / 350.0))
@@ -333,6 +356,15 @@ def build_dirt(tex):
     g.out(base, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.92), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.2), unreal.MaterialProperty.MP_SPECULAR)
+    # The edge: ragged in world space and dithered over a soft band, so the dirt frays into the grass instead of stopping at a line
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    edge = g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, True, False), -0.5), 2.0)))   # 0 at the sides, 1 down the middle
+    rag = g.tex(tex, g.mul(xy, 1.0 / 260.0))
+    noise = g.one(unreal.MaterialExpressionSaturate, g.mul(g.add(g.mask(rag, True, False), -0.15), 3.5))
+    alpha = g.one(unreal.MaterialExpressionSaturate, g.mul(g.addn(g.add(edge, -0.02), g.mul(noise, -0.16)), 7.0))
+    speck = g.tex(tex, g.mul(xy, 1.0 / 45.0))   # fine grit breaks the soft band into scattered specks of dirt and grass
+    grit = g.mul(g.add(g.mul(g.mask(speck, True, False), 3.5), -1.0), 0.45)
+    g.out(g.addn(alpha, grit), unreal.MaterialProperty.MP_OPACITY_MASK)
     finish(mat, "M_Dirt")
 
 
@@ -343,7 +375,10 @@ def imported(png, name):
 
 build_star()
 build_streak()
-build_milky_way(imported(gen_textures.milky_way(), "T_MilkyWay"))
 build_moon(imported(gen_textures.moon(), "T_Moon"))
+build_cirrus(imported(gen_textures.cirrus(), "T_Cirrus"))
+for old in ("M_MilkyWay", "T_MilkyWay"):   # the Milky Way was taken out
+    if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
+        unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
 build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
 unreal.log("MATDIAG all materials built")

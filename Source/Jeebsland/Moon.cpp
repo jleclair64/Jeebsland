@@ -26,8 +26,10 @@ AMoon::AMoon()
 	};
 	Dark = Make(TEXT("MoonDark"));
 	Lit = Make(TEXT("MoonLit"));
+	Halo = Make(TEXT("MoonHalo"));
 	Dark->SetTranslucentSortPriority(0);   // in front of the stars, behind the lit part
-	Lit->SetTranslucentSortPriority(1);
+	Halo->SetTranslucentSortPriority(1);
+	Lit->SetTranslucentSortPriority(2);
 
 	// Where in the sky: low in the south-west, opposite the setting sun
 	SkyDir = ADayNight::MoonDir;
@@ -62,6 +64,20 @@ void AMoon::BeginPlay()
 	}
 	BuildLit(0.f);
 
+	// A soft glow round the moon, so its light spills into the sky instead of ending at a hard circle
+	{
+		const float H = MoonRadius * 3.2f;
+		TArray<FVector> V = { FVector(-20.f, -H, -H), FVector(-20.f, H, -H), FVector(-20.f, H, H), FVector(-20.f, -H, H) };
+		TArray<FVector2D> UV = { FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0), FVector2D(0, 0) };
+		TArray<FVector> N = { FVector(1, 0, 0), FVector(1, 0, 0), FVector(1, 0, 0), FVector(1, 0, 0) };
+		Halo->CreateMeshSection_LinearColor(0, V, { 0, 1, 2, 0, 2, 3 }, N, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		if (UMaterialInterface* HaloMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_MoonHalo.M_MoonHalo")))
+		{
+			HaloMid = UMaterialInstanceDynamic::Create(HaloMat, this);
+			Halo->SetMaterial(0, HaloMid);
+		}
+	}
+
 	UMaterialInterface* LitMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Moon.M_Moon"));
 	UMaterialInterface* DarkMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_MoonDark.M_MoonDark"));
 	if (LitMat && DarkMat)
@@ -86,21 +102,30 @@ void AMoon::BeginPlay()
 void AMoon::BuildLit(float Phase)
 {
 	const float C = -1.f + 1.9f * Phase;   // terminator position: -1 = whole disc lit, +0.9 = a sliver
+	// Three columns per row: the terminator fades in over a soft band (vertex alpha), then full light out to the limb
 	const int32 Rows = 64;
-	TArray<FVector> V, N; TArray<int32> I; TArray<FVector2D> UV;
+	const float Soft = 0.12f;
+	TArray<FVector> V, N; TArray<int32> I; TArray<FVector2D> UV; TArray<FLinearColor> Col;
 	for (int32 j = 0; j <= Rows; ++j)
 	{
 		const float Y = -1.f + 2.f * j / Rows;
 		const float W = FMath::Sqrt(FMath::Max(0.f, 1.f - Y * Y));
-		V.Add(FVector(40.f, C * W * MoonRadius, Y * MoonRadius)); N.Add(FVector(1, 0, 0)); UV.Add(DiscUV(C * W * MoonRadius, Y * MoonRadius, MoonRadius));
-		V.Add(FVector(40.f, W * MoonRadius, Y * MoonRadius));     N.Add(FVector(1, 0, 0)); UV.Add(DiscUV(W * MoonRadius, Y * MoonRadius, MoonRadius));
+		const float Xs[3] = { FMath::Max(C - Soft, -1.f) * W, FMath::Min(C + Soft, 1.f) * W, W };
+		for (int32 k = 0; k < 3; ++k)
+		{
+			V.Add(FVector(40.f, Xs[k] * MoonRadius, Y * MoonRadius));
+			N.Add(FVector(1, 0, 0));
+			UV.Add(DiscUV(Xs[k] * MoonRadius, Y * MoonRadius, MoonRadius));
+			Col.Add(FLinearColor(1.f, 1.f, 1.f, k == 0 ? 0.f : 1.f));
+		}
 	}
 	for (int32 j = 0; j < Rows; ++j)
-	{
-		const int32 A = j * 2, B = j * 2 + 1, Cc = j * 2 + 2, D = j * 2 + 3;
-		I.Append({ A, B, D,  A, D, Cc });
-	}
-	Lit->CreateMeshSection_LinearColor(0, V, I, N, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		for (int32 k = 0; k < 2; ++k)
+		{
+			const int32 A = j * 3 + k, B = A + 1, Cc = A + 3, D = Cc + 1;
+			I.Append({ A, B, D,  A, D, Cc });
+		}
+	Lit->CreateMeshSection_LinearColor(0, V, I, N, UV, Col, TArray<FProcMeshTangent>(), false);
 	if (LitMid) Lit->SetMaterial(0, LitMid);   // a rebuilt section needs its material again
 	LastPhase = Phase;
 }
@@ -114,17 +139,20 @@ void AMoon::Tick(float DeltaSeconds)
 	const float Phase = 0.5f * (1.f - FMath::Cos(PI * Age / PhaseLegSeconds));
 	if (FMath::Abs(Phase - LastPhase) > 0.003f) BuildLit(Phase);
 
-	// Bright and golden at night; a pale ghost in a daytime sky
-	const float N = ADayNight::Night;
-	if (LitMid)
+	// Bright and golden when the sun is low; a pale ghost in the noon sky
+	const float N = ADayNight::Dusk;
+	const float Bright = FMath::Lerp(1.2f, 6.5f, N);
+	const FLinearColor Tint = FMath::Lerp(FLinearColor(1.f, 0.97f, 0.92f), MoonGlow, N);
+	for (UMaterialInstanceDynamic* M : { LitMid, HaloMid })
 	{
-		LitMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(0.18f, 3.2f, N));
-		LitMid->SetVectorParameterValue(TEXT("Tint"), FMath::Lerp(FLinearColor(1.f, 0.97f, 0.92f), MoonGlow, N));
+		if (!M) continue;
+		M->SetScalarParameterValue(TEXT("Bright"), Bright);
+		M->SetVectorParameterValue(TEXT("Tint"), Tint);
 	}
 	if (DarkMid)
 	{
-		DarkMid->SetScalarParameterValue(TEXT("Opacity"), N);
-		DarkMid->SetScalarParameterValue(TEXT("EarthShine"), 0.05f * N);
+		DarkMid->SetScalarParameterValue(TEXT("Opacity"), 0.f);   // the sky never gets dark enough to need the shadowed disc
+		DarkMid->SetScalarParameterValue(TEXT("EarthShine"), 0.f);
 	}
 
 	// The moon hangs at the same spot in the sky wherever you walk, turned to face you

@@ -164,6 +164,20 @@ void AMeadow::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("M_Grass is missing: run MakeGrassCards.bat once. No grass tufts will grow."));
 	}
 	PlaceBushesAndFlowers();
+
+	// Grow the grass round the start right away (a moment longer to load, but nothing pops in when you first run off)
+	if (NearMesh)
+	{
+		for (int32 j = -6; j <= 6; ++j)
+			for (int32 i = -6; i <= 6; ++i)
+			{
+				const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
+				const float D = Ctr.Size();
+				if (D > 4200.f || D > FieldR) continue;
+				StartJob(FIntPoint(i, j), TierFor(D));
+				StepJob(1.0e6);
+			}
+	}
 }
 
 void AMeadow::DropCell(const FIntPoint& Id)
@@ -191,6 +205,10 @@ void AMeadow::Tick(float Dt)
 	}
 	for (const FIntPoint& Id : Far) DropCell(Id);
 
+	// Build toward where you are heading: distances are measured from a point a second and a half ahead of you
+	const FVector Vel = Pawn->GetVelocity();
+	const FVector2D Ahead = Me + FVector2D(Vel.X, Vel.Y) * 1.5f;
+
 	struct FWant { FIntPoint Id; int32 Tier; float D; };
 	TArray<FWant> Want;
 	const int32 Cx = FMath::FloorToInt(Me.X / CellSize), Cy = FMath::FloorToInt(Me.Y / CellSize);
@@ -201,13 +219,17 @@ void AMeadow::Tick(float Dt)
 			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
 			const float D = FVector2D::Distance(Ctr, Me);
 			if (D > Reach || Ctr.Size() > FieldR) continue;
-			const int32 T = TierFor(D);
 			const FCell* Have = Cells.Find(FIntPoint(i, j));
-			if (!Have || Have->Tier != T) Want.Add({ FIntPoint(i, j), T, D });
+			// Pick the detail from the nearer of now and a moment ahead, and only coarsen a square once it is well behind (no flicker at the boundary)
+			const float DA = FMath::Min(D, float(FVector2D::Distance(Ctr, Ahead)));
+			int32 T = TierFor(DA);
+			if (Have && T > Have->Tier && TierFor(FMath::Max(D - 400.f, 0.f)) <= Have->Tier) T = Have->Tier;
+			if (!Have || Have->Tier != T) Want.Add({ FIntPoint(i, j), T, DA + (Have ? 600.f : 0.f) });
 		}
 	Want.Sort([](const FWant& A, const FWant& B) { return A.D < B.D; });
 	if (!bJob && Want.Num() > 0) StartJob(Want[0].Id, Want[0].Tier);
-	if (bJob) StepJob(0.003);   // about 3 ms of grass work per frame
+	if (bJob) StepJob(0.006);   // about 6 ms of grass work per frame
+	if (!bJob && Want.Num() > 1) { StartJob(Want[1].Id, Want[1].Tier); StepJob(0.002); }   // a quick second square when there is time
 }
 
 void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
@@ -215,6 +237,9 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 	bJob = true; JobId = Id; JobTier = Tier; JobDone = 0;
 	JobRand.Initialize(int32(uint32(Id.X) * 73856093u ^ uint32(Id.Y) * 19349663u ^ uint32(Tier) * 83492791u));
 	JobCount = FMath::RoundToInt(CellSize * CellSize * NearDensity * TierDensity(Tier));
+	// Far from every road, no tuft in this square can be near one: skip the (slow) road check for each tuft
+	const FVector2D Ctr((Id.X + 0.5f) * CellSize, (Id.Y + 0.5f) * CellSize);
+	bJobNearRoad = JeebTerrain::PathClearance(Ctr.X, Ctr.Y) < CellSize * 0.75f + 200.f;
 	JobXf.Reset();
 	JobXf.Reserve(JobCount);
 }
@@ -230,11 +255,11 @@ void AMeadow::StepJob(double BudgetSeconds)
 		const float Yaw = JobRand.FRandRange(0.f, 360.f), Sz = JobRand.FRandRange(0.75f, 1.3f);
 				if (FVector2D(X, Y).Size() <= FieldR)
 		{
-			const float Pc = JeebTerrain::PathClearance(X, Y);
-			if (Pc >= 20.f && !JeebTerrain::NoGroundCover(X, Y))
+			const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
+			if (Pc >= -12.f && !JeebTerrain::NoGroundCover(X, Y))
 			{
-				// the grass tapers off: short at the very edge of a path, full height about 120 units back
-				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc - 20.f) / 100.f, 0.f, 1.f));
+				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
+				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc + 12.f) / 110.f, 0.f, 1.f));
 				if (JobTier < 2)   // the same around huts, stalls, the castle and the pond
 				{
 					const float D = 90.f;

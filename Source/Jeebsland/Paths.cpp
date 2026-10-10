@@ -56,7 +56,7 @@ void APaths::BeginPlay()
 			for (int32 c = 0; c < Cols; ++c)
 			{
 				const float S = float(c) / (Cols - 1) - 0.5f;   // -0.5 .. 0.5 across the road
-				const FVector2D P = Line[i] + Nrm * (Def.Width * S);
+				const FVector2D P = Line[i] + Nrm * (Def.Width * 1.2f * S);   // a bit wider than the road: the material frays the edge back in
 				Verts.Add(FVector(P.X, P.Y, JeebTerrain::GroundMeshHeight(P.X, P.Y) + Lift));
 				Normals.Add(FVector::UpVector);
 				UV.Add(FVector2D(S + 0.5f, Along / Def.Width));

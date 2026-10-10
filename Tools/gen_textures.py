@@ -183,7 +183,7 @@ def paint_moon():
                 continue
             limb = 0.75 + 0.25 * math.sqrt(max(0.0, 1 - r2))   # a little darker toward the edge
             a = alb[j * N + i] * limb
-            edge = clamp01((1.0 - math.sqrt(r2)) * N * 0.5)    # anti-aliased rim
+            edge = clamp01((1.0 - math.sqrt(r2)) / 0.035)       # a soft, slightly blurred rim
             px[o] = to8(a * 1.00)
             px[o + 1] = to8(a * 0.97)
             px[o + 2] = to8(a * 0.92)
@@ -275,7 +275,7 @@ def paint_dirt():
 
 
 def moon():
-    return cached("T_Moon", 3, paint_moon)
+    return cached("T_Moon", 4, paint_moon)
 
 
 def milky_way():
@@ -284,3 +284,27 @@ def milky_way():
 
 def dirt():
     return cached("T_Dirt", 1, paint_dirt)
+
+
+# ------------------------------------------------------------------ thin streaky high cloud (wraps left to right)
+def paint_cirrus():
+    W, H = 512, 128
+    broad = [Noise(401 + i, 4 << i) for i in range(4)]
+    fibre = [Noise(501 + i, 16 << i) for i in range(3)]
+    px = bytearray(W * H * 4)
+    for j in range(H):
+        v = j / H
+        across = math.sin(math.pi * v) ** 1.5                      # thin out toward the top and bottom
+        for i in range(W):
+            u = i / W
+            b = fbm(broad, u, v * 0.35)                            # big soft wisps, stretched long
+            f = fbm(fibre, u, v * 4.0)                             # fine combed fibres running along the band
+            c = clamp01((b - 0.50) * 4.0) * (0.15 + 1.1 * f * f) * across
+            o = (j * W + i) * 4
+            px[o] = px[o + 1] = px[o + 2] = to8(c)
+            px[o + 3] = 255
+    return W, H, px
+
+
+def cirrus():
+    return cached("T_Cirrus", 2, paint_cirrus)
