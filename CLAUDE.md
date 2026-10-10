@@ -4,7 +4,7 @@ Unreal Engine 5.8 C++ project (Windows). Game code lives in `Source/Jeebsland/`.
 
 - Default game mode: `KnightGameMode` (set in `Config/DefaultEngine.ini`).
 - `Variant_Combat`, `Variant_Platforming`, `Variant_SideScrolling` are UE template code, mostly unused.
-- `Game Updates.txt` is the owner's to-do / idea list.
+- `Game Updates.txt` is the owner's private notes. Don't read or act on it; requests come through chat.
 
 ## Build
 
