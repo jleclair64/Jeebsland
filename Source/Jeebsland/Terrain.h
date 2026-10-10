@@ -236,6 +236,23 @@ namespace JeebTerrain
 		return H;
 	}
 
+	// The height of the ground mesh as actually drawn (GrassField: a 200 cm grid, each cell split along its B-C diagonal).
+	// Between grid points the mesh is flat triangles, which can sit a little above or below HeightAt; anything that must
+	// lie exactly on the ground (the roads) uses this instead.
+	constexpr float GroundHalf = 16000.f;
+	constexpr float GroundStep = 200.f;
+	inline float GroundMeshHeight(float X, float Y)
+	{
+		const float GX = (X + GroundHalf) / GroundStep, GY = (Y + GroundHalf) / GroundStep;
+		const float I = FMath::FloorToFloat(GX), J = FMath::FloorToFloat(GY);
+		const float Fx = GX - I, Fy = GY - J;
+		const float X0 = -GroundHalf + I * GroundStep, Y0 = -GroundHalf + J * GroundStep;
+		const float A = HeightAt(X0, Y0), B = HeightAt(X0 + GroundStep, Y0), C = HeightAt(X0, Y0 + GroundStep);
+		if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;            // triangle A, C, B
+		const float D = HeightAt(X0 + GroundStep, Y0 + GroundStep);
+		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);                 // triangle B, C, D
+	}
+
 	// 0..1 map of where the woods are. Low values are open valleys and meadows.
 	inline float WoodsDensity(float X, float Y)
 	{

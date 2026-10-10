@@ -185,4 +185,165 @@ build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,     
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
 build_bark()
+
+
+# ------------------------------------------------------------------ sky, moon and road materials
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gen_textures
+
+
+class Graph:
+    """Small helpers for wiring material nodes"""
+
+    def __init__(self, mat):
+        self.mat = mat
+
+    def node(self, cls, **props):
+        n = lib.create_material_expression(self.mat, cls, 0, 0)
+        for k, v in props.items():
+            n.set_editor_property(k, v)
+        return n
+
+    def link(self, a, b, pin="", out=""):
+        lib.connect_material_expressions(a, out, b, pin)
+
+    def mul(self, a, c):
+        n = self.node(unreal.MaterialExpressionMultiply, const_b=c); self.link(a, n, "A"); return n
+
+    def add(self, a, c):
+        n = self.node(unreal.MaterialExpressionAdd, const_b=c); self.link(a, n, "A"); return n
+
+    def muln(self, a, b, out_a="", out_b=""):
+        n = self.node(unreal.MaterialExpressionMultiply); self.link(a, n, "A", out_a); self.link(b, n, "B", out_b); return n
+
+    def addn(self, a, b):
+        n = self.node(unreal.MaterialExpressionAdd); self.link(a, n, "A"); self.link(b, n, "B"); return n
+
+    def one(self, cls, a, out=""):
+        n = self.node(cls); self.link(a, n, "", out); return n
+
+    def power(self, a, e):
+        n = self.node(unreal.MaterialExpressionPower, const_exponent=e); self.link(a, n, "Base"); return n
+
+    def scalar(self, name, default):
+        return self.node(unreal.MaterialExpressionScalarParameter, parameter_name=name, default_value=default)
+
+    def vector(self, name, rgb):
+        return self.node(unreal.MaterialExpressionVectorParameter, parameter_name=name, default_value=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+
+    def const3(self, rgb):
+        return self.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
+
+    def mask(self, a, r, g, b=False):
+        n = self.node(unreal.MaterialExpressionComponentMask, r=r, g=g, b=b, a=False); self.link(a, n); return n
+
+    def tex(self, texture, uv=None):
+        n = self.node(unreal.MaterialExpressionTextureSample, texture=texture)
+        if uv is not None:
+            self.link(uv, n, "UVs")
+        return n
+
+    def out(self, a, prop, pin=""):
+        lib.connect_material_property(a, pin, prop)
+
+
+def unlit(name, blend, two_sided=True):
+    mat = fresh_material(name)
+    mat.set_editor_property("blend_mode", blend)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("two_sided", two_sided)
+    set_flags(mat, ("used_with_instanced_static_meshes",))
+    return mat, Graph(mat)
+
+
+def finish(mat, name):
+    lib.recompile_material(mat)
+    unreal.EditorAssetLibrary.save_asset("/Game/" + name)
+    unreal.log("MATDIAG built " + name)
+
+
+def build_star():
+    # A soft point of light. Each star (instance) has its own brightness, colour and twinkle rate.
+    mat, g = unlit("M_Star", unreal.BlendMode.BLEND_ADDITIVE)
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    centre = g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5)
+    dist = g.node(unreal.MaterialExpressionDistance); g.link(uv, dist, "A"); g.link(centre, dist, "B")
+    core = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0))), 3.0)
+    rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
+    bright = g.addn(g.scalar("BrightMin", 0.22), g.mul(g.power(rnd, 4.0), 2.6))      # most faint, a few very bright
+    rate = g.add(g.mul(g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 13.7)), 0.9), 0.3)
+    wave = g.node(unreal.MaterialExpressionSine, period=1.0)
+    g.link(g.addn(g.muln(g.node(unreal.MaterialExpressionTime), rate), g.mul(rnd, 7.0)), wave)
+    twinkle = g.node(unreal.MaterialExpressionOneMinus)
+    g.link(g.muln(g.scalar("Twinkle", 0.35), g.add(g.mul(wave, 0.5), 0.5)), twinkle)
+    hue = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.const3((0.72, 0.84, 1.0)), hue, "A"); g.link(g.const3((1.0, 0.86, 0.66)), hue, "B")
+    g.link(g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 7.31)), hue, "Alpha")
+    e = g.muln(g.muln(g.muln(hue, core), g.muln(bright, twinkle)), g.muln(g.scalar("Night", 1.0), g.scalar("Boost", 5.0)))
+    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_Star")
+
+
+def build_streak():
+    # A streak of light, brightest at the head (+U end) and fading along the tail and toward its edges
+    mat, g = unlit("M_Streak", unreal.BlendMode.BLEND_ADDITIVE)
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    head = g.power(g.mask(uv, True, False), 2.5)
+    across = g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, False, True), -0.5), 2.0))
+    prof = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, across)), 2.0)
+    e = g.muln(g.muln(g.const3((0.95, 0.93, 1.0)), g.muln(head, prof)), g.muln(g.scalar("Night", 1.0), g.scalar("Intensity", 4.0)))
+    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_Streak")
+
+
+def build_milky_way(tex):
+    mat, g = unlit("M_MilkyWay", unreal.BlendMode.BLEND_ADDITIVE)
+    t = g.tex(tex)
+    e = g.muln(t, g.muln(g.scalar("Night", 1.0), g.scalar("Strength", 1.0)), "RGB")
+    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_MilkyWay")
+
+
+def build_moon(tex):
+    # The lit part of the moon: its painted face, glowing (added on top of the sky so it looks right by day too)
+    mat, g = unlit("M_Moon", unreal.BlendMode.BLEND_ADDITIVE)
+    t = g.tex(tex)
+    e = g.muln(g.muln(t, g.vector("Tint", (1.0, 0.8, 0.45)), "RGB"), g.muln(g.scalar("Bright", 3.0), t, "", "A"))
+    g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_Moon")
+    # The unlit part: a dark disc, faintly earth-lit, that hides the stars behind it at night and vanishes by day
+    mat, g = unlit("M_MoonDark", unreal.BlendMode.BLEND_TRANSLUCENT)
+    t = g.tex(tex)
+    g.out(g.muln(t, g.scalar("EarthShine", 0.04), "RGB"), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.muln(t, g.scalar("Opacity", 1.0), "A"), unreal.MaterialProperty.MP_OPACITY)
+    finish(mat, "M_MoonDark")
+
+
+def build_dirt(tex):
+    # Packed earth laid in world space (no stretching along curves); a second, much larger sampling breaks up the tiling
+    mat = fresh_material("M_Dirt")
+    g = Graph(mat)
+    xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
+    near = g.tex(tex, g.mul(xy, 1.0 / 350.0))
+    far = g.tex(tex, g.mul(xy, 1.0 / 1700.0))
+    var = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.72, const_b=1.22)
+    g.link(far, var, "Alpha", "G")
+    base = g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0)))
+    g.out(base, unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.92), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.2), unreal.MaterialProperty.MP_SPECULAR)
+    finish(mat, "M_Dirt")
+
+
+def imported(png, name):
+    import_texture(png, name)
+    return unreal.EditorAssetLibrary.load_asset("/Game/" + name)
+
+
+build_star()
+build_streak()
+build_milky_way(imported(gen_textures.milky_way(), "T_MilkyWay"))
+build_moon(imported(gen_textures.moon(), "T_Moon"))
+build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
 unreal.log("MATDIAG all materials built")

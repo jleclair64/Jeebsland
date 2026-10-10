@@ -17,6 +17,9 @@
 #include "Inventory.h"
 #include "CanvasItem.h"
 #include "Store.h"
+#include "Engine/Texture2D.h"
+#include "TextureResource.h"
+#include "RenderUtils.h"
 #include "Messages.h"
 
 using namespace JeebItems;
@@ -473,31 +476,27 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 {
 	UFont* Font = GEngine->GetMediumFont();
 	const float MS = 210.f;                // map size on screen
-	const float MX0 = 20.f, MY0 = 20.f;
+	const float MX0 = 24.f, MY0 = 24.f;
 	const float Range = 6500.f;            // how far the map reaches from the knight (world units)
 	const float Half = MS * 0.5f;
 	const float Cx = MX0 + Half, Cy = MY0 + Half;
 	const float K = Half / Range;
 	const FVector PL = Pawn->GetActorLocation();
 
-	// Round dark-grey backdrop: a stack of thin strips, rim first and then the fill
-	for (int32 Pass = 0; Pass < 2; ++Pass)
-	{
-		const float R = Half + (Pass == 0 ? 3.f : 0.f);
-		const FLinearColor Col = Pass == 0 ? FLinearColor(0.f, 0.f, 0.f, 0.8f) : FLinearColor(0.13f, 0.13f, 0.14f, 0.92f);
-		for (float Dy = -R; Dy < R; Dy += 2.f)
-		{
-			const float W = FMath::Sqrt(FMath::Max(0.f, R * R - (Dy + 1.f) * (Dy + 1.f)));
-			DrawRect(Col, Cx - W, Cy + Dy, W * 2.f, 2.f);
-		}
-	}
+	// Backdrop: a gold ring round a dark disc (smooth, anti-aliased circles)
+	DrawCircle(Cx, Cy, Half + 7.f, FLinearColor(0.f, 0.f, 0.f, 0.75f));
+	DrawCircle(Cx, Cy, Half + 5.f, FLinearColor(0.62f, 0.44f, 0.18f, 1.f));
+	DrawCircle(Cx, Cy, Half + 1.5f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
+	DrawCircle(Cx, Cy, Half, FLinearColor(0.12f, 0.13f, 0.12f, 0.92f));
+	DrawCircle(Cx, Cy, Half * 0.5f + 0.75f, FLinearColor(1.f, 1.f, 1.f, 0.06f));   // a faint inner ring at half range
+	DrawCircle(Cx, Cy, Half * 0.5f - 0.75f, FLinearColor(0.12f, 0.13f, 0.12f, 1.f));
 
 	// World (X forward, Y right) -> map (up, right). Returns false if off the map unless clamped to the edge.
-	auto ToMap = [&](const FVector2D& W, float Size, bool bClamp, float& OutX, float& OutY) -> bool
+	auto ToMap = [&](const FVector2D& W, float R, bool bClamp, float& OutX, float& OutY) -> bool
 	{
 		float dx = (W.Y - PL.Y) * K;   // map right
 		float dy = -(W.X - PL.X) * K;  // map down
-		const float Lim = Half - Size * 0.5f - 2.f;
+		const float Lim = Half - R - 3.f;
 		const float Dist = FMath::Sqrt(dx * dx + dy * dy);
 		if (Dist > Lim)
 		{
@@ -509,61 +508,104 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 		OutY = Cy + dy;
 		return true;
 	};
-	auto Marker = [&](const FVector2D& W, float Size, const FLinearColor& Col, bool bClamp)
+	auto Marker = [&](const FVector2D& W, float R, const FLinearColor& Col, bool bClamp)
 	{
 		float X, Y;
-		if (!ToMap(W, Size, bClamp, X, Y)) return;
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.8f), X - Size * 0.5f - 1.f, Y - Size * 0.5f - 1.f, Size + 2.f, Size + 2.f);
-		DrawRect(Col, X - Size * 0.5f, Y - Size * 0.5f, Size, Size);
+		if (!ToMap(W, R, bClamp, X, Y)) return;
+		DrawCircle(X, Y, R + 1.5f, FLinearColor(0.f, 0.f, 0.f, 0.85f));
+		DrawCircle(X, Y, R, Col);
 	};
 
 	// Water
-	Marker(JeebTerrain::PondCenter(), 9.f, FLinearColor(0.2f, 0.55f, 0.95f), true);
+	Marker(JeebTerrain::PondCenter(), 6.f, FLinearColor(0.2f, 0.55f, 0.95f), true);
 
 	// Stores: shop, smithy, bank
-	Marker(JeebTerrain::ShopPos(), 6.f, FLinearColor(1.f, 0.85f, 0.2f), false);
-	Marker(JeebTerrain::SmithyPos(), 6.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
-	Marker(JeebTerrain::BankPos(), 6.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
+	Marker(JeebTerrain::ShopPos(), 4.f, FLinearColor(1.f, 0.85f, 0.2f), false);
+	Marker(JeebTerrain::SmithyPos(), 4.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
+	Marker(JeebTerrain::BankPos(), 4.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
 
 	// People
 	for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
 	{
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor::White, false);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor::White, false);
 	}
 	// Your horse
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
 	{
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor(0.7f, 0.4f, 0.15f), true);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.5f, FLinearColor(0.75f, 0.45f, 0.18f), true);
 	}
 	// Enemies (any other character)
 	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
 	{
 		if (*It == Pawn) continue;
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
 	}
 
-	// You: a yellow arrow pointing the way you face
+	// You: a filled arrow pointing the way you face
 	{
 		const FVector F = Pawn->GetActorForwardVector();
-		const FVector2D Fwd(F.Y, -F.X);               // map direction
+		const FVector2D Fwd = FVector2D(F.Y, -F.X).GetSafeNormal();   // map direction
 		const FVector2D Side(-Fwd.Y, Fwd.X);
-		const FVector2D Tip = FVector2D(Cx, Cy) + Fwd * 9.f;
-		const FVector2D L = FVector2D(Cx, Cy) - Fwd * 6.f + Side * 6.f;
-		const FVector2D Rr = FVector2D(Cx, Cy) - Fwd * 6.f - Side * 6.f;
-		const FLinearColor Y(1.f, 0.9f, 0.1f);
-		DrawLine(Tip.X, Tip.Y, L.X, L.Y, Y, 2.f);
-		DrawLine(Tip.X, Tip.Y, Rr.X, Rr.Y, Y, 2.f);
-		DrawLine(L.X, L.Y, Rr.X, Rr.Y, Y, 2.f);
+		const FVector2D C(Cx, Cy);
+		const FVector2D Tip = C + Fwd * 10.f, L = C - Fwd * 7.f + Side * 7.f, Rr = C - Fwd * 7.f - Side * 7.f, Notch = C - Fwd * 3.f;
+		auto Tri = [&](const FVector2D& A, const FVector2D& B, const FVector2D& D, const FLinearColor& Col)
+		{
+			if (!CircleTex || !CircleTex->GetResource()) return;
+			const FVector2D Mid(0.5f, 0.5f);   // the solid middle of the circle texture: plain white
+			FCanvasTriangleItem T(A, B, D, Mid, Mid, Mid, CircleTex->GetResource());
+			T.SetColor(Col);
+			T.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(T);
+		};
+		const FVector2D O = FVector2D(1.2f, 1.2f);
+		Tri(Tip + O, L + O, Notch + O, FLinearColor(0.f, 0.f, 0.f, 0.6f));
+		Tri(Tip + O, Notch + O, Rr + O, FLinearColor(0.f, 0.f, 0.f, 0.6f));
+		Tri(Tip, L, Notch, FLinearColor(1.f, 0.9f, 0.15f));
+		Tri(Tip, Notch, Rr, FLinearColor(1.f, 0.78f, 0.1f));
 	}
+
+	// Compass letters sitting on the ring
 	{
+		auto Letter = [&](const TCHAR* T, float Dx, float Dy, const FLinearColor& Col)
+		{
+			float TW = 0.f, TH = 0.f;
+			GetTextSize(T, TW, TH, Font, 0.85f);
+			const float X = Cx + Dx * (Half + 3.f), Y = Cy + Dy * (Half + 3.f);
+			DrawCircle(X, Y, 9.f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
+			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 0.85f);
+		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
-		DrawText(TEXT("N"), FLinearColor(1.f, 0.35f, 0.3f, 0.95f), Cx - 4.f, MY0 + 2.f, Font, 0.9f);
-		DrawText(TEXT("S"), CC, Cx - 4.f, MY0 + MS - 16.f, Font, 0.9f);
-		DrawText(TEXT("W"), CC, MX0 + 4.f, Cy - 7.f, Font, 0.9f);
-		DrawText(TEXT("E"), CC, MX0 + MS - 14.f, Cy - 7.f, Font, 0.9f);
+		Letter(TEXT("N"), 0.f, -1.f, FLinearColor(1.f, 0.35f, 0.3f, 1.f));
+		Letter(TEXT("S"), 0.f, 1.f, CC);
+		Letter(TEXT("W"), -1.f, 0.f, CC);
+		Letter(TEXT("E"), 1.f, 0.f, CC);
 	}
 }
 
+// A smooth filled circle (an anti-aliased disc texture, so it moves smoothly between pixels)
+void AKnightHUD::DrawCircle(float X, float Y, float R, const FLinearColor& Col)
+{
+	if (!CircleTex)
+	{
+		const int32 N = 128;
+		CircleTex = UTexture2D::CreateTransient(N, N, PF_B8G8R8A8);
+		if (!CircleTex) return;
+		CircleTex->SRGB = false;
+		CircleTex->Filter = TF_Bilinear;
+		FColor* Px = static_cast<FColor*>(CircleTex->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
+		const float C = (N - 1) * 0.5f, Rad = N * 0.5f - 1.5f;
+		for (int32 y = 0; y < N; ++y)
+			for (int32 x = 0; x < N; ++x)
+			{
+				const float D = FMath::Sqrt(FMath::Square(x - C) + FMath::Square(y - C));
+				const float A = FMath::Clamp(Rad - D + 0.5f, 0.f, 1.f);
+				Px[y * N + x] = FColor(255, 255, 255, uint8(A * 255.f));
+			}
+		CircleTex->GetPlatformData()->Mips[0].BulkData.Unlock();
+		CircleTex->UpdateResource();
+	}
+	DrawTexture(CircleTex, X - R, Y - R, 2.f * R, 2.f * R, 0.f, 0.f, 1.f, 1.f, Col, BLEND_Translucent);
+}
 // ---------------------------------------------------------------------------------------------------
 // Settings, controls and the dictionary (press O)
 // ---------------------------------------------------------------------------------------------------

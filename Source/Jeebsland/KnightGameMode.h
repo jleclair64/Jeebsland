@@ -21,4 +21,11 @@ protected:
 private:
 	TWeakObjectPtr<class AExponentialHeightFog> FogActor;
 	float FogNow = 0.012f;
+
+	// Test screenshot mode (-JeebShot)
+	bool bShotMode = false;
+	bool bShotTaken = false;
+	float ShotClock = 0.f;
+	FRotator ShotRot = FRotator::ZeroRotator;
+	FString ShotName = TEXT("shot");
 };

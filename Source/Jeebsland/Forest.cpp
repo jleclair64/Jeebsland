@@ -132,12 +132,9 @@ static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const 
 	// Unreal's front face is the one where (B-A)x(C-A) points out, so wind each triangle to face the way its normals point
 	auto Tri = [&](FVector A, FVector B, FVector C, FVector NA, FVector NB, FVector NC)
 	{
-				if (FVector::CrossProduct(B - A, C - A).Dot(NA + NB + NC) < 0.f) { Swap(B, C); Swap(NB, NC); }
-		// flat shading: every face uses its own true normal (smooth normals on a low-poly tube leave a dotted line of shadow specks along the lit edge)
-		{
-			const FVector Fn = FVector::CrossProduct(B - A, C - A).GetSafeNormal();
-			NA = Fn; NB = Fn; NC = Fn;
-		}
+		if (FVector::CrossProduct(B - A, C - A).Dot(NA + NB + NC) < 0.f) { Swap(B, C); Swap(NB, NC); }
+		// Smooth shading: each corner keeps the tube's round normal. (Flat facets made one narrow strip catch the low sun
+		// and show as a pale line up the trunk; with 20 sides the round shading reads as bark, not stripes.)
 		const FVector P[3] = { A, B, C };
 		const FVector N[3] = { NA, NB, NC };
 		TArray<FVertexInstanceID> Inst;
@@ -217,7 +214,7 @@ static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32
 		}
 		Tubes.Add(Limb);
 	}
-	return MakeTubeMesh(Outer, Mat, Tubes, 16, FVector(1, 0, 0), FVector(0, 1, 0), true);   // 16 sides: fewer hard facet edges catching the light
+	return MakeTubeMesh(Outer, Mat, Tubes, 20, FVector(1, 0, 0), FVector(0, 1, 0), true);
 }
 
 // A branch lies along +X, 100 long and 100 wide at the base, thinning to a twig with a gentle arch

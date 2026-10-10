@@ -96,8 +96,8 @@ AAutumnDecor::AAutumnDecor()
 	PumpkinB = MakeISM(TEXT("PumpkinB"), SphereMesh.Object, FLinearColor(0.68f, 0.17f, 0.02f), true);
 	PumpkinC = MakeISM(TEXT("PumpkinC"), SphereMesh.Object, FLinearColor(0.80f, 0.46f, 0.08f), true);
 	Stem     = MakeISM(TEXT("Stem"),     CylMesh.Object,    FLinearColor(0.20f, 0.25f, 0.06f), false);
-	Glow     = MakeISM(TEXT("Glow"),     CubeMesh.Object,   FLinearColor(1.00f, 0.72f, 0.12f), false);
-	GlowCone = MakeISM(TEXT("GlowCone"), ConeMesh.Object,   FLinearColor(1.00f, 0.72f, 0.12f), false);
+	Glow     = MakeISM(TEXT("Glow"),     CubeMesh.Object,   FLinearColor(3.2f, 2.0f, 0.45f), false);   // bright: lantern glass and carved faces glow
+	GlowCone = MakeISM(TEXT("GlowCone"), ConeMesh.Object,   FLinearColor(3.2f, 2.0f, 0.45f), false);
 	Wood     = MakeISM(TEXT("Wood"),     CylMesh.Object,    FLinearColor(0.16f, 0.09f, 0.05f), true);
 	WoodCone = MakeISM(TEXT("WoodCone"), ConeMesh.Object,   FLinearColor(0.07f, 0.04f, 0.08f), true);
 	Cloth    = MakeISM(TEXT("Cloth"),    CubeMesh.Object,   FLinearColor(0.35f, 0.12f, 0.12f), false);
@@ -109,6 +109,9 @@ AAutumnDecor::AAutumnDecor()
 	CandleCup  = MakeISM(TEXT("CandleCup"),  CylMesh.Object, FLinearColor(0.50f, 0.33f, 0.07f), false);
 	Flame    = MakeISM(TEXT("Flame"),    ConeMesh.Object,   FLinearColor(5.0f, 2.2f, 0.35f), false);   // bright: glows
 	Rope     = MakeISM(TEXT("Rope"),     CylMesh.Object,    FLinearColor(0.20f, 0.14f, 0.07f), false);
+	Iron     = MakeISM(TEXT("Iron"),     CylMesh.Object,    FLinearColor(0.07f, 0.07f, 0.08f), false);
+	TorchFlame = MakeISM(TEXT("TorchFlame"), ConeMesh.Object, FLinearColor(5.0f, 1.7f, 0.25f), false);
+	TorchCore  = MakeISM(TEXT("TorchCore"),  ConeMesh.Object, FLinearColor(7.0f, 4.5f, 1.2f), false);
 	for (int32 i = 0; i < NumLeafTypes; ++i)
 	{
 		GroundLeaf.Add(MakeISM(*FString::Printf(TEXT("GroundLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false, 4500, 6000));
@@ -130,6 +133,65 @@ UInstancedStaticMeshComponent* AAutumnDecor::MakeISM(const TCHAR* Name, UStaticM
 	if (CullEnd > 0) C->SetCullDistances(CullStart, CullEnd);
 	Tints.Add(TPair<UInstancedStaticMeshComponent*, FLinearColor>(C, Color));
 	return C;
+}
+
+// A warm point light that flickers (Tick varies its strength)
+void AAutumnDecor::AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker)
+{
+	UPointLightComponent* L = NewObject<UPointLightComponent>(this);
+	L->SetupAttachment(RootComponent);
+	L->SetRelativeLocation(P);
+	L->SetIntensity(Intensity);
+	L->SetLightColor(Col);
+	L->SetAttenuationRadius(Radius);
+	L->SetCastShadows(false);   // cheap: no shadows from these
+	L->RegisterComponent();
+	FlickerLights.Add(L);
+	FlickerBase.Add(Intensity);
+	FlickerAmt.Add(Flicker);
+	FlickerPhase.Add(Rand.FRandRange(0.f, 100.f));
+}
+
+static FTransform CylBetween(const FVector& A, const FVector& B, float Thick)
+{
+	const FVector D = B - A;
+	const float Len = FMath::Max(D.Size(), 0.1f);
+	return FTransform(FRotationMatrix::MakeFromZ(D / Len).ToQuat(), (A + B) * 0.5f, FVector(Thick / 100.f, Thick / 100.f, Len / 100.f));
+}
+
+// The burning end of a torch: an iron cup, a layered flame and its light
+void AAutumnDecor::TorchHead(const FVector& Top)
+{
+	Iron->AddInstance(FTransform(FQuat::Identity, Top + FVector(0.f, 0.f, 4.f), FVector(0.13f, 0.13f, 0.12f)));
+	Iron->AddInstance(FTransform(FQuat::Identity, Top + FVector(0.f, 0.f, 10.f), FVector(0.16f, 0.16f, 0.02f)));   // cup rim
+	const FVector F = Top + FVector(0.f, 0.f, 27.f);
+	TorchFlame->AddInstance(FTransform(FQuat::Identity, F, FVector(0.16f, 0.16f, 0.36f)));
+	TorchCore->AddInstance(FTransform(FQuat::Identity, F - FVector(0.f, 0.f, 5.f), FVector(0.09f, 0.09f, 0.22f)));
+	TorchFlamePos.Add(F);
+	TorchPhase.Add(Rand.FRandRange(0.f, 100.f));
+	AddFlickerLight(F + FVector(0.f, 0.f, 15.f), 4500.f, 1100.f, FLinearColor(1.0f, 0.55f, 0.22f), 0.22f);
+}
+
+// A torch in an iron bracket on a wall, leaning out from it
+void AAutumnDecor::WallTorch(const FVector2D& WallPt, const FVector2D& Out, float OutOff, float Height)
+{
+	const float Z = JeebTerrain::HeightAt(WallPt.X, WallPt.Y) + Height;
+	const FVector O(Out.X, Out.Y, 0.f);
+	const FVector Wall(WallPt.X, WallPt.Y, Z);
+	const FVector Base = Wall + O * OutOff;
+	Iron->AddInstance(CylBetween(Wall + O * (OutOff - 30.f) - FVector(0.f, 0.f, 10.f), Base + O * 6.f, 3.f));      // bracket arm
+	Iron->AddInstance(CylBetween(Base - FVector(0.f, 0.f, 6.f), Base + FVector(0.f, 0.f, 6.f), 9.f));              // ring
+	const FVector Top = Base + (O * 0.45f + FVector::UpVector).GetSafeNormal() * 55.f;
+	Wood->AddInstance(CylBetween(Base - (Top - Base).GetSafeNormal() * 14.f, Top, 7.f));
+	TorchHead(Top);
+}
+
+// A torch on its own post
+void AAutumnDecor::PostTorch(const FVector2D& P)
+{
+	const float Z = JeebTerrain::HeightAt(P.X, P.Y);
+	Wood->AddInstance(FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 115.f), FVector(0.14f, 0.14f, 2.3f)));
+	TorchHead(FVector(P.X, P.Y, Z + 230.f));
 }
 
 void AAutumnDecor::BeginPlay()
@@ -359,14 +421,45 @@ void AAutumnDecor::BeginPlay()
 		Put(Glow, FTransform(FQuat::Identity, FVector(Spot.X, Spot.Y, Z + 262.f), FVector(0.26f, 0.26f, 0.34f)));
 		Put(WoodCone, FTransform(FQuat::Identity, FVector(Spot.X, Spot.Y, Z + 296.f), FVector(0.4f, 0.4f, 0.25f)));
 
-		UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
-		Light->SetupAttachment(RootComponent);
-		Light->SetRelativeLocation(FVector(Spot.X, Spot.Y, Z + 255.f));
-		Light->SetIntensity(160.f);
-		Light->SetLightColor(FLinearColor(1.0f, 0.68f, 0.32f));
-		Light->SetAttenuationRadius(650.f);
-		Light->SetCastShadows(false); // cheap: no shadow for these
-		Light->RegisterComponent();
+		AddFlickerLight(FVector(Spot.X, Spot.Y, Z + 250.f), 2400.f, 950.f, FLinearColor(1.0f, 0.68f, 0.32f), 0.07f);
+	}
+
+	// ---------------- Torches: on the village palisade and round the castle ----------------
+	{
+		const FVector2D VC = JeebTerrain::VillageCenter();
+		const float VH = JeebTerrain::VillageHalf();
+		struct FWall { FVector2D C; FVector2D Along; FVector2D Out; bool bGate; };
+		const FWall Walls[4] = {
+			{ VC + FVector2D(VH, 0.f),  FVector2D(0, 1), FVector2D(1, 0),  true },    // east, gate toward the start
+			{ VC + FVector2D(0.f, VH),  FVector2D(1, 0), FVector2D(0, 1),  true },    // north, gate toward the graveyard
+			{ VC + FVector2D(-VH, 0.f), FVector2D(0, 1), FVector2D(-1, 0), false },
+			{ VC + FVector2D(0.f, -VH), FVector2D(1, 0), FVector2D(0, -1), false },
+		};
+		for (const FWall& W : Walls)
+		{
+			for (float U : { -1400.f, -700.f, 700.f, 1400.f }) WallTorch(W.C + W.Along * U, W.Out, 28.f, 215.f);
+			if (W.bGate)
+			{
+				// both sides of the gate, outside and in
+				for (float U : { -235.f, 235.f })
+				{
+					WallTorch(W.C + W.Along * U, W.Out, 52.f, 235.f);
+					WallTorch(W.C + W.Along * U, -W.Out, 52.f, 235.f);
+				}
+			}
+		}
+
+		const FVector2D CP = JeebTerrain::CastlePos();
+		const float Face = JeebTerrain::CastleWall + JeebTerrain::CastleWallT;
+		const float Gate = JeebTerrain::CastleGateHalf;
+		WallTorch(CP + FVector2D(-Face, Gate + 75.f), FVector2D(-1, 0), 4.f, 300.f);    // flanking the gate
+		WallTorch(CP + FVector2D(-Face, -(Gate + 75.f)), FVector2D(-1, 0), 4.f, 300.f);
+		WallTorch(CP + FVector2D(Face, 0.f), FVector2D(1, 0), 4.f, 300.f);               // the middle of each other wall
+		WallTorch(CP + FVector2D(0.f, Face), FVector2D(0, 1), 4.f, 300.f);
+		WallTorch(CP + FVector2D(0.f, -Face), FVector2D(0, -1), 4.f, 300.f);
+		const float BridgeEnd = JeebTerrain::CastleMoatOut + 70.f;
+		PostTorch(CP + FVector2D(-BridgeEnd, Gate + 45.f));                              // posts where the bridge meets the bank
+		PostTorch(CP + FVector2D(-BridgeEnd, -(Gate + 45.f)));
 	}
 
 	// ---------------- Graveyard ----------------
@@ -525,17 +618,7 @@ void AAutumnDecor::BeginPlay()
 				const float T = (i + 0.5f) / N;
 				Candle(At(T), B - A);
 			}
-			if (bLight && Len > 300.f)
-			{
-				UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
-				Light->SetupAttachment(RootComponent);
-				Light->SetRelativeLocation(At(0.5f) - FVector(0.f, 0.f, 60.f));
-				Light->SetIntensity(90.f);
-				Light->SetLightColor(FLinearColor(1.0f, 0.66f, 0.30f));
-				Light->SetAttenuationRadius(430.f);
-				Light->SetCastShadows(false);
-				Light->RegisterComponent();
-			}
+			if (bLight && Len > 300.f) AddFlickerLight(At(0.5f) - FVector(0.f, 0.f, 60.f), 1500.f, 560.f, FLinearColor(1.0f, 0.66f, 0.30f), 0.12f);
 		};
 
 		const FVector2D VC = JeebTerrain::VillageCenter();
@@ -620,6 +703,14 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	Time += DeltaSeconds;
 
+	// Lamp, candle and torch lights flicker
+	for (int32 i = 0; i < FlickerLights.Num(); ++i)
+	{
+		const float Ph = FlickerPhase[i];
+		const float W = 0.55f * FMath::Sin(Time * 9.3f + Ph) + 0.30f * FMath::Sin(Time * 23.1f + Ph * 1.7f) + 0.15f * FMath::Sin(Time * 41.f + Ph * 2.3f);
+		FlickerLights[i]->SetIntensity(FlickerBase[i] * (1.f + FlickerAmt[i] * W));
+	}
+
 	// Candle flames flicker (about 12 times a second is plenty)
 	FlameTimer += DeltaSeconds;
 	if (FlameTimer >= 0.08f && FlameBase.Num() > 0)
@@ -631,6 +722,18 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Flicker = 1.f + 0.20f * FMath::Sin(Time * 11.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
 			const FVector P = FlameBase[i] + FVector(0.4f * FMath::Sin(Time * 7.f + Ph), 0.4f * FMath::Cos(Time * 6.f + Ph), 3.2f * (Flicker - 1.f));
 			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.027f, 0.027f, 0.065f * Flicker)), true, i == FlameBase.Num() - 1, true);
+		}
+		// Torch flames lick and sway
+		for (int32 i = 0; i < TorchFlamePos.Num(); ++i)
+		{
+			const float Ph = TorchPhase[i];
+			const float H = 1.f + 0.22f * FMath::Sin(Time * 8.f + Ph) + 0.12f * FMath::Sin(Time * 19.f + Ph * 2.f);
+			const float Wd = 1.f - 0.10f * FMath::Sin(Time * 11.f + Ph * 1.3f);
+			const FQuat Lean = FRotator(5.f * FMath::Sin(Time * 3.1f + Ph), 0.f, 5.f * FMath::Cos(Time * 2.7f + Ph)).Quaternion();
+			const FVector F = TorchFlamePos[i] + FVector(0.f, 0.f, 18.f * (H - 1.f));
+			const bool bLast = i == TorchFlamePos.Num() - 1;
+			TorchFlame->UpdateInstanceTransform(i, FTransform(Lean, F, FVector(0.16f * Wd, 0.16f * Wd, 0.36f * H)), true, bLast, true);
+			TorchCore->UpdateInstanceTransform(i, FTransform(Lean, F - FVector(0.f, 0.f, 5.f), FVector(0.09f * Wd, 0.09f * Wd, 0.22f * H)), true, bLast, true);
 		}
 	}
 	// ---- Gust of wind: every few seconds a flurry of leaves whips past in an open part of the map ----

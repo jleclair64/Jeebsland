@@ -39,6 +39,10 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* CandleCup = nullptr;    // little brass holders
 	UPROPERTY() UInstancedStaticMeshComponent* Flame = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* Rope = nullptr;         // string-light cord, wires and the poles' finials
+	UPROPERTY() UInstancedStaticMeshComponent* Iron = nullptr;         // torch brackets and cups
+	UPROPERTY() UInstancedStaticMeshComponent* TorchFlame = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* TorchCore = nullptr;
+	UPROPERTY() TArray<class UPointLightComponent*> FlickerLights;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> GroundLeaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> FallLeaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> GustLeaf;
@@ -49,6 +53,13 @@ private:
 	TArray<FVector> FlameBase;
 	TArray<float> FlamePhase;
 	float FlameTimer = 0.f;
+	TArray<float> FlickerBase, FlickerAmt, FlickerPhase;
+	TArray<FVector> TorchFlamePos;
+	TArray<float> TorchPhase;
+	void AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker);
+	void TorchHead(const FVector& Top);
+	void WallTorch(const FVector2D& WallPt, const FVector2D& Out, float OutOff, float Height);
+	void PostTorch(const FVector2D& P);
 	// Leaves drifting down around the player
 	struct FFallingLeaf { FVector Pos; float Fall; float Phase; float Spin; int32 Type; int32 Index; };
 	TArray<FFallingLeaf> Falling;

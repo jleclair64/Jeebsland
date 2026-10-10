@@ -10,6 +10,13 @@
 #include "Village.h"
 #include "PigPen.h"
 #include "Moon.h"
+#include "DayNight.h"
+#include "NightSky.h"
+#include "UnrealClient.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Misc/Paths.h"
+#include "GameFramework/PlayerController.h"
 #include "BatSwarm.h"
 #include "Cottage.h"
 #include "Pond.h"
@@ -40,6 +47,21 @@ AKnightGameMode::AKnightGameMode()
 void AKnightGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Test screenshots (launch with -JeebShot): aim the camera, wait for things to settle, save, quit
+	if (bShotMode)
+	{
+		ShotClock += DeltaSeconds;
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (PC) PC->SetControlRotation(ShotRot);
+		if (ShotClock > 9.f && !bShotTaken)
+		{
+			bShotTaken = true;
+			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
+		}
+		if (ShotClock > 11.f && PC) PC->ConsoleCommand(TEXT("quit"));
+	}
+
 	if (!FogActor.IsValid()) return;
 	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (!P) return;
@@ -124,7 +146,9 @@ void AKnightGameMode::BeginPlay()
 	World->SpawnActor<APaths>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AVillage>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<APigPen>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<ADayNight>(FVector::ZeroVector, FRotator::ZeroRotator);   // the sun's daily round (drives the lights below)
 	World->SpawnActor<AMoon>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<ANightSky>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<ABatSwarm>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AFishingPond>(FVector::ZeroVector, FRotator::ZeroRotator);
 
@@ -164,8 +188,32 @@ void AKnightGameMode::BeginPlay()
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
 
 	// Make sure the knight starts standing on the meadow
+	FVector2D Start(0.f, 0.f);
+
+	// Test screenshot mode: -JeebShot -ShotName=x -ShotPhase=0.2 -ShotPos=X,Y -ShotYaw=deg -ShotPitch=deg
+	const TCHAR* Cmd = FCommandLine::Get();
+	if (FParse::Param(Cmd, TEXT("JeebShot")))
+	{
+		bShotMode = true;
+		float Ph = -1.f, Yaw = 0.f, Pitch = -10.f;
+		FParse::Value(Cmd, TEXT("ShotPhase="), Ph);
+		FParse::Value(Cmd, TEXT("ShotYaw="), Yaw);
+		FParse::Value(Cmd, TEXT("ShotPitch="), Pitch);
+		FParse::Value(Cmd, TEXT("ShotName="), ShotName);
+		FString PosS;
+		if (FParse::Value(Cmd, TEXT("ShotPos="), PosS))
+		{
+			FString A, B;
+			if (PosS.Split(TEXT(","), &A, &B)) Start = FVector2D(FCString::Atof(*A), FCString::Atof(*B));
+		}
+		ADayNight::FixedPhase = Ph;
+		ShotRot = FRotator(Pitch, Yaw, 0.f);
+	}
 	if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
 	{
-		Player->SetActorLocation(FVector(0.f, 0.f, JeebTerrain::HeightAt(0.f, 0.f) + 130.f));
+		Player->SetActorLocation(FVector(Start.X, Start.Y, JeebTerrain::HeightAt(Start.X, Start.Y) + 130.f));
 	}
+
+	// Game messages are drawn by the HUD; keep the engine's debug text off the screen
+	if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
 }

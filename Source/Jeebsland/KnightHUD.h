@@ -6,6 +6,7 @@
 
 class AKnightCharacter;
 class USkillComponent;
+class UTexture2D;
 
 // Everything drawn on the screen: minimap, stamina, skills, weapon bar, the inventory / store / smithy / dictionary
 // screens and the dialogue box.
@@ -36,6 +37,8 @@ private:
 	void DrawSettingsScreen(AKnightCharacter* Knight);
 	void DrawDictionary(float PX, float PY, float PW, float PH);
 	void DrawMinimap(APawn* Pawn);
+	void DrawCircle(float X, float Y, float R, const FLinearColor& Col);
+	UPROPERTY() UTexture2D* CircleTex = nullptr;
 	void DrawInventoryScreen(AKnightCharacter* Knight);
 	void DrawShopScreen(AKnightCharacter* Knight);
 	void DrawSmithScreen(AKnightCharacter* Knight);

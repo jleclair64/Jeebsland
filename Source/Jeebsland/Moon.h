@@ -22,6 +22,8 @@ protected:
 private:
 	UPROPERTY() UProceduralMeshComponent* Dark = nullptr;  // the whole disc, very dim
 	UPROPERTY() UProceduralMeshComponent* Lit = nullptr;   // the bright part (changes shape with the phase)
+	UPROPERTY() class UMaterialInstanceDynamic* LitMid = nullptr;
+	UPROPERTY() class UMaterialInstanceDynamic* DarkMid = nullptr;
 
 	static constexpr float PhaseLegSeconds = 300.f;   // full moon to fingernail
 	static constexpr float SkyDistance = 20000.f;
