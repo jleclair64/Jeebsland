@@ -217,7 +217,7 @@ static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32
 		}
 		Tubes.Add(Limb);
 	}
-	return MakeTubeMesh(Outer, Mat, Tubes, 10, FVector(1, 0, 0), FVector(0, 1, 0), true);
+	return MakeTubeMesh(Outer, Mat, Tubes, 16, FVector(1, 0, 0), FVector(0, 1, 0), true);   // 16 sides: fewer hard facet edges catching the light
 }
 
 // A branch lies along +X, 100 long and 100 wide at the base, thinning to a twig with a gentle arch
@@ -471,9 +471,9 @@ void AForest::BeginPlay()
 
 	SetActorLocation(FVector::ZeroVector);
 
-	Tint(Trunk,    FLinearColor(0.16f, 0.09f, 0.05f));
-	Tint(RedTrunk, FLinearColor(0.30f, 0.10f, 0.05f));
-	Tint(Branch,   FLinearColor(0.14f, 0.08f, 0.04f));
+	Tint(Trunk,    FLinearColor(0.30f, 0.18f, 0.10f));
+	Tint(RedTrunk, FLinearColor(0.45f, 0.17f, 0.08f));
+	Tint(Branch,   FLinearColor(0.28f, 0.17f, 0.09f));
 	UMaterialInterface* LeafMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_TreeLeaf.M_TreeLeaf"));
 	if (LeafMat)
 	{
@@ -500,10 +500,10 @@ void AForest::BeginPlay()
 	if (BarkMat)
 	{
 		const FLinearColor BarkColors[4] = {
-			FLinearColor(0.22f, 0.13f, 0.07f),   // brown
-			FLinearColor(0.34f, 0.22f, 0.13f),   // warm light brown
-			FLinearColor(0.18f, 0.15f, 0.14f),   // grey-brown
-			FLinearColor(0.38f, 0.17f, 0.08f) }; // reddish
+			FLinearColor(0.36f, 0.22f, 0.12f),   // brown
+			FLinearColor(0.50f, 0.34f, 0.20f),   // warm light brown
+			FLinearColor(0.32f, 0.28f, 0.25f),   // grey-brown
+			FLinearColor(0.52f, 0.26f, 0.13f) }; // reddish
 		for (int32 v = 0; v < 4; ++v)
 		{
 			TrunkVar[v]->SetStaticMesh(MakeTrunkMesh(this, BarkMat, v));
@@ -513,7 +513,7 @@ void AForest::BeginPlay()
 		}
 		Branch->SetStaticMesh(MakeBranchMesh(this, BarkMat));
 		UMaterialInstanceDynamic* BM = UMaterialInstanceDynamic::Create(BarkMat, this);
-		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.20f, 0.11f, 0.056f));
+		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.32f, 0.19f, 0.10f));
 		Branch->SetMaterial(0, BM);
 		bBark = true;
 	}

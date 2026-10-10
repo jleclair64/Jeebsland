@@ -4,6 +4,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 
+static const FLinearColor MoonGlow(7.f, 5.4f, 2.2f); // bright harvest-moon yellow, bright enough to glow
+
 AMoon::AMoon()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -22,8 +24,8 @@ AMoon::AMoon()
 	Dark = Make(TEXT("MoonDark"));
 	Lit = Make(TEXT("MoonLit"));
 
-	// Where in the sky: opposite the low golden sun, about 35 degrees up
-	SkyDir = FRotator(35.f, 205.f, 0.f).Vector();
+	// Where in the sky: opposite the low golden sun, hanging low (about 15 degrees up)
+	SkyDir = FRotator(15.f, 205.f, 0.f).Vector();
 }
 
 void AMoon::BeginPlay()
@@ -51,8 +53,8 @@ void AMoon::BeginPlay()
 	BuildLit(0.f);
 
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
-	if (UMaterialInstanceDynamic* M = Dark->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.05f, 0.055f, 0.09f));
-	if (UMaterialInstanceDynamic* M = Lit->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(7.f, 7.f, 6.4f)); // very bright, so it glows
+	if (UMaterialInstanceDynamic* M = Dark->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.07f, 0.06f, 0.04f));
+	if (UMaterialInstanceDynamic* M = Lit->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), MoonGlow); // very bright, so it glows
 }
 
 // Phase: 0 = full moon, 1 = a thin fingernail. The lit part lies between the terminator (an ellipse edge) and the right limb.
@@ -89,7 +91,7 @@ void AMoon::Tick(float DeltaSeconds)
 		BuildLit(Phase);
 		// A new mesh section needs its material again
 		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
-		if (UMaterialInstanceDynamic* M = Lit->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(7.f, 7.f, 6.4f));
+		if (UMaterialInstanceDynamic* M = Lit->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), MoonGlow);
 	}
 
 	// The moon hangs at the same spot in the sky wherever you walk, turned to face you

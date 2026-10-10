@@ -8,6 +8,10 @@ public class Jeebsland : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
+		// Compile each .cpp on its own. Several files share helper names at file scope (e.g. FRing),
+		// which clash when Unreal merges unchanged files into combined "unity" files.
+		bUseUnity = false;
+
 		PublicDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription", "ProceduralMeshComponent",
 			"Core",
 			"CoreUObject",
