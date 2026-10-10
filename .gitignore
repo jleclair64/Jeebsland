@@ -1,0 +1,20 @@
+# Unreal generated folders (rebuilt automatically)
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+.vs/
+
+# Generated Visual Studio files
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Backups and logs (git replaces these)
+*.bak
+*.bak?
+build_log.txt

@@ -1,0 +1,63 @@
+It looks like the grass stopped swaying in the wind. And could you add something similar for the leaves on the trees so they aren't perfectly still?
+
+The tree trunks are still too dark and I still see the spinal phenomenon
+
+Make the moon lower in the sky and more yellow
+
+Take the top off of the large trees with forts built on them
+
+Make the knight without armor look connect, more realistic, and less blocky
+
+Remove the legend for the HUD. Remove ore, trees, and redwoods from the HUD
+
+Add a skill progress bar that appears in the bottom left any time a skill is activated. For example, if I chop a tree, I want the chopping skill to pop up for the next 30 seconds. If I catch a fish, it's replaced by the fishing skill bar. I also want a tab to show all the skills I have, represented by and icon and the level I am at that skill, similar to runescape
+
+
+
+Work on textures - path, sides of buildings, tree trunks, etc
+
+
+
+rewrite the lore to invoke lord of the flies themes and lessons 
+friendly army
+Enemy army
+battles
+Fires
+Dragons
+Dinosaurs
+Trolls
+Dark knights
+Volanos
+Mountains
+swamps
+tropics
+food for health
+potions
+spells
+mountains
+NPS
+Lore
+Dark lore
+Graphics updates
+Dungeins
+Caves
+cave monsters
+Spider and rats
+Meteor showers
+Storms
+Tornados
+Music/Sounds
+aliens
+ancient reptile creatures
+elves
+goblins
+vampires
+werewolves
+bears
+
+
+
+
+
+
+

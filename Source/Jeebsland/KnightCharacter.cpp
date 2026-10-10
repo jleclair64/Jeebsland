@@ -1,0 +1,1991 @@
+#include "KnightCharacter.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/LocalPlayer.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
+#include "InputModifiers.h"
+#include "EnhancedInputComponent.h"
+#include "SkillComponent.h"
+#include "ResourceNode.h"
+#include "EngineUtils.h"
+#include "Engine/Engine.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Terrain.h"
+#include "Pig.h"
+#include "Inventory.h"
+#include "Npc.h"
+#include "Horse.h"
+#include "Cottage.h"
+#include "Loot.h"
+#include "Pond.h"
+#include "HealthComponent.h"
+#include "Projectile.h"
+#include "Combat.h"
+#include "WeaponDesign.h"
+#include "ProceduralMeshComponent.h"
+#include "Misc/ConfigCacheIni.h"
+
+AKnightCharacter::AKnightCharacter()
+{
+	// Hide the (empty) skeletal mesh slot; the knight is made of shapes instead
+	GetMesh()->SetVisibility(false);
+
+	PrimaryActorTick.bCanEverTick = true;
+
+	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
+
+	// Movement feel
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);
+	GetCharacterMovement()->JumpZVelocity *= 0.894f; // about 20% lower jump (height grows with the square of launch speed)
+
+	// Camera: a bit further back and higher, with gentle lag for a smooth follow
+	if (USpringArmComponent* Boom = GetCameraBoom())
+	{
+		Boom->TargetArmLength = 450.f;
+		Boom->SocketOffset = FVector(0.f, 0.f, 60.f);
+		Boom->bEnableCameraLag = true;
+		Boom->CameraLagSpeed = 8.f;
+	}
+
+	// Dust puffs live in world space, so they stay where they were kicked up
+	{
+		ConstructorHelpers::FObjectFinder<UStaticMesh> DustMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		DustISM = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Dust"));
+		DustISM->SetupAttachment(RootComponent);
+		DustISM->SetStaticMesh(DustMesh.Object);
+		DustISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		DustISM->SetCastShadow(false);
+		DustISM->SetUsingAbsoluteLocation(true);
+		DustISM->SetUsingAbsoluteRotation(true);
+		DustISM->SetUsingAbsoluteScale(true);
+	}
+
+	// Every body part hangs off a pivot so it can be animated. Positions below are given relative to the
+	// capsule center (feet at Z = -96, forward = +X, right = +Y); the helpers convert them to pivot space.
+	TMap<USceneComponent*, FVector> PivotPos;
+
+	auto MakePivot = [&](const TCHAR* Name, USceneComponent* Parent, FVector CapsulePos) -> USceneComponent*
+	{
+		USceneComponent* P = CreateDefaultSubobject<USceneComponent>(Name);
+		P->SetupAttachment(Parent ? Parent : RootComponent.Get());
+		P->SetRelativeLocation(CapsulePos - (Parent ? PivotPos.FindChecked(Parent) : FVector::ZeroVector));
+		PivotPos.Add(P, CapsulePos);
+		return P;
+	};
+
+	// ---- Pivots (the skeleton) ----
+	BodyRoot   = MakePivot(TEXT("BodyRoot"),   nullptr,   FVector(0, 0, 0));       // bounces up and down
+	HipL       = MakePivot(TEXT("HipL"),       BodyRoot,  KnightDesign::PivotPos(KnightDesign::P_HipL));
+	HipR       = MakePivot(TEXT("HipR"),       BodyRoot,  KnightDesign::PivotPos(KnightDesign::P_HipR));
+	KneeL      = MakePivot(TEXT("KneeL"),      HipL,      KnightDesign::PivotPos(KnightDesign::P_KneeL));
+	KneeR      = MakePivot(TEXT("KneeR"),      HipR,      KnightDesign::PivotPos(KnightDesign::P_KneeR));
+	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,  FVector(0, 0, -41.f));     // chest: leans and twists
+	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
+	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot, FVector(-2, 0, 71.f));
+	HeadPivot->SetRelativeScale3D(FVector(0.85f, 0.85f, 0.85f)); // smaller head
+	CapeUpper  = MakePivot(TEXT("CapeUpper"),  UpperPivot, FVector(-26, 0, 13.f));
+	CapeLower  = MakePivot(TEXT("CapeLower"),  CapeUpper, FVector(-26, 0, -19.f));
+	ArmPivot   = MakePivot(TEXT("ArmPivotR"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmR));     // right shoulder (sword arm)
+	ArmPivotL  = MakePivot(TEXT("ArmPivotL"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmL));    // left shoulder (shield arm)
+	ElbowR     = MakePivot(TEXT("ElbowR"),     ArmPivot,  KnightDesign::PivotPos(KnightDesign::P_ElbowR));
+	ElbowL     = MakePivot(TEXT("ElbowL"),     ArmPivotL, KnightDesign::PivotPos(KnightDesign::P_ElbowL));
+}
+
+// ---------------- The knight's body parts ----------------
+void AKnightCharacter::BuildKnight()
+{
+	USceneComponent* Pivots[KnightDesign::P_Count] = {};
+	Pivots[KnightDesign::P_Body] = BodyRoot;     Pivots[KnightDesign::P_Upper] = UpperPivot;  Pivots[KnightDesign::P_Head] = HeadPivot;
+	Pivots[KnightDesign::P_Plume] = PlumePivot;  Pivots[KnightDesign::P_CapeU] = CapeUpper;   Pivots[KnightDesign::P_CapeL] = CapeLower;
+	Pivots[KnightDesign::P_ArmL] = ArmPivotL;    Pivots[KnightDesign::P_ArmR] = ArmPivot;     Pivots[KnightDesign::P_ElbowL] = ElbowL;
+	Pivots[KnightDesign::P_ElbowR] = ElbowR;     Pivots[KnightDesign::P_HipL] = HipL;         Pivots[KnightDesign::P_HipR] = HipR;
+	Pivots[KnightDesign::P_KneeL] = KneeL;       Pivots[KnightDesign::P_KneeR] = KneeR;
+
+	TArray<KnightDesign::FDef> Defs;
+	KnightDesign::Build(Defs);
+
+	for (const KnightDesign::FDef& D : Defs)
+	{
+		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot]) continue;
+		UProceduralMeshComponent* C = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
+
+		FArmorPart P;
+		P.Comp = C;
+		P.Slot = D.Slot; P.Role = D.Role; P.MinTier = D.MinTier; P.MaxTier = D.MaxTier;
+		P.Fixed = D.Fixed; P.bFixedMetal = D.bFixedMetal; P.Shade = D.Shade; P.bBare = D.bBare;
+		ArmorParts.Add(P);
+	}
+}
+
+UProceduralMeshComponent* AKnightCharacter::MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md)
+{
+	UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
+	C->SetupAttachment(Attach);
+	// The shape is modelled around the knight's centre; move it back so it sits right on its pivot
+	C->SetRelativeLocation(-KnightDesign::PivotPos(PivotId));
+	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	C->RegisterComponent();
+
+	TArray<FVector> Normals;
+	KM::ComputeNormals(Md, Normals);
+	TArray<int32> Tris;
+	Tris.Reserve(Md.I.Num() * 2);
+	for (int32 t = 0; t + 2 < Md.I.Num(); t += 3)
+	{
+		// Both windings, so the outside shows whichever way the engine treats as front
+		Tris.Add(Md.I[t]); Tris.Add(Md.I[t + 1]); Tris.Add(Md.I[t + 2]);
+		Tris.Add(Md.I[t]); Tris.Add(Md.I[t + 2]); Tris.Add(Md.I[t + 1]);
+	}
+	TArray<FVector2D> UV;
+	TArray<FLinearColor> Colors;
+	TArray<FProcMeshTangent> Tangents;
+	C->CreateMeshSection_LinearColor(0, Md.V, Tris, Normals, UV, Colors, Tangents, false);
+	return C;
+}
+
+void AKnightCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	PrevYaw = GetActorRotation().Yaw;
+	SpawnLoc = GetActorLocation();
+	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
+
+	// Saved graphics choices (default: fast lighting, full resolution)
+	if (GConfig)
+	{
+		GConfig->GetBool(TEXT("Jeebsland"), TEXT("FancyLighting"), bFancyLighting, GGameUserSettingsIni);
+		GConfig->GetFloat(TEXT("Jeebsland"), TEXT("RenderScale"), RenderScale, GGameUserSettingsIni);
+	}
+	ApplyGraphics();
+	UpperBase = UpperPivot->GetRelativeLocation();
+	LeftBase = ArmPivotL->GetRelativeLocation();
+
+	Dust.SetNum(16);
+	{
+		TArray<FTransform> Hidden;
+		for (int32 i = 0; i < Dust.Num(); ++i) Hidden.Add(FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)));
+		DustISM->AddInstances(Hidden, false, false, false);
+		UMaterialInterface* DBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+		if (UMaterialInstanceDynamic* DM = DustISM->CreateDynamicMaterialInstance(0, DBase))
+		{
+			DM->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.50f, 0.40f, 0.26f));
+		}
+	}
+
+	BuildKnight();
+	RefreshEquipment();
+}
+
+// ---------------- What you wear and hold ----------------
+namespace
+{
+	bool PartIsMetal(int32 Tier, EArmorRole Role)
+	{
+		return Tier >= 1 && (Role == EArmorRole::Plate || Role == EArmorRole::Trim || Role == EArmorRole::BootBody);
+	}
+	// The kind of gear that belongs in each knight slot
+	int32 KindForSlot(int32 Slot)
+	{
+		switch (Slot)
+		{
+		case KnightDesign::SlotHelmet:    return JeebItems::K_Helmet;
+		case KnightDesign::SlotBody:      return JeebItems::K_Chest;
+		case KnightDesign::SlotShoulders: return JeebItems::K_Shoulders;
+		case KnightDesign::SlotBoots:     return JeebItems::K_Boots;
+		case KnightDesign::SlotCape:      return JeebItems::K_Cape;
+		case KnightDesign::SlotGloves:    return JeebItems::K_Gloves;
+		default:                          return JeebItems::K_Shield;
+		}
+	}
+}
+
+void AKnightCharacter::ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal)
+{
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	// Metal parts use the shiny M_Metal if it exists (made once by MakeMetal.bat); otherwise plain colour
+	UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
+	UMaterialInterface* Mat = (bMetal && Metal) ? Metal : Base;
+	if (UMaterialInstanceDynamic* M = P.Comp->CreateDynamicMaterialInstance(0, Mat))
+	{
+		M->SetVectorParameterValue(TEXT("Color"), Color);
+		if (bMetal && Metal)
+		{
+			M->SetScalarParameterValue(TEXT("Metallic"), 0.9f);
+			M->SetScalarParameterValue(TEXT("Roughness"), 0.28f);
+		}
+	}
+}
+
+bool AKnightCharacter::ShieldActive() const
+{
+	if (!Skills || Skills->Worn[JeebItems::K_Shield] == 0) return false;
+	const int32 K = SelectedKind();
+	return K < 0 || JeebItems::AllowsShield(K);
+}
+
+int32 AKnightCharacter::SelectedKind() const
+{
+	if (!Skills) return -1;
+	const int32 Id = Skills->SelectedItem();
+	return JeebItems::IsGear(Id) ? JeebItems::KindOf(Id) : -1;
+}
+
+float AKnightCharacter::GetStaminaMult() const
+{
+	return JeebItems::StaminaMult(Skills);
+}
+
+void AKnightCharacter::ApplyArmorSlot(int32 Slot)
+{
+	if (!Skills) return;
+	const int32 Kind = KindForSlot(Slot);
+	const int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
+	const bool bWorn = Id != 0;
+	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
+	for (FArmorPart& P : ArmorParts)
+	{
+		if (P.Slot != Slot) continue;
+
+		// Underclothes, belt and boots are always there; everything else shows only while worn
+		bool bAlways = false;
+		if (Slot == KnightDesign::SlotBody) bAlways = (P.Role == EArmorRole::Under || P.Role == EArmorRole::Leather);
+		if (Slot == KnightDesign::SlotBoots) bAlways = (P.Role == EArmorRole::BootBody || P.Role == EArmorRole::Under);
+		bool bVisible;
+		if (P.bBare) bVisible = !bWorn;
+		else if (bAlways) bVisible = true;
+		else bVisible = bWorn && (Slot == KnightDesign::SlotCape || (Var >= P.MinTier && Var <= P.MaxTier));
+		P.Comp->SetVisibility(bVisible);
+		if (!bVisible) continue;
+
+		FLinearColor Color;
+		bool bMetal = false;
+		if (P.bBare) Color = P.Fixed;
+		else if (Slot == KnightDesign::SlotCape)
+		{
+			Color = JeebItems::CapeColor(Var);
+			Color.R *= P.Shade; Color.G *= P.Shade; Color.B *= P.Shade;
+		}
+		else
+		{
+			Color = JeebItems::Palette(Var, static_cast<int32>(P.Role));
+			Color.R *= P.Shade; Color.G *= P.Shade; Color.B *= P.Shade;
+			bMetal = PartIsMetal(Var, P.Role);
+		}
+		ApplyPartMaterial(P, Color, bMetal);
+	}
+}
+
+void AKnightCharacter::RefreshEquipment()
+{
+	for (int32 Slot = 0; Slot < KnightDesign::NumSlots; ++Slot) ApplyArmorSlot(Slot);
+	RebuildHeld();
+}
+
+void AKnightCharacter::RebuildHeld()
+{
+	for (UProceduralMeshComponent* C : HeldComps)
+	{
+		if (C) C->DestroyComponent();
+	}
+	HeldComps.Reset();
+	HeldElbow = 25.f;
+	if (!Skills) return;
+	const int32 Id = Skills->SelectedItem();
+	if (!JeebItems::IsGear(Id)) return;
+	const int32 K = JeebItems::KindOf(Id), T = JeebItems::VariantOf(Id);
+	if (!JeebItems::IsWeaponKind(K)) return;
+	HeldElbow = WeaponDesign::IdleElbow(K);
+
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
+
+	auto Make = [&](USceneComponent* Attach, int32 PivotId, const KM::FXf& Place)
+	{
+		TArray<WeaponDesign::FWPart> Parts;
+		WeaponDesign::Build(K, Parts, Place);
+		for (const WeaponDesign::FWPart& WP : Parts)
+		{
+			if (WP.Mesh.V.Num() == 0) continue;
+			UProceduralMeshComponent* C = MakeMeshComp(Attach, PivotId, WP.Mesh);
+			HeldComps.Add(C);
+			FLinearColor Color;
+			bool bMetal = false;
+			if (WP.bFixed)
+			{
+				Color = WP.Fixed;
+				Color.R *= WP.Glow; Color.G *= WP.Glow; Color.B *= WP.Glow;
+			}
+			else
+			{
+				Color = JeebItems::Palette(T, WP.Role);
+				bMetal = PartIsMetal(T, static_cast<EArmorRole>(WP.Role));
+			}
+			UMaterialInterface* Mat = (bMetal && Metal) ? Metal : Base;
+			if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Mat))
+			{
+				M->SetVectorParameterValue(TEXT("Color"), Color);
+				if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 0.9f); M->SetScalarParameterValue(TEXT("Roughness"), 0.28f); }
+			}
+		}
+	};
+
+	const KM::FXf Tilt = KM::Xf(FVector(8, 30 * KnightDesign::SlimY, -27), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
+	Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
+	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(FVector(8, -30 * KnightDesign::SlimY, -27), FVector(0, -20, 0)));
+}
+
+void AKnightCharacter::EquipFromInventory(int32 Idx)
+{
+	if (!Skills) return;
+	if (Skills->EquipFromSlot(Idx)) RefreshEquipment();
+}
+
+void AKnightCharacter::UnequipHotbar(int32 H)
+{
+	if (!Skills) return;
+	if (Skills->UnequipHotbar(H)) RefreshEquipment();
+	else if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("No room in your inventory."));
+}
+
+void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing)
+{
+	if (!Skills) return;
+	if (Skills->UnequipWorn(Kind, bSecondRing)) RefreshEquipment();
+	else if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("No room in your inventory."));
+}
+
+void AKnightCharacter::CycleHotbar(int32 Dir)
+{
+	if (!Skills || IsUIOpen() || bClimbing) return;
+	for (int32 Step = 1; Step <= 5; ++Step)
+	{
+		const int32 Next = ((Skills->Selected + Dir * Step) % 5 + 5) % 5;
+		if (Skills->Hotbar[Next] != 0) { SelectHotbar(Next); return; }
+	}
+}
+
+void AKnightCharacter::SelectHotbar(int32 H)
+{
+	if (!Skills || H < 0 || H > 4 || Skills->Selected == H) return;
+	Skills->Selected = H;
+	bAttacking = false;
+	bCharging = false;
+	RefreshEquipment();
+}
+
+bool AKnightCharacter::PrepareTool(ESkillType Skill, float& OutTimeMult)
+{
+	OutTimeMult = 1.f;
+	if (!Skills) return true;
+	int32 Need;
+	const TCHAR* Name;
+	if (Skill == ESkillType::Mining) { Need = JeebItems::K_Pickaxe; Name = TEXT("pickaxe"); }
+	else if (Skill == ESkillType::Woodcutting) { Need = JeebItems::K_Axe; Name = TEXT("axe"); }
+	else if (Skill == ESkillType::Fishing) { Need = JeebItems::K_Rod; Name = TEXT("fishing pole"); }
+	else return true;
+
+	int32 Best = -1, BestTier = -1;
+	for (int32 i = 0; i < 5; ++i)
+	{
+		const int32 Id = Skills->Hotbar[i];
+		if (!JeebItems::IsGear(Id) || JeebItems::KindOf(Id) != Need) continue;
+		// Keep the one already in hand if it is a tool of this kind
+		const int32 Tier = JeebItems::VariantOf(Id) + (i == Skills->Selected ? 100 : 0);
+		if (Tier > BestTier) { BestTier = Tier; Best = i; }
+	}
+	if (Best < 0)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, FString::Printf(TEXT("You need a %s on your weapon bar. Buy or smith one."), Name));
+		return false;
+	}
+	if (Skills->Selected != Best) SelectHotbar(Best);
+	OutTimeMult = JeebItems::ToolTimeMult(JeebItems::VariantOf(Skills->Hotbar[Best]));
+	return true;
+}
+
+void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+{
+	// Build the input actions and key bindings in code (WASD, mouse look, space to jump)
+	JumpAction = NewObject<UInputAction>(this, TEXT("KnightJump"));
+	JumpAction->ValueType = EInputActionValueType::Boolean;
+
+	MoveAction = NewObject<UInputAction>(this, TEXT("KnightMove"));
+	MoveAction->ValueType = EInputActionValueType::Axis2D;
+
+	LookAction = NewObject<UInputAction>(this, TEXT("KnightLook"));
+	LookAction->ValueType = EInputActionValueType::Axis2D;
+
+	MouseLookAction = NewObject<UInputAction>(this, TEXT("KnightMouseLook"));
+	MouseLookAction->ValueType = EInputActionValueType::Axis2D;
+
+	KnightContext = NewObject<UInputMappingContext>(this, TEXT("KnightContext"));
+
+	auto MakeSwizzle = [this]()
+	{
+		UInputModifierSwizzleAxis* S = NewObject<UInputModifierSwizzleAxis>(this);
+		S->Order = EInputAxisSwizzle::YXZ;
+		return S;
+	};
+	auto MakeNegate = [this]()
+	{
+		return NewObject<UInputModifierNegate>(this);
+	};
+
+	SprintAction = NewObject<UInputAction>(this, TEXT("KnightSprint"));
+	SprintAction->ValueType = EInputActionValueType::Boolean;
+
+	KnightContext->MapKey(JumpAction, EKeys::SpaceBar);
+	KnightContext->MapKey(SprintAction, EKeys::LeftShift);
+
+	InteractAction = NewObject<UInputAction>(this, TEXT("KnightInteract"));
+	InteractAction->ValueType = EInputActionValueType::Boolean;
+	KnightContext->MapKey(InteractAction, EKeys::LeftMouseButton);
+
+	auto MakeBool = [this](const TCHAR* Name)
+	{
+		UInputAction* A = NewObject<UInputAction>(this, Name);
+		A->ValueType = EInputActionValueType::Boolean;
+		return A;
+	};
+	CrouchAction = MakeBool(TEXT("KnightCrouch"));
+	BlockAction  = MakeBool(TEXT("KnightBlock"));
+	SlideAction  = MakeBool(TEXT("KnightSlide"));
+	RollAction   = MakeBool(TEXT("KnightRoll"));
+	SitAction    = MakeBool(TEXT("KnightSit"));
+	KnightContext->MapKey(CrouchAction, EKeys::LeftControl);
+	KnightContext->MapKey(BlockAction, EKeys::RightMouseButton);
+	KnightContext->MapKey(SlideAction, EKeys::C);
+	KnightContext->MapKey(RollAction, EKeys::V);
+	KnightContext->MapKey(RollAction, EKeys::LeftAlt);
+	KnightContext->MapKey(SitAction, EKeys::E);
+
+	{
+		static const FKey HotbarKeys[5] = { EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five };
+		for (int32 i = 0; i < 5; ++i)
+		{
+			HotbarActions[i] = MakeBool(*FString::Printf(TEXT("KnightHotbar%d"), i + 1));
+			KnightContext->MapKey(HotbarActions[i], HotbarKeys[i]);
+		}
+	}
+		ScrollUpAction = MakeBool(TEXT("KnightScrollUp"));
+	KnightContext->MapKey(ScrollUpAction, EKeys::MouseScrollUp);
+	ScrollDownAction = MakeBool(TEXT("KnightScrollDown"));
+	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);
+	InventoryAction = MakeBool(TEXT("KnightInventory"));
+	KnightContext->MapKey(InventoryAction, EKeys::Tab);
+	SkillsAction = MakeBool(TEXT("KnightSkills"));
+	KnightContext->MapKey(SkillsAction, EKeys::K);
+	CallHorseAction = MakeBool(TEXT("KnightCallHorse"));
+	KnightContext->MapKey(CallHorseAction, EKeys::T);
+
+	SettingsAction = NewObject<UInputAction>(this, TEXT("KnightSettings"));
+	SettingsAction->ValueType = EInputActionValueType::Boolean;
+	KnightContext->MapKey(SettingsAction, EKeys::O);
+
+	KnightContext->MapKey(MoveAction, EKeys::D); // right = +X
+	KnightContext->MapKey(MoveAction, EKeys::A).Modifiers.Add(MakeNegate());
+	KnightContext->MapKey(MoveAction, EKeys::W).Modifiers.Add(MakeSwizzle()); // forward = +Y
+	{
+		FEnhancedActionKeyMapping& Back = KnightContext->MapKey(MoveAction, EKeys::S);
+		Back.Modifiers.Add(MakeSwizzle());
+		Back.Modifiers.Add(MakeNegate());
+	}
+
+	{
+		UInputModifierNegate* FlipY = NewObject<UInputModifierNegate>(this);
+		FlipY->bX = false;
+		FlipY->bY = true;
+		FlipY->bZ = false;
+		GConfig->GetFloat(TEXT("Jeebsland"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
+		FEnhancedActionKeyMapping& MouseMap = KnightContext->MapKey(MouseLookAction, EKeys::Mouse2D);
+		MouseMap.Modifiers.Add(FlipY);
+	}
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (ULocalPlayer* LP = PC->GetLocalPlayer())
+		{
+			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+			{
+				Subsystem->AddMappingContext(KnightContext, 0);
+			}
+		}
+	}
+
+	// The template's code now binds these actions to movement, looking, and jumping
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	// Hold Shift to sprint
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
+		EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &AKnightCharacter::StartSprint);
+		EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopSprint);
+		EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &AKnightCharacter::Interact);
+		EIC->BindAction(InteractAction, ETriggerEvent::Completed, this, &AKnightCharacter::InteractReleased);
+		EIC->BindAction(SettingsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSettingsKey);
+		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &AKnightCharacter::StartCrouch);
+		EIC->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopCrouch);
+		EIC->BindAction(BlockAction, ETriggerEvent::Started, this, &AKnightCharacter::StartBlock);
+		EIC->BindAction(BlockAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopBlock);
+		EIC->BindAction(SlideAction, ETriggerEvent::Started, this, &AKnightCharacter::StartSlide);
+		EIC->BindAction(RollAction, ETriggerEvent::Started, this, &AKnightCharacter::StartRoll);
+		EIC->BindAction(SitAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInteractKey);
+		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInventoryKey);
+		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
+		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
+				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
+		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);
+		EIC->BindAction(HotbarActions[0], ETriggerEvent::Started, this, &AKnightCharacter::Select1);
+		EIC->BindAction(HotbarActions[1], ETriggerEvent::Started, this, &AKnightCharacter::Select2);
+		EIC->BindAction(HotbarActions[2], ETriggerEvent::Started, this, &AKnightCharacter::Select3);
+		EIC->BindAction(HotbarActions[3], ETriggerEvent::Started, this, &AKnightCharacter::Select4);
+		EIC->BindAction(HotbarActions[4], ETriggerEvent::Started, this, &AKnightCharacter::Select5);
+	}
+}
+
+void AKnightCharacter::StartSprint()
+{
+	bSprinting = true;
+	bCrouched = false; // sprinting stands you up
+}
+
+void AKnightCharacter::StopSprint()
+{
+	bSprinting = false;
+}
+
+void AKnightCharacter::Interact()
+{
+	if (IsUIOpen() || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen; no attacks mid-move
+	if (ActiveNode.IsValid()) return;                               // already working
+	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); return; }   // swinging: remember the click for the combo
+
+	// Gather from the closest rock or tree within reach that the knight is facing
+		AResourceNode* Best = nullptr;
+	float BestDist = 1.0e9f;
+	for (TActorIterator<AResourceNode> It(GetWorld()); It; ++It)
+	{
+		const FVector ToNode = It->GetActorLocation() - GetActorLocation();
+		const float D = ToNode.Size2D();
+		if (D >= It->ReachRadius()) continue;
+		const float FacingDot = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToNode.GetSafeNormal2D());
+		if (FacingDot < It->MinFacing()) continue; // outside about 60 degrees (wider for fishing)
+		if (D < BestDist)
+		{
+			BestDist = D;
+			Best = *It;
+		}
+	}
+
+	const bool bHandled = Best && Best->StartGathering(this);
+
+	// Nothing to gather: just swing whatever is in your hand
+	if (!ActiveNode.IsValid() && !bHandled)
+	{
+		const int32 K = SelectedKind();
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (K == JeebItems::K_Spear)
+		{
+			bCharging = true;       // hold to charge, let go to thrust
+			ChargeT = 0.f;
+		}
+		else if (K == JeebItems::K_Bow)
+		{
+			const int32 Tier = Skills ? Skills->TakeBestArrow() : -1;
+			if (Tier < 0)
+			{
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("You have no arrows."));
+				return;
+			}
+			PendingArrowTier = Tier;
+			StartAttack(EAtkStyle::Cast, 1, 0.f);
+		}
+		else if (K == JeebItems::K_Wand || K == JeebItems::K_Staff)
+		{
+			StartAttack(EAtkStyle::Cast, 1, 0.f);
+		}
+		else
+		{
+			// A second swing within 0.3 s of the first sweeps back left-to-right, a little faster
+			const bool bCombo = (LastStyle == EAtkStyle::Slash && LastSwingDir > 0 && Now - LastSwingEnd <= 0.3f);
+			StartAttack(EAtkStyle::Slash, bCombo ? -1 : 1, 0.f);
+		}
+	}
+}
+
+void AKnightCharacter::InteractReleased()
+{
+	if (!bCharging) return;
+	bCharging = false;
+	if (IsUIOpen() || bAttacking || bSitting || bRolling || bSliding || bClimbing) return;
+	const float C = FMath::Clamp(ChargeT / 1.0f, 0.f, 1.f);
+	StartAttack(EAtkStyle::Thrust, 1, C);
+	if (!GetCharacterMovement()->IsFalling())
+	{
+		LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (200.f + 700.f * C), true, false);   // lunge forward
+	}
+}
+
+void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
+{
+	const int32 K = SelectedKind();
+	const float Cd = (K >= 0) ? JeebItems::WeaponBase(K).Cooldown : 0.5f;
+	AtkStyle = Style;
+	AttackDir = Dir;
+	AtkCharge = Charge;
+	AttackDur = (Style == EAtkStyle::Thrust) ? 0.45f : (Style == EAtkStyle::Cast ? FMath::Max(0.45f, Cd * 1.1f) : Cd * 1.25f);
+	if (Dir < 0) AttackDur *= 0.85f;           // the follow-up swing is 15% faster
+	bAttacking = true;
+	bAttackHit = false;
+	AttackT = 0.f;
+	QueuedClick = -10.f;
+	if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
+}
+
+void AKnightCharacter::StartCrouch()
+{
+	if (bSitting || bRolling || bSliding || bClimbing || bMounted) return;
+	bCrouched = true;
+}
+
+void AKnightCharacter::StopCrouch()
+{
+	bCrouched = false;
+}
+
+void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill)
+{
+	if (!Target || !Target->IsAlive()) return;
+	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit);
+	if (Dealt > 0 && Skills) Skills->AddXP(Skill, 3 + Dealt / 3);
+}
+
+void AKnightCharacter::AttackLands()
+{
+	if (!Skills) return;
+	const int32 Id = Skills->SelectedItem();
+	const int32 K = JeebItems::IsGear(Id) ? JeebItems::KindOf(Id) : -1;
+	const int32 Tier = (K >= 0) ? JeebItems::VariantOf(Id) : 0;
+	const ESkillType Sk = JeebItems::CombatSkillFor(K < 0 ? JeebItems::K_Sword : K);
+
+	if (AtkStyle == EAtkStyle::Cast)
+	{
+		FRotator Aim = GetActorRotation();
+		if (AController* C = GetController()) Aim = C->GetControlRotation();
+		const FVector Dir = Aim.Vector();
+		const bool bBow = (K == JeebItems::K_Bow);
+		bool bCrit = false;
+		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit);
+		const float Range = JeebItems::WeaponBase(K).Range;
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Start = GetActorLocation() + GetActorForwardVector() * 70.f + FVector(0.f, 0.f, 30.f);
+		if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), Start, Dir.Rotation(), SP))
+		{
+			P->Launch(this, Dir, bBow ? 3500.f : (K == JeebItems::K_Staff ? 1800.f : 2200.f), Range, Dmg, bCrit, Sk, !bBow,
+				bBow ? PendingArrowTier : (K == JeebItems::K_Staff ? 100 : 0));
+		}
+		return;
+	}
+
+	const bool bThrust = (AtkStyle == EAtkStyle::Thrust);
+	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f);
+	const float MinDot = bThrust ? 0.8f : 0.2f;
+	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+
+	TArray<UHealthComponent*> Targets;
+	UHealthComponent* Nearest = nullptr;
+	float NearestD = 1.0e9f;
+	for (UHealthComponent* H : UHealthComponent::All())
+	{
+		if (!H || !H->IsAlive() || H->GetOwner() == this) continue;
+		const FVector To = H->GetOwner()->GetActorLocation() - GetActorLocation();
+		const float D = To.Size2D();
+		if (D > Range + H->HitRadius * 0.4f) continue;
+		if (D > 40.f && FVector::DotProduct(Fwd, To.GetSafeNormal2D()) < MinDot) continue;
+		if (FMath::Abs(To.Z) > 260.f) continue;
+		Targets.Add(H);
+		if (D < NearestD) { NearestD = D; Nearest = H; }
+	}
+	if (bThrust && Nearest) { Targets.Reset(); Targets.Add(Nearest); }
+	for (UHealthComponent* H : Targets)
+	{
+		bool bCrit = false;
+		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, 0, bCrit, bThrust ? (1.f + AtkCharge) : 1.f);
+		DealDamage(H, Dmg, bCrit, Sk);
+	}
+}
+
+void AKnightCharacter::Hurt(int32 Raw, AActor* From)
+{
+	if (Health <= 0.f || Raw <= 0 || !Skills) return;
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now < InvulnUntil) return;
+
+	bool bFront = false;
+	if (bBlocking && ShieldActive() && From)
+	{
+		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) > 0.1f;
+	}
+	const int32 Armor = JeebItems::TotalDefense(Skills, false) / 3;
+	const int32 FromSkill = Skills->GetLevel(ESkillType::Defense) / 5;
+	const int32 Shield = bFront ? JeebItems::DefenseOf(JeebItems::K_Shield, JeebItems::VariantOf(Skills->Worn[JeebItems::K_Shield])) : 0;
+	const int32 Taken = FMath::Max(bFront ? 0 : 1, Raw - (Armor + FromSkill + Shield));
+	const int32 Absorbed = Raw - Taken;
+
+	const FVector Head = GetActorLocation() + FVector(0.f, 0.f, 120.f);
+	if (bFront && Absorbed > 0) JeebCombat::AddNumber(GetWorld(), Head + FVector(0.f, 0.f, 25.f), Absorbed, JeebCombat::N_Blocked);
+	if (Taken > 0) JeebCombat::AddNumber(GetWorld(), Head, Taken, JeebCombat::N_Damage);
+	Health -= Taken;
+	LastHurtTime = Now;
+	InvulnUntil = Now + 0.4f;
+	Skills->AddXP(ESkillType::Defense, 2 + Raw / 2);   // defence trains from being hit and from blocking
+
+	if (Health <= 0.f)
+	{
+		// Knocked out: wake up at the start with full health
+		Health = (float)MaxHealth;
+		bAttacking = false;
+		bCharging = false;
+				bBlocking = false;
+		if (bClimbing) ExitClimb(false, false);
+		GetCharacterMovement()->Velocity = FVector::ZeroVector;
+		SetActorLocation(SpawnLoc);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, TEXT("You were knocked out and woke up back at the start."));
+	}
+}
+
+void AKnightCharacter::TryStartClimb()
+{
+	if (bSitting || bRolling || bSliding || bMounted || IsUIOpen()) return;
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	const FVector Acc = Move->GetCurrentAcceleration();
+	if (Acc.SizeSquared2D() < 1.f) return;
+	const FVector2D WishDir = FVector2D(Acc.X, Acc.Y).GetSafeNormal();
+	const FVector Loc = GetActorLocation();
+	const FVector2D P2(Loc.X, Loc.Y);
+	const float FeetZ = Loc.Z - 90.f;
+	const FVector2D VC = JeebTerrain::VillageCenter();
+	const float VillageDeckTop = JeebTerrain::HeightAt(VC.X, VC.Y) + JeebTerrain::DeckHeight();
+
+	static TArray<JeebTerrain::FLadder> AllLadders;
+	if (AllLadders.Num() == 0)
+	{
+		AllLadders.Append(JeebTerrain::Ladders());
+		AllLadders.Append(JeebTerrain::FortLadders());   // rope ladders up to the redwood forts
+		AllLadders.Append(JeebTerrain::CastleLadders());   // and up the castle wall
+	}
+	for (const JeebTerrain::FLadder& L : AllLadders)
+	{
+		const float DeckTop = (L.Top > 0.f) ? L.Top : VillageDeckTop;
+		const FVector2D Rel = P2 - L.Pos;
+		const FVector2D Side(-L.Out.Y, L.Out.X);
+		if (FMath::Abs(FVector2D::DotProduct(Rel, Side)) > 70.f) continue;
+		const float Along = FVector2D::DotProduct(Rel, L.Out);
+				const float Ground = (L.Bottom > 0.f) ? L.Bottom : JeebTerrain::HeightAt(L.Pos.X, L.Pos.Y);
+		const bool bAtBottom = !Move->IsFalling() && FeetZ < Ground + 60.f && Along > 0.f && Along < 150.f;
+		const bool bOnDeck = !Move->IsFalling() && FeetZ > DeckTop - 40.f && Along < 0.f && Along > -150.f;
+		int32 Dir = 0;
+		if (bAtBottom && FVector2D::DotProduct(WishDir, -L.Out) > 0.6f) Dir = 1;
+		else if (bOnDeck && FVector2D::DotProduct(WishDir, L.Out) > 0.6f) Dir = -1;
+		if (Dir == 0) continue;
+
+		bClimbing = true;
+		bClimbIgnoreUp = (Dir < 0);
+		bCrouched = false;
+		bBlocking = false;
+		bAttacking = false;
+		ClimbPos = L.Pos;
+		ClimbOut = L.Out;
+				ClimbGround = Ground;
+		ClimbT = 0.f;
+		ClimbDeckTop = DeckTop;
+		Move->StopMovementImmediately();
+		Move->DisableMovement();
+		const FVector2D Hold = L.Pos + L.Out * 55.f;
+		SetActorLocationAndRotation(FVector(Hold.X, Hold.Y, Loc.Z), FRotator(0.f, FVector(-L.Out.X, -L.Out.Y, 0.f).Rotation().Yaw, 0.f));
+		return;
+	}
+}
+
+void AKnightCharacter::UpdateClimb(float Dt)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	const bool bUp = PC && (PC->IsInputKeyDown(EKeys::W) || PC->IsInputKeyDown(EKeys::Up));
+	const bool bDown = PC && (PC->IsInputKeyDown(EKeys::S) || PC->IsInputKeyDown(EKeys::Down));
+	if (!bUp) bClimbIgnoreUp = false;
+	const float Dir = (bUp && !bClimbIgnoreUp) ? 1.f : (bDown ? -1.f : 0.f);
+
+			ClimbT += Dt;
+	{
+		// Nothing else may turn gravity back on while you are on the rope
+		UCharacterMovementComponent* Cm = GetCharacterMovement();
+		if (Cm->MovementMode != MOVE_None) Cm->DisableMovement();
+		Cm->Velocity = FVector::ZeroVector;
+	}
+	FVector Loc = GetActorLocation();
+	const FVector2D Hold = ClimbPos + ClimbOut * 55.f;
+	Loc.X = FMath::FInterpTo(Loc.X, Hold.X, Dt, 15.f);
+	Loc.Y = FMath::FInterpTo(Loc.Y, Hold.Y, Dt, 15.f);
+	Loc.Z += Dir * 280.f * Dt;
+	SetActorLocation(Loc, false);
+	ClimbPhase += Dir * Dt * 7.f;
+
+	const float FeetZ = Loc.Z - 90.f;
+	if (Dir > 0.f && FeetZ >= ClimbDeckTop - 5.f) ExitClimb(true, false);
+	else if (Dir < 0.f && FeetZ <= ClimbGround + 4.f) ExitClimb(false, true);
+}
+
+void AKnightCharacter::ExitClimb(bool bAtTop, bool bAtBottom)
+{
+	if (!bClimbing) return;
+	bClimbing = false;
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (bAtTop)
+	{
+		const FVector2D P = ClimbPos - ClimbOut * 85.f;
+		SetActorLocation(FVector(P.X, P.Y, ClimbDeckTop + 95.f), false);
+	}
+	else if (bAtBottom)
+	{
+				const bool bFromDeck = ClimbGround > JeebTerrain::HeightAt(ClimbPos.X, ClimbPos.Y) + 40.f;   // a ladder between two terraces
+		const FVector2D P = ClimbPos + ClimbOut * (bFromDeck ? 60.f : 115.f);
+		SetActorLocation(FVector(P.X, P.Y, (bFromDeck ? ClimbGround : JeebTerrain::HeightAt(P.X, P.Y)) + 95.f), false);
+	}
+	Move->SetMovementMode(MOVE_Falling);
+	if (!bAtTop && !bAtBottom)
+	{
+		Move->Velocity = FVector(ClimbOut.X * 250.f, ClimbOut.Y * 250.f, 120.f); // let go: hop off the ladder
+	}
+}
+
+void AKnightCharacter::StartBlock()
+{
+	if (bSitting || bRolling || bClimbing || IsUIOpen() || !ShieldActive()) return;
+	bBlocking = true;
+}
+
+void AKnightCharacter::StopBlock()
+{
+	bBlocking = false;
+}
+
+void AKnightCharacter::StartSlide()
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float Speed = GetVelocity().Size2D();
+	if (bSliding || bRolling || bSitting || bClimbing || bMounted || SlideCooldown > 0.f || Move->IsFalling()) return;
+	if (!bSprinting || Speed < 480.f || Stamina < 10.f) return; // slides start from a sprint
+
+	SlideDir = GetVelocity().GetSafeNormal2D();
+	SlideSpeed = FMath::Max(Speed, 750.f) * 1.15f;
+	SlideT = 0.f;
+	SlideDustTimer = 0.f;
+	Stamina -= 10.f;
+	StaminaDelay = 1.0f;
+	bCrouched = false;
+	bBlocking = false;
+	bSavedOrient = Move->bOrientRotationToMovement;
+	Move->bOrientRotationToMovement = false;
+	SetActorRotation(FRotator(0.f, SlideDir.Rotation().Yaw, 0.f));
+	bSliding = true;
+}
+
+void AKnightCharacter::StartRoll()
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (bRolling || bSliding || bSitting || bClimbing || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
+
+	// Roll the way you are steering, or straight ahead if you are standing still
+	FVector Dir = Move->GetCurrentAcceleration().GetSafeNormal2D();
+	if (Dir.IsNearlyZero()) Dir = GetActorForwardVector().GetSafeNormal2D();
+	RollDir = Dir;
+	RollT = 0.f;
+	Stamina -= 20.f;
+	StaminaDelay = 1.0f;
+	bCrouched = false;
+	bBlocking = false;
+	bSavedOrient = Move->bOrientRotationToMovement;
+	Move->bOrientRotationToMovement = false;
+	SetActorRotation(FRotator(0.f, RollDir.Rotation().Yaw, 0.f));
+	bRolling = true;
+	SpawnDust(GetActorLocation() + FVector(0, 0, -85.f), 55.f);
+}
+
+AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const
+{
+	OutIndex = -1;
+	OutNpc = nullptr;
+	OutHorse = nullptr;
+	const FVector2D Me(GetActorLocation().X, GetActorLocation().Y);
+	// Your horse, if it is standing right beside you
+	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
+	{
+		if (It->HasRider()) continue;
+		if (FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y)) < 200.f) { OutHorse = *It; return EInteract::Horse; }
+	}
+	// Villagers (store, smithy, gate knight): talk to the nearest one in reach
+	float NpcD = 230.f;
+	for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
+	{
+		const float D = FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y));
+		if (D < NpcD) { NpcD = D; OutNpc = *It; }
+	}
+		if (OutNpc) return EInteract::Npc;
+	// Things left on the ground by what died
+	FoundDrop = nullptr;
+	{
+		float BestDrop = 190.f;
+		for (TActorIterator<ALootDrop> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y));
+			if (D < BestDrop && FMath::Abs(GetActorLocation().Z - 90.f - It->GetActorLocation().Z) < 150.f) { BestDrop = D; FoundDrop = *It; }
+		}
+		if (FoundDrop.IsValid()) return EInteract::Drop;
+	}
+	// Doors of huts, and the ingot stash inside the locked ones
+	FoundCottage = nullptr;
+	{
+		const FVector Me3 = GetActorLocation();
+		ACottage* LootHut = nullptr;
+		ACottage* DoorHut = nullptr;
+		float BestLoot = 170.f, BestDoor = 210.f;
+		for (TActorIterator<ACottage> It(GetWorld()); It; ++It)
+		{
+			if (It->HasLoot())
+			{
+				const FVector LP = It->LootPos();
+				const float D = FVector::Dist2D(Me3, LP);
+				if (D < BestLoot && FMath::Abs(Me3.Z - 90.f - LP.Z) < 150.f) { BestLoot = D; LootHut = *It; }
+			}
+			const FVector DP = It->DoorPos();
+			const float D = FVector::Dist2D(Me3, DP);
+			if (D < BestDoor && FMath::Abs(Me3.Z - 90.f - DP.Z) < 200.f) { BestDoor = D; DoorHut = *It; }
+		}
+		if (LootHut) { FoundCottage = LootHut; return EInteract::Loot; }
+		if (DoorHut) { FoundCottage = DoorHut; return EInteract::Door; }
+	}
+	// Benches
+	float BestD = 170.f;
+	const TArray<JeebTerrain::FSeat>& Seats = JeebTerrain::Seats();
+	for (int32 i = 0; i < Seats.Num(); ++i)
+	{
+		const float D = FVector2D::Distance(Me, Seats[i].Pos);
+		if (D < BestD) { BestD = D; OutIndex = i; }
+	}
+	return OutIndex >= 0 ? EInteract::Bench : EInteract::None;
+}
+
+bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
+{
+	if (IsUIOpen() || bRolling || bSliding || bClimbing) return false;
+	if (bSitting) { OutText = TEXT("Press E to stand up"); return true; }
+	if (bMounted) { OutText = TEXT("Press E to dismount"); return true; }
+	if (GetCharacterMovement()->IsFalling()) return false;
+	int32 Idx = -1;
+	ANpc* Npc = nullptr;
+	AHorse* Horse = nullptr;
+	switch (FindInteractable(Idx, Npc, Horse))
+	{
+	case EInteract::Horse: OutText = TEXT("Press E to mount the horse"); return true;
+	case EInteract::Npc:
+		OutText = FString::Printf(TEXT("Press E to talk to %s"), *Npc->GetNpcName());
+		return true;
+	case EInteract::Bench: OutText = TEXT("Press E to sit"); return true;
+		case EInteract::Loot:  OutText = TEXT("Press E to take the ingots"); return true;
+	case EInteract::Drop:
+		if (const ALootDrop* Drop = FoundDrop.Get()) { OutText = Drop->Describe(); return true; }
+		return false;
+	case EInteract::Door:
+	{
+		const ACottage* Hut = FoundCottage.Get();
+		if (!Hut) return false;
+		if (Hut->IsLocked())
+		{
+			const int32 Need = Hut->GetLockLevel();
+			OutText = (Skills && Skills->GetLevel(ESkillType::Lockpicking) >= Need)
+				? FString::Printf(TEXT("Press E to pick the lock (Lockpicking %d)"), Need)
+				: FString::Printf(TEXT("Locked. Needs Lockpicking level %d"), Need);
+		}
+				else OutText = Hut->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door");
+		return true;
+	}
+	default: break;
+	}
+	// Facing a place to fish
+	if (!bFishing)
+	{
+		for (TActorIterator<AFishingSpot> It(GetWorld()); It; ++It)
+		{
+			const FVector To = It->GetActorLocation() - GetActorLocation();
+			if (To.Size2D() < It->ReachRadius() && FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To.GetSafeNormal2D()) > It->MinFacing())
+			{
+				OutText = It->PromptText();
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void AKnightCharacter::OnInteractKey()
+{
+	if (bSitting) { StandUp(); return; }
+	if (bMounted && !IsUIOpen()) { Dismount(); return; }
+	if (bDialogueOpen) { AdvanceDialogue(); return; }
+	if (bShopOpen) { CloseShop(); return; }
+	if (bSmithOpen) { CloseSmith(); return; }
+	if (bBankOpen) { CloseBank(); return; }
+	if (IsUIOpen() || bRolling || bSliding || bClimbing || GetCharacterMovement()->IsFalling()) return;
+	int32 Idx = -1;
+	ANpc* Npc = nullptr;
+	AHorse* Horse = nullptr;
+	switch (FindInteractable(Idx, Npc, Horse))
+	{
+	case EInteract::Horse: Mount(Horse); break;
+	case EInteract::Npc:   StartDialogue(Npc); break;
+	case EInteract::Bench: SitOnSeat(Idx); break;
+		case EInteract::Door:  UseDoor(FoundCottage.Get()); break;
+	case EInteract::Drop:
+		if (ALootDrop* Drop = FoundDrop.Get()) Drop->TakeAll(this);
+		break;
+	case EInteract::Loot:
+		if (ACottage* Hut = FoundCottage.Get())
+		{
+			const int32 Got = Hut->TakeLoot();
+			if (Got > 0 && Skills)
+			{
+				Skills->AddIngots(Got);
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("You take %d ingots."), Got));
+			}
+		}
+		break;
+	default: break;
+	}
+}
+
+void AKnightCharacter::UseDoor(ACottage* Hut)
+{
+	if (!Hut || !Skills) return;
+	if (!Hut->IsLocked()) { Hut->ToggleDoor(); return; }
+
+	const float Now = GetWorld()->GetTimeSeconds();
+	const int32 Need = Hut->GetLockLevel();
+	const int32 Lv = Skills->GetLevel(ESkillType::Lockpicking);
+	if (Lv < Need)
+	{
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, FString::Printf(TEXT("The lock is too fine for you. Lockpicking level %d needed."), Need));
+		return;
+	}
+	if (Now < PickCooldownUntil) return;
+	PickCooldownUntil = Now + 1.0f;
+	// Better than the lock's level: easier. Always at least a one-in-three chance.
+	const float Chance = FMath::Clamp(0.35f + 0.06f * (Lv - Need), 0.35f, 0.95f);
+	if (FMath::FRand() < Chance)
+	{
+		Hut->Unlock();
+		Skills->AddXP(ESkillType::Lockpicking, 15 + 6 * Need);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, TEXT("Click. The lock gives way."));
+	}
+	else
+	{
+		Skills->AddXP(ESkillType::Lockpicking, 3);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("The pick slips. Try again."));
+	}
+}
+
+void AKnightCharacter::CallHorse()
+{
+	if (IsUIOpen() || bMounted) return;
+	AHorse* Best = nullptr;
+	for (TActorIterator<AHorse> It(GetWorld()); It; ++It) { if (!It->HasRider()) { Best = *It; break; } }
+	if (!Best) return;
+	Best->CallTo(this);
+	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Yellow, TEXT("You whistle. Your horse comes galloping."));
+}
+
+void AKnightCharacter::Mount(AHorse* H)
+{
+	if (!H || bMounted || bSitting || bClimbing) return;
+	bMounted = true;
+	MyHorse = H;
+	H->SetRider(this);
+	bCrouched = false;
+	bBlocking = false;
+	bAttacking = false;
+	HorseEnergy = 100.f;
+	bHorseTired = false;
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 2.f;
+}
+
+void AKnightCharacter::Dismount()
+{
+	if (!bMounted) return;
+	bMounted = false;
+	if (AHorse* H = MyHorse.Get()) H->SetRider(nullptr);
+	// Hop off to the right of the horse
+	SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+}
+
+void AKnightCharacter::SitOnSeat(int32 SeatIdx)
+{
+	const JeebTerrain::FSeat* Best = &JeebTerrain::Seats()[SeatIdx];
+
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	bCrouched = false;
+	bBlocking = false;
+	Move->StopMovementImmediately();
+	Move->DisableMovement();
+	const float Ground = JeebTerrain::HeightAt(Best->Pos.X, Best->Pos.Y);
+	SeatForward = FRotator(0.f, Best->Yaw, 0.f).Vector();
+	SetActorLocationAndRotation(FVector(Best->Pos.X, Best->Pos.Y, Ground + 79.f), FRotator(0.f, Best->Yaw, 0.f));
+	bSitting = true;
+}
+
+void AKnightCharacter::StandUp()
+{
+	if (!bSitting) return;
+	bSitting = false;
+	// Step forward off the bench and drop back to the ground
+	SetActorLocation(GetActorLocation() + SeatForward * 85.f + FVector(0.f, 0.f, 25.f));
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+}
+
+void AKnightCharacter::Jump()
+{
+		if (bClimbing)
+	{
+		if (ClimbT > 0.6f) ExitClimb(false, false);   // letting go takes a deliberate press, not a stray one
+		return;
+	}
+	if (bSitting)
+	{
+		StandUp();
+		return;
+	}
+	if (bSliding)
+	{
+		bSliding = false;
+		GetCharacterMovement()->bOrientRotationToMovement = bSavedOrient;
+	}
+	Super::Jump();
+}
+
+void AKnightCharacter::SpawnDust(const FVector& Pos, float Size)
+{
+	if (Dust.Num() == 0) return;
+	FDust& D = Dust[DustNext];
+	DustNext = (DustNext + 1) % Dust.Num();
+	D.Pos = Pos;
+	D.Age = 0.f;
+	D.Life = FMath::FRandRange(0.4f, 0.6f);
+	D.Size = Size * 0.45f; // small, subtle puffs
+}
+
+void AKnightCharacter::RefreshUIMode()
+{
+	const bool bOpen = IsUIOpen();
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetShowMouseCursor(bOpen);
+		PC->ResetIgnoreLookInput();
+		if (bOpen) PC->SetIgnoreLookInput(true);
+		if (bOpen)
+		{
+			FInputModeGameAndUI Mode;
+			Mode.SetHideCursorDuringCapture(false);
+			PC->SetInputMode(Mode);
+		}
+		else
+		{
+			PC->SetInputMode(FInputModeGameOnly());
+		}
+	}
+}
+
+void AKnightCharacter::ToggleSettings()
+{
+	bSettingsOpen = !bSettingsOpen;
+	if (bSettingsOpen) { bInventoryOpen = false; bBankOpen = false; bSkillsOpen = false; bShopOpen = false; bSmithOpen = false; CloseDialogue(); }
+	RefreshUIMode();
+	if (!bSettingsOpen && GConfig)
+	{
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+void AKnightCharacter::ToggleSkills()
+{
+	if (bSettingsOpen || bShopOpen || bSmithOpen || bDialogueOpen || bBankOpen) return;
+	bInventoryOpen = false;
+	bSkillsOpen = !bSkillsOpen;
+	GetCharacterMovement()->StopMovementImmediately();
+	RefreshUIMode();
+}
+
+void AKnightCharacter::ToggleInventory()
+{
+	if (bSettingsOpen) return;
+	if (bSkillsOpen) { bSkillsOpen = false; RefreshUIMode(); return; }
+	if (bDialogueOpen) { CloseDialogue(); return; }
+	if (bShopOpen) { CloseShop(); return; }
+	if (bSmithOpen) { CloseSmith(); return; }
+	if (bBankOpen) { CloseBank(); return; }
+	bInventoryOpen = !bInventoryOpen;
+	RefreshUIMode();
+}
+
+void AKnightCharacter::OpenShop()
+{
+	if (bSettingsOpen || bShopOpen) return;
+	bInventoryOpen = false;
+	bSmithOpen = false;
+	bShopOpen = true;
+	GetCharacterMovement()->StopMovementImmediately();
+	RefreshUIMode();
+}
+
+void AKnightCharacter::CloseShop()
+{
+	bShopOpen = false;
+	if (ANpc* N = TradeNpc.Get()) N->SetTalking(false);
+	RefreshUIMode();
+}
+
+void AKnightCharacter::OpenBank()
+{
+	if (bSettingsOpen || bBankOpen) return;
+	bInventoryOpen = false;
+	bShopOpen = false;
+	bSmithOpen = false;
+	bSkillsOpen = false;
+	bBankOpen = true;
+	GetCharacterMovement()->StopMovementImmediately();
+	RefreshUIMode();
+}
+
+void AKnightCharacter::CloseBank()
+{
+	bBankOpen = false;
+	if (ANpc* N = TradeNpc.Get()) N->SetTalking(false);
+	RefreshUIMode();
+}
+
+void AKnightCharacter::OpenSmith()
+{
+	if (bSettingsOpen || bSmithOpen) return;
+	bInventoryOpen = false;
+	bShopOpen = false;
+	bSmithOpen = true;
+	GetCharacterMovement()->StopMovementImmediately();
+	RefreshUIMode();
+}
+
+void AKnightCharacter::CloseSmith()
+{
+	bSmithOpen = false;
+	if (ANpc* N = TradeNpc.Get()) N->SetTalking(false);
+	RefreshUIMode();
+}
+
+void AKnightCharacter::StartDialogue(ANpc* Npc)
+{
+	if (!Npc || IsUIOpen()) return;
+	TradeNpc = Npc;
+	DialogueLines = Npc->MakeConversation();
+	DialogueIdx = 0;
+	bDialogueOpen = true;
+	bCrouched = false;
+	bBlocking = false;
+	Npc->SetTalking(true);
+	GetCharacterMovement()->StopMovementImmediately();
+	// Turn to face them
+	const FVector To = Npc->GetActorLocation() - GetActorLocation();
+	SetActorRotation(FRotator(0.f, FVector(To.X, To.Y, 0.f).Rotation().Yaw, 0.f));
+	RefreshUIMode();
+}
+
+void AKnightCharacter::AdvanceDialogue()
+{
+	if (!bDialogueOpen) return;
+	++DialogueIdx;
+	if (DialogueIdx < DialogueLines.Num()) return;
+
+	// The conversation is over: on to the trade screen if they have one
+	bDialogueOpen = false;
+	ANpc* Npc = TradeNpc.Get();
+	if (Npc && Npc->OffersTrade())
+	{
+		if (Npc->GetRole() == ENpcRole::Blacksmith) OpenSmith();
+		else if (Npc->GetRole() == ENpcRole::Banker) OpenBank();
+		else OpenShop();
+	}
+	else
+	{
+		if (Npc) Npc->SetTalking(false);
+		RefreshUIMode();
+	}
+}
+
+void AKnightCharacter::CloseDialogue()
+{
+	if (!bDialogueOpen) return;
+	bDialogueOpen = false;
+	if (ANpc* N = TradeNpc.Get()) N->SetTalking(false);
+	RefreshUIMode();
+}
+
+bool AKnightCharacter::GetDialogue(FString& OutName, FString& OutLine, bool& bOutLast) const
+{
+	if (!bDialogueOpen || !DialogueLines.IsValidIndex(DialogueIdx)) return false;
+	const ANpc* N = TradeNpc.Get();
+	OutName = N ? N->GetNpcName() : FString();
+	OutLine = DialogueLines[DialogueIdx];
+	bOutLast = (DialogueIdx == DialogueLines.Num() - 1);
+	return true;
+}
+
+void AKnightCharacter::AddControllerYawInput(float Val)
+{
+	Super::AddControllerYawInput(Val * LookSensitivity);
+}
+
+void AKnightCharacter::AddControllerPitchInput(float Val)
+{
+	Super::AddControllerPitchInput(Val * LookSensitivity);
+}
+
+void AKnightCharacter::ApplyGraphics()
+{
+	if (!GEngine || !GetWorld()) return;
+	UWorld* W = GetWorld();
+	// 1 = Lumen (pretty, heavy); 0 = off, with simple sky ambient light (much faster)
+	GEngine->Exec(W, *FString::Printf(TEXT("r.DynamicGlobalIlluminationMethod %d"), bFancyLighting ? 1 : 0));
+	GEngine->Exec(W, *FString::Printf(TEXT("r.ReflectionMethod %d"), bFancyLighting ? 1 : 2));
+	GEngine->Exec(W, *FString::Printf(TEXT("r.VolumetricCloud %d"), bFancyLighting ? 1 : 0));
+	GEngine->Exec(W, *FString::Printf(TEXT("r.VolumetricFog %d"), bFancyLighting ? 1 : 0));
+	GEngine->Exec(W, *FString::Printf(TEXT("r.ScreenPercentage %d"), FMath::RoundToInt(RenderScale * 100.f)));
+}
+
+void AKnightCharacter::SetFancyLighting(bool bOn)
+{
+	bFancyLighting = bOn;
+	if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("FancyLighting"), bOn, GGameUserSettingsIni);
+	ApplyGraphics();
+}
+
+void AKnightCharacter::SetRenderScale(float Value)
+{
+	const float New = FMath::Clamp(Value, 0.5f, 1.0f);
+	if (FMath::IsNearlyEqual(New, RenderScale, 0.005f)) return;
+	RenderScale = New;
+	if (GConfig) GConfig->SetFloat(TEXT("Jeebsland"), TEXT("RenderScale"), RenderScale, GGameUserSettingsIni);
+	ApplyGraphics();
+}
+
+void AKnightCharacter::SetLookSensitivity(float Value)
+{
+	LookSensitivity = FMath::Clamp(Value, 0.05f, 2.0f);
+	if (GConfig)
+	{
+		GConfig->SetFloat(TEXT("Jeebsland"), TEXT("LookSensitivity"), LookSensitivity, GGameUserSettingsIni);
+	}
+}
+
+void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
+{
+	ActiveNode = Node;
+	GatherStart = GetActorLocation();
+	if (Skill == ESkillType::Fishing)
+	{
+		// Face the water and cast: no swinging, just the pole held out
+		const FVector To = Node->GetActorLocation() - GetActorLocation();
+		SetActorRotation(FRotator(0.f, FVector(To.X, To.Y, 0.f).Rotation().Yaw, 0.f));
+		bFishing = true;
+		bSwinging = false;
+		return;
+	}
+	bFishing = false;
+	bSwinging = true;
+	SwingTime = 0.f;
+
+	if (Skill == ESkillType::Mining)
+	{
+		// Pickaxe: big overhead swings, two in a 2-second mine
+		bSideways = false;
+		SwingPeriod = 1.0f;
+		WindupAngle = 150.f;
+		StrikeAngle = 30.f;
+	}
+	else
+	{
+		// Axe: the arm is held out in front and sweeps sideways, right to left, about four chops in 5 seconds
+		bSideways = true;
+		SwingPeriod = 1.25f;
+		WindupAngle = 85.f;    // arm pulled out to the right
+		StrikeAngle = -40.f;   // arm swept across the front
+	}
+}
+
+void AKnightCharacter::EndGathering()
+{
+	ActiveNode.Reset();
+	bSwinging = false;
+	bFishing = false;
+}
+
+void AKnightCharacter::Tick(float DeltaSeconds)
+{
+	if (bShopOpen || bSmithOpen || bDialogueOpen || bBankOpen)
+	{
+		// Walking (or being pushed) away from whoever you are trading with ends the conversation
+		const ANpc* N = TradeNpc.Get();
+		if (!N || FVector::Dist2D(GetActorLocation(), N->GetActorLocation()) > 650.f)
+		{
+			CloseDialogue();
+			if (bShopOpen) CloseShop();
+			if (bSmithOpen) CloseSmith();
+			if (bBankOpen) CloseBank();
+		}
+	}
+
+	Super::Tick(DeltaSeconds);
+
+	// Working continues while you move; it only stops if you drift about a body length away
+	// from where you started, or turn so you are no longer facing the tree or rock
+	if (AResourceNode* Node = ActiveNode.Get())
+	{
+				const bool bTooFar = FVector::Dist2D(GetActorLocation(), GatherStart) > (bFishing ? 320.f : 200.f);
+		const FVector ToNode = Node->GetActorLocation() - GetActorLocation();
+		const bool bLookedAway = !bFishing && FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToNode.GetSafeNormal2D()) < 0.34f; // beyond about 70 degrees
+		if (bTooFar || bLookedAway)
+		{
+			Node->CancelGathering();
+		}
+	}
+
+	const float Dt = FMath::Max(DeltaSeconds, 0.0001f);
+	const FVector Vel = GetVelocity();
+	const float Speed = Vel.Size2D();
+	const bool bFalling = GetCharacterMovement()->IsFalling();
+
+	// ---------- Ladders ----------
+	if (bClimbing) UpdateClimb(Dt); else TryStartClimb();
+
+	// ---------- Special moves: roll, slide ----------
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	SlideCooldown = FMath::Max(0.f, SlideCooldown - Dt);
+	RollCooldown = FMath::Max(0.f, RollCooldown - Dt);
+	float SpecialSpeed = 0.f;
+
+	if (bRolling)
+	{
+		RollT += Dt;
+		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
+		SpecialSpeed = FMath::Lerp(900.f, 380.f, K * K);
+		Move->Velocity.X = RollDir.X * SpecialSpeed;
+		Move->Velocity.Y = RollDir.Y * SpecialSpeed;
+		if (RollT >= RollDur || bFalling)
+		{
+			bRolling = false;
+			RollCooldown = 0.9f;
+			Move->bOrientRotationToMovement = bSavedOrient;
+		}
+	}
+	if (bSliding)
+	{
+		SlideT += Dt;
+		// Downhill keeps the slide going; flat ground slows it
+		float Downhill = 0.f;
+		if (Move->CurrentFloor.IsWalkableFloor())
+		{
+			Downhill = FMath::Max(0.f, FVector::DotProduct(Move->CurrentFloor.HitResult.ImpactNormal, SlideDir));
+		}
+		SlideSpeed = FMath::Clamp(SlideSpeed + (-650.f + 2600.f * Downhill) * Dt, 0.f, 1100.f);
+		SpecialSpeed = SlideSpeed + 50.f;
+		Move->Velocity.X = SlideDir.X * SlideSpeed;
+		Move->Velocity.Y = SlideDir.Y * SlideSpeed;
+		if (SlideSpeed < 190.f || SlideT > 3.f || AirAlpha > 0.8f)
+		{
+			bSliding = false;
+			SlideCooldown = 0.9f;
+			Move->bOrientRotationToMovement = bSavedOrient;
+		}
+	}
+	const bool bSpecial = bRolling || bSliding;
+
+	if (bAttacking)
+	{
+		AttackT += Dt;
+		const float HitFrac = (AtkStyle == EAtkStyle::Slash) ? 0.43f : (AtkStyle == EAtkStyle::Thrust ? 0.5f : 0.3f);
+		if (!bAttackHit && AttackT >= AttackDur * HitFrac)
+		{
+			bAttackHit = true;
+			AttackLands();
+		}
+		if (AttackT >= AttackDur)
+		{
+			bAttacking = false;
+			const float Now = GetWorld()->GetTimeSeconds();
+			LastSwingEnd = Now;
+			LastSwingDir = AttackDir;
+			LastStyle = AtkStyle;
+			// Clicked during the swing (within 0.3 s of it ending): go straight into the left-to-right follow-up
+			if (AtkStyle == EAtkStyle::Slash && AttackDir > 0 && Now - QueuedClick <= 0.3f && !IsUIOpen())
+			{
+				StartAttack(EAtkStyle::Slash, -1, 0.f);
+			}
+		}
+	}
+
+	// Spear: charging builds up while the button is held
+	if (bCharging)
+	{
+		ChargeT += Dt;
+		if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || SelectedKind() != JeebItems::K_Spear) bCharging = false;
+	}
+
+	// Health: your maximum grows with Defence and the Vitality amulet; you recover slowly when left alone
+	if (Skills)
+	{
+		const int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
+		if (NewMax != MaxHealth)
+		{
+			Health = FMath::Max(1.f, Health + (NewMax - MaxHealth));
+			MaxHealth = NewMax;
+		}
+		if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastHurtTime > 6.f)
+		{
+			Health = FMath::Min((float)MaxHealth, Health + MaxHealth * 0.02f * Dt);
+		}
+	}
+
+	// ---------- Sprint stamina ----------
+	const bool bWantSprint = !bMounted && bSprinting && !bCrouched && !bBlocking && !bExhausted;
+	const bool bDrain = bWantSprint && Speed > 330.f && !bFalling && !bSpecial;
+	if (bDrain)
+	{
+		Stamina = FMath::Max(0.f, Stamina - 16.f * Dt / GetStaminaMult());   // better boots: it lasts longer...
+		StaminaDelay = 1.0f;
+		if (Stamina <= 0.f) bExhausted = true;
+	}
+	else
+	{
+		StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
+		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
+	}
+	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+
+	// ---------- Ground speed (crouching and blocking are slow); slower in the air with a smooth slide down to it ----------
+	const float AirMul = 0.69f;
+	// Riding: twice the walking speed, and twice the sprint. The horse sprints for about four seconds, then needs
+	// its 100-point bar to refill completely before the next gallop.
+	bool bHorseSprint = false;
+	if (bMounted)
+	{
+		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling;
+		if (bAsk && HorseEnergy > 0.f)
+		{
+			HorseEnergy = FMath::Max(0.f, HorseEnergy - (25.f / 100.f) * Dt);
+			bHorseSprint = true;
+			if (HorseEnergy <= 0.f) bHorseTired = true;
+		}
+		else
+		{
+			HorseEnergy = FMath::Min(100.f, HorseEnergy + (bHorseTired ? 10.f : 16.f) * Dt);
+			if (bHorseTired && HorseEnergy >= 4.f) bHorseTired = false;
+		}
+	}
+	const float BaseSpeed = bMounted ? (bHorseSprint ? 2.f * SprintSpeed : 2.f * WalkSpeed)
+	                                 : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed));
+	if (bFalling && !bSpecial)
+	{
+		AirSpeedMul = AirMul;
+		const float AirCap = BaseSpeed * AirMul;
+		FVector Horizontal(Move->Velocity.X, Move->Velocity.Y, 0.f);
+		const float HSpeed = Horizontal.Size();
+		if (HSpeed > AirCap)
+		{
+			const float NewSpeed = FMath::FInterpConstantTo(HSpeed, AirCap, Dt, 1500.f); // about 0.2 s to go from a sprint to the air speed
+			Horizontal *= NewSpeed / HSpeed;
+			Move->Velocity.X = Horizontal.X;
+			Move->Velocity.Y = Horizontal.Y;
+		}
+	}
+	else if (!bFalling)
+	{
+		AirSpeedMul = FMath::FInterpTo(AirSpeedMul, 1.f, Dt, 6.f); // speeding back up after landing, as before
+	}
+	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
+
+	// ---------- Landing detection ----------
+	if (bFalling)
+	{
+		if (!bWasFalling) LastFallVz = 0.f;
+		LastFallVz = FMath::Min(LastFallVz, Vel.Z);
+	}
+	else if (bWasFalling)
+	{
+		LandImpact = FMath::Clamp(-LastFallVz / 900.f, 0.3f, 1.f); // harder landings squash more
+		LandTimer = LandDuration;
+	}
+	bWasFalling = bFalling;
+	LandTimer = FMath::Max(0.f, LandTimer - Dt);
+	const float Squash = LandImpact * (LandTimer / LandDuration);
+
+	// ---------- Blends (everything eases in and out) ----------
+	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
+	RunAlpha  = FMath::FInterpTo(RunAlpha, FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f), Dt, 6.f); // 0 = walk, 1 = full sprint
+	AirAlpha  = FMath::FInterpTo(AirAlpha, bFalling ? 1.f : 0.f, Dt, 14.f);
+	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, bCrouched ? 1.f : 0.f, Dt, 10.f);
+	BlockAlpha  = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
+	SlideAlpha  = FMath::FInterpTo(SlideAlpha, bSliding ? 1.f : 0.f, Dt, 12.f);
+	SitAlpha    = FMath::FInterpTo(SitAlpha, bSitting ? 1.f : 0.f, Dt, 8.f);
+	MountAlpha  = FMath::FInterpTo(MountAlpha, bMounted ? 1.f : 0.f, Dt, 8.f);
+	TuckAlpha   = FMath::FInterpTo(TuckAlpha, bRolling ? 1.f : 0.f, Dt, 18.f);
+	ClimbAlpha  = FMath::FInterpTo(ClimbAlpha, bClimbing ? 1.f : 0.f, Dt, 12.f);
+	const float CS = FMath::Sin(ClimbPhase);
+	const float Air = AirAlpha;
+	const float Ground = 1.f - Air;
+	const float Duck = FMath::Max(CrouchAlpha, 0.5f * BlockAlpha) * Ground; // how low the knight is sitting
+	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
+
+	// ---------- Gait clock: faster strides when running ----------
+	const float Hz = FMath::Lerp(1.3f, 2.1f, RunAlpha) * FMath::Lerp(1.f, 0.7f, CrouchAlpha); // crouch-walking is about 40% slower
+	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * Hz * Dt, 2.f * PI);
+	IdleTime += Dt;
+	FlutterTime += Dt * (1.f + 1.5f * Stream);
+	const float S = FMath::Sin(GaitPhase); // right leg forward when positive
+	const float C = FMath::Cos(GaitPhase);
+
+	// ---------- Strength of each motion ----------
+	const float StepScale  = 1.f - 0.4f * CrouchAlpha; // smaller steps when crouched
+	const float HipAmp     = FMath::Lerp(32.f, 80.f, RunAlpha) * MoveBlend * StepScale;
+	const float KneeAmp    = FMath::Lerp(40.f, 105.f, RunAlpha) * MoveBlend * StepScale;
+	const float ArmAmp     = FMath::Lerp(22.f, 55.f, RunAlpha) * MoveBlend;
+	const float ElbowBase  = FMath::Lerp(12.f, 70.f, RunAlpha) * MoveBlend;
+	const float ElbowSwing = FMath::Lerp(8.f, 25.f, RunAlpha) * MoveBlend;
+	const float Lean       = FMath::Lerp(3.f, 20.f, RunAlpha) * MoveBlend;
+	const float Twist      = FMath::Lerp(5.f, 12.f, RunAlpha) * MoveBlend;
+
+	// ---------- Jump pose: where are we in the arc? 0 = rising fast ... 1 = falling fast ----------
+	const float F01 = FMath::Clamp(0.5f - Vel.Z / 1000.f, 0.f, 1.f);
+	const float Asym = FMath::Clamp(Speed / 250.f, 0.f, 1.f); // running leap (one knee up) vs standing jump (both tucked)
+
+	// ---------- Legs ----------
+	// On the ground: legs swing opposite each other; the knee bends most as a leg passes under the body
+	// (smooth everywhere: no sharp corners in the curve, so no jerks)
+	const float SwingR = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f + C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f - C));
+	const float SwingL = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f - C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f + C));
+	const float HipRg = HipAmp * S;
+	const float HipLg = -HipAmp * S;
+	const float KneeRg = -KneeAmp * SwingR;
+	const float KneeLg = -KneeAmp * SwingL;
+	// In the air: knees tuck on the way up, legs reach forward on the way down
+	const float HipRa  = FMath::Lerp(FMath::Lerp(30.f, 60.f, Asym), FMath::Lerp(15.f, 35.f, Asym), F01);
+	const float HipLa  = FMath::Lerp(FMath::Lerp(30.f, -15.f, Asym), FMath::Lerp(15.f, 0.f, Asym), F01);
+	const float KneeRa = -FMath::Lerp(FMath::Lerp(55.f, 85.f, Asym), 25.f, F01);
+	const float KneeLa = -FMath::Lerp(FMath::Lerp(55.f, 40.f, Asym), 20.f, F01);
+
+	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * Squash + 55.f * Duck;
+	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + 55.f * Duck;
+	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash - 95.f * Duck;
+	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash - 95.f * Duck;
+	// Sliding: one leg stretched out in front, the other folded under
+	HipRf = FMath::Lerp(HipRf, 78.f, SlideAlpha);   KneeRf = FMath::Lerp(KneeRf, -4.f, SlideAlpha);
+	HipLf = FMath::Lerp(HipLf, 45.f, SlideAlpha);   KneeLf = FMath::Lerp(KneeLf, -115.f, SlideAlpha);
+	// Sitting: thighs level, shins hanging down
+	HipRf = FMath::Lerp(HipRf, 90.f, SitAlpha);     KneeRf = FMath::Lerp(KneeRf, -90.f, SitAlpha);
+	HipLf = FMath::Lerp(HipLf, 90.f, SitAlpha);     KneeLf = FMath::Lerp(KneeLf, -90.f, SitAlpha);
+	// Riding: thighs forward and a little apart, shins hanging beside the horse
+	HipRf = FMath::Lerp(HipRf, 62.f, MountAlpha);   KneeRf = FMath::Lerp(KneeRf, -42.f, MountAlpha);
+	HipLf = FMath::Lerp(HipLf, 62.f, MountAlpha);   KneeLf = FMath::Lerp(KneeLf, -42.f, MountAlpha);
+	// Climbing: legs step up the rungs alternately
+	HipRf = FMath::Lerp(HipRf, 55.f + 45.f * CS, ClimbAlpha);   KneeRf = FMath::Lerp(KneeRf, -(65.f + 35.f * CS), ClimbAlpha);
+	HipLf = FMath::Lerp(HipLf, 55.f - 45.f * CS, ClimbAlpha);   KneeLf = FMath::Lerp(KneeLf, -(65.f - 35.f * CS), ClimbAlpha);
+	// Rolling: tucked into a ball
+	HipRf = FMath::Lerp(HipRf, 105.f, TuckAlpha);   KneeRf = FMath::Lerp(KneeRf, -125.f, TuckAlpha);
+	HipLf = FMath::Lerp(HipLf, 105.f, TuckAlpha);   KneeLf = FMath::Lerp(KneeLf, -125.f, TuckAlpha);
+
+	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, 0.f));
+	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, 0.f));
+	KneeR->SetRelativeRotation(FRotator(KneeRf, 0.f, 0.f));
+	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
+
+	// ---------- Body bounce ----------
+	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
+	// Walking: the hips dip when the legs spread. Running: the body is lowest mid-stance and floats up
+	// while the legs are spread, so there is a brief moment with both feet off the ground.
+	const float WalkBounce = -48.6f * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
+	const float RunBounce  = -0.75f * 48.6f * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
+	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);
+	const float Breath = 0.8f * FMath::Sin(IdleTime * 2.2f) * (1.f - MoveBlend);
+	float BodyZ = FMath::Lerp(Bounce + Breath, 0.f, Air) - 16.f * Squash - 16.f * Duck;
+	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
+	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
+	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle
+	BodyZ = FMath::Lerp(BodyZ, -45.f, TuckAlpha);
+	SmoothBodyZ = FMath::FInterpTo(SmoothBodyZ, BodyZ, Dt, 22.f); // soften any remaining steps
+	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, SmoothBodyZ));
+
+	// ---------- Chest: lean into the run, twist against the hips, lean into turns ----------
+	const float NewYaw = GetActorRotation().Yaw;
+	const float TurnRate = FMath::Clamp(FMath::FindDeltaAngleDegrees(PrevYaw, NewYaw) / Dt, -720.f, 720.f);
+	PrevYaw = NewYaw;
+	YawRate = FMath::FInterpTo(YawRate, TurnRate, Dt, 8.f);
+	const float TurnRoll = FMath::Clamp(YawRate * 0.025f, -12.f, 12.f) * Stream;
+
+	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
+	float UpperPitch = FMath::Lerp(-Lean, AirLean, Air) - 12.f * Squash - 14.f * Duck;
+	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
+	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
+	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
+	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
+	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground, TurnRoll));
+
+	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
+	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
+	const float BobAmp = FMath::Lerp(4.f, 16.f, RunAlpha) * MoveBlend;
+	const float ChestTarget = (Ground * (-BobAmp * (1.f - S * S)) + Air * FMath::Lerp(5.f, -4.f, F01)) * (1.f - FMath::Max(SlideAlpha, SitAlpha));
+	SmoothChestZ = FMath::FInterpTo(SmoothChestZ, ChestTarget, Dt, 30.f);
+	UpperPivot->SetRelativeLocation(UpperBase + FVector(0.f, 0.f, SmoothChestZ));
+
+	// Pelvis sways with the steps: a little roll as weight shifts, and hips turning against the shoulders
+	float FlipPitch = 0.f;
+	if (bRolling)
+	{
+		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
+		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
+	}
+	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground, 2.5f * MoveBlend * C * Ground));
+
+	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
+	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod, -0.7f * Twist * S * Ground, -0.5f * TurnRoll));
+
+	// ---------- Cape and plume ----------
+	const float FlapAmp = 3.f + 9.f * Stream;
+	const float CapeUpperG = FMath::Lerp(-4.f, -28.f, Stream) + FlapAmp * FMath::Sin(FlutterTime * 3.1f);
+	const float CapeLowerG = FMath::Lerp(-6.f, -38.f, Stream) + FlapAmp * 1.6f * FMath::Sin(FlutterTime * 5.3f + 1.2f);
+	const float CapeUpperA = FMath::Lerp(-5.f, -40.f, F01);  // streams down while rising, flies up while falling
+	const float CapeLowerA = FMath::Lerp(-8.f, -65.f, F01);
+	CapeUpper->SetRelativeRotation(FRotator(
+		FMath::Lerp(CapeUpperG, CapeUpperA, Air), 0.f,
+		(2.f + 5.f * Stream) * FMath::Sin(FlutterTime * 2.3f) - 0.5f * TurnRoll));
+	CapeLower->SetRelativeRotation(FRotator(
+		FMath::Lerp(CapeLowerG, CapeLowerA, Air), 0.f,
+		(3.f + 9.f * Stream) * FMath::Sin(FlutterTime * 3.7f + 0.8f) - 0.8f * TurnRoll));
+
+	const float PlumeG = FMath::Lerp(0.f, 20.f, Stream) + (3.f + 5.f * Stream) * FMath::Sin(FlutterTime * 4.1f + 0.5f);
+	const float PlumeA = FMath::Lerp(20.f, -15.f, F01);
+	PlumePivot->SetRelativeRotation(FRotator(FMath::Lerp(PlumeG, PlumeA, Air), 0.f, 4.f * Stream * FMath::Sin(FlutterTime * 3.3f)));
+
+	// ---------- Arms ----------
+	const float ArmSway = 1.5f * FMath::Sin(IdleTime * 1.7f) * (1.f - MoveBlend);
+	const float ArmAirPitch = FMath::Lerp(100.f, 25.f, F01);   // arms thrown up on the way up, then out
+	const float ArmAirSpread = FMath::Lerp(20.f, 50.f, F01);
+
+	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
+	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash;
+	float RollL = Air * ArmAirSpread * 0.7f;
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air);
+	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
+	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
+	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
+	PitchL = FMath::Lerp(PitchL, 32.f, SitAlpha);      ElbowLdeg = FMath::Lerp(ElbowLdeg, 70.f, SitAlpha);
+	PitchL = FMath::Lerp(PitchL, 38.f, MountAlpha);    ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, MountAlpha);    // holding the reins
+	PitchL = FMath::Lerp(PitchL, 85.f, TuckAlpha);     ElbowLdeg = FMath::Lerp(ElbowLdeg, 100.f, TuckAlpha);
+	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
+	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 22.f, 10.f)); // shield comes across in front of the body
+	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, 0.f));
+
+	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
+	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash;
+	float TargetYaw = 0.f;
+	float RollR = -Air * ArmAirSpread;
+	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
+	float ArmSpeed = 25.f;
+
+	TargetPitch = FMath::Lerp(TargetPitch, -35.f, SlideAlpha);   RollR = FMath::Lerp(RollR, -30.f, SlideAlpha);
+	TargetPitch = FMath::Lerp(TargetPitch, 32.f, SitAlpha);      ElbowRdeg = FMath::Lerp(ElbowRdeg, 70.f, SitAlpha);
+	TargetPitch = FMath::Lerp(TargetPitch, 38.f, MountAlpha);    ElbowRdeg = FMath::Lerp(ElbowRdeg, 55.f, MountAlpha);
+	TargetPitch = FMath::Lerp(TargetPitch, 85.f, TuckAlpha);     ElbowRdeg = FMath::Lerp(ElbowRdeg, 100.f, TuckAlpha);
+	TargetPitch = FMath::Lerp(TargetPitch, 140.f - 35.f * CS, ClimbAlpha);  ElbowRdeg = FMath::Lerp(ElbowRdeg, 25.f, ClimbAlpha);
+
+	if (bCharging && !bAttacking && !bSwinging)
+	{
+		// Spear drawn back, the stronger the pull the further back
+		const float K = FMath::Clamp(ChargeT / 1.0f, 0.f, 1.f);
+		TargetPitch = FMath::Lerp(70.f, 45.f, K);
+		TargetYaw = FMath::Lerp(0.f, 18.f, K);
+		ElbowRdeg = FMath::Lerp(60.f, 110.f, K);
+		RollR = 0.f;
+		ArmSpeed = 20.f;
+	}
+
+	if (bAttacking && !bSwinging)
+	{
+		const float T = AttackT / AttackDur;
+		if (AtkStyle == EAtkStyle::Thrust)
+		{
+			// Pull back, then drive the arm straight out
+			if (T < 0.35f)
+			{
+				const float A = T / 0.35f;
+				TargetPitch = FMath::Lerp(55.f, 45.f, A);  TargetYaw = FMath::Lerp(10.f, 18.f, A);  ElbowRdeg = FMath::Lerp(90.f, 115.f, A);
+			}
+			else
+			{
+				const float A = FMath::Clamp((T - 0.35f) / 0.25f, 0.f, 1.f);
+				TargetPitch = FMath::Lerp(45.f, 88.f, A);  TargetYaw = FMath::Lerp(18.f, 0.f, A);  ElbowRdeg = FMath::Lerp(115.f, 4.f, A);
+			}
+		}
+		else if (AtkStyle == EAtkStyle::Cast)
+		{
+			// Raise the arm and point
+			const float A = FMath::Clamp(T / 0.3f, 0.f, 1.f);
+			const float E = A * A * (3.f - 2.f * A);
+			TargetPitch = FMath::Lerp(20.f, 92.f, E);  TargetYaw = 0.f;  ElbowRdeg = FMath::Lerp(50.f, 8.f, E);
+		}
+		else if (AttackDir > 0)
+		{
+						// First swing, right to left: the arm comes up to shoulder height and swings out to the right,
+			// then the whole arm sweeps flat across the body
+			if (T < 0.35f)
+			{
+				const float A = T / 0.35f;
+				const float E = A * A * (3.f - 2.f * A);
+				TargetPitch = FMath::Lerp(10.f, 78.f, E);
+				TargetYaw = FMath::Lerp(0.f, 80.f, E);
+				ElbowRdeg = FMath::Lerp(ElbowRdeg, 65.f, E);
+			}
+			else if (T < 0.55f)
+			{
+				const float A = (T - 0.35f) / 0.2f;
+				TargetPitch = FMath::Lerp(78.f, 84.f, A);
+				TargetYaw = FMath::Lerp(80.f, -70.f, A * A);
+				ElbowRdeg = FMath::Lerp(65.f, 5.f, A);
+			}
+			else { TargetPitch = 84.f; TargetYaw = -70.f; ElbowRdeg = 5.f; }
+		}
+		else
+		{
+						// Follow-up, left to right: starts where the first one ended, draws back across the body, whips flat back out
+			if (T < 0.35f)
+			{
+				const float A = T / 0.35f;
+				const float E = A * A * (3.f - 2.f * A);
+				TargetPitch = FMath::Lerp(84.f, 80.f, E);
+				TargetYaw = FMath::Lerp(-70.f, -88.f, E);
+				ElbowRdeg = FMath::Lerp(5.f, 70.f, E);
+			}
+			else if (T < 0.55f)
+			{
+				const float A = (T - 0.35f) / 0.2f;
+				TargetPitch = FMath::Lerp(80.f, 84.f, A);
+				TargetYaw = FMath::Lerp(-88.f, 75.f, A * A);
+				ElbowRdeg = FMath::Lerp(70.f, 5.f, A);
+			}
+			else { TargetPitch = 84.f; TargetYaw = 75.f; ElbowRdeg = 5.f; }
+		}
+		RollR = 0.f;
+		ArmSpeed = 38.f;
+	}
+
+	if (bFishing)
+	{
+		// Pole held out over the water, with a slow bob
+		TargetPitch = 66.f + 3.f * FMath::Sin(IdleTime * 2.f);
+		TargetYaw = 0.f;
+		RollR = 0.f;
+		ElbowRdeg = 22.f;
+		ArmSpeed = 14.f;
+	}
+
+	if (bSwinging)
+	{
+		SwingTime += Dt;
+		const float T = FMath::Fmod(SwingTime, SwingPeriod) / SwingPeriod;
+
+		if (T < 0.55f)
+		{
+			// Wind up: raise the arm smoothly
+			const float A = T / 0.55f;
+			TargetPitch = FMath::Lerp(StrikeAngle, WindupAngle, A * A * (3.f - 2.f * A));
+		}
+		else if (T < 0.7f)
+		{
+			// Strike: fast swing down
+			const float A = (T - 0.55f) / 0.15f;
+			TargetPitch = FMath::Lerp(WindupAngle, StrikeAngle, A * A);
+		}
+		else
+		{
+			// Brief pause on impact
+			TargetPitch = StrikeAngle;
+		}
+		if (bSideways)
+		{
+			// The swing value drives a horizontal sweep, with the arm held out in front
+			TargetYaw = TargetPitch;
+			TargetPitch = 80.f;
+		}
+		RollR = 0.f;
+		ElbowRdeg = 0.f;
+		ArmSpeed = 30.f;
+	}
+
+	ArmPitch = FMath::FInterpTo(ArmPitch, TargetPitch, Dt, ArmSpeed);
+	ArmYaw = FMath::FInterpTo(ArmYaw, TargetYaw, Dt, ArmSpeed);
+	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, RollR));
+	ElbowRCur = FMath::FInterpTo(ElbowRCur, ElbowRdeg, Dt, 18.f);
+	ElbowR->SetRelativeRotation(FRotator(ElbowRCur, 0.f, 0.f));
+
+	// ---------- Dust puffs: footfalls when running, landings, slides ----------
+	const FVector FeetBase = GetActorLocation() + FVector(0.f, 0.f, -90.f);
+	if (!bFalling && !bSpecial && MoveBlend > 0.6f && RunAlpha > 0.3f && ((C > 0.f) != (PrevC > 0.f)))
+	{
+		const float Side = (S > 0.f) ? 13.f : -13.f;
+		SpawnDust(FeetBase + GetActorForwardVector() * 12.f + GetActorRightVector() * Side, 26.f + 14.f * RunAlpha);
+	}
+	PrevC = C;
+	if (!bFalling && bWasFalling == false && LandTimer > LandDuration - Dt * 1.5f && LandImpact > 0.45f)
+	{
+		SpawnDust(FeetBase + GetActorRightVector() * 25.f, 50.f * LandImpact + 20.f);
+		SpawnDust(FeetBase - GetActorRightVector() * 25.f, 50.f * LandImpact + 20.f);
+	}
+	if (bSliding)
+	{
+		SlideDustTimer += Dt;
+		if (SlideDustTimer > 0.06f)
+		{
+			SlideDustTimer = 0.f;
+			SpawnDust(FeetBase - SlideDir * 30.f + GetActorRightVector() * FMath::FRandRange(-20.f, 20.f), FMath::FRandRange(32.f, 52.f));
+		}
+	}
+	for (int32 i = 0; i < Dust.Num(); ++i)
+	{
+		FDust& D = Dust[i];
+		D.Age += Dt;
+		FTransform T(FQuat::Identity, FVector(0.f, 0.f, -9000.f), FVector(0.001f));
+		if (D.Age < D.Life)
+		{
+			const float K = D.Age / D.Life;
+			const float Sz = D.Size * (0.4f + 0.9f * FMath::Sqrt(K)) * (1.f - K * K) / 100.f;
+			T = FTransform(FQuat::Identity, D.Pos + FVector(0.f, 0.f, 30.f * K), FVector(FMath::Max(Sz, 0.001f)));
+		}
+		DustISM->UpdateInstanceTransform(i, T, true, i == Dust.Num() - 1, true);
+	}
+}
