@@ -1,4 +1,5 @@
 #include "ResourceNode.h"
+#include "Messages.h"
 #include "KnightCharacter.h"
 #include "Inventory.h"
 #include "Engine/Engine.h"
@@ -28,7 +29,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 
 	if (Charges <= 0)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, EmptyText);
+		JeebMsg::Post(2.f, FColor::Orange, EmptyText);
 		return true;
 	}
 	if (bBeingGathered) return true;
@@ -39,7 +40,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 		const int32 Need = RequiredLevel();
 		if (Skills->GetLevel(Skill) < Need)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange,
+			JeebMsg::Post(3.f, FColor::Orange,
 				FString::Printf(TEXT("You need %s level %d for this."), *USkillComponent::SkillName(Skill), Need));
 			return true;
 		}
@@ -54,7 +55,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 	bBeingGathered = true;
 	CurrentGatherer = Gatherer;
 	if (Knight) Knight->BeginGathering(this, Skill);
-	GEngine->AddOnScreenDebugMessage(-1, EffectiveSeconds, FColor::Yellow, StartText);
+	JeebMsg::Post(EffectiveSeconds, FColor::Yellow, StartText);
 	GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
 	return true;
 }
@@ -69,7 +70,7 @@ void AResourceNode::CancelGathering()
 	{
 		Knight->EndGathering();
 	}
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("You stop."));
+	if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You stop."));
 }
 
 void AResourceNode::FinishGathering()
@@ -83,7 +84,7 @@ void AResourceNode::FinishGathering()
 	}
 	if (!Gatherer || FVector::Dist2D(Gatherer->GetActorLocation(), GetActorLocation()) > ReachRadius() + 150.f)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("You wandered off and stopped."));
+		if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You wandered off and stopped."));
 		return;
 	}
 
@@ -94,7 +95,7 @@ void AResourceNode::FinishGathering()
 		RollYield(Skills, Item, XP);
 		if (!Skills->AddItem(Item, ItemsPerGather))
 		{
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
+			if (GEngine) JeebMsg::Post(3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
 			return;
 		}
 		Skills->AddXP(Skill, XP);
@@ -110,7 +111,7 @@ void AResourceNode::FinishGathering()
 		{
 			Msg += FString::Printf(TEXT(" (%d left)"), Charges);
 		}
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, Msg);
+		JeebMsg::Post(2.f, FColor::Green, Msg);
 	}
 
 	if (Charges <= 0)

@@ -44,6 +44,8 @@ private:
 	void DrawSkills(const USkillComponent* Skills);
 	void DrawSkillsScreen(AKnightCharacter* Knight);
 	void DrawSkillIcon(int32 SkillIdx, float X, float Y, float S);
+	void DrawSkillPopup(const USkillComponent* Skills);
+	bool DrawPackTabs(AKnightCharacter* Knight, float PX, float PY, bool bSkills);
 	void DrawLore(float PX, float PY, float PW, float PH);
 	void DrawBankScreen(AKnightCharacter* Knight);
 

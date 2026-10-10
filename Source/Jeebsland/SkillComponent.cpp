@@ -1,4 +1,5 @@
 #include "SkillComponent.h"
+#include "Messages.h"
 #include "Engine/Engine.h"
 #include "Inventory.h"
 #include "Lore.h"
@@ -88,16 +89,15 @@ void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 	XP[static_cast<int32>(Skill)] += Amount;
 	const int32 NewLevel = GetLevel(Skill);
 
-	if (GEngine)
+	// The HUD shows a progress bar for the skill you last trained, for 30 seconds
+	const double Now = FPlatformTime::Seconds();
+	LastSkill = Skill;
+	LastSkillTime = Now;
+	LastXPGain = Amount;
+	if (NewLevel > OldLevel)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Cyan,
-			FString::Printf(TEXT("+%d %s XP"), Amount, *SkillName(Skill)));
-		if (NewLevel > OldLevel)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green,
-				FString::Printf(TEXT("LEVEL UP! %s is now level %d"), *SkillName(Skill), NewLevel),
-				true, FVector2D(2.f, 2.f));
-		}
+		LevelUpTime = Now;
+		JeebMsg::Post(5.f, FColor::Green, FString::Printf(TEXT("Level up! %s is now level %d."), *SkillName(Skill), NewLevel));
 	}
 }
 
@@ -289,7 +289,7 @@ bool USkillComponent::DiscoverLore(int32 Index)
 	LoreFound.Add(Index);
 	if (GEngine)
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press O, Lore tab)"), E[Index].Title));
+		JeebMsg::Post(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press O, Lore tab)"), E[Index].Title));
 	}
 	return true;
 }

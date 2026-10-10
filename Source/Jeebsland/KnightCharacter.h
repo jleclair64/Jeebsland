@@ -72,6 +72,8 @@ public:
 	bool IsSmithOpen() const { return bSmithOpen; }
 	bool IsDialogueOpen() const { return bDialogueOpen; }
 	void ToggleInventory();
+	void ShowPackTab(bool bSkills);   // switch the open pack window between its Inventory and Skills tabs
+	bool bPitchLimitsSet = false;
 	void OpenShop();
 	void CloseShop();
 	void OpenSmith();

@@ -54,6 +54,15 @@ public:
 	static constexpr int32 NumWornKinds = 24;   // indexed by JeebItems::EKind
 
 	void AddXP(ESkillType Skill, int32 Amount);
+
+	// The skill trained most recently (for the HUD's pop-up progress bar); times are FPlatformTime::Seconds()
+	ESkillType LastSkill = ESkillType::Mining;
+	double LastSkillTime = -1000.0;
+	double LevelUpTime = -1000.0;
+	int32 LastXPGain = 0;
+
+	// The store's mystery satchel can be opened once per real-world hour (hours since 1970)
+	int64 LastGambleHour = -1;
 	bool AddItem(EItemType Item, int32 Amount = 1);   // false (and nothing added) if it does not fit
 	bool CanAdd(int32 Id, int32 Amount) const;
 	bool AddInvItem(int32 Id, int32 Amount = 1);

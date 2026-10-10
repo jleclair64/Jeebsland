@@ -1,4 +1,5 @@
 #include "Loot.h"
+#include "Messages.h"
 #include "Terrain.h"
 #include "Inventory.h"
 #include "Components/StaticMeshComponent.h"
@@ -122,8 +123,8 @@ void ALootDrop::TakeAll(AActor* Taker)
 	}
 	if (GEngine)
 	{
-		if (!Got.IsEmpty()) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("You take: %s"), *Got));
-		if (bLeft) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, TEXT("Your pack is full. Some is left behind."));
+		if (!Got.IsEmpty()) JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("You take: %s"), *Got));
+		if (bLeft) JeebMsg::Post(3.f, FColor::Orange, TEXT("Your pack is full. Some is left behind."));
 	}
 	if (!bLeft) Destroy();
 }

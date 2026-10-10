@@ -1,8 +1,10 @@
 #include "KnightCharacter.h"
+#include "Messages.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
@@ -352,14 +354,14 @@ void AKnightCharacter::UnequipHotbar(int32 H)
 {
 	if (!Skills) return;
 	if (Skills->UnequipHotbar(H)) RefreshEquipment();
-	else if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("No room in your inventory."));
+	else if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("No room in your inventory."));
 }
 
 void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing)
 {
 	if (!Skills) return;
 	if (Skills->UnequipWorn(Kind, bSecondRing)) RefreshEquipment();
-	else if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("No room in your inventory."));
+	else if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("No room in your inventory."));
 }
 
 void AKnightCharacter::CycleHotbar(int32 Dir)
@@ -403,7 +405,7 @@ bool AKnightCharacter::PrepareTool(ESkillType Skill, float& OutTimeMult)
 	}
 	if (Best < 0)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, FString::Printf(TEXT("You need a %s on your weapon bar. Buy or smith one."), Name));
+		if (GEngine) JeebMsg::Post(3.f, FColor::Orange, FString::Printf(TEXT("You need a %s on your weapon bar. Buy or smith one."), Name));
 		return false;
 	}
 	if (Skills->Selected != Best) SelectHotbar(Best);
@@ -602,7 +604,7 @@ void AKnightCharacter::Interact()
 			const int32 Tier = Skills ? Skills->TakeBestArrow() : -1;
 			if (Tier < 0)
 			{
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("You have no arrows."));
+				if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows."));
 				return;
 			}
 			PendingArrowTier = Tier;
@@ -760,7 +762,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From)
 		if (bClimbing) ExitClimb(false, false);
 		GetCharacterMovement()->Velocity = FVector::ZeroVector;
 		SetActorLocation(SpawnLoc);
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Red, TEXT("You were knocked out and woke up back at the start."));
+		if (GEngine) JeebMsg::Post(4.f, FColor::Red, TEXT("You were knocked out and woke up back at the start."));
 	}
 }
 
@@ -1065,7 +1067,7 @@ void AKnightCharacter::OnInteractKey()
 			if (Got > 0 && Skills)
 			{
 				Skills->AddIngots(Got);
-				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("You take %d ingots."), Got));
+				if (GEngine) JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("You take %d ingots."), Got));
 			}
 		}
 		break;
@@ -1083,7 +1085,7 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 	const int32 Lv = Skills->GetLevel(ESkillType::Lockpicking);
 	if (Lv < Need)
 	{
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, FString::Printf(TEXT("The lock is too fine for you. Lockpicking level %d needed."), Need));
+		if (GEngine) JeebMsg::Post(3.f, FColor::Orange, FString::Printf(TEXT("The lock is too fine for you. Lockpicking level %d needed."), Need));
 		return;
 	}
 	if (Now < PickCooldownUntil) return;
@@ -1094,12 +1096,12 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 	{
 		Hut->Unlock();
 		Skills->AddXP(ESkillType::Lockpicking, 15 + 6 * Need);
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, TEXT("Click. The lock gives way."));
+		if (GEngine) JeebMsg::Post(3.f, FColor::Green, TEXT("Click. The lock gives way."));
 	}
 	else
 	{
 		Skills->AddXP(ESkillType::Lockpicking, 3);
-		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("The pick slips. Try again."));
+		if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("The pick slips. Try again."));
 	}
 }
 
@@ -1110,7 +1112,7 @@ void AKnightCharacter::CallHorse()
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It) { if (!It->HasRider()) { Best = *It; break; } }
 	if (!Best) return;
 	Best->CallTo(this);
-	if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 2.5f, FColor::Yellow, TEXT("You whistle. Your horse comes galloping."));
+	if (GEngine) JeebMsg::Post(2.5f, FColor::Yellow, TEXT("You whistle. Your horse comes galloping."));
 }
 
 void AKnightCharacter::Mount(AHorse* H)
@@ -1231,6 +1233,14 @@ void AKnightCharacter::ToggleSkills()
 	bInventoryOpen = false;
 	bSkillsOpen = !bSkillsOpen;
 	GetCharacterMovement()->StopMovementImmediately();
+	RefreshUIMode();
+}
+
+void AKnightCharacter::ShowPackTab(bool bSkills)
+{
+	if (!bInventoryOpen && !bSkillsOpen) return;
+	bInventoryOpen = !bSkills;
+	bSkillsOpen = bSkills;
 	RefreshUIMode();
 }
 
@@ -1447,6 +1457,20 @@ void AKnightCharacter::EndGathering()
 
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
+	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
+	if (!bPitchLimitsSet)
+	{
+		if (APlayerController* PCtl = Cast<APlayerController>(GetController()))
+		{
+			if (PCtl->PlayerCameraManager)
+			{
+				PCtl->PlayerCameraManager->ViewPitchMin = -60.f;
+				PCtl->PlayerCameraManager->ViewPitchMax = 35.f;
+				bPitchLimitsSet = true;
+			}
+		}
+	}
+
 	if (bShopOpen || bSmithOpen || bDialogueOpen || bBankOpen)
 	{
 		// Walking (or being pushed) away from whoever you are trading with ends the conversation
