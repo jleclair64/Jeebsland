@@ -85,7 +85,7 @@ def add_wind(mat, strength, tip_only, lift):
     lib.connect_material_property(final, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0):
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -127,7 +127,8 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     lib.connect_material_property(spec, "", unreal.MaterialProperty.MP_SPECULAR)
     lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
 
-    add_wind(mat, strength, tip_only, lift)
+    if wind:
+        add_wind(mat, strength, tip_only, lift)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
     unreal.log("MATDIAG built " + name)
@@ -175,9 +176,13 @@ def import_texture(png, name):
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
 
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
+
 #              name          texture          tint                     gust lean cm  tips only  lift
 build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 9.0,          True,      0.0)
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88)
+# one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
+build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
 build_bark()
 unreal.log("MATDIAG all materials built")

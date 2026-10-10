@@ -31,6 +31,9 @@ public:
 	// Called by the forest right after spawning
 	void Setup(ETreeKind InKind, float Radius, float Height);
 
+	ETreeKind GetKind() const { return Kind; }
+	float GetTreeHeight() const { return TreeHeight; }
+
 	TArray<FTreePart> Parts;
 
 protected:
@@ -41,6 +44,7 @@ private:
 	UPROPERTY() UCapsuleComponent* Capsule = nullptr;
 
 	ETreeKind Kind = ETreeKind::Oak;
+	float TreeHeight = 0.f;
 	bool bHidden = false;
 	TArray<FTransform> Saved;
 };

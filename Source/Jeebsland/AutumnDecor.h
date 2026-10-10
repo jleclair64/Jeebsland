@@ -7,7 +7,7 @@
 class UInstancedStaticMeshComponent;
 
 // The Autumn Realm's finishing touches: carved pumpkins, hay bales, scarecrows, lamp posts, a graveyard,
-// floating candles, fallen leaves on the ground and a few drifting down around the player.
+// candle string lights in the village, fallen leaves and leaf piles under the trees, and a few leaves drifting down around the player.
 // Everything is drawn with shared instanced meshes, so it stays cheap.
 UCLASS()
 class AAutumnDecor : public AActor
@@ -35,17 +35,20 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* HayBox = nullptr;     // straw tufts (cubes)
 	UPROPERTY() UInstancedStaticMeshComponent* StoneBox = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* StoneCyl = nullptr;
-	UPROPERTY() UInstancedStaticMeshComponent* CandleBody = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* CandleBody = nullptr;   // candle wax (cylinders)
+	UPROPERTY() UInstancedStaticMeshComponent* CandleCup = nullptr;    // little brass holders
 	UPROPERTY() UInstancedStaticMeshComponent* Flame = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* Rope = nullptr;         // string-light cord, wires and the poles' finials
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> GroundLeaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> FallLeaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> GustLeaf;
 
 	UInstancedStaticMeshComponent* MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow, int32 CullStart = 0, int32 CullEnd = 0);
 
-	// Candles that float and bob over the meadow
-	TArray<FVector> CandleBase;
-	TArray<FVector> CandleBob;   // x = height of the bob, y = speed, z = phase
+	// Candle flames on the village string lights (they flicker)
+	TArray<FVector> FlameBase;
+	TArray<float> FlamePhase;
+	float FlameTimer = 0.f;
 	// Leaves drifting down around the player
 	struct FFallingLeaf { FVector Pos; float Fall; float Phase; float Spin; int32 Type; int32 Index; };
 	TArray<FFallingLeaf> Falling;
@@ -59,6 +62,8 @@ private:
 	FVector GustOrigin = FVector::ZeroVector;
 	FVector2D GustDir = FVector2D(1.f, 0.f);
 
+	float LeafZ = 0.012f;   // thickness scale of a loose leaf (the painted card is flat, so 1)
+	float LeafXY = 0.22f;   // size scale of a flying leaf
 	void SetGustLeaves(float Fade);
 
 	FRandomStream Rand;

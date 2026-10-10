@@ -471,9 +471,9 @@ void AForest::BeginPlay()
 
 	SetActorLocation(FVector::ZeroVector);
 
-	Tint(Trunk,    FLinearColor(0.22f, 0.14f, 0.08f));
-	Tint(RedTrunk, FLinearColor(0.34f, 0.14f, 0.07f));
-	Tint(Branch,   FLinearColor(0.21f, 0.13f, 0.07f));
+	Tint(Trunk,    FLinearColor(0.19f, 0.12f, 0.07f));
+	Tint(RedTrunk, FLinearColor(0.29f, 0.12f, 0.06f));
+	Tint(Branch,   FLinearColor(0.18f, 0.11f, 0.06f));
 	UMaterialInterface* LeafMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_TreeLeaf.M_TreeLeaf"));
 	if (LeafMat)
 	{
@@ -500,10 +500,10 @@ void AForest::BeginPlay()
 	if (BarkMat)
 	{
 		const FLinearColor BarkColors[4] = {
-			FLinearColor(0.24f, 0.15f, 0.085f),   // brown
-			FLinearColor(0.30f, 0.20f, 0.12f),    // warm brown
-			FLinearColor(0.22f, 0.19f, 0.16f),    // grey-brown
-			FLinearColor(0.30f, 0.16f, 0.085f) }; // reddish
+			FLinearColor(0.20f, 0.13f, 0.07f),    // brown
+			FLinearColor(0.26f, 0.17f, 0.10f),    // warm brown
+			FLinearColor(0.19f, 0.16f, 0.14f),    // grey-brown
+			FLinearColor(0.26f, 0.14f, 0.07f) };  // reddish
 		for (int32 v = 0; v < 4; ++v)
 		{
 			TrunkVar[v]->SetStaticMesh(MakeTrunkMesh(this, BarkMat, v));
@@ -513,7 +513,7 @@ void AForest::BeginPlay()
 		}
 		Branch->SetStaticMesh(MakeBranchMesh(this, BarkMat));
 		UMaterialInstanceDynamic* BM = UMaterialInstanceDynamic::Create(BarkMat, this);
-		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.21f, 0.13f, 0.07f));
+		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.18f, 0.11f, 0.06f));
 		Branch->SetMaterial(0, BM);
 		bBark = true;
 	}

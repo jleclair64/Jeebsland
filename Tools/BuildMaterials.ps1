@@ -40,6 +40,29 @@ $g.Dispose()
 $bmp.Save($png, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp.Dispose()
 
+# A single leaf in the same style as the tree-leaf texture: pale, varied in brightness (the game tints it), with a vein
+$png2 = Join-Path $proj 'Saved\T_LeafSingle.png'
+$bmp2 = New-Object System.Drawing.Bitmap 128, 128, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+$g2 = [System.Drawing.Graphics]::FromImage($bmp2)
+$g2.SmoothingMode = 'AntiAlias'
+$g2.Clear([System.Drawing.Color]::FromArgb(0, 200, 190, 180))
+$path = New-Object System.Drawing.Drawing2D.GraphicsPath
+# an almond-shaped leaf, pointed at the top, running nearly the full height of the card
+$path.AddBezier(64, 122, 18, 96, 22, 40, 64, 6)
+$path.AddBezier(64, 6, 106, 40, 110, 96, 64, 122)
+$lb = New-Object System.Drawing.Drawing2D.LinearGradientBrush ([System.Drawing.PointF]::new(20, 0)), ([System.Drawing.PointF]::new(108, 0)), ([System.Drawing.Color]::FromArgb(255, 250, 238, 220)), ([System.Drawing.Color]::FromArgb(255, 205, 192, 175))
+$g2.FillPath($lb, $path)
+$vein = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 160, 148, 132)), 2.5
+$g2.DrawLine($vein, 64, 122, 64, 14)
+for ($k = 0; $k -lt 4; $k++) {
+    $y = 100 - $k * 20
+    $g2.DrawLine($vein, 64, $y, 40 + $k * 4, $y - 16)
+    $g2.DrawLine($vein, 64, $y, 88 - $k * 4, $y - 16)
+}
+$g2.Dispose()
+$bmp2.Save($png2, [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp2.Dispose()
+
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $py = Join-Path $PSScriptRoot 'build_materials.py'
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$py" -unattended -nosplash -stdout -FullStdOutLogOutput

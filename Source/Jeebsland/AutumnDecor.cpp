@@ -1,6 +1,12 @@
 #include "AutumnDecor.h"
 #include "Scarecrow.h"
+#include "Cottage.h"
+#include "ChoppableTree.h"
 #include "Terrain.h"
+#include "EngineUtils.h"
+#include "Engine/StaticMesh.h"
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/BoxComponent.h"
@@ -12,18 +18,65 @@
 
 namespace
 {
-	const FLinearColor LeafPalette[3] = {
-		FLinearColor(0.80f, 0.30f, 0.05f), // orange
-		FLinearColor(0.55f, 0.08f, 0.05f), // red
-		FLinearColor(0.85f, 0.55f, 0.08f), // amber
+	// The same five autumn colours as the tree leaves (see Forest.cpp); the last is the green holdout
+	constexpr int32 NumLeafTypes = 5;
+	const FLinearColor LeafPalette[NumLeafTypes] = {
+		FLinearColor(0.62f, 0.17f, 0.03f), // burnt orange
+		FLinearColor(0.45f, 0.06f, 0.04f), // deep red
+		FLinearColor(0.70f, 0.40f, 0.05f), // amber
+		FLinearColor(0.50f, 0.30f, 0.04f), // gold-brown
+		FLinearColor(0.20f, 0.26f, 0.05f), // last green holdout
 	};
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;
 	constexpr float GustDuration = 2.4f;
 	constexpr float GustSpeed = 840.f;    // 40% slower than before
 	constexpr float GustWidth = 800.f;   // about as wide as a hut
-	constexpr int32 NumGroundLeaves = 4000;
-	constexpr int32 NumCandles = 45;
+	constexpr int32 NumOpenLeaves = 1500;   // loose leaves scattered in the open
+	constexpr int32 NumOpenPiles = 40;
+	constexpr float LeafScale = 0.30f;      // flying leaves: 30 cm long
+}
+
+// One painted leaf on a flat card (100 x 100, lying in XY, long axis along X), the same painted style as the tree leaves
+static UStaticMesh* MakeLeafCardMesh(UObject* Outer, UMaterialInterface* Mat)
+{
+	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf"), FName("Leaf")));
+
+	FMeshDescription MD;
+	FStaticMeshAttributes Attr(MD);
+	Attr.Register();
+	TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+	TVertexInstanceAttributesRef<FVector3f> Nrm = Attr.GetVertexInstanceNormals();
+	TVertexInstanceAttributesRef<FVector3f> Tan = Attr.GetVertexInstanceTangents();
+	TVertexInstanceAttributesRef<float> Sign = Attr.GetVertexInstanceBinormalSigns();
+	TVertexInstanceAttributesRef<FVector2f> UVs = Attr.GetVertexInstanceUVs();
+	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
+	const FPolygonGroupID Group = MD.CreatePolygonGroup();
+	GroupSlot[Group] = FName("Leaf");
+
+	auto Corner = [&](float X, float Y)
+	{
+		const FVertexID V = MD.CreateVertex();
+		Pos[V] = FVector3f(X, Y, 0.f);
+		const FVertexInstanceID I = MD.CreateVertexInstance(V);
+		Nrm[I] = FVector3f(0.f, 0.f, 1.f);
+		Tan[I] = FVector3f(1.f, 0.f, 0.f);
+		Sign[I] = 1.f;
+		UVs[I] = FVector2f((Y + 50.f) / 100.f, 1.f - (X + 50.f) / 100.f);   // texture "up" runs along +X
+		return I;
+	};
+	const FVertexInstanceID A = Corner(-50.f, -50.f), B = Corner(50.f, -50.f), C = Corner(50.f, 50.f), D = Corner(-50.f, 50.f);
+	MD.CreatePolygon(Group, { A, B, C });
+	MD.CreatePolygon(Group, { A, C, D });
+
+	UStaticMesh::FBuildMeshDescriptionsParams Params;
+	Params.bBuildSimpleCollision = false;
+	Params.bFastBuild = true;
+	TArray<const FMeshDescription*> Descs;
+	Descs.Add(&MD);
+	SM->BuildFromMeshDescriptions(Descs, Params);
+	return SM;
 }
 
 AAutumnDecor::AAutumnDecor()
@@ -53,10 +106,12 @@ AAutumnDecor::AAutumnDecor()
 	StoneBox = MakeISM(TEXT("StoneBox"), CubeMesh.Object,   FLinearColor(0.22f, 0.23f, 0.27f), true);
 	StoneCyl = MakeISM(TEXT("StoneCyl"), CylMesh.Object,    FLinearColor(0.22f, 0.23f, 0.27f), true);
 	CandleBody = MakeISM(TEXT("CandleBody"), CylMesh.Object, FLinearColor(0.88f, 0.84f, 0.72f), false);
-	Flame    = MakeISM(TEXT("Flame"),    ConeMesh.Object,   FLinearColor(1.00f, 0.72f, 0.10f), false);
-	for (int32 i = 0; i < 3; ++i)
+	CandleCup  = MakeISM(TEXT("CandleCup"),  CylMesh.Object, FLinearColor(0.50f, 0.33f, 0.07f), false);
+	Flame    = MakeISM(TEXT("Flame"),    ConeMesh.Object,   FLinearColor(5.0f, 2.2f, 0.35f), false);   // bright: glows
+	Rope     = MakeISM(TEXT("Rope"),     CylMesh.Object,    FLinearColor(0.20f, 0.14f, 0.07f), false);
+	for (int32 i = 0; i < NumLeafTypes; ++i)
 	{
-		GroundLeaf.Add(MakeISM(*FString::Printf(TEXT("GroundLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false, 5000, 6500));
+		GroundLeaf.Add(MakeISM(*FString::Printf(TEXT("GroundLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false, 4500, 6000));
 		FallLeaf.Add(MakeISM(*FString::Printf(TEXT("FallLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false));
 		GustLeaf.Add(MakeISM(*FString::Printf(TEXT("GustLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false));
 	}
@@ -90,6 +145,30 @@ void AAutumnDecor::BeginPlay()
 			M->SetVectorParameterValue(TEXT("Color"), T.Value);
 		}
 	}
+
+	// Loose leaves use a painted leaf card (same look and tints as the tree leaves) instead of plain squares
+	bool bLeafCards = false;
+	if (UMaterialInterface* LeafMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_FlyLeaf.M_FlyLeaf")))
+	{
+		UStaticMesh* LeafMesh = MakeLeafCardMesh(this, LeafMat);
+		for (int32 t = 0; t < NumLeafTypes; ++t)
+		{
+			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(LeafMat, this);
+			M->SetVectorParameterValue(TEXT("Tint"), LeafPalette[t]);
+			for (UInstancedStaticMeshComponent* C : { GroundLeaf[t], FallLeaf[t], GustLeaf[t] })
+			{
+				C->SetStaticMesh(LeafMesh);
+				C->SetMaterial(0, M);
+			}
+		}
+		bLeafCards = true;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("M_FlyLeaf is missing: run Tools/BuildMaterials.ps1. Loose leaves stay plain squares."));
+	}
+	LeafZ = bLeafCards ? 1.f : 0.012f;           // the card is flat already; the old cubes needed squashing
+	LeafXY = bLeafCards ? LeafScale : 0.22f;
 
 	// Collect transforms per mesh, then add them all in one go
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Batch;
@@ -324,17 +403,68 @@ void AAutumnDecor::BeginPlay()
 		AddPumpkin(FVector(G.X - 90.f, G.Y - 420.f, Ground(G.X - 90.f, G.Y - 420.f) - 2.f), 1.0f, Facing(FVector2D(G.X, G.Y)), true);
 	}
 
-	// ---------------- Fallen leaves covering the ground ----------------
-	for (int32 i = 0; i < NumGroundLeaves; ++i)
+	// ---------------- Fallen leaves: mostly under the trees, a thin scatter in the open, and leaf piles ----------------
+	auto PickLeaf = [&]() { return Rand.FRand() < 0.08f ? NumLeafTypes - 1 : Rand.RandRange(0, NumLeafTypes - 2); };
+	auto LooseLeaf = [&](float X, float Y)
+	{
+		if (JeebTerrain::NoGroundCover(X, Y)) return;                                        // none indoors, in the moat or on the pond
+		if (JeebTerrain::PathClearance(X, Y) < 40.f && Rand.FRand() < 0.6f) return;          // paths stay mostly swept
+		const float Wd = Rand.FRandRange(22.f, 36.f) * (bLeafCards ? 1.15f : 1.f);
+		const FQuat Q = FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-10.f, 10.f)).Quaternion();
+		Put(GroundLeaf[PickLeaf()], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
+	};
+	// A mound of leaves: cards heaped in a dome, tilted more toward the edge
+	auto LeafPile = [&](float CX, float CY, float Radius)
+	{
+		if (JeebTerrain::NoGroundCover(CX, CY) || JeebTerrain::PathClearance(CX, CY) < Radius + 40.f) return;
+		const int32 Cards = FMath::RoundToInt(Radius * 0.6f);
+		const int32 Dominant = PickLeaf();   // a pile is mostly one or two colours, like leaves from one tree
+		for (int32 k = 0; k < Cards; ++k)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI);
+			const float Fr = FMath::Sqrt(Rand.FRand());                               // 0 at the middle, 1 at the rim
+			const float X = CX + Radius * Fr * FMath::Cos(A), Y = CY + Radius * Fr * FMath::Sin(A);
+			const float Hgt = Radius * 0.32f * (1.f - Fr * Fr);
+			const float Wd = Rand.FRandRange(26.f, 42.f) * (bLeafCards ? 1.15f : 1.f);
+			const float Tilt = 12.f + 38.f * Fr;
+			const FQuat Q = FRotator(Rand.FRandRange(-Tilt, Tilt), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-Tilt, Tilt)).Quaternion();
+			const int32 Type = Rand.FRand() < 0.7f ? Dominant : PickLeaf();
+			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f + Hgt + Rand.FRandRange(0.f, 3.f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
+		}
+	};
+
+	// Under every broad-leaf tree: a carpet about as wide as the canopy, thinning toward the edge and drifting a little downwind
+	for (TActorIterator<AChoppableTree> It(GetWorld()); It; ++It)
+	{
+		if (It->GetKind() != ETreeKind::Oak) continue;
+		const FVector T = It->GetActorLocation();
+		const float R = FMath::Clamp(It->GetTreeHeight() * 0.5f, 160.f, 520.f);       // canopy radius, from the tree's height
+		const int32 Count = FMath::RoundToInt(PI * R * R / 3500.f * Rand.FRandRange(0.7f, 1.3f));   // about one leaf per 60 x 60 cm
+		for (int32 i = 0; i < Count; ++i)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI);
+			const float Rad = R * 1.1f * FMath::Pow(Rand.FRand(), 0.65f);               // denser near the trunk
+			if (Rad < 35.f) continue;                                                   // not inside the trunk
+			LooseLeaf(T.X + Rad * FMath::Cos(A) + 0.12f * R, T.Y + Rad * FMath::Sin(A) + 0.05f * R);
+		}
+		if (Rand.FRand() < 0.30f)
+		{
+			const float A = Rand.FRandRange(0.f, 2.f * PI), Rad = R * Rand.FRandRange(0.3f, 0.85f);
+			LeafPile(T.X + Rad * FMath::Cos(A), T.Y + Rad * FMath::Sin(A), Rand.FRandRange(28.f, 60.f));
+		}
+	}
+	// A thin scatter across the open land, and a few piles out in the meadows
+	for (int32 i = 0; i < NumOpenLeaves; ++i)
 	{
 		const float Ang = Rand.FRandRange(0.f, 2.f * PI);
 		const float Rad = 600.f + 8600.f * FMath::Sqrt(Rand.FRand());
-		const float X = Rad * FMath::Cos(Ang);
-		const float Y = Rad * FMath::Sin(Ang);
-				const float Wd = Rand.FRandRange(22.f, 38.f);
-		if (JeebTerrain::NoGroundCover(X, Y)) continue;   // no leaves indoors, in the moat or on the pond
-		const FQuat Q = FRotator(Rand.FRandRange(-12.f, 12.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-12.f, 12.f)).Quaternion();
-		Put(GroundLeaf[Rand.RandRange(0, 2)], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f), FVector(Wd / 100.f, Wd / 100.f, 0.012f)));
+		LooseLeaf(Rad * FMath::Cos(Ang), Rad * FMath::Sin(Ang));
+	}
+	for (int32 i = 0; i < NumOpenPiles; ++i)
+	{
+		const float Ang = Rand.FRandRange(0.f, 2.f * PI);
+		const float Rad = 900.f + 7000.f * FMath::Sqrt(Rand.FRand());
+		LeafPile(Rad * FMath::Cos(Ang), Rad * FMath::Sin(Ang), Rand.FRandRange(30.f, 65.f));
 	}
 
 	for (TPair<UInstancedStaticMeshComponent*, TArray<FTransform>>& Pair : Batch)
@@ -342,52 +472,135 @@ void AAutumnDecor::BeginPlay()
 		Pair.Key->AddInstances(Pair.Value, false, false, false);
 	}
 
-	// ---------------- Floating candles over the meadow, like the great hall ----------------
+	// ---------------- Candle string lights in the village: poles around the plaza and in front of each hut, cords swagged between them ----------------
 	{
-		TArray<FTransform> Bodies, Flames;
-		for (int32 i = 0; i < NumCandles; ++i)
+		TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Strings;
+		auto Add = [&](UInstancedStaticMeshComponent* C, const FTransform& T) { Strings.FindOrAdd(C).Add(T); };
+		auto Cyl = [&](UInstancedStaticMeshComponent* C, const FVector& A, const FVector& B, float Thick)   // a thin cylinder from A to B
 		{
-			const float Ang = Rand.FRandRange(0.f, 2.f * PI);
-			const float Rad = Rand.FRandRange(450.f, 1500.f);
-			const float X = 500.f + Rad * FMath::Cos(Ang);
-			const float Y = 300.f + Rad * FMath::Sin(Ang);
-			const FVector P(X, Y, Ground(X, Y) + Rand.FRandRange(330.f, 700.f));
-			CandleBase.Add(P);
-			CandleBob.Add(FVector(Rand.FRandRange(8.f, 18.f), Rand.FRandRange(0.6f, 1.1f), Rand.FRandRange(0.f, 6.28f)));
-			Bodies.Add(FTransform(FQuat::Identity, P, FVector(0.06f, 0.06f, 0.28f)));
-			Flames.Add(FTransform(FQuat::Identity, P + FVector(0, 0, 21.f), FVector(0.07f, 0.07f, 0.14f)));
-		}
-		CandleBody->AddInstances(Bodies, false, false, false);
-		Flame->AddInstances(Flames, false, false, false);
-	}
+			const FVector D = B - A;
+			const float Len = FMath::Max(D.Size(), 0.1f);
+			Add(C, FTransform(FRotationMatrix::MakeFromZ(D / Len).ToQuat(), (A + B) * 0.5f, FVector(Thick / 100.f, Thick / 100.f, Len / 100.f)));
+		};
 
+		// A pole: wood post with a little cap, returns the point the cord ties on to
+		auto Pole = [&](float X, float Y, float Height) -> FVector
+		{
+			const float Z = Ground(X, Y);
+			Add(Wood, FTransform(FQuat::Identity, FVector(X, Y, Z + Height * 0.5f), FVector(0.12f, 0.12f, Height / 100.f)));
+			Add(WoodCone, FTransform(FQuat::Identity, FVector(X, Y, Z + Height + 12.f), FVector(0.2f, 0.2f, 0.26f)));
+			return FVector(X, Y, Z + Height);
+		};
+
+		// One candle hanging from the cord at P: two fine wires to a brass cup, a wax candle with a melted rim, and a flame
+		auto Candle = [&](const FVector& P, const FVector& AlongDir)
+		{
+			const FVector Dh = FVector(AlongDir.X, AlongDir.Y, 0.f).GetSafeNormal();
+			const float BaseZ = P.Z - 34.f - 6.f;                                  // bottom of the cup
+			const float H = Rand.FRandRange(10.f, 15.f);                           // candle height
+			const FVector Rim = FVector(P.X, P.Y, BaseZ + 6.f);
+			Cyl(Rope, P, Rim + Dh * 5.f, 0.5f);                                    // wires from the cord down to the cup's rim
+			Cyl(Rope, P, Rim - Dh * 5.f, 0.5f);
+			Add(CandleCup,  FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 3.f), FVector(0.08f, 0.08f, 0.06f)));
+			Add(CandleCup,  FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 6.f), FVector(0.105f, 0.105f, 0.015f)));    // flared rim
+			Add(CandleBody, FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 2.f + H * 0.5f), FVector(0.044f, 0.044f, H / 100.f)));
+			Add(CandleBody, FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 2.f + H + 0.5f), FVector(0.056f, 0.056f, 0.012f)));   // melted wax pool on top
+			const FVector F(P.X, P.Y, BaseZ + 2.f + H + 4.2f);
+			Add(Flame, FTransform(FQuat::Identity, F, FVector(0.027f, 0.027f, 0.065f)));
+			FlameBase.Add(F);
+			FlamePhase.Add(Rand.FRandRange(0.f, 6.28f));
+		};
+
+		// A cord hung from A to B in a gentle sag, with candles along it and (on long runs) one warm light
+		auto Swag = [&](const FVector& A, const FVector& B, bool bLight)
+		{
+			const float Len = FVector::Distance(A, B);
+			const float Sag = FMath::Clamp(Len * 0.09f, 18.f, 55.f);
+			auto At = [&](float T) { return FMath::Lerp(A, B, T) - FVector(0.f, 0.f, Sag * 4.f * T * (1.f - T)); };
+			const int32 Segs = FMath::Max(6, FMath::CeilToInt(Len / 40.f));
+			for (int32 s = 0; s < Segs; ++s) Cyl(Rope, At(float(s) / Segs), At(float(s + 1) / Segs), 1.6f);
+			const int32 N = FMath::Max(2, FMath::RoundToInt(Len / 85.f));
+			for (int32 i = 0; i < N; ++i)
+			{
+				const float T = (i + 0.5f) / N;
+				Candle(At(T), B - A);
+			}
+			if (bLight && Len > 300.f)
+			{
+				UPointLightComponent* Light = NewObject<UPointLightComponent>(this);
+				Light->SetupAttachment(RootComponent);
+				Light->SetRelativeLocation(At(0.5f) - FVector(0.f, 0.f, 60.f));
+				Light->SetIntensity(90.f);
+				Light->SetLightColor(FLinearColor(1.0f, 0.66f, 0.30f));
+				Light->SetAttenuationRadius(430.f);
+				Light->SetCastShadows(false);
+				Light->RegisterComponent();
+			}
+		};
+
+		const FVector2D VC = JeebTerrain::VillageCenter();
+		const float VHalf = JeebTerrain::VillageHalf();
+
+		// Ring of poles round the fountain plaza, joined to one another
+		TArray<FVector> RingTops;
+		for (int32 k = 0; k < 8; ++k)
+		{
+			const float A = (k + 0.5f) * PI * 0.25f;
+			RingTops.Add(Pole(VC.X + 820.f * FMath::Cos(A), VC.Y + 820.f * FMath::Sin(A), 380.f));
+		}
+		for (int32 k = 0; k < 8; ++k) Swag(RingTops[k], RingTops[(k + 1) % 8], true);
+
+		// At each hut inside the walls: from the front roof corners to a pole either side of the doorway, then on to the ring
+		for (TActorIterator<ACottage> It(GetWorld()); It; ++It)
+		{
+			const FTransform HT = It->GetActorTransform();
+			const FVector HP = HT.GetLocation();
+			if (JeebTerrain::RectSD(FVector2D(HP.X, HP.Y), VC, FVector2D(VHalf, VHalf)) > -150.f) continue;   // only the huts inside the village
+			for (int32 Sd = -1; Sd <= 1; Sd += 2)
+			{
+				const FVector Eave = HT.TransformPosition(FVector(385.f, Sd * 300.f, 262.f));
+				const FVector PoleXY = HT.TransformPosition(FVector(560.f, Sd * 330.f, 0.f));
+				const FVector Top = Pole(PoleXY.X, PoleXY.Y, 330.f);
+				Swag(Eave, Top, false);
+				int32 Near = 0;
+				for (int32 r = 1; r < 8; ++r)
+					if (FVector2D::DistSquared(FVector2D(Top), FVector2D(RingTops[r])) < FVector2D::DistSquared(FVector2D(Top), FVector2D(RingTops[Near]))) Near = r;
+				Swag(Top, RingTops[Near], true);
+			}
+		}
+
+		for (TPair<UInstancedStaticMeshComponent*, TArray<FTransform>>& Pair : Strings)
+		{
+			Pair.Key->AddInstances(Pair.Value, false, false, false);
+		}
+	}
 	// ---------------- Leaves drifting down around the player ----------------
 	{
 		TArray<TArray<FTransform>> PerType;
-		PerType.SetNum(3);
+		PerType.SetNum(NumLeafTypes);
 		for (int32 i = 0; i < NumFallingLeaves; ++i)
 		{
 			FFallingLeaf Lf;
-			Lf.Type = i % 3;
+			Lf.Type = i % 4;   // no green ones in the air
 			Lf.Pos = FVector(Rand.FRandRange(-1500.f, 1500.f), Rand.FRandRange(-1500.f, 1500.f), Rand.FRandRange(0.f, 800.f));
 			Lf.Fall = Rand.FRandRange(55.f, 110.f);
 			Lf.Phase = Rand.FRandRange(0.f, 6.28f);
 			Lf.Spin = Rand.FRandRange(0.6f, 1.6f);
 			Lf.Index = PerType[Lf.Type].Num();
-			PerType[Lf.Type].Add(FTransform(FQuat::Identity, Lf.Pos, FVector(0.22f, 0.22f, 0.012f)));
+			PerType[Lf.Type].Add(FTransform(FQuat::Identity, Lf.Pos, FVector(LeafXY, LeafXY, LeafZ)));
 			Falling.Add(Lf);
 		}
-		for (int32 t = 0; t < 3; ++t) FallLeaf[t]->AddInstances(PerType[t], false, false, false);
+		for (int32 t = 0; t < NumLeafTypes; ++t) FallLeaf[t]->AddInstances(PerType[t], false, false, false);
 	}
 
 	// ---------------- Gust leaves (hidden until a gust blows through) ----------------
 	{
 		TArray<TArray<FTransform>> PerType;
-		PerType.SetNum(3);
+		PerType.SetNum(NumLeafTypes);
 		for (int32 i = 0; i < NumGustLeaves; ++i)
 		{
 			FGustLeaf L;
-			L.Type = i % 3;
+			L.Type = i % 4;
 			L.Along = Rand.FRandRange(-350.f, 350.f);
 			L.Across = Rand.FRandRange(-GustWidth * 0.5f, GustWidth * 0.5f);
 			L.Height = Rand.FRandRange(40.f, 330.f);
@@ -397,7 +610,7 @@ void AAutumnDecor::BeginPlay()
 			PerType[L.Type].Add(FTransform(FQuat::Identity, FVector(0, 0, -5000.f), FVector(0.001f)));
 			GustLeaves.Add(L);
 		}
-		for (int32 t = 0; t < 3; ++t) GustLeaf[t]->AddInstances(PerType[t], false, false, false);
+		for (int32 t = 0; t < NumLeafTypes; ++t) GustLeaf[t]->AddInstances(PerType[t], false, false, false);
 		bGustHidden = true;
 	}
 }
@@ -407,19 +620,19 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	Time += DeltaSeconds;
 
-	// Candles bob gently
-	for (int32 i = 0; i < CandleBase.Num(); ++i)
+	// Candle flames flicker (about 12 times a second is plenty)
+	FlameTimer += DeltaSeconds;
+	if (FlameTimer >= 0.08f && FlameBase.Num() > 0)
 	{
-		const FVector& B = CandleBase[i];
-		const FVector& Bob = CandleBob[i];
-		const FVector P(B.X + 10.f * FMath::Sin(Time * 0.3f + Bob.Z), B.Y + 10.f * FMath::Cos(Time * 0.27f + Bob.Z),
-		                B.Z + Bob.X * FMath::Sin(Time * Bob.Y + Bob.Z));
-		const bool bLast = (i == CandleBase.Num() - 1);
-		CandleBody->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.06f, 0.06f, 0.28f)), true, bLast, true);
-		const float Flicker = 1.f + 0.12f * FMath::Sin(Time * 9.f + Bob.Z * 3.f);
-		Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P + FVector(0, 0, 21.f), FVector(0.07f, 0.07f, 0.14f * Flicker)), true, bLast, true);
+		FlameTimer = 0.f;
+		for (int32 i = 0; i < FlameBase.Num(); ++i)
+		{
+			const float Ph = FlamePhase[i];
+			const float Flicker = 1.f + 0.20f * FMath::Sin(Time * 11.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
+			const FVector P = FlameBase[i] + FVector(0.4f * FMath::Sin(Time * 7.f + Ph), 0.4f * FMath::Cos(Time * 6.f + Ph), 3.2f * (Flicker - 1.f));
+			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.027f, 0.027f, 0.065f * Flicker)), true, i == FlameBase.Num() - 1, true);
+		}
 	}
-
 	// ---- Gust of wind: every few seconds a flurry of leaves whips past in an open part of the map ----
 	{
 		APlayerController* GPC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
@@ -477,7 +690,8 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 	if (!Pawn) return;
 	const FVector C = Pawn->GetActorLocation();
 
-	int32 LastOfType[3] = { -1, -1, -1 };
+	int32 LastOfType[NumLeafTypes];
+	for (int32 t = 0; t < NumLeafTypes; ++t) LastOfType[t] = -1;
 	for (int32 i = 0; i < Falling.Num(); ++i) LastOfType[Falling[i].Type] = i;
 
 	for (int32 i = 0; i < Falling.Num(); ++i)
@@ -497,7 +711,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 		}
 
 		const FQuat Q = FRotator(Time * L.Spin * 50.f + L.Phase * 40.f, Time * L.Spin * 70.f, Time * 35.f).Quaternion();
-		FallLeaf[L.Type]->UpdateInstanceTransform(L.Index, FTransform(Q, L.Pos, FVector(0.22f, 0.22f, 0.012f)), true, i == LastOfType[L.Type], true);
+		FallLeaf[L.Type]->UpdateInstanceTransform(L.Index, FTransform(Q, L.Pos, FVector(LeafXY, LeafXY, LeafZ)), true, i == LastOfType[L.Type], true);
 	}
 }
 
@@ -506,7 +720,8 @@ void AAutumnDecor::SetGustLeaves(float Fade)
 	const FVector2D Perp(-GustDir.Y, GustDir.X);
 	const FVector2D Center = FVector2D(GustOrigin.X, GustOrigin.Y) + GustDir * (GustSpeed * GustT);
 
-	int32 LastOfType[3] = { -1, -1, -1 };
+	int32 LastOfType[NumLeafTypes];
+	for (int32 t = 0; t < NumLeafTypes; ++t) LastOfType[t] = -1;
 	for (int32 i = 0; i < GustLeaves.Num(); ++i) LastOfType[GustLeaves[i].Type] = i;
 
 	for (int32 i = 0; i < GustLeaves.Num(); ++i)
@@ -523,7 +738,7 @@ void AAutumnDecor::SetGustLeaves(float Fade)
 			const FVector2D P = Center + GustDir * L.Along + Perp * (L.Across + Swirl);
 			const float Z = JeebTerrain::HeightAt(P.X, P.Y) + L.Height + 45.f * FMath::Sin(GustT * 6.f + L.Phase) + 25.f * GustT;
 			const FQuat Q = FRotator(GustT * L.Spin * 260.f, GustT * L.Spin * 340.f + L.Phase * 50.f, GustT * 200.f).Quaternion();
-			T = FTransform(Q, FVector(P.X, P.Y, Z), FVector(FMath::Max(0.22f * Fade, 0.001f), FMath::Max(0.22f * Fade, 0.001f), 0.012f));
+			T = FTransform(Q, FVector(P.X, P.Y, Z), FVector(FMath::Max(LeafXY * Fade, 0.001f), FMath::Max(LeafXY * Fade, 0.001f), LeafZ));
 		}
 		GustLeaf[L.Type]->UpdateInstanceTransform(L.Index, T, true, i == LastOfType[L.Type], true);
 	}
