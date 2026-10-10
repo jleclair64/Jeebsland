@@ -14,8 +14,8 @@ namespace
 	const FLinearColor CometBlue(0.45f, 0.70f, 1.0f), CometRed(1.0f, 0.42f, 0.30f);
 }
 
-// A flat 100 x 100 card in XY (normal +Z), UVs 0..1 with U running along +X
-static UStaticMesh* MakeCard(UObject* Outer, UMaterialInterface* Mat)
+// A flat 100 x 100 card in XY (normal +Z), UVs 0..1 with U running along +X (or a window of the texture)
+static UStaticMesh* MakeCard(UObject* Outer, UMaterialInterface* Mat, FVector2D UV0 = FVector2D(0, 0), FVector2D UV1 = FVector2D(1, 1))
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
 	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Sky"), FName("Sky")));
@@ -38,7 +38,7 @@ static UStaticMesh* MakeCard(UObject* Outer, UMaterialInterface* Mat)
 		Nrm[I] = FVector3f(0.f, 0.f, 1.f);
 		Tan[I] = FVector3f(1.f, 0.f, 0.f);
 		Sign[I] = 1.f;
-		UVs[I] = FVector2f((X + 50.f) / 100.f, (Y + 50.f) / 100.f);
+		UVs[I] = FVector2f(FMath::Lerp(float(UV0.X), float(UV1.X), (X + 50.f) / 100.f), FMath::Lerp(float(UV0.Y), float(UV1.Y), (Y + 50.f) / 100.f));
 		return I;
 	};
 	const FVertexInstanceID A = Corner(-50.f, -50.f), B = Corner(50.f, -50.f), C = Corner(50.f, 50.f), D = Corner(-50.f, 50.f);
@@ -76,12 +76,14 @@ ANightSky::ANightSky()
 	Streaks = MakeISM(TEXT("Streaks"), -9);
 	CometTail = MakeISM(TEXT("CometTail"), -8);
 	CometHead = MakeISM(TEXT("CometHead"), -7);
-	Clouds = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Clouds"));
-	Clouds->SetupAttachment(RootComponent);
-	Clouds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Clouds->SetCastShadow(false);
-	Clouds->SetTranslucentSortPriority(5);   // in front of the moon and stars
-	Clouds->bNeverDistanceCull = true;
+	CloudRoot = CreateDefaultSubobject<USceneComponent>(TEXT("CloudRoot"));
+	CloudRoot->SetupAttachment(RootComponent);
+	for (int32 k = 0; k < 4; ++k)   // one per cloud shape in the picture
+	{
+		UInstancedStaticMeshComponent* C = MakeISM(*FString::Printf(TEXT("Clouds%d"), k), 5);   // in front of the moon and stars
+		C->SetupAttachment(CloudRoot);
+		CloudSprites.Add(C);
+	}
 }
 
 FTransform ANightSky::StreakTransform(const FVector& HeadDir, const FVector& TailDir, float Length, float Width) const
@@ -99,7 +101,7 @@ void ANightSky::BeginPlay()
 	Super::BeginPlay();
 	UMaterialInterface* StarMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Star.M_Star"));
 	UMaterialInterface* StreakMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Streak.M_Streak"));
-	UMaterialInterface* CloudMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cirrus.M_Cirrus"));
+	UMaterialInterface* CloudMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cumulus.M_Cumulus"));
 	if (!StarMat || !StreakMat)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Sky materials missing: run Tools/BuildMaterials.ps1. No stars or comets."));
@@ -153,55 +155,36 @@ void ANightSky::BeginPlay()
 		CometHead->AddInstance(FTransform(FQuat::Identity, FVector(0, 0, -Radius), FVector(0.001f)));
 	}
 
-	// ---- High streaky clouds ----
+	// ---- Puffy clouds ----
 	if (CloudMat)
 	{
-		BuildClouds();
 		CloudMid = UMaterialInstanceDynamic::Create(CloudMat, this);
-		Clouds->SetMaterial(0, CloudMid);
+		for (int32 k = 0; k < CloudSprites.Num(); ++k)
+		{
+			const FVector2D UV0(0.5f * (k % 2), 0.5f * (k / 2));
+			CloudSprites[k]->SetStaticMesh(MakeCard(this, CloudMat, UV0, UV0 + FVector2D(0.5f, 0.5f)));
+			CloudSprites[k]->SetMaterial(0, CloudMid);
+		}
+		BuildClouds();
 	}
 }
 
-// A handful of long, thin bands of cirrus on a dome: each a curved strip with the streaky picture stretched along it
+// Fair-weather clouds: soft puffs scattered round the sky, thicker toward the horizon, flat side down
 void ANightSky::BuildClouds()
 {
-	TArray<FVector> Verts, Normals;
-	TArray<FVector2D> UV;
-	TArray<FLinearColor> Fade;
-	TArray<int32> Tris;
-	const int32 Along = 24, Across = 4;
-	for (int32 b = 0; b < 7; ++b)
+	TArray<TArray<FTransform>> Xf;
+	Xf.SetNum(CloudSprites.Num());
+	for (int32 i = 0; i < 90; ++i)
 	{
-		const float Az0 = Rand.FRandRange(0.f, 360.f);
-		const float Span = Rand.FRandRange(50.f, 85.f);              // degrees of sky each band crosses
-		const float El = Rand.FRandRange(14.f, 42.f);
-		const float Tilt = Rand.FRandRange(-10.f, 10.f);             // bands drift up or down a little along their length
-		const float Wd = Rand.FRandRange(3.5f, 7.f);                  // degrees wide
-		const float V0 = Rand.FRand();                                // which part of the picture this band uses
-		const int32 First = Verts.Num();
-		for (int32 i = 0; i <= Along; ++i)
-		{
-			const float T = float(i) / Along;
-			for (int32 j = 0; j <= Across; ++j)
-			{
-				const float S = float(j) / Across - 0.5f;
-				const FVector D = FRotator(El + Tilt * (T - 0.5f) + S * Wd, Az0 + Span * T, 0.f).Vector();
-				Verts.Add(D * CloudRadius);
-				Normals.Add(-D);
-				UV.Add(FVector2D(T * 2.f + b * 0.37f, V0 + (S + 0.5f) * 0.25f));
-				Fade.Add(FLinearColor(1.f, 1.f, 1.f, FMath::Pow(FMath::Sin(PI * T), 0.8f) * (1.f - FMath::Square(2.f * S))));   // thin out at the ends and edges
-			}
-		}
-		for (int32 i = 0; i < Along; ++i)
-			for (int32 j = 0; j < Across; ++j)
-			{
-				const int32 A = First + i * (Across + 1) + j, B = A + 1, C = A + (Across + 1), D = C + 1;
-				Tris.Append({ A, C, B, B, C, D });
-			}
+		const float El = 3.f + 34.f * FMath::Pow(Rand.FRand(), 1.6f);       // most clouds sit lowish in the sky
+		const FVector D = FRotator(El, Rand.FRandRange(0.f, 360.f), 0.f).Vector();
+		const FVector Up = (FVector::UpVector - D * FVector::DotProduct(D, FVector::UpVector)).GetSafeNormal();
+		const float Width = CloudRadius * FMath::DegreesToRadians(Rand.FRandRange(9.f, 20.f) * FMath::Lerp(0.75f, 1.f, El / 37.f));
+		const FQuat Q = FRotationMatrix::MakeFromYZ(-Up, -D).ToQuat();   // texture top toward the sky, facing the middle
+		Xf[Rand.RandRange(0, CloudSprites.Num() - 1)].Add(FTransform(Q, D * (CloudRadius - i * 4.f), FVector(Width / 100.f, Width * 0.55f / 100.f, 1.f)));
 	}
-	Clouds->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Fade, TArray<FProcMeshTangent>(), false);
+	for (int32 k = 0; k < CloudSprites.Num(); ++k) CloudSprites[k]->AddInstances(Xf[k], false, false, false);
 }
-
 void ANightSky::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -213,15 +196,15 @@ void ANightSky::Tick(float DeltaSeconds)
 	for (UMaterialInstanceDynamic* M : StarMids) M->SetScalarParameterValue(TEXT("Night"), N);
 	Stars->SetVisibility(N > 0.01f);
 
-	// Clouds: white in the high sun, flushed orange and pink as it sinks, slowly drifting round
+	// Clouds: white with soft blue-grey undersides in the high sun, flushed peach and lilac as it sinks, slowly drifting round
 	if (CloudMid)
 	{
 		const float E = ADayNight::SunElevation;
-		const float Sunset = 1.f - FMath::SmoothStep(8.f, 24.f, E);
-		const FLinearColor Day(1.0f, 1.0f, 1.0f), Glow(1.0f, 0.55f, 0.42f);
-		CloudMid->SetVectorParameterValue(TEXT("Tint"), FMath::Lerp(Day, Glow, Sunset));
-		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.4f, 1.6f, Sunset));
-		Clouds->AddLocalRotation(FRotator(0.f, DeltaSeconds * 0.15f, 0.f));
+		const float Sunset = 1.f - FMath::SmoothStep(12.f, 28.f, E);
+		CloudMid->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(FLinearColor(1.0f, 1.0f, 1.0f), FLinearColor(1.0f, 0.68f, 0.50f), Sunset));
+		CloudMid->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(FLinearColor(0.70f, 0.76f, 0.88f), FLinearColor(0.58f, 0.46f, 0.60f), Sunset));
+		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.3f, 1.7f, Sunset));
+		CloudRoot->AddLocalRotation(FRotator(0.f, DeltaSeconds * 0.15f, 0.f));
 	}
 
 	// ---- Shooting stars: every few seconds while the sun is low, one streaks down and burns out ----

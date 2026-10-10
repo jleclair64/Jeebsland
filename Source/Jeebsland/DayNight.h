@@ -26,7 +26,7 @@ public:
 
 	// Shared state, updated every frame
 	static float Phase;          // 0 = noon, 0.5 = the sun's lowest point
-	static float SunElevation;   // degrees above the horizon (6 to 54)
+	static float SunElevation;   // degrees above the horizon (11 to 54)
 	static float Dusk;           // 0 = broad day, 1 = the sun down by the horizon
 	static FVector SunDir;       // unit vector toward the sun
 	static FVector MoonDir;      // unit vector toward the moon (it hangs low in the south-west)

@@ -85,6 +85,42 @@ def add_wind(mat, strength, tip_only, lift):
     lib.connect_material_property(final, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
 
 
+def soft_edges(mat, ts):
+    """Opacity through a temporal dither, so cut-out edges blend softly with anti-aliasing instead of stair-stepping"""
+    try:
+        cls = unreal.load_class(None, "/Script/Engine.MaterialExpressionDitherTemporalAA")
+        if cls is None:
+            raise RuntimeError("no DitherTemporalAA class")
+        d = lib.create_material_expression(mat, cls, -300, 500)
+        lib.connect_material_expressions(ts, "A", d, "")
+        lib.connect_material_property(d, "", unreal.MaterialProperty.MP_OPACITY_MASK)
+        mat.set_editor_property("opacity_mask_clip_value", 0.35)
+    except Exception as e:
+        unreal.log("MATDIAG dither unavailable, plain cut-out: " + str(e))
+        lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+
+
+def fluffy_normal(mat):
+    """Light every card as if it faced mostly upward, so a canopy or a lawn shades as one soft mass instead of
+    thousands of cards each catching the sun differently (the sparkly, sharp look)"""
+    try:
+        up = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -500, 700)
+        up.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+        tr = lib.create_material_expression(mat, unreal.MaterialExpressionTransform, -350, 700)
+        tr.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_WORLD)
+        tr.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_TANGENT)
+        lib.connect_material_expressions(up, "", tr, "")
+        flat = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -500, 800)
+        flat.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+        mix = lib.create_material_expression(mat, unreal.MaterialExpressionLinearInterpolate, -200, 700)
+        mix.set_editor_property("const_alpha", 0.8)
+        lib.connect_material_expressions(flat, "", mix, "A")
+        lib.connect_material_expressions(tr, "", mix, "B")
+        lib.connect_material_property(mix, "", unreal.MaterialProperty.MP_NORMAL)
+    except Exception as e:
+        unreal.log("MATDIAG fluffy normal skipped: " + str(e))
+
+
 def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
@@ -125,7 +161,8 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     spec = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 400)
     spec.set_editor_property("r", 0.0)
     lib.connect_material_property(spec, "", unreal.MaterialProperty.MP_SPECULAR)
-    lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+    soft_edges(mat, ts)
+    fluffy_normal(mat)
 
     if wind:
         add_wind(mat, strength, tip_only, lift)
@@ -177,6 +214,8 @@ def import_texture(png, name):
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_TreeLeaves.png"), "T_TreeLeaves")   # painted by BuildMaterials.ps1
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 9.0,          True,      0.0)
@@ -331,14 +370,15 @@ def build_moon(tex):
     finish(mat, "M_MoonDark")
 
 
-def build_cirrus(tex):
-    # Thin high cloud: the streaky picture, faded toward the ends and edges of each band (vertex alpha)
-    mat, g = unlit("M_Cirrus", unreal.BlendMode.BLEND_TRANSLUCENT)
+def build_cumulus(tex):
+    # Puffy clouds: R = how much cloud, G = how lit. Lit tops and shaded undersides take their colours from the sun.
+    mat, g = unlit("M_Cumulus", unreal.BlendMode.BLEND_TRANSLUCENT)
     t = g.tex(tex)
-    vc = g.node(unreal.MaterialExpressionVertexColor)
-    g.out(g.muln(g.muln(g.vector("Tint", (1.0, 1.0, 1.0)), g.scalar("Bright", 2.0)), t, "", "R"), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    g.out(g.mul(g.muln(t, vc, "R", "A"), 0.75), unreal.MaterialProperty.MP_OPACITY)
-    finish(mat, "M_Cirrus")
+    col = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.vector("Shade", (0.70, 0.76, 0.88)), col, "A"); g.link(g.vector("Lit", (1.0, 1.0, 1.0)), col, "B"); g.link(t, col, "Alpha", "G")
+    g.out(g.muln(col, g.scalar("Bright", 2.3)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.muln(t, g.scalar("Opacity", 0.95), "R"), unreal.MaterialProperty.MP_OPACITY)
+    finish(mat, "M_Cumulus")
 
 
 def build_dirt(tex):
@@ -376,8 +416,8 @@ def imported(png, name):
 build_star()
 build_streak()
 build_moon(imported(gen_textures.moon(), "T_Moon"))
-build_cirrus(imported(gen_textures.cirrus(), "T_Cirrus"))
-for old in ("M_MilkyWay", "T_MilkyWay"):   # the Milky Way was taken out
+build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
+for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
     if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
         unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
 build_dirt(imported(gen_textures.dirt(), "T_Dirt"))

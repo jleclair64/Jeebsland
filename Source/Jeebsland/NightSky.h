@@ -9,7 +9,7 @@ class UInstancedStaticMeshComponent;
 class UMaterialInstanceDynamic;
 
 // The sky dressing that travels with the camera: stars, shooting stars and the odd comet (they come out as the sun
-// sinks toward the horizon, ADayNight::Dusk), and a few long streaks of high cloud that turn sunset colours.
+// sinks toward the horizon, ADayNight::Dusk), and soft puffy clouds that turn sunset colours.
 UCLASS()
 class ANightSky : public AActor
 {
@@ -27,7 +27,8 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* Streaks = nullptr;     // shooting stars
 	UPROPERTY() UInstancedStaticMeshComponent* CometTail = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* CometHead = nullptr;
-	UPROPERTY() UProceduralMeshComponent* Clouds = nullptr;
+	UPROPERTY() USceneComponent* CloudRoot = nullptr;
+	UPROPERTY() TArray<UInstancedStaticMeshComponent*> CloudSprites;
 	UPROPERTY() TArray<UMaterialInstanceDynamic*> StarMids;          // every star-like material has a "Night" parameter
 	UPROPERTY() UMaterialInstanceDynamic* TailMid = nullptr;
 	UPROPERTY() UMaterialInstanceDynamic* HeadMid = nullptr;

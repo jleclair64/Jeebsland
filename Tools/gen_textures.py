@@ -308,3 +308,63 @@ def paint_cirrus():
 
 def cirrus():
     return cached("T_Cirrus", 2, paint_cirrus)
+
+# ------------------------------------------------------------------ puffy cumulus: four cloud shapes in a 2 x 2 atlas
+# R = how much cloud (soft-edged), G = how lit (bright tops, shaded flat bottoms)
+def paint_cumulus():
+    T = 256
+    W = H = 2 * T
+    rnd = random.Random(4242)
+    wisp = [Noise(601 + i, 8 << i) for i in range(3)]
+    px = bytearray(W * H * 4)
+    for tile in range(4):
+        ox, oy = (tile % 2) * T, (tile // 2) * T
+        base = T * 0.72                                     # the flat bottom of the cloud
+        blobs = []
+        n = rnd.randint(7, 11)
+        for k in range(n):                                  # a row of puffs along the base, taller ones in the middle
+            x = T * (0.16 + 0.68 * k / (n - 1)) + rnd.uniform(-8, 8)
+            mid = 1 - abs(k / (n - 1) - 0.5) * 2
+            r = T * (0.07 + 0.08 * mid + rnd.uniform(0, 0.04))
+            blobs.append((x, base - r * 0.6, r))
+        for k in range(rnd.randint(4, 7)):                  # puffs piled on top
+            x = T * rnd.uniform(0.3, 0.7)
+            r = T * rnd.uniform(0.08, 0.15)
+            blobs.append((x, base - T * rnd.uniform(0.18, 0.36), r))
+        for k in range(rnd.randint(10, 16)):                # little cauliflower bumps round the top edge
+            a = rnd.uniform(math.pi * 1.05, math.pi * 1.95)
+            (bx, by, br) = blobs[rnd.randrange(len(blobs))]
+            blobs.append((bx + math.cos(a) * br * 0.85, by + math.sin(a) * br * 0.85, br * rnd.uniform(0.3, 0.5)))
+
+        def field(x, y):
+            s = 0.0
+            for (bx, by, br) in blobs:
+                d2 = ((x - bx) ** 2 + (y - by) ** 2) / (br * br)
+                if d2 < 4.0:
+                    s += math.exp(-d2 * 1.6)
+            return s
+
+        for j in range(T):
+            y = j + 0.5
+            for i in range(T):
+                x = i + 0.5
+                f = field(x, y)
+                if f < 0.05:
+                    continue
+                w = fbm(wisp, (ox + i) / W, (oy + j) / H)
+                density = clamp01((f - 0.32 + 0.25 * (w - 0.5)) * 2.4)
+                density *= clamp01((base + T * 0.05 - y) / (T * 0.07))       # soft flat underside
+                if density <= 0.0:
+                    continue
+                above = field(x - 6, y - 16)                                  # light from above: lit where little cloud sits over it
+                lit = clamp01(1.05 - 0.55 * above) * 0.7 + 0.3 * clamp01((base - y) / (T * 0.45))
+                o = ((oy + j) * W + ox + i) * 4
+                px[o] = to8(density)
+                px[o + 1] = to8(lit)
+                px[o + 2] = 0
+                px[o + 3] = 255
+    return W, H, px
+
+
+def cumulus():
+    return cached("T_Cumulus", 2, paint_cumulus)
