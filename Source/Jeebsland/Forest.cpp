@@ -430,14 +430,14 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		Radius = 85.f * S;
 		TrunkT.Add(FTransform(FQuat::Identity, Pos + FVector(0, 0, Height * 0.5f), FVector(1.6f * S, 1.6f * S, Height / 100.f)));
 		TrunkT.Add(FTransform(FQuat::Identity, Pos + FVector(0, 0, 110.f * S), FVector(2.4f * S, 2.4f * S, 220.f * S / 100.f))); // base flare
-				// A fort tree wears its foliage only as a crown above the top terrace, so the decks have a clear view
-		const int32 Tiers = bFortTree ? 7 : 16;
+		// A fort tree has no crown at all: its trunk ends under the top deck, which is open to the sky
+		const int32 Tiers = bFortTree ? 0 : 16;
 		for (int32 i = 0; i < Tiers; ++i)
 		{
 			const float T = float(i) / (Tiers - 1);
-			const float W = bFortTree ? FMath::Lerp(560.f, 140.f, T) * S : FMath::Lerp(620.f, 140.f, T) * S;
+			const float W = FMath::Lerp(620.f, 140.f, T) * S;
 			const float H = 380.f * S;
-			const float Zc = bFortTree ? FMath::Lerp(3350.f, 3900.f, T) : FMath::Lerp(Height * 0.35f, Height + 200.f * S, T);
+			const float Zc = FMath::Lerp(Height * 0.35f, Height + 200.f * S, T);
 			ConeT.Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f).Quaternion(),
 				Pos + FVector(0, 0, Zc),
 				FVector(W / 100.f, W / 100.f, H / 100.f)));
@@ -471,9 +471,9 @@ void AForest::BeginPlay()
 
 	SetActorLocation(FVector::ZeroVector);
 
-	Tint(Trunk,    FLinearColor(0.30f, 0.18f, 0.10f));
-	Tint(RedTrunk, FLinearColor(0.45f, 0.17f, 0.08f));
-	Tint(Branch,   FLinearColor(0.28f, 0.17f, 0.09f));
+	Tint(Trunk,    FLinearColor(0.22f, 0.14f, 0.08f));
+	Tint(RedTrunk, FLinearColor(0.34f, 0.14f, 0.07f));
+	Tint(Branch,   FLinearColor(0.21f, 0.13f, 0.07f));
 	UMaterialInterface* LeafMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_TreeLeaf.M_TreeLeaf"));
 	if (LeafMat)
 	{
@@ -500,10 +500,10 @@ void AForest::BeginPlay()
 	if (BarkMat)
 	{
 		const FLinearColor BarkColors[4] = {
-			FLinearColor(0.36f, 0.22f, 0.12f),   // brown
-			FLinearColor(0.50f, 0.34f, 0.20f),   // warm light brown
-			FLinearColor(0.32f, 0.28f, 0.25f),   // grey-brown
-			FLinearColor(0.52f, 0.26f, 0.13f) }; // reddish
+			FLinearColor(0.24f, 0.15f, 0.085f),   // brown
+			FLinearColor(0.30f, 0.20f, 0.12f),    // warm brown
+			FLinearColor(0.22f, 0.19f, 0.16f),    // grey-brown
+			FLinearColor(0.30f, 0.16f, 0.085f) }; // reddish
 		for (int32 v = 0; v < 4; ++v)
 		{
 			TrunkVar[v]->SetStaticMesh(MakeTrunkMesh(this, BarkMat, v));
@@ -513,7 +513,7 @@ void AForest::BeginPlay()
 		}
 		Branch->SetStaticMesh(MakeBranchMesh(this, BarkMat));
 		UMaterialInstanceDynamic* BM = UMaterialInstanceDynamic::Create(BarkMat, this);
-		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.32f, 0.19f, 0.10f));
+		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.21f, 0.13f, 0.07f));
 		Branch->SetMaterial(0, BM);
 		bBark = true;
 	}

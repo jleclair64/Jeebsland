@@ -16,7 +16,6 @@ void AFort::Build(const JeebTerrain::FFort& Def)
 {
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
 	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 
 	auto MakeISM = [&](UStaticMesh* Msh, const FLinearColor& Color, bool bShadow)
@@ -34,8 +33,6 @@ void AFort::Build(const JeebTerrain::FFort& Def)
 	};
 	UInstancedStaticMeshComponent* Plank = MakeISM(Cube, FLinearColor(0.36f, 0.22f, 0.10f), true);
 	UInstancedStaticMeshComponent* Beam = MakeISM(Cube, FLinearColor(0.20f, 0.11f, 0.05f), true);
-	UInstancedStaticMeshComponent* Log = MakeISM(Cyl, FLinearColor(0.28f, 0.16f, 0.07f), true);
-	UInstancedStaticMeshComponent* Roof = MakeISM(Cone, FLinearColor(0.42f, 0.11f, 0.06f), true);
 	UInstancedStaticMeshComponent* Rope = MakeISM(Cyl, FLinearColor(0.62f, 0.50f, 0.30f), false);
 	UInstancedStaticMeshComponent* Lamp = MakeISM(Cube, FLinearColor(5.0f, 2.0f, 0.4f), false);   // bright: glows
 
@@ -70,7 +67,7 @@ void AFort::Build(const JeebTerrain::FFort& Def)
 		// ---- Deck, with beams under it and braces down to the trunk ----
 		Plank->AddInstance(FTransform(Q, W(0, 0, Top - 12.f), FVector(2.f * Half / 100.f, 2.f * Half / 100.f, 0.24f)));
 		Solid(W(0, 0, Top - 12.f), FVector(Half, Half, 12.f));
-		Solid(W(0, 0, Top + 200.f), FVector(80.f, 80.f, 200.f));   // the trunk itself is solid on every deck
+		if (!bTopDeck) Solid(W(0, 0, Top + 200.f), FVector(80.f, 80.f, 200.f));   // the trunk is solid on every deck it passes through
 		Beam->AddInstance(FTransform(Q, W(0, 0, Top - 38.f), FVector(2.f * Half / 100.f, 0.3f, 0.3f)));
 		Beam->AddInstance(FTransform(Q, W(0, 0, Top - 38.f), FVector(0.3f, 2.f * Half / 100.f, 0.3f)));
 		for (int32 Sx = -1; Sx <= 1; Sx += 2)
@@ -78,7 +75,6 @@ void AFort::Build(const JeebTerrain::FFort& Def)
 			for (int32 Sy = -1; Sy <= 1; Sy += 2)
 			{
 				Stick(Beam, W(Sx * 90.f, Sy * 90.f, Top - 320.f), W(Sx * (Half - 30.f), Sy * (Half - 30.f), Top - 36.f), 20.f);   // brace
-				if (bTopDeck) Log->AddInstance(FTransform(Q, W(Sx * (Half - 12.f), Sy * (Half - 12.f), Top + 105.f), FVector(0.16f, 0.16f, 2.1f))); // roof post
 			}
 		}
 
@@ -101,13 +97,9 @@ void AFort::Build(const JeebTerrain::FFort& Def)
 		Rail(Half - 8.f, Gap + SideLen * 0.5f, SideLen, false);
 		Rail(Half - 8.f, -(Gap + SideLen * 0.5f), SideLen, false);
 
-		// ---- Lanterns on every deck; the roof and the warm light on the top one ----
+		// ---- Lanterns and a warm light on every deck (the top one is open to the sky) ----
 		Lamp->AddInstance(FTransform(Q, W(Half - 40.f, Half - 40.f, Top + 80.f), FVector(0.14f, 0.14f, 0.2f)));
 		Lamp->AddInstance(FTransform(Q, W(-(Half - 40.f), -(Half - 40.f), Top + 80.f), FVector(0.14f, 0.14f, 0.2f)));
-		if (bTopDeck)
-		{
-			Roof->AddInstance(FTransform(Q, W(0, 0, Top + 210.f + 80.f), FVector(8.2f, 8.2f, 1.6f)));
-		}
 		{
 			UPointLightComponent* Pl = NewObject<UPointLightComponent>(this);
 			Pl->SetupAttachment(RootComponent);

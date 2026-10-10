@@ -432,7 +432,8 @@ namespace JeebTerrain
 	constexpr int32 FortLevels = 4;
 	constexpr float FortSpacing = 700.f;
 	inline float FortHalf(int32 Level) { return 250.f + 110.f * float(FortLevels - 1 - Level); }
-	inline float FortTreeHeight() { return 3700.f; }
+	// A fort tree is cut off just under the top deck (first deck 720 up, trunk planted 40 below ground), leaving an open platform on top
+	inline float FortTreeHeight() { return 720.f + FortSpacing * (FortLevels - 1) + 40.f - 12.f; }
 	inline const TArray<FFort>& Forts()
 	{
 		static const TArray<FFort> All = []()

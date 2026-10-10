@@ -439,43 +439,29 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 		DrawRect(Col, X - Size * 0.5f, Y - Size * 0.5f, Size, Size);
 	};
 
-	// Village (walls) and its huts
-	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		Marker(VC, 12.f, FLinearColor(0.55f, 0.38f, 0.16f), true);
-		for (const JeebTerrain::FHutDef& H : JeebTerrain::VillageHuts()) Marker(H.Pos, 5.f, FLinearColor(0.95f, 0.75f, 0.45f), false);
-	}
-	for (const FVector2D& H : JeebTerrain::HutSites()) Marker(H, 6.f, FLinearColor(0.95f, 0.75f, 0.45f), false);
+	// Water
+	Marker(JeebTerrain::PondCenter(), 9.f, FLinearColor(0.2f, 0.55f, 0.95f), true);
 
-	// Store, smithy, pig pen, redwood grove, graveyard
+	// Stores: shop, smithy, bank
 	Marker(JeebTerrain::ShopPos(), 6.f, FLinearColor(1.f, 0.85f, 0.2f), false);
 	Marker(JeebTerrain::SmithyPos(), 6.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
 	Marker(JeebTerrain::BankPos(), 6.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
-	Marker(JeebTerrain::PenCenter(), 9.f, FLinearColor(0.95f, 0.55f, 0.65f), true);
-	for (const FVector2D& G : JeebTerrain::RedwoodGroves()) Marker(G, 9.f, FLinearColor(0.05f, 0.45f, 0.12f), true);
-	Marker(JeebTerrain::PondCenter(), 9.f, FLinearColor(0.2f, 0.55f, 0.95f), true);
-	Marker(JeebTerrain::CastlePos(), 11.f, FLinearColor(0.62f, 0.62f, 0.7f), true);
-	Marker(FVector2D(JeebTerrain::GraveyardPos().X, JeebTerrain::GraveyardPos().Y), 6.f, FLinearColor(0.6f, 0.6f, 0.7f), false);
 
-	// Ore
-	for (TActorIterator<AMiningRock> It(GetWorld()); It; ++It)
+	// People
+	for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
 	{
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 4.f, FLinearColor(0.95f, 0.45f, 0.1f), false);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor::White, false);
 	}
-	// Animals
+	// Your horse
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
 	{
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor(0.7f, 0.4f, 0.15f), false);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor(0.7f, 0.4f, 0.15f), true);
 	}
-	for (TActorIterator<APig> It(GetWorld()); It; ++It)
-	{
-		if (It->IsAlive()) Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 4.f, FLinearColor(1.f, 0.6f, 0.7f), false);
-	}
-	// Other players / characters
+	// Enemies (any other character)
 	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
 	{
 		if (*It == Pawn) continue;
-		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor::White, true);
+		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 5.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
 	}
 
 	// You: a yellow arrow pointing the way you face
@@ -497,22 +483,6 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 		DrawText(TEXT("S"), CC, Cx - 4.f, MY0 + MS - 16.f, Font, 0.9f);
 		DrawText(TEXT("W"), CC, MX0 + 4.f, Cy - 7.f, Font, 0.9f);
 		DrawText(TEXT("E"), CC, MX0 + MS - 14.f, Cy - 7.f, Font, 0.9f);
-	}
-
-	// Legend
-	const float LY = MY0 + MS + 8.f;
-	struct FKey { FLinearColor C; const TCHAR* T; };
-	const FKey Keys[] = {
-		{ FLinearColor(0.95f, 0.75f, 0.45f), TEXT("Huts") },  { FLinearColor(0.95f, 0.45f, 0.1f), TEXT("Ore") },
-		{ FLinearColor(1.f, 0.6f, 0.7f), TEXT("Pigs") },      { FLinearColor(0.05f, 0.55f, 0.15f), TEXT("Redwoods") },
-		{ FLinearColor(1.f, 0.85f, 0.2f), TEXT("Store") },    { FLinearColor(0.9f, 0.4f, 0.1f), TEXT("Smithy") },
-		{ FLinearColor(0.2f, 0.55f, 0.95f), TEXT("Pond") },   { FLinearColor(0.7f, 0.4f, 0.15f), TEXT("Horse") },
-	};
-	for (int32 i = 0; i < 8; ++i)
-	{
-		const float LX = MX0 + (i % 2) * 105.f, LYY = LY + (i / 2) * 18.f;
-		DrawRect(Keys[i].C, LX, LYY + 3.f, 9.f, 9.f);
-		DrawText(Keys[i].T, FLinearColor(1.f, 1.f, 1.f, 0.8f), LX + 14.f, LYY, Font, 0.85f);
 	}
 }
 

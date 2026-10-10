@@ -1,5 +1,6 @@
 # Rebuilds the foliage and bark materials (M_Grass, M_Bush, M_TreeLeaf, M_BarkTint) from the textures already in /Game.
 # Run with Tools\BuildMaterials.ps1 (the editor must be closed). The textures were painted by MakeGrassCards.bat.
+import os
 import unreal
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -21,8 +22,8 @@ def set_flags(mat, flags):
 
 
 def add_wind(mat, strength, tip_only, lift):
-    """Breezes that roll across the land now and then, a gentle constant stir between them,
-    and every instance fluttering on its own beat. strength = sway at the tip in cm during calm air."""
+    """A gentle breeze: broad gusts sweep slowly across the land from one side, rising and fading,
+    with a faint flutter on top. strength = how far a tip leans (cm) in a full gust."""
     def node(cls, **props):
         n = lib.create_material_expression(mat, cls, 0, 600)
         for k, v in props.items():
@@ -56,19 +57,23 @@ def add_wind(mat, strength, tip_only, lift):
     wy = mask(wp, False, True, False)
     rnd = node(unreal.MaterialExpressionPerInstanceRandom)
 
-    # two slow waves roll across the map in different directions; where they line up there is a gust
-    s1 = sine(addn(addn(mul(wx, 0.00020), mul(wy, 0.00013)), mul(t, -0.04)))
-    s2 = sine(addn(addn(mul(wx, 0.00009), mul(wy, -0.00017)), mul(t, 0.017)))
+    # Gust bands: two long waves travelling downwind (roughly +X) at different speeds and slightly different angles.
+    # Where their crests meet a gust passes; because the speeds don't divide evenly the pattern never quite repeats.
+    # (Sine has period 1, so inputs are in cycles: position / wavelength - time * speed / wavelength.)
+    s1 = sine(addn(addn(mul(wx, 0.000152), mul(wy, 0.000068)), mul(t, -0.058)))   # 60 m bands, 3.5 m/s
+    s2 = sine(addn(addn(mul(wx, 0.000216), mul(wy, 0.000162)), mul(t, -0.076)))   # 37 m bands, 2.8 m/s
+    s3 = sine(addn(addn(mul(wx, -0.000027), mul(wy, 0.000061)), mul(t, 0.008)))   # a very slow swell: some minutes breezier than others
     u1 = add(mul(s1, 0.5), 0.5)
     u2 = add(mul(s2, 0.5), 0.5)
+    u3 = add(mul(s3, 0.35), 0.65)
     gust = node(unreal.MaterialExpressionSaturate)
-    link(mul(add(muln(u1, u2), -0.25), 2.5), gust)
-    gust2 = muln(gust, gust)
+    link(mul(add(muln(u1, u2), -0.15), 1.9), gust)
+    gust2 = muln(muln(gust, gust), u3)
 
-    # each instance flutters on its own random beat; calm air still stirs it, a gust shakes it hard
-    flutter = sine(addn(mul(t, 0.9), addn(mul(rnd, 6.28), mul(wx, 0.01))))
-    sway_amp = add(mul(gust2, 2.0), 1.0)
-    total = addn(muln(flutter, sway_amp), mul(gust2, 1.5))     # sway, plus a lean downwind during a gust
+    # a faint flutter on each instance's own beat: barely there in calm air, livelier inside a gust
+    flutter = sine(addn(mul(t, 0.6), addn(rnd, mul(wx, 0.002))))
+    flutter_amp = add(mul(gust2, 0.35), 0.15)
+    total = addn(gust2, muln(flutter, flutter_amp))           # lean downwind as a gust passes, plus the flutter
 
     if tip_only:
         uv = node(unreal.MaterialExpressionTextureCoordinate)
@@ -138,7 +143,7 @@ def build_bark():
     lib.connect_material_property(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
     lib.connect_material_expressions(tint, "", glow, "A")
-    glow.set_editor_property("const_b", 0.12)
+    glow.set_editor_property("const_b", 0.03)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
     rough.set_editor_property("r", 1.0)
@@ -151,9 +156,28 @@ def build_bark():
     unreal.log("MATDIAG built M_BarkTint")
 
 
-#              name          texture          tint                     sway cm  tips only  lift
-build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 4.0,     True,      0.0)
-build_foliage("M_Bush",     "T_BushLeaves",  (0.78, 0.72, 0.50, 0.0), 2.5,     True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    5.0,     False,     0.35, param=True, gain=0.88)
+def import_texture(png, name):
+    task = unreal.AssetImportTask()
+    task.filename = png
+    task.destination_path = "/Game"
+    task.destination_name = name
+    task.replace_existing = True
+    task.automated = True
+    task.save = True
+    tools.import_asset_tasks([task])
+    tex = unreal.EditorAssetLibrary.load_asset("/Game/" + name)
+    if tex is None:
+        raise RuntimeError("MATDIAG the picture " + name + " did not import")
+    tex.set_editor_property("compression_no_alpha", False)
+    tex.set_editor_property("srgb", True)
+    unreal.EditorAssetLibrary.save_asset("/Game/" + name)
+
+
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
+
+#              name          texture          tint                     gust lean cm  tips only  lift
+build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 9.0,          True,      0.0)
+build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88)
 build_bark()
 unreal.log("MATDIAG all materials built")
