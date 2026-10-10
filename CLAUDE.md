@@ -6,6 +6,13 @@ Unreal Engine 5.8 C++ project (Windows). Game code lives in `Source/Jeebsland/`.
 - `Variant_Combat`, `Variant_Platforming`, `Variant_SideScrolling` are UE template code, mostly unused.
 - `Game Updates.txt` is the owner's private notes. Don't read or act on it; requests come through chat.
 
+## Model and effort
+
+The owner wants a recommendation on model and effort for each request, to balance quality against token use. Before starting a request, say in one line which fits, and only if it differs from the current setting. Don't switch unless asked.
+- Sonnet 5.5, low or medium effort: tweaks to values, colors, sizes or positions; removing things; small single-file changes.
+- Sonnet 5.5, high effort: moderate features or multi-file changes along existing patterns.
+- Opus 5.5, high effort: new systems (skills UI, enemies, combat, dungeons), tricky visual or rendering bugs, anything Sonnet failed at.
+
 ## Build
 
 The editor must be closed before building (Live Coding is not used).
