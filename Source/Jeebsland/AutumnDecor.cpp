@@ -226,6 +226,13 @@ void AAutumnDecor::BeginPlay()
 				C->SetStaticMesh(LeafMesh);
 				C->SetMaterial(0, M);
 			}
+			// on the ground each card is a scatter of small leaves, so they stay small without needing many more instances
+			if (UMaterialInterface* LitterMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_LeafLitter.M_LeafLitter")))
+			{
+				UMaterialInstanceDynamic* L = UMaterialInstanceDynamic::Create(LitterMat, this);
+				L->SetVectorParameterValue(TEXT("Tint"), LeafPalette[t]);
+				GroundLeaf[t]->SetMaterial(0, L);
+			}
 		}
 		bLeafCards = true;
 	}
@@ -506,7 +513,7 @@ void AAutumnDecor::BeginPlay()
 	{
 		if (JeebTerrain::NoGroundCover(X, Y)) return;                                        // none indoors, in the moat or on the pond
 		const float Z = JeebTerrain::PathClearance(X, Y) < 25.f ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;   // leaves on a road rest on its surface
-		const float Wd = Rand.FRandRange(22.f, 36.f) * (bLeafCards ? 1.15f : 1.f);
+		const float Wd = Rand.FRandRange(36.f, 50.f);
 		const FQuat Q = FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-10.f, 10.f)).Quaternion();
 		Put(GroundLeaf[PickLeaf()], FTransform(Q, FVector(X, Y, Z), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 	};
@@ -522,7 +529,7 @@ void AAutumnDecor::BeginPlay()
 			const float Fr = FMath::Sqrt(Rand.FRand());                               // 0 at the middle, 1 at the rim
 			const float X = CX + Radius * Fr * FMath::Cos(A), Y = CY + Radius * Fr * FMath::Sin(A);
 			const float Hgt = Radius * 0.32f * (1.f - Fr * Fr);
-			const float Wd = Rand.FRandRange(26.f, 42.f) * (bLeafCards ? 1.15f : 1.f);
+			const float Wd = Rand.FRandRange(40.f, 56.f);
 			const float Tilt = 12.f + 38.f * Fr;
 			const FQuat Q = FRotator(Rand.FRandRange(-Tilt, Tilt), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-Tilt, Tilt)).Quaternion();
 			const int32 Type = Rand.FRand() < 0.7f ? Dominant : PickLeaf();
@@ -548,10 +555,14 @@ void AAutumnDecor::BeginPlay()
 			if (JeebTerrain::NoGroundCover(X, Y)) continue;
 			// on a road, rest on the road surface (it sits a little above the grass)
 			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;
-			const float Wd = Rand.FRandRange(30.f, 46.f) * (bLeafCards ? 1.15f : 1.f);
-			const FQuat Q = FRotator(Rand.FRandRange(-12.f, 12.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-12.f, 12.f)).Quaternion();
+			const float Wd = Rand.FRandRange(40.f, 56.f);
+			// most lie flat on the ground; some rest on the short grass, tipped, so they show from the side too
+			const bool bPerched = Rand.FRand() < 0.45f;
+			const float Tip = bPerched ? 28.f : 10.f;
+			const FQuat Q = FRotator(Rand.FRandRange(-Tip, Tip), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-Tip, Tip)).Quaternion();
+			const float Lift = bPerched ? Rand.FRandRange(4.f, 11.f) : Rand.FRandRange(0.f, 2.5f);
 			const int32 Type = Rand.FRand() < 0.8f ? Own : Rand.RandRange(0, NumLeafTypes - 2);   // mostly this tree's colour, the rest autumn colours (never green)
-			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Z + Rand.FRandRange(0.f, 2.5f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
+			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Z + Lift), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 		}
 		if (Rand.FRand() < 0.30f)
 		{

@@ -63,6 +63,36 @@ $g2.Dispose()
 $bmp2.Save($png2, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp2.Dispose()
 
+# Leaf litter: a scatter of small fallen leaves on one card (pale; the game tints it)
+$png5 = Join-Path $proj 'Saved\T_LeafLitter.png'
+$bmp5 = New-Object System.Drawing.Bitmap 256, 256, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+$g5 = [System.Drawing.Graphics]::FromImage($bmp5)
+$g5.SmoothingMode = 'AntiAlias'
+$g5.Clear([System.Drawing.Color]::FromArgb(0, 230, 215, 195))
+$rnd5 = New-Object System.Random 61
+for ($i = 0; $i -lt 8; $i++) {
+    $cx = 40 + $rnd5.Next(0, 176); $cy = 40 + $rnd5.Next(0, 176)
+    $v = $rnd5.Next(200, 256)
+    $st = $g5.Save()
+    $g5.TranslateTransform([single]$cx, [single]$cy)
+    $g5.RotateTransform([single]($rnd5.Next(0, 360)))
+    $s = 0.75 + $rnd5.NextDouble() * 0.45
+    $g5.ScaleTransform([single]$s, [single]$s)
+    $leaf = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $leaf.AddBezier(0, 38, -26, 18, -22, -22, 0, -40)
+    $leaf.AddBezier(0, -40, 22, -22, 26, 18, 0, 38)
+    $fill = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, $v, [int]($v * 0.94), [int]($v * 0.86)))
+    $g5.FillPath($fill, $leaf)
+    $vein = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, [int]($v * 0.7), [int]($v * 0.64), [int]($v * 0.56))), 2
+    $g5.DrawLine($vein, 0, 38, 0, -34)
+    $g5.DrawLine($vein, 0, 46, 0, 36)
+    $g5.Restore($st)
+    $fill.Dispose(); $vein.Dispose(); $leaf.Dispose()
+}
+$g5.Dispose()
+$bmp5.Save($png5, [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp5.Dispose()
+
 # Grass tufts: soft, round-tipped blades (no sharp points), each with a faint feathered fringe
 $png3 = Join-Path $proj 'Saved\T_GrassTuft.png'
 $bmp3 = New-Object System.Drawing.Bitmap 256, 128, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)

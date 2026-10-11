@@ -100,7 +100,7 @@ def soft_edges(mat, ts):
         lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
 
 
-def fluffy_normal(mat):
+def fluffy_normal(mat, amount=0.8):
     """Light every card as if it faced mostly upward, so a canopy or a lawn shades as one soft mass instead of
     thousands of cards each catching the sun differently (the sparkly, sharp look)"""
     try:
@@ -113,7 +113,7 @@ def fluffy_normal(mat):
         flat = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -500, 800)
         flat.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
         mix = lib.create_material_expression(mat, unreal.MaterialExpressionLinearInterpolate, -200, 700)
-        mix.set_editor_property("const_alpha", 0.8)
+        mix.set_editor_property("const_alpha", amount)
         lib.connect_material_expressions(flat, "", mix, "A")
         lib.connect_material_expressions(tr, "", mix, "B")
         lib.connect_material_property(mix, "", unreal.MaterialProperty.MP_NORMAL)
@@ -219,8 +219,9 @@ def build_bark(tex):
     lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
     lib.connect_material_expressions(col2, "", glow, "A")
-    glow.set_editor_property("const_b", 0.03)
+    glow.set_editor_property("const_b", 0.07)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    fluffy_normal(bark, 0.35)   # trunks and branches take light more evenly, so a trunk in shade matches its branches
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
     rough.set_editor_property("r", 1.0)
     lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
@@ -473,6 +474,8 @@ build_foliage("M_Grass",    "T_GrassTuft",   (0.52, 0.70, 0.40, 0.0), 9.0,      
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.80, crown_shade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
+build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves stay bright even in shade
 build_bark(imported(gen_textures.bark(), "T_Bark"))
 
