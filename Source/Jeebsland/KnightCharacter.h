@@ -239,6 +239,18 @@ private:
 	UPROPERTY() USceneComponent* ElbowR = nullptr;
 	UPROPERTY() USceneComponent* ElbowL = nullptr;
 
+	// The cape: a small cloth simulation (a grid of points pinned across the shoulders), redrawn every frame
+	UPROPERTY() UProceduralMeshComponent* CapeCloth = nullptr;
+	UPROPERTY() class UMaterialInstanceDynamic* CapeMid = nullptr;
+	static constexpr int32 CapeNX = 7, CapeNY = 10;
+	TArray<FVector> CapeP, CapePrev;
+	bool bCapeInit = false;
+	bool bCapeMeshMade = false;
+	float CapeAccum = 0.f;
+	float CapeTime = 0.f;
+	void TickCape(float Dt);
+	FVector CapePin(int32 i) const;
+
 	// Animation state
 	float GaitPhase = 0.f;
 	float MoveBlend = 0.f;   // 0 = standing, 1 = moving

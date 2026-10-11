@@ -491,11 +491,19 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	DrawCircle(Cx, Cy, Half * 0.5f + 0.75f, FLinearColor(1.f, 1.f, 1.f, 0.06f));   // a faint inner ring at half range
 	DrawCircle(Cx, Cy, Half * 0.5f - 0.75f, FLinearColor(0.12f, 0.13f, 0.12f, 1.f));
 
-	// World (X forward, Y right) -> map (up, right). Returns false if off the map unless clamped to the edge.
+	// The map turns with the camera: whatever the camera faces is at the top
+	float CamYaw = Pawn->GetActorRotation().Yaw;
+	if (APlayerController* MPC = GetOwningPlayerController())
+		if (MPC->PlayerCameraManager) CamYaw = MPC->PlayerCameraManager->GetCameraRotation().Yaw;
+	const FVector2D CamF(FMath::Cos(FMath::DegreesToRadians(CamYaw)), FMath::Sin(FMath::DegreesToRadians(CamYaw)));
+	const FVector2D CamR(-CamF.Y, CamF.X);
+	auto Rot = [&](const FVector2D& D, float& OutRight, float& OutDown) { OutRight = FVector2D::DotProduct(D, CamR); OutDown = -FVector2D::DotProduct(D, CamF); };
+
+	// World -> map. Returns false if off the map unless clamped to the edge.
 	auto ToMap = [&](const FVector2D& W, float R, bool bClamp, float& OutX, float& OutY) -> bool
 	{
-		float dx = (W.Y - PL.Y) * K;   // map right
-		float dy = -(W.X - PL.X) * K;  // map down
+		float dx, dy;
+		Rot((W - FVector2D(PL.X, PL.Y)) * K, dx, dy);
 		const float Lim = Half - R - 3.f;
 		const float Dist = FMath::Sqrt(dx * dx + dy * dy);
 		if (Dist > Lim)
@@ -541,10 +549,12 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
 	}
 
-	// You: a filled arrow pointing the way you face
+	// You: a filled arrow pointing the way you face (relative to the camera)
 	{
 		const FVector F = Pawn->GetActorForwardVector();
-		const FVector2D Fwd = FVector2D(F.Y, -F.X).GetSafeNormal();   // map direction
+		float FR, FD;
+		Rot(FVector2D(F.X, F.Y), FR, FD);
+		const FVector2D Fwd = FVector2D(FR, FD).GetSafeNormal();   // map direction
 		const FVector2D Side(-Fwd.Y, Fwd.X);
 		const FVector2D C(Cx, Cy);
 		const FVector2D Tip = C + Fwd * 10.f, L = C - Fwd * 7.f + Side * 7.f, Rr = C - Fwd * 7.f - Side * 7.f, Notch = C - Fwd * 3.f;
@@ -566,8 +576,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 
 	// Compass letters sitting on the ring
 	{
-		auto Letter = [&](const TCHAR* T, float Dx, float Dy, const FLinearColor& Col)
+		auto Letter = [&](const TCHAR* T, float WX, float WY, const FLinearColor& Col)   // the world direction the letter marks
 		{
+			float Dx, Dy;
+			Rot(FVector2D(WX, WY), Dx, Dy);
 			float TW = 0.f, TH = 0.f;
 			GetTextSize(T, TW, TH, Font, 0.85f);
 			const float X = Cx + Dx * (Half + 3.f), Y = Cy + Dy * (Half + 3.f);
@@ -575,10 +587,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 0.85f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
-		Letter(TEXT("N"), 0.f, -1.f, FLinearColor(1.f, 0.35f, 0.3f, 1.f));
-		Letter(TEXT("S"), 0.f, 1.f, CC);
-		Letter(TEXT("W"), -1.f, 0.f, CC);
-		Letter(TEXT("E"), 1.f, 0.f, CC);
+		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.35f, 0.3f, 1.f));   // north is world +X, east +Y
+		Letter(TEXT("S"), -1.f, 0.f, CC);
+		Letter(TEXT("W"), 0.f, -1.f, CC);
+		Letter(TEXT("E"), 0.f, 1.f, CC);
 	}
 }
 

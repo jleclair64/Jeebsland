@@ -544,7 +544,7 @@ void AAutumnDecor::BeginPlay()
 	for (const JeebCanopy::FSpot& Sp : JeebCanopy::Spots())
 	{
 		const float R = Sp.R;
-		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 520.f * Rand.FRandRange(0.8f, 1.2f)), 620);
+		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 520.f * Rand.FRandRange(0.8f, 1.2f)), 800);
 		const int32 Own = FMath::Clamp(Sp.Color, 0, NumLeafTypes - 1);
 		const bool bNearRoad = JeebTerrain::PathClearance(Sp.P.X, Sp.P.Y) < R * 2.2f + 60.f;   // the per-leaf road check is slow; skip it far from roads
 		const float WindA = Rand.FRandRange(0.f, 2.f * PI);

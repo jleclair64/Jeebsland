@@ -351,25 +351,9 @@ namespace KnightDesign
 		}
 
 		// =========================================================================================
-		// CAPE (two parts, so it ripples) and the KITE SHIELD (weapons are modelled in WeaponDesign.h)
+		// The KITE SHIELD (weapons are modelled in WeaponDesign.h)
 		// =========================================================================================
-		auto CapeSection = [&](FMD& M, double ZTop, double ZBot, double WTop, double WBot)
-		{
-			TArray<FRing> Rings;
-			const int32 NZ = 6, NY = 9;
-			for (int32 k = 0; k <= NZ; ++k)
-			{
-				const double T = double(k) / double(NZ);
-				const double Z = ZTop + (ZBot - ZTop) * T, W = WTop + (WBot - WTop) * T;
-				FRing Rg;
-				for (int32 j = 0; j < NY; ++j) { const double Yy = -W + 2.0 * W * double(j) / double(NY - 1); Rg.Add(V3(-29.0 + 0.018 * Yy * Yy + 1.2, Yy, Z)); }
-				for (int32 j = NY - 1; j >= 0; --j) { const double Yy = -W + 2.0 * W * double(j) / double(NY - 1); Rg.Add(V3(-29.0 + 0.018 * Yy * Yy - 1.2, Yy, Z)); }
-				Rings.Add(Rg);
-			}
-			Solid(M, Rings, false, true, true, Xf(V3(0, 0, 0)));
-		};
-		{ FDef& D = Add(P_CapeU, SlotCape, EArmorRole::Accent); CapeSection(D.Mesh, 12.0, -19.0, 17.0, 19.5); }
-		{ FDef& D = Add(P_CapeL, SlotCape, EArmorRole::Accent); D.Shade = 0.78f; CapeSection(D.Mesh, -19.0, -52.0, 19.5, 25.0); }
+		// (the cape itself is cloth, simulated by the character: see AKnightCharacter::TickCape)
 
 		// Kite shield (left arm): domed white face, steel rim, red cross that follows the dome
 		{

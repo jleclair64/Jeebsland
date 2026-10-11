@@ -183,7 +183,155 @@ void AKnightCharacter::BeginPlay()
 	}
 
 	BuildKnight();
+
+	// The cape is cloth: its points live in world space, so the mesh component sits at the world origin
+	CapeCloth = NewObject<UProceduralMeshComponent>(this);
+	CapeCloth->SetupAttachment(RootComponent);
+	CapeCloth->SetUsingAbsoluteLocation(true);
+	CapeCloth->SetUsingAbsoluteRotation(true);
+	CapeCloth->SetUsingAbsoluteScale(true);
+	CapeCloth->SetWorldLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+	CapeCloth->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapeCloth->RegisterComponent();
+	{
+		UMaterialInterface* ClothMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cloth.M_Cloth"));
+		if (!ClothMat) ClothMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+		CapeMid = UMaterialInstanceDynamic::Create(ClothMat, this);
+	}
+
 	RefreshEquipment();
+}
+
+// Where cape point i of the top row is pinned: across the back of the shoulders, curving round them a little
+FVector AKnightCharacter::CapePin(int32 i) const
+{
+	const float Y = FMath::Lerp(-14.f, 14.f, float(i) / (CapeNX - 1));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-27.f + 0.022f * Y * Y, Y, 12.f));
+}
+
+// A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
+// gravity, slowed by the air, pushed back and lifted by the wind of running, and kept off the knight's back.
+void AKnightCharacter::TickCape(float Dt)
+{
+	if (!CapeCloth || !UpperPivot || !CapeCloth->IsVisible()) { bCapeInit = false; return; }
+	const int32 N = CapeNX * CapeNY;
+	const float Length = 52.f, WTop = 28.f, WBot = 36.f;
+	const float DV = Length / (CapeNY - 1);
+	auto Idx = [](int32 i, int32 j) { return j * CapeNX + i; };
+	const FTransform Up = UpperPivot->GetComponentTransform();
+	const FVector Back = -Up.GetUnitAxis(EAxis::X);
+
+	if (!bCapeInit || CapeP.Num() != N)
+	{
+		CapeP.SetNum(N); CapePrev.SetNum(N);
+		for (int32 j = 0; j < CapeNY; ++j)
+			for (int32 i = 0; i < CapeNX; ++i)
+			{
+				const FVector P = CapePin(i) - FVector(0.f, 0.f, j * DV) + Back * (j * 0.8f);
+				CapeP[Idx(i, j)] = P; CapePrev[Idx(i, j)] = P;
+			}
+		bCapeInit = true;
+		CapeAccum = 0.f;
+	}
+
+	// Wind of moving: streams the cape back and lifts it when running, with a ripple running down it
+	const FVector Vel = GetVelocity();
+	const float Speed = FVector(Vel.X, Vel.Y, 0.f).Size();
+	const FVector Fwd = GetActorForwardVector();
+	const FVector Side = GetActorRightVector();
+	CapeTime += Dt;
+
+	constexpr float H = 1.f / 90.f;   // fixed small steps, so it behaves the same at any frame rate
+	CapeAccum = FMath::Min(CapeAccum + Dt, 4.f * H);
+	auto Link = [&](int32 a, int32 b, float Rest, float Stiff)
+	{
+		const FVector D = CapeP[b] - CapeP[a];
+		const float L = D.Size();
+		if (L < 1e-3f) return;
+		const FVector Fix = D * ((L - Rest) / L) * 0.5f * Stiff;
+		const bool bPinA = a < CapeNX, bPinB = b < CapeNX;
+		if (bPinA && bPinB) return;
+		if (bPinA) CapeP[b] -= Fix * 2.f;
+		else if (bPinB) CapeP[a] += Fix * 2.f;
+		else { CapeP[a] += Fix; CapeP[b] -= Fix; }
+	};
+	while (CapeAccum >= H)
+	{
+		CapeAccum -= H;
+		for (int32 j = 1; j < CapeNY; ++j)
+			for (int32 i = 0; i < CapeNX; ++i)
+			{
+				const int32 k = Idx(i, j);
+				const float Down = float(j) / (CapeNY - 1);
+				const FVector Ripple = (Side * FMath::Sin(CapeTime * 7.f - j * 0.8f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 5.f - j * 0.6f) * 0.4f)
+				                     * (40.f + 0.9f * Speed) * Down;
+				const FVector Force = FVector(0.f, 0.f, -980.f) - Fwd * (1.5f * Speed) + FVector(0.f, 0.f, 0.35f * Speed) + Ripple;
+				const FVector V = (CapeP[k] - CapePrev[k]) * 0.975f;   // air drag
+				CapePrev[k] = CapeP[k];
+				CapeP[k] += V + Force * H * H;
+			}
+		// Keep its shape: links across, down, diagonally, and every other point down (stiffer, so it folds rather than crumples)
+		for (int32 It = 0; It < 6; ++It)
+		{
+			for (int32 i = 0; i < CapeNX; ++i) CapeP[Idx(i, 0)] = CapePin(i);
+			for (int32 j = 0; j < CapeNY; ++j)
+			{
+				const float W = FMath::Lerp(WTop, WBot, float(j) / (CapeNY - 1));
+				const float DH = W / (CapeNX - 1);
+				for (int32 i = 0; i < CapeNX; ++i)
+				{
+					if (i + 1 < CapeNX) Link(Idx(i, j), Idx(i + 1, j), DH, 1.f);
+					if (j + 1 < CapeNY) Link(Idx(i, j), Idx(i, j + 1), DV, 1.f);
+					if (i + 1 < CapeNX && j + 1 < CapeNY)
+					{
+						const float Diag = FMath::Sqrt(DH * DH + DV * DV);
+						Link(Idx(i, j), Idx(i + 1, j + 1), Diag, 0.6f);
+						Link(Idx(i + 1, j), Idx(i, j + 1), Diag, 0.6f);
+					}
+					if (j + 2 < CapeNY) Link(Idx(i, j), Idx(i, j + 2), 2.f * DV, 0.35f);
+				}
+			}
+			// Never through the knight: stay behind his back and the backs of his legs
+			for (int32 k = CapeNX; k < N; ++k)
+			{
+				FVector L = Up.InverseTransformPosition(CapeP[k]);
+				const float Lim = L.Z > -30.f ? -24.f : -17.f;
+				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
+			}
+		}
+	}
+
+	// Draw it: positions, smooth normals facing away from the back, and two triangles per cell
+	TArray<FVector> V; TArray<FVector> Nrm; TArray<FVector2D> UV;
+	V.Reserve(N); Nrm.Reserve(N); UV.Reserve(N);
+	for (int32 j = 0; j < CapeNY; ++j)
+		for (int32 i = 0; i < CapeNX; ++i)
+		{
+			V.Add(CapeP[Idx(i, j)]);
+			const FVector Dx = CapeP[Idx(FMath::Min(i + 1, CapeNX - 1), j)] - CapeP[Idx(FMath::Max(i - 1, 0), j)];
+			const FVector Dy = CapeP[Idx(i, FMath::Min(j + 1, CapeNY - 1))] - CapeP[Idx(i, FMath::Max(j - 1, 0))];
+			FVector Nm = FVector::CrossProduct(Dx, Dy).GetSafeNormal();
+			if (FVector::DotProduct(Nm, Back) < 0.f) Nm = -Nm;
+			Nrm.Add(Nm);
+			UV.Add(FVector2D(float(i) / (CapeNX - 1), float(j) / (CapeNY - 1)));
+		}
+	if (!bCapeMeshMade)
+	{
+		TArray<int32> Tris;
+		for (int32 j = 0; j + 1 < CapeNY; ++j)
+			for (int32 i = 0; i + 1 < CapeNX; ++i)
+			{
+				const int32 A = Idx(i, j), B = Idx(i + 1, j), C = Idx(i, j + 1), D = Idx(i + 1, j + 1);
+				Tris.Append({ A, B, D, A, D, C });
+			}
+		CapeCloth->CreateMeshSection_LinearColor(0, V, Tris, Nrm, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		if (CapeMid) CapeCloth->SetMaterial(0, CapeMid);
+		bCapeMeshMade = true;
+	}
+	else
+	{
+		CapeCloth->UpdateMeshSection_LinearColor(0, V, Nrm, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>());
+	}
 }
 
 // ---------------- What you wear and hold ----------------
@@ -282,6 +430,11 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 			bMetal = PartIsMetal(Var, P.Role);
 		}
 		ApplyPartMaterial(P, Color, bMetal);
+	}
+	if (Slot == KnightDesign::SlotCape && CapeCloth)
+	{
+		CapeCloth->SetVisibility(bWorn);
+		if (CapeMid && bWorn) CapeMid->SetVectorParameterValue(TEXT("Color"), JeebItems::CapeColor(Var));
 	}
 }
 
@@ -1814,6 +1967,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float PlumeG = FMath::Lerp(0.f, 20.f, Stream) + (3.f + 5.f * Stream) * FMath::Sin(FlutterTime * 4.1f + 0.5f);
 	const float PlumeA = FMath::Lerp(20.f, -15.f, F01);
 	PlumePivot->SetRelativeRotation(FRotator(FMath::Lerp(PlumeG, PlumeA, Air), 0.f, 4.f * Stream * FMath::Sin(FlutterTime * 3.3f)));
+	TickCape(Dt);
 
 	// ---------- Arms ----------
 	const float ArmSway = 1.5f * FMath::Sin(IdleTime * 1.7f) * (1.f - MoveBlend);

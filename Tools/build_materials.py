@@ -469,6 +469,19 @@ def build_ground(tex):
     finish(mat, "M_Ground")
 
 
+def build_cloth():
+    # The knight's cape: plain lit cloth in a Color parameter, seen from both sides, always shaded with the normal the
+    # cloth simulation gives it (the two-sided sign cancels the engine's back-face flip)
+    mat = fresh_material("M_Cloth")
+    mat.set_editor_property("two_sided", True)
+    g = Graph(mat)
+    g.out(g.vector("Color", (0.6, 0.1, 0.08)), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.85), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.2), unreal.MaterialProperty.MP_SPECULAR)
+    g.out(g.muln(g.const3((0.0, 0.0, 1.0)), g.node(unreal.MaterialExpressionTwoSidedSign)), unreal.MaterialProperty.MP_NORMAL)
+    finish(mat, "M_Cloth")
+
+
 def imported(png, name):
     import_texture(png, name)
     return unreal.EditorAssetLibrary.load_asset("/Game/" + name)
@@ -500,4 +513,5 @@ for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
         unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
 build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
 build_ground(imported(gen_textures.ground(), "T_Ground"))
+build_cloth()
 unreal.log("MATDIAG all materials built")

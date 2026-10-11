@@ -143,9 +143,9 @@ for ($i = 0; $i -lt 36; $i++) {
     $g4.TranslateTransform([single]$cx, [single]$cy)
     $g4.RotateTransform([single]($rnd4.Next(0, 180)))
     $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(80, $v, [int]($v * 0.95), [int]($v * 0.88)))
-    $g4.FillEllipse($soft, -12, -16, 24, 32)
+    $g4.FillEllipse($soft, -16, -21, 32, 42)
     $fill = New-Object System.Drawing.SolidBrush $c4
-    $g4.FillEllipse($fill, -10, -14, 20, 28)
+    $g4.FillEllipse($fill, -13, -18, 26, 36)
     $g4.Restore($st)
     $soft.Dispose(); $fill.Dispose()
 }

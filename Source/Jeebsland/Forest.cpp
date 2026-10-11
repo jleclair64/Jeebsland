@@ -391,7 +391,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			for (int32 s = 0; s < Segs; ++s)
 			{
 				const float K = float(s + 1) / Segs;
-				const float ThickHere = Thick * (1.f - 0.6f * float(s) / Segs);
+				const float ThickHere = Thick * FMath::Pow(1.f - 0.82f * float(s) / Segs, 1.3f);
 				const FVector Next = P + Dir * SegLen;
 				BranchT.Add(Stick(P - Dir * ThickHere * 0.3f, Next, ThickHere));   // overlaps the joint a touch, so bends never show a gap
 				P = Next;
@@ -409,28 +409,26 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			const float Az = FMath::DegreesToRadians(i * 137.5f + R.FRandRange(-20.f, 20.f));
 			const float El = FMath::DegreesToRadians(R.FRandRange(ElLo, ElHi));
 			const FVector Dir(FMath::Cos(El) * FMath::Cos(Az), FMath::Cos(El) * FMath::Sin(Az), FMath::Sin(El));
-			const float L1 = 165.f * S * LenMul * (1.1f - 0.45f * T) * R.FRandRange(0.85f, 1.15f);
-			const float T1 = 9.f * S * (1.f - 0.45f * T);   // the main limbs are thick enough to see inside the crown
+			const float L1 = 300.f * S * LenMul * (1.1f - 0.45f * T) * R.FRandRange(0.85f, 1.15f);   // long limbs: a broad crown
+			const float T1 = 18.f * S * (1.f - 0.45f * T);   // stout at the trunk, tapering hard toward the tips
 
 			Limb(Start, Dir, L1, T1, 4, Bend, [&](const FVector& P, const FVector& D, float K, float Th)
 			{
 				if (K < 0.3f) return;   // bare near the trunk
 				// side branches from each joint, each with leaves along it and at its tip
-				const int32 Shoots = K >= 1.f ? 3 : 2;
+				const int32 Shoots = K >= 1.f ? 4 : 3;
 				for (int32 j = 0; j < Shoots; ++j)
 				{
 					const FVector D2 = (D * 0.5f + R.GetUnitVector() * 0.85f + FVector(0.f, 0.f, Bend >= 0.f ? 0.3f : -0.1f)).GetSafeNormal();
 					const float L2 = L1 * 0.42f * R.FRandRange(0.75f, 1.2f);
-					Limb(P, D2, L2, FMath::Max(2.2f * S, Th * 0.5f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector& QD, float K2, float)
+					Limb(P, D2, L2, FMath::Max(2.5f * S, Th * 0.42f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector& QD, float K2, float)
 					{
 						// leaves spread along the shoot and fanned round its tip, not heaped in one ball
-						Leafy(Q);
-						Leafy(Q - QD * L2 * 0.17f + R.GetUnitVector() * 16.f * S);
-						Leafy(Q - QD * L2 * 0.34f + R.GetUnitVector() * 16.f * S);
-						if (K2 >= 1.f) for (int32 n = 0; n < 4; ++n) Leafy(Q + R.GetUnitVector() * 30.f * S);
+						for (int32 n = 0; n < 4; ++n) Leafy(Q - QD * L2 * (0.12f * n) + R.GetUnitVector() * 20.f * S);   // all along the shoot
+						if (K2 >= 1.f) for (int32 n = 0; n < 6; ++n) Leafy(Q + R.GetUnitVector() * 36.f * S);         // a full spray at its tip
 					});
 				}
-				Leafy(P + R.GetUnitVector() * 15.f * S);
+				for (int32 n = 0; n < 2; ++n) Leafy(P + R.GetUnitVector() * 24.f * S);
 			});
 		}
 		// A few twigs at the very top finish the crown
@@ -541,7 +539,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	if (Kind == ETreeKind::Oak)
 	{
 		// remember the canopy: thinner grass and a carpet of this tree's leaves underneath
-		JeebCanopy::Add(FVector2D(Pos.X, Pos.Y), FMath::Clamp(CanopyR > 0.f ? CanopyR : Height * 0.5f, 160.f, 650.f), LeafComp ? Leaf.IndexOfByKey(LeafComp) : 0);
+		JeebCanopy::Add(FVector2D(Pos.X, Pos.Y), FMath::Clamp(CanopyR > 0.f ? CanopyR : Height * 0.5f, 160.f, 1100.f), LeafComp ? Leaf.IndexOfByKey(LeafComp) : 0);
 	}
 	return Tree;
 }
