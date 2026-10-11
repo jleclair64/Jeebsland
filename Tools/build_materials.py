@@ -470,7 +470,7 @@ def build_ground(tex, dirt):
     ragged = g.tex(dirt, g.mul(xy, 1.0 / 140.0))
     mix_amt = g.one(unreal.MaterialExpressionSaturate, g.mul(g.add(g.addn(g.mul(worn, 1.25), g.mul(g.mask(ragged, True, False), 1.4)), -0.55), 1.8))
     blend = g.node(unreal.MaterialExpressionLinearInterpolate)
-    g.link(grass, blend, "A"); g.link(soil, blend, "B", "RGB"); g.link(mix_amt, blend, "Alpha")
+    g.link(grass, blend, "A"); g.link(soil, blend, "B"); g.link(mix_amt, blend, "Alpha")
     g.out(blend, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.95), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.15), unreal.MaterialProperty.MP_SPECULAR)
