@@ -19,7 +19,20 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
-(Nothing recorded yet. Fill in at the end of a session.)
+Last updated 2026-10-11. Everything below is built and committed; the owner checks visuals themselves and sends screenshots.
+
+**Just done (not yet seen in-game by the owner):** real volumetric clouds always on (low, deep layer, set in `DayNight.cpp`; sprite clouds retired); cape pinned at the true shoulder tops and longer; knight starts in bronze (metal) armour with shinier metal; trees got leader branches, wider crowns and more leaf cards per shoot; trunk lighting fix (bark uses the two-sided sign normal); roads blend into grass via a worn-soil margin in the ground material.
+
+**Check first next time:** frame rate (volumetric clouds, many leaf cards, leaf shadows; if slow, thin leaf cards or drop leaf shadows first); whether stars draw over the new clouds at low sun; cape motion; trunk lighting on the sun side.
+
+**Decisions and preferences:**
+- Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
+- Sun never sets: lowest point 11 degrees, noon 41. Day loop is 60 s per half for preview; owner will ask to change it to 1200 s.
+- Armour can be swapped but never removed (starts as a full bronze suit); cape starts black.
+- Minimap rotates with the camera. Store restocks hourly with a mystery satchel.
+- Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
+
+**Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
 
 ## Checking visuals
 
