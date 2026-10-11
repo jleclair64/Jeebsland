@@ -13,6 +13,10 @@ The owner wants a recommendation on model and effort for each request, to balanc
 - Sonnet 5.5, high effort: moderate features or multi-file changes along existing patterns.
 - Opus 5.5, high effort: new systems (skills UI, enemies, combat, dungeons), tricky visual or rendering bugs, anything Sonnet failed at.
 
+## Checking visuals
+
+Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and the owner prefers to check visuals themselves and send screenshots. Build, rebuild materials, commit, reopen the editor, and say what to look for.
+
 ## Build
 
 The editor must be closed before building (Live Coding is not used).

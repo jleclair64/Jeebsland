@@ -15,11 +15,11 @@ namespace
 	constexpr int32 NumSub = 7;      // twigs on each main branch  (12 + 12*7 + 4 top twigs = 100 branches)
 
 	const FLinearColor LeafColors[5] = {
-		FLinearColor(0.62f, 0.17f, 0.03f), // burnt orange
-		FLinearColor(0.45f, 0.06f, 0.04f), // deep red
-		FLinearColor(0.70f, 0.40f, 0.05f), // amber
-		FLinearColor(0.50f, 0.30f, 0.04f), // gold-brown
-		FLinearColor(0.20f, 0.26f, 0.05f), // last green holdout
+		FLinearColor(0.50f, 0.17f, 0.045f), // burnt orange
+		FLinearColor(0.36f, 0.07f, 0.045f), // deep red
+		FLinearColor(0.55f, 0.33f, 0.07f),  // amber
+		FLinearColor(0.42f, 0.27f, 0.07f),  // gold-brown
+		FLinearColor(0.17f, 0.22f, 0.07f),  // last green holdout
 	};
 }
 
@@ -112,7 +112,8 @@ static FVector ForkLimbPoint(float u)   // mesh units; the second limb of the fo
 
 struct FRing { FVector C; float R; };
 
-static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const TArray<TArray<FRing>>& Tubes, int32 Sides, const FVector& Right, const FVector& Fwd, bool bCapEnd)
+// UTiles: how many times the bark picture wraps round the tube; VPer100: how many times it repeats per 100 units along it
+static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const TArray<TArray<FRing>>& Tubes, int32 Sides, const FVector& Right, const FVector& Fwd, bool bCapEnd, float UTiles, float VPer100)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
 	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Bark"), FName("Bark")));
@@ -129,24 +130,21 @@ static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const 
 	const FPolygonGroupID Group = MD.CreatePolygonGroup();
 	GroupSlot[Group] = FName("Bark");
 
+	struct FCorner { FVector P; FVector N; FVector T; FVector2D UV; };
 	// Unreal's front face is the one where (B-A)x(C-A) points out, so wind each triangle to face the way its normals point
-	auto Tri = [&](FVector A, FVector B, FVector C, FVector NA, FVector NB, FVector NC)
+	auto Tri = [&](FCorner A, FCorner B, FCorner C)
 	{
-		if (FVector::CrossProduct(B - A, C - A).Dot(NA + NB + NC) < 0.f) { Swap(B, C); Swap(NB, NC); }
-		// Smooth shading: each corner keeps the tube's round normal. (Flat facets made one narrow strip catch the low sun
-		// and show as a pale line up the trunk; with 20 sides the round shading reads as bark, not stripes.)
-		const FVector P[3] = { A, B, C };
-		const FVector N[3] = { NA, NB, NC };
+		if (FVector::CrossProduct(B.P - A.P, C.P - A.P).Dot(A.N + B.N + C.N) < 0.f) Swap(B, C);
 		TArray<FVertexInstanceID> Inst;
-		for (int32 k = 0; k < 3; ++k)
+		for (const FCorner* K : { &A, &B, &C })
 		{
 			const FVertexID V = MD.CreateVertex();
-			Pos[V] = FVector3f(P[k]);
+			Pos[V] = FVector3f(K->P);
 			const FVertexInstanceID I = MD.CreateVertexInstance(V);
-			Nrm[I] = FVector3f(N[k]);
-			Tan[I] = FVector3f(1.f, 0.f, 0.f);
+			Nrm[I] = FVector3f(K->N);
+			Tan[I] = FVector3f(K->T);   // runs round the tube, always at right angles to the normal
 			Sign[I] = 1.f;
-			UVs[I] = FVector2f(0.f, 0.f);
+			UVs[I] = FVector2f(K->UV);
 			Inst.Add(I);
 		}
 		MD.CreatePolygon(Group, Inst);
@@ -154,31 +152,41 @@ static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const 
 
 	for (const TArray<FRing>& Rings : Tubes)
 	{
-		auto Pt = [&](int32 k, int32 j, FVector& OutN)
+		// Distance along the tube's centre line, for the bark picture's V
+		TArray<float> Along;
+		Along.Add(0.f);
+		for (int32 k = 1; k < Rings.Num(); ++k) Along.Add(Along[k - 1] + FVector::Distance(Rings[k].C, Rings[k - 1].C));
+
+		auto Pt = [&](int32 k, int32 j) -> FCorner
 		{
 			const float A = 2.f * PI * (j % Sides) / Sides;
-			OutN = (FMath::Cos(A) * Right + FMath::Sin(A) * Fwd).GetSafeNormal();
-			return Rings[k].C + OutN * Rings[k].R;
+			FCorner Out;
+			Out.N = (FMath::Cos(A) * Right + FMath::Sin(A) * Fwd).GetSafeNormal();
+			Out.T = (-FMath::Sin(A) * Right + FMath::Cos(A) * Fwd).GetSafeNormal();
+			Out.P = Rings[k].C + Out.N * Rings[k].R;
+			Out.UV = FVector2D(UTiles * float(j) / Sides, Along[k] / 100.f * VPer100);   // j (not wrapped) so there is no seam smear
+			return Out;
 		};
 		for (int32 k = 0; k + 1 < Rings.Num(); ++k)
 		{
 			for (int32 j = 0; j < Sides; ++j)
 			{
-				FVector N00, N10, N01, N11;
-				const FVector P00 = Pt(k, j, N00), P10 = Pt(k, j + 1, N10), P01 = Pt(k + 1, j, N01), P11 = Pt(k + 1, j + 1, N11);
-				Tri(P00, P10, P11, N00, N10, N11);
-				Tri(P00, P11, P01, N00, N11, N01);
+				const FCorner C00 = Pt(k, j), C10 = Pt(k, j + 1), C01 = Pt(k + 1, j), C11 = Pt(k + 1, j + 1);
+				Tri(C00, C10, C11);
+				Tri(C00, C11, C01);
 			}
 		}
 		if (bCapEnd && Rings.Num() > 1)
 		{
 			const int32 L = Rings.Num() - 1;
 			const FVector Out = (Rings[L].C - Rings[L - 1].C).GetSafeNormal();
+			const FVector T = FVector::CrossProduct(FMath::Abs(Out.Z) < 0.9f ? FVector::UpVector : Right, Out).GetSafeNormal();
+			FCorner Mid{ Rings[L].C, Out, T, FVector2D(0.5f, 0.5f) };
 			for (int32 j = 0; j < Sides; ++j)
 			{
-				FVector Na, Nb;
-				const FVector Pa = Pt(L, j, Na), Pb = Pt(L, j + 1, Nb);
-				Tri(Rings[L].C, Pa, Pb, Out, Out, Out);
+				FCorner Ca = Pt(L, j), Cb = Pt(L, j + 1);
+				Ca.N = Cb.N = Out; Ca.T = Cb.T = T;
+				Tri(Mid, Ca, Cb);
 			}
 		}
 	}
@@ -191,7 +199,6 @@ static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const 
 	SM->BuildFromMeshDescriptions(Descs, Params);
 	return SM;
 }
-
 static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32 V)
 {
 	TArray<TArray<FRing>> Tubes;
@@ -214,7 +221,7 @@ static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32
 		}
 		Tubes.Add(Limb);
 	}
-	return MakeTubeMesh(Outer, Mat, Tubes, 20, FVector(1, 0, 0), FVector(0, 1, 0), true);
+	return MakeTubeMesh(Outer, Mat, Tubes, 20, FVector(1, 0, 0), FVector(0, 1, 0), true, 2.f, 5.5f);
 }
 
 // A branch lies along X from -50 to +50 (centred, like the stick transforms expect), 100 wide at the base, thinning to a twig with a gentle arch
@@ -225,7 +232,7 @@ static UStaticMesh* MakeBranchMesh(UObject* Outer, UMaterialInterface* Mat)
 	const float Ts[4] = { 0.f, 0.33f, 0.66f, 1.f };
 	for (float t : Ts) B.Add({ FVector(t * 100.f - 50.f, 0.f, 9.f * FMath::Sin(t * PI)), 50.f * (1.f - 0.68f * t) });
 	Tubes.Add(B);
-	return MakeTubeMesh(Outer, Mat, Tubes, 5, FVector(0, 1, 0), FVector(0, 0, 1), true);
+	return MakeTubeMesh(Outer, Mat, Tubes, 6, FVector(0, 1, 0), FVector(0, 0, 1), true, 1.f, 8.f);
 }
 
 AForest::AForest()
@@ -242,6 +249,7 @@ AForest::AForest()
 	Trunk    = MakeISM(TEXT("Trunk"),    CylMesh.Object,  true,  0,    0);
 		RedTrunk = MakeISM(TEXT("RedTrunk"), CylMesh.Object,  true,  0,    0);
 	for (int32 i = 0; i < 4; ++i) TrunkVar.Add(MakeISM(*FString::Printf(TEXT("TrunkV%d"), i), CylMesh.Object, true, 0, 0));
+	for (int32 i = 0; i < 4; ++i) BranchVar.Add(MakeISM(*FString::Printf(TEXT("BranchV%d"), i), CubeMesh.Object, false, 3500, 4500));
 	Branch   = MakeISM(TEXT("Branch"),   CubeMesh.Object, false, 3500, 4500);
 	for (int32 i = 0; i < 5; ++i)
 	{
@@ -288,6 +296,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 
 	TArray<FTransform> TrunkT, BranchT, LeafT, ConeT;
 	UInstancedStaticMeshComponent* TrunkComp = Trunk;
+	UInstancedStaticMeshComponent* BranchComp = Branch;
 	UInstancedStaticMeshComponent* LeafComp = nullptr;
 	UInstancedStaticMeshComponent* ConeComp = nullptr;
 	float Radius = 25.f, Height = 220.f;
@@ -317,6 +326,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		if (bBark)
 		{
 			TrunkComp = TrunkVar[TrunkVariant];
+			BranchComp = BranchVar[TrunkVariant];
 			TrunkT.Add(FTransform(YawQ, Pos, FVector(Ds, Ds, Height / 100.f)));
 			Radius = (TrunkVariant == 3 ? 28.f : 24.f) * S;
 		}
@@ -454,7 +464,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		Tree->Parts.Add(P);
 	};
 	Commit(TrunkComp, TrunkT, true);
-	Commit(Branch, BranchT, false);
+	Commit(BranchComp, BranchT, false);
 	Commit(LeafComp, LeafT, false);
 	Commit(ConeComp, ConeT, false);
 
@@ -499,18 +509,21 @@ void AForest::BeginPlay()
 		const FLinearColor BarkColors[4] = {
 			FLinearColor(0.20f, 0.13f, 0.07f),    // brown
 			FLinearColor(0.26f, 0.17f, 0.10f),    // warm brown
-			FLinearColor(0.19f, 0.16f, 0.14f),    // grey-brown
+			FLinearColor(0.21f, 0.155f, 0.11f),  // grey-brown
 			FLinearColor(0.26f, 0.14f, 0.07f) };  // reddish
+		UStaticMesh* BranchMesh = MakeBranchMesh(this, BarkMat);
 		for (int32 v = 0; v < 4; ++v)
 		{
 			TrunkVar[v]->SetStaticMesh(MakeTrunkMesh(this, BarkMat, v));
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(BarkMat, this);
 			M->SetVectorParameterValue(TEXT("Tint"), BarkColors[v]);
 			TrunkVar[v]->SetMaterial(0, M);
+			BranchVar[v]->SetStaticMesh(BranchMesh);
+			BranchVar[v]->SetMaterial(0, M);   // the very same bark as the trunk it grows from
 		}
-		Branch->SetStaticMesh(MakeBranchMesh(this, BarkMat));
+		Branch->SetStaticMesh(BranchMesh);
 		UMaterialInstanceDynamic* BM = UMaterialInstanceDynamic::Create(BarkMat, this);
-		BM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.18f, 0.11f, 0.06f));
+		BM->SetVectorParameterValue(TEXT("Tint"), BarkColors[0]);
 		Branch->SetMaterial(0, BM);
 		bBark = true;
 	}

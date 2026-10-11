@@ -368,3 +368,72 @@ def paint_cumulus():
 
 def cumulus():
     return cached("T_Cumulus", 2, paint_cumulus)
+
+class NoiseXY:
+    """Value noise that wraps every px cells across and py cells down (for stretched, tiling patterns)"""
+
+    def __init__(self, seed, px, py):
+        self.px, self.py = px, py
+        r = random.Random(seed)
+        self.g = [r.random() for _ in range(px * py)]
+
+    def at01(self, u, v):
+        x, y = u * self.px, v * self.py
+        xi, yi = math.floor(x), math.floor(y)
+        fx, fy = x - xi, y - yi
+        x0, y0 = int(xi) % self.px, int(yi) % self.py
+        x1, y1 = (x0 + 1) % self.px, (y0 + 1) % self.py
+        g, p = self.g, self.px
+        a, b, c, d = g[y0 * p + x0], g[y0 * p + x1], g[y1 * p + x0], g[y1 * p + x1]
+        sx, sy = fx * fx * (3 - 2 * fx), fy * fy * (3 - 2 * fy)
+        top = a + (b - a) * sx
+        return top + ((c + (d - c) * sx) - top) * sy
+
+
+# ------------------------------------------------------------------ bark: vertical plates split by dark fissures (tiles both ways)
+def paint_bark():
+    W, H = 256, 512
+    warp = [NoiseXY(701 + i, 4 << i, 4 << i) for i in range(3)]       # wandering lines
+    plate = [NoiseXY(801 + i, 8 << i, 4 << i) for i in range(3)]
+    fine = [NoiseXY(901 + i, 64 << i, 16 << i) for i in range(2)]     # streaks running up the bark
+    width = NoiseXY(951, 12, 6)
+    px = bytearray(W * H * 4)
+    for j in range(H):
+        v = j / H
+        for i in range(W):
+            u = i / W
+            w = sum(n.at01(u, v) * a for n, a in zip(warp, (0.6, 0.3, 0.1)))
+            ridge = abs(math.sin(math.pi * (u * 7 + 2.2 * w)))                  # 0 in a fissure, 1 on a plate
+            fissure = 1 - clamp01(ridge / (0.25 + 0.45 * width.at01(u, v)))     # fissures open and close along their length
+            p = sum(n.at01(u, v) * a for n, a in zip(plate, (0.5, 0.3, 0.2)))
+            f = sum(n.at01(u, v) * a for n, a in zip(fine, (0.6, 0.4)))
+            l = (0.52 + 0.24 * (p - 0.5) + 0.22 * (f - 0.5)) * (0.75 + 0.25 * ridge)
+            l *= 1 - 0.68 * fissure * fissure
+            o = (j * W + i) * 4
+            px[o] = to8(l * 1.02)
+            px[o + 1] = to8(l)
+            px[o + 2] = to8(l * 0.96)
+            px[o + 3] = 255
+    return W, H, px
+
+
+def bark():
+    return cached("T_Bark", 2, paint_bark)
+
+
+# ------------------------------------------------------------------ big soft blotches (for patchy variation across the meadow)
+def paint_patches():
+    N = 128
+    oct_ = [Noise(1101 + i, 4 << i) for i in range(4)]
+    px = bytearray(N * N * 4)
+    for j in range(N):
+        for i in range(N):
+            n = fbm(oct_, i / N, j / N)
+            o = (j * N + i) * 4
+            px[o] = px[o + 1] = px[o + 2] = to8(clamp01((n - 0.3) * 2.5))
+            px[o + 3] = 255
+    return N, N, px
+
+
+def patches():
+    return cached("T_Patches", 1, paint_patches)

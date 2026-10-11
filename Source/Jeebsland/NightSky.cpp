@@ -200,10 +200,14 @@ void ANightSky::Tick(float DeltaSeconds)
 	if (CloudMid)
 	{
 		const float E = ADayNight::SunElevation;
-		const float Sunset = 1.f - FMath::SmoothStep(12.f, 28.f, E);
-		CloudMid->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(FLinearColor(1.0f, 1.0f, 1.0f), FLinearColor(1.0f, 0.68f, 0.50f), Sunset));
-		CloudMid->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(FLinearColor(0.70f, 0.76f, 0.88f), FLinearColor(0.58f, 0.46f, 0.60f), Sunset));
-		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.3f, 1.7f, Sunset));
+		// golden first, then a deep rose-red as the sun reaches the bottom of its loop
+		const float Golden = 1.f - FMath::SmoothStep(16.f, 30.f, E);
+		const float Red = 1.f - FMath::SmoothStep(11.f, 17.f, E);
+		const FLinearColor Lit = FMath::Lerp(FMath::Lerp(FLinearColor(1.0f, 1.0f, 1.0f), FLinearColor(1.0f, 0.70f, 0.42f), Golden), FLinearColor(1.0f, 0.36f, 0.24f), Red);
+		const FLinearColor Shade = FMath::Lerp(FMath::Lerp(FLinearColor(0.70f, 0.76f, 0.88f), FLinearColor(0.62f, 0.50f, 0.58f), Golden), FLinearColor(0.50f, 0.22f, 0.32f), Red);
+		CloudMid->SetVectorParameterValue(TEXT("Lit"), Lit);
+		CloudMid->SetVectorParameterValue(TEXT("Shade"), Shade);
+		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.1f, 1.8f, Golden));
 		CloudRoot->AddLocalRotation(FRotator(0.f, DeltaSeconds * 0.15f, 0.f));
 	}
 

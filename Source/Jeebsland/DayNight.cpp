@@ -56,11 +56,11 @@ void ADayNight::BeginPlay()
 		Post->Settings.AutoExposureBias = 0.35f;
 		Post->Settings.bOverride_BloomIntensity = true;   // a gentle glow round bright edges: softer, cosier light
 		Post->Settings.BloomIntensity = 0.95f;
-		// A painterly grade: a little less contrast, and shadows lifted toward a soft blue instead of falling to black
+		// A painterly grade: a little less contrast, and shadows lifted a touch (barely cool) instead of falling to black
 		Post->Settings.bOverride_ColorContrast = true;
 		Post->Settings.ColorContrast = FVector4(0.9f, 0.9f, 0.9f, 1.f);
 		Post->Settings.bOverride_ColorOffsetShadows = true;
-		Post->Settings.ColorOffsetShadows = FVector4(0.012f, 0.018f, 0.035f, 0.f);
+		Post->Settings.ColorOffsetShadows = FVector4(0.012f, 0.012f, 0.016f, 0.f);
 	}
 }
 
@@ -73,12 +73,12 @@ void ADayNight::Tick(float DeltaSeconds)
 	// A midnight sun: it circles the whole sky once a day, high at noon (phase 0) and skimming low over the
 	// horizon at the bottom of its loop (phase 0.5), where the light is the old golden dusk. It never sets.
 	const float A = 2.f * PI * Phase;
-	SunElevation = 32.5f + 21.5f * FMath::Cos(A);   // 54 degrees at noon, 11 at the low point
+	SunElevation = 26.f + 15.f * FMath::Cos(A);     // 41 degrees at noon, 11 at the low point
 	const float Azimuth = 35.f + 360.f * (Phase - 0.5f);   // at the low point it sits opposite the moon
 	SunDir = FRotator(SunElevation, Azimuth, 0.f).Vector();
 
 	const float E = SunElevation;
-	const float High = FMath::SmoothStep(14.f, 50.f, E);   // 0 at the golden low point, 1 at noon
+	const float High = FMath::SmoothStep(14.f, 41.f, E);   // 0 at the golden low point, 1 at noon
 	Dusk = 1.f - FMath::SmoothStep(13.f, 24.f, E);        // 1 while the sun is near the horizon (stars come out)
 
 	if (ADirectionalLight* S = Sun.Get())
@@ -87,7 +87,7 @@ void ADayNight::Tick(float DeltaSeconds)
 		S->SetActorRotation(FRotator(-E, Azimuth + 180.f, 0.f));
 		const FLinearColor Ember(1.0f, 0.50f, 0.26f), Golden(1.0f, 0.62f, 0.34f), Noon(1.0f, 0.94f, 0.84f);
 		const FLinearColor Low = FMath::Lerp(Ember, Golden, FMath::SmoothStep(11.f, 20.f, E));   // a little redder right down by the horizon
-		L->SetIntensity(3.5f + 4.5f * High);
+		L->SetIntensity(3.5f + 2.7f * High);   // 6.2 at noon: bright, but not glaring
 		L->SetLightColor(FMath::Lerp(Low, Noon, High));
 	}
 

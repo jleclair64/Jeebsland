@@ -21,11 +21,11 @@ namespace
 	// The same five autumn colours as the tree leaves (see Forest.cpp); the last is the green holdout
 	constexpr int32 NumLeafTypes = 5;
 	const FLinearColor LeafPalette[NumLeafTypes] = {
-		FLinearColor(0.62f, 0.17f, 0.03f), // burnt orange
-		FLinearColor(0.45f, 0.06f, 0.04f), // deep red
-		FLinearColor(0.70f, 0.40f, 0.05f), // amber
-		FLinearColor(0.50f, 0.30f, 0.04f), // gold-brown
-		FLinearColor(0.20f, 0.26f, 0.05f), // last green holdout
+		FLinearColor(0.50f, 0.17f, 0.045f), // burnt orange
+		FLinearColor(0.36f, 0.07f, 0.045f), // deep red
+		FLinearColor(0.55f, 0.33f, 0.07f),  // amber
+		FLinearColor(0.42f, 0.27f, 0.07f),  // gold-brown
+		FLinearColor(0.17f, 0.22f, 0.07f),  // last green holdout
 	};
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;

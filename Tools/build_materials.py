@@ -121,7 +121,21 @@ def fluffy_normal(mat):
         unreal.log("MATDIAG fluffy normal skipped: " + str(e))
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True):
+def patchy(mat, col):
+    """Big soft patches across the land, some lusher, some drier, and each tuft a shade lighter or darker than its neighbour"""
+    patches = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")
+    if patches is None:
+        return col
+    g = Graph(mat)
+    xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
+    p = g.tex(patches, g.mul(xy, 1.0 / 4500.0))
+    shade = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.const3((0.80, 1.0, 0.76)), shade, "A"); g.link(g.const3((1.12, 0.98, 0.70)), shade, "B"); g.link(p, shade, "Alpha", "R")
+    each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.24), 0.88)
+    return g.muln(g.muln(col, shade), each)
+
+
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -149,6 +163,8 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
         lib.connect_material_expressions(col, "", boosted, "A")
         boosted.set_editor_property("const_b", gain)
         col = boosted
+    if vary:
+        col = patchy(mat, col)
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     glow = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, -100)   # a faint glow so deep shade is never pitch black
@@ -171,16 +187,25 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     unreal.log("MATDIAG built " + name)
 
 
-def build_bark():
+def build_bark(tex):
     bark = fresh_material("M_BarkTint")
     bark.set_editor_property("two_sided", True)
     set_flags(bark, ("used_with_instanced_static_meshes", "used_with_static_lighting"))
     tint = lib.create_material_expression(bark, unreal.MaterialExpressionVectorParameter, -500, 0)
     tint.set_editor_property("parameter_name", "Tint")
     tint.set_editor_property("default_value", unreal.LinearColor(0.16, 0.09, 0.05, 1.0))
-    lib.connect_material_property(tint, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    # the bark picture (plates and fissures, about mid-grey) coloured by the tint
+    ts = lib.create_material_expression(bark, unreal.MaterialExpressionTextureSample, -700, 200)
+    ts.set_editor_property("texture", tex)
+    col = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -350, 0)
+    lib.connect_material_expressions(ts, "RGB", col, "A")
+    lib.connect_material_expressions(tint, "", col, "B")
+    col2 = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 0)
+    lib.connect_material_expressions(col, "", col2, "A")
+    col2.set_editor_property("const_b", 1.9)
+    lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
-    lib.connect_material_expressions(tint, "", glow, "A")
+    lib.connect_material_expressions(col2, "", glow, "A")
     glow.set_editor_property("const_b", 0.03)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
@@ -211,19 +236,7 @@ def import_texture(png, name):
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
 
 
-import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
 
-import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
-import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
-import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_TreeLeaves.png"), "T_TreeLeaves")   # painted by BuildMaterials.ps1
-
-#              name          texture          tint                     gust lean cm  tips only  lift
-build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 9.0,          True,      0.0)
-build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.80)
-# one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
-build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
-build_bark()
 
 
 # ------------------------------------------------------------------ sky, moon and road materials
@@ -359,7 +372,14 @@ def build_moon(tex):
     centre = g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5)
     dist = g.node(unreal.MaterialExpressionDistance); g.link(uv, dist, "A"); g.link(centre, dist, "B")
     glow = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0))), 3.5)
-    e = g.muln(g.muln(g.vector("Tint", (1.0, 0.8, 0.45)), g.scalar("Bright", 3.0)), g.mul(glow, 0.22))
+    # nothing over the moon disc itself: fades in just outside its rim
+    disc = g.node(unreal.MaterialExpressionDistance); g.link(uv, disc, "A"); g.link(g.mask(g.vector("DiscCenter", (0.5, 0.5, 0.0)), True, True), disc, "B")
+    rim = g.scalar("DiscRadius", 0.156)
+    outside = g.node(unreal.MaterialExpressionDivide)
+    sub = g.node(unreal.MaterialExpressionSubtract); g.link(disc, sub, "A"); g.link(rim, sub, "B"); g.link(sub, outside, "A")
+    g.link(g.mul(rim, 0.12), outside, "B")
+    mask = g.one(unreal.MaterialExpressionSaturate, outside)
+    e = g.muln(g.muln(g.vector("Tint", (1.0, 0.8, 0.45)), g.scalar("Bright", 3.0)), g.muln(g.mul(glow, 0.22), mask))
     g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_MoonHalo")
     # The unlit part: a dark disc, faintly earth-lit, that hides the stars behind it at night and vanishes by day
@@ -412,6 +432,21 @@ def imported(png, name):
     import_texture(png, name)
     return unreal.EditorAssetLibrary.load_asset("/Game/" + name)
 
+
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
+
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_TreeLeaves.png"), "T_TreeLeaves")   # painted by BuildMaterials.ps1
+
+#              name          texture          tint                     gust lean cm  tips only  lift
+imported(gen_textures.patches(), "T_Patches")
+build_foliage("M_Grass",    "T_GrassTuft",   (0.64, 0.66, 0.40, 0.0), 9.0,          True,      0.0, vary=True)
+build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.72)
+# one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
+build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
+build_bark(imported(gen_textures.bark(), "T_Bark"))
 
 build_star()
 build_streak()

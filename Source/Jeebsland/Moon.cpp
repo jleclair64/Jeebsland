@@ -143,11 +143,24 @@ void AMoon::Tick(float DeltaSeconds)
 	const float N = ADayNight::Dusk;
 	const float Bright = FMath::Lerp(1.2f, 6.5f, N);
 	const FLinearColor Tint = FMath::Lerp(FLinearColor(1.f, 0.97f, 0.92f), MoonGlow, N);
-	for (UMaterialInstanceDynamic* M : { LitMid, HaloMid })
+	if (LitMid)
 	{
-		if (!M) continue;
-		M->SetScalarParameterValue(TEXT("Bright"), Bright);
-		M->SetVectorParameterValue(TEXT("Tint"), Tint);
+		LitMid->SetScalarParameterValue(TEXT("Bright"), Bright);
+		LitMid->SetVectorParameterValue(TEXT("Tint"), Tint);
+	}
+	// The glow comes from the lit part only: centred on it, as strong as the lit share of the disc, and never over the
+	// disc itself (so the shadowed part stays plain sky)
+	if (HaloMid)
+	{
+		const float C = -1.f + 1.9f * Phase;
+		const float LitShare = FMath::Clamp((1.f - C) * 0.5f, 0.f, 1.f);
+		const float Offset = 0.45f * (1.f + C) * MoonRadius;          // from the disc centre toward the lit limb
+		const float H = MoonRadius * 3.2f;                              // half the halo square
+		Halo->SetRelativeLocation(FVector(0.f, Offset, 0.f));
+		HaloMid->SetScalarParameterValue(TEXT("Bright"), Bright * LitShare);
+		HaloMid->SetVectorParameterValue(TEXT("Tint"), Tint);
+		HaloMid->SetVectorParameterValue(TEXT("DiscCenter"), FLinearColor(0.5f - Offset / (2.f * H), 0.5f, 0.f));
+		HaloMid->SetScalarParameterValue(TEXT("DiscRadius"), MoonRadius / (2.f * H));
 	}
 	if (DarkMid)
 	{
