@@ -135,7 +135,7 @@ def patchy(mat, col):
     return g.muln(g.muln(col, shade), each)
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False):
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -165,11 +165,24 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
         col = boosted
     if vary:
         col = patchy(mat, col)
+    if crown_shade:
+        # each leaf cluster carries how deep in the crown it sits (per-instance data 0): darken it that much
+        try:
+            cd = lib.create_material_expression(mat, unreal.MaterialExpressionPerInstanceCustomData, -500, -300)
+            cd.set_editor_property("data_index", 0)
+            lit = lib.create_material_expression(mat, unreal.MaterialExpressionOneMinus, -350, -300)
+            lib.connect_material_expressions(cd, "", lit, "")
+            shaded = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, -300)
+            lib.connect_material_expressions(col, "", shaded, "A")
+            lib.connect_material_expressions(lit, "", shaded, "B")
+            col = shaded
+        except Exception as e:
+            unreal.log("MATDIAG crown shade skipped: " + str(e))
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     glow = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, -100)   # a faint glow so deep shade is never pitch black
     lib.connect_material_expressions(col, "", glow, "A")
-    glow.set_editor_property("const_b", 0.05)
+    glow.set_editor_property("const_b", glow_amt)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     rough = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 300)
     rough.set_editor_property("r", 1.0)
@@ -428,6 +441,21 @@ def build_dirt(tex):
     finish(mat, "M_Dirt")
 
 
+def build_ground(tex):
+    # The soil under the grass: a painted, world-aligned texture with large soft light and dark patches across it
+    mat = fresh_material("M_Ground")
+    g = Graph(mat)
+    xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
+    near = g.tex(tex, g.mul(xy, 1.0 / 300.0))
+    far = g.tex(tex, g.mul(xy, 1.0 / 2400.0))
+    var = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.78, const_b=1.18)
+    g.link(far, var, "Alpha", "G")
+    g.out(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.95), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.15), unreal.MaterialProperty.MP_SPECULAR)
+    finish(mat, "M_Ground")
+
+
 def imported(png, name):
     import_texture(png, name)
     return unreal.EditorAssetLibrary.load_asset("/Game/" + name)
@@ -443,9 +471,9 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 imported(gen_textures.patches(), "T_Patches")
 build_foliage("M_Grass",    "T_GrassTuft",   (0.52, 0.70, 0.40, 0.0), 9.0,          True,      0.0, vary=True)
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.72)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.80, crown_shade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
-build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
+build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves stay bright even in shade
 build_bark(imported(gen_textures.bark(), "T_Bark"))
 
 build_star()
@@ -456,4 +484,5 @@ for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
     if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
         unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
 build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
+build_ground(imported(gen_textures.ground(), "T_Ground"))
 unreal.log("MATDIAG all materials built")

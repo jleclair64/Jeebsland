@@ -446,3 +446,35 @@ def paint_patches():
 
 def patches():
     return cached("T_Patches", 1, paint_patches)
+
+# ------------------------------------------------------------------ the ground under the grass: mottled greens with bits of soil (tiles both ways)
+def paint_ground():
+    N = 256
+    rnd = random.Random(515)
+    mottle = [Noise(1201 + i, 4 << i) for i in range(4)]
+    soil = [Noise(1301 + i, 8 << i) for i in range(3)]
+    grain = [Noise(1401 + i, 64 << i) for i in range(2)]
+    px = bytearray(N * N * 4)
+    for j in range(N):
+        for i in range(N):
+            u, v = i / N, j / N
+            m = fbm(mottle, u, v)
+            s = clamp01((fbm(soil, u, v) - 0.58) * 4.0)          # small bare, earthy patches
+            g = fbm(grain, u, v)
+            l = (0.82 + 0.40 * (m - 0.5)) * (0.88 + 0.24 * g)
+            r = (0.30 + 0.06 * m) * (1 - s) + 0.36 * s
+            gg = (0.40 + 0.04 * m) * (1 - s) + 0.27 * s
+            b = 0.20 * (1 - s) + 0.17 * s
+            o = (j * N + i) * 4
+            px[o], px[o + 1], px[o + 2], px[o + 3] = to8(r * l), to8(gg * l), to8(b * l), 255
+    for _ in range(500):                                        # specks of soil and old stems
+        x, y = rnd.randrange(N), rnd.randrange(N)
+        k = rnd.uniform(0.6, 0.8)
+        for dx, dy in ((0, 0), (1, 0), (0, 1)):
+            o = (((y + dy) % N) * N + (x + dx) % N) * 4
+            px[o], px[o + 1], px[o + 2] = int(px[o] * k), int(px[o + 1] * k), int(px[o + 2] * k)
+    return N, N, px
+
+
+def ground():
+    return cached("T_Ground", 1, paint_ground)

@@ -105,7 +105,12 @@ void AGrassField::BeginPlay()
 	SetActorLocation(FVector::ZeroVector); // always sit at the world origin
 
 	BuildTerrain();
-	Tint(Terrain, FLinearColor(0.085f, 0.13f, 0.035f));   // a mid green under the tufts, so gaps between blades blend in instead of showing as dark lines
+	// The ground under the tufts: a painted soil-and-grass texture (Tools/build_materials.py), or a mid green if it is missing
+	if (UMaterialInterface* GroundMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground")))
+	{
+		for (int32 i = 0; i < Terrain->GetNumMaterials(); ++i) Terrain->SetMaterial(i, GroundMat);
+	}
+	else Tint(Terrain, FLinearColor(0.085f, 0.13f, 0.035f));
 	Tint(Grass,   FLinearColor(0.30f, 0.34f, 0.06f));
 
 	FRandomStream Rand(1337); // fixed seed = same meadow every run

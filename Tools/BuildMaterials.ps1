@@ -95,16 +95,16 @@ $g3.Dispose()
 $bmp3.Save($png3, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp3.Dispose()
 
-# Tree leaves: a full, rounded cluster of soft leaves, heaped toward the middle, gently varied in brightness (the game tints them)
+# Tree leaves: a full, rounded cluster of many small soft leaves, heaped toward the middle, gently varied in brightness (the game tints them)
 $png4 = Join-Path $proj 'Saved\T_TreeLeaves.png'
 $bmp4 = New-Object System.Drawing.Bitmap 256, 256, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $g4 = [System.Drawing.Graphics]::FromImage($bmp4)
 $g4.SmoothingMode = 'AntiAlias'
 $g4.Clear([System.Drawing.Color]::FromArgb(0, 210, 200, 190))
 $rnd4 = New-Object System.Random 29
-for ($i = 0; $i -lt 58; $i++) {
+for ($i = 0; $i -lt 120; $i++) {
     $a = $rnd4.NextDouble() * 2 * [math]::PI
-    $d = [math]::Sqrt($rnd4.NextDouble()) * 96
+    $d = [math]::Sqrt($rnd4.NextDouble()) * 104
     $cx = 128 + [math]::Cos($a) * $d
     $cy = 128 + [math]::Sin($a) * $d
     $v = $rnd4.Next(195, 256)
@@ -113,9 +113,9 @@ for ($i = 0; $i -lt 58; $i++) {
     $g4.TranslateTransform([single]$cx, [single]$cy)
     $g4.RotateTransform([single]($rnd4.Next(0, 180)))
     $soft = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(80, $v, [int]($v * 0.95), [int]($v * 0.88)))
-    $g4.FillEllipse($soft, -17, -23, 34, 46)
+    $g4.FillEllipse($soft, -12, -16, 24, 32)
     $fill = New-Object System.Drawing.SolidBrush $c4
-    $g4.FillEllipse($fill, -14, -20, 28, 40)
+    $g4.FillEllipse($fill, -10, -14, 20, 28)
     $g4.Restore($st)
     $soft.Dispose(); $fill.Dispose()
 }

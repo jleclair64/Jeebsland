@@ -535,7 +535,7 @@ void AAutumnDecor::BeginPlay()
 	for (const JeebCanopy::FSpot& Sp : JeebCanopy::Spots())
 	{
 		const float R = Sp.R * 1.15f;
-		const int32 Count = FMath::RoundToInt(PI * R * R / 1300.f * Rand.FRandRange(0.8f, 1.2f));
+		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 700.f * Rand.FRandRange(0.8f, 1.2f)), 520);
 		const int32 Own = FMath::Clamp(Sp.Color, 0, NumLeafTypes - 1);
 		const bool bNearRoad = JeebTerrain::PathClearance(Sp.P.X, Sp.P.Y) < R * 1.2f + 60.f;   // the per-leaf road check is slow; skip it far from roads
 		for (int32 i = 0; i < Count; ++i)
@@ -550,7 +550,7 @@ void AAutumnDecor::BeginPlay()
 			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;
 			const float Wd = Rand.FRandRange(30.f, 46.f) * (bLeafCards ? 1.15f : 1.f);
 			const FQuat Q = FRotator(Rand.FRandRange(-12.f, 12.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-12.f, 12.f)).Quaternion();
-			const int32 Type = Rand.FRand() < 0.75f ? Own : PickLeaf();               // mostly this tree's colour
+			const int32 Type = Rand.FRand() < 0.8f ? Own : Rand.RandRange(0, NumLeafTypes - 2);   // mostly this tree's colour, the rest autumn colours (never green)
 			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Z + Rand.FRandRange(0.f, 2.5f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 		}
 		if (Rand.FRand() < 0.30f)

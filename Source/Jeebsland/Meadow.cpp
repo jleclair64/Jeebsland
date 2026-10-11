@@ -266,17 +266,16 @@ void AMeadow::StepJob(double BudgetSeconds)
 			{
 				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
 				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc + 12.f) / 110.f, 0.f, 1.f));
-				// under a tree the grass is sparse and short, so the fallen leaves show
+				// under a tree the grass is short, so the fallen leaves show through it
 				const float Cov = JeebCanopy::Cover(X, Y);
-				const bool bSkip = Cov > 0.f && JobRand.FRand() < Cov * 0.8f;
-				Short *= 1.f - 0.45f * Cov;
+				Short *= 1.f - 0.55f * Cov;
 				if (JobTier < 2)   // the same around huts, stalls, the castle and the pond
 				{
 					const float D = 90.f;
 					if (JeebTerrain::NoGroundCover(X + D, Y) || JeebTerrain::NoGroundCover(X - D, Y) || JeebTerrain::NoGroundCover(X, Y + D) || JeebTerrain::NoGroundCover(X, Y - D))
 						Short = FMath::Min(Short, 0.4f);
 				}
-				if (!bSkip) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Sxy * FMath::Lerp(0.75f, 1.f, Short), Sxy * FMath::Lerp(0.75f, 1.f, Short), Sz * (1.f + 0.1f * JobTier) * Short)));
+				JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Sxy * FMath::Lerp(0.75f, 1.f, Short), Sxy * FMath::Lerp(0.75f, 1.f, Short), Sz * (1.f + 0.1f * JobTier) * Short)));
 			}
 		}
 		if ((JobDone & 15) == 0 && FPlatformTime::Seconds() > End) return;

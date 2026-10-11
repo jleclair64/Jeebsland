@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "Canopy.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
@@ -11,9 +12,6 @@
 
 namespace
 {
-	// Turn these down if the game runs slowly in big woods: fewer branches = fewer instances
-	constexpr int32 NumPrimary = 12; // main branches off the trunk
-	constexpr int32 NumSub = 7;      // twigs on each main branch  (12 + 12*7 + 4 top twigs = 100 branches)
 
 	const FLinearColor LeafColors[5] = {
 		FLinearColor(0.50f, 0.17f, 0.045f), // burnt orange
@@ -225,13 +223,13 @@ static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32
 	return MakeTubeMesh(Outer, Mat, Tubes, 20, FVector(1, 0, 0), FVector(0, 1, 0), true, 2.f, 5.5f);
 }
 
-// A branch lies along X from -50 to +50 (centred, like the stick transforms expect), 100 wide at the base, thinning to a twig with a gentle arch
+// One piece of a branch: along X from -50 to +50 (centred, like the stick transforms expect), 100 wide at the base, 75 at the end
 static UStaticMesh* MakeBranchMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	TArray<TArray<FRing>> Tubes;
 	TArray<FRing> B;
 	const float Ts[4] = { 0.f, 0.33f, 0.66f, 1.f };
-	for (float t : Ts) B.Add({ FVector(t * 100.f - 50.f, 0.f, 9.f * FMath::Sin(t * PI)), 50.f * (1.f - 0.68f * t) });
+	for (float t : Ts) B.Add({ FVector(t * 100.f - 50.f, 0.f, 0.f), 50.f * (1.f - 0.25f * t) });   // straight, gently tapered: limbs bend by joining several
 	Tubes.Add(B);
 	return MakeTubeMesh(Outer, Mat, Tubes, 6, FVector(0, 1, 0), FVector(0, 0, 1), true, 1.f, 8.f);
 }
@@ -250,20 +248,24 @@ AForest::AForest()
 	Trunk    = MakeISM(TEXT("Trunk"),    CylMesh.Object,  true,  0,    0);
 		RedTrunk = MakeISM(TEXT("RedTrunk"), CylMesh.Object,  true,  0,    0);
 	for (int32 i = 0; i < 4; ++i) TrunkVar.Add(MakeISM(*FString::Printf(TEXT("TrunkV%d"), i), CylMesh.Object, true, 0, 0));
-	for (int32 i = 0; i < 4; ++i) BranchVar.Add(MakeISM(*FString::Printf(TEXT("BranchV%d"), i), CubeMesh.Object, false, 3500, 4500));
+	for (int32 i = 0; i < 4; ++i) BranchVar.Add(MakeISM(*FString::Printf(TEXT("BranchV%d"), i), CubeMesh.Object, false, 3500, 4500, true));
 	Branch   = MakeISM(TEXT("Branch"),   CubeMesh.Object, false, 3500, 4500);
 	for (int32 i = 0; i < 5; ++i)
 	{
-		Leaf.Add(MakeISM(*FString::Printf(TEXT("Leaf%d"), i), CubeMesh.Object, false, 7000, 9000));
+		Leaf.Add(MakeISM(*FString::Printf(TEXT("Leaf%d"), i), CubeMesh.Object, false, 7000, 9000, true));
+		Leaf.Last()->SetNumCustomDataFloats(1);   // per cluster: how shaded it is inside the crown
 	}
 	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, true, 0, 0));
 	Pine.Add(MakeISM(TEXT("PineB"), ConeMesh.Object, true, 0, 0));
 	RedCone  = MakeISM(TEXT("RedCone"), ConeMesh.Object, true, 0, 0);
 }
 
-UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, bool bShadow, int32 CullStart, int32 CullEnd)
+UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, bool bShadow, int32 CullStart, int32 CullEnd, bool bHierarchical)
 {
-	UInstancedStaticMeshComponent* C = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
+	// Hierarchical for the many small pieces (leaves, branches): culled in clumps, so only what is on screen is drawn
+	UInstancedStaticMeshComponent* C = bHierarchical
+		? CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(Name)
+		: CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
 	C->SetupAttachment(RootComponent);
 	C->SetStaticMesh(Mesh);
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -301,6 +303,8 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	UInstancedStaticMeshComponent* LeafComp = nullptr;
 	UInstancedStaticMeshComponent* ConeComp = nullptr;
 	float Radius = 25.f, Height = 220.f;
+	TArray<float> LeafShade;   // how deep in the crown each leaf cluster sits (darkens it)
+	float CanopyR = 0.f;
 
 	// A thin square stick between two points
 	auto Stick = [](const FVector& A, const FVector& B, float Thick)
@@ -346,62 +350,114 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			return Pos + YawQ.RotateVector(FVector(M.X * Ds, M.Y * Ds, 0.f)) + FVector(0.f, 0.f, M.Z * Height / 100.f);
 		};
 
-		// Small diamond leaves: thin square plates turned 45 degrees, three clustered at each twig tip
-		auto Leafy = [&](const FVector& At)
+		// Small diamond leaves: thin square plates turned 45 degrees (only if the painted leaf material is missing)
+		auto Diamonds = [&](const FVector& At)
 		{
-			if (bLeafCards)
+			for (int32 k = 0; k < 2; ++k)
 			{
-				// one painted cluster per twig tip, turned any which way
-				const float W = R.FRandRange(52.f, 80.f) * S;
-				LeafT.Add(FTransform(FRotator(R.FRandRange(-90.f, 90.f), R.FRandRange(0.f, 360.f), R.FRandRange(-60.f, 60.f)).Quaternion(), At + R.GetUnitVector() * 10.f * S, FVector(W / 100.f)));
-				return;
-			}
-			for (int32 k = 0; k < 3; ++k)
-			{
-				if (k == 2 && R.FRand() > 0.1f) continue; // 30% fewer leaves overall
 				const float W = R.FRandRange(26.f, 40.f) * S;
 				const FQuat Q = FRotator(R.FRandRange(-40.f, 40.f), 45.f + R.FRandRange(-20.f, 20.f), R.FRandRange(-40.f, 40.f)).Quaternion();
-				const FVector Spot = At + R.GetUnitVector() * (k == 0 ? 0.f : 22.f * S);
-				LeafT.Add(FTransform(Q, Spot, FVector(W / 100.f, W / 100.f, 0.035f * S)));
+				LeafT.Add(FTransform(Q, At + R.GetUnitVector() * (k == 0 ? 0.f : 22.f * S), FVector(W / 100.f, W / 100.f, 0.035f * S)));
+			}
+		};
+		// A small painted cluster of leaves, turned any which way
+		auto Leafy = [&](const FVector& At)
+		{
+			if (!bLeafCards) { Diamonds(At); return; }
+			const float W = R.FRandRange(30.f, 44.f) * S;
+			LeafT.Add(FTransform(FRotator(R.FRandRange(-90.f, 90.f), R.FRandRange(0.f, 360.f), R.FRandRange(-60.f, 60.f)).Quaternion(), At + R.GetUnitVector() * 8.f * S, FVector(W / 100.f)));
+		};
+
+		// ---- Crown shape: how high the limbs start, how steeply they rise, how long they reach, and whether they bend up or droop ----
+		enum EShape { Round, Tall, Spreading, Weeping };
+		const EShape Shape = EShape(R.RandRange(0, 3));
+		float StartLo = 0.40f, ElLo = 25.f, ElHi = 55.f, LenMul = 1.f, Bend = 0.10f;   // Bend > 0 curls the limbs up, < 0 makes them droop
+		switch (Shape)
+		{
+		case Tall:      StartLo = 0.30f; ElLo = 48.f; ElHi = 72.f; LenMul = 0.75f; Bend = 0.12f; break;
+		case Spreading: StartLo = 0.35f; ElLo = 8.f;  ElHi = 32.f; LenMul = 1.40f; Bend = 0.16f; break;
+		case Weeping:   StartLo = 0.45f; ElLo = 28.f; ElHi = 48.f; LenMul = 1.10f; Bend = -0.32f; break;
+		default: break;
+		}
+
+		// A bending branch: Segs straight pieces, each turning a little (and curling up or drooping), tapering as it goes.
+		// Calls Out(point, fraction along) at every joint, so side shoots and leaves can grow from it.
+		auto Limb = [&](const FVector& From, FVector Dir, float Len, float Thick, int32 Segs, float BendBy, TFunctionRef<void(const FVector&, const FVector&, float, float)> Out)
+		{
+			FVector P = From;
+			const float SegLen = Len / Segs;
+			for (int32 s = 0; s < Segs; ++s)
+			{
+				const float K = float(s + 1) / Segs;
+				const float ThickHere = Thick * (1.f - 0.6f * float(s) / Segs);
+				const FVector Next = P + Dir * SegLen;
+				BranchT.Add(Stick(P - Dir * ThickHere * 0.3f, Next, ThickHere));   // overlaps the joint a touch, so bends never show a gap
+				P = Next;
+				Out(P, Dir, K, ThickHere);
+				Dir = (Dir + FVector(0.f, 0.f, BendBy * (BendBy < 0.f ? K : 1.f)) + R.GetUnitVector() * 0.22f).GetSafeNormal();
 			}
 		};
 
-		for (int32 i = 0; i < NumPrimary; ++i)
+		const int32 NumLimbs = R.RandRange(9, 12);
+		for (int32 i = 0; i < NumLimbs; ++i)
 		{
-			const float T = (i + 0.5f) / NumPrimary;
-						const bool bLimbBranch = (TrunkVariant == 2) && (i % 3 == 1);
-			const FVector Start = AxisPoint(FMath::Max(0.45f + 0.55f * T, bLimbBranch ? ForkT + 0.1f : 0.f), bLimbBranch);
+			const float T = (i + 0.5f) / NumLimbs;
+			const bool bLimbBranch = (TrunkVariant == 2) && (i % 3 == 1);
+			const FVector Start = AxisPoint(FMath::Max(StartLo + (1.f - StartLo) * T, bLimbBranch ? ForkT + 0.1f : 0.f), bLimbBranch);
 			const float Az = FMath::DegreesToRadians(i * 137.5f + R.FRandRange(-20.f, 20.f));
-			const float El = FMath::DegreesToRadians(R.FRandRange(30.f, 55.f));
+			const float El = FMath::DegreesToRadians(R.FRandRange(ElLo, ElHi));
 			const FVector Dir(FMath::Cos(El) * FMath::Cos(Az), FMath::Cos(El) * FMath::Sin(Az), FMath::Sin(El));
-			const float L1 = 150.f * S * (1.1f - 0.5f * T) * R.FRandRange(0.85f, 1.15f);
-			const float T1 = 5.5f * S * (1.f - 0.4f * T); // skinny, like real branches
-			const FVector End1 = Start + Dir * L1;
-			BranchT.Add(Stick(Start, End1, T1));
-			Leafy(End1);
+			const float L1 = 165.f * S * LenMul * (1.1f - 0.45f * T) * R.FRandRange(0.85f, 1.15f);
+			const float T1 = 9.f * S * (1.f - 0.45f * T);   // the main limbs are thick enough to see inside the crown
 
-			for (int32 j = 0; j < NumSub; ++j)
+			Limb(Start, Dir, L1, T1, 4, Bend, [&](const FVector& P, const FVector& D, float K, float Th)
 			{
-				const float U = 0.3f + 0.7f * (j + R.FRand()) / NumSub;
-				const FVector Origin = Start + Dir * (L1 * U);
-				FVector D2 = (Dir * 0.55f + R.GetUnitVector() * 0.8f + FVector(0, 0, 0.35f)).GetSafeNormal();
-				const float L2 = L1 * 0.55f * R.FRandRange(0.8f, 1.2f);
-				const FVector End2 = Origin + D2 * L2;
-				BranchT.Add(Stick(Origin, End2, FMath::Max(2.2f * S, T1 * 0.45f)));
-				Leafy(End2);
-			}
+				if (K < 0.3f) return;   // bare near the trunk
+				// side branches from each joint, each with leaves along it and at its tip
+				const int32 Shoots = K >= 1.f ? 3 : 2;
+				for (int32 j = 0; j < Shoots; ++j)
+				{
+					const FVector D2 = (D * 0.5f + R.GetUnitVector() * 0.85f + FVector(0.f, 0.f, Bend >= 0.f ? 0.3f : -0.1f)).GetSafeNormal();
+					const float L2 = L1 * 0.42f * R.FRandRange(0.75f, 1.2f);
+					Limb(P, D2, L2, FMath::Max(2.2f * S, Th * 0.5f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector&, float K2, float)
+					{
+						Leafy(Q);
+						if (K2 >= 1.f) { Leafy(Q + R.GetUnitVector() * 22.f * S); Leafy(Q + R.GetUnitVector() * 22.f * S); }
+					});
+				}
+				Leafy(P + R.GetUnitVector() * 15.f * S);
+			});
 		}
-		// A few twigs at the very top finish the crown (this makes exactly 100 branches)
+		// A few twigs at the very top finish the crown
 		for (int32 k = 0; k < 4; ++k)
 		{
-						const FVector Start = AxisPoint(1.f, k % 2 == 1);
+			const FVector Start = AxisPoint(1.f, k % 2 == 1);
 			const FVector Dir = (FVector(R.FRandRange(-1.f, 1.f), R.FRandRange(-1.f, 1.f), 1.6f)).GetSafeNormal();
-			const FVector End = Start + Dir * 90.f * S;
-			BranchT.Add(Stick(Start, End, 3.f * S));
-			Leafy(End);
+			Limb(Start, Dir, 100.f * S * LenMul, 4.f * S, 2, Bend, [&](const FVector& Q, const FVector&, float, float) { Leafy(Q); });
 		}
-	}
-	else if (Kind == ETreeKind::Pine)
+
+		// ---- Shade inside the crown: clusters deep inside and low down are darker, so it reads as one rounded mass ----
+		if (LeafT.Num() > 0)
+		{
+			FVector Mid = FVector::ZeroVector;
+			float ZLo = 1e9f, ZHi = -1e9f;
+			for (const FTransform& X : LeafT) { Mid += X.GetLocation(); ZLo = FMath::Min(ZLo, float(X.GetLocation().Z)); ZHi = FMath::Max(ZHi, float(X.GetLocation().Z)); }
+			Mid /= LeafT.Num();
+			float Far = 1.f, Spread = 1.f;
+			for (const FTransform& X : LeafT)
+			{
+				Far = FMath::Max(Far, float(FVector::Dist(X.GetLocation(), Mid)));
+				Spread = FMath::Max(Spread, float(FVector::Dist2D(X.GetLocation(), Pos)));
+			}
+			for (const FTransform& X : LeafT)
+			{
+				const float Inner = 1.f - FVector::Dist(X.GetLocation(), Mid) / Far;
+				const float Low = 1.f - (X.GetLocation().Z - ZLo) / FMath::Max(ZHi - ZLo, 1.f);
+				LeafShade.Add(FMath::Clamp(0.42f * Inner + 0.22f * Low, 0.f, 0.55f));
+			}
+			CanopyR = Spread * 0.9f;
+		}
+	}	else if (Kind == ETreeKind::Pine)
 	{
 		// ------- Pine: slim trunk with seven stacked cone tiers -------
 		ConeComp = Pine[R.RandRange(0, 1)];
@@ -468,13 +524,19 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	Commit(TrunkComp, TrunkT, true);
 	Commit(BranchComp, BranchT, false);
 	Commit(LeafComp, LeafT, false);
+	if (LeafComp && LeafShade.Num() == LeafT.Num() && LeafComp->NumCustomDataFloats > 0)
+	{
+		const int32 First = LeafComp->GetInstanceCount() - LeafT.Num();
+		for (int32 i = 0; i < LeafShade.Num(); ++i) LeafComp->SetCustomDataValue(First + i, 0, LeafShade[i], false);
+		LeafComp->MarkRenderStateDirty();
+	}
 	Commit(ConeComp, ConeT, false);
 
 	Tree->Setup(Kind, FMath::Max(Radius, 18.f), Height);
 	if (Kind == ETreeKind::Oak)
 	{
 		// remember the canopy: thinner grass and a carpet of this tree's leaves underneath
-		JeebCanopy::Add(FVector2D(Pos.X, Pos.Y), FMath::Clamp(Height * 0.5f, 160.f, 520.f), LeafComp ? Leaf.IndexOfByKey(LeafComp) : 0);
+		JeebCanopy::Add(FVector2D(Pos.X, Pos.Y), FMath::Clamp(CanopyR > 0.f ? CanopyR : Height * 0.5f, 160.f, 650.f), LeafComp ? Leaf.IndexOfByKey(LeafComp) : 0);
 	}
 	return Tree;
 }
