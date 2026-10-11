@@ -42,4 +42,6 @@ private:
 	void FinishJob();
 	void DropCell(const FIntPoint& Id);
 	void PlaceBushesAndFlowers();
+	void Prewarm();
+	bool bPrewarmed = false;
 };

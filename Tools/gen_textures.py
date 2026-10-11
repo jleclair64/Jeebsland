@@ -310,54 +310,64 @@ def cirrus():
     return cached("T_Cirrus", 2, paint_cirrus)
 
 # ------------------------------------------------------------------ puffy cumulus: four cloud shapes in a 2 x 2 atlas
-# R = how much cloud (soft-edged), G = how lit (bright tops, shaded flat bottoms)
+# R = how much cloud (soft-edged), G = how lit. Every puff is shaded like a ball lit from above and to one side,
+# so the cloud reads as a heap of rounded lobes (the cauliflower look), with flat, shaded undersides.
 def paint_cumulus():
-    T = 256
+    T = 512
     W = H = 2 * T
     rnd = random.Random(4242)
-    wisp = [Noise(601 + i, 8 << i) for i in range(3)]
+    wisp = [Noise(601 + i, 8 << i) for i in range(4)]
+    L = (-0.35, -0.80, 0.50)                                # light from up and a little to the left
+    ll = math.sqrt(sum(a * a for a in L))
+    L = tuple(a / ll for a in L)
     px = bytearray(W * H * 4)
     for tile in range(4):
         ox, oy = (tile % 2) * T, (tile // 2) * T
-        base = T * 0.72                                     # the flat bottom of the cloud
+        base = T * 0.74
         blobs = []
         n = rnd.randint(7, 11)
-        for k in range(n):                                  # a row of puffs along the base, taller ones in the middle
-            x = T * (0.16 + 0.68 * k / (n - 1)) + rnd.uniform(-8, 8)
+        for k in range(n):                                  # a row of puffs along the base, taller in the middle
+            x = T * (0.14 + 0.72 * k / (n - 1)) + rnd.uniform(-10, 10)
             mid = 1 - abs(k / (n - 1) - 0.5) * 2
-            r = T * (0.07 + 0.08 * mid + rnd.uniform(0, 0.04))
-            blobs.append((x, base - r * 0.6, r))
-        for k in range(rnd.randint(4, 7)):                  # puffs piled on top
-            x = T * rnd.uniform(0.3, 0.7)
-            r = T * rnd.uniform(0.08, 0.15)
-            blobs.append((x, base - T * rnd.uniform(0.18, 0.36), r))
-        for k in range(rnd.randint(10, 16)):                # little cauliflower bumps round the top edge
-            a = rnd.uniform(math.pi * 1.05, math.pi * 1.95)
+            r = T * (0.065 + 0.075 * mid + rnd.uniform(0, 0.035))
+            blobs.append((x, base - r * 0.55, r))
+        for k in range(rnd.randint(5, 8)):                  # puffs piled on top
+            x = T * rnd.uniform(0.28, 0.72)
+            r = T * rnd.uniform(0.07, 0.13)
+            blobs.append((x, base - T * rnd.uniform(0.18, 0.38), r))
+        for k in range(rnd.randint(26, 40)):                # many small lobes round the upper edge
+            a = rnd.uniform(math.pi * 1.0, math.pi * 2.0)
             (bx, by, br) = blobs[rnd.randrange(len(blobs))]
-            blobs.append((bx + math.cos(a) * br * 0.85, by + math.sin(a) * br * 0.85, br * rnd.uniform(0.3, 0.5)))
-
-        def field(x, y):
-            s = 0.0
-            for (bx, by, br) in blobs:
-                d2 = ((x - bx) ** 2 + (y - by) ** 2) / (br * br)
-                if d2 < 4.0:
-                    s += math.exp(-d2 * 1.6)
-            return s
+            blobs.append((bx + math.cos(a) * br * 0.9, by + math.sin(a) * br * 0.9, br * rnd.uniform(0.22, 0.42)))
 
         for j in range(T):
             y = j + 0.5
             for i in range(T):
                 x = i + 0.5
-                f = field(x, y)
+                f = 0.0
+                shade = 0.0
+                wsum = 0.0
+                for (bx, by, br) in blobs:
+                    dx, dy = (x - bx) / br, (y - by) / br
+                    d2 = dx * dx + dy * dy
+                    if d2 < 4.0:
+                        f += math.exp(-d2 * 1.6)
+                        if d2 < 1.0:                        # inside this puff: its ball shading, outer puffs weigh most
+                            nz = math.sqrt(1.0 - d2)
+                            lam = max(0.0, dx * L[0] + dy * L[1] + nz * L[2])
+                            wgt = (1.0 - d2) ** 2 * br                  # fades to nothing at the puff's edge: no seams
+                            shade += lam * wgt
+                            wsum += wgt
                 if f < 0.05:
                     continue
                 w = fbm(wisp, (ox + i) / W, (oy + j) / H)
-                density = clamp01((f - 0.32 + 0.25 * (w - 0.5)) * 2.4)
-                density *= clamp01((base + T * 0.05 - y) / (T * 0.07))       # soft flat underside
+                density = clamp01((f - 0.34 + 0.22 * (w - 0.5)) * 2.6)
+                density *= clamp01((base + T * 0.05 - y) / (T * 0.06))          # soft flat underside
                 if density <= 0.0:
                     continue
-                above = field(x - 6, y - 16)                                  # light from above: lit where little cloud sits over it
-                lit = clamp01(1.05 - 0.55 * above) * 0.7 + 0.3 * clamp01((base - y) / (T * 0.45))
+                ball = shade / wsum if wsum > 0 else 0.5
+                height = clamp01((base - y) / (T * 0.5))                          # the base is in its own shadow
+                lit = clamp01(0.15 + 0.75 * ball + 0.25 * height - 0.25 * clamp01((y - base + T * 0.08) / (T * 0.1)))
                 o = ((oy + j) * W + ox + i) * 4
                 px[o] = to8(density)
                 px[o + 1] = to8(lit)
@@ -365,9 +375,8 @@ def paint_cumulus():
                 px[o + 3] = 255
     return W, H, px
 
-
 def cumulus():
-    return cached("T_Cumulus", 2, paint_cumulus)
+    return cached("T_Cumulus", 4, paint_cumulus)
 
 class NoiseXY:
     """Value noise that wraps every px cells across and py cells down (for stretched, tiling patterns)"""

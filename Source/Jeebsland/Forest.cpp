@@ -1,5 +1,6 @@
 #include "Forest.h"
 #include "Terrain.h"
+#include "Canopy.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -316,7 +317,8 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	if (Kind == ETreeKind::Oak)
 	{
 		// ------- Broad leafy tree: trunk, 100 branches, a leaf cluster on the end of each twig -------
-		LeafComp = Leaf[R.RandRange(0, 4)];
+		const int32 LeafColor = R.RandRange(0, 4);
+		LeafComp = Leaf[LeafColor];
 		Height = 220.f * S * HV;
 		Radius = 20.f * S;
 				const int32 TrunkVariant = R.RandRange(0, 3);
@@ -469,12 +471,19 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	Commit(ConeComp, ConeT, false);
 
 	Tree->Setup(Kind, FMath::Max(Radius, 18.f), Height);
+	if (Kind == ETreeKind::Oak)
+	{
+		// remember the canopy: thinner grass and a carpet of this tree's leaves underneath
+		JeebCanopy::Add(FVector2D(Pos.X, Pos.Y), FMath::Clamp(Height * 0.5f, 160.f, 520.f), LeafComp ? Leaf.IndexOfByKey(LeafComp) : 0);
+	}
 	return Tree;
 }
 
 void AForest::BeginPlay()
 {
 	Super::BeginPlay();
+	JeebCanopy::Spots().Reset();   // fresh for each play session
+	JeebCanopy::Grid().Reset();
 
 	SetActorLocation(FVector::ZeroVector);
 

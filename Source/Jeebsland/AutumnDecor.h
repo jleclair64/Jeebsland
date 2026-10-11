@@ -47,7 +47,7 @@ private:
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> FallLeaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> GustLeaf;
 
-	UInstancedStaticMeshComponent* MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow, int32 CullStart = 0, int32 CullEnd = 0);
+	UInstancedStaticMeshComponent* MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow, int32 CullStart = 0, int32 CullEnd = 0, bool bHierarchical = false);
 
 	// Candle flames on the village string lights (they flicker)
 	TArray<FVector> FlameBase;

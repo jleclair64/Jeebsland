@@ -130,7 +130,7 @@ def patchy(mat, col):
     xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
     p = g.tex(patches, g.mul(xy, 1.0 / 4500.0))
     shade = g.node(unreal.MaterialExpressionLinearInterpolate)
-    g.link(g.const3((0.80, 1.0, 0.76)), shade, "A"); g.link(g.const3((1.12, 0.98, 0.70)), shade, "B"); g.link(p, shade, "Alpha", "R")
+    g.link(g.const3((0.86, 1.06, 0.84)), shade, "A"); g.link(g.const3((1.02, 1.0, 0.82)), shade, "B"); g.link(p, shade, "Alpha", "R")   # lush to fresh green
     each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.24), 0.88)
     return g.muln(g.muln(col, shade), each)
 
@@ -372,12 +372,12 @@ def build_moon(tex):
     centre = g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5)
     dist = g.node(unreal.MaterialExpressionDistance); g.link(uv, dist, "A"); g.link(centre, dist, "B")
     glow = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, g.mul(dist, 2.0))), 3.5)
-    # nothing over the moon disc itself: fades in just outside its rim
+    # nothing over the moon disc itself; it fades in across the moon's outer rim, so there is no dark gap between moon and glow
     disc = g.node(unreal.MaterialExpressionDistance); g.link(uv, disc, "A"); g.link(g.mask(g.vector("DiscCenter", (0.5, 0.5, 0.0)), True, True), disc, "B")
     rim = g.scalar("DiscRadius", 0.156)
     outside = g.node(unreal.MaterialExpressionDivide)
-    sub = g.node(unreal.MaterialExpressionSubtract); g.link(disc, sub, "A"); g.link(rim, sub, "B"); g.link(sub, outside, "A")
-    g.link(g.mul(rim, 0.12), outside, "B")
+    sub = g.node(unreal.MaterialExpressionSubtract); g.link(disc, sub, "A"); g.link(g.mul(rim, 0.86), sub, "B"); g.link(sub, outside, "A")
+    g.link(g.mul(rim, 0.14), outside, "B")
     mask = g.one(unreal.MaterialExpressionSaturate, outside)
     e = g.muln(g.muln(g.vector("Tint", (1.0, 0.8, 0.45)), g.scalar("Bright", 3.0)), g.muln(g.mul(glow, 0.22), mask))
     g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
@@ -441,7 +441,7 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 imported(gen_textures.patches(), "T_Patches")
-build_foliage("M_Grass",    "T_GrassTuft",   (0.64, 0.66, 0.40, 0.0), 9.0,          True,      0.0, vary=True)
+build_foliage("M_Grass",    "T_GrassTuft",   (0.52, 0.70, 0.40, 0.0), 9.0,          True,      0.0, vary=True)
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.72)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway

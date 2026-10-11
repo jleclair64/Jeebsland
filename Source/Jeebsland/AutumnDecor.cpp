@@ -2,6 +2,8 @@
 #include "Scarecrow.h"
 #include "Cottage.h"
 #include "ChoppableTree.h"
+#include "Canopy.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Terrain.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMesh.h"
@@ -114,15 +116,17 @@ AAutumnDecor::AAutumnDecor()
 	TorchCore  = MakeISM(TEXT("TorchCore"),  ConeMesh.Object, FLinearColor(7.0f, 4.5f, 1.2f), false);
 	for (int32 i = 0; i < NumLeafTypes; ++i)
 	{
-		GroundLeaf.Add(MakeISM(*FString::Printf(TEXT("GroundLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false, 4500, 6000));
+		GroundLeaf.Add(MakeISM(*FString::Printf(TEXT("GroundLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false, 4500, 6000, true));   // hierarchical: many thousands, culled in clumps
 		FallLeaf.Add(MakeISM(*FString::Printf(TEXT("FallLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false));
 		GustLeaf.Add(MakeISM(*FString::Printf(TEXT("GustLeaf%d"), i), CubeMesh.Object, LeafPalette[i], false));
 	}
 }
 
-UInstancedStaticMeshComponent* AAutumnDecor::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow, int32 CullStart, int32 CullEnd)
+UInstancedStaticMeshComponent* AAutumnDecor::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow, int32 CullStart, int32 CullEnd, bool bHierarchical)
 {
-	UInstancedStaticMeshComponent* C = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
+	UInstancedStaticMeshComponent* C = bHierarchical
+		? CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(Name)
+		: CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
 	C->SetupAttachment(RootComponent);
 	C->SetStaticMesh(Mesh);
 	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -526,27 +530,34 @@ void AAutumnDecor::BeginPlay()
 		}
 	};
 
-	// Under every broad-leaf tree: a carpet about as wide as the canopy, thinning toward the edge and drifting a little downwind
-	for (TActorIterator<AChoppableTree> It(GetWorld()); It; ++It)
+	// Under every broad-leaf tree: a thick carpet of its own leaves, as wide as the canopy, thinning at the edge and
+	// drifting a little downwind (the grass there is sparse and short, see Meadow.cpp)
+	for (const JeebCanopy::FSpot& Sp : JeebCanopy::Spots())
 	{
-		if (It->GetKind() != ETreeKind::Oak) continue;
-		const FVector T = It->GetActorLocation();
-		const float R = FMath::Clamp(It->GetTreeHeight() * 0.5f, 160.f, 520.f);       // canopy radius, from the tree's height
-		const int32 Count = FMath::RoundToInt(PI * R * R / 3500.f * Rand.FRandRange(0.7f, 1.3f));   // about one leaf per 60 x 60 cm
+		const float R = Sp.R * 1.15f;
+		const int32 Count = FMath::RoundToInt(PI * R * R / 1300.f * Rand.FRandRange(0.8f, 1.2f));
+		const int32 Own = FMath::Clamp(Sp.Color, 0, NumLeafTypes - 1);
+		const bool bNearRoad = JeebTerrain::PathClearance(Sp.P.X, Sp.P.Y) < R * 1.2f + 60.f;   // the per-leaf road check is slow; skip it far from roads
 		for (int32 i = 0; i < Count; ++i)
 		{
 			const float A = Rand.FRandRange(0.f, 2.f * PI);
-			const float Rad = R * 1.1f * FMath::Pow(Rand.FRand(), 0.65f);               // denser near the trunk
-			if (Rad < 35.f) continue;                                                   // not inside the trunk
-			LooseLeaf(T.X + Rad * FMath::Cos(A) + 0.12f * R, T.Y + Rad * FMath::Sin(A) + 0.05f * R);
+			const float Fr = FMath::Pow(Rand.FRand(), 0.6f);                       // fuller near the trunk, fraying at the rim
+			const float Rad = R * Fr;
+			if (Rad < 30.f) continue;                                               // not inside the trunk
+			const float X = Sp.P.X + Rad * FMath::Cos(A) + 0.10f * R, Y = Sp.P.Y + Rad * FMath::Sin(A) + 0.04f * R;
+			if (JeebTerrain::NoGroundCover(X, Y)) continue;
+			if (bNearRoad && JeebTerrain::PathClearance(X, Y) < 30.f && Rand.FRand() < 0.6f) continue;   // paths stay mostly swept
+			const float Wd = Rand.FRandRange(30.f, 46.f) * (bLeafCards ? 1.15f : 1.f);
+			const FQuat Q = FRotator(Rand.FRandRange(-12.f, 12.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-12.f, 12.f)).Quaternion();
+			const int32 Type = Rand.FRand() < 0.75f ? Own : PickLeaf();               // mostly this tree's colour
+			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f + Rand.FRandRange(0.f, 2.5f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 		}
 		if (Rand.FRand() < 0.30f)
 		{
-			const float A = Rand.FRandRange(0.f, 2.f * PI), Rad = R * Rand.FRandRange(0.3f, 0.85f);
-			LeafPile(T.X + Rad * FMath::Cos(A), T.Y + Rad * FMath::Sin(A), Rand.FRandRange(28.f, 60.f));
+			const float A = Rand.FRandRange(0.f, 2.f * PI), Rad = Sp.R * Rand.FRandRange(0.3f, 0.85f);
+			LeafPile(Sp.P.X + Rad * FMath::Cos(A), Sp.P.Y + Rad * FMath::Sin(A), Rand.FRandRange(28.f, 60.f));
 		}
-	}
-	// A thin scatter across the open land, and a few piles out in the meadows
+	}	// A thin scatter across the open land, and a few piles out in the meadows
 	for (int32 i = 0; i < NumOpenLeaves; ++i)
 	{
 		const float Ang = Rand.FRandRange(0.f, 2.f * PI);

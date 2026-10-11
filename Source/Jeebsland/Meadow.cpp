@@ -1,5 +1,6 @@
 #include "Meadow.h"
 #include "Terrain.h"
+#include "Canopy.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
@@ -165,6 +166,10 @@ void AMeadow::BeginPlay()
 	}
 	PlaceBushesAndFlowers();
 
+}
+
+void AMeadow::Prewarm()
+{
 	// Grow the grass round the start right away (a moment longer to load, but nothing pops in when you first run off)
 	if (NearMesh)
 	{
@@ -195,6 +200,7 @@ void AMeadow::Tick(float Dt)
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (!Pawn || !NearMesh) return;
+	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
 
 	TArray<FIntPoint> Far;
@@ -260,13 +266,17 @@ void AMeadow::StepJob(double BudgetSeconds)
 			{
 				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
 				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc + 12.f) / 110.f, 0.f, 1.f));
+				// under a tree the grass is sparse and short, so the fallen leaves show
+				const float Cov = JeebCanopy::Cover(X, Y);
+				const bool bSkip = Cov > 0.f && JobRand.FRand() < Cov * 0.8f;
+				Short *= 1.f - 0.45f * Cov;
 				if (JobTier < 2)   // the same around huts, stalls, the castle and the pond
 				{
 					const float D = 90.f;
 					if (JeebTerrain::NoGroundCover(X + D, Y) || JeebTerrain::NoGroundCover(X - D, Y) || JeebTerrain::NoGroundCover(X, Y + D) || JeebTerrain::NoGroundCover(X, Y - D))
 						Short = FMath::Min(Short, 0.4f);
 				}
-				JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Sxy * FMath::Lerp(0.75f, 1.f, Short), Sxy * FMath::Lerp(0.75f, 1.f, Short), Sz * (1.f + 0.1f * JobTier) * Short)));
+				if (!bSkip) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Sxy * FMath::Lerp(0.75f, 1.f, Short), Sxy * FMath::Lerp(0.75f, 1.f, Short), Sz * (1.f + 0.1f * JobTier) * Short)));
 			}
 		}
 		if ((JobDone & 15) == 0 && FPlatformTime::Seconds() > End) return;

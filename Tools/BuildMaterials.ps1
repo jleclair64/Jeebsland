@@ -83,10 +83,10 @@ for ($i = 0; $i -lt 16; $i++) {
     $path.AddArc([single]($tx - $tipR), [single]$ty, [single]($tipR * 2), [single]($tipR * 2), [single]180, [single]180)
     $path.AddBezier([single]($tx + $tipR), [single]($ty + $tipR), [single]($tx + $tipR + 1), [single]($ty + 14), [single]($mx + $w * 0.75), [single]$my, [single]($bx + $w), [single]128)
     $path.CloseFigure()
-    $tip = [System.Drawing.Color]::FromArgb(255, 132, 156, 62)
-    $root = [System.Drawing.Color]::FromArgb(255, 72, 98, 38)
+    $tip = [System.Drawing.Color]::FromArgb(255, 118, 168, 64)
+    $root = [System.Drawing.Color]::FromArgb(255, 58, 102, 40)
     $br = [System.Drawing.Drawing2D.LinearGradientBrush]::new([System.Drawing.PointF]::new(0, [single]$ty), [System.Drawing.PointF]::new(0, [single]128), $tip, $root)
-    $fringe = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(70, 110, 140, 55)), 4
+    $fringe = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(70, 96, 146, 56)), 4
     $g3.DrawPath($fringe, $path)
     $g3.FillPath($br, $path)
     $br.Dispose(); $fringe.Dispose(); $path.Dispose()

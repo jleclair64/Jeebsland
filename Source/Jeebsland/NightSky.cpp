@@ -201,8 +201,8 @@ void ANightSky::Tick(float DeltaSeconds)
 	{
 		const float E = ADayNight::SunElevation;
 		// golden first, then a deep rose-red as the sun reaches the bottom of its loop
-		const float Golden = 1.f - FMath::SmoothStep(16.f, 30.f, E);
-		const float Red = 1.f - FMath::SmoothStep(11.f, 17.f, E);
+		const float Golden = 1.f - FMath::SmoothStep(22.f, 34.f, E);
+		const float Red = 1.f - FMath::SmoothStep(13.f, 24.f, E);   // red for most of the sun's low swing, deepest at the bottom
 		const FLinearColor Lit = FMath::Lerp(FMath::Lerp(FLinearColor(1.0f, 1.0f, 1.0f), FLinearColor(1.0f, 0.70f, 0.42f), Golden), FLinearColor(1.0f, 0.36f, 0.24f), Red);
 		const FLinearColor Shade = FMath::Lerp(FMath::Lerp(FLinearColor(0.70f, 0.76f, 0.88f), FLinearColor(0.62f, 0.50f, 0.58f), Golden), FLinearColor(0.50f, 0.22f, 0.32f), Red);
 		CloudMid->SetVectorParameterValue(TEXT("Lit"), Lit);
