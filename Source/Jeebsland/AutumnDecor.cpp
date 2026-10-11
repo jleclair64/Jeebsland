@@ -537,21 +537,33 @@ void AAutumnDecor::BeginPlay()
 		}
 	};
 
-	// Under every broad-leaf tree: a thick carpet of its own leaves, as wide as the canopy, thinning at the edge and
-	// drifting a little downwind (the grass there is sparse and short, see Meadow.cpp)
+	// Round every broad-leaf tree: its fallen leaves, scattered the way wind leaves them. The whole fall is pushed off to one
+	// side, part of it gathers in a few drifts, most lies in a loose spread that thins outward, and some strays far off.
+	// (The grass shortens gradually toward the trunk, see Meadow.cpp.)
+	auto Gauss = [&]() { return FMath::Sqrt(-2.f * FMath::Loge(FMath::Max(Rand.FRand(), 1e-4f))) * FMath::Cos(2.f * PI * Rand.FRand()); };
 	for (const JeebCanopy::FSpot& Sp : JeebCanopy::Spots())
 	{
-		const float R = Sp.R * 1.15f;
-		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 700.f * Rand.FRandRange(0.8f, 1.2f)), 520);
+		const float R = Sp.R;
+		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 520.f * Rand.FRandRange(0.8f, 1.2f)), 620);
 		const int32 Own = FMath::Clamp(Sp.Color, 0, NumLeafTypes - 1);
-		const bool bNearRoad = JeebTerrain::PathClearance(Sp.P.X, Sp.P.Y) < R * 1.2f + 60.f;   // the per-leaf road check is slow; skip it far from roads
-		for (int32 i = 0; i < Count; ++i)
+		const bool bNearRoad = JeebTerrain::PathClearance(Sp.P.X, Sp.P.Y) < R * 2.2f + 60.f;   // the per-leaf road check is slow; skip it far from roads
+		const float WindA = Rand.FRandRange(0.f, 2.f * PI);
+		const FVector2D Centre = Sp.P + FVector2D(FMath::Cos(WindA), FMath::Sin(WindA)) * R * Rand.FRandRange(0.15f, 0.45f);
+		FVector2D Drifts[5];
+		for (FVector2D& D : Drifts)
 		{
 			const float A = Rand.FRandRange(0.f, 2.f * PI);
-			const float Fr = FMath::Pow(Rand.FRand(), 0.6f);                       // fuller near the trunk, fraying at the rim
-			const float Rad = R * Fr;
-			if (Rad < 30.f) continue;                                               // not inside the trunk
-			const float X = Sp.P.X + Rad * FMath::Cos(A) + 0.10f * R, Y = Sp.P.Y + Rad * FMath::Sin(A) + 0.04f * R;
+			D = Centre + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R * Rand.FRandRange(0.3f, 1.1f);
+		}
+		for (int32 i = 0; i < Count; ++i)
+		{
+			FVector2D P;
+			const float Kind = Rand.FRand();
+			if (Kind < 0.30f)      P = Drifts[Rand.RandRange(0, 4)] + FVector2D(Gauss(), Gauss()) * R * 0.18f;   // gathered in a drift
+			else if (Kind < 0.88f) P = Centre + FVector2D(Gauss(), Gauss()) * R * 0.62f;                       // the loose spread
+			else { const float A = Rand.FRandRange(0.f, 2.f * PI); P = Centre + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R * Rand.FRandRange(1.f, 2.2f); }   // strays
+			const float X = P.X, Y = P.Y;
+			if (FVector2D::Distance(P, Sp.P) < 30.f) continue;                     // not inside the trunk
 			if (JeebTerrain::NoGroundCover(X, Y)) continue;
 			// on a road, rest on the road surface (it sits a little above the grass)
 			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;
@@ -561,7 +573,9 @@ void AAutumnDecor::BeginPlay()
 			const float Tip = bPerched ? 28.f : 10.f;
 			const FQuat Q = FRotator(Rand.FRandRange(-Tip, Tip), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-Tip, Tip)).Quaternion();
 			const float Lift = bPerched ? Rand.FRandRange(4.f, 11.f) : Rand.FRandRange(0.f, 2.5f);
-			const int32 Type = Rand.FRand() < 0.8f ? Own : Rand.RandRange(0, NumLeafTypes - 2);   // mostly this tree's colour, the rest autumn colours (never green)
+			// half this tree's own colour, the rest the warm oranges and ambers, now and then a red or gold
+			const float C = Rand.FRand();
+			const int32 Type = C < 0.5f ? Own : (C < 0.8f ? 0 : (C < 0.93f ? 2 : Rand.RandRange(1, 3)));
 			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Z + Lift), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 		}
 		if (Rand.FRand() < 0.30f)
@@ -569,7 +583,9 @@ void AAutumnDecor::BeginPlay()
 			const float A = Rand.FRandRange(0.f, 2.f * PI), Rad = Sp.R * Rand.FRandRange(0.3f, 0.85f);
 			LeafPile(Sp.P.X + Rad * FMath::Cos(A), Sp.P.Y + Rad * FMath::Sin(A), Rand.FRandRange(28.f, 60.f));
 		}
-	}	// A thin scatter across the open land, and a few piles out in the meadows
+	}
+
+	// A thin scatter across the open land, and a few piles out in the meadows
 	for (int32 i = 0; i < NumOpenLeaves; ++i)
 	{
 		const float Ang = Rand.FRandRange(0.f, 2.f * PI);

@@ -215,13 +215,13 @@ def build_bark(tex):
     lib.connect_material_expressions(tint, "", col, "B")
     col2 = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 0)
     lib.connect_material_expressions(col, "", col2, "A")
-    col2.set_editor_property("const_b", 1.9)
+    col2.set_editor_property("const_b", 2.3)
     lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
     lib.connect_material_expressions(col2, "", glow, "A")
     glow.set_editor_property("const_b", 0.07)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-    fluffy_normal(bark, 0.35)   # trunks and branches take light more evenly, so a trunk in shade matches its branches
+
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
     rough.set_editor_property("r", 1.0)
     lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)

@@ -70,8 +70,8 @@ $g5 = [System.Drawing.Graphics]::FromImage($bmp5)
 $g5.SmoothingMode = 'AntiAlias'
 $g5.Clear([System.Drawing.Color]::FromArgb(0, 230, 215, 195))
 $rnd5 = New-Object System.Random 61
-for ($i = 0; $i -lt 8; $i++) {
-    $cx = 40 + $rnd5.Next(0, 176); $cy = 40 + $rnd5.Next(0, 176)
+for ($i = 0; $i -lt 15; $i++) {
+    $cx = 34 + $rnd5.Next(0, 188); $cy = 34 + $rnd5.Next(0, 188)
     $v = $rnd5.Next(200, 256)
     $st = $g5.Save()
     $g5.TranslateTransform([single]$cx, [single]$cy)
@@ -125,16 +125,16 @@ $g3.Dispose()
 $bmp3.Save($png3, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp3.Dispose()
 
-# Tree leaves: a full, rounded cluster of many small soft leaves, heaped toward the middle, gently varied in brightness (the game tints them)
+# Tree leaves: a loose, airy spray of small soft leaves with sky showing between them, heaped toward the middle, gently varied in brightness (the game tints them)
 $png4 = Join-Path $proj 'Saved\T_TreeLeaves.png'
 $bmp4 = New-Object System.Drawing.Bitmap 256, 256, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $g4 = [System.Drawing.Graphics]::FromImage($bmp4)
 $g4.SmoothingMode = 'AntiAlias'
 $g4.Clear([System.Drawing.Color]::FromArgb(0, 210, 200, 190))
 $rnd4 = New-Object System.Random 29
-for ($i = 0; $i -lt 120; $i++) {
+for ($i = 0; $i -lt 55; $i++) {
     $a = $rnd4.NextDouble() * 2 * [math]::PI
-    $d = [math]::Sqrt($rnd4.NextDouble()) * 104
+    $d = [math]::Sqrt($rnd4.NextDouble()) * 108
     $cx = 128 + [math]::Cos($a) * $d
     $cy = 128 + [math]::Sin($a) * $d
     $v = $rnd4.Next(195, 256)

@@ -16,7 +16,7 @@ namespace JeebCanopy
 	inline void Add(const FVector2D& P, float R, int32 Color)
 	{
 		const int32 Idx = Spots().Add(FSpot{ P, R, Color });
-		const float Reach = R * 1.2f;
+		const float Reach = R * 1.7f;
 		for (int32 y = FMath::FloorToInt((P.Y - Reach) / GridCell); y <= FMath::FloorToInt((P.Y + Reach) / GridCell); ++y)
 			for (int32 x = FMath::FloorToInt((P.X - Reach) / GridCell); x <= FMath::FloorToInt((P.X + Reach) / GridCell); ++x)
 				Grid().FindOrAdd(FIntPoint(x, y)).Add(Idx);
@@ -32,7 +32,7 @@ namespace JeebCanopy
 		{
 			const FSpot& S = Spots()[i];
 			const float D = FVector2D::Distance(FVector2D(X, Y), S.P);
-			Best = FMath::Max(Best, 1.f - FMath::SmoothStep(0.55f * S.R, 1.15f * S.R, D));
+			Best = FMath::Max(Best, 1.f - FMath::SmoothStep(0.35f * S.R, 1.6f * S.R, D));   // a long, gentle taper out from the trunk
 		}
 		return Best;
 	}

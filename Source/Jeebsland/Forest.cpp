@@ -248,11 +248,12 @@ AForest::AForest()
 	Trunk    = MakeISM(TEXT("Trunk"),    CylMesh.Object,  true,  0,    0);
 		RedTrunk = MakeISM(TEXT("RedTrunk"), CylMesh.Object,  true,  0,    0);
 	for (int32 i = 0; i < 4; ++i) TrunkVar.Add(MakeISM(*FString::Printf(TEXT("TrunkV%d"), i), CylMesh.Object, true, 0, 0));
-	for (int32 i = 0; i < 4; ++i) BranchVar.Add(MakeISM(*FString::Printf(TEXT("BranchV%d"), i), CubeMesh.Object, false, 3500, 4500, true));
+	for (int32 i = 0; i < 4; ++i) BranchVar.Add(MakeISM(*FString::Printf(TEXT("BranchV%d"), i), CubeMesh.Object, true, 3500, 4500, true));
 	Branch   = MakeISM(TEXT("Branch"),   CubeMesh.Object, false, 3500, 4500);
 	for (int32 i = 0; i < 5; ++i)
 	{
-		Leaf.Add(MakeISM(*FString::Printf(TEXT("Leaf%d"), i), CubeMesh.Object, false, 7000, 9000, true));
+		Leaf.Add(MakeISM(*FString::Printf(TEXT("Leaf%d"), i), CubeMesh.Object, true, 7000, 9000, true));   // canopies cast dappled shade on trunks and ground
+		Leaf.Last()->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;   // the gentle sway does not force shadows to redraw
 		Leaf.Last()->SetNumCustomDataFloats(1);   // per cluster: how shaded it is inside the crown
 	}
 	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, true, 0, 0));
@@ -273,7 +274,7 @@ UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* 
 	C->SetCastShadow(bShadow);
 	C->bAffectDynamicIndirectLighting = false; // keeps thousands of instances out of the expensive lighting passes
 	C->bAffectDistanceFieldLighting = false;
-	C->bUseAsOccluder = bShadow;               // only trunks and needle tiers hide things behind them
+	C->bUseAsOccluder = bShadow && !bHierarchical;   // only trunks and needle tiers hide things behind them
 	if (CullEnd > 0)
 	{
 		C->SetCullDistances(CullStart, CullEnd);
@@ -364,7 +365,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		auto Leafy = [&](const FVector& At)
 		{
 			if (!bLeafCards) { Diamonds(At); return; }
-			const float W = R.FRandRange(30.f, 44.f) * S;
+			const float W = R.FRandRange(24.f, 36.f) * S;
 			LeafT.Add(FTransform(FRotator(R.FRandRange(-90.f, 90.f), R.FRandRange(0.f, 360.f), R.FRandRange(-60.f, 60.f)).Quaternion(), At + R.GetUnitVector() * 8.f * S, FVector(W / 100.f)));
 		};
 
@@ -419,10 +420,12 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 				{
 					const FVector D2 = (D * 0.5f + R.GetUnitVector() * 0.85f + FVector(0.f, 0.f, Bend >= 0.f ? 0.3f : -0.1f)).GetSafeNormal();
 					const float L2 = L1 * 0.42f * R.FRandRange(0.75f, 1.2f);
-					Limb(P, D2, L2, FMath::Max(2.2f * S, Th * 0.5f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector&, float K2, float)
+					Limb(P, D2, L2, FMath::Max(2.2f * S, Th * 0.5f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector& QD, float K2, float)
 					{
+						// leaves spread along the shoot and fanned round its tip, not heaped in one ball
 						Leafy(Q);
-						if (K2 >= 1.f) { Leafy(Q + R.GetUnitVector() * 22.f * S); Leafy(Q + R.GetUnitVector() * 22.f * S); }
+						Leafy(Q - QD * L2 * 0.25f + R.GetUnitVector() * 18.f * S);
+						if (K2 >= 1.f) for (int32 n = 0; n < 3; ++n) Leafy(Q + R.GetUnitVector() * 26.f * S);
 					});
 				}
 				Leafy(P + R.GetUnitVector() * 15.f * S);
