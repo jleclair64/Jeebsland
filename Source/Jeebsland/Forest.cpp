@@ -94,7 +94,7 @@ static FVector2D TrunkCenter(int32 V, float t)
 }
 static float TrunkRadius(int32 V, float t)
 {
-	float R = 50.f * (1.f - 0.55f * t);
+	float R = 50.f * (1.f - 0.55f * t) * (1.f - 0.5f * FMath::SmoothStep(0.7f, 1.f, t));   // narrows at the top into the leader branch
 	const float FlareAmt = (V == 3) ? 34.f : (V == 0 ? 22.f : (V == 1 ? 16.f : 26.f));
 	R += FlareAmt * FMath::Exp(-t * 9.f);
 	const float Wob = (V == 3) ? 0.13f * FMath::Sin(t * 11.f + 1.f) : 0.05f * FMath::Sin(t * 7.f + V);
@@ -401,6 +401,29 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			}
 		};
 
+		// Leaves along a limb: side shoots from each joint (more on longer limbs), each shoot dressed in leaf cards all along
+		// its length (spaced evenly, so long shoots are as full as short ones) and a spray at its tip
+		auto Grow = [&](float L1)
+		{
+			return [&, L1](const FVector& P, const FVector& D, float K, float Th)
+			{
+				if (K < 0.3f) return;   // bare near the trunk
+				const int32 Shoots = (K >= 1.f ? 4 : 3) + (L1 > 400.f * S ? 1 : 0);
+				for (int32 j = 0; j < Shoots; ++j)
+				{
+					const FVector D2 = (D * 0.5f + R.GetUnitVector() * 0.85f + FVector(0.f, 0.f, Bend >= 0.f ? 0.3f : -0.1f)).GetSafeNormal();
+					const float L2 = L1 * 0.42f * R.FRandRange(0.75f, 1.2f);
+					const int32 Along = FMath::Clamp(FMath::RoundToInt(L2 / (16.f * S)), 4, 12);
+					Limb(P, D2, L2, FMath::Max(2.5f * S, Th * 0.42f), 2, Bend * 1.4f, [&, L2, Along](const FVector& Q, const FVector& QD, float K2, float)
+					{
+						for (int32 n = 0; n < Along / 2; ++n) Leafy(Q - QD * (L2 * 0.5f) * (float(n) / (Along / 2)) + R.GetUnitVector() * 20.f * S);   // all along this half of the shoot
+						if (K2 >= 1.f) for (int32 n = 0; n < 6; ++n) Leafy(Q + R.GetUnitVector() * 36.f * S);                                          // a full spray at its tip
+					});
+				}
+				for (int32 n = 0; n < 3; ++n) Leafy(P + R.GetUnitVector() * 26.f * S);
+			};
+		};
+
 		const int32 NumLimbs = R.RandRange(9, 12);
 		for (int32 i = 0; i < NumLimbs; ++i)
 		{
@@ -412,34 +435,17 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			const FVector Dir(FMath::Cos(El) * FMath::Cos(Az), FMath::Cos(El) * FMath::Sin(Az), FMath::Sin(El));
 			const float L1 = 300.f * S * LenMul * (1.1f - 0.45f * T) * R.FRandRange(0.85f, 1.15f);   // long limbs: a broad crown
 			const float T1 = 18.f * S * (1.f - 0.45f * T);   // stout at the trunk, tapering hard toward the tips
-
-			Limb(Start, Dir, L1, T1, 4, Bend, [&](const FVector& P, const FVector& D, float K, float Th)
-			{
-				if (K < 0.3f) return;   // bare near the trunk
-				// side branches from each joint, each with leaves along it and at its tip
-				const int32 Shoots = K >= 1.f ? 4 : 3;
-				for (int32 j = 0; j < Shoots; ++j)
-				{
-					const FVector D2 = (D * 0.5f + R.GetUnitVector() * 0.85f + FVector(0.f, 0.f, Bend >= 0.f ? 0.3f : -0.1f)).GetSafeNormal();
-					const float L2 = L1 * 0.42f * R.FRandRange(0.75f, 1.2f);
-					Limb(P, D2, L2, FMath::Max(2.5f * S, Th * 0.42f), 2, Bend * 1.4f, [&](const FVector& Q, const FVector& QD, float K2, float)
-					{
-						// leaves spread along the shoot and fanned round its tip, not heaped in one ball
-						for (int32 n = 0; n < 4; ++n) Leafy(Q - QD * L2 * (0.12f * n) + R.GetUnitVector() * 20.f * S);   // all along the shoot
-						if (K2 >= 1.f) for (int32 n = 0; n < 6; ++n) Leafy(Q + R.GetUnitVector() * 36.f * S);         // a full spray at its tip
-					});
-				}
-				for (int32 n = 0; n < 2; ++n) Leafy(P + R.GetUnitVector() * 24.f * S);
-			});
+			Limb(Start, Dir, L1, T1, 4, Bend, Grow(L1));
 		}
-		// A few twigs at the very top finish the crown
-		for (int32 k = 0; k < 4; ++k)
+		// The trunk carries on as a leader branch that grows up through the middle and crowns the tree, so the top is
+		// leafy and rounded instead of ending in a stump (a forked trunk gets one on each limb)
+		for (int32 k = 0; k < (TrunkVariant == 2 ? 2 : 1); ++k)
 		{
-			const FVector Start = AxisPoint(1.f, k % 2 == 1);
-			const FVector Dir = (FVector(R.FRandRange(-1.f, 1.f), R.FRandRange(-1.f, 1.f), 1.6f)).GetSafeNormal();
-			Limb(Start, Dir, 100.f * S * LenMul, 4.f * S, 2, Bend, [&](const FVector& Q, const FVector&, float, float) { Leafy(Q); });
+			const FVector Start = AxisPoint(0.97f, k == 1);
+			const FVector Dir = (FVector(R.FRandRange(-0.25f, 0.25f), R.FRandRange(-0.25f, 0.25f), 1.f)).GetSafeNormal();
+			const float L1 = FMath::Max(Height * 0.32f, 160.f * S) * FMath::Min(LenMul, 1.2f);
+			Limb(Start, Dir, L1, 11.f * S, 3, 0.f, Grow(L1));
 		}
-
 		// ---- Shade inside the crown: clusters deep inside and low down are darker, so it reads as one rounded mass ----
 		if (LeafT.Num() > 0)
 		{
