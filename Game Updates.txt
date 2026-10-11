@@ -1,21 +1,19 @@
-It looks like the grass stopped swaying in the wind. And could you add something similar for the leaves on the trees so they aren't perfectly still?
-
-The tree trunks are still too dark and I still see the spinal phenomenon
-
-Make the moon lower in the sky and more yellow
-
-Take the top off of the large trees with forts built on them
-
-Make the knight without armor look connect, more realistic, and less blocky
-
-Remove the legend for the HUD. Remove ore, trees, and redwoods from the HUD
-
-Add a skill progress bar that appears in the bottom left any time a skill is activated. For example, if I chop a tree, I want the chopping skill to pop up for the next 30 seconds. If I catch a fish, it's replaced by the fishing skill bar. I also want a tab to show all the skills I have, represented by and icon and the level I am at that skill, similar to runescape
+Fix the pine trees so they look real 
+Fix the texture on the wooden fence so it looks real
+What is the white thing on the knights back under the cape? Remove it
+Remove the part of the wood fence platform for the doorways to the fort
+Check on the size of the project. Ask Claude to remove any bloat or files things we aren't using anymore
 
 
 
-Work on textures - path, sides of buildings, tree trunks, etc
 
+
+
+Each class can only use certain weapons, some are shared. Vary their speeds, health, damage output, jump height, climb walls ability? Ninja double jump and can hit crits? Make certain skills increase faster aka the viking gets 20% increase xp for sailing and fishing skill, give them different abilities like the ninja can hit crits and double jump, the wizard can float for a while, etc. Keep the users skills and inventory the same as they change classes, give them the options to switch at the beginning of the game. At the beginning of the game the user can choose where to spawn in at select points on the map, they start with one and have to explore to unlock more. 
+Knight
+Viking
+Wizard
+Ninja
 
 
 rewrite the lore to invoke lord of the flies themes and lessons 
@@ -23,6 +21,7 @@ friendly army
 Enemy army
 battles
 Fires
+Potions
 Dragons
 Dinosaurs
 Trolls

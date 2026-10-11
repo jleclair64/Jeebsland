@@ -13,6 +13,14 @@ The owner wants a recommendation on model and effort for each request, to balanc
 - Sonnet 5.5, high effort: moderate features or multi-file changes along existing patterns.
 - Opus 5.5, high effort: new systems (skills UI, enemies, combat, dungeons), tricky visual or rendering bugs, anything Sonnet failed at.
 
+## Ending a session
+
+When the owner says goodbye, goodnight or anything similar, don't just sign off: first ask if they'd like you to commit and refresh the "Current state" notes below for their next chat. If they say yes, update that section (what was just done, what's unfinished, known issues, decisions, anything they want carried over), remove stale lines, keep it to about a screen, and commit.
+
+## Current state
+
+(Nothing recorded yet. Fill in at the end of a session.)
+
 ## Checking visuals
 
 Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and the owner prefers to check visuals themselves and send screenshots. Build, rebuild materials, commit, reopen the editor, and say what to look for.
