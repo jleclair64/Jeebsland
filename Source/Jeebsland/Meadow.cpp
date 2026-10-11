@@ -262,7 +262,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 				if (FVector2D(X, Y).Size() <= FieldR)
 		{
 			const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
-			if (Pc >= -12.f && !JeebTerrain::NoGroundCover(X, Y))
+			if ((Pc >= -12.f || (Pc >= -40.f && JobRand.FRand() < (Pc + 40.f) / 28.f)) && !JeebTerrain::NoGroundCover(X, Y))   // a few tufts creep onto the edge of the dirt
 			{
 				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
 				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc + 12.f) / 110.f, 0.f, 1.f));

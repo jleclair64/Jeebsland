@@ -206,7 +206,7 @@ void AKnightCharacter::BeginPlay()
 FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-14.f, 14.f, float(i) / (CapeNX - 1));
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-27.f + 0.022f * Y * Y, Y, 12.f));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-25.f + 0.022f * Y * Y, Y, 22.f));   // across the tops of the shoulders
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by

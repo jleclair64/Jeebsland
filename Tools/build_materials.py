@@ -447,14 +447,14 @@ def build_dirt(tex):
     # plus a slow wander a metre or two long, so the edge bulges and bites in instead of running parallel to the road
     wander = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")
     slow = g.mask(g.tex(wander, g.mul(xy, 1.0 / 650.0)), True, False) if wander is not None else g.node(unreal.MaterialExpressionConstant, r=0.5)
-    alpha = g.one(unreal.MaterialExpressionSaturate, g.mul(g.addn(g.addn(g.add(edge, 0.02), g.mul(noise, -0.16)), g.mul(slow, -0.26)), 6.0))
-    speck = g.tex(tex, g.mul(xy, 1.0 / 45.0))   # fine grit breaks the soft band into scattered specks of dirt and grass
-    grit = g.mul(g.add(g.mul(g.mask(speck, True, False), 3.5), -1.0), 0.45)
+    alpha = g.one(unreal.MaterialExpressionSaturate, g.mul(g.addn(g.addn(g.add(edge, -0.12), g.mul(noise, -0.16)), g.mul(slow, -0.22)), 2.4))   # a broad, gentle band
+    speck = g.tex(tex, g.mul(xy, 1.0 / 32.0))   # fine grit breaks the soft band into scattered specks of dirt and grass
+    grit = g.mul(g.add(g.mul(g.mask(speck, True, False), 3.5), -1.0), 0.55)
     g.out(g.addn(alpha, grit), unreal.MaterialProperty.MP_OPACITY_MASK)
     finish(mat, "M_Dirt")
 
 
-def build_ground(tex):
+def build_ground(tex, dirt):
     # The soil under the grass: a painted, world-aligned texture with large soft light and dark patches across it
     mat = fresh_material("M_Ground")
     g = Graph(mat)
@@ -463,7 +463,15 @@ def build_ground(tex):
     far = g.tex(tex, g.mul(xy, 1.0 / 2400.0))
     var = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.78, const_b=1.18)
     g.link(far, var, "Alpha", "G")
-    g.out(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), unreal.MaterialProperty.MP_BASE_COLOR)
+    grass = g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0)))
+    # beside the roads (vertex colour red) the ground turns to trodden soil, in ragged patches rather than a smooth band
+    soil = g.mul(g.tex(dirt, g.mul(xy, 1.0 / 350.0)), 0.95)
+    worn = g.mask(g.node(unreal.MaterialExpressionVertexColor), True, False)
+    ragged = g.tex(dirt, g.mul(xy, 1.0 / 140.0))
+    mix_amt = g.one(unreal.MaterialExpressionSaturate, g.mul(g.add(g.addn(g.mul(worn, 1.25), g.mul(g.mask(ragged, True, False), 1.4)), -0.55), 1.8))
+    blend = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(grass, blend, "A"); g.link(soil, blend, "B", "RGB"); g.link(mix_amt, blend, "Alpha")
+    g.out(blend, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.95), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.15), unreal.MaterialProperty.MP_SPECULAR)
     finish(mat, "M_Ground")
@@ -512,6 +520,6 @@ for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
     if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
         unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
 build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
-build_ground(imported(gen_textures.ground(), "T_Ground"))
+build_ground(imported(gen_textures.ground(), "T_Ground"), unreal.EditorAssetLibrary.load_asset("/Game/T_Dirt"))
 build_cloth()
 unreal.log("MATDIAG all materials built")

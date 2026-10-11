@@ -381,6 +381,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		case Weeping:   StartLo = 0.58f; ElLo = 28.f; ElHi = 48.f; LenMul = 1.25f; Bend = -0.28f; break;
 		default: break;
 		}
+		if (R.FRand() < 0.8f) StartLo = FMath::Min(StartLo * 1.25f, 0.8f);   // most trees: the lowest limbs another 25% up, clear of your head
 
 		// A bending branch: Segs straight pieces, each turning a little (and curling up or drooping), tapering as it goes.
 		// Calls Out(point, fraction along) at every joint, so side shoots and leaves can grow from it.

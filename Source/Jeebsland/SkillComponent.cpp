@@ -34,7 +34,7 @@ USkillComponent::USkillComponent()
 	Hotbar[2] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
 	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
-	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 0);
+	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 5);   // black
 	// The knight always wears a full suit of armour (wooden to start). Pieces can be swapped for better ones, never taken off.
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, 0);
 }
