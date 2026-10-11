@@ -105,7 +105,7 @@ void AGrassField::BeginPlay()
 	SetActorLocation(FVector::ZeroVector); // always sit at the world origin
 
 	BuildTerrain();
-	Tint(Terrain, FLinearColor(0.035f, 0.06f, 0.015f));   // dark soil-green under the tufts, so gaps between blades read as shadow
+	Tint(Terrain, FLinearColor(0.085f, 0.13f, 0.035f));   // a mid green under the tufts, so gaps between blades blend in instead of showing as dark lines
 	Tint(Grass,   FLinearColor(0.30f, 0.34f, 0.06f));
 
 	FRandomStream Rand(1337); // fixed seed = same meadow every run

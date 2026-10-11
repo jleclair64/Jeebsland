@@ -153,7 +153,7 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     glow = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, -100)   # a faint glow so deep shade is never pitch black
     lib.connect_material_expressions(col, "", glow, "A")
-    glow.set_editor_property("const_b", 0.07)
+    glow.set_editor_property("const_b", 0.05)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     rough = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 300)
     rough.set_editor_property("r", 1.0)
@@ -220,7 +220,7 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 #              name          texture          tint                     gust lean cm  tips only  lift
 build_foliage("M_Grass",    "T_GrassTuft",   (0.72, 0.68, 0.42, 0.0), 9.0,          True,      0.0)
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.80)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=0.88, wind=False)
 build_bark()

@@ -217,13 +217,13 @@ static UStaticMesh* MakeTrunkMesh(UObject* Outer, UMaterialInterface* Mat, int32
 	return MakeTubeMesh(Outer, Mat, Tubes, 20, FVector(1, 0, 0), FVector(0, 1, 0), true);
 }
 
-// A branch lies along +X, 100 long and 100 wide at the base, thinning to a twig with a gentle arch
+// A branch lies along X from -50 to +50 (centred, like the stick transforms expect), 100 wide at the base, thinning to a twig with a gentle arch
 static UStaticMesh* MakeBranchMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	TArray<TArray<FRing>> Tubes;
 	TArray<FRing> B;
 	const float Ts[4] = { 0.f, 0.33f, 0.66f, 1.f };
-	for (float t : Ts) B.Add({ FVector(t * 100.f, 0.f, 9.f * FMath::Sin(t * PI)), 50.f * (1.f - 0.68f * t) });
+	for (float t : Ts) B.Add({ FVector(t * 100.f - 50.f, 0.f, 9.f * FMath::Sin(t * PI)), 50.f * (1.f - 0.68f * t) });
 	Tubes.Add(B);
 	return MakeTubeMesh(Outer, Mat, Tubes, 5, FVector(0, 1, 0), FVector(0, 0, 1), true);
 }

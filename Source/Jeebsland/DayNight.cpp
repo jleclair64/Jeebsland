@@ -26,7 +26,16 @@ void ADayNight::BeginPlay()
 {
 	Super::BeginPlay();
 	UWorld* World = GetWorld();
-	for (TActorIterator<ADirectionalLight> It(World); It; ++It) { Sun = *It; break; }
+	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+	{
+		Sun = *It;
+		if (UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
+		{
+			L->LightSourceAngle = 2.5f;   // a bigger sun disc: shadow edges soften with distance from what casts them
+			L->MarkRenderStateDirty();
+		}
+		break;
+	}
 	for (TActorIterator<ASkyLight> It(World); It; ++It)
 	{
 		Sky = *It;
@@ -47,6 +56,11 @@ void ADayNight::BeginPlay()
 		Post->Settings.AutoExposureBias = 0.35f;
 		Post->Settings.bOverride_BloomIntensity = true;   // a gentle glow round bright edges: softer, cosier light
 		Post->Settings.BloomIntensity = 0.95f;
+		// A painterly grade: a little less contrast, and shadows lifted toward a soft blue instead of falling to black
+		Post->Settings.bOverride_ColorContrast = true;
+		Post->Settings.ColorContrast = FVector4(0.9f, 0.9f, 0.9f, 1.f);
+		Post->Settings.bOverride_ColorOffsetShadows = true;
+		Post->Settings.ColorOffsetShadows = FVector4(0.012f, 0.018f, 0.035f, 0.f);
 	}
 }
 
@@ -81,7 +95,7 @@ void ADayNight::Tick(float DeltaSeconds)
 	{
 		USkyLightComponent* C = SL->GetLightComponent();
 		C->SetLightColor(FMath::Lerp(FLinearColor(0.66f, 0.66f, 0.86f), FLinearColor(0.88f, 0.88f, 0.96f), High));
-		C->SetIntensity(1.25f + 0.45f * High);
+		C->SetIntensity(1.7f + 0.5f * High);   // generous sky light: shade stays soft and readable, never black
 		if (!bSkyRealTime)
 		{
 			RecaptureTimer += DeltaSeconds;
