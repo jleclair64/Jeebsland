@@ -32,16 +32,25 @@ void APaths::BeginPlay()
 		if (N < 2) continue;
 		const float Lift = 4.f + d * 0.6f;   // a hair above the grass; each road a little higher so crossings never flicker
 
-		// Points along the centre line
+		// Points along the centre line, with the road's half-width on each side
 		TArray<FVector2D> Line;
+		TArray<float> HL, HR;
+		const bool bShaped = Def.HalfL.Num() == N && Def.HalfR.Num() == N;
 		const int32 Segs = Def.bClosed ? N : N - 1;
 		for (int32 i = 0; i < Segs; ++i)
 		{
-			const FVector2D A = Def.Pts[i], B = Def.Pts[(i + 1) % N];
+			const int32 j = (i + 1) % N;
+			const FVector2D A = Def.Pts[i], B = Def.Pts[j];
 			const int32 Sub = FMath::Max(1, FMath::CeilToInt(FVector2D::Distance(A, B) / StepLen));
-			for (int32 s = 0; s < Sub; ++s) Line.Add(FMath::Lerp(A, B, float(s) / Sub));
+			for (int32 s = 0; s < Sub; ++s)
+			{
+				const float K = float(s) / Sub;
+				Line.Add(FMath::Lerp(A, B, K));
+				HL.Add(bShaped ? FMath::Lerp(Def.HalfL[i], Def.HalfL[j], K) : Def.Width * 0.5f);
+				HR.Add(bShaped ? FMath::Lerp(Def.HalfR[i], Def.HalfR[j], K) : Def.Width * 0.5f);
+			}
 		}
-		if (!Def.bClosed) Line.Add(Def.Pts.Last());
+		if (!Def.bClosed) { Line.Add(Def.Pts.Last()); HL.Add(bShaped ? Def.HalfL.Last() : Def.Width * 0.5f); HR.Add(bShaped ? Def.HalfR.Last() : Def.Width * 0.5f); }
 		const int32 L = Line.Num();
 
 		const int32 First = Verts.Num();
@@ -56,7 +65,8 @@ void APaths::BeginPlay()
 			for (int32 c = 0; c < Cols; ++c)
 			{
 				const float S = float(c) / (Cols - 1) - 0.5f;   // -0.5 .. 0.5 across the road
-				const FVector2D P = Line[i] + Nrm * (Def.Width * 1.2f * S);   // a bit wider than the road: the material frays the edge back in
+				const float Half = (S < 0.f ? HR[i] : HL[i]) * 1.2f;   // a bit wider than the road: the material frays the edge back in
+				const FVector2D P = Line[i] + Nrm * (2.f * Half * S);
 				Verts.Add(FVector(P.X, P.Y, JeebTerrain::GroundMeshHeight(P.X, P.Y) + Lift));
 				Normals.Add(FVector::UpVector);
 				UV.Add(FVector2D(S + 0.5f, Along / Def.Width));

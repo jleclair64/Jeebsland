@@ -35,6 +35,8 @@ USkillComponent::USkillComponent()
 	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 0);
+	// The knight always wears a full suit of armour (wooden to start). Pieces can be swapped for better ones, never taken off.
+	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, 0);
 }
 
 float USkillComponent::BaseXP(ESkillType Skill)
@@ -277,6 +279,11 @@ bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 	if (Kind < 0 || Kind >= NumWornKinds) return false;
 	int32& Target = (bSecondRing && Kind == JeebItems::K_Ring) ? RingB : Worn[Kind];
 	if (Target == 0) return false;
+	if (JeebItems::IsArmorKind(Kind))
+	{
+		JeebMsg::Post(3.f, FColor::Orange, TEXT("Armour can't be taken off. Click a better piece in your pack to swap it."));
+		return false;
+	}
 	if (!AddInvItem(Target, 1)) return false;
 	Target = 0;
 	return true;

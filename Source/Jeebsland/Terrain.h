@@ -274,7 +274,36 @@ namespace JeebTerrain
 		TArray<FVector2D> Pts; // already smoothed into a dense list of points
 		float Width = 260.f;
 		bool bClosed = false;
+		// Half the road's width on its left and right at each point. Each side wanders on its own, and here and there
+		// the grass has crept in and the road narrows to about 60% (Width is the usual, full width).
+		TArray<float> HalfL, HalfR;
 	};
+
+	// Fills HalfL / HalfR from the distance along the road (Seed makes each road different)
+	inline void ShapeRoadEdges(FPathDef& P, int32 Seed)
+	{
+		FRandomStream R(Seed * 7919 + 13);
+		const float Ph[6] = { R.FRandRange(0.f, 6.28f), R.FRandRange(0.f, 6.28f), R.FRandRange(0.f, 6.28f), R.FRandRange(0.f, 6.28f), R.FRandRange(0.f, 6.28f), R.FRandRange(0.f, 6.28f) };
+		float Total = 0.f;
+		for (int32 i = 1; i < P.Pts.Num(); ++i) Total += FVector2D::Distance(P.Pts[i], P.Pts[i - 1]);
+		const bool bVary = Total > 1500.f && P.Width <= 300.f;   // yards and the plaza keep their full width
+		float S = 0.f;
+		for (int32 i = 0; i < P.Pts.Num(); ++i)
+		{
+			if (i > 0) S += FVector2D::Distance(P.Pts[i], P.Pts[i - 1]);
+			float Over = 0.f, WobL = 0.f, WobR = 0.f;
+			if (bVary)
+			{
+				const float N = 0.5f + 0.5f * (0.6f * FMath::Sin(S / 1700.f + Ph[0]) + 0.4f * FMath::Sin(S / 690.f + Ph[1]));
+				Over = FMath::SmoothStep(0.62f, 0.92f, N);                                     // overgrown stretches
+				WobL = 0.07f * FMath::Sin(S / 330.f + Ph[2]) + 0.035f * FMath::Sin(S / 110.f + Ph[3]);
+				WobR = 0.07f * FMath::Sin(S / 290.f + Ph[4]) + 0.035f * FMath::Sin(S / 125.f + Ph[5]);
+			}
+			const float Base = P.Width * 0.5f * (1.f - 0.40f * Over);
+			P.HalfL.Add(Base * (1.f + WobL));
+			P.HalfR.Add(Base * (1.f + WobR));
+		}
+	}
 
 	inline TArray<FVector2D> SmoothPath(const TArray<FVector2D>& C, bool bClosed)
 	{
@@ -313,6 +342,7 @@ namespace JeebTerrain
 				P.Pts = SmoothPath(TArray<FVector2D>(Pts), bClosed);
 				P.Width = Width;
 				P.bClosed = bClosed;
+				ShapeRoadEdges(P, D.Num());
 				D.Add(P);
 			};
 			// Around the whole map
@@ -363,7 +393,10 @@ namespace JeebTerrain
 				const FVector2D AB = B - A;
 				const float L2 = FMath::Max(AB.SizeSquared(), 0.001f);
 				const float T = FMath::Clamp(FVector2D::DotProduct(P - A, AB) / L2, 0.f, 1.f);
-				const float D = FVector2D::Distance(P, A + AB * T) - Def.Width * 0.5f;
+				const bool bLeft = (AB.X * (P.Y - A.Y) - AB.Y * (P.X - A.X)) > 0.f;   // which side of the road the spot is on
+				const TArray<float>& Half = bLeft ? Def.HalfL : Def.HalfR;
+				const float W = Half.Num() == N ? FMath::Lerp(Half[i], Half[(i + 1) % N], T) : Def.Width * 0.5f;
+				const float D = FVector2D::Distance(P, A + AB * T) - W;
 				if (D < Best) Best = D;
 			}
 		}

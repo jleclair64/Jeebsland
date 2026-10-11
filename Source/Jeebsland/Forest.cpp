@@ -317,7 +317,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	};
 
 	// Every tree is about 30% taller than before, and heights vary a lot from tree to tree
-	const float HV = (Kind == ETreeKind::Redwood) ? 1.3f * R.FRandRange(0.9f, 1.1f) : 2.0f * R.FRandRange(0.75f, 1.3f);
+	const float HV = (Kind == ETreeKind::Redwood) ? 1.3f * R.FRandRange(0.9f, 1.1f) : 2.4f * R.FRandRange(0.75f, 1.3f);   // broad-leaf trees about 20% taller than before
 
 	if (Kind == ETreeKind::Oak)
 	{
@@ -365,19 +365,20 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		auto Leafy = [&](const FVector& At)
 		{
 			if (!bLeafCards) { Diamonds(At); return; }
-			const float W = R.FRandRange(24.f, 36.f) * S;
+			const float W = R.FRandRange(22.f, 32.f) * S;
 			LeafT.Add(FTransform(FRotator(R.FRandRange(-90.f, 90.f), R.FRandRange(0.f, 360.f), R.FRandRange(-60.f, 60.f)).Quaternion(), At + R.GetUnitVector() * 8.f * S, FVector(W / 100.f)));
 		};
 
 		// ---- Crown shape: how high the limbs start, how steeply they rise, how long they reach, and whether they bend up or droop ----
 		enum EShape { Round, Tall, Spreading, Weeping };
 		const EShape Shape = EShape(R.RandRange(0, 3));
-		float StartLo = 0.40f, ElLo = 25.f, ElHi = 55.f, LenMul = 1.f, Bend = 0.10f;   // Bend > 0 curls the limbs up, < 0 makes them droop
+		// limbs start high on the trunk, so walking under a tree you pass trunks, not a thicket of low branches
+		float StartLo = 0.52f, ElLo = 25.f, ElHi = 55.f, LenMul = 1.15f, Bend = 0.10f;   // Bend > 0 curls the limbs up, < 0 makes them droop
 		switch (Shape)
 		{
-		case Tall:      StartLo = 0.30f; ElLo = 48.f; ElHi = 72.f; LenMul = 0.75f; Bend = 0.12f; break;
-		case Spreading: StartLo = 0.35f; ElLo = 8.f;  ElHi = 32.f; LenMul = 1.40f; Bend = 0.16f; break;
-		case Weeping:   StartLo = 0.45f; ElLo = 28.f; ElHi = 48.f; LenMul = 1.10f; Bend = -0.32f; break;
+		case Tall:      StartLo = 0.45f; ElLo = 48.f; ElHi = 72.f; LenMul = 0.90f; Bend = 0.12f; break;
+		case Spreading: StartLo = 0.50f; ElLo = 8.f;  ElHi = 32.f; LenMul = 1.60f; Bend = 0.16f; break;
+		case Weeping:   StartLo = 0.58f; ElLo = 28.f; ElHi = 48.f; LenMul = 1.25f; Bend = -0.28f; break;
 		default: break;
 		}
 
@@ -424,8 +425,9 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 					{
 						// leaves spread along the shoot and fanned round its tip, not heaped in one ball
 						Leafy(Q);
-						Leafy(Q - QD * L2 * 0.25f + R.GetUnitVector() * 18.f * S);
-						if (K2 >= 1.f) for (int32 n = 0; n < 3; ++n) Leafy(Q + R.GetUnitVector() * 26.f * S);
+						Leafy(Q - QD * L2 * 0.17f + R.GetUnitVector() * 16.f * S);
+						Leafy(Q - QD * L2 * 0.34f + R.GetUnitVector() * 16.f * S);
+						if (K2 >= 1.f) for (int32 n = 0; n < 4; ++n) Leafy(Q + R.GetUnitVector() * 30.f * S);
 					});
 				}
 				Leafy(P + R.GetUnitVector() * 15.f * S);

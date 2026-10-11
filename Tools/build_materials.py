@@ -130,7 +130,7 @@ def patchy(mat, col):
     xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
     p = g.tex(patches, g.mul(xy, 1.0 / 4500.0))
     shade = g.node(unreal.MaterialExpressionLinearInterpolate)
-    g.link(g.const3((0.86, 1.06, 0.84)), shade, "A"); g.link(g.const3((1.02, 1.0, 0.82)), shade, "B"); g.link(p, shade, "Alpha", "R")   # lush to fresh green
+    g.link(g.const3((0.86, 1.0, 0.86)), shade, "A"); g.link(g.const3((1.04, 1.0, 0.84)), shade, "B"); g.link(p, shade, "Alpha", "R")   # deeper to lighter green
     each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.24), 0.88)
     return g.muln(g.muln(col, shade), each)
 
@@ -215,13 +215,22 @@ def build_bark(tex):
     lib.connect_material_expressions(tint, "", col, "B")
     col2 = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 0)
     lib.connect_material_expressions(col, "", col2, "A")
-    col2.set_editor_property("const_b", 2.3)
+    col2.set_editor_property("const_b", 2.0)
     lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
     lib.connect_material_expressions(col2, "", glow, "A")
-    glow.set_editor_property("const_b", 0.07)
+    glow.set_editor_property("const_b", 0.04)
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-
+    # The trunk and branch meshes are wound so Unreal sees their outside as the back face, and a two-sided material
+    # flips the normal on back faces: the bark was lit as if facing inward (sunny side dark, shadows invisible).
+    # Multiplying the normal by the two-sided sign cancels that flip, so the bark uses its outward normal on either face.
+    up = lib.create_material_expression(bark, unreal.MaterialExpressionConstant3Vector, -500, 450)
+    up.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+    sign = lib.create_material_expression(bark, unreal.MaterialExpressionTwoSidedSign, -500, 550)
+    signed = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -300, 500)
+    lib.connect_material_expressions(up, "", signed, "A")
+    lib.connect_material_expressions(sign, "", signed, "B")
+    lib.connect_material_property(signed, "", unreal.MaterialProperty.MP_NORMAL)
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
     rough.set_editor_property("r", 1.0)
     lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
@@ -435,7 +444,10 @@ def build_dirt(tex):
     edge = g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, True, False), -0.5), 2.0)))   # 0 at the sides, 1 down the middle
     rag = g.tex(tex, g.mul(xy, 1.0 / 260.0))
     noise = g.one(unreal.MaterialExpressionSaturate, g.mul(g.add(g.mask(rag, True, False), -0.15), 3.5))
-    alpha = g.one(unreal.MaterialExpressionSaturate, g.mul(g.addn(g.add(edge, -0.02), g.mul(noise, -0.16)), 7.0))
+    # plus a slow wander a metre or two long, so the edge bulges and bites in instead of running parallel to the road
+    wander = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")
+    slow = g.mask(g.tex(wander, g.mul(xy, 1.0 / 650.0)), True, False) if wander is not None else g.node(unreal.MaterialExpressionConstant, r=0.5)
+    alpha = g.one(unreal.MaterialExpressionSaturate, g.mul(g.addn(g.addn(g.add(edge, 0.02), g.mul(noise, -0.16)), g.mul(slow, -0.26)), 6.0))
     speck = g.tex(tex, g.mul(xy, 1.0 / 45.0))   # fine grit breaks the soft band into scattered specks of dirt and grass
     grit = g.mul(g.add(g.mul(g.mask(speck, True, False), 3.5), -1.0), 0.45)
     g.out(g.addn(alpha, grit), unreal.MaterialProperty.MP_OPACITY_MASK)
@@ -470,9 +482,9 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 imported(gen_textures.patches(), "T_Patches")
-build_foliage("M_Grass",    "T_GrassTuft",   (0.52, 0.70, 0.40, 0.0), 9.0,          True,      0.0, vary=True)
+build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True)   # a softer, more natural green
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.80, crown_shade=True)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card

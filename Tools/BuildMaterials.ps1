@@ -113,8 +113,8 @@ for ($i = 0; $i -lt 16; $i++) {
     $path.AddArc([single]($tx - $tipR), [single]$ty, [single]($tipR * 2), [single]($tipR * 2), [single]180, [single]180)
     $path.AddBezier([single]($tx + $tipR), [single]($ty + $tipR), [single]($tx + $tipR + 1), [single]($ty + 14), [single]($mx + $w * 0.75), [single]$my, [single]($bx + $w), [single]128)
     $path.CloseFigure()
-    $tip = [System.Drawing.Color]::FromArgb(255, 118, 168, 64)
-    $root = [System.Drawing.Color]::FromArgb(255, 58, 102, 40)
+    $tip = [System.Drawing.Color]::FromArgb(255, 112, 148, 70)
+    $root = [System.Drawing.Color]::FromArgb(255, 56, 88, 42)
     $br = [System.Drawing.Drawing2D.LinearGradientBrush]::new([System.Drawing.PointF]::new(0, [single]$ty), [System.Drawing.PointF]::new(0, [single]128), $tip, $root)
     $fringe = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(70, 96, 146, 56)), 4
     $g3.DrawPath($fringe, $path)
@@ -132,9 +132,9 @@ $g4 = [System.Drawing.Graphics]::FromImage($bmp4)
 $g4.SmoothingMode = 'AntiAlias'
 $g4.Clear([System.Drawing.Color]::FromArgb(0, 210, 200, 190))
 $rnd4 = New-Object System.Random 29
-for ($i = 0; $i -lt 55; $i++) {
+for ($i = 0; $i -lt 36; $i++) {
     $a = $rnd4.NextDouble() * 2 * [math]::PI
-    $d = [math]::Sqrt($rnd4.NextDouble()) * 108
+    $d = [math]::Sqrt($rnd4.NextDouble()) * 110
     $cx = 128 + [math]::Cos($a) * $d
     $cy = 128 + [math]::Sin($a) * $d
     $v = $rnd4.Next(195, 256)
