@@ -505,10 +505,10 @@ void AAutumnDecor::BeginPlay()
 	auto LooseLeaf = [&](float X, float Y)
 	{
 		if (JeebTerrain::NoGroundCover(X, Y)) return;                                        // none indoors, in the moat or on the pond
-		if (JeebTerrain::PathClearance(X, Y) < 40.f && Rand.FRand() < 0.6f) return;          // paths stay mostly swept
+		const float Z = JeebTerrain::PathClearance(X, Y) < 25.f ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;   // leaves on a road rest on its surface
 		const float Wd = Rand.FRandRange(22.f, 36.f) * (bLeafCards ? 1.15f : 1.f);
 		const FQuat Q = FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-10.f, 10.f)).Quaternion();
-		Put(GroundLeaf[PickLeaf()], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
+		Put(GroundLeaf[PickLeaf()], FTransform(Q, FVector(X, Y, Z), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 	};
 	// A mound of leaves: cards heaped in a dome, tilted more toward the edge
 	auto LeafPile = [&](float CX, float CY, float Radius)
@@ -546,11 +546,12 @@ void AAutumnDecor::BeginPlay()
 			if (Rad < 30.f) continue;                                               // not inside the trunk
 			const float X = Sp.P.X + Rad * FMath::Cos(A) + 0.10f * R, Y = Sp.P.Y + Rad * FMath::Sin(A) + 0.04f * R;
 			if (JeebTerrain::NoGroundCover(X, Y)) continue;
-			if (bNearRoad && JeebTerrain::PathClearance(X, Y) < 30.f && Rand.FRand() < 0.6f) continue;   // paths stay mostly swept
+			// on a road, rest on the road surface (it sits a little above the grass)
+			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;
 			const float Wd = Rand.FRandRange(30.f, 46.f) * (bLeafCards ? 1.15f : 1.f);
 			const FQuat Q = FRotator(Rand.FRandRange(-12.f, 12.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-12.f, 12.f)).Quaternion();
 			const int32 Type = Rand.FRand() < 0.75f ? Own : PickLeaf();               // mostly this tree's colour
-			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Ground(X, Y) + 2.f + Rand.FRandRange(0.f, 2.5f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
+			Put(GroundLeaf[Type], FTransform(Q, FVector(X, Y, Z + Rand.FRandRange(0.f, 2.5f)), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
 		}
 		if (Rand.FRand() < 0.30f)
 		{
