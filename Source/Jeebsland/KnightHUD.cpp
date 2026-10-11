@@ -707,7 +707,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		DrawRect(FLinearColor::White, BoxX, BoxY, 26.f, 26.f);
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 2.f, 22.f, 22.f);
 		if (Knight->GetFancyLighting()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 5.f, 16.f, 16.f);
-		DrawText(TEXT("Fancy lighting (bounce light, clouds) - slower"), FLinearColor::White, BoxX + 38.f, BoxY + 2.f, Font, 1.1f);
+		DrawText(TEXT("Fancy lighting (bounce light, misty air) - slower"), FLinearColor::White, BoxX + 38.f, BoxY + 2.f, Font, 1.1f);
 
 		DrawText(TEXT("Click or drag the sliders.   Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 40.f, PY + PH - 40.f, Font, 1.0f);
 	}

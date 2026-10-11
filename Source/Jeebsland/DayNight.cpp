@@ -8,6 +8,7 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/PostProcessVolume.h"
+#include "Components/VolumetricCloudComponent.h"
 
 float ADayNight::Phase = 0.f;
 float ADayNight::SunElevation = 54.f;
@@ -43,6 +44,18 @@ void ADayNight::BeginPlay()
 		break;
 	}
 	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It) { Fog = *It; break; }
+
+	// The sky's volumetric clouds: a lower, deeper layer, so they tower up in big billowing heaps lit by the sun
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (UVolumetricCloudComponent* VC = It->FindComponentByClass<UVolumetricCloudComponent>())
+		{
+			VC->SetLayerBottomAltitude(1.6f);   // km
+			VC->SetLayerHeight(5.f);
+			VC->SetTracingMaxDistance(60.f);
+			break;
+		}
+	}
 
 	// One unbounded post-process volume: the whole land a touch brighter
 	FActorSpawnParameters SP;

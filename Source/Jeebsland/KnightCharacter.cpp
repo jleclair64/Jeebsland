@@ -206,7 +206,8 @@ void AKnightCharacter::BeginPlay()
 FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-14.f, 14.f, float(i) / (CapeNX - 1));
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-25.f + 0.022f * Y * Y, Y, 22.f));   // across the tops of the shoulders
+	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-23.f + 0.022f * Y * Y, Y, 54.f));
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -215,7 +216,7 @@ void AKnightCharacter::TickCape(float Dt)
 {
 	if (!CapeCloth || !UpperPivot || !CapeCloth->IsVisible()) { bCapeInit = false; return; }
 	const int32 N = CapeNX * CapeNY;
-	const float Length = 52.f, WTop = 28.f, WBot = 36.f;
+	const float Length = 64.f, WTop = 28.f, WBot = 38.f;   // from the shoulders to the upper thigh
 	const float DV = Length / (CapeNY - 1);
 	auto Idx = [](int32 i, int32 j) { return j * CapeNX + i; };
 	const FTransform Up = UpperPivot->GetComponentTransform();
@@ -295,7 +296,7 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				const float Lim = L.Z > -30.f ? -24.f : -17.f;
+				const float Lim = L.Z > 0.f ? -23.f : -17.f;   // the back of the torso, then the backs of the legs
 				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
 			}
 		}
@@ -368,8 +369,8 @@ void AKnightCharacter::ApplyPartMaterial(FArmorPart& P, const FLinearColor& Colo
 		M->SetVectorParameterValue(TEXT("Color"), Color);
 		if (bMetal && Metal)
 		{
-			M->SetScalarParameterValue(TEXT("Metallic"), 0.9f);
-			M->SetScalarParameterValue(TEXT("Roughness"), 0.28f);
+			M->SetScalarParameterValue(TEXT("Metallic"), 1.0f);
+			M->SetScalarParameterValue(TEXT("Roughness"), 0.2f);   // polished plate
 		}
 	}
 }
@@ -1536,7 +1537,7 @@ void AKnightCharacter::ApplyGraphics()
 	// 1 = Lumen (pretty, heavy); 0 = off, with simple sky ambient light (much faster)
 	GEngine->Exec(W, *FString::Printf(TEXT("r.DynamicGlobalIlluminationMethod %d"), bFancyLighting ? 1 : 0));
 	GEngine->Exec(W, *FString::Printf(TEXT("r.ReflectionMethod %d"), bFancyLighting ? 1 : 2));
-	GEngine->Exec(W, *FString::Printf(TEXT("r.VolumetricCloud %d"), bFancyLighting ? 1 : 0));
+	GEngine->Exec(W, TEXT("r.VolumetricCloud 1"));   // the sky's clouds are always on (drawn at half resolution, so they stay affordable)
 	GEngine->Exec(W, *FString::Printf(TEXT("r.VolumetricFog %d"), bFancyLighting ? 1 : 0));
 	GEngine->Exec(W, *FString::Printf(TEXT("r.ScreenPercentage %d"), FMath::RoundToInt(RenderScale * 100.f)));
 }

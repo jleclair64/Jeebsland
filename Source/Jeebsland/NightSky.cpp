@@ -101,7 +101,7 @@ void ANightSky::BeginPlay()
 	Super::BeginPlay();
 	UMaterialInterface* StarMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Star.M_Star"));
 	UMaterialInterface* StreakMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Streak.M_Streak"));
-	UMaterialInterface* CloudMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cumulus.M_Cumulus"));
+	UMaterialInterface* CloudMat = nullptr;   // the painted sprite clouds are retired: the sky now has real volumetric clouds (see DayNight.cpp)
 	if (!StarMat || !StreakMat)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Sky materials missing: run Tools/BuildMaterials.ps1. No stars or comets."));
