@@ -122,6 +122,7 @@ void AKnightCharacter::BuildKnight()
 		P.Comp = C;
 		P.Slot = D.Slot; P.Role = D.Role; P.MinTier = D.MinTier; P.MaxTier = D.MaxTier;
 		P.Fixed = D.Fixed; P.bFixedMetal = D.bFixedMetal; P.Shade = D.Shade; P.bBare = D.bBare;
+		P.Style = D.Style;
 		ArmorParts.Add(P);
 	}
 }
@@ -419,6 +420,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		if (P.bBare) bVisible = !bWorn;
 		else if (bAlways) bVisible = true;
 		else bVisible = bWorn && (Slot == KnightDesign::SlotCape || (Var >= P.MinTier && Var <= P.MaxTier));
+		if (Slot == KnightDesign::SlotShield && bWorn && P.Style != JeebItems::StyleOf(Id)) bVisible = false;   // only the worn shield style
 		P.Comp->SetVisibility(bVisible);
 		if (!bVisible) continue;
 
@@ -1919,9 +1921,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// 10 s after the last blow it took, a full bar in 10 s. A broken guard is mended only once it is full again.
 	{
 		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
-		const float NewMax = ShieldId ? float(JeebItems::DefenseOf(JeebItems::K_Shield, JeebItems::VariantOf(ShieldId))) : 0.f;
+		const float NewMax = ShieldId ? float(JeebItems::ShieldGuard(ShieldId)) : 0.f;
+		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 10.f;   // the round shield recovers sooner
 		if (!FMath::IsNearlyEqual(NewMax, GuardMax)) { GuardMax = NewMax; GuardPool = NewMax; bGuardBroken = false; }
-		if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > 10.f)
+		if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > RecoverDelay)
 		{
 			GuardPool = FMath::Min(GuardMax, GuardPool + GuardMax * 0.1f * Dt);
 			if (GuardPool >= GuardMax && bGuardBroken)
@@ -1973,8 +1976,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
 	const float StanceFactor = StanceFwd < -0.1f ? 0.4f : (StanceFwd > 0.1f ? 0.6f : (FMath::Abs(StanceRight) > 0.1f ? 0.5f : 0.6f));
+	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield])) : 1.f;   // round: quicker, tower: slower
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f);   // swiftness potion
+	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f);   // swiftness potion
 	if (bFalling && !bSpecial)
 	{
 		AirSpeedMul = AirMul;

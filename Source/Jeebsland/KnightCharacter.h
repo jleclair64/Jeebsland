@@ -32,6 +32,7 @@ struct FArmorPart
 	FLinearColor Fixed = FLinearColor::White;
 	bool bFixedMetal = false;
 	bool bBare = false;              // skin / hair: shown only while the slot is empty
+	int32 Style = 0;                 // shields: which shield style the piece belongs to
 	float Shade = 1.f;
 };
 

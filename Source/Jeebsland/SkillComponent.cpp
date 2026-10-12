@@ -421,6 +421,9 @@ void USkillComponent::FillPracticePack()
 	Slots[0].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[0].Count = 3;
 	Slots[1].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[1].Count = 3;
 	PotionSlot.Id = JeebItems::PotionId(JeebItems::P_Heal); PotionSlot.Count = 3;
+	// and one of each new shield style to try (iron)
+	Slots[2].Id = JeebItems::ShieldId(1, 2); Slots[2].Count = 1;
+	Slots[3].Id = JeebItems::ShieldId(2, 2); Slots[3].Count = 1;
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;

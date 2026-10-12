@@ -57,6 +57,7 @@ namespace KnightDesign
 		FLinearColor Fixed = FLinearColor(1.f, 1.f, 1.f, 1.f);
 		bool bFixedMetal = false;
 		bool bBare = false;          // skin and hair: shown only while nothing is worn in this slot (uses Fixed)
+		int32 Style = 0;             // shields: which of the shield styles this piece belongs to (only the worn one shows)
 		FMD Mesh;
 	};
 
@@ -352,57 +353,107 @@ namespace KnightDesign
 		// =========================================================================================
 		// (the cape itself is cloth, simulated by the character: see AKnightCharacter::TickCape)
 
-		// Kite shield (left arm): domed white face, steel rim, red cross that follows the dome
+		// Shields (left arm). Three styles share one slot; each piece carries its Style so only the worn one shows:
+		// 0 the kite (domed face, steel rim, a red cross that follows the dome), 1 the round shield (a deep dome, a boss in the
+		// middle and studs round the rim), 2 the tower shield (tall and nearly flat, with a band down the middle and two straps).
 		{
-			const double YC = -36.0, BackX = 11.0, FrontX = 14.3, Dome = 4.2;
-			auto F = [&](double Yl, double Z)
+			const double YC = -36.0, BackX = 11.0, FrontX = 14.3;
+			// One shield face: Outline (sideways offset, height; the last point repeats the first), its middle C, and a dome that
+			// rises Dome cm at the middle and falls to nothing over Ry sideways and Rz up and down
+			auto Face = [&](int32 Style, const TArray<FVector2D>& O, const FVector2D& C, double Ry, double Rz, double Dome)
 			{
-				const double Q = (Yl / 21.0) * (Yl / 21.0) + ((Z + 12.0) / 43.0) * ((Z + 12.0) / 43.0);
-				return FMath::Pow(DMax(0.0, 1.0 - Q), 0.8);
-			};
-			// The outline of the kite (sideways offset from the shield's centre, height)
-			TArray<FVector2D> O;
-			for (int32 i = 0; i <= 12; ++i) { const double Yl = -17.0 + 34.0 * double(i) / 12.0; O.Add(FVector2D(Yl, 17.5 + 2.2 * (1.0 - (Yl / 17.0) * (Yl / 17.0)))); }
-			TArray<FVector2D> RightSide;
-			RightSide.Add(FVector2D(17.2, 12.0)); RightSide.Add(FVector2D(17.4, 4.0)); RightSide.Add(FVector2D(17.3, -4.0)); RightSide.Add(FVector2D(17.2, -9.0));
-			for (int32 s = 1; s <= 10; ++s) { const double T = double(s) / 10.0; RightSide.Add(FVector2D(17.2 * (1.0 - FMath::Pow(T, 1.8)), -9.0 - 41.0 * T)); }
-			RightSide.Last() = FVector2D(0.0, -50.0);
-			for (int32 i = 0; i < RightSide.Num(); ++i) O.Add(RightSide[i]);
-			for (int32 i = RightSide.Num() - 2; i >= 0; --i) O.Add(FVector2D(-RightSide[i].X, RightSide[i].Y));
-			// (the last point repeats the first corner, so the loop closes by itself)
-			const FVector2D C(0.0, -12.0);
-			const int32 NO = O.Num();
-
-			TArray<FRing> Front, Back;
-			const int32 NT = 8;
-			for (int32 k = 0; k <= NT; ++k)
-			{
-				const double T = double(k) / double(NT);
-				FRing Rf, Rb;
-				for (int32 i = 0; i <= NO; ++i)
+				auto F = [C, Ry, Rz](double Yl, double Z)   // by value: it is handed back and used after Face returns
 				{
-					const FVector2D& P = O[i % NO];
-					const double Yl = C.X + T * (P.X - C.X), Z = C.Y + T * (P.Y - C.Y);
-					Rf.Add(V3(FrontX + Dome * F(Yl, Z), YC + Yl, Z));
-					Rb.Add(V3(BackX, YC + Yl, Z));
+					const double Q = (Yl / Ry) * (Yl / Ry) + ((Z - C.Y) / Rz) * ((Z - C.Y) / Rz);
+					return FMath::Pow(DMax(0.0, 1.0 - Q), 0.8);
+				};
+				const int32 NO = O.Num();
+				TArray<FRing> Front, Back;
+				const int32 NT = 8;
+				for (int32 k = 0; k <= NT; ++k)
+				{
+					const double T = double(k) / double(NT);
+					FRing Rf, Rb;
+					for (int32 i = 0; i <= NO; ++i)
+					{
+						const FVector2D& P = O[i % NO];
+						const double Yl = C.X + T * (P.X - C.X), Z = C.Y + T * (P.Y - C.Y);
+						Rf.Add(V3(FrontX + Dome * F(Yl, Z), YC + Yl, Z));
+						Rb.Add(V3(BackX, YC + Yl, Z));
+					}
+					Front.Add(Rf); Back.Add(Rb);
 				}
-				Front.Add(Rf); Back.Add(Rb);
+				{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Plate); D.Style = Style;
+				  Patch(D.Mesh, Front, V3(1, 0, 0), Xf(V3(0, 0, 0)));
+				  Patch(D.Mesh, Back, V3(-1, 0, 0), Xf(V3(0, 0, 0))); }
+				{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Trim); D.Style = Style;
+				  TArray<FVector> Loop;
+				  for (int32 i = 0; i + 1 < NO; ++i) { Loop.Add(V3(12.65, YC + O[i].X, O[i].Y)); }
+				  TubeLoop(D.Mesh, Loop, V3(1, 0, 0), 2.2, 3.1, 10, Xf(V3(0, 0, 0))); }
+				return F;
+			};
+			// a band of accent colour lying on the face, from (Y0, Z0) to (Y1, Z1), Wd wide
+			auto Band = [&](FDef& D, const TFunction<double(double, double)>& F, double Dome, double Y0, double Z0, double Y1, double Z1, double Wd)
+			{
+				TArray<FRing> Rs;
+				const int32 N = 14;
+				const FVector2D Dir = FVector2D(Y1 - Y0, Z1 - Z0).GetSafeNormal(), Side(-Dir.Y, Dir.X);
+				for (int32 k = 0; k <= N; ++k)
+				{
+					const double T = double(k) / N, Yl = Y0 + (Y1 - Y0) * T, Z = Z0 + (Z1 - Z0) * T;
+					FRing R;
+					for (int32 j = -1; j <= 1; ++j) { const double Ys = Yl + Side.X * Wd * j, Zs = Z + Side.Y * Wd * j; R.Add(V3(FrontX + Dome * F(Ys, Zs) + 0.55, YC + Ys, Zs)); }
+					Rs.Add(R);
+				}
+				Patch(D.Mesh, Rs, V3(1, 0, 0), Xf(V3(0, 0, 0)));
+			};
+
+			// ---- 0: the kite ----
+			{
+				TArray<FVector2D> O;
+				for (int32 i = 0; i <= 12; ++i) { const double Yl = -17.0 + 34.0 * double(i) / 12.0; O.Add(FVector2D(Yl, 17.5 + 2.2 * (1.0 - (Yl / 17.0) * (Yl / 17.0)))); }
+				TArray<FVector2D> RightSide;
+				RightSide.Add(FVector2D(17.2, 12.0)); RightSide.Add(FVector2D(17.4, 4.0)); RightSide.Add(FVector2D(17.3, -4.0)); RightSide.Add(FVector2D(17.2, -9.0));
+				for (int32 s = 1; s <= 10; ++s) { const double T = double(s) / 10.0; RightSide.Add(FVector2D(17.2 * (1.0 - FMath::Pow(T, 1.8)), -9.0 - 41.0 * T)); }
+				RightSide.Last() = FVector2D(0.0, -50.0);
+				for (int32 i = 0; i < RightSide.Num(); ++i) O.Add(RightSide[i]);
+				for (int32 i = RightSide.Num() - 2; i >= 0; --i) O.Add(FVector2D(-RightSide[i].X, RightSide[i].Y));
+				const double Dome = 4.2;
+				auto F = Face(0, O, FVector2D(0.0, -12.0), 21.0, 43.0, Dome);
+				FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Accent); D.Style = 0;
+				Band(D, F, Dome, 0.0, 15.5, 0.0, -44.0, 4.4);     // the cross: down ...
+				Band(D, F, Dome, -13.5, 3.0, 13.5, 3.0, 4.4);     // ... and across
 			}
-			{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Plate);
-			  Patch(D.Mesh, Front, V3(1, 0, 0), Xf(V3(0, 0, 0)));
-			  Patch(D.Mesh, Back, V3(-1, 0, 0), Xf(V3(0, 0, 0))); }
-			{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Trim);
-			  TArray<FVector> Loop;
-			  for (int32 i = 0; i + 1 < NO; ++i) { Loop.Add(V3(12.65, YC + O[i].X, O[i].Y)); }
-			  TubeLoop(D.Mesh, Loop, V3(1, 0, 0), 2.2, 3.1, 10, Xf(V3(0, 0, 0))); }
-			{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Accent);
-			  TArray<FRing> Vert, Horiz;
-			  for (double Z = 15.5; Z >= -44.0; Z -= 3.0)
-			  { FRing R; for (int32 j = -1; j <= 1; ++j) { const double Yl = j * 4.4; R.Add(V3(FrontX + Dome * F(Yl, Z) + 0.55, YC + Yl, Z)); } Vert.Add(R); }
-			  for (double Yl = -13.5; Yl <= 13.51; Yl += 2.25)
-			  { FRing R; for (int32 j = -1; j <= 1; ++j) { const double Z = 3.0 + j * 4.4; R.Add(V3(FrontX + Dome * F(Yl, Z) + 0.55, YC + Yl, Z)); } Horiz.Add(R); }
-			  Patch(D.Mesh, Vert, V3(1, 0, 0), Xf(V3(0, 0, 0)));
-			  Patch(D.Mesh, Horiz, V3(1, 0, 0), Xf(V3(0, 0, 0))); }
+			// ---- 1: the round shield ----
+			{
+				TArray<FVector2D> O;
+				const double R = 19.0, Cz = -6.0;
+				for (int32 i = 0; i <= 28; ++i) { const double A = 2.0 * PI * i / 28.0; O.Add(FVector2D(R * FMath::Sin(A), Cz + R * FMath::Cos(A))); }
+				const double Dome = 6.0;
+				auto F = Face(1, O, FVector2D(0.0, Cz), 21.5, 21.5, Dome);
+				FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Accent); D.Style = 1;
+				Blob(D.Mesh, 2.8, 5.2, 5.2, Xf(V3(FrontX + Dome + 0.8, YC, Cz)));   // the boss in the middle
+				for (int32 k = 0; k < 8; ++k)                                         // studs round the rim
+				{
+					const double A = 2.0 * PI * k / 8.0, Yl = 15.0 * FMath::Sin(A), Z = Cz + 15.0 * FMath::Cos(A);
+					Blob(D.Mesh, 1.2, 1.5, 1.5, Xf(V3(FrontX + Dome * F(Yl, Z) + 0.6, YC + Yl, Z)));
+				}
+			}
+			// ---- 2: the tower shield ----
+			{
+				TArray<FVector2D> O;
+				for (int32 i = 0; i <= 12; ++i) { const double Yl = -17.5 + 35.0 * double(i) / 12.0; O.Add(FVector2D(Yl, 22.0 + 2.5 * (1.0 - (Yl / 17.5) * (Yl / 17.5)))); }
+				const FVector2D RightSide[] = { FVector2D(17.8, 14.0), FVector2D(18.0, -5.0), FVector2D(18.0, -25.0), FVector2D(17.8, -44.0), FVector2D(16.5, -51.0), FVector2D(12.0, -54.5), FVector2D(0.0, -56.0) };
+				for (const FVector2D& P : RightSide) O.Add(P);
+				for (int32 i = UE_ARRAY_COUNT(RightSide) - 2; i >= 0; --i) O.Add(FVector2D(-RightSide[i].X, RightSide[i].Y));
+				O.Add(O[0]);
+				const double Dome = 3.0;
+				auto F = Face(2, O, FVector2D(0.0, -16.0), 24.0, 52.0, Dome);
+				FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Accent); D.Style = 2;
+				Band(D, F, Dome, 0.0, 21.0, 0.0, -51.0, 3.6);      // a band down the middle
+				Band(D, F, Dome, -15.5, 12.0, 15.5, 12.0, 1.8);    // and two straps across
+				Band(D, F, Dome, -15.5, -38.0, 15.5, -38.0, 1.8);
+			}
 		}
 
 		// ---- slim everything below the helmet; the shield only slides in with the arm ----

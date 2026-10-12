@@ -78,6 +78,7 @@ namespace JeebStore
 			const float P = R.FRand();
 			if (P < 0.30f) Push(GearWare(K_Ring, R.RandRange(0, NumRings - 1)), 1, 2);
 			else if (P < 0.42f) Push(ArrowWare(2), 3, 3);
+			else if (P < 0.52f) { const int32 T = R.RandRange(1, 2); FWare W = GearWare(K_Shield, T); W.Id = ShieldId(R.RandRange(1, 2), T); Push(W, 1, 2); }   // a round or a tower shield
 			else if (P < 0.70f) Push(GearWare(AnyKind(false), 2), 1, 2);
 			else Push(GearWare(AnyKind(true), 1), 1, 2);
 		}

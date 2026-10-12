@@ -27,7 +27,8 @@ namespace JeebItems
 		K_Count
 	};
 
-	// Ids: 0 = empty; 1..99 = materials and fish (EItemType + 1); 900..904 = arrows by tier; 1000 + kind * 10 + variant = gear.
+	// Ids: 0 = empty; 1..99 = materials and fish (EItemType + 1); 900..904 = arrows by tier; 950..952 potions;
+	// 1000 + kind * 100 + variant = gear (shields also carry a style: 1000 + kind * 100 + style * 10 + tier).
 	// The variant is the tier (0-4) for weapons and armour, the colour for capes, the particular piece for rings and amulets.
 	constexpr int32 IdArrowBase = 900;
 	constexpr int32 IdGearBase = 1000;
@@ -49,10 +50,19 @@ namespace JeebItems
 	inline const TCHAR* PotionText(int32 Type) { static const TCHAR* N[NumPotions] = { TEXT("You run 50% faster for 8 seconds. Ready again after 1 minute."), TEXT("Heals you to full at once. Ready again after 2 minutes."), TEXT("Your health bar grows by 50% for 1 minute (the extra comes full). Ready again after 1 minute.") }; return N[FMath::Clamp(Type, 0, NumPotions - 1)]; }
 	inline float PotionCooldown(int32 Type) { static const float C[NumPotions] = { 60.f, 120.f, 60.f }; return C[FMath::Clamp(Type, 0, NumPotions - 1)]; }
 	inline int32 PotionPrice(int32 Type) { static const int32 P[NumPotions] = { 25, 40, 35 }; return P[FMath::Clamp(Type, 0, NumPotions - 1)]; }
-	inline int32 GearId(int32 Kind, int32 Variant) { return IdGearBase + Kind * 10 + Variant; }
+	inline int32 GearId(int32 Kind, int32 Variant) { return IdGearBase + Kind * 100 + Variant; }
 	inline bool IsGear(int32 Id) { return Id >= IdGearBase; }
-	inline int32 KindOf(int32 Id) { return (Id - IdGearBase) / 10; }
-	inline int32 VariantOf(int32 Id) { return (Id - IdGearBase) % 10; }
+	inline int32 KindOf(int32 Id) { return (Id - IdGearBase) / 100; }
+	inline int32 VariantOf(int32 Id) { return (Id - IdGearBase) % 10; }   // the tier (or cape colour, or which ring)
+	// Shields come in three styles: 0 kite (the all-rounder), 1 round (a smaller guard that recovers twice as fast, and you move
+	// quicker behind it), 2 tower (a guard half as big again, but slower to move behind)
+	constexpr int32 NumShieldStyles = 3;
+	inline int32 StyleOf(int32 Id) { return ((Id - IdGearBase) % 100) / 10; }
+	inline int32 ShieldId(int32 Style, int32 Tier) { return IdGearBase + 11 * 100 + Style * 10 + Tier; }   // 11 = K_Shield
+	inline const TCHAR* ShieldStyleName(int32 Style) { static const TCHAR* N[NumShieldStyles] = { TEXT("Kite Shield"), TEXT("Round Shield"), TEXT("Tower Shield") }; return N[FMath::Clamp(Style, 0, NumShieldStyles - 1)]; }
+	inline float ShieldGuardMul(int32 Style) { static const float M[NumShieldStyles] = { 1.f, 0.75f, 1.5f }; return M[FMath::Clamp(Style, 0, NumShieldStyles - 1)]; }
+	inline float ShieldMoveMul(int32 Style) { static const float M[NumShieldStyles] = { 1.f, 1.15f, 0.8f }; return M[FMath::Clamp(Style, 0, NumShieldStyles - 1)]; }
+	inline float ShieldRecoverDelay(int32 Style) { static const float D[NumShieldStyles] = { 10.f, 5.f, 10.f }; return D[FMath::Clamp(Style, 0, NumShieldStyles - 1)]; }
 	inline int32 TierOf(int32 Id) { return IsArrow(Id) ? ArrowTier(Id) : VariantOf(Id); }
 
 	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
@@ -147,6 +157,7 @@ namespace JeebItems
 		if (!IsGear(Id)) return FString();
 		const int32 K = KindOf(Id), V = VariantOf(Id);
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), CapeColorName(V));
+		if (K == K_Shield) return FString::Printf(TEXT("%s %s"), TierName(V), ShieldStyleName(StyleOf(Id)));
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
 		return FString::Printf(TEXT("%s %s"), TierName(V), KindName(K));
 	}
@@ -232,6 +243,13 @@ namespace JeebItems
 		static const int32 Base[K_Count] = { 0,0,0,0,0,0,0,0,0,0,0, 8, 3, 7, 4, 2, 3, 0, 0, 0 };
 		return FMath::RoundToInt(Base[FMath::Clamp(Kind, 0, K_Count - 1)] * TierMult(Tier));
 	}
+	// A shield's guard (the damage it can stop while raised): its Defence, scaled by its style
+	inline int32 ShieldGuard(int32 ShieldItemId)
+	{
+		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 0;
+		return FMath::RoundToInt(DefenseOf(K_Shield, VariantOf(ShieldItemId)) * ShieldGuardMul(StyleOf(ShieldItemId)));
+	}
+	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 Tier)
 	{
@@ -393,7 +411,7 @@ namespace JeebItems
 		int32 D = 0;
 		for (int32 K = K_Helmet; K <= K_Boots; ++K)
 			if (S->Worn[K]) D += DefenseOf(K, VariantOf(S->Worn[K]));
-		if (bShield && S->Worn[K_Shield]) D += DefenseOf(K_Shield, VariantOf(S->Worn[K_Shield]));
+		if (bShield && S->Worn[K_Shield]) D += ShieldGuard(S->Worn[K_Shield]);
 		return FMath::RoundToInt(D * CombinedMods(S).DefenseMul);
 	}
 	// Full damage range: weapon, then rings and amulets, then + (skill level / 5) on both ends. Kind -1 = bare fists.

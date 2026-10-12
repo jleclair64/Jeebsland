@@ -112,7 +112,7 @@ void AFoeKnight::BeginPlay()
 	Build(Defs);
 	for (const FDef& D : Defs)
 	{
-		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare) continue;
+		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0) continue;   // (he carries the kite shield)
 		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));

@@ -341,7 +341,12 @@ void AKnightHUD::ItemTip(int32 Id)
 		if (K == K_Pickaxe || K == K_Axe || K == K_Rod) L.Add(FString::Printf(TEXT("Gathers %d%% quicker than wood"), FMath::RoundToInt((1.f - ToolTimeMult(V)) * 100.f)));
 		if (!AllowsShield(K)) L.Add(TEXT("Two-handed: cannot be used with a shield"));
 	}
-	else if (K == K_Shield) { L.Add(FString::Printf(TEXT("Guard %d: stops that much damage while raised, then half until it recovers"), DefenseOf(K, V))); }
+	else if (K == K_Shield)
+	{
+		L.Add(FString::Printf(TEXT("Guard %d: stops that much damage while raised, then half until it recovers"), ShieldGuard(Id)));
+		static const TCHAR* StyleNote[NumShieldStyles] = { TEXT("Kite: the all-rounder"), TEXT("Round: a smaller guard, but it recovers twice as soon and you move 15% quicker behind it"), TEXT("Tower: a guard half as big again, but you move 20% slower behind it") };
+		L.Add(StyleNote[StyleOf(Id)]);
+	}
 	else if (IsArmorKind(K))
 	{
 		L.Add(FString::Printf(TEXT("Defence +%d"), DefenseOf(K, V)));
@@ -1482,10 +1487,28 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			DiscP(56.5f, 44, 3, 3, FLinearColor(0.9f, 0.2f, 0.15f));
 			break;
 		case K_Shield:
-			Poly({ P(10, 6), P(54, 6), P(54, 28), P(32, 60), P(10, 28) }, Tr);
-			Poly({ P(14, 10), P(50, 10), P(50, 27), P(32, 54), P(14, 27) }, Pl);
-			Quad(29, 12, 35, 46, Ac);
-			Quad(19, 21, 45, 27, Ac);
+			if (StyleOf(Id) == 1)   // round: rim, face, a boss in the middle and studs round the edge
+			{
+				DiscP(32, 32, 27, 27, Tr);
+				DiscP(32, 32, 23, 23, Pl);
+				DiscP(32, 32, 7, 7, Ac);
+				for (int32 s = 0; s < 8; ++s) { const float A = s * PI / 4.f; DiscP(32 + 17.f * FMath::Cos(A), 32 + 17.f * FMath::Sin(A), 2.2f, 2.2f, Ac); }
+			}
+			else if (StyleOf(Id) == 2)   // tower: tall, with a band down the middle and two straps
+			{
+				Poly({ P(14, 2), P(50, 2), P(52, 6), P(52, 58), P(48, 62), P(16, 62), P(12, 58), P(12, 6) }, Tr);
+				Poly({ P(16, 6), P(48, 6), P(48, 58), P(16, 58) }, Pl);
+				Quad(29, 6, 35, 58, Ac);
+				Quad(16, 16, 48, 19, Ac);
+				Quad(16, 46, 48, 49, Ac);
+			}
+			else   // kite, with its cross
+			{
+				Poly({ P(10, 6), P(54, 6), P(54, 28), P(32, 60), P(10, 28) }, Tr);
+				Poly({ P(14, 10), P(50, 10), P(50, 27), P(32, 54), P(14, 27) }, Pl);
+				Quad(29, 12, 35, 46, Ac);
+				Quad(19, 21, 45, 27, Ac);
+			}
 			break;
 		case K_Helmet:
 			Poly({ P(32, 0), P(36, 6), P(28, 6) }, Ac);
@@ -1853,7 +1876,8 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			{
 				const int32 K = KindOf(W.Id), V = VariantOf(W.Id);
 				if (IsWeaponKind(K)) { int32 A, B; WeaponDamage(K, V, A, B, V); Stat = FString::Printf(TEXT("Damage %d-%d"), A, B); }
-				else if (K == K_Shield || IsArmorKind(K)) Stat = FString::Printf(TEXT("Defence %d"), DefenseOf(K, V));
+				else if (K == K_Shield) Stat = FString::Printf(TEXT("Guard %d"), ShieldGuard(W.Id));
+				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Defence %d"), DefenseOf(K, V));
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
@@ -2103,7 +2127,7 @@ void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
 	}
 	else if (K == K_Shield || IsArmorKind(K))
 	{
-		const int32 D = DefenseOf(K, V);
+		const int32 D = (K == K_Shield) ? ShieldGuard(Id) : DefenseOf(K, V);
 		if (D > 0) Def = FString::Printf(TEXT("+%d"), D);
 	}
 	else if (IsAccessoryKind(K))
@@ -2233,7 +2257,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		const bool bWeapon = HotbarDamage(Skills, Skills->Selected, A, B);
 		const int32 Offence = bWeapon ? FMath::RoundToInt(0.5f * (A + B)) : 0;
 		const int32 Defence = TotalDefense(Skills, false);
-		const int32 Guard = (Skills->Worn[K_Shield] && Knight->ShieldActive()) ? DefenseOf(K_Shield, VariantOf(Skills->Worn[K_Shield])) : 0;
+		const int32 Guard = (Skills->Worn[K_Shield] && Knight->ShieldActive()) ? ShieldGuard(Skills->Worn[K_Shield]) : 0;
 		const int32 Held = Skills->SelectedItem();
 		const int32 OffIcon = (Held && IsGear(Held)) ? Held : GearId(K_Sword, 1);
 		const int32 DefIcon = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
