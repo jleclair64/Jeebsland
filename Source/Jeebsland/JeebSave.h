@@ -6,9 +6,11 @@
 
 class USkillComponent;
 
-// What is written to disk (Saved/SaveGames/Jeebsland_0.sav). See Docs/SaveLoadPlan.md.
+// A player's character. Single player: written to Saved/SaveGames/Jeebsland_0.sav. Online: the SERVER writes one file per
+// account (Saved/Characters/<name>.sav, see JeebAccounts). See Docs/SaveLoadPlan.md.
 // RULES: never reorder JeebItems::EKind / EItemType (item ids are stored as numbers); when the layout of this class changes in a
-// way old saves cannot be read, bump CurrentVersion and add a step to UJeebSave::Migrate.
+// way old saves cannot be read, bump CurrentVersion and add a step to UJeebSave::Migrate. (Adding a new UPROPERTY is fine:
+// old saves simply don't have it and it keeps its default.)
 UCLASS()
 class UJeebSave : public USaveGame
 {
@@ -37,11 +39,23 @@ public:
 	UPROPERTY() TArray<int32> LoreFound;
 	UPROPERTY() int64 LastGambleHour = -1;
 
-	// Writes the component's state to disk. False if the write failed.
+	// Where the knight stood (online: you log back in where you logged out)
+	UPROPERTY() bool bHasPos = false;
+	UPROPERTY() FVector Pos = FVector::ZeroVector;
+	UPROPERTY() float Yaw = 0.f;
+
+	// Single player: writes the component's state to disk. False if the write failed.
 	static bool Save(const USkillComponent* Skills);
-	// Reads the save and puts it into the component. False (component untouched) if there is no usable save.
+	// Single player: reads the save and puts it into the component. False (component untouched) if there is no usable save.
 	static bool Restore(USkillComponent* Skills);
 	static bool Exists();
+
+	// The building blocks (the server uses these per account). Body: the knight, for its position (may be null).
+	static UJeebSave* Capture(const USkillComponent* Skills, const AActor* Body);
+	bool ApplyTo(USkillComponent* Skills);   // checked on the way in; false (component untouched) if written by a newer game
+	// A file of its own: written to a temporary file first and then swapped in, so a crash mid-write can't destroy the save
+	static bool WriteFile(UJeebSave* Save, const FString& Path);
+	static UJeebSave* ReadFile(const FString& Path);   // null if missing or unreadable
 
 private:
 	// Brings an older save up to CurrentVersion (nothing to do yet)

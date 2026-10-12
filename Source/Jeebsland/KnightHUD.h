@@ -17,10 +17,28 @@ class AKnightHUD : public AHUD
 
 public:
 	virtual void DrawHUD() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	// Typing on the starting screen (a small Slate widget passes the keys here: see KnightHUDMenu.cpp)
+	void TypeChar(TCHAR C);
+	bool TypeKey(const FKey& Key);
+
 	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
 	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
 
 private:
+	// The starting screen (KnightHUDMenu.cpp): name and password, the worlds and their player counts, and the server address
+	void DrawNoKnight();
+	void DrawStartScreen();
+	void DrawTextField(float X, float Y, float W, const TCHAR* Label, const FString& Value, int32 Field, bool bSecret);
+	void TryPlay();
+	void HideTyping();
+	TSharedPtr<class SJeebTyping> Typing;
+	FString TypeName, TypePass, TypePass2, TypeAddr;
+	int32 TypeFocus = 0;              // 0 name, 1 password, 2 password again, 3 server address
+	bool bTypeInit = false, bTypeEnter = false, bCreateMode = false;
+	int32 PickedWorld = 0;
+	FString LocalNote;                // a problem found before asking the server ("Passwords don't match.")
+
 	// Drawing helpers
 	void Poly(const TArray<FVector2D>& P, const FLinearColor& C);
 	void Disc(float Cx, float Cy, float Rx, float Ry, const FLinearColor& C);

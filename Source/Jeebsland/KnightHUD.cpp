@@ -33,12 +33,7 @@ using namespace JeebItems;
 void AKnightHUD::DrawHUD()
 {
 	Super::DrawHUD();
-
-	APawn* Pawn = GetOwningPawn();
-	if (!Pawn || !Canvas || !GEngine) return;
-	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
-	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
-	if (!Skills || !Knight) return;
+	if (!Canvas || !GEngine) return;
 
 	UFont* Font = GEngine->GetMediumFont();
 	// Make the sharp copies of the font once (runtime fonts only: their size can simply be raised)
@@ -66,6 +61,15 @@ void AKnightHUD::DrawHUD()
 	const bool bRightNow = PC && PC->IsInputKeyDown(EKeys::RightMouseButton);
 	bUIRightClick = bRightNow && !bRightWasDown;
 	bRightWasDown = bRightNow;
+	TipLines.Reset();
+
+	// No knight: the starting screen, or (online) waiting for the server to let us in
+	APawn* Pawn = GetOwningPawn();
+	if (!Pawn) { DrawNoKnight(); return; }
+	HideTyping();
+	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
+	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
+	if (!Skills || !Knight) return;
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
 	TipLines.Reset();
 

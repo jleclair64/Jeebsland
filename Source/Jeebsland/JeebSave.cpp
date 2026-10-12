@@ -3,6 +3,9 @@
 #include "Inventory.h"
 #include "Lore.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "GameFramework/Actor.h"
 
 using namespace JeebItems;
 
@@ -27,11 +30,11 @@ void UJeebSave::Migrate()
 	SaveVersion = CurrentVersion;
 }
 
-bool UJeebSave::Save(const USkillComponent* Skills)
+UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 {
-	if (!Skills) return false;
+	if (!Skills) return nullptr;
 	UJeebSave* S = Cast<UJeebSave>(UGameplayStatics::CreateSaveGameObject(UJeebSave::StaticClass()));
-	if (!S) return false;
+	if (!S) return nullptr;
 
 	S->SaveVersion = CurrentVersion;
 	for (int32 i = 0; i < USkillComponent::NumSkills; ++i)
@@ -50,17 +53,20 @@ bool UJeebSave::Save(const USkillComponent* Skills)
 	S->PotionCount = Skills->PotionSlot.Count;
 	S->LoreFound = Skills->LoreFound;
 	S->LastGambleHour = Skills->LastGambleHour;
-
-	return UGameplayStatics::SaveGameToSlot(S, SlotName, 0);
+	if (Body)
+	{
+		S->bHasPos = true;
+		S->Pos = Body->GetActorLocation();
+		S->Yaw = Body->GetActorRotation().Yaw;
+	}
+	return S;
 }
 
-bool UJeebSave::Restore(USkillComponent* Skills)
+bool UJeebSave::ApplyTo(USkillComponent* Skills)
 {
-	if (!Skills || !Exists()) return false;
-	UJeebSave* S = Cast<UJeebSave>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
-	if (!S) return false;
-	if (S->SaveVersion > CurrentVersion) return false;   // written by a newer game: leave it alone rather than damage it
-	S->Migrate();
+	if (!Skills) return false;
+	if (SaveVersion > CurrentVersion) return false;   // written by a newer game: leave it alone rather than damage it
+	Migrate();
 
 	// Everything is checked on the way in: unknown ids vanish, counts are held to the stack size
 	auto Fill = [](TArray<FInvSlot>& Dest, const TArray<int32>& Ids, const TArray<int32>& Counts)
@@ -78,19 +84,48 @@ bool UJeebSave::Restore(USkillComponent* Skills)
 	};
 	Skills->Slots.SetNum(NumSlots);
 	Skills->Bank.SetNum(USkillComponent::NumBankSlots);
-	Fill(Skills->Slots, S->SlotIds, S->SlotCounts);
-	Fill(Skills->Bank, S->BankIds, S->BankCounts);
+	Fill(Skills->Slots, SlotIds, SlotCounts);
+	Fill(Skills->Bank, BankIds, BankCounts);
 
-	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (S->Hotbar.IsValidIndex(i) && ValidId(S->Hotbar[i])) ? S->Hotbar[i] : 0;
-	Skills->SetSelected(S->Selected);
-	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (S->Worn.IsValidIndex(i) && ValidId(S->Worn[i])) ? S->Worn[i] : 0;
-	Skills->RingB = ValidId(S->RingB) ? S->RingB : 0;
+	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (Hotbar.IsValidIndex(i) && ValidId(Hotbar[i])) ? Hotbar[i] : 0;
+	Skills->SetSelected(Selected);
+	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (Worn.IsValidIndex(i) && ValidId(Worn[i])) ? Worn[i] : 0;
+	Skills->RingB = ValidId(RingB) ? RingB : 0;
 	Skills->PotionSlot = FInvSlot();
-	if (S->PotionId != 0 && IsPotion(S->PotionId)) { Skills->PotionSlot.Id = S->PotionId; Skills->PotionSlot.Count = FMath::Clamp(S->PotionCount, 1, StackSize(S->PotionId)); }
+	if (PotionId != 0 && IsPotion(PotionId)) { Skills->PotionSlot.Id = PotionId; Skills->PotionSlot.Count = FMath::Clamp(PotionCount, 1, StackSize(PotionId)); }
 
-	Skills->RestoreSkills(S->XP, S->Known, FMath::Max(0, S->Ingots));
+	Skills->RestoreSkills(XP, Known, FMath::Max(0, Ingots));
 	Skills->LoreFound.Empty();
-	for (int32 L : S->LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
-	Skills->LastGambleHour = S->LastGambleHour;
+	for (int32 L : LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
+	Skills->LastGambleHour = LastGambleHour;
 	return true;
+}
+
+bool UJeebSave::Save(const USkillComponent* Skills)
+{
+	UJeebSave* S = Capture(Skills, nullptr);
+	return S && UGameplayStatics::SaveGameToSlot(S, SlotName, 0);
+}
+
+bool UJeebSave::Restore(USkillComponent* Skills)
+{
+	if (!Skills || !Exists()) return false;
+	UJeebSave* S = Cast<UJeebSave>(UGameplayStatics::LoadGameFromSlot(SlotName, 0));
+	return S && S->ApplyTo(Skills);
+}
+
+bool UJeebSave::WriteFile(UJeebSave* Save, const FString& Path)
+{
+	TArray<uint8> Bytes;
+	if (!Save || !UGameplayStatics::SaveGameToMemory(Save, Bytes)) return false;
+	const FString Tmp = Path + TEXT(".tmp");
+	if (!FFileHelper::SaveArrayToFile(Bytes, *Tmp)) return false;
+	return IFileManager::Get().Move(*Path, *Tmp, true, true);
+}
+
+UJeebSave* UJeebSave::ReadFile(const FString& Path)
+{
+	TArray<uint8> Bytes;
+	if (!FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent) || Bytes.Num() == 0) return nullptr;
+	return Cast<UJeebSave>(UGameplayStatics::LoadGameFromMemory(Bytes));
 }

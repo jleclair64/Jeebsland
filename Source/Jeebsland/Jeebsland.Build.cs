@@ -18,8 +18,14 @@ public class Jeebsland : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"Slate"
+			"Slate",
+			"SlateCore",
+			"HTTP",          // the starting screen asks each world how many players it has
+			"HTTPServer"     // and each world answers
 		});
+
+		// Password hashing on the server (PBKDF2-SHA256)
+		AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
