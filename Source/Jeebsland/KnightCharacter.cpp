@@ -594,40 +594,73 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		}
 		else
 		{
-			P.Comp->AttachToComponent(ElbowL, FAttachmentTransformRules::KeepRelativeTransform);   // strapped to the forearm: HoldShield poses it
+			P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);   // HoldShield poses it
 		}
+	}
+}
+
+// The resting shield, and the left arm that holds it. The shield stays where it was placed (in the shoulder's frame, so it
+// swings with the arm); the elbow bends up and turns in so the forearm lies flat behind it, a hand's depth back.
+namespace
+{
+	struct FShieldRest { FTransform InArm; float ElbowPitch = 15.f, ElbowRoll = -22.f; };
+	const FShieldRest& ShieldRest()
+	{
+		static const FShieldRest R = []()
+		{
+			FShieldRest Out;
+			const FVector PA = KnightDesign::PivotPos(KnightDesign::P_ArmL), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowL);
+			const FVector W(6.0, -34.6, -24.5);
+			// where the shield sat (strapped to the forearm bent 15 degrees forward and turned 22 degrees in): keep exactly that
+			{
+				const FVector Fore = (PE - W).GetSafeNormal();
+				const FVector Up = FVector(0.573, 0.0, 0.819);
+				const FVector Want = FVector(0.676, -0.70, -0.181).GetSafeNormal();
+				const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
+				const FQuat Q = FQuat(N, FMath::DegreesToRadians(-30.f)) * FRotationMatrix::MakeFromXZ(N, Up).ToQuat();
+				const FVector Strap(14.0, -41.0, -8.0);
+				const FVector Target = -Fore * 2.0 + N * 11.5 + FVector(5.0, 4.0, 0.0);
+				const FTransform InElbow(Q, Target - Q.RotateVector(Strap));
+				const FTransform ElbowInArm(FRotator(15.f, 0.f, -22.f).Quaternion(), PE - PA);
+				Out.InArm = InElbow * ElbowInArm;
+			}
+			// the shield's back (a plane, in the shoulder's frame) and the way it faces
+			const FVector Back = Out.InArm.TransformPosition(FVector(14.0, -41.0, 0.0));
+			const FVector Face = Out.InArm.TransformVectorNoScale(FVector(1, 0, 0)).GetSafeNormal();
+			// find the elbow bend and inward turn that lay the forearm flat behind it, held in towards the chest
+			const FVector F = KnightDesign::FistPos(-1);
+			float Best = 1e9f;
+			for (float P = 0.f; P <= 120.f; P += 2.f)
+				for (float Rl = -80.f; Rl <= 30.f; Rl += 2.f)
+				{
+					const FQuat Q = FRotator(P, 0.f, Rl).Quaternion();
+					const FVector Dir = Q.RotateVector((W - PE).GetSafeNormal());
+					const FVector Fist = (PE - PA) + Q.RotateVector(F - PE);
+					const float Flat = FMath::Square(FVector::DotProduct(Dir, Face)) * 400.f;         // parallel to the shield
+					const float Depth = FVector::DotProduct(Fist - Back, Face);                        // the fist behind the shield's back
+					const float Gap = FMath::Square(FMath::Min(0.f, -9.f - Depth) * 1.f + FMath::Max(0.f, -13.f - Depth) * 0.5f);
+					const float CapsY = (Fist + PA).Y;                                                 // not into the chest
+					const float Body = FMath::Square(FMath::Max(0.f, CapsY + 25.f)) * 4.f;
+					const float Cost = Flat + Gap + Body - 0.02f * P;                                 // among the rest, held up more
+					if (Cost < Best) { Best = Cost; Out.ElbowPitch = P; Out.ElbowRoll = Rl; }
+				}
+			return Out;
+		}();
+		return R;
 	}
 }
 
 void AKnightCharacter::HoldShield()
 {
 	if (bStowed || !ElbowL || !ArmPivotL) return;
-	// At rest: strapped along the outside of the left forearm, at the elbow and at the hand, its face turned out and forward
-	// (diagonal to the body), hanging down at the side with its point near the knee. All in the forearm's own frame.
-	static const FTransform Rest = []()
-	{
-		const FVector E = KnightDesign::PivotPos(KnightDesign::P_ElbowL), W(6.0, -34.6, -24.5);
-		const FVector Fore = (E - W).GetSafeNormal();                       // along the forearm, towards the elbow
-		const FVector Up = FVector(0.573, 0.0, 0.819);                       // the shield's top: forward of the shoulder, its point behind (top tipped 20 degrees forward)
-		const FVector Want = FVector(0.676, -0.70, -0.181).GetSafeNormal();  // face turned to the front-left (diagonal), upright
-		// the shield's back runs parallel to the forearm (the arm lies flat behind it, so the glove never pokes through)
-		const FVector N = (Want - Fore * FVector::DotProduct(Want, Fore)).GetSafeNormal();
-		// the shield's face (+X) and its top (+Z); then turned 30 degrees about its face (anticlockwise seen from behind) so the
-		// forearm crosses its back from the elbow strap on one side to the hand grip on the other
-		const FQuat Q = FQuat(N, FMath::DegreesToRadians(-30.f)) * FRotationMatrix::MakeFromXZ(N, Up).ToQuat();
-		const FVector Strap(14.0, -41.0, -8.0);                               // a point on the shield's back, a third of the way down
-		const FVector Round = FVector(5.0, 4.0, 0.0) - N * FVector::DotProduct(FVector(5.0, 4.0, 0.0), N);   // drawn a little round to the front, along its face
-		const FVector Target = -Fore * 2.0 + N * 12.0 + Round;               // just below the elbow, a hand's depth outside the forearm
-		return FTransform(Q, Target - Q.RotateVector(Strap));
-	}();
-	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
-	const FTransform Guard = (FTransform(-KnightDesign::PivotPos(KnightDesign::P_ArmL)) * ArmPivotL->GetComponentTransform()).GetRelativeTransform(ElbowL->GetComponentTransform());
+	// Raised: where the guard always put it (in front of the arm, turning with the shoulder); at rest: as worked out above
+	const FTransform Guard(-KnightDesign::PivotPos(KnightDesign::P_ArmL));
 	FTransform Now;
-	Now.Blend(Rest, Guard, BlockAlpha);
+	Now.Blend(ShieldRest().InArm, Guard, BlockAlpha);
 	for (FArmorPart& P : ArmorParts)
 	{
 		if (P.Slot != KnightDesign::SlotShield || !P.Comp) continue;
-		if (P.Comp->GetAttachParent() != ElbowL) P.Comp->AttachToComponent(ElbowL, FAttachmentTransformRules::KeepRelativeTransform);
+		if (P.Comp->GetAttachParent() != ArmPivotL) P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);
 		P.Comp->SetRelativeTransform(Now);
 	}
 }
@@ -2317,7 +2350,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
 	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + 15.f * Ground;   // the shield arm rests with the elbow a little bent forward
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground;   // the shield arm rests bent up behind the shield
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
@@ -2327,7 +2360,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, -22.f * Ground * (1.f - BlockAlpha)));   // at rest the forearm turns in towards the body
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha)));   // and turned in towards the chest
 	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
