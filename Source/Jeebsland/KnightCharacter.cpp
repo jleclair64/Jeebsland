@@ -207,7 +207,7 @@ void AKnightCharacter::BeginPlay()
 		{
 			DM->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.50f, 0.40f, 0.26f));
 		}
-		Clods.SetNum(36); Blades.SetNum(24);
+		Clods.SetNum(48); Blades.SetNum(30);
 		auto Prep = [&](UInstancedStaticMeshComponent* I, int32 N, const FLinearColor& C)
 		{
 			TArray<FTransform> H;
@@ -216,7 +216,7 @@ void AKnightCharacter::BeginPlay()
 			if (UMaterialInstanceDynamic* M = I->CreateDynamicMaterialInstance(0, DBase)) M->SetVectorParameterValue(TEXT("Color"), C);
 		};
 		Prep(ClodISM, Clods.Num(), FLinearColor(0.27f, 0.17f, 0.09f));    // the path's soil
-		Prep(BladeISM, Blades.Num(), FLinearColor(0.20f, 0.42f, 0.10f));  // grass green
+		Prep(BladeISM, Blades.Num(), FLinearColor(0.34f, 0.62f, 0.14f));  // fresh grass green (bright enough to show against the field)
 	}
 
 	BuildKnight();
@@ -1684,28 +1684,28 @@ void AKnightCharacter::Kick(const FVector& Foot, float Strength)
 	if (G == 1)
 	{
 		// a dirt path: a few small clods and a faint puff of dust
-		const int32 N = FMath::RoundToInt(2.f + 2.5f * Strength);
+		const int32 N = FMath::RoundToInt(4.f + 3.f * Strength);
 		for (int32 i = 0; i < N; ++i)
 		{
 			FBit& B = Clods[ClodNext];
 			ClodNext = (ClodNext + 1) % Clods.Num();
 			Launch(B, 230.f, 130.f, 14.f);
-			const float S = FMath::FRandRange(0.9f, 2.0f) * 0.01f;
+			const float S = FMath::FRandRange(2.2f, 4.2f) * 0.01f;   // chunks of 2 to 4 cm
 			B.Size = FVector(S, S * FMath::FRandRange(0.7f, 1.2f), S * FMath::FRandRange(0.6f, 1.f));
 			B.Life = FMath::FRandRange(0.8f, 1.2f);
 		}
-		SpawnDust(Foot, 14.f * Strength);
+		// (no round puff: just the soil itself)
 	}
 	else
 	{
 		// grass: a blade or two flicked up (three on a hard landing)
-		const int32 N = Strength >= 1.4f ? 3 : (FMath::FRand() < 0.55f ? 1 : 2);
+		const int32 N = Strength >= 1.4f ? 5 : (FMath::FRand() < 0.5f ? 2 : 3);
 		for (int32 i = 0; i < N; ++i)
 		{
 			FBit& B = Blades[BladeNext];
 			BladeNext = (BladeNext + 1) % Blades.Num();
 			Launch(B, 260.f, 90.f, 11.f);
-			B.Size = FVector(0.005f, FMath::FRandRange(0.011f, 0.016f), FMath::FRandRange(0.055f, 0.085f));
+			B.Size = FVector(0.008f, FMath::FRandRange(0.024f, 0.034f), FMath::FRandRange(0.12f, 0.17f));   // 12-17 cm blades
 			B.Life = FMath::FRandRange(1.0f, 1.4f);
 		}
 	}
