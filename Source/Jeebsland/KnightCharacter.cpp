@@ -2086,8 +2086,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	}
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
-	if (bAttacking) bBlocking = false;
-	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
+	if (bAttacking || bRolling || Move->IsFalling()) bBlocking = false;   // no guard mid-swing, mid-roll or in the air
+	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 
 	// ---------- Ground speed (crouching and blocking are slow); slower in the air with a smooth slide down to it ----------
 	const float AirMul = 0.69f;
