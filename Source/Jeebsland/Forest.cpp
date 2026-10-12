@@ -351,6 +351,11 @@ UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* 
 	return C;
 }
 
+void AForest::SetLeafShadows(bool bOn)
+{
+	for (UInstancedStaticMeshComponent* C : Leaf) if (C) C->SetCastShadow(bOn);
+}
+
 void AForest::Tint(UInstancedStaticMeshComponent* C, const FLinearColor& Color)
 {
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));

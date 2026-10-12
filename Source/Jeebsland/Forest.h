@@ -16,6 +16,8 @@ class AForest : public AActor
 
 public:
 	AForest();
+	// Leaves cast shadows (off on the Lowest graphics setting: swaying leaf shadows flicker there)
+	void SetLeafShadows(bool bOn);
 
 	// Plants one tree (random shape comes from R). Used by the woods and by the game mode.
 	AChoppableTree* AddTree(ETreeKind Kind, const FVector& Pos, float Scale, FRandomStream& R);
