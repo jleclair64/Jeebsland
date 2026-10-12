@@ -28,7 +28,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Decisions and preferences:**
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
-- Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a tight radius, S only brakes, no sideways movement.
+- Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a very tight radius (~1.75 m), S backs up slowly (half the knight's walk, never sprints), no sideways movement. The knight also backs up with S alone at that same slow pace without turning round.
 - Village palisade wood uses `M_WoodV`/`M_WoodH` (painted grain texture T_Wood from gen_textures.py: logs use the mesh UVs, beams follow their long axis); other buildings still use flat colours. The first bark-blob wood looked fake: avoid contour-line patterns.
 - Candles and carved pumpkins glow via `M_Flame` halos plus flickering point lights (see AutumnDecor.cpp); every 4th candle and every 2nd lit pumpkin has a real light.
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.

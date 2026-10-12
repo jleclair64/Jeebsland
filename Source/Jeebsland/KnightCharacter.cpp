@@ -1837,7 +1837,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	bool bHorseSprint = false;
 	if (bMounted)
 	{
-		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling;
+		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling && (GetWorld()->GetTimeSeconds() - LastBackTime > 0.15);
 		if (bAsk && HorseEnergy > 0.f)
 		{
 			// the horse never tires: its gallop energy does not drain
@@ -1858,7 +1858,11 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (HorseSpeedNow < 1.f) HorseSpeedNow = 0.8f * 2.f * WalkSpeed;
 		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
 	}
-	const float BaseSpeed = bMounted ? HorseSpeedNow
+	// Backing up (S alone): slowly, at half the walking pace, never sprinting, without turning round
+	const bool bBackStep = (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15) && !bRolling && !bSliding && !bClimbing && !bSitting;
+	if (!bMounted && bBackStep && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
+	else if (!bMounted && !bBackStep && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
+	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
 	                                 : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed));
 	if (bFalling && !bSpecial)
 	{
@@ -2250,13 +2254,30 @@ void AKnightCharacter::HurtHorse(float Amount)
 
 void AKnightCharacter::DoMove(float Right, float Forward)
 {
-	if (!bMounted) { Super::DoMove(Right, Forward); return; }
-	// Like a car in a game: the horse only goes forward, and turns on a tight circle. The faster it goes, the quicker it
-	// turns (a fixed turning radius of about 3.5 m, capped), and standing still it can still swing round slowly.
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (!bMounted)
+	{
+		// S on its own: back up slowly, still facing the way you were (the speed is capped in Tick)
+		if (Forward < -0.1f && FMath::Abs(Right) < 0.1f && !bRolling && !bSliding && !bClimbing)
+		{
+			LastBackTime = Now;
+			AddMovementInput(-GetActorForwardVector(), 1.f);
+			return;
+		}
+		Super::DoMove(Right, Forward);
+		return;
+	}
+	// Like a car in a game: the horse goes forward and turns on a tight circle (a turning radius of about 1.75 m). The faster
+	// it goes, the quicker it turns, and standing still it can still swing round. S backs it up slowly (it never sprints backwards).
 	const float Dt = GetWorld()->GetDeltaSeconds();
 	const float Speed = GetVelocity().Size2D();
-	const float TurnRate = FMath::Clamp(FMath::RadiansToDegrees(Speed / 350.f), 45.f, 125.f);   // degrees per second
+	const float TurnRate = FMath::Clamp(FMath::RadiansToDegrees(Speed / 175.f), 70.f, 230.f);   // degrees per second
 	if (!FMath::IsNearlyZero(Right))
 		SetActorRotation(FRotator(0.f, GetActorRotation().Yaw + Right * TurnRate * Dt, 0.f));
-	AddMovementInput(GetActorForwardVector(), FMath::Max(Forward, 0.f));   // S only lets go (no reversing)
+	if (Forward < -0.1f)
+	{
+		LastBackTime = Now;
+		AddMovementInput(-GetActorForwardVector(), 1.f);
+	}
+	else AddMovementInput(GetActorForwardVector(), FMath::Max(Forward, 0.f));
 }
