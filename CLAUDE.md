@@ -78,6 +78,14 @@ Last updated 2026-10-12 (end of the knight-redesign session). Everything below i
 
 Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and the owner prefers to check visuals themselves and send screenshots. Build, rebuild materials, commit, reopen the editor, and say what to look for.
 
+## Code layout (split 2026-10-12; function bodies unchanged)
+
+`AKnightHUD` (header `KnightHUD.h`): `KnightHUD.cpp` main DrawHUD, bars, weapon bar, minimap; `KnightHUDGlass.cpp` liquid-glass drawing helpers, buttons, tooltips; `KnightHUDIcons.cpp` Poly/Disc and all item icons; `KnightHUDInventory.cpp` inventory, side panel, badges, drag and drop, drop box, loot windows; `KnightHUDShops.cpp` store, smithy, bank; `KnightHUDScreens.cpp` settings, dictionary, lore, skills screen, dialogue; `KnightHUDText.cpp` HDText, DrawLinesAt, NorseText.
+
+`AKnightCharacter` (header `KnightCharacter.h`): `KnightCharacter.cpp` constructor, BeginPlay, input setup and the big Tick; `...Body.cpp` mesh building, cape, armour, shield and weapon holding (`ShieldRest()` is declared in `KnightShieldRest.h`); `...Combat.cpp` attacks, Hurt, block, Die, potions; `...Movement.cpp` sprint, crouch, climb, slide, roll, jump, DoMove; `...Interact.cpp` interaction prompts, doors, horse, seats, gathering; `...Inventory.cpp` hotbar, equip, drops; `...UI.cpp` screens opening/closing, dialogue, graphics settings; `...Fx.cpp` dust and footfall bits. Put new code in the matching file; `Tick` is still ~660 lines and is the next candidate to break up.
+
+Save/load is planned in `Docs/SaveLoadPlan.md` (not built yet).
+
 ## Build
 
 The editor must be closed before building (Live Coding is not used). The owner has given standing permission to close a running editor (`Stop-Process -Name UnrealEditor`) whenever a build or material rebuild needs it, without asking, and to reopen it afterwards.
