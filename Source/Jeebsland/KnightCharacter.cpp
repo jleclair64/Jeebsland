@@ -639,7 +639,7 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 		const FVector Blade = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0));
 		const FVector Want = FVector(0.32, -0.45, -0.83).GetSafeNormal();   // tip further out in front
 		// then twisted in the wrist like turning a key: 40 degrees about the blade itself
-		return FQuat(Want, FMath::DegreesToRadians(40.f)) * FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
+		return FQuat(Want, FMath::DegreesToRadians(-40.f)) * FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
 	}();
 	const FQuat Q = FQuat::Slerp(FQuat::Identity, EaseQ, EaseAlpha);
 	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowR);
