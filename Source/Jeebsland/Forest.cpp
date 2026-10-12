@@ -558,24 +558,34 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		}
 		// (a fort tree keeps no crown: its trunk ends under the top deck, which is open to the sky)
 		if (bBark) BranchComp = BranchVar[bRed ? 3 : 2];   // bark-textured branches (reddish for redwoods, grey-brown for pines)
-		const int32 Whorls = bFortTree ? 0 : (bRed ? R.RandRange(16, 19) : R.RandRange(11, 14));
+		const int32 Whorls = bFortTree ? 0 : (bRed ? R.RandRange(22, 25) : R.RandRange(16, 18));
 		const float Lowest = bRed ? 0.42f : 0.16f;
 		const float ReachBase = bRed ? 330.f * S : 160.f * S * FMath::Sqrt(HV);
 		const float ReachTop = bRed ? 70.f * S : 28.f * S;
-		const float CardLen = bRed ? 120.f * S : 70.f * S;
+		const float CardLen = bRed ? 170.f * S : 100.f * S;   // big boughs: the crown reads as a full mass, not a skeleton
 		TArray<float> Shade;
 		auto Bough = [&](const FVector& At, const FVector& Dir, float Len, float Shd)
 		{
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Dir, FVector(0.f, 0.f, 1.f)).ToQuat() * FRotator(0.f, 0.f, R.FRandRange(-25.f, 25.f)).Quaternion();
-			ConeT.Add(FTransform(Q, At, FVector(Len / 100.f, Len * 0.75f / 100.f, Len * 0.75f / 100.f)));
+			ConeT.Add(FTransform(Q, At, FVector(Len / 100.f, Len * 1.1f / 100.f, Len * 0.9f / 100.f)));
 			Shade.Add(Shd);
+			// a second bough on the same spot, turned a little and tipped, so the gaps between boughs fill in
+			const FQuat Q2 = Q * FRotator(R.FRandRange(-12.f, 4.f), R.FRandRange(25.f, 40.f) * (R.FRand() < 0.5f ? -1.f : 1.f), R.FRandRange(-40.f, 40.f)).Quaternion();
+			ConeT.Add(FTransform(Q2, At + FVector(0.f, 0.f, R.FRandRange(-8.f, 8.f)), FVector(Len * 0.9f / 100.f, Len / 100.f, Len * 0.8f / 100.f)));
+			Shade.Add(FMath::Min(Shd + 0.08f, 0.55f));
 		};
 		for (int32 w = 0; w < Whorls; ++w)
 		{
 			const float T = float(w) / FMath::Max(Whorls - 1, 1);
 			const FVector Start = Pos + FVector(0.f, 0.f, FMath::Lerp(Lowest, 0.97f, T) * Height);
 			const float Reach = FMath::Lerp(ReachBase, ReachTop, FMath::Pow(T, 0.85f));
-			const int32 NB = T > 0.85f ? 3 : R.RandRange(4, 6);
+			const int32 NB = T > 0.85f ? 4 : R.RandRange(5, 7);
+			// fill close to the trunk too, so you never see straight through the tree to it
+			for (int32 k = 0; k < 2; ++k)
+			{
+				const float Az0 = R.FRandRange(0.f, 2.f * PI);
+				Bough(Start + FVector(0.f, 0.f, R.FRandRange(-20.f, 20.f) * S), FVector(FMath::Cos(Az0), FMath::Sin(Az0), -0.15f).GetSafeNormal(), FMath::Min(Reach, CardLen) * 0.7f, 0.45f);
+			}
 			for (int32 b = 0; b < NB; ++b)
 			{
 				const float Az = FMath::DegreesToRadians(w * 47.f + b * 360.f / NB + R.FRandRange(-18.f, 18.f));
@@ -590,8 +600,8 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 				BranchT.Add(Stick(Start, Mid, Th));
 				BranchT.Add(Stick(Mid - Dir2 * Th * 0.3f, Tip, Th * 0.6f));
 				// needle boughs all along it, from a little way out to just past the tip (fanned a little)
-				const float Cl = FMath::Clamp(L * 0.55f, CardLen * 0.45f, CardLen);
-				const int32 N = FMath::Clamp(FMath::RoundToInt(L / (Cl * 0.45f)), 2, 7);
+				const float Cl = FMath::Clamp(L * 0.65f, CardLen * 0.5f, CardLen);
+				const int32 N = FMath::Clamp(FMath::RoundToInt(L / (Cl * 0.4f)), 2, 7);
 				for (int32 k = 0; k < N; ++k)
 				{
 					const float Fk = 0.15f + 0.85f * float(k) / N;
