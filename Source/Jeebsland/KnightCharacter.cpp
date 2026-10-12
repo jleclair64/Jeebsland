@@ -565,8 +565,8 @@ void AKnightCharacter::HoldShield()
 		const FVector Want = FVector(0.66, -0.70, 0.24).GetSafeNormal();     // out to the left and forward
 		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromXZ(N, Up).ToQuat();         // the shield's face (+X) and its top (+Z)
-		const FVector Strap(14.0, -41.0, 2.0);                               // a point on the shield's back, a third of the way down
-		const FVector Target = -Up * 3.0 + N * 9.0;                          // just below the elbow, outside the forearm
+		const FVector Strap(14.0, -41.0, 10.0);                              // a point on the shield's back, a third of the way down
+		const FVector Target = -Up * 3.0 + N * 11.0;                         // just below the elbow, outside the forearm
 		return FTransform(Q, Target - Q.RotateVector(Strap));
 	}();
 	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
@@ -590,7 +590,7 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 	static const FQuat EaseQ = []()
 	{
 		const FVector Blade = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0));
-		const FVector Want = FVector(0.0, -0.4876, -0.873).GetSafeNormal();
+		const FVector Want = FVector(0.32, -0.45, -0.83).GetSafeNormal();   // tip further out in front
 		return FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
 	}();
 	const FQuat Q = FQuat::Slerp(FQuat::Identity, EaseQ, EaseAlpha);
@@ -2237,7 +2237,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
 
 	// ---------- Cape and plume ----------
 	const float FlapAmp = 3.f + 9.f * Stream;

@@ -326,7 +326,7 @@ private:
 	UPROPERTY() class UMaterialInstanceDynamic* CapeMid = nullptr;
 	static constexpr int32 CapeNX = 7, CapeNY = 10;
 	static constexpr float StanceHip = 12.f;   // relaxed stance: the thighs lean this far forward and the knees bend twice as much
-	static constexpr float RestLean = 5.f;    // at ease the chest leans this far forward
+	static constexpr float RestLean = 0.f;    // at ease the chest leans this far forward
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	bool bCapeMeshMade = false;
