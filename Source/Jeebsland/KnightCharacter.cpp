@@ -346,6 +346,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	SettingsAction = NewObject<UInputAction>(this, TEXT("KnightSettings"));
 	SettingsAction->ValueType = EInputActionValueType::Boolean;
 	KnightContext->MapKey(SettingsAction, EKeys::O);
+	KnightContext->MapKey(SettingsAction, EKeys::Escape);   // (in the editor, Escape also stops Play: use O there)
 
 	KnightContext->MapKey(MoveAction, EKeys::D); // right = +X
 	KnightContext->MapKey(MoveAction, EKeys::A).Modifiers.Add(MakeNegate());

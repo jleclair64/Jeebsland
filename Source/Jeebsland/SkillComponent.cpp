@@ -415,7 +415,7 @@ bool USkillComponent::DiscoverLore(int32 Index)
 	const TArray<JeebLore::FEntry>& E = JeebLore::Entries();
 	if (!E.IsValidIndex(Index) || LoreFound.Contains(Index)) return false;
 	LoreFound.Add(Index);
-	Say(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press O, Lore tab)"), E[Index].Title));
+	Say(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press Esc, Lore tab)"), E[Index].Title));
 	return true;
 }
 

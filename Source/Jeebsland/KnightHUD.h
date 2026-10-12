@@ -139,7 +139,15 @@ private:
 	float ShopMsgUntil = 0.f;
 
 	// Settings screen
-	int32 SettingsTab = 0;       // 0 = settings, 1 = controls, 2 = dictionary, 3 = lore
+	int32 SettingsTab = 0;       // 0 = map, 1 = settings, 2 = controls, 3 = dictionary, 4 = lore
+	bool bSettingsWasOpen = false;
+	float SavedNoteUntil = 0.f;  // "Saved" shows on the button for a moment
+	// The world map (KnightHUDMap.cpp): painted once into a texture; north (+X) is up
+	UPROPERTY() UTexture2D* MapTex = nullptr;
+	FVector2D MapMin = FVector2D::ZeroVector;
+	float MapSize = 1.f;
+	void BuildMapTex();
+	void DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float S);
 	int32 BankPage = 0;
 	int32 LoreCat = 0;
 	int32 LoreSel = -1;

@@ -3,6 +3,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "KnightCharacter.h"
+#include "JeebGameInstance.h"
 #include "Pig.h"
 #include "FoeKnight.h"
 #include "Loot.h"
@@ -28,7 +29,8 @@
 using namespace JeebItems;
 
 // ---------------------------------------------------------------------------------------------------
-// Settings, controls and the dictionary (press O)
+// The Escape screen: the world map (with Save and Back to menu), settings, controls, the dictionary and the lore. Escape
+// (or O) opens and closes it; it always opens on the map.
 // ---------------------------------------------------------------------------------------------------
 void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 {
@@ -49,8 +51,8 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 
 	// Tabs
 	const float TabW = 170.f, TabH = 32.f, TabY = PY + 10.f;
-	const TCHAR* TabNames[4] = { TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE") };
-	for (int32 t = 0; t < 4; ++t)
+	const TCHAR* TabNames[5] = { TEXT("MAP"), TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE") };
+	for (int32 t = 0; t < 5; ++t)
 	{
 		const float TX = PX + 20.f + t * (TabW + 8.f);
 		if (Btn(TX, TabY, TabW, TabH, TabNames[t], true, SettingsTab == t, 1.2f))
@@ -61,6 +63,28 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	}
 
 	if (SettingsTab == 0)
+	{
+		// The map on the left; Save and Back to menu on the right
+		const float MS = PH - 80.f;
+		DrawWorldMap(Knight, PX + 30.f, PY + 58.f, MS);
+		const float BX = PX + 30.f + MS + 30.f, BW = PX + PW - 30.f - BX;
+		const float Now = GetWorld()->GetTimeSeconds();
+		if (Btn(BX, PY + 70.f, BW, 54.f, Now < SavedNoteUntil ? TEXT("Saved") : TEXT("SAVE"), true, Now < SavedNoteUntil, 1.3f))
+		{
+			Knight->SaveNow();
+			SavedNoteUntil = Now + 2.f;
+		}
+		Wrapped(TEXT("Your character is also saved every minute, and whenever you leave."), BX + 4.f, PY + 134.f, BW - 8.f, 0.9f, FLinearColor(0.7f, 0.72f, 0.78f));
+		const bool bOnline = GetNetMode() == NM_Client;
+		if (Btn(BX, PY + 210.f, BW, 54.f, TEXT("BACK TO MENU"), bOnline, false, 1.3f))
+		{
+			if (UJeebGameInstance* GI = GetGameInstance<UJeebGameInstance>()) GI->ReturnToMenu(FString());   // (the server saves you as you leave)
+			return;
+		}
+		if (!bOnline) Wrapped(TEXT("(Offline play has no starting screen.)"), BX + 4.f, PY + 274.f, BW - 8.f, 0.9f, FLinearColor(0.6f, 0.6f, 0.65f));
+		HDText(TEXT("Press Esc to go back to the game."), FLinearColor(0.8f, 0.8f, 0.8f), BX + 4.f, PY + PH - 50.f, Font, 1.0f);
+	}
+	else if (SettingsTab == 1)
 	{
 		const float SX = PX + 40.f, SW = 560.f;
 		const float LookY = PY + 130.f;    // slider 0: look sensitivity
@@ -131,7 +155,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 92.f, Font, 1.1f);
 
 	}
-	else if (SettingsTab == 1)
+	else if (SettingsTab == 2)
 	{
 		struct FRow { const TCHAR* Key; const TCHAR* Action; };
 		static const FRow Rows[] = {
@@ -151,7 +175,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Click (spear)"),  TEXT("Hold to charge, let go to thrust. Swords: click again within 0.3 s for a quick sweeping follow-up") },
 			{ TEXT("E"),              TEXT("Talk to the shopkeeper, blacksmith and others; sit on benches") },
 			{ TEXT("W / S at a ladder"), TEXT("Climb up / down (walk into it)") },
-			{ TEXT("O"),              TEXT("Settings, controls, dictionary and the lore you have collected") },
+			{ TEXT("Esc (or O)"),     TEXT("The world map, saving, settings, controls, dictionary and the lore you have collected") },
 		};
 		float RowY = PY + 70.f;
 		for (const FRow& R : Rows)
@@ -160,9 +184,9 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			HDText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
 			RowY += 30.f;
 		}
-		HDText(TEXT("Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
+		HDText(TEXT("Press Esc to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}
-	else if (SettingsTab == 2)
+	else if (SettingsTab == 3)
 	{
 		DrawDictionary(PX, PY, PW, PH);
 	}
@@ -493,7 +517,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Lore tab (in the O screen): every fragment you have heard, sorted by kind
+// Lore tab (in the Escape screen): every fragment you have heard, sorted by kind
 // ---------------------------------------------------------------------------------------------------
 void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 {

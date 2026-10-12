@@ -279,6 +279,8 @@ void AKnightHUD::DrawHUD()
 	}
 
 	// Screens (only one at a time)
+	if (Knight->IsSettingsOpen() && !bSettingsWasOpen) SettingsTab = 0;   // it always opens on the map
+	bSettingsWasOpen = Knight->IsSettingsOpen();
 	if (Knight->IsSettingsOpen()) DrawSettingsScreen(Knight);
 	else if (Knight->IsInventoryOpen()) DrawInventoryScreen(Knight);
 	else if (Knight->IsSkillsOpen()) DrawSkillsScreen(Knight);
@@ -558,7 +560,7 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	// Enemies (any other character)
 	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
 	{
-		if (*It == Pawn) continue;
+		if (*It == Pawn || It->IsA<AKnightCharacter>()) continue;   // (other players never show)
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
 	}
 

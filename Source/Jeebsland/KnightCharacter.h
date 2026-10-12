@@ -193,7 +193,11 @@ public:
 	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP
 	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill);
 
-	// Settings screen (press O)
+	// The Escape screen (map, settings ...): Escape or O
+	// Save now (the button on the map): online the server writes it (at most every few seconds)
+	void SaveNow();
+	UFUNCTION(Server, Reliable) void ServerSaveNow();
+	double LastSaveAsk = -100.0;
 	void ToggleSettings();
 	bool IsSettingsOpen() const { return bSettingsOpen; }
 	float GetLookSensitivity() const { return LookSensitivity; }

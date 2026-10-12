@@ -9,6 +9,9 @@
 #include "ResourceNode.h"
 #include "KnightHUD.h"
 #include "KnightGameState.h"
+#include "KnightGameMode.h"
+#include "KnightPlayerController.h"
+#include "JeebSave.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -31,6 +34,21 @@ void AKnightCharacter::Inv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target,
 void AKnightCharacter::ServerInv_Implementation(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, FVector_NetQuantize At)
 {
 	DoInv(Op, A, B, C, Target, At);
+}
+
+void AKnightCharacter::SaveNow()
+{
+	if (!HasAuthority()) { ServerSaveNow(); return; }
+	if (GetNetMode() == NM_Standalone) { if (Skills) UJeebSave::Save(Skills); return; }   // single player: the save on this PC
+	ServerSaveNow_Implementation();
+}
+
+void AKnightCharacter::ServerSaveNow_Implementation()
+{
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastSaveAsk < 5.0) return;   // (it saves every minute anyway)
+	LastSaveAsk = Now;
+	if (AKnightGameMode* GM = GetWorld()->GetAuthGameMode<AKnightGameMode>()) GM->SaveCharacter(Cast<AKnightPlayerController>(GetController()));
 }
 
 bool AKnightCharacter::NearTrader(uint8 InRole) const
