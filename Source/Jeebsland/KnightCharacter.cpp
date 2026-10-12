@@ -204,6 +204,8 @@ void AKnightCharacter::BeginPlay()
 	CapeCloth->SetUsingAbsoluteScale(true);
 	CapeCloth->SetWorldLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
 	CapeCloth->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	CapeCloth->bCastContactShadow = false;           // the cloth's own small shadows flickered across it as it moved
+	CapeCloth->bAffectDistanceFieldLighting = false;
 	CapeCloth->RegisterComponent();
 	{
 		UMaterialInterface* ClothMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cloth.M_Cloth"));
@@ -339,6 +341,14 @@ void AKnightCharacter::TickCape(float Dt)
 			const FVector Dy = CapeP[Idx(i, FMath::Min(j + 1, CapeNY - 1))] - CapeP[Idx(i, FMath::Max(j - 1, 0))];
 			FVector Nm = FVector::CrossProduct(Dx, Dy).GetSafeNormal();
 			if (FVector::DotProduct(Nm, Back) < 0.f) Nm = -Nm;
+			// ease the shading normal from frame to frame: the folds still catch the light, but it no longer flickers as the
+			// little ripples come and go
+			{
+				const int32 k = Idx(i, j);
+				if (CapeNrmPrev.Num() != N) CapeNrmPrev.Init(Nm, N);
+				Nm = FMath::Lerp(CapeNrmPrev[k], Nm, FMath::Clamp(Dt * 12.f, 0.f, 1.f)).GetSafeNormal();
+				CapeNrmPrev[k] = Nm;
+			}
 			Nrm.Add(Nm);
 			UV.Add(FVector2D(float(i) / (CapeNX - 1), float(j) / (CapeNY - 1)));
 		}

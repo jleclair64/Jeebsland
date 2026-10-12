@@ -330,6 +330,7 @@ private:
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	FVector CapeRootPrev = FVector::ZeroVector; bool bCapeRootSet = false;
+	TArray<FVector> CapeNrmPrev;
 	bool bCapeMeshMade = false;
 	float CapeAccum = 0.f;
 	float CapeTime = 0.f;
