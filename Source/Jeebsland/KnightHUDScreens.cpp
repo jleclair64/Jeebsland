@@ -112,19 +112,18 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		HDText(FString::Printf(TEXT("Render resolution:  %d%%   (lower = faster)"), FMath::RoundToInt(RS * 100.f)), FLinearColor::White, PX + 40.f, PY + 186.f, Font, Scale);
 		Slider(ScaleY, FMath::Clamp((RS - 0.35f) / 0.65f, 0.f, 1.f), FLinearColor(0.3f, 0.7f, 0.9f));
 
-		// Graphics: three levels, one click each
-		static const TCHAR* LevelNames[3] = { TEXT("LOWEST"), TEXT("LOW"), TEXT("FANCY") };
-		static const TCHAR* LevelText[3] = {
+		// Graphics: two levels, one click each
+		static const TCHAR* LevelNames[2] = { TEXT("LOWEST"), TEXT("LOW") };
+		static const TCHAR* LevelText[2] = {
 			TEXT("For weaker computers: no clouds, simple shadows and edges"),
-			TEXT("Clouds and soft shadows, plain lighting"),
-			TEXT("Bounce light, reflections and misty air - slowest") };
+			TEXT("Clouds and soft shadows") };
 		HDText(TEXT("Graphics:"), FLinearColor::White, BoxX, BoxY + 4.f, Font, 1.1f);
-		for (int32 L = 0; L < 3; ++L)
+		for (int32 L = 0; L < 2; ++L)
 		{
 			if (Btn(BoxX + 130.f + L * 140.f, BoxY, 130.f, 32.f, LevelNames[L], true, Knight->GetGraphicsLevel() == L, 1.05f))
 				Knight->SetGraphicsLevel(L);
 		}
-		HDText(LevelText[FMath::Clamp(Knight->GetGraphicsLevel(), 0, 2)], FLinearColor(0.75f, 0.75f, 0.75f), BoxX + 130.f, BoxY + 42.f, Font, 1.0f);
+		HDText(LevelText[FMath::Clamp(Knight->GetGraphicsLevel(), 0, 1)], FLinearColor(0.75f, 0.75f, 0.75f), BoxX + 130.f, BoxY + 42.f, Font, 1.0f);
 		// Side panel: always on screen, or only while the cursor is out (Tab)
 		DrawRect(FLinearColor::White, BoxX, BoxY + 90.f, 26.f, 26.f);
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 92.f, 22.f, 22.f);

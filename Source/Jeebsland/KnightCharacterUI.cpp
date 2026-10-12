@@ -213,13 +213,13 @@ void AKnightCharacter::ApplyGraphics()
 	if (!IsLocallyControlled() || IsNetMode(NM_DedicatedServer)) return;
 	bGraphicsApplied = true;
 	UWorld* W = GetWorld();
-	const bool bFancy = GraphicsLevel >= 2, bLowest = GraphicsLevel <= 0;
+	const bool bLowest = GraphicsLevel <= 0;
 	auto Set = [&](const TCHAR* Var, int32 V) { GEngine->Exec(W, *FString::Printf(TEXT("%s %d"), Var, V)); };
-	// Fancy: Lumen bounce light and reflections, misty air. Otherwise plain sky light (much faster) and screen-space reflections,
-	// none at all on Lowest.
-	Set(TEXT("r.DynamicGlobalIlluminationMethod"), bFancy ? 1 : 0);
-	Set(TEXT("r.ReflectionMethod"), bFancy ? 1 : (bLowest ? 0 : 2));
-	Set(TEXT("r.VolumetricFog"), bFancy ? 1 : 0);
+	// Plain sky light, no Lumen (the old "Fancy" level was removed 2026-10-12 for speed and size; see CLAUDE.md to bring it
+	// back). Screen-space reflections on Low, none on Lowest.
+	Set(TEXT("r.DynamicGlobalIlluminationMethod"), 0);
+	Set(TEXT("r.ReflectionMethod"), bLowest ? 0 : 2);
+	Set(TEXT("r.VolumetricFog"), 0);
 	// Lowest, for weak PCs: no volumetric clouds, ordinary (cheaper) shadow maps instead of virtual ones, short shadow range,
 	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
 	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
@@ -233,7 +233,7 @@ void AKnightCharacter::ApplyGraphics()
 
 void AKnightCharacter::SetGraphicsLevel(int32 Level)
 {
-	GraphicsLevel = FMath::Clamp(Level, 0, 2);
+	GraphicsLevel = FMath::Clamp(Level, 0, 1);
 	ApplyGraphics();
 }
 

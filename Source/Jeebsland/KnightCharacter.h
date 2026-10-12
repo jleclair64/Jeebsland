@@ -155,7 +155,7 @@ public:
 	void SetLookSensitivity(float Value);
 
 	// Graphics options (also in the settings screen)
-	// Graphics: 0 Lowest (for weak PCs: no clouds, simple shadows, FXAA), 1 Low (the start), 2 Fancy (Lumen bounce light, misty air)
+	// Graphics: 0 Lowest (for weak PCs: no clouds, simple shadows, FXAA), 1 Low (the start). No Lumen level any more.
 	int32 GetGraphicsLevel() const { return GraphicsLevel; }
 	void SetGraphicsLevel(int32 Level);
 	float GetRenderScale() const { return RenderScale; }

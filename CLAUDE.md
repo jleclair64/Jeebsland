@@ -32,7 +32,8 @@ Last updated 2026-10-12 (end of the knight-redesign session). Everything below i
 **Decisions and preferences:**
 - Icon pictures are drawn with an anti-aliased fill (`AKnightHUD::Poly`): keep using it for any new icon.
 - HUD text must go through `HDText` / `HDTextSize` (sharp, size-matched font copies), never `DrawText` directly.
-- Settings (O) screen is opaque dark grey. Graphics ALWAYS start low (fancy lighting off, render scale 60%), not loaded from the saved config; raise them in Settings each session (owner changed their mind from "always on").
+- Settings (O) screen is opaque dark grey. Graphics: two levels, Lowest and Low (O screen buttons); ALWAYS start on Low at render scale 60% (slider 35-100%), not loaded from the saved config.
+- Fancy lighting (Lumen) was REMOVED 2026-10-12 at the owner's request, for frame rate and download size; they may want it back later. To restore: in Config/DefaultEngine.ini set r.DynamicGlobalIlluminationMethod=1, r.ReflectionMethod=1, r.GenerateMeshDistanceFields=True (and r.RayTracing=True, r.Lumen.HardwareRayTracing=True, r.SkinCache.CompileShaders=1 for hardware ray tracing); then add a third level to `ApplyGraphics` (KnightCharacterUI.cpp) setting GI 1, reflections 1, VolumetricFog 1, and a FANCY button in the O screen. Commit 1969fec has the working three-level version.
 - Conversation text: large; the words start at the left and wrap at about the middle of the screen; no "Press E" hint.
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
