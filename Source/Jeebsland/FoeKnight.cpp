@@ -40,6 +40,8 @@ AFoeKnight::AFoeKnight()
 	HipR       = MakePivot(TEXT("HipR"),       BodyRoot,   PivotPos(P_HipR));
 	KneeL      = MakePivot(TEXT("KneeL"),      HipL,       PivotPos(P_KneeL));
 	KneeR      = MakePivot(TEXT("KneeR"),      HipR,       PivotPos(P_KneeR));
+	AnkleL     = MakePivot(TEXT("AnkleL"),     KneeL,      PivotPos(P_AnkleL));
+	AnkleR     = MakePivot(TEXT("AnkleR"),     KneeR,      PivotPos(P_AnkleR));
 	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,   FVector(0, 0, -41.f));
 	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
 	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot,  FVector(-2, 0, 71.f));
@@ -106,6 +108,7 @@ void AFoeKnight::BeginPlay()
 	Pivots[P_CapeU] = CapeUpper; Pivots[P_CapeL] = CapeLower;  Pivots[P_ArmL] = ArmL;      Pivots[P_ArmR] = ArmR;
 	Pivots[P_ElbowL] = ElbowL;   Pivots[P_ElbowR] = ElbowR;    Pivots[P_HipL] = HipL;      Pivots[P_HipR] = HipR;
 	Pivots[P_KneeL] = KneeL;     Pivots[P_KneeR] = KneeR;
+	Pivots[P_AnkleL] = AnkleL;   Pivots[P_AnkleR] = AnkleR;
 
 	// A full suit of iron (dark grey plate, red accents), shield included; no bare skin
 	TArray<FDef> Defs;
@@ -326,11 +329,18 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	const float Fw = LV.Size() > 0.1f ? LV.X / LV.Size() : 1.f, Sd = LV.Size() > 0.1f ? LV.Y / LV.Size() : 0.f;
 	const float HipAmp = 30.f * MoveBlend, KneeAmp = 40.f * MoveBlend;
 	const float Crouch = 0.35f * BlockAlpha + (Act == EAct::Strike ? 0.3f : 0.f);
-	HipR->SetRelativeRotation(FRotator(HipAmp * S * Fw + 30.f * Crouch, 0.f, 22.f * MoveBlend * Sd * (0.5f + 0.5f * S)));
-	HipL->SetRelativeRotation(FRotator(-HipAmp * S * Fw + 30.f * Crouch, 0.f, 22.f * MoveBlend * Sd * (0.5f - 0.5f * S)));
-	KneeR->SetRelativeRotation(FRotator(-KneeAmp * FMath::Pow(0.5f * (1.f + C), 2.f) - 55.f * Crouch, 0.f, 0.f));
-	KneeL->SetRelativeRotation(FRotator(-KneeAmp * FMath::Pow(0.5f * (1.f - C), 2.f) - 55.f * Crouch, 0.f, 0.f));
-	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -3.f * MoveBlend * FMath::Abs(S) - 10.f * Crouch));
+	// a relaxed stance (knees a little bent), feet kept flat at the ankles
+	const float Stance = 12.f;
+	const float HipRp = HipAmp * S * Fw + 30.f * Crouch + Stance, HipLp = -HipAmp * S * Fw + 30.f * Crouch + Stance;
+	const float KneeRp = -KneeAmp * FMath::Pow(0.5f * (1.f + C), 2.f) - 55.f * Crouch - 2.f * Stance;
+	const float KneeLp = -KneeAmp * FMath::Pow(0.5f * (1.f - C), 2.f) - 55.f * Crouch - 2.f * Stance;
+	HipR->SetRelativeRotation(FRotator(HipRp, 0.f, 22.f * MoveBlend * Sd * (0.5f + 0.5f * S)));
+	HipL->SetRelativeRotation(FRotator(HipLp, 0.f, 22.f * MoveBlend * Sd * (0.5f - 0.5f * S)));
+	KneeR->SetRelativeRotation(FRotator(KneeRp, 0.f, 0.f));
+	KneeL->SetRelativeRotation(FRotator(KneeLp, 0.f, 0.f));
+	AnkleR->SetRelativeRotation(FRotator(-(HipRp + KneeRp), 0.f, 0.f));
+	AnkleL->SetRelativeRotation(FRotator(-(HipLp + KneeLp), 0.f, 0.f));
+	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -3.f * MoveBlend * FMath::Abs(S) - 10.f * Crouch - 1.f));
 
 	// sword arm: hangs ready; on a windup it rises high overhead (the tell), then cuts down hard and follows through
 	float ArmPitch = 20.f, ArmYaw = 0.f, Elbow = -25.f;

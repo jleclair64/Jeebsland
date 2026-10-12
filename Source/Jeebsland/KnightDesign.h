@@ -23,7 +23,7 @@ namespace KnightDesign
 
 	enum EPivot : int32
 	{
-		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_Count
+		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_AnkleL, P_AnkleR, P_Count
 	};
 	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotNone = -1 };
 	constexpr int32 NumSlots = 7;
@@ -47,6 +47,8 @@ namespace KnightDesign
 		case P_HipR:   return FVector(0, 11.5, -40);
 		case P_KneeL:  return FVector(0, -12, -63);
 		case P_KneeR:  return FVector(0, 12, -63);
+		case P_AnkleL: return FVector(1, -12.5, -86.5);   // the feet turn here, so they can stay flat while the knees bend
+		case P_AnkleR: return FVector(1, 12.5, -86.5);
 		}
 		return FVector(0, 0, 0);
 	}
@@ -163,14 +165,14 @@ namespace KnightDesign
 		// =========================================================================================
 		const double HSX = 1.12;
 		const TArray<FVector2D> HelmP = Prof({ 0, 69, 5.5, 68.6, 9.5, 67.2, 12.8, 64.8, 15.0, 61.5, 16.3, 57.5, 16.6, 52, 16.5, 44, 16.0, 37, 15.0, 31.5, 14.0, 28.5, 13.6, 27, 0, 27 });
-		const FOct Helm(HelmP, HSX, O0, 16);
+		const FOct Helm(HelmP, HSX, O0, 32);
 		auto HS = [&](double Th, double Z, double H) { return Helm.At(Th, Z, H); };
 		// the brow's lower edge (it dips to a point over the nose) and the bottom of the eye openings
 		auto BrowBot = [](double Th) { const double A = FMath::Abs(Th); return A >= 30.0 ? 53.0 : (A >= 8.0 ? 50.5 + 2.5 * (A - 8.0) / 22.0 : 48.8 + 1.7 * A / 8.0); };
 		auto EyeBot = [](double Th) { const double A = FMath::Abs(Th); return A <= 8.0 ? 45.5 : 45.5 + 2.0 * FMath::Min(1.0, (A - 8.0) / 42.0); };
 		{
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Plate);
-			Lathe(D.Mesh, HelmP, 16, HSX, 1.0, Xf(O0), false, true);
+			Lathe(D.Mesh, HelmP, 32, HSX, 1.0, Xf(O0));   // a smooth, polished dome
 		}
 		{
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Trim);
@@ -202,7 +204,7 @@ namespace KnightDesign
 			Ribbon(D.Mesh, 6, [&](double T) { const double Z = 36.8 - 7.6 * T, Dw = FMath::RadiansToDegrees(0.4 / Helm.R(Z));
 				return Quad(HS(-Dw, Z, -0.3), HS(-Dw, Z, 0.55), HS(Dw, Z, 0.55), HS(Dw, Z, -0.3)); });
 			// the rim round the bottom
-			Lathe(D.Mesh, Prof({ Helm.R(27.0) - 0.4, 27.0, Helm.R(27.0) + 0.9, 27.0, Helm.R(29.2) + 0.9, 29.2, Helm.R(29.2) - 0.4, 29.2 }), 16, HSX, 1.0, Xf(O0), true, true);
+			Lathe(D.Mesh, Prof({ Helm.R(27.0) - 0.4, 27.0, Helm.R(27.0) + 0.9, 27.0, Helm.R(29.2) + 0.9, 29.2, Helm.R(29.2) - 0.4, 29.2 }), 32, HSX, 1.0, Xf(O0), true);
 			// the crest: a raised ridge from the brow, over the top, down the back, tallest on top
 			{
 				TArray<FVector> Mer;
@@ -230,9 +232,9 @@ namespace KnightDesign
 			{
 				Ribbon(D.Mesh, 16, [&](double T) { const double Th = sd * (7.0 + 43.0 * T), Zt = BrowBot(Th) + 0.4, Zb = EyeBot(Th) - 0.3;
 					return Quad(HS(Th, Zt, -0.3), HS(Th, Zt, 0.3), HS(Th, Zb, 0.3), HS(Th, Zb, -0.3)); });
-				for (int32 k = 0; k < 2; ++k)
-					Ribbon(D.Mesh, 6, [&](double T) { const double Th = sd * (17.0 + 11.0 * T), Z = 39.5 - 3.6 * k - 1.6 * T;
-						return Quad(HS(Th, Z + 0.45, -0.3), HS(Th, Z + 0.45, 0.25), HS(Th, Z - 0.45, 0.25), HS(Th, Z - 0.45, -0.3)); });
+				for (int32 k = 0; k < 3; ++k)   // three upright breathing slits on each cheek
+					Ribbon(D.Mesh, 6, [&](double T) { const double Th0 = sd * (14.0 + 5.5 * k), Z = 40.5 - 6.0 * T + 0.6 * k, Dw = FMath::RadiansToDegrees(0.4 / Helm.R(Z));
+						return Quad(HS(Th0 - Dw, Z, -0.3), HS(Th0 - Dw, Z, 0.25), HS(Th0 + Dw, Z, 0.25), HS(Th0 + Dw, Z, -0.3)); });
 			}
 		}
 
@@ -412,10 +414,10 @@ namespace KnightDesign
 				}
 				Solid(D.Mesh, R, true, false, false, ForeX, true);
 				// the fist, with two knuckle plates across the front and a thumb
-				RBox(D.Mesh, 5.4, 4.6, 5.6, 0.35, Xf(F), true);
-				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.0, 0, 2.6)), true);
-				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.3, 0, 0.0)), true);
-				RBox(D.Mesh, 2.4, 1.8, 3.2, 0.4, Xf(F + V3(3.5, -sd * 4.6, 1.0)), true);
+				RBox(D.Mesh, 5.4, 4.6, 5.6, 0.35, Xf(F));
+				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.0, 0, 2.6)));
+				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.3, 0, 0.0)));
+				RBox(D.Mesh, 2.4, 1.8, 3.2, 0.4, Xf(F + V3(3.5, -sd * 4.6, 1.0)));
 				D.Shade = 0.85f;
 			}
 			{
@@ -437,11 +439,11 @@ namespace KnightDesign
 				}
 				Solid(D.Mesh, R, true, false, false, ForeX, true);
 				Lathe(D.Mesh, Prof({ 8.9, -13.9, 10.0, -13.9, 10.0, -15.2, 8.9, -15.2 }), 8, 1.0, 1.0, ForeX, true, true);
-				RBox(D.Mesh, 0.5, 5.0, 0.45, 0.4, Xf(F + V3(6.1, 0, 3.9)), true);   // gold on the top knuckle plate
+				RBox(D.Mesh, 0.5, 5.0, 0.45, 0.4, Xf(F + V3(6.1, 0, 3.9)));   // gold on the top knuckle plate
 			}
 			{
 				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under);   // finger grooves
-				for (int32 j = -1; j <= 1; ++j) RBox(D.Mesh, 0.35, 0.3, 2.2, 0.5, Xf(F + V3(5.35, j * 1.9, -3.0)), true);
+				for (int32 j = -1; j <= 1; ++j) RBox(D.Mesh, 0.35, 0.3, 2.2, 0.5, Xf(F + V3(5.35, j * 1.9, -3.0)));
 			}
 			{
 				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);   // bare hand
@@ -455,14 +457,31 @@ namespace KnightDesign
 		// =========================================================================================
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
-			const int32 Hip = (sd < 0) ? P_HipL : P_HipR, Knee = (sd < 0) ? P_KneeL : P_KneeR;
+			const int32 Hip = (sd < 0) ? P_HipL : P_HipR, Knee = (sd < 0) ? P_KneeL : P_KneeR, Ankle = (sd < 0) ? P_AnkleL : P_AnkleR;
 			const FVector LC(0.5, sd * 12.0, 0);
 			const TArray<FVector2D> GreaveP = Prof({ 0, -64, 7.0, -64, 7.7, -68, 7.9, -73, 7.1, -78.5, 5.6, -83.5, 0, -83.5 });
 			const FOct Greave(GreaveP, 1.1, LC, 8);
 			const FXf KneeX = Xf(V3(5.0, sd * 12.0, -63.5), DownTo(V3(1, 0, 0)));
 			{
 				FDef& D = Add(Hip, SlotBody, EArmorRole::Plate);
-				Lathe(D.Mesh, Prof({ 0, -30.5, 9.0, -30.5, 9.7, -36, 9.8, -44, 9.1, -51, 8.2, -57, 7.6, -61, 0, -61 }), 8, 1.05, 1.0, Xf(LC), false, true);   // cuisse
+				// cuisse: broad at the top (its inner side shifted in so the thighs meet under the mail, no gap between them),
+				// tapering to the knee
+				{
+					struct FT { double Z, Cy, R; };
+					static const FT Th[6] = { { -30.5, 10.6, 11.2 }, { -36.0, 10.8, 11.3 }, { -44.0, 11.2, 11.0 }, { -51.0, 11.6, 10.0 }, { -57.0, 12.0, 8.6 }, { -61.0, 12.0, 7.8 } };
+					TArray<FRing> R;
+					for (const FT& T : Th)
+					{
+						FRing Rg;
+						for (int32 k = 0; k < 8; ++k)
+						{
+							const double A = 2.0 * PI * k / 8.0;
+							Rg.Add(V3(0.5 + T.R * FMath::Cos(A) * 0.95, sd * T.Cy + T.R * FMath::Sin(A), T.Z));
+						}
+						R.Add(Rg);
+					}
+					Solid(D.Mesh, R, false, true, true, FXf(), true);
+				}
 				Hoop(D.Mesh, LC, 8.1, 8.9, -56.5, 9.1, 8.3, -59.0, 8, 1.05);                                                                          // lame above the knee
 			}
 			{ FDef& D = Add(Hip, SlotBody, EArmorRole::Trim); Edge(D.Mesh, LC, 9.1, -59.0, 8, 1.05); }
@@ -532,18 +551,18 @@ namespace KnightDesign
 				return R;
 			};
 			{
-				FDef& D = Add(Knee, SlotBoots, EArmorRole::BootBody);
+				FDef& D = Add(Ankle, SlotBoots, EArmorRole::BootBody);
 				Ribbon(D.Mesh, 18, [&](double T) { return Arch(-7.0 + 27.0 * T, 1.0, 0.0, true); });
 			}
 			struct FLame { double X0, X1, K, Dz; };
 			static const FLame Lames[4] = { { 1.0, 6.2, 1.10, 0.75 }, { 5.6, 10.8, 1.085, 0.6 }, { 10.2, 15.2, 1.07, 0.45 }, { 14.6, 19.8, 1.055, 0.3 } };
 			{
-				FDef& D = Add(Knee, SlotBoots, EArmorRole::Plate);
+				FDef& D = Add(Ankle, SlotBoots, EArmorRole::Plate);
 				for (const FLame& L : Lames)
 					Ribbon(D.Mesh, 4, [&](double T) { return Shell(L.X0 + (L.X1 - L.X0) * T, L.K, L.Dz, 0.97, -0.5); });
 			}
 			{
-				FDef& D = Add(Knee, SlotBoots, EArmorRole::Trim);
+				FDef& D = Add(Ankle, SlotBoots, EArmorRole::Trim);
 				for (int32 i = 0; i < 3; ++i)
 				{
 					const FLame& L = Lames[i];

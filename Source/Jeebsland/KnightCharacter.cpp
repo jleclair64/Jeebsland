@@ -88,6 +88,8 @@ AKnightCharacter::AKnightCharacter()
 	HipR       = MakePivot(TEXT("HipR"),       BodyRoot,  KnightDesign::PivotPos(KnightDesign::P_HipR));
 	KneeL      = MakePivot(TEXT("KneeL"),      HipL,      KnightDesign::PivotPos(KnightDesign::P_KneeL));
 	KneeR      = MakePivot(TEXT("KneeR"),      HipR,      KnightDesign::PivotPos(KnightDesign::P_KneeR));
+	AnkleL     = MakePivot(TEXT("AnkleL"),     KneeL,     KnightDesign::PivotPos(KnightDesign::P_AnkleL));
+	AnkleR     = MakePivot(TEXT("AnkleR"),     KneeR,     KnightDesign::PivotPos(KnightDesign::P_AnkleR));
 	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,  FVector(0, 0, -41.f));     // chest: leans and twists
 	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
 	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot, FVector(-2, 0, 71.f));
@@ -109,6 +111,7 @@ void AKnightCharacter::BuildKnight()
 	Pivots[KnightDesign::P_ArmL] = ArmPivotL;    Pivots[KnightDesign::P_ArmR] = ArmPivot;     Pivots[KnightDesign::P_ElbowL] = ElbowL;
 	Pivots[KnightDesign::P_ElbowR] = ElbowR;     Pivots[KnightDesign::P_HipL] = HipL;         Pivots[KnightDesign::P_HipR] = HipR;
 	Pivots[KnightDesign::P_KneeL] = KneeL;       Pivots[KnightDesign::P_KneeR] = KneeR;
+	Pivots[KnightDesign::P_AnkleL] = AnkleL;     Pivots[KnightDesign::P_AnkleR] = AnkleR;
 
 	TArray<KnightDesign::FDef> Defs;
 	KnightDesign::Build(Defs);
@@ -2084,6 +2087,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + 55.f * Duck;
 	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash - 95.f * Duck;
 	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash - 95.f * Duck;
+	// A relaxed stance: on the ground the knees are always a little bent (eased out as he crouches, which bends them anyway)
+	const float Relax = Ground * (1.f - Duck);
+	HipRf += StanceHip * Relax;   HipLf += StanceHip * Relax;
+	KneeRf -= 2.f * StanceHip * Relax;   KneeLf -= 2.f * StanceHip * Relax;
 	// Sliding: one leg stretched out in front, the other folded under
 	HipRf = FMath::Lerp(HipRf, 78.f, SlideAlpha);   KneeRf = FMath::Lerp(KneeRf, -4.f, SlideAlpha);
 	HipLf = FMath::Lerp(HipLf, 45.f, SlideAlpha);   KneeLf = FMath::Lerp(KneeLf, -115.f, SlideAlpha);
@@ -2104,16 +2111,27 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll));
 	KneeR->SetRelativeRotation(FRotator(KneeRf, 0.f, 0.f));
 	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
+	// Feet stay flat on the ground (a running stride lets them tip a little); in the air, sitting, riding, climbing,
+	// sliding and rolling they follow the shins as before
+	const float Level = Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha) * (1.f - 0.4f * RunAlpha * MoveBlend);
+	AnkleR->SetRelativeRotation(FRotator(-(HipRf + KneeRf) * Level, 0.f, 0.f));
+	AnkleL->SetRelativeRotation(FRotator(-(HipLf + KneeLf) * Level, 0.f, 0.f));
 
 	// ---------- Body bounce ----------
 	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
 	// Walking: the hips dip when the legs spread. Running: the body is lowest mid-stance and floats up
 	// while the legs are spread, so there is a brief moment with both feet off the ground.
-	const float WalkBounce = -48.6f * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
-	const float RunBounce  = -0.75f * 48.6f * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
+	const float LegLen = 46.5f;   // hip to ankle (the feet stay flat, so the ankle is what rises and falls)
+	const float WalkBounce = -LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
+	const float RunBounce  = -0.75f * LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
 	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);
 	const float Breath = 0.8f * FMath::Sin(IdleTime * 2.2f) * (1.f - MoveBlend);
-	float BodyZ = FMath::Lerp(Bounce + Breath, 0.f, Air) - 16.f * Squash - 16.f * Duck;
+	// Bent knees (relaxed stance, crouching, guarding, landing): the body sinks exactly as far as the legs fold, so the
+	// flat feet stay on the ground (thigh 23 cm, shin 23.5 cm)
+	const float PoseH = 35.f * Squash + 55.f * Duck + StanceHip * Relax;
+	const float PoseK = -70.f * Squash - 95.f * Duck - 2.f * StanceHip * Relax;
+	const float LegDrop = 23.f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + 23.5f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
+	float BodyZ = FMath::Lerp(Bounce + Breath, 0.f, Air) - LegDrop;
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle

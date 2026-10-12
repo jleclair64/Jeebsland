@@ -46,6 +46,8 @@ private:
 	UPROPERTY() USceneComponent* HipR = nullptr;
 	UPROPERTY() USceneComponent* KneeL = nullptr;
 	UPROPERTY() USceneComponent* KneeR = nullptr;
+	UPROPERTY() USceneComponent* AnkleL = nullptr;   // the feet turn here to stay flat on the ground
+	UPROPERTY() USceneComponent* AnkleR = nullptr;
 	UPROPERTY() USceneComponent* CapeUpper = nullptr;
 	UPROPERTY() USceneComponent* CapeLower = nullptr;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Meshes;

@@ -81,23 +81,36 @@ namespace KM
 	// Loft: join a stack of rings (each the same number of points) into a surface. Rings go along the shape;
 	// points in a ring go around it. bWrapRings joins the last ring back to the first (torus-like shapes).
 	// Caps close the first and last ring with a flat disc. The result faces outward.
+	// bCrisp: each strip between two neighbouring points of a ring keeps its own corners, so the strips meet at sharp edges
+	// (the faces of a plate), while each strip still shades smoothly along the shape. That keeps plate armour crisp without
+	// breaking it into lots of little mirror-like facets.
 	// ------------------------------------------------------------------------------------------------
-	inline void Solid(FMD& Dst, const TArray<FRing>& R, bool bWrapRings, bool bCapStart, bool bCapEnd, const FXf& X, bool bFlat = false)
+	inline void Solid(FMD& Dst, const TArray<FRing>& R, bool bWrapRings, bool bCapStart, bool bCapEnd, const FXf& X, bool bCrisp = false)
 	{
 		const int32 NR = R.Num();
 		if (NR < 2) return;
 		const int32 NP = R[0].Num();
 		FMD M;
-		for (int32 i = 0; i < NR; ++i)
-			for (int32 j = 0; j < NP; ++j) M.V.Add(R[i][j]);
-		auto Idx = [&](int32 i, int32 j) { return i * NP + (j % NP); };
+		TArray<int32> VRing;   // which ring each vertex came from
+		if (bCrisp)
+		{
+			for (int32 j = 0; j < NP; ++j)
+				for (int32 i = 0; i < NR; ++i) { M.V.Add(R[i][j]); M.V.Add(R[i][(j + 1) % NP]); VRing.Add(i); VRing.Add(i); }
+		}
+		else
+		{
+			for (int32 i = 0; i < NR; ++i)
+				for (int32 j = 0; j < NP; ++j) { M.V.Add(R[i][j]); VRing.Add(i); }
+		}
+		// the corner on ring i at point j (bRight: the strip's right-hand corner, for strip j)
+		auto Idx = [&](int32 i, int32 j, bool bRight) { return bCrisp ? (j * NR + i) * 2 + (bRight ? 1 : 0) : i * NP + ((j + (bRight ? 1 : 0)) % NP); };
 		const int32 Segs = bWrapRings ? NR : NR - 1;
 		for (int32 i = 0; i < Segs; ++i)
 		{
 			const int32 i2 = (i + 1) % NR;
 			for (int32 j = 0; j < NP; ++j)
 			{
-				const int32 a = Idx(i, j), b = Idx(i, j + 1), c = Idx(i2, j), d = Idx(i2, j + 1);
+				const int32 a = Idx(i, j, false), b = Idx(i, j, true), c = Idx(i2, j, false), d = Idx(i2, j, true);
 				M.I.Add(a); M.I.Add(b); M.I.Add(c);
 				M.I.Add(b); M.I.Add(d); M.I.Add(c);
 			}
@@ -111,7 +124,7 @@ namespace KM
 			const FVector& B = M.V[M.I[t + 1]];
 			const FVector& C = M.V[M.I[t + 2]];
 			const FVector Fn = FVector::CrossProduct(B - A, C - A);
-			const int32 Ring = M.I[t] / NP;
+			const int32 Ring = VRing[M.I[t]];
 			FVector Cen(0.0, 0.0, 0.0);
 			for (int32 j = 0; j < NP; ++j) Cen += R[Ring][j];
 			Cen = Cen / double(NP);
@@ -151,7 +164,7 @@ namespace KM
 		// each cap faces away from its neighbouring ring (right even when the shape curves round, like a band round a helm)
 		if (bCapStart) Cap(0, (Centroid(0) - Centroid(1)).GetSafeNormal());
 		if (bCapEnd) Cap(NR - 1, (Centroid(NR - 1) - Centroid(NR - 2)).GetSafeNormal());
-		Append(Dst, M, X, bFlat);
+		Append(Dst, M, X, false);
 	}
 
 	// Surface of revolution around Z. Profile points are (radius, height); a radius of 0 at an end closes it to a point.
@@ -205,7 +218,7 @@ namespace KM
 	inline void Blob(FMD& Dst, double rx, double ry, double rz, const FXf& X) { Ellipsoid(Dst, rx, ry, rz, 1.0, 1.0, 18, 12, X); }
 	inline void RBox(FMD& Dst, double hx, double hy, double hz, double Round, const FXf& X, bool bFlat = false) { Ellipsoid(Dst, hx, hy, hz, Round, Round, 14, 10, X, bFlat); }
 	// A small faceted bead (rivets)
-	inline void Bead(FMD& Dst, double R, const FVector& At) { Ellipsoid(Dst, R, R, R, 1.0, 1.0, 8, 4, FXf{ At, FVector(0.0, 0.0, 0.0) }, true); }
+	inline void Bead(FMD& Dst, double R, const FVector& At) { Ellipsoid(Dst, R, R, R, 1.0, 1.0, 10, 6, FXf{ At, FVector(0.0, 0.0, 0.0) }); }
 
 	// The rotation (degrees about X, then Y) that turns a shape built pointing down (-Z) to point along Dir
 	inline FVector DownTo(const FVector& Dir)

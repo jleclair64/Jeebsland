@@ -306,6 +306,8 @@ private:
 	UPROPERTY() USceneComponent* HipR = nullptr;
 	UPROPERTY() USceneComponent* KneeL = nullptr;
 	UPROPERTY() USceneComponent* KneeR = nullptr;
+	UPROPERTY() USceneComponent* AnkleL = nullptr;   // the feet turn here to stay flat on the ground
+	UPROPERTY() USceneComponent* AnkleR = nullptr;
 	UPROPERTY() USceneComponent* ArmPivot = nullptr;    // right shoulder (sword arm); mining and chopping drive this
 	UPROPERTY() USceneComponent* ArmPivotL = nullptr;   // left shoulder (shield arm)
 	UPROPERTY() USceneComponent* ElbowR = nullptr;
@@ -315,6 +317,7 @@ private:
 	UPROPERTY() UProceduralMeshComponent* CapeCloth = nullptr;
 	UPROPERTY() class UMaterialInstanceDynamic* CapeMid = nullptr;
 	static constexpr int32 CapeNX = 7, CapeNY = 10;
+	static constexpr float StanceHip = 12.f;   // relaxed stance: the thighs lean this far forward and the knees bend twice as much
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	bool bCapeMeshMade = false;
