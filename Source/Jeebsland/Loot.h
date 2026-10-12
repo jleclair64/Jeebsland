@@ -32,6 +32,12 @@ public:
 	uint8 WhereOf(int32 i) const { return Where.IsValidIndex(i) ? Where[i] : 0; }
 	int32 GetIngots() const { return Ingots; }
 	bool IsSack() const { return Look == ELootLook::Pack; }
+	bool IsItemLook() const { return Look == ELootLook::Item; }
+	int32 ShownId() const { for (const FInvSlot& S : Items) if (S.Id != 0 && S.Count > 0) return S.Id; return 0; }
+	int32 ShownCount() const { for (const FInvSlot& S : Items) if (S.Id != 0 && S.Count > 0) return S.Count; return 0; }
+	FVector TopOfLook() const { return GetActorLocation() + GlowBase; }   // where the marker floats: a label sits just above it
+	// More things put into a sack (dropped beside it, or loose things gathered up into it)
+	void AddLoose(const TArray<FInvSlot>& In, int32 InIngots);
 	bool TakeOne(int32 Index, AActor* Taker);   // one entry into the taker's pack (false if it does not fit)
 	void TakeIngots(AActor* Taker);
 	// Puts a sack item straight into a weapon-bar slot (Hot >= 0) or a worn slot (Kind). What was there goes to the taker's pack,
@@ -50,6 +56,8 @@ private:
 	UPROPERTY() UStaticMeshComponent* Tie = nullptr;
 	UPROPERTY() UStaticMeshComponent* Glow = nullptr;
 	UPROPERTY() TArray<class UProceduralMeshComponent*> ItemComps;
+	UPROPERTY() USceneComponent* Hover = nullptr;   // a dropped thing floats above the grass, bobbing and slowly turning
+	float HoverZ = 30.f, ItemTop = 46.f;
 	void BuildItemLook();
 
 	TArray<FInvSlot> Items;

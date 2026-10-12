@@ -399,6 +399,33 @@ void AKnightHUD::DrawHUD()
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
 	TipLines.Reset();
 
+	// A dropped thing close by says what it is (the same description you see in the inventory), floating above it
+	if (PC && !Knight->IsUIOpen())
+	{
+		ALootDrop* Best = nullptr;
+		float BestD = 300.f;
+		for (TActorIterator<ALootDrop> It(GetWorld()); It; ++It)
+		{
+			if (!It->IsItemLook()) continue;
+			const float D = FVector::Dist2D(It->GetActorLocation(), Pawn->GetActorLocation());
+			if (D < BestD) { BestD = D; Best = *It; }
+		}
+		FVector2D SP;
+		if (Best && PC->ProjectWorldLocationToScreen(Best->TopOfLook() + FVector(0.f, 0.f, 10.f), SP))
+		{
+			TArray<FString> Lines;
+			if (const int32 Id = Best->ShownId())
+			{
+				ItemTip(Id);
+				Lines = TipLines;
+				TipLines.Reset();
+				if (Lines.Num() > 0 && Best->ShownCount() > 1) Lines[0] += FString::Printf(TEXT("  x%d"), Best->ShownCount());
+			}
+			else if (Best->GetIngots() > 0) Lines = { TEXT("Ingots"), FString::Printf(TEXT("%d ingots"), Best->GetIngots()) };
+			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f));   // fades in over the last metre
+		}
+	}
+
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
 	if (PC && !Knight->IsUIOpen())
 	{
@@ -2967,5 +2994,32 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 			++C;
 		}
 		for (; C < 5; ++C) Tile(LX + Pad + C * (SS + Gap), WY + Pad, SS, SS, Idle, 0.07f);
+	}
+}
+
+// A tooltip-style panel centred above a point on screen (the description over a dropped thing)
+void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha)
+{
+	if (Lines.Num() == 0 || Alpha <= 0.01f) return;
+	UFont* Font = GEngine->GetMediumFont();
+	float W = 0.f, H = 0.f;
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		float TW = 0.f, TH = 0.f;
+		HDTextSize(Lines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
+		W = FMath::Max(W, TW); H += TH + 3.f;
+	}
+	const float X = FMath::Clamp(CX - W * 0.5f, 12.f, Canvas->ClipX - W - 28.f), Y = FMath::Clamp(BottomY - H, 12.f, Canvas->ClipY - H - 20.f);
+	Panel(X - 8.f, Y - 8.f, W + 24.f, H + 16.f, Alpha);
+	float Cy = Y;
+	for (int32 i = 0; i < Lines.Num(); ++i)
+	{
+		const float Sc = i == 0 ? 1.15f : 0.95f;
+		float TW = 0.f, TH = 0.f;
+		HDTextSize(Lines[i], TW, TH, Font, Sc);
+		FLinearColor C = i == 0 ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f);
+		C.A = Alpha;
+		HDText(Lines[i], C, X + 2.f, Cy, Font, Sc);
+		Cy += TH + 3.f;
 	}
 }

@@ -77,7 +77,7 @@ void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 I
 		break;
 	}
 	}
-	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : Look == ELootLook::Item ? 46.f : 78.f);
+	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : Look == ELootLook::Item ? ItemTop : 78.f);
 	Paint(Glow, FLinearColor(4.f, 3.f, 0.6f), GlowBase, FVector(9, 9, 9), 0.f);
 	SetLifeSpan(240.f);
 }
@@ -88,6 +88,11 @@ void ALootDrop::Tick(float DeltaSeconds)
 	Clock += DeltaSeconds;
 	Glow->SetRelativeLocation(GlowBase + FVector(0.f, 0.f, 6.f * FMath::Sin(Clock * 3.f)));
 	Glow->SetRelativeRotation(FRotator(0.f, Clock * 120.f, 0.f));
+	if (Hover)   // a dropped thing bobs gently and slowly turns
+	{
+		Hover->SetRelativeLocation(FVector(0.f, 0.f, HoverZ + 3.f * FMath::Sin(Clock * 2.f)));
+		Hover->SetRelativeRotation(FRotator(0.f, Clock * 30.f, 0.f));
+	}
 }
 
 FString ALootDrop::Describe() const
@@ -264,15 +269,28 @@ void ALootDrop::BuildItemLook()
 	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
 	if (Parts.Num() == 0) { Body->SetVisibility(true); return; }   // nothing to show: keep the plain parcel
 
+	// it floats: small things are shown bigger (at least about 22 cm across) so they read from a distance and above tall grass
+	FBox Bx(ForceInit);
+	for (const JeebItemModel::FPart& P : Parts) for (const FVector& V : P.Mesh.V) Bx += V;
+	const float Extent = Bx.IsValid ? (float)Bx.GetSize().GetMax() : 20.f;
+	const float Grow = FMath::Clamp(22.f / FMath::Max(Extent, 1.f), 1.f, 3.f);
+	Hover = NewObject<USceneComponent>(this);
+	Hover->SetupAttachment(Origin);
+	Hover->RegisterComponent();
+	Hover->SetRelativeScale3D(FVector(Grow));
+	HoverZ = 30.f;
+	Hover->SetRelativeLocation(FVector(0.f, 0.f, HoverZ));
+	ItemTop = HoverZ + (Bx.IsValid ? (float)Bx.Max.Z : 10.f) * Grow + 16.f;
+	if (Copies > 1) Copies = FMath::Min(Copies, 3);
 	FRandomStream R(GetUniqueID());
 	for (int32 c = 0; c < Copies; ++c)
 	{
-		const FVector Off = c == 0 ? FVector::ZeroVector : FVector(R.FRandRange(-18.f, 18.f), R.FRandRange(-18.f, 18.f), 0.f);
+		const FVector Off = c == 0 ? FVector::ZeroVector : FVector(R.FRandRange(-10.f, 10.f), R.FRandRange(-10.f, 10.f), R.FRandRange(-4.f, 6.f));
 		const FRotator Yaw(0.f, R.FRandRange(0.f, 360.f), 0.f);
 		for (const JeebItemModel::FPart& P : Parts)
 		{
 			UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
-			C->SetupAttachment(Origin);
+			C->SetupAttachment(Hover);
 			C->SetRelativeLocationAndRotation(Off, Yaw);
 			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			C->RegisterComponent();
@@ -293,4 +311,12 @@ void ALootDrop::BuildItemLook()
 			ItemComps.Add(C);
 		}
 	}
+}
+
+void ALootDrop::AddLoose(const TArray<FInvSlot>& In, int32 InIngots)
+{
+	for (const FInvSlot& S : In) if (S.Id != 0 && S.Count > 0) Items.Add(S);
+	if (Where.Num() > 0) Where.SetNumZeroed(Items.Num());   // (a death sack keeps its layout: these go in its pack)
+	Ingots += InIngots;
+	SetLifeSpan(FMath::Max(GetLifeSpan(), 240.f));
 }

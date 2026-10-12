@@ -631,7 +631,7 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 // swings with the arm); the elbow bends up and turns in so the forearm lies flat behind it, a hand's depth back.
 namespace
 {
-	struct FShieldRest { FTransform InArm; float ElbowPitch = 15.f, ElbowRoll = -22.f; };
+	struct FShieldRest { FTransform InArm; float ElbowPitch = 85.f, ElbowYaw = 15.f, ElbowRoll = 0.f; };
 	const FShieldRest& ShieldRest()
 	{
 		static const FShieldRest R = []()
@@ -655,26 +655,22 @@ namespace
 				const FVector Pv = Out.InArm.TransformPosition(Strap);
 				Out.InArm = Out.InArm * FTransform(-Pv) * FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(-30.f))) * FTransform(Pv);
 			}
-			// the shield's back (a plane, in the shoulder's frame) and the way it faces
-			const FVector Back = Out.InArm.TransformPosition(FVector(14.0, -41.0, 0.0));
+			// the left fist goes to the middle of the shield's inside, a hand's depth behind it, with the forearm lying flat
+			// along the back of the shield: try every elbow bend, swing and turn, keep the best
 			const FVector Face = Out.InArm.TransformVectorNoScale(FVector(1, 0, 0)).GetSafeNormal();
-			// find the elbow bend and inward turn that lay the forearm flat behind it, held in towards the chest
+			const FVector Goal = Out.InArm.TransformPosition(FVector(14.0, -41.0, -10.0)) - Face * 6.0;
 			const FVector F = KnightDesign::FistPos(-1);
 			float Best = 1e9f;
-			for (float P = 0.f; P <= 120.f; P += 2.f)
-				for (float Rl = -80.f; Rl <= 30.f; Rl += 2.f)
-				{
-					const FQuat Q = FRotator(P, 0.f, Rl).Quaternion();
-					const FVector Dir = Q.RotateVector((W - PE).GetSafeNormal());
-					const FVector Fist = (PE - PA) + Q.RotateVector(F - PE);
-					const float Flat = FMath::Square(FVector::DotProduct(Dir, Face)) * 400.f;         // parallel to the shield
-					const float Depth = FVector::DotProduct(Fist - Back, Face);                        // the fist behind the shield's back
-					const float Gap = FMath::Square(FMath::Min(0.f, -9.f - Depth) * 1.f + FMath::Max(0.f, -13.f - Depth) * 0.5f);
-					const float CapsY = (Fist + PA).Y;                                                 // not into the chest
-					const float Body = FMath::Square(FMath::Max(0.f, CapsY + 25.f)) * 4.f;
-					const float Cost = Flat + Gap + Body - 0.02f * P;                                 // among the rest, held up more
-					if (Cost < Best) { Best = Cost; Out.ElbowPitch = P; Out.ElbowRoll = Rl; }
-				}
+			for (float P = 0.f; P <= 140.f; P += 4.f)
+				for (float Yw = -60.f; Yw <= 90.f; Yw += 4.f)
+					for (float Rl = -60.f; Rl <= 60.f; Rl += 4.f)
+					{
+						const FQuat Q = FRotator(P, Yw, Rl).Quaternion();
+						const FVector Dir = Q.RotateVector((W - PE).GetSafeNormal());
+						const FVector Fist = (PE - PA) + Q.RotateVector(F - PE);
+						const float Cost = (Fist - Goal).SizeSquared() + FMath::Square(FVector::DotProduct(Dir, Face)) * 300.f;
+						if (Cost < Best) { Best = Cost; Out.ElbowPitch = P; Out.ElbowYaw = Yw; Out.ElbowRoll = Rl; }
+					}
 			return Out;
 		}();
 		return R;
@@ -2479,7 +2475,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
 	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + 85.f * Ground;   // at rest the left hand comes up behind the inside front of the shield
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground;   // at rest the left hand rests on the inside of the shield
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
@@ -2489,7 +2485,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 15.f * Ground * (1.f - BlockAlpha), 0.f));   // and swung in, so the hand rests against the chest
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, ShieldRest().ElbowYaw * Ground * (1.f - BlockAlpha), ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha)));   // the forearm flat behind the shield
 	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
@@ -2766,6 +2762,38 @@ void AKnightCharacter::DropBag(const TArray<FInvSlot>& Items, int32 Ingots)
 {
 	const FVector Where = GetActorLocation() + GetActorForwardVector() * 130.f;
 	const FVector Ground(Where.X, Where.Y, JeebTerrain::HeightAt(Where.X, Where.Y));
+	// Things dropped in the same spot don't pile up through each other: next to a sack they go into it, and once three or
+	// more loose things lie close together they are gathered into one sack
+	{
+		constexpr float Near = 170.f;
+		ALootDrop* Sack = nullptr;
+		TArray<ALootDrop*> Loose;
+		for (TActorIterator<ALootDrop> It(GetWorld()); It; ++It)
+		{
+			if (FVector::Dist2D(It->GetActorLocation(), Ground) > Near || It->IsActorBeingDestroyed()) continue;
+			if (It->IsSack()) Sack = *It;
+			else if (It->IsItemLook()) Loose.Add(*It);
+		}
+		if (Sack) { Sack->AddLoose(Items, Ingots); return; }
+		if (Loose.Num() >= 2)
+		{
+			TArray<FInvSlot> All = Items;
+			int32 AllIngots = Ingots;
+			FVector Mid = Ground;
+			for (ALootDrop* L : Loose)
+			{
+				for (const FInvSlot& S : L->GetItems()) if (S.Id != 0 && S.Count > 0) All.Add(S);
+				AllIngots += L->GetIngots();
+				Mid += L->GetActorLocation();
+			}
+			Mid /= float(Loose.Num() + 1);
+			for (ALootDrop* L : Loose) L->Destroy();
+			const FVector At(Mid.X, Mid.Y, JeebTerrain::HeightAt(Mid.X, Mid.Y));
+			if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(At, FRotator::ZeroRotator)) Drop->Setup(ELootLook::Pack, All, AllIngots);
+			JeebMsg::Post(2.5f, FColor(255, 220, 140), TEXT("The things here are gathered into a sack."));
+			return;
+		}
+	}
 	if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(Ground, FRotator::ZeroRotator)) Drop->Setup(Items.Num() <= 1 ? ELootLook::Item : ELootLook::Pack, Items, Ingots);   // one thing: show the thing itself
 }
 
