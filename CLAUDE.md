@@ -98,6 +98,8 @@ The owner dropped the single-player story mode: Jeebsland is becoming an online 
 
 Save/load is planned in `Docs/SaveLoadPlan.md` (not built yet).
 
+Packaging: `RunUAT BuildCookRun ... -clientconfig=Shipping -cook -stage -pak -iostore -compressed -archive -archivedirectory=Packaged` (about 330 MB zipped; leave out the `.pdb` when sharing). The game loads materials/textures by name (`LoadObject`), which the packager cannot see, so `/Game` and `/Engine/BasicShapes` are always cooked (DefaultGame.ini). Any new asset loaded by name must live under `/Game` (or add its folder there), or it shows as grey checkerboard in the packaged game only. Code must also compile for Shipping (no editor-only fields, e.g. `FStaticMaterial` takes two arguments).
+
 ## Build
 
 The editor must be closed before building (Live Coding is not used). The owner has given standing permission to close a running editor (`Stop-Process -Name UnrealEditor`) whenever a build or material rebuild needs it, without asking, and to reopen it afterwards.
