@@ -25,8 +25,8 @@ namespace KnightDesign
 	{
 		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_AnkleL, P_AnkleR, P_Count
 	};
-	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotBrush = 7, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
-	constexpr int32 NumSlots = 8;
+	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotBrush = 7, SlotRingR = 8, SlotRingL = 9, SlotAmulet = 10, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
+	constexpr int32 NumSlots = 11;
 
 	// Where each pivot sits (capsule space). The animation turns parts about these points.
 	inline FVector PivotPos(int32 P)
@@ -260,7 +260,7 @@ namespace KnightDesign
 				const double Tc = T0 + (T1 - T0) * T, S = FMath::Pow(FMath::Sin(PI * T), 0.55);
 				FVector P, N; double H;
 				CrestAt(Tc, P, N, H);
-				const double Bh = 1.2 + 7.5 * S, Wb = 0.9 + 0.9 * S, B0 = H + 0.3;
+				const double Bh = 2.0 + 11.0 * S, Wb = 1.4 + 1.4 * S, B0 = H + 0.4;
 				const FVector Y(0, 1, 0);
 				return FRing({ P + N * B0 - Y * Wb, P + N * (B0 + 0.5 * Bh) - Y * (1.25 * Wb), P + N * (B0 + Bh) - Y * (0.45 * Wb),
 				               P + N * (B0 + Bh) + Y * (0.45 * Wb), P + N * (B0 + 0.5 * Bh) + Y * (1.25 * Wb), P + N * B0 + Y * Wb }); }, false);
@@ -602,6 +602,31 @@ namespace KnightDesign
 				}
 			}
 		}
+
+		// RINGS and the AMULET (worn in the miscellaneous slots): a gold band with a red stone over the knuckles of each
+		// fist (first ring right hand, second left), and a gold pendant hung on a chain over the chest
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			const int32 Elb = (sd < 0) ? P_ElbowL : P_ElbowR, Slot = (sd < 0) ? SlotRingL : SlotRingR;
+			const FVector F = FistPos(sd);
+			{ FDef& D = Add(Elb, Slot, EArmorRole::Trim); D.bFixedColor = true; D.Fixed = FLinearColor(1.0f, 0.72f, 0.22f);
+			  Torus(D.Mesh, 2.1, 0.7, 12, 6, 1.0, 1.0, Xf(F + V3(5.6, -sd * 1.6, -1.2), V3(90, 0, 0))); }
+			{ FDef& D = Add(Elb, Slot, EArmorRole::Accent); D.bFixedColor = true; D.Fixed = FLinearColor(0.8f, 0.05f, 0.08f);
+			  Bead(D.Mesh, 1.1, F + V3(7.9, -sd * 1.6, -1.2)); }
+		}
+		{
+			FDef& D = Add(P_Upper, SlotAmulet, EArmorRole::Trim); D.bFixedColor = true; D.Fixed = FLinearColor(1.0f, 0.72f, 0.22f);
+			for (int32 sd = -1; sd <= 1; sd += 2)
+			{
+				TArray<FVector> Path; TArray<FVector2D> AB;
+				Path.Add(V3(13.0, sd * 10.0, 19.5)); Path.Add(V3(18.5, sd * 6.0, 15.5)); Path.Add(V3(21.2, sd * 1.5, 12.8));
+				for (int32 i = 0; i < 3; ++i) AB.Add(FVector2D(0.4, 0.4));
+				Sweep(D.Mesh, Path, AB, V3(0, 0, 1), 6, 1.0, Xf(O0));
+			}
+			Ellipsoid(D.Mesh, 0.8, 3.0, 3.6, 1.0, 1.0, 16, 10, Xf(V3(21.6, 0, 9.5)));
+		}
+		{ FDef& D = Add(P_Upper, SlotAmulet, EArmorRole::Accent); D.bFixedColor = true; D.Fixed = FLinearColor(0.1f, 0.35f, 0.9f);
+		  Bead(D.Mesh, 1.4, V3(22.5, 0, 9.5)); }
 
 		// =========================================================================================
 		// SHIELDS (left arm; weapons are modelled in WeaponDesign.h). The cape is cloth, simulated by the character

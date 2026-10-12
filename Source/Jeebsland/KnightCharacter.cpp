@@ -372,6 +372,8 @@ namespace
 		case KnightDesign::SlotCape:      return JeebItems::K_Cape;
 		case KnightDesign::SlotGloves:    return JeebItems::K_Gloves;
 		case KnightDesign::SlotBrush:     return JeebItems::K_Crest;
+		case KnightDesign::SlotRingR: case KnightDesign::SlotRingL: return JeebItems::K_Ring;
+		case KnightDesign::SlotAmulet:    return JeebItems::K_Amulet;
 		default:                          return JeebItems::K_Shield;
 		}
 	}
@@ -423,6 +425,18 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		Id = 0;
 		for (int32 M : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
 			if (JeebItems::IsGear(M) && JeebItems::KindOf(M) == JeebItems::K_Crest) Id = M;
+	}
+	if (Slot == KnightDesign::SlotRingR || Slot == KnightDesign::SlotRingL || Slot == KnightDesign::SlotAmulet)   // jewellery in the miscellaneous slots
+	{
+		Id = 0;
+		int32 Rings = 0;
+		for (int32 M : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
+		{
+			if (!JeebItems::IsGear(M)) continue;
+			const int32 MK = JeebItems::KindOf(M);
+			if (MK == JeebItems::K_Amulet && Slot == KnightDesign::SlotAmulet) Id = M;
+			if (MK == JeebItems::K_Ring) { ++Rings; if ((Rings == 1 && Slot == KnightDesign::SlotRingR) || (Rings == 2 && Slot == KnightDesign::SlotRingL)) Id = M; }
+		}
 	}
 	const bool bWorn = Id != 0;
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
