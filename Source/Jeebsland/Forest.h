@@ -26,6 +26,9 @@ protected:
 private:
 	UPROPERTY() UInstancedStaticMeshComponent* Trunk = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* RedTrunk = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* RedTaper = nullptr;      // redwood trunks: wide flared foot, narrowing to almost nothing at the top
+	UPROPERTY() UInstancedStaticMeshComponent* RedFortTrunk = nullptr;  // the fort redwoods: a gentler taper, so the decks still fit round them
+	UPROPERTY() TArray<UInstancedStaticMeshComponent*> NeedleFill;      // the in-between needle boughs (pine A, pine B, redwood): no shadows, to keep shadows cheap
 	UPROPERTY() UInstancedStaticMeshComponent* Branch = nullptr;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> Leaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> Pine;
