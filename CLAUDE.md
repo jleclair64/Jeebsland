@@ -19,11 +19,13 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
-Last updated 2026-10-12 (end of the knight-redesign session). Everything below is built and committed; the owner checks visuals themselves and sends screenshots. Details of each system are in the dated sections further down.
+Last updated 2026-10-12 (end of the multiplayer-pivot session). Everything below is built and committed; the owner checks visuals themselves and sends screenshots. Details of each system are in the dated sections further down.
 
-**Just done (last few changes not yet seen in-game):** the knight redesign (see "Knight redesign"), worked over many rounds of screenshots; dropped items float, bob, turn, show their description when near, and gather into a sack when 3+ lie together (`ItemModels.h`, `ALootDrop` Item look, `DropBag`); the Red Helm Brush (+5% speed); rings and amulet show on the knight; footfalls kick up dirt chunks / grass blades / orange and red leaves by surface (`Kick`, `GroundUnderfoot`); place names in gold Norse lettering (`AKnightHUD::NorseText`, full A-Z); left arm hangs normally when no shield is shown; wizard staff held upright at rest (middle of the shaft, foot on the ground).
+**Just done (2026-10-12, second session):** the game is now going ONLINE, RuneScape style (see "Direction: online multiplayer"); first milestone works (owner tested two players on a local dedicated server). Also: HUD and knight code split into themed files ("Code layout"); local save/load step 1 (`JeebSave`, single player only now); graphics cut to Lowest / Low (fancy Lumen lighting and ray tracing removed, how to restore is below); all UE template code and content deleted; first packaged release build (about 330 MB zipped, 470 MB unzipped; owner is happy with that size, no more trimming). The first package showed everything grey (materials loaded by name were not packed); fixed and repackaged.
 
-**Check first next time:** left fist on the inside of the resting shield (elbow angles found by a search in `ShieldRest()` in KnightCharacter.cpp; the shield itself must NOT move, the owner set its angle by eye); staff foot height (40 cm slide in `HoldWeaponAtEase`); sizes of the floating items; Norse banner size (5% of screen height).
+**Check first next time:** that the repackaged game (`Packaged/Windows/Jeebsland.exe`) shows real materials, not grey checkerboard. From the earlier session, still unchecked: left fist on the inside of the resting shield (`ShieldRest()` in KnightCharacterBody.cpp; the shield itself must NOT move, the owner set its angle by eye); staff foot height (40 cm slide in `HoldWeaponAtEase`); sizes of the floating items; Norse banner size (5% of screen height).
+
+**Next steps (owner's direction):** 1) server-owned characters (pack, XP, gear decided and saved on the server per player; `Docs/SaveLoadPlan.md`); 2) shared combat (swings, damage, health seen by everyone); 3) a "join a friend" launcher plus a Tailscale guide so the owner can test with a friend (send the packaged build zipped, without the `.pdb`). Hosting later: the owner's PC for now; a rented cloud server needs a source-built engine for a dedicated-server build.
 
 **How the owner wants posture changes made:** small, stated-direction tweaks (e.g. "30 degrees counterclockwise from this angle"); if a direction is a guess, say so so they can ask for a flip. Keep the body upright with only the head leaning forward; the sword at ease rests tip-down in front of his middle, twisted 40 degrees in the wrist (this direction is confirmed).
 
@@ -47,7 +49,7 @@ Last updated 2026-10-12 (end of the knight-redesign session). Everything below i
 - Defence XP comes only from blows blocked with a raised shield (armour hits and hazards train nothing). Attack and Defence level quietly: no skill popup. Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
 - Inventory drag and drop (`AKnightHUD::ProcessDrag`): drag between the 5x5 pack (24 slots + fixed ingot cell) and the weapon bar; items trade places; only weapons go on the bar; clicking empty screen leaves Tab pointer mode. `FillPracticePack()` is called from KnightCharacter::BeginPlay as a TEMPORARY stock of random gear: remove it when the owner is done practising.
 - Three cats (`ACat`) roam near the town; `AFireflies` swarms drift in and out (60-120 s on, 60-120 s off). Tuning constants at the top of each header.
-- `ASmokeCloud` (purple poison smoke test hazard) sits beside the horse spawn; delete the spawn line in KnightGameMode.cpp when the owner is done with it.
+- `ASmokeCloud` (purple poison smoke test hazard) sits beside the horse spawn; delete the spawn line in KnightGameState.cpp when the owner is done with it.
 - Health (knight and horse) heals only after 10 s without a hit, and a full bar takes 10 s. In PvP areas health must NOT regenerate (not built yet). The horse is meant to get its own hit boxes and take damage separately from the knight (`HurtHorse`); not built yet. The stamina bar is hidden on purpose but stamina still works.
 - Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
 - Sun never sets: lowest point 11 degrees, noon 41. Day loop is 60 s per half for preview; owner will ask to change it to 1200 s.
@@ -56,7 +58,7 @@ Last updated 2026-10-12 (end of the knight-redesign session). Everything below i
 - Always keep grass near buildings (fort, cottages, castle, etc.) a bit shorter than open-field grass (about 22% shorter, the owner found 40% too short and the crossed cards showed), with wider overlapping tufts there to hide the cards, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
 - Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
 
-**Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
+**Open ideas:** breaking up the ~660-line `AKnightCharacter::Tick`; a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
 
 ## Combat and UI systems (built 2026-10-11, Opus session; not yet seen in-game by the owner)
 
