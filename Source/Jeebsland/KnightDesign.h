@@ -240,10 +240,7 @@ namespace KnightDesign
 			TArray<FVector> Path; TArray<FVector2D> AB;
 			for (int32 i = 0; i < 8; ++i) { Path.Add(V3(TabX[i], 0, TabZ[i])); AB.Add(FVector2D(TabA[i], 1.3)); }
 			Sweep(D.Mesh, Path, AB, V3(0, 1, 0), 12, 0.35, Xf(V3(0, 0, 0)));
-			TArray<FVector> PathB;
-			const double BackX[] = { -17, -24, -25, -24, -21.5, -21.5, -23, -25 };
-			for (int32 i = 0; i < 8; ++i) PathB.Add(V3(BackX[i], 0, TabZ[i]));
-			Sweep(D.Mesh, PathB, AB, V3(0, 1, 0), 12, 0.35, Xf(V3(0, 0, 0)));
+			// (no back panel: the cape covers the back, and the pale panel showed under it as a white patch)
 		}
 		{
 			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Accent);     // the red cross

@@ -264,10 +264,11 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				const int32 k = Idx(i, j);
 				const float Down = float(j) / (CapeNY - 1);
-				const FVector Ripple = (Side * FMath::Sin(CapeTime * 7.f - j * 0.8f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 5.f - j * 0.6f) * 0.4f)
-				                     * (40.f + 0.9f * Speed) * Down;
-				const FVector Force = FVector(0.f, 0.f, -980.f) - Fwd * (1.5f * Speed) + FVector(0.f, 0.f, 0.35f * Speed) + Ripple;
-				const FVector V = (CapeP[k] - CapePrev[k]) * 0.975f;   // air drag
+				// A heavy cloth: slow, low ripples, and the wind of running only lifts it a little (gravity wins)
+				const FVector Ripple = (Side * FMath::Sin(CapeTime * 4.5f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 3.2f - j * 0.5f) * 0.4f)
+				                     * (14.f + 0.35f * Speed) * Down;
+				const FVector Force = FVector(0.f, 0.f, -1300.f) - Fwd * (0.8f * Speed) + FVector(0.f, 0.f, 0.12f * Speed) + Ripple;
+				const FVector V = (CapeP[k] - CapePrev[k]) * 0.955f;   // more drag: it swings slowly and settles quickly
 				CapePrev[k] = CapeP[k];
 				CapeP[k] += V + Force * H * H;
 			}
@@ -296,7 +297,8 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				const float Lim = L.Z > 0.f ? -23.f : -17.f;   // the back of the torso, then the backs of the legs
+				float Lim = L.Z > 0.f ? -23.f : -17.f;   // the back of the torso, then the backs of the legs
+				if (bStowed && L.Z > -9.f) Lim = -36.f;   // and over the shield when it is on the back
 				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
 			}
 		}
@@ -493,9 +495,40 @@ void AKnightCharacter::RebuildHeld()
 		}
 	};
 
+	if (bStowed)
+	{
+		// On the back, diagonally: the grip over the right shoulder and the blade down to the left hip, lying flat against
+		// the back (under the shield). Built at the grip, then turned flat (width across the back) and tilted 35 degrees.
+		const int32 First = HeldComps.Num();
+		Make(UpperPivot, KnightDesign::P_Upper, KM::Xf(FVector::ZeroVector));
+		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
+		for (int32 i = First; i < HeldComps.Num(); ++i)
+			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-24.5f, 14.f, 41.f + 16.f), Q);   // chest pivot sits 41 below the body's centre
+		return;
+	}
 	const KM::FXf Tilt = KM::Xf(FVector(8, 30 * KnightDesign::SlimY, -27), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
 	Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(FVector(8, -30 * KnightDesign::SlimY, -27), FVector(0, -20, 0)));
+}
+
+// The shield on the arm, or on the back: turned to face backwards, its inner face just behind the sword on the back,
+// centred on the spine with its point down by the hips (the cape is kept outside it, see TickCape)
+void AKnightCharacter::PlaceShield(bool bOnBack)
+{
+	for (FArmorPart& P : ArmorParts)
+	{
+		if (P.Slot != KnightDesign::SlotShield || !P.Comp) continue;
+		if (bOnBack)
+		{
+			P.Comp->AttachToComponent(UpperPivot, FAttachmentTransformRules::KeepRelativeTransform);
+			P.Comp->SetRelativeLocationAndRotation(FVector(-16.f, -30.f, 41.f), FRotator(0.f, 180.f, 0.f));
+		}
+		else
+		{
+			P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);
+			P.Comp->SetRelativeLocationAndRotation(-KnightDesign::PivotPos(KnightDesign::P_ArmL), FRotator::ZeroRotator);
+		}
+	}
 }
 
 void AKnightCharacter::EquipFromInventory(int32 Idx)
@@ -895,19 +928,37 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 	}
 	const int32 Armor = bEnvironmental ? 0 : JeebItems::TotalDefense(Skills, false) / 3;   // smoke seeps through armour
 	const int32 FromSkill = bEnvironmental ? 0 : Skills->GetLevel(ESkillType::Defense) / 5;
-	const int32 Shield = bFront ? JeebItems::DefenseOf(JeebItems::K_Shield, JeebItems::VariantOf(Skills->Worn[JeebItems::K_Shield])) : 0;
-	const int32 Taken = FMath::Max(bFront ? 0 : 1, Raw - (Armor + FromSkill + Shield));
-	const int32 Absorbed = Raw - Taken;
+	// The shield takes the blow first. With its guard up it stops damage until the guard (its Defence) is spent; a broken
+	// guard stops half of each blow until it has recovered. Whatever gets past the shield is then softened by armour.
+	int32 ShieldStop = 0;
+	if (bFront)
+	{
+		if (!bGuardBroken)
+		{
+			ShieldStop = FMath::Min(Raw, FMath::FloorToInt(GuardPool));
+			GuardPool -= ShieldStop;
+			if (GuardPool < 1.f)
+			{
+				GuardPool = 0.f;
+				bGuardBroken = true;
+				JeebMsg::Post(2.5f, FColor::Orange, TEXT("Guard broken! Your shield stops only half a blow until it recovers."));
+			}
+		}
+		else ShieldStop = Raw / 2;
+		LastGuardHitTime = Now;
+	}
+	const int32 Through = Raw - ShieldStop;
+	const int32 Taken = (Through <= 0) ? 0 : FMath::Max(1, Through - (Armor + FromSkill));
 
 	const FVector Head = GetActorLocation() + FVector(0.f, 0.f, 120.f);
-	if (bFront && Absorbed > 0) JeebCombat::AddNumber(GetWorld(), Head + FVector(0.f, 0.f, 25.f), Absorbed, JeebCombat::N_Blocked);
+	if (ShieldStop > 0) JeebCombat::AddNumber(GetWorld(), Head + FVector(0.f, 0.f, 25.f), ShieldStop, JeebCombat::N_Blocked);
 	if (Taken > 0) JeebCombat::AddNumber(GetWorld(), Head, Taken, JeebCombat::N_Damage);
 	Health -= Taken;
 	LastHurtTime = Now;
 	InvulnUntil = Now + 0.4f;
 	// Defence trains only from blows you block with a raised shield, facing the attacker.
 	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
-	if (!bEnvironmental && bFront && Absorbed > 0) Skills->AddXP(ESkillType::Defense, 2 + Absorbed / 2);
+	if (!bEnvironmental && ShieldStop > 0) Skills->AddXP(ESkillType::Defense, 2 + ShieldStop / 2);
 
 	if (Health <= 0.f)
 	{
@@ -1833,6 +1884,35 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	}
 	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
 
+	// Climbing, riding or sitting: the shield and the weapon go on the back; they come back to the hands afterwards
+	{
+		const bool bWantStow = bClimbing || bMounted || bSitting;
+		if (bWantStow != bStowed)
+		{
+			bStowed = bWantStow;
+			PlaceShield(bStowed);
+			RebuildHeld();
+			if (bStowed) bBlocking = false;
+		}
+	}
+
+	// Shield guard: its size is the shield's Defence; a new or changed shield starts full. It recovers like health:
+	// 10 s after the last blow it took, a full bar in 10 s. A broken guard is mended only once it is full again.
+	{
+		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
+		const float NewMax = ShieldId ? float(JeebItems::DefenseOf(JeebItems::K_Shield, JeebItems::VariantOf(ShieldId))) : 0.f;
+		if (!FMath::IsNearlyEqual(NewMax, GuardMax)) { GuardMax = NewMax; GuardPool = NewMax; bGuardBroken = false; }
+		if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > 10.f)
+		{
+			GuardPool = FMath::Min(GuardMax, GuardPool + GuardMax * 0.1f * Dt);
+			if (GuardPool >= GuardMax && bGuardBroken)
+			{
+				bGuardBroken = false;
+				JeebMsg::Post(2.5f, FColor(140, 200, 255), TEXT("Your shield guard is back to full."));
+			}
+		}
+	}
+
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
 	if (bAttacking) bBlocking = false;
 	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
@@ -1955,8 +2035,20 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// (smooth everywhere: no sharp corners in the curve, so no jerks)
 	const float SwingR = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f + C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f - C));
 	const float SwingL = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f - C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f + C));
-	const float HipRg = HipAmp * S;
-	const float HipLg = -HipAmp * S;
+	// Shield-up stance: the legs step the way you are actually moving. Backing up runs the stride in reverse; a sidestep
+	// swings the legs out to the side instead (the leading leg reaches out, the other closes up after it).
+	{
+		const FVector LV = GetActorRotation().UnrotateVector(FVector(Vel.X, Vel.Y, 0.f));
+		float Fw = 1.f, Sd = 0.f;
+		if (bBlocking && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
+		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
+		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
+	}
+	const float HipRg = HipAmp * S * StepFw;
+	const float HipLg = -HipAmp * S * StepFw;
+	const float SideAmp = 24.f * MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
+	const float HipRroll = SideAmp * StepSd * (0.5f + 0.5f * S);   // positive roll swings a hanging leg to the right
+	const float HipLroll = SideAmp * StepSd * (0.5f - 0.5f * S);
 	const float KneeRg = -KneeAmp * SwingR;
 	const float KneeLg = -KneeAmp * SwingL;
 	// In the air: knees tuck on the way up, legs reach forward on the way down
@@ -1985,8 +2077,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	HipRf = FMath::Lerp(HipRf, 105.f, TuckAlpha);   KneeRf = FMath::Lerp(KneeRf, -125.f, TuckAlpha);
 	HipLf = FMath::Lerp(HipLf, 105.f, TuckAlpha);   KneeLf = FMath::Lerp(KneeLf, -125.f, TuckAlpha);
 
-	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, 0.f));
-	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, 0.f));
+	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, HipRroll));
+	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll));
 	KneeR->SetRelativeRotation(FRotator(KneeRf, 0.f, 0.f));
 	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
 

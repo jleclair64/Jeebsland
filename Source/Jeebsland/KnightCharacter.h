@@ -104,6 +104,10 @@ public:
 	// The horse is hurt separately from the knight (its own hit boxes come later). Heals only after 10 s unhurt.
 	void HurtHorse(float Amount);
 	bool IsHorseTired() const { return bHorseTired; }
+	// Shield guard, for the HUD
+	float GetGuardFraction() const { return GuardMax > 0.f ? GuardPool / GuardMax : 0.f; }
+	bool IsGuardBroken() const { return bGuardBroken; }
+	bool IsBlocking() const { return bBlocking; }
 	USkillComponent* GetSkills() const { return Skills; }
 	// Text for the "Press E ..." prompt, or false if nothing is in reach
 	bool GetInteractPrompt(FString& OutText) const;
@@ -197,6 +201,15 @@ private:
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
 	float HeldElbow = 25.f;                    // how far the sword arm is bent while holding the weapon
 	bool bShieldShown = false;
+	// Shield and weapon go on the back (shield over the sword, both under the cape) while climbing, riding or sitting
+	bool bStowed = false;
+	void PlaceShield(bool bOnBack);
+	// Stepping in the shield-up stance: the way the legs step (forward/back, and sideways), eased
+	float StepFw = 1.f, StepSd = 0.f;
+	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
+	// each blow until it has fully recovered (it recovers like health: 10 s after the last blocked hit, then a full bar in 10 s)
+	float GuardPool = 0.f, GuardMax = 0.f, LastGuardHitTime = -100.f;
+	bool bGuardBroken = false;
 	UPROPERTY() UInstancedStaticMeshComponent* DustISM = nullptr;
 	UPROPERTY() UInputModifierScalar* LookScalar = nullptr;
 	bool bSettingsOpen = false;

@@ -479,6 +479,19 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
+	// Shield guard: a thin steel bar just above your health while you have a shield ready, shown while blocking or recovering.
+	// A broken guard turns orange and throbs until it is full again.
+	if (Knight->GetGuardFraction() > 0.f || Knight->IsGuardBroken())
+	{
+		const float F = Knight->GetGuardFraction();
+		if (F < 0.999f || Knight->IsBlocking())
+		{
+			const float BY = Canvas->ClipY - 39.f;
+			const float GW = BarW * 0.6f, GX = (Canvas->ClipX - GW) * 0.5f;
+			Gauge(GX, BY, GW, 4.f, F, Knight->IsGuardBroken() ? FLinearColor(0.85f, 0.45f, 0.15f) : FLinearColor(0.55f, 0.68f, 0.85f), Knight->IsGuardBroken());
+		}
+	}
+
 	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)
 	if (Knight->IsMounted())
 	{

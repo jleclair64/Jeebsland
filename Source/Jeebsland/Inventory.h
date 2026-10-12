@@ -435,7 +435,7 @@ namespace JeebItems
 		case K_Staff:      return TEXT("A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield.");
 		case K_Bow:        return TEXT("Fires arrows from a distance. Arrows run out: buy them at the store or smith them. Better arrows hit harder. A shield can be carried with it.");
 		case K_Rod:        return TEXT("A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.");
-		case K_Shield:     return TEXT("Hold right-click to block. Blocks a flat amount of damage. Not usable with two-handed weapons.");
+		case K_Shield:     return TEXT("Hold right-click to block blows from the front. A shield's guard stops damage up to its Defence; once spent, the guard is broken and stops only half of each blow until it recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons.");
 		case K_Helmet:     return TEXT("Protects the head. Defence adds to the total of all worn armour.");
 		case K_Chest:      return TEXT("The heaviest armour piece and the biggest defence bonus.");
 		case K_Shoulders:  return TEXT("Layered pauldrons for the shoulders.");
