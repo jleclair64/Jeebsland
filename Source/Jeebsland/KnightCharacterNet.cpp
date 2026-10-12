@@ -13,6 +13,7 @@
 #include "KnightPlayerController.h"
 #include "JeebSave.h"
 #include "EngineUtils.h"
+#include "TimerManager.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -417,9 +418,35 @@ void AKnightCharacter::ServerSlide_Implementation(FVector_NetQuantizeNormal Dir,
 	BeginSlide(Dir, Speed);
 }
 
+void AKnightCharacter::ServerClimb_Implementation(bool bOn)
+{
+	// On the ladder the knight is moved by the player's machine; the server follows it instead of pulling it back
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	bClimbing = bOn;
+	if (bOn)
+	{
+		GetWorldTimerManager().ClearTimer(ClimbTrustTimer);
+		Move->bIgnoreClientMovementErrorChecksAndCorrection = true;
+		Move->bServerAcceptClientAuthoritativePosition = true;
+	}
+	else
+	{
+		// (keep trusting it a moment longer: the step off the top of the ladder may arrive just after this)
+		TWeakObjectPtr<AKnightCharacter> Self(this);
+		GetWorldTimerManager().SetTimer(ClimbTrustTimer, FTimerDelegate::CreateLambda([Self]()
+		{
+			if (!Self.IsValid() || Self->bClimbing) return;
+			Self->GetCharacterMovement()->bIgnoreClientMovementErrorChecksAndCorrection = false;
+			Self->GetCharacterMovement()->bServerAcceptClientAuthoritativePosition = false;
+		}), 0.75f, false);
+	}
+	if (bOn) { bCrouched = false; bBlocking = false; bAttacking = false; }
+}
+
 void AKnightCharacter::OnRep_MoveFlags()
 {
 	if (HasAuthority() || IsLocallyControlled()) return;
+	bClimbing = (RepMoveFlags & 16) != 0;
 	// another player's knight: copy the stance so it is drawn the same way
 	bCrouched = (RepMoveFlags & 1) != 0;
 	bBlocking = (RepMoveFlags & 2) != 0;

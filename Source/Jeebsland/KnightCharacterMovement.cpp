@@ -104,6 +104,7 @@ void AKnightCharacter::TryStartClimb()
 		ClimbDeckTop = DeckTop;
 		Move->StopMovementImmediately();
 		Move->DisableMovement();
+		if (!HasAuthority()) ServerClimb(true);
 		const FVector2D Hold = L.Pos + L.Out * 55.f;
 		SetActorLocationAndRotation(FVector(Hold.X, Hold.Y, Loc.Z), FRotator(0.f, FVector(-L.Out.X, -L.Out.Y, 0.f).Rotation().Yaw, 0.f));
 		return;
@@ -129,9 +130,9 @@ void AKnightCharacter::UpdateClimb(float Dt)
 	const FVector2D Hold = ClimbPos + ClimbOut * 55.f;
 	Loc.X = FMath::FInterpTo(Loc.X, Hold.X, Dt, 15.f);
 	Loc.Y = FMath::FInterpTo(Loc.Y, Hold.Y, Dt, 15.f);
-	Loc.Z += Dir * 280.f * Dt;
+	Loc.Z += Dir * 420.f * Dt;   // (was 280: half as fast again)
 	SetActorLocation(Loc, false);
-	ClimbPhase += Dir * Dt * 7.f;
+	ClimbPhase += Dir * Dt * 10.5f;
 
 	const float FeetZ = Loc.Z - 90.f;
 	if (Dir > 0.f && FeetZ >= ClimbDeckTop - 5.f) ExitClimb(true, false);
@@ -142,6 +143,7 @@ void AKnightCharacter::ExitClimb(bool bAtTop, bool bAtBottom)
 {
 	if (!bClimbing) return;
 	bClimbing = false;
+	if (!HasAuthority() && IsLocallyControlled()) ServerClimb(false);
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	if (bAtTop)
 	{

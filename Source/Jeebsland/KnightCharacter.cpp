@@ -420,6 +420,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
 	SendState();                      // online: our sprint / crouch / shield button, to the server
 	if (!bGraphicsApplied && IsLocallyControlled()) ApplyGraphics();   // online, our knight may only become ours after BeginPlay
+	// Coming from the starting screen the mouse is still in menu mode: hand it back to the camera once our knight is ours
+	if (!bUIModeSet && IsLocallyControlled() && GetController()) { bUIModeSet = true; RefreshUIMode(); }
 
 	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
 	if (!bPitchLimitsSet)
@@ -469,7 +471,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const bool bFalling = GetCharacterMovement()->IsFalling();
 
 	// ---------- Ladders ----------
-	if (bClimbing) UpdateClimb(Dt); else TryStartClimb();
+	// (online the player's own machine climbs and the server takes its word for where the knight is on the ladder; the
+	// server can't climb by itself because it doesn't get the W and S keys)
+	if (IsLocallyControlled() || GetNetMode() == NM_Standalone) { if (bClimbing) UpdateClimb(Dt); else TryStartClimb(); }
+	else if (bClimbing && !HasAuthority()) ClimbPhase += Vel.Z / 400.f * 7.f * Dt;   // another player's knight: hands and feet follow how fast it rises
 
 	// ---------- Special moves: roll, slide ----------
 	UCharacterMovementComponent* Move = GetCharacterMovement();
@@ -658,7 +663,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		StanceFwd = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X));
 		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
 	}
-	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0);
+	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0);
 	if (bStance && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
