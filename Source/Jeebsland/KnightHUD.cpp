@@ -189,15 +189,16 @@ void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGl
 		FillRR(X - k * 2.f, Y + 5.f - k, W + k * 4.f, H + k * 4.f, R + k * 2.f, [&](float) { return FLinearColor(0.f, 0.f, 0.02f, 0.07f * Alpha); });
 	FillRR(X, Y, W, H, R, [&](float t)   // the body: cool and clear, deeper toward the bottom
 	{
+		if (bGreyGlass) return FLinearColor(FMath::Lerp(0.07f, 0.035f, t), FMath::Lerp(0.07f, 0.035f, t), FMath::Lerp(0.075f, 0.04f, t), FMath::Lerp(0.30f, 0.40f, t) * Alpha);   // smoky grey, dim, see-through
 		return FLinearColor(FMath::Lerp(0.10f, 0.04f, t), FMath::Lerp(0.15f, 0.07f, t), FMath::Lerp(0.22f, 0.12f, t), FMath::Lerp(0.44f, 0.54f, t) * Alpha);
 	});
 	FillRR(X + 2.f, Y + 2.f, W - 4.f, H * 0.55f, R - 2.f, [&](float t)   // sheen pouring down from the top edge
 	{
-		return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.20f, 0.f, FMath::Clamp(t * 1.2f, 0.f, 1.f)) * Alpha);
+		return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(bGreyGlass ? 0.07f : 0.20f, 0.f, FMath::Clamp(t * 1.2f, 0.f, 1.f)) * Alpha);
 	});
 	if (bGlow) FillRR(X + 2.f, Y + 2.f, W - 4.f, H - 4.f, R - 2.f, [&](float t) { return FLinearColor(Warm.R, Warm.G, Warm.B, (0.08f + 0.10f * FMath::Sin(T * 4.f)) * (0.4f + t) * Alpha); });
 	// specular band just inside the top edge
-	if (W > 24.f && H > 24.f) FillRR(X + R * 0.7f, Y + 3.f, W - R * 1.4f, FMath::Max(3.f, H * 0.045f), 2.f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.16f * Alpha); });
+	if (W > 24.f && H > 24.f) FillRR(X + R * 0.7f, Y + 3.f, W - R * 1.4f, FMath::Max(3.f, H * 0.045f), 2.f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, (bGreyGlass ? 0.06f : 0.16f) * Alpha); });
 	RimLight(X, Y, W, H, R, Alpha, bGlow ? Warm : FLinearColor(1.f, 1.f, 1.f, 1.f));
 	// a glint gliding slowly along the top edge
 	const float Sweep = FMath::Fmod(T * 0.16f + X * 0.0007f, 1.7f);
@@ -216,7 +217,7 @@ void AKnightHUD::Tile(float X, float Y, float W, float H, const FLinearColor& Ti
 	{
 		return FLinearColor(FMath::Lerp(Tint.R, Tint.R * 0.5f, t), FMath::Lerp(Tint.G, Tint.G * 0.5f, t), FMath::Lerp(Tint.B, Tint.B * 0.5f, t), Alpha * FMath::Lerp(1.f, 0.8f, t));
 	});
-	FillRR(X + 1.5f, Y + 1.5f, W - 3.f, H * 0.42f, R - 1.f, [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.15f, 0.f, FMath::Clamp(t * 1.4f, 0.f, 1.f))); });
+	FillRR(X + 1.5f, Y + 1.5f, W - 3.f, H * 0.42f, R - 1.f, [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(bGreyGlass ? 0.06f : 0.15f, 0.f, FMath::Clamp(t * 1.4f, 0.f, 1.f))); });
 	if (bRim) RimLight(X, Y, W, H, R, 0.8f, FLinearColor(1.f, 1.f, 1.f, 1.f));
 }
 
@@ -337,7 +338,7 @@ void AKnightHUD::ItemTip(int32 Id)
 		if (K == K_Pickaxe || K == K_Axe || K == K_Rod) L.Add(FString::Printf(TEXT("Gathers %d%% quicker than wood"), FMath::RoundToInt((1.f - ToolTimeMult(V)) * 100.f)));
 		if (!AllowsShield(K)) L.Add(TEXT("Two-handed: cannot be used with a shield"));
 	}
-	else if (K == K_Shield) { L.Add(FString::Printf(TEXT("Blocks %d damage"), DefenseOf(K, V))); }
+	else if (K == K_Shield) { L.Add(FString::Printf(TEXT("Guard %d: stops that much damage while raised, then half until it recovers"), DefenseOf(K, V))); }
 	else if (IsArmorKind(K))
 	{
 		L.Add(FString::Printf(TEXT("Defence +%d"), DefenseOf(K, V)));
@@ -403,7 +404,6 @@ void AKnightHUD::DrawHUD()
 	}
 
 	DrawText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
-	DrawText(TEXT("Tab  -  Cursor    Caps Lock  -  Tabs"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 34.f, Font, 1.0f);
 	DrawIngot(Canvas->ClipX - 340.f, 58.f, 22.f);
 	DrawText(FString::Printf(TEXT("%d"), Skills->GetIngots()), FLinearColor(1.f, 0.85f, 0.3f), Canvas->ClipX - 308.f, 58.f, Font, 1.2f);
 
@@ -481,23 +481,24 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// Shield guard: a thin steel bar just above your health while you have a shield ready, shown while blocking or recovering.
-	// A broken guard turns orange and throbs until it is full again.
+	// Shield guard: a steel bar like the health bar, just above the weapon slots. It appears when the shield comes up and goes
+	// once it is lowered, but stays while the guard is below full, until it has recovered.
+	// A broken guard throbs until it is full again.
 	if (Knight->GetGuardFraction() > 0.f || Knight->IsGuardBroken())
 	{
 		const float F = Knight->GetGuardFraction();
 		if (F < 0.999f || Knight->IsBlocking())
 		{
-			const float BY = Canvas->ClipY - 39.f;
-			const float GW = BarW * 0.6f, GX = (Canvas->ClipX - GW) * 0.5f;
-			Gauge(GX, BY, GW, 4.f, F, Knight->IsGuardBroken() ? FLinearColor(0.85f, 0.45f, 0.15f) : FLinearColor(0.55f, 0.68f, 0.85f), Knight->IsGuardBroken());
+			const float BY = Canvas->ClipY - 46.f - 46.f - 26.f;
+			const float GW = BarW, GX = BarX;
+			Gauge(GX, BY, GW, BarH, F, FLinearColor(0.64f, 0.68f, 0.75f), Knight->IsGuardBroken());   // steel
 		}
 	}
 
 	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)
 	if (Knight->IsMounted())
 	{
-		const float BY = Canvas->ClipY - 46.f - 46.f - 22.f;
+		const float BY = Canvas->ClipY - 46.f - 46.f - 40.f;   // above the shield bar
 		const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);
@@ -590,7 +591,7 @@ void AKnightHUD::DrawSkillPopup(const USkillComponent* Skills)
 	const float A = FMath::Clamp(FMath::Min(Since / 0.25f, (30.f - Since) / 1.5f), 0.f, 1.f);
 	UFont* Font = GEngine->GetMediumFont();
 	const float W = 330.f, H = 92.f;
-	const float X = 16.f - (1.f - A) * 40.f, Y = (PanelTop > 0.f ? PanelTop : Canvas->ClipY) - H - 12.f;   // just above the side panel
+	const float X = 24.f - (1.f - A) * 40.f, Y = Canvas->ClipY - H - 24.f;
 
 	const float SinceLevel = float(Now - Skills->LevelUpTime);
 	const bool bLevelGlow = SinceLevel < 4.f;
@@ -677,16 +678,25 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		}
 		if (IsGear(Id) && KindOf(Id) == K_Bow)
 			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), Sx + Ss - 26.f, Sy + 1.f, Font, 0.7f);
-		if (Over(X, Y0, SS, SS)) ItemTip(Id);
+		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(Id);   // hover with the cursor out (Tab) to read about it
 	}
 
 	// Defence total, to the right of the bar
 	{
-		const float X = X0 + TotalW + 22.f;
-		Panel(X, Y0, 74.f, SS);
+		// a slot like the weapon slots: your shield (or a plain one), leaning the same way, with your defence in blue
+		const float X = X0 + TotalW + 18.f;
+		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
-		DrawText(TEXT("DEFENCE"), FLinearColor(0.7f, 0.75f, 0.9f), X + 7.f, Y0 + 4.f, Font, 0.7f);
-		DrawText(FString::Printf(TEXT("%d"), Def), FLinearColor(0.55f, 0.75f, 1.f), X + 7.f, Y0 + 17.f, Font, 1.4f);
+		const int32 ShieldId = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
+		IconTiltDeg = 35.f; IconPivot = FVector2D(X + SS * 0.5f, Y0 + SS * 0.5f);
+		DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
+		IconTiltDeg = 0.f;
+		const FString Txt = FString::FromInt(Def);
+		float TW = 0.f, TH = 0.f;
+		GetTextSize(Txt, TW, TH, Font, 1.15f);
+		Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+		DrawText(Txt, FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
+		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Defence"), FString::Printf(TEXT("%d in all: armour%s, every bonus counted"), Def, Knight->ShieldActive() ? TEXT(" and shield") : TEXT("")) });
 	}
 }
 
@@ -1904,7 +1914,7 @@ void AKnightHUD::DrawDialogue(AKnightCharacter* Knight)
 	if (!Knight->GetDialogue(Name, Line, bLast)) return;
 	UFont* Font = GEngine->GetMediumFont();
 		// Just words along the bottom of the screen, with a dark edge so they read over anything
-	const float W = FMath::Min(960.f, Canvas->ClipX - 80.f), H = 200.f;
+	const float W = FMath::Min(1300.f, Canvas->ClipX - 80.f), H = 300.f;   // large, easy-to-read conversation text
 	const float X = (Canvas->ClipX - W) * 0.5f, Y = Canvas->ClipY - H - 110.f;
 	auto Shadowed = [&](const FString& Txt, float Tx, float Ty, float Sc, const FLinearColor& Col)
 	{
@@ -1912,19 +1922,66 @@ void AKnightHUD::DrawDialogue(AKnightCharacter* Knight)
 		DrawText(Txt, FLinearColor(0.f, 0.f, 0.f, 0.9f), Tx - 1.f, Ty + 1.f, Font, Sc);
 		DrawText(Txt, Col, Tx, Ty, Font, Sc);
 	};
-	Shadowed(Name, X + 26.f, Y + 14.f, 1.6f, FLinearColor(1.f, 0.85f, 0.3f));
-	Wrapped(Line, X + 28.f, Y + 62.f, W - 52.f, 1.25f, FLinearColor(0.f, 0.f, 0.f, 0.9f));
-	Wrapped(Line, X + 26.f, Y + 60.f, W - 52.f, 1.25f, FLinearColor(0.97f, 0.97f, 0.97f));
+	Shadowed(Name, X + 26.f, Y + 10.f, 2.4f, FLinearColor(1.f, 0.85f, 0.3f));
+	Wrapped(Line, X + 28.f, Y + 82.f, W - 52.f, 2.0f, FLinearColor(0.f, 0.f, 0.f, 0.9f));
+	Wrapped(Line, X + 26.f, Y + 80.f, W - 52.f, 2.0f, FLinearColor(0.97f, 0.97f, 0.97f));
 	const FString Hint = bLast ? TEXT("Press E or click to continue") : TEXT("Press E or click for more");
 	float TW = 0.f, TH = 0.f;
-	GetTextSize(Hint, TW, TH, Font, 1.0f);
-	Shadowed(Hint, X + W - TW - 24.f, Y + H - TH - 14.f, 1.0f, FLinearColor(1.f, 0.9f, 0.4f));
+	GetTextSize(Hint, TW, TH, Font, 1.4f);
+	Shadowed(Hint, X + W - TW - 24.f, Y + H - TH - 14.f, 1.4f, FLinearColor(1.f, 0.9f, 0.4f));
 	if (bUIClick && Over(X, Y, W, H)) Knight->AdvanceDialogue();
 }
 
 
 // ===================================================================================================
-// The side panel (lower left, always there, like RuneScape's): three tabs, Inventory, Apparel and Skills.
+// Item badges: what a piece adds, in small numbers on its icon. Red (lower left) = offence, blue (lower right) = defence.
+// A weapon just shows its damage (the middle of its range, no plus sign); armour and shields show +defence;
+// rings and amulets show what they shift (+15% attack, +2 damage, +10% defence, +20 health ...).
+// ===================================================================================================
+void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
+{
+	if (!IsGear(Id)) return;
+	UFont* Font = GEngine->GetMediumFont();
+	const int32 K = KindOf(Id), V = VariantOf(Id);
+	FString Off, Def;
+	if (IsWeaponKind(K))
+	{
+		int32 A, B;
+		WeaponDamage(K, V, A, B, V);
+		Off = FString::FromInt(FMath::RoundToInt(0.5f * (A + B)));
+	}
+	else if (K == K_Shield || IsArmorKind(K))
+	{
+		const int32 D = DefenseOf(K, V);
+		if (D > 0) Def = FString::Printf(TEXT("+%d"), D);
+	}
+	else if (IsAccessoryKind(K))
+	{
+		const FMods M = AccessoryMods(K, V);
+		const int32 AtkPct = FMath::RoundToInt((M.AttackMul - 1.f) * 100.f), DefPct = FMath::RoundToInt((M.DefenseMul - 1.f) * 100.f);
+		if (AtkPct != 0) Off = FString::Printf(TEXT("%+d%%"), AtkPct);
+		else if (M.FloorDelta != 0 || M.CeilDelta != 0) Off = FString::Printf(TEXT("%+d"), FMath::RoundToInt(0.5f * (M.FloorDelta + M.CeilDelta)));
+		else if (M.CritChance > 0.f) Off = FString::Printf(TEXT("%d%%"), FMath::RoundToInt(M.CritChance * 100.f));
+		else if (M.bWild) Off = TEXT("x2");
+		if (DefPct != 0) Def = FString::Printf(TEXT("%+d%%"), DefPct);
+		else if (M.MaxHealthBonus > 0) Def = FString::Printf(TEXT("+%d"), M.MaxHealthBonus);
+	}
+	const float Sc = FMath::Clamp(S / 76.f, 0.55f, 0.85f);
+	auto Badge = [&](const FString& T, bool bRight, const FLinearColor& Col)
+	{
+		if (T.IsEmpty()) return;
+		float W = 0.f, H = 0.f;
+		GetTextSize(T, W, H, Font, Sc);
+		const float Tx = bRight ? X + S - W - 3.f : X + 3.f, Ty = Y + S - H - 1.f;
+		DrawText(T, FLinearColor(0.f, 0.f, 0.f, 0.85f), Tx + 1.f, Ty + 1.f, Font, Sc);   // a dark edge so it reads over any icon
+		DrawText(T, Col, Tx, Ty, Font, Sc);
+	};
+	Badge(Off, false, FLinearColor(1.f, 0.38f, 0.32f));
+	Badge(Def, true, FLinearColor(0.45f, 0.72f, 1.f));
+}
+
+// ===================================================================================================
+// The side panel (lower right, always there, like RuneScape's): three tabs, Inventory, Armor and Skills.
 // Tab frees the mouse cursor to use it; Caps Lock moves to the next tab. Without the cursor it is just a display.
 // ===================================================================================================
 void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
@@ -1934,33 +1991,43 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
 
-	const float SS = 58.f, Gap = 6.f, Pad = 14.f;
-	const float GridW = 4 * SS + 3 * Gap;
-	const float PW = GridW + 2.f * Pad, TabH = 30.f;
-	const float PH = Pad + TabH + 10.f + (4 * SS + 3 * Gap) + 26.f;
-	const float PX = 16.f, PY = Canvas->ClipY - PH - 16.f;
+	const float SS = 50.f, Gap = 5.f, Pad = 10.f, TabH = 28.f;
+	const float GridW = 4 * SS + 3 * Gap, GridH = 4 * SS + 3 * Gap;
+	const float PW = GridW + 2.f * Pad;
+	const float PH = Pad + TabH + 8.f + GridH + Pad;
+	const float PX = Canvas->ClipX - PW - 16.f, PY = Canvas->ClipY - PH - 16.f;
 	PanelTop = PY;
-	Panel(PX, PY, PW, PH, 1.f, Knight->IsPanelCursor());
+	bGreyGlass = true;
+	Panel(PX, PY, PW, PH, 1.f, false);
 
-	// ---- Tabs ----
-	static const TCHAR* Names[3] = { TEXT("Inventory"), TEXT("Apparel"), TEXT("Skills") };
-	const float TW3 = (GridW - 2 * Gap) / 3.f;
+	const FLinearColor Idle(0.62f, 0.63f, 0.66f), Hover(0.86f, 0.87f, 0.9f);
+	auto SlotTile = [&](float X, float Y, float W, float H, bool bOver)
+	{
+		Tile(X, Y, W, H, bOver ? Hover : Idle, bOver ? 0.24f : 0.11f);
+	};
+
+	// ---- Tabs: the words as large as fit ----
+	static const TCHAR* Names[3] = { TEXT("Inventory"), TEXT("Armor"), TEXT("Skills") };
+	const float TW3 = (GridW - 2 * 4.f) / 3.f;
+	float LabelSc = 1.15f;
+	for (const TCHAR* N : Names)
+	{
+		float W = 0.f, H = 0.f;
+		GetTextSize(N, W, H, Font, 1.f);
+		LabelSc = FMath::Min(LabelSc, (TW3 - 8.f) / FMath::Max(W, 1.f));
+	}
 	for (int32 t = 0; t < 3; ++t)
 	{
-		const float X = PX + Pad + t * (TW3 + Gap), Y = PY + Pad;
+		const float X = PX + Pad + t * (TW3 + 4.f), Y = PY + Pad;
 		const bool bOn = Knight->GetPanelTab() == t;
 		const bool bOver = Hot(X, Y, TW3, TabH);
-		Tile(X, Y, TW3, TabH, bOn ? FLinearColor(1.f, 0.78f, 0.35f) : (bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f)), bOn ? 0.5f : (bOver ? 0.36f : 0.18f));
+		Tile(X, Y, TW3, TabH, bOn ? FLinearColor(1.f, 0.86f, 0.6f) : (bOver ? Hover : Idle), bOn ? 0.34f : (bOver ? 0.24f : 0.11f));
 		float W = 0.f, H = 0.f;
-		GetTextSize(Names[t], W, H, Font, 0.8f);
-		DrawText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.75f) : FLinearColor(0.85f, 0.88f, 0.95f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, 0.8f);
+		GetTextSize(Names[t], W, H, Font, LabelSc);
+		DrawText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.8f) : FLinearColor(0.82f, 0.83f, 0.86f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, LabelSc);
 		if (bOver && bUIClick) Knight->SetPanelTab(t);
 	}
-	const float GX = PX + Pad, GY = PY + Pad + TabH + 10.f;
-	auto SlotBox = [&](float X, float Y, float S, bool bOver)
-	{
-		Tile(X, Y, S, S, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.18f);
-	};
+	const float GX = PX + Pad, GY = PY + Pad + TabH + 8.f;
 
 	const int32 Tab = Knight->GetPanelTab();
 	if (Tab == 0)
@@ -1971,10 +2038,11 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			const float X = GX + (i % 4) * (SS + Gap), Y = GY + (i / 4) * (SS + Gap);
 			const bool bOver = Hot(X, Y, SS, SS);
 			const FInvSlot S = Skills->Slots[i];
-			SlotBox(X, Y, SS, bOver);
+			SlotTile(X, Y, SS, SS, bOver);
 			if (S.Id == 0) continue;
-			DrawIcon(S.Id, X + 6.f, Y + 5.f, SS - 12.f);
-			if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 24.f, Y + SS - 20.f, Font, 0.85f);
+			DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);
+			if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
+			ItemBadges(S.Id, X, Y, SS);
 			if (bOver)
 			{
 				ItemTip(S.Id);
@@ -1984,73 +2052,77 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	}
 	else if (Tab == 1)
 	{
-		// ---- Apparel: what you are wearing. Click to take it off (armour can only be swapped). ----
+		// ---- Armor: what you are wearing. Click to take it off (armour pieces can only be swapped). ----
 		struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
 		static const FWornSlot Worn[10] = {
 			{ K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
 			{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Shield, false, TEXT("Shield") }, { K_Ring, false, TEXT("Misc") },
 			{ K_Ring, true, TEXT("Misc") }, { K_Amulet, false, TEXT("Misc") },
 		};
-		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 16.f;
+		const float WS = 46.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 13.f;
 		for (int32 w = 0; w < 10; ++w)
 		{
 			const float X = GX + (w % 4) * (WS + WG), Y = GY + (w / 4) * RowH;
 			const bool bOver = Hot(X, Y, WS, WS);
-			SlotBox(X, Y, WS, bOver);
+			SlotTile(X, Y, WS, WS, bOver);
 			float LW = 0.f, LH = 0.f;
-			GetTextSize(Worn[w].Label, LW, LH, Font, 0.62f);
-			DrawText(Worn[w].Label, FLinearColor(0.75f, 0.78f, 0.85f), X + (WS - LW) * 0.5f, Y + WS + 1.f, Font, 0.62f);
+			GetTextSize(Worn[w].Label, LW, LH, Font, 0.6f);
+			DrawText(Worn[w].Label, FLinearColor(0.72f, 0.73f, 0.77f), X + (WS - LW) * 0.5f, Y + WS, Font, 0.6f);
 			const int32 Id = Worn[w].bSecond ? Skills->RingB : Skills->Worn[Worn[w].Kind];
 			if (Id == 0) continue;
-			DrawIcon(Id, X + 5.f, Y + 4.f, WS - 10.f);
+			DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);
+			ItemBadges(Id, X, Y, WS);
 			if (bOver)
 			{
 				ItemTip(Id);
 				if (bUIClick) Knight->UnequipWorn(Worn[w].Kind, Worn[w].bSecond);
 			}
 		}
-		// the numbers that matter
-		float Y = GY + 3 * RowH + 2.f;
-		DrawText(FString::Printf(TEXT("Defence  %d"), TotalDefense(Skills, false)), FLinearColor(0.6f, 0.78f, 1.f), GX, Y, Font, 0.9f);
-		if (Skills->Worn[K_Shield])
-			DrawText(FString::Printf(TEXT("Shield guard  %d"), DefenseOf(K_Shield, VariantOf(Skills->Worn[K_Shield]))), FLinearColor(0.6f, 0.78f, 1.f), GX + GridW * 0.5f, Y, Font, 0.9f);
-		const int32 Sel = Skills->SelectedItem();
-		if (IsGear(Sel) && IsWeaponKind(KindOf(Sel)))
-		{
-			int32 A, B;
-			HotbarDamage(Skills, Skills->Selected, A, B);
-			DrawText(FString::Printf(TEXT("In hand  %d - %d"), A, B), FLinearColor(1.f, 0.65f, 0.55f), GX, Y + 20.f, Font, 0.9f);
-		}
+		// Totals: offence is what the weapon in hand deals with every bonus counted (the middle of its range);
+		// defence is your armour with every bonus counted, plus your shield's guard when one is ready
+		const float TY = GY + 3 * RowH + 4.f, Half = GridW * 0.5f;
+		int32 A = 0, B = 0;
+		const bool bWeapon = HotbarDamage(Skills, Skills->Selected, A, B);
+		const int32 Offence = bWeapon ? FMath::RoundToInt(0.5f * (A + B)) : 0;
+		const int32 Defence = TotalDefense(Skills, false);
+		const int32 Guard = (Skills->Worn[K_Shield] && Knight->ShieldActive()) ? DefenseOf(K_Shield, VariantOf(Skills->Worn[K_Shield])) : 0;
+		const int32 SwordIcon = GearId(K_Sword, 1), ShieldIcon = GearId(K_Shield, 1);
+		Tile(GX, TY, Half - 3.f, 34.f, FLinearColor(1.f, 0.45f, 0.4f), 0.12f, false);
+		Tile(GX + Half + 3.f, TY, Half - 3.f, 34.f, FLinearColor(0.45f, 0.65f, 1.f), 0.12f, false);
+		DrawIcon(Skills->SelectedItem() && IsGear(Skills->SelectedItem()) ? Skills->SelectedItem() : SwordIcon, GX + 3.f, TY + 3.f, 28.f);
+		DrawText(FString::FromInt(Offence), FLinearColor(1.f, 0.42f, 0.36f), GX + 36.f, TY + 5.f, Font, 1.25f);
+		DrawIcon(Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : ShieldIcon, GX + Half + 6.f, TY + 3.f, 28.f);
+		DrawText(Guard > 0 ? FString::Printf(TEXT("%d  +%d"), Defence, Guard) : FString::FromInt(Defence), FLinearColor(0.5f, 0.75f, 1.f), GX + Half + 39.f, TY + 5.f, Font, 1.25f);
+		if (Hot(GX, TY, Half, 34.f)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
+		if (Hot(GX + Half, TY, Half, 34.f)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Armour %d, all bonuses counted"), Defence),
+			Guard > 0 ? FString::Printf(TEXT("Shield guard %d (stops that much while raised)"), Guard) : FString(TEXT("No shield ready")) });
 	}
 	else
 	{
 		// ---- Skills: a 3 x 3 board, icon and level; hover for the XP ----
 		static const ESkillType Order[9] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
 			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking };
-		const float BW = (GridW - 2 * Gap) / 3.f, BH = (4 * SS + 3 * Gap - 2 * Gap) / 3.f;
+		const float BW = (GridW - 2 * Gap) / 3.f, BH = (GridH - 2 * Gap) / 3.f;
 		for (int32 i = 0; i < 9; ++i)
 		{
 			const ESkillType T = Order[i];
 			const float X = GX + (i % 3) * (BW + Gap), Y = GY + (i / 3) * (BH + Gap);
 			const bool bOver = Hot(X, Y, BW, BH);
-			Tile(X, Y, BW, BH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.18f);
+			SlotTile(X, Y, BW, BH, bOver);
 			int32 Lv, Into, Need;
 			Skills->GetProgress(T, Lv, Into, Need);
-			DrawSkillIcon(static_cast<int32>(T), X + 6.f, Y + 6.f, BH - 26.f);
+			DrawSkillIcon(static_cast<int32>(T), X + 5.f, Y + 5.f, BH - 22.f);
 			const FString LvS = FString::FromInt(Lv);
 			float LW = 0.f, LH = 0.f;
-			GetTextSize(LvS, LW, LH, Font, 1.25f);
-			DrawText(LvS, FLinearColor(1.f, 0.9f, 0.45f), X + BW - LW - 6.f, Y + BH - LH - 14.f, Font, 1.25f);
+			GetTextSize(LvS, LW, LH, Font, 1.2f);
+			DrawText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + BW - LW - 5.f, Y + BH - LH - 10.f, Font, 1.2f);
 			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
-			Gauge(X + 6.f, Y + BH - 8.f, BW - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
+			Gauge(X + 6.f, Y + BH - 7.f, BW - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
 			if (bOver)
 				SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d / %d XP  (%d to level %d)"), Into, Need, FMath::Max(0, Need - Into), Lv + 1) });
 		}
 	}
-
-	// how to use it
-	DrawText(Knight->IsPanelCursor() ? TEXT("Tab: back to the game    Caps Lock: next tab") : TEXT("Tab: use the panel    Caps Lock: next tab"),
-		FLinearColor(0.8f, 0.82f, 0.9f, 0.7f), PX + Pad, PY + PH - 22.f, Font, 0.62f);
+	bGreyGlass = false;
 }
 
 // ---------------------------------------------------------------------------------------------------

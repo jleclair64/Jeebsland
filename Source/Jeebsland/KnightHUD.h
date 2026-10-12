@@ -59,6 +59,8 @@ private:
 	void DrawInventoryScreen(AKnightCharacter* Knight);
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
 	float PanelTop = 0.f;
+	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
+	void ItemBadges(int32 Id, float X, float Y, float S);   // small red (offence) and blue (defence) numbers on an item icon
 	void DrawShopScreen(AKnightCharacter* Knight);
 	void DrawSmithScreen(AKnightCharacter* Knight);
 	void DrawDialogue(AKnightCharacter* Knight);
