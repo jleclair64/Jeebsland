@@ -46,6 +46,8 @@ public:
 	AKnightCharacter();
 
 	virtual void Tick(float DeltaSeconds) override;
+	// On a horse, steering is like a car: W goes forward along the horse, A and D turn it (it cannot slide sideways), S only brakes.
+	virtual void DoMove(float Right, float Forward) override;
 	virtual void Jump() override; // also stands you up from a bench, and ends a slide
 
 	// For the HUD
@@ -218,6 +220,7 @@ private:
 	float HorseEnergy = 100.f;
 	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
 	float HorseSpeedNow = 0.f;   // the horse's current top speed while ridden (ramps up when sprinting)
+	bool bSavedOrientMount = true;
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;

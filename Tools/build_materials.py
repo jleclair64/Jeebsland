@@ -419,6 +419,31 @@ def build_star():
     finish(mat, "M_Star")
 
 
+def build_wood(name, tex, vertical):
+    # Wood for the village palisade and its walkways. The bark picture is laid on in world space (so it does not stretch with a
+    # log's length or a beam's scale), with the grain running up the logs (vertical) or along the beams and planks (horizontal);
+    # each log is shifted along the picture, so no two look alike. The colour comes from a Color parameter, like M_Color.
+    mat = fresh_material(name)
+    set_flags(mat, ("used_with_instanced_static_meshes",))
+    g = Graph(mat)
+    wp = g.node(unreal.MaterialExpressionWorldPosition)
+    wx = g.mask(wp, True, False, False)
+    wy = g.mask(wp, False, True, False)
+    wz = g.mask(wp, False, False, True)
+    rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
+    along = g.addn(g.mul(g.addn(wx, wy), 1.0 / 150.0), g.mul(rnd, 5.3))   # across the grain, a different slice for each piece
+    up = g.mul(wz, 1.0 / 170.0)
+    uv = g.node(unreal.MaterialExpressionAppendVector)
+    g.link(along if vertical else up, uv, "A")
+    g.link(up if vertical else along, uv, "B")
+    col = g.mul(g.muln(g.tex(tex, uv), g.vector("Color", (0.3, 0.17, 0.08)), "RGB"), 2.0)
+    g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.mul(col, 0.04), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # deep shade stays a readable brown
+    g.out(g.node(unreal.MaterialExpressionConstant, r=1.0), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.0), unreal.MaterialProperty.MP_SPECULAR)
+    finish(mat, name)
+
+
 def build_smoke():
     # A puff of poison smoke: unlit purple, denser toward the middle of each ball and wispy at the rim (a view-angle falloff),
     # fading out where it meets the ground so it does not cut a hard line. Overlapping puffs make the cloud.
@@ -590,6 +615,9 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves stay bright even in shade
 build_bark(imported(gen_textures.bark(), "T_Bark"))
+bark_tex = unreal.EditorAssetLibrary.load_asset("/Game/T_Bark")
+build_wood("M_WoodV", bark_tex, True)    # logs and stakes: grain runs up
+build_wood("M_WoodH", bark_tex, False)   # beams and planks: grain runs along
 
 build_star()
 build_smoke()

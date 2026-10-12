@@ -28,6 +28,8 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Decisions and preferences:**
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
+- Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a tight radius, S only brakes, no sideways movement.
+- Village palisade wood uses `M_WoodV`/`M_WoodH` (world-space bark grain); other buildings still use flat colours.
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.
 - Defence XP comes only from blows blocked with a raised shield (armour hits and hazards train nothing). Attack and Defence level quietly: no skill popup. Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
 - `ASmokeCloud` (purple poison smoke test hazard) sits beside the horse spawn; delete the spawn line in KnightGameMode.cpp when the owner is done with it.

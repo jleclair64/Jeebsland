@@ -65,9 +65,15 @@ void AVillage::BeginPlay()
 	SetActorLocation(FVector::ZeroVector);
 
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	// Logs, stakes, beams and planks use real-looking wood (grain up for the logs, along for the beams), if the materials are built
+	UMaterialInterface* WoodV = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_WoodV.M_WoodV"));
+	UMaterialInterface* WoodH = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_WoodH.M_WoodH"));
 	for (const TPair<UInstancedStaticMeshComponent*, FLinearColor>& T : Tints)
 	{
-		if (UMaterialInstanceDynamic* M = T.Key->CreateDynamicMaterialInstance(0, Base))
+		UMaterialInterface* Mat = Base;
+		if (T.Key == Log || T.Key == Tip) { if (WoodV) Mat = WoodV; }
+		else if (T.Key == Beam || T.Key == Plank) { if (WoodH) Mat = WoodH; }
+		if (UMaterialInstanceDynamic* M = T.Key->CreateDynamicMaterialInstance(0, Mat))
 		{
 			M->SetVectorParameterValue(TEXT("Color"), T.Value);
 		}

@@ -784,10 +784,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			float Dx, Dy;
 			Rot(FVector2D(WX, WY), Dx, Dy);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(T, TW, TH, Font, 1.36f);
-			const float X = Cx + Dx * (Half + 5.f), Y = Cy + Dy * (Half + 5.f);
-			DrawCircle(X, Y, 14.4f, FLinearColor(0.10f, 0.11f, 0.10f, 0.5f));
-			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.36f);
+			GetTextSize(T, TW, TH, Font, 1.7f);
+			const float X = Cx + Dx * (Half + 6.f), Y = Cy + Dy * (Half + 6.f);
+			DrawCircle(X, Y, 18.f, FLinearColor(0.10f, 0.11f, 0.10f, 0.5f));
+			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
 		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.82f, 0.28f, 1.f));   // north is world +X, east +Y

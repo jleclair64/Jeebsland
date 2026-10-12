@@ -1340,14 +1340,15 @@ void AKnightCharacter::Mount(AHorse* H)
 	bHorseTired = false;
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 2.f;
-	GetCharacterMovement()->RotationRate = FRotator(0.f, 130.f, 0.f);   // a horse turns in a wide, smooth arc, not on the spot
+	bSavedOrientMount = GetCharacterMovement()->bOrientRotationToMovement;
+	GetCharacterMovement()->bOrientRotationToMovement = false;   // the horse faces where it steers, not where it is pushed
 }
 
 void AKnightCharacter::Dismount()
 {
 	if (!bMounted) return;
 	bMounted = false;
-	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);   // back to the knight's quick turning
+	GetCharacterMovement()->bOrientRotationToMovement = bSavedOrientMount;
 	if (AHorse* H = MyHorse.Get()) H->SetRider(nullptr);
 	// Hop off to the right of the horse
 	SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));
@@ -2245,4 +2246,17 @@ void AKnightCharacter::HurtHorse(float Amount)
 {
 	HorseHealth = FMath::Clamp(HorseHealth - Amount, 0.f, HorseMaxHealth);
 	LastHorseHurtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+}
+
+void AKnightCharacter::DoMove(float Right, float Forward)
+{
+	if (!bMounted) { Super::DoMove(Right, Forward); return; }
+	// Like a car in a game: the horse only goes forward, and turns on a tight circle. The faster it goes, the quicker it
+	// turns (a fixed turning radius of about 3.5 m, capped), and standing still it can still swing round slowly.
+	const float Dt = GetWorld()->GetDeltaSeconds();
+	const float Speed = GetVelocity().Size2D();
+	const float TurnRate = FMath::Clamp(FMath::RadiansToDegrees(Speed / 350.f), 45.f, 125.f);   // degrees per second
+	if (!FMath::IsNearlyZero(Right))
+		SetActorRotation(FRotator(0.f, GetActorRotation().Yaw + Right * TurnRate * Dt, 0.f));
+	AddMovementInput(GetActorForwardVector(), FMath::Max(Forward, 0.f));   // S only lets go (no reversing)
 }
