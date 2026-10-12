@@ -723,6 +723,12 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float Air = AirAlpha;
 	const float Ground = 1.f - Air;
 	const float Duck = FMath::Max(CrouchAlpha, BlockAlpha) * Ground; // how low the knight is sitting
+	// Crouching (Ctrl) is a deep squat, thighs about level and knees well forward like a person squatting low; the shield
+	// guard keeps its own shallower crouch. Both can be on at once (the deeper legs win; the shield arm still comes up).
+	const float DuckC = CrouchAlpha * Ground, DuckB = BlockAlpha * Ground;
+	const float DuckHip = FMath::Max(55.f * DuckB, 100.f * DuckC);
+	const float DuckKnee = FMath::Min(-95.f * DuckB, -140.f * DuckC);
+	const float DuckLean = FMath::Max(14.f * DuckB, 24.f * DuckC);   // a person squatting low leans forward to keep balance
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
 	// ---------- Gait clock: faster strides when running ----------
@@ -774,10 +780,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float KneeRa = -FMath::Lerp(FMath::Lerp(55.f, 85.f, Asym), 25.f, F01);
 	const float KneeLa = -FMath::Lerp(FMath::Lerp(55.f, 40.f, Asym), 20.f, F01);
 
-	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * Squash + 55.f * Duck;
-	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + 55.f * Duck;
-	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash - 95.f * Duck;
-	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash - 95.f * Duck;
+	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * Squash + DuckHip;
+	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + DuckHip;
+	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash + DuckKnee;
+	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash + DuckKnee;
 	// Standing still: slow breathing (the chest rises, the knees ease a little), like the idle in Breath of the Wild
 	const float IdleAmt = (1.f - MoveBlend) * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
 	const float BreathS = FMath::Sin(IdleTime * 1.65f);   // one breath every 3.8 s
@@ -822,8 +828,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);
 	// Bent knees (relaxed stance, crouching, guarding, landing): the body sinks exactly as far as the legs fold, so the
 	// flat feet stay on the ground (thigh 23 cm, shin 23.5 cm)
-	const float PoseH = 35.f * Squash + 55.f * Duck + Stance * Relax;
-	const float PoseK = -70.f * Squash - 95.f * Duck - 2.f * Stance * Relax;
+	const float PoseH = 35.f * Squash + DuckHip + Stance * Relax;
+	const float PoseK = -70.f * Squash + DuckKnee - 2.f * Stance * Relax;
 	const float LegDrop = 23.f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + 23.5f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
 	float BodyZ = FMath::Lerp(Bounce, 0.f, Air) - LegDrop;
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
@@ -842,7 +848,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
 	// at ease the chest leans a little forward (not standing against a wall) and lifts with each breath
-	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - 14.f * Duck - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
+	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - DuckLean - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
 	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
 	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
@@ -868,7 +874,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
+	// (crouched, the head also takes back the rest of the squat's lean, so the helm looks the same way as when standing)
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
 
 	// ---------- Cape and plume ----------
 	const float FlapAmp = 3.f + 9.f * Stream;

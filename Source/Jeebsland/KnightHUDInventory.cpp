@@ -363,7 +363,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 // ---------------------------------------------------------------------------------------------------
 void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 {
-	if (!Knight->IsPanelCursor() || !bUIHaveMouse) { DragKind = 0; bDragging = false; return; }
+	if (!Knight->IsPanelCursor() || !bUIHaveMouse || Knight->IsBankOpen()) { DragKind = 0; bDragging = false; return; }   // (the bank screen does its own dragging)
 	USkillComponent* Sk = Knight->GetSkills();
 	const FVector2D M(UIMouseX, UIMouseY);
 	auto OverCell = [&](float X, float Y, float S) { return M.X >= X && M.X <= X + S && M.Y >= Y && M.Y <= Y + S; };

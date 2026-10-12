@@ -179,6 +179,11 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		if (A < 0) { for (int32 i = 0; i < Sk->Slots.Num(); ++i) Sk->BankDeposit(i); }
 		else Sk->BankDeposit(A);
 		break;
+	case EInvOp::BankDepositHot:
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Banker))) break;
+		if (Sk->BankDepositHot(A)) bGear = true;
+		else Sk->Say(2.f, Warn, TEXT("The bank has no room for it."));
+		break;
 	case EInvOp::BankWithdraw:
 		if (NearTrader(static_cast<uint8>(ENpcRole::Banker))) Sk->BankWithdraw(A);
 		break;

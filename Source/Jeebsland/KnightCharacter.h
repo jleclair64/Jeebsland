@@ -70,6 +70,7 @@ enum class EInvOp : uint8
 	PickLock,       // At: the cottage
 	Gather,         // At: the rock, tree or fishing spot
 	Lore,           // A lore entry (heard from a villager)
+	BankDepositHot, // A bar slot: that weapon into the bank
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse

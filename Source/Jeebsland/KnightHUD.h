@@ -149,6 +149,7 @@ private:
 	void BuildMapTex();
 	void DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float S);
 	int32 BankPage = 0;
+	int32 BankDragHot = -1;   // a weapon being dragged from the weapon bar onto the bank
 	int32 LoreCat = 0;
 	int32 LoreSel = -1;
 	int32 DictEntry = 0;

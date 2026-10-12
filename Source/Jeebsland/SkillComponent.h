@@ -107,6 +107,7 @@ public:
 	UPROPERTY(Replicated) TArray<FInvSlot> Bank;
 	bool BankDeposit(int32 PackIdx);     // the whole stack; false if the bank has no room
 	bool BankWithdraw(int32 BankIdx);    // the whole stack (or as much as fits in the pack)
+	bool BankDepositHot(int32 H);        // a weapon straight from the weapon bar
 	int32 BankUsed() const;
 
 	// The 16 inventory slots (drawn by the HUD, changed by the shops and equipping)

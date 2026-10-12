@@ -451,6 +451,14 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 	return true;
 }
 
+bool USkillComponent::BankDepositHot(int32 H)
+{
+	if (!HasAuth() || H < 0 || H >= 5 || Hotbar[H] == 0) return false;
+	if (PutInto(Bank, Hotbar[H], 1) > 0) return false;   // the bank is full
+	Hotbar[H] = 0;
+	return true;
+}
+
 bool USkillComponent::BankWithdraw(int32 BankIdx)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack

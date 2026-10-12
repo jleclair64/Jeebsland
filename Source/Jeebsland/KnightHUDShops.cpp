@@ -369,7 +369,20 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	if (Btn(BX0, PgY, 90.f, 32.f, TEXT("< PREV"), BankPage > 0, false, 1.0f)) BankPage = FMath::Max(0, BankPage - 1);
 	if (Btn(BX0 + 100.f, PgY, 90.f, 32.f, TEXT("NEXT >"), BankPage < Pages - 1, false, 1.0f)) BankPage = FMath::Min(Pages - 1, BankPage + 1);
 	HDText(FString::Printf(TEXT("Page %d / %d   (mouse wheel also turns pages)"), BankPage + 1, Pages), FLinearColor(0.8f, 0.8f, 0.8f), BX0 + 210.f, PgY + 6.f, Font, 1.0f);
-	HDText(TEXT("Gear you are wearing or holding stays on you. Press E to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 34.f, Font, 1.0f);
+	// Weapons can be dragged from the weapon bar (at the bottom of the screen) onto the bank
+	if (bHotCells && bUIClick && BankDragHot < 0)
+		for (int32 h = 0; h < 5; ++h)
+			if (Sk->Hotbar[h] != 0 && Over(HotCellX[h], HotCellY[h], HotCellS, HotCellS)) BankDragHot = h;
+	if (BankDragHot >= 0)
+	{
+		if (Sk->Hotbar[BankDragHot] != 0) DrawIcon(Sk->Hotbar[BankDragHot], UIMouseX - 28.f, UIMouseY - 28.f, 56.f);
+		if (bUIRelease || !bUIWasDown)
+		{
+			if (Over(PX, PY, PW, PH)) Knight->Inv(EInvOp::BankDepositHot, BankDragHot);
+			BankDragHot = -1;
+		}
+	}
+	HDText(TEXT("Worn gear stays on you. Drag weapons from your weapon bar onto the bank to store them. Press E to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 34.f, Font, 1.0f);
 }
 
 
