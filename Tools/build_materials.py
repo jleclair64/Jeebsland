@@ -77,15 +77,22 @@ def add_wind(mat, strength, tip_only, lift):
     flutter_amp = add(mul(gust2, 0.35), 0.15)
     total = addn(gust2, muln(flutter, flutter_amp))           # lean downwind as a gust passes, plus the flutter
 
-    # Big gust fronts: every ~17 s a wide line (about 30 m across, ragged along its length) sweeps downwind at 7 m/s and
-    # pushes the grass over hard. A slow gate lets some fronts fade out so they do not arrive like clockwork.
-    front_phase = addn(addn(mul(wx, 0.0000783), mul(wy, 0.0000283)), mul(t, -0.0583))   # 120 m between fronts
-    crest = node(unreal.MaterialExpressionSaturate); link(mul(add(sine(front_phase), -0.55), 2.2), crest)
+    # Big gust fronts, in spurts. A wide line sweeps downwind at 7 m/s; fronts come ~5 s apart inside a spurt, and a slow,
+    # position-dependent gate opens for ~15 s (so 2-4 fronts) then closes for ~20 s. Spurt timing differs from place to
+    # place (about one front every 10 s per 100 m square on average). Spacing is warped so it is never evenly timed, the
+    # line bends, and each front covers a different stretch of the land, so they are never lined up with each other.
+    warp = mul(sine(addn(mul(wx, 0.00011), addn(mul(wy, 0.00007), mul(t, 0.137)))), 0.2)
+    bend = mul(sine(addn(mul(wy, 0.00016), mul(t, 0.011))), 0.12)
+    front_phase = addn(addn(addn(mul(wx, 0.000269), mul(wy, 0.0000971)), mul(t, -0.2)), addn(warp, bend))   # 35 m between fronts
+    crest = node(unreal.MaterialExpressionSaturate); link(mul(add(sine(front_phase), -0.2), 2.4), crest)
     crest = muln(crest, crest)
-    along = add(mul(sine(addn(addn(mul(wy, 0.00005), mul(wx, -0.00002)), mul(t, 0.012))), 0.3), 0.7)   # the line is longer in places
-    gate = node(unreal.MaterialExpressionSaturate); link(mul(add(sine(addn(mul(t, 0.021), mul(wx, 0.000017))), 0.45), 1.6), gate)
+    perp = addn(mul(wy, 0.94), mul(wx, -0.34))
+    along = node(unreal.MaterialExpressionSaturate)
+    link(add(mul(sine(addn(mul(perp, 0.000143), mul(front_phase, 0.37))), 1.6), 0.15), along)   # each front covers a different 35 m stretch
+    gate = node(unreal.MaterialExpressionSaturate)
+    link(mul(add(sine(addn(addn(mul(t, 0.0278), mul(wx, 0.000066)), mul(wy, 0.000048))), -0.2), 3.0), gate)
     front = muln(muln(crest, along), gate)
-    total = addn(total, mul(front, 1.7))
+    total = addn(total, mul(front, 2.8 if tip_only else 0.8))   # trees only ripple a little
 
     if tip_only:
         uv = node(unreal.MaterialExpressionTextureCoordinate)

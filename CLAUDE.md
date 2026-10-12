@@ -26,14 +26,21 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Check first next time:** frame rate (volumetric clouds, many leaf cards, leaf shadows; if slow, thin leaf cards or drop leaf shadows first); whether stars draw over the new clouds at low sun; cape motion; trunk lighting on the sun side.
 
 **Decisions and preferences:**
+- UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
+- Rings and amulets share three miscellaneous slots (any mix).
 - Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
 - Sun never sets: lowest point 11 degrees, noon 41. Day loop is 60 s per half for preview; owner will ask to change it to 1200 s.
 - Armour can be swapped but never removed (starts as a full bronze suit); cape starts black.
 - Minimap rotates with the camera. Store restocks hourly with a mystery satchel.
-- Always keep grass near buildings (fort, cottages, castle, etc.) about 40% shorter than open-field grass, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
+- Always keep grass near buildings (fort, cottages, castle, etc.) a bit shorter than open-field grass (about 22% shorter, the owner found 40% too short and the crossed cards showed), with wider overlapping tufts there to hide the cards, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
 - Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
 
 **Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
+
+## Pending: do these in a fresh Opus 5.5 (high effort) session, and remind the owner at the end of every session until done
+
+1. Cape: fix the white thing showing under the cape (the knight's lower back), and give the cape more weight so it looks heavy.
+2. Shield and weapon stowing: during any action like climbing or riding the horse, the shield goes on the back behind the cape, and the sword sits diagonal on the back, under the shield.
 
 ## Checking visuals
 

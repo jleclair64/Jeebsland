@@ -255,11 +255,12 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 		return true;
 	}
 	if (K < 0 || K >= NumWornKinds) return false;
-	if (K == JeebItems::K_Ring)
+	if (JeebItems::IsAccessoryKind(K))
 	{
-		if (Worn[K] == 0) Swap(Worn[K]);
-		else if (RingB == 0) Swap(RingB);
-		else Swap(Worn[K]);
+		// three miscellaneous slots hold any mix of rings and amulets: the first free one, or swap with the first
+		int32* Misc[3] = { &Worn[JeebItems::K_Ring], &RingB, &Worn[JeebItems::K_Amulet] };
+		for (int32* M : Misc) if (*M == 0) { Swap(*M); return true; }
+		Swap(*Misc[0]);
 		return true;
 	}
 	Swap(Worn[K]);

@@ -442,8 +442,8 @@ namespace JeebItems
 		case K_Gloves:     return TEXT("Armoured gauntlets for the hands.");
 		case K_Boots:      return TEXT("Armoured boots. Better boots also give you more stamina: it lasts longer and returns faster.");
 		case K_Cape:       return TEXT("A cloak in your choice of colour. Purely for style.");
-		case K_Ring:       return TEXT("Rings shift damage and defence. You can wear two. Every effect is on top of the weapon's own damage range.");
-		case K_Amulet:     return TEXT("One amulet at a time. Some change the damage rules in strange ways.");
+		case K_Ring:       return TEXT("Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range.");
+		case K_Amulet:     return TEXT("Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways.");
 		}
 		return TEXT("");
 	}

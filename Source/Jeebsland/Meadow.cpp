@@ -270,10 +270,12 @@ void AMeadow::StepJob(double BudgetSeconds)
 				const float Cov = JeebCanopy::Cover(X, Y);
 				Short *= 1.f - 0.72f * Cov;                                          // about ankle height under the crown
 				const bool bThin = Cov > 0.f && JobRand.FRand() < 0.35f * Cov;     // and a little sparser
-				// beside every building (huts, stalls, the castle, the village inside its palisade, the forts) the grass is 40% shorter,
+				// beside every building (huts, stalls, the castle, the village inside its palisade, the forts) the grass is a little shorter,
 				// easing back up to full height over about 7 m so it never reads as tall-then-suddenly-short
-				Short *= 1.f - 0.4f * JeebTerrain::BuildingNearness(X, Y);
-				if (!bThin) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Sxy * FMath::Lerp(0.75f, 1.f, Short), Sxy * FMath::Lerp(0.75f, 1.f, Short), Sz * (1.f + 0.1f * JobTier) * Short)));
+				const float Near = JeebTerrain::BuildingNearness(X, Y);
+				Short *= 1.f - 0.22f * Near;   // a bit shorter beside buildings (taller than before, so the crossed cards stand up)
+				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, Short) * (1.f + 0.35f * Near);   // and wider there, so the tufts overlap into one mat and the individual cards disappear
+				if (!bThin) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
 			}
 		}
 		if ((JobDone & 15) == 0 && FPlatformTime::Seconds() > End) return;

@@ -32,7 +32,10 @@ private:
 	void ItemTip(int32 Id);
 	void DrawTip();
 	static FLinearColor Lift(const FLinearColor& C, float F);
-	// Warm, lively frames: a panel with a gradient, gold border, studs and a slow shimmer; and a bevelled gauge with a sheen
+	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
+	void FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt);
+	void RimLight(float X, float Y, float W, float H, float R, float Alpha, const FLinearColor& Tint);
+	void Tile(float X, float Y, float W, float H, const FLinearColor& Tint, float Alpha = 0.35f, bool bRim = true);
 	void Panel(float X, float Y, float W, float H, float Alpha = 1.f, bool bGlow = false);
 	void Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse = false);
 

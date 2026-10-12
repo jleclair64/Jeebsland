@@ -64,61 +64,127 @@ float AKnightHUD::Wrapped(const FString& Text, float X, float Y, float MaxW, flo
 	return Cy - Y;
 }
 
-// A lively panel: a warm dark-brown gradient, a gold border with a dark inner line, studs in the corners, and a soft
-// highlight that glides along the top edge every few seconds. bGlow pulses the border (the selected slot).
-void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
+// ---------------------------------------------------------------------------------------------------
+// "Liquid glass" look. The canvas cannot blur what is behind a panel, so the glass is faked in layers: a cool,
+// translucent body that is a little darker toward the bottom (so text stays readable over anything), a soft white sheen
+// down from the top, a bright specular band under the top edge, and a thin rim of light that is strongest on the upper
+// left and fades round to the lower right, with a slow glint travelling along the top.
+// ---------------------------------------------------------------------------------------------------
+
+// A rounded rectangle filled with a colour that varies from the top (t = 0) to the bottom (t = 1)
+void AKnightHUD::FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt)
 {
-	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.35f * Alpha), X + 3.f, Y + 4.f, W, H);   // soft drop shadow
-	const int32 Strips = FMath::Clamp(FMath::RoundToInt(H / 6.f), 4, 40);
-	for (int32 i = 0; i < Strips; ++i)
+	R = FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f);
+	const int32 N = FMath::Max(1, FMath::CeilToInt(R / 1.5f));
+	const float Row = R / N;
+	for (int32 i = 0; i < N; ++i)
 	{
-		const float A = float(i) / float(Strips);
-		const FLinearColor C(FMath::Lerp(0.19f, 0.07f, A), FMath::Lerp(0.13f, 0.05f, A), FMath::Lerp(0.08f, 0.04f, A), 0.93f * Alpha);
-		DrawRect(C, X, Y + H * A, W, H / Strips + 0.6f);
+		const float Dy = (i + 0.5f) * Row;
+		const float Inset = R - FMath::Sqrt(FMath::Max(0.f, R * R - (R - Dy) * (R - Dy)));
+		const float Ty = Y + i * Row, By = Y + H - (i + 1) * Row;
+		DrawRect(ColorAt((Ty + Row * 0.5f - Y) / H), X + Inset, Ty, W - 2.f * Inset, Row + 0.4f);
+		DrawRect(ColorAt((By + Row * 0.5f - Y) / H), X + Inset, By, W - 2.f * Inset, Row + 0.4f);
 	}
-	const float Pulse = bGlow ? 0.5f + 0.5f * FMath::Sin(T * 4.f) : 0.f;
-	const FLinearColor Gold = bGlow ? FLinearColor(1.f, FMath::Lerp(0.62f, 0.85f, Pulse), FMath::Lerp(0.2f, 0.4f, Pulse), Alpha) : FLinearColor(0.62f, 0.42f, 0.14f, Alpha);
-	DrawRect(Gold, X, Y, W, 2.f); DrawRect(Gold, X, Y + H - 2.f, W, 2.f);
-	DrawRect(Gold, X, Y, 2.f, H); DrawRect(Gold, X + W - 2.f, Y, 2.f, H);
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.55f * Alpha), X + 2.f, Y + 2.f, W - 4.f, 1.f);                   // dark inner line
-	DrawRect(FLinearColor(1.f, 0.85f, 0.5f, 0.22f * Alpha), X + 3.f, Y + 3.f, W - 6.f, 1.f);                 // light edge under it
-	if (W > 90.f && H > 90.f)
-		for (int32 c = 0; c < 4; ++c)   // studs in the corners
-			DrawRect(FLinearColor(0.85f, 0.62f, 0.25f, Alpha), X + 6.f + (c & 1) * (W - 18.f), Y + 6.f + (c >> 1) * (H - 18.f), 6.f, 6.f);
-	// the glint: a short bright run along the top edge, sweeping across once in a while
-	const float Sweep = FMath::Fmod(T * 0.18f + X * 0.0007f, 1.6f);
-	if (Sweep < 1.f)
+	const float MidTop = Y + R, MidH = H - 2.f * R;
+	if (MidH > 0.f)
 	{
-		const float GW = FMath::Min(90.f, W * 0.4f), GX = X + (W - GW) * Sweep;
-		DrawRect(FLinearColor(1.f, 0.9f, 0.6f, 0.55f * Alpha * FMath::Sin(Sweep * PI)), GX, Y, GW, 2.f);
+		const int32 Bands = FMath::Max(1, FMath::CeilToInt(MidH / 8.f));
+		for (int32 b = 0; b < Bands; ++b)
+		{
+			const float By = MidTop + MidH * b / Bands, Bh = MidH / Bands;
+			DrawRect(ColorAt((By + Bh * 0.5f - Y) / H), X, By, W, Bh + 0.4f);
+		}
 	}
 }
 
-// A bevelled gauge: dark well, a fill that is brighter along the top and darker below, tick marks, and a slow sheen.
+// The rim of light round a rounded rectangle: bright upper left, fading to the lower right
+void AKnightHUD::RimLight(float X, float Y, float W, float H, float R, float Alpha, const FLinearColor& Tint)
+{
+	R = FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f);
+	const float Th = 1.6f;
+	auto C = [&](float A) { return FLinearColor(Tint.R, Tint.G, Tint.B, A * Alpha); };
+	DrawRect(C(0.62f), X + R, Y, W - 2.f * R, Th);                 // top
+	DrawRect(C(0.18f), X + R, Y + H - Th, W - 2.f * R, Th);        // bottom
+	DrawRect(C(0.42f), X, Y + R, Th, H - 2.f * R);                 // left
+	DrawRect(C(0.14f), X + W - Th, Y + R, Th, H - 2.f * R);        // right
+	const int32 N = FMath::Max(5, FMath::CeilToInt(R / 1.4f));
+	const float Strength[4] = { 0.62f, 0.30f, 0.30f, 0.14f };       // top left, top right, bottom left, bottom right
+	for (int32 c = 0; c < 4; ++c)
+	{
+		const float Cx = (c & 1) ? X + W - R : X + R, Cy = (c & 2) ? Y + H - R : Y + R;
+		const float Sx = (c & 1) ? 1.f : -1.f, Sy = (c & 2) ? 1.f : -1.f;
+		for (int32 k = 0; k <= N; ++k)
+		{
+			const float A = 0.5f * PI * k / N;
+			DrawRect(C(Strength[c]), Cx + Sx * R * FMath::Cos(A) - Th * 0.5f, Cy + Sy * R * FMath::Sin(A) - Th * 0.5f, Th, Th);
+		}
+	}
+}
+
+void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
+{
+	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float R = FMath::Clamp(FMath::Min(W, H) * 0.22f, 8.f, 30.f);
+	const FLinearColor Warm(1.f, 0.82f, 0.45f, 1.f);
+	for (int32 k = 3; k >= 1; --k)   // a soft shadow underneath, so the glass lifts off the world
+		FillRR(X - k * 2.f, Y + 5.f - k, W + k * 4.f, H + k * 4.f, R + k * 2.f, [&](float) { return FLinearColor(0.f, 0.f, 0.02f, 0.07f * Alpha); });
+	FillRR(X, Y, W, H, R, [&](float t)   // the body: cool and clear, deeper toward the bottom
+	{
+		return FLinearColor(FMath::Lerp(0.10f, 0.04f, t), FMath::Lerp(0.15f, 0.07f, t), FMath::Lerp(0.22f, 0.12f, t), FMath::Lerp(0.50f, 0.64f, t) * Alpha);
+	});
+	FillRR(X + 2.f, Y + 2.f, W - 4.f, H * 0.55f, R - 2.f, [&](float t)   // sheen pouring down from the top edge
+	{
+		return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.20f, 0.f, FMath::Clamp(t * 1.2f, 0.f, 1.f)) * Alpha);
+	});
+	if (bGlow) FillRR(X + 2.f, Y + 2.f, W - 4.f, H - 4.f, R - 2.f, [&](float t) { return FLinearColor(Warm.R, Warm.G, Warm.B, (0.08f + 0.10f * FMath::Sin(T * 4.f)) * (0.4f + t) * Alpha); });
+	// specular band just inside the top edge
+	if (W > 24.f && H > 24.f) FillRR(X + R * 0.7f, Y + 3.f, W - R * 1.4f, FMath::Max(3.f, H * 0.045f), 2.f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.16f * Alpha); });
+	RimLight(X, Y, W, H, R, Alpha, bGlow ? Warm : FLinearColor(1.f, 1.f, 1.f, 1.f));
+	// a glint gliding slowly along the top edge
+	const float Sweep = FMath::Fmod(T * 0.16f + X * 0.0007f, 1.7f);
+	if (Sweep < 1.f && W > 60.f)
+	{
+		const float GW = FMath::Min(110.f, W * 0.35f), GX = X + R + (W - 2.f * R - GW) * Sweep;
+		FillRR(GX, Y, GW, 2.4f, 1.2f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.7f * Alpha * FMath::Sin(Sweep * PI)); });
+	}
+}
+
+// A small glass tile: buttons, slots, rows. Tint colours it (a hover or an active state); Alpha is its strength.
+void AKnightHUD::Tile(float X, float Y, float W, float H, const FLinearColor& Tint, float Alpha, bool bRim)
+{
+	const float R = FMath::Clamp(FMath::Min(W, H) * 0.24f, 4.f, 14.f);
+	FillRR(X, Y, W, H, R, [&](float t)
+	{
+		return FLinearColor(FMath::Lerp(Tint.R, Tint.R * 0.5f, t), FMath::Lerp(Tint.G, Tint.G * 0.5f, t), FMath::Lerp(Tint.B, Tint.B * 0.5f, t), Alpha * FMath::Lerp(1.f, 0.8f, t));
+	});
+	FillRR(X + 1.5f, Y + 1.5f, W - 3.f, H * 0.42f, R - 1.f, [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.15f, 0.f, FMath::Clamp(t * 1.4f, 0.f, 1.f))); });
+	if (bRim) RimLight(X, Y, W, H, R, 0.8f, FLinearColor(1.f, 1.f, 1.f, 1.f));
+}
+
+// A glass gauge: a pill-shaped well, and a pill of lit colour inside it with a gloss on top and a slow sheen along it.
 void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse)
 {
 	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	F = FMath::Clamp(F, 0.f, 1.f);
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.65f), X - 3.f, Y - 3.f, W + 6.f, H + 6.f);
-	DrawRect(FLinearColor(0.62f, 0.42f, 0.14f, 1.f), X - 2.f, Y - 2.f, W + 4.f, H + 4.f);        // gold rim
-	DrawRect(FLinearColor(0.05f, 0.04f, 0.04f, 1.f), X - 1.f, Y - 1.f, W + 2.f, H + 2.f);
-	DrawRect(FLinearColor(0.11f, 0.09f, 0.08f, 1.f), X, Y, W, H);
-	const float Glow = bPulse ? 0.75f + 0.25f * FMath::Sin(T * 7.f) : 1.f;
+	const float R = H * 0.5f;
+	FillRR(X - 3.f, Y - 2.f, W + 6.f, H + 6.f, R + 3.f, [&](float) { return FLinearColor(0.f, 0.f, 0.02f, 0.18f); });   // shadow
+	FillRR(X - 2.f, Y - 2.f, W + 4.f, H + 4.f, R + 2.f, [&](float t) { return FLinearColor(0.05f, 0.08f, 0.13f, FMath::Lerp(0.55f, 0.7f, t)); });
+	const float Glow = bPulse ? 0.78f + 0.22f * FMath::Sin(T * 7.f) : 1.f;
 	const float FW = W * F;
-	if (FW > 0.5f)
+	if (FW > 2.f)
 	{
-		DrawRect(FLinearColor(Fill.R * 0.7f * Glow, Fill.G * 0.7f * Glow, Fill.B * 0.7f * Glow, 1.f), X, Y, FW, H);                       // darker body
-		DrawRect(FLinearColor(FMath::Min(Fill.R * 1.15f, 1.f) * Glow, FMath::Min(Fill.G * 1.15f, 1.f) * Glow, FMath::Min(Fill.B * 1.15f, 1.f) * Glow, 1.f), X, Y, FW, H * 0.55f);   // lighter top
-		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.22f), X, Y + 1.f, FW, FMath::Max(1.f, H * 0.18f));                                            // gloss
-		const float Sw = FMath::Fmod(T * 0.35f, 1.5f);                                                                                          // a sheen gliding along the fill
-		if (Sw < 1.f)
+		const float FR = FMath::Min(R, FW * 0.5f);
+		FillRR(X, Y, FW, H, FR, [&](float t)
 		{
-			const float SX = X + (FW - 26.f) * Sw;
-			if (FW > 30.f) DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.28f * FMath::Sin(Sw * PI)), SX, Y, 26.f, H);
-		}
+			const float L = FMath::Lerp(1.2f, 0.62f, t) * Glow;
+			return FLinearColor(FMath::Min(Fill.R * L, 1.f), FMath::Min(Fill.G * L, 1.f), FMath::Min(Fill.B * L, 1.f), 0.95f);
+		});
+		FillRR(X + 1.f, Y + 1.f, FW - 2.f, H * 0.42f, FMath::Max(0.f, FR - 1.f), [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.5f, 0.1f, t)); });   // gloss
+		const float Sw = FMath::Fmod(T * 0.35f, 1.5f);
+		if (Sw < 1.f && FW > 40.f) FillRR(X + (FW - 30.f) * Sw, Y, 30.f, H, FMath::Min(R, 15.f), [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.26f * FMath::Sin(Sw * PI)); });
 	}
-	for (int32 k = 1; k < 4; ++k) DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.3f), X + W * 0.25f * k - 0.5f, Y, 1.f, H);   // quarter marks
+	RimLight(X - 2.f, Y - 2.f, W + 4.f, H + 4.f, R + 2.f, 0.9f, FLinearColor(1.f, 1.f, 1.f, 1.f));
+	for (int32 k = 1; k < 4; ++k) DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.14f), X + W * 0.25f * k - 0.5f, Y + 2.f, 1.f, H - 4.f);   // quarter marks
 }
 
 bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, bool bEnabled, bool bActive, float Scale)
@@ -129,7 +195,7 @@ bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, b
 	if (!bEnabled) Fill = FLinearColor(0.14f, 0.14f, 0.14f);
 	else if (bActive) Fill = FLinearColor(0.55f, 0.32f, 0.08f);
 	else if (bOver) Fill = FLinearColor(0.34f, 0.26f, 0.12f);
-	DrawRect(Fill, X, Y, W, H);
+	Tile(X, Y, W, H, bActive ? FLinearColor(0.95f, 0.65f, 0.25f) : (bOver ? FLinearColor(0.8f, 0.9f, 1.f) : FLinearColor(0.55f, 0.68f, 0.85f)), !bEnabled ? 0.10f : (bActive ? 0.55f : (bOver ? 0.42f : 0.24f)));
 	float TW = 0.f, TH = 0.f;
 	GetTextSize(Label, TW, TH, Font, Scale);
 	const FLinearColor Txt = !bEnabled ? FLinearColor(0.45f, 0.45f, 0.45f) : (bActive ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.85f, 0.85f, 0.85f));
@@ -142,7 +208,7 @@ bool AKnightHUD::CloseBtn(float PX, float PY, float PW)
 	UFont* Font = GEngine->GetMediumFont();
 	const float BX = PX + PW - 34.f, BY = PY + 6.f;
 	const bool bOver = Over(BX, BY, 26.f, 26.f);
-	DrawRect(bOver ? FLinearColor(0.7f, 0.15f, 0.1f) : FLinearColor(0.25f, 0.25f, 0.25f), BX, BY, 26.f, 26.f);
+	Tile(BX, BY, 26.f, 26.f, bOver ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.6f, 0.7f, 0.85f), bOver ? 0.6f : 0.26f);
 	DrawText(TEXT("X"), FLinearColor::White, BX + 7.f, BY + 3.f, Font, 1.0f);
 	return bOver && bUIClick;
 }
@@ -161,8 +227,7 @@ void AKnightHUD::DrawTip()
 	float X = UIMouseX + 16.f, Y = UIMouseY + 12.f;
 	if (X + W + 20.f > Canvas->ClipX) X = UIMouseX - W - 30.f;
 	if (Y + H + 14.f > Canvas->ClipY) Y = Canvas->ClipY - H - 16.f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.94f), X - 6.f, Y - 6.f, W + 20.f, H + 12.f);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f), X - 6.f, Y - 6.f, W + 20.f, 2.f);
+	Panel(X - 8.f, Y - 8.f, W + 24.f, H + 16.f, 1.f);
 	float Cy = Y;
 	for (int32 i = 0; i < TipLines.Num(); ++i)
 	{
@@ -436,8 +501,7 @@ void AKnightHUD::DrawSkillPopup(const USkillComponent* Skills)
 	const float SinceLevel = float(Now - Skills->LevelUpTime);
 	const bool bLevelGlow = SinceLevel < 4.f;
 	const float Pulse = bLevelGlow ? 0.5f + 0.5f * FMath::Sin(SinceLevel * 9.f) : 0.f;
-	DrawRect(bLevelGlow ? FLinearColor(1.f, 0.8f, 0.25f, A * (0.5f + 0.5f * Pulse)) : FLinearColor(0.55f, 0.32f, 0.08f, A), X - 2.f, Y - 2.f, W + 4.f, H + 4.f);
-	DrawRect(FLinearColor(0.06f, 0.05f, 0.04f, 0.88f * A), X, Y, W, H);
+	Panel(X, Y, W, H, A, bLevelGlow);
 
 	const ESkillType T = Skills->LastSkill;
 	DrawSkillIcon(static_cast<int32>(T), X + 10.f, Y + 10.f, 72.f);
@@ -452,8 +516,7 @@ void AKnightHUD::DrawSkillPopup(const USkillComponent* Skills)
 	}
 	const float BX = X + 92.f, BY = Y + 46.f, BW = W - 104.f, BH = 12.f;
 	const float F = Need > 0 ? FMath::Clamp(float(Into) / float(Need), 0.f, 1.f) : 0.f;
-	DrawRect(FLinearColor(0.18f, 0.18f, 0.18f, A), BX, BY, BW, BH);
-	DrawRect(FLinearColor(0.35f, 0.8f, 0.3f, A), BX, BY, BW * F, BH);
+	Gauge(BX, BY, BW, BH, F, FLinearColor(0.35f, 0.8f, 0.3f));
 	DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.8f, 0.8f, 0.8f, A), BX, BY + 16.f, Font, 0.9f);
 	if (Since < 2.5f && Skills->LastXPGain > 0)
 	{
@@ -482,7 +545,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	const float SS = 66.f, Gap = 8.f;
 	const float TotalW = 5 * SS + 4 * Gap;
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f - 40.f;
-	const float Y0 = Canvas->ClipY - 36.f - 12.f - SS;
+	const float Y0 = Canvas->ClipY - 98.f - SS;   // clear of the health, stamina and horse bars
 
 	int32 Arrows = 0;
 	for (int32 T = 0; T < NumTiers; ++T) Arrows += Skills->CountItem(ArrowId(T));
@@ -1283,8 +1346,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver, bool bSel)
 	{
-		DrawRect(bSel ? FLinearColor(1.f, 0.7f, 0.2f, 1.f) : (bOver ? FLinearColor(0.50f, 0.38f, 0.16f, 1.f) : FLinearColor(0.32f, 0.26f, 0.16f, 1.f)), X, Y, S, S);
-		DrawRect(FLinearColor(0.10f, 0.09f, 0.08f, 1.f), X + 3.f, Y + 3.f, S - 6.f, S - 6.f);
+		Tile(X, Y, S, S, bSel ? FLinearColor(1.f, 0.78f, 0.35f) : (bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f)), bSel ? 0.5f : (bOver ? 0.36f : 0.2f));
 	};
 
 	// ----- The pack: 16 slots -----
@@ -1336,7 +1398,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
 	static const FWornSlot Worn[10] = {
 		{ K_Shield, false, TEXT("Shield") }, { K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
-		{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Ring, false, TEXT("Ring") }, { K_Ring, true, TEXT("Ring") }, { K_Amulet, false, TEXT("Amulet") },
+		{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Ring, false, TEXT("Misc") }, { K_Ring, true, TEXT("Misc") }, { K_Amulet, false, TEXT("Misc") },
 	};
 	for (int32 w = 0; w < 10; ++w)
 	{
@@ -1410,7 +1472,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		const EItemType T = Sellable[r];
 		const float RY = PY + 94.f + r * 38.f;
 		const int32 N = Skills->GetItemCount(T);
-		DrawRect(FLinearColor(0.16f, 0.14f, 0.11f, 1.f), PX + 30.f, RY, 510.f, 34.f);
+		Tile(PX + 30.f, RY, 510.f, 34.f, FLinearColor(0.6f, 0.72f, 0.88f), 0.16f, false);
 		DrawIcon(MaterialId(T), PX + 34.f, RY + 1.f, 32.f);
 		DrawText(SellNames[r], FLinearColor::White, PX + 74.f, RY + 8.f, Font, 1.0f);
 		DrawText(FString::Printf(TEXT("x %d"), N), FLinearColor(0.85f, 0.85f, 0.85f), PX + 210.f, RY + 8.f, Font, 1.05f);
@@ -1430,8 +1492,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		const FInvSlot S = Skills->Slots[i];
 		const bool bSellable = S.Id != 0 && (IsGear(S.Id) || IsArrow(S.Id));
 		const bool bOver = Over(X, Y, 58.f, 58.f);
-		DrawRect(bOver && bSellable ? FLinearColor(0.50f, 0.38f, 0.16f) : FLinearColor(0.26f, 0.21f, 0.13f), X, Y, 58.f, 58.f);
-		DrawRect(FLinearColor(0.10f, 0.09f, 0.08f), X + 2.f, Y + 2.f, 54.f, 54.f);
+		Tile(X, Y, 58.f, 58.f, bOver && bSellable ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver && bSellable ? 0.38f : 0.2f);
 		if (S.Id == 0) continue;
 		DrawIcon(S.Id, X + 5.f, Y + 3.f, 48.f);
 		if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + 36.f, Y + 38.f, Font, 0.85f);
@@ -1473,7 +1534,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			const bool bSoldOut = W.Stock <= 0;
 			const bool bAfford = Skills->GetIngots() >= W.Price;
 			const bool bOver = !bSoldOut && Over(CX, CY, CW, CH);
-			DrawRect(bOver ? FLinearColor(0.30f, 0.24f, 0.13f) : FLinearColor(0.16f, 0.14f, 0.11f), CX, CY, CW, CH);
+			Tile(CX, CY, CW, CH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.34f : 0.18f);
 			if (i >= 8) DrawRect(FLinearColor(0.75f, 0.55f, 0.15f, 0.9f), CX, CY, CW, 3.f);       // the valuable row gets a gold edge
 			DrawIcon(W.Id, CX + 6.f, CY + 6.f, 58.f);
 			FString Name = W.Count > 1 ? FString::Printf(TEXT("%d %s"), W.Count, *ItemName(W.Id)) : ItemName(W.Id);
@@ -1519,7 +1580,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			const int64 Hour = JeebStore::HourNow();
 			const bool bUsed = Skills->LastGambleHour == Hour;
 			const bool bAfford = Skills->GetIngots() >= JeebStore::GamblePrice;
-			DrawRect(FLinearColor(0.22f, 0.12f, 0.20f), RX, BY, RW, BH);
+			Tile(RX, BY, RW, BH, FLinearColor(0.75f, 0.45f, 0.9f), 0.22f);
 			DrawRect(FLinearColor(0.70f, 0.40f, 0.85f, 0.9f), RX, BY, RW, 3.f);
 			// a little drawstring sack
 			Disc(RX + 38.f, BY + 44.f, 22.f, 20.f, FLinearColor(0.55f, 0.36f, 0.18f));
@@ -1591,8 +1652,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		int32 Lv, Into, Need;
 		Skills->GetProgress(ESkillType::Smithing, Lv, Into, Need);
 		DrawText(FString::Printf(TEXT("Smithing  Lv %d"), Lv), FLinearColor(1.f, 0.7f, 0.4f), PX + PW - 330.f, PY + 56.f, Font, 1.2f);
-		DrawRect(FLinearColor(0.15f, 0.15f, 0.15f), PX + PW - 330.f, PY + 86.f, 290.f, 9.f);
-		DrawRect(FLinearColor(0.8f, 0.3f, 0.15f), PX + PW - 330.f, PY + 86.f, 290.f * (Need > 0 ? float(Into) / float(Need) : 0.f), 9.f);
+		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
 
 	// Kind list (two columns)
@@ -1615,7 +1675,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		const float CX = CX0 + t * (CW + CGap);
 		const FRecipe R = SmithRecipe(BKind, t, bArrows);
 		const int32 Id = bArrows ? ArrowId(t) : GearId(Kind, t);
-		DrawRect(FLinearColor(0.16f, 0.14f, 0.11f), CX, CY, CW, CH);
+		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
 		DrawRect(Palette(t, 0), CX, CY, CW, 5.f);
 		DrawIcon(Id, CX + 25.f, CY + 14.f, 100.f);
 		float Y = CY + 120.f;
@@ -1863,8 +1923,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 		const ESkillType T = Order[i];
 		const float X = GX + (i % 3) * (BW + Gap), Y = GY + (i / 3) * (BH + Gap);
 		const bool bOver = Over(X, Y, BW, BH);
-		DrawRect(bOver ? FLinearColor(0.50f, 0.38f, 0.16f, 1.f) : FLinearColor(0.32f, 0.26f, 0.16f, 1.f), X, Y, BW, BH);
-		DrawRect(FLinearColor(0.10f, 0.09f, 0.08f, 1.f), X + 3.f, Y + 3.f, BW - 6.f, BH - 6.f);
+		Tile(X, Y, BW, BH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.2f);
 		DrawSkillIcon(static_cast<int32>(T), X + 16.f, Y + 16.f, 96.f);
 
 		int32 Lv, Into, Need;
@@ -1875,8 +1934,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 		GetTextSize(LvS, TW, TH, Font, 2.8f);
 		DrawText(LvS, FLinearColor(1.f, 0.9f, 0.45f), X + BW - 22.f - TW, Y + 48.f, Font, 2.8f);
 		const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
-		DrawRect(FLinearColor(0.2f, 0.2f, 0.2f, 1.f), X + 16.f, Y + BH - 24.f, BW - 32.f, 10.f);
-		DrawRect(FLinearColor(0.35f, 0.8f, 0.3f), X + 16.f, Y + BH - 24.f, (BW - 32.f) * F, 10.f);
+		Gauge(X + 16.f, Y + BH - 24.f, BW - 32.f, 10.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
 		DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.7f, 0.7f, 0.7f), X + 126.f, Y + BH - 46.f, Font, 0.9f);
 		if (bOver)
 		{
@@ -1915,14 +1973,14 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 		++Row;
 		const bool bKnown = Sk->LoreFound.Contains(i);
 		const bool bOver = bKnown && Over(LX, Y, LW, RowH - 4.f);
-		DrawRect(LoreSel == i ? FLinearColor(0.55f, 0.32f, 0.08f, 1.f) : (bOver ? FLinearColor(0.30f, 0.24f, 0.12f, 1.f) : FLinearColor(0.14f, 0.13f, 0.12f, 1.f)), LX, Y, LW, RowH - 4.f);
+		Tile(LX, Y, LW, RowH - 4.f, LoreSel == i ? FLinearColor(1.f, 0.78f, 0.35f) : FLinearColor(0.6f, 0.72f, 0.88f), LoreSel == i ? 0.5f : (bOver ? 0.34f : 0.16f));
 		DrawText(bKnown ? FString(E[i].Title) : FString(TEXT("???")), bKnown ? FLinearColor(1.f, 0.92f, 0.65f) : FLinearColor(0.4f, 0.4f, 0.4f), LX + 10.f, Y + 5.f, Font, 1.05f);
 		if (bOver && bUIClick) LoreSel = i;
 	}
 
 	// Reading pane
 	const float RX = PX + 440.f, RY = PY + 130.f, RW = PW - 440.f - 30.f;
-	DrawRect(FLinearColor(0.08f, 0.07f, 0.06f, 1.f), RX - 10.f, RY - 6.f, RW + 20.f, PH - 130.f - 60.f);
+	Tile(RX - 10.f, RY - 6.f, RW + 20.f, PH - 130.f - 60.f, FLinearColor(0.1f, 0.14f, 0.22f), 0.45f, false);
 	if (LoreSel >= 0 && E.IsValidIndex(LoreSel) && Sk->LoreFound.Contains(LoreSel))
 	{
 		const JeebLore::FEntry& En = E[LoreSel];
@@ -1956,8 +2014,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver)
 	{
-		DrawRect(bOver ? FLinearColor(0.50f, 0.38f, 0.16f, 1.f) : FLinearColor(0.32f, 0.26f, 0.16f, 1.f), X, Y, S, S);
-		DrawRect(FLinearColor(0.10f, 0.09f, 0.08f, 1.f), X + 3.f, Y + 3.f, S - 6.f, S - 6.f);
+		Tile(X, Y, S, S, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.2f);
 	};
 
 	// ----- Your pack -----
