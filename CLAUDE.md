@@ -19,11 +19,15 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
-Last updated 2026-10-11. Everything below is built and committed; the owner checks visuals themselves and sends screenshots.
+Last updated 2026-10-12 (end of the knight-redesign session). Everything below is built and committed; the owner checks visuals themselves and sends screenshots. Details of each system are in the dated sections further down.
 
-**Just done (not yet seen in-game by the owner):** real volumetric clouds always on (low, deep layer, set in `DayNight.cpp`; sprite clouds retired); cape pinned at the true shoulder tops and longer; knight starts in bronze (metal) armour with shinier metal; trees got leader branches, wider crowns and more leaf cards per shoot; trunk lighting fix (bark uses the two-sided sign normal); roads blend into grass via a worn-soil margin in the ground material.
+**Just done (last few changes not yet seen in-game):** the knight redesign (see "Knight redesign"), worked over many rounds of screenshots; dropped items float, bob, turn, show their description when near, and gather into a sack when 3+ lie together (`ItemModels.h`, `ALootDrop` Item look, `DropBag`); the Red Helm Brush (+5% speed); rings and amulet show on the knight; footfalls kick up dirt chunks / grass blades / orange and red leaves by surface (`Kick`, `GroundUnderfoot`); place names in gold Norse lettering (`AKnightHUD::NorseText`, full A-Z); left arm hangs normally when no shield is shown; wizard staff held upright at rest (middle of the shaft, foot on the ground).
 
-**Check first next time:** frame rate (volumetric clouds, many leaf cards, leaf shadows; if slow, thin leaf cards or drop leaf shadows first); whether stars draw over the new clouds at low sun; cape motion; trunk lighting on the sun side.
+**Check first next time:** left fist on the inside of the resting shield (elbow angles found by a search in `ShieldRest()` in KnightCharacter.cpp; the shield itself must NOT move, the owner set its angle by eye); staff foot height (40 cm slide in `HoldWeaponAtEase`); sizes of the floating items; Norse banner size (5% of screen height).
+
+**How the owner wants posture changes made:** small, stated-direction tweaks (e.g. "30 degrees counterclockwise from this angle"); if a direction is a guess, say so so they can ask for a flip. Keep the body upright with only the head leaning forward; the sword at ease rests tip-down in front of his middle, twisted 40 degrees in the wrist (this direction is confirmed).
+
+**Cleanup still waiting on the owner's word:** `FillPracticePack()` (temporary random gear) and the `ASmokeCloud` test hazard. Shield guard numbers may need 3-4x; parry / guard break / bash still unpicked.
 
 **Decisions and preferences:**
 - Icon pictures are drawn with an anti-aliased fill (`AKnightHUD::Poly`): keep using it for any new icon.
@@ -129,3 +133,4 @@ Local git repo (no remote). Commit after each change that builds successfully, w
 - Shield: strapped along the outside of the left forearm (`HoldShield`, every frame): at rest it hangs at the side, face turned out and forward (diagonal to the body); raising it blends to the old guard placement.
 - Swords at ease (`HoldWeaponAtEase`): sword, broadsword and right-hand katana turn in the hand so the tip rests in front of the knight between his feet; blends back to the normal grip for attacks, charging, fishing, jumping, sitting, riding, climbing and rolling.
 - Red Helm Brush: new accessory kind `K_Crest` (worn in a misc slot), +5% on-foot speed (`FMods::SpeedMul`), shows a red horsehair brush along the helm's crest (`SlotBrush`). One is added to the pack on spawn (BeginPlay); the pen knight never wears it.
+- Later in the redesign session: cape is 3 cm thick (two layers), wider, very heavy, fully matte (M_Cloth roughness 1, specular 0.04), eases its shading normals, has no contact shadows, follows the body's rise and fall, and the knight ticks after its movement (`AddTickPrerequisiteComponent`) so the cape never lags a frame. Right click always gives the strafing stance (even mid-swing or without a shield); the shield drops while jumping or rolling; guarding is a full crouch with a hunch and lowered head. Blades of the sword, broadsword and spear lie in line with the crossguard (`BladeSolid` bAlongGuard; the katana keeps its old orientation). Camera boom 540.
