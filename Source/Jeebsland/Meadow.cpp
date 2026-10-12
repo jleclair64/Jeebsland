@@ -33,7 +33,7 @@ AMeadow::AMeadow()
 static UStaticMesh* MakeCardMesh(UObject* Outer, UMaterialInterface* Mat, float Width, float Height)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Grass"), FName("Grass")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Grass")));
 
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);
@@ -89,7 +89,7 @@ static UStaticMesh* MakeCardMesh(UObject* Outer, UMaterialInterface* Mat, float 
 static UStaticMesh* MakeBushMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf"), FName("Leaf")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf")));
 
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);

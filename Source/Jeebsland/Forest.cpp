@@ -27,7 +27,7 @@ namespace
 static UStaticMesh* MakeLeafClusterMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf"), FName("Leaf")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf")));
 
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);
@@ -115,7 +115,7 @@ struct FRing { FVector C; float R; };
 static UStaticMesh* MakeTubeMesh(UObject* Outer, UMaterialInterface* Mat, const TArray<TArray<FRing>>& Tubes, int32 Sides, const FVector& Right, const FVector& Fwd, bool bCapEnd, float UTiles, float VPer100)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Bark"), FName("Bark")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Bark")));
 
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);

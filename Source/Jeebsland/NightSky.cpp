@@ -18,7 +18,7 @@ namespace
 static UStaticMesh* MakeCard(UObject* Outer, UMaterialInterface* Mat, FVector2D UV0 = FVector2D(0, 0), FVector2D UV1 = FVector2D(1, 1))
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Sky"), FName("Sky")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Sky")));
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);
 	Attr.Register();

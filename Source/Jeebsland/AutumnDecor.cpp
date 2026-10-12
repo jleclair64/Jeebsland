@@ -43,7 +43,7 @@ namespace
 static UStaticMesh* MakeLeafCardMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf"), FName("Leaf")));
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf")));
 
 	FMeshDescription MD;
 	FStaticMeshAttributes Attr(MD);
