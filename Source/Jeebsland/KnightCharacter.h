@@ -217,6 +217,7 @@ private:
 	float MountAlpha = 0.f;
 	float HorseEnergy = 100.f;
 	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
+	float HorseSpeedNow = 0.f;   // the horse's current top speed while ridden (ramps up when sprinting)
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;

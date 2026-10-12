@@ -1847,7 +1847,15 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 			if (bHorseTired && HorseEnergy >= 4.f) bHorseTired = false;
 		}
 	}
-	const float BaseSpeed = bMounted ? (bHorseSprint ? 2.f * SprintSpeed : 2.f * WalkSpeed)
+	// The horse is 20% slower than before, and builds up to a gallop: it does not jump to full speed when you sprint
+	float HorseTarget = 0.8f * (bHorseSprint ? 2.f * SprintSpeed : 2.f * WalkSpeed);
+	if (!bMounted) HorseSpeedNow = 0.f;
+	else
+	{
+		if (HorseSpeedNow < 1.f) HorseSpeedNow = 0.8f * 2.f * WalkSpeed;
+		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
+	}
+	const float BaseSpeed = bMounted ? HorseSpeedNow
 	                                 : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed));
 	if (bFalling && !bSpecial)
 	{

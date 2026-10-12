@@ -133,7 +133,7 @@ void AHorse::Tick(float DeltaSeconds)
 		else
 		{
 			const FVector2D Dir = FVector2D(To.X, To.Y).GetSafeNormal();
-			const float Speed = FMath::Min(1300.f, 300.f + D * 1.5f);
+			const float Speed = FMath::Min(1040.f, 240.f + D * 1.2f);   // 20% slower than before
 			FVector NewLoc(Me.X + Dir.X * Speed * Dt, Me.Y + Dir.Y * Speed * Dt, 0.f);
 			NewLoc.Z = JeebTerrain::HeightAt(NewLoc.X, NewLoc.Y);
 			SetActorLocation(NewLoc);
@@ -147,17 +147,24 @@ void AHorse::Tick(float DeltaSeconds)
 	const float Speed = FVector2D(Now.X - LastPos.X, Now.Y - LastPos.Y).Size() / FMath::Max(Dt, 0.001f);
 	LastPos = Now;
 	SpeedBlend = FMath::FInterpTo(SpeedBlend, FMath::Clamp(Speed / 250.f, 0.f, 1.f), Dt, 8.f);
-	if (SpeedBlend > 0.02f) Phase += Dt * (4.f + Speed * 0.006f);
+	// Gait: a trot swings the legs in diagonal pairs; at a full gallop the two front legs swing together and the two back legs
+	// swing together (a bound), the back pair a little ahead of the front, with the whole body rocking and lifting with each stride.
+	const float Gallop = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((Speed - 850.f) / 250.f, 0.f, 1.f));
+	if (SpeedBlend > 0.02f) Phase += Dt * (4.f + Speed * 0.006f) * FMath::Lerp(1.f, 0.85f, Gallop);
 
-	const float Amp = (25.f + 15.f * FMath::Clamp((Speed - 800.f) / 700.f, 0.f, 1.f)) * SpeedBlend;
-	const float Sw = FMath::Sin(Phase) * Amp;
-	LegFL->SetRelativeRotation(FRotator(Sw, 0.f, 0.f));
-	LegBR->SetRelativeRotation(FRotator(Sw, 0.f, 0.f));
-	LegFR->SetRelativeRotation(FRotator(-Sw, 0.f, 0.f));
-	LegBL->SetRelativeRotation(FRotator(-Sw, 0.f, 0.f));
+	const float Amp = (25.f + 30.f * Gallop) * SpeedBlend;
+	const float SinA = FMath::Sin(Phase), SinFront = FMath::Sin(Phase), SinBack = FMath::Sin(Phase + 2.1f);
+	const float FL = FMath::Lerp(SinA, SinFront, Gallop), FR = FMath::Lerp(-SinA, SinFront, Gallop);
+	const float BL = FMath::Lerp(-SinA, SinBack, Gallop), BR = FMath::Lerp(SinA, SinBack, Gallop);
+	LegFL->SetRelativeRotation(FRotator(FL * Amp, 0.f, 0.f));
+	LegFR->SetRelativeRotation(FRotator(FR * Amp, 0.f, 0.f));
+	LegBL->SetRelativeRotation(FRotator(BL * Amp, 0.f, 0.f));
+	LegBR->SetRelativeRotation(FRotator(BR * Amp, 0.f, 0.f));
 
-	BodyPivot->SetRelativeLocation(FVector(0.f, 0.f, 4.f * FMath::Abs(FMath::Sin(Phase)) * SpeedBlend + 1.5f * FMath::Sin(Clock * 1.6f) * (1.f - SpeedBlend)));
-	BodyPivot->SetRelativeRotation(FRotator(2.5f * FMath::Sin(Phase * 2.f) * SpeedBlend, 0.f, 0.f));
+	const float Bob = FMath::Lerp(4.f * FMath::Abs(SinA), 9.f * FMath::Abs(FMath::Sin(Phase + 1.0f)), Gallop);
+	BodyPivot->SetRelativeLocation(FVector(0.f, 0.f, Bob * SpeedBlend + 1.5f * FMath::Sin(Clock * 1.6f) * (1.f - SpeedBlend)));
+	const float Rock = FMath::Lerp(2.5f * FMath::Sin(Phase * 2.f), 6.f * FMath::Sin(Phase + 0.6f), Gallop);   // the body pitches with each stride
+	BodyPivot->SetRelativeRotation(FRotator(Rock * SpeedBlend, 0.f, 0.f));
 
 	// Head: bobs while moving; now and then it lowers to graze when standing free
 	GrazeT -= Dt;

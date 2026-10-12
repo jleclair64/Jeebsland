@@ -74,6 +74,8 @@ private:
 	float UIMouseX = 0.f, UIMouseY = 0.f;
 	bool bUIHaveMouse = false;
 	float PolyStep = 1.5f;
+	float IconTiltDeg = 0.f;                   // lean applied to everything Poly draws (the toolbar icons)
+	FVector2D IconPivot = FVector2D::ZeroVector;
 	TArray<FString> TipLines;
 
 	// Store and smithy

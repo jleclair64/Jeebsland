@@ -440,7 +440,6 @@ void AKnightHUD::DrawHUD()
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);   // throbs when nearly dead
-		DrawText(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(Knight->GetHealth()), Knight->GetMaxHealth()), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
 	}
 
 	// Enemy health bars (15 s after a hit, or under half health) and floating damage numbers
@@ -487,7 +486,6 @@ void AKnightHUD::DrawHUD()
 		const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);
-		DrawText(FString::Printf(TEXT("Horse  %d / %d"), FMath::CeilToInt(Knight->GetHorseHealth()), FMath::RoundToInt(Knight->GetHorseMaxHealth())), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
 	}
 
 	// The E prompt: an outlined square with an E in it, floating just in front of and above whatever you can use. It fades in
@@ -639,15 +637,17 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f, 1.f, bSel);
 		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.85f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f), X + 4.f, Y0 + 1.f, Font, 0.7f);
 		if (Id == 0) continue;
-		DrawIcon(Id, X + 5.f, Y0 + 3.f, SS - 10.f);
+		IconTiltDeg = 35.f; IconPivot = FVector2D(X + SS * 0.5f, Y0 + SS * 0.5f);   // icons lean diagonally and fill the slot
+		DrawIcon(Id, X - 4.f, Y0 - 4.f, SS + 8.f);
+		IconTiltDeg = 0.f;
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
 		{
-			const FString Txt = FString::Printf(TEXT("%d-%d"), A, B);
+			const FString Txt = FString::FromInt(FMath::RoundToInt(0.5f * (A + B)));   // one number: the middle of the range
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Txt, TW, TH, Font, 0.7f);
+			GetTextSize(Txt, TW, TH, Font, 1.15f);
 			Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
-			DrawText(Txt, FLinearColor(1.f, 0.55f, 0.45f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 0.7f);
+			DrawText(Txt, FLinearColor(1.f, 0.55f, 0.45f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
 		}
 		if (IsGear(Id) && KindOf(Id) == K_Bow)
 			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), X + SS - 26.f, Y0 + 1.f, Font, 0.7f);
@@ -773,10 +773,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			float Dx, Dy;
 			Rot(FVector2D(WX, WY), Dx, Dy);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(T, TW, TH, Font, 1.7f);
-			const float X = Cx + Dx * (Half + 6.f), Y = Cy + Dy * (Half + 6.f);
-			DrawCircle(X, Y, 18.f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
-			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
+			GetTextSize(T, TW, TH, Font, 1.36f);
+			const float X = Cx + Dx * (Half + 5.f), Y = Cy + Dy * (Half + 5.f);
+			DrawCircle(X, Y, 14.4f, FLinearColor(0.10f, 0.11f, 0.10f, 0.5f));
+			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.36f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
 		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.82f, 0.28f, 1.f));   // north is world +X, east +Y
@@ -1095,10 +1095,20 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 // ===================================================================================================
 // Drawing helpers and icons
 // ===================================================================================================
-void AKnightHUD::Poly(const TArray<FVector2D>& P, const FLinearColor& C)
+void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 {
 	// Filled by thin horizontal strips (works for any shape whose rows are one solid run)
-	if (P.Num() < 3) return;
+	if (Src.Num() < 3) return;
+	TArray<FVector2D> P = Src;
+	if (!FMath::IsNearlyZero(IconTiltDeg))   // lean the whole picture about its centre
+	{
+		const float Cs = FMath::Cos(FMath::DegreesToRadians(IconTiltDeg)), Sn = FMath::Sin(FMath::DegreesToRadians(IconTiltDeg));
+		for (FVector2D& V : P)
+		{
+			const FVector2D D = V - IconPivot;
+			V = IconPivot + FVector2D(D.X * Cs - D.Y * Sn, D.X * Sn + D.Y * Cs);
+		}
+	}
 	float MinY = P[0].Y, MaxY = P[0].Y;
 	for (const FVector2D& V : P) { MinY = FMath::Min(MinY, V.Y); MaxY = FMath::Max(MaxY, V.Y); }
 	const float Step = PolyStep;
