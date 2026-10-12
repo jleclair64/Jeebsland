@@ -250,20 +250,53 @@ namespace KnightDesign
 			}
 		}
 
-		// The Red Helm Brush (shown while one is worn in a miscellaneous slot): a stiff red horsehair brush standing along the
-		// crest, tallest over the top of the head
+		// The Red Helm Brush (shown while one is worn in a miscellaneous slot): a broad, square-cut red horsehair brush
+		// standing along the crest, made of a solid core with rows of bristle tufts on both faces and along the top
 		{
-			FDef& D = Add(P_Head, SlotBrush, EArmorRole::Accent);
-			D.bFixedColor = true; D.Fixed = FLinearColor(0.62f, 0.035f, 0.025f);
-			const double T0 = 0.03, T1 = 0.93;
-			Ribbon(D.Mesh, 40, [&](double T) {
-				const double Tc = T0 + (T1 - T0) * T, S = FMath::Pow(FMath::Max(0.0, FMath::Sin(PI * T)), 0.55);
-				FVector P, N; double H;
-				CrestAt(Tc, P, N, H);
-				const double Bh = 2.0 + 11.0 * S, Wb = 1.4 + 1.4 * S, B0 = H + 0.4;
-				const FVector Y(0, 1, 0);
-				return FRing({ P + N * B0 - Y * Wb, P + N * (B0 + 0.5 * Bh) - Y * (1.25 * Wb), P + N * (B0 + Bh) - Y * (0.45 * Wb),
-				               P + N * (B0 + Bh) + Y * (0.45 * Wb), P + N * (B0 + 0.5 * Bh) + Y * (1.25 * Wb), P + N * B0 + Y * Wb }); }, false);
+			const double T0 = 0.04, T1 = 0.90;
+			// its outline along the crest: almost full height everywhere, rounding off only at the two ends
+			auto Height = [](double U) { const double E = FMath::Min(U, 1.0 - U) / 0.12; return 11.0 * FMath::Sqrt(DClamp(E, 0.0, 1.0)) + 1.5; };
+			const double Wd = 3.2;   // half its thickness
+			{
+				FDef& D = Add(P_Head, SlotBrush, EArmorRole::Accent);
+				D.bFixedColor = true; D.Fixed = FLinearColor(0.55f, 0.03f, 0.02f);
+				Ribbon(D.Mesh, 40, [&](double U) {
+					FVector P, N; double H;
+					CrestAt(T0 + (T1 - T0) * U, P, N, H);
+					const double B0 = H + 0.4, Bh = Height(U);
+					const FVector Y(0, 1, 0);
+					return FRing({ P + N * B0 - Y * Wd, P + N * (B0 + Bh) - Y * Wd, P + N * (B0 + Bh) + Y * Wd, P + N * B0 + Y * Wd }); });
+			}
+			// bristles: thin tufts standing a little proud of the core, of uneven length, in two shades of red
+			for (int32 Shade = 0; Shade < 2; ++Shade)
+			{
+				FDef& D = Add(P_Head, SlotBrush, EArmorRole::Accent);
+				D.bFixedColor = true; D.Fixed = Shade == 0 ? FLinearColor(0.78f, 0.06f, 0.04f) : FLinearColor(0.36f, 0.015f, 0.01f);
+				FRandomStream R(77 + Shade);
+				for (int32 k = 0; k < 70; ++k)
+				{
+					const double U = R.FRandRange(0.02, 0.98);
+					FVector P, N; double H;
+					CrestAt(T0 + (T1 - T0) * U, P, N, H);
+					const double B0 = H + 0.4, Bh = Height(U);
+					const int32 Face = R.RandRange(0, 2);   // left face, right face, or the top
+					const FVector Y(0, 1, 0);
+					const double Bw = R.FRandRange(0.25, 0.45);
+					FVector A, B;
+					if (Face < 2)
+					{
+						const double S = Face == 0 ? -1.0 : 1.0, Z0 = R.FRandRange(0.0, 0.5) * Bh, Z1 = FMath::Min(Bh + R.FRandRange(0.2, 1.4), Z0 + R.FRandRange(0.4, 0.9) * Bh);
+						A = P + N * (B0 + Z0) + Y * (S * (Wd + 0.15)); B = P + N * (B0 + Z1) + Y * (S * (Wd + 0.15));
+						RBox(D.Mesh, Bw, 0.2, 0.5 * (Z1 - Z0), 0.6, Xf((A + B) * 0.5, V3(0, FMath::RadiansToDegrees(FMath::Atan2(N.X, N.Z)), 0)));
+					}
+					else
+					{
+						const double Ys = R.FRandRange(-Wd + 0.3, Wd - 0.3), Up = R.FRandRange(0.4, 1.6);
+						A = P + N * (B0 + Bh - 0.5) + Y * Ys; B = A + N * (Up + 0.5);
+						RBox(D.Mesh, Bw, 0.3, 0.5 * (Up + 0.5), 0.6, Xf((A + B) * 0.5, V3(0, FMath::RadiansToDegrees(FMath::Atan2(N.X, N.Z)), 0)));
+					}
+				}
+			}
 		}
 
 		// Bare head (shown while no helmet is worn): neck, head, hair, eyes (built a size smaller about the neck)

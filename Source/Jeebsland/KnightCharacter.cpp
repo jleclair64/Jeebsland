@@ -439,7 +439,6 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		}
 	}
 	const bool bWorn = Id != 0;
-	if (Slot == KnightDesign::SlotBrush) { int32 NP = 0, NV = 0; for (const FArmorPart& P : ArmorParts) if (P.Slot == Slot) { ++NP; if (UProceduralMeshComponent* PM = Cast<UProceduralMeshComponent>(P.Comp)) NV += PM->GetProcMeshSection(0) ? PM->GetProcMeshSection(0)->ProcVertexBuffer.Num() : 0; } UE_LOG(LogTemp, Warning, TEXT("JeebBrush: id %d, %d parts, %d verts"), Id, NP, NV); }
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
 	for (FArmorPart& P : ArmorParts)
 	{
