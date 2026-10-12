@@ -226,7 +226,7 @@ void AKnightCharacter::ApplyGraphics()
 	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
 	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
 	Set(TEXT("r.Shadow.Virtual.Enable"), 0);   // standard shadow maps on both levels (virtual ones overloaded in the pine woods)
-	Set(TEXT("sg.ShadowQuality"), bLowest ? 1 : 3);
+	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
 	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 1 : 4);
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 3);
 	Set(TEXT("sg.EffectsQuality"), bLowest ? 0 : 3);
