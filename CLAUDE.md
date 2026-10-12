@@ -28,7 +28,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Decisions and preferences:**
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
-- Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a very tight radius (~1.75 m), S backs up slowly (half the knight's walk, never sprints), no sideways movement. The knight also backs up with S alone at that same slow pace without turning round.
+- Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a very tight radius (~1.75 m), S backs up slowly (half the knight's walk, never sprints), no sideways movement. On foot there is no backing up in normal movement; with the shield up the knight is in a combat stance (faces the camera, sidesteps and backs up at 50-60% walk speed, no sprint).
 - Village palisade wood uses `M_WoodV`/`M_WoodH` (painted grain texture T_Wood from gen_textures.py: logs use the mesh UVs, beams follow their long axis); other buildings still use flat colours. The first bark-blob wood looked fake: avoid contour-line patterns.
 - Candles and carved pumpkins glow via `M_Flame` halos plus flickering point lights (see AutumnDecor.cpp); every 4th candle and every 2nd lit pumpkin has a real light.
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.
@@ -49,6 +49,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 1. Cape: fix the white thing showing under the cape (the knight's lower back), and give the cape more weight so it looks heavy.
 2. Shield and weapon stowing: during any action like climbing or riding the horse, the shield goes on the back behind the cape, and the sword sits diagonal on the back, under the shield.
 3. RuneScape-style side panel: replace the Tab menu with a panel that is always visible in the lower-left of the screen, with three tabs: Inventory (left, default), Apparel (middle: what is equipped), Skills (right). Pressing Tab frees the mouse cursor so the panel can be clicked; pressing Caps Lock cycles the tabs left to right. (Liquid-glass style, like the rest of the UI.)
+4. Stepping animations for the shield-up stance: proper sidestep (left and right) and backwards-walk animations (or convincing procedural leans) for the knight while the shield is up. The stance movement itself is built (face the camera, sidestep, back up, see `DoMove`), but it currently plays the forward walk animation, so it looks like gliding.
 
 ## Checking visuals
 

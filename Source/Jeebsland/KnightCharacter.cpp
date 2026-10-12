@@ -1858,12 +1858,17 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (HorseSpeedNow < 1.f) HorseSpeedNow = 0.8f * 2.f * WalkSpeed;
 		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
 	}
-	// Backing up (S alone): slowly, at half the walking pace, never sprinting, without turning round
-	const bool bBackStep = (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15) && !bRolling && !bSliding && !bClimbing && !bSitting;
-	if (!bMounted && bBackStep && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
-	else if (!bMounted && !bBackStep && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
+	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
+	// points and sidestep or back up instead of turning round, a little slower than walking (forward 60%, sidestep 50%, back 40%).
+	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
+	const bool bStance = bBlocking && ShieldActive() && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
+	if (bStance && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
+	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
+	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
+	const float StanceFactor = StanceFwd < -0.1f ? 0.4f : (StanceFwd > 0.1f ? 0.6f : (FMath::Abs(StanceRight) > 0.1f ? 0.5f : 0.6f));
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed));
+	                                 : (bStance ? WalkSpeed * StanceFactor : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed)));
 	if (bFalling && !bSpecial)
 	{
 		AirSpeedMul = AirMul;
@@ -2257,11 +2262,14 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 	const double Now = GetWorld()->GetTimeSeconds();
 	if (!bMounted)
 	{
-		// S on its own: back up slowly, still facing the way you were (the speed is capped in Tick)
-		if (Forward < -0.1f && FMath::Abs(Right) < 0.1f && !bRolling && !bSliding && !bClimbing)
+		// Shield up: a combat stance. Move relative to the camera (which is where you face), so A and D sidestep and S backs up.
+		if (bBlocking && ShieldActive() && !bRolling && !bSliding && !bClimbing && !bSitting && GetController())
 		{
-			LastBackTime = Now;
-			AddMovementInput(-GetActorForwardVector(), 1.f);
+			const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+			AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), Forward);
+			AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y), Right);
+			StanceFwd = Forward;
+			StanceRight = Right;
 			return;
 		}
 		Super::DoMove(Right, Forward);

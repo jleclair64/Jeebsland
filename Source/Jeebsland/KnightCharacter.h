@@ -221,7 +221,8 @@ private:
 	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
 	float HorseSpeedNow = 0.f;   // the horse's current top speed while ridden (ramps up when sprinting)
 	bool bSavedOrientMount = true;
-	double LastBackTime = -10.0;          // last time S was held for backing up
+	double LastBackTime = -10.0;          // last time S was held while riding (backing the horse up)
+	float StanceFwd = 0.f, StanceRight = 0.f;   // the last movement input while the shield is up
 	bool bBackOrient = false, bBackSavedOrient = true;
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
