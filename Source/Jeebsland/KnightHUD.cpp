@@ -451,10 +451,7 @@ void AKnightHUD::DrawHUD()
 		const float Alpha = FMath::Clamp(FMath::Min(T / 1.2f, (7.f - T) / 1.5f), 0.f, 1.f);
 		if (Alpha > 0.f)
 		{
-			const FString Title = TEXT("THE AUTUMN REALM");
-			float TW = 0.f, TH = 0.f;
-			HDTextSize(Title, TW, TH, Font, 3.f);
-			HDText(Title, FLinearColor(1.f, 0.62f, 0.2f, Alpha), (Canvas->ClipX - TW) * 0.5f, Canvas->ClipY * 0.14f, Font, 3.f);
+			NorseText(TEXT("THE AUTUMN REALM"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
 		}
 	}
 
@@ -468,47 +465,7 @@ void AKnightHUD::DrawHUD()
 		if (TownBannerT > 0.f && Age < 4.5f)
 		{
 			const float A = FMath::Clamp(FMath::Min(Age / 0.8f, (4.5f - Age) / 1.2f), 0.f, 1.f);
-			// Lettered in a Norse hand: angular strokes cut like runes, in gold with a dark edge and a soft shadow
-			struct FSeg { float X0, Y0, X1, Y1; };
-			auto Glyph = [](TCHAR Ch) -> TArray<FSeg>
-			{
-				auto Line = [](std::initializer_list<FVector2f> Pts) { TArray<FSeg> S; const FVector2f* P = Pts.begin(); for (size_t i = 1; i < Pts.size(); ++i) S.Add({ P[i - 1].X, P[i - 1].Y, P[i].X, P[i].Y }); return S; };
-				TArray<FSeg> G;
-				switch (Ch)
-				{
-				case 'B': G = Line({ {0,0}, {0,1} }); G.Append(Line({ {0,0}, {0.48f,0}, {0.6f,0.2f}, {0.44f,0.47f}, {0,0.47f} })); G.Append(Line({ {0,0.47f}, {0.52f,0.47f}, {0.68f,0.72f}, {0.54f,1}, {0,1} })); break;
-				case 'L': G = Line({ {0,0}, {0,1}, {0.56f,1}, {0.64f,0.86f} }); break;
-				case 'A': G = Line({ {0,1}, {0.34f,0}, {0.68f,1} }); G.Append(Line({ {0.13f,0.62f}, {0.55f,0.62f} })); break;
-				case 'C': G = Line({ {0.62f,0.14f}, {0.46f,0}, {0.16f,0}, {0,0.26f}, {0,0.74f}, {0.16f,1}, {0.46f,1}, {0.62f,0.86f} }); break;
-				case 'K': G = Line({ {0,0}, {0,1} }); G.Append(Line({ {0.62f,0}, {0,0.56f} })); G.Append(Line({ {0.2f,0.4f}, {0.66f,1} })); break;
-				case 'R': G = Line({ {0,0}, {0,1} }); G.Append(Line({ {0,0}, {0.5f,0}, {0.62f,0.22f}, {0.5f,0.47f}, {0,0.47f} })); G.Append(Line({ {0.26f,0.47f}, {0.66f,1} })); break;
-				case 'O': G = Line({ {0.32f,0}, {0.64f,0.26f}, {0.64f,0.74f}, {0.32f,1}, {0,0.74f}, {0,0.26f}, {0.32f,0} }); break;
-				default: break;
-				}
-				return G;
-			};
-			const FString Name = TEXT("BLACKROCK");
-			const float H = FMath::Clamp(Canvas->ClipY * 0.075f, 46.f, 96.f), Adv = H * 0.86f, Wd = H * 0.12f;
-			const float X0 = (Canvas->ClipX - (Name.Len() * Adv - H * 0.2f)) * 0.5f, Y0 = Canvas->ClipY * 0.15f;
-			auto Stroke = [&](const FSeg& S, float Ox, float Oy, float Width, const FLinearColor& C)
-			{
-				const FVector2D P0(X0 + Ox + S.X0 * H, Y0 + Oy + S.Y0 * H), P1(X0 + Ox + S.X1 * H, Y0 + Oy + S.Y1 * H);
-				const FVector2D D = (P1 - P0).GetSafeNormal(), N(-D.Y, D.X);
-				const FVector2D E = D * Width * 0.35f;   // chisel-cut ends, overlapping at the joints
-				Poly({ P0 - E + N * Width * 0.5f, P1 + E + N * Width * 0.5f, P1 + E - N * Width * 0.5f, P0 - E - N * Width * 0.5f }, C);
-			};
-			for (int32 Pass = 0; Pass < 4; ++Pass)
-			{
-				for (int32 i = 0; i < Name.Len(); ++i)
-					for (const FSeg& S : Glyph(Name[i]))
-					{
-						const float Ox = i * Adv;
-						if (Pass == 0) Stroke(S, Ox + H * 0.05f, H * 0.06f, Wd * 1.6f, FLinearColor(0.f, 0.f, 0.f, 0.45f * A));          // shadow
-						else if (Pass == 1) Stroke(S, Ox, 0.f, Wd * 1.55f, FLinearColor(0.32f, 0.18f, 0.03f, A));                           // dark edge
-						else if (Pass == 2) Stroke(S, Ox, 0.f, Wd, FLinearColor(1.f, 0.74f, 0.2f, A));                                      // gold
-						else Stroke(S, Ox - Wd * 0.12f, -Wd * 0.12f, Wd * 0.35f, FLinearColor(1.f, 0.95f, 0.65f, 0.75f * A));            // a bright sheen
-					}
-			}
+			NorseText(TEXT("BLACKROCK"), Canvas->ClipY * 0.15f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), A);
 		}
 	}
 
@@ -3057,5 +3014,74 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 		C.A = Alpha;
 		HDText(Lines[i], C, X + 2.f, Cy, Font, Sc);
 		Cy += TH + 3.f;
+	}
+}
+
+// Place names in a Norse hand: every letter built from straight, angular strokes with chisel-cut ends, like carved runes,
+// in gold with a dark bronze edge, a soft shadow and a pale sheen. Centred across the screen, its top at Y, H tall.
+void AKnightHUD::NorseText(const FString& Text, float Y, float H, float Alpha)
+{
+	if (Alpha <= 0.01f) return;
+	struct FSeg { float X0, Y0, X1, Y1; };
+	auto Line = [](TArray<FSeg>& G, std::initializer_list<FVector2f> Pts) { const FVector2f* P = Pts.begin(); for (size_t i = 1; i < Pts.size(); ++i) G.Add({ P[i - 1].X, P[i - 1].Y, P[i].X, P[i].Y }); };
+	auto Glyph = [&](TCHAR Ch) -> TArray<FSeg>
+	{
+		TArray<FSeg> G;
+		switch (FChar::ToUpper(Ch))
+		{
+		case 'A': Line(G, { {0,1}, {0.34f,0}, {0.68f,1} }); Line(G, { {0.13f,0.62f}, {0.55f,0.62f} }); break;
+		case 'B': Line(G, { {0,0}, {0,1} }); Line(G, { {0,0}, {0.48f,0}, {0.6f,0.2f}, {0.44f,0.47f}, {0,0.47f} }); Line(G, { {0,0.47f}, {0.52f,0.47f}, {0.68f,0.72f}, {0.54f,1}, {0,1} }); break;
+		case 'C': Line(G, { {0.62f,0.14f}, {0.46f,0}, {0.16f,0}, {0,0.26f}, {0,0.74f}, {0.16f,1}, {0.46f,1}, {0.62f,0.86f} }); break;
+		case 'D': Line(G, { {0,0}, {0,1} }); Line(G, { {0,0}, {0.4f,0}, {0.64f,0.28f}, {0.64f,0.72f}, {0.4f,1}, {0,1} }); break;
+		case 'E': Line(G, { {0.6f,0}, {0,0}, {0,1}, {0.6f,1} }); Line(G, { {0,0.48f}, {0.45f,0.48f} }); break;
+		case 'F': Line(G, { {0.6f,0}, {0,0}, {0,1} }); Line(G, { {0,0.48f}, {0.45f,0.48f} }); break;
+		case 'G': Line(G, { {0.62f,0.14f}, {0.46f,0}, {0.16f,0}, {0,0.26f}, {0,0.74f}, {0.16f,1}, {0.46f,1}, {0.62f,0.86f}, {0.62f,0.56f}, {0.36f,0.56f} }); break;
+		case 'H': Line(G, { {0,0}, {0,1} }); Line(G, { {0.62f,0}, {0.62f,1} }); Line(G, { {0,0.5f}, {0.62f,0.5f} }); break;
+		case 'I': Line(G, { {0.2f,0}, {0.2f,1} }); break;
+		case 'J': Line(G, { {0.5f,0}, {0.5f,0.78f}, {0.3f,1}, {0.05f,0.85f} }); break;
+		case 'K': Line(G, { {0,0}, {0,1} }); Line(G, { {0.62f,0}, {0,0.56f} }); Line(G, { {0.2f,0.4f}, {0.66f,1} }); break;
+		case 'L': Line(G, { {0,0}, {0,1}, {0.56f,1}, {0.64f,0.86f} }); break;
+		case 'M': Line(G, { {0,1}, {0,0}, {0.36f,0.5f}, {0.72f,0}, {0.72f,1} }); break;
+		case 'N': Line(G, { {0,1}, {0,0}, {0.64f,1}, {0.64f,0} }); break;
+		case 'O': Line(G, { {0.32f,0}, {0.64f,0.26f}, {0.64f,0.74f}, {0.32f,1}, {0,0.74f}, {0,0.26f}, {0.32f,0} }); break;
+		case 'P': Line(G, { {0,1}, {0,0}, {0.5f,0}, {0.62f,0.22f}, {0.5f,0.47f}, {0,0.47f} }); break;
+		case 'Q': Line(G, { {0.32f,0}, {0.64f,0.26f}, {0.64f,0.74f}, {0.32f,1}, {0,0.74f}, {0,0.26f}, {0.32f,0} }); Line(G, { {0.38f,0.7f}, {0.72f,1.08f} }); break;
+		case 'R': Line(G, { {0,0}, {0,1} }); Line(G, { {0,0}, {0.5f,0}, {0.62f,0.22f}, {0.5f,0.47f}, {0,0.47f} }); Line(G, { {0.26f,0.47f}, {0.66f,1} }); break;
+		case 'S': Line(G, { {0.62f,0.12f}, {0.46f,0}, {0.14f,0}, {0,0.2f}, {0.14f,0.44f}, {0.5f,0.56f}, {0.64f,0.8f}, {0.5f,1}, {0.16f,1}, {0,0.88f} }); break;
+		case 'T': Line(G, { {0,0}, {0.68f,0} }); Line(G, { {0.34f,0}, {0.34f,1} }); break;
+		case 'U': Line(G, { {0,0}, {0,0.78f}, {0.2f,1}, {0.44f,1}, {0.64f,0.78f}, {0.64f,0} }); break;
+		case 'V': Line(G, { {0,0}, {0.34f,1}, {0.68f,0} }); break;
+		case 'W': Line(G, { {0,0}, {0.18f,1}, {0.38f,0.4f}, {0.58f,1}, {0.76f,0} }); break;
+		case 'X': Line(G, { {0,0}, {0.64f,1} }); Line(G, { {0.64f,0}, {0,1} }); break;
+		case 'Y': Line(G, { {0,0}, {0.34f,0.5f}, {0.68f,0} }); Line(G, { {0.34f,0.5f}, {0.34f,1} }); break;
+		case 'Z': Line(G, { {0,0}, {0.64f,0}, {0,1}, {0.64f,1} }); break;
+		default: break;
+		}
+		return G;
+	};
+	auto Adv = [&](TCHAR Ch) { const TCHAR U = FChar::ToUpper(Ch); return H * (U == ' ' ? 0.55f : U == 'I' ? 0.5f : (U == 'M' || U == 'W') ? 0.98f : 0.86f); };
+	float Total = 0.f;
+	for (int32 i = 0; i < Text.Len(); ++i) Total += Adv(Text[i]);
+	const float X0 = (Canvas->ClipX - (Total - H * 0.2f)) * 0.5f, Wd = H * 0.12f;
+	auto Stroke = [&](const FSeg& S, float Ox, float Oy, float Width, const FLinearColor& C)
+	{
+		const FVector2D P0(X0 + Ox + S.X0 * H, Y + Oy + S.Y0 * H), P1(X0 + Ox + S.X1 * H, Y + Oy + S.Y1 * H);
+		const FVector2D D = (P1 - P0).GetSafeNormal(), N(-D.Y, D.X), E = D * Width * 0.35f;   // chisel-cut ends, overlapping at the joints
+		Poly({ P0 - E + N * Width * 0.5f, P1 + E + N * Width * 0.5f, P1 + E - N * Width * 0.5f, P0 - E - N * Width * 0.5f }, C);
+	};
+	for (int32 Pass = 0; Pass < 4; ++Pass)
+	{
+		float Ox = 0.f;
+		for (int32 i = 0; i < Text.Len(); ++i)
+		{
+			for (const FSeg& S : Glyph(Text[i]))
+			{
+				if (Pass == 0) Stroke(S, Ox + H * 0.05f, H * 0.06f, Wd * 1.6f, FLinearColor(0.f, 0.f, 0.f, 0.45f * Alpha));       // shadow
+				else if (Pass == 1) Stroke(S, Ox, 0.f, Wd * 1.55f, FLinearColor(0.32f, 0.18f, 0.03f, Alpha));                      // dark edge
+				else if (Pass == 2) Stroke(S, Ox, 0.f, Wd, FLinearColor(1.f, 0.74f, 0.2f, Alpha));                                 // gold
+				else Stroke(S, Ox - Wd * 0.12f, -Wd * 0.12f, Wd * 0.35f, FLinearColor(1.f, 0.95f, 0.65f, 0.75f * Alpha));       // sheen
+			}
+			Ox += Adv(Text[i]);
+		}
 	}
 }

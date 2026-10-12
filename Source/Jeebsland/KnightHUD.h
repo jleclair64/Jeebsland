@@ -32,6 +32,7 @@ private:
 	void SetTip(const TArray<FString>& Lines) { TipLines = Lines; }
 	void ItemTip(int32 Id);
 	void DrawTip();
+	void NorseText(const FString& Text, float Y, float H, float Alpha);   // place names, lettered in a Norse hand (gold, rune-cut strokes), centred
 	void DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha);   // a tooltip-style panel centred over a point (dropped things)
 	static FLinearColor Lift(const FLinearColor& C, float F);
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
