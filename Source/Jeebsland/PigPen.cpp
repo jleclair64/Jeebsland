@@ -1,5 +1,5 @@
 #include "PigPen.h"
-#include "Pig.h"
+#include "FoeKnight.h"
 #include "Terrain.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -137,15 +137,9 @@ void APigPen::BeginPlay()
 		Pair.Key->AddInstances(Pair.Value, false, false, false);
 	}
 
-	// The pigs
-	FRandomStream R(777);
-	for (int32 i = 0; i < 7; ++i)
+	// No more pigs: the pen is now a sparring ring, kept by a knight in iron (see FoeKnight.cpp)
+	if (AFoeKnight* Foe = GetWorld()->SpawnActor<AFoeKnight>(FVector(C.X, C.Y, Ground(C.X, C.Y) + 98.f), FRotator(0.f, -90.f, 0.f)))
 	{
-		const float X = C.X + R.FRandRange(-1.f, 1.f) * (H.X - 200.f);
-		const float Y = C.Y + R.FRandRange(-1.f, 1.f) * (H.Y - 200.f);
-		if (APig* Pig = GetWorld()->SpawnActor<APig>(FVector(X, Y, Ground(X, Y)), FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f)))
-		{
-			Pig->Setup(C, H);
-		}
+		Foe->Setup(C, H);
 	}
 }

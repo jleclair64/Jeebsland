@@ -21,6 +21,8 @@ public:
 	float HitRadius = 90.f;
 	float LastHitTime = -1000.f;
 	TFunction<void(AActor* From)> OnDamaged;
+	// Optional: lets the owner soften a blow before it lands (a raised shield). Returns the damage that gets through.
+	TFunction<int32(int32 Amount, AActor* From)> ModifyDamage;
 
 	bool IsAlive() const { return Cur > 0; }
 	void Reset() { Cur = Max; LastHitTime = -1000.f; }

@@ -40,6 +40,7 @@ bool UHealthComponent::ShowBar(float Now) const
 int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit)
 {
 	if (Cur <= 0 || Amount <= 0) return 0;
+	if (ModifyDamage) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
 	const int32 Dealt = FMath::Min(Amount, Cur);
 	Cur -= Dealt;
 	if (UWorld* W = GetWorld())

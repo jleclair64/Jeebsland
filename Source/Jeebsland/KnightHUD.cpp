@@ -4,6 +4,7 @@
 #include "Engine/Engine.h"
 #include "KnightCharacter.h"
 #include "Pig.h"
+#include "FoeKnight.h"
 #include "Npc.h"
 #include "HealthComponent.h"
 #include "Combat.h"
@@ -757,6 +758,11 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
 	{
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.5f, FLinearColor(0.75f, 0.45f, 0.18f), true);
+	}
+	// The pen knight
+	for (TActorIterator<AFoeKnight> It(GetWorld()); It; ++It)
+	{
+		if (!It->IsHidden()) Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.5f, FLinearColor(0.95f, 0.15f, 0.1f), false);
 	}
 	// Enemies (any other character)
 	for (TActorIterator<ACharacter> It(GetWorld()); It; ++It)
