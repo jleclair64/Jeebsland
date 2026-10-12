@@ -290,6 +290,7 @@ private:
 	// Moves and stances
 	bool bCrouched = false;
 	bool bBlocking = false;
+	bool bBlockHeld = false;   // the block button is down (the shield drops during a swing and comes back after it if still held)
 	bool bSliding = false;
 	bool bRolling = false;
 	bool bSitting = false;

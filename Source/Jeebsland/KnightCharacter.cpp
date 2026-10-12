@@ -800,6 +800,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	AttackDur = (Style == EAtkStyle::Thrust) ? 0.45f : (Style == EAtkStyle::Cast ? FMath::Max(0.45f, Cd * 1.1f) : Cd * 1.25f);
 	if (Dir < 0) AttackDur *= 0.85f;           // the follow-up swing is 15% faster
 	bAttacking = true;
+	bBlocking = false;   // the shield drops for the swing; Tick raises it again afterwards if the block button is still held
 	bAttackHit = false;
 	AttackT = 0.f;
 	QueuedClick = -10.f;
@@ -1028,12 +1029,14 @@ void AKnightCharacter::ExitClimb(bool bAtTop, bool bAtBottom)
 
 void AKnightCharacter::StartBlock()
 {
-	if (bSitting || bRolling || bClimbing || IsUIOpen() || !ShieldActive()) return;
+	bBlockHeld = true;
+	if (bSitting || bRolling || bClimbing || IsUIOpen() || !ShieldActive() || bAttacking) return;   // no blocking mid-swing
 	bBlocking = true;
 }
 
 void AKnightCharacter::StopBlock()
 {
+	bBlockHeld = false;
 	bBlocking = false;
 }
 
@@ -1829,6 +1832,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
 	}
 	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+
+	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
+	if (bAttacking) bBlocking = false;
+	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 
 	// ---------- Ground speed (crouching and blocking are slow); slower in the air with a smooth slide down to it ----------
 	const float AirMul = 0.69f;
