@@ -228,7 +228,10 @@ void AKnightCharacter::ApplyGraphics()
 	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
 	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
 	Set(TEXT("r.Shadow.Virtual.Enable"), 0);   // standard shadow maps on both levels (virtual ones overloaded in the pine woods)
-	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
+	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);
+	// Soft shadows that blur with distance from the caster (the sun's size sets how much): high branches leave soft dapples
+	// on the ground instead of a sharp dark web
+	Set(TEXT("r.Shadow.FilterMethod"), 1);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
 	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 2 : 4);   // Lowest: plain temporal smoothing (calms flicker; FXAA did not)
 	for (TActorIterator<AForest> It(W); It; ++It) It->SetLeafShadows(!bLowest);   // Lowest: no swaying leaf shadows (they blinked)
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 3);

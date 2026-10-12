@@ -33,7 +33,7 @@ void ADayNight::BeginPlay()
 		Sun = *It;
 		if (UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
 		{
-			L->LightSourceAngle = 2.5f;   // a bigger sun disc: shadow edges soften with distance from what casts them
+			L->LightSourceAngle = 4.f;   // a bigger sun disc: shadow edges soften with distance from what casts them (branch shadows blur)
 			L->MarkRenderStateDirty();
 		}
 		break;
