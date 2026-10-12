@@ -233,7 +233,7 @@ namespace JeebItemModel
 				P.Mesh = W.Mesh;
 				P.bMetal = !W.bFixed && V >= 1 && (W.Role == 0 || W.Role == 2 || W.Role == 6);
 			}
-			Turn(Out, V3(90, 0, 30));   // blade flat on the ground, at a slant
+			Turn(Out, K == K_Katana ? V3(90, 0, 30) : V3(0, 90, 30));   // blade flat on the ground, at a slant
 			Settle(Out);
 			return;
 		}

@@ -27,7 +27,8 @@ namespace WeaponDesign
 
 	struct FSec { double Z, W, T, Xo; };
 
-	inline void BladeSolid(FMD& M, std::initializer_list<FSec> L, const FXf& Pl)
+	// bAlongGuard: the blade's flat lies in line with the crossguard (across Y), as on a real sword; otherwise across X (the katana)
+	inline void BladeSolid(FMD& M, std::initializer_list<FSec> L, const FXf& Pl, bool bAlongGuard = true)
 	{
 		TArray<FRing> Rings;
 		for (const FSec& S : L)
@@ -35,6 +36,7 @@ namespace WeaponDesign
 			FRing Rg;
 			Rg.Add(V3(S.Xo + S.W, 0, S.Z)); Rg.Add(V3(S.Xo + S.W * 0.55, S.T, S.Z)); Rg.Add(V3(S.Xo - S.W * 0.55, S.T, S.Z));
 			Rg.Add(V3(S.Xo - S.W, 0, S.Z)); Rg.Add(V3(S.Xo - S.W * 0.55, -S.T, S.Z)); Rg.Add(V3(S.Xo + S.W * 0.55, -S.T, S.Z));
+			if (bAlongGuard) for (FVector& P : Rg) Swap(P.X, P.Y);
 			Rings.Add(Rg);
 		}
 		Solid(M, Rings, false, true, false, Pl, true);
@@ -89,7 +91,7 @@ namespace WeaponDesign
 			  Blob(M, 2.4, 2.4, 2.4, At(0, 0, 10.5)); }
 			const double C = 0.0020;
 			auto Xo = [&](double Z) { return -C * (Z + 14.0) * (Z + 14.0); };
-			BladeSolid(Add(Plate), { {-15, 3.0, 0.9, Xo(-15)}, {-45, 3.0, 0.85, Xo(-45)}, {-70, 2.8, 0.8, Xo(-70)}, {-88, 2.0, 0.6, Xo(-88)}, {-98, 0.8, 0.3, Xo(-98)}, {-101, 0, 0, Xo(-101)} }, Pl);
+			BladeSolid(Add(Plate), { {-15, 3.0, 0.9, Xo(-15)}, {-45, 3.0, 0.85, Xo(-45)}, {-70, 2.8, 0.8, Xo(-70)}, {-88, 2.0, 0.6, Xo(-88)}, {-98, 0.8, 0.3, Xo(-98)}, {-101, 0, 0, Xo(-101)} }, Pl, false);
 			break;
 		}
 		case K_Axe:
