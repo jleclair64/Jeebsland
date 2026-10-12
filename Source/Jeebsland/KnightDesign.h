@@ -446,7 +446,7 @@ namespace KnightDesign
 				const FVector2D RightSide[] = { FVector2D(17.8, 14.0), FVector2D(18.0, -5.0), FVector2D(18.0, -25.0), FVector2D(17.8, -44.0), FVector2D(16.5, -51.0), FVector2D(12.0, -54.5), FVector2D(0.0, -56.0) };
 				for (const FVector2D& P : RightSide) O.Add(P);
 				for (int32 i = UE_ARRAY_COUNT(RightSide) - 2; i >= 0; --i) O.Add(FVector2D(-RightSide[i].X, RightSide[i].Y));
-				O.Add(O[0]);
+				{ const FVector2D First = O[0]; O.Add(First); }
 				const double Dome = 3.0;
 				auto F = Face(2, O, FVector2D(0.0, -16.0), 24.0, 52.0, Dome);
 				FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Accent); D.Style = 2;
