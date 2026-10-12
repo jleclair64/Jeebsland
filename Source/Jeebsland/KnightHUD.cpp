@@ -421,6 +421,24 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
+	// "BLACKROCK" fades in for a few seconds each time you walk in through the walls
+	{
+		const bool bIn = JeebTerrain::RectSD(FVector2D(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y), JeebTerrain::VillageCenter(), FVector2D(JeebTerrain::VillageHalf(), JeebTerrain::VillageHalf())) < 0.f;
+		const float T = GetWorld()->GetTimeSeconds();
+		if (bIn && !bInTown && T > 8.f) TownBannerT = T;
+		bInTown = bIn;
+		const float Age = T - TownBannerT;
+		if (TownBannerT > 0.f && Age < 4.5f)
+		{
+			const float A = FMath::Clamp(FMath::Min(Age / 0.8f, (4.5f - Age) / 1.2f), 0.f, 1.f);
+			const FString Name = TEXT("BLACKROCK");
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(Name, TW, TH, Font, 3.f);
+			HDText(Name, FLinearColor(0.f, 0.f, 0.f, 0.6f * A), (Canvas->ClipX - TW) * 0.5f + 3.f, Canvas->ClipY * 0.16f + 3.f, Font, 3.f);
+			HDText(Name, FLinearColor(1.f, 0.88f, 0.55f, A), (Canvas->ClipX - TW) * 0.5f, Canvas->ClipY * 0.16f, Font, 3.f);
+		}
+	}
+
 	HDText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
 
 	DrawMinimap(Pawn);

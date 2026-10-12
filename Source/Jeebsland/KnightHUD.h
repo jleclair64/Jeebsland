@@ -60,6 +60,7 @@ private:
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
 	float PanelTop = 0.f;
 	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
+	bool bInTown = false; float TownBannerT = -100.f;   // the BLACKROCK banner
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
 	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;

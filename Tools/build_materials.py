@@ -4,6 +4,7 @@ import os
 import unreal
 
 GRASS_DESATURATION = 0.15   # how far the grass and the ground under it are pulled toward grey
+GRASS_SHADOW_LIFT = 0.55    # how much the darkest parts of the grass are brightened (lights untouched)
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 lib = unreal.MaterialEditingLibrary
@@ -175,8 +176,12 @@ def patchy(mat, col):
     p = g.tex(patches, g.mul(xy, 1.0 / 4500.0))
     shade = g.node(unreal.MaterialExpressionLinearInterpolate)
     g.link(g.const3((0.86, 1.0, 0.86)), shade, "A"); g.link(g.const3((1.04, 1.0, 0.84)), shade, "B"); g.link(p, shade, "Alpha", "R")   # deeper to lighter green
-    each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.24), 0.88)
-    return g.desat(g.muln(g.muln(col, shade), each), GRASS_DESATURATION)   # 15% less vibrant, still fresh
+    each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.16), 0.92)   # a little less tuft-to-tuft speckle
+    out = g.desat(g.muln(g.muln(col, shade), each), GRASS_DESATURATION)   # 15% less vibrant, still fresh
+    # Softer shadows between the blades: the darkest parts are lifted (up to 55%), the light parts are left exactly as they were
+    lum = g.mask(g.desat(out, 1.0), True, False)
+    lift = g.one(unreal.MaterialExpressionSaturate, g.add(g.mul(lum, -3.0), 1.0))
+    return g.muln(out, g.add(g.mul(lift, GRASS_SHADOW_LIFT), 1.0))
 
 
 def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False):
@@ -235,7 +240,7 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     spec.set_editor_property("r", 0.0)
     lib.connect_material_property(spec, "", unreal.MaterialProperty.MP_SPECULAR)
     soft_edges(mat, ts)
-    fluffy_normal(mat)
+    fluffy_normal(mat, 0.93 if vary else 0.8)   # grass is lit almost evenly, so it reads as soft and fluffy
 
     if wind:
         shade = add_wind(mat, strength, tip_only, lift)
@@ -635,7 +640,7 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 imported(gen_textures.patches(), "T_Patches")
-build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True)   # a softer, more natural green
+build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.10)   # a softer, more natural green
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
