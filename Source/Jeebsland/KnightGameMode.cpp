@@ -86,7 +86,8 @@ void AKnightGameMode::BeginPlay()
 	{
 		if (UGameUserSettings* GS = UGameUserSettings::GetGameUserSettings())
 		{
-			GS->SetFullscreenMode(EWindowMode::Fullscreen);
+			GS->SetFullscreenMode(EWindowMode::WindowedFullscreen);   // a borderless window over the whole screen
+			GS->SetScreenResolution(GS->GetDesktopResolution());       // at the monitor's own native resolution
 			GS->ApplySettings(false);
 		}
 	}
