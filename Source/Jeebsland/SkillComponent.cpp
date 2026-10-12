@@ -354,3 +354,45 @@ int32 USkillComponent::BankUsed() const
 	for (const FInvSlot& S : Bank) if (S.Id != 0) ++N;
 	return N;
 }
+
+bool USkillComponent::SwapInvHotbar(int32 InvIdx, int32 H)
+{
+	if (!Slots.IsValidIndex(InvIdx) || H < 0 || H >= 5) return false;
+	FInvSlot& S = Slots[InvIdx];
+	if (S.Id != 0 && !(JeebItems::IsGear(S.Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(S.Id)))) return false;   // only weapons go on the bar
+	if (S.Id == 0 && Hotbar[H] == 0) return false;
+	const int32 FromBar = Hotbar[H];
+	Hotbar[H] = S.Id;
+	S.Id = FromBar;
+	S.Count = FromBar ? 1 : 0;
+	return true;
+}
+
+bool USkillComponent::SwapInv(int32 A, int32 B)
+{
+	if (!Slots.IsValidIndex(A) || !Slots.IsValidIndex(B) || A == B) return false;
+	Swap(Slots[A], Slots[B]);
+	return true;
+}
+
+bool USkillComponent::SwapHotbar(int32 A, int32 B)
+{
+	if (A < 0 || B < 0 || A >= 5 || B >= 5 || A == B) return false;
+	Swap(Hotbar[A], Hotbar[B]);
+	return true;
+}
+
+void USkillComponent::FillPracticePack()
+{
+	FRandomStream R(5150);
+	using namespace JeebItems;
+	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
+		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Cape, K_Ring, K_Amulet };
+	for (int32 i = 0; i < Slots.Num(); ++i)
+	{
+		if (Slots[i].Id != 0) continue;
+		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
+		Slots[i].Id = GearId(K, R.RandRange(0, 4));
+		Slots[i].Count = 1;
+	}
+}

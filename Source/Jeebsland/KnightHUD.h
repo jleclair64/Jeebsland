@@ -60,6 +60,14 @@ private:
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
 	float PanelTop = 0.f;
 	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
+	// Drag and drop between the pack (side panel) and the weapon bar
+	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
+	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;
+	float PanelX = 0.f, PanelW = 0.f, PanelH = 0.f;
+	int32 DragKind = 0, DragIdx = -1, DragId = 0;   // 0 none, 1 from the pack, 2 from the weapon bar
+	FVector2D DragStart = FVector2D::ZeroVector; bool bDragging = false; bool bUIRelease = false;
+	void ProcessDrag(AKnightCharacter* Knight);
+	void DrawDragGhost();
 	// Sharp text: the canvas draws a font at its own size and then scales the picture, which blurs big text. These are
 	// copies of the medium font rasterised at 2x, 3x and 4x; HDText picks the one that needs the least scaling.
 	UPROPERTY() UFont* HDFonts[4] = {};

@@ -159,6 +159,7 @@ void AKnightCharacter::BeginPlay()
 	PrevYaw = GetActorRotation().Yaw;
 	SpawnLoc = GetActorLocation();
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
+	if (Skills) Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 
 	// Saved choices (resolution, side panel). Fancy lighting always starts on, whatever was saved.
 	if (GConfig)

@@ -78,6 +78,7 @@ public:
 	// The side panel (lower left): Tab frees the cursor to use it, Caps Lock steps through its tabs (Inventory, Apparel, Skills)
 	bool IsPanelCursor() const { return bPanelCursor; }
 	int32 GetPanelTab() const { return PanelTab; }
+	void SetPanelCursor(bool bOn) { if (bPanelCursor != bOn) { bPanelCursor = bOn; RefreshUIMode(); } }
 	void SetPanelTab(int32 T) { PanelTab = FMath::Clamp(T, 0, 2); }
 	void CyclePanelTab() { PanelTab = (PanelTab + 1) % 3; }
 	// Settings: show the side panel all the time (on), or only while the cursor is out with Tab (off)

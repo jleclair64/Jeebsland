@@ -384,7 +384,9 @@ void AKnightHUD::DrawHUD()
 	bUIHaveMouse = PC && PC->GetMousePosition(UIMouseX, UIMouseY);
 	const bool bDownNow = PC && PC->IsInputKeyDown(EKeys::LeftMouseButton);
 	bUIClick = bDownNow && !bUIWasDown;
+	bUIRelease = bUIWasDown && !bDownNow;
 	bUIWasDown = bDownNow;
+	InvCellCount = 0; bHotCells = false; PanelW = 0.f;
 	TipLines.Reset();
 
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
@@ -564,6 +566,8 @@ void AKnightHUD::DrawHUD()
 	else if (Knight->IsSmithOpen()) DrawSmithScreen(Knight);
 	else if (Knight->IsDialogueOpen()) DrawDialogue(Knight);
 
+	ProcessDrag(Knight);
+	DrawDragGhost();
 	DrawTip();
 }
 
@@ -662,6 +666,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	for (int32 i = 0; i < NumHotbar; ++i)
 	{
 		const float X = X0 + i * (SS + Gap);
+		HotCellX[i] = X; HotCellY[i] = Y0; HotCellS = SS; bHotCells = true;
 		const bool bSel = (Skills->Selected == i);
 		const int32 Id = Skills->Hotbar[i];
 		// The chosen slot stands out: it is lifted and bigger, tinted gold with a bright gold outline, while the others are dimmed
@@ -2011,12 +2016,12 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
 
-	const float SS = 50.f, Gap = 5.f, Pad = 10.f, TabH = 28.f;
-	const float GridW = 4 * SS + 3 * Gap, GridH = 4 * SS + 3 * Gap;
+	const float SS = 44.f, Gap = 5.f, Pad = 10.f, TabH = 28.f;
+	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;   // a 5 x 5 pack
 	const float PW = GridW + 2.f * Pad;
 	const float PH = Pad + TabH + 8.f + GridH + Pad;
 	const float PX = Canvas->ClipX - PW - 16.f, PY = Canvas->ClipY - PH - 16.f;
-	PanelTop = PY;
+	PanelTop = PY; PanelX = PX; PanelW = PW; PanelH = PH;
 	bGreyGlass = true;
 	Panel(PX, PY, PW, PH, 1.f, false);
 
@@ -2068,18 +2073,18 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		for (int32 i = 0; i < NumSlots; ++i)
 		{
 			const int32 Cell = i + 1;
-			const float X = GX + (Cell % 4) * (SS + Gap), Y = GY + (Cell / 4) * (SS + Gap);
+			const float X = GX + (Cell % 5) * (SS + Gap), Y = GY + (Cell / 5) * (SS + Gap);
+			InvCellX[i] = X; InvCellY[i] = Y; InvCellS = SS; InvCellCount = i + 1;
 			const bool bOver = Hot(X, Y, SS, SS);
 			const FInvSlot S = Skills->Slots[i];
 			SlotTile(X, Y, SS, SS, bOver);
 			if (S.Id == 0) continue;
-			DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);
+			if (!(DragKind == 1 && bDragging && DragIdx == i)) DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);   // the picked-up item leaves its cell
 			if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
 			ItemBadges(S.Id, X, Y, SS);
 			if (bOver)
 			{
 				ItemTip(S.Id);
-				if (bUIClick && IsGear(S.Id)) Knight->EquipFromInventory(i);
 			}
 		}
 	}
@@ -2095,15 +2100,12 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			{ K_Shield, false, TEXT("Shield"), 0, 2 }, { K_Boots, false, TEXT("Boots"), 1, 2 }, { K_Cape, false, TEXT("Cape"), 2, 2 },
 			{ K_Ring, false, TEXT("Misc"), 3, 0 }, { K_Ring, true, TEXT("Misc"), 3, 1 }, { K_Amulet, false, TEXT("Misc"), 3, 2 },
 		};
-		const float WS = 46.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 13.f;
+		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f;
 		for (const FWornSlot& Ws : Worn)
 		{
 			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
 			const bool bOver = Hot(X, Y, WS, WS);
 			SlotTile(X, Y, WS, WS, bOver);
-			float LW = 0.f, LH = 0.f;
-			HDTextSize(Ws.Label, LW, LH, Font, 0.6f);
-			HDText(Ws.Label, FLinearColor(0.72f, 0.73f, 0.77f), X + (WS - LW) * 0.5f, Y + WS, Font, 0.6f);
 			const int32 Id = Ws.bSecond ? Skills->RingB : Skills->Worn[Ws.Kind];
 			if (Id == 0) continue;
 			DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);
@@ -2157,8 +2159,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			int32 Lv, Into, Need;
 			Skills->GetProgress(T, Lv, Into, Need);
 			DrawSkillIcon(static_cast<int32>(T), X + 5.f, Y + 5.f, BH - 22.f);
-			const FString LvS = FString::FromInt(Lv);
 			float LW = 0.f, LH = 0.f;
+			const FString LvS = FString::FromInt(Lv);
 			HDTextSize(LvS, LW, LH, Font, 1.2f);
 			HDText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + BW - LW - 5.f, Y + BH - LH - 10.f, Font, 1.2f);
 			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
@@ -2493,4 +2495,73 @@ void AKnightHUD::HDTextSize(const FString& Text, float& OutW, float& OutH, UFont
 	float S = Scale;
 	UFont* F = PickFont(Font, S);
 	GetTextSize(Text, OutW, OutH, F, S);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Drag and drop: pick an item up from the pack or the weapon bar, drop it on a pack cell or a bar slot. The two trade places
+// (or it moves into an empty cell). A click without dragging does what it always did (hold or wear the gear).
+// Clicking anywhere else on the screen (not the panel, not the weapon bar) puts the cursor away again.
+// ---------------------------------------------------------------------------------------------------
+void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
+{
+	if (!Knight->IsPanelCursor() || !bUIHaveMouse) { DragKind = 0; bDragging = false; return; }
+	USkillComponent* Sk = Knight->GetSkills();
+	const FVector2D M(UIMouseX, UIMouseY);
+	auto OverCell = [&](float X, float Y, float S) { return M.X >= X && M.X <= X + S && M.Y >= Y && M.Y <= Y + S; };
+
+	// pick up
+	if (bUIClick && DragKind == 0)
+	{
+		for (int32 i = 0; i < InvCellCount && DragKind == 0; ++i)
+			if (OverCell(InvCellX[i], InvCellY[i], InvCellS) && Sk->Slots[i].Id != 0) { DragKind = 1; DragIdx = i; DragId = Sk->Slots[i].Id; }
+		if (bHotCells)
+			for (int32 h = 0; h < 5 && DragKind == 0; ++h)
+				if (OverCell(HotCellX[h], HotCellY[h], HotCellS) && Sk->Hotbar[h] != 0) { DragKind = 2; DragIdx = h; DragId = Sk->Hotbar[h]; }
+		if (DragKind != 0) { DragStart = M; bDragging = false; }
+		else
+		{
+			// a click on nothing: leave pointer mode, unless it was on the panel or the weapon bar
+			const bool bOnPanel = PanelW > 0.f && M.X >= PanelX - 6.f && M.X <= PanelX + PanelW + 6.f && M.Y >= PanelTop - 6.f && M.Y <= PanelTop + PanelH + 6.f;
+			const bool bOnBar = bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 130.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f;
+			if (!bOnPanel && !bOnBar) Knight->SetPanelCursor(false);
+		}
+	}
+	if (DragKind == 0) return;
+	if (!bDragging && FVector2D::Distance(M, DragStart) > 6.f) bDragging = true;
+
+	// drop
+	if (bUIRelease)
+	{
+		bool bChanged = false;
+		if (!bDragging)
+		{
+			if (DragKind == 1 && IsGear(DragId)) { Knight->EquipFromInventory(DragIdx); }   // a plain click: hold or wear it
+		}
+		else
+		{
+			int32 ToInv = -1, ToHot = -1;
+			for (int32 i = 0; i < InvCellCount; ++i) if (OverCell(InvCellX[i], InvCellY[i], InvCellS)) ToInv = i;
+			if (bHotCells) for (int32 h = 0; h < 5; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
+			if (DragKind == 1)
+			{
+				if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
+				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
+			}
+			else
+			{
+				if (ToInv >= 0) bChanged = Sk->SwapInvHotbar(ToInv, DragIdx);
+				else if (ToHot >= 0) bChanged = Sk->SwapHotbar(DragIdx, ToHot);
+			}
+			if (bChanged) Knight->RefreshEquipment();   // the weapon in hand may have changed
+		}
+		DragKind = 0; bDragging = false; DragIdx = -1;
+	}
+}
+
+// the item follows the cursor while it is being dragged
+void AKnightHUD::DrawDragGhost()
+{
+	if (DragKind == 0 || !bDragging || !bUIHaveMouse) return;
+	const float S = 56.f;
+	DrawIcon(DragId, UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
 }

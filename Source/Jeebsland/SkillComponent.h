@@ -95,6 +95,11 @@ public:
 
 	bool EquipFromSlot(int32 InvIdx);                 // hold or wear the gear in that inventory slot (swaps with what is there)
 	bool UnequipHotbar(int32 H);                      // back into the inventory
+	// Drag and drop between the pack and the weapon bar (and within each). Only weapons and tools can go on the bar.
+	bool SwapInvHotbar(int32 InvIdx, int32 H);   // the bar slot and the pack slot trade places (either may be empty)
+	bool SwapInv(int32 A, int32 B);
+	bool SwapHotbar(int32 A, int32 B);
+	void FillPracticePack();                     // stocks the pack with random weapons and armour (for trying out swaps)
 	bool UnequipWorn(int32 Kind, bool bSecondRing = false);
 
 	// Counting and taking items by id
