@@ -1,36 +1,30 @@
-Make the vents on the knight helmet near the mouth vertical instead of horizontal
+
+Make crouching much lower so the knight goes down to half his height by bending his knees the way a normal human would crouch down low, keep the helmet in the same orientation at the low point of the crouch. Allow shielding while crouching 
 
 
-If I drop an item by dragging it out of my inventory I want it to show up in the real world. I want you to create 3d rendering for all the items we have including a log to represent wood, different for the different kinds of wood, and gems to represent the ore, again different for each different ore type. Please use your best judgement with the rest of these items similar to the ore and wood. 
+Make a world map and a starting screen. Will need to set up profile saves and auto saving eventually. I want to press the escape key to go back to the menu, save profile, and on the right pull up the world map 
 
 
-
-What do you think of the project so far? What should I be focusing on? What's going to be the hardest to change in the future? (designs, colors, animations, builds, the map, HUD, etc)
-
-
-Make a world map and a starting screen. Will need to set up profile saves and auto saving eventually 
-
-
-Ask about dropping frames and how we can optimize this thing. It looks like a cartoon game, if my PC can run battlefield 6 at max setting this game should be a piece of cake. I'm confused with it's having trouble with frames at the highest graphics settings
-
-
-Check on the size of the project. Ask Claude to remove any bloat or files things we aren't using anymore
 
 Fix the pine trees so they look real 
-Add blood splatters?
+
 
 
 Combat
+Make this operate like a fighting game in 3d with low sweep strikes, high or low shield option, slash that we already have, overhead strike. Need to find a fix for the strafing. I think shield always up makes sense but I want the character to move faster while in strafe mode. Can you make the shield health bar glow red once it's been reduces to 0. Maybe make upscroll an overhead attack that can be block by a high shield, down scroll a low sweeping blow that hits under shield but has little range, and if the scroll is pressed down then it's used a potion. Change the weapon switch to "R"
 Run + jump + attack does like a stabbing animation with a little cool down where the knight is vulnerable afterwards
+Run + attack is a stab, let this be able to charge up too
 Be able to charge up a strong attack
 Be able to throw your weapons like spears and swords?
+Add parries from perfect blocks
+
 
 
 Each class can only use certain weapons, some are shared. Vary their speeds, health, damage output, jump height, climb walls ability? Ninja double jump and can hit crits? Make certain skills increase faster aka the viking gets 20% increase xp for sailing and fishing skill, give them different abilities like the ninja can hit crits and double jump, the wizard can float for a while, etc. Keep the users skills and inventory the same as they change classes, give them the options to switch at the beginning of the game. At the beginning of the game the user can choose where to spawn in at select points on the map, they start with one and have to explore to unlock more. 
 
-Knight (trolls are the enemies) - strong shield sword/spear
-Troll (attacking the knights) - weak wood shield - battle axe/battle hammer
-Wizard (mysterious faction) - defensive spells for a blue shield - wands/staffs
+Knight (trolls are the enemies) - strong shield sword/spear/bow
+Troll (attacking the knights) - weak wood shield - battle axe/battle hammer/bow
+Wizard (mysterious faction) - defensive crystal ball held in left hand (bubble that follows the character, Winston type of bubble, stand a long flat shield, flat shield that follows the wizard around, etc for a blue shield - wands/staffs
 
 
 Viking
