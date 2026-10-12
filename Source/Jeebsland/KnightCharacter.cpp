@@ -2350,7 +2350,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
 	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + 95.f * Ground;   // at rest the left hand comes up to the chest
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + 85.f * Ground;   // at rest the left hand comes up behind the inside front of the shield
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
@@ -2360,7 +2360,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 50.f * Ground * (1.f - BlockAlpha), 0.f));   // and swung in, so the hand rests against the chest
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 15.f * Ground * (1.f - BlockAlpha), 0.f));   // and swung in, so the hand rests against the chest
 	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
