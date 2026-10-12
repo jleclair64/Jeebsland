@@ -32,6 +32,9 @@ private:
 	void ItemTip(int32 Id);
 	void DrawTip();
 	static FLinearColor Lift(const FLinearColor& C, float F);
+	// Warm, lively frames: a panel with a gradient, gold border, studs and a slow shimmer; and a bevelled gauge with a sheen
+	void Panel(float X, float Y, float W, float H, float Alpha = 1.f, bool bGlow = false);
+	void Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse = false);
 
 	// Screens
 	void DrawSettingsScreen(AKnightCharacter* Knight);

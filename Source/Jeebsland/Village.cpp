@@ -136,9 +136,18 @@ void AVillage::BeginPlay()
 		{
 			const float DeckTop = JeebTerrain::HeightAt(VC.X, VC.Y) + JeebTerrain::DeckHeight();
 			const float DeckLen = 2.f * Half - 270.f; // stops at the corner towers
-			const FVector2D DC = C + In * 115.f;
-			Put(Plank, FTransform(Q, FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(DeckLen / 100.f, 1.7f, 0.2f)));
-			AddSolid(FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(DeckLen * 0.5f, 85.f, 10.f), Q);
+			// One run of deck, or two with a break over each gate (nothing spans the doorway)
+			const float DeckEnd = DeckLen * 0.5f, GateBreak = 300.f;
+			TArray<TPair<float, float>> Runs;
+			if (bGate) { Runs.Add(TPair<float, float>(-DeckEnd, -GateBreak)); Runs.Add(TPair<float, float>(GateBreak, DeckEnd)); }
+			else Runs.Add(TPair<float, float>(-DeckEnd, DeckEnd));
+			for (const TPair<float, float>& Run : Runs)
+			{
+				const float RunLen = Run.Value - Run.Key;
+				const FVector2D DC = C + Dir * ((Run.Key + Run.Value) * 0.5f) + In * 115.f;
+				Put(Plank, FTransform(Q, FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(RunLen / 100.f, 1.7f, 0.2f)));
+				AddSolid(FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(RunLen * 0.5f, 85.f, 10.f), Q);
+			}
 			for (float U = -Half + 250.f; U <= Half - 250.f; U += 400.f)
 			{
 				if (bGate && FMath::Abs(U) < 300.f) continue; // keep the gate road clear

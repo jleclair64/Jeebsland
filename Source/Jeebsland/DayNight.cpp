@@ -9,6 +9,7 @@
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/PostProcessVolume.h"
 #include "Components/VolumetricCloudComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 float ADayNight::Phase = 0.f;
 float ADayNight::SunElevation = 54.f;
@@ -53,6 +54,15 @@ void ADayNight::BeginPlay()
 			VC->SetLayerBottomAltitude(1.6f);   // km
 			VC->SetLayerHeight(5.f);
 			VC->SetTracingMaxDistance(60.f);
+			if (UMaterialInterface* Parent = VC->GetMaterial())
+			{
+				CloudMat = UMaterialInstanceDynamic::Create(Parent, this);
+				VC->SetMaterial(CloudMat);
+				BaseCoverage = CloudMat->K2_GetScalarParameterValue(TEXT("Cloud_GlobalCoverage"));
+				BaseDensity = CloudMat->K2_GetScalarParameterValue(TEXT("Cloud_GlobalDensity"));
+				UE_LOG(LogTemp, Log, TEXT("Clouds: base coverage %.3f, density %.3f"), BaseCoverage, BaseDensity);
+			}
+			WeatherRand.Initialize(FMath::RandRange(1, 1000000));
 			break;
 		}
 	}
@@ -81,6 +91,7 @@ void ADayNight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	Clock += DeltaSeconds;
+	TickClouds(DeltaSeconds);
 	Phase = FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
 
 	// A midnight sun: it circles the whole sky once a day, high at noon (phase 0) and skimming low over the
@@ -120,4 +131,31 @@ void ADayNight::Tick(float DeltaSeconds)
 	{
 		F->GetComponent()->SetFogInscatteringColor(FMath::Lerp(FLinearColor(0.42f, 0.30f, 0.34f), FLinearColor(0.60f, 0.57f, 0.58f), High));
 	}
+}
+
+// The clouds drift slowly overhead, and the weather changes every few minutes: sometimes a clear sky, sometimes about
+// 50% more cloud than the old fixed look, and sometimes something in between. Changes ease in over about a minute.
+void ADayNight::TickClouds(float DeltaSeconds)
+{
+	if (!CloudMat) return;
+
+	// A steady breeze moves the whole cloud pattern (the direction wanders a little over the minutes)
+	const float Heading = 0.6f + 0.4f * FMath::Sin(Clock * 0.003f);
+	CloudMat->SetVectorParameterValue(TEXT("WindVelocity"), FLinearColor(FMath::Cos(Heading), FMath::Sin(Heading), 0.f, 1.f));
+	CloudMat->SetScalarParameterValue(TEXT("WindMultiplier"), CloudWindSpeed);
+
+	CloudHold -= DeltaSeconds;
+	if (CloudHold <= 0.f)
+	{
+		const float Pick = WeatherRand.FRand();
+		if (Pick < 0.28f)      CloudTarget = WeatherRand.FRandRange(0.f, 0.12f);    // a clear sky
+		else if (Pick < 0.64f) CloudTarget = WeatherRand.FRandRange(0.5f, 1.1f);    // scattered cloud, about the old look
+		else                   CloudTarget = WeatherRand.FRandRange(1.35f, 1.5f);   // heavy: about 50% more cloud
+		CloudHold = WeatherRand.FRandRange(90.f, 210.f);
+	}
+	CloudCover = FMath::FInterpTo(CloudCover, CloudTarget, DeltaSeconds, 0.04f);
+
+	// Cover moves the amount of sky the clouds fill; density thins them to wisps (and nothing) toward a clear sky
+	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), BaseCoverage + 0.5f * (CloudCover - 1.f));
+	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), BaseDensity * FMath::Clamp(0.15f + 0.85f * CloudCover, 0.f, 1.3f));
 }

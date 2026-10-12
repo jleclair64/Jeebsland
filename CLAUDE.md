@@ -8,7 +8,7 @@ Unreal Engine 5.8 C++ project (Windows). Game code lives in `Source/Jeebsland/`.
 
 ## Model and effort
 
-The owner wants a recommendation on model and effort for each request, to balance quality against token use. Before starting a request, say in one line which fits, and only if it differs from the current setting. Don't switch unless asked.
+The owner wants a recommendation on model and effort for each request, to balance quality against token use. Before executing any large task (or a batch of tasks), always suggest the most optimal model and effort first. "Optimal" means balancing token usage while still getting a great result that won't need rework. For a mixed batch, say which items suit which model. For small requests, one line is enough, and only if it differs from the current setting. Don't switch unless asked.
 - Sonnet 5.5, low or medium effort: tweaks to values, colors, sizes or positions; removing things; small single-file changes.
 - Sonnet 5.5, high effort: moderate features or multi-file changes along existing patterns.
 - Opus 5.5, high effort: new systems (skills UI, enemies, combat, dungeons), tricky visual or rendering bugs, anything Sonnet failed at.
@@ -30,6 +30,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 - Sun never sets: lowest point 11 degrees, noon 41. Day loop is 60 s per half for preview; owner will ask to change it to 1200 s.
 - Armour can be swapped but never removed (starts as a full bronze suit); cape starts black.
 - Minimap rotates with the camera. Store restocks hourly with a mystery satchel.
+- Always keep grass near buildings (fort, cottages, castle, etc.) about 40% shorter than open-field grass, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
 - Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
 
 **Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
@@ -40,7 +41,7 @@ Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and
 
 ## Build
 
-The editor must be closed before building (Live Coding is not used).
+The editor must be closed before building (Live Coding is not used). The owner has given standing permission to close a running editor (`Stop-Process -Name UnrealEditor`) whenever a build or material rebuild needs it, without asking, and to reopen it afterwards.
 
 ```
 & "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" JeebslandEditor Win64 Development "C:\Users\johnl\Documents\Unreal Projects\Jeebsland\Jeebsland.uproject" -waitmutex

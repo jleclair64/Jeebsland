@@ -31,7 +31,7 @@ namespace
 	};
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;
-	constexpr float GustDuration = 2.4f;
+	constexpr float GustDuration = 5.2f;   // about twice as long, so leaves carry much further before they fade
 	constexpr float GustSpeed = 840.f;    // 40% slower than before
 	constexpr float GustWidth = 800.f;   // about as wide as a hut
 	constexpr int32 NumOpenLeaves = 1500;   // loose leaves scattered in the open
@@ -810,7 +810,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			if (bGusting)
 			{
 				GustT += DeltaSeconds;
-				const float Fade = FMath::Clamp(FMath::Min(GustT / 0.3f, (GustDuration - GustT) / 0.4f), 0.f, 1.f);
+				const float Fade = FMath::Clamp(FMath::Min(GustT / 0.3f, (GustDuration - GustT) / 1.1f), 0.f, 1.f);
 				SetGustLeaves(Fade);
 				bGustHidden = false;
 				if (GustT >= GustDuration)

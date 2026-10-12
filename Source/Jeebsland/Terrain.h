@@ -535,4 +535,22 @@ namespace JeebTerrain
 		}();
 		return All;
 	}
+
+	// How close a point is to a building, 0 (open country) to 1 (at a wall or inside the grounds), easing off over about
+	// 7 m. Grass uses it to grow short beside buildings and taper up gradually, never tall-then-suddenly-short.
+	inline float BuildingNearness(float X, float Y)
+	{
+		const FVector2D P(X, Y);
+		float D = 1.0e6f;   // signed distance to the nearest building footprint (negative inside)
+		for (const FVector2D& S : HutSites()) D = FMath::Min(D, float(FVector2D::Distance(P, S)) - 480.f);
+		for (const FHutDef& H : VillageHuts()) D = FMath::Min(D, float(FVector2D::Distance(P, H.Pos)) - 480.f);
+		D = FMath::Min(D, float(FVector2D::Distance(P, FVector2D(CottagePos().X, CottagePos().Y))) - 480.f);
+		const FVector2D Stalls[3] = { ShopPos(), SmithyPos(), BankPos() };
+		for (const FVector2D& St : Stalls) D = FMath::Min(D, RectSD(P, St, FVector2D(270.f, 260.f)));
+		D = FMath::Min(D, float(FVector2D::Distance(P, CastlePos())) - (CastleMoatOut + 80.f));
+		D = FMath::Min(D, RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())));   // the whole walled village
+		D = FMath::Min(D, RectSD(P, PenCenter(), PenHalf()));
+		for (const FFort& F : Forts()) D = FMath::Min(D, float(FVector2D::Distance(P, F.Tree)) - 400.f);
+		return 1.f - FMath::SmoothStep(0.f, 700.f, D);
+	}
 }

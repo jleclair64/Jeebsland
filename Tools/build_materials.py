@@ -3,6 +3,8 @@
 import os
 import unreal
 
+GRASS_DESATURATION = 0.15   # how far the grass and the ground under it are pulled toward grey
+
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 lib = unreal.MaterialEditingLibrary
 
@@ -75,6 +77,16 @@ def add_wind(mat, strength, tip_only, lift):
     flutter_amp = add(mul(gust2, 0.35), 0.15)
     total = addn(gust2, muln(flutter, flutter_amp))           # lean downwind as a gust passes, plus the flutter
 
+    # Big gust fronts: every ~17 s a wide line (about 30 m across, ragged along its length) sweeps downwind at 7 m/s and
+    # pushes the grass over hard. A slow gate lets some fronts fade out so they do not arrive like clockwork.
+    front_phase = addn(addn(mul(wx, 0.0000783), mul(wy, 0.0000283)), mul(t, -0.0583))   # 120 m between fronts
+    crest = node(unreal.MaterialExpressionSaturate); link(mul(add(sine(front_phase), -0.55), 2.2), crest)
+    crest = muln(crest, crest)
+    along = add(mul(sine(addn(addn(mul(wy, 0.00005), mul(wx, -0.00002)), mul(t, 0.012))), 0.3), 0.7)   # the line is longer in places
+    gate = node(unreal.MaterialExpressionSaturate); link(mul(add(sine(addn(mul(t, 0.021), mul(wx, 0.000017))), 0.45), 1.6), gate)
+    front = muln(muln(crest, along), gate)
+    total = addn(total, mul(front, 1.7))
+
     if tip_only:
         uv = node(unreal.MaterialExpressionTextureCoordinate)
         tip = node(unreal.MaterialExpressionOneMinus); link(mask(uv, False, True, False), tip)   # V = 0 at the top of the card
@@ -132,7 +144,7 @@ def patchy(mat, col):
     shade = g.node(unreal.MaterialExpressionLinearInterpolate)
     g.link(g.const3((0.86, 1.0, 0.86)), shade, "A"); g.link(g.const3((1.04, 1.0, 0.84)), shade, "B"); g.link(p, shade, "Alpha", "R")   # deeper to lighter green
     each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.24), 0.88)
-    return g.muln(g.muln(col, shade), each)
+    return g.desat(g.muln(g.muln(col, shade), each), GRASS_DESATURATION)   # 15% less vibrant, still fresh
 
 
 def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False):
@@ -310,6 +322,13 @@ class Graph:
     def const3(self, rgb):
         return self.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(rgb[0], rgb[1], rgb[2], 1.0))
 
+    def desat(self, a, amount):
+        """Pull a colour toward its own grey by amount (0.15 = 15% less vibrant), keeping the brightness"""
+        n = self.node(unreal.MaterialExpressionDesaturation, luminance_factors=unreal.LinearColor(0.3, 0.59, 0.11, 0.0))
+        self.link(a, n, "")
+        self.link(self.node(unreal.MaterialExpressionConstant, r=amount), n, "Fraction")
+        return n
+
     def mask(self, a, r, g, b=False):
         n = self.node(unreal.MaterialExpressionComponentMask, r=r, g=g, b=b, a=False); self.link(a, n); return n
 
@@ -463,7 +482,7 @@ def build_ground(tex, dirt):
     far = g.tex(tex, g.mul(xy, 1.0 / 2400.0))
     var = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.78, const_b=1.18)
     g.link(far, var, "Alpha", "G")
-    grass = g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0)))
+    grass = g.desat(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), GRASS_DESATURATION)
     # beside the roads (vertex colour red) the ground turns to trodden soil, in ragged patches rather than a smooth band
     soil = g.mul(g.tex(dirt, g.mul(xy, 1.0 / 350.0)), 0.95)
     worn = g.mask(g.node(unreal.MaterialExpressionVertexColor), True, False)

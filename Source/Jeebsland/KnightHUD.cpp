@@ -64,6 +64,63 @@ float AKnightHUD::Wrapped(const FString& Text, float X, float Y, float MaxW, flo
 	return Cy - Y;
 }
 
+// A lively panel: a warm dark-brown gradient, a gold border with a dark inner line, studs in the corners, and a soft
+// highlight that glides along the top edge every few seconds. bGlow pulses the border (the selected slot).
+void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
+{
+	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.35f * Alpha), X + 3.f, Y + 4.f, W, H);   // soft drop shadow
+	const int32 Strips = FMath::Clamp(FMath::RoundToInt(H / 6.f), 4, 40);
+	for (int32 i = 0; i < Strips; ++i)
+	{
+		const float A = float(i) / float(Strips);
+		const FLinearColor C(FMath::Lerp(0.19f, 0.07f, A), FMath::Lerp(0.13f, 0.05f, A), FMath::Lerp(0.08f, 0.04f, A), 0.93f * Alpha);
+		DrawRect(C, X, Y + H * A, W, H / Strips + 0.6f);
+	}
+	const float Pulse = bGlow ? 0.5f + 0.5f * FMath::Sin(T * 4.f) : 0.f;
+	const FLinearColor Gold = bGlow ? FLinearColor(1.f, FMath::Lerp(0.62f, 0.85f, Pulse), FMath::Lerp(0.2f, 0.4f, Pulse), Alpha) : FLinearColor(0.62f, 0.42f, 0.14f, Alpha);
+	DrawRect(Gold, X, Y, W, 2.f); DrawRect(Gold, X, Y + H - 2.f, W, 2.f);
+	DrawRect(Gold, X, Y, 2.f, H); DrawRect(Gold, X + W - 2.f, Y, 2.f, H);
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.55f * Alpha), X + 2.f, Y + 2.f, W - 4.f, 1.f);                   // dark inner line
+	DrawRect(FLinearColor(1.f, 0.85f, 0.5f, 0.22f * Alpha), X + 3.f, Y + 3.f, W - 6.f, 1.f);                 // light edge under it
+	if (W > 90.f && H > 90.f)
+		for (int32 c = 0; c < 4; ++c)   // studs in the corners
+			DrawRect(FLinearColor(0.85f, 0.62f, 0.25f, Alpha), X + 6.f + (c & 1) * (W - 18.f), Y + 6.f + (c >> 1) * (H - 18.f), 6.f, 6.f);
+	// the glint: a short bright run along the top edge, sweeping across once in a while
+	const float Sweep = FMath::Fmod(T * 0.18f + X * 0.0007f, 1.6f);
+	if (Sweep < 1.f)
+	{
+		const float GW = FMath::Min(90.f, W * 0.4f), GX = X + (W - GW) * Sweep;
+		DrawRect(FLinearColor(1.f, 0.9f, 0.6f, 0.55f * Alpha * FMath::Sin(Sweep * PI)), GX, Y, GW, 2.f);
+	}
+}
+
+// A bevelled gauge: dark well, a fill that is brighter along the top and darker below, tick marks, and a slow sheen.
+void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse)
+{
+	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	F = FMath::Clamp(F, 0.f, 1.f);
+	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.65f), X - 3.f, Y - 3.f, W + 6.f, H + 6.f);
+	DrawRect(FLinearColor(0.62f, 0.42f, 0.14f, 1.f), X - 2.f, Y - 2.f, W + 4.f, H + 4.f);        // gold rim
+	DrawRect(FLinearColor(0.05f, 0.04f, 0.04f, 1.f), X - 1.f, Y - 1.f, W + 2.f, H + 2.f);
+	DrawRect(FLinearColor(0.11f, 0.09f, 0.08f, 1.f), X, Y, W, H);
+	const float Glow = bPulse ? 0.75f + 0.25f * FMath::Sin(T * 7.f) : 1.f;
+	const float FW = W * F;
+	if (FW > 0.5f)
+	{
+		DrawRect(FLinearColor(Fill.R * 0.7f * Glow, Fill.G * 0.7f * Glow, Fill.B * 0.7f * Glow, 1.f), X, Y, FW, H);                       // darker body
+		DrawRect(FLinearColor(FMath::Min(Fill.R * 1.15f, 1.f) * Glow, FMath::Min(Fill.G * 1.15f, 1.f) * Glow, FMath::Min(Fill.B * 1.15f, 1.f) * Glow, 1.f), X, Y, FW, H * 0.55f);   // lighter top
+		DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.22f), X, Y + 1.f, FW, FMath::Max(1.f, H * 0.18f));                                            // gloss
+		const float Sw = FMath::Fmod(T * 0.35f, 1.5f);                                                                                          // a sheen gliding along the fill
+		if (Sw < 1.f)
+		{
+			const float SX = X + (FW - 26.f) * Sw;
+			if (FW > 30.f) DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.28f * FMath::Sin(Sw * PI)), SX, Y, 26.f, H);
+		}
+	}
+	for (int32 k = 1; k < 4; ++k) DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.3f), X + W * 0.25f * k - 0.5f, Y, 1.f, H);   // quarter marks
+}
+
 bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, bool bEnabled, bool bActive, float Scale)
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -235,7 +292,7 @@ void AKnightHUD::DrawHUD()
 			float TW = 0.f, TH = 0.f;
 			GetTextSize(M.Text, TW, TH, Font, 1.15f);
 			const float X = (Canvas->ClipX - TW) * 0.5f;
-			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.45f * A), X - 10.f, Y - 3.f, TW + 20.f, TH + 6.f);
+			Panel(X - 10.f, Y - 3.f, TW + 20.f, TH + 6.f, 0.8f * A);
 			DrawText(M.Text, FLinearColor(M.Color.R, M.Color.G, M.Color.B, A), X, Y, Font, 1.15f);
 			Y -= TH + 10.f;
 		}
@@ -248,9 +305,7 @@ void AKnightHUD::DrawHUD()
 		const float BY = Canvas->ClipY - 36.f;
 		const float F = Knight->GetStaminaFraction();
 		const FLinearColor Fill = Knight->IsExhausted() ? FLinearColor(0.85f, 0.15f, 0.1f) : FLinearColor(0.35f, 0.8f, 0.3f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX - 3.f, BY - 3.f, BW + 6.f, BH + 6.f);
-		DrawRect(FLinearColor(0.15f, 0.15f, 0.15f, 1.f), BX, BY, BW, BH);
-		DrawRect(Fill, BX, BY, BW * F, BH);
+		Gauge(BX, BY, BW, BH, F, Fill, Knight->IsExhausted());
 	}
 
 	// Health bar (above the stamina bar)
@@ -259,10 +314,8 @@ void AKnightHUD::DrawHUD()
 		const float BX = (Canvas->ClipX - BW) * 0.5f;
 		const float BY = Canvas->ClipY - 56.f;
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX - 3.f, BY - 3.f, BW + 6.f, BH + 6.f);
-		DrawRect(FLinearColor(0.05f, 0.06f, 0.12f, 1.f), BX, BY, BW, BH);
-				const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.85f, 0.12f, 0.10f) : (F < 0.5f ? FLinearColor(0.95f, 0.78f, 0.12f) : FLinearColor(0.15f, 0.42f, 0.95f));
-		DrawRect(HpCol, BX, BY, BW * F, BH);
+		const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.85f, 0.12f, 0.10f) : (F < 0.5f ? FLinearColor(0.95f, 0.78f, 0.12f) : FLinearColor(0.15f, 0.42f, 0.95f));
+		Gauge(BX, BY, BW, BH, F, HpCol, F < 0.2f);   // throbs when nearly dead
 		DrawText(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(Knight->GetHealth()), Knight->GetMaxHealth()), FLinearColor::White, BX + BW * 0.5f - 22.f, BY - 1.f, Font, 0.8f);
 	}
 
@@ -311,9 +364,7 @@ void AKnightHUD::DrawHUD()
 		const float BY = Canvas->ClipY - 84.f;
 		const float F = FMath::Clamp(Knight->GetHorseEnergy() / 100.f, 0.f, 1.f);
 		const FLinearColor Fill = Knight->IsHorseTired() ? FLinearColor(0.85f, 0.35f, 0.1f) : FLinearColor(0.95f, 0.75f, 0.2f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), BX - 3.f, BY - 3.f, BW + 6.f, BH + 6.f);
-		DrawRect(FLinearColor(0.15f, 0.15f, 0.15f, 1.f), BX, BY, BW, BH);
-		DrawRect(Fill, BX, BY, BW * F, BH);
+		Gauge(BX, BY, BW, BH, F, Fill, Knight->IsHorseTired());
 		DrawText(FString::Printf(TEXT("Horse  %d"), FMath::RoundToInt(Knight->GetHorseEnergy())), FLinearColor::White, BX + BW + 12.f, BY - 3.f, Font, 1.0f);
 	}
 
@@ -325,7 +376,7 @@ void AKnightHUD::DrawHUD()
 			float TW = 0.f, TH = 0.f;
 			GetTextSize(Prompt, TW, TH, Font, 1.5f);
 			const float PX2 = (Canvas->ClipX - TW) * 0.5f, PY2 = Canvas->ClipY * 0.6f;
-			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), PX2 - 14.f, PY2 - 6.f, TW + 28.f, TH + 12.f);
+			Panel(PX2 - 14.f, PY2 - 6.f, TW + 28.f, TH + 12.f, 0.95f, true);
 			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.4f), PX2, PY2, Font, 1.5f);
 		}
 	}
@@ -351,7 +402,7 @@ void AKnightHUD::DrawSkills(const USkillComponent* Skills)
 	const float X = 24.f;
 	const float Y = Canvas->ClipY - H - 24.f;
 
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), X, Y, W, H);
+	Panel(X, Y, W, H);
 	DrawText(TEXT("SKILLS"), FLinearColor(1.f, 0.85f, 0.3f), X + 16.f, Y + 8.f, Font, 1.3f);
 
 	auto SkillRow = [&](float RowY, const TCHAR* Name, ESkillType Skill, const FLinearColor& BarColor)
@@ -361,8 +412,7 @@ void AKnightHUD::DrawSkills(const USkillComponent* Skills)
 		DrawText(FString::Printf(TEXT("%s   Lv %d"), Name, Level), FLinearColor::White, X + 16.f, RowY, Font, Scale);
 		const float BarX = X + 16.f, BarY = RowY + 26.f, BarW = W - 32.f;
 		const float Fill = Needed > 0 ? FMath::Clamp(float(Into) / float(Needed), 0.f, 1.f) : 0.f;
-		DrawRect(FLinearColor(0.15f, 0.15f, 0.15f, 1.f), BarX, BarY, BarW, 9.f);
-		DrawRect(BarColor, BarX, BarY, BarW * Fill, 9.f);
+		Gauge(BarX, BarY, BarW, 9.f, Fill, BarColor);
 		DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Needed), FLinearColor(0.8f, 0.8f, 0.8f), BarX + BarW - 100.f, RowY + 2.f, Font, 0.9f);
 	};
 	SkillRow(Y + 40.f,  TEXT("Mining"),      ESkillType::Mining,      FLinearColor(0.9f, 0.55f, 0.15f));
@@ -442,8 +492,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const float X = X0 + i * (SS + Gap);
 		const bool bSel = (Skills->Selected == i);
 		const int32 Id = Skills->Hotbar[i];
-		DrawRect(bSel ? FLinearColor(1.f, 0.7f, 0.2f, 1.f) : FLinearColor(0.f, 0.f, 0.f, 0.7f), X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
-		DrawRect(FLinearColor(0.11f, 0.10f, 0.09f, 0.92f), X, Y0, SS, SS);
+		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f, 1.f, bSel);
 		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.85f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f), X + 4.f, Y0 + 2.f, Font, 0.95f);
 		if (Id == 0) continue;
 		DrawIcon(Id, X + 6.f, Y0 + 4.f, SS - 12.f);
@@ -464,7 +513,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	// Defence total, to the right of the bar
 	{
 		const float X = X0 + TotalW + 22.f;
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.7f), X, Y0, 92.f, SS);
+		Panel(X, Y0, 92.f, SS);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
 		DrawText(TEXT("DEFENCE"), FLinearColor(0.7f, 0.75f, 0.9f), X + 8.f, Y0 + 6.f, Font, 0.9f);
 		DrawText(FString::Printf(TEXT("%d"), Def), FLinearColor(0.55f, 0.75f, 1.f), X + 8.f, Y0 + 28.f, Font, 1.8f);
@@ -628,8 +677,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	const float PW = 980.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.88f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSettings(); return; }
 
 	const float MX = UIMouseX, MY = UIMouseY;
@@ -1221,8 +1269,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1060.f, PH = 650.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.9f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 
 	if (DrawPackTabs(Knight, PX, PY, false)) return;
 	{
@@ -1343,8 +1390,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PW = 1190.f, PH = 690.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.92f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 	DrawText(TEXT("THE TRADING POST"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
@@ -1523,8 +1569,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const float PW = 1190.f, PH = 690.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.92f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.75f, 0.30f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 	DrawText(TEXT("THE SMITHY"), FLinearColor(1.f, 0.6f, 0.25f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
@@ -1793,8 +1838,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1060.f, PH = 650.f;   // the same window as the inventory, on its other tab
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.9f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 	if (DrawPackTabs(Knight, PX, PY, true)) return;
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSkills(); return; }
 
@@ -1906,8 +1950,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1090.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.92f), PX, PY, PW, PH);
-	DrawRect(FLinearColor(0.55f, 0.32f, 0.08f, 1.f), PX, PY, PW, 4.f);
+	Panel(PX, PY, PW, PH);
 	DrawText(TEXT("THE VAULT"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
 

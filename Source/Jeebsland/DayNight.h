@@ -8,6 +8,7 @@ class ADirectionalLight;
 class ASkyLight;
 class AExponentialHeightFog;
 class APostProcessVolume;
+class UMaterialInstanceDynamic;
 
 // A midnight sun, like June above the Arctic Circle: the sun circles the sky, high at noon and skimming the
 // horizon at the bottom of its loop (the golden dusk), and never sets. Drives the sun's height, colour and
@@ -31,6 +32,7 @@ public:
 	static FVector SunDir;       // unit vector toward the sun
 	static FVector MoonDir;      // unit vector toward the moon (it hangs low in the south-west)
 	static float FixedPhase;     // >= 0 freezes the clock at that phase (used for test screenshots)
+	static constexpr float CloudWindSpeed = 1.f;   // how fast the clouds drift; raise it if they crawl, lower it if they race
 
 protected:
 	virtual void BeginPlay() override;
@@ -43,4 +45,13 @@ private:
 	float Clock = 0.f;
 	float RecaptureTimer = 0.f;
 	bool bSkyRealTime = false;
+
+	// Sky weather: the cloud layer drifts overhead and its cover wanders between a clear sky, scattered cloud and heavy cloud
+	UPROPERTY() UMaterialInstanceDynamic* CloudMat = nullptr;
+	float BaseCoverage = 0.5f, BaseDensity = 1.f;
+	float CloudCover = 1.f;        // multiplier on the original look: 0 = clear, 1 = as it was, 1.5 = about 50% more cloud
+	float CloudTarget = 1.f;
+	float CloudHold = 20.f;        // seconds until the next change of weather
+	FRandomStream WeatherRand;
+	void TickClouds(float DeltaSeconds);
 };
