@@ -38,6 +38,17 @@ namespace JeebItems
 	inline int32 ArrowId(int32 Tier) { return IdArrowBase + Tier; }
 	inline bool IsArrow(int32 Id) { return Id >= IdArrowBase && Id < IdArrowBase + NumTiers; }
 	inline int32 ArrowTier(int32 Id) { return Id - IdArrowBase; }
+	// Potions: 950 green (speed), 951 red (healing), 952 purple (vigour: a bigger health bar for a while)
+	constexpr int32 IdPotionBase = 950;
+	constexpr int32 NumPotions = 3;
+	enum EPotion : int32 { P_Speed = 0, P_Heal = 1, P_Vigour = 2 };
+	inline int32 PotionId(int32 Type) { return IdPotionBase + Type; }
+	inline bool IsPotion(int32 Id) { return Id >= IdPotionBase && Id < IdPotionBase + NumPotions; }
+	inline int32 PotionType(int32 Id) { return Id - IdPotionBase; }
+	inline const TCHAR* PotionName(int32 Type) { static const TCHAR* N[NumPotions] = { TEXT("Swiftness Potion"), TEXT("Healing Potion"), TEXT("Vigour Potion") }; return N[FMath::Clamp(Type, 0, NumPotions - 1)]; }
+	inline const TCHAR* PotionText(int32 Type) { static const TCHAR* N[NumPotions] = { TEXT("You run 50% faster for 8 seconds. Ready again after 1 minute."), TEXT("Heals you to full at once. Ready again after 2 minutes."), TEXT("Your health bar grows by 50% for 1 minute (the extra comes full). Ready again after 1 minute.") }; return N[FMath::Clamp(Type, 0, NumPotions - 1)]; }
+	inline float PotionCooldown(int32 Type) { static const float C[NumPotions] = { 60.f, 120.f, 60.f }; return C[FMath::Clamp(Type, 0, NumPotions - 1)]; }
+	inline int32 PotionPrice(int32 Type) { static const int32 P[NumPotions] = { 25, 40, 35 }; return P[FMath::Clamp(Type, 0, NumPotions - 1)]; }
 	inline int32 GearId(int32 Kind, int32 Variant) { return IdGearBase + Kind * 10 + Variant; }
 	inline bool IsGear(int32 Id) { return Id >= IdGearBase; }
 	inline int32 KindOf(int32 Id) { return (Id - IdGearBase) / 10; }
@@ -54,6 +65,7 @@ namespace JeebItems
 	inline int32 StackSize(int32 Id)
 	{
 		if (IsArrow(Id)) return 30;
+		if (IsPotion(Id)) return 10;
 		if (!IsMaterial(Id)) return 1;
 		switch (MaterialType(Id))
 		{
@@ -131,6 +143,7 @@ namespace JeebItems
 	inline FString ItemName(int32 Id)
 	{
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
+		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (!IsGear(Id)) return FString();
 		const int32 K = KindOf(Id), V = VariantOf(Id);
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), CapeColorName(V));

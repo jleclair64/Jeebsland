@@ -107,6 +107,13 @@ public:
 	int32* WornSlotPtr(int32 Kind, bool bSecond);   // the int that holds that worn slot (the three misc slots are Worn[K_Ring], RingB and Worn[K_Amulet])
 	bool SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond);
 	void FillPracticePack();                     // stocks the pack with random weapons and armour (for trying out swaps)
+	// Dying: everything you own (pack, weapon bar, worn gear, potions, ingots) leaves you, sorted by where it was
+	// (0 pack, 1 weapon bar, 2 worn); then you start again with the default kit. (Skills and levels are kept.)
+	void TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots);
+	void ResetToStartingKit();
+	// The potion slot (beside the weapon bar): one stack of potions ready to drink with Q
+	FInvSlot PotionSlot;
+	bool SwapInvPotion(int32 InvIdx);   // a pack slot and the potion slot trade places (only potions go in it)
 	bool UnequipWorn(int32 Kind, bool bSecondRing = false);
 
 	// Counting and taking items by id

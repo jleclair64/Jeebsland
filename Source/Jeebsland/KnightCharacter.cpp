@@ -666,6 +666,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(DodgeFAction, EKeys::W);
 	DodgeBAction = MakeBool(TEXT("KnightDodgeB"));
 	KnightContext->MapKey(DodgeBAction, EKeys::S);
+	PotionAction = MakeBool(TEXT("KnightPotion"));
+	KnightContext->MapKey(PotionAction, EKeys::Q);
 	KnightContext->MapKey(SitAction, EKeys::E);
 
 	{
@@ -747,6 +749,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(DodgeRAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeRight);
 		EIC->BindAction(DodgeFAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeFwd);
 		EIC->BindAction(DodgeBAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeBack);
+		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
@@ -978,19 +981,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 	// Defence trains only from blows you block with a raised shield, facing the attacker.
 	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
 	if (!bEnvironmental && ShieldStop > 0) Skills->AddXP(ESkillType::Defense, 2 + ShieldStop / 2);
-
-	if (Health <= 0.f)
-	{
-		// Knocked out: wake up at the start with full health
-		Health = (float)MaxHealth;
-		bAttacking = false;
-		bCharging = false;
-				bBlocking = false;
-		if (bClimbing) ExitClimb(false, false);
-		GetCharacterMovement()->Velocity = FVector::ZeroVector;
-		SetActorLocation(SpawnLoc);
-		if (GEngine) JeebMsg::Post(4.f, FColor::Red, TEXT("You were knocked out and woke up back at the start."));
-	}
+	if (Health <= 0.f) Die();   // any death: the sack, and a fresh start in Blackrock
 }
 
 void AKnightCharacter::TryStartClimb()
@@ -1234,7 +1225,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	case EInteract::Bench: OutText = TEXT("Press E to sit"); return true;
 		case EInteract::Loot:  OutText = TEXT("Press E to take the ingots"); return true;
 	case EInteract::Drop:
-		if (const ALootDrop* Drop = FoundDrop.Get()) { OutText = Drop->Describe(); return true; }
+		if (const ALootDrop* Drop = FoundDrop.Get()) { OutText = Drop->IsSack() ? FString(TEXT("Press E to open the sack")) : Drop->Describe(); return true; }
 		return false;
 	case EInteract::Door:
 	{
@@ -1344,7 +1335,11 @@ void AKnightCharacter::OnInteractKey()
 	case EInteract::Bench: SitOnSeat(Idx); break;
 		case EInteract::Door:  UseDoor(FoundCottage.Get()); break;
 	case EInteract::Drop:
-		if (ALootDrop* Drop = FoundDrop.Get()) Drop->TakeAll(this);
+		if (ALootDrop* Drop = FoundDrop.Get())
+		{
+			if (Drop->IsSack()) OpenLoot(Drop);   // a sack opens its own windows beside yours, with the cursor out
+			else Drop->TakeAll(this);
+		}
 		break;
 	case EInteract::Loot:
 		if (ACottage* Hut = FoundCottage.Get())
@@ -1872,14 +1867,15 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// The horse heals the same way: 10 s after its last hit, a full bar takes 10 s. (Not in PvP areas, once those exist.)
 	if (HorseHealth < HorseMaxHealth && GetWorld()->GetTimeSeconds() - LastHorseHurtTime > 10.f)
 		HorseHealth = FMath::Min(HorseMaxHealth, HorseHealth + HorseMaxHealth * 0.1f * Dt);
-
 	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s
 	if (Skills)
 	{
-		const int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
+		int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
+		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * 1.5f);   // vigour potion: a bigger bar for a minute
 		if (NewMax != MaxHealth)
 		{
-			Health = FMath::Max(1.f, Health + (NewMax - MaxHealth));
+			if (NewMax > MaxHealth) Health += NewMax - MaxHealth;   // a bigger bar comes with the extra already full
+			else Health = FMath::Clamp(Health, 1.f, (float)NewMax);   // a smaller one only trims what does not fit
 			MaxHealth = NewMax;
 		}
 		if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastHurtTime > 10.f)   // 10 s after the last hit it starts to heal
@@ -1903,6 +1899,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
 	}
 	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+
+	// An open sack closes when you walk away from it, or put the cursor away
+	if (LootTarget.IsValid() && (!bPanelCursor || FVector::Dist2D(GetActorLocation(), LootTarget->GetActorLocation()) > 400.f)) LootTarget = nullptr;
 
 	// Climbing, riding or sitting: the shield and the weapon go on the back; they come back to the hands afterwards
 	{
@@ -1975,7 +1974,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
 	const float StanceFactor = StanceFwd < -0.1f ? 0.4f : (StanceFwd > 0.1f ? 0.6f : (FMath::Abs(StanceRight) > 0.1f ? 0.5f : 0.6f));
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed)));
+	                                 : (bStance ? WalkSpeed * StanceFactor : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f);   // swiftness potion
 	if (bFalling && !bSpecial)
 	{
 		AirSpeedMul = AirMul;
@@ -2495,4 +2494,78 @@ void AKnightCharacter::DropFromHotbar(int32 H)
 	Skills->Hotbar[H] = 0;
 	DropBag(Items, 0);
 	RefreshEquipment();
+}
+
+// ---------------- Dying ----------------
+// Whatever killed you (a blow, the poison gas, anything), everything you own goes into a big sack where you fell: your pack,
+// your weapon bar, your armour and the rest of what you wore, your potions and your ingots. You wake up in Blackrock, just
+// inside the east gate, in the starting kit, at full health. Skills and levels stay with you.
+void AKnightCharacter::Die()
+{
+	if (!Skills) return;
+	if (bMounted) Dismount();
+	if (bClimbing) ExitClimb(false, false);
+	if (bSitting) StandUp();
+	const FVector Fell = GetActorLocation();
+	TArray<FInvSlot> Items;
+	TArray<uint8> Where;
+	int32 Ingots = 0;
+	Skills->TakeEverything(Items, Where, Ingots);
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	if (ALootDrop* Sack = GetWorld()->SpawnActor<ALootDrop>(FVector(Fell.X, Fell.Y, JeebTerrain::HeightAt(Fell.X, Fell.Y) + 2.f), FRotator::ZeroRotator, SP))
+		Sack->SetupSack(Items, Where, Ingots);
+
+	Skills->ResetToStartingKit();
+	RefreshEquipment();
+	CloseLoot();
+	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false;
+	SpeedUntil = -1.f; VigourUntil = -1.f;
+	GetCharacterMovement()->Velocity = FVector::ZeroVector;
+	const FVector2D VC = JeebTerrain::VillageCenter();
+	const FVector2D Wake(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
+	SetActorLocation(FVector(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f));
+	SetActorRotation(FRotator(0.f, 180.f, 0.f));
+	MaxHealth = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3;
+	Health = (float)MaxHealth;
+	LastHurtTime = -100.f;
+	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
+}
+
+// ---------------- Potions ----------------
+float AKnightCharacter::GetPotionCooldownLeft(int32 Type) const
+{
+	if (Type < 0 || Type >= JeebItems::NumPotions) return 0.f;
+	return FMath::Max(0.f, PotionReadyAt[Type] - GetWorld()->GetTimeSeconds());
+}
+
+void AKnightCharacter::DrinkPotion()
+{
+	if (!Skills || IsUIOpen()) return;
+	FInvSlot& P = Skills->PotionSlot;
+	if (P.Id == 0 || !JeebItems::IsPotion(P.Id) || P.Count <= 0) { JeebMsg::Post(2.f, FColor::Orange, TEXT("No potion in the potion slot.")); return; }
+	const int32 T = JeebItems::PotionType(P.Id);
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (Now < PotionReadyAt[T])
+	{
+		JeebMsg::Post(2.f, FColor::Orange, FString::Printf(TEXT("%s is not ready yet (%d s)."), JeebItems::PotionName(T), FMath::CeilToInt(PotionReadyAt[T] - Now)));
+		return;
+	}
+	switch (T)
+	{
+	case JeebItems::P_Speed:  SpeedUntil = Now + 8.f; break;
+	case JeebItems::P_Heal:   Health = (float)MaxHealth; break;
+	case JeebItems::P_Vigour: VigourUntil = Now + 60.f; break;   // the bigger bar is worked out in Tick (the extra comes full)
+	}
+	PotionReadyAt[T] = Now + JeebItems::PotionCooldown(T);
+	if (--P.Count <= 0) P = FInvSlot();
+	JeebMsg::Post(2.5f, FColor(170, 255, 170), FString::Printf(TEXT("You drink a %s."), JeebItems::PotionName(T)));
+}
+
+// ---------------- Looting a sack ----------------
+void AKnightCharacter::OpenLoot(ALootDrop* Drop)
+{
+	if (!Drop) return;
+	LootTarget = Drop;
+	SetPanelCursor(true);   // the cursor comes out, like Tab, so you can take things
 }

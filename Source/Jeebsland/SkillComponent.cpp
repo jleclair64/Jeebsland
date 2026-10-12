@@ -30,15 +30,37 @@ USkillComponent::USkillComponent()
 	Known[static_cast<int32>(ESkillType::Attack)] = true;
 	Known[static_cast<int32>(ESkillType::Defense)] = true;
 
-	// Starting kit: a wooden sword, axe, pickaxe and fishing pole on the weapon bar, a wooden shield and a red cape
+	ResetToStartingKit();
+}
+
+// The kit you begin with (and wake up with after dying): a wooden sword, axe, pickaxe and fishing pole on the weapon bar, a wooden
+// shield, a black cape and a full suit of bronze armour (pieces can be swapped for others, never taken off)
+void USkillComponent::ResetToStartingKit()
+{
+	for (int32 i = 0; i < 5; ++i) Hotbar[i] = 0;
+	for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
+	RingB = 0;
+	Selected = 0;
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
 	Hotbar[1] = JeebItems::GearId(JeebItems::K_Axe, 0);
 	Hotbar[2] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
 	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 5);   // black
-	// The knight always wears a full suit of armour (bronze to start). Pieces can be swapped for others, never taken off.
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, 1);   // bronze: real metal plate from the start
+}
+
+// Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
+void USkillComponent::TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots)
+{
+	auto Put = [&](int32 Id, int32 Count, uint8 W) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; Out.Add(D); OutWhere.Add(W); } };
+	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0); S.Id = 0; S.Count = 0; }
+	for (int32 i = 0; i < 5; ++i) { Put(Hotbar[i], 1, 1); Hotbar[i] = 0; }
+	for (int32 i = 0; i < NumWornKinds; ++i) { Put(Worn[i], 1, 2); Worn[i] = 0; }
+	Put(RingB, 1, 2); RingB = 0;
+	Put(PotionSlot.Id, PotionSlot.Count, 0); PotionSlot = FInvSlot();
+	OutIngots = Ingots;
+	Ingots = 0;
 }
 
 float USkillComponent::BaseXP(ESkillType Skill)
@@ -395,6 +417,10 @@ void USkillComponent::FillPracticePack()
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Cape, K_Ring, K_Amulet };
+	// three of each potion: swiftness and vigour in the pack, healing in the potion slot
+	Slots[0].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[0].Count = 3;
+	Slots[1].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[1].Count = 3;
+	PotionSlot.Id = JeebItems::PotionId(JeebItems::P_Heal); PotionSlot.Count = 3;
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;
@@ -425,5 +451,15 @@ bool USkillComponent::SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond)
 	*Target = S.Id;
 	S.Id = Old;
 	S.Count = Old ? 1 : 0;
+	return true;
+}
+
+bool USkillComponent::SwapInvPotion(int32 InvIdx)
+{
+	if (!Slots.IsValidIndex(InvIdx)) return false;
+	FInvSlot& S = Slots[InvIdx];
+	if (S.Id != 0 && !JeebItems::IsPotion(S.Id)) return false;   // only potions go in the potion slot
+	if (S.Id == 0 && PotionSlot.Id == 0) return false;
+	Swap(S, PotionSlot);
 	return true;
 }

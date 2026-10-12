@@ -314,6 +314,14 @@ void AKnightHUD::ItemTip(int32 Id)
 		SetTip(L);
 		return;
 	}
+	if (IsPotion(Id))
+	{
+		L.Add(ItemName(Id));
+		L.Add(PotionText(PotionType(Id)));
+		L.Add(TEXT("Put it in the potion slot and press Q to drink"));
+		SetTip(L);
+		return;
+	}
 	if (IsArrow(Id))
 	{
 		L.Add(ItemName(Id));
@@ -1301,6 +1309,19 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	auto Quad = [&](float x0, float y0, float x1, float y1, const FLinearColor& C) { Poly({ P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1) }, C); };
 	auto DiscP = [&](float Cx, float Cy, float Rx, float Ry, const FLinearColor& C) { Disc(X + Cx * U, Y + Cy * U, Rx * U, Ry * U, C); };
 
+	// ---------------- potions: a round flask with a cork, filled with its colour ----------------
+	if (IsPotion(Id))
+	{
+		static const FLinearColor Fill[NumPotions] = { FLinearColor(0.25f, 0.85f, 0.25f), FLinearColor(0.9f, 0.12f, 0.1f), FLinearColor(0.6f, 0.2f, 0.9f) };
+		const FLinearColor F = Fill[PotionType(Id)];
+		const FLinearColor Glass(0.75f, 0.85f, 0.95f, 0.55f), Cork(0.55f, 0.36f, 0.18f);
+		DiscP(32, 42, 18, 18, Glass);                                      // the bulb
+		DiscP(32, 46, 15, 11, F);                                          // the potion inside, filling the lower part
+		Quad(27, 12, 37, 27, Glass);                                       // the neck
+		Quad(26, 6, 38, 13, Cork);                                         // the cork
+		DiscP(25, 36, 4, 6, FLinearColor(1.f, 1.f, 1.f, 0.55f));           // a highlight on the glass
+		return;
+	}
 	// ---------------- arrows: a bundle of three ----------------
 	if (IsArrow(Id))
 	{
@@ -1806,6 +1827,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
+			else if (IsPotion(W.Id)) { static const TCHAR* S[NumPotions] = { TEXT("Speed for 8 s"), TEXT("Heals you fully"), TEXT("+50% health, 1 min") }; Stat = S[PotionType(W.Id)]; }
 			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
 			DrawIngot(CX + 8.f, CY + CH - 30.f, 22.f);
 			HDText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);

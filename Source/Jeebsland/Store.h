@@ -25,6 +25,15 @@ namespace JeebStore
 		W.Price = FMath::Max(1, FMath::RoundToInt(BuyPrice(Kind, Tier) * PriceMul));
 		return W;
 	}
+	inline FWare PotionWare(int32 Type)
+	{
+		FWare W;
+		W.Id = PotionId(Type);
+		W.Count = 1;
+		W.Price = PotionPrice(Type);
+		W.Stock = 5;
+		return W;
+	}
 	inline FWare ArrowWare(int32 Tier)
 	{
 		FWare W;
@@ -55,14 +64,16 @@ namespace JeebStore
 		};
 
 		// Cheap: always a bundle of plain arrows, then wood and bronze bits and a cape
+		// Potions are always in stock: swiftness, healing and vigour
+		for (int32 T = 0; T < NumPotions; ++T) Push(PotionWare(T), 5, 5);
 		Push(ArrowWare(R.RandRange(0, 1)), 5, 5);
-		for (int32 Guard = 0; Out.Num() < 4 && Guard < 50; ++Guard)
+		for (int32 Guard = 0; Out.Num() < 6 && Guard < 50; ++Guard)
 		{
 			if (R.FRand() < 0.25f) Push(GearWare(K_Cape, R.RandRange(0, NumCapeColors - 1)), 1, 2);
 			else Push(GearWare(AnyKind(false), R.RandRange(0, 1)), 2, 3);
 		}
 		// Middling: iron pieces, bronze heavy weapons, rings, iron arrows
-		for (int32 Guard = 0; Out.Num() < 8 && Guard < 50; ++Guard)
+		for (int32 Guard = 0; Out.Num() < 9 && Guard < 50; ++Guard)
 		{
 			const float P = R.FRand();
 			if (P < 0.30f) Push(GearWare(K_Ring, R.RandRange(0, NumRings - 1)), 1, 2);

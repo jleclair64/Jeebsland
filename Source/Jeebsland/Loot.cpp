@@ -58,12 +58,20 @@ void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 I
 		break;
 	case ELootLook::Pack:
 	default:
-		Paint(Body, FLinearColor(0.30f, 0.20f, 0.10f), FVector(0, 0, 28), FVector(48, 38, 56), 0.f);
-		Paint(Flap, FLinearColor(0.22f, 0.14f, 0.07f), FVector(0, 0, 58), FVector(50, 40, 12), 0.f);
-		Paint(Tie, FLinearColor(0.95f, 0.72f, 0.12f), FVector(25, 0, 40), FVector(4, 10, 14), 0.f);
+	{
+		// A big burlap sack: a round, slumped body, a gathered neck tied off with cord, and the cloth flaring above the tie
+		UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+		if (Ball) { Body->SetStaticMesh(Ball); Tie->SetStaticMesh(Ball); }
+		if (Cone) Flap->SetStaticMesh(Cone);
+		Paint(Body, FLinearColor(0.50f, 0.38f, 0.22f), FVector(0, 0, 42), FVector(92, 84, 88), 0.f);    // the sack itself
+		Paint(Tie, FLinearColor(0.22f, 0.13f, 0.06f), FVector(0, 0, 90), FVector(30, 30, 9), 0.f);      // the cord round its neck
+		Paint(Flap, FLinearColor(0.46f, 0.35f, 0.20f), FVector(0, 0, 100), FVector(34, 34, 28), 180.f); // the gathered top, flaring out
+		Flap->SetRelativeRotation(FRotator(180.f, 0.f, 0.f));   // the cone stands upside down: narrow at the tie, wide at the top
 		break;
 	}
-	GlowBase = FVector(0.f, 0.f, 78.f);
+	}
+	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : 78.f);
 	Paint(Glow, FLinearColor(4.f, 3.f, 0.6f), GlowBase, FVector(9, 9, 9), 0.f);
 	SetLifeSpan(240.f);
 }
@@ -167,4 +175,40 @@ ALootDrop* ALootDrop::SpawnPack(UWorld* World, const FVector& Where, USkillCompo
 	const int32 Gold = From->GetIngots();
 	if (Gold > 0) From->SpendIngots(Gold);
 	return SpawnDrop(World, Where, ELootLook::Pack, L, Gold);
+}
+
+void ALootDrop::SetupSack(const TArray<FInvSlot>& InItems, const TArray<uint8>& InWhere, int32 InIngots)
+{
+	Setup(ELootLook::Pack, InItems, InIngots);
+	Where = InWhere;
+	Where.SetNumZeroed(Items.Num());
+	SetLifeSpan(600.f);   // a death sack waits ten minutes
+}
+
+bool ALootDrop::TakeOne(int32 Index, AActor* Taker)
+{
+	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
+	if (!Sk || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
+	FInvSlot& S = Items[Index];
+	if (!Sk->CanAdd(S.Id, S.Count) || !Sk->AddInvItem(S.Id, S.Count))
+	{
+		JeebMsg::Post(2.5f, FColor::Orange, TEXT("Your pack is full."));
+		return false;
+	}
+	S.Id = 0; S.Count = 0;
+	bool bAnyLeft = Ingots > 0;
+	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
+	if (!bAnyLeft) Destroy();
+	return true;
+}
+
+void ALootDrop::TakeIngots(AActor* Taker)
+{
+	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
+	if (!Sk || Ingots <= 0) return;
+	Sk->AddIngots(Ingots);
+	Ingots = 0;
+	bool bAnyLeft = false;
+	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
+	if (!bAnyLeft) Destroy();
 }

@@ -86,6 +86,15 @@ public:
 	void DropIngots(int32 Count);
 	void DropFromHotbar(int32 H);
 	void DropBag(const TArray<FInvSlot>& Items, int32 Ingots);
+	// Potions: Q drinks the one in the potion slot, if that kind is ready (each kind has its own cooldown)
+	void DrinkPotion();
+	float GetPotionCooldownLeft(int32 Type) const;
+	// A sack on the ground opened with E: its windows show beside yours until you walk away or put the cursor away
+	class ALootDrop* GetLootTarget() const { return LootTarget.Get(); }
+	void OpenLoot(class ALootDrop* Drop);
+	void CloseLoot() { LootTarget = nullptr; }
+	// Dying, of anything: everything you own goes into a sack where you fell, and you wake in Blackrock in the starting kit
+	void Die();
 	// Settings: show the side panel all the time (on), or only while the cursor is out with Tab (off)
 	bool GetPanelAlways() const { return bPanelAlways; }
 	void SetPanelAlways(bool bOn);
@@ -242,6 +251,10 @@ private:
 	bool bSkillsOpen = false;
 	bool bPanelCursor = false;
 	bool bPanelAlways = true;
+	float PotionReadyAt[3] = { 0.f, 0.f, 0.f };
+	float SpeedUntil = -1.f, VigourUntil = -1.f;
+	TWeakObjectPtr<class ALootDrop> LootTarget;
+	UPROPERTY() UInputAction* PotionAction = nullptr;
 	int32 PanelTab = 0;
 	UPROPERTY() UInputAction* PanelTabAction = nullptr;
 	bool bBankOpen = false;
