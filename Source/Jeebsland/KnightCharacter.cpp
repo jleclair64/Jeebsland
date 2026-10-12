@@ -2435,3 +2435,45 @@ void AKnightCharacter::Dodge(float Side)
 	StartRoll();
 	PendingRollDir = FVector::ZeroVector;
 }
+
+// ---------------- Dropping things on the ground ----------------
+void AKnightCharacter::DropBag(const TArray<FInvSlot>& Items, int32 Ingots)
+{
+	const FVector Where = GetActorLocation() + GetActorForwardVector() * 130.f;
+	const FVector Ground(Where.X, Where.Y, JeebTerrain::HeightAt(Where.X, Where.Y));
+	if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(Ground, FRotator::ZeroRotator)) Drop->Setup(ELootLook::Pack, Items, Ingots);
+}
+
+void AKnightCharacter::DropFromPack(int32 SlotIdx, int32 Count)
+{
+	if (!Skills || !Skills->Slots.IsValidIndex(SlotIdx)) return;
+	FInvSlot& S = Skills->Slots[SlotIdx];
+	if (S.Id == 0 || S.Count <= 0) return;
+	const int32 N = FMath::Clamp(Count, 1, S.Count);
+	TArray<FInvSlot> Items;
+	FInvSlot D; D.Id = S.Id; D.Count = N;
+	Items.Add(D);
+	S.Count -= N;
+	if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
+	DropBag(Items, 0);
+	RefreshEquipment();
+}
+
+void AKnightCharacter::DropIngots(int32 Count)
+{
+	if (!Skills) return;
+	const int32 N = FMath::Clamp(Count, 0, Skills->GetIngots());
+	if (N <= 0 || !Skills->SpendIngots(N)) return;
+	DropBag(TArray<FInvSlot>(), N);
+}
+
+void AKnightCharacter::DropFromHotbar(int32 H)
+{
+	if (!Skills || H < 0 || H >= 5 || Skills->Hotbar[H] == 0) return;
+	TArray<FInvSlot> Items;
+	FInvSlot D; D.Id = Skills->Hotbar[H]; D.Count = 1;
+	Items.Add(D);
+	Skills->Hotbar[H] = 0;
+	DropBag(Items, 0);
+	RefreshEquipment();
+}

@@ -379,7 +379,10 @@ void AKnightHUD::DrawHUD()
 	bUIClick = bDownNow && !bUIWasDown;
 	bUIRelease = bUIWasDown && !bDownNow;
 	bUIWasDown = bDownNow;
-	InvCellCount = 0; bHotCells = false; PanelW = 0.f;
+	const bool bRightNow = PC && PC->IsInputKeyDown(EKeys::RightMouseButton);
+	bUIRightClick = bRightNow && !bRightWasDown;
+	bRightWasDown = bRightNow;
+	InvCellCount = 0; bHotCells = false; RectCount = 0;
 	TipLines.Reset();
 
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
@@ -576,7 +579,8 @@ void AKnightHUD::DrawHUD()
 	else if (Knight->IsSmithOpen()) DrawSmithScreen(Knight);
 	else if (Knight->IsDialogueOpen()) DrawDialogue(Knight);
 
-	ProcessDrag(Knight);
+	if (!bDropOpen) ProcessDrag(Knight);
+	DrawDropBox(Knight);
 	DrawDragGhost();
 	DrawTip();
 }
@@ -2032,54 +2036,37 @@ void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
 // ===================================================================================================
 void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 {
+	// Three windows. The inventory is the one that can stay on screen all the time (lower right). Tab frees the cursor and brings
+	// up the other two: Armor just above the inventory, and Skills down the left side of the screen. With the HUD setting off,
+	// nothing is shown until Tab, and then all three appear.
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
+	const bool bCursor = Knight->IsPanelCursor();
+	const bool bLive = bCursor && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
+	RectCount = 0;
+	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 4) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
 
-	const float SS = 44.f, Gap = 5.f, Pad = 10.f, TabH = 28.f;
+	const float SS = 44.f, Gap = 5.f, Pad = 10.f;
 	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;   // a 5 x 5 pack
 	const float PW = GridW + 2.f * Pad;
-	const float PH = Pad + TabH + 8.f + GridH + Pad;
-	const float PX = Canvas->ClipX - PW - 16.f, PY = Canvas->ClipY - PH - 16.f;
-	PanelTop = PY; PanelX = PX; PanelW = PW; PanelH = PH;
 	bGreyGlass = true;
-	Panel(PX, PY, PW, PH, 1.f, false);
-
 	const FLinearColor Idle(0.62f, 0.63f, 0.66f), Hover(0.86f, 0.87f, 0.9f);
 	auto SlotTile = [&](float X, float Y, float W, float H, bool bOver)
 	{
 		Tile(X, Y, W, H, bOver ? Hover : Idle, bOver ? 0.24f : 0.11f);
 	};
 
-	// ---- Tabs: the words as large as fit ----
-	static const TCHAR* Names[3] = { TEXT("Inventory"), TEXT("Armor"), TEXT("Skills") };
-	const float TW3 = (GridW - 2 * 4.f) / 3.f;
-	float LabelSc = 1.15f;
-	for (const TCHAR* N : Names)
+	// ================= Inventory (lower right) =================
+	const float IH = Pad + GridH + Pad;
+	const float IX = Canvas->ClipX - PW - 16.f, IY = Canvas->ClipY - IH - 16.f;
+	PanelTop = IY;
 	{
-		float W = 0.f, H = 0.f;
-		HDTextSize(N, W, H, Font, 1.f);
-		LabelSc = FMath::Min(LabelSc, (TW3 - 8.f) / FMath::Max(W, 1.f));
-	}
-	for (int32 t = 0; t < 3; ++t)
-	{
-		const float X = PX + Pad + t * (TW3 + 4.f), Y = PY + Pad;
-		const bool bOn = Knight->GetPanelTab() == t;
-		const bool bOver = Hot(X, Y, TW3, TabH);
-		Tile(X, Y, TW3, TabH, bOn ? FLinearColor(1.f, 0.86f, 0.6f) : (bOver ? Hover : Idle), bOn ? 0.34f : (bOver ? 0.24f : 0.11f));
-		float W = 0.f, H = 0.f;
-		HDTextSize(Names[t], W, H, Font, LabelSc);
-		HDText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.8f) : FLinearColor(0.82f, 0.83f, 0.86f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, LabelSc);
-		if (bOver && bUIClick) Knight->SetPanelTab(t);
-	}
-	const float GX = PX + Pad, GY = PY + Pad + TabH + 8.f;
-
-	const int32 Tab = Knight->GetPanelTab();
-	if (Tab == 0)
-	{
-		// ---- Inventory: the top-left cell always holds your ingots (it cannot be changed); then the 15-slot pack.
-		// Click gear to hold or wear it. ----
+		Panel(IX, IY, PW, IH, 1.f, false);
+		AddRect(IX, IY, PW, IH);
+		const float GX = IX + Pad, GY = IY + Pad;
+		// the top-left cell always holds your ingots (it cannot be changed); then the 24-slot pack
+		InvIngotX = GX; InvIngotY = GY;
 		{
 			const bool bOver = Hot(GX, GY, SS, SS);
 			Tile(GX, GY, SS, SS, FLinearColor(1.f, 0.85f, 0.45f), bOver ? 0.26f : 0.16f);
@@ -2103,25 +2090,28 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			if (!(DragKind == 1 && bDragging && DragIdx == i)) DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);   // the picked-up item leaves its cell
 			if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
 			ItemBadges(S.Id, X, Y, SS);
-			if (bOver)
-			{
-				ItemTip(S.Id);
-			}
+			if (bOver) ItemTip(S.Id);
 		}
 	}
-	else if (Tab == 1)
+	if (!bCursor) { bGreyGlass = false; return; }
+
+	// ================= Armor (just above the inventory) =================
 	{
-		// ---- Armor: what you are wearing. Click to take it off (armour pieces can only be swapped). ----
 		// Laid out like the knight himself: helmet on top; gloves, chest and shoulders across the middle; boots below,
 		// with the shield beside them and the cape on the other side. The three miscellaneous slots run down the right edge.
-		struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; int32 Col, Row; };
+		struct FWornSlot { int32 Kind; bool bSecond; int32 Col, Row; };
 		static const FWornSlot Worn[10] = {
-			{ K_Helmet, false, TEXT("Helmet"), 1, 0 },
-			{ K_Gloves, false, TEXT("Gloves"), 0, 1 }, { K_Chest, false, TEXT("Chest"), 1, 1 }, { K_Shoulders, false, TEXT("Shoulders"), 2, 1 },
-			{ K_Shield, false, TEXT("Shield"), 0, 2 }, { K_Boots, false, TEXT("Boots"), 1, 2 }, { K_Cape, false, TEXT("Cape"), 2, 2 },
-			{ K_Ring, false, TEXT("Misc"), 3, 0 }, { K_Ring, true, TEXT("Misc"), 3, 1 }, { K_Amulet, false, TEXT("Misc"), 3, 2 },
+			{ K_Helmet, false, 1, 0 },
+			{ K_Gloves, false, 0, 1 }, { K_Chest, false, 1, 1 }, { K_Shoulders, false, 2, 1 },
+			{ K_Shield, false, 0, 2 }, { K_Boots, false, 1, 2 }, { K_Cape, false, 2, 2 },
+			{ K_Ring, false, 3, 0 }, { K_Ring, true, 3, 1 }, { K_Amulet, false, 3, 2 },
 		};
-		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f;
+		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f, BoxH = 36.f;
+		const float AH = Pad + 3 * RowH + 2.f + BoxH + Pad;
+		const float AX = IX, AY = IY - AH - 10.f;
+		Panel(AX, AY, PW, AH, 1.f, false);
+		AddRect(AX, AY, PW, AH);
+		const float GX = AX + Pad, GY = AY + Pad;
 		for (const FWornSlot& Ws : Worn)
 		{
 			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
@@ -2139,8 +2129,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		}
 		// Totals: offence is what the weapon in hand deals with every bonus counted (the middle of its range);
 		// defence is your armour with every bonus counted, plus your shield's guard when one is ready.
-		// Each box shows an icon and a big number, centred together.
-		const float TY = GY + 3 * RowH + 2.f, Half = GridW * 0.5f, BoxH = 36.f;
+		const float TY = GY + 3 * RowH + 2.f, Half = GridW * 0.5f;
 		int32 A = 0, B = 0;
 		const bool bWeapon = HotbarDamage(Skills, Skills->Selected, A, B);
 		const int32 Offence = bWeapon ? FMath::RoundToInt(0.5f * (A + B)) : 0;
@@ -2165,27 +2154,36 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Armour %d, all bonuses counted"), Defence),
 			Guard > 0 ? FString::Printf(TEXT("Shield guard %d (stops that much while raised)"), Guard) : FString(TEXT("No shield ready")) });
 	}
-	else
+
+	// ================= Skills (down the left side of the screen) =================
 	{
-		// ---- Skills: a 3 x 3 board, icon and level; hover for the XP ----
+		// Only the skills you have discovered. The window grows to fit: up to 5 across, then more rows.
 		static const ESkillType Order[9] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
 			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking };
-		const float BW = (GridW - 2 * Gap) / 3.f, BH = (GridH - 2 * Gap) / 3.f;
-		for (int32 i = 0; i < 9; ++i)
+		TArray<ESkillType> Shown;
+		for (ESkillType T : Order) if (Skills->IsKnown(T)) Shown.Add(T);
+		const int32 N = FMath::Max(1, Shown.Num());
+		const int32 Cols = FMath::Min(N, 5), Rows = (N + 4) / 5;
+		const float CS = 54.f;   // a skill tile: icon, level, a thin progress bar
+		const float SW = Pad * 2.f + Cols * CS + (Cols - 1) * Gap, SH = Pad * 2.f + Rows * CS + (Rows - 1) * Gap;
+		const float SX0 = 16.f, SY0 = FMath::Max(270.f, Canvas->ClipY * 0.5f - SH * 0.5f);   // clear of the map
+		Panel(SX0, SY0, SW, SH, 1.f, false);
+		AddRect(SX0, SY0, SW, SH);
+		for (int32 i = 0; i < Shown.Num(); ++i)
 		{
-			const ESkillType T = Order[i];
-			const float X = GX + (i % 3) * (BW + Gap), Y = GY + (i / 3) * (BH + Gap);
-			const bool bOver = Hot(X, Y, BW, BH);
-			SlotTile(X, Y, BW, BH, bOver);
+			const ESkillType T = Shown[i];
+			const float X = SX0 + Pad + (i % 5) * (CS + Gap), Y = SY0 + Pad + (i / 5) * (CS + Gap);
+			const bool bOver = Hot(X, Y, CS, CS);
+			SlotTile(X, Y, CS, CS, bOver);
 			int32 Lv, Into, Need;
 			Skills->GetProgress(T, Lv, Into, Need);
-			DrawSkillIcon(static_cast<int32>(T), X + 5.f, Y + 5.f, BH - 22.f);
+			DrawSkillIcon(static_cast<int32>(T), X + 4.f, Y + 3.f, CS - 22.f);
 			float LW = 0.f, LH = 0.f;
 			const FString LvS = FString::FromInt(Lv);
 			HDTextSize(LvS, LW, LH, Font, 1.2f);
-			HDText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + BW - LW - 5.f, Y + BH - LH - 10.f, Font, 1.2f);
+			HDText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + CS - LW - 4.f, Y + CS - LH - 9.f, Font, 1.2f);
 			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
-			Gauge(X + 6.f, Y + BH - 7.f, BW - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
+			Gauge(X + 6.f, Y + CS - 7.f, CS - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
 			if (bOver)
 				SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d / %d XP  (%d to level %d)"), Into, Need, FMath::Max(0, Need - Into), Lv + 1) });
 		}
@@ -2529,6 +2527,16 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 	USkillComponent* Sk = Knight->GetSkills();
 	const FVector2D M(UIMouseX, UIMouseY);
 	auto OverCell = [&](float X, float Y, float S) { return M.X >= X && M.X <= X + S && M.Y >= Y && M.Y <= Y + S; };
+	auto OverWindows = [&]() { for (int32 r = 0; r < RectCount; ++r) if (M.X >= RectX[r] - 6.f && M.X <= RectX[r] + RectW[r] + 6.f && M.Y >= RectY[r] - 6.f && M.Y <= RectY[r] + RectH[r] + 6.f) return true; return false; };
+	auto OverBar = [&]() { return bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 130.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f; };
+
+	// right-click a stack (or the ingots) for "drop how many?"
+	if (bUIRightClick && DragKind == 0)
+	{
+		for (int32 i = 0; i < InvCellCount; ++i)
+			if (OverCell(InvCellX[i], InvCellY[i], InvCellS) && Sk->Slots[i].Id != 0 && Sk->Slots[i].Count > 1) { OpenDropBox(i, Sk->Slots[i].Id, Sk->Slots[i].Count); return; }
+		if (InvCellCount > 0 && Sk->GetIngots() > 0 && OverCell(InvIngotX, InvIngotY, InvCellS)) { OpenDropBox(-1, 0, Sk->GetIngots()); return; }
+	}
 
 	// pick up
 	if (bUIClick && DragKind == 0)
@@ -2538,14 +2546,9 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		if (bHotCells)
 			for (int32 h = 0; h < 5 && DragKind == 0; ++h)
 				if (OverCell(HotCellX[h], HotCellY[h], HotCellS) && Sk->Hotbar[h] != 0) { DragKind = 2; DragIdx = h; DragId = Sk->Hotbar[h]; }
+		if (DragKind == 0 && InvCellCount > 0 && Sk->GetIngots() > 0 && OverCell(InvIngotX, InvIngotY, InvCellS)) { DragKind = 3; DragIdx = -1; DragId = 0; }
 		if (DragKind != 0) { DragStart = M; bDragging = false; }
-		else
-		{
-			// a click on nothing: leave pointer mode, unless it was on the panel or the weapon bar
-			const bool bOnPanel = PanelW > 0.f && M.X >= PanelX - 6.f && M.X <= PanelX + PanelW + 6.f && M.Y >= PanelTop - 6.f && M.Y <= PanelTop + PanelH + 6.f;
-			const bool bOnBar = bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 130.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f;
-			if (!bOnPanel && !bOnBar) Knight->SetPanelCursor(false);
-		}
+		else if (!OverWindows() && !OverBar()) Knight->SetPanelCursor(false);   // a click on nothing: leave pointer mode
 	}
 	if (DragKind == 0) return;
 	if (!bDragging && FVector2D::Distance(M, DragStart) > 6.f) bDragging = true;
@@ -2556,7 +2559,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		bool bChanged = false;
 		if (!bDragging)
 		{
-			if (DragKind == 1 && IsGear(DragId)) { Knight->EquipFromInventory(DragIdx); }   // a plain click: hold or wear it
+			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
 		}
 		else
 		{
@@ -2567,12 +2570,20 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			{
 				if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
 				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
+				else if (!OverWindows() && !OverBar())
+				{
+					// let go out in the world: it drops to the ground (a stack asks how many)
+					if (Sk->Slots[DragIdx].Count > 1) OpenDropBox(DragIdx, Sk->Slots[DragIdx].Id, Sk->Slots[DragIdx].Count);
+					else Knight->DropFromPack(DragIdx, 1);
+				}
 			}
-			else
+			else if (DragKind == 2)
 			{
 				if (ToInv >= 0) bChanged = Sk->SwapInvHotbar(ToInv, DragIdx);
 				else if (ToHot >= 0) bChanged = Sk->SwapHotbar(DragIdx, ToHot);
+				else if (!OverWindows() && !OverBar()) Knight->DropFromHotbar(DragIdx);
 			}
+			else if (DragKind == 3 && !OverWindows() && !OverBar()) OpenDropBox(-1, 0, Sk->GetIngots());
 			if (bChanged) Knight->RefreshEquipment();   // the weapon in hand may have changed
 		}
 		DragKind = 0; bDragging = false; DragIdx = -1;
@@ -2584,5 +2595,62 @@ void AKnightHUD::DrawDragGhost()
 {
 	if (DragKind == 0 || !bDragging || !bUIHaveMouse) return;
 	const float S = 56.f;
-	DrawIcon(DragId, UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
+	if (DragKind == 3) DrawIngot(UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
+	else DrawIcon(DragId, UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
+}
+
+void AKnightHUD::OpenDropBox(int32 Slot, int32 Id, int32 Max)
+{
+	bDropOpen = true; DropSlot = Slot; DropId = Id; DropMax = Max;
+	DropText = FString::FromInt(Max);   // starts as the whole stack: type a smaller number
+	DragKind = 0; bDragging = false;
+}
+
+// "Drop how many?": type a number, Enter (or Drop) to drop it, Esc (or Cancel) to keep everything
+void AKnightHUD::DrawDropBox(AKnightCharacter* Knight)
+{
+	if (!bDropOpen) return;
+	UFont* Font = GEngine->GetMediumFont();
+	APlayerController* PC = GetOwningPlayerController();
+	if (PC)
+	{
+		static const FKey Digits[10] = { EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven, EKeys::Eight, EKeys::Nine };
+		static const FKey Pad[10] = { EKeys::NumPadZero, EKeys::NumPadOne, EKeys::NumPadTwo, EKeys::NumPadThree, EKeys::NumPadFour, EKeys::NumPadFive, EKeys::NumPadSix, EKeys::NumPadSeven, EKeys::NumPadEight, EKeys::NumPadNine };
+		for (int32 d = 0; d < 10; ++d)
+			if ((PC->WasInputKeyJustPressed(Digits[d]) || PC->WasInputKeyJustPressed(Pad[d])) && DropText.Len() < 7) DropText += FString::FromInt(d);
+		if (PC->WasInputKeyJustPressed(EKeys::BackSpace) && DropText.Len() > 0) DropText.LeftChopInline(1);
+	}
+	int32 Amount = FCString::Atoi(*DropText);
+	if (Amount > DropMax) { Amount = DropMax; DropText = FString::FromInt(Amount); }
+	const float W = 440.f, H = 230.f, X = (Canvas->ClipX - W) * 0.5f, Y = (Canvas->ClipY - H) * 0.5f;
+	bGreyGlass = true;
+	FillRR(X, Y, W, H, 26.f, [&](float) { return FLinearColor(0.05f, 0.05f, 0.055f, 0.96f); });
+	Panel(X, Y, W, H);
+	bGreyGlass = false;
+	const FString Name = DropSlot < 0 ? FString(TEXT("ingots")) : (IsMaterial(DropId) ? FString(MaterialName(MaterialType(DropId))) : ItemName(DropId));
+	const FString Title = FString::Printf(TEXT("Drop how many %s?"), *Name);
+	float TW = 0.f, TH = 0.f;
+	HDTextSize(Title, TW, TH, Font, 1.4f);
+	HDText(Title, FLinearColor(1.f, 0.9f, 0.6f), X + (W - TW) * 0.5f, Y + 18.f, Font, 1.4f);
+	// the number box
+	Tile(X + 120.f, Y + 66.f, W - 240.f, 52.f, FLinearColor(0.8f, 0.82f, 0.9f), 0.22f);
+	const FString Shown = DropText + ((FMath::FloorToInt(GetWorld()->GetTimeSeconds() * 2.f) % 2 == 0) ? TEXT("|") : TEXT(" "));
+	HDTextSize(Shown, TW, TH, Font, 2.0f);
+	HDText(Shown, FLinearColor::White, X + (W - TW) * 0.5f, Y + 66.f + (52.f - TH) * 0.5f, Font, 2.0f);
+	const FString Of = FString::Printf(TEXT("of %d"), DropMax);
+	HDTextSize(Of, TW, TH, Font, 1.0f);
+	HDText(Of, FLinearColor(0.7f, 0.72f, 0.8f), X + (W - TW) * 0.5f, Y + 124.f, Font, 1.0f);
+	const float BY = Y + H - 62.f, BW = 120.f, BH = 40.f;
+	const bool bAll = Btn(X + 30.f, BY, BW, BH, TEXT("All"), true, false, 1.2f);
+	const bool bDrop = Btn(X + (W - BW) * 0.5f, BY, BW, BH, TEXT("Drop"), Amount > 0, true, 1.2f);
+	const bool bCancel = Btn(X + W - 30.f - BW, BY, BW, BH, TEXT("Cancel"), true, false, 1.2f);
+	if (bAll) DropText = FString::FromInt(DropMax);
+	if (PC && PC->WasInputKeyJustPressed(EKeys::Escape)) { bDropOpen = false; return; }
+	if (bCancel) { bDropOpen = false; return; }
+	if ((bDrop || (PC && (PC->WasInputKeyJustPressed(EKeys::Enter) || PC->WasInputKeyJustPressed(EKeys::SpaceBar)))) && Amount > 0)
+	{
+		if (DropSlot < 0) Knight->DropIngots(Amount);
+		else Knight->DropFromPack(DropSlot, Amount);
+		bDropOpen = false;
+	}
 }

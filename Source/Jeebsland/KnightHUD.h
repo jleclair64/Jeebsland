@@ -65,11 +65,16 @@ private:
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
 	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;
-	float PanelX = 0.f, PanelW = 0.f, PanelH = 0.f;
+	float RectX[4] = {}, RectY[4] = {}, RectW[4] = {}, RectH[4] = {}; int32 RectCount = 0;   // the windows on screen this frame
+	float InvIngotX = 0.f, InvIngotY = 0.f;   // the fixed ingot cell
 	int32 DragKind = 0, DragIdx = -1, DragId = 0;   // 0 none, 1 from the pack, 2 from the weapon bar
 	FVector2D DragStart = FVector2D::ZeroVector; bool bDragging = false; bool bUIRelease = false;
 	void ProcessDrag(AKnightCharacter* Knight);
 	void DrawDragGhost();
+	// The "drop how many?" box (right-click a stack in the pack, or drag a stack out onto the world)
+	bool bDropOpen = false; int32 DropSlot = -1, DropMax = 0, DropId = 0; FString DropText; bool bRightWasDown = false, bUIRightClick = false;
+	void OpenDropBox(int32 Slot, int32 Id, int32 Max);
+	void DrawDropBox(AKnightCharacter* Knight);
 	// Sharp text: the canvas draws a font at its own size and then scales the picture, which blurs big text. These are
 	// copies of the medium font rasterised at 2x, 3x and 4x; HDText picks the one that needs the least scaling.
 	UPROPERTY() UFont* HDFonts[4] = {};

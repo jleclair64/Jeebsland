@@ -81,6 +81,11 @@ public:
 	void SetPanelCursor(bool bOn) { if (bPanelCursor != bOn) { bPanelCursor = bOn; RefreshUIMode(); } }
 	void SetPanelTab(int32 T) { PanelTab = FMath::Clamp(T, 0, 2); }
 	void CyclePanelTab() { PanelTab = (PanelTab + 1) % 3; }
+	// Dropping things on the ground (they land in a bag in front of you; press E to pick them up again; it fades after 4 minutes)
+	void DropFromPack(int32 SlotIdx, int32 Count);
+	void DropIngots(int32 Count);
+	void DropFromHotbar(int32 H);
+	void DropBag(const TArray<FInvSlot>& Items, int32 Ingots);
 	// Settings: show the side panel all the time (on), or only while the cursor is out with Tab (off)
 	bool GetPanelAlways() const { return bPanelAlways; }
 	void SetPanelAlways(bool bOn);

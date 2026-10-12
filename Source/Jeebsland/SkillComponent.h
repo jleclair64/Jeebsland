@@ -67,6 +67,10 @@ public:
 	bool CanAdd(int32 Id, int32 Amount) const;
 	bool AddInvItem(int32 Id, int32 Amount = 1);
 	int32 SellAll(EItemType Item);                    // removes every unit, pays ingots, returns the payment
+	// Skills are discovered by doing: only Attack and Defence are known at the start; the rest appear in the skills window the
+	// first time you earn XP in them.
+	bool Known[NumSkills] = {};
+	bool IsKnown(ESkillType S) const { return Known[static_cast<int32>(S)]; }
 	int32 GetIngots() const { return Ingots; }
 	bool SpendIngots(int32 Amount);
 	void AddIngots(int32 Amount) { Ingots += Amount; }

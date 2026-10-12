@@ -27,6 +27,8 @@ USkillComponent::USkillComponent()
 	Slots.SetNum(JeebItems::NumSlots);
 	Bank.SetNum(NumBankSlots);
 	for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
+	Known[static_cast<int32>(ESkillType::Attack)] = true;
+	Known[static_cast<int32>(ESkillType::Defense)] = true;
 
 	// Starting kit: a wooden sword, axe, pickaxe and fishing pole on the weapon bar, a wooden shield and a red cape
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
@@ -90,6 +92,11 @@ void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 	const int32 OldLevel = GetLevel(Skill);
 	XP[static_cast<int32>(Skill)] += Amount;
 	const int32 NewLevel = GetLevel(Skill);
+	if (!Known[static_cast<int32>(Skill)])
+	{
+		Known[static_cast<int32>(Skill)] = true;
+		JeebMsg::Post(5.f, FColor(255, 215, 120), FString::Printf(TEXT("New skill discovered: %s!"), *SkillName(Skill)));
+	}
 
 	// The HUD shows a progress bar for the skill you last trained, for 30 seconds (but not for Attack and Defence: those level quietly)
 	const double Now = FPlatformTime::Seconds();
