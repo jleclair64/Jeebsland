@@ -42,6 +42,7 @@
 #include "Net/UnrealNetwork.h"
 #include "ResourceNode.h"
 #include "Store.h"
+#include "Combat.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -262,6 +263,16 @@ void AKnightGameState::OnRep_Nodes()
 		for (const FNodeCharge& N : NodeCharges) if (FVector::DistSquared2D(N.Loc, L) < 9.f && FMath::Abs(N.Loc.Z - L.Z) < 3.f) { C = N.Charges; break; }
 		It->ApplyCharges(C);
 	}
+}
+
+void JeebCombat::SendToAll(const UWorld* World, const FVector& Loc, int32 Amount, int32 Type)
+{
+	if (AKnightGameState* GS = World ? World->GetGameState<AKnightGameState>() : nullptr) GS->MulticastNumber(Loc, Amount, static_cast<uint8>(Type));
+}
+
+void AKnightGameState::MulticastNumber_Implementation(FVector_NetQuantize Loc, int32 Amount, uint8 Type)
+{
+	if (!IsNetMode(NM_DedicatedServer)) JeebCombat::AddLocal(GetWorld(), Loc, Amount, Type);
 }
 
 void AKnightGameState::SyncStore()

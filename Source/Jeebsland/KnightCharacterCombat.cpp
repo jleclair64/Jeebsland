@@ -69,6 +69,12 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	AttackT = 0.f;
 	QueuedClick = -10.f;
 	if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
+	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
+	if (GetNetMode() != NM_Standalone)
+	{
+		if (IsLocallyControlled() && !HasAuthority()) ServerAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
+		else if (HasAuthority()) MulticastAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
+	}
 }
 
 void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill)
@@ -80,7 +86,7 @@ void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCri
 
 void AKnightCharacter::AttackLands()
 {
-	if (!Skills) return;
+	if (!Skills || !HasAuthority()) return;   // (the server lands every blow and fires every arrow)
 	const int32 Id = Skills->SelectedItem();
 	const int32 K = JeebItems::IsGear(Id) ? JeebItems::KindOf(Id) : -1;
 	const int32 Tier = (K >= 0) ? JeebItems::VariantOf(Id) : 0;
@@ -136,7 +142,7 @@ void AKnightCharacter::AttackLands()
 
 void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 {
-	if (Health <= 0.f || Raw <= 0 || !Skills) return;
+	if (Health <= 0.f || Raw <= 0 || !Skills || !HasAuthority()) return;   // (only the server hurts anyone)
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < InvulnUntil) return;
 
@@ -161,7 +167,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 			{
 				GuardPool = 0.f;
 				bGuardBroken = true;
-				JeebMsg::Post(2.5f, FColor::Orange, TEXT("Guard broken! Your shield stops only half a blow until it recovers."));
+				Skills->Say(2.5f, FColor::Orange, TEXT("Guard broken! Your shield stops only half a blow until it recovers."));
 			}
 		}
 		else ShieldStop = Raw / 2;
@@ -207,7 +213,7 @@ void AKnightCharacter::HurtHorse(float Amount)
 // inside the east gate, in the starting kit, at full health. Skills and levels stay with you.
 void AKnightCharacter::Die()
 {
-	if (!Skills) return;
+	if (!Skills || !HasAuthority()) return;
 	if (bMounted) Dismount();
 	if (bClimbing) ExitClimb(false, false);
 	if (bSitting) StandUp();
@@ -229,12 +235,14 @@ void AKnightCharacter::Die()
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	const FVector2D VC = JeebTerrain::VillageCenter();
 	const FVector2D Wake(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
-	SetActorLocation(FVector(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f));
+	const FVector WakeAt(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f);
+	SetActorLocation(WakeAt);
 	SetActorRotation(FRotator(0.f, 180.f, 0.f));
 	MaxHealth = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3;
 	Health = (float)MaxHealth;
 	LastHurtTime = -100.f;
-	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
+	if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDied(WakeAt, 180.f);   // the player's machine wakes up too
+	else JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
 }
 
 // ---------------- Potions ----------------

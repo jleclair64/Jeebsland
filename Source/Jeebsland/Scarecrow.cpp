@@ -6,10 +6,14 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+#include "EngineUtils.h"
 
 AScarecrow::AScarecrow()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetReplicateMovement(true);   // (it turns to face you)
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 
@@ -76,6 +80,25 @@ void AScarecrow::BeginPlay()
 		if (UMaterialInstanceDynamic* M = P.Key->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), P.Value);
 	}
 	Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
+	Hp->OnHitSeen = [this]() { HitFlash = 0.3f; };
+}
+
+void AScarecrow::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AScarecrow, bRepDown);
+	DOREPLIFETIME(AScarecrow, ShoveCount);
+}
+
+void AScarecrow::OnRep_Down()
+{
+	if (bRepDown) { if (DeathT <= 0.f) DeathT = 0.001f; AttackT = -1.f; Solid->SetCollisionEnabled(ECollisionEnabled::NoCollision); return; }
+	DeathT = 0.f;
+	HitFlash = 0.f;
+	BodyPivot->SetRelativeRotation(FRotator::ZeroRotator);
+	BodyPivot->SetRelativeScale3D(FVector::OneVector);
+	SetActorHiddenInGame(false);
+	Solid->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
 
 void AScarecrow::OnHurt(AActor* From)
@@ -84,6 +107,7 @@ void AScarecrow::OnHurt(AActor* From)
 	if (Hp->Cur <= 0 && DeathT <= 0.f)
 	{
 		DeathT = 0.001f;
+		bRepDown = true;
 		RespawnT = 15.f;
 		AttackT = -1.f;
 		Solid->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -93,6 +117,7 @@ void AScarecrow::OnHurt(AActor* From)
 void AScarecrow::Rise()
 {
 	Hp->Reset();
+	bRepDown = false;
 	DeathT = 0.f;
 	HitFlash = 0.f;
 	AttackCool = 2.f;
@@ -117,18 +142,27 @@ void AScarecrow::Tick(float DeltaSeconds)
 			BodyPivot->SetRelativeRotation(FRotator(0.f, 0.f, 85.f * K * K));
 			if (DeathT >= 1.f) { SetActorHiddenInGame(true); DeathT = 2.f; }
 		}
-		RespawnT -= Dt;
-		if (RespawnT <= 0.f) Rise();
+		if (HasAuthority())
+		{
+			RespawnT -= Dt;
+			if (RespawnT <= 0.f) Rise();
+		}
 		return;
 	}
 
 	if (HitFlash > 0.f) HitFlash -= Dt;
 	const float Hurt = FMath::Clamp(HitFlash / 0.3f, 0.f, 1.f);
 
-	APawn* P = UGameplayStatics::GetPlayerPawn(this, 0);
-	AKnightCharacter* Knight = Cast<AKnightCharacter>(P);
+	// The nearest player (the server decides; players' machines only draw it)
+	AKnightCharacter* Knight = nullptr;
 	float Yaw = GetActorRotation().Yaw;
 	float Dist = 1.0e9f;
+	if (HasAuthority())
+		for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+		{
+			const float D = FVector::Dist2D(It->GetActorLocation(), GetActorLocation());
+			if (It->GetHealth() > 0.f && D < Dist) { Dist = D; Knight = *It; }
+		}
 	if (Knight)
 	{
 		const FVector To = Knight->GetActorLocation() - GetActorLocation();
@@ -148,6 +182,7 @@ void AScarecrow::Tick(float DeltaSeconds)
 		AttackT = 0.f;
 		bAttackLanded = false;
 		AttackCool = 2.4f;
+		++ShoveCount;
 	}
 	float ArmYaw = 0.f;
 	if (AttackT >= 0.f)

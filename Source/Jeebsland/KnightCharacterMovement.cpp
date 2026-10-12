@@ -167,9 +167,15 @@ void AKnightCharacter::StartSlide()
 	const float Speed = GetVelocity().Size2D();
 	if (bSliding || bRolling || bSitting || bClimbing || bMounted || SlideCooldown > 0.f || Move->IsFalling()) return;
 	if (!bSprinting || Speed < 480.f || Stamina < 10.f) return; // slides start from a sprint
+	BeginSlide(GetVelocity().GetSafeNormal2D(), FMath::Max(Speed, 750.f) * 1.15f);
+	if (IsLocallyControlled() && !HasAuthority()) ServerSlide(SlideDir, SlideSpeed);   // online: the server slides us too
+}
 
-	SlideDir = GetVelocity().GetSafeNormal2D();
-	SlideSpeed = FMath::Max(Speed, 750.f) * 1.15f;
+void AKnightCharacter::BeginSlide(const FVector& Dir, float Speed)
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	SlideDir = Dir.GetSafeNormal2D();
+	SlideSpeed = FMath::Clamp(Speed, 0.f, 1300.f);
 	SlideT = 0.f;
 	SlideDustTimer = 0.f;
 	Stamina -= 10.f;
@@ -202,6 +208,7 @@ void AKnightCharacter::StartRoll()
 	SetActorRotation(FRotator(0.f, RollDir.Rotation().Yaw, 0.f));
 	bRolling = true;
 	Kick(GetActorLocation() + FVector(0, 0, -94.f), 1.2f);
+	if (IsLocallyControlled() && !HasAuthority()) ServerRoll(RollDir);   // online: the server rolls us too
 }
 
 void AKnightCharacter::Jump()

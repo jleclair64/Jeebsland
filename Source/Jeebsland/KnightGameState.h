@@ -36,6 +36,9 @@ public:
 	UPROPERTY(Replicated) int64 StoreHour = -1;
 	UPROPERTY(Replicated) TArray<int32> StoreLeft;
 	void SyncStore();                        // server: after a sale
+
+	// A floating damage number, from the server to every player (see JeebCombat::AddNumber)
+	UFUNCTION(NetMulticast, Unreliable) void MulticastNumber(FVector_NetQuantize Loc, int32 Amount, uint8 Type);
 	static void ApplyStore(UWorld* World);   // a player's machine: puts the server's counts into its own store list
 
 protected:

@@ -14,8 +14,9 @@ class UHealthComponent : public UActorComponent
 public:
 	UHealthComponent();
 
-	int32 Max = 20;
-	int32 Cur = 20;
+	// (online: the server's numbers, sent to every player when the owner is a replicated actor)
+	UPROPERTY(Replicated) int32 Max = 20;
+	UPROPERTY(ReplicatedUsing = OnRep_Cur) int32 Cur = 20;
 	float BarHeight = 150.f;        // how far above the actor's origin the bar floats
 	float HitHeight = 70.f;         // centre of the body for arrows and bolts
 	float HitRadius = 90.f;
@@ -23,6 +24,9 @@ public:
 	TFunction<void(AActor* From)> OnDamaged;
 	// Optional: lets the owner soften a blow before it lands (a raised shield). Returns the damage that gets through.
 	TFunction<int32(int32 Amount, AActor* From)> ModifyDamage;
+	// On players' machines (online): the server says it was hit (for the flinch). OnDamaged only runs on the server.
+	TFunction<void()> OnHitSeen;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }
 	void Reset() { Cur = Max; LastHitTime = -1000.f; }
@@ -35,6 +39,7 @@ public:
 	static TArray<UHealthComponent*>& All();
 
 protected:
+	UFUNCTION() void OnRep_Cur(int32 Old);
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 };

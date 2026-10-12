@@ -13,6 +13,8 @@ class UHealthComponent;
 // every swing (the sword goes up high for a moment before it comes down), raises his shield now and then after being hit,
 // and never leaves the pen. Beaten, he drops a little purse and is back on his feet 20 seconds later.
 // He is built from the same body shapes as the player's knight (KnightDesign.h / WeaponDesign.h).
+// Online he is the server's: it runs his fighting (against the nearest player) and sends every player where he is, what he
+// is doing (RepAct, bRepBlock) and whether he is down; their machines only animate him.
 UCLASS()
 class AFoeKnight : public AActor
 {
@@ -21,6 +23,7 @@ class AFoeKnight : public AActor
 public:
 	AFoeKnight();
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void Setup(const FVector2D& InPenCenter, const FVector2D& InPenHalf);
 
 	// Tuning
@@ -72,6 +75,14 @@ private:
 	float GaitPhase = 0.f, MoveBlend = 0.f;
 	bool bStruck = false;
 	FRandomStream Rand;
+	FVector LastLoc = FVector::ZeroVector;   // (his steps are worked out from how far he moved since the last frame)
+
+	UPROPERTY(ReplicatedUsing = OnRep_Act) uint8 RepAct = 0;
+	UPROPERTY(Replicated) bool bRepBlock = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Down) bool bRepDown = false;
+	UFUNCTION() void OnRep_Act();
+	UFUNCTION() void OnRep_Down();
+	class AKnightCharacter* FindTarget(float& OutDist) const;   // the nearest player still standing
 
 	UProceduralMeshComponent* MakePart(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);
 	void Paint(UProceduralMeshComponent* C, const FLinearColor& Color, bool bMetal);

@@ -12,6 +12,7 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 using namespace JeebItems;
 
@@ -330,4 +331,99 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 
 	if (bGear) RefreshEquipment();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Combat and moves online. The player's own machine plays everything at once (so it feels instant); the server is told and
+// does the same on its copy, where the blows actually land; everyone else is shown the swing (MulticastAttack) and the
+// stance (RepMoveFlags).
+// ---------------------------------------------------------------------------------------------------
+void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
+{
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Cast) || Health <= 0.f) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
+	LastServerAttack = Now;
+	const EAtkStyle S = static_cast<EAtkStyle>(Style);
+	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow)
+	{
+		const int32 Tier = Skills->TakeBestArrow();
+		if (Tier < 0) { Skills->Say(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
+		PendingArrowTier = Tier;
+	}
+	const float C = FMath::Clamp(Charge, 0.f, 1.f);
+	StartAttack(S, Dir < 0 ? -1 : 1, C);
+	if (S == EAtkStyle::Thrust && !GetCharacterMovement()->IsFalling())
+		LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (200.f + 700.f * C), true, false);   // the spear lunge, as on the player's machine
+}
+
+void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, float Charge)
+{
+	if (HasAuthority() || IsLocallyControlled()) return;   // (the server and the swinging player already swing)
+	if (Style > static_cast<uint8>(EAtkStyle::Cast)) return;
+	StartAttack(static_cast<EAtkStyle>(Style), Dir < 0 ? -1 : 1, Charge);
+}
+
+void AKnightCharacter::SendState()
+{
+	if (HasAuthority() || !IsLocallyControlled()) return;
+	const uint8 F = (bSprinting ? 1 : 0) | (bCrouched ? 2 : 0) | (bBlockHeld ? 4 : 0);
+	if (F == SentState) return;
+	SentState = F;
+	ServerState(F);
+}
+
+void AKnightCharacter::ServerState_Implementation(uint8 Flags)
+{
+	bSprinting = (Flags & 1) != 0;
+	if (bSprinting) bCrouched = false;
+	const bool bCrouch = (Flags & 2) != 0;
+	if (bCrouch != bCrouched) { if (bCrouch) StartCrouch(); else StopCrouch(); }
+	const bool bHold = (Flags & 4) != 0;
+	if (bHold != bBlockHeld) { if (bHold) StartBlock(); else StopBlock(); }
+}
+
+void AKnightCharacter::ServerRoll_Implementation(FVector_NetQuantizeNormal Dir)
+{
+	if (bRolling) return;
+	PendingRollDir = FVector(Dir.X, Dir.Y, 0.f).GetSafeNormal();
+	RollCooldown = 0.f;                         // (the player's machine already checked; small timing differences must not refuse it)
+	Stamina = FMath::Max(Stamina, 20.f);
+	StartRoll();
+	PendingRollDir = FVector::ZeroVector;
+}
+
+void AKnightCharacter::ServerSlide_Implementation(FVector_NetQuantizeNormal Dir, float Speed)
+{
+	if (bSliding || bRolling || bMounted || bClimbing || bSitting) return;
+	BeginSlide(Dir, Speed);
+}
+
+void AKnightCharacter::OnRep_MoveFlags()
+{
+	if (HasAuthority() || IsLocallyControlled()) return;
+	// another player's knight: copy the stance so it is drawn the same way
+	bCrouched = (RepMoveFlags & 1) != 0;
+	bBlocking = (RepMoveFlags & 2) != 0;
+	const bool bRoll = (RepMoveFlags & 4) != 0, bSlide = (RepMoveFlags & 8) != 0;
+	if (bRoll && !bRolling) { bRolling = true; RollT = 0.f; RollDir = GetActorForwardVector().GetSafeNormal2D(); }
+	if (bSlide && !bSliding) { bSliding = true; SlideT = 0.f; SlideSpeed = 800.f; SlideDir = GetActorForwardVector().GetSafeNormal2D(); }
+	else if (!bSlide) bSliding = false;
+}
+
+// The server says we fell: wake up in Blackrock here too
+void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float Yaw)
+{
+	if (bMounted) Dismount();
+	if (bClimbing) ExitClimb(false, false);
+	if (bSitting) StandUp();
+	EndGathering();
+	CloseLoot();
+	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bRolling = false; bSliding = false;
+	SpeedUntil = -1.f; VigourUntil = -1.f;
+	GetCharacterMovement()->Velocity = FVector::ZeroVector;
+	SetActorLocation(Wake);
+	SetActorRotation(FRotator(0.f, Yaw, 0.f));
+	if (AController* C = GetController()) C->SetControlRotation(FRotator(0.f, Yaw, 0.f));
+	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
 }

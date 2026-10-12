@@ -416,7 +416,7 @@ void AAutumnDecor::BeginPlay()
 		const TArray<TPair<FVector2D, float>> Spots = { TPair<FVector2D, float>(FVector2D(1250.f, 1500.f), -130.f), TPair<FVector2D, float>(FVector2D(-1350.f, -1000.f), 60.f) };
 		for (const TPair<FVector2D, float>& Sp : Spots)
 		{
-			if (JeebTerrain::PropBlocked(Sp.Key.X, Sp.Key.Y, 110.f)) continue;
+			if (JeebTerrain::PropBlocked(Sp.Key.X, Sp.Key.Y, 110.f) || GetWorld()->GetNetMode() == NM_Client) continue;   // (online only the server makes them)
 			FActorSpawnParameters SP;
 			SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 			GetWorld()->SpawnActor<AScarecrow>(AScarecrow::StaticClass(), FVector(Sp.Key.X, Sp.Key.Y, Ground(Sp.Key.X, Sp.Key.Y)), FRotator(0.f, Sp.Value, 0.f), SP);

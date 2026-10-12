@@ -56,14 +56,15 @@ void ASmokeCloud::Tick(float DeltaSeconds)
 	HitTimer += DeltaSeconds;
 	if (HitTimer < HitEvery) return;
 	HitTimer = 0.f;
-	APlayerController* PC = GetWorld()->GetFirstPlayerController();
-	AKnightCharacter* Knight = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
-	if (!Knight) return;
+	if (!HasAuthority()) return;   // (online the server does the hurting, to every player inside)
 	const FVector Here = GetActorLocation();
 	auto Inside = [&](const FVector& P) { return FVector::Dist2D(P, Here) < Radius && FMath::Abs(P.Z - Here.Z) < Radius; };
-	const bool bKnightIn = Inside(Knight->GetActorLocation());
-	if (bKnightIn) Knight->Hurt(KnightHit, this, true);
-	bool bHorseIn = bKnightIn && Knight->IsMounted();   // riding, the horse is in it with you
-	for (TActorIterator<AHorse> It(GetWorld()); It && !bHorseIn; ++It) bHorseIn = Inside(It->GetActorLocation());   // or standing in it
-	if (bHorseIn) Knight->HurtHorse(HorseHit);
+	bool bHorseIn = false;
+	for (TActorIterator<AHorse> It(GetWorld()); It && !bHorseIn; ++It) bHorseIn = Inside(It->GetActorLocation());   // a horse standing in it
+	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+	{
+		const bool bKnightIn = Inside(It->GetActorLocation());
+		if (bKnightIn) It->Hurt(KnightHit, this, true);
+		if ((bKnightIn && It->IsMounted()) || bHorseIn) It->HurtHorse(HorseHit);   // riding, the horse is in it with you
+	}
 }

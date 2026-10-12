@@ -11,11 +11,16 @@
 #include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+#include "EngineUtils.h"
 
 AFoeKnight::AFoeKnight()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	Rand.Initialize(4242);
+	bReplicates = true;
+	SetReplicateMovement(true);
+	SetNetUpdateFrequency(30.f);
 
 	// The root is a capsule the size of the player's, so you bump into him; his feet are 96 below its centre
 	Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
@@ -138,6 +143,7 @@ void AFoeKnight::BeginPlay()
 	}
 
 	Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
+	Hp->OnHitSeen = [this]() { HitFlash = 0.35f; };
 	// A raised shield, facing the blow, stops most of it
 	Hp->ModifyDamage = [this](int32 Amount, AActor* From) -> int32
 	{
@@ -148,7 +154,52 @@ void AFoeKnight::BeginPlay()
 		JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Stopped, JeebCombat::N_Blocked);
 		return Amount - Stopped;
 	};
-	Rise();
+	LastLoc = GetActorLocation();
+	if (HasAuthority()) Rise();
+}
+
+void AFoeKnight::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AFoeKnight, RepAct);
+	DOREPLIFETIME(AFoeKnight, bRepBlock);
+	DOREPLIFETIME(AFoeKnight, bRepDown);
+}
+
+void AFoeKnight::OnRep_Act()
+{
+	Act = static_cast<EAct>(RepAct);
+	ActT = 0.f;
+}
+
+void AFoeKnight::OnRep_Down()
+{
+	if (bRepDown)
+	{
+		if (DeathT <= 0.f) DeathT = 0.001f;   // topple
+		Act = EAct::Idle;
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		return;
+	}
+	// back on his feet
+	DeathT = 0.f;
+	HitFlash = 0.f;
+	BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
+	BodyRoot->SetRelativeLocation(FVector::ZeroVector);
+	Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+}
+
+AKnightCharacter* AFoeKnight::FindTarget(float& OutDist) const
+{
+	AKnightCharacter* Best = nullptr;
+	OutDist = 1.0e9f;
+	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+	{
+		if (It->GetHealth() <= 0.f) continue;
+		const float D = FVector::Dist2D(It->GetActorLocation(), GetActorLocation());
+		if (D < OutDist) { OutDist = D; Best = *It; }
+	}
+	return Best;
 }
 
 FVector2D AFoeKnight::ClampToPen(const FVector2D& P) const
@@ -174,6 +225,7 @@ bool AFoeKnight::MoveTowards(const FVector2D& To, float Speed, float Dt)
 void AFoeKnight::Rise()
 {
 	Hp->Reset();
+	bRepDown = false;
 	DeathT = 0.f;
 	HitFlash = 0.f;
 	Act = EAct::Idle;
@@ -195,13 +247,15 @@ void AFoeKnight::OnHurt(AActor* From)
 		if (DeathT <= 0.f)
 		{
 			DeathT = 0.001f;
+			bRepDown = true;
 			RespawnT = 20.f;
 			Act = EAct::Idle;
 			BlockT = 0.f;
 			Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(GetActorLocation() - FVector(0.f, 0.f, 90.f), FRotator::ZeroRotator))
 				Drop->Setup(ELootLook::Item, TArray<FInvSlot>(), 12 + Rand.RandRange(0, 8));   // a small purse of ingots
-			JeebMsg::Post(4.f, FColor(255, 210, 120), TEXT("The pen knight yields! He will be ready for another bout soon."));
+			if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
+				Sk->Say(4.f, FColor(255, 210, 120), TEXT("The pen knight yields! He will be ready for another bout soon."));
 		}
 		return;
 	}
@@ -227,23 +281,34 @@ void AFoeKnight::Tick(float DeltaSeconds)
 			BodyRoot->SetRelativeRotation(FRotator(-80.f * K, 0.f, 0.f));
 			BodyRoot->SetRelativeLocation(FVector(-30.f * K, 0.f, -60.f * K));
 		}
-		RespawnT -= Dt;
-		if (RespawnT < 14.f) SetActorHiddenInGame(true);
-		if (RespawnT <= 0.f) Rise();
+		if (HasAuthority())
+		{
+			RespawnT -= Dt;
+			if (RespawnT < 14.f) SetActorHiddenInGame(true);
+			if (RespawnT <= 0.f) Rise();
+		}
+		LastLoc = GetActorLocation();
 		return;
 	}
 
-	AKnightCharacter* Knight = Cast<AKnightCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+	// (on players' machines he is only drawn: the server decides what he does)
+	if (!HasAuthority())
+	{
+		if (Act != EAct::Idle) ActT += Dt;
+		BlockT = bRepBlock ? 1.f : -1.f;
+	}
+	else
+	{
+	float Dist = 1.0e9f;
+	AKnightCharacter* Knight = FindTarget(Dist);
 	const FVector Me = GetActorLocation();
 	FVector2D ToP = FVector2D::ZeroVector;
-	float Dist = 1.0e9f;
 	if (Knight)
 	{
 		ToP = FVector2D(Knight->GetActorLocation() - Me);
 		Dist = ToP.Size();
 	}
 	const bool bEngaged = Knight && Dist < 1100.f && Knight->GetHealth() > 0.f;
-	const FVector PrevLoc = Me;
 
 	// ---- Facing: toward you when engaged, otherwise the way he walks ----
 	float Yaw = GetActorRotation().Yaw;
@@ -315,9 +380,13 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		break;
 	}
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
+	RepAct = static_cast<uint8>(Act);
+	bRepBlock = BlockT > 0.f;
+	}
 
 	// ---- Animation ----
-	const FVector Moved = GetActorLocation() - PrevLoc;
+	const FVector Moved = GetActorLocation() - LastLoc;
+	LastLoc = GetActorLocation();
 	const float Speed = FVector2D(Moved.X, Moved.Y).Size() / FMath::Max(Dt, 1e-4f);
 	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
 	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * 1.4f * Dt, 2.f * PI);

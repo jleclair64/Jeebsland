@@ -221,6 +221,12 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
+	DOREPLIFETIME(AKnightCharacter, Health);
+	DOREPLIFETIME(AKnightCharacter, MaxHealth);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardMax, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, bGuardBroken, COND_OwnerOnly);
 }
 
 void AKnightCharacter::SendLook()
@@ -411,6 +417,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
 	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
+	SendState();                      // online: our sprint / crouch / shield button, to the server
 	if (!bGraphicsApplied && IsLocallyControlled()) ApplyGraphics();   // online, our knight may only become ours after BeginPlay
 
 	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
@@ -539,8 +546,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// The horse heals the same way: 10 s after its last hit, a full bar takes 10 s. (Not in PvP areas, once those exist.)
 	if (HorseHealth < HorseMaxHealth && GetWorld()->GetTimeSeconds() - LastHorseHurtTime > 10.f)
 		HorseHealth = FMath::Min(HorseMaxHealth, HorseHealth + HorseMaxHealth * 0.1f * Dt);
-	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s
-	if (Skills)
+	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s (the server's job online)
+	if (Skills && HasAuthority())
 	{
 		int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
 		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * 1.5f);   // vigour potion: a bigger bar for a minute
@@ -589,6 +596,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// Shield guard: its size is the shield's Defence; a new or changed shield starts full. It recovers like health:
 	// 10 s after the last blow it took, a full bar in 10 s. A broken guard is mended only once it is full again.
+	if (HasAuthority())   // (online: the server's job; the player's machine is sent the numbers)
 	{
 		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
 		const float NewMax = ShieldId ? float(JeebItems::ShieldGuard(ShieldId)) : 0.f;
@@ -600,7 +608,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 			if (GuardPool >= GuardMax && bGuardBroken)
 			{
 				bGuardBroken = false;
-				JeebMsg::Post(2.5f, FColor(140, 200, 255), TEXT("Your shield guard is back to full."));
+				if (Skills) Skills->Say(2.5f, FColor(140, 200, 255), TEXT("Your shield guard is back to full."));
 			}
 		}
 	}
@@ -641,6 +649,15 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// points and sidestep or back up instead of turning round, a little slower than walking (forward 60%, sidestep 50%, back 40%).
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
+	if (bStance && HasAuthority() && !IsLocallyControlled() && GetController())
+	{
+		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)
+		const FVector Acc = Move->GetCurrentAcceleration().GetSafeNormal2D();
+		const FRotator CamYaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		StanceFwd = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X));
+		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
+	}
+	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0);
 	if (bStance && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)

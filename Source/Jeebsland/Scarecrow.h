@@ -9,7 +9,7 @@ class UBoxComponent;
 class UHealthComponent;
 
 // A pumpkin-headed scarecrow you can fight. It shoves back lightly when you stand close. Beaten, it falls apart and
-// is standing again 15 seconds later.
+// is standing again 15 seconds later. Online it is the server's (which shoves the nearest player); players' machines draw it.
 UCLASS()
 class AScarecrow : public AActor
 {
@@ -18,6 +18,7 @@ class AScarecrow : public AActor
 public:
 	AScarecrow();
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -40,4 +41,9 @@ private:
 
 	void OnHurt(AActor* From);
 	void Rise();
+
+	UPROPERTY(ReplicatedUsing = OnRep_Down) bool bRepDown = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Shove) uint8 ShoveCount = 0;   // goes up by one for every shove (players' machines play it)
+	UFUNCTION() void OnRep_Down();
+	UFUNCTION() void OnRep_Shove() { AttackT = 0.f; bAttackLanded = true; }
 };

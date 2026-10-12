@@ -222,6 +222,22 @@ protected:
 	UFUNCTION(Server, Reliable) void ServerInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, FVector_NetQuantize At);
 	void DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, const FVector& At);
 	bool NearTrader(uint8 Role) const;   // a villager of that ENpcRole is close enough to trade with
+
+	// Online combat and moves (KnightCharacterNet.cpp). The server decides every hit; swings, guarding, crouching, rolls and
+	// slides are copied to the server (so it moves the knight the same way) and shown to everyone else.
+	UFUNCTION(Server, Reliable) void ServerAttack(uint8 Style, int8 Dir, float Charge);
+	UFUNCTION(NetMulticast, Unreliable) void MulticastAttack(uint8 Style, int8 Dir, float Charge);
+	UFUNCTION(Server, Reliable) void ServerState(uint8 Flags);   // 1 sprinting, 2 crouching, 4 shield button held
+	UFUNCTION(Server, Reliable) void ServerRoll(FVector_NetQuantizeNormal Dir);
+	UFUNCTION(Server, Reliable) void ServerSlide(FVector_NetQuantizeNormal Dir, float Speed);
+	UFUNCTION(Client, Reliable) void ClientDied(FVector_NetQuantize Wake, float Yaw);
+	void SendState();
+	uint8 SentState = 0;
+	double LastServerAttack = -10.0;
+	// What other players' machines need to animate this knight: 1 crouched, 2 guarding, 4 rolling, 8 sliding
+	UPROPERTY(ReplicatedUsing = OnRep_MoveFlags) uint8 RepMoveFlags = 0;
+	UFUNCTION() void OnRep_MoveFlags();
+	void BeginSlide(const FVector& Dir, float Speed);
 	void ApplyPotion(int32 Type);       // the potion's effect (both on the server and on the player's machine)
 	void ApplyLook(const TArray<int32>& Look);   // another player's knight: dress our copy of it
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -317,8 +333,11 @@ private:
 	float StepFw = 1.f, StepSd = 0.f;
 	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
 	// each blow until it has fully recovered (it recovers like health: 10 s after the last blocked hit, then a full bar in 10 s)
-	float GuardPool = 0.f, GuardMax = 0.f, LastGuardHitTime = -100.f;
-	bool bGuardBroken = false;
+	// (online: the server's numbers, sent to this knight's player)
+	UPROPERTY(Replicated) float GuardPool = 0.f;
+	UPROPERTY(Replicated) float GuardMax = 0.f;
+	float LastGuardHitTime = -100.f;
+	UPROPERTY(Replicated) bool bGuardBroken = false;
 	UPROPERTY() UInstancedStaticMeshComponent* DustISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* ClodISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* BladeISM = nullptr;
@@ -461,8 +480,9 @@ private:
 	bool bCharging = false;
 	float ChargeT = 0.f;
 	int32 PendingArrowTier = 0;
-	float Health = 100.f;
-	int32 MaxHealth = 100;
+	// (online: the server's numbers, sent to everyone)
+	UPROPERTY(Replicated) float Health = 100.f;
+	UPROPERTY(Replicated) int32 MaxHealth = 100;
 	float LastHurtTime = -100.f, InvulnUntil = 0.f;
 	FVector SpawnLoc = FVector::ZeroVector;
 	float PrevC = 1.f;

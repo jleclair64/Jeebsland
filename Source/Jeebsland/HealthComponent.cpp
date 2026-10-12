@@ -2,10 +2,26 @@
 #include "Combat.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
+#include "Net/UnrealNetwork.h"
 
 UHealthComponent::UHealthComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
+}
+
+void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(UHealthComponent, Max);
+	DOREPLIFETIME(UHealthComponent, Cur);
+}
+
+void UHealthComponent::OnRep_Cur(int32 Old)
+{
+	if (Cur >= Old || !GetWorld()) return;
+	LastHitTime = GetWorld()->GetTimeSeconds();   // (the bar shows for a while after a hit)
+	if (OnHitSeen) OnHitSeen();
 }
 
 TArray<UHealthComponent*>& UHealthComponent::All()
@@ -39,7 +55,7 @@ bool UHealthComponent::ShowBar(float Now) const
 
 int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit)
 {
-	if (Cur <= 0 || Amount <= 0) return 0;
+	if (Cur <= 0 || Amount <= 0 || !GetOwner() || !GetOwner()->HasAuthority()) return 0;   // (damage is the server's to deal)
 	if (ModifyDamage) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
 	const int32 Dealt = FMath::Min(Amount, Cur);
 	Cur -= Dealt;

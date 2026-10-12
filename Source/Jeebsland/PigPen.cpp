@@ -138,7 +138,8 @@ void APigPen::BeginPlay()
 	}
 
 	// No more pigs: the pen is now a sparring ring, kept by a knight in iron (see FoeKnight.cpp)
-	if (AFoeKnight* Foe = GetWorld()->SpawnActor<AFoeKnight>(FVector(C.X, C.Y, Ground(C.X, C.Y) + 98.f), FRotator(0.f, -90.f, 0.f)))
+	// (online only the server makes him; players' machines are sent him)
+	if (AFoeKnight* Foe = GetWorld()->GetNetMode() == NM_Client ? nullptr : GetWorld()->SpawnActor<AFoeKnight>(FVector(C.X, C.Y, Ground(C.X, C.Y) + 98.f), FRotator(0.f, -90.f, 0.f)))
 	{
 		Foe->Setup(C, H);
 	}
