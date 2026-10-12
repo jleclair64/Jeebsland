@@ -79,6 +79,10 @@ Last updated 2026-10-12 (end of the multiplayer-pivot session). Everything below
 - **Shields**: three styles share the shield slot, encoded in the id (gear ids are now 1000 + kind*100 + variant; shields 1000 + 1100 + style*10 + tier; `StyleOf`, `ShieldId`, `ShieldGuard`). Kite (all-rounder), Round (guard x0.75, recovers after 5 s instead of 10, 15% quicker in the stance), Tower (guard x1.5, 20% slower in the stance). Each has its own model (`KnightDesign` shields, `FDef::Style`) and icon. The store sometimes sells round and tower shields; the practice pack has one of each.
 - Optional shield ideas still unpicked: perfect block (parry), guard-break stagger, shield bash, heavy-weapon guard drain. Shield guard numbers are still low against the pen knight (maybe 3-4x).
 
+## How to test
+
+The owner's cheat sheet is `Docs/HowToTest.md` (editor Play never needs the worlds; the .bat files are the real thing). Point them to it, and keep it up to date when testing steps change. Hosting friends: `Docs/PlayWithFriends.md`.
+
 ## Checking visuals
 
 Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and the owner prefers to check visuals themselves and send screenshots. Build, rebuild materials, commit, reopen the editor, and say what to look for.
