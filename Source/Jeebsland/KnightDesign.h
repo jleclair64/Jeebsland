@@ -25,8 +25,8 @@ namespace KnightDesign
 	{
 		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_AnkleL, P_AnkleR, P_Count
 	};
-	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotNone = -1 };
-	constexpr int32 NumSlots = 7;
+	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotBrush = 7, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
+	constexpr int32 NumSlots = 8;
 
 	// Where each pivot sits (capsule space). The animation turns parts about these points.
 	inline FVector PivotPos(int32 P)
@@ -66,6 +66,7 @@ namespace KnightDesign
 		FLinearColor Fixed = FLinearColor(1.f, 1.f, 1.f, 1.f);
 		bool bFixedMetal = false;
 		bool bBare = false;          // skin and hair: shown only while nothing is worn in this slot (uses Fixed)
+		bool bFixedColor = false;    // always painted Fixed (matte), whatever the tier: the black eye openings, the red brush
 		int32 Style = 0;             // shields: which of the shield styles this piece belongs to (only the worn one shows)
 		FMD Mesh;
 	};
@@ -170,6 +171,27 @@ namespace KnightDesign
 		// the brow's lower edge (it dips to a point over the nose) and the bottom of the eye openings
 		auto BrowBot = [](double Th) { const double A = FMath::Abs(Th); return A >= 30.0 ? 53.0 : (A >= 8.0 ? 50.5 + 2.5 * (A - 8.0) / 22.0 : 48.8 + 1.7 * A / 8.0); };
 		auto EyeBot = [](double Th) { const double A = FMath::Abs(Th); return A <= 8.0 ? 45.5 : 45.5 + 2.0 * FMath::Min(1.0, (A - 8.0) / 42.0); };
+		// The line of the crest: from the brow, over the top, down the back (evenly spaced points), with the outward direction
+		// and the crest's height at each point (tallest on top)
+		TArray<FVector> CP;
+		{
+			TArray<FVector> Mer;
+			Mer.Add(V3(Helm.R(56.5) * HSX, 0, 56.5));
+			for (int32 i = HelmP.Num() - 2; i >= 0; --i) if (HelmP[i].Y > 56.5) Mer.Add(V3(HelmP[i].X * HSX, 0, HelmP[i].Y));
+			for (int32 i = 1; i < HelmP.Num() - 1; ++i) if (HelmP[i].Y > 40.0) Mer.Add(V3(-HelmP[i].X * HSX, 0, HelmP[i].Y));
+			Mer.Add(V3(-Helm.R(40.0) * HSX, 0, 40.0));
+			CP = Resample(Mer, 44);
+		}
+		auto CrestAt = [&](double T, FVector& P, FVector& N, double& H)
+		{
+			const int32 i = FMath::Clamp(FMath::RoundToInt(T * 44.0), 0, 44);
+			P = CP[i];
+			const FVector Tg = CP[FMath::Min(i + 1, 44)] - CP[FMath::Max(i - 1, 0)];
+			N = FVector(Tg.Z, 0.0, -Tg.X);
+			N.Normalize();
+			if (FVector::DotProduct(N, P - V3(0, 0, 48)) < 0.0) N = -N;
+			H = 0.8 + 1.6 * DClamp((P.Z - 40.0) / 29.0, 0.0, 1.0);
+		};
 		{
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Plate);
 			Lathe(D.Mesh, HelmP, 32, HSX, 1.0, Xf(O0));   // a smooth, polished dome
@@ -206,28 +228,18 @@ namespace KnightDesign
 			// the rim round the bottom
 			Lathe(D.Mesh, Prof({ Helm.R(27.0) - 0.4, 27.0, Helm.R(27.0) + 0.9, 27.0, Helm.R(29.2) + 0.9, 29.2, Helm.R(29.2) - 0.4, 29.2 }), 32, HSX, 1.0, Xf(O0), true);
 			// the crest: a raised ridge from the brow, over the top, down the back, tallest on top
-			{
-				TArray<FVector> Mer;
-				Mer.Add(V3(Helm.R(56.5) * HSX, 0, 56.5));
-				for (int32 i = HelmP.Num() - 2; i >= 0; --i) if (HelmP[i].Y > 56.5) Mer.Add(V3(HelmP[i].X * HSX, 0, HelmP[i].Y));
-				for (int32 i = 1; i < HelmP.Num() - 1; ++i) if (HelmP[i].Y > 40.0) Mer.Add(V3(-HelmP[i].X * HSX, 0, HelmP[i].Y));
-				Mer.Add(V3(-Helm.R(40.0) * HSX, 0, 40.0));
-				const TArray<FVector> CP = Resample(Mer, 44);
-				Ribbon(D.Mesh, 44, [&](double T) {
-					const int32 i = FMath::Clamp(FMath::RoundToInt(T * 44.0), 0, 44);
-					const FVector P = CP[i], Tg = CP[FMath::Min(i + 1, 44)] - CP[FMath::Max(i - 1, 0)];
-					FVector N(Tg.Z, 0.0, -Tg.X);
-					N.Normalize();
-					if (FVector::DotProduct(N, P - V3(0, 0, 48)) < 0.0) N = -N;
-					const double W = 1.2 + 0.6 * FMath::Sin(PI * T), H = 0.8 + 1.6 * DClamp((P.Z - 40.0) / 29.0, 0.0, 1.0);
-					const FVector Y(0, 1, 0);
-					return FRing({ P - Y * W - N * 0.3, P - Y * W + N * H, P + N * (H + 0.6), P + Y * W + N * H, P + Y * W - N * 0.3 }); });
-			}
+			Ribbon(D.Mesh, 44, [&](double T) {
+				FVector P, N; double H;
+				CrestAt(T, P, N, H);
+				const double W = 1.2 + 0.6 * FMath::Sin(PI * T);
+				const FVector Y(0, 1, 0);
+				return FRing({ P - Y * W - N * 0.3, P - Y * W + N * H, P + N * (H + 0.6), P + Y * W + N * H, P + Y * W - N * 0.3 }); });
 			// rivets on the sides
 			for (int32 sd = -1; sd <= 1; sd += 2) { Bead(D.Mesh, 0.8, HS(sd * 100.0, 46.0, 0.3)); Bead(D.Mesh, 0.8, HS(sd * 100.0, 39.0, 0.3)); }
 		}
 		{
-			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under);   // the dark openings: eyes and breathing vents
+			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under);   // the dark openings: eyes and breathing vents (always black)
+			D.bFixedColor = true; D.Fixed = FLinearColor(0.006f, 0.006f, 0.008f);
 			for (int32 sd = -1; sd <= 1; sd += 2)
 			{
 				Ribbon(D.Mesh, 16, [&](double T) { const double Th = sd * (7.0 + 43.0 * T), Zt = BrowBot(Th) + 0.4, Zb = EyeBot(Th) - 0.3;
@@ -236,6 +248,22 @@ namespace KnightDesign
 					Ribbon(D.Mesh, 6, [&](double T) { const double Th0 = sd * (14.0 + 5.5 * k), Z = 40.5 - 6.0 * T + 0.6 * k, Dw = FMath::RadiansToDegrees(0.4 / Helm.R(Z));
 						return Quad(HS(Th0 - Dw, Z, -0.3), HS(Th0 - Dw, Z, 0.25), HS(Th0 + Dw, Z, 0.25), HS(Th0 + Dw, Z, -0.3)); });
 			}
+		}
+
+		// The Red Helm Brush (shown while one is worn in a miscellaneous slot): a stiff red horsehair brush standing along the
+		// crest, tallest over the top of the head
+		{
+			FDef& D = Add(P_Head, SlotBrush, EArmorRole::Accent);
+			D.bFixedColor = true; D.Fixed = FLinearColor(0.62f, 0.035f, 0.025f);
+			const double T0 = 0.03, T1 = 0.93;
+			Ribbon(D.Mesh, 40, [&](double T) {
+				const double Tc = T0 + (T1 - T0) * T, S = FMath::Pow(FMath::Sin(PI * T), 0.55);
+				FVector P, N; double H;
+				CrestAt(Tc, P, N, H);
+				const double Bh = 1.2 + 7.5 * S, Wb = 0.9 + 0.9 * S, B0 = H + 0.3;
+				const FVector Y(0, 1, 0);
+				return FRing({ P + N * B0 - Y * Wb, P + N * (B0 + 0.5 * Bh) - Y * (1.25 * Wb), P + N * (B0 + Bh) - Y * (0.45 * Wb),
+				               P + N * (B0 + Bh) + Y * (0.45 * Wb), P + N * (B0 + 0.5 * Bh) + Y * (1.25 * Wb), P + N * B0 + Y * Wb }); }, false);
 		}
 
 		// Bare head (shown while no helmet is worn): neck, head, hair, eyes (built a size smaller about the neck)
@@ -258,6 +286,10 @@ namespace KnightDesign
 		}
 		for (int32 i = FirstBare; i < Out.Num(); ++i)
 			for (FVector& V : Out[i].Mesh.V) V = V3(0, 0, 23) + (V - V3(0, 0, 23)) * 0.85;
+		// The whole head sits a little lower (a shorter neck) and a little forward of the shoulders, the way people carry it
+		for (FDef& D : Out)
+			if (D.Pivot == P_Head)
+				for (FVector& V : D.Mesh.V) { V.X += 3.5; V.Z -= 2.5; }
 
 		// =========================================================================================
 		// GORGET: two lames round the neck, gold edged (the helm tapers in above it, so the knight has a neck)

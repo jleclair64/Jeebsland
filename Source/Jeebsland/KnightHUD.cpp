@@ -1392,6 +1392,18 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	{
 		const int32 K = KindOf(Id), V = VariantOf(Id);
 
+		if (K == K_Crest)
+		{
+			// a red horsehair brush fanning up out of a gold socket
+			const FLinearColor Red(0.82f, 0.10f, 0.08f), Deep(0.55f, 0.05f, 0.04f), Gold(0.95f, 0.75f, 0.25f);
+			Poly({ P(10, 40), P(13, 24), P(22, 13), P(32, 9), P(42, 13), P(51, 24), P(54, 40), P(44, 35), P(32, 33), P(20, 35) }, Red);
+			Poly({ P(20, 35), P(24, 20), P(32, 15), P(30, 33) }, Lift(Red, 1.25f));
+			for (int32 s = -2; s <= 2; ++s)   // strands
+				Poly({ P(32.f + s * 3.f, 33.f), P(32.f + s * 8.5f + 1.2f, 15.f + FMath::Abs(s) * 3.f), P(32.f + s * 8.5f + 2.6f, 16.f + FMath::Abs(s) * 3.f), P(32.f + s * 3.f + 1.4f, 33.f) }, Deep);
+			Poly({ P(24, 36), P(40, 36), P(38, 48), P(26, 48) }, Gold);
+			Quad(29, 48, 35, 58, Lift(Gold, 0.75f));
+			return;
+		}
 		if (K == K_Ring || K == K_Amulet)
 		{
 			static const FLinearColor RingBand[NumRings] = { {0.80f,0.82f,0.88f,1.f}, {0.95f,0.75f,0.20f,1.f}, {0.72f,0.45f,0.20f,1.f}, {0.80f,0.82f,0.88f,1.f}, {0.95f,0.75f,0.20f,1.f} };

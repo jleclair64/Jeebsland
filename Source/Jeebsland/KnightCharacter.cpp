@@ -50,7 +50,7 @@ AKnightCharacter::AKnightCharacter()
 	// Camera: a bit further back and higher, with gentle lag for a smooth follow
 	if (USpringArmComponent* Boom = GetCameraBoom())
 	{
-		Boom->TargetArmLength = 450.f;
+		Boom->TargetArmLength = 540.f;   // 20% further back than before
 		Boom->SocketOffset = FVector(0.f, 0.f, 60.f);
 		Boom->bEnableCameraLag = true;
 		Boom->CameraLagSpeed = 8.f;
@@ -125,7 +125,7 @@ void AKnightCharacter::BuildKnight()
 		P.Comp = C;
 		P.Slot = D.Slot; P.Role = D.Role; P.MinTier = D.MinTier; P.MaxTier = D.MaxTier;
 		P.Fixed = D.Fixed; P.bFixedMetal = D.bFixedMetal; P.Shade = D.Shade; P.bBare = D.bBare;
-		P.Style = D.Style;
+		P.Style = D.Style; P.bFixedColor = D.bFixedColor;
 		ArmorParts.Add(P);
 	}
 }
@@ -164,6 +164,7 @@ void AKnightCharacter::BeginPlay()
 	SpawnLoc = GetActorLocation();
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
 	if (Skills) Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
+	if (Skills) Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 
 	// Saved choices (side panel). Graphics always start low: fancy lighting off, 60% resolution.
 	if (GConfig)
@@ -363,6 +364,7 @@ namespace
 		case KnightDesign::SlotBoots:     return JeebItems::K_Boots;
 		case KnightDesign::SlotCape:      return JeebItems::K_Cape;
 		case KnightDesign::SlotGloves:    return JeebItems::K_Gloves;
+		case KnightDesign::SlotBrush:     return JeebItems::K_Crest;
 		default:                          return JeebItems::K_Shield;
 		}
 	}
@@ -408,7 +410,13 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 {
 	if (!Skills) return;
 	const int32 Kind = KindForSlot(Slot);
-	const int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
+	int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
+	if (Slot == KnightDesign::SlotBrush)   // the brush is worn in one of the three miscellaneous slots
+	{
+		Id = 0;
+		for (int32 M : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
+			if (JeebItems::IsGear(M) && JeebItems::KindOf(M) == JeebItems::K_Crest) Id = M;
+	}
 	const bool bWorn = Id != 0;
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
 	for (FArmorPart& P : ArmorParts)
@@ -429,7 +437,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 
 		FLinearColor Color;
 		bool bMetal = false;
-		if (P.bBare) Color = P.Fixed;
+		if (P.bBare || P.bFixedColor) Color = P.Fixed;
 		else if (Slot == KnightDesign::SlotCape)
 		{
 			Color = JeebItems::CapeColor(Var);
@@ -463,6 +471,7 @@ void AKnightCharacter::RebuildHeld()
 		if (C) C->DestroyComponent();
 	}
 	HeldComps.Reset();
+	EaseComps.Reset();
 	HeldElbow = 25.f;
 	if (!Skills) return;
 	const int32 Id = Skills->SelectedItem();
@@ -516,7 +525,12 @@ void AKnightCharacter::RebuildHeld()
 		return;
 	}
 	const KM::FXf Tilt = KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
-	Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
+	{
+		const int32 First = HeldComps.Num();
+		Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
+		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana)   // swords can be held at ease
+			for (int32 i = First; i < HeldComps.Num(); ++i) EaseComps.Add(HeldComps[i]);
+	}
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), FVector(0, -20, 0)));
 }
 
@@ -534,10 +548,55 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		}
 		else
 		{
-			P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);
-			P.Comp->SetRelativeLocationAndRotation(-KnightDesign::PivotPos(KnightDesign::P_ArmL), FRotator::ZeroRotator);
+			P.Comp->AttachToComponent(ElbowL, FAttachmentTransformRules::KeepRelativeTransform);   // strapped to the forearm: HoldShield poses it
 		}
 	}
+}
+
+void AKnightCharacter::HoldShield()
+{
+	if (bStowed || !ElbowL || !ArmPivotL) return;
+	// At rest: strapped along the outside of the left forearm, at the elbow and at the hand, its face turned out and forward
+	// (diagonal to the body), hanging down at the side with its point near the knee. All in the forearm's own frame.
+	static const FTransform Rest = []()
+	{
+		const FVector E = KnightDesign::PivotPos(KnightDesign::P_ElbowL), W(6.0, -34.6, -24.5);
+		const FVector Up = (E - W).GetSafeNormal();                         // along the forearm, towards the elbow
+		const FVector Want = FVector(0.66, -0.70, 0.24).GetSafeNormal();     // out to the left and forward
+		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
+		const FQuat Q = FRotationMatrix::MakeFromXZ(N, Up).ToQuat();         // the shield's face (+X) and its top (+Z)
+		const FVector Strap(14.0, -41.0, 2.0);                               // a point on the shield's back, a third of the way down
+		const FVector Target = -Up * 3.0 + N * 9.0;                          // just below the elbow, outside the forearm
+		return FTransform(Q, Target - Q.RotateVector(Strap));
+	}();
+	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
+	const FTransform Guard = (FTransform(-KnightDesign::PivotPos(KnightDesign::P_ArmL)) * ArmPivotL->GetComponentTransform()).GetRelativeTransform(ElbowL->GetComponentTransform());
+	FTransform Now;
+	Now.Blend(Rest, Guard, BlockAlpha);
+	for (FArmorPart& P : ArmorParts)
+	{
+		if (P.Slot != KnightDesign::SlotShield || !P.Comp) continue;
+		if (P.Comp->GetAttachParent() != ElbowL) P.Comp->AttachToComponent(ElbowL, FAttachmentTransformRules::KeepRelativeTransform);
+		P.Comp->SetRelativeTransform(Now);
+	}
+}
+
+void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
+{
+	EaseAlpha = FMath::FInterpTo(EaseAlpha, (bBusy || bStowed || EaseComps.Num() == 0) ? 0.f : 1.f, Dt, 9.f);
+	if (EaseComps.Num() == 0) return;
+	// The blade leaves the hand pointing down and forward (built that way); at ease it turns in so the tip rests in front
+	// of the knight, between his feet (worked out for the arm's relaxed bend)
+	static const FQuat EaseQ = []()
+	{
+		const FVector Blade = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0));
+		const FVector Want = FVector(0.0, -0.4876, -0.873).GetSafeNormal();
+		return FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
+	}();
+	const FQuat Q = FQuat::Slerp(FQuat::Identity, EaseQ, EaseAlpha);
+	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowR);
+	for (UProceduralMeshComponent* C : EaseComps)
+		if (C) C->SetRelativeLocationAndRotation(G - PE - Q.RotateVector(G), Q);
 }
 
 void AKnightCharacter::EquipFromInventory(int32 Idx)
@@ -1981,7 +2040,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float StanceFactor = StanceFwd < -0.1f ? 0.4f : (StanceFwd > 0.1f ? 0.6f : (FMath::Abs(StanceRight) > 0.1f ? 0.5f : 0.6f));
 	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield])) : 1.f;   // round: quicker, tower: slower
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f);   // swiftness potion
+	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f)   // swiftness potion
+	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush
 	if (bFalling && !bSpecial)
 	{
 		AirSpeedMul = AirMul;
@@ -2087,10 +2147,14 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + 55.f * Duck;
 	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash - 95.f * Duck;
 	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash - 95.f * Duck;
+	// Standing still: slow breathing (the chest rises, the knees ease a little), like the idle in Breath of the Wild
+	const float IdleAmt = (1.f - MoveBlend) * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
+	const float BreathS = FMath::Sin(IdleTime * 1.65f);   // one breath every 3.8 s
+	const float Stance = StanceHip - 1.5f * BreathS * IdleAmt;
 	// A relaxed stance: on the ground the knees are always a little bent (eased out as he crouches, which bends them anyway)
 	const float Relax = Ground * (1.f - Duck);
-	HipRf += StanceHip * Relax;   HipLf += StanceHip * Relax;
-	KneeRf -= 2.f * StanceHip * Relax;   KneeLf -= 2.f * StanceHip * Relax;
+	HipRf += Stance * Relax;   HipLf += Stance * Relax;
+	KneeRf -= 2.f * Stance * Relax;   KneeLf -= 2.f * Stance * Relax;
 	// Sliding: one leg stretched out in front, the other folded under
 	HipRf = FMath::Lerp(HipRf, 78.f, SlideAlpha);   KneeRf = FMath::Lerp(KneeRf, -4.f, SlideAlpha);
 	HipLf = FMath::Lerp(HipLf, 45.f, SlideAlpha);   KneeLf = FMath::Lerp(KneeLf, -115.f, SlideAlpha);
@@ -2125,13 +2189,12 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float WalkBounce = -LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
 	const float RunBounce  = -0.75f * LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
 	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);
-	const float Breath = 0.8f * FMath::Sin(IdleTime * 2.2f) * (1.f - MoveBlend);
 	// Bent knees (relaxed stance, crouching, guarding, landing): the body sinks exactly as far as the legs fold, so the
 	// flat feet stay on the ground (thigh 23 cm, shin 23.5 cm)
-	const float PoseH = 35.f * Squash + 55.f * Duck + StanceHip * Relax;
-	const float PoseK = -70.f * Squash - 95.f * Duck - 2.f * StanceHip * Relax;
+	const float PoseH = 35.f * Squash + 55.f * Duck + Stance * Relax;
+	const float PoseK = -70.f * Squash - 95.f * Duck - 2.f * Stance * Relax;
 	const float LegDrop = 23.f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + 23.5f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
-	float BodyZ = FMath::Lerp(Bounce + Breath, 0.f, Air) - LegDrop;
+	float BodyZ = FMath::Lerp(Bounce, 0.f, Air) - LegDrop;
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle
@@ -2147,17 +2210,19 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float TurnRoll = FMath::Clamp(YawRate * 0.025f, -12.f, 12.f) * Stream;
 
 	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
-	float UpperPitch = FMath::Lerp(-Lean, AirLean, Air) - 12.f * Squash - 14.f * Duck;
+	// at ease the chest leans a little forward (not standing against a wall) and lifts with each breath
+	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - 14.f * Duck + 0.9f * BreathS * IdleAmt;
 	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
 	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
-	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground, TurnRoll));
+	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
+	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground, TurnRoll + Sway));
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
 	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
 	const float BobAmp = FMath::Lerp(4.f, 16.f, RunAlpha) * MoveBlend;
-	const float ChestTarget = (Ground * (-BobAmp * (1.f - S * S)) + Air * FMath::Lerp(5.f, -4.f, F01)) * (1.f - FMath::Max(SlideAlpha, SitAlpha));
+	const float ChestTarget = (Ground * (-BobAmp * (1.f - S * S)) + Air * FMath::Lerp(5.f, -4.f, F01)) * (1.f - FMath::Max(SlideAlpha, SitAlpha)) + 0.6f * BreathS * IdleAmt;   // the chest rises as he breathes in
 	SmoothChestZ = FMath::FInterpTo(SmoothChestZ, ChestTarget, Dt, 30.f);
 	UpperPivot->SetRelativeLocation(UpperBase + FVector(0.f, 0.f, SmoothChestZ));
 
@@ -2172,7 +2237,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod, -0.7f * Twist * S * Ground, -0.5f * TurnRoll));
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
 
 	// ---------- Cape and plume ----------
 	const float FlapAmp = 3.f + 9.f * Stream;
@@ -2198,9 +2263,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float ArmAirSpread = FMath::Lerp(20.f, 50.f, F01);
 
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
-	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash;
-	float RollL = Air * ArmAirSpread * 0.7f;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air);
+	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
+	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) - 20.f * Ground;   // the shield arm hangs nearly straight
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
@@ -2211,11 +2276,12 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
 	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, 0.f));
+	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
-	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash;
+	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;   // arms hang a touch forward (relaxed shoulders)
 	float TargetYaw = 0.f;
-	float RollR = -Air * ArmAirSpread;
+	float RollR = -Air * ArmAirSpread - 1.2f * BreathS * IdleAmt;   // the arms ease out a little with each breath
 	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
 	float ArmSpeed = 25.f;
 
@@ -2353,6 +2419,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, RollR));
 	ElbowRCur = FMath::FInterpTo(ElbowRCur, ElbowRdeg, Dt, 18.f);
 	ElbowR->SetRelativeRotation(FRotator(ElbowRCur, 0.f, 0.f));
+	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
 
 	// ---------- Dust puffs: footfalls when running, landings, slides ----------
 	const FVector FeetBase = GetActorLocation() + FVector(0.f, 0.f, -90.f);

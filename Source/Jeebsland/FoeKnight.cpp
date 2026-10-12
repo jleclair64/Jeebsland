@@ -115,12 +115,13 @@ void AFoeKnight::BeginPlay()
 	Build(Defs);
 	for (const FDef& D : Defs)
 	{
-		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0) continue;   // (he carries the kite shield)
+		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0 || D.Slot == SlotBrush) continue;   // (he carries the kite shield, and no brush)
 		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
-		const bool bMetal = D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody;
+		if (D.bFixedColor) Col = D.Fixed;
+		const bool bMetal = !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
 		Paint(C, Col, bMetal);
 	}
 	// His sword, in the right hand, held the way the player holds one

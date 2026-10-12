@@ -24,6 +24,7 @@ namespace JeebItems
 		K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots,
 		K_Cape,
 		K_Ring, K_Amulet,
+		K_Crest,          // a brush along the helm's crest: worn in a miscellaneous slot like a ring or amulet
 		K_Count
 	};
 
@@ -67,7 +68,7 @@ namespace JeebItems
 
 	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
 	inline bool IsArmorKind(int32 K) { return K >= K_Helmet && K <= K_Boots; }
-	inline bool IsAccessoryKind(int32 K) { return K == K_Ring || K == K_Amulet; }
+	inline bool IsAccessoryKind(int32 K) { return K == K_Ring || K == K_Amulet || K == K_Crest; }
 
 	// Two-handed weapons cannot be used with a shield
 	inline bool AllowsShield(int32 Kind) { return !(Kind == K_Broadsword || Kind == K_BattleAxe || Kind == K_Katana || Kind == K_Staff); }
@@ -125,7 +126,7 @@ namespace JeebItems
 	{
 		static const TCHAR* N[K_Count] = { TEXT("Sword"), TEXT("Axe"), TEXT("Pickaxe"), TEXT("Spear"), TEXT("Broadsword"), TEXT("Battle Axe"), TEXT("Katana"),
 			TEXT("Wand"), TEXT("Wizard Staff"), TEXT("Bow"), TEXT("Fishing Pole"), TEXT("Shield"),
-			TEXT("Helmet"), TEXT("Chestplate"), TEXT("Shoulders"), TEXT("Gloves"), TEXT("Boots"), TEXT("Cape"), TEXT("Ring"), TEXT("Amulet") };
+			TEXT("Helmet"), TEXT("Chestplate"), TEXT("Shoulders"), TEXT("Gloves"), TEXT("Boots"), TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Helm Brush") };
 		return N[FMath::Clamp(K, 0, K_Count - 1)];
 	}
 	inline const TCHAR* CapeColorName(int32 C)
@@ -145,6 +146,7 @@ namespace JeebItems
 	constexpr int32 NumRings = 5, NumAmulets = 5;
 	inline const TCHAR* AccessoryName(int32 Kind, int32 V)
 	{
+		if (Kind == K_Crest) return TEXT("Red Helm Brush");
 		static const TCHAR* R[NumRings] = { TEXT("Silver Ring"), TEXT("Gold Ring"), TEXT("Bronze Band"), TEXT("Sapphire Ring"), TEXT("Ruby Ring") };
 		static const TCHAR* A[NumAmulets] = { TEXT("Hawk's Eye Amulet"), TEXT("Emerald Necklace"), TEXT("Chaos Pendant"), TEXT("Guardian Amulet"), TEXT("Vitality Amulet") };
 		return Kind == K_Ring ? R[FMath::Clamp(V, 0, NumRings - 1)] : A[FMath::Clamp(V, 0, NumAmulets - 1)];
@@ -266,11 +268,13 @@ namespace JeebItems
 		float CritChance = 0.f, CritBonus = 0.5f;   // chance, and extra damage on a crit
 		int32 FloorDelta = 0, CeilDelta = 0;        // moves the lowest / highest damage
 		bool bWild = false;                         // each hit is multiplied by a random 0.5 - 2.0
+		float SpeedMul = 1.f;                       // running and walking speed
 		int32 MaxHealthBonus = 0;
 	};
 	inline FMods AccessoryMods(int32 Kind, int32 V)
 	{
 		FMods M;
+		if (Kind == K_Crest) { M.SpeedMul = 1.05f; return M; }   // Red Helm Brush: +5% speed
 		if (Kind == K_Ring)
 		{
 			switch (V)
@@ -297,6 +301,7 @@ namespace JeebItems
 	}
 	inline const TCHAR* AccessoryText(int32 Kind, int32 V)
 	{
+		if (Kind == K_Crest) return TEXT("+5% speed. A red horsehair brush along the crest of your helm");
 		static const TCHAR* R[NumRings] = { TEXT("+15% attack, -5% defence"), TEXT("+10% defence, -5% attack"), TEXT("+5% attack, +5% defence"),
 			TEXT("+20% defence, -10% attack"), TEXT("+25% attack, -15% defence") };
 		static const TCHAR* A[NumAmulets] = { TEXT("20% of hits are critical: +50% damage"), TEXT("Every hit is multiplied by 0.5 to 2.0"),
@@ -324,6 +329,7 @@ namespace JeebItems
 	}
 	inline int32 AccessoryPrice(int32 Kind, int32 V)
 	{
+		if (Kind == K_Crest) return 120;
 		static const int32 R[NumRings] = { 120, 100, 60, 130, 140 };
 		static const int32 A[NumAmulets] = { 200, 180, 160, 150, 150 };
 		return Kind == K_Ring ? R[FMath::Clamp(V, 0, NumRings - 1)] : A[FMath::Clamp(V, 0, NumAmulets - 1)];
@@ -401,6 +407,7 @@ namespace JeebItems
 			M.CeilDelta += A.CeilDelta;
 			M.bWild = M.bWild || A.bWild;
 			M.MaxHealthBonus += A.MaxHealthBonus;
+			M.SpeedMul *= A.SpeedMul;
 		}
 		return M;
 	}

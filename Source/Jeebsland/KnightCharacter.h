@@ -32,6 +32,7 @@ struct FArmorPart
 	FLinearColor Fixed = FLinearColor::White;
 	bool bFixedMetal = false;
 	bool bBare = false;              // skin / hair: shown only while the slot is empty
+	bool bFixedColor = false;        // always its Fixed colour, matte (black eye openings, the red brush)
 	int32 Style = 0;                 // shields: which shield style the piece belongs to
 	float Shade = 1.f;
 };
@@ -239,6 +240,13 @@ private:
 	// Shield and weapon go on the back (shield over the sword, both under the cape) while climbing, riding or sitting
 	bool bStowed = false;
 	void PlaceShield(bool bOnBack);
+	// The shield is strapped along the left forearm (at the elbow and the hand) and hangs at the side; raising it blends to
+	// the guard. Called every frame after the arms are posed.
+	void HoldShield();
+	// A sword held at ease: the blade turned in the hand so its tip rests in front, between the feet. Blends out for attacks.
+	TArray<UProceduralMeshComponent*> EaseComps;
+	float EaseAlpha = 0.f;
+	void HoldWeaponAtEase(float Dt, bool bBusy);
 	// Stepping in the shield-up stance: the way the legs step (forward/back, and sideways), eased
 	float StepFw = 1.f, StepSd = 0.f;
 	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
@@ -318,6 +326,7 @@ private:
 	UPROPERTY() class UMaterialInstanceDynamic* CapeMid = nullptr;
 	static constexpr int32 CapeNX = 7, CapeNY = 10;
 	static constexpr float StanceHip = 12.f;   // relaxed stance: the thighs lean this far forward and the knees bend twice as much
+	static constexpr float RestLean = 5.f;    // at ease the chest leans this far forward
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	bool bCapeMeshMade = false;
