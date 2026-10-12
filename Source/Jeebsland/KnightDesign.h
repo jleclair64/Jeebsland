@@ -4,9 +4,16 @@
 #include "KnightMesh.h"
 #include <initializer_list>
 
-// The knight's look: every armour plate, strap, blade and plume, modelled in code.
+// The knight's look: every armour plate, rivet and trim, modelled in code.
 // All coordinates are "capsule space" in cm: feet at Z = -96, forward = +X, right = +Y.
 // A part hangs off one pivot of the skeleton so it moves with that body part.
+//
+// The style (owner's sketches, 2026-10-12): a broad, stocky knight in crisp, faceted plate. Bronze plate with gold edges,
+// a round great helm with a gold crest, brow and nose guard (closed cheeks, small vents), compact shoulder caps of
+// overlapping lames, fan-winged elbow and knee cops, flared pointed gauntlet cuffs, hip lames and tassets over a mail
+// skirt, and long layered sabatons. Most plates are eight-sided and flat-shaded so every face catches the light on its
+// own. Each limb piece hangs off its own joint (shoulder, elbow, hip, knee) and the joints are covered by cops and lames,
+// so the arms and legs can bend without opening gaps.
 
 enum class EArmorRole : uint8 { Plate, Under, Trim, Cloth, Accent, Leather, BootBody };
 
@@ -21,9 +28,6 @@ namespace KnightDesign
 	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotNone = -1 };
 	constexpr int32 NumSlots = 7;
 
-	// The knight is built lean: everything below the helmet is squeezed by these factors at the end of Build()
-	constexpr double SlimY = 0.80, SlimX = 0.90;
-
 	// Where each pivot sits (capsule space). The animation turns parts about these points.
 	inline FVector PivotPos(int32 P)
 	{
@@ -35,17 +39,20 @@ namespace KnightDesign
 		case P_Plume:  return FVector(-2, 0, 71);
 		case P_CapeU:  return FVector(-26, 0, 13);
 		case P_CapeL:  return FVector(-26, 0, -19);
-		case P_ArmL:   return FVector(0, -26 * SlimY, 7);
-		case P_ArmR:   return FVector(0, 26 * SlimY, 7);
-		case P_ElbowL: return FVector(0, -27 * SlimY, -11);
-		case P_ElbowR: return FVector(0, 27 * SlimY, -11);
-		case P_HipL:   return FVector(0, -13 * SlimY, -47);
-		case P_HipR:   return FVector(0, 13 * SlimY, -47);
-		case P_KneeL:  return FVector(0, -13 * SlimY, -68);
-		case P_KneeR:  return FVector(0, 13 * SlimY, -68);
+		case P_ArmL:   return FVector(0, -28, 6);      // shoulders: broad
+		case P_ArmR:   return FVector(0, 28, 6);
+		case P_ElbowL: return FVector(0, -32, -13);    // the arms hang a little out from the body
+		case P_ElbowR: return FVector(0, 32, -13);
+		case P_HipL:   return FVector(0, -11.5, -40);
+		case P_HipR:   return FVector(0, 11.5, -40);
+		case P_KneeL:  return FVector(0, -12, -63);
+		case P_KneeR:  return FVector(0, 12, -63);
 		}
 		return FVector(0, 0, 0);
 	}
+	// The middle of each fist, and where a held weapon's grip sits in it
+	inline FVector FistPos(int32 Side) { return FVector(7, Side * 35.0, -30); }
+	inline FVector GripPos(bool bLeft) { return FVector(8, bLeft ? -35.0 : 35.0, -26); }
 
 	struct FDef
 	{
@@ -53,7 +60,7 @@ namespace KnightDesign
 		int32 Slot = SlotNone;       // which armour set it belongs to (-1 = fixed gear)
 		EArmorRole Role = EArmorRole::Plate;
 		int32 MinTier = 0, MaxTier = 9;
-		float Shade = 1.f;           // darkens the palette colour (cape lining)
+		float Shade = 1.f;           // darkens the palette colour (the fists)
 		FLinearColor Fixed = FLinearColor(1.f, 1.f, 1.f, 1.f);
 		bool bFixedMetal = false;
 		bool bBare = false;          // skin and hair: shown only while nothing is worn in this slot (uses Fixed)
@@ -70,11 +77,6 @@ namespace KnightDesign
 		while (It != L.end()) { const double r = *It++; const double z = *It++; A.Add(FVector2D(r, z)); }
 		return A;
 	}
-	// A rounded dome with a flat underside: radius R, top at height H, 13.5 deep
-	inline TArray<FVector2D> DomeProf(double R, double H)
-	{
-		return Prof({ 0, H, 0.28 * R, H - 0.5, 0.55 * R, H - 1.8, 0.78 * R, H - 4.5, 0.94 * R, H - 8.0, R, H - 12.0, R, H - 13.5, 0, H - 13.5 });
-	}
 	inline FVector Off(const FVector& Loc, const FVector& Rot, const FVector& Local) { return Loc + RotateEuler(Local, Rot); }
 	inline double Lerp1(const TArray<FVector2D>& P, double X) // piecewise linear y(x), x ascending
 	{
@@ -88,6 +90,50 @@ namespace KnightDesign
 		return P[P.Num() - 1].Y;
 	}
 
+	// A point on (or H cm off) a many-sided lathe with one corner straight ahead: angle Th in degrees (0 ahead, + to the
+	// right), height Z. Prof is the lathe's profile (radius, height), Sx squashes it front to back, C is where its axis is.
+	// Bands and ridges laid on with this sit flat on the faces of the plate underneath.
+	struct FOct
+	{
+		TArray<FVector2D> ZR;
+		double Sx = 1.0;
+		FVector C = FVector::ZeroVector;
+		int32 Sides = 8;
+		FOct(const TArray<FVector2D>& Pr, double InSx, const FVector& InC, int32 InSides) : Sx(InSx), C(InC), Sides(InSides)
+		{
+			for (const FVector2D& P : Pr) if (P.X > 0.0) ZR.Add(FVector2D(P.Y, P.X));
+			ZR.Sort([](const FVector2D& A, const FVector2D& B) { return A.X < B.X; });
+		}
+		double R(double Z) const { return Lerp1(ZR, Z); }
+		FVector At(double Th, double Z, double H) const
+		{
+			const double Step = 360.0 / Sides;
+			double M = FMath::Fmod(Th, Step);
+			if (M < 0.0) M += Step;
+			const double K = FMath::Cos(FMath::DegreesToRadians(0.5 * Step)) / FMath::Cos(FMath::DegreesToRadians(M - 0.5 * Step));
+			const double Rr = (R(Z) + H) * K, A = FMath::DegreesToRadians(Th);
+			return C + FVector(Rr * FMath::Cos(A) * Sx, Rr * FMath::Sin(A), Z);
+		}
+	};
+
+	// Even spacing along a polyline (N + 1 points)
+	inline TArray<FVector> Resample(const TArray<FVector>& P, int32 N)
+	{
+		TArray<double> L;
+		L.Add(0.0);
+		for (int32 i = 1; i < P.Num(); ++i) L.Add(L.Last() + FVector::Distance(P[i], P[i - 1]));
+		TArray<FVector> Res;
+		for (int32 k = 0; k <= N; ++k)
+		{
+			const double S = L.Last() * double(k) / double(N);
+			int32 i = 1;
+			while (i < P.Num() - 1 && L[i] < S) ++i;
+			const double T = (S - L[i - 1]) / DMax(L[i] - L[i - 1], 1e-6);
+			Res.Add(P[i - 1] + (P[i] - P[i - 1]) * T);
+		}
+		return Res;
+	}
+
 	inline void Build(TArray<FDef>& Out)
 	{
 		auto Add = [&](int32 Pivot, int32 Slot, EArmorRole Role, int32 MinTier = 0, int32 MaxTier = 9) -> FDef&
@@ -96,84 +142,102 @@ namespace KnightDesign
 			Out.Add(D);
 			return Out.Last();
 		};
-		const FVector NoRot(0, 0, 0);
+		// A plate hoop round an axis at C: inner/outer radius at the top (Zt), outer/inner at the bottom (Zb). Faceted.
+		auto Hoop = [&](FMD& M, const FVector& C, double Ti, double To, double Zt, double Bo, double Bi, double Zb, int32 Seg, double Sx)
+		{
+			Lathe(M, Prof({ Ti, Zt, To, Zt, Bo, Zb, Bi, Zb }), Seg, Sx, 1.0, Xf(C), true, true);
+		};
+		// A gold edge round the bottom of a hoop (outer radius R at height Z)
+		auto Edge = [&](FMD& M, const FVector& C, double R, double Z, int32 Seg, double Sx)
+		{
+			Lathe(M, Prof({ R - 0.3, Z + 1.1, R + 0.5, Z + 1.1, R + 0.6, Z - 0.2, R - 0.2, Z - 0.2 }), Seg, Sx, 1.0, Xf(C), true, true);
+		};
+		// A rectangular cross-section between two surface points (A above B), from depth H0 to height H1 off the surface
+		auto Quad = [](const FVector& A0, const FVector& A1, const FVector& B1, const FVector& B0) { return FRing({ A0, A1, B1, B0 }); };
+		const FVector O0(0, 0, 0);
 
 		// =========================================================================================
-		// HELMET: a closed, angular war helm in the Westerosi style: beaked faceplate, T-shaped eye slit,
-		// vent slits, steel cheek plates and a tall blade crest
+		// HELMET: a round great helm (sixteen faces, tapering in to the neck) with a gold crest over the top, a gold brow
+		// dipping to a point over the nose, a raised nose guard, gold frames under the eyes, gold cheek sweeps and rim.
+		// The cheeks meet below the nose guard: only the eyes and a few small vents are open.
 		// =========================================================================================
-		const double HC = 45.0; // helm centre height
-		const double HSX = 1.12, HSY = 0.86;
-		const TArray<FVector2D> HelmP = Prof({ 0, -22, 13.5, -22, 15.5, -17, 17.5, -9, 18.8, 0, 18.8, 9, 17.6, 15, 14.6, 20.5, 10, 24, 4.6, 26.2, 0, 26.8 });
-		TArray<FVector2D> HZ;
-		for (int32 i = 0; i < HelmP.Num(); ++i) HZ.Add(FVector2D(HelmP[i].Y, HelmP[i].X));
-		auto HelmRadius = [&](double Zr) { return Lerp1(HZ, Zr); };
-		auto HelmX = [&](double Zr, double Y)
-		{
-			const double R = HelmRadius(Zr);
-			return HSX * FMath::Sqrt(DMax(0.0, R * R - (Y / HSY) * (Y / HSY)));
-		};
-		// The sideways slope of the helm's surface at height Zr, sideways offset Y (as a yaw in degrees)
-		auto HelmYaw = [&](double Zr, double Y)
-		{
-			const double R = HelmRadius(Zr);
-			const double Root = FMath::Sqrt(DMax(1.0, R * R - (Y / HSY) * (Y / HSY)));
-			return FMath::RadiansToDegrees(FMath::Atan(HSX * (Y / (HSY * HSY)) / Root));
-		};
-
+		const double HSX = 1.12;
+		const TArray<FVector2D> HelmP = Prof({ 0, 69, 5.5, 68.6, 9.5, 67.2, 12.8, 64.8, 15.0, 61.5, 16.3, 57.5, 16.6, 52, 16.5, 44, 16.0, 37, 15.0, 31.5, 14.0, 28.5, 13.6, 27, 0, 27 });
+		const FOct Helm(HelmP, HSX, O0, 16);
+		auto HS = [&](double Th, double Z, double H) { return Helm.At(Th, Z, H); };
+		// the brow's lower edge (it dips to a point over the nose) and the bottom of the eye openings
+		auto BrowBot = [](double Th) { const double A = FMath::Abs(Th); return A >= 30.0 ? 53.0 : (A >= 8.0 ? 50.5 + 2.5 * (A - 8.0) / 22.0 : 48.8 + 1.7 * A / 8.0); };
+		auto EyeBot = [](double Th) { const double A = FMath::Abs(Th); return A <= 8.0 ? 45.5 : 45.5 + 2.0 * FMath::Min(1.0, (A - 8.0) / 42.0); };
 		{
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Plate);
-			TArray<FVector2D> Pr;
-			for (int32 i = 0; i < HelmP.Num(); ++i) Pr.Add(FVector2D(HelmP[i].X, HC + HelmP[i].Y));
-			Lathe(D.Mesh, Pr, 12, HSX, HSY, Xf(V3(0, 0, 0)));   // 12 flat-ish sides: a rigid, faceted skull
-			// The beak: a sharp ridge from the brow to the chin, jutting out most at the nose
-			TArray<FVector> Path; TArray<FVector2D> AB;
-			const double Zs[] = { 11, 6, 1, -4, -9, -14, -19 };
-			const double Ex[] = { 0.4, 1.4, 2.6, 3.0, 2.4, 1.4, 0.5 };
-			const double Hw[] = { 2.4, 3.6, 4.4, 4.2, 3.6, 3.0, 2.4 };
-			const double Th[] = { 2.0, 2.8, 3.4, 3.6, 3.2, 2.6, 2.0 };
-			for (int32 i = 0; i < 7; ++i) { Path.Add(V3(HelmX(Zs[i], 0) + Ex[i], 0, HC + Zs[i])); AB.Add(FVector2D(Hw[i], Th[i])); }
-			Sweep(D.Mesh, Path, AB, V3(0, 1, 0), 6, 0.3, Xf(V3(0, 0, 0)));
+			Lathe(D.Mesh, HelmP, 16, HSX, 1.0, Xf(O0), false, true);
 		}
 		{
-			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under); // dark openings: the long eye slit and the vents
+			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Trim);
+			// brow band, round the front and both sides
+			Ribbon(D.Mesh, 84, [&](double T) { const double Th = -105.0 + 210.0 * T, Zb = BrowBot(Th);
+				return Quad(HS(Th, 57.5, -0.3), HS(Th, 57.5, 0.9), HS(Th, Zb, 0.9), HS(Th, Zb, -0.3)); });
+			// nose guard, with a ridge down its middle, ending in a point
+			{
+				const TArray<FVector2D> NW = Prof({ 36.5, 0.25, 38.0, 0.8, 42.0, 1.8, 48.0, 2.6, 57.5, 2.0 });   // (height, half width)
+				const TArray<FVector2D> NH = Prof({ 36.5, 0.9, 46.0, 1.5, 57.5, 1.1 });                           // (height, how proud)
+				Ribbon(D.Mesh, 18, [&](double T) {
+					const double Z = 57.5 - 21.0 * T, W = FMath::RadiansToDegrees(Lerp1(NW, Z) / Helm.R(Z)), H = Lerp1(NH, Z);
+					return FRing({ HS(-W, Z, -0.3), HS(-W, Z, H), HS(0, Z, H + 0.7), HS(W, Z, H), HS(W, Z, -0.3) }); });
+			}
+			// frame under the eyes, meeting under the nose guard
+			Ribbon(D.Mesh, 40, [&](double T) { const double Th = -50.0 + 100.0 * T, Zt = EyeBot(Th);
+				return Quad(HS(Th, Zt, -0.3), HS(Th, Zt, 0.8), HS(Th, Zt - 1.7, 0.8), HS(Th, Zt - 1.7, -0.3)); });
+			// cheek sweeps: from the corners of the brow down and forward to the jaw
 			for (int32 sd = -1; sd <= 1; sd += 2)
 			{
-				const double Ye = sd * 8.4;
-				RBox(D.Mesh, 1.4, 5.6, 1.7, 0.5, Xf(V3(HelmX(5.4, Ye) + 0.2, Ye, HC + 5.4), V3(0, 0, HelmYaw(5.4, Ye))));   // eye slit
-				for (int32 k = 0; k < 4; ++k)
-				{
-					const double Zr = -2.0 - 4.2 * k, Y = sd * (10.0 + 0.4 * k);
-					RBox(D.Mesh, 1.2, 0.8, 1.6, 0.3, Xf(V3(HelmX(Zr, Y) + 0.2, Y, HC + Zr), V3(0, 0, HelmYaw(Zr, Y))));   // vent slits
-				}
+				static const double PT[5] = { 80, 76, 68, 57, 49 }, PZ[5] = { 52.5, 46, 38.5, 31.8, 27.6 };
+				Ribbon(D.Mesh, 16, [&](double T) {
+					const double F = T * 4.0; const int32 i = FMath::Min(int32(F), 3); const double U = F - i;
+					const double Th = sd * (PT[i] + (PT[i + 1] - PT[i]) * U), Z = PZ[i] + (PZ[i + 1] - PZ[i]) * U;
+					const double Dw = FMath::RadiansToDegrees(1.1 / Helm.R(Z));
+					return Quad(HS(Th - Dw, Z, -0.3), HS(Th - Dw, Z, 0.8), HS(Th + Dw, Z, 0.8), HS(Th + Dw, Z, -0.3)); });
 			}
-			RBox(D.Mesh, 1.4, 1.2, 6.0, 0.4, Xf(V3(HelmX(0.0, 0) + 4.5, 0, HC + 2.0)));   // the stem of the T, down the nose guard
+			// a seam down the chin, under the nose guard
+			Ribbon(D.Mesh, 6, [&](double T) { const double Z = 36.8 - 7.6 * T, Dw = FMath::RadiansToDegrees(0.4 / Helm.R(Z));
+				return Quad(HS(-Dw, Z, -0.3), HS(-Dw, Z, 0.55), HS(Dw, Z, 0.55), HS(Dw, Z, -0.3)); });
+			// the rim round the bottom
+			Lathe(D.Mesh, Prof({ Helm.R(27.0) - 0.4, 27.0, Helm.R(27.0) + 0.9, 27.0, Helm.R(29.2) + 0.9, 29.2, Helm.R(29.2) - 0.4, 29.2 }), 16, HSX, 1.0, Xf(O0), true, true);
+			// the crest: a raised ridge from the brow, over the top, down the back, tallest on top
+			{
+				TArray<FVector> Mer;
+				Mer.Add(V3(Helm.R(56.5) * HSX, 0, 56.5));
+				for (int32 i = HelmP.Num() - 2; i >= 0; --i) if (HelmP[i].Y > 56.5) Mer.Add(V3(HelmP[i].X * HSX, 0, HelmP[i].Y));
+				for (int32 i = 1; i < HelmP.Num() - 1; ++i) if (HelmP[i].Y > 40.0) Mer.Add(V3(-HelmP[i].X * HSX, 0, HelmP[i].Y));
+				Mer.Add(V3(-Helm.R(40.0) * HSX, 0, 40.0));
+				const TArray<FVector> CP = Resample(Mer, 44);
+				Ribbon(D.Mesh, 44, [&](double T) {
+					const int32 i = FMath::Clamp(FMath::RoundToInt(T * 44.0), 0, 44);
+					const FVector P = CP[i], Tg = CP[FMath::Min(i + 1, 44)] - CP[FMath::Max(i - 1, 0)];
+					FVector N(Tg.Z, 0.0, -Tg.X);
+					N.Normalize();
+					if (FVector::DotProduct(N, P - V3(0, 0, 48)) < 0.0) N = -N;
+					const double W = 1.2 + 0.6 * FMath::Sin(PI * T), H = 0.8 + 1.6 * DClamp((P.Z - 40.0) / 29.0, 0.0, 1.0);
+					const FVector Y(0, 1, 0);
+					return FRing({ P - Y * W - N * 0.3, P - Y * W + N * H, P + N * (H + 0.6), P + Y * W + N * H, P + Y * W - N * 0.3 }); });
+			}
+			// rivets on the sides
+			for (int32 sd = -1; sd <= 1; sd += 2) { Bead(D.Mesh, 0.8, HS(sd * 100.0, 46.0, 0.3)); Bead(D.Mesh, 0.8, HS(sd * 100.0, 39.0, 0.3)); }
 		}
 		{
-			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Trim); // brow band, neck rim, angled cheek plates
-			Torus(D.Mesh, 19.4, 1.3, 12, 6, HSX, HSY, Xf(V3(0, 0, HC + 9.6)));
-			Torus(D.Mesh, 14.4, 1.4, 12, 6, HSX, HSY, Xf(V3(0, 0, HC - 21.0)));
+			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under);   // the dark openings: eyes and breathing vents
 			for (int32 sd = -1; sd <= 1; sd += 2)
 			{
-				const double Y = sd * 12.6, Zr = -10.0;
-				RBox(D.Mesh, 1.0, 3.0, 6.4, 0.3, Xf(V3(HelmX(Zr, Y) + 0.6, Y, HC + Zr), V3(0, 0, HelmYaw(Zr, Y))));
+				Ribbon(D.Mesh, 16, [&](double T) { const double Th = sd * (7.0 + 43.0 * T), Zt = BrowBot(Th) + 0.4, Zb = EyeBot(Th) - 0.3;
+					return Quad(HS(Th, Zt, -0.3), HS(Th, Zt, 0.3), HS(Th, Zb, 0.3), HS(Th, Zb, -0.3)); });
+				for (int32 k = 0; k < 2; ++k)
+					Ribbon(D.Mesh, 6, [&](double T) { const double Th = sd * (17.0 + 11.0 * T), Z = 39.5 - 3.6 * k - 1.6 * T;
+						return Quad(HS(Th, Z + 0.45, -0.3), HS(Th, Z + 0.45, 0.25), HS(Th, Z - 0.45, 0.25), HS(Th, Z - 0.45, -0.3)); });
 			}
-		}
-		{
-			FDef& D = Add(P_Plume, SlotHelmet, EArmorRole::Accent); // a tall, thin blade crest from brow to nape
-			TArray<FVector> Path; TArray<FVector2D> AB;
-			const double Zf[] = { 17, 21, 24.5, 26.6 };
-			const double Hf[] = { 2.0, 3.4, 5.0, 7.0 };
-			for (int32 i = 0; i < 4; ++i) { Path.Add(V3(HelmX(Zf[i], 0) + 0.4, 0, HC + Zf[i] + 1.5)); AB.Add(FVector2D(1.7, Hf[i])); }
-			Path.Add(V3(0, 0, HC + 26.8 + 8.0)); AB.Add(FVector2D(1.3, 8.0));
-			const double Zb[] = { 26.2, 24, 20, 15, 9, 3 };
-			const double Hb[] = { 7.0, 6.0, 5.0, 4.0, 3.0, 2.0 };
-			for (int32 i = 0; i < 6; ++i) { Path.Add(V3(-HelmX(Zb[i], 0) - 0.4 - (Zb[i] < 12 ? (12 - Zb[i]) * 0.8 : 0.0), 0, HC + Zb[i] + 1.5)); AB.Add(FVector2D(1.7, Hb[i])); }
-			Path.Add(V3(-26, 0, HC - 6)); AB.Add(FVector2D(1.0, 1.4));
-			Sweep(D.Mesh, Path, AB, V3(0, 1, 0), 6, 0.6, Xf(V3(0, 0, 0)));
 		}
 
-		// Bare head (shown while no helmet is worn): neck, head, hair, eyes
+		// Bare head (shown while no helmet is worn): neck, head, hair, eyes (built a size smaller about the neck)
+		const int32 FirstBare = Out.Num();
 		{
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);
 			Lathe(D.Mesh, Prof({ 0, 12, 7.5, 12, 8.0, 24, 0, 28 }), 16, 1.0, 1.0, Xf(V3(0, 0, 0)));                       // neck
@@ -190,174 +254,313 @@ namespace KnightDesign
 			FDef& D = Add(P_Head, SlotHelmet, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.03f, 0.03f, 0.04f);   // eyes
 			Blob(D.Mesh, 1.6, 2.2, 2.4, Xf(V3(15.2, 6.2, 49.0))); Blob(D.Mesh, 1.6, 2.2, 2.4, Xf(V3(15.2, -6.2, 49.0)));
 		}
+		for (int32 i = FirstBare; i < Out.Num(); ++i)
+			for (FVector& V : Out[i].Mesh.V) V = V3(0, 0, 23) + (V - V3(0, 0, 23)) * 0.85;
 
 		// =========================================================================================
-		// BODY: breastplate, back plate, plate lames, belt, tabard with a red cross, gorget, hip guards
+		// GORGET: two lames round the neck, gold edged (the helm tapers in above it, so the knight has a neck)
 		// =========================================================================================
 		{
 			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Plate);
-			Lathe(D.Mesh, Prof({ 0, 9, 14, 9, 18.5, 10.5, 21.5, 12.8, 22, 15.5, 20.5, 18.5, 17, 20, 0, 20 }), 14, 1.0, 1.0, Xf(V3(0, 0, 0)));   // gorget
-			Ellipsoid(D.Mesh, 21, 20.5, 17.5, 0.75, 0.8, 12, 8, Xf(V3(2, 0, -3)));      // breastplate
-			Ellipsoid(D.Mesh, 16, 19.5, 17, 0.75, 0.8, 12, 8, Xf(V3(-8, 0, -4)));       // back plate
-			{ TArray<FVector> Kp; TArray<FVector2D> Ka; const double Kz[] = { 14, 6, -2, -10, -17 }, Kx[] = { 16.0, 20.0, 21.4, 20.8, 19.0 };
-			  for (int32 i = 0; i < 5; ++i) { Kp.Add(V3(Kx[i], 0, Kz[i])); Ka.Add(FVector2D(1.6, 1.7)); }
-			  Sweep(D.Mesh, Kp, Ka, V3(0, 1, 0), 6, 0.3, Xf(V3(0, 0, 0))); }   // angular keel down the chest
-			Ellipsoid(D.Mesh, 20.5, 19.5, 3.6, 0.55, 0.9, 12, 8, Xf(V3(1, 0, -15.5)));  // belly lames
-			Ellipsoid(D.Mesh, 21, 20, 3.4, 0.55, 0.9, 12, 8, Xf(V3(1, 0, -19.5)));
-		}
-		{
-			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Under);
-			Ellipsoid(D.Mesh, 17, 17, 16, 0.8, 0.9, 12, 8, Xf(V3(0, 0, -5)));
-			Lathe(D.Mesh, Prof({ 0, -34, 17.5, -34, 18.5, -30, 18.5, -20, 0, -20 }), 10, 1.0, 1.0, Xf(V3(0, 0, 0)));
+			Hoop(D.Mesh, O0, 11.0, 11.8, 29.5, 13.0, 12.2, 24.0, 8, 0.92);
+			Hoop(D.Mesh, O0, 12.6, 13.4, 25.0, 17.6, 16.8, 19.4, 8, 0.92);
 		}
 		{
 			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Trim);
-			Torus(D.Mesh, 18.3, 1.3, 10, 6, 1.0, 1.0, Xf(V3(0, 0, 19.2)));                // collar rim
-			RBox(D.Mesh, 1.8, 5.2, 5.0, 0.35, Xf(V3(23.4, 0, -26.2)));                     // buckle
-			RBox(D.Mesh, 1.6, 14.2, 1.2, 0.35, Xf(V3(25.4, 0, -45.6)));                    // tabard hem
+			Edge(D.Mesh, O0, 13.0, 24.0, 8, 0.92);
+			Edge(D.Mesh, O0, 17.6, 19.4, 8, 0.92);
+		}
+
+		// =========================================================================================
+		// BODY: a broad eight-sided breastplate (a crisp ridge down the middle), a raised plackart over the belly with a
+		// gold V edge, two hip lames, tassets over the hips and a short mail skirt
+		// =========================================================================================
+		const double TSX = 0.85;
+		const FVector TC(1, 0, 0);
+		const TArray<FVector2D> TorsoP = Prof({ 13.5, 21, 19.5, 18.5, 22.4, 14, 23.0, 7, 22.6, 0, 21.4, -7, 19.6, -13, 18.2, -18, 18.0, -21.5, 0, -21.5 });
+		const FOct Torso(TorsoP, TSX, TC, 8);
+		auto PlackTop = [](double Th) { return -4.0 - 7.0 * FMath::Min(FMath::Abs(Th), 60.0) / 60.0; };
+		{
+			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Plate);
+			Lathe(D.Mesh, TorsoP, 8, TSX, 1.0, Xf(TC), false, true);
+			Ribbon(D.Mesh, 90, [&](double T) { const double Th = -112.5 + 225.0 * T, Zt = PlackTop(Th);    // the plackart
+				return Quad(Torso.At(Th, Zt, -0.2), Torso.At(Th, Zt, 0.9), Torso.At(Th, -21.3, 0.9), Torso.At(Th, -21.3, -0.2)); });
+			Hoop(D.Mesh, TC, 18.4, 19.2, -20.0, 20.8, 20.0, -26.0, 8, TSX);                                    // hip lames
+			Hoop(D.Mesh, TC, 19.6, 20.4, -25.2, 22.0, 21.2, -31.0, 8, TSX);
 		}
 		{
-			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Leather);
-			Lathe(D.Mesh, Prof({ 0, -29, 21.2, -29, 22.4, -28, 22.4, -24.5, 21.2, -23.5, 0, -23.5 }), 14, 1.02, 1.0, Xf(V3(0, 0, 0)));   // belt
-			RBox(D.Mesh, 0.9, 2.2, 6.0, 0.4, Xf(V3(23.0, -8, -33.5)));                     // belt tail
-			RBox(D.Mesh, 4.2, 3.8, 5.6, 0.5, Xf(V3(3, -23.5, -31)));                       // pouch
-		}
-		// Tabard: hangs from the chest to below the belt
-		const double TabZ[] = { 9, 3, -6, -14, -22, -30, -38, -45 };
-		const double TabX[] = { 19.5, 23.8, 24.6, 23.6, 20.8, 20.8, 22.6, 25.0 };
-		const double TabA[] = { 11.5, 12, 12.5, 12.5, 12.3, 12.8, 13.3, 13.8 };
-		auto TabXAt = [&](double Z)
-		{
-			for (int32 i = 0; i + 1 < 8; ++i)
-				if (Z <= TabZ[i] && Z >= TabZ[i + 1])
-				{
-					const double T = (TabZ[i] - Z) / (TabZ[i] - TabZ[i + 1]);
-					return TabX[i] + (TabX[i + 1] - TabX[i]) * T;
-				}
-			return TabX[7];
-		};
-		{
-			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Cloth);
-			TArray<FVector> Path; TArray<FVector2D> AB;
-			for (int32 i = 0; i < 8; ++i) { Path.Add(V3(TabX[i], 0, TabZ[i])); AB.Add(FVector2D(TabA[i], 1.3)); }
-			Sweep(D.Mesh, Path, AB, V3(0, 1, 0), 12, 0.35, Xf(V3(0, 0, 0)));
-			// (no back panel: the cape covers the back, and the pale panel showed under it as a white patch)
-		}
-		{
-			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Accent);     // the red cross
-			TArray<FVector> Path; TArray<FVector2D> AB;
-			for (double Z = 7.0; Z >= -21.0; Z -= 4.0) { Path.Add(V3(TabXAt(Z) + 1.35, 0, Z)); AB.Add(FVector2D(3.4, 0.5)); }
-			Sweep(D.Mesh, Path, AB, V3(0, 1, 0), 8, 0.4, Xf(V3(0, 0, 0)));
-			RBox(D.Mesh, 0.5, 10.5, 3.4, 0.3, Xf(V3(TabXAt(0.5) + 1.35, 0, 0.5)));
+			FDef& D = Add(P_Upper, SlotBody, EArmorRole::Trim);
+			// the ridge down the chest
+			Ribbon(D.Mesh, 12, [&](double T) { const double Z = 17.0 - 20.6 * T, A = FMath::RadiansToDegrees(0.75 / Torso.R(Z));
+				return Quad(Torso.At(-A, Z, -0.2), Torso.At(-A, Z, 0.55), Torso.At(A, Z, 0.55), Torso.At(A, Z, -0.2)); });
+			// the plackart's gold V edge
+			Ribbon(D.Mesh, 90, [&](double T) { const double Th = -112.5 + 225.0 * T, Zt = PlackTop(Th);
+				return Quad(Torso.At(Th, Zt + 0.2, 0.7), Torso.At(Th, Zt + 0.2, 1.45), Torso.At(Th, Zt - 1.1, 1.45), Torso.At(Th, Zt - 1.1, 0.7)); });
+			for (int32 sd = -1; sd <= 1; sd += 2) Bead(D.Mesh, 0.85, Torso.At(sd * 40.0, -15.0, 1.1));
+			Edge(D.Mesh, TC, 20.8, -26.0, 8, TSX);
+			Edge(D.Mesh, TC, 22.0, -31.0, 8, TSX);
 		}
 		{
 			FDef& D = Add(P_Body, SlotBody, EArmorRole::Under);
-			Ellipsoid(D.Mesh, 14, 16.5, 11, 0.7, 0.8, 12, 8, Xf(V3(0, 0, -37)));        // pelvis
+			RBox(D.Mesh, 13.0, 16.0, 8.0, 0.6, Xf(V3(0, 0, -35)));                                              // pelvis
+			Lathe(D.Mesh, Prof({ 20.2, -27, 22.0, -35, 22.8, -43.5, 22.2, -43.5, 21.4, -35, 19.6, -27 }), 16, TSX, 1.0, Xf(V3(0.5, 0, 0)), true);   // mail skirt
 		}
+		// Tassets: a plate over each hip, flaring out, hung from under the hip lames
+		auto Tasset = [&](int32 sd, double Th0, double Th1, double Zt, double Zb0, double Zb1, double H0, double H1, double Inset)
+		{
+			return [=](double T) {
+				const double Th = sd * (Th0 + (Th1 - Th0) * T), Zb = Zb0 + (Zb1 - Zb0) * T, A = FMath::DegreesToRadians(Th);
+				auto P = [&](double Z, double H) { const double R = 20.3 + 2.7 * (-29.5 - Z) / 11.5 + H; return V3(R * FMath::Cos(A) * 0.9 + 0.5, R * FMath::Sin(A), Z); };
+				return FRing({ P(Zt, H0), P(Zt, H1), P(Zb + Inset, H1), P(Zb + Inset, H0) });
+			};
+		};
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
-			FDef& D = Add(P_Body, SlotBody, EArmorRole::Plate);
-			Ellipsoid(D.Mesh, 9.5, 3.6, 11, 0.5, 0.7, 12, 8, Xf(V3(1, sd * 20.5, -43), V3(sd * 8.0, 0, 0)));   // hip guards (tassets)
+			{ FDef& D = Add(P_Body, SlotBody, EArmorRole::Plate); Ribbon(D.Mesh, 12, Tasset(sd, 58, 112, -29.5, -40.0, -42.0, 0.0, 1.0, 0.0)); }
+			{ FDef& D = Add(P_Body, SlotBody, EArmorRole::Trim);
+			  Ribbon(D.Mesh, 12, [&](double T) {   // gold along the bottom edge
+				const double Th = sd * (58.0 + 54.0 * T), Zb = -40.0 - 2.0 * T, A = FMath::DegreesToRadians(Th);
+				auto P = [&](double Z, double H) { const double R = 20.3 + 2.7 * (-29.5 - Z) / 11.5 + H; return V3(R * FMath::Cos(A) * 0.9 + 0.5, R * FMath::Sin(A), Z); };
+				return FRing({ P(Zb + 1.2, 0.8), P(Zb + 1.2, 1.5), P(Zb - 0.2, 1.5), P(Zb - 0.2, 0.8) }); });
+			  const double A = FMath::DegreesToRadians(sd * 85.0), R = 20.3 + 2.7 * 4.0 / 11.5 + 1.2;
+			  Bead(D.Mesh, 0.8, V3(R * FMath::Cos(A) * 0.9 + 0.5, R * FMath::Sin(A), -33.5)); }
 		}
 
 		// =========================================================================================
-		// SHOULDERS: three layered, domed pauldrons on each side with steel edge trim; rivets / spikes on higher tiers
+		// SHOULDERS: a compact faceted cap on each shoulder (gold rim; a rivet on bronze and iron, a spike on steel and
+		// better), and three narrow lames that hug the top of the arm and swing with it
 		// =========================================================================================
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
-			const FVector R1(-sd * 22.0, 0, 0), R2(-sd * 30.0, 0, 0), R3(-sd * 38.0, 0, 0);
-			const FVector P1(0, sd * 27.5, 10.5), P2(0, sd * 31.0, 3.5), P3(0, sd * 33.5, -3.5);
+			const int32 Arm = (sd < 0) ? P_ArmL : P_ArmR;
+			const FVector J = PivotPos(Arm);
+			const FVector Up(0, sd * FMath::Sin(FMath::DegreesToRadians(25.0)), FMath::Cos(FMath::DegreesToRadians(25.0)));
+			const FVector C(0, sd * 28.0, 8.5);
+			const FXf CapX = Xf(C, DownTo(Up));          // the cap is built pointing down (-Z) and turned to face up and out
+			const FVector Dn = (PivotPos((sd < 0) ? P_ElbowL : P_ElbowR) - J).GetSafeNormal();
+			const FXf LameX = Xf(J, DownTo(Dn));
 			{
 				FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Plate);
-				Lathe(D.Mesh, DomeProf(17.0, 8.0), 14, 1.05, 1.0, Xf(P1, R1));
-				Lathe(D.Mesh, DomeProf(18.0, 6.0), 14, 1.05, 1.0, Xf(P2, R2));
-			}
-			{
-				FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Under);
-				Lathe(D.Mesh, DomeProf(16.5, 5.0), 14, 1.05, 1.0, Xf(P3, R3));
+				Lathe(D.Mesh, Prof({ 0, -9.5, 5.0, -9.0, 9.0, -7.0, 11.5, -4.2, 12.6, -1.0, 12.8, 0.4, 0, 0.4 }), 8, 1.0, 1.0, CapX, false, true);
 			}
 			{
 				FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Trim);
-				Torus(D.Mesh, 17.0, 0.85, 10, 6, 1.05, 1.0, Xf(Off(P1, R1, V3(0, 0, -4.0)), R1));
-				Torus(D.Mesh, 18.0, 0.85, 10, 6, 1.05, 1.0, Xf(Off(P2, R2, V3(0, 0, -6.0)), R2));
+				Lathe(D.Mesh, Prof({ 12.3, 0.5, 13.4, 0.5, 13.4, -1.4, 12.3, -1.4 }), 8, 1.0, 1.0, CapX, true, true);
+			}
+			{ FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Trim, 1, 2); Bead(D.Mesh, 1.3, C + Up * 9.8); }
+			{ FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Trim, 3, 9); Lathe(D.Mesh, Prof({ 0, -6.5, 1.7, 0, 0, 0 }), 6, 1.0, 1.0, Xf(C + Up * 9.0, DownTo(Up)), false, true); }
+			{
+				FDef& D = Add(Arm, SlotShoulders, EArmorRole::Plate);
+				Lathe(D.Mesh, Prof({ 11.6, -0.5, 12.4, -0.5, 12.6, -5.0, 11.8, -5.0 }), 8, 1.0, 1.0, LameX, true, true);
+				Lathe(D.Mesh, Prof({ 10.9, -4.3, 11.7, -4.3, 11.9, -8.8, 11.1, -8.8 }), 8, 1.0, 1.0, LameX, true, true);
+				Lathe(D.Mesh, Prof({ 10.2, -8.1, 11.0, -8.1, 11.2, -12.4, 10.4, -12.4 }), 8, 1.0, 1.0, LameX, true, true);
 			}
 			{
-				FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Trim, 1, 1);
-				Blob(D.Mesh, 2.2, 2.2, 2.2, Xf(Off(P1, R1, V3(0, 0, 8.3)), R1));
-			}
-			{
-				FDef& D = Add(P_Upper, SlotShoulders, EArmorRole::Trim, 2, 2);
-				Lathe(D.Mesh, Prof({ 0, 17, 3.4, 3, 3.4, 0, 0, 0 }), 10, 1.0, 1.0, Xf(Off(P1, R1, V3(0, 0, 7.5)), R1));
+				FDef& D = Add(Arm, SlotShoulders, EArmorRole::Trim);
+				Lathe(D.Mesh, Prof({ 12.4, -4.0, 13.15, -4.0, 13.15, -5.2, 12.4, -5.2 }), 8, 1.0, 1.0, LameX, true, true);
+				Lathe(D.Mesh, Prof({ 11.7, -7.8, 12.45, -7.8, 12.45, -9.0, 11.7, -9.0 }), 8, 1.0, 1.0, LameX, true, true);
+				Lathe(D.Mesh, Prof({ 11.0, -11.4, 11.75, -11.4, 11.75, -12.6, 11.0, -12.6 }), 8, 1.0, 1.0, LameX, true, true);
 			}
 		}
 
 		// =========================================================================================
-		// ARMS, LEGS and BOOTS
+		// ARMS: thick upper arms, an angular elbow cop with a fan on the outside, vambraces, and gauntlets with a flared cuff
+		// rising to points, layered knuckle plates and a big fist
 		// =========================================================================================
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
 			const int32 Arm = (sd < 0) ? P_ArmL : P_ArmR, Elb = (sd < 0) ? P_ElbowL : P_ElbowR;
-			const int32 Hip = (sd < 0) ? P_HipL : P_HipR, Knee = (sd < 0) ? P_KneeL : P_KneeR;
-			const double Y = sd * 13.0;
-
-			{ FDef& D = Add(Arm, SlotBody, EArmorRole::Under);
-			  Lathe(D.Mesh, Prof({ 0, 9, 6.8, 8.4, 7.2, 0, 6.4, -7, 0, -8.5 }), 10, 1.0, 1.0, Xf(V3(0, sd * 27, -2))); }
-			{ FDef& D = Add(Arm, SlotBody, EArmorRole::Plate);
-			  Lathe(D.Mesh, Prof({ 0, 5, 8.4, 4.6, 8.9, 0, 8.4, -4.6, 0, -5 }), 10, 1.0, 1.0, Xf(V3(0, sd * 27, -5.5))); }
-			{ FDef& D = Add(Arm, SlotBody, EArmorRole::Trim);
-			  Torus(D.Mesh, 8.3, 0.9, 10, 6, 1.0, 1.0, Xf(V3(0, sd * 27, -0.6))); }
-			{ FDef& D = Add(Elb, SlotBody, EArmorRole::Plate);
-			  Ellipsoid(D.Mesh, 7.8, 7.6, 7.4, 0.85, 0.85, 12, 8, Xf(V3(1.5, sd * 27.8, -11)));              // elbow cop
-			  Lathe(D.Mesh, Prof({ 0, 8, 6.6, 7.6, 7.2, 2, 7.6, -3, 7.8, -7, 0, -8 }), 10, 1.0, 1.0, Xf(V3(3.5, sd * 28, -22)));   // bracer
-			  }
-			{ FDef& D = Add(Elb, SlotGloves, EArmorRole::Plate);                                               // gauntlet
-			  Ellipsoid(D.Mesh, 6.4, 5.6, 6.6, 0.8, 0.8, 12, 8, Xf(V3(7, sd * 30, -31))); }
-			{ FDef& D = Add(Elb, SlotGloves, EArmorRole::Trim);
-			  Torus(D.Mesh, 5.6, 0.9, 10, 6, 1.0, 1.0, Xf(V3(5.0, sd * 29.5, -26.5))); }
-			{ FDef& D = Add(Elb, SlotGloves, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);   // bare hand
-			  Blob(D.Mesh, 5.6, 4.8, 6.0, Xf(V3(7, sd * 30, -31))); }
-			{ FDef& D = Add(Elb, SlotBody, EArmorRole::Under);
-			  Lathe(D.Mesh, Prof({ 0, 10, 5.7, 9.4, 5.9, 0, 5.3, -10, 0, -10.5 }), 10, 1.0, 1.0, Xf(V3(3, sd * 28, -21))); }
-			{ FDef& D = Add(Elb, SlotBody, EArmorRole::Trim);
-			  Torus(D.Mesh, 7.6, 0.9, 10, 6, 1.0, 1.0, Xf(V3(3.5, sd * 28, -15.8)));
-			  Torus(D.Mesh, 7.8, 0.9, 10, 6, 1.0, 1.0, Xf(V3(3.5, sd * 28, -28.6))); }
-
-			// Legs
-			{ FDef& D = Add(Hip, SlotBody, EArmorRole::Under);
-			  Lathe(D.Mesh, Prof({ 0, 10, 7.6, 9.4, 8.0, 0, 6.9, -9, 0, -10 }), 10, 1.0, 1.0, Xf(V3(0, Y, -57.5))); }
-			{ FDef& D = Add(Hip, SlotBody, EArmorRole::Plate);
-			  Lathe(D.Mesh, Prof({ 0, 9, 8.6, 8.4, 9.8, 3, 9.6, -3, 8.8, -8.4, 0, -9 }), 10, 1.06, 1.0, Xf(V3(1, Y, -57))); }
-			{ FDef& D = Add(Knee, SlotBody, EArmorRole::Plate);
-			  Ellipsoid(D.Mesh, 8.6, 8.2, 8.2, 0.9, 0.9, 12, 8, Xf(V3(5.5, Y, -67.5)));                      // knee cop
-			  Lathe(D.Mesh, Prof({ 0, 8.5, 7.6, 8, 8.4, 3, 7.9, -3, 7, -8, 0, -8.5 }), 10, 1.1, 1.0, Xf(V3(1.2, Y, -80))); }  // greave
-			{ FDef& D = Add(Knee, SlotBody, EArmorRole::Under);
-			  Lathe(D.Mesh, Prof({ 0, 10, 6.1, 9.4, 5.8, 0, 5.2, -9, 0, -10 }), 10, 1.0, 1.0, Xf(V3(0, Y, -79))); }
-			{ FDef& D = Add(Knee, SlotBody, EArmorRole::Trim);
-			  RBox(D.Mesh, 1.0, 1.5, 7.0, 0.4, Xf(V3(9.2, Y, -80)));                                           // shin ridge
-			  Torus(D.Mesh, 8.0, 0.9, 10, 6, 1.05, 1.0, Xf(V3(3, Y, -62.5))); }
-
-			// Boots
-			{ FDef& D = Add(Knee, SlotBoots, EArmorRole::BootBody);
-			  Lathe(D.Mesh, Prof({ 0, 6, 7.8, 5.8, 8.2, 0, 7.8, -5.5, 0, -6 }), 10, 1.0, 1.0, Xf(V3(0, Y, -85.5)));
-			  Lathe(D.Mesh, Prof({ 0, -10, 6.2, -9, 8.6, -4, 9, 3, 7.6, 11, 5.6, 18, 3.4, 23, 0, 25.5 }), 10, 0.62, 1.0, Xf(V3(0, Y, -90.3), V3(0, 90, 0))); }
-			{ FDef& D = Add(Knee, SlotBoots, EArmorRole::Plate);
-			  Lathe(D.Mesh, Prof({ 0, 9.5, 7.6, 10, 8.4, 12, 6.4, 18, 4.2, 23.2, 2.3, 26.3, 0, 27.2 }), 10, 0.62, 1.0, Xf(V3(0, Y, -90.3), V3(0, 90, 0))); }
-			{ FDef& D = Add(Knee, SlotBoots, EArmorRole::Trim);
-			  Torus(D.Mesh, 8.1, 1.0, 10, 6, 1.0, 1.0, Xf(V3(0, Y, -80.4))); }
-			{ FDef& D = Add(Knee, SlotBoots, EArmorRole::Under);
-			  Lathe(D.Mesh, Prof({ 0, -10.5, 6.4, -9.5, 8.8, -4, 9.2, 3, 7.8, 11, 5.8, 18, 3.6, 23, 0, 26 }), 10, 0.14, 1.0, Xf(V3(0, Y, -95.1), V3(0, 90, 0))); }
+			const FVector J = PivotPos(Arm), E = PivotPos(Elb), F = FistPos(sd);
+			const FVector W(6.0, sd * 34.6, -24.5);                 // the wrist
+			const FXf UpperX = Xf(J, DownTo(E - J)), ForeX = Xf(E, DownTo(W - E));
+			const FVector Cd = V3(-0.55, sd * 0.8, -0.1).GetSafeNormal();   // the point of the elbow: back and out
+			{
+				FDef& D = Add(Arm, SlotBody, EArmorRole::Plate);   // upper arm, thickest at the biceps
+				Lathe(D.Mesh, Prof({ 0, 1.0, 7.4, 1.0, 8.4, -3.5, 8.6, -8.5, 8.0, -13.5, 7.2, -17.5, 6.6, -19.0, 0, -19.0 }), 8, 1.0, 1.0, UpperX, false, true);
+			}
+			{
+				FDef& D = Add(Elb, SlotBody, EArmorRole::Plate);
+				Lathe(D.Mesh, Prof({ 0, -5.5, 4.5, -5.0, 7.5, -3.2, 8.8, -0.8, 9.0, 0.6, 0, 0.6 }), 6, 1.0, 1.0, Xf(E, DownTo(Cd)), false, true);   // elbow cop
+				TArray<FVector> Fan;   // the fan on the outside of the elbow
+				const double Fy = E.Y + sd * 7.6;
+				Fan.Add(V3(-1.0, Fy, E.Z + 5.5)); Fan.Add(V3(-9.5, Fy, E.Z + 0.5)); Fan.Add(V3(-4.0, Fy, E.Z - 8.0)); Fan.Add(V3(3.0, Fy, E.Z - 2.5));
+				Prism(D.Mesh, Fan, V3(0, sd * 1.2, 0));
+				Lathe(D.Mesh, Prof({ 0, 0.5, 6.9, 0.5, 7.2, -3.0, 6.7, -8.5, 6.0, -12.5, 0, -12.5 }), 8, 1.0, 1.0, ForeX, false, true);   // vambrace
+			}
+			{
+				FDef& D = Add(Elb, SlotBody, EArmorRole::Trim);
+				Bead(D.Mesh, 1.0, E + Cd * 5.7);
+				Bead(D.Mesh, 0.9, V3(-2.6, E.Y + sd * 9.0, E.Z - 0.8));
+			}
+			// Gauntlet: the flared cuff, its top edge rising to four points
+			{
+				FDef& D = Add(Elb, SlotGloves, EArmorRole::Plate);
+				const double Zb = -14.8;
+				auto Top = [](int32 k) { return (k % 2 == 0) ? -5.0 : -8.5; };
+				TArray<FRing> R;
+				for (int32 Ring = 0; Ring < 4; ++Ring)
+				{
+					FRing Rg;
+					for (int32 k = 0; k < 8; ++k)
+					{
+						const double A = 2.0 * PI * k / 8.0;
+						const double Rad = (Ring == 0) ? 6.6 : (Ring == 1) ? 7.4 : (Ring == 2) ? 9.6 : 8.8;
+						const double Z = (Ring <= 1) ? Top(k) : Zb;
+						Rg.Add(V3(Rad * FMath::Cos(A), Rad * FMath::Sin(A), Z));
+					}
+					R.Add(Rg);
+				}
+				Solid(D.Mesh, R, true, false, false, ForeX, true);
+				// the fist, with two knuckle plates across the front and a thumb
+				RBox(D.Mesh, 5.4, 4.6, 5.6, 0.35, Xf(F), true);
+				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.0, 0, 2.6)), true);
+				RBox(D.Mesh, 1.1, 4.9, 1.6, 0.3, Xf(F + V3(5.3, 0, 0.0)), true);
+				RBox(D.Mesh, 2.4, 1.8, 3.2, 0.4, Xf(F + V3(3.5, -sd * 4.6, 1.0)), true);
+				D.Shade = 0.85f;
+			}
+			{
+				FDef& D = Add(Elb, SlotGloves, EArmorRole::Trim);
+				// gold along the cuff's pointed top edge and round its bottom
+				TArray<FRing> R;
+				for (int32 Ring = 0; Ring < 4; ++Ring)
+				{
+					FRing Rg;
+					for (int32 k = 0; k < 8; ++k)
+					{
+						const double A = 2.0 * PI * k / 8.0, Zt = (k % 2 == 0) ? -5.0 : -8.5;
+						const double Fr = 1.3 / (Zt + 14.8), Ro = 7.4 + 2.2 * Fr;   // the cuff's radius 1.3 cm below its edge
+						const double Rad = (Ring == 0) ? 7.25 : (Ring == 1) ? 7.95 : (Ring == 2) ? Ro + 0.55 : Ro - 0.15;
+						const double Z = (Ring <= 1) ? Zt + 0.1 : Zt - 1.3;
+						Rg.Add(V3(Rad * FMath::Cos(A), Rad * FMath::Sin(A), Z));
+					}
+					R.Add(Rg);
+				}
+				Solid(D.Mesh, R, true, false, false, ForeX, true);
+				Lathe(D.Mesh, Prof({ 8.9, -13.9, 10.0, -13.9, 10.0, -15.2, 8.9, -15.2 }), 8, 1.0, 1.0, ForeX, true, true);
+				RBox(D.Mesh, 0.5, 5.0, 0.45, 0.4, Xf(F + V3(6.1, 0, 3.9)), true);   // gold on the top knuckle plate
+			}
+			{
+				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under);   // finger grooves
+				for (int32 j = -1; j <= 1; ++j) RBox(D.Mesh, 0.35, 0.3, 2.2, 0.5, Xf(F + V3(5.35, j * 1.9, -3.0)), true);
+			}
+			{
+				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);   // bare hand
+				Blob(D.Mesh, 5.0, 4.4, 5.4, Xf(F));
+			}
 		}
 
 		// =========================================================================================
-		// The KITE SHIELD (weapons are modelled in WeaponDesign.h)
+		// LEGS and BOOTS: thick cuisses, an angular knee cop with a fan and a lame above and below, greaves with a gold ridge,
+		// two flaring ankle rings, and long sabatons of overlapping plates
 		// =========================================================================================
-		// (the cape itself is cloth, simulated by the character: see AKnightCharacter::TickCape)
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			const int32 Hip = (sd < 0) ? P_HipL : P_HipR, Knee = (sd < 0) ? P_KneeL : P_KneeR;
+			const FVector LC(0.5, sd * 12.0, 0);
+			const TArray<FVector2D> GreaveP = Prof({ 0, -64, 7.0, -64, 7.7, -68, 7.9, -73, 7.1, -78.5, 5.6, -83.5, 0, -83.5 });
+			const FOct Greave(GreaveP, 1.1, LC, 8);
+			const FXf KneeX = Xf(V3(5.0, sd * 12.0, -63.5), DownTo(V3(1, 0, 0)));
+			{
+				FDef& D = Add(Hip, SlotBody, EArmorRole::Plate);
+				Lathe(D.Mesh, Prof({ 0, -30.5, 9.0, -30.5, 9.7, -36, 9.8, -44, 9.1, -51, 8.2, -57, 7.6, -61, 0, -61 }), 8, 1.05, 1.0, Xf(LC), false, true);   // cuisse
+				Hoop(D.Mesh, LC, 8.1, 8.9, -56.5, 9.1, 8.3, -59.0, 8, 1.05);                                                                          // lame above the knee
+			}
+			{ FDef& D = Add(Hip, SlotBody, EArmorRole::Trim); Edge(D.Mesh, LC, 9.1, -59.0, 8, 1.05); }
+			{
+				FDef& D = Add(Knee, SlotBody, EArmorRole::Plate);
+				Lathe(D.Mesh, Prof({ 0, -4.6, 4.0, -4.1, 6.4, -2.3, 7.3, -0.4, 7.4, 0.8, 0, 0.8 }), 6, 1.0, 1.0, KneeX, false, true);   // knee cop
+				TArray<FVector> Fan;   // the fan on the outside of the knee
+				const double Fy = sd * 20.2;
+				Fan.Add(V3(2.5, Fy, -57.5)); Fan.Add(V3(-4.8, Fy, -61.0)); Fan.Add(V3(-2.0, Fy, -69.5)); Fan.Add(V3(4.2, Fy, -65.5));
+				Prism(D.Mesh, Fan, V3(0, sd * 1.2, 0));
+				Hoop(D.Mesh, LC, 7.5, 8.3, -65.5, 8.5, 7.7, -67.8, 8, 1.1);                                                 // lame below the knee
+				Lathe(D.Mesh, GreaveP, 8, 1.1, 1.0, Xf(LC), false, true);                                                   // greave
+			}
+			{
+				FDef& D = Add(Knee, SlotBody, EArmorRole::Trim);
+				Lathe(D.Mesh, Prof({ 7.0, 1.0, 7.9, 1.0, 7.9, -0.6, 7.0, -0.6 }), 6, 1.0, 1.0, KneeX, true, true);         // knee cop rim
+				Bead(D.Mesh, 1.0, V3(9.9, sd * 12.0, -63.5));
+				Bead(D.Mesh, 0.9, V3(0.0, sd * 21.4, -63.2));
+				Edge(D.Mesh, LC, 8.5, -67.8, 8, 1.1);
+				Ribbon(D.Mesh, 10, [&](double T) { const double Z = -68.5 - 14.5 * T, A = FMath::RadiansToDegrees(0.7 / Greave.R(Z));   // shin ridge
+					return Quad(Greave.At(-A, Z, -0.2), Greave.At(-A, Z, 0.55), Greave.At(A, Z, 0.55), Greave.At(A, Z, -0.2)); });
+			}
+			// Ankle rings
+			{
+				FDef& D = Add(Knee, SlotBoots, EArmorRole::Plate);
+				Hoop(D.Mesh, LC, 5.9, 6.7, -82.3, 7.4, 6.6, -85.2, 8, 1.1);
+				Hoop(D.Mesh, LC, 6.4, 7.2, -84.5, 7.9, 7.1, -87.4, 8, 1.1);
+			}
+			{
+				FDef& D = Add(Knee, SlotBoots, EArmorRole::Trim);
+				Edge(D.Mesh, LC, 7.4, -85.2, 8, 1.1);
+				Edge(D.Mesh, LC, 7.9, -87.4, 8, 1.1);
+			}
+			// The sabaton: a long, faceted foot (always there) with overlapping plates over the top, each gold edged
+			struct FSt { double X, W, Top, Bot; };
+			static const FSt St[7] = { { -7.0, 4.4, -88.0, -96.0 }, { -3.5, 5.6, -86.4, -96.0 }, { 2.5, 6.2, -86.6, -96.0 }, { 8.5, 6.1, -89.2, -96.0 },
+			                           { 13.5, 5.0, -91.8, -96.0 }, { 17.5, 3.0, -93.6, -96.0 }, { 20.0, 0.9, -94.8, -95.6 } };
+			auto StAt = [&](double X) -> FSt
+			{
+				if (X <= St[0].X) return St[0];
+				for (int32 i = 0; i < 6; ++i)
+					if (X <= St[i + 1].X)
+					{
+						const double T = (X - St[i].X) / (St[i + 1].X - St[i].X);
+						return { X, St[i].W + (St[i + 1].W - St[i].W) * T, St[i].Top + (St[i + 1].Top - St[i].Top) * T, St[i].Bot + (St[i + 1].Bot - St[i].Bot) * T };
+					}
+				return St[6];
+			};
+			const double FY = sd * 12.5;
+			// the arch over the foot at X (wider by K, raised by Dz); bFull adds the sole
+			auto Arch = [&](double X, double K, double Dz, bool bFull) -> FRing
+			{
+				const FSt S = StAt(X);
+				const double Mid = S.Bot + 0.42 * (S.Top - S.Bot), Wd = S.W * K;
+				FRing R;
+				if (bFull) { R.Add(V3(X, FY - Wd, S.Bot)); R.Add(V3(X, FY + Wd, S.Bot)); }
+				R.Add(V3(X, FY + 1.08 * Wd, Mid)); R.Add(V3(X, FY + 0.78 * Wd, S.Top + Dz)); R.Add(V3(X, FY, S.Top + 0.7 + Dz));
+				R.Add(V3(X, FY - 0.78 * Wd, S.Top + Dz)); R.Add(V3(X, FY - 1.08 * Wd, Mid));
+				return R;
+			};
+			// a plate lying over the foot from X0 to X1: outer arch, then the inner arch back again
+			auto Shell = [&](double X, double Ko, double Dzo, double Ki, double Dzi) -> FRing
+			{
+				FRing R = Arch(X, Ko, Dzo, false);
+				const FRing In = Arch(X, Ki, Dzi, false);
+				for (int32 i = In.Num() - 1; i >= 0; --i) R.Add(In[i]);
+				return R;
+			};
+			{
+				FDef& D = Add(Knee, SlotBoots, EArmorRole::BootBody);
+				Ribbon(D.Mesh, 18, [&](double T) { return Arch(-7.0 + 27.0 * T, 1.0, 0.0, true); });
+			}
+			struct FLame { double X0, X1, K, Dz; };
+			static const FLame Lames[4] = { { 1.0, 6.2, 1.10, 0.75 }, { 5.6, 10.8, 1.085, 0.6 }, { 10.2, 15.2, 1.07, 0.45 }, { 14.6, 19.8, 1.055, 0.3 } };
+			{
+				FDef& D = Add(Knee, SlotBoots, EArmorRole::Plate);
+				for (const FLame& L : Lames)
+					Ribbon(D.Mesh, 4, [&](double T) { return Shell(L.X0 + (L.X1 - L.X0) * T, L.K, L.Dz, 0.97, -0.5); });
+			}
+			{
+				FDef& D = Add(Knee, SlotBoots, EArmorRole::Trim);
+				for (int32 i = 0; i < 3; ++i)
+				{
+					const FLame& L = Lames[i];
+					Ribbon(D.Mesh, 1, [&](double T) { return Shell(L.X1 - 0.8 + 0.85 * T, L.K + 0.03, L.Dz + 0.35, L.K - 0.02, L.Dz - 0.1); });
+				}
+			}
+		}
 
-		// Shields (left arm). Three styles share one slot; each piece carries its Style so only the worn one shows:
+		// =========================================================================================
+		// SHIELDS (left arm; weapons are modelled in WeaponDesign.h). The cape is cloth, simulated by the character
+		// (see AKnightCharacter::TickCape).
+		// Three styles share one slot; each piece carries its Style so only the worn one shows:
 		// 0 the kite (domed face, steel rim, a red cross that follows the dome), 1 the round shield (a deep dome, a boss in the
 		// middle and studs round the rim), 2 the tower shield (tall and nearly flat, with a band down the middle and two straps).
+		// =========================================================================================
 		{
-			const double YC = -36.0, BackX = 11.0, FrontX = 14.3;
+			const double YC = -41.0, BackX = 14.0, FrontX = 17.3;   // in front of the left fist
 			// One shield face: Outline (sideways offset, height; the last point repeats the first), its middle C, and a dome that
 			// rises Dome cm at the middle and falls to nothing over Ry sideways and Rz up and down
 			auto Face = [&](int32 Style, const TArray<FVector2D>& O, const FVector2D& C, double Ry, double Rz, double Dome)
@@ -388,7 +591,7 @@ namespace KnightDesign
 				  Patch(D.Mesh, Back, V3(-1, 0, 0), Xf(V3(0, 0, 0))); }
 				{ FDef& D = Add(P_ArmL, SlotShield, EArmorRole::Trim); D.Style = Style;
 				  TArray<FVector> Loop;
-				  for (int32 i = 0; i + 1 < NO; ++i) { Loop.Add(V3(12.65, YC + O[i].X, O[i].Y)); }
+				  for (int32 i = 0; i + 1 < NO; ++i) { Loop.Add(V3(0.5 * (BackX + FrontX), YC + O[i].X, O[i].Y)); }
 				  TubeLoop(D.Mesh, Loop, V3(1, 0, 0), 2.2, 3.1, 10, Xf(V3(0, 0, 0))); }
 				return F;
 			};
@@ -453,18 +656,6 @@ namespace KnightDesign
 				Band(D, F, Dome, 0.0, 21.0, 0.0, -51.0, 3.6);      // a band down the middle
 				Band(D, F, Dome, -15.5, 12.0, 15.5, 12.0, 1.8);    // and two straps across
 				Band(D, F, Dome, -15.5, -38.0, 15.5, -38.0, 1.8);
-			}
-		}
-
-		// ---- slim everything below the helmet; the shield only slides in with the arm ----
-		for (FDef& D : Out)
-		{
-			if (D.Slot == SlotHelmet) continue;
-			for (FVector& V : D.Mesh.V)
-			{
-				if (D.Slot == SlotShield) { V.Y += 6.0; continue; }
-				if (D.Slot != SlotCape) V.X *= SlimX;
-				V.Y *= SlimY;
 			}
 		}
 	}

@@ -43,7 +43,7 @@ AFoeKnight::AFoeKnight()
 	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,   FVector(0, 0, -41.f));
 	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
 	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot,  FVector(-2, 0, 71.f));
-	HeadPivot->SetRelativeScale3D(FVector(0.85f));
+	// (the helm is modelled at its full size: no head scaling)
 	CapeUpper  = MakePivot(TEXT("CapeUpper"),  UpperPivot, FVector(-26, 0, 13.f));
 	CapeLower  = MakePivot(TEXT("CapeLower"),  CapeUpper,  FVector(-26, 0, -19.f));
 	ArmR       = MakePivot(TEXT("ArmR"),       UpperPivot, PivotPos(P_ArmR));
@@ -123,7 +123,7 @@ void AFoeKnight::BeginPlay()
 	// His sword, in the right hand, held the way the player holds one
 	{
 		TArray<WeaponDesign::FWPart> Parts;
-		WeaponDesign::Build(JeebItems::K_Sword, Parts, KM::Xf(FVector(8, 30 * SlimY, -27), FVector(0, -20, 0)));
+		WeaponDesign::Build(JeebItems::K_Sword, Parts, KM::Xf(GripPos(false), FVector(0, -20, 0)));
 		for (const WeaponDesign::FWPart& WP : Parts)
 		{
 			if (WP.Mesh.V.Num() == 0) continue;

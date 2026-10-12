@@ -91,7 +91,7 @@ AKnightCharacter::AKnightCharacter()
 	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,  FVector(0, 0, -41.f));     // chest: leans and twists
 	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
 	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot, FVector(-2, 0, 71.f));
-	HeadPivot->SetRelativeScale3D(FVector(0.85f, 0.85f, 0.85f)); // smaller head
+	// (the helm is modelled at its full size: no head scaling)
 	CapeUpper  = MakePivot(TEXT("CapeUpper"),  UpperPivot, FVector(-26, 0, 13.f));
 	CapeLower  = MakePivot(TEXT("CapeLower"),  CapeUpper, FVector(-26, 0, -19.f));
 	ArmPivot   = MakePivot(TEXT("ArmPivotR"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmR));     // right shoulder (sword arm)
@@ -210,9 +210,9 @@ void AKnightCharacter::BeginPlay()
 // Where cape point i of the top row is pinned: across the back of the shoulders, curving round them a little
 FVector AKnightCharacter::CapePin(int32 i) const
 {
-	const float Y = FMath::Lerp(-14.f, 14.f, float(i) / (CapeNX - 1));
+	const float Y = FMath::Lerp(-16.f, 16.f, float(i) / (CapeNX - 1));
 	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-23.f + 0.022f * Y * Y, Y, 54.f));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-19.f + 0.028f * Y * Y, Y, 57.f));
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -221,7 +221,7 @@ void AKnightCharacter::TickCape(float Dt)
 {
 	if (!CapeCloth || !UpperPivot || !CapeCloth->IsVisible()) { bCapeInit = false; return; }
 	const int32 N = CapeNX * CapeNY;
-	const float Length = 64.f, WTop = 28.f, WBot = 38.f;   // from the shoulders to the upper thigh
+	const float Length = 64.f, WTop = 32.f, WBot = 44.f;   // from the shoulders to the upper thigh
 	const float DV = Length / (CapeNY - 1);
 	auto Idx = [](int32 i, int32 j) { return j * CapeNX + i; };
 	const FTransform Up = UpperPivot->GetComponentTransform();
@@ -269,11 +269,11 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				const int32 k = Idx(i, j);
 				const float Down = float(j) / (CapeNY - 1);
-				// A heavy cloth: slow, low ripples, and the wind of running only lifts it a little (gravity wins)
-				const FVector Ripple = (Side * FMath::Sin(CapeTime * 4.5f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 3.2f - j * 0.5f) * 0.4f)
-				                     * (14.f + 0.35f * Speed) * Down;
-				const FVector Force = FVector(0.f, 0.f, -1300.f) - Fwd * (0.8f * Speed) + FVector(0.f, 0.f, 0.12f * Speed) + Ripple;
-				const FVector V = (CapeP[k] - CapePrev[k]) * 0.955f;   // more drag: it swings slowly and settles quickly
+				// A very heavy cloth (twice the old weight): slow, low ripples, and the wind of running barely lifts it (gravity wins)
+				const FVector Ripple = (Side * FMath::Sin(CapeTime * 3.6f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 2.6f - j * 0.5f) * 0.4f)
+				                     * (7.f + 0.17f * Speed) * Down;
+				const FVector Force = FVector(0.f, 0.f, -1700.f) - Fwd * (0.4f * Speed) + FVector(0.f, 0.f, 0.06f * Speed) + Ripple;
+				const FVector V = (CapeP[k] - CapePrev[k]) * 0.93f;   // more drag: it swings slowly and settles quickly
 				CapePrev[k] = CapeP[k];
 				CapeP[k] += V + Force * H * H;
 			}
@@ -302,8 +302,8 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				float Lim = L.Z > 0.f ? -23.f : -17.f;   // the back of the torso, then the backs of the legs
-				if (bStowed && L.Z > -9.f) Lim = -36.f;   // and over the shield when it is on the back
+				float Lim = L.Z > 10.f ? -20.5f : -21.5f;   // the back of the breastplate, then the mail skirt
+				if (bStowed && L.Z > -9.f) Lim = -34.f;   // and over the shield when it is on the back
 				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
 			}
 		}
@@ -509,12 +509,12 @@ void AKnightCharacter::RebuildHeld()
 		Make(UpperPivot, KnightDesign::P_Upper, KM::Xf(FVector::ZeroVector));
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
-			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-24.5f, 14.f, 41.f + 16.f), Q);   // chest pivot sits 41 below the body's centre
+			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-21.5f, 14.f, 41.f + 16.f), Q);   // chest pivot sits 41 below the body's centre
 		return;
 	}
-	const KM::FXf Tilt = KM::Xf(FVector(8, 30 * KnightDesign::SlimY, -27), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
+	const KM::FXf Tilt = KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
 	Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
-	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(FVector(8, -30 * KnightDesign::SlimY, -27), FVector(0, -20, 0)));
+	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), FVector(0, -20, 0)));
 }
 
 // The shield on the arm, or on the back: turned to face backwards, its inner face just behind the sword on the back,
@@ -527,7 +527,7 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		if (bOnBack)
 		{
 			P.Comp->AttachToComponent(UpperPivot, FAttachmentTransformRules::KeepRelativeTransform);
-			P.Comp->SetRelativeLocationAndRotation(FVector(-16.f, -30.f, 41.f), FRotator(0.f, 180.f, 0.f));
+			P.Comp->SetRelativeLocationAndRotation(FVector(-10.f, -41.f, 41.f), FRotator(0.f, 180.f, 0.f));
 		}
 		else
 		{
@@ -2190,7 +2190,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 38.f, MountAlpha);    ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, MountAlpha);    // holding the reins
 	PitchL = FMath::Lerp(PitchL, 85.f, TuckAlpha);     ElbowLdeg = FMath::Lerp(ElbowLdeg, 100.f, TuckAlpha);
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
-	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 22.f, 10.f)); // shield comes across in front of the body
+	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
 	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, 0.f));
 

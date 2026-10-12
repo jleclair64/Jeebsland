@@ -148,9 +148,9 @@ namespace KM
 			for (int32 j = 0; j < NP; ++j) Cen += R[Ring][j];
 			return Cen / double(NP);
 		};
-		const FVector Axis = (Centroid(NR - 1) - Centroid(0)).GetSafeNormal();
-		if (bCapStart) Cap(0, -Axis);
-		if (bCapEnd) Cap(NR - 1, Axis);
+		// each cap faces away from its neighbouring ring (right even when the shape curves round, like a band round a helm)
+		if (bCapStart) Cap(0, (Centroid(0) - Centroid(1)).GetSafeNormal());
+		if (bCapEnd) Cap(NR - 1, (Centroid(NR - 1) - Centroid(NR - 2)).GetSafeNormal());
 		Append(Dst, M, X, bFlat);
 	}
 
@@ -173,7 +173,7 @@ namespace KM
 	}
 
 	// A circle of profile points for ring-shaped tubes
-	inline void Torus(FMD& Dst, double Rad, double Thick, int32 Seg, int32 SegTube, double sx, double sy, const FXf& X)
+	inline void Torus(FMD& Dst, double Rad, double Thick, int32 Seg, int32 SegTube, double sx, double sy, const FXf& X, bool bFlat = false)
 	{
 		TArray<FVector2D> P;
 		for (int32 k = 0; k < SegTube; ++k)
@@ -181,11 +181,11 @@ namespace KM
 			const double T = 2.0 * PI * double(k) / double(SegTube);
 			P.Add(FVector2D(Rad + Thick * FMath::Cos(T), Thick * FMath::Sin(T)));
 		}
-		Lathe(Dst, P, Seg, sx, sy, X, true);
+		Lathe(Dst, P, Seg, sx, sy, X, true, bFlat);
 	}
 
 	// Rounded blob or box: e = 1 is an ellipsoid, smaller e gives squarer corners
-	inline void Ellipsoid(FMD& Dst, double rx, double ry, double rz, double e1, double e2, int32 SegU, int32 SegV, const FXf& X)
+	inline void Ellipsoid(FMD& Dst, double rx, double ry, double rz, double e1, double e2, int32 SegU, int32 SegV, const FXf& X, bool bFlat = false)
 	{
 		TArray<FRing> Rings;
 		for (int32 v = 0; v <= SegV; ++v)
@@ -200,10 +200,40 @@ namespace KM
 			}
 			Rings.Add(Rg);
 		}
-		Solid(Dst, Rings, false, false, false, X);
+		Solid(Dst, Rings, false, false, false, X, bFlat);
 	}
 	inline void Blob(FMD& Dst, double rx, double ry, double rz, const FXf& X) { Ellipsoid(Dst, rx, ry, rz, 1.0, 1.0, 18, 12, X); }
-	inline void RBox(FMD& Dst, double hx, double hy, double hz, double Round, const FXf& X) { Ellipsoid(Dst, hx, hy, hz, Round, Round, 14, 10, X); }
+	inline void RBox(FMD& Dst, double hx, double hy, double hz, double Round, const FXf& X, bool bFlat = false) { Ellipsoid(Dst, hx, hy, hz, Round, Round, 14, 10, X, bFlat); }
+	// A small faceted bead (rivets)
+	inline void Bead(FMD& Dst, double R, const FVector& At) { Ellipsoid(Dst, R, R, R, 1.0, 1.0, 8, 4, FXf{ At, FVector(0.0, 0.0, 0.0) }, true); }
+
+	// The rotation (degrees about X, then Y) that turns a shape built pointing down (-Z) to point along Dir
+	inline FVector DownTo(const FVector& Dir)
+	{
+		const FVector D = Dir.GetSafeNormal();
+		const double A = FMath::Asin(DClamp(D.Y, -1.0, 1.0));
+		const double B = FMath::Atan2(-D.X, -D.Z);
+		return FVector(FMath::RadiansToDegrees(A), FMath::RadiansToDegrees(B), 0.0);
+	}
+
+	// A slab that follows any path: RingAt(t) gives its cross-section for t from 0 to 1. Capped at both ends, crisp edges.
+	inline void Ribbon(FMD& Dst, int32 N, TFunctionRef<FRing(double)> RingAt, bool bFlat = true)
+	{
+		TArray<FRing> R;
+		for (int32 k = 0; k <= N; ++k) R.Add(RingAt(double(k) / double(N)));
+		Solid(Dst, R, false, true, true, FXf(), bFlat);
+	}
+
+	// A flat plate: a convex outline (all in one plane) given thickness along Thick. Crisp edges.
+	inline void Prism(FMD& Dst, const TArray<FVector>& Outline, const FVector& Thick)
+	{
+		TArray<FRing> R;
+		R.Add(Outline);
+		FRing B;
+		for (const FVector& P : Outline) B.Add(P + Thick);
+		R.Add(B);
+		Solid(Dst, R, false, true, true, FXf(), true);
+	}
 
 	// A tube along a path whose cross-section (a wide, b thick) changes along the way; Exp < 1 squares the section.
 	inline void Sweep(FMD& Dst, const TArray<FVector>& Path, const TArray<FVector2D>& AB, const FVector& Side, int32 Seg, double Exp, const FXf& X, bool bFlat = false)

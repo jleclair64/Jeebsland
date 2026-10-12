@@ -1,22 +1,46 @@
-Fix the pine trees so they look real 
-Fix the texture on the wooden fence so it looks real
-What is the white thing on the knights back under the cape? Remove it
-Remove the part of the wood fence platform for the doorways to the fort
+Make the vents on the knight helmet near the mouth vertical instead of horizontal
+
+
+If I drop an item by dragging it out of my inventory I want it to show up in the real world. I want you to create 3d rendering for all the items we have including a log to represent wood, different for the different kinds of wood, and gems to represent the ore, again different for each different ore type. Please use your best judgement with the rest of these items similar to the ore and wood. 
+
+
+
+What do you think of the project so far? What should I be focusing on? What's going to be the hardest to change in the future? (designs, colors, animations, builds, the map, HUD, etc)
+
+
+Make a world map and a starting screen. Will need to set up profile saves and auto saving eventually 
+
+
+Ask about dropping frames and how we can optimize this thing. It looks like a cartoon game, if my PC can run battlefield 6 at max setting this game should be a piece of cake. I'm confused with it's having trouble with frames at the highest graphics settings
+
+
 Check on the size of the project. Ask Claude to remove any bloat or files things we aren't using anymore
 
+Fix the pine trees so they look real 
+Add blood splatters?
 
 
-
+Combat
+Run + jump + attack does like a stabbing animation with a little cool down where the knight is vulnerable afterwards
+Be able to charge up a strong attack
+Be able to throw your weapons like spears and swords?
 
 
 Each class can only use certain weapons, some are shared. Vary their speeds, health, damage output, jump height, climb walls ability? Ninja double jump and can hit crits? Make certain skills increase faster aka the viking gets 20% increase xp for sailing and fishing skill, give them different abilities like the ninja can hit crits and double jump, the wizard can float for a while, etc. Keep the users skills and inventory the same as they change classes, give them the options to switch at the beginning of the game. At the beginning of the game the user can choose where to spawn in at select points on the map, they start with one and have to explore to unlock more. 
-Knight
+
+Knight (trolls are the enemies) - strong shield sword/spear
+Troll (attacking the knights) - weak wood shield - battle axe/battle hammer
+Wizard (mysterious faction) - defensive spells for a blue shield - wands/staffs
+
+
 Viking
-Wizard
+Pirate
 Ninja
 
 
-rewrite the lore to invoke lord of the flies themes and lessons 
+
+rewrite the lore to invoke lord of the flies, red rising, count of monte cristo, harry potter, lord of the rings, game of thrones themes/vibes. I want a plot line that can be played and invokes the same sense of injustice, and rage that I got from red rising. For future reference, I want this game to be online, so we'll have to find a way to add a main storyline in while allowing everyone to play it at different points. Take this lightly, just an idea, but maybe like how destiny or no mans sky did it. 
+
 friendly army
 Enemy army
 battles
@@ -26,13 +50,15 @@ Dragons
 Dinosaurs
 Trolls
 Dark knights
-Volanos
+cannons 
+Volnanos
 Mountains
 swamps
 tropics
 food for health
 potions
 spells
+wands
 mountains
 NPS
 Lore
