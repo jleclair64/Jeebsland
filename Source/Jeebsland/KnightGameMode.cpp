@@ -1,4 +1,5 @@
 #include "KnightGameMode.h"
+#include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
 #include "GrassField.h"
 #include "Meadow.h"
@@ -77,6 +78,16 @@ void AKnightGameMode::Tick(float DeltaSeconds)
 void AKnightGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Always full screen (in a standalone or packaged game; the editor's own Play-in-Editor window keeps its own size)
+	if (!GIsEditor)
+	{
+		if (UGameUserSettings* GS = UGameUserSettings::GetGameUserSettings())
+		{
+			GS->SetFullscreenMode(EWindowMode::Fullscreen);
+			GS->ApplySettings(false);
+		}
+	}
 
 	UWorld* World = GetWorld();
 

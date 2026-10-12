@@ -23,6 +23,7 @@ private:
 	void Poly(const TArray<FVector2D>& P, const FLinearColor& C);
 	void Disc(float Cx, float Cy, float Rx, float Ry, const FLinearColor& C);
 	void DrawIcon(int32 Id, float X, float Y, float S);
+	void DrawIconBody(int32 Id, float X, float Y, float S);
 	void DrawIngot(float X, float Y, float S);
 	float Wrapped(const FString& Text, float X, float Y, float MaxW, float Scale, const FLinearColor& Col);   // returns the height used
 	bool Over(float X, float Y, float W, float H) const { return bUIHaveMouse && UIMouseX >= X && UIMouseX <= X + W && UIMouseY >= Y && UIMouseY <= Y + H; }

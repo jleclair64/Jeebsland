@@ -657,6 +657,10 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(SlideAction, EKeys::C);
 	KnightContext->MapKey(RollAction, EKeys::V);
 	KnightContext->MapKey(RollAction, EKeys::LeftAlt);
+	DodgeLAction = MakeBool(TEXT("KnightDodgeL"));
+	KnightContext->MapKey(DodgeLAction, EKeys::A);
+	DodgeRAction = MakeBool(TEXT("KnightDodgeR"));
+	KnightContext->MapKey(DodgeRAction, EKeys::D);
 	KnightContext->MapKey(SitAction, EKeys::E);
 
 	{
@@ -734,6 +738,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(SitAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInteractKey);
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInventoryKey);
 		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
+		EIC->BindAction(DodgeLAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeLeft);
+		EIC->BindAction(DodgeRAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeRight);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
@@ -1124,7 +1130,8 @@ void AKnightCharacter::StartRoll()
 	if (bRolling || bSliding || bSitting || bClimbing || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
 
 	// Roll the way you are steering, or straight ahead if you are standing still
-	FVector Dir = Move->GetCurrentAcceleration().GetSafeNormal2D();
+	FVector Dir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;
+	PendingRollDir = FVector::ZeroVector;
 	if (Dir.IsNearlyZero()) Dir = GetActorForwardVector().GetSafeNormal2D();
 	RollDir = Dir;
 	RollT = 0.f;
@@ -1798,7 +1805,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (RollT >= RollDur || bFalling)
 		{
 			bRolling = false;
-			RollCooldown = 0.9f;
+			RollCooldown = 1.0f;   // one second before the next roll (every kind of roll)
 			Move->bOrientRotationToMovement = bSavedOrient;
 		}
 	}
@@ -2412,4 +2419,19 @@ void AKnightCharacter::SetPanelAlways(bool bOn)
 {
 	bPanelAlways = bOn;
 	if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
+}
+
+// A or D tapped twice within a quarter second, with the shield up: a roll to that side (relative to the camera)
+void AKnightCharacter::Dodge(float Side)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	double& Last = Side < 0.f ? LastTapA : LastTapD;
+	const bool bDouble = (Now - Last) < 0.28;
+	Last = Now;
+	if (!bDouble || !bBlocking || bMounted || IsUIOpen() || !GetController()) return;
+	const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+	PendingRollDir = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * Side;
+	Last = -10.0;   // a third tap does not start another
+	StartRoll();
+	PendingRollDir = FVector::ZeroVector;
 }

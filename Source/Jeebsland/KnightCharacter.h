@@ -164,6 +164,11 @@ protected:
 	void StopBlock();
 	void StartSlide();          // C while sprinting
 	void StartRoll();           // V or Alt
+	void DodgeLeft() { Dodge(-1.f); }    // A tapped twice quickly, with the shield up: a sidestep roll
+	void DodgeRight() { Dodge(1.f); }    // D tapped twice
+	void Dodge(float Side);
+	double LastTapA = -10.0, LastTapD = -10.0;
+	FVector PendingRollDir = FVector::ZeroVector;
 	void OnInteractKey();       // E: sit, trade, talk, mount, open doors ...
 	void UseDoor(ACottage* Hut);   // open, close, or try to pick the lock
 	void CallHorse();           // T
@@ -199,6 +204,8 @@ private:
 	UPROPERTY() UInputAction* BlockAction = nullptr;
 	UPROPERTY() UInputAction* SlideAction = nullptr;
 	UPROPERTY() UInputAction* RollAction = nullptr;
+	UPROPERTY() UInputAction* DodgeLAction = nullptr;
+	UPROPERTY() UInputAction* DodgeRAction = nullptr;
 	UPROPERTY() UInputAction* SitAction = nullptr;
 	UPROPERTY() UInputAction* InventoryAction = nullptr;
 	UPROPERTY() UInputAction* CallHorseAction = nullptr;

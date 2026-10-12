@@ -201,13 +201,6 @@ void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGl
 	// specular band just inside the top edge
 	if (W > 24.f && H > 24.f) FillRR(X + R * 0.7f, Y + 3.f, W - R * 1.4f, FMath::Max(3.f, H * 0.045f), 2.f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, (bGreyGlass ? 0.06f : 0.16f) * Alpha); });
 	RimLight(X, Y, W, H, R, Alpha, bGlow ? Warm : FLinearColor(1.f, 1.f, 1.f, 1.f));
-	// a glint gliding slowly along the top edge
-	const float Sweep = FMath::Fmod(T * 0.16f + X * 0.0007f, 1.7f);
-	if (Sweep < 1.f && W > 60.f)
-	{
-		const float GW = FMath::Min(110.f, W * 0.35f), GX = X + R + (W - 2.f * R - GW) * Sweep;
-		FillRR(GX, Y, GW, 2.4f, 1.2f, [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.7f * Alpha * FMath::Sin(Sweep * PI)); });
-	}
 }
 
 // A small glass tile: buttons, slots, rows. Tint colours it (a hover or an active state); Alpha is its strength.
@@ -439,7 +432,6 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	HDText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
 
 	DrawMinimap(Pawn);
 	DrawWeaponBar(Knight);
@@ -698,11 +690,8 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		}
 		HDText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.7f, 0.7f, 0.7f), Sx + 4.f, Sy + 1.f, Font, bSel ? 0.9f : 0.7f);
 		if (Id == 0) { if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.25f); }); continue; }
-		// icons lean diagonally and fill the slot (the fishing rod is drawn already leaning, so it needs less)
-		IconTiltDeg = (IsGear(Id) && KindOf(Id) == K_Rod) ? -9.f : 35.f;
-		IconPivot = FVector2D(Sx + Ss * 0.5f, Sy + Ss * 0.5f);
+		// (every weapon icon leans the same way everywhere: see DrawIcon)
 		DrawIcon(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f);
-		IconTiltDeg = 0.f;
 		if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.30f); });   // dim the ones not in hand
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
@@ -725,9 +714,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
 		const int32 ShieldId = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
-		IconTiltDeg = 35.f; IconPivot = FVector2D(X + SS * 0.5f, Y0 + SS * 0.5f);
 		DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
-		IconTiltDeg = 0.f;
 		const FString Txt = FString::FromInt(Def);
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(Txt, TW, TH, Font, 1.15f);
@@ -1237,7 +1224,23 @@ void AKnightHUD::DrawIngot(float X, float Y, float S)
 	Poly({ FVector2D(X + 8 * U, Y + 11 * U), FVector2D(X + 18 * U, Y + 11 * U), FVector2D(X + 16 * U, Y + 14 * U), FVector2D(X + 6 * U, Y + 14 * U) }, FLinearColor(1.f, 0.97f, 0.7f));
 }
 
+// Every weapon icon leans the same way wherever it is drawn (pack, bar, drag): 35 degrees, the fishing rod a little less because
+// its picture already leans
 void AKnightHUD::DrawIcon(int32 Id, float X, float Y, float S)
+{
+	const float SavedTilt = IconTiltDeg;
+	const FVector2D SavedPivot = IconPivot;
+	if (FMath::IsNearlyZero(SavedTilt) && IsGear(Id) && IsWeaponKind(KindOf(Id)))
+	{
+		IconTiltDeg = (KindOf(Id) == K_Rod) ? -9.f : 35.f;
+		IconPivot = FVector2D(X + S * 0.5f, Y + S * 0.5f);
+	}
+	DrawIconBody(Id, X, Y, S);
+	IconTiltDeg = SavedTilt;
+	IconPivot = SavedPivot;
+}
+
+void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 {
 	PolyStep = FMath::Clamp(S / 44.f, 1.f, 2.5f);
 	const float U = S / 64.f;
