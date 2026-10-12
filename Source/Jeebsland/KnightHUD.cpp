@@ -239,7 +239,16 @@ void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinea
 		});
 		FillRR(X + 1.f, Y + 1.f, FW - 2.f, H * 0.42f, FMath::Max(0.f, FR - 1.f), [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.26f, 0.04f, t)); });   // gloss
 		const float Sw = FMath::Fmod(T * 0.35f, 1.5f);
-		if (Sw < 1.f && FW > 40.f) FillRR(X + (FW - 30.f) * Sw, Y, 30.f, H, FMath::Min(R, 15.f), [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.26f * FMath::Sin(Sw * PI)); });
+		if (Sw < 1.f && FW > 40.f)   // a soft sheen gliding along the fill: stacked, narrowing layers fade it out at both ends (no hard-edged block)
+		{
+			const float Mid = X + 32.f + (FW - 64.f) * Sw;
+			const float Env = FMath::Sin(Sw * PI);
+			for (int32 k = 0; k < 8; ++k)
+			{
+				const float Wk = 64.f - k * 7.f, Lo = FMath::Max(X, Mid - Wk * 0.5f), Hi = FMath::Min(X + FW, Mid + Wk * 0.5f);
+				if (Hi - Lo > 2.f) FillRR(Lo, Y, Hi - Lo, H, FMath::Min(R, (Hi - Lo) * 0.5f), [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.03f * Env); });
+			}
+		}
 	}
 	RimLight(X - 2.f, Y - 2.f, W + 4.f, H + 4.f, R + 2.f, 0.9f, FLinearColor(1.f, 1.f, 1.f, 1.f));
 	for (int32 k = 1; k < 4; ++k) DrawRect(FLinearColor(1.f, 1.f, 1.f, 0.14f), X + W * 0.25f * k - 0.5f, Y + 2.f, 1.f, H - 4.f);   // quarter marks

@@ -23,6 +23,7 @@
 #include "TreeFort.h"
 #include "Castle.h"
 #include "Horse.h"
+#include "SmokeCloud.h"
 #include "KnightHUD.h"
 #include "Terrain.h"
 #include "Engine/World.h"
@@ -169,6 +170,8 @@ void AKnightGameMode::BeginPlay()
 	{
 		const FVector2D HP(650.f, 420.f);
 		World->SpawnActor<AHorse>(FVector(HP.X, HP.Y, JeebTerrain::HeightAt(HP.X, HP.Y)), FRotator(0.f, 200.f, 0.f));
+		// A cloud of purple poison smoke a few metres from the horse, to see how a hazard looks and feels
+		World->SpawnActor<ASmokeCloud>(FVector(HP.X + 380.f, HP.Y, JeebTerrain::HeightAt(HP.X + 380.f, HP.Y)), FRotator::ZeroRotator);
 	}
 
 	// The woods (thousands of trees, a redwood grove) plus a few trees close to the start

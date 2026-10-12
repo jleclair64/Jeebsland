@@ -1196,11 +1196,11 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 {
 	if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || bMounted || GetCharacterMovement()->IsFalling()) return false;
 	const FVector Me = GetActorLocation();
-	auto Float = [&](const FVector& P, float Up)   // a little toward the knight and up, so it hangs in front of the thing
+	auto Float = [&](const FVector& P, float Up)   // a hand's breadth toward the knight and up, so it hangs just in front of the thing
 	{
 		FVector To = Me - P;
 		To.Z = 0.f;
-		Out = P + To.GetSafeNormal() * 35.f + FVector(0.f, 0.f, Up);
+		Out = P + To.GetSafeNormal() * 10.f + FVector(0.f, 0.f, Up);   // right against the thing (the prompt is drawn on screen, so it can never sink into a wall)
 	};
 	bOutE = true;
 	int32 Idx = -1;

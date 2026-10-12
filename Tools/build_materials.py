@@ -419,6 +419,29 @@ def build_star():
     finish(mat, "M_Star")
 
 
+def build_smoke():
+    # A puff of poison smoke: unlit purple, denser toward the middle of each ball and wispy at the rim (a view-angle falloff),
+    # fading out where it meets the ground so it does not cut a hard line. Overlapping puffs make the cloud.
+    mat, g = unlit("M_Smoke", unreal.BlendMode.BLEND_TRANSLUCENT)
+    rim = g.node(unreal.MaterialExpressionFresnel, exponent=1.4, base_reflect_fraction=0.0)
+    core = g.one(unreal.MaterialExpressionOneMinus, rim)
+    rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
+    vary = g.add(g.mul(rnd, 0.5), 0.75)
+    opacity = g.muln(g.mul(g.muln(core, vary), 0.5), g.scalar("Density", 1.0))
+    try:
+        fade = g.node(unreal.MaterialExpressionDepthFade, fade_distance_default=90.0)
+        g.link(opacity, fade, "Opacity")
+        opacity = fade
+    except Exception as e:
+        unreal.log("MATDIAG depth fade skipped: " + str(e))
+    g.out(g.one(unreal.MaterialExpressionSaturate, opacity), unreal.MaterialProperty.MP_OPACITY)
+    deep = g.const3((0.26, 0.03, 0.46)); light = g.const3((0.70, 0.34, 1.0))
+    hue = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(deep, hue, "A"); g.link(light, hue, "B"); g.link(rim, hue, "Alpha")
+    g.out(g.mul(hue, 1.3), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_Smoke")
+
+
 def build_streak():
     # A streak of light, brightest at the head (+U end) and fading along the tail and toward its edges
     mat, g = unlit("M_Streak", unreal.BlendMode.BLEND_ADDITIVE)
@@ -569,6 +592,7 @@ build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,      
 build_bark(imported(gen_textures.bark(), "T_Bark"))
 
 build_star()
+build_smoke()
 build_streak()
 build_moon(imported(gen_textures.moon(), "T_Moon"))
 build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
