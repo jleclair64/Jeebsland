@@ -225,7 +225,7 @@ void AKnightCharacter::TickCape(float Dt)
 {
 	if (!CapeCloth || !UpperPivot || !CapeCloth->IsVisible()) { bCapeInit = false; return; }
 	const int32 N = CapeNX * CapeNY;
-	const float Length = 64.f, WTop = 32.f, WBot = 44.f;   // from the shoulders to the upper thigh
+	const float Length = 68.f, WTop = 36.f, WBot = 56.f;   // from the shoulders to the upper thigh
 	const float DV = Length / (CapeNY - 1);
 	auto Idx = [](int32 i, int32 j) { return j * CapeNX + i; };
 	const FTransform Up = UpperPivot->GetComponentTransform();
@@ -276,8 +276,8 @@ void AKnightCharacter::TickCape(float Dt)
 				// A very heavy cloth (twice the old weight): slow, low ripples, and the wind of running barely lifts it (gravity wins)
 				const FVector Ripple = (Side * FMath::Sin(CapeTime * 3.6f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 2.6f - j * 0.5f) * 0.4f)
 				                     * (7.f + 0.17f * Speed) * Down;
-				const FVector Force = FVector(0.f, 0.f, -1700.f) - Fwd * (0.4f * Speed) + FVector(0.f, 0.f, 0.06f * Speed) + Ripple;
-				const FVector V = (CapeP[k] - CapePrev[k]) * 0.93f;   // more drag: it swings slowly and settles quickly
+				const FVector Force = FVector(0.f, 0.f, -2200.f) - Fwd * (0.4f * Speed) + FVector(0.f, 0.f, 0.06f * Speed) + Ripple;
+				const FVector V = (CapeP[k] - CapePrev[k]) * 0.9f;   // more drag: it swings slowly and settles quickly
 				CapePrev[k] = CapeP[k];
 				CapeP[k] += V + Force * H * H;
 			}
@@ -327,6 +327,8 @@ void AKnightCharacter::TickCape(float Dt)
 			Nrm.Add(Nm);
 			UV.Add(FVector2D(float(i) / (CapeNX - 1), float(j) / (CapeNY - 1)));
 		}
+	// a thick, heavy cloth: a second layer 1.6 cm inside, joined round the edges, so it never reads as a sheet of paper
+	for (int32 k = 0; k < N; ++k) { V.Add(V[k] - Nrm[k] * 1.6f); Nrm.Add(-Nrm[k]); UV.Add(UV[k]); }
 	if (!bCapeMeshMade)
 	{
 		TArray<int32> Tris;
@@ -335,7 +337,11 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				const int32 A = Idx(i, j), B = Idx(i + 1, j), C = Idx(i, j + 1), D = Idx(i + 1, j + 1);
 				Tris.Append({ A, B, D, A, D, C });
+				Tris.Append({ N + A, N + D, N + B, N + A, N + C, N + D });
 			}
+		auto Rim = [&](int32 P, int32 Q) { Tris.Append({ P, Q, N + Q, P, N + Q, N + P }); };
+		for (int32 i = 0; i + 1 < CapeNX; ++i) { Rim(Idx(i, 0), Idx(i + 1, 0)); Rim(Idx(i + 1, CapeNY - 1), Idx(i, CapeNY - 1)); }
+		for (int32 j = 0; j + 1 < CapeNY; ++j) { Rim(Idx(0, j + 1), Idx(0, j)); Rim(Idx(CapeNX - 1, j), Idx(CapeNX - 1, j + 1)); }
 		CapeCloth->CreateMeshSection_LinearColor(0, V, Tris, Nrm, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
 		if (CapeMid) CapeCloth->SetMaterial(0, CapeMid);
 		bCapeMeshMade = true;
@@ -2033,7 +2039,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
 	// points and sidestep or back up instead of turning round, a little slower than walking (forward 60%, sidestep 50%, back 40%).
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
-	const bool bStance = bBlocking && ShieldActive() && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
+	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
 	if (bStance && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
@@ -2092,7 +2098,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float CS = FMath::Sin(ClimbPhase);
 	const float Air = AirAlpha;
 	const float Ground = 1.f - Air;
-	const float Duck = FMath::Max(CrouchAlpha, 0.5f * BlockAlpha) * Ground; // how low the knight is sitting
+	const float Duck = FMath::Max(CrouchAlpha, 0.8f * BlockAlpha) * Ground; // how low the knight is sitting
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
 	// ---------- Gait clock: faster strides when running ----------
@@ -2127,7 +2133,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	{
 		const FVector LV = GetActorRotation().UnrotateVector(FVector(Vel.X, Vel.Y, 0.f));
 		float Fw = 1.f, Sd = 0.f;
-		if (bBlocking && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
+		if (bBlockHeld && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
 		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
 		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
 	}
@@ -2471,7 +2477,7 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 	if (!bMounted)
 	{
 		// Shield up: a combat stance. Move relative to the camera (which is where you face), so A and D sidestep and S backs up.
-		if (bBlocking && ShieldActive() && !bRolling && !bSliding && !bClimbing && !bSitting && GetController())
+		if (bBlockHeld && !bRolling && !bSliding && !bClimbing && !bSitting && GetController())
 		{
 			const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
 			AddMovementInput(FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), Forward);
