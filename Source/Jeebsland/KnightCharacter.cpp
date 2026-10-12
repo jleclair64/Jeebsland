@@ -661,6 +661,10 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(DodgeLAction, EKeys::A);
 	DodgeRAction = MakeBool(TEXT("KnightDodgeR"));
 	KnightContext->MapKey(DodgeRAction, EKeys::D);
+	DodgeFAction = MakeBool(TEXT("KnightDodgeF"));
+	KnightContext->MapKey(DodgeFAction, EKeys::W);
+	DodgeBAction = MakeBool(TEXT("KnightDodgeB"));
+	KnightContext->MapKey(DodgeBAction, EKeys::S);
 	KnightContext->MapKey(SitAction, EKeys::E);
 
 	{
@@ -740,6 +744,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
 		EIC->BindAction(DodgeLAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeLeft);
 		EIC->BindAction(DodgeRAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeRight);
+		EIC->BindAction(DodgeFAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeFwd);
+		EIC->BindAction(DodgeBAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeBack);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
@@ -2392,7 +2398,17 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 	const float Dt = GetWorld()->GetDeltaSeconds();
 	const float Speed = GetVelocity().Size2D();
 	const float TurnRate = FMath::Clamp(FMath::RadiansToDegrees(Speed / 175.f), 70.f, 230.f);   // degrees per second
-	if (!FMath::IsNearlyZero(Right))
+	if (Forward > 0.1f && GetController())
+	{
+		// Moving forward, the horse follows the camera like the knight does on foot: turn the mouse and it swings round that way
+		// (A and D bend the direction further left or right of where the camera points), at its tight turning rate.
+		const FRotator Cam(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		const FVector Want = FRotationMatrix(Cam).GetUnitAxis(EAxis::X) * Forward + FRotationMatrix(Cam).GetUnitAxis(EAxis::Y) * Right;
+		const float Cur = GetActorRotation().Yaw;
+		const float Delta = FMath::FindDeltaAngleDegrees(Cur, Want.Rotation().Yaw);
+		SetActorRotation(FRotator(0.f, Cur + FMath::Clamp(Delta, -TurnRate * Dt, TurnRate * Dt), 0.f));
+	}
+	else if (!FMath::IsNearlyZero(Right))
 		SetActorRotation(FRotator(0.f, GetActorRotation().Yaw + Right * TurnRate * Dt, 0.f));
 	if (Forward < -0.1f)
 	{
@@ -2421,17 +2437,19 @@ void AKnightCharacter::SetPanelAlways(bool bOn)
 	if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
 }
 
-// A or D tapped twice within a quarter second, with the shield up: a roll to that side (relative to the camera)
-void AKnightCharacter::Dodge(float Side)
+// A movement key (A, D, W or S) tapped twice within a quarter second, always (shield or not): a roll that way, relative to the
+// camera. Any other movement key pressed in between breaks the pair, so "A D A D" (strafing back and forth) never rolls.
+void AKnightCharacter::TapKey(int32 Key)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
-	double& Last = Side < 0.f ? LastTapA : LastTapD;
-	const bool bDouble = (Now - Last) < 0.28;
-	Last = Now;
-	if (!bDouble || !bBlocking || bMounted || IsUIOpen() || !GetController()) return;
+	const bool bDouble = (Key == LastTapKey) && (Now - LastTapTime) < 0.28;
+	LastTapKey = Key;
+	LastTapTime = Now;
+	if (!bDouble || bMounted || IsUIOpen() || !GetController()) return;
 	const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
-	PendingRollDir = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * Side;
-	Last = -10.0;   // a third tap does not start another
+	const FVector Fwd = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), Right = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y);
+	PendingRollDir = Key == 0 ? -Right : (Key == 1 ? Right : (Key == 2 ? Fwd : -Fwd));
+	LastTapKey = -1;   // a third tap does not start another
 	StartRoll();
 	PendingRollDir = FVector::ZeroVector;
 }

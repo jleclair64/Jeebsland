@@ -1174,7 +1174,9 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 // ===================================================================================================
 void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 {
-	// Filled by thin horizontal strips (works for any shape whose rows are one solid run)
+	// A smooth (anti-aliased) fill, for the item and skill pictures. Each pixel row is sampled at three heights; the middle of
+	// the shape is one solid bar, and the edge pixels get a share of the colour in proportion to how much of them the shape
+	// covers. Works for any shape whose rows are one solid run.
 	if (Src.Num() < 3) return;
 	TArray<FVector2D> P = Src;
 	if (!FMath::IsNearlyZero(IconTiltDeg))   // lean the whole picture about its centre
@@ -1188,31 +1190,78 @@ void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 	}
 	float MinY = P[0].Y, MaxY = P[0].Y;
 	for (const FVector2D& V : P) { MinY = FMath::Min(MinY, V.Y); MaxY = FMath::Max(MaxY, V.Y); }
-	const float Step = PolyStep;
-	for (float Y = MinY + Step * 0.5f; Y < MaxY; Y += Step)
+	constexpr int32 Subs = 3;
+	for (int32 Row = FMath::FloorToInt(MinY); Row < FMath::CeilToInt(MaxY); ++Row)
 	{
-		float X0 = 1e9f, X1 = -1e9f;
-		for (int32 i = 0; i < P.Num(); ++i)
+		float A[Subs], B[Subs];
+		bool Has[Subs];
+		bool bAll = true, bAny = false;
+		float MinA = 1e9f, MaxB = -1e9f, CoreL = -1e9f, CoreR = 1e9f;
+		for (int32 k = 0; k < Subs; ++k)
 		{
-			const FVector2D& A = P[i];
-			const FVector2D& B = P[(i + 1) % P.Num()];
-			if ((A.Y <= Y && B.Y > Y) || (B.Y <= Y && A.Y > Y))
+			const float Y = Row + (k + 0.5f) / Subs;
+			float X0 = 1e9f, X1 = -1e9f;
+			for (int32 i = 0; i < P.Num(); ++i)
 			{
-				const float X = A.X + (Y - A.Y) / (B.Y - A.Y) * (B.X - A.X);
-				X0 = FMath::Min(X0, X);
-				X1 = FMath::Max(X1, X);
+				const FVector2D& Pa = P[i];
+				const FVector2D& Pb = P[(i + 1) % P.Num()];
+				if ((Pa.Y <= Y && Pb.Y > Y) || (Pb.Y <= Y && Pa.Y > Y))
+				{
+					const float X = Pa.X + (Y - Pa.Y) / (Pb.Y - Pa.Y) * (Pb.X - Pa.X);
+					X0 = FMath::Min(X0, X);
+					X1 = FMath::Max(X1, X);
+				}
+			}
+			Has[k] = X1 > X0;
+			A[k] = X0; B[k] = X1;
+			if (Has[k]) { bAny = true; MinA = FMath::Min(MinA, X0); MaxB = FMath::Max(MaxB, X1); CoreL = FMath::Max(CoreL, X0); CoreR = FMath::Min(CoreR, X1); }
+			else bAll = false;
+		}
+		if (!bAny) continue;
+		auto Cover = [&](int32 Col)   // how much of the pixel (Col, Row) the shape covers, 0..1
+		{
+			float S = 0.f;
+			for (int32 k = 0; k < Subs; ++k)
+				if (Has[k]) S += FMath::Max(0.f, FMath::Min(float(Col + 1), B[k]) - FMath::Max(float(Col), A[k]));
+			return S / Subs;
+		};
+		auto Run = [&](int32 Col0, int32 Col1)   // pixels Col0 .. Col1-1: equal coverage is drawn as one bar
+		{
+			int32 Start = Col0;
+			float Cur = Cover(Col0);
+			for (int32 Col = Col0 + 1; Col <= Col1; ++Col)
+			{
+				const float Cv = (Col < Col1) ? Cover(Col) : -1.f;
+				if (Col == Col1 || FMath::Abs(Cv - Cur) > 0.03f)
+				{
+					if (Cur > 0.02f) DrawRect(FLinearColor(C.R, C.G, C.B, C.A * FMath::Min(Cur, 1.f)), float(Start), float(Row), float(Col - Start), 1.f);
+					Start = Col; Cur = Cv;
+				}
+			}
+		};
+		const int32 C0 = FMath::FloorToInt(MinA), C1 = FMath::CeilToInt(MaxB);
+		if (bAll && CoreR - CoreL > 1.f)
+		{
+			const int32 SL = FMath::CeilToInt(CoreL), SR = FMath::FloorToInt(CoreR);
+			if (SR > SL)
+			{
+				if (SL > C0) Run(C0, SL);
+				DrawRect(C, float(SL), float(Row), float(SR - SL), 1.f);
+				if (C1 > SR) Run(SR, C1);
+				continue;
 			}
 		}
-		if (X1 > X0) DrawRect(C, X0, Y - Step * 0.5f, X1 - X0, Step + 0.3f);
+		Run(C0, C1);
 	}
 }
 
 void AKnightHUD::Disc(float Cx, float Cy, float Rx, float Ry, const FLinearColor& C)
 {
 	TArray<FVector2D> P;
-	for (int32 i = 0; i < 18; ++i)
+	const int32 N = 32;
+	for (int32 i = 0; i < N; ++i)
 	{
-		const float A = i * 2.f * PI / 18.f;
+		const float A = i * 2.f * PI / N;
 		P.Add(FVector2D(Cx + FMath::Cos(A) * Rx, Cy + FMath::Sin(A) * Ry));
 	}
 	Poly(P, C);

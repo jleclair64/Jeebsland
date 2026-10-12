@@ -26,11 +26,13 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Check first next time:** frame rate (volumetric clouds, many leaf cards, leaf shadows; if slow, thin leaf cards or drop leaf shadows first); whether stars draw over the new clouds at low sun; cape motion; trunk lighting on the sun side.
 
 **Decisions and preferences:**
+- Icon pictures are drawn with an anti-aliased fill (`AKnightHUD::Poly`): keep using it for any new icon.
 - HUD text must go through `HDText` / `HDTextSize` (sharp, size-matched font copies), never `DrawText` directly.
 - Settings (O) screen is opaque dark grey. Fancy lighting always starts ON (not loaded from the saved config).
 - Conversation text: large; the words start at the left and wrap at about the middle of the screen; no "Press E" hint.
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
+- Double-tap A / D / W / S (any other movement key in between cancels it) rolls that way, shield or not; 1 s cooldown. The horse follows the mouse (camera) when W is held, like the knight does on foot.
 - Riding steers like a car (`AKnightCharacter::DoMove`): W forward, A/D turn on a very tight radius (~1.75 m), S backs up slowly (half the knight's walk, never sprints), no sideways movement. On foot there is no backing up in normal movement; with the shield up the knight is in a combat stance (faces the camera, sidesteps and backs up at 50-60% walk speed, no sprint).
 - Village palisade wood uses `M_WoodV`/`M_WoodH` (painted grain texture T_Wood from gen_textures.py: logs use the mesh UVs, beams follow their long axis); other buildings still use flat colours. The first bark-blob wood looked fake: avoid contour-line patterns.
 - Candles and carved pumpkins glow via `M_Flame` halos plus flickering point lights (see AutumnDecor.cpp); every 4th candle and every 2nd lit pumpkin has a real light.
