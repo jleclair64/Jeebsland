@@ -329,6 +329,7 @@ private:
 	static constexpr float RestLean = 0.f;    // at ease the chest leans this far forward
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
+	FVector CapeRootPrev = FVector::ZeroVector; bool bCapeRootSet = false;
 	bool bCapeMeshMade = false;
 	float CapeAccum = 0.f;
 	float CapeTime = 0.f;

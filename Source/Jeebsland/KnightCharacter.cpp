@@ -241,6 +241,7 @@ void AKnightCharacter::TickCape(float Dt)
 				CapeP[Idx(i, j)] = P; CapePrev[Idx(i, j)] = P;
 			}
 		bCapeInit = true;
+		bCapeRootSet = false;
 		CapeAccum = 0.f;
 	}
 
@@ -252,7 +253,18 @@ void AKnightCharacter::TickCape(float Dt)
 	CapeTime += Dt;
 
 	constexpr float H = 1.f / 90.f;   // fixed small steps, so it behaves the same at any frame rate
-	CapeAccum = FMath::Min(CapeAccum + Dt, 4.f * H);
+	CapeAccum = FMath::Min(CapeAccum + Dt, 8.f * H);
+	// The cloth is carried up and down with most of the body's own rise and fall (a jump, a landing), so it only has to
+	// swing with what is left: no sudden stretching and snapping back when the knight leaps
+	{
+		const FVector Root = GetActorLocation();
+		if (bCapeRootSet)
+		{
+			const FVector Carry(0.f, 0.f, (Root.Z - CapeRootPrev.Z) * 0.8f);   // up and down only: running still trails it behind
+			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] += Carry; CapePrev[k] += Carry; }
+		}
+		CapeRootPrev = Root; bCapeRootSet = true;
+	}
 	auto Link = [&](int32 a, int32 b, float Rest, float Stiff)
 	{
 		const FVector D = CapeP[b] - CapeP[a];
@@ -282,7 +294,7 @@ void AKnightCharacter::TickCape(float Dt)
 				CapeP[k] += V + Force * H * H;
 			}
 		// Keep its shape: links across, down, diagonally, and every other point down (stiffer, so it folds rather than crumples)
-		for (int32 It = 0; It < 6; ++It)
+		for (int32 It = 0; It < 8; ++It)
 		{
 			for (int32 i = 0; i < CapeNX; ++i) CapeP[Idx(i, 0)] = CapePin(i);
 			for (int32 j = 0; j < CapeNY; ++j)
@@ -306,7 +318,7 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				float Lim = L.Z > 10.f ? -20.5f : -21.5f;   // the back of the breastplate, then the mail skirt
+				float Lim = FMath::Lerp(-21.5f, -20.5f, FMath::Clamp((L.Z - 5.f) / 10.f, 0.f, 1.f));   // the back of the breastplate, easing into the mail skirt (no sudden step for points to jump across)
 				if (bStowed && L.Z > -9.f) Lim = -34.f;   // and over the shield when it is on the back
 				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
 			}
@@ -329,7 +341,7 @@ void AKnightCharacter::TickCape(float Dt)
 		}
 	// a thick, heavy cloth: a second layer 1.6 cm inside, joined round the edges, so it never reads as a sheet of paper
 	V.Reserve(2 * N); Nrm.Reserve(2 * N); UV.Reserve(2 * N);
-	for (int32 k = 0; k < N; ++k) { const FVector P = V[k] - Nrm[k] * 1.6f, Nk = -Nrm[k]; const FVector2D Uk = UV[k]; V.Add(P); Nrm.Add(Nk); UV.Add(Uk); }
+	for (int32 k = 0; k < N; ++k) { const FVector P = V[k] - Nrm[k] * 3.0f, Nk = -Nrm[k]; const FVector2D Uk = UV[k]; V.Add(P); Nrm.Add(Nk); UV.Add(Uk); }
 	if (!bCapeMeshMade)
 	{
 		TArray<int32> Tris;
