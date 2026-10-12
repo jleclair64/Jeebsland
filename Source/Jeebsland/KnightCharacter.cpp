@@ -20,6 +20,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Terrain.h"
 #include "GrassField.h"
+#include "Canopy.h"
 #include "Pig.h"
 #include "Inventory.h"
 #include "Npc.h"
@@ -70,9 +71,9 @@ AKnightCharacter::AKnightCharacter()
 		DustISM->SetUsingAbsoluteScale(true);
 		// little clods of dirt and blades of grass kicked up by the feet (cubes, squashed to shape)
 		ConstructorHelpers::FObjectFinder<UStaticMesh> BitMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-		for (UInstancedStaticMeshComponent** Slot : { &ClodISM, &BladeISM })
+		for (UInstancedStaticMeshComponent** Slot : { &ClodISM, &BladeISM, &LeafAISM, &LeafBISM })
 		{
-			UInstancedStaticMeshComponent* I = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Slot == &ClodISM ? TEXT("Clods") : TEXT("Blades"));
+			UInstancedStaticMeshComponent* I = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Slot == &ClodISM ? TEXT("Clods") : Slot == &BladeISM ? TEXT("Blades") : Slot == &LeafAISM ? TEXT("LeavesA") : TEXT("LeavesB"));
 			I->SetupAttachment(RootComponent);
 			I->SetStaticMesh(BitMesh.Object);
 			I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -207,7 +208,7 @@ void AKnightCharacter::BeginPlay()
 		{
 			DM->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.50f, 0.40f, 0.26f));
 		}
-		Clods.SetNum(48); Blades.SetNum(30);
+		Clods.SetNum(48); Blades.SetNum(30); LeavesA.SetNum(24); LeavesB.SetNum(24);
 		auto Prep = [&](UInstancedStaticMeshComponent* I, int32 N, const FLinearColor& C)
 		{
 			TArray<FTransform> H;
@@ -217,6 +218,8 @@ void AKnightCharacter::BeginPlay()
 		};
 		Prep(ClodISM, Clods.Num(), FLinearColor(0.27f, 0.17f, 0.09f));    // the path's soil
 		Prep(BladeISM, Blades.Num(), FLinearColor(0.34f, 0.62f, 0.14f));  // fresh grass green (bright enough to show against the field)
+		Prep(LeafAISM, LeavesA.Num(), FLinearColor(0.95f, 0.42f, 0.06f));   // fallen leaves: orange
+		Prep(LeafBISM, LeavesB.Num(), FLinearColor(0.62f, 0.12f, 0.04f));   // and deep red
 	}
 
 	BuildKnight();
@@ -1671,6 +1674,8 @@ void AKnightCharacter::Kick(const FVector& Foot, float Strength)
 {
 	const int32 G = GroundUnderfoot();
 	if (G == 0 || Clods.Num() == 0 || Blades.Num() == 0) return;
+	// under the broad-leaf trees the ground is carpeted with fallen leaves: kick some of those up as well
+	const bool bLeaves = JeebCanopy::Cover(Foot.X, Foot.Y) > 0.3f && LeavesA.Num() > 0;
 	const FVector Back = -GetActorForwardVector(), Side = GetActorRightVector();
 	auto Launch = [&](FBit& B, float Up, float Out, float SpinMax)
 	{
@@ -1696,7 +1701,7 @@ void AKnightCharacter::Kick(const FVector& Foot, float Strength)
 		}
 		// (no round puff: just the soil itself)
 	}
-	else
+	else if (!bLeaves)
 	{
 		// grass: a blade or two flicked up (three on a hard landing)
 		const int32 N = Strength >= 1.4f ? 5 : (FMath::FRand() < 0.5f ? 2 : 3);
@@ -1708,6 +1713,21 @@ void AKnightCharacter::Kick(const FVector& Foot, float Strength)
 			B.Size = FVector(0.008f, FMath::FRandRange(0.024f, 0.034f), FMath::FRandRange(0.12f, 0.17f));   // 12-17 cm blades
 			B.Life = FMath::FRandRange(1.0f, 1.4f);
 		}
+	}
+	if (bLeaves)
+	{
+		// a little flurry of orange and red leaves that flutter back down
+		const int32 N = Strength >= 1.4f ? 8 : FMath::RandRange(3, 5);
+		for (int32 i = 0; i < N; ++i)
+		{
+			TArray<FBit>& Pile = (i % 3 == 2) ? LeavesB : LeavesA;
+			FBit& B = Pile[(LeafNext + i) % Pile.Num()];
+			Launch(B, 210.f, 85.f, 7.f);
+			const float S = FMath::FRandRange(0.9f, 1.3f);
+			B.Size = FVector(0.065f * S, 0.05f * S, 0.004f);   // a leaf about 6 by 5 cm
+			B.Life = FMath::FRandRange(1.4f, 2.0f);
+		}
+		LeafNext = (LeafNext + N) % 24;
 	}
 }
 
@@ -2652,6 +2672,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	}
 	TickBits(Clods, ClodISM, Dt, 980.f, 0.6f);    // clods: heavy, they drop straight back
 	TickBits(Blades, BladeISM, Dt, 520.f, 2.4f);  // blades: light, they flutter down
+	TickBits(LeavesA, LeafAISM, Dt, 380.f, 3.2f);  // leaves: lightest, they drift down
+	TickBits(LeavesB, LeafBISM, Dt, 380.f, 3.2f);
 }
 
 void AKnightCharacter::HurtHorse(float Amount)

@@ -256,6 +256,8 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* DustISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* ClodISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* BladeISM = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* LeafAISM = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* LeafBISM = nullptr;
 	UPROPERTY() UInputModifierScalar* LookScalar = nullptr;
 	bool bSettingsOpen = false;
 	bool bInventoryOpen = false;
@@ -409,8 +411,8 @@ private:
 	// What the feet kick up, by what they are on: dirt clods (and a faint puff) on a path, a few grass blades in the grass,
 	// nothing on stone, wood or indoors. Small pieces with a little physics: they fly, tumble, land and fade.
 	struct FBit { FVector Pos = FVector::ZeroVector, Vel = FVector::ZeroVector; FQuat Rot = FQuat::Identity; FVector Spin = FVector::ZeroVector; FVector Size = FVector(1.f); float Age = 99.f, Life = 1.f, Floor = 0.f; };
-	TArray<FBit> Clods, Blades;
-	int32 ClodNext = 0, BladeNext = 0;
+	TArray<FBit> Clods, Blades, LeavesA, LeavesB;   // (leaves under the trees: orange and deep red)
+	int32 ClodNext = 0, BladeNext = 0, LeafNext = 0;
 	int32 GroundUnderfoot() const;   // 0 none (stone, wood, indoors, water), 1 a dirt path, 2 grass
 	void Kick(const FVector& Foot, float Strength);
 	static void TickBits(TArray<FBit>& Bits, UInstancedStaticMeshComponent* ISM, float Dt, float Gravity, float Drag);
