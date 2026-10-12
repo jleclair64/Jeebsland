@@ -161,14 +161,15 @@ void AKnightCharacter::BeginPlay()
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
 	if (Skills) Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 
-	// Saved choices (resolution, side panel). Fancy lighting always starts on, whatever was saved.
+	// Saved choices (side panel). Graphics always start low: fancy lighting off, 60% resolution.
 	if (GConfig)
 	{
-		// (fancy lighting is not loaded: it starts on every time)
-		GConfig->GetFloat(TEXT("Jeebsland"), TEXT("RenderScale"), RenderScale, GGameUserSettingsIni);
+		
+		// (resolution is not loaded either: the game always starts on low graphics, and you raise them in Settings)
 		GConfig->GetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
 	}
-	bFancyLighting = true;
+	bFancyLighting = false;   // fancy lighting starts off every time
+	RenderScale = 0.6f;       // and a low render resolution
 	ApplyGraphics();
 	UpperBase = UpperPivot->GetRelativeLocation();
 	LeftBase = ArmPivotL->GetRelativeLocation();

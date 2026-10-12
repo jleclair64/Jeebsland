@@ -269,8 +269,8 @@ private:
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;
-	bool bFancyLighting = true;    // Lumen global illumination, reflections and volumetric clouds
-	float RenderScale = 1.f;       // 0.5 - 1.0 of the screen resolution
+	bool bFancyLighting = false;   // Lumen global illumination, reflections and volumetric clouds
+	float RenderScale = 0.6f;     // 0.5 - 1.0 of the screen resolution
 	void ApplyGraphics();
 	float LookSensitivity = 0.5f; // 1.0 = the original (fast) speed
 	FVector GatherStart = FVector::ZeroVector;

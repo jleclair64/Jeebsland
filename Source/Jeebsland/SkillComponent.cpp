@@ -395,11 +395,35 @@ void USkillComponent::FillPracticePack()
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Cape, K_Ring, K_Amulet };
-	for (int32 i = 0; i < Slots.Num(); ++i)
+	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;
 		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
 		Slots[i].Id = GearId(K, R.RandRange(0, 4));
 		Slots[i].Count = 1;
 	}
+}
+
+int32* USkillComponent::WornSlotPtr(int32 Kind, bool bSecond)
+{
+	if (Kind == JeebItems::K_Ring) return bSecond ? &RingB : &Worn[JeebItems::K_Ring];
+	if (Kind < 0 || Kind >= NumWornKinds) return nullptr;
+	return &Worn[Kind];
+}
+
+bool USkillComponent::SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond)
+{
+	if (!Slots.IsValidIndex(InvIdx)) return false;
+	FInvSlot& S = Slots[InvIdx];
+	if (S.Id == 0 || !JeebItems::IsGear(S.Id)) return false;
+	const int32 IK = JeebItems::KindOf(S.Id);
+	const bool bMiscSlot = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
+	if (bMiscSlot ? !JeebItems::IsAccessoryKind(IK) : IK != Kind) return false;   // the item has to belong in that slot
+	int32* Target = WornSlotPtr(Kind, bSecond);
+	if (!Target) return false;
+	const int32 Old = *Target;
+	*Target = S.Id;
+	S.Id = Old;
+	S.Count = Old ? 1 : 0;
+	return true;
 }

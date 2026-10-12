@@ -103,6 +103,9 @@ public:
 	bool SwapInvHotbar(int32 InvIdx, int32 H);   // the bar slot and the pack slot trade places (either may be empty)
 	bool SwapInv(int32 A, int32 B);
 	bool SwapHotbar(int32 A, int32 B);
+	// Armour and other worn gear: the pack item and the worn slot trade places if the item belongs there
+	int32* WornSlotPtr(int32 Kind, bool bSecond);   // the int that holds that worn slot (the three misc slots are Worn[K_Ring], RingB and Worn[K_Amulet])
+	bool SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond);
 	void FillPracticePack();                     // stocks the pack with random weapons and armour (for trying out swaps)
 	bool UnequipWorn(int32 Kind, bool bSecondRing = false);
 

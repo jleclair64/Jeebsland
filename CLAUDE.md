@@ -28,7 +28,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 **Decisions and preferences:**
 - Icon pictures are drawn with an anti-aliased fill (`AKnightHUD::Poly`): keep using it for any new icon.
 - HUD text must go through `HDText` / `HDTextSize` (sharp, size-matched font copies), never `DrawText` directly.
-- Settings (O) screen is opaque dark grey. Fancy lighting always starts ON (not loaded from the saved config).
+- Settings (O) screen is opaque dark grey. Graphics ALWAYS start low (fancy lighting off, render scale 60%), not loaded from the saved config; raise them in Settings each session (owner changed their mind from "always on").
 - Conversation text: large; the words start at the left and wrap at about the middle of the screen; no "Press E" hint.
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
@@ -61,6 +61,13 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 - **Shield stance stepping**: legs step backwards or sideways in the shield-up stance (`StepFw`/`StepSd` in Tick).
 - **Pen knight** (`AFoeKnight`, FoeKnight.cpp): replaces the pigs. Iron armour, sword and kite shield, 90 HP, hits 11-15 raw, 0.65 s overhead windup tell, sometimes raises his shield after being hit (stops 70%), never leaves the pen, drops a small purse and respawns 20 s after defeat. Tuning constants are at the top of FoeKnight.h. (Pigs, and with them pork, are gone; `APig` is unused.)
 - Cape: heavier cloth settings; the pale back panel of the tabard was removed (it showed as a white patch under the cape).
+
+## Pending: for a fresh Opus 5.5 (high effort) session. Remind the owner at the end of every session until done.
+
+1. **Death boxes and loot windows.** On death everything (pack and worn armour and weapons) drops into a box others can loot; the dead player respawns in Blackrock wearing the DEFAULT starting armour. Pressing E on a box frees the cursor like Tab and opens the box's inventory and armor windows to the LEFT of the player's own windows; the box's equipped weapons get their own section above its armor window. Applies to every death (including the pen knight). Items can be taken out (drag/click).
+2. **Potions.** A potion slot left of the shield. Green: speed for 8 s (1 min cooldown). Red: instant heal (2 min cooldown). Purple: +50% health bar (1 min cooldown). Cooldown display on the slot. Still to decide: the key to use them, and where they come from (shop, drops, or at the start).
+3. **More than one shield.** New shield shapes modelled in code with their own looks and stats. (Shield guard numbers are low compared with the pen knight's 11-15 hits: maybe 3-4x.)
+4. Optional shield ideas the owner has not picked: perfect block (parry), guard-break stagger, shield bash, heavy-weapon guard drain.
 
 ## Checking visuals
 

@@ -382,7 +382,7 @@ void AKnightHUD::DrawHUD()
 	const bool bRightNow = PC && PC->IsInputKeyDown(EKeys::RightMouseButton);
 	bUIRightClick = bRightNow && !bRightWasDown;
 	bRightWasDown = bRightNow;
-	InvCellCount = 0; bHotCells = false; RectCount = 0;
+	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0;
 	TipLines.Reset();
 
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
@@ -2164,17 +2164,14 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		for (const FWornSlot& Ws : Worn)
 		{
 			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
+			WornCellX[WornCellCount] = X; WornCellY[WornCellCount] = Y; WornCellS = WS; WornKind[WornCellCount] = Ws.Kind; WornSecond[WornCellCount] = Ws.bSecond; ++WornCellCount;
 			const bool bOver = Hot(X, Y, WS, WS);
 			SlotTile(X, Y, WS, WS, bOver);
 			const int32 Id = Ws.bSecond ? Skills->RingB : Skills->Worn[Ws.Kind];
 			if (Id == 0) continue;
-			DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);
+			if (!(DragKind == 4 && bDragging && DragIdx == WornCellCount - 1)) DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);   // a piece being dragged leaves its slot
 			ItemBadges(Id, X, Y, WS);
-			if (bOver)
-			{
-				ItemTip(Id);
-				if (bUIClick) Knight->UnequipWorn(Ws.Kind, Ws.bSecond);
-			}
+			if (bOver) ItemTip(Id);
 		}
 		// Totals: offence is what the weapon in hand deals with every bonus counted (the middle of its range);
 		// defence is your armour with every bonus counted, plus your shield's guard when one is ready.
@@ -2596,6 +2593,12 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			for (int32 h = 0; h < 5 && DragKind == 0; ++h)
 				if (OverCell(HotCellX[h], HotCellY[h], HotCellS) && Sk->Hotbar[h] != 0) { DragKind = 2; DragIdx = h; DragId = Sk->Hotbar[h]; }
 		if (DragKind == 0 && InvCellCount > 0 && Sk->GetIngots() > 0 && OverCell(InvIngotX, InvIngotY, InvCellS)) { DragKind = 3; DragIdx = -1; DragId = 0; }
+		if (DragKind == 0)
+			for (int32 w = 0; w < WornCellCount && DragKind == 0; ++w)
+			{
+				int32* Wp = Sk->WornSlotPtr(WornKind[w], WornSecond[w]);
+				if (OverCell(WornCellX[w], WornCellY[w], WornCellS) && Wp && *Wp != 0) { DragKind = 4; DragIdx = w; DragId = *Wp; }
+			}
 		if (DragKind != 0) { DragStart = M; bDragging = false; }
 		else if (!OverWindows() && !OverBar()) Knight->SetPanelCursor(false);   // a click on nothing: leave pointer mode
 	}
@@ -2609,6 +2612,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		if (!bDragging)
 		{
 			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
+			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
 		}
 		else
 		{
@@ -2617,7 +2621,10 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			if (bHotCells) for (int32 h = 0; h < 5; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
 			if (DragKind == 1)
 			{
-				if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
+				int32 ToWorn = -1;
+				for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
+				if (ToWorn >= 0) bChanged = Sk->SwapInvWorn(DragIdx, WornKind[ToWorn], WornSecond[ToWorn]);   // onto a worn slot: swap
+				else if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
 				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
 				else if (!OverWindows() && !OverBar())
 				{
@@ -2631,6 +2638,15 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				if (ToInv >= 0) bChanged = Sk->SwapInvHotbar(ToInv, DragIdx);
 				else if (ToHot >= 0) bChanged = Sk->SwapHotbar(DragIdx, ToHot);
 				else if (!OverWindows() && !OverBar()) Knight->DropFromHotbar(DragIdx);
+			}
+			else if (DragKind == 4)
+			{
+				// a worn piece back to the pack: onto an empty cell it comes off (armour cannot be taken off, only swapped); onto a piece that belongs in that slot they swap
+				if (ToInv >= 0)
+				{
+					if (Sk->Slots[ToInv].Id == 0) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);
+					else bChanged = Sk->SwapInvWorn(ToInv, WornKind[DragIdx], WornSecond[DragIdx]);
+				}
 			}
 			else if (DragKind == 3 && !OverWindows() && !OverBar()) OpenDropBox(-1, 0, Sk->GetIngots());
 			if (bChanged) Knight->RefreshEquipment();   // the weapon in hand may have changed
