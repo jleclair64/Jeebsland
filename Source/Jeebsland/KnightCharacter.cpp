@@ -623,6 +623,9 @@ namespace
 				const FTransform InElbow(Q, Target - Q.RotateVector(Strap));
 				const FTransform ElbowInArm(FRotator(15.f, 0.f, -22.f).Quaternion(), PE - PA);
 				Out.InArm = InElbow * ElbowInArm;
+				// then turned 30 degrees about the upright through its strap (anticlockwise seen from above)
+				const FVector Pv = Out.InArm.TransformPosition(Strap);
+				Out.InArm = Out.InArm * FTransform(-Pv) * FTransform(FQuat(FVector::UpVector, FMath::DegreesToRadians(-30.f))) * FTransform(Pv);
 			}
 			// the shield's back (a plane, in the shoulder's frame) and the way it faces
 			const FVector Back = Out.InArm.TransformPosition(FVector(14.0, -41.0, 0.0));
