@@ -1,6 +1,7 @@
 #include "KnightCharacter.h"
 #include "KnightShieldRest.h"
 #include "JeebSave.h"
+#include "Net/UnrealNetwork.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -129,14 +130,15 @@ void AKnightCharacter::BeginPlay()
 	if (GetCharacterMovement()) AddTickPrerequisiteComponent(GetCharacterMovement());
 	PrevYaw = GetActorRotation().Yaw;
 	SpawnLoc = GetActorLocation();
-	// Pick up where you left off; with no save yet, start fresh with the temporary practice pack
-	if (Skills && !UJeebSave::Restore(Skills))
+	// Pick up where you left off; with no save yet, start fresh with the temporary practice pack. The save file on this PC is
+	// for single player only: in an online game the server will own every character (not built yet), so they start fresh.
+	if (Skills && !(UsesLocalSave() && UJeebSave::Restore(Skills)))
 	{
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 	}
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
-	GetWorldTimerManager().SetTimer(AutosaveTimer, this, &AKnightCharacter::Autosave, 60.f, true);
+	if (UsesLocalSave()) GetWorldTimerManager().SetTimer(AutosaveTimer, this, &AKnightCharacter::Autosave, 60.f, true);
 
 	// Saved choices (side panel). Graphics always start low: fancy lighting off, 60% resolution.
 	if (GConfig)
@@ -205,7 +207,55 @@ void AKnightCharacter::EndPlay(const EEndPlayReason::Type Reason)
 
 void AKnightCharacter::Autosave()
 {
-	if (Skills) UJeebSave::Save(Skills);
+	if (Skills && UsesLocalSave()) UJeebSave::Save(Skills);
+}
+
+bool AKnightCharacter::UsesLocalSave() const
+{
+	return GetNetMode() == NM_Standalone;
+}
+
+void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
+}
+
+void AKnightCharacter::SendLook()
+{
+	if (!Skills || GetNetMode() == NM_Standalone) return;
+	TArray<int32> Look;
+	Look.Reserve(USkillComponent::NumWornKinds + 2);
+	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Look.Add(Skills->Worn[i]);
+	Look.Add(Skills->RingB);
+	Look.Add(Skills->SelectedItem());
+	if (Look == RepLook) return;
+	RepLook = Look;
+	if (!HasAuthority()) ServerSetLook(Look);
+}
+
+void AKnightCharacter::ServerSetLook_Implementation(const TArray<int32>& Look)
+{
+	if (Look.Num() != USkillComponent::NumWornKinds + 2) return;
+	for (int32 Id : Look) if (Id < 0) return;
+	RepLook = Look;
+	ApplyLook(Look);   // the server's own copy matches too
+}
+
+void AKnightCharacter::OnRep_Look()
+{
+	if (!IsLocallyControlled()) ApplyLook(RepLook);
+}
+
+void AKnightCharacter::ApplyLook(const TArray<int32>& Look)
+{
+	if (!Skills || Look.Num() != USkillComponent::NumWornKinds + 2) return;
+	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = Look[i];
+	Skills->RingB = Look[USkillComponent::NumWornKinds];
+	Skills->Selected = 0;
+	Skills->Hotbar[0] = Look[USkillComponent::NumWornKinds + 1];
+	// The look can arrive before the body is built; BeginPlay dresses it then
+	if (HasActorBegunPlay()) RefreshEquipment();
 }
 
 void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -368,6 +418,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
+	if (IsLocallyControlled()) SendLook();   // online: let everyone see what we now wear and hold
+
 	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
 	if (!bPitchLimitsSet)
 	{

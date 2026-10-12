@@ -4,7 +4,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "KnightGameMode.generated.h"
 
-// Plays as the knight and spawns the meadow automatically.
+// The server's rules: plays as the knight, and decides where each player appears. Lives ONLY on the server (or in a
+// single-player game); the world itself is built by AKnightGameState, which every machine has.
 UCLASS()
 class AKnightGameMode : public AGameModeBase
 {
@@ -13,19 +14,10 @@ class AKnightGameMode : public AGameModeBase
 public:
 	AKnightGameMode();
 
-	virtual void Tick(float DeltaSeconds) override;
-
 protected:
-	virtual void BeginPlay() override;
+	// Every player starts on the meadow by the cottage, spread round a small ring so two never land on each other
+	virtual APawn* SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot) override;
 
 private:
-	TWeakObjectPtr<class AExponentialHeightFog> FogActor;
-	float FogNow = 0.012f;
-
-	// Test screenshot mode (-JeebShot)
-	bool bShotMode = false;
-	bool bShotTaken = false;
-	float ShotClock = 0.f;
-	FRotator ShotRot = FRotator::ZeroRotator;
-	FString ShotName = TEXT("shot");
+	int32 SpawnCount = 0;
 };

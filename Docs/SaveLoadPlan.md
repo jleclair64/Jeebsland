@@ -41,3 +41,9 @@ the shield and `PotionSlot`. So a save is mostly "write that component out, read
 5. Migration scaffolding + a test with a hand-edited old save.
 
 Suggested model: step 1-3 Sonnet 5.5 high (follows a clear pattern once this plan is agreed); item-id/migration design above was the Opus part.
+
+## UPDATE 2026-10-12: the game is going online (RuneScape style)
+The local `.sav` file is now single-player / test only (`AKnightCharacter::UsesLocalSave`). Online, the SERVER must own
+characters: same `UJeebSave` fields (still versioned, still validated on load), but loaded and saved by the server per
+account (first as one file per player name on the server, later a database behind an account service). Steps 2-5 above
+still apply, just run on the server. Nothing the client sends may write the save directly.

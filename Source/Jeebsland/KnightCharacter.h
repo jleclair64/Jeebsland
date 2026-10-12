@@ -164,6 +164,17 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
 	void Autosave();   // writes the player to disk (every minute, and when the game ends)
+	bool UsesLocalSave() const;   // single player only: online, the server will own characters
+
+	// Online: what this knight wears and holds (Worn[0..23], then RingB, then the held item), so other players see it.
+	// The owning player sends it up whenever it changes (SendLook, every tick, cheap); the server passes it on to everyone.
+	// TEMPORARY trust: the server takes the player's word for it until inventories are server-owned.
+	UPROPERTY(ReplicatedUsing = OnRep_Look) TArray<int32> RepLook;
+	UFUNCTION() void OnRep_Look();
+	UFUNCTION(Server, Reliable) void ServerSetLook(const TArray<int32>& Look);
+	void SendLook();
+	void ApplyLook(const TArray<int32>& Look);   // another player's knight: dress our copy of it
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	FTimerHandle AutosaveTimer;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
