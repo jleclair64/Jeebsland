@@ -610,12 +610,14 @@ void AKnightCharacter::HoldShield()
 		const FVector Fore = (E - W).GetSafeNormal();                       // along the forearm, towards the elbow
 		const FVector Up = FVector(0.573, 0.0, 0.819);                       // the shield's top: forward of the shoulder, its point behind (top tipped 20 degrees forward)
 		const FVector Want = FVector(0.676, -0.70, -0.181).GetSafeNormal();  // face turned to the front-left (diagonal), upright
-		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
+		// the shield's back runs parallel to the forearm (the arm lies flat behind it, so the glove never pokes through)
+		const FVector N = (Want - Fore * FVector::DotProduct(Want, Fore)).GetSafeNormal();
 		// the shield's face (+X) and its top (+Z); then turned 30 degrees about its face (anticlockwise seen from behind) so the
 		// forearm crosses its back from the elbow strap on one side to the hand grip on the other
 		const FQuat Q = FQuat(N, FMath::DegreesToRadians(-30.f)) * FRotationMatrix::MakeFromXZ(N, Up).ToQuat();
 		const FVector Strap(14.0, -41.0, -8.0);                               // a point on the shield's back, a third of the way down
-		const FVector Target = -Fore * 2.0 + N * 11.5 + FVector(5.0, 4.0, 0.0);   // and drawn a little round to the front                         // just below the elbow, outside the forearm
+		const FVector Round = FVector(5.0, 4.0, 0.0) - N * FVector::DotProduct(FVector(5.0, 4.0, 0.0), N);   // drawn a little round to the front, along its face
+		const FVector Target = -Fore * 2.0 + N * 12.0 + Round;               // just below the elbow, a hand's depth outside the forearm
 		return FTransform(Q, Target - Q.RotateVector(Strap));
 	}();
 	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
