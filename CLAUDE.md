@@ -3,7 +3,7 @@
 Unreal Engine 5.8 C++ project (Windows). Game code lives in `Source/Jeebsland/`. Most of the world (forest, village, castle, pond, etc.) is built procedurally in C++ actors rather than placed assets.
 
 - Default game mode: `KnightGameMode` (set in `Config/DefaultEngine.ini`); the world is built by `KnightGameState`. Map: `/Game/Field`.
-- `Variant_Combat`, `Variant_Platforming`, `Variant_SideScrolling` are UE template code, mostly unused.
+- The UE template code and content (Variant_*, Characters, ThirdPerson, LevelPrototyping, template game mode / controller) were deleted 2026-10-12. `AJeebslandCharacter` stays: it is the knight's base class (camera boom and camera). StateTree plugins are off.
 - `Game Updates.txt` is the owner's private notes. Don't read or act on it; requests come through chat.
 
 ## Model and effort

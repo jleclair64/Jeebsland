@@ -18,30 +18,13 @@ public class Jeebsland : ModuleRules
 			"Engine",
 			"InputCore",
 			"EnhancedInput",
-			"AIModule",
-			"StateTreeModule",
-			"GameplayStateTreeModule",
-			"UMG",
 			"Slate"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"Jeebsland",
-			"Jeebsland/Variant_Platforming",
-			"Jeebsland/Variant_Platforming/Animation",
-			"Jeebsland/Variant_Combat",
-			"Jeebsland/Variant_Combat/AI",
-			"Jeebsland/Variant_Combat/Animation",
-			"Jeebsland/Variant_Combat/Gameplay",
-			"Jeebsland/Variant_Combat/Interfaces",
-			"Jeebsland/Variant_Combat/UI",
-			"Jeebsland/Variant_SideScrolling",
-			"Jeebsland/Variant_SideScrolling/AI",
-			"Jeebsland/Variant_SideScrolling/Gameplay",
-			"Jeebsland/Variant_SideScrolling/Interfaces",
-			"Jeebsland/Variant_SideScrolling/UI"
+			"Jeebsland"
 		});
 
 		// Uncomment if you are using Slate UI

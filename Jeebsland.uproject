@@ -1,4 +1,4 @@
-﻿{
+{
     "FileVersion":  3,
     "EngineAssociation":  "5.8",
     "Category":  "",
@@ -9,9 +9,7 @@
                         "Type":  "Runtime",
                         "LoadingPhase":  "Default",
                         "AdditionalDependencies":  [
-                                                       "Engine",
-                                                       "AIModule",
-                                                       "UMG"
+                                                       "Engine"
                                                    ]
                     }
                 ],
@@ -25,11 +23,11 @@
                     },
                     {
                         "Name":  "StateTree",
-                        "Enabled":  true
+                        "Enabled":  false
                     },
                     {
                         "Name":  "GameplayStateTree",
-                        "Enabled":  true
+                        "Enabled":  false
                     },
                     {
                         "Name":  "ProceduralMeshComponent",
