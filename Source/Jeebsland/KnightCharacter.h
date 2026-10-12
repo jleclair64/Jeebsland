@@ -86,6 +86,12 @@ public:
 	// On a horse, steering is like a car: W goes forward along the horse, A and D turn it (it cannot slide sideways), S only brakes.
 	virtual void DoMove(float Right, float Forward) override;
 	virtual void Jump() override; // also stands you up from a bench, and ends a slide
+	// Online: what the knight stands on is never used as its "movement base" unless it is a shared (replicated) actor. The
+	// ground, Blackrock, the towers and forts are built separately on every machine, so the server can't name them to the
+	// player's machine: a correction that names one is thrown away there, and the two copies of the knight drift apart
+	// until the knight jumps (then it snaps to wherever the server had it).
+	using ACharacter::SetBase;
+	virtual void SetBase(FMovementBaseInterfaceData* Data, const FName BoneName = NAME_None, bool bNotifyActor = true) override;
 
 	// For the HUD
 	float GetStaminaFraction() const { return Stamina / MaxStamina; }

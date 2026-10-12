@@ -357,6 +357,18 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 // does the same on its copy, where the blows actually land; everyone else is shown the swing (MulticastAttack) and the
 // stance (RepMoveFlags).
 // ---------------------------------------------------------------------------------------------------
+void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName BoneName, bool bNotifyActor)
+{
+	if (Data)
+	{
+		const UObject* O = Data->GetMovementBaseObject();
+		const UActorComponent* C = Cast<UActorComponent>(O);
+		const AActor* A = C ? C->GetOwner() : Cast<AActor>(O);
+		if (!A || !A->GetIsReplicated()) Data = nullptr;   // (world-space positions instead: they always match)
+	}
+	Super::SetBase(Data, BoneName, bNotifyActor);
+}
+
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
 	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Cast) || Health <= 0.f) return;
