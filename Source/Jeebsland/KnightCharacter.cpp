@@ -2595,7 +2595,7 @@ void AKnightCharacter::DropBag(const TArray<FInvSlot>& Items, int32 Ingots)
 {
 	const FVector Where = GetActorLocation() + GetActorForwardVector() * 130.f;
 	const FVector Ground(Where.X, Where.Y, JeebTerrain::HeightAt(Where.X, Where.Y));
-	if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(Ground, FRotator::ZeroRotator)) Drop->Setup(ELootLook::Pack, Items, Ingots);
+	if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(Ground, FRotator::ZeroRotator)) Drop->Setup(Items.Num() <= 1 ? ELootLook::Item : ELootLook::Pack, Items, Ingots);   // one thing: show the thing itself
 }
 
 void AKnightCharacter::DropFromPack(int32 SlotIdx, int32 Count)

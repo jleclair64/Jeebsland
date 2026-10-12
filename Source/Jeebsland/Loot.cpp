@@ -8,6 +8,8 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "Engine/StaticMesh.h"
+#include "ProceduralMeshComponent.h"
+#include "ItemModels.h"
 
 ALootDrop::ALootDrop()
 {
@@ -56,6 +58,10 @@ void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 I
 		Paint(Flap, FLinearColor(0.90f, 0.86f, 0.74f), FVector(8, 6, 17), FVector(44, 7, 6), 70.f);
 		Paint(Tie, FLinearColor(0.90f, 0.86f, 0.74f), FVector(-8, -6, 17), FVector(34, 7, 6), -20.f);
 		break;
+	case ELootLook::Item:
+		Body->SetVisibility(false); Flap->SetVisibility(false); Tie->SetVisibility(false);
+		BuildItemLook();
+		break;
 	case ELootLook::Pack:
 	default:
 	{
@@ -71,7 +77,7 @@ void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 I
 		break;
 	}
 	}
-	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : 78.f);
+	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : Look == ELootLook::Item ? 46.f : 78.f);
 	Paint(Glow, FLinearColor(4.f, 3.f, 0.6f), GlowBase, FVector(9, 9, 9), 0.f);
 	SetLifeSpan(240.f);
 }
@@ -239,4 +245,52 @@ void ALootDrop::TakeIngots(AActor* Taker)
 	bool bAnyLeft = false;
 	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
 	if (!bAnyLeft) Destroy();
+}
+
+// A single dropped thing shows as itself (ItemModels.h): a stack of logs or ore shows a few, scattered and turned
+void ALootDrop::BuildItemLook()
+{
+	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	UMaterialInterface* MetalMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
+	TArray<JeebItemModel::FPart> Parts;
+	int32 Copies = 1;
+	const FInvSlot* First = nullptr;
+	for (const FInvSlot& S : Items) if (S.Id != 0 && S.Count > 0) { First = &S; break; }
+	if (First)
+	{
+		JeebItemModel::Build(First->Id, Parts);
+		if (JeebItems::StackSize(First->Id) > 1) Copies = FMath::Clamp(First->Count, 1, 4);
+	}
+	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
+	if (Parts.Num() == 0) { Body->SetVisibility(true); return; }   // nothing to show: keep the plain parcel
+
+	FRandomStream R(GetUniqueID());
+	for (int32 c = 0; c < Copies; ++c)
+	{
+		const FVector Off = c == 0 ? FVector::ZeroVector : FVector(R.FRandRange(-18.f, 18.f), R.FRandRange(-18.f, 18.f), 0.f);
+		const FRotator Yaw(0.f, R.FRandRange(0.f, 360.f), 0.f);
+		for (const JeebItemModel::FPart& P : Parts)
+		{
+			UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
+			C->SetupAttachment(Origin);
+			C->SetRelativeLocationAndRotation(Off, Yaw);
+			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			C->RegisterComponent();
+			TArray<FVector> N;
+			KM::ComputeNormals(P.Mesh, N);
+			TArray<int32> Tris;
+			for (int32 t = 0; t + 2 < P.Mesh.I.Num(); t += 3)
+			{
+				Tris.Add(P.Mesh.I[t]); Tris.Add(P.Mesh.I[t + 1]); Tris.Add(P.Mesh.I[t + 2]);
+				Tris.Add(P.Mesh.I[t]); Tris.Add(P.Mesh.I[t + 2]); Tris.Add(P.Mesh.I[t + 1]);
+			}
+			C->CreateMeshSection_LinearColor(0, P.Mesh.V, Tris, N, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+			if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, (P.bMetal && MetalMat) ? MetalMat : BaseMat))
+			{
+				M->SetVectorParameterValue(TEXT("Color"), P.Color);
+				if (P.bMetal && MetalMat) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), 0.28f); }
+			}
+			ItemComps.Add(C);
+		}
+	}
 }

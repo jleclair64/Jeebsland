@@ -200,7 +200,7 @@ void AFoeKnight::OnHurt(AActor* From)
 			BlockT = 0.f;
 			Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(GetActorLocation() - FVector(0.f, 0.f, 90.f), FRotator::ZeroRotator))
-				Drop->Setup(ELootLook::Pack, TArray<FInvSlot>(), 12 + Rand.RandRange(0, 8));   // a small purse of ingots
+				Drop->Setup(ELootLook::Item, TArray<FInvSlot>(), 12 + Rand.RandRange(0, 8));   // a small purse of ingots
 			JeebMsg::Post(4.f, FColor(255, 210, 120), TEXT("The pen knight yields! He will be ready for another bout soon."));
 		}
 		return;

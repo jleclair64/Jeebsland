@@ -7,7 +7,7 @@
 
 class UStaticMeshComponent;
 
-enum class ELootLook : uint8 { Meat, Beast, Pack };
+enum class ELootLook : uint8 { Meat, Beast, Pack, Item };   // Item: the dropped thing itself, modelled (see ItemModels.h)
 
 // Things left behind when something dies: raw pork from a pig, hides and bones from a dangerous beast, or a pack with
 // everything another knight was carrying. A little glowing speck marks it; press E beside it to take it all.
@@ -49,6 +49,8 @@ private:
 	UPROPERTY() UStaticMeshComponent* Flap = nullptr;
 	UPROPERTY() UStaticMeshComponent* Tie = nullptr;
 	UPROPERTY() UStaticMeshComponent* Glow = nullptr;
+	UPROPERTY() TArray<class UProceduralMeshComponent*> ItemComps;
+	void BuildItemLook();
 
 	TArray<FInvSlot> Items;
 	TArray<uint8> Where;
