@@ -613,7 +613,7 @@ void AKnightCharacter::HoldShield()
 		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromXZ(N, Up).ToQuat();         // the shield's face (+X) and its top (+Z)
 		const FVector Strap(14.0, -41.0, -8.0);                               // a point on the shield's back, a third of the way down
-		const FVector Target = -Fore * 2.0 + N * 9.5 + FVector(5.0, 4.0, 0.0);   // and drawn a little round to the front                         // just below the elbow, outside the forearm
+		const FVector Target = -Fore * 2.0 + N * 11.5 + FVector(5.0, 4.0, 0.0);   // and drawn a little round to the front                         // just below the elbow, outside the forearm
 		return FTransform(Q, Target - Q.RotateVector(Strap));
 	}();
 	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
@@ -2139,7 +2139,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float CS = FMath::Sin(ClimbPhase);
 	const float Air = AirAlpha;
 	const float Ground = 1.f - Air;
-	const float Duck = FMath::Max(CrouchAlpha, 0.8f * BlockAlpha) * Ground; // how low the knight is sitting
+	const float Duck = FMath::Max(CrouchAlpha, BlockAlpha) * Ground; // how low the knight is sitting
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
 	// ---------- Gait clock: faster strides when running ----------
@@ -2259,7 +2259,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
 	// at ease the chest leans a little forward (not standing against a wall) and lifts with each breath
-	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - 14.f * Duck + 0.9f * BreathS * IdleAmt;
+	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - 14.f * Duck - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
 	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
 	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
@@ -2285,7 +2285,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground, -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
 
 	// ---------- Cape and plume ----------
 	const float FlapAmp = 3.f + 9.f * Stream;
@@ -2323,7 +2323,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, 0.f));
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, 0.f, -22.f * Ground * (1.f - BlockAlpha)));   // at rest the forearm turns in towards the body
 	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
