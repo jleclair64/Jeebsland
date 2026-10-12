@@ -396,7 +396,7 @@ void AKnightHUD::DrawHUD()
 	const bool bRightNow = PC && PC->IsInputKeyDown(EKeys::RightMouseButton);
 	bUIRightClick = bRightNow && !bRightWasDown;
 	bRightWasDown = bRightNow;
-	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false;
+	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
 	TipLines.Reset();
 
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
@@ -760,14 +760,29 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const float X = X0 + TotalW + 18.f + SS + 14.f;
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
-		const int32 ShieldId = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
-		DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
+		// this is the shield slot: drag a shield here to hold it, drag it off to put it away
+		DefCellX = X; DefCellY = Y0; bDefCell = true;
+		const int32 ShieldId = Skills->Worn[K_Shield];
+		if (ShieldId != 0)
+		{
+			if (!(DragKind == 7 && bDragging)) DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
+		}
+		else
+		{
+			float LW = 0.f, LH = 0.f;
+			HDTextSize(TEXT("Shield"), LW, LH, Font, 0.7f);
+			HDText(TEXT("Shield"), FLinearColor(0.6f, 0.6f, 0.62f), X + (SS - LW) * 0.5f, Y0 + (SS - LH) * 0.5f, Font, 0.7f);
+		}
 		const FString Txt = FString::FromInt(Def);
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(Txt, TW, TH, Font, 1.15f);
 		Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
 		HDText(Txt, FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
-		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Defence"), FString::Printf(TEXT("%d in all: armour%s, every bonus counted"), Def, Knight->ShieldActive() ? TEXT(" and shield") : TEXT("")) });
+		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
+		{
+			if (ShieldId != 0) ItemTip(ShieldId);
+			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Defence %d in all, every bonus counted"), Def) });
+		}
 	}
 }
 
@@ -2223,12 +2238,12 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	// ================= Armor (just above the inventory) =================
 	{
 		// Laid out like the knight himself: helmet on top; gloves, chest and shoulders across the middle; boots below,
-		// with the shield beside them and the cape on the other side. The three miscellaneous slots run down the right edge.
+		// with the cape beside them (the shield lives in the slot at the end of the weapon bar). The three miscellaneous slots run down the right edge.
 		struct FWornSlot { int32 Kind; bool bSecond; int32 Col, Row; };
-		static const FWornSlot Worn[10] = {
+		static const FWornSlot Worn[9] = {
 			{ K_Helmet, false, 1, 0 },
 			{ K_Gloves, false, 0, 1 }, { K_Chest, false, 1, 1 }, { K_Shoulders, false, 2, 1 },
-			{ K_Shield, false, 0, 2 }, { K_Boots, false, 1, 2 }, { K_Cape, false, 2, 2 },
+			{ K_Boots, false, 1, 2 }, { K_Cape, false, 2, 2 },
 			{ K_Ring, false, 3, 0 }, { K_Ring, true, 3, 1 }, { K_Amulet, false, 3, 2 },
 		};
 		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f, BoxH = 36.f;
@@ -2702,18 +2717,20 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
 			else if (DragKind == 5 && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }   // a click takes it
 			else if (DragKind == 6) Knight->DrinkPotion();   // a click on the potion slot drinks
+			else if (DragKind == 7) Knight->UnequipWorn(K_Shield);   // a click on the shield slot puts the shield away
 		}
 		else
 		{
-			int32 ToInv = -1, ToHot = -1;
+			int32 ToInv = -1, ToHot = -1, ToWorn = -1;
 			for (int32 i = 0; i < InvCellCount; ++i) if (OverCell(InvCellX[i], InvCellY[i], InvCellS)) ToInv = i;
 			if (bHotCells) for (int32 h = 0; h < 5; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
+			for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
+			const bool bOnDef = bDefCell && OverCell(DefCellX, DefCellY, HotCellS);
 			if (DragKind == 1)
 			{
-				int32 ToWorn = -1;
-				for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
 				const bool bOnPotion = bPotionCell && OverCell(PotionCellX, PotionCellY, HotCellS);
 				if (bOnPotion) bChanged = Sk->SwapInvPotion(DragIdx);   // onto the potion slot (potions only)
+				else if (bOnDef) bChanged = Sk->SwapInvWorn(DragIdx, K_Shield, false);   // onto the shield slot (shields only)
 				else if (ToWorn >= 0) bChanged = Sk->SwapInvWorn(DragIdx, WornKind[ToWorn], WornSecond[ToWorn]);   // onto a worn slot: swap
 				else if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
 				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
@@ -2739,10 +2756,25 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 					else bChanged = Sk->SwapInvWorn(ToInv, WornKind[DragIdx], WornSecond[DragIdx]);
 				}
 			}
+			else if (DragKind == 7)
+			{
+				// the shield back to the pack: onto an empty cell it comes off; onto another shield they swap
+				if (ToInv >= 0)
+				{
+					if (Sk->Slots[ToInv].Id == 0) Knight->UnequipWorn(K_Shield);
+					else bChanged = Sk->SwapInvWorn(ToInv, K_Shield, false);
+				}
+			}
 			else if (DragKind == 3 && !OverWindows() && !OverBar()) OpenDropBox(-1, 0, Sk->GetIngots());
 			else if (DragKind == 5)
 			{
-				// from the sack onto your own inventory or armor window: take it
+				// from the sack straight onto the weapon bar, the shield slot or an armor slot (the old piece goes to your pack, or
+				// into the sack if your pack is full); anywhere else on your inventory or armor window just takes it
+				ALootDrop* Sack = Knight->GetLootTarget();
+				if (Sack && DragIdx >= 0 && ToHot >= 0) bChanged = Sack->EquipTo(DragIdx, Knight, ToHot, -1, false);
+				else if (Sack && DragIdx >= 0 && bOnDef) bChanged = Sack->EquipTo(DragIdx, Knight, -1, K_Shield, false);
+				else if (Sack && DragIdx >= 0 && ToWorn >= 0) bChanged = Sack->EquipTo(DragIdx, Knight, -1, WornKind[ToWorn], WornSecond[ToWorn]);
+				if (bChanged) { DragKind = 0; bDragging = false; DragIdx = -1; Knight->RefreshEquipment(); return; }
 				const bool bMine = (RectCount > 0 && M.X >= RectX[0] && M.X <= RectX[0] + RectW[0] && M.Y >= RectY[0] && M.Y <= RectY[0] + RectH[0])
 					|| (RectCount > 1 && M.X >= RectX[1] && M.X <= RectX[1] + RectW[1] && M.Y >= RectY[1] && M.Y <= RectY[1] + RectH[1]);
 				if (bMine && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }

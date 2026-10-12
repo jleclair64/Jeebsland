@@ -34,6 +34,9 @@ public:
 	bool IsSack() const { return Look == ELootLook::Pack; }
 	bool TakeOne(int32 Index, AActor* Taker);   // one entry into the taker's pack (false if it does not fit)
 	void TakeIngots(AActor* Taker);
+	// Puts a sack item straight into a weapon-bar slot (Hot >= 0) or a worn slot (Kind). What was there goes to the taker's pack,
+	// or (pack full) takes the item's place in the sack. False if the item does not belong in that slot.
+	bool EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool bSecond);
 	void TakeEverythingFits(AActor* Taker) { TakeAll(Taker); }
 
 	static ALootDrop* SpawnPork(UWorld* World, const FVector& Where);                     // 2 raw pork

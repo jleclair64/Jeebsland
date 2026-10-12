@@ -69,6 +69,7 @@ private:
 	float InvIngotX = 0.f, InvIngotY = 0.f;   // the fixed ingot cell
 	float WornCellX[10] = {}, WornCellY[10] = {}, WornCellS = 0.f; int32 WornKind[10] = {}; bool WornSecond[10] = {}; int32 WornCellCount = 0;   // the armour slots drawn this frame
 	float PotionCellX = 0.f, PotionCellY = 0.f; bool bPotionCell = false;   // the potion slot
+	float DefCellX = 0.f, DefCellY = 0.f; bool bDefCell = false;   // the shield slot at the end of the weapon bar
 	// An open sack (E on it): its windows sit to the left of yours. Cells point at entries in the sack (-1 = its ingots).
 	float LootCellX[64] = {}, LootCellY[64] = {}, LootCellS = 0.f; int32 LootCellIdx[64] = {}; int32 LootCellCount = 0;
 	float ArmorTopY = 0.f;

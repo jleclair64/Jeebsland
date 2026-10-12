@@ -109,3 +109,9 @@ Local git repo (no remote). Commit after each change that builds successfully, w
 ## Legacy scripts
 
 `Update.bat` / `Update.ps1` / `Build.bat` / `FixIni.bat` were used when code came from a chat via the Downloads folder. With Claude Code, edit files in place instead.
+
+## Shield slot and sack drags (2026-10-12; not yet seen in-game)
+
+- The shield is no longer in the Armor window: it is equipped only through the slot at the end of the weapon bar (shields only; drag in, drag out, or click to put it away). Drag kind 7 in `ProcessDrag`.
+- Dragging from the sack's weapon window onto your weapon bar, or from its armour window onto your Armor window / shield slot, equips it (`ALootDrop::EquipTo`). The old piece goes to your pack, or into the sack's cell if your pack is full. The sack's own armour window still shows its owner's shield.
+- Pumpkin halo and point lights are about 60% dimmer (halo Intensity 0.14, lights 360).

@@ -222,7 +222,7 @@ void AAutumnDecor::BeginPlay()
 		C->SetScalarParameterValue(TEXT("Intensity"), 0.22f);
 		CandleHalo->SetMaterial(0, C);
 		UMaterialInstanceDynamic* P = UMaterialInstanceDynamic::Create(FlameMat, this);
-		P->SetScalarParameterValue(TEXT("Intensity"), 0.35f);
+		P->SetScalarParameterValue(TEXT("Intensity"), 0.14f);
 		PumpkinHalo->SetMaterial(0, P);
 	}
 	else UE_LOG(LogTemp, Warning, TEXT("M_Flame is missing: run Tools/BuildMaterials.ps1. Candles and pumpkins lose their soft glow."));
@@ -313,7 +313,7 @@ void AAutumnDecor::BeginPlay()
 			PHaloPhase.Add(0.37f * PHaloPos.Num());
 			PumpkinHalo->AddInstance(FTransform(FQuat::Identity, PHaloPos.Last(), FVector(0.7f * D / 100.f)));
 			if (bLit && (LitCount++ % 2) == 0)
-				AddFlickerLight(Pos + Q.RotateVector(FVector(0.75f * D, 0.f, Zc)), 900.f * FMath::Max(Scale, 0.8f), 420.f * FMath::Max(Scale, 0.8f), FLinearColor(1.0f, 0.55f, 0.18f), 0.35f, 3.1f * LitCount);
+				AddFlickerLight(Pos + Q.RotateVector(FVector(0.75f * D, 0.f, Zc)), 360.f * FMath::Max(Scale, 0.8f), 420.f * FMath::Max(Scale, 0.8f), FLinearColor(1.0f, 0.55f, 0.18f), 0.35f, 3.1f * LitCount);
 		}
 	};
 

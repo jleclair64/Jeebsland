@@ -202,6 +202,34 @@ bool ALootDrop::TakeOne(int32 Index, AActor* Taker)
 	return true;
 }
 
+bool ALootDrop::EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool bSecond)
+{
+	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
+	if (!Sk || !Items.IsValidIndex(Index) || Items[Index].Id == 0 || !JeebItems::IsGear(Items[Index].Id)) return false;
+	const int32 Id = Items[Index].Id, IK = JeebItems::KindOf(Id);
+	int32* Target = nullptr;
+	if (Hot >= 0)
+	{
+		if (Hot >= 5 || !JeebItems::IsWeaponKind(IK)) return false;   // only weapons go on the bar
+		Target = &Sk->Hotbar[Hot];
+	}
+	else
+	{
+		const bool bMisc = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
+		if (bMisc ? !JeebItems::IsAccessoryKind(IK) : IK != Kind) return false;   // it has to belong in that slot
+		Target = Sk->WornSlotPtr(Kind, bSecond);
+	}
+	if (!Target) return false;
+	const int32 Old = *Target;
+	*Target = Id;
+	if (Old == 0 || (Sk->CanAdd(Old, 1) && Sk->AddInvItem(Old, 1))) { Items[Index].Id = 0; Items[Index].Count = 0; }
+	else { Items[Index].Id = Old; Items[Index].Count = 1; }   // pack full: they trade places
+	bool bAnyLeft = Ingots > 0;
+	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
+	if (!bAnyLeft) Destroy();
+	return true;
+}
+
 void ALootDrop::TakeIngots(AActor* Taker)
 {
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
