@@ -65,9 +65,14 @@ private:
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
 	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;
-	float RectX[4] = {}, RectY[4] = {}, RectW[4] = {}, RectH[4] = {}; int32 RectCount = 0;   // the windows on screen this frame
+	float RectX[8] = {}, RectY[8] = {}, RectW[8] = {}, RectH[8] = {}; int32 RectCount = 0;   // the windows on screen this frame
 	float InvIngotX = 0.f, InvIngotY = 0.f;   // the fixed ingot cell
 	float WornCellX[10] = {}, WornCellY[10] = {}, WornCellS = 0.f; int32 WornKind[10] = {}; bool WornSecond[10] = {}; int32 WornCellCount = 0;   // the armour slots drawn this frame
+	float PotionCellX = 0.f, PotionCellY = 0.f; bool bPotionCell = false;   // the potion slot
+	// An open sack (E on it): its windows sit to the left of yours. Cells point at entries in the sack (-1 = its ingots).
+	float LootCellX[64] = {}, LootCellY[64] = {}, LootCellS = 0.f; int32 LootCellIdx[64] = {}; int32 LootCellCount = 0;
+	float ArmorTopY = 0.f;
+	void DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, float PW);
 	int32 DragKind = 0, DragIdx = -1, DragId = 0;   // 0 none, 1 from the pack, 2 from the weapon bar
 	FVector2D DragStart = FVector2D::ZeroVector; bool bDragging = false; bool bUIRelease = false;
 	void ProcessDrag(AKnightCharacter* Knight);

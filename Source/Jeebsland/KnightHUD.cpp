@@ -5,6 +5,7 @@
 #include "KnightCharacter.h"
 #include "Pig.h"
 #include "FoeKnight.h"
+#include "Loot.h"
 #include "Npc.h"
 #include "HealthComponent.h"
 #include "Combat.h"
@@ -390,7 +391,7 @@ void AKnightHUD::DrawHUD()
 	const bool bRightNow = PC && PC->IsInputKeyDown(EKeys::RightMouseButton);
 	bUIRightClick = bRightNow && !bRightWasDown;
 	bRightWasDown = bRightNow;
-	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0;
+	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false;
 	TipLines.Reset();
 
 	// Name tags over villagers, only when you are within a few steps (fading in over the last metre)
@@ -719,10 +720,39 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(Id);   // hover with the cursor out (Tab) to read about it
 	}
 
-	// Defence total, to the right of the bar
+	// The potion slot, between the weapons and the defence slot: Q drinks it. While that kind of potion is cooling down the slot
+	// darkens from the top and shows the seconds left.
+	{
+		const float X = X0 + TotalW + 18.f;
+		PotionCellX = X; PotionCellY = Y0; bPotionCell = true;
+		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
+		HDText(TEXT("Q"), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y0 + 1.f, Font, 0.7f);
+		const FInvSlot& P = Skills->PotionSlot;
+		if (P.Id != 0 && IsPotion(P.Id))
+		{
+			if (!(DragKind == 6 && bDragging)) DrawIcon(P.Id, X + 3.f, Y0 + 3.f, SS - 6.f);
+			HDText(FString::FromInt(P.Count), FLinearColor::White, X + SS - 14.f, Y0 + 1.f, Font, 0.8f);
+			const int32 T = PotionType(P.Id);
+			const float Left = Knight->GetPotionCooldownLeft(T);
+			if (Left > 0.f)
+			{
+				const float F = FMath::Clamp(Left / PotionCooldown(T), 0.f, 1.f);
+				FillRR(X, Y0, SS, SS * F, FMath::Min(10.f, SS * F * 0.5f), [&](float) { return FLinearColor(0.f, 0.f, 0.02f, 0.6f); });
+				const FString Sec = FString::FromInt(FMath::CeilToInt(Left));
+				float SW = 0.f, SH = 0.f;
+				HDTextSize(Sec, SW, SH, Font, 1.2f);
+				HDText(Sec, FLinearColor(0.f, 0.f, 0.f, 0.8f), X + (SS - SW) * 0.5f + 1.f, Y0 + (SS - SH) * 0.5f + 1.f, Font, 1.2f);
+				HDText(Sec, FLinearColor(1.f, 1.f, 1.f), X + (SS - SW) * 0.5f, Y0 + (SS - SH) * 0.5f, Font, 1.2f);
+			}
+			if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(P.Id);
+		}
+		else if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Potion slot"), TEXT("Drag a potion here, then press Q to drink it") });
+	}
+
+	// Defence total, to the right of the potion slot
 	{
 		// a slot like the weapon slots: your shield (or a plain one), leaning the same way, with your defence in blue
-		const float X = X0 + TotalW + 18.f;
+		const float X = X0 + TotalW + 18.f + SS + 14.f;
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
 		const int32 ShieldId = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
@@ -2116,7 +2146,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	const bool bLive = bCursor && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
 	RectCount = 0;
-	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 4) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
+	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 8) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
 
 	const float SS = 44.f, Gap = 5.f, Pad = 10.f;
 	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;   // a 5 x 5 pack
@@ -2180,6 +2210,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f, BoxH = 36.f;
 		const float AH = Pad + 3 * RowH + 2.f + BoxH + Pad;
 		const float AX = IX, AY = IY - AH - 10.f;
+		ArmorTopY = AY;
 		Panel(AX, AY, PW, AH, 1.f, false);
 		AddRect(AX, AY, PW, AH);
 		const float GX = AX + Pad, GY = AY + Pad;
@@ -2256,6 +2287,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 				SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d / %d XP  (%d to level %d)"), Into, Need, FMath::Max(0, Need - Into), Lv + 1) });
 		}
 	}
+	if (Knight->GetLootTarget()) DrawLootWindows(Knight, IX, IY, PW);   // an open sack, to the left of your windows
 	bGreyGlass = false;
 }
 
@@ -2596,7 +2628,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 	const FVector2D M(UIMouseX, UIMouseY);
 	auto OverCell = [&](float X, float Y, float S) { return M.X >= X && M.X <= X + S && M.Y >= Y && M.Y <= Y + S; };
 	auto OverWindows = [&]() { for (int32 r = 0; r < RectCount; ++r) if (M.X >= RectX[r] - 6.f && M.X <= RectX[r] + RectW[r] + 6.f && M.Y >= RectY[r] - 6.f && M.Y <= RectY[r] + RectH[r] + 6.f) return true; return false; };
-	auto OverBar = [&]() { return bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 130.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f; };
+	auto OverBar = [&]() { return bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 200.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f; };
 
 	// right-click a stack (or the ingots) for "drop how many?"
 	if (bUIRightClick && DragKind == 0)
@@ -2621,6 +2653,15 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				int32* Wp = Sk->WornSlotPtr(WornKind[w], WornSecond[w]);
 				if (OverCell(WornCellX[w], WornCellY[w], WornCellS) && Wp && *Wp != 0) { DragKind = 4; DragIdx = w; DragId = *Wp; }
 			}
+		if (DragKind == 0)
+			for (int32 l = 0; l < LootCellCount && DragKind == 0; ++l)
+			{
+				const int32 Idx = LootCellIdx[l];
+				ALootDrop* Sack = Knight->GetLootTarget();
+				if (!Sack || !OverCell(LootCellX[l], LootCellY[l], LootCellS)) continue;
+				if (Idx < 0 ? Sack->GetIngots() > 0 : (Sack->GetItems().IsValidIndex(Idx) && Sack->GetItems()[Idx].Id != 0)) { DragKind = 5; DragIdx = Idx; DragId = Idx < 0 ? 0 : Sack->GetItems()[Idx].Id; }
+			}
+		if (DragKind == 0 && bPotionCell && Sk->PotionSlot.Id != 0 && OverCell(PotionCellX, PotionCellY, HotCellS)) { DragKind = 6; DragIdx = 0; DragId = Sk->PotionSlot.Id; }
 		if (DragKind != 0) { DragStart = M; bDragging = false; }
 		else if (!OverWindows() && !OverBar()) Knight->SetPanelCursor(false);   // a click on nothing: leave pointer mode
 	}
@@ -2635,6 +2676,8 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		{
 			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
 			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
+			else if (DragKind == 5 && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }   // a click takes it
+			else if (DragKind == 6) Knight->DrinkPotion();   // a click on the potion slot drinks
 		}
 		else
 		{
@@ -2645,7 +2688,9 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			{
 				int32 ToWorn = -1;
 				for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
-				if (ToWorn >= 0) bChanged = Sk->SwapInvWorn(DragIdx, WornKind[ToWorn], WornSecond[ToWorn]);   // onto a worn slot: swap
+				const bool bOnPotion = bPotionCell && OverCell(PotionCellX, PotionCellY, HotCellS);
+				if (bOnPotion) bChanged = Sk->SwapInvPotion(DragIdx);   // onto the potion slot (potions only)
+				else if (ToWorn >= 0) bChanged = Sk->SwapInvWorn(DragIdx, WornKind[ToWorn], WornSecond[ToWorn]);   // onto a worn slot: swap
 				else if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
 				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
 				else if (!OverWindows() && !OverBar())
@@ -2671,6 +2716,14 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				}
 			}
 			else if (DragKind == 3 && !OverWindows() && !OverBar()) OpenDropBox(-1, 0, Sk->GetIngots());
+			else if (DragKind == 5)
+			{
+				// from the sack onto your own inventory or armor window: take it
+				const bool bMine = (RectCount > 0 && M.X >= RectX[0] && M.X <= RectX[0] + RectW[0] && M.Y >= RectY[0] && M.Y <= RectY[0] + RectH[0])
+					|| (RectCount > 1 && M.X >= RectX[1] && M.X <= RectX[1] + RectW[1] && M.Y >= RectY[1] && M.Y <= RectY[1] + RectH[1]);
+				if (bMine && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }
+			}
+			else if (DragKind == 6 && ToInv >= 0) bChanged = Sk->SwapInvPotion(ToInv);   // the potion slot back into the pack
 			if (bChanged) Knight->RefreshEquipment();   // the weapon in hand may have changed
 		}
 		DragKind = 0; bDragging = false; DragIdx = -1;
@@ -2682,7 +2735,7 @@ void AKnightHUD::DrawDragGhost()
 {
 	if (DragKind == 0 || !bDragging || !bUIHaveMouse) return;
 	const float S = 56.f;
-	if (DragKind == 3) DrawIngot(UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
+	if (DragKind == 3 || (DragKind == 5 && DragIdx < 0)) DrawIngot(UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
 	else DrawIcon(DragId, UIMouseX - S * 0.5f, UIMouseY - S * 0.5f, S);
 }
 
@@ -2739,5 +2792,112 @@ void AKnightHUD::DrawDropBox(AKnightCharacter* Knight)
 		if (DropSlot < 0) Knight->DropIngots(Amount);
 		else Knight->DropFromPack(DropSlot, Amount);
 		bDropOpen = false;
+	}
+}
+
+// ---------------------------------------------------------------------------------------------------
+// An open sack (E on it): its own windows, to the left of yours, laid out the way its owner had things. Its pack (with its
+// ingots in the top-left cell) beside your inventory; its armour beside your Armor window; its weapon bar above that.
+// Click (or drag onto your inventory) to take a thing; "Take all" takes whatever fits.
+// ---------------------------------------------------------------------------------------------------
+void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, float PW)
+{
+	ALootDrop* Sack = Knight->GetLootTarget();
+	if (!Sack) return;
+	UFont* Font = GEngine->GetMediumFont();
+	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;
+	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
+	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 8) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
+	const float SS = 44.f, Gap = 5.f, Pad = 10.f, TitleH = 30.f;
+	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;
+	const FLinearColor Idle(0.62f, 0.63f, 0.66f), Hover(0.86f, 0.87f, 0.9f);
+	const TArray<FInvSlot>& Items = Sack->GetItems();
+	auto Cell = [&](float X, float Y, float S, int32 Idx)   // one loot cell (Idx -1 = the ingots)
+	{
+		const bool bOver = Hot(X, Y, S, S);
+		Tile(X, Y, S, S, bOver ? Hover : Idle, bOver ? 0.24f : 0.11f);
+		if (LootCellCount < 64) { LootCellX[LootCellCount] = X; LootCellY[LootCellCount] = Y; LootCellIdx[LootCellCount] = Idx; LootCellS = S; ++LootCellCount; }
+		const bool bLifted = DragKind == 5 && bDragging && DragIdx == Idx;
+		if (Idx < 0)
+		{
+			if (Sack->GetIngots() <= 0) return;
+			if (!bLifted) DrawIngot(X + 7.f, Y + 4.f, S - 14.f);
+			HDText(FString::FromInt(Sack->GetIngots()), FLinearColor(1.f, 0.88f, 0.4f), X + 4.f, Y + S - 18.f, Font, 0.9f);
+			if (bOver) SetTip({ TEXT("Ingots"), FString::Printf(TEXT("%d ingots: click to take them"), Sack->GetIngots()) });
+			return;
+		}
+		const FInvSlot& It = Items[Idx];
+		if (It.Id == 0) return;
+		if (!bLifted) DrawIcon(It.Id, X + 4.f, Y + 3.f, S - 8.f);
+		if (StackSize(It.Id) > 1 || It.Count > 1) HDText(FString::FromInt(It.Count), FLinearColor::White, X + S - 22.f, Y + 2.f, Font, 0.75f);
+		ItemBadges(It.Id, X, Y, S);
+		if (bOver) ItemTip(It.Id);
+	};
+
+	// ---- The sack's pack, beside your inventory (bottoms lined up) ----
+	const float LH = Pad + TitleH + GridH + Pad;
+	const float LX = IX - PW - 12.f, LY = IY + (Pad + GridH + Pad) - LH;
+	Panel(LX, LY, PW, LH, 1.f, false);
+	AddRect(LX, LY, PW, LH);
+	HDText(TEXT("Sack"), FLinearColor(1.f, 0.9f, 0.65f), LX + Pad + 2.f, LY + Pad + 2.f, Font, 1.15f);
+	if (Btn(LX + PW - Pad - 96.f, LY + Pad - 2.f, 96.f, 26.f, TEXT("Take all"), true, false, 0.9f)) { Sack->TakeEverythingFits(Knight); return; }
+	{
+		const float GX = LX + Pad, GY = LY + Pad + TitleH;
+		Cell(GX, GY, SS, -1);
+		int32 C = 1;
+		for (int32 i = 0; i < Items.Num() && C < 25; ++i)
+		{
+			if (Sack->WhereOf(i) != 0 || Items[i].Id == 0) continue;
+			Cell(GX + (C % 5) * (SS + Gap), GY + (C / 5) * (SS + Gap), SS, i);
+			++C;
+		}
+		for (; C < 25; ++C) Tile(GX + (C % 5) * (SS + Gap), GY + (C / 5) * (SS + Gap), SS, SS, Idle, 0.07f);   // empty cells
+	}
+
+	// ---- Its armour, laid out like the knight, beside your Armor window ----
+	struct FWornSlot { int32 Kind; int32 Col, Row; };
+	static const FWornSlot Layout[10] = {
+		{ K_Helmet, 1, 0 }, { K_Gloves, 0, 1 }, { K_Chest, 1, 1 }, { K_Shoulders, 2, 1 },
+		{ K_Shield, 0, 2 }, { K_Boots, 1, 2 }, { K_Cape, 2, 2 }, { K_Ring, 3, 0 }, { K_Ring, 3, 1 }, { K_Ring, 3, 2 },
+	};
+	const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f;
+	const float AH = Pad + 3 * RowH + Pad;
+	const float AY = (ArmorTopY > 0.f ? ArmorTopY : LY - AH - 10.f);
+	const float AYb = FMath::Min(AY, LY - AH - 10.f);
+	Panel(LX, AYb, PW, AH, 1.f, false);
+	AddRect(LX, AYb, PW, AH);
+	{
+		// which sack entries were worn: one per slot (accessories fill the three misc slots in turn)
+		int32 SlotIdx[10]; for (int32& V : SlotIdx) V = -2;
+		int32 NextMisc = 7;
+		for (int32 i = 0; i < Items.Num(); ++i)
+		{
+			if (Sack->WhereOf(i) != 2 || Items[i].Id == 0 || !IsGear(Items[i].Id)) continue;
+			const int32 K = KindOf(Items[i].Id);
+			if (IsAccessoryKind(K)) { if (NextMisc < 10) SlotIdx[NextMisc++] = i; continue; }
+			for (int32 s = 0; s < 7; ++s) if (Layout[s].Kind == K && SlotIdx[s] == -2) { SlotIdx[s] = i; break; }
+		}
+		const float GX = LX + Pad, GY = AYb + Pad;
+		for (int32 s = 0; s < 10; ++s)
+		{
+			const float X = GX + Layout[s].Col * (WS + WG) + (Layout[s].Col == 3 ? 0.f : -2.f), Y = GY + Layout[s].Row * RowH;
+			if (SlotIdx[s] >= 0) Cell(X, Y, WS, SlotIdx[s]);
+			else Tile(X, Y, WS, WS, Idle, 0.07f);
+		}
+	}
+
+	// ---- Its weapon bar, above its armour ----
+	{
+		const float WH = Pad + SS + Pad, WY = AYb - WH - 10.f;
+		Panel(LX, WY, PW, WH, 1.f, false);
+		AddRect(LX, WY, PW, WH);
+		int32 C = 0;
+		for (int32 i = 0; i < Items.Num() && C < 5; ++i)
+		{
+			if (Sack->WhereOf(i) != 1 || Items[i].Id == 0) continue;
+			Cell(LX + Pad + C * (SS + Gap), WY + Pad, SS, i);
+			++C;
+		}
+		for (; C < 5; ++C) Tile(LX + Pad + C * (SS + Gap), WY + Pad, SS, SS, Idle, 0.07f);
 	}
 }
