@@ -160,6 +160,9 @@ void AKnightCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Tick after the movement has moved us this frame: the cape (which lives in world space) is pinned to where the body
+	// really is, not where it was a frame ago. Otherwise in a fast jump it lags one frame behind on some frames and not others.
+	if (GetCharacterMovement()) AddTickPrerequisiteComponent(GetCharacterMovement());
 	PrevYaw = GetActorRotation().Yaw;
 	SpawnLoc = GetActorLocation();
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
