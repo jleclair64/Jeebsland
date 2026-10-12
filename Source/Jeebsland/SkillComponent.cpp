@@ -466,3 +466,13 @@ bool USkillComponent::SwapInvPotion(int32 InvIdx)
 	Swap(S, PotionSlot);
 	return true;
 }
+
+void USkillComponent::RestoreSkills(const TArray<int32>& InXP, const TArray<uint8>& InKnown, int32 InIngots)
+{
+	for (int32 i = 0; i < NumSkills; ++i)
+	{
+		XP[i] = InXP.IsValidIndex(i) ? FMath::Max(0, InXP[i]) : 0;
+		Known[i] = (InKnown.IsValidIndex(i) && InKnown[i] != 0) || i == static_cast<int32>(ESkillType::Attack) || i == static_cast<int32>(ESkillType::Defense);
+	}
+	Ingots = InIngots;
+}

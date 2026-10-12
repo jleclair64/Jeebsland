@@ -162,6 +162,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	void Autosave();   // writes the player to disk (every minute, and when the game ends)
+	FTimerHandle AutosaveTimer;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	void StartSprint();

@@ -1,5 +1,6 @@
 #include "KnightCharacter.h"
 #include "KnightShieldRest.h"
+#include "JeebSave.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -128,9 +129,14 @@ void AKnightCharacter::BeginPlay()
 	if (GetCharacterMovement()) AddTickPrerequisiteComponent(GetCharacterMovement());
 	PrevYaw = GetActorRotation().Yaw;
 	SpawnLoc = GetActorLocation();
+	// Pick up where you left off; with no save yet, start fresh with the temporary practice pack
+	if (Skills && !UJeebSave::Restore(Skills))
+	{
+		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
+		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
+	}
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
-	if (Skills) Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
-	if (Skills) Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
+	GetWorldTimerManager().SetTimer(AutosaveTimer, this, &AKnightCharacter::Autosave, 60.f, true);
 
 	// Saved choices (side panel). Graphics always start low: fancy lighting off, 60% resolution.
 	if (GConfig)
@@ -189,6 +195,17 @@ void AKnightCharacter::BeginPlay()
 	}
 
 	RefreshEquipment();
+}
+
+void AKnightCharacter::EndPlay(const EEndPlayReason::Type Reason)
+{
+	Autosave();
+	Super::EndPlay(Reason);
+}
+
+void AKnightCharacter::Autosave()
+{
+	if (Skills) UJeebSave::Save(Skills);
 }
 
 void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

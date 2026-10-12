@@ -111,6 +111,8 @@ public:
 	// (0 pack, 1 weapon bar, 2 worn); then you start again with the default kit. (Skills and levels are kept.)
 	void TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots);
 	void ResetToStartingKit();
+	// Loading a save: puts back XP, which skills are known and the ingots (the rest is public)
+	void RestoreSkills(const TArray<int32>& InXP, const TArray<uint8>& InKnown, int32 InIngots);
 	// The potion slot (beside the weapon bar): one stack of potions ready to drink with Q
 	FInvSlot PotionSlot;
 	bool SwapInvPotion(int32 InvIdx);   // a pack slot and the potion slot trade places (only potions go in it)

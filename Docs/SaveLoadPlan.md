@@ -1,4 +1,4 @@
-# Save / load plan (written 2026-10-12, nothing built yet)
+# Save / load plan (written 2026-10-12). STATUS: step 1 built (JeebSave.h/.cpp: player pack, bank, XP, gear, potion, lore, ingots; loads in KnightCharacter::BeginPlay; autosaves every 60 s and on EndPlay, single-step write). Steps 2-5 not built.
 
 ## Good news
 Almost everything about the player already lives in one place: `USkillComponent` (SkillComponent.h/.cpp). It holds XP,
