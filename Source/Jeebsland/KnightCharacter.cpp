@@ -19,6 +19,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Terrain.h"
+#include "GrassField.h"
 #include "Pig.h"
 #include "Inventory.h"
 #include "Npc.h"
@@ -67,6 +68,20 @@ AKnightCharacter::AKnightCharacter()
 		DustISM->SetUsingAbsoluteLocation(true);
 		DustISM->SetUsingAbsoluteRotation(true);
 		DustISM->SetUsingAbsoluteScale(true);
+		// little clods of dirt and blades of grass kicked up by the feet (cubes, squashed to shape)
+		ConstructorHelpers::FObjectFinder<UStaticMesh> BitMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
+		for (UInstancedStaticMeshComponent** Slot : { &ClodISM, &BladeISM })
+		{
+			UInstancedStaticMeshComponent* I = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Slot == &ClodISM ? TEXT("Clods") : TEXT("Blades"));
+			I->SetupAttachment(RootComponent);
+			I->SetStaticMesh(BitMesh.Object);
+			I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			I->SetCastShadow(false);
+			I->SetUsingAbsoluteLocation(true);
+			I->SetUsingAbsoluteRotation(true);
+			I->SetUsingAbsoluteScale(true);
+			*Slot = I;
+		}
 	}
 
 	// Every body part hangs off a pivot so it can be animated. Positions below are given relative to the
@@ -192,6 +207,16 @@ void AKnightCharacter::BeginPlay()
 		{
 			DM->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.50f, 0.40f, 0.26f));
 		}
+		Clods.SetNum(36); Blades.SetNum(24);
+		auto Prep = [&](UInstancedStaticMeshComponent* I, int32 N, const FLinearColor& C)
+		{
+			TArray<FTransform> H;
+			for (int32 i = 0; i < N; ++i) H.Add(FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)));
+			I->AddInstances(H, false, false, false);
+			if (UMaterialInstanceDynamic* M = I->CreateDynamicMaterialInstance(0, DBase)) M->SetVectorParameterValue(TEXT("Color"), C);
+		};
+		Prep(ClodISM, Clods.Num(), FLinearColor(0.27f, 0.17f, 0.09f));    // the path's soil
+		Prep(BladeISM, Blades.Num(), FLinearColor(0.20f, 0.42f, 0.10f));  // grass green
 	}
 
 	BuildKnight();
@@ -1293,7 +1318,7 @@ void AKnightCharacter::StartRoll()
 	Move->bOrientRotationToMovement = false;
 	SetActorRotation(FRotator(0.f, RollDir.Rotation().Yaw, 0.f));
 	bRolling = true;
-	SpawnDust(GetActorLocation() + FVector(0, 0, -85.f), 55.f);
+	Kick(GetActorLocation() + FVector(0, 0, -94.f), 1.2f);
 }
 
 AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const
@@ -1629,6 +1654,87 @@ void AKnightCharacter::SpawnDust(const FVector& Pos, float Size)
 	D.Age = 0.f;
 	D.Life = FMath::FRandRange(0.4f, 0.6f);
 	D.Size = Size * 0.45f; // small, subtle puffs
+}
+
+int32 AKnightCharacter::GroundUnderfoot() const
+{
+	const UCharacterMovementComponent* M = GetCharacterMovement();
+	if (!M || M->IsFalling() || !M->CurrentFloor.bBlockingHit) return 0;
+	const AActor* A = M->CurrentFloor.HitResult.GetActor();
+	if (!A || !A->IsA<AGrassField>()) return 0;   // decks, floors, bridges, stone: nothing to kick up
+	const FVector L = GetActorLocation();
+	if (FVector2D::Distance(FVector2D(L.X, L.Y), JeebTerrain::CastlePos()) < JeebTerrain::CastleWall + 100.f) return 0;   // the castle's paved yard
+	return JeebTerrain::PathClearance(L.X, L.Y) < 0.f ? 1 : 2;
+}
+
+void AKnightCharacter::Kick(const FVector& Foot, float Strength)
+{
+	const int32 G = GroundUnderfoot();
+	if (G == 0 || Clods.Num() == 0 || Blades.Num() == 0) return;
+	const FVector Back = -GetActorForwardVector(), Side = GetActorRightVector();
+	auto Launch = [&](FBit& B, float Up, float Out, float SpinMax)
+	{
+		B.Pos = Foot + Side * FMath::FRandRange(-5.f, 5.f) + Back * FMath::FRandRange(0.f, 6.f) + FVector(0.f, 0.f, 2.f);
+		B.Vel = Back * FMath::FRandRange(0.4f, 1.f) * Out * Strength + Side * FMath::FRandRange(-0.45f, 0.45f) * Out + FVector(0.f, 0.f, FMath::FRandRange(0.6f, 1.f) * Up * FMath::Sqrt(Strength));
+		B.Rot = FQuat(FMath::VRand(), FMath::FRandRange(0.f, 6.28f));
+		B.Spin = FMath::VRand() * FMath::FRandRange(0.4f, 1.f) * SpinMax;
+		B.Floor = Foot.Z;
+		B.Age = 0.f;
+	};
+	if (G == 1)
+	{
+		// a dirt path: a few small clods and a faint puff of dust
+		const int32 N = FMath::RoundToInt(2.f + 2.5f * Strength);
+		for (int32 i = 0; i < N; ++i)
+		{
+			FBit& B = Clods[ClodNext];
+			ClodNext = (ClodNext + 1) % Clods.Num();
+			Launch(B, 230.f, 130.f, 14.f);
+			const float S = FMath::FRandRange(0.9f, 2.0f) * 0.01f;
+			B.Size = FVector(S, S * FMath::FRandRange(0.7f, 1.2f), S * FMath::FRandRange(0.6f, 1.f));
+			B.Life = FMath::FRandRange(0.8f, 1.2f);
+		}
+		SpawnDust(Foot, 14.f * Strength);
+	}
+	else
+	{
+		// grass: a blade or two flicked up (three on a hard landing)
+		const int32 N = Strength >= 1.4f ? 3 : (FMath::FRand() < 0.55f ? 1 : 2);
+		for (int32 i = 0; i < N; ++i)
+		{
+			FBit& B = Blades[BladeNext];
+			BladeNext = (BladeNext + 1) % Blades.Num();
+			Launch(B, 260.f, 90.f, 11.f);
+			B.Size = FVector(0.005f, FMath::FRandRange(0.011f, 0.016f), FMath::FRandRange(0.055f, 0.085f));
+			B.Life = FMath::FRandRange(1.0f, 1.4f);
+		}
+	}
+}
+
+// The kicked-up bits fly, tumble, land and shrink away
+void AKnightCharacter::TickBits(TArray<FBit>& Bits, UInstancedStaticMeshComponent* ISM, float Dt, float Gravity, float Drag)
+{
+	if (!ISM) return;
+	for (int32 i = 0; i < Bits.Num(); ++i)
+	{
+		FBit& B = Bits[i];
+		FTransform T(FQuat::Identity, FVector(0.f, 0.f, -9000.f), FVector(0.001f));
+		if (B.Age < B.Life)
+		{
+			B.Age += Dt;
+			if (B.Pos.Z > B.Floor + 0.6f || B.Vel.Z > 0.f)
+			{
+				B.Vel.Z -= Gravity * Dt;
+				B.Vel *= FMath::Max(0.f, 1.f - Drag * Dt);
+				B.Pos += B.Vel * Dt;
+				if (!B.Spin.IsNearlyZero()) B.Rot = FQuat(B.Spin.GetSafeNormal(), B.Spin.Size() * Dt) * B.Rot;
+				if (B.Pos.Z < B.Floor + 0.6f) { B.Pos.Z = B.Floor + 0.6f; B.Vel = FVector::ZeroVector; B.Spin = FVector::ZeroVector; }   // landed
+			}
+			const float Fade = FMath::Clamp((B.Life - B.Age) / (0.3f * B.Life), 0.f, 1.f);
+			T = FTransform(B.Rot, B.Pos, B.Size * FMath::Max(Fade, 0.01f));
+		}
+		ISM->UpdateInstanceTransform(i, T, true, i == Bits.Num() - 1, true);
+	}
 }
 
 void AKnightCharacter::RefreshUIMode()
@@ -2510,25 +2616,25 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
 
 	// ---------- Dust puffs: footfalls when running, landings, slides ----------
-	const FVector FeetBase = GetActorLocation() + FVector(0.f, 0.f, -90.f);
+	const FVector FeetBase = GetActorLocation() + FVector(0.f, 0.f, -94.f);
 	if (!bFalling && !bSpecial && MoveBlend > 0.6f && RunAlpha > 0.3f && ((C > 0.f) != (PrevC > 0.f)))
 	{
 		const float Side = (S > 0.f) ? 13.f : -13.f;
-		SpawnDust(FeetBase + GetActorForwardVector() * 12.f + GetActorRightVector() * Side, 26.f + 14.f * RunAlpha);
+		Kick(FeetBase + GetActorForwardVector() * 8.f + GetActorRightVector() * Side, 0.7f + 0.4f * RunAlpha);
 	}
 	PrevC = C;
 	if (!bFalling && bWasFalling == false && LandTimer > LandDuration - Dt * 1.5f && LandImpact > 0.45f)
 	{
-		SpawnDust(FeetBase + GetActorRightVector() * 25.f, 50.f * LandImpact + 20.f);
-		SpawnDust(FeetBase - GetActorRightVector() * 25.f, 50.f * LandImpact + 20.f);
+		Kick(FeetBase + GetActorRightVector() * 13.f, 0.8f + 1.0f * LandImpact);
+		Kick(FeetBase - GetActorRightVector() * 13.f, 0.8f + 1.0f * LandImpact);
 	}
 	if (bSliding)
 	{
 		SlideDustTimer += Dt;
-		if (SlideDustTimer > 0.06f)
+		if (SlideDustTimer > 0.12f)
 		{
 			SlideDustTimer = 0.f;
-			SpawnDust(FeetBase - SlideDir * 30.f + GetActorRightVector() * FMath::FRandRange(-20.f, 20.f), FMath::FRandRange(32.f, 52.f));
+			Kick(FeetBase - SlideDir * 20.f + GetActorRightVector() * FMath::FRandRange(-15.f, 15.f), 0.6f);
 		}
 	}
 	for (int32 i = 0; i < Dust.Num(); ++i)
@@ -2544,6 +2650,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		}
 		DustISM->UpdateInstanceTransform(i, T, true, i == Dust.Num() - 1, true);
 	}
+	TickBits(Clods, ClodISM, Dt, 980.f, 0.6f);    // clods: heavy, they drop straight back
+	TickBits(Blades, BladeISM, Dt, 520.f, 2.4f);  // blades: light, they flutter down
 }
 
 void AKnightCharacter::HurtHorse(float Amount)

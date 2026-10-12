@@ -254,6 +254,8 @@ private:
 	float GuardPool = 0.f, GuardMax = 0.f, LastGuardHitTime = -100.f;
 	bool bGuardBroken = false;
 	UPROPERTY() UInstancedStaticMeshComponent* DustISM = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* ClodISM = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* BladeISM = nullptr;
 	UPROPERTY() UInputModifierScalar* LookScalar = nullptr;
 	bool bSettingsOpen = false;
 	bool bInventoryOpen = false;
@@ -404,6 +406,14 @@ private:
 	TArray<FDust> Dust;
 	int32 DustNext = 0;
 	void SpawnDust(const FVector& Pos, float Size);
+	// What the feet kick up, by what they are on: dirt clods (and a faint puff) on a path, a few grass blades in the grass,
+	// nothing on stone, wood or indoors. Small pieces with a little physics: they fly, tumble, land and fade.
+	struct FBit { FVector Pos = FVector::ZeroVector, Vel = FVector::ZeroVector; FQuat Rot = FQuat::Identity; FVector Spin = FVector::ZeroVector; FVector Size = FVector(1.f); float Age = 99.f, Life = 1.f, Floor = 0.f; };
+	TArray<FBit> Clods, Blades;
+	int32 ClodNext = 0, BladeNext = 0;
+	int32 GroundUnderfoot() const;   // 0 none (stone, wood, indoors, water), 1 a dirt path, 2 grass
+	void Kick(const FVector& Foot, float Strength);
+	static void TickBits(TArray<FBit>& Bits, UInstancedStaticMeshComponent* ISM, float Dt, float Gravity, float Drag);
 
 	TWeakObjectPtr<AResourceNode> ActiveNode;
 	bool bSwinging = false;
