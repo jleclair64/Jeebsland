@@ -34,7 +34,8 @@ private:
 			bool bBark = false;        // trunks and branches use the shaped bark meshes (M_BarkTint)
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> TrunkVar;   // four trunk shapes
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> BranchVar;  // branches in the same four bark colours, so they match their trunk
-	bool bLeafCards = false;   // leaves are painted cards (M_TreeLeaf) rather than plain diamonds
+	bool bLeafCards = false;
+	bool bNeedleCards = false; // pines and redwoods wear painted needle boughs (M_PineNeedle) rather than stacked cones   // leaves are painted cards (M_TreeLeaf) rather than plain diamonds
 
 	UInstancedStaticMeshComponent* MakeISM(const TCHAR* Name, UStaticMesh* Mesh, bool bShadow, int32 CullStart, int32 CullEnd, bool bHierarchical = false);
 	void Tint(UInstancedStaticMeshComponent* C, const FLinearColor& Color);

@@ -153,6 +153,49 @@ $g4.Dispose()
 $bmp4.Save($png4, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp4.Dispose()
 
+# Pine needles: one bough seen from above, running left (where it joins the branch) to right (its tip). A thin twig with
+# side shoots, every twig thick with short, fine needles angled forward; pale, so the game tints it (pines dark green)
+$png6 = Join-Path $proj 'Saved\T_PineNeedles.png'
+$bmp6 = New-Object System.Drawing.Bitmap 256, 256, ([System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+$g6 = [System.Drawing.Graphics]::FromImage($bmp6)
+$g6.SmoothingMode = 'AntiAlias'
+$g6.Clear([System.Drawing.Color]::FromArgb(0, 200, 205, 190))
+$rnd6 = New-Object System.Random 41
+$twigs = New-Object System.Collections.ArrayList
+[void]$twigs.Add(@(4.0, 128.0, 252.0, 124.0))
+for ($k = 0; $k -lt 7; $k++) {
+    $x0 = 30 + $k * 30 + $rnd6.Next(-6, 7)
+    $side = if ($k % 2 -eq 0) { -1 } else { 1 }
+    $len = 70 - $k * 6 + $rnd6.Next(-8, 9)
+    [void]$twigs.Add(@([double]$x0, 127.0, [double]($x0 + $len * 0.75), [double](127 + $side * $len * 0.7)))
+}
+foreach ($t in $twigs) {
+    $dx = $t[2] - $t[0]; $dy = $t[3] - $t[1]
+    $L = [math]::Sqrt($dx * $dx + $dy * $dy)
+    $ux = $dx / $L; $uy = $dy / $L
+    $n = [int]($L / 2.2)
+    for ($i = 0; $i -lt $n; $i++) {
+        $fr = $i / $n
+        $px = $t[0] + $dx * $fr; $py = $t[1] + $dy * $fr
+        $nl = 13 + 9 * [math]::Sin($fr * [math]::PI) + $rnd6.Next(-2, 3)
+        foreach ($s in @(-1, 1)) {
+            $ang = (38 + $rnd6.Next(-10, 11)) * [math]::PI / 180 * $s
+            $ex = $px + ($ux * [math]::Cos($ang) - $uy * [math]::Sin($ang)) * $nl
+            $ey = $py + ($ux * [math]::Sin($ang) + $uy * [math]::Cos($ang)) * $nl
+            $v = $rnd6.Next(170, 256)
+            $pen = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, [int]($v * 0.92), $v, [int]($v * 0.86))), 1.6
+            $g6.DrawLine($pen, [single]$px, [single]$py, [single]$ex, [single]$ey)
+            $pen.Dispose()
+        }
+    }
+    $tw = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(255, 120, 95, 70)), 2.4
+    $g6.DrawLine($tw, [single]$t[0], [single]$t[1], [single]$t[2], [single]$t[3])
+    $tw.Dispose()
+}
+$g6.Dispose()
+$bmp6.Save($png6, [System.Drawing.Imaging.ImageFormat]::Png)
+$bmp6.Dispose()
+
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $py = Join-Path $PSScriptRoot 'build_materials.py'
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$py" -unattended -nosplash -stdout -FullStdOutLogOutput

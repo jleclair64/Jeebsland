@@ -80,6 +80,57 @@ static UStaticMesh* MakeLeafClusterMesh(UObject* Outer, UMaterialInterface* Mat)
 }
 
 
+// A pine bough: two cards crossed along +X (0..100 = from where it joins the branch out to its tip), one lying flat, one
+// standing on edge (narrower), so it reads as a bough from above, below and the side
+static UStaticMesh* MakeNeedleCardMesh(UObject* Outer, UMaterialInterface* Mat)
+{
+	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Needles")));
+	FMeshDescription MD;
+	FStaticMeshAttributes Attr(MD);
+	Attr.Register();
+	TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+	TVertexInstanceAttributesRef<FVector3f> Nrm = Attr.GetVertexInstanceNormals();
+	TVertexInstanceAttributesRef<FVector3f> Tan = Attr.GetVertexInstanceTangents();
+	TVertexInstanceAttributesRef<float> Sign = Attr.GetVertexInstanceBinormalSigns();
+	TVertexInstanceAttributesRef<FVector2f> UVs = Attr.GetVertexInstanceUVs();
+	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
+	const FPolygonGroupID Group = MD.CreatePolygonGroup();
+	GroupSlot[Group] = FName("Needles");
+	auto Quad = [&](const FVector& A, const FVector& B, const FVector& C, const FVector& D)   // A-B along the bough's near edge, D-C far edge
+	{
+		const FVector Pts[4] = { A, B, C, D };
+		const FVector2D Uv[4] = { FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0), FVector2D(0, 0) };
+		const int32 Tris[6] = { 0, 1, 2, 0, 2, 3 };
+		for (int32 t = 0; t < 2; ++t)
+		{
+			TArray<FVertexInstanceID> Inst;
+			for (int32 k = 0; k < 3; ++k)
+			{
+				const int32 i = Tris[t * 3 + k];
+				const FVertexID V = MD.CreateVertex();
+				Pos[V] = FVector3f(Pts[i]);
+				const FVertexInstanceID I = MD.CreateVertexInstance(V);
+				Nrm[I] = FVector3f(0.f, 0.f, 1.f);   // lit from above like the leaves (soft, even)
+				Tan[I] = FVector3f(1.f, 0.f, 0.f);
+				Sign[I] = 1.f;
+				UVs[I] = FVector2f(float(Uv[i].X), float(Uv[i].Y));
+				Inst.Add(I);
+			}
+			MD.CreatePolygon(Group, Inst);
+		}
+	};
+	Quad(FVector(0, -50, 0), FVector(100, -50, 0), FVector(100, 50, 0), FVector(0, 50, 0));     // flat
+	Quad(FVector(0, 0, -30), FVector(100, 0, -30), FVector(100, 0, 30), FVector(0, 0, 30));     // on edge
+	UStaticMesh::FBuildMeshDescriptionsParams Params;
+	Params.bBuildSimpleCollision = false;
+	Params.bFastBuild = true;
+	TArray<const FMeshDescription*> Descs;
+	Descs.Add(&MD);
+	SM->BuildFromMeshDescriptions(Descs, Params);
+	return SM;
+}
+
 // ---------------------------------------------------------------- shaped trunks and branches
 // Four trunk shapes, built as tapered tubes. Mesh units: height 0..100, and 100 = the trunk's base width.
 static FVector2D TrunkCenter(int32 V, float t)
@@ -256,9 +307,16 @@ AForest::AForest()
 		Leaf.Last()->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;   // the gentle sway does not force shadows to redraw
 		Leaf.Last()->SetNumCustomDataFloats(1);   // per cluster: how shaded it is inside the crown
 	}
-	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, true, 0, 0));
-	Pine.Add(MakeISM(TEXT("PineB"), ConeMesh.Object, true, 0, 0));
-	RedCone  = MakeISM(TEXT("RedCone"), ConeMesh.Object, true, 0, 0);
+	// needle boughs (or cones if the needle material is missing); pines fade out a little further away than leafy crowns,
+	// redwoods much further (they stand over the forest)
+	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, true, 9000, 12000, true));
+	Pine.Add(MakeISM(TEXT("PineB"), ConeMesh.Object, true, 9000, 12000, true));
+	RedCone  = MakeISM(TEXT("RedCone"), ConeMesh.Object, true, 20000, 25000, true);
+	for (UInstancedStaticMeshComponent* C : { Pine[0], Pine[1], RedCone })
+	{
+		C->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;
+		C->SetNumCustomDataFloats(1);   // per bough: how deep in the crown it sits
+	}
 }
 
 UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, bool bShadow, int32 CullStart, int32 CullEnd, bool bHierarchical)
@@ -467,7 +525,89 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			}
 			CanopyR = Spread * 0.9f;
 		}
-	}	else if (Kind == ETreeKind::Pine)
+	}
+	else if (bNeedleCards && (Kind == ETreeKind::Pine || Kind == ETreeKind::Redwood))
+	{
+		// ------- Pines and redwoods: a straight trunk with whorls of drooping branches dressed in needle boughs, shorter
+		// toward the top (a narrow point on a pine; on a redwood a crown that starts high up a long bare trunk) -------
+		const bool bRed = (Kind == ETreeKind::Redwood);
+		bool bFortTree = false;
+		if (bRed)
+			for (const JeebTerrain::FFort& F : JeebTerrain::Forts())
+				if (FVector2D::Distance(F.Tree, FVector2D(Pos.X, Pos.Y)) < 1.f) bFortTree = true;
+		if (bRed)
+		{
+			TrunkComp = RedTrunk;
+			ConeComp = RedCone;
+			Height = bFortTree ? JeebTerrain::FortTreeHeight() : 2100.f * S * HV;
+			Radius = 85.f * S;
+			TrunkT.Add(FTransform(FQuat::Identity, Pos + FVector(0, 0, Height * 0.5f), FVector(1.6f * S, 1.6f * S, Height / 100.f)));
+			TrunkT.Add(FTransform(FQuat::Identity, Pos + FVector(0, 0, 110.f * S), FVector(2.4f * S, 2.4f * S, 220.f * S / 100.f)));   // base flare
+		}
+		else
+		{
+			ConeComp = Pine[R.RandRange(0, 1)];
+			Height = 250.f * S * HV;
+			Radius = 15.f * S;
+			if (bBark)
+			{
+				TrunkComp = TrunkVar[0];
+				TrunkT.Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f).Quaternion(), Pos, FVector(0.3f * S, 0.3f * S, Height / 100.f)));
+			}
+			else TrunkT.Add(FTransform(FQuat::Identity, Pos + FVector(0, 0, Height * 0.5f), FVector(0.3f * S, 0.3f * S, Height / 100.f)));
+		}
+		// (a fort tree keeps no crown: its trunk ends under the top deck, which is open to the sky)
+		if (bBark) BranchComp = BranchVar[bRed ? 3 : 2];   // bark-textured branches (reddish for redwoods, grey-brown for pines)
+		const int32 Whorls = bFortTree ? 0 : (bRed ? R.RandRange(16, 19) : R.RandRange(11, 14));
+		const float Lowest = bRed ? 0.42f : 0.16f;
+		const float ReachBase = bRed ? 330.f * S : 160.f * S * FMath::Sqrt(HV);
+		const float ReachTop = bRed ? 70.f * S : 28.f * S;
+		const float CardLen = bRed ? 120.f * S : 70.f * S;
+		TArray<float> Shade;
+		auto Bough = [&](const FVector& At, const FVector& Dir, float Len, float Shd)
+		{
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Dir, FVector(0.f, 0.f, 1.f)).ToQuat() * FRotator(0.f, 0.f, R.FRandRange(-25.f, 25.f)).Quaternion();
+			ConeT.Add(FTransform(Q, At, FVector(Len / 100.f, Len * 0.75f / 100.f, Len * 0.75f / 100.f)));
+			Shade.Add(Shd);
+		};
+		for (int32 w = 0; w < Whorls; ++w)
+		{
+			const float T = float(w) / FMath::Max(Whorls - 1, 1);
+			const FVector Start = Pos + FVector(0.f, 0.f, FMath::Lerp(Lowest, 0.97f, T) * Height);
+			const float Reach = FMath::Lerp(ReachBase, ReachTop, FMath::Pow(T, 0.85f));
+			const int32 NB = T > 0.85f ? 3 : R.RandRange(4, 6);
+			for (int32 b = 0; b < NB; ++b)
+			{
+				const float Az = FMath::DegreesToRadians(w * 47.f + b * 360.f / NB + R.FRandRange(-18.f, 18.f));
+				const float El = FMath::DegreesToRadians(FMath::Lerp(-20.f, -6.f, T) + R.FRandRange(-6.f, 6.f));   // branches droop a little, less near the top
+				FVector Dir(FMath::Cos(El) * FMath::Cos(Az), FMath::Cos(El) * FMath::Sin(Az), FMath::Sin(El));
+				const float L = Reach * R.FRandRange(0.85f, 1.1f);
+				const float Th = (bRed ? 16.f : 6.f) * S * (1.f - 0.7f * T) + 1.5f * S;
+				// the branch: two pieces, the outer one drooping more
+				const FVector Mid = Start + Dir * L * 0.55f;
+				const FVector Dir2 = (Dir + FVector(0.f, 0.f, -0.25f)).GetSafeNormal();
+				const FVector Tip = Mid + Dir2 * L * 0.45f;
+				BranchT.Add(Stick(Start, Mid, Th));
+				BranchT.Add(Stick(Mid - Dir2 * Th * 0.3f, Tip, Th * 0.6f));
+				// needle boughs all along it, from a little way out to just past the tip (fanned a little)
+				const float Cl = FMath::Clamp(L * 0.55f, CardLen * 0.45f, CardLen);
+				const int32 N = FMath::Clamp(FMath::RoundToInt(L / (Cl * 0.45f)), 2, 7);
+				for (int32 k = 0; k < N; ++k)
+				{
+					const float Fk = 0.15f + 0.85f * float(k) / N;
+					const FVector P = Fk < 0.55f ? FMath::Lerp(Start, Mid, Fk / 0.55f) : FMath::Lerp(Mid, Tip, (Fk - 0.55f) / 0.45f);
+					const FVector D = ((Fk < 0.55f ? Dir : Dir2) + FVector(R.FRandRange(-0.35f, 0.35f), R.FRandRange(-0.35f, 0.35f), R.FRandRange(-0.12f, 0.05f))).GetSafeNormal();
+					Bough(P, D, Cl * R.FRandRange(0.8f, 1.1f), FMath::Clamp(0.38f * (1.f - Fk) + 0.22f * (1.f - T), 0.f, 0.55f));
+				}
+			}
+		}
+		// the leader: a tuft of short boughs pointing up at the very top
+		if (Whorls > 0)
+			for (int32 k = 0; k < 4; ++k)
+				Bough(Pos + FVector(0.f, 0.f, Height * 0.97f), (FVector(R.FRandRange(-0.4f, 0.4f), R.FRandRange(-0.4f, 0.4f), 1.f)).GetSafeNormal(), CardLen * 0.55f, 0.05f);
+		LeafShade = Shade;   // (handed to the needle boughs below)
+	}
+	else if (Kind == ETreeKind::Pine)
 	{
 		// ------- Pine: slim trunk with seven stacked cone tiers -------
 		ConeComp = Pine[R.RandRange(0, 1)];
@@ -541,6 +681,12 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		LeafComp->MarkRenderStateDirty();
 	}
 	Commit(ConeComp, ConeT, false);
+	if (bNeedleCards && ConeComp && LeafShade.Num() == ConeT.Num() && ConeT.Num() > 0 && ConeComp->NumCustomDataFloats > 0)
+	{
+		const int32 First = ConeComp->GetInstanceCount() - ConeT.Num();
+		for (int32 i = 0; i < LeafShade.Num(); ++i) ConeComp->SetCustomDataValue(First + i, 0, LeafShade[i], false);
+		ConeComp->MarkRenderStateDirty();
+	}
 
 	Tree->Setup(Kind, FMath::Max(Radius, 18.f), Height);
 	if (Kind == ETreeKind::Oak)
@@ -580,9 +726,29 @@ void AForest::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("M_TreeLeaf is missing: run MakeGrassCards.bat once. Trees keep their old blocky leaves."));
 		for (int32 i = 0; i < Leaf.Num(); ++i) Tint(Leaf[i], LeafColors[i]);
 	}
-	Tint(Pine[0],  FLinearColor(0.04f, 0.15f, 0.07f));
-	Tint(Pine[1],  FLinearColor(0.06f, 0.19f, 0.09f));
-	Tint(RedCone,  FLinearColor(0.05f, 0.17f, 0.12f));
+	UMaterialInterface* NeedleMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_PineNeedle.M_PineNeedle"));
+	if (NeedleMat)
+	{
+		// painted needle boughs, in three greens: two for pines, a bluer one for the redwoods
+		UStaticMesh* NeedleMesh = MakeNeedleCardMesh(this, NeedleMat);
+		const FLinearColor Greens[3] = { FLinearColor(0.10f, 0.26f, 0.12f), FLinearColor(0.13f, 0.31f, 0.14f), FLinearColor(0.10f, 0.27f, 0.19f) };
+		UInstancedStaticMeshComponent* Comps[3] = { Pine[0], Pine[1], RedCone };
+		for (int32 i = 0; i < 3; ++i)
+		{
+			Comps[i]->SetStaticMesh(NeedleMesh);
+			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(NeedleMat, this);
+			M->SetVectorParameterValue(TEXT("Tint"), Greens[i]);
+			Comps[i]->SetMaterial(0, M);
+		}
+		bNeedleCards = true;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("M_PineNeedle is missing: run Tools/BuildMaterials.ps1. Pines keep their old cones."));
+		Tint(Pine[0],  FLinearColor(0.04f, 0.15f, 0.07f));
+		Tint(Pine[1],  FLinearColor(0.06f, 0.19f, 0.09f));
+		Tint(RedCone,  FLinearColor(0.05f, 0.17f, 0.12f));
+	}
 
 		UMaterialInterface* BarkMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_BarkTint.M_BarkTint"));
 	if (BarkMat)

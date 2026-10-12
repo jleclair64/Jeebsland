@@ -643,6 +643,9 @@ imported(gen_textures.patches(), "T_Patches")
 build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.10)   # a softer, more natural green
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True)
+# pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
+import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_PineNeedles.png"), "T_PineNeedles")   # painted by BuildMaterials.ps1
+build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,          False,     0.2, param=True, gain=0.9, crown_shade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
