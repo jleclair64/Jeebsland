@@ -53,7 +53,8 @@ bool UJeebGameInstance::InMenu(const UObject* WorldContext)
 	const UWorld* W = WorldContext ? WorldContext->GetWorld() : nullptr;
 	if (!W || W->GetNetMode() != NM_Standalone || W->WorldType != EWorldType::Game) return false;
 	const TCHAR* Cmd = FCommandLine::Get();
-	return !FParse::Param(Cmd, TEXT("JeebOffline")) && !FParse::Param(Cmd, TEXT("JeebShot"));
+	// (the editor's "Standalone Game" play mode starts with -PIEVIACONSOLE: like every editor Play button, it plays straight away)
+	return !FParse::Param(Cmd, TEXT("JeebOffline")) && !FParse::Param(Cmd, TEXT("JeebShot")) && !FParse::Param(Cmd, TEXT("PIEVIACONSOLE"));
 }
 
 void UJeebGameInstance::RememberChoices()
