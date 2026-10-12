@@ -35,25 +35,10 @@
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
 
-void AKnightCharacter::EquipFromInventory(int32 Idx)
-{
-	if (!Skills) return;
-	if (Skills->EquipFromSlot(Idx)) RefreshEquipment();
-}
-
-void AKnightCharacter::UnequipHotbar(int32 H)
-{
-	if (!Skills) return;
-	if (Skills->UnequipHotbar(H)) RefreshEquipment();
-	else if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("No room in your inventory."));
-}
-
-void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing)
-{
-	if (!Skills) return;
-	if (Skills->UnequipWorn(Kind, bSecondRing)) RefreshEquipment();
-	else if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("No room in your inventory."));
-}
+// (these ask the server: see Inv in KnightCharacterNet.cpp)
+void AKnightCharacter::EquipFromInventory(int32 Idx) { Inv(EInvOp::Equip, Idx); }
+void AKnightCharacter::UnequipHotbar(int32 H) { Inv(EInvOp::UnequipHot, H); }
+void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing) { Inv(EInvOp::UnequipWorn, Kind, bSecondRing ? 1 : 0); }
 
 void AKnightCharacter::CycleHotbar(int32 Dir)
 {
@@ -68,7 +53,14 @@ void AKnightCharacter::CycleHotbar(int32 Dir)
 void AKnightCharacter::SelectHotbar(int32 H)
 {
 	if (!Skills || H < 0 || H > 4 || Skills->Selected == H) return;
-	Skills->Selected = H;
+	// The hand changes here straight away; online the server is told and follows
+	if (HasAuthority()) Skills->SetSelected(H);
+	else
+	{
+		Skills->Selected = H;
+		Skills->LocalSelectTime = FPlatformTime::Seconds();
+		Inv(EInvOp::Select, H);
+	}
 	bAttacking = false;
 	bCharging = false;
 	RefreshEquipment();
@@ -107,6 +99,7 @@ bool AKnightCharacter::PrepareTool(ESkillType Skill, float& OutTimeMult)
 // ---------------- Dropping things on the ground ----------------
 void AKnightCharacter::DropBag(const TArray<FInvSlot>& Items, int32 Ingots)
 {
+	if (!HasAuthority()) return;   // drops are made by the server
 	const FVector Where = GetActorLocation() + GetActorForwardVector() * 130.f;
 	const FVector Ground(Where.X, Where.Y, JeebTerrain::HeightAt(Where.X, Where.Y));
 	// Things dropped in the same spot don't pile up through each other: next to a sack they go into it, and once three or
@@ -137,44 +130,15 @@ void AKnightCharacter::DropBag(const TArray<FInvSlot>& Items, int32 Ingots)
 			for (ALootDrop* L : Loose) L->Destroy();
 			const FVector At(Mid.X, Mid.Y, JeebTerrain::HeightAt(Mid.X, Mid.Y));
 			if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(At, FRotator::ZeroRotator)) Drop->Setup(ELootLook::Pack, All, AllIngots);
-			JeebMsg::Post(2.5f, FColor(255, 220, 140), TEXT("The things here are gathered into a sack."));
+			if (Skills) Skills->Say(2.5f, FColor(255, 220, 140), TEXT("The things here are gathered into a sack."));
 			return;
 		}
 	}
 	if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(Ground, FRotator::ZeroRotator)) Drop->Setup(Items.Num() <= 1 ? ELootLook::Item : ELootLook::Pack, Items, Ingots);   // one thing: show the thing itself
 }
 
-void AKnightCharacter::DropFromPack(int32 SlotIdx, int32 Count)
-{
-	if (!Skills || !Skills->Slots.IsValidIndex(SlotIdx)) return;
-	FInvSlot& S = Skills->Slots[SlotIdx];
-	if (S.Id == 0 || S.Count <= 0) return;
-	const int32 N = FMath::Clamp(Count, 1, S.Count);
-	TArray<FInvSlot> Items;
-	FInvSlot D; D.Id = S.Id; D.Count = N;
-	Items.Add(D);
-	S.Count -= N;
-	if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
-	DropBag(Items, 0);
-	RefreshEquipment();
-}
-
-void AKnightCharacter::DropIngots(int32 Count)
-{
-	if (!Skills) return;
-	const int32 N = FMath::Clamp(Count, 0, Skills->GetIngots());
-	if (N <= 0 || !Skills->SpendIngots(N)) return;
-	DropBag(TArray<FInvSlot>(), N);
-}
-
-void AKnightCharacter::DropFromHotbar(int32 H)
-{
-	if (!Skills || H < 0 || H >= 5 || Skills->Hotbar[H] == 0) return;
-	TArray<FInvSlot> Items;
-	FInvSlot D; D.Id = Skills->Hotbar[H]; D.Count = 1;
-	Items.Add(D);
-	Skills->Hotbar[H] = 0;
-	DropBag(Items, 0);
-	RefreshEquipment();
-}
+// (the server takes the things out of the pack and makes the bag: see DoInv)
+void AKnightCharacter::DropFromPack(int32 SlotIdx, int32 Count) { Inv(EInvOp::DropPack, SlotIdx, Count); }
+void AKnightCharacter::DropIngots(int32 Count) { Inv(EInvOp::DropIngots, Count); }
+void AKnightCharacter::DropFromHotbar(int32 H) { Inv(EInvOp::DropHot, H); }
 

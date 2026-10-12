@@ -48,7 +48,7 @@ bool UJeebSave::Save(const USkillComponent* Skills)
 	S->RingB = Skills->RingB;
 	S->PotionId = Skills->PotionSlot.Id;
 	S->PotionCount = Skills->PotionSlot.Count;
-	S->LoreFound = Skills->LoreFound.Array();
+	S->LoreFound = Skills->LoreFound;
 	S->LastGambleHour = Skills->LastGambleHour;
 
 	return UGameplayStatics::SaveGameToSlot(S, SlotName, 0);
@@ -82,7 +82,7 @@ bool UJeebSave::Restore(USkillComponent* Skills)
 	Fill(Skills->Bank, S->BankIds, S->BankCounts);
 
 	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (S->Hotbar.IsValidIndex(i) && ValidId(S->Hotbar[i])) ? S->Hotbar[i] : 0;
-	Skills->Selected = FMath::Clamp(S->Selected, 0, 4);
+	Skills->SetSelected(S->Selected);
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (S->Worn.IsValidIndex(i) && ValidId(S->Worn[i])) ? S->Worn[i] : 0;
 	Skills->RingB = ValidId(S->RingB) ? S->RingB : 0;
 	Skills->PotionSlot = FInvSlot();
@@ -90,7 +90,7 @@ bool UJeebSave::Restore(USkillComponent* Skills)
 
 	Skills->RestoreSkills(S->XP, S->Known, FMath::Max(0, S->Ingots));
 	Skills->LoreFound.Empty();
-	for (int32 L : S->LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.Add(L);
+	for (int32 L : S->LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
 	Skills->LastGambleHour = S->LastGambleHour;
 	return true;
 }

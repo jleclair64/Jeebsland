@@ -3,6 +3,8 @@
 #include "Engine/Engine.h"
 #include "Inventory.h"
 #include "Lore.h"
+#include "Net/UnrealNetwork.h"
+#include "GameFramework/Pawn.h"
 
 namespace
 {
@@ -24,6 +26,7 @@ namespace
 USkillComponent::USkillComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 	Slots.SetNum(JeebItems::NumSlots);
 	Bank.SetNum(NumBankSlots);
 	for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
@@ -37,10 +40,11 @@ USkillComponent::USkillComponent()
 // shield, a black cape and a full suit of bronze armour (pieces can be swapped for others, never taken off)
 void USkillComponent::ResetToStartingKit()
 {
+	if (!HasAuth()) return;   // only the server changes the pack
 	for (int32 i = 0; i < 5; ++i) Hotbar[i] = 0;
 	for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
 	RingB = 0;
-	Selected = 0;
+	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
 	Hotbar[1] = JeebItems::GearId(JeebItems::K_Axe, 0);
 	Hotbar[2] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
@@ -53,6 +57,7 @@ void USkillComponent::ResetToStartingKit()
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
 void USkillComponent::TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots)
 {
+	if (!HasAuth()) return;   // only the server changes the pack
 	auto Put = [&](int32 Id, int32 Count, uint8 W) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; Out.Add(D); OutWhere.Add(W); } };
 	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0); S.Id = 0; S.Count = 0; }
 	for (int32 i = 0; i < 5; ++i) { Put(Hotbar[i], 1, 1); Hotbar[i] = 0; }
@@ -111,16 +116,23 @@ void USkillComponent::GetProgress(ESkillType Skill, int32& Level, int32& XPIntoL
 
 void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 {
+	if (!HasAuth()) return;   // only the server changes the pack
 	const int32 OldLevel = GetLevel(Skill);
 	XP[static_cast<int32>(Skill)] += Amount;
 	const int32 NewLevel = GetLevel(Skill);
 	if (!Known[static_cast<int32>(Skill)])
 	{
 		Known[static_cast<int32>(Skill)] = true;
-		JeebMsg::Post(5.f, FColor(255, 215, 120), FString::Printf(TEXT("New skill discovered: %s!"), *SkillName(Skill)));
+		Say(5.f, FColor(255, 215, 120), FString::Printf(TEXT("New skill discovered: %s!"), *SkillName(Skill)));
 	}
 
-	// The HUD shows a progress bar for the skill you last trained, for 30 seconds (but not for Attack and Defence: those level quietly)
+	if (IsRemoteOwned()) ClientXP(static_cast<uint8>(Skill), Amount, NewLevel > OldLevel);
+	else ShowXP(Skill, Amount, NewLevel > OldLevel);
+}
+
+// The HUD shows a progress bar for the skill you last trained, for 30 seconds (but not for Attack and Defence: those level quietly)
+void USkillComponent::ShowXP(ESkillType Skill, int32 Amount, bool bLevelUp)
+{
 	const double Now = FPlatformTime::Seconds();
 	const bool bQuiet = (Skill == ESkillType::Attack || Skill == ESkillType::Defense);
 	if (!bQuiet)
@@ -129,11 +141,76 @@ void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 		LastSkillTime = Now;
 		LastXPGain = Amount;
 	}
-	if (NewLevel > OldLevel)
+	if (bLevelUp)
 	{
 		if (!bQuiet) LevelUpTime = Now;
-		JeebMsg::Post(5.f, FColor::Green, FString::Printf(TEXT("Level up! %s is now level %d."), *SkillName(Skill), NewLevel));
+		JeebMsg::Post(5.f, FColor::Green, FString::Printf(TEXT("Level up! %s is now level %d."), *SkillName(Skill), GetLevel(Skill)));
 	}
+}
+
+void USkillComponent::ClientXP_Implementation(uint8 Skill, int32 Amount, bool bLevelUp)
+{
+	// (the XP itself arrives by replication; it may land a moment after this, so the level is read when the pop-up draws)
+	if (Skill < NumSkills) ShowXP(static_cast<ESkillType>(Skill), Amount, bLevelUp);
+}
+
+void USkillComponent::ClientSay_Implementation(const FString& Text, FColor Color, float Seconds)
+{
+	JeebMsg::Post(Seconds, Color, Text);
+}
+
+bool USkillComponent::HasAuth() const
+{
+	const AActor* O = GetOwner();
+	return !O || O->HasAuthority();
+}
+
+bool USkillComponent::IsRemoteOwned() const
+{
+	const APawn* P = Cast<APawn>(GetOwner());
+	return P && P->HasAuthority() && P->GetNetMode() != NM_Standalone && !P->IsLocallyControlled();
+}
+
+void USkillComponent::Say(float Seconds, const FColor& Color, const FString& Text)
+{
+	if (IsRemoteOwned()) ClientSay(Text, Color, Seconds);
+	else if (!GetOwner() || GetOwner()->GetNetMode() != NM_DedicatedServer) JeebMsg::Post(Seconds, Color, Text);
+}
+
+void USkillComponent::SetSelected(int32 H)
+{
+	Selected = FMath::Clamp(H, 0, 4);
+	if (HasAuth()) RepSelected = Selected;
+}
+
+void USkillComponent::OnRep_Selected()
+{
+	// the server moved the hand (a tool picked for gathering, a death): follow it, unless the player has just chosen a slot
+	if (FPlatformTime::Seconds() - LocalSelectTime < 1.0) return;
+	if (Selected != RepSelected) { Selected = RepSelected; OnGearChanged.Broadcast(); }
+}
+
+void USkillComponent::OnRep_Gear()
+{
+	OnGearChanged.Broadcast();   // the owner's knight redraws its armour and the weapon in hand
+}
+
+void USkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	// all of it is private to the player who owns the knight (others see the knight's look through AKnightCharacter::RepLook)
+	DOREPLIFETIME_CONDITION(USkillComponent, Slots, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Bank, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Hotbar, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, RepSelected, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Worn, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, RingB, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, PotionSlot, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, XP, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Known, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Ingots, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, LoreFound, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, LastGambleHour, COND_OwnerOnly);
 }
 
 bool USkillComponent::CanAdd(int32 Id, int32 Amount) const
@@ -150,6 +227,7 @@ bool USkillComponent::CanAdd(int32 Id, int32 Amount) const
 
 bool USkillComponent::AddInvItem(int32 Id, int32 Amount)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!CanAdd(Id, Amount)) return false;
 	const int32 Stack = JeebItems::StackSize(Id);
 	for (FInvSlot& S : Slots) // top up existing stacks first
@@ -180,6 +258,7 @@ bool USkillComponent::AddItem(EItemType Item, int32 Amount)
 
 int32 USkillComponent::SellAll(EItemType Item)
 {
+	if (!HasAuth()) return 0;   // only the server changes the pack
 	const int32 Id = JeebItems::MaterialId(Item);
 	int32 Total = 0;
 	for (FInvSlot& S : Slots)
@@ -193,6 +272,7 @@ int32 USkillComponent::SellAll(EItemType Item)
 
 bool USkillComponent::SpendIngots(int32 Amount)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (Ingots < Amount) return false;
 	Ingots -= Amount;
 	return true;
@@ -212,6 +292,7 @@ int32 USkillComponent::CountItem(int32 Id) const
 
 bool USkillComponent::RemoveItems(int32 Id, int32 Count)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (CountItem(Id) < Count) return false;
 	// Take from the smallest stacks first so big stacks stay tidy
 	while (Count > 0)
@@ -236,6 +317,7 @@ int32 USkillComponent::CountWood() const
 
 bool USkillComponent::TakeWood(int32 Count)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (CountWood() < Count) return false;
 	const EItemType Order[3] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs };
 	for (EItemType T : Order)
@@ -257,6 +339,7 @@ int32 USkillComponent::BestArrowTier() const
 
 int32 USkillComponent::TakeBestArrow()
 {
+	if (!HasAuth()) return -1;   // only the server changes the pack
 	const int32 T = BestArrowTier();
 	if (T < 0) return -1;
 	RemoveItems(JeebItems::ArrowId(T), 1);
@@ -265,6 +348,7 @@ int32 USkillComponent::TakeBestArrow()
 
 bool USkillComponent::EquipFromSlot(int32 Idx)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(Idx)) return false;
 	FInvSlot& S = Slots[Idx];
 	if (!JeebItems::IsGear(S.Id)) return false;
@@ -284,7 +368,7 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] == 0) { H = i; break; }
 		if (H < 0) H = Selected;
 		Swap(Hotbar[H]);
-		Selected = H;
+		SetSelected(H);
 		return true;
 	}
 	if (K < 0 || K >= NumWornKinds) return false;
@@ -302,6 +386,7 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 
 bool USkillComponent::UnequipHotbar(int32 H)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (H < 0 || H >= 5 || Hotbar[H] == 0) return false;
 	if (!AddInvItem(Hotbar[H], 1)) return false;
 	Hotbar[H] = 0;
@@ -310,12 +395,13 @@ bool USkillComponent::UnequipHotbar(int32 H)
 
 bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (Kind < 0 || Kind >= NumWornKinds) return false;
 	int32& Target = (bSecondRing && Kind == JeebItems::K_Ring) ? RingB : Worn[Kind];
 	if (Target == 0) return false;
 	if (JeebItems::IsArmorKind(Kind))
 	{
-		JeebMsg::Post(3.f, FColor::Orange, TEXT("Armour can't be taken off. Click a better piece in your pack to swap it."));
+		Say(3.f, FColor::Orange, TEXT("Armour can't be taken off. Click a better piece in your pack to swap it."));
 		return false;
 	}
 	if (!AddInvItem(Target, 1)) return false;
@@ -325,13 +411,11 @@ bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 
 bool USkillComponent::DiscoverLore(int32 Index)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	const TArray<JeebLore::FEntry>& E = JeebLore::Entries();
 	if (!E.IsValidIndex(Index) || LoreFound.Contains(Index)) return false;
 	LoreFound.Add(Index);
-	if (GEngine)
-	{
-		JeebMsg::Post(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press O, Lore tab)"), E[Index].Title));
-	}
+	Say(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press O, Lore tab)"), E[Index].Title));
 	return true;
 }
 
@@ -357,6 +441,7 @@ namespace
 
 bool USkillComponent::BankDeposit(int32 PackIdx)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(PackIdx) || Slots[PackIdx].Id == 0) return false;
 	FInvSlot& S = Slots[PackIdx];
 	const int32 Left = PutInto(Bank, S.Id, S.Count);
@@ -368,6 +453,7 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 
 bool USkillComponent::BankWithdraw(int32 BankIdx)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Bank.IsValidIndex(BankIdx) || Bank[BankIdx].Id == 0) return false;
 	FInvSlot& S = Bank[BankIdx];
 	const int32 Left = PutInto(Slots, S.Id, S.Count);
@@ -386,6 +472,7 @@ int32 USkillComponent::BankUsed() const
 
 bool USkillComponent::SwapInvHotbar(int32 InvIdx, int32 H)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(InvIdx) || H < 0 || H >= 5) return false;
 	FInvSlot& S = Slots[InvIdx];
 	if (S.Id != 0 && !(JeebItems::IsGear(S.Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(S.Id)))) return false;   // only weapons go on the bar
@@ -399,6 +486,7 @@ bool USkillComponent::SwapInvHotbar(int32 InvIdx, int32 H)
 
 bool USkillComponent::SwapInv(int32 A, int32 B)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(A) || !Slots.IsValidIndex(B) || A == B) return false;
 	Swap(Slots[A], Slots[B]);
 	return true;
@@ -406,6 +494,7 @@ bool USkillComponent::SwapInv(int32 A, int32 B)
 
 bool USkillComponent::SwapHotbar(int32 A, int32 B)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (A < 0 || B < 0 || A >= 5 || B >= 5 || A == B) return false;
 	Swap(Hotbar[A], Hotbar[B]);
 	return true;
@@ -413,6 +502,7 @@ bool USkillComponent::SwapHotbar(int32 A, int32 B)
 
 void USkillComponent::FillPracticePack()
 {
+	if (!HasAuth()) return;   // only the server changes the pack
 	FRandomStream R(5150);
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
@@ -442,6 +532,7 @@ int32* USkillComponent::WornSlotPtr(int32 Kind, bool bSecond)
 
 bool USkillComponent::SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(InvIdx)) return false;
 	FInvSlot& S = Slots[InvIdx];
 	if (S.Id == 0 || !JeebItems::IsGear(S.Id)) return false;
@@ -459,6 +550,7 @@ bool USkillComponent::SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond)
 
 bool USkillComponent::SwapInvPotion(int32 InvIdx)
 {
+	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(InvIdx)) return false;
 	FInvSlot& S = Slots[InvIdx];
 	if (S.Id != 0 && !JeebItems::IsPotion(S.Id)) return false;   // only potions go in the potion slot
@@ -469,6 +561,7 @@ bool USkillComponent::SwapInvPotion(int32 InvIdx)
 
 void USkillComponent::RestoreSkills(const TArray<int32>& InXP, const TArray<uint8>& InKnown, int32 InIngots)
 {
+	if (!HasAuth()) return;   // only the server changes the pack
 	for (int32 i = 0; i < NumSkills; ++i)
 	{
 		XP[i] = InXP.IsValidIndex(i) ? FMath::Max(0, InXP[i]) : 0;

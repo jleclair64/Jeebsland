@@ -4,6 +4,8 @@
 #include "Inventory.h"
 #include "Engine/Engine.h"
 #include "TimerManager.h"
+#include "KnightGameState.h"
+#include "Engine/World.h"
 
 AResourceNode::AResourceNode()
 {
@@ -14,6 +16,27 @@ void AResourceNode::BeginPlay()
 {
 	Super::BeginPlay();
 	Charges = MaxCharges;
+}
+
+void AResourceNode::Tell(AActor* Who, float Seconds, const FColor& Color, const FString& Text)
+{
+	if (USkillComponent* Sk = Who ? Who->FindComponentByClass<USkillComponent>() : nullptr) Sk->Say(Seconds, Color, Text);
+	else JeebMsg::Post(Seconds, Color, Text);
+}
+
+void AResourceNode::ChargesChanged()
+{
+	OnChargesChanged(Charges, MaxCharges);
+	if (AKnightGameState* GS = GetWorld() ? GetWorld()->GetGameState<AKnightGameState>() : nullptr) GS->SetNodeCharges(GetActorLocation(), Charges, MaxCharges);
+}
+
+void AResourceNode::ApplyCharges(int32 N)
+{
+	if (bLockedNode || HasAuthority()) return;
+	const int32 C = N < 0 ? MaxCharges : FMath::Clamp(N, 0, MaxCharges);
+	if (C == Charges) return;
+	Charges = C;
+	OnChargesChanged(Charges, MaxCharges);
 }
 
 int32 AResourceNode::RequiredLevel() const
@@ -29,7 +52,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 
 	if (Charges <= 0)
 	{
-		JeebMsg::Post(2.f, FColor::Orange, EmptyText);
+		Tell(Gatherer, 2.f, FColor::Orange, EmptyText);
 		return true;
 	}
 	if (bBeingGathered) return true;
@@ -40,7 +63,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 		const int32 Need = RequiredLevel();
 		if (Skills->GetLevel(Skill) < Need)
 		{
-			JeebMsg::Post(3.f, FColor::Orange,
+			Tell(Gatherer, 3.f, FColor::Orange,
 				FString::Printf(TEXT("You need %s level %d for this."), *USkillComponent::SkillName(Skill), Need));
 			return true;
 		}
@@ -55,7 +78,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 	bBeingGathered = true;
 	CurrentGatherer = Gatherer;
 	if (Knight) Knight->BeginGathering(this, Skill);
-	JeebMsg::Post(EffectiveSeconds, FColor::Yellow, StartText);
+	Tell(Gatherer, EffectiveSeconds, FColor::Yellow, StartText);
 	GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
 	return true;
 }
@@ -70,7 +93,7 @@ void AResourceNode::CancelGathering()
 	{
 		Knight->EndGathering();
 	}
-	if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You stop."));
+	Tell(CurrentGatherer.Get(), 2.f, FColor::Orange, TEXT("You stop."));
 }
 
 void AResourceNode::FinishGathering()
@@ -84,7 +107,7 @@ void AResourceNode::FinishGathering()
 	}
 	if (!Gatherer || FVector::Dist2D(Gatherer->GetActorLocation(), GetActorLocation()) > ReachRadius() + 150.f)
 	{
-		if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You wandered off and stopped."));
+		Tell(Gatherer, 2.f, FColor::Orange, TEXT("You wandered off and stopped."));
 		return;
 	}
 
@@ -95,23 +118,22 @@ void AResourceNode::FinishGathering()
 		RollYield(Skills, Item, XP);
 		if (!Skills->AddItem(Item, ItemsPerGather))
 		{
-			if (GEngine) JeebMsg::Post(3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
+			Tell(Gatherer, 3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
 			return;
 		}
 		Skills->AddXP(Skill, XP);
 	}
 
 	--Charges;
-	OnChargesChanged(Charges, MaxCharges);
+	ChargesChanged();
 
-	if (GEngine)
 	{
 		FString Msg = SuccessText;
 		if (MaxCharges > 1 && Charges > 0)
 		{
 			Msg += FString::Printf(TEXT(" (%d left)"), Charges);
 		}
-		JeebMsg::Post(2.f, FColor::Green, Msg);
+		Tell(Gatherer, 2.f, FColor::Green, Msg);
 	}
 
 	if (Charges <= 0)
@@ -123,5 +145,5 @@ void AResourceNode::FinishGathering()
 void AResourceNode::Respawn()
 {
 	Charges = MaxCharges;
-	OnChargesChanged(Charges, MaxCharges);
+	ChargesChanged();
 }

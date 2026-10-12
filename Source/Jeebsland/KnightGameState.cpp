@@ -39,6 +39,9 @@
 #include "Components/SkyLightComponent.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Components/ExponentialHeightFogComponent.h"
+#include "Net/UnrealNetwork.h"
+#include "ResourceNode.h"
+#include "Store.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -227,6 +230,56 @@ void AKnightGameState::BuildWorld()
 
 	// Game messages are drawn by the HUD; keep the engine's debug text off the screen
 	if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
+
+	// Online: the server's rock and tree counts may have arrived before the world was built
+	if (!HasAuthority()) OnRep_Nodes();
+}
+
+void AKnightGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AKnightGameState, NodeCharges);
+	DOREPLIFETIME(AKnightGameState, StoreHour);
+	DOREPLIFETIME(AKnightGameState, StoreLeft);
+}
+
+void AKnightGameState::SetNodeCharges(const FVector& Loc, int32 Charges, int32 Max)
+{
+	if (!HasAuthority() || GetNetMode() == NM_Standalone) return;
+	const FVector Q(FMath::RoundToFloat(Loc.X), FMath::RoundToFloat(Loc.Y), FMath::RoundToFloat(Loc.Z));
+	const int32 Found = NodeCharges.IndexOfByPredicate([&](const FNodeCharge& N) { return FVector::DistSquared(N.Loc, Q) < 4.f; });
+	if (Charges >= Max) { if (Found != INDEX_NONE) NodeCharges.RemoveAtSwap(Found); return; }
+	if (Found != INDEX_NONE) NodeCharges[Found].Charges = Charges;
+	else { FNodeCharge N; N.Loc = Q; N.Charges = Charges; NodeCharges.Add(N); }
+}
+
+void AKnightGameState::OnRep_Nodes()
+{
+	for (TActorIterator<AResourceNode> It(GetWorld()); It; ++It)
+	{
+		const FVector L = It->GetActorLocation();
+		int32 C = -1;   // -1: not listed, so full
+		for (const FNodeCharge& N : NodeCharges) if (FVector::DistSquared2D(N.Loc, L) < 9.f && FMath::Abs(N.Loc.Z - L.Z) < 3.f) { C = N.Charges; break; }
+		It->ApplyCharges(C);
+	}
+}
+
+void AKnightGameState::SyncStore()
+{
+	if (!HasAuthority()) return;
+	const TArray<JeebStore::FWare>& W = JeebStore::Stock();
+	StoreHour = JeebStore::HourNow();
+	StoreLeft.SetNum(W.Num());
+	for (int32 i = 0; i < W.Num(); ++i) StoreLeft[i] = W[i].Stock;
+}
+
+void AKnightGameState::ApplyStore(UWorld* World)
+{
+	const AKnightGameState* GS = World ? World->GetGameState<AKnightGameState>() : nullptr;
+	if (!GS || GS->HasAuthority()) return;
+	TArray<JeebStore::FWare>& W = JeebStore::Stock();
+	if (GS->StoreHour != JeebStore::HourNow() || GS->StoreLeft.Num() != W.Num()) return;   // nobody has bought anything this hour
+	for (int32 i = 0; i < W.Num(); ++i) W[i].Stock = GS->StoreLeft[i];
 }
 
 // Light haze everywhere, a little thicker among dense trees and over the graveyard

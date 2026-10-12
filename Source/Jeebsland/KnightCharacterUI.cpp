@@ -153,7 +153,9 @@ void AKnightCharacter::StartDialogue(ANpc* Npc)
 {
 	if (!Npc || IsUIOpen()) return;
 	TradeNpc = Npc;
-	DialogueLines = Npc->MakeConversation();
+	int32 Lore = -1;
+	DialogueLines = Npc->MakeConversation(&Lore);
+	if (Lore >= 0) Inv(EInvOp::Lore, Lore);
 	DialogueIdx = 0;
 	bDialogueOpen = true;
 	bCrouched = false;

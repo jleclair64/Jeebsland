@@ -35,10 +35,25 @@ enum class EItemType : uint8
 	Bones
 };
 
-// One inventory slot: what is in it (see Inventory.h for ids) and how many
-struct FInvSlot { int32 Id = 0; int32 Count = 0; };
+// Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
+constexpr int32 JeebNumSkills = 9;
+constexpr int32 JeebNumWornKinds = 24;
 
-// Tracks skill XP, the inventory and what you wear / hold. Lives on the character; later the server will own this.
+// One inventory slot: what is in it (see Inventory.h for ids) and how many
+USTRUCT()
+struct FInvSlot
+{
+	GENERATED_BODY()
+	FInvSlot() {}
+	FInvSlot(int32 InId, int32 InCount) : Id(InId), Count(InCount) {}
+	UPROPERTY() int32 Id = 0;
+	UPROPERTY() int32 Count = 0;
+	bool operator==(const FInvSlot& O) const { return Id == O.Id && Count == O.Count; }
+};
+
+// Tracks skill XP, the inventory and what you wear / hold. Lives on the character.
+// ONLINE: the server owns all of it. Only the server changes it (every changing function below does nothing on a client);
+// it replicates to the owning player only. Players ask for changes through AKnightCharacter::Inv (a request the server checks).
 //
 // Levels: level 1 costs a base amount of XP (Mining 20, Woodcutting 40, Smithing 30, Fishing 25) and every level after
 // costs 20% more than the one before it.
@@ -50,8 +65,15 @@ class USkillComponent : public UActorComponent
 public:
 	USkillComponent();
 
-	static constexpr int32 NumSkills = 9;
-	static constexpr int32 NumWornKinds = 24;   // indexed by JeebItems::EKind
+	static constexpr int32 NumSkills = JeebNumSkills;
+	static constexpr int32 NumWornKinds = JeebNumWornKinds;   // indexed by JeebItems::EKind
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// True where changes are allowed: the server, or a single-player game
+	bool HasAuth() const;
+	// A message for this player: shown here, or sent down to their machine when the server is running it for someone else
+	void Say(float Seconds, const FColor& Color, const FString& Text);
 
 	void AddXP(ESkillType Skill, int32 Amount);
 
@@ -62,39 +84,47 @@ public:
 	int32 LastXPGain = 0;
 
 	// The store's mystery satchel can be opened once per real-world hour (hours since 1970)
-	int64 LastGambleHour = -1;
+	UPROPERTY(Replicated) int64 LastGambleHour = -1;
 	bool AddItem(EItemType Item, int32 Amount = 1);   // false (and nothing added) if it does not fit
 	bool CanAdd(int32 Id, int32 Amount) const;
 	bool AddInvItem(int32 Id, int32 Amount = 1);
 	int32 SellAll(EItemType Item);                    // removes every unit, pays ingots, returns the payment
 	// Skills are discovered by doing: only Attack and Defence are known at the start; the rest appear in the skills window the
 	// first time you earn XP in them.
-	bool Known[NumSkills] = {};
-	bool IsKnown(ESkillType S) const { return Known[static_cast<int32>(S)]; }
+	UPROPERTY(Replicated) uint8 Known[JeebNumSkills] = {};
+	bool IsKnown(ESkillType S) const { return Known[static_cast<int32>(S)] != 0; }
 	int32 GetIngots() const { return Ingots; }
 	bool SpendIngots(int32 Amount);
-	void AddIngots(int32 Amount) { Ingots += Amount; }
+	void AddIngots(int32 Amount) { if (HasAuth()) Ingots += Amount; }
 
 	// Lore fragments heard so far (indices into JeebLore::Entries()). Returns true the first time.
-	TSet<int32> LoreFound;
+	UPROPERTY(Replicated) TArray<int32> LoreFound;
 	bool DiscoverLore(int32 Index);
 	int32 GetXPTotal(ESkillType Skill) const { return XP[static_cast<int32>(Skill)]; }
 
 	// The bank: 300 slots, kept at the vault. Click a pack item to deposit it, click a bank item to take it out.
 	static constexpr int32 NumBankSlots = 300;
-	TArray<FInvSlot> Bank;
+	UPROPERTY(Replicated) TArray<FInvSlot> Bank;
 	bool BankDeposit(int32 PackIdx);     // the whole stack; false if the bank has no room
 	bool BankWithdraw(int32 BankIdx);    // the whole stack (or as much as fits in the pack)
 	int32 BankUsed() const;
 
 	// The 16 inventory slots (drawn by the HUD, changed by the shops and equipping)
-	TArray<FInvSlot> Slots;
+	UPROPERTY(Replicated) TArray<FInvSlot> Slots;
 
 	// The weapon bar (5 slots, keys 1-5) and what is worn, by kind. Rings use Worn[K_Ring] and RingB.
-	int32 Hotbar[5] = { 0, 0, 0, 0, 0 };
+	UPROPERTY(ReplicatedUsing = OnRep_Gear) int32 Hotbar[5] = { 0, 0, 0, 0, 0 };
+	// Which weapon-bar slot is in hand. The player's own machine changes it straight away (keys 1-5) and tells the server;
+	// the server's choice comes back in RepSelected (and wins unless the player has just picked one themselves).
 	int32 Selected = 0;
-	int32 Worn[NumWornKinds] = {};
-	int32 RingB = 0;
+	UPROPERTY(ReplicatedUsing = OnRep_Selected) int32 RepSelected = 0;
+	double LocalSelectTime = -100.0;
+	void SetSelected(int32 H);   // server: also sends it down
+	// Fires on the owning player's machine when worn gear, the weapon bar or the hand changes (the knight redraws itself)
+	DECLARE_MULTICAST_DELEGATE(FOnGearChanged);
+	FOnGearChanged OnGearChanged;
+	UPROPERTY(ReplicatedUsing = OnRep_Gear) int32 Worn[JeebNumWornKinds] = {};
+	UPROPERTY(ReplicatedUsing = OnRep_Gear) int32 RingB = 0;
 	int32 SelectedItem() const { return Hotbar[Selected]; }
 
 	bool EquipFromSlot(int32 InvIdx);                 // hold or wear the gear in that inventory slot (swaps with what is there)
@@ -114,7 +144,7 @@ public:
 	// Loading a save: puts back XP, which skills are known and the ingots (the rest is public)
 	void RestoreSkills(const TArray<int32>& InXP, const TArray<uint8>& InKnown, int32 InIngots);
 	// The potion slot (beside the weapon bar): one stack of potions ready to drink with Q
-	FInvSlot PotionSlot;
+	UPROPERTY(Replicated) FInvSlot PotionSlot;
 	bool SwapInvPotion(int32 InvIdx);   // a pack slot and the potion slot trade places (only potions go in it)
 	bool UnequipWorn(int32 Kind, bool bSecondRing = false);
 
@@ -132,10 +162,18 @@ public:
 	void GetProgress(ESkillType Skill, int32& Level, int32& XPIntoLevel, int32& XPNeeded) const;
 	static FString SkillName(ESkillType Skill);
 
+	// Down to the owning player: a message, and the XP pop-up (the server earns the XP; their HUD shows it)
+	UFUNCTION(Client, Reliable) void ClientSay(const FString& Text, FColor Color, float Seconds);
+	UFUNCTION(Client, Reliable) void ClientXP(uint8 Skill, int32 Amount, bool bLevelUp);
+
 private:
 	int32 GetXP(ESkillType Skill) const { return XP[static_cast<int32>(Skill)]; }
 	static float BaseXP(ESkillType Skill);
+	bool IsRemoteOwned() const;   // the server is running this for a player on another machine
+	void ShowXP(ESkillType Skill, int32 Amount, bool bLevelUp);
+	UFUNCTION() void OnRep_Gear();
+	UFUNCTION() void OnRep_Selected();
 
-	int32 XP[NumSkills] = {};
-	UPROPERTY(VisibleAnywhere, Category = "Inventory") int32 Ingots = 500; // testing money: lower or remove later
+	UPROPERTY(Replicated) int32 XP[JeebNumSkills] = {};
+	UPROPERTY(Replicated, VisibleAnywhere, Category = "Inventory") int32 Ingots = 500; // testing money: lower or remove later
 };

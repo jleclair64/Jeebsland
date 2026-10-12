@@ -37,6 +37,41 @@ struct FArmorPart
 	float Shade = 1.f;
 };
 
+// Everything a player can do to their pack, gear and money. ONLINE the player's machine only asks (AKnightCharacter::Inv sends a
+// request); the server checks it, carries it out, and the result comes back by replication. Single player: done straight away.
+// A, B, C, Target and At mean different things per request (below).
+UENUM()
+enum class EInvOp : uint8
+{
+	Equip,          // A pack slot: hold or wear it
+	UnequipHot,     // A bar slot back into the pack
+	UnequipWorn,    // A kind, B 1 = the second misc slot
+	SwapInvHot,     // A pack slot, B bar slot
+	SwapInv,        // A, B pack slots
+	SwapHot,        // A, B bar slots
+	SwapInvWorn,    // A pack slot, B kind, C 1 = the second misc slot
+	SwapInvPotion,  // A pack slot
+	Select,         // A the bar slot to hold
+	DropPack,       // A pack slot, B how many
+	DropIngots,     // A how many
+	DropHot,        // A bar slot
+	BankDeposit,    // A pack slot (-1: everything)
+	BankWithdraw,   // A bank slot
+	SellAll,        // A the EItemType
+	SellSlot,       // A pack slot, B the id the player saw there
+	Buy,            // A ware index, B the id the player saw
+	Gamble,
+	Smith,          // A kind (-1 arrows), B tier
+	Drink,
+	LootTakeAll,    // Target: the drop
+	LootTakeOne,    // Target, A entry (-1: its ingots)
+	LootEquip,      // Target, A entry, B bar slot (or -1), C worn kind (+100 for the second misc slot)
+	HutLoot,        // At: the cottage
+	PickLock,       // At: the cottage
+	Gather,         // At: the rock, tree or fishing spot
+	Lore,           // A lore entry (heard from a villager)
+};
+
 // Knight built from basic shapes. Also creates its own keyboard/mouse
 // controls in code, so no input assets are needed.
 UCLASS()
@@ -111,6 +146,16 @@ public:
 	void CloseDialogue();
 	bool GetDialogue(FString& OutName, FString& OutLine, bool& bOutLast) const;
 
+	// Ask for a change to the pack, gear or money (see EInvOp). Online it goes to the server; single player it happens now.
+	void Inv(EInvOp Op, int32 A = 0, int32 B = 0, int32 C = 0, AActor* Target = nullptr, FVector At = FVector::ZeroVector);
+	// Down from the server to this player: a line for the open shop screen, gathering starting or stopping (the server runs
+	// the gathering; this machine only plays the animation), a potion drunk, a lock picked
+	UFUNCTION(Client, Reliable) void ClientShopNote(const FString& Text, float Seconds);
+	UFUNCTION(Client, Reliable) void ClientGather(FVector_NetQuantize At, uint8 Skill, bool bStart);
+	UFUNCTION(Client, Reliable) void ClientDrank(uint8 Type);
+	UFUNCTION(Client, Reliable) void ClientUnlockHut(FVector_NetQuantize At);
+	void ShopNote(const FString& Text, float Seconds = 3.f);   // shown at the bottom of the shop or smithy screen
+
 	void EquipFromInventory(int32 Idx);          // hold or wear the gear in that slot (swaps with what you have on)
 	void UnequipHotbar(int32 H);
 	void UnequipWorn(int32 Kind, bool bSecondRing = false);
@@ -168,12 +213,16 @@ protected:
 	bool UsesLocalSave() const;   // single player only: online, the server will own characters
 
 	// Online: what this knight wears and holds (Worn[0..23], then RingB, then the held item), so other players see it.
-	// The owning player sends it up whenever it changes (SendLook, every tick, cheap); the server passes it on to everyone.
-	// TEMPORARY trust: the server takes the player's word for it until inventories are server-owned.
+	// The server works it out from the pack it owns (SendLook, every tick, cheap) and passes it on to everyone else.
 	UPROPERTY(ReplicatedUsing = OnRep_Look) TArray<int32> RepLook;
 	UFUNCTION() void OnRep_Look();
-	UFUNCTION(Server, Reliable) void ServerSetLook(const TArray<int32>& Look);
 	void SendLook();
+
+	// Requests (see Inv). DoInv runs on the server (or in single player) and checks everything before doing it.
+	UFUNCTION(Server, Reliable) void ServerInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, FVector_NetQuantize At);
+	void DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, const FVector& At);
+	bool NearTrader(uint8 Role) const;   // a villager of that ENpcRole is close enough to trade with
+	void ApplyPotion(int32 Type);       // the potion's effect (both on the server and on the player's machine)
 	void ApplyLook(const TArray<int32>& Look);   // another player's knight: dress our copy of it
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	FTimerHandle AutosaveTimer;

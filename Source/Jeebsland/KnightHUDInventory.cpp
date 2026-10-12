@@ -411,12 +411,11 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 	// drop
 	if (bUIRelease)
 	{
-		bool bChanged = false;
 		if (!bDragging)
 		{
 			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
 			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
-			else if (DragKind == 5 && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }   // a click takes it
+			else if (DragKind == 5 && Knight->GetLootTarget()) Knight->Inv(EInvOp::LootTakeOne, DragIdx, 0, 0, Knight->GetLootTarget());   // a click takes it
 			else if (DragKind == 6) Knight->DrinkPotion();   // a click on the potion slot drinks
 			else if (DragKind == 7) Knight->UnequipWorn(K_Shield);   // a click on the shield slot puts the shield away
 		}
@@ -430,11 +429,11 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			if (DragKind == 1)
 			{
 				const bool bOnPotion = bPotionCell && OverCell(PotionCellX, PotionCellY, HotCellS);
-				if (bOnPotion) bChanged = Sk->SwapInvPotion(DragIdx);   // onto the potion slot (potions only)
-				else if (bOnDef) bChanged = Sk->SwapInvWorn(DragIdx, K_Shield, false);   // onto the shield slot (shields only)
-				else if (ToWorn >= 0) bChanged = Sk->SwapInvWorn(DragIdx, WornKind[ToWorn], WornSecond[ToWorn]);   // onto a worn slot: swap
-				else if (ToHot >= 0) bChanged = Sk->SwapInvHotbar(DragIdx, ToHot);
-				else if (ToInv >= 0) bChanged = Sk->SwapInv(DragIdx, ToInv);
+				if (bOnPotion) Knight->Inv(EInvOp::SwapInvPotion, DragIdx);   // onto the potion slot (potions only)
+				else if (bOnDef) Knight->Inv(EInvOp::SwapInvWorn, DragIdx, K_Shield, 0);   // onto the shield slot (shields only)
+				else if (ToWorn >= 0) Knight->Inv(EInvOp::SwapInvWorn, DragIdx, WornKind[ToWorn], WornSecond[ToWorn] ? 1 : 0);   // onto a worn slot: swap
+				else if (ToHot >= 0) Knight->Inv(EInvOp::SwapInvHot, DragIdx, ToHot);
+				else if (ToInv >= 0) Knight->Inv(EInvOp::SwapInv, DragIdx, ToInv);
 				else if (!OverWindows() && !OverBar())
 				{
 					// let go out in the world: it drops to the ground (a stack asks how many)
@@ -444,8 +443,8 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			}
 			else if (DragKind == 2)
 			{
-				if (ToInv >= 0) bChanged = Sk->SwapInvHotbar(ToInv, DragIdx);
-				else if (ToHot >= 0) bChanged = Sk->SwapHotbar(DragIdx, ToHot);
+				if (ToInv >= 0) Knight->Inv(EInvOp::SwapInvHot, ToInv, DragIdx);
+				else if (ToHot >= 0) Knight->Inv(EInvOp::SwapHot, DragIdx, ToHot);
 				else if (!OverWindows() && !OverBar()) Knight->DropFromHotbar(DragIdx);
 			}
 			else if (DragKind == 4)
@@ -454,7 +453,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				if (ToInv >= 0)
 				{
 					if (Sk->Slots[ToInv].Id == 0) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);
-					else bChanged = Sk->SwapInvWorn(ToInv, WornKind[DragIdx], WornSecond[DragIdx]);
+					else Knight->Inv(EInvOp::SwapInvWorn, ToInv, WornKind[DragIdx], WornSecond[DragIdx] ? 1 : 0);
 				}
 			}
 			else if (DragKind == 7)
@@ -463,7 +462,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				if (ToInv >= 0)
 				{
 					if (Sk->Slots[ToInv].Id == 0) Knight->UnequipWorn(K_Shield);
-					else bChanged = Sk->SwapInvWorn(ToInv, K_Shield, false);
+					else Knight->Inv(EInvOp::SwapInvWorn, ToInv, K_Shield, 0);
 				}
 			}
 			else if (DragKind == 3 && !OverWindows() && !OverBar()) OpenDropBox(-1, 0, Sk->GetIngots());
@@ -472,16 +471,21 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				// from the sack straight onto the weapon bar, the shield slot or an armor slot (the old piece goes to your pack, or
 				// into the sack if your pack is full); anywhere else on your inventory or armor window just takes it
 				ALootDrop* Sack = Knight->GetLootTarget();
-				if (Sack && DragIdx >= 0 && ToHot >= 0) bChanged = Sack->EquipTo(DragIdx, Knight, ToHot, -1, false);
-				else if (Sack && DragIdx >= 0 && bOnDef) bChanged = Sack->EquipTo(DragIdx, Knight, -1, K_Shield, false);
-				else if (Sack && DragIdx >= 0 && ToWorn >= 0) bChanged = Sack->EquipTo(DragIdx, Knight, -1, WornKind[ToWorn], WornSecond[ToWorn]);
-				if (bChanged) { DragKind = 0; bDragging = false; DragIdx = -1; Knight->RefreshEquipment(); return; }
+				int32 EqHot = -1, EqKind = -1;
+				if (ToHot >= 0) EqHot = ToHot;
+				else if (bOnDef) EqKind = K_Shield;
+				else if (ToWorn >= 0) EqKind = WornKind[ToWorn] + (WornSecond[ToWorn] ? 100 : 0);
+				if (Sack && DragIdx >= 0 && (EqHot >= 0 || EqKind >= 0) && ALootDrop::Fits(DragId, EqHot, EqKind % 100))
+				{
+					Knight->Inv(EInvOp::LootEquip, DragIdx, EqHot, EqKind, Sack);
+					DragKind = 0; bDragging = false; DragIdx = -1;
+					return;
+				}
 				const bool bMine = (RectCount > 0 && M.X >= RectX[0] && M.X <= RectX[0] + RectW[0] && M.Y >= RectY[0] && M.Y <= RectY[0] + RectH[0])
 					|| (RectCount > 1 && M.X >= RectX[1] && M.X <= RectX[1] + RectW[1] && M.Y >= RectY[1] && M.Y <= RectY[1] + RectH[1]);
-				if (bMine && Knight->GetLootTarget()) { if (DragIdx < 0) Knight->GetLootTarget()->TakeIngots(Knight); else Knight->GetLootTarget()->TakeOne(DragIdx, Knight); }
+				if (bMine && Sack) Knight->Inv(EInvOp::LootTakeOne, DragIdx, 0, 0, Sack);
 			}
-			else if (DragKind == 6 && ToInv >= 0) bChanged = Sk->SwapInvPotion(ToInv);   // the potion slot back into the pack
-			if (bChanged) Knight->RefreshEquipment();   // the weapon in hand may have changed
+			else if (DragKind == 6 && ToInv >= 0) Knight->Inv(EInvOp::SwapInvPotion, ToInv);   // the potion slot back into the pack
 		}
 		DragKind = 0; bDragging = false; DragIdx = -1;
 	}
@@ -598,7 +602,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 	Panel(LX, LY, PW, LH, 1.f, false);
 	AddRect(LX, LY, PW, LH);
 	HDText(TEXT("Sack"), FLinearColor(1.f, 0.9f, 0.65f), LX + Pad + 2.f, LY + Pad + 2.f, Font, 1.15f);
-	if (Btn(LX + PW - Pad - 96.f, LY + Pad - 2.f, 96.f, 26.f, TEXT("Take all"), true, false, 0.9f)) { Sack->TakeEverythingFits(Knight); return; }
+	if (Btn(LX + PW - Pad - 96.f, LY + Pad - 2.f, 96.f, 26.f, TEXT("Take all"), true, false, 0.9f)) { Knight->Inv(EInvOp::LootTakeAll, 0, 0, 0, Sack); return; }
 	{
 		const float GX = LX + Pad, GY = LY + Pad + TitleH;
 		Cell(GX, GY, SS, -1);

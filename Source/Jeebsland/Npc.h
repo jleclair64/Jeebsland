@@ -36,7 +36,7 @@ public:
 	bool OffersTrade() const { return Role == ENpcRole::Shopkeeper || Role == ENpcRole::Blacksmith || Role == ENpcRole::Banker; }
 	int32 SpeakerIdx() const;   // which storyteller this is (see Lore.h)
 	// What they say on this visit, one entry per click
-	TArray<FString> MakeConversation();
+	TArray<FString> MakeConversation(int32* OutLore = nullptr);   // OutLore: the fragment of lore told this time (or untouched)
 	void SetTalking(bool bOn) { bTalking = bOn; }
 
 	virtual void Tick(float DeltaSeconds) override;

@@ -21,7 +21,9 @@ public:
 	void CancelGathering();
 	bool IsBeingGathered() const { return bBeingGathered; }
 	// For landmarks that must stay put (the redwood that carries a fort): gathering shows this message instead
-	void Lock(const FString& Message) { Charges = 0; EmptyText = Message; }
+	void Lock(const FString& Message) { Charges = 0; EmptyText = Message; bLockedNode = true; }
+	// Online: the server's count for this node (-1 = full), applied to this machine's copy
+	void ApplyCharges(int32 N);
 		AActor* GetCurrentGatherer() const { return CurrentGatherer.Get(); }
 	// How far away (flat distance) and how squarely the player must face the node to start working on it
 	virtual float ReachRadius() const { return 300.f; }
@@ -57,6 +59,11 @@ private:
 	float EffectiveSeconds = 2.f;
 	bool bBeingGathered = false;
 
+	bool bLockedNode = false;
+
 	void FinishGathering();
 	void Respawn();
+	void ChargesChanged();   // redraws, and (online, on the server) tells every player
+	// A message for whoever is gathering (sent to their machine when the server runs it)
+	static void Tell(AActor* Who, float Seconds, const FColor& Color, const FString& Text);
 };

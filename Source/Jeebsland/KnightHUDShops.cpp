@@ -24,6 +24,7 @@
 #include "TextureResource.h"
 #include "RenderUtils.h"
 #include "Messages.h"
+#include "KnightGameState.h"
 
 using namespace JeebItems;
 
@@ -63,12 +64,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		HDText(FString::Printf(TEXT("x %d"), N), FLinearColor(0.85f, 0.85f, 0.85f), PX + 210.f, RY + 8.f, Font, 1.05f);
 		DrawIngot(PX + 280.f, RY + 4.f, 24.f);
 		HDText(FString::Printf(TEXT("%d each"), SellValue(T)), FLinearColor(1.f, 0.85f, 0.3f), PX + 310.f, RY + 8.f, Font, 1.0f);
-		if (Btn(PX + 430.f, RY + 2.f, 104.f, 30.f, TEXT("SELL ALL"), N > 0, false, 1.0f))
-		{
-			const int32 Pay = Skills->SellAll(T);
-			ShopMsg = FString::Printf(TEXT("Sold for %d ingots."), Pay);
-			ShopMsgUntil = Now + 3.f;
-		}
+		if (Btn(PX + 430.f, RY + 2.f, 104.f, 30.f, TEXT("SELL ALL"), N > 0, false, 1.0f)) Knight->Inv(EInvOp::SellAll, static_cast<int32>(T));
 	}
 	HDText(TEXT("Click gear or arrows in your pack to sell them:"), FLinearColor(0.75f, 0.75f, 0.75f), PX + 30.f, PY + 94.f + 10 * 38.f + 6.f, Font, 0.95f);
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -88,13 +84,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			Tip.Add(ItemName(S.Id));
 			Tip.Add(FString::Printf(TEXT("Click to sell for %d ingots"), Pay));
 			SetTip(Tip);
-			if (bUIClick)
-			{
-				Skills->AddIngots(Pay);
-				ShopMsg = FString::Printf(TEXT("Sold %s for %d ingots."), *ItemName(S.Id), Pay);
-				ShopMsgUntil = Now + 3.f;
-				Skills->Slots[i].Id = 0; Skills->Slots[i].Count = 0;
-			}
+			if (bUIClick) Knight->Inv(EInvOp::SellSlot, i, S.Id);
 		}
 	}
 
@@ -110,6 +100,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			HDText(Re, FLinearColor(0.75f, 0.75f, 0.75f), RX + RW - TW, PY + 66.f, Font, 1.0f);
 		}
 
+		AKnightGameState::ApplyStore(GetWorld());   // online: what is left is the server's count
 		TArray<JeebStore::FWare>& Wares = JeebStore::Stock();
 		const float CW = (RW - 3 * 8.f) / 4.f, CH = 142.f;
 		for (int32 i = 0; i < Wares.Num(); ++i)
@@ -149,13 +140,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				{
 					if (!bAfford) ShopMsg = TEXT("Not enough ingots.");
 					else if (!Skills->CanAdd(W.Id, W.Count)) ShopMsg = TEXT("Your pack is full.");
-					else
-					{
-						Skills->SpendIngots(W.Price);
-						Skills->AddInvItem(W.Id, W.Count);
-						--W.Stock;
-						ShopMsg = FString::Printf(TEXT("Bought %s. It is in your pack (Tab)."), *Name);
-					}
+					else Knight->Inv(EInvOp::Buy, i, W.Id);   // the server says how it went
 					ShopMsgUntil = Now + 3.f;
 				}
 			}
@@ -185,23 +170,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 					Tip.Add(FString::Printf(TEXT("%5.1f%%   %s"), O.Percent, O.Label));
 				SetTip(Tip);
 			}
-			if (Btn(RX + RW - 128.f, BY + 20.f, 116.f, 36.f, TEXT("OPEN"), !bUsed && bAfford, false, 1.1f))
-			{
-				FRandomStream R(static_cast<int32>(FPlatformTime::Cycles()));
-				int32 Id = 0, Count = 0;
-				const int32 Row = JeebStore::RollGamble(R, Id, Count);
-				if (Id != 0 && !Skills->CanAdd(Id, Count)) ShopMsg = TEXT("Make room in your pack first.");
-				else
-				{
-					Skills->SpendIngots(JeebStore::GamblePrice);
-					Skills->LastGambleHour = Hour;
-					if (Id == 0) Skills->AddIngots(Count);
-					else Skills->AddInvItem(Id, Count);
-					const FString Got = Id == 0 ? FString::Printf(TEXT("%d ingots"), Count) : (Count > 1 ? FString::Printf(TEXT("%d %s"), Count, *ItemName(Id)) : ItemName(Id));
-					ShopMsg = FString::Printf(TEXT("The satchel holds... %s!  (a %.1f%% chance)"), *Got, JeebStore::GambleTable()[Row].Percent);
-				}
-				ShopMsgUntil = Now + 6.f;
-			}
+			if (Btn(RX + RW - 128.f, BY + 20.f, 116.f, 36.f, TEXT("OPEN"), !bUsed && bAfford, false, 1.1f)) Knight->Inv(EInvOp::Gamble);   // the server rolls it
 		}
 		if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), RX, PY + PH - 30.f, Font, 1.05f);
 	}
@@ -316,18 +285,8 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		if (Btn(CX + 10.f, CY + CH - 50.f, CW - 20.f, 38.f, TEXT("SMITH"), bCan, false, 1.1f))
 		{
 			const int32 Count = bArrows ? ArrowBundle : 1;
-			if (!Skills->CanAdd(Id, Count)) ShopMsg = TEXT("Your pack is full.");
-			else
-			{
-				if (R.Logs > 0) Skills->TakeWood(R.Logs);
-				if (R.Copper > 0) Skills->RemoveItems(MaterialId(EItemType::CopperOre), R.Copper);
-				if (R.Coal > 0) Skills->RemoveItems(MaterialId(EItemType::Coal), R.Coal);
-				if (R.Diamonds > 0) Skills->RemoveItems(MaterialId(EItemType::Diamond), R.Diamonds);
-				Skills->AddInvItem(Id, Count);
-				Skills->AddXP(ESkillType::Smithing, R.XP);
-				ShopMsg = FString::Printf(TEXT("Smithed %s. It is in your pack (Tab)."), bArrows ? *FString::Printf(TEXT("%d %s arrows"), ArrowBundle, TierName(t)) : *ItemName(Id));
-			}
-			ShopMsgUntil = Now + 3.f;
+			if (!Skills->CanAdd(Id, Count)) { ShopMsg = TEXT("Your pack is full."); ShopMsgUntil = Now + 3.f; }
+			else Knight->Inv(EInvOp::Smith, bArrows ? -1 : Kind, t);   // the server checks the recipe and makes it
 		}
 		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
 	}
@@ -370,12 +329,12 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (bOver)
 		{
 			ItemTip(S.Id);
-			if (bUIClick) Sk->BankDeposit(i);
+			if (bUIClick) Knight->Inv(EInvOp::BankDeposit, i);
 		}
 	}
 	if (Btn(GX, GY + 4 * (SS + Gap) + 8.f, 4 * (SS + Gap) - Gap, 34.f, TEXT("DEPOSIT EVERYTHING"), true, false, 1.0f))
 	{
-		for (int32 i = 0; i < NumSlots; ++i) Sk->BankDeposit(i);
+		Knight->Inv(EInvOp::BankDeposit, -1);
 	}
 
 	// ----- The bank: 10 x 6 per page -----
@@ -403,7 +362,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (bOver)
 		{
 			ItemTip(S.Id);
-			if (bUIClick) Sk->BankWithdraw(Idx);
+			if (bUIClick) Knight->Inv(EInvOp::BankWithdraw, Idx);
 		}
 	}
 	const float PgY = GY + Rows * (BS + BG) + 10.f;

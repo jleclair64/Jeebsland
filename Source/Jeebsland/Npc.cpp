@@ -220,7 +220,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	}
 }
 
-TArray<FString> ANpc::MakeConversation()
+TArray<FString> ANpc::MakeConversation(int32* OutLore)
 {
 	TArray<FString> Lines;
 	const int32 V = Visits++;
@@ -256,10 +256,7 @@ TArray<FString> ANpc::MakeConversation()
 		TArray<FString> Parts;
 		FString(E.Text).ParseIntoArray(Parts, TEXT("|"), true);
 		for (const FString& P : Parts) Lines.Add(P);
-		if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
-		{
-			if (USkillComponent* Sk = Player->FindComponentByClass<USkillComponent>()) Sk->DiscoverLore(Idx);
-		}
+		if (OutLore) *OutLore = Idx;   // the listener asks the server to note it down (EInvOp::Lore)
 	}
 
 	switch (Role)

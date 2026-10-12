@@ -10,10 +10,13 @@
 #include "Engine/StaticMesh.h"
 #include "ProceduralMeshComponent.h"
 #include "ItemModels.h"
+#include "Net/UnrealNetwork.h"
 
 ALootDrop::ALootDrop()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetNetCullDistanceSquared(FMath::Square(12000.f));
 	Origin = CreateDefaultSubobject<USceneComponent>(TEXT("Origin"));
 	SetRootComponent(Origin);
 
@@ -33,11 +36,51 @@ ALootDrop::ALootDrop()
 	Glow = Make(TEXT("Glow"));
 }
 
+void ALootDrop::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ALootDrop, Items);
+	DOREPLIFETIME(ALootDrop, Where);
+	DOREPLIFETIME(ALootDrop, Ingots);
+	DOREPLIFETIME(ALootDrop, LookByte);
+}
+
+void ALootDrop::Tell(AActor* Who, float Seconds, const FColor& Color, const FString& Text) const
+{
+	if (USkillComponent* Sk = Who ? Who->FindComponentByClass<USkillComponent>() : nullptr) Sk->Say(Seconds, Color, Text);
+	else JeebMsg::Post(Seconds, Color, Text);
+}
+
+void ALootDrop::EmptyCheck()
+{
+	bool bAnyLeft = Ingots > 0;
+	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
+	if (!bAnyLeft) Destroy();
+}
+
+bool ALootDrop::Fits(int32 Id, int32 Hot, int32 Kind)
+{
+	if (!JeebItems::IsGear(Id)) return false;
+	const int32 IK = JeebItems::KindOf(Id);
+	if (Hot >= 0) return Hot < 5 && JeebItems::IsWeaponKind(IK);   // only weapons go on the bar
+	const bool bMisc = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
+	return bMisc ? JeebItems::IsAccessoryKind(IK) : IK == Kind;
+}
+
 void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 InIngots)
 {
-	Look = InLook;
+	LookByte = static_cast<uint8>(InLook);
 	Items = InItems;
 	Ingots = InIngots;
+	if (HasAuthority()) SetLifeSpan(240.f);
+	BuildLook();
+}
+
+void ALootDrop::BuildLook()
+{
+	if (bBuilt || IsNetMode(NM_DedicatedServer)) return;
+	bBuilt = true;
+	const ELootLook Look = LookOf();
 	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	auto Paint = [&](UStaticMeshComponent* C, const FLinearColor& Col, const FVector& Loc, const FVector& Size, float Yaw)
 	{
@@ -79,7 +122,6 @@ void ALootDrop::Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 I
 	}
 	GlowBase = FVector(0.f, 0.f, Look == ELootLook::Pack ? 128.f : Look == ELootLook::Item ? ItemTop : 78.f);
 	Paint(Glow, FLinearColor(4.f, 3.f, 0.6f), GlowBase, FVector(9, 9, 9), 0.f);
-	SetLifeSpan(240.f);
 }
 
 void ALootDrop::Tick(float DeltaSeconds)
@@ -111,14 +153,14 @@ FString ALootDrop::Describe() const
 		Out += FString::Printf(TEXT("%d ingots"), Ingots);
 	}
 	if (Out.IsEmpty()) Out = TEXT("nothing");
-	const TCHAR* What = (Look == ELootLook::Pack) ? TEXT("the pack") : TEXT("the loot");
+	const TCHAR* What = IsSack() ? TEXT("the pack") : TEXT("the loot");
 	return FString::Printf(TEXT("Press E to take %s (%s)"), What, *Out);
 }
 
 void ALootDrop::TakeAll(AActor* Taker)
 {
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
-	if (!Sk) return;
+	if (!Sk || !HasAuthority()) return;
 	bool bLeft = false;
 	FString Got;
 	for (FInvSlot& S : Items)
@@ -140,11 +182,8 @@ void ALootDrop::TakeAll(AActor* Taker)
 		Got += FString::Printf(TEXT("%d ingots"), Ingots);
 		Ingots = 0;
 	}
-	if (GEngine)
-	{
-		if (!Got.IsEmpty()) JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("You take: %s"), *Got));
-		if (bLeft) JeebMsg::Post(3.f, FColor::Orange, TEXT("Your pack is full. Some is left behind."));
-	}
+	if (!Got.IsEmpty()) Tell(Taker, 3.f, FColor::Yellow, FString::Printf(TEXT("You take: %s"), *Got));
+	if (bLeft) Tell(Taker, 3.f, FColor::Orange, TEXT("Your pack is full. Some is left behind."));
 	if (!bLeft) Destroy();
 }
 
@@ -193,63 +232,47 @@ void ALootDrop::SetupSack(const TArray<FInvSlot>& InItems, const TArray<uint8>& 
 	Setup(ELootLook::Pack, InItems, InIngots);
 	Where = InWhere;
 	Where.SetNumZeroed(Items.Num());
-	SetLifeSpan(600.f);   // a death sack waits ten minutes
+	if (HasAuthority()) SetLifeSpan(600.f);   // a death sack waits ten minutes
 }
 
 bool ALootDrop::TakeOne(int32 Index, AActor* Taker)
 {
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
-	if (!Sk || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
+	if (!Sk || !HasAuthority() || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
 	FInvSlot& S = Items[Index];
 	if (!Sk->CanAdd(S.Id, S.Count) || !Sk->AddInvItem(S.Id, S.Count))
 	{
-		JeebMsg::Post(2.5f, FColor::Orange, TEXT("Your pack is full."));
+		Tell(Taker, 2.5f, FColor::Orange, TEXT("Your pack is full."));
 		return false;
 	}
 	S.Id = 0; S.Count = 0;
-	bool bAnyLeft = Ingots > 0;
-	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
-	if (!bAnyLeft) Destroy();
+	EmptyCheck();
 	return true;
 }
 
 bool ALootDrop::EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool bSecond)
 {
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
-	if (!Sk || !Items.IsValidIndex(Index) || Items[Index].Id == 0 || !JeebItems::IsGear(Items[Index].Id)) return false;
-	const int32 Id = Items[Index].Id, IK = JeebItems::KindOf(Id);
-	int32* Target = nullptr;
-	if (Hot >= 0)
-	{
-		if (Hot >= 5 || !JeebItems::IsWeaponKind(IK)) return false;   // only weapons go on the bar
-		Target = &Sk->Hotbar[Hot];
-	}
-	else
-	{
-		const bool bMisc = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
-		if (bMisc ? !JeebItems::IsAccessoryKind(IK) : IK != Kind) return false;   // it has to belong in that slot
-		Target = Sk->WornSlotPtr(Kind, bSecond);
-	}
+	if (!Sk || !HasAuthority() || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
+	const int32 Id = Items[Index].Id;
+	if (!Fits(Id, Hot, Kind)) return false;   // it has to belong in that slot
+	int32* Target = Hot >= 0 ? &Sk->Hotbar[Hot] : Sk->WornSlotPtr(Kind, bSecond);
 	if (!Target) return false;
 	const int32 Old = *Target;
 	*Target = Id;
 	if (Old == 0 || (Sk->CanAdd(Old, 1) && Sk->AddInvItem(Old, 1))) { Items[Index].Id = 0; Items[Index].Count = 0; }
 	else { Items[Index].Id = Old; Items[Index].Count = 1; }   // pack full: they trade places
-	bool bAnyLeft = Ingots > 0;
-	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
-	if (!bAnyLeft) Destroy();
+	EmptyCheck();
 	return true;
 }
 
 void ALootDrop::TakeIngots(AActor* Taker)
 {
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
-	if (!Sk || Ingots <= 0) return;
+	if (!Sk || !HasAuthority() || Ingots <= 0) return;
 	Sk->AddIngots(Ingots);
 	Ingots = 0;
-	bool bAnyLeft = false;
-	for (const FInvSlot& I : Items) if (I.Id != 0) bAnyLeft = true;
-	if (!bAnyLeft) Destroy();
+	EmptyCheck();
 }
 
 // A single dropped thing shows as itself (ItemModels.h): a stack of logs or ore shows a few, scattered and turned
@@ -318,5 +341,5 @@ void ALootDrop::AddLoose(const TArray<FInvSlot>& In, int32 InIngots)
 	for (const FInvSlot& S : In) if (S.Id != 0 && S.Count > 0) Items.Add(S);
 	if (Where.Num() > 0) Where.SetNumZeroed(Items.Num());   // (a death sack keeps its layout: these go in its pack)
 	Ingots += InIngots;
-	SetLifeSpan(FMath::Max(GetLifeSpan(), 240.f));
+	if (HasAuthority()) SetLifeSpan(FMath::Max(GetLifeSpan(), 240.f));
 }

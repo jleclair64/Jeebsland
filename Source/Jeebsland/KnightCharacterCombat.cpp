@@ -244,26 +244,10 @@ float AKnightCharacter::GetPotionCooldownLeft(int32 Type) const
 	return FMath::Max(0.f, PotionReadyAt[Type] - GetWorld()->GetTimeSeconds());
 }
 
+// The server checks the cooldown, takes the potion and runs its effect (DoInv, EInvOp::Drink)
 void AKnightCharacter::DrinkPotion()
 {
 	if (!Skills || IsUIOpen()) return;
-	FInvSlot& P = Skills->PotionSlot;
-	if (P.Id == 0 || !JeebItems::IsPotion(P.Id) || P.Count <= 0) { JeebMsg::Post(2.f, FColor::Orange, TEXT("No potion in the potion slot.")); return; }
-	const int32 T = JeebItems::PotionType(P.Id);
-	const float Now = GetWorld()->GetTimeSeconds();
-	if (Now < PotionReadyAt[T])
-	{
-		JeebMsg::Post(2.f, FColor::Orange, FString::Printf(TEXT("%s is not ready yet (%d s)."), JeebItems::PotionName(T), FMath::CeilToInt(PotionReadyAt[T] - Now)));
-		return;
-	}
-	switch (T)
-	{
-	case JeebItems::P_Speed:  SpeedUntil = Now + 8.f; break;
-	case JeebItems::P_Heal:   Health = (float)MaxHealth; break;
-	case JeebItems::P_Vigour: VigourUntil = Now + 60.f; break;   // the bigger bar is worked out in Tick (the extra comes full)
-	}
-	PotionReadyAt[T] = Now + JeebItems::PotionCooldown(T);
-	if (--P.Count <= 0) P = FInvSlot();
-	JeebMsg::Post(2.5f, FColor(170, 255, 170), FString::Printf(TEXT("You drink a %s."), JeebItems::PotionName(T)));
+	Inv(EInvOp::Drink);
 }
 

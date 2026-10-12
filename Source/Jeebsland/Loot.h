@@ -12,6 +12,7 @@ enum class ELootLook : uint8 { Meat, Beast, Pack, Item };   // Item: the dropped
 // Things left behind when something dies: raw pork from a pig, hides and bones from a dangerous beast, or a pack with
 // everything another knight was carrying. A little glowing speck marks it; press E beside it to take it all.
 // It fades away after four minutes (a sack left by a death lasts ten).
+// Online: drops are made by the server and replicated to everyone; taking from one is a request to the server (EInvOp::Loot...).
 UCLASS()
 class ALootDrop : public AActor
 {
@@ -20,6 +21,7 @@ class ALootDrop : public AActor
 public:
 	ALootDrop();
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void Setup(ELootLook InLook, const TArray<FInvSlot>& InItems, int32 InIngots);
 	FString Describe() const;
@@ -31,8 +33,10 @@ public:
 	const TArray<FInvSlot>& GetItems() const { return Items; }
 	uint8 WhereOf(int32 i) const { return Where.IsValidIndex(i) ? Where[i] : 0; }
 	int32 GetIngots() const { return Ingots; }
-	bool IsSack() const { return Look == ELootLook::Pack; }
-	bool IsItemLook() const { return Look == ELootLook::Item; }
+	bool IsSack() const { return LookOf() == ELootLook::Pack; }
+	bool IsItemLook() const { return LookOf() == ELootLook::Item; }
+	// Would this item go in that weapon-bar slot (Hot >= 0) or worn slot (Kind)? (the same check EquipTo makes)
+	static bool Fits(int32 Id, int32 Hot, int32 Kind);
 	int32 ShownId() const { for (const FInvSlot& S : Items) if (S.Id != 0 && S.Count > 0) return S.Id; return 0; }
 	int32 ShownCount() const { for (const FInvSlot& S : Items) if (S.Id != 0 && S.Count > 0) return S.Count; return 0; }
 	FVector TopOfLook() const { return GetActorLocation() + GlowBase; }   // where the marker floats: a label sits just above it
@@ -59,11 +63,17 @@ private:
 	UPROPERTY() USceneComponent* Hover = nullptr;   // a dropped thing floats above the grass, bobbing and slowly turning
 	float HoverZ = 30.f, ItemTop = 46.f;
 	void BuildItemLook();
+	void BuildLook();   // the drop's models (once, when its contents are known; never on a dedicated server)
+	bool bBuilt = false;
+	UFUNCTION() void OnRep_Look() { BuildLook(); }
+	ELootLook LookOf() const { return static_cast<ELootLook>(LookByte); }
+	void Tell(AActor* Who, float Seconds, const FColor& Color, const FString& Text) const;
+	void EmptyCheck();   // gone once nothing is left in it
 
-	TArray<FInvSlot> Items;
-	TArray<uint8> Where;
-	int32 Ingots = 0;
-	ELootLook Look = ELootLook::Meat;
+	UPROPERTY(Replicated) TArray<FInvSlot> Items;
+	UPROPERTY(Replicated) TArray<uint8> Where;
+	UPROPERTY(Replicated) int32 Ingots = 0;
+	UPROPERTY(ReplicatedUsing = OnRep_Look) uint8 LookByte = 0;   // ELootLook
 	float Clock = 0.f;
 	FVector GlowBase = FVector::ZeroVector;
 };

@@ -17,6 +17,8 @@ class AKnightHUD : public AHUD
 
 public:
 	virtual void DrawHUD() override;
+	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
+	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
 
 private:
 	// Drawing helpers

@@ -58,6 +58,8 @@ void AKnightCharacter::Interact()
 		}
 	}
 
+	// Online the server does the gathering (and its checks); we just ask, and it tells us when to start the animation
+	if (Best && !HasAuthority()) { Inv(EInvOp::Gather, 0, 0, 0, nullptr, Best->GetActorLocation()); return; }
 	const bool bHandled = Best && Best->StartGathering(this);
 
 	// Nothing to gather: just swing whatever is in your hand
@@ -72,7 +74,8 @@ void AKnightCharacter::Interact()
 		}
 		else if (K == JeebItems::K_Bow)
 		{
-			const int32 Tier = Skills ? Skills->TakeBestArrow() : -1;
+			// (online, combat is not on the server yet: a player's own machine shoots without using up the arrow)
+			const int32 Tier = !Skills ? -1 : HasAuthority() ? Skills->TakeBestArrow() : Skills->BestArrowTier();
 			if (Tier < 0)
 			{
 				if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows."));
@@ -301,18 +304,14 @@ void AKnightCharacter::OnInteractKey()
 		if (ALootDrop* Drop = FoundDrop.Get())
 		{
 			if (Drop->IsSack()) OpenLoot(Drop);   // a sack opens its own windows beside yours, with the cursor out
-			else Drop->TakeAll(this);
+			else Inv(EInvOp::LootTakeAll, 0, 0, 0, Drop);
 		}
 		break;
 	case EInteract::Loot:
 		if (ACottage* Hut = FoundCottage.Get())
 		{
-			const int32 Got = Hut->TakeLoot();
-			if (Got > 0 && Skills)
-			{
-				Skills->AddIngots(Got);
-				if (GEngine) JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("You take %d ingots."), Got));
-			}
+			if (!HasAuthority()) Hut->TakeLoot();   // empty our own copy of the stash; the server pays out from its copy
+			Inv(EInvOp::HutLoot, 0, 0, 0, nullptr, Hut->GetActorLocation());
 		}
 		break;
 	default: break;
@@ -323,30 +322,8 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 {
 	if (!Hut || !Skills) return;
 	if (!Hut->IsLocked()) { Hut->ToggleDoor(); return; }
-
-	const float Now = GetWorld()->GetTimeSeconds();
-	const int32 Need = Hut->GetLockLevel();
-	const int32 Lv = Skills->GetLevel(ESkillType::Lockpicking);
-	if (Lv < Need)
-	{
-		if (GEngine) JeebMsg::Post(3.f, FColor::Orange, FString::Printf(TEXT("The lock is too fine for you. Lockpicking level %d needed."), Need));
-		return;
-	}
-	if (Now < PickCooldownUntil) return;
-	PickCooldownUntil = Now + 1.0f;
-	// Better than the lock's level: easier. Always at least a one-in-three chance.
-	const float Chance = FMath::Clamp(0.35f + 0.06f * (Lv - Need), 0.35f, 0.95f);
-	if (FMath::FRand() < Chance)
-	{
-		Hut->Unlock();
-		Skills->AddXP(ESkillType::Lockpicking, 15 + 6 * Need);
-		if (GEngine) JeebMsg::Post(3.f, FColor::Green, TEXT("Click. The lock gives way."));
-	}
-	else
-	{
-		Skills->AddXP(ESkillType::Lockpicking, 3);
-		if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("The pick slips. Try again."));
-	}
+	// Picking the lock: the server rolls it and awards the XP (DoInv, EInvOp::PickLock)
+	Inv(EInvOp::PickLock, 0, 0, 0, nullptr, Hut->GetActorLocation());
 }
 
 void AKnightCharacter::CallHorse()
@@ -415,6 +392,8 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 {
 	ActiveNode = Node;
 	GatherStart = GetActorLocation();
+	// online: the server runs the gathering; the player's machine plays the animation
+	if (HasAuthority() && GetNetMode() != NM_Standalone && !IsLocallyControlled()) ClientGather(Node->GetActorLocation(), static_cast<uint8>(Skill), true);
 	if (Skill == ESkillType::Fishing)
 	{
 		// Face the water and cast: no swinging, just the pole held out
@@ -448,6 +427,7 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 
 void AKnightCharacter::EndGathering()
 {
+	if (ActiveNode.IsValid() && HasAuthority() && GetNetMode() != NM_Standalone && !IsLocallyControlled()) ClientGather(FVector::ZeroVector, 0, false);
 	ActiveNode.Reset();
 	bSwinging = false;
 	bFishing = false;

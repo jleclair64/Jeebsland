@@ -197,6 +197,8 @@ void AKnightCharacter::BeginPlay()
 	}
 
 	RefreshEquipment();
+	// Online, our own pack and gear arrive from the server: redraw the knight whenever they change
+	if (Skills) Skills->OnGearChanged.AddUObject(this, &AKnightCharacter::RefreshEquipment);
 }
 
 void AKnightCharacter::EndPlay(const EEndPlayReason::Type Reason)
@@ -223,23 +225,13 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void AKnightCharacter::SendLook()
 {
-	if (!Skills || GetNetMode() == NM_Standalone) return;
+	if (!Skills || !HasAuthority() || GetNetMode() == NM_Standalone) return;
 	TArray<int32> Look;
 	Look.Reserve(USkillComponent::NumWornKinds + 2);
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Look.Add(Skills->Worn[i]);
 	Look.Add(Skills->RingB);
 	Look.Add(Skills->SelectedItem());
-	if (Look == RepLook) return;
-	RepLook = Look;
-	if (!HasAuthority()) ServerSetLook(Look);
-}
-
-void AKnightCharacter::ServerSetLook_Implementation(const TArray<int32>& Look)
-{
-	if (Look.Num() != USkillComponent::NumWornKinds + 2) return;
-	for (int32 Id : Look) if (Id < 0) return;
-	RepLook = Look;
-	ApplyLook(Look);   // the server's own copy matches too
+	if (Look != RepLook) RepLook = Look;
 }
 
 void AKnightCharacter::OnRep_Look()
@@ -418,7 +410,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
-	if (IsLocallyControlled()) SendLook();   // online: let everyone see what we now wear and hold
+	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
 	if (!bGraphicsApplied && IsLocallyControlled()) ApplyGraphics();   // online, our knight may only become ours after BeginPlay
 
 	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
