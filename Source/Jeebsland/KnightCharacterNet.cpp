@@ -431,14 +431,21 @@ void AKnightCharacter::ServerClimb_Implementation(bool bOn)
 	}
 	else
 	{
-		// (keep trusting it a moment longer: the step off the top of the ladder may arrive just after this)
+		// Keep trusting it until the knight has stood on solid ground for half a second (at most 10 s): stepping off the top,
+		// walking about up there and jumping down are all still the player's machine's word
 		TWeakObjectPtr<AKnightCharacter> Self(this);
-		GetWorldTimerManager().SetTimer(ClimbTrustTimer, FTimerDelegate::CreateLambda([Self]()
+		const double Since = FPlatformTime::Seconds();
+		ClimbGroundedFor = 0.f;
+		GetWorldTimerManager().SetTimer(ClimbTrustTimer, FTimerDelegate::CreateLambda([Self, Since]()
 		{
 			if (!Self.IsValid() || Self->bClimbing) return;
-			Self->GetCharacterMovement()->bIgnoreClientMovementErrorChecksAndCorrection = false;
-			Self->GetCharacterMovement()->bServerAcceptClientAuthoritativePosition = false;
-		}), 0.75f, false);
+			UCharacterMovementComponent* M = Self->GetCharacterMovement();
+			Self->ClimbGroundedFor = M->IsMovingOnGround() ? Self->ClimbGroundedFor + 0.25f : 0.f;
+			if (Self->ClimbGroundedFor < 0.5f && FPlatformTime::Seconds() - Since < 10.0) return;
+			M->bIgnoreClientMovementErrorChecksAndCorrection = false;
+			M->bServerAcceptClientAuthoritativePosition = false;
+			Self->GetWorldTimerManager().ClearTimer(Self->ClimbTrustTimer);
+		}), 0.25f, true);
 	}
 	if (bOn) { bCrouched = false; bBlocking = false; bAttacking = false; }
 }

@@ -163,8 +163,7 @@ void AKnightGameState::BuildWorld()
 	// Your horse, waiting near the start (T calls it)
 	{
 		const FVector2D HP(650.f, 420.f);
-		if (GetNetMode() == NM_Standalone)   // (no horses online for now: they aren't shared yet; single player keeps one)
-			World->SpawnActor<AHorse>(FVector(HP.X, HP.Y, JeebTerrain::HeightAt(HP.X, HP.Y)), FRotator(0.f, 200.f, 0.f));
+		// (no horse for now: horses aren't shared online yet. One game for everyone: single player has none either.)
 		// A cloud of purple poison smoke a few metres from the horse, to see how a hazard looks and feels
 		World->SpawnActor<ASmokeCloud>(FVector(HP.X + 380.f, HP.Y, JeebTerrain::HeightAt(HP.X + 380.f, HP.Y)), FRotator::ZeroRotator);
 	}

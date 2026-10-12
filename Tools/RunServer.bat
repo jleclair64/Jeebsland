@@ -8,4 +8,4 @@ set WORLD=%1
 if "%WORLD%"=="" set WORLD=1
 set /a PORT=7776+%WORLD%
 title Jeebsland World %WORLD% (port %PORT%)
-"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "%~dp0..\Jeebsland.uproject" -server -log -port=%PORT%
+"C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "%~dp0..\Jeebsland.uproject" -server -log -port=%PORT% -ExecCmds="p.NetShowCorrections 1"

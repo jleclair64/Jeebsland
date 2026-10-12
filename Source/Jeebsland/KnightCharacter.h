@@ -245,6 +245,7 @@ protected:
 	// Climbing online: the player's machine says when it gets on and off a ladder; meanwhile the server trusts its position
 	UFUNCTION(Server, Reliable) void ServerClimb(bool bOn);
 	FTimerHandle ClimbTrustTimer;
+	float ClimbGroundedFor = 0.f;
 	bool bUIModeSet = false;
 	void ApplyPotion(int32 Type);       // the potion's effect (both on the server and on the player's machine)
 	void ApplyLook(const TArray<int32>& Look);   // another player's knight: dress our copy of it
