@@ -561,12 +561,13 @@ void AKnightCharacter::HoldShield()
 	static const FTransform Rest = []()
 	{
 		const FVector E = KnightDesign::PivotPos(KnightDesign::P_ElbowL), W(6.0, -34.6, -24.5);
-		const FVector Up = (E - W).GetSafeNormal();                         // along the forearm, towards the elbow
-		const FVector Want = FVector(0.66, -0.70, 0.24).GetSafeNormal();     // out to the left and forward
+		const FVector Fore = (E - W).GetSafeNormal();                       // along the forearm, towards the elbow
+		const FVector Up = FVector(0.573, 0.0, 0.819);                       // the shield's top: forward of the shoulder, its point behind (top tipped 20 degrees forward)
+		const FVector Want = FVector(0.251, -0.966, -0.067);                // face out to the left, a little forward, upright (not leaning in)
 		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromXZ(N, Up).ToQuat();         // the shield's face (+X) and its top (+Z)
 		const FVector Strap(14.0, -41.0, 10.0);                              // a point on the shield's back, a third of the way down
-		const FVector Target = -Up * 3.0 + N * 11.0;                         // just below the elbow, outside the forearm
+		const FVector Target = -Fore * 6.0 + N * 11.0;                         // just below the elbow, outside the forearm
 		return FTransform(Q, Target - Q.RotateVector(Strap));
 	}();
 	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
@@ -2265,7 +2266,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
 	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) - 20.f * Ground;   // the shield arm hangs nearly straight
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + 15.f * Ground;   // the shield arm rests with the elbow a little bent forward
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
