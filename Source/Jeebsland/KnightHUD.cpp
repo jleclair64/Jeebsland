@@ -19,6 +19,7 @@
 #include "CanvasItem.h"
 #include "Store.h"
 #include "Engine/Texture2D.h"
+#include "Engine/Font.h"
 #include "TextureResource.h"
 #include "RenderUtils.h"
 #include "Messages.h"
@@ -44,7 +45,7 @@ float AKnightHUD::Wrapped(const FString& Text, float X, float Y, float MaxW, flo
 	auto Flush = [&]()
 	{
 		if (Line.IsEmpty()) return;
-		DrawText(Line, Col, X, Cy, Font, Scale);
+		HDText(Line, Col, X, Cy, Font, Scale);
 		Cy += LineH + 3.f;
 		Line.Reset();
 	};
@@ -52,7 +53,7 @@ float AKnightHUD::Wrapped(const FString& Text, float X, float Y, float MaxW, flo
 	{
 		const FString Try = Line.IsEmpty() ? W : Line + TEXT(" ") + W;
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Try, TW, TH, Font, Scale);
+		HDTextSize(Try, TW, TH, Font, Scale);
 		LineH = FMath::Max(LineH, TH);
 		if (TW > MaxW && !Line.IsEmpty())
 		{
@@ -266,9 +267,9 @@ bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, b
 	else if (bOver) Fill = FLinearColor(0.34f, 0.26f, 0.12f);
 	Tile(X, Y, W, H, bActive ? FLinearColor(0.95f, 0.65f, 0.25f) : (bOver ? FLinearColor(0.8f, 0.9f, 1.f) : FLinearColor(0.55f, 0.68f, 0.85f)), !bEnabled ? 0.10f : (bActive ? 0.55f : (bOver ? 0.42f : 0.24f)));
 	float TW = 0.f, TH = 0.f;
-	GetTextSize(Label, TW, TH, Font, Scale);
+	HDTextSize(Label, TW, TH, Font, Scale);
 	const FLinearColor Txt = !bEnabled ? FLinearColor(0.45f, 0.45f, 0.45f) : (bActive ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.85f, 0.85f, 0.85f));
-	DrawText(Label, Txt, X + (W - TW) * 0.5f, Y + (H - TH) * 0.5f, Font, Scale);
+	HDText(Label, Txt, X + (W - TW) * 0.5f, Y + (H - TH) * 0.5f, Font, Scale);
 	return bOver && bUIClick;
 }
 
@@ -278,7 +279,7 @@ bool AKnightHUD::CloseBtn(float PX, float PY, float PW)
 	const float BX = PX + PW - 34.f, BY = PY + 6.f;
 	const bool bOver = Over(BX, BY, 26.f, 26.f);
 	Tile(BX, BY, 26.f, 26.f, bOver ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.6f, 0.7f, 0.85f), bOver ? 0.6f : 0.26f);
-	DrawText(TEXT("X"), FLinearColor::White, BX + 7.f, BY + 3.f, Font, 1.0f);
+	HDText(TEXT("X"), FLinearColor::White, BX + 7.f, BY + 3.f, Font, 1.0f);
 	return bOver && bUIClick;
 }
 
@@ -290,7 +291,7 @@ void AKnightHUD::DrawTip()
 	for (int32 i = 0; i < TipLines.Num(); ++i)
 	{
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(TipLines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
+		HDTextSize(TipLines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
 		W = FMath::Max(W, TW); H += TH + 3.f;
 	}
 	float X = UIMouseX + 16.f, Y = UIMouseY + 12.f;
@@ -302,8 +303,8 @@ void AKnightHUD::DrawTip()
 	{
 		const float Sc = i == 0 ? 1.15f : 0.95f;
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(TipLines[i], TW, TH, Font, Sc);
-		DrawText(TipLines[i], i == 0 ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f), X + 2.f, Cy, Font, Sc);
+		HDTextSize(TipLines[i], TW, TH, Font, Sc);
+		HDText(TipLines[i], i == 0 ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f), X + 2.f, Cy, Font, Sc);
 		Cy += TH + 3.f;
 	}
 }
@@ -363,6 +364,21 @@ void AKnightHUD::DrawHUD()
 	if (!Skills || !Knight) return;
 
 	UFont* Font = GEngine->GetMediumFont();
+	// Make the sharp copies of the font once (runtime fonts only: their size can simply be raised)
+	if (!HDFonts[0] && Font)
+	{
+		HDFonts[0] = Font;
+		if (Font->FontCacheType == EFontCacheType::Runtime)
+		{
+			for (int32 k = 2; k <= 4; ++k)
+			{
+				UFont* F = DuplicateObject<UFont>(Font, this);
+				F->LegacyFontSize = Font->LegacyFontSize * k;
+				HDFonts[k - 1] = F;
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("HUD font: %s, runtime %d, size %d"), *Font->GetName(), Font->FontCacheType == EFontCacheType::Runtime ? 1 : 0, Font->LegacyFontSize);
+	}
 
 	APlayerController* PC = GetOwningPlayerController();
 	bUIHaveMouse = PC && PC->GetMousePosition(UIMouseX, UIMouseY);
@@ -384,9 +400,9 @@ void AKnightHUD::DrawHUD()
 			if (!PC->ProjectWorldLocationToScreen(Head, SP)) continue;
 			const FString Nm = It->GetNpcName();
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Nm, TW, TH, Font, 2.f);
-			DrawText(Nm, FLinearColor(0.f, 0.f, 0.f, 0.8f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, 2.f);
-			DrawText(Nm, FLinearColor(1.f, 0.85f, 0.45f, 0.95f * A), SP.X - TW * 0.5f, SP.Y - TH, Font, 2.f);
+			HDTextSize(Nm, TW, TH, Font, 2.f);
+			HDText(Nm, FLinearColor(0.f, 0.f, 0.f, 0.8f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, 2.f);
+			HDText(Nm, FLinearColor(1.f, 0.85f, 0.45f, 0.95f * A), SP.X - TW * 0.5f, SP.Y - TH, Font, 2.f);
 		}
 	}
 
@@ -398,18 +414,16 @@ void AKnightHUD::DrawHUD()
 		{
 			const FString Title = TEXT("THE AUTUMN REALM");
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Title, TW, TH, Font, 3.f);
-			DrawText(Title, FLinearColor(1.f, 0.62f, 0.2f, Alpha), (Canvas->ClipX - TW) * 0.5f, Canvas->ClipY * 0.14f, Font, 3.f);
+			HDTextSize(Title, TW, TH, Font, 3.f);
+			HDText(Title, FLinearColor(1.f, 0.62f, 0.2f, Alpha), (Canvas->ClipX - TW) * 0.5f, Canvas->ClipY * 0.14f, Font, 3.f);
 		}
 	}
 
-	DrawText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
-	DrawIngot(Canvas->ClipX - 340.f, 58.f, 22.f);
-	DrawText(FString::Printf(TEXT("%d"), Skills->GetIngots()), FLinearColor(1.f, 0.85f, 0.3f), Canvas->ClipX - 308.f, 58.f, Font, 1.2f);
+	HDText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
 
 	DrawMinimap(Pawn);
 	DrawWeaponBar(Knight);
-	if (!Knight->IsUIOpen()) DrawSidePanel(Knight);
+	if (!Knight->IsUIOpen() && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 
 	// Game messages, newest at the bottom, fading out
@@ -424,10 +438,10 @@ void AKnightHUD::DrawHUD()
 			const float Age = float(NowS - M.Born);
 			const float A = FMath::Clamp(FMath::Min(Age / 0.15f, (M.Life - Age) / 0.6f), 0.f, 1.f);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(M.Text, TW, TH, Font, 1.15f);
+			HDTextSize(M.Text, TW, TH, Font, 1.15f);
 			const float X = (Canvas->ClipX - TW) * 0.5f;
 			Panel(X - 10.f, Y - 3.f, TW + 20.f, TH + 6.f, 0.8f * A);
-			DrawText(M.Text, FLinearColor(M.Color.R, M.Color.G, M.Color.B, A), X, Y, Font, 1.15f);
+			HDText(M.Text, FLinearColor(M.Color.R, M.Color.G, M.Color.B, A), X, Y, Font, 1.15f);
 			Y -= TH + 10.f;
 		}
 	}
@@ -475,9 +489,9 @@ void AKnightHUD::DrawHUD()
 			Col.A = FMath::Clamp((1.2f - Age) / 0.4f, 0.f, 1.f);
 			const FString Txt = FString::FromInt(Nums[i].Amount);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Txt, TW, TH, Font, Sc);
-			DrawText(Txt, FLinearColor(0.f, 0.f, 0.f, Col.A), SP.X - TW * 0.5f + 2.f, SP.Y + 2.f, Font, Sc);
-			DrawText(Txt, Col, SP.X - TW * 0.5f, SP.Y, Font, Sc);
+			HDTextSize(Txt, TW, TH, Font, Sc);
+			HDText(Txt, FLinearColor(0.f, 0.f, 0.f, Col.A), SP.X - TW * 0.5f + 2.f, SP.Y + 2.f, Font, Sc);
+			HDText(Txt, Col, SP.X - TW * 0.5f, SP.Y, Font, Sc);
 		}
 	}
 
@@ -527,16 +541,16 @@ void AKnightHUD::DrawHUD()
 				FillRR(X, Y, S, S, 9.f, [&](float) { return FLinearColor(0.f, 0.02f, 0.05f, 0.22f * A); });
 				Outline(X, Y, S, S, 9.f, FLinearColor(1.f, 1.f, 1.f, 0.9f * A));
 				float TW = 0.f, TH = 0.f;
-				GetTextSize(TEXT("E"), TW, TH, Font, 1.5f);
-				DrawText(TEXT("E"), FLinearColor(1.f, 1.f, 1.f, A), X + (S - TW) * 0.5f, Y + (S - TH) * 0.5f, Font, 1.5f);
+				HDTextSize(TEXT("E"), TW, TH, Font, 1.5f);
+				HDText(TEXT("E"), FLinearColor(1.f, 1.f, 1.f, A), X + (S - TW) * 0.5f, Y + (S - TH) * 0.5f, Font, 1.5f);
 			}
 			if (!bPromptE || !PromptText.StartsWith(TEXT("Press E")))
 			{
 				float TW = 0.f, TH = 0.f;
-				GetTextSize(PromptText, TW, TH, Font, 1.0f);
+				HDTextSize(PromptText, TW, TH, Font, 1.0f);
 				const float CY = bPromptE ? Y + S + 6.f : Y;
 				Tile(SP.X - TW * 0.5f - 10.f, CY - 2.f, TW + 20.f, TH + 6.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.5f * A, false);
-				DrawText(PromptText, FLinearColor(1.f, 1.f, 1.f, A), SP.X - TW * 0.5f, CY + 1.f, Font, 1.0f);
+				HDText(PromptText, FLinearColor(1.f, 1.f, 1.f, A), SP.X - TW * 0.5f, CY + 1.f, Font, 1.0f);
 			}
 		}
 	}
@@ -563,17 +577,17 @@ void AKnightHUD::DrawSkills(const USkillComponent* Skills)
 	const float Y = Canvas->ClipY - H - 24.f;
 
 	Panel(X, Y, W, H);
-	DrawText(TEXT("SKILLS"), FLinearColor(1.f, 0.85f, 0.3f), X + 16.f, Y + 8.f, Font, 1.3f);
+	HDText(TEXT("SKILLS"), FLinearColor(1.f, 0.85f, 0.3f), X + 16.f, Y + 8.f, Font, 1.3f);
 
 	auto SkillRow = [&](float RowY, const TCHAR* Name, ESkillType Skill, const FLinearColor& BarColor)
 	{
 		int32 Level, Into, Needed;
 		Skills->GetProgress(Skill, Level, Into, Needed);
-		DrawText(FString::Printf(TEXT("%s   Lv %d"), Name, Level), FLinearColor::White, X + 16.f, RowY, Font, Scale);
+		HDText(FString::Printf(TEXT("%s   Lv %d"), Name, Level), FLinearColor::White, X + 16.f, RowY, Font, Scale);
 		const float BarX = X + 16.f, BarY = RowY + 26.f, BarW = W - 32.f;
 		const float Fill = Needed > 0 ? FMath::Clamp(float(Into) / float(Needed), 0.f, 1.f) : 0.f;
 		Gauge(BarX, BarY, BarW, 9.f, Fill, BarColor);
-		DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Needed), FLinearColor(0.8f, 0.8f, 0.8f), BarX + BarW - 100.f, RowY + 2.f, Font, 0.9f);
+		HDText(FString::Printf(TEXT("%d / %d XP"), Into, Needed), FLinearColor(0.8f, 0.8f, 0.8f), BarX + BarW - 100.f, RowY + 2.f, Font, 0.9f);
 	};
 	SkillRow(Y + 40.f,  TEXT("Mining"),      ESkillType::Mining,      FLinearColor(0.9f, 0.55f, 0.15f));
 	SkillRow(Y + 92.f,  TEXT("Woodcutting"), ESkillType::Woodcutting, FLinearColor(0.3f, 0.75f, 0.25f));
@@ -602,26 +616,26 @@ void AKnightHUD::DrawSkillPopup(const USkillComponent* Skills)
 	DrawSkillIcon(static_cast<int32>(T), X + 10.f, Y + 10.f, 72.f);
 	int32 Lv, Into, Need;
 	Skills->GetProgress(T, Lv, Into, Need);
-	DrawText(USkillComponent::SkillName(T), FLinearColor(1.f, 0.9f, 0.6f, A), X + 92.f, Y + 10.f, Font, 1.2f);
+	HDText(USkillComponent::SkillName(T), FLinearColor(1.f, 0.9f, 0.6f, A), X + 92.f, Y + 10.f, Font, 1.2f);
 	{
 		const FString LvS = FString::Printf(TEXT("Lv %d"), Lv);
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(LvS, TW, TH, Font, 1.35f);
-		DrawText(LvS, bLevelGlow ? FLinearColor(1.f, 0.85f, 0.3f, A) : FLinearColor(1.f, 1.f, 1.f, A), X + W - TW - 12.f, Y + 8.f, Font, 1.35f);
+		HDTextSize(LvS, TW, TH, Font, 1.35f);
+		HDText(LvS, bLevelGlow ? FLinearColor(1.f, 0.85f, 0.3f, A) : FLinearColor(1.f, 1.f, 1.f, A), X + W - TW - 12.f, Y + 8.f, Font, 1.35f);
 	}
 	const float BX = X + 92.f, BY = Y + 46.f, BW = W - 104.f, BH = 12.f;
 	const float F = Need > 0 ? FMath::Clamp(float(Into) / float(Need), 0.f, 1.f) : 0.f;
 	Gauge(BX, BY, BW, BH, F, FLinearColor(0.35f, 0.8f, 0.3f));
-	DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.8f, 0.8f, 0.8f, A), BX, BY + 16.f, Font, 0.9f);
+	HDText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.8f, 0.8f, 0.8f, A), BX, BY + 16.f, Font, 0.9f);
 	if (Since < 2.5f && Skills->LastXPGain > 0)
 	{
 		const float GA = A * FMath::Clamp((2.5f - Since) / 0.8f, 0.f, 1.f);
 		const FString Gain = FString::Printf(TEXT("+%d"), Skills->LastXPGain);
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Gain, TW, TH, Font, 1.0f);
-		DrawText(Gain, FLinearColor(0.6f, 1.f, 0.5f, GA), BX + BW - TW, BY + 16.f - Since * 4.f, Font, 1.0f);
+		HDTextSize(Gain, TW, TH, Font, 1.0f);
+		HDText(Gain, FLinearColor(0.6f, 1.f, 0.5f, GA), BX + BW - TW, BY + 16.f - Since * 4.f, Font, 1.0f);
 	}
-	if (bLevelGlow) DrawText(TEXT("LEVEL UP!"), FLinearColor(1.f, 0.85f, 0.3f, A * (0.6f + 0.4f * Pulse)), X + 92.f, Y - 26.f, Font, 1.2f);
+	if (bLevelGlow) HDText(TEXT("LEVEL UP!"), FLinearColor(1.f, 0.85f, 0.3f, A * (0.6f + 0.4f * Pulse)), X + 92.f, Y - 26.f, Font, 1.2f);
 }
 
 // Tabs across the top of the pack window: INVENTORY and SKILLS. Returns true if a click switched tabs.
@@ -659,7 +673,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			Outline(Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f, 15.f, FLinearColor(1.f, 0.8f, 0.3f, 1.f));
 			Outline(Sx - 1.f, Sy - 1.f, Ss + 2.f, Ss + 2.f, 13.f, FLinearColor(1.f, 0.92f, 0.6f, 0.7f));
 		}
-		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.7f, 0.7f, 0.7f), Sx + 4.f, Sy + 1.f, Font, bSel ? 0.9f : 0.7f);
+		HDText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.7f, 0.7f, 0.7f), Sx + 4.f, Sy + 1.f, Font, bSel ? 0.9f : 0.7f);
 		if (Id == 0) { if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.25f); }); continue; }
 		// icons lean diagonally and fill the slot (the fishing rod is drawn already leaning, so it needs less)
 		IconTiltDeg = (IsGear(Id) && KindOf(Id) == K_Rod) ? -9.f : 35.f;
@@ -672,12 +686,12 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		{
 			const FString Txt = FString::FromInt(FMath::RoundToInt(0.5f * (A + B)));   // one number: the middle of the range
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Txt, TW, TH, Font, 1.15f);
+			HDTextSize(Txt, TW, TH, Font, 1.15f);
 			Tile(Sx + Ss - TW - 9.f, Sy + Ss - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
-			DrawText(Txt, bSel ? FLinearColor(1.f, 0.7f, 0.55f) : FLinearColor(0.85f, 0.5f, 0.42f), Sx + Ss - TW - 5.f, Sy + Ss - TH - 3.f, Font, 1.15f);
+			HDText(Txt, bSel ? FLinearColor(1.f, 0.7f, 0.55f) : FLinearColor(0.85f, 0.5f, 0.42f), Sx + Ss - TW - 5.f, Sy + Ss - TH - 3.f, Font, 1.15f);
 		}
 		if (IsGear(Id) && KindOf(Id) == K_Bow)
-			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), Sx + Ss - 26.f, Sy + 1.f, Font, 0.7f);
+			HDText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), Sx + Ss - 26.f, Sy + 1.f, Font, 0.7f);
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(Id);   // hover with the cursor out (Tab) to read about it
 	}
 
@@ -693,9 +707,9 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		IconTiltDeg = 0.f;
 		const FString Txt = FString::FromInt(Def);
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Txt, TW, TH, Font, 1.15f);
+		HDTextSize(Txt, TW, TH, Font, 1.15f);
 		Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
-		DrawText(Txt, FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
+		HDText(Txt, FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Defence"), FString::Printf(TEXT("%d in all: armour%s, every bonus counted"), Def, Knight->ShieldActive() ? TEXT(" and shield") : TEXT("")) });
 	}
 }
@@ -814,10 +828,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			float Dx, Dy;
 			Rot(FVector2D(WX, WY), Dx, Dy);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(T, TW, TH, Font, 1.7f);
+			HDTextSize(T, TW, TH, Font, 1.7f);
 			const float X = Cx + Dx * (Half + 6.f), Y = Cy + Dy * (Half + 6.f);
 			DrawCircle(X, Y, 18.f, FLinearColor(0.10f, 0.11f, 0.10f, 0.5f));
-			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
+			HDText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
 		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.82f, 0.28f, 1.f));   // north is world +X, east +Y
@@ -887,6 +901,8 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	const float PW = 980.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f;
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
+	// Solid, not see-through: a dark grey backing under the glass
+	FillRR(PX, PY, PW, PH, 30.f, [&](float t) { return FLinearColor(FMath::Lerp(0.10f, 0.05f, t), FMath::Lerp(0.10f, 0.05f, t), FMath::Lerp(0.11f, 0.06f, t), 1.f); });
 	Panel(PX, PY, PW, PH);
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSettings(); return; }
 
@@ -928,6 +944,8 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 				if (DraggingSlider == 1) Knight->SetRenderScale(FMath::Lerp(0.5f, 1.0f, T));
 
 				// Checkbox: toggles once per click
+				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 560.f && MY >= BoxY + 46.f && MY <= BoxY + 82.f)
+					Knight->SetPanelAlways(!Knight->GetPanelAlways());
 				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 460.f && MY >= BoxY - 4.f && MY <= BoxY + 32.f)
 				{
 					Knight->SetFancyLighting(!Knight->GetFancyLighting());
@@ -955,19 +973,23 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		};
 
 		const float Look = Knight->GetLookSensitivity();
-		DrawText(FString::Printf(TEXT("Look sensitivity:  %d%%"), FMath::RoundToInt(Look * 100.f)), FLinearColor::White, PX + 40.f, PY + 96.f, Font, Scale);
+		HDText(FString::Printf(TEXT("Look sensitivity:  %d%%"), FMath::RoundToInt(Look * 100.f)), FLinearColor::White, PX + 40.f, PY + 96.f, Font, Scale);
 		Slider(LookY, FMath::Clamp((Look - 0.1f) / 1.9f, 0.f, 1.f), FLinearColor(0.9f, 0.55f, 0.15f));
 
 		const float RS = Knight->GetRenderScale();
-		DrawText(FString::Printf(TEXT("Render resolution:  %d%%   (lower = faster)"), FMath::RoundToInt(RS * 100.f)), FLinearColor::White, PX + 40.f, PY + 186.f, Font, Scale);
+		HDText(FString::Printf(TEXT("Render resolution:  %d%%   (lower = faster)"), FMath::RoundToInt(RS * 100.f)), FLinearColor::White, PX + 40.f, PY + 186.f, Font, Scale);
 		Slider(ScaleY, FMath::Clamp((RS - 0.5f) / 0.5f, 0.f, 1.f), FLinearColor(0.3f, 0.7f, 0.9f));
 
 		DrawRect(FLinearColor::White, BoxX, BoxY, 26.f, 26.f);
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 2.f, 22.f, 22.f);
 		if (Knight->GetFancyLighting()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 5.f, 16.f, 16.f);
-		DrawText(TEXT("Fancy lighting (bounce light, misty air) - slower"), FLinearColor::White, BoxX + 38.f, BoxY + 2.f, Font, 1.1f);
+		HDText(TEXT("Fancy lighting (bounce light, misty air) - slower"), FLinearColor::White, BoxX + 38.f, BoxY + 2.f, Font, 1.1f);
+		// Side panel: always on screen, or only while the cursor is out (Tab)
+		DrawRect(FLinearColor::White, BoxX, BoxY + 50.f, 26.f, 26.f);
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 52.f, 22.f, 22.f);
+		if (Knight->GetPanelAlways()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 55.f, 16.f, 16.f);
+		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 52.f, Font, 1.1f);
 
-		DrawText(TEXT("Click or drag the sliders.   Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 40.f, PY + PH - 40.f, Font, 1.0f);
 	}
 	else if (SettingsTab == 1)
 	{
@@ -994,11 +1016,11 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		float RowY = PY + 70.f;
 		for (const FRow& R : Rows)
 		{
-			DrawText(R.Key, FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, RowY, Font, 1.1f);
-			DrawText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
+			HDText(R.Key, FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, RowY, Font, 1.1f);
+			HDText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
 			RowY += 30.f;
 		}
-		DrawText(TEXT("Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
+		HDText(TEXT("Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}
 	else if (SettingsTab == 2)
 	{
@@ -1037,7 +1059,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	const float CX = PX + 255.f, CW = PW - 275.f;
 	const FEntry& E = Entries[DictEntry];
 	float Y = PY + 62.f;
-	DrawText(E.Name, FLinearColor(1.f, 0.85f, 0.3f), CX, Y, Font, 1.7f);
+	HDText(E.Name, FLinearColor(1.f, 0.85f, 0.3f), CX, Y, Font, 1.7f);
 	Y += 40.f;
 
 	if (E.Kind == -1)
@@ -1060,18 +1082,18 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		Y += Wrapped(TEXT("Arrows are limited: every shot uses one, and the bow uses the best arrows you carry. Better arrows hit harder. Buy bundles of ten at the store (wood, bronze and iron) or smith any rank, including steel and diamond."), CX, Y, CW, 1.05f, FLinearColor::White) + 12.f;
 		const TCHAR* Heads[] = { TEXT("RANK"), TEXT("BOW DAMAGE"), TEXT("SMITH LV"), TEXT("MATERIALS (10)"), TEXT("STORE (10)") };
 		const float Xs[] = { 0.f, 110.f, 250.f, 360.f, 580.f };
-		for (int32 c = 0; c < 5; ++c) DrawText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
+		for (int32 c = 0; c < 5; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
 		Y += 28.f;
 		for (int32 t = 0; t < NumTiers; ++t)
 		{
 			int32 A, B; WeaponDamage(K_Bow, t, A, B, t);
 			const FRecipe R = SmithRecipe(K_Bow, t, true);
 			DrawIcon(ArrowId(t), CX - 4.f, Y - 4.f, 28.f);
-			DrawText(TierName(t), FLinearColor::White, CX + 30.f, Y, Font, 1.0f);
-			DrawText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
-			DrawText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[2], Y, Font, 1.0f);
-			DrawText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[3], Y, Font, 1.0f);
-			DrawText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), ArrowBundlePrice(t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
+			HDText(TierName(t), FLinearColor::White, CX + 30.f, Y, Font, 1.0f);
+			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
+			HDText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[2], Y, Font, 1.0f);
+			HDText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[3], Y, Font, 1.0f);
+			HDText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), ArrowBundlePrice(t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
 			Y += 34.f;
 		}
 		return;
@@ -1085,8 +1107,8 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		for (int32 c = 0; c < NumCapeColors; ++c)
 		{
 			DrawIcon(GearId(K_Cape, c), CX, Y - 4.f, 30.f);
-			DrawText(CapeColorName(c), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
-			DrawText(FString::Printf(TEXT("%d ingots"), BuyPrice(K_Cape, c)), FLinearColor(1.f, 0.85f, 0.3f), CX + 200.f, Y, Font, 1.0f);
+			HDText(CapeColorName(c), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
+			HDText(FString::Printf(TEXT("%d ingots"), BuyPrice(K_Cape, c)), FLinearColor(1.f, 0.85f, 0.3f), CX + 200.f, Y, Font, 1.0f);
 			Y += 34.f;
 		}
 		return;
@@ -1097,9 +1119,9 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		for (int32 v = 0; v < N; ++v)
 		{
 			DrawIcon(GearId(K, v), CX, Y - 6.f, 36.f);
-			DrawText(AccessoryName(K, v), FLinearColor(1.f, 0.9f, 0.6f), CX + 46.f, Y, Font, 1.05f);
-			DrawText(AccessoryText(K, v), FLinearColor(0.85f, 0.85f, 0.85f), CX + 46.f, Y + 20.f, Font, 0.95f);
-			DrawText(FString::Printf(TEXT("%d ingots"), AccessoryPrice(K, v)), FLinearColor(1.f, 0.85f, 0.3f), CX + CW - 120.f, Y, Font, 1.0f);
+			HDText(AccessoryName(K, v), FLinearColor(1.f, 0.9f, 0.6f), CX + 46.f, Y, Font, 1.05f);
+			HDText(AccessoryText(K, v), FLinearColor(0.85f, 0.85f, 0.85f), CX + 46.f, Y + 20.f, Font, 0.95f);
+			HDText(FString::Printf(TEXT("%d ingots"), AccessoryPrice(K, v)), FLinearColor(1.f, 0.85f, 0.3f), CX + CW - 120.f, Y, Font, 1.0f);
 			Y += 50.f;
 		}
 		Wrapped(TEXT("Rings and amulets are sold at the store. Two rings and one amulet can be worn at once."), CX, Y + 8.f, CW, 0.95f, FLinearColor(0.7f, 0.7f, 0.7f));
@@ -1110,23 +1132,23 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	const bool bWeapon = IsWeaponKind(K);
 	const TCHAR* Heads[] = { TEXT("RANK"), bWeapon ? TEXT("DAMAGE") : TEXT("DEFENCE"), TEXT("SMITH LV"), TEXT("MATERIALS"), TEXT("STORE") };
 	const float Xs[] = { 44.f, 150.f, 250.f, 350.f, 580.f };
-	for (int32 c = 0; c < 5; ++c) DrawText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
+	for (int32 c = 0; c < 5; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
 	Y += 28.f;
 	for (int32 t = 0; t < NumTiers; ++t)
 	{
 		const FRecipe R = SmithRecipe(K, t);
 		DrawIcon(GearId(K, t), CX - 2.f, Y - 6.f, 36.f);
-		DrawText(TierName(t), FLinearColor::White, CX + Xs[0], Y, Font, 1.0f);
+		HDText(TierName(t), FLinearColor::White, CX + Xs[0], Y, Font, 1.0f);
 		if (bWeapon)
 		{
 			int32 A, B; WeaponDamage(K, t, A, B, t);
-			DrawText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
+			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
 		}
-		else DrawText(FString::Printf(TEXT("%d"), DefenseOf(K, t)), FLinearColor(0.55f, 0.75f, 1.f), CX + Xs[1], Y, Font, 1.0f);
-		DrawText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[2], Y, Font, 1.0f);
-		DrawText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[3], Y, Font, 1.0f);
-		DrawText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), BuyPrice(K, t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
-		if (K == K_Boots) DrawText(FString::Printf(TEXT("stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + Xs[1], Y + 18.f, Font, 0.85f);
+		else HDText(FString::Printf(TEXT("%d"), DefenseOf(K, t)), FLinearColor(0.55f, 0.75f, 1.f), CX + Xs[1], Y, Font, 1.0f);
+		HDText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[2], Y, Font, 1.0f);
+		HDText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[3], Y, Font, 1.0f);
+		HDText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), BuyPrice(K, t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
+		if (K == K_Boots) HDText(FString::Printf(TEXT("stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + Xs[1], Y + 18.f, Font, 0.85f);
 		Y += (K == K_Boots) ? 42.f : 38.f;
 	}
 	if (K == K_Pickaxe || K == K_Axe || K == K_Rod)
@@ -1495,8 +1517,8 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Bal, TW, TH, Font, 1.8f);
-		DrawText(Bal, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 100.f - TW, PY + 14.f, Font, 1.8f);
+		HDTextSize(Bal, TW, TH, Font, 1.8f);
+		HDText(Bal, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 100.f - TW, PY + 14.f, Font, 1.8f);
 		DrawIngot(PX + PW - 92.f, PY + 10.f, 40.f);
 	}
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleInventory(); return; }
@@ -1507,7 +1529,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	};
 
 	// ----- The pack: 16 slots -----
-	DrawText(TEXT("PACK"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 64.f, Font, 1.2f);
+	HDText(TEXT("PACK"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 64.f, Font, 1.2f);
 	const float SS = 84.f, Gap = 8.f;
 	const float GX = PX + 30.f, GY = PY + 92.f;
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -1519,7 +1541,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		if (S.Id == 0) continue;
 		DrawIcon(S.Id, SX + 10.f, SY + 8.f, SS - 20.f);
 		if (StackSize(S.Id) > 1)
-			DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, SX + SS - 30.f, SY + SS - 24.f, Font, 1.1f);
+			HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, SX + SS - 30.f, SY + SS - 24.f, Font, 1.1f);
 		if (bOver)
 		{
 			ItemTip(S.Id);
@@ -1529,20 +1551,20 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 
 	// ----- Weapon bar -----
 	const float EX = GX + 4 * (SS + Gap) + 34.f;
-	DrawText(TEXT("WEAPON BAR  (keys 1-5)"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 64.f, Font, 1.2f);
+	HDText(TEXT("WEAPON BAR  (keys 1-5)"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 64.f, Font, 1.2f);
 	const float HS = 66.f, HG = 10.f;
 	for (int32 h = 0; h < NumHotbar; ++h)
 	{
 		const float X = EX + h * (HS + HG), Y = PY + 92.f;
 		const bool bOver = Over(X, Y, HS, HS);
 		SlotBox(X, Y, HS, bOver, Skills->Selected == h);
-		DrawText(FString::Printf(TEXT("%d"), h + 1), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y + 2.f, Font, 0.9f);
+		HDText(FString::Printf(TEXT("%d"), h + 1), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y + 2.f, Font, 0.9f);
 		const int32 Id = Skills->Hotbar[h];
 		if (Id == 0) continue;
 		DrawIcon(Id, X + 7.f, Y + 5.f, HS - 14.f);
 		int32 A, B;
 		if (HotbarDamage(Skills, h, A, B))
-			DrawText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.55f, 0.45f), X + HS - 44.f, Y + HS - 20.f, Font, 0.9f);
+			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.55f, 0.45f), X + HS - 44.f, Y + HS - 20.f, Font, 0.9f);
 		if (bOver)
 		{
 			ItemTip(Id);
@@ -1551,7 +1573,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	}
 
 	// ----- Worn gear -----
-	DrawText(TEXT("WORN"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 170.f, Font, 1.2f);
+	HDText(TEXT("WORN"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 170.f, Font, 1.2f);
 	struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
 	static const FWornSlot Worn[10] = {
 		{ K_Shield, false, TEXT("Shield") }, { K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
@@ -1562,7 +1584,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		const float X = EX + (w % 5) * (HS + HG), Y = PY + 198.f + (w / 5) * (HS + 34.f);
 		const bool bOver = Over(X, Y, HS, HS);
 		SlotBox(X, Y, HS, bOver, false);
-		DrawText(Worn[w].Label, FLinearColor(0.7f, 0.7f, 0.7f), X + 2.f, Y + HS + 4.f, Font, 0.85f);
+		HDText(Worn[w].Label, FLinearColor(0.7f, 0.7f, 0.7f), X + 2.f, Y + HS + 4.f, Font, 0.85f);
 		const int32 Id = Worn[w].bSecond ? Skills->RingB : Skills->Worn[Worn[w].Kind];
 		if (Id == 0) continue;
 		DrawIcon(Id, X + 7.f, Y + 5.f, HS - 14.f);
@@ -1577,13 +1599,13 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	{
 		const float Y0 = PY + 198.f + 2 * (HS + 34.f) + 4.f;
 		const FMods M = CombinedMods(Skills);
-		DrawText(FString::Printf(TEXT("Defence: %d%s"), TotalDefense(Skills, Knight->ShieldActive()), Knight->ShieldActive() ? TEXT("  (shield included)") : TEXT("")), FLinearColor(0.6f, 0.78f, 1.f), EX, Y0, Font, 1.1f);
+		HDText(FString::Printf(TEXT("Defence: %d%s"), TotalDefense(Skills, Knight->ShieldActive()), Knight->ShieldActive() ? TEXT("  (shield included)") : TEXT("")), FLinearColor(0.6f, 0.78f, 1.f), EX, Y0, Font, 1.1f);
 		const int32 Sel = Skills->SelectedItem();
 		if (IsGear(Sel) && IsWeaponKind(KindOf(Sel)))
 		{
 			int32 A, B;
 			HotbarDamage(Skills, Skills->Selected, A, B);
-			DrawText(FString::Printf(TEXT("In hand: %s    Damage %d-%d"), *ItemName(Sel), A, B), FLinearColor(1.f, 0.65f, 0.55f), EX, Y0 + 26.f, Font, 1.1f);
+			HDText(FString::Printf(TEXT("In hand: %s    Damage %d-%d"), *ItemName(Sel), A, B), FLinearColor(1.f, 0.65f, 0.55f), EX, Y0 + 26.f, Font, 1.1f);
 		}
 		FString Extra;
 		if (M.CritChance > 0.f) Extra += FString::Printf(TEXT("Critical hits %d%% (+50%%).  "), FMath::RoundToInt(M.CritChance * 100.f));
@@ -1596,7 +1618,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		if (!Extra.IsEmpty()) Wrapped(Extra, EX, Y0 + 54.f, PW - (EX - PX) - 30.f, 0.95f, FLinearColor(0.7f, 0.9f, 0.7f));
 	}
 
-	DrawText(TEXT("Click gear in your pack to hold or wear it.  Click worn gear to take it off.  Tab to close, K for skills."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
+	HDText(TEXT("Click gear in your pack to hold or wear it.  Click worn gear to take it off.  Tab to close, K for skills."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
 }
 
 // ===================================================================================================
@@ -1610,18 +1632,18 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	DrawText(TEXT("THE TRADING POST"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	HDText(TEXT("THE TRADING POST"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Bal, TW, TH, Font, 1.8f);
-		DrawText(Bal, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 100.f - TW, PY + 14.f, Font, 1.8f);
+		HDTextSize(Bal, TW, TH, Font, 1.8f);
+		HDText(Bal, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 100.f - TW, PY + 14.f, Font, 1.8f);
 		DrawIngot(PX + PW - 92.f, PY + 10.f, 40.f);
 	}
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseShop(); return; }
 
 	// ----- Sell (left) -----
-	DrawText(TEXT("SELL"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 62.f, Font, 1.3f);
+	HDText(TEXT("SELL"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 62.f, Font, 1.3f);
 		static const EItemType Sellable[12] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::CopperOre, EItemType::Coal, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
 	static const TCHAR* SellNames[12] = { TEXT("Logs"), TEXT("Pine logs"), TEXT("Redwood logs"), TEXT("Copper ore"), TEXT("Coal"), TEXT("Diamond"), TEXT("Raw pork"), TEXT("Perch"), TEXT("Trout"), TEXT("Golden carp"), TEXT("Beast hide"), TEXT("Bones") };
 	for (int32 r = 0; r < 12; ++r)
@@ -1631,10 +1653,10 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		const int32 N = Skills->GetItemCount(T);
 		Tile(PX + 30.f, RY, 510.f, 34.f, FLinearColor(0.6f, 0.72f, 0.88f), 0.16f, false);
 		DrawIcon(MaterialId(T), PX + 34.f, RY + 1.f, 32.f);
-		DrawText(SellNames[r], FLinearColor::White, PX + 74.f, RY + 8.f, Font, 1.0f);
-		DrawText(FString::Printf(TEXT("x %d"), N), FLinearColor(0.85f, 0.85f, 0.85f), PX + 210.f, RY + 8.f, Font, 1.05f);
+		HDText(SellNames[r], FLinearColor::White, PX + 74.f, RY + 8.f, Font, 1.0f);
+		HDText(FString::Printf(TEXT("x %d"), N), FLinearColor(0.85f, 0.85f, 0.85f), PX + 210.f, RY + 8.f, Font, 1.05f);
 		DrawIngot(PX + 280.f, RY + 4.f, 24.f);
-		DrawText(FString::Printf(TEXT("%d each"), SellValue(T)), FLinearColor(1.f, 0.85f, 0.3f), PX + 310.f, RY + 8.f, Font, 1.0f);
+		HDText(FString::Printf(TEXT("%d each"), SellValue(T)), FLinearColor(1.f, 0.85f, 0.3f), PX + 310.f, RY + 8.f, Font, 1.0f);
 		if (Btn(PX + 430.f, RY + 2.f, 104.f, 30.f, TEXT("SELL ALL"), N > 0, false, 1.0f))
 		{
 			const int32 Pay = Skills->SellAll(T);
@@ -1642,7 +1664,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			ShopMsgUntil = Now + 3.f;
 		}
 	}
-	DrawText(TEXT("Click gear or arrows in your pack to sell them:"), FLinearColor(0.75f, 0.75f, 0.75f), PX + 30.f, PY + 94.f + 10 * 38.f + 6.f, Font, 0.95f);
+	HDText(TEXT("Click gear or arrows in your pack to sell them:"), FLinearColor(0.75f, 0.75f, 0.75f), PX + 30.f, PY + 94.f + 10 * 38.f + 6.f, Font, 0.95f);
 	for (int32 i = 0; i < NumSlots; ++i)
 	{
 		const float X = PX + 30.f + (i % 8) * 64.f, Y = PY + 94.f + 10 * 38.f + 32.f + (i / 8) * 62.f;
@@ -1652,7 +1674,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		Tile(X, Y, 58.f, 58.f, bOver && bSellable ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver && bSellable ? 0.38f : 0.2f);
 		if (S.Id == 0) continue;
 		DrawIcon(S.Id, X + 5.f, Y + 3.f, 48.f);
-		if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + 36.f, Y + 38.f, Font, 0.85f);
+		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + 36.f, Y + 38.f, Font, 0.85f);
 		if (bOver && bSellable)
 		{
 			const int32 Pay = IsArrow(S.Id) ? S.Count : GearSellPrice(S.Id) * S.Count;
@@ -1673,13 +1695,13 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	// ----- Buy (right): this hour's random wares, and the mystery satchel -----
 	{
 		const float RX = PX + 574.f, RW = PW - 574.f - 30.f;
-		DrawText(TEXT("TODAY'S WARES"), FLinearColor(1.f, 0.85f, 0.3f), RX, PY + 62.f, Font, 1.3f);
+		HDText(TEXT("TODAY'S WARES"), FLinearColor(1.f, 0.85f, 0.3f), RX, PY + 62.f, Font, 1.3f);
 		{
 			const int32 Mins = JeebStore::MinutesToRestock();
 			const FString Re = Mins <= 0 ? FString(TEXT("Restocking any moment")) : FString::Printf(TEXT("New stock in %d min"), Mins + 1);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Re, TW, TH, Font, 1.0f);
-			DrawText(Re, FLinearColor(0.75f, 0.75f, 0.75f), RX + RW - TW, PY + 66.f, Font, 1.0f);
+			HDTextSize(Re, TW, TH, Font, 1.0f);
+			HDText(Re, FLinearColor(0.75f, 0.75f, 0.75f), RX + RW - TW, PY + 66.f, Font, 1.0f);
 		}
 
 		TArray<JeebStore::FWare>& Wares = JeebStore::Stock();
@@ -1707,11 +1729,11 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
 			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
 			DrawIngot(CX + 8.f, CY + CH - 30.f, 22.f);
-			DrawText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);
+			HDText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);
 			const FString Left = bSoldOut ? FString(TEXT("Sold out")) : FString::Printf(TEXT("%d left"), W.Stock);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Left, TW, TH, Font, 0.85f);
-			DrawText(Left, bSoldOut ? FLinearColor(0.9f, 0.35f, 0.3f) : FLinearColor(0.7f, 0.7f, 0.7f), CX + CW - TW - 8.f, CY + CH - 25.f, Font, 0.85f);
+			HDTextSize(Left, TW, TH, Font, 0.85f);
+			HDText(Left, bSoldOut ? FLinearColor(0.9f, 0.35f, 0.3f) : FLinearColor(0.7f, 0.7f, 0.7f), CX + CW - TW - 8.f, CY + CH - 25.f, Font, 0.85f);
 			if (bOver)
 			{
 				ItemTip(W.Id);
@@ -1742,9 +1764,9 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			// a little drawstring sack
 			Disc(RX + 38.f, BY + 44.f, 22.f, 20.f, FLinearColor(0.55f, 0.36f, 0.18f));
 			Disc(RX + 38.f, BY + 20.f, 9.f, 5.f, FLinearColor(0.45f, 0.28f, 0.14f));
-			DrawText(TEXT("?"), FLinearColor(1.f, 0.9f, 0.5f), RX + 33.f, BY + 32.f, Font, 1.3f);
-			DrawText(TEXT("MYSTERY SATCHEL"), FLinearColor(0.95f, 0.8f, 1.f), RX + 76.f, BY + 10.f, Font, 1.15f);
-			DrawText(bUsed ? FString::Printf(TEXT("Opened this hour. Another in %d min."), JeebStore::MinutesToRestock() + 1)
+			HDText(TEXT("?"), FLinearColor(1.f, 0.9f, 0.5f), RX + 33.f, BY + 32.f, Font, 1.3f);
+			HDText(TEXT("MYSTERY SATCHEL"), FLinearColor(0.95f, 0.8f, 1.f), RX + 76.f, BY + 10.f, Font, 1.15f);
+			HDText(bUsed ? FString::Printf(TEXT("Opened this hour. Another in %d min."), JeebStore::MinutesToRestock() + 1)
 			               : FString::Printf(TEXT("Once an hour, %d ingots. Hover for the odds."), JeebStore::GamblePrice),
 				FLinearColor(0.8f, 0.8f, 0.8f), RX + 76.f, BY + 38.f, Font, 0.9f);
 			if (Over(RX, BY, RW - 140.f, BH))
@@ -1773,9 +1795,9 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				ShopMsgUntil = Now + 6.f;
 			}
 		}
-		if (Now < ShopMsgUntil) DrawText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), RX, PY + PH - 30.f, Font, 1.05f);
+		if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), RX, PY + PH - 30.f, Font, 1.05f);
 	}
-	DrawText(TEXT("Press E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
+	HDText(TEXT("Press E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
 }
 // ===================================================================================================
 // The smithy: turn materials into gear
@@ -1788,7 +1810,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	DrawText(TEXT("THE SMITHY"), FLinearColor(1.f, 0.6f, 0.25f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	HDText(TEXT("THE SMITHY"), FLinearColor(1.f, 0.6f, 0.25f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
 	const int32 Logs = Skills->CountWood();
@@ -1804,11 +1826,11 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		{
 			const float X = PX + 30.f + m * 150.f;
 			DrawIcon(MaterialId(Mats[m].T), X, PY + 58.f, 34.f);
-			DrawText(FString::Printf(TEXT("%s  %d"), Mats[m].N, Mats[m].Have), FLinearColor::White, X + 40.f, PY + 66.f, Font, 1.1f);
+			HDText(FString::Printf(TEXT("%s  %d"), Mats[m].N, Mats[m].Have), FLinearColor::White, X + 40.f, PY + 66.f, Font, 1.1f);
 		}
 		int32 Lv, Into, Need;
 		Skills->GetProgress(ESkillType::Smithing, Lv, Into, Need);
-		DrawText(FString::Printf(TEXT("Smithing  Lv %d"), Lv), FLinearColor(1.f, 0.7f, 0.4f), PX + PW - 330.f, PY + 56.f, Font, 1.2f);
+		HDText(FString::Printf(TEXT("Smithing  Lv %d"), Lv), FLinearColor(1.f, 0.7f, 0.4f), PX + PW - 330.f, PY + 56.f, Font, 1.2f);
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
 
@@ -1836,30 +1858,30 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		DrawRect(Palette(t, 0), CX, CY, CW, 5.f);
 		DrawIcon(Id, CX + 25.f, CY + 14.f, 100.f);
 		float Y = CY + 120.f;
-		DrawText(bArrows ? FString::Printf(TEXT("%s Arrows"), TierName(t)) : ItemName(Id), FLinearColor(1.f, 0.9f, 0.6f), CX + 8.f, Y, Font, 1.05f);
+		HDText(bArrows ? FString::Printf(TEXT("%s Arrows"), TierName(t)) : ItemName(Id), FLinearColor(1.f, 0.9f, 0.6f), CX + 8.f, Y, Font, 1.05f);
 		Y += 26.f;
 		if (bArrows)
 		{
 			int32 A, B; WeaponDamage(K_Bow, t, A, B, t);
-			DrawText(FString::Printf(TEXT("Makes %d arrows"), ArrowBundle), FLinearColor(0.9f, 0.9f, 0.9f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
-			DrawText(FString::Printf(TEXT("Bow damage %d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + 8.f, Y, Font, 0.95f); Y += 26.f;
+			HDText(FString::Printf(TEXT("Makes %d arrows"), ArrowBundle), FLinearColor(0.9f, 0.9f, 0.9f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+			HDText(FString::Printf(TEXT("Bow damage %d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + 8.f, Y, Font, 0.95f); Y += 26.f;
 		}
 		else if (IsWeaponKind(Kind))
 		{
 			int32 A, B; WeaponDamage(Kind, t, A, B, t);
-			DrawText(FString::Printf(TEXT("Damage %d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
-			if (!AllowsShield(Kind)) { DrawText(TEXT("Two-handed"), FLinearColor(0.7f, 0.7f, 0.7f), CX + 8.f, Y, Font, 0.85f); }
+			HDText(FString::Printf(TEXT("Damage %d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+			if (!AllowsShield(Kind)) { HDText(TEXT("Two-handed"), FLinearColor(0.7f, 0.7f, 0.7f), CX + 8.f, Y, Font, 0.85f); }
 			Y += 20.f;
 		}
 		else
 		{
-			DrawText(FString::Printf(TEXT("Defence %d"), DefenseOf(Kind, t)), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
-			if (Kind == K_Boots) DrawText(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + 8.f, Y, Font, 0.85f);
+			HDText(FString::Printf(TEXT("Defence %d"), DefenseOf(Kind, t)), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+			if (Kind == K_Boots) HDText(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + 8.f, Y, Font, 0.85f);
 			Y += 20.f;
 		}
 
 		// Materials: have / need
-		DrawText(TEXT("MATERIALS"), FLinearColor(0.65f, 0.65f, 0.65f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
+		HDText(TEXT("MATERIALS"), FLinearColor(0.65f, 0.65f, 0.65f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
 		bool bHaveAll = true;
 		auto MatLine = [&](EItemType Ty, const TCHAR* Name, int32 Have, int32 Need)
 		{
@@ -1867,7 +1889,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 			const bool bOk = Have >= Need;
 			if (!bOk) bHaveAll = false;
 			DrawIcon(MaterialId(Ty), CX + 6.f, Y - 3.f, 24.f);
-			DrawText(FString::Printf(TEXT("%s %d/%d"), Name, Have, Need), bOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.95f);
+			HDText(FString::Printf(TEXT("%s %d/%d"), Name, Have, Need), bOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.95f);
 			Y += 26.f;
 		};
 		MatLine(EItemType::Logs, TEXT("Logs"), Logs, R.Logs);
@@ -1878,8 +1900,8 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		const int32 Lv = Skills->GetLevel(ESkillType::Smithing);
 		const bool bLevelOk = Lv >= R.Level;
 		Y += 6.f;
-		DrawText(FString::Printf(TEXT("Needs Smithing %d"), R.Level), bLevelOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 8.f, Y, Font, 0.95f); Y += 24.f;
-		DrawText(FString::Printf(TEXT("+%d XP"), R.XP), FLinearColor(0.5f, 0.85f, 1.f), CX + 8.f, Y, Font, 0.95f);
+		HDText(FString::Printf(TEXT("Needs Smithing %d"), R.Level), bLevelOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 8.f, Y, Font, 0.95f); Y += 24.f;
+		HDText(FString::Printf(TEXT("+%d XP"), R.XP), FLinearColor(0.5f, 0.85f, 1.f), CX + 8.f, Y, Font, 0.95f);
 
 		const bool bCan = bHaveAll && bLevelOk;
 		if (Btn(CX + 10.f, CY + CH - 50.f, CW - 20.f, 38.f, TEXT("SMITH"), bCan, false, 1.1f))
@@ -1900,8 +1922,8 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		}
 		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
 	}
-	if (Now < ShopMsgUntil) DrawText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	DrawText(TEXT("Wood uses logs, bronze copper, iron coal, steel coal and copper, diamond diamonds and coal.   Press E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
+	HDText(TEXT("Wood uses logs, bronze copper, iron coal, steel coal and copper, diamond diamonds and coal.   Press E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 // ===================================================================================================
@@ -1918,18 +1940,16 @@ void AKnightHUD::DrawDialogue(AKnightCharacter* Knight)
 	const float X = (Canvas->ClipX - W) * 0.5f, Y = Canvas->ClipY - H - 110.f;
 	auto Shadowed = [&](const FString& Txt, float Tx, float Ty, float Sc, const FLinearColor& Col)
 	{
-		DrawText(Txt, FLinearColor(0.f, 0.f, 0.f, 0.9f), Tx + 2.f, Ty + 2.f, Font, Sc);
-		DrawText(Txt, FLinearColor(0.f, 0.f, 0.f, 0.9f), Tx - 1.f, Ty + 1.f, Font, Sc);
-		DrawText(Txt, Col, Tx, Ty, Font, Sc);
+		HDText(Txt, FLinearColor(0.f, 0.f, 0.f, 0.9f), Tx + 2.f, Ty + 2.f, Font, Sc);
+		HDText(Txt, FLinearColor(0.f, 0.f, 0.f, 0.9f), Tx - 1.f, Ty + 1.f, Font, Sc);
+		HDText(Txt, Col, Tx, Ty, Font, Sc);
 	};
 	Shadowed(Name, X + 26.f, Y + 10.f, 2.4f, FLinearColor(1.f, 0.85f, 0.3f));
-	Wrapped(Line, X + 28.f, Y + 82.f, W - 52.f, 2.0f, FLinearColor(0.f, 0.f, 0.f, 0.9f));
-	Wrapped(Line, X + 26.f, Y + 80.f, W - 52.f, 2.0f, FLinearColor(0.97f, 0.97f, 0.97f));
-	const FString Hint = bLast ? TEXT("Press E or click to continue") : TEXT("Press E or click for more");
-	float TW = 0.f, TH = 0.f;
-	GetTextSize(Hint, TW, TH, Font, 1.4f);
-	Shadowed(Hint, X + W - TW - 24.f, Y + H - TH - 14.f, 1.4f, FLinearColor(1.f, 0.9f, 0.4f));
-	if (bUIClick && Over(X, Y, W, H)) Knight->AdvanceDialogue();
+	// The words start a little left of the name and wrap at about the middle of the screen, so they stay on the left
+	const float LX = X + 8.f, LW = FMath::Max(300.f, Canvas->ClipX * 0.49f - LX);
+	Wrapped(Line, LX + 2.f, Y + 82.f, LW, 2.0f, FLinearColor(0.f, 0.f, 0.f, 0.9f));
+	Wrapped(Line, LX, Y + 80.f, LW, 2.0f, FLinearColor(0.97f, 0.97f, 0.97f));
+	if (bUIClick && Over(X, Y, W, H)) Knight->AdvanceDialogue();   // (E or a click moves on; no hint shown)
 }
 
 
@@ -1966,15 +1986,15 @@ void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
 		if (DefPct != 0) Def = FString::Printf(TEXT("%+d%%"), DefPct);
 		else if (M.MaxHealthBonus > 0) Def = FString::Printf(TEXT("+%d"), M.MaxHealthBonus);
 	}
-	const float Sc = FMath::Clamp(S / 76.f, 0.55f, 0.85f);
+	const float Sc = FMath::Clamp(S / 42.f, 0.85f, 1.3f);   // big enough to read, small enough for two on one icon
 	auto Badge = [&](const FString& T, bool bRight, const FLinearColor& Col)
 	{
 		if (T.IsEmpty()) return;
 		float W = 0.f, H = 0.f;
-		GetTextSize(T, W, H, Font, Sc);
+		HDTextSize(T, W, H, Font, Sc);
 		const float Tx = bRight ? X + S - W - 3.f : X + 3.f, Ty = Y + S - H - 1.f;
-		DrawText(T, FLinearColor(0.f, 0.f, 0.f, 0.85f), Tx + 1.f, Ty + 1.f, Font, Sc);   // a dark edge so it reads over any icon
-		DrawText(T, Col, Tx, Ty, Font, Sc);
+		HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.85f), Tx + 1.f, Ty + 1.f, Font, Sc);   // a dark edge so it reads over any icon
+		HDText(T, Col, Tx, Ty, Font, Sc);
 	};
 	Badge(Off, false, FLinearColor(1.f, 0.38f, 0.32f));
 	Badge(Def, true, FLinearColor(0.45f, 0.72f, 1.f));
@@ -2013,7 +2033,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	for (const TCHAR* N : Names)
 	{
 		float W = 0.f, H = 0.f;
-		GetTextSize(N, W, H, Font, 1.f);
+		HDTextSize(N, W, H, Font, 1.f);
 		LabelSc = FMath::Min(LabelSc, (TW3 - 8.f) / FMath::Max(W, 1.f));
 	}
 	for (int32 t = 0; t < 3; ++t)
@@ -2023,8 +2043,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		const bool bOver = Hot(X, Y, TW3, TabH);
 		Tile(X, Y, TW3, TabH, bOn ? FLinearColor(1.f, 0.86f, 0.6f) : (bOver ? Hover : Idle), bOn ? 0.34f : (bOver ? 0.24f : 0.11f));
 		float W = 0.f, H = 0.f;
-		GetTextSize(Names[t], W, H, Font, LabelSc);
-		DrawText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.8f) : FLinearColor(0.82f, 0.83f, 0.86f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, LabelSc);
+		HDTextSize(Names[t], W, H, Font, LabelSc);
+		HDText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.8f) : FLinearColor(0.82f, 0.83f, 0.86f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, LabelSc);
 		if (bOver && bUIClick) Knight->SetPanelTab(t);
 	}
 	const float GX = PX + Pad, GY = PY + Pad + TabH + 8.f;
@@ -2032,16 +2052,29 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	const int32 Tab = Knight->GetPanelTab();
 	if (Tab == 0)
 	{
-		// ---- Inventory: the 16-slot pack. Click gear to hold or wear it. ----
+		// ---- Inventory: the top-left cell always holds your ingots (it cannot be changed); then the 15-slot pack.
+		// Click gear to hold or wear it. ----
+		{
+			const bool bOver = Hot(GX, GY, SS, SS);
+			Tile(GX, GY, SS, SS, FLinearColor(1.f, 0.85f, 0.45f), bOver ? 0.26f : 0.16f);
+			DrawIngot(GX + 7.f, GY + 4.f, SS - 14.f);
+			const FString N = FString::FromInt(Skills->GetIngots());
+			float NW = 0.f, NH = 0.f;
+			HDTextSize(N, NW, NH, Font, 1.0f);
+			HDText(N, FLinearColor(0.f, 0.f, 0.f, 0.85f), GX + (SS - NW) * 0.5f + 1.f, GY + SS - NH, Font, 1.0f);
+			HDText(N, FLinearColor(1.f, 0.88f, 0.4f), GX + (SS - NW) * 0.5f, GY + SS - NH - 1.f, Font, 1.0f);
+			if (bOver) SetTip({ TEXT("Ingots"), FString::Printf(TEXT("%d ingots: spend them at the store and the smithy"), Skills->GetIngots()) });
+		}
 		for (int32 i = 0; i < NumSlots; ++i)
 		{
-			const float X = GX + (i % 4) * (SS + Gap), Y = GY + (i / 4) * (SS + Gap);
+			const int32 Cell = i + 1;
+			const float X = GX + (Cell % 4) * (SS + Gap), Y = GY + (Cell / 4) * (SS + Gap);
 			const bool bOver = Hot(X, Y, SS, SS);
 			const FInvSlot S = Skills->Slots[i];
 			SlotTile(X, Y, SS, SS, bOver);
 			if (S.Id == 0) continue;
 			DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);
-			if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
+			if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
 			ItemBadges(S.Id, X, Y, SS);
 			if (bOver)
 			{
@@ -2053,48 +2086,60 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	else if (Tab == 1)
 	{
 		// ---- Armor: what you are wearing. Click to take it off (armour pieces can only be swapped). ----
-		struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
+		// Laid out like the knight himself: helmet on top; gloves, chest and shoulders across the middle; boots below,
+		// with the shield beside them and the cape on the other side. The three miscellaneous slots run down the right edge.
+		struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; int32 Col, Row; };
 		static const FWornSlot Worn[10] = {
-			{ K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
-			{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Shield, false, TEXT("Shield") }, { K_Ring, false, TEXT("Misc") },
-			{ K_Ring, true, TEXT("Misc") }, { K_Amulet, false, TEXT("Misc") },
+			{ K_Helmet, false, TEXT("Helmet"), 1, 0 },
+			{ K_Gloves, false, TEXT("Gloves"), 0, 1 }, { K_Chest, false, TEXT("Chest"), 1, 1 }, { K_Shoulders, false, TEXT("Shoulders"), 2, 1 },
+			{ K_Shield, false, TEXT("Shield"), 0, 2 }, { K_Boots, false, TEXT("Boots"), 1, 2 }, { K_Cape, false, TEXT("Cape"), 2, 2 },
+			{ K_Ring, false, TEXT("Misc"), 3, 0 }, { K_Ring, true, TEXT("Misc"), 3, 1 }, { K_Amulet, false, TEXT("Misc"), 3, 2 },
 		};
 		const float WS = 46.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 13.f;
-		for (int32 w = 0; w < 10; ++w)
+		for (const FWornSlot& Ws : Worn)
 		{
-			const float X = GX + (w % 4) * (WS + WG), Y = GY + (w / 4) * RowH;
+			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
 			const bool bOver = Hot(X, Y, WS, WS);
 			SlotTile(X, Y, WS, WS, bOver);
 			float LW = 0.f, LH = 0.f;
-			GetTextSize(Worn[w].Label, LW, LH, Font, 0.6f);
-			DrawText(Worn[w].Label, FLinearColor(0.72f, 0.73f, 0.77f), X + (WS - LW) * 0.5f, Y + WS, Font, 0.6f);
-			const int32 Id = Worn[w].bSecond ? Skills->RingB : Skills->Worn[Worn[w].Kind];
+			HDTextSize(Ws.Label, LW, LH, Font, 0.6f);
+			HDText(Ws.Label, FLinearColor(0.72f, 0.73f, 0.77f), X + (WS - LW) * 0.5f, Y + WS, Font, 0.6f);
+			const int32 Id = Ws.bSecond ? Skills->RingB : Skills->Worn[Ws.Kind];
 			if (Id == 0) continue;
 			DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);
 			ItemBadges(Id, X, Y, WS);
 			if (bOver)
 			{
 				ItemTip(Id);
-				if (bUIClick) Knight->UnequipWorn(Worn[w].Kind, Worn[w].bSecond);
+				if (bUIClick) Knight->UnequipWorn(Ws.Kind, Ws.bSecond);
 			}
 		}
 		// Totals: offence is what the weapon in hand deals with every bonus counted (the middle of its range);
-		// defence is your armour with every bonus counted, plus your shield's guard when one is ready
-		const float TY = GY + 3 * RowH + 4.f, Half = GridW * 0.5f;
+		// defence is your armour with every bonus counted, plus your shield's guard when one is ready.
+		// Each box shows an icon and a big number, centred together.
+		const float TY = GY + 3 * RowH + 2.f, Half = GridW * 0.5f, BoxH = 36.f;
 		int32 A = 0, B = 0;
 		const bool bWeapon = HotbarDamage(Skills, Skills->Selected, A, B);
 		const int32 Offence = bWeapon ? FMath::RoundToInt(0.5f * (A + B)) : 0;
 		const int32 Defence = TotalDefense(Skills, false);
 		const int32 Guard = (Skills->Worn[K_Shield] && Knight->ShieldActive()) ? DefenseOf(K_Shield, VariantOf(Skills->Worn[K_Shield])) : 0;
-		const int32 SwordIcon = GearId(K_Sword, 1), ShieldIcon = GearId(K_Shield, 1);
-		Tile(GX, TY, Half - 3.f, 34.f, FLinearColor(1.f, 0.45f, 0.4f), 0.12f, false);
-		Tile(GX + Half + 3.f, TY, Half - 3.f, 34.f, FLinearColor(0.45f, 0.65f, 1.f), 0.12f, false);
-		DrawIcon(Skills->SelectedItem() && IsGear(Skills->SelectedItem()) ? Skills->SelectedItem() : SwordIcon, GX + 3.f, TY + 3.f, 28.f);
-		DrawText(FString::FromInt(Offence), FLinearColor(1.f, 0.42f, 0.36f), GX + 36.f, TY + 5.f, Font, 1.25f);
-		DrawIcon(Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : ShieldIcon, GX + Half + 6.f, TY + 3.f, 28.f);
-		DrawText(Guard > 0 ? FString::Printf(TEXT("%d  +%d"), Defence, Guard) : FString::FromInt(Defence), FLinearColor(0.5f, 0.75f, 1.f), GX + Half + 39.f, TY + 5.f, Font, 1.25f);
-		if (Hot(GX, TY, Half, 34.f)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
-		if (Hot(GX + Half, TY, Half, 34.f)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Armour %d, all bonuses counted"), Defence),
+		const int32 Held = Skills->SelectedItem();
+		const int32 OffIcon = (Held && IsGear(Held)) ? Held : GearId(K_Sword, 1);
+		const int32 DefIcon = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
+		auto Total = [&](float BX, int32 Icon, const FString& Num, const FLinearColor& Col, const FLinearColor& Tint)
+		{
+			const float BW = Half - 3.f;
+			Tile(BX, TY, BW, BoxH, Tint, 0.12f, false);
+			float NW = 0.f, NH = 0.f;
+			HDTextSize(Num, NW, NH, Font, 1.7f);
+			const float IconS = 28.f, GroupW = IconS + 6.f + NW, SX = BX + (BW - GroupW) * 0.5f;
+			DrawIcon(Icon, SX, TY + (BoxH - IconS) * 0.5f, IconS);
+			HDText(Num, Col, SX + IconS + 6.f, TY + (BoxH - NH) * 0.5f, Font, 1.7f);
+		};
+		Total(GX, OffIcon, FString::FromInt(Offence), FLinearColor(1.f, 0.42f, 0.36f), FLinearColor(1.f, 0.45f, 0.4f));
+		Total(GX + Half + 3.f, DefIcon, Guard > 0 ? FString::Printf(TEXT("%d+%d"), Defence, Guard) : FString::FromInt(Defence), FLinearColor(0.5f, 0.75f, 1.f), FLinearColor(0.45f, 0.65f, 1.f));
+		if (Hot(GX, TY, Half, BoxH)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
+		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Armour %d, all bonuses counted"), Defence),
 			Guard > 0 ? FString::Printf(TEXT("Shield guard %d (stops that much while raised)"), Guard) : FString(TEXT("No shield ready")) });
 	}
 	else
@@ -2114,8 +2159,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			DrawSkillIcon(static_cast<int32>(T), X + 5.f, Y + 5.f, BH - 22.f);
 			const FString LvS = FString::FromInt(Lv);
 			float LW = 0.f, LH = 0.f;
-			GetTextSize(LvS, LW, LH, Font, 1.2f);
-			DrawText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + BW - LW - 5.f, Y + BH - LH - 10.f, Font, 1.2f);
+			HDTextSize(LvS, LW, LH, Font, 1.2f);
+			HDText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + BW - LW - 5.f, Y + BH - LH - 10.f, Font, 1.2f);
 			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
 			Gauge(X + 6.f, Y + BH - 7.f, BW - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
 			if (bOver)
@@ -2259,8 +2304,8 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	{
 		const FString Tot = FString::Printf(TEXT("Total level  %d"), Total);
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(Tot, TW, TH, Font, 1.3f);
-		DrawText(Tot, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 60.f - TW, PY + 20.f, Font, 1.3f);
+		HDTextSize(Tot, TW, TH, Font, 1.3f);
+		HDText(Tot, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 60.f - TW, PY + 20.f, Font, 1.3f);
 	}
 
 	// A 3 x 3 board of skills: icon, name, big level number, and progress to the next level
@@ -2277,20 +2322,20 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 
 		int32 Lv, Into, Need;
 		Sk->GetProgress(T, Lv, Into, Need);
-		DrawText(USkillComponent::SkillName(T), FLinearColor(0.95f, 0.9f, 0.8f), X + 126.f, Y + 18.f, Font, 1.2f);
+		HDText(USkillComponent::SkillName(T), FLinearColor(0.95f, 0.9f, 0.8f), X + 126.f, Y + 18.f, Font, 1.2f);
 		const FString LvS = FString::FromInt(Lv);
 		float TW = 0.f, TH = 0.f;
-		GetTextSize(LvS, TW, TH, Font, 2.8f);
-		DrawText(LvS, FLinearColor(1.f, 0.9f, 0.45f), X + BW - 22.f - TW, Y + 48.f, Font, 2.8f);
+		HDTextSize(LvS, TW, TH, Font, 2.8f);
+		HDText(LvS, FLinearColor(1.f, 0.9f, 0.45f), X + BW - 22.f - TW, Y + 48.f, Font, 2.8f);
 		const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
 		Gauge(X + 16.f, Y + BH - 24.f, BW - 32.f, 10.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
-		DrawText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.7f, 0.7f, 0.7f), X + 126.f, Y + BH - 46.f, Font, 0.9f);
+		HDText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.7f, 0.7f, 0.7f), X + 126.f, Y + BH - 46.f, Font, 0.9f);
 		if (bOver)
 		{
 			SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d XP to level %d"), FMath::Max(0, Need - Into), Lv + 1) });
 		}
 	}
-	DrawText(TEXT("K or Tab to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
+	HDText(TEXT("K or Tab to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);
 }
 // ---------------------------------------------------------------------------------------------------
 // Lore tab (in the O screen): every fragment you have heard, sorted by kind
@@ -2303,7 +2348,7 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 	UFont* Font = GEngine->GetMediumFont();
 	const TArray<JeebLore::FEntry>& E = JeebLore::Entries();
 
-	DrawText(FString::Printf(TEXT("Fragments heard:  %d / %d      Talk to the people of Jeebsland. They remember things."), Sk->LoreFound.Num(), E.Num()),
+	HDText(FString::Printf(TEXT("Fragments heard:  %d / %d      Talk to the people of Jeebsland. They remember things."), Sk->LoreFound.Num(), E.Num()),
 		FLinearColor(0.8f, 0.78f, 0.7f), PX + 30.f, PY + 56.f, Font, 1.0f);
 
 	const float CW = 150.f;
@@ -2323,7 +2368,7 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 		const bool bKnown = Sk->LoreFound.Contains(i);
 		const bool bOver = bKnown && Over(LX, Y, LW, RowH - 4.f);
 		Tile(LX, Y, LW, RowH - 4.f, LoreSel == i ? FLinearColor(1.f, 0.78f, 0.35f) : FLinearColor(0.6f, 0.72f, 0.88f), LoreSel == i ? 0.5f : (bOver ? 0.34f : 0.16f));
-		DrawText(bKnown ? FString(E[i].Title) : FString(TEXT("???")), bKnown ? FLinearColor(1.f, 0.92f, 0.65f) : FLinearColor(0.4f, 0.4f, 0.4f), LX + 10.f, Y + 5.f, Font, 1.05f);
+		HDText(bKnown ? FString(E[i].Title) : FString(TEXT("???")), bKnown ? FLinearColor(1.f, 0.92f, 0.65f) : FLinearColor(0.4f, 0.4f, 0.4f), LX + 10.f, Y + 5.f, Font, 1.05f);
 		if (bOver && bUIClick) LoreSel = i;
 	}
 
@@ -2333,8 +2378,8 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 	if (LoreSel >= 0 && E.IsValidIndex(LoreSel) && Sk->LoreFound.Contains(LoreSel))
 	{
 		const JeebLore::FEntry& En = E[LoreSel];
-		DrawText(En.Title, FLinearColor(1.f, 0.85f, 0.3f), RX, RY, Font, 1.5f);
-		DrawText(FString::Printf(TEXT("as told by %s"), JeebLore::SpeakerName(En.Speaker)), FLinearColor(0.65f, 0.65f, 0.7f), RX, RY + 34.f, Font, 0.95f);
+		HDText(En.Title, FLinearColor(1.f, 0.85f, 0.3f), RX, RY, Font, 1.5f);
+		HDText(FString::Printf(TEXT("as told by %s"), JeebLore::SpeakerName(En.Speaker)), FLinearColor(0.65f, 0.65f, 0.7f), RX, RY + 34.f, Font, 0.95f);
 		TArray<FString> Parts;
 		FString(En.Text).ParseIntoArray(Parts, TEXT("|"), true);
 		float Y = RY + 72.f;
@@ -2342,9 +2387,9 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 	}
 	else
 	{
-		DrawText(TEXT("Choose a fragment to read it."), FLinearColor(0.5f, 0.5f, 0.5f), RX, RY, Font, 1.1f);
+		HDText(TEXT("Choose a fragment to read it."), FLinearColor(0.5f, 0.5f, 0.5f), RX, RY, Font, 1.1f);
 	}
-	DrawText(TEXT("Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
+	HDText(TEXT("Press O to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 }
 
 
@@ -2358,7 +2403,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	const float PW = 1090.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH);
-	DrawText(TEXT("THE VAULT"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	HDText(TEXT("THE VAULT"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver)
@@ -2367,7 +2412,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	};
 
 	// ----- Your pack -----
-	DrawText(TEXT("YOUR PACK  (click to deposit)"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 62.f, Font, 1.1f);
+	HDText(TEXT("YOUR PACK  (click to deposit)"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 62.f, Font, 1.1f);
 	const float SS = 74.f, Gap = 6.f;
 	const float GX = PX + 30.f, GY = PY + 94.f;
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -2378,7 +2423,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		const FInvSlot S = Sk->Slots[i];
 		if (S.Id == 0) continue;
 		DrawIcon(S.Id, X + 8.f, Y + 6.f, SS - 16.f);
-		if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 28.f, Y + SS - 22.f, Font, 1.0f);
+		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 28.f, Y + SS - 22.f, Font, 1.0f);
 		if (bOver)
 		{
 			ItemTip(S.Id);
@@ -2400,7 +2445,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (PC->WasInputKeyJustPressed(EKeys::MouseScrollUp)) BankPage = FMath::Max(0, BankPage - 1);
 	}
 	const float BX0 = PX + 400.f, BS = 58.f, BG = 6.f;
-	DrawText(FString::Printf(TEXT("BANK  %d / %d slots used   (click to take out)"), Sk->BankUsed(), USkillComponent::NumBankSlots), FLinearColor(1.f, 0.85f, 0.3f), BX0, PY + 62.f, Font, 1.1f);
+	HDText(FString::Printf(TEXT("BANK  %d / %d slots used   (click to take out)"), Sk->BankUsed(), USkillComponent::NumBankSlots), FLinearColor(1.f, 0.85f, 0.3f), BX0, PY + 62.f, Font, 1.1f);
 	for (int32 k = 0; k < PerPage; ++k)
 	{
 		const int32 Idx = BankPage * PerPage + k;
@@ -2411,7 +2456,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		const FInvSlot S = Sk->Bank[Idx];
 		if (S.Id == 0) continue;
 		DrawIcon(S.Id, X + 6.f, Y + 4.f, BS - 12.f);
-		if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + BS - 26.f, Y + BS - 20.f, Font, 0.85f);
+		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + BS - 26.f, Y + BS - 20.f, Font, 0.85f);
 		if (bOver)
 		{
 			ItemTip(S.Id);
@@ -2421,6 +2466,31 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	const float PgY = GY + Rows * (BS + BG) + 10.f;
 	if (Btn(BX0, PgY, 90.f, 32.f, TEXT("< PREV"), BankPage > 0, false, 1.0f)) BankPage = FMath::Max(0, BankPage - 1);
 	if (Btn(BX0 + 100.f, PgY, 90.f, 32.f, TEXT("NEXT >"), BankPage < Pages - 1, false, 1.0f)) BankPage = FMath::Min(Pages - 1, BankPage + 1);
-	DrawText(FString::Printf(TEXT("Page %d / %d   (mouse wheel also turns pages)"), BankPage + 1, Pages), FLinearColor(0.8f, 0.8f, 0.8f), BX0 + 210.f, PgY + 6.f, Font, 1.0f);
-	DrawText(TEXT("Gear you are wearing or holding stays on you. Press E to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 34.f, Font, 1.0f);
+	HDText(FString::Printf(TEXT("Page %d / %d   (mouse wheel also turns pages)"), BankPage + 1, Pages), FLinearColor(0.8f, 0.8f, 0.8f), BX0 + 210.f, PgY + 6.f, Font, 1.0f);
+	HDText(TEXT("Gear you are wearing or holding stays on you. Press E to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 34.f, Font, 1.0f);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Sharp text (see KnightHUD.h)
+// ---------------------------------------------------------------------------------------------------
+UFont* AKnightHUD::PickFont(UFont* Font, float& Scale) const
+{
+	if (!Font || !HDFonts[3] || Font != HDFonts[0]) return Font;
+	const int32 K = FMath::Clamp(FMath::CeilToInt(Scale - 0.05f), 1, 4);   // the smallest raster at least as big as needed
+	Scale /= float(K);
+	return HDFonts[K - 1];
+}
+
+void AKnightHUD::HDText(const FString& Text, const FLinearColor& Color, float X, float Y, UFont* Font, float Scale)
+{
+	float S = Scale;
+	UFont* F = PickFont(Font, S);
+	DrawText(Text, Color, X, Y, F, S);
+}
+
+void AKnightHUD::HDTextSize(const FString& Text, float& OutW, float& OutH, UFont* Font, float Scale) const
+{
+	float S = Scale;
+	UFont* F = PickFont(Font, S);
+	GetTextSize(Text, OutW, OutH, F, S);
 }

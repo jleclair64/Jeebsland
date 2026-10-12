@@ -80,6 +80,9 @@ public:
 	int32 GetPanelTab() const { return PanelTab; }
 	void SetPanelTab(int32 T) { PanelTab = FMath::Clamp(T, 0, 2); }
 	void CyclePanelTab() { PanelTab = (PanelTab + 1) % 3; }
+	// Settings: show the side panel all the time (on), or only while the cursor is out with Tab (off)
+	bool GetPanelAlways() const { return bPanelAlways; }
+	void SetPanelAlways(bool bOn);
 	bool bPitchLimitsSet = false;
 	void OpenShop();
 	void CloseShop();
@@ -221,6 +224,7 @@ private:
 	bool bInventoryOpen = false;
 	bool bSkillsOpen = false;
 	bool bPanelCursor = false;
+	bool bPanelAlways = true;
 	int32 PanelTab = 0;
 	UPROPERTY() UInputAction* PanelTabAction = nullptr;
 	bool bBankOpen = false;
@@ -248,7 +252,7 @@ private:
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;
-	bool bFancyLighting = false;   // Lumen global illumination, reflections and volumetric clouds
+	bool bFancyLighting = true;    // Lumen global illumination, reflections and volumetric clouds
 	float RenderScale = 1.f;       // 0.5 - 1.0 of the screen resolution
 	void ApplyGraphics();
 	float LookSensitivity = 0.5f; // 1.0 = the original (fast) speed

@@ -60,6 +60,12 @@ private:
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
 	float PanelTop = 0.f;
 	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
+	// Sharp text: the canvas draws a font at its own size and then scales the picture, which blurs big text. These are
+	// copies of the medium font rasterised at 2x, 3x and 4x; HDText picks the one that needs the least scaling.
+	UPROPERTY() UFont* HDFonts[4] = {};
+	UFont* PickFont(UFont* Font, float& Scale) const;
+	void HDText(const FString& Text, const FLinearColor& Color, float X, float Y, UFont* Font = nullptr, float Scale = 1.f);
+	void HDTextSize(const FString& Text, float& OutW, float& OutH, UFont* Font = nullptr, float Scale = 1.f) const;
 	void ItemBadges(int32 Id, float X, float Y, float S);   // small red (offence) and blue (defence) numbers on an item icon
 	void DrawShopScreen(AKnightCharacter* Knight);
 	void DrawSmithScreen(AKnightCharacter* Knight);

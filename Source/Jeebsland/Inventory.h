@@ -11,7 +11,7 @@
 // ===================================================================================================
 namespace JeebItems
 {
-	constexpr int32 NumSlots = 16;      // inventory slots
+	constexpr int32 NumSlots = 15;      // inventory slots (the side panel shows ingots in a 16th, fixed, top-left cell)
 	constexpr int32 NumHotbar = 5;      // weapons and tools you carry ready
 	constexpr int32 NumTiers = 5;
 	constexpr int32 NumCapeColors = 7;

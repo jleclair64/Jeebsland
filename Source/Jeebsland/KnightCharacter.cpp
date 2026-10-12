@@ -160,12 +160,14 @@ void AKnightCharacter::BeginPlay()
 	SpawnLoc = GetActorLocation();
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
 
-	// Saved graphics choices (default: fast lighting, full resolution)
+	// Saved choices (resolution, side panel). Fancy lighting always starts on, whatever was saved.
 	if (GConfig)
 	{
-		GConfig->GetBool(TEXT("Jeebsland"), TEXT("FancyLighting"), bFancyLighting, GGameUserSettingsIni);
+		// (fancy lighting is not loaded: it starts on every time)
 		GConfig->GetFloat(TEXT("Jeebsland"), TEXT("RenderScale"), RenderScale, GGameUserSettingsIni);
+		GConfig->GetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
 	}
+	bFancyLighting = true;
 	ApplyGraphics();
 	UpperBase = UpperPivot->GetRelativeLocation();
 	LeftBase = ArmPivotL->GetRelativeLocation();
@@ -2403,4 +2405,10 @@ void AKnightCharacter::OnInventoryKey()
 	// Otherwise Tab frees the mouse cursor to use the side panel, or puts it away again
 	bPanelCursor = !bPanelCursor;
 	RefreshUIMode();
+}
+
+void AKnightCharacter::SetPanelAlways(bool bOn)
+{
+	bPanelAlways = bOn;
+	if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
 }
