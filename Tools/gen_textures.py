@@ -430,6 +430,48 @@ def bark():
     return cached("T_Bark", 2, paint_bark)
 
 
+# ------------------------------------------------------------------ weathered wood (palisade logs, beams, planks)
+def paint_wood():
+    # Grain runs down the picture (v). Long fine fibres, soft wavering growth lines, a few hairline cracks and slow
+    # weathering patches. Low contrast and close to grey, so the material's colour tints it into a believable brown.
+    W, H = 256, 512
+    fibre_a = NoiseXY(1101, 160, 4)      # thin streaks, very long
+    fibre_b = NoiseXY(1111, 64, 3)
+    fibre_c = NoiseXY(1121, 24, 2)
+    drift = NoiseXY(1131, 3, 2)          # wanders the growth lines sideways along the board
+    drift2 = NoiseXY(1141, 7, 3)
+    patch = NoiseXY(1151, 4, 3)          # weathering: grey and dark patches
+    crack_u = [0.12, 0.37, 0.61, 0.86]
+    crack_wander = NoiseXY(1161, 1, 9)
+    crack_gate = [NoiseXY(1171 + k, 1, 3) for k in range(4)]
+    px = bytearray(W * H * 4)
+    for j in range(H):
+        v = j / H
+        for i in range(W):
+            u = i / W
+            wob = 0.7 * drift.at01(u, v) + 0.3 * drift2.at01(u, v)
+            rings = 0.5 + 0.5 * math.sin(2 * math.pi * (u * 11 + 2.6 * wob))      # growth lines
+            rings2 = 0.5 + 0.5 * math.sin(2 * math.pi * (u * 31 + 5.0 * wob + 0.3))   # a finer set between them
+            fibre = 0.5 * fibre_a.at01(u, v) + 0.3 * fibre_b.at01(u, v) + 0.2 * fibre_c.at01(u, v)
+            p = patch.at01(u, v)
+            l = 0.50 + 0.15 * (rings - 0.5) + 0.05 * (rings2 - 0.5) + 0.34 * (fibre - 0.5) + 0.12 * (p - 0.5)
+            crack = 0.0
+            for k in range(4):   # a few hairline splits that run down the grain, each only part of the way
+                d = abs(u - crack_u[k] - 0.012 * (crack_wander.at01(0.5, (v + 0.25 * k) % 1.0) - 0.5))
+                crack = max(crack, (1 - clamp01(d / 0.0022)) * clamp01((crack_gate[k].at01(0.5, v) - 0.52) * 9.0))
+            l *= 1 - 0.5 * crack
+            o = (j * W + i) * 4
+            px[o] = to8(l * 1.06)
+            px[o + 1] = to8(l * 1.0)
+            px[o + 2] = to8(l * 0.92)
+            px[o + 3] = 255
+    return W, H, px
+
+
+def wood():
+    return cached("T_Wood", 2, paint_wood)
+
+
 # ------------------------------------------------------------------ big soft blotches (for patchy variation across the meadow)
 def paint_patches():
     N = 128

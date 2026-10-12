@@ -98,8 +98,8 @@ AAutumnDecor::AAutumnDecor()
 	PumpkinB = MakeISM(TEXT("PumpkinB"), SphereMesh.Object, FLinearColor(0.68f, 0.17f, 0.02f), true);
 	PumpkinC = MakeISM(TEXT("PumpkinC"), SphereMesh.Object, FLinearColor(0.80f, 0.46f, 0.08f), true);
 	Stem     = MakeISM(TEXT("Stem"),     CylMesh.Object,    FLinearColor(0.20f, 0.25f, 0.06f), false);
-	Glow     = MakeISM(TEXT("Glow"),     CubeMesh.Object,   FLinearColor(3.2f, 2.0f, 0.45f), false);   // bright: lantern glass and carved faces glow
-	GlowCone = MakeISM(TEXT("GlowCone"), ConeMesh.Object,   FLinearColor(3.2f, 2.0f, 0.45f), false);
+	Glow     = MakeISM(TEXT("Glow"),     CubeMesh.Object,   FLinearColor(4.5f, 2.6f, 0.5f), false);   // bright: lantern glass and carved faces glow (and flicker)
+	GlowCone = MakeISM(TEXT("GlowCone"), ConeMesh.Object,   FLinearColor(4.5f, 2.6f, 0.5f), false);
 	Wood     = MakeISM(TEXT("Wood"),     CylMesh.Object,    FLinearColor(0.16f, 0.09f, 0.05f), true);
 	WoodCone = MakeISM(TEXT("WoodCone"), ConeMesh.Object,   FLinearColor(0.07f, 0.04f, 0.08f), true);
 	Cloth    = MakeISM(TEXT("Cloth"),    CubeMesh.Object,   FLinearColor(0.35f, 0.12f, 0.12f), false);
@@ -109,7 +109,9 @@ AAutumnDecor::AAutumnDecor()
 	StoneCyl = MakeISM(TEXT("StoneCyl"), CylMesh.Object,    FLinearColor(0.22f, 0.23f, 0.27f), true);
 	CandleBody = MakeISM(TEXT("CandleBody"), CylMesh.Object, FLinearColor(0.88f, 0.84f, 0.72f), false);
 	CandleCup  = MakeISM(TEXT("CandleCup"),  CylMesh.Object, FLinearColor(0.50f, 0.33f, 0.07f), false);
-	Flame    = MakeISM(TEXT("Flame"),    ConeMesh.Object,   FLinearColor(5.0f, 2.2f, 0.35f), false);   // bright: glows
+	Flame    = MakeISM(TEXT("Flame"),    ConeMesh.Object,   FLinearColor(9.0f, 4.0f, 0.6f), false);   // bright: glows
+	CandleHalo  = MakeISM(TEXT("CandleHalo"),  SphereMesh.Object, FLinearColor(1.f, 1.f, 1.f), false);
+	PumpkinHalo = MakeISM(TEXT("PumpkinHalo"), SphereMesh.Object, FLinearColor(1.f, 1.f, 1.f), false);
 	Rope     = MakeISM(TEXT("Rope"),     CylMesh.Object,    FLinearColor(0.20f, 0.14f, 0.07f), false);
 	Iron     = MakeISM(TEXT("Iron"),     CylMesh.Object,    FLinearColor(0.07f, 0.07f, 0.08f), false);
 	TorchFlame = MakeISM(TEXT("TorchFlame"), ConeMesh.Object, FLinearColor(5.0f, 1.7f, 0.25f), false);
@@ -140,7 +142,7 @@ UInstancedStaticMeshComponent* AAutumnDecor::MakeISM(const TCHAR* Name, UStaticM
 }
 
 // A warm point light that flickers (Tick varies its strength)
-void AAutumnDecor::AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker)
+void AAutumnDecor::AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker, float Phase)
 {
 	UPointLightComponent* L = NewObject<UPointLightComponent>(this);
 	L->SetupAttachment(RootComponent);
@@ -153,7 +155,7 @@ void AAutumnDecor::AddFlickerLight(const FVector& P, float Intensity, float Radi
 	FlickerLights.Add(L);
 	FlickerBase.Add(Intensity);
 	FlickerAmt.Add(Flicker);
-	FlickerPhase.Add(Rand.FRandRange(0.f, 100.f));
+	FlickerPhase.Add(Phase >= 0.f ? Phase : Rand.FRandRange(0.f, 100.f));
 }
 
 static FTransform CylBetween(const FVector& A, const FVector& B, float Thick)
@@ -209,8 +211,21 @@ void AAutumnDecor::BeginPlay()
 		if (UMaterialInstanceDynamic* M = T.Key->CreateDynamicMaterialInstance(0, Base))
 		{
 			M->SetVectorParameterValue(TEXT("Color"), T.Value);
+			if (T.Key == Glow) GlowMid = M;
+			else if (T.Key == GlowCone) GlowConeMid = M;
 		}
 	}
+	// Soft glows round candle flames and carved faces: additive, see-through balls of warm light (M_Flame)
+	if (UMaterialInterface* FlameMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Flame.M_Flame")))
+	{
+		UMaterialInstanceDynamic* C = UMaterialInstanceDynamic::Create(FlameMat, this);
+		C->SetScalarParameterValue(TEXT("Intensity"), 3.2f);
+		CandleHalo->SetMaterial(0, C);
+		UMaterialInstanceDynamic* P = UMaterialInstanceDynamic::Create(FlameMat, this);
+		P->SetScalarParameterValue(TEXT("Intensity"), 2.4f);
+		PumpkinHalo->SetMaterial(0, P);
+	}
+	else UE_LOG(LogTemp, Warning, TEXT("M_Flame is missing: run Tools/BuildMaterials.ps1. Candles and pumpkins lose their soft glow."));
 
 	// Loose leaves use a painted leaf card (same look and tints as the tree leaves) instead of plain squares
 	bool bLeafCards = false;
@@ -263,7 +278,8 @@ void AAutumnDecor::BeginPlay()
 	};
 
 	// ---------------- A pumpkin; face points along +X after the yaw, so carved ones look at the player ----------------
-	auto AddPumpkin = [&](const FVector& Pos, float Scale, float YawDeg, bool bCarved)
+	int32 LitCount = 0;   // every second lit pumpkin gets a real light
+	auto AddPumpkin = [&](const FVector& Pos, float Scale, float YawDeg, bool bCarved, bool bLit = false)
 	{
 		const float D = 60.f * Scale; // body diameter
 		if (JeebTerrain::PropBlocked(Pos.X, Pos.Y, D * 0.5f + 10.f)) return; // never on a fence or wall
@@ -281,22 +297,30 @@ void AAutumnDecor::BeginPlay()
 		{
 			const float X = 0.485f * D;
 			const float Zc = 0.41f * D;
-			// Triangle eyes and nose (flat cones), a jagged grin of little blocks
-			Put(GlowCone, L(FVector(X, -0.17f * D, Zc + 0.13f * D), FVector(0.06f * D, 0.16f * D, 0.15f * D)));
-			Put(GlowCone, L(FVector(X,  0.17f * D, Zc + 0.13f * D), FVector(0.06f * D, 0.16f * D, 0.15f * D)));
-			Put(GlowCone, L(FVector(X, 0.f, Zc + 0.01f * D),       FVector(0.06f * D, 0.08f * D, 0.09f * D)));
-			for (int32 k = -2; k <= 2; ++k)
+			// The classic face: two triangle eyes, a triangle nose and a wide, toothy grin, all glowing with the candle inside
+			Put(GlowCone, L(FVector(X, -0.19f * D, Zc + 0.15f * D), FVector(0.07f * D, 0.20f * D, 0.19f * D)));
+			Put(GlowCone, L(FVector(X,  0.19f * D, Zc + 0.15f * D), FVector(0.07f * D, 0.20f * D, 0.19f * D)));
+			Put(GlowCone, L(FVector(X, 0.f, Zc + 0.02f * D),       FVector(0.07f * D, 0.10f * D, 0.11f * D)));
+			for (int32 k = -3; k <= 3; ++k)   // the grin: alternating tall and short teeth, curving up at the ends
 			{
-				const float Hh = (k % 2 == 0) ? 0.11f * D : 0.06f * D;
-				Put(Glow, L(FVector(X * 0.99f, k * 0.085f * D, Zc - 0.13f * D), FVector(0.06f * D, 0.075f * D, Hh)));
+				const float Hh = (k % 2 == 0) ? 0.13f * D : 0.07f * D;
+				const float Rise = 0.012f * D * k * k;
+				Put(Glow, L(FVector(X * 0.99f, k * 0.085f * D, Zc - 0.15f * D + Rise), FVector(0.07f * D, 0.08f * D, Hh)));
 			}
+			// the candle's light spilling out over the face: a soft glow, and (for some) a real flickering light
+			PHaloPos.Add(Pos + Q.RotateVector(FVector(0.5f * D, 0.f, Zc)));
+			PHaloScale.Add(1.15f * D / 100.f);
+			PHaloPhase.Add(0.37f * PHaloPos.Num());
+			PumpkinHalo->AddInstance(FTransform(FQuat::Identity, PHaloPos.Last(), FVector(1.15f * D / 100.f)));
+			if (bLit && (LitCount++ % 2) == 0)
+				AddFlickerLight(Pos + Q.RotateVector(FVector(0.75f * D, 0.f, Zc)), 900.f * FMath::Max(Scale, 0.8f), 420.f * FMath::Max(Scale, 0.8f), FLinearColor(1.0f, 0.55f, 0.18f), 0.35f, 3.1f * LitCount);
 		}
 	};
 
 	auto Facing = [&](const FVector2D& P) { return FRotator((-FVector(P.X, P.Y, 0.f)).Rotation()).Yaw + Rand.FRandRange(-70.f, 70.f); };
 
 	// ---------------- Pumpkin patches ----------------
-	auto Patch = [&](const FVector2D& C, int32 Count, float Radius, float SizeMul)
+	auto Patch = [&](const FVector2D& C, int32 Count, float Radius, float SizeMul, bool bLit = false)
 	{
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -304,16 +328,16 @@ void AAutumnDecor::BeginPlay()
 			const float Rad = Radius * FMath::Sqrt(Rand.FRand());
 			const float X = C.X + Rad * FMath::Cos(Ang);
 			const float Y = C.Y + Rad * FMath::Sin(Ang);
-			AddPumpkin(FVector(X, Y, Ground(X, Y) - 2.f), SizeMul * Rand.FRandRange(0.6f, 1.5f), Facing(FVector2D(X, Y)), Rand.FRand() < 0.6f);
+			AddPumpkin(FVector(X, Y, Ground(X, Y) - 2.f), SizeMul * Rand.FRandRange(0.6f, 1.5f), Facing(FVector2D(X, Y)), Rand.FRand() < 0.6f, bLit);
 		}
 	};
 
 	// Beside the cottage door
 	const FVector2D ToStart = (-CottageXY).GetSafeNormal();
 	const FVector2D Side(-ToStart.Y, ToStart.X);
-	Patch(CottageXY + ToStart * 650.f + Side * 380.f, 7, 200.f, 1.0f);
-	Patch(CottageXY + ToStart * 650.f - Side * 380.f, 6, 200.f, 1.0f);
-	Patch(CottageXY - ToStart * 600.f + Side * 200.f, 5, 220.f, 1.1f);
+	Patch(CottageXY + ToStart * 650.f + Side * 380.f, 7, 200.f, 1.0f, true);
+	Patch(CottageXY + ToStart * 650.f - Side * 380.f, 6, 200.f, 1.0f, true);
+	Patch(CottageXY - ToStart * 600.f + Side * 200.f, 5, 220.f, 1.1f, true);
 
 	// Out in the open meadows (found by looking for gaps in the woods)
 	int32 Patches = 0;
@@ -328,7 +352,7 @@ void AAutumnDecor::BeginPlay()
 		Patch(C, Rand.RandRange(4, 8), 320.f, 1.0f);
 		if (Patches < 2) // a couple of giants
 		{
-			AddPumpkin(FVector(C.X, C.Y, Ground(C.X, C.Y) - 4.f), 3.2f, Facing(C), true);
+			AddPumpkin(FVector(C.X, C.Y, Ground(C.X, C.Y) - 4.f), 3.2f, Facing(C), true, true);
 		}
 		++Patches;
 	}
@@ -339,12 +363,12 @@ void AAutumnDecor::BeginPlay()
 		const FVector2D Near = JeebTerrain::NearestPathPoint(Site.X, Site.Y);
 		const FVector2D Fwd = (Near - Site).GetSafeNormal();
 		const FVector2D Sd(-Fwd.Y, Fwd.X);
-		Patch(Site + Fwd * 520.f + Sd * 300.f, 3, 90.f, 0.9f);
+		Patch(Site + Fwd * 520.f + Sd * 300.f, 3, 90.f, 0.9f, true);
 	}
 	{
 		const FVector2D VC = JeebTerrain::VillageCenter();
-		Patch(VC + FVector2D(-1000.f, 520.f), 5, 130.f, 1.0f);
-		Patch(VC + FVector2D(1000.f, 0.f), 4, 110.f, 0.9f);
+		Patch(VC + FVector2D(-1000.f, 520.f), 5, 130.f, 1.0f, true);
+		Patch(VC + FVector2D(1000.f, 0.f), 4, 110.f, 0.9f, true);
 	}
 
 	// ---------------- Hay bales ----------------
@@ -503,8 +527,8 @@ void AAutumnDecor::BeginPlay()
 			}
 		}
 		// a couple of pumpkins keep watch
-		AddPumpkin(FVector(G.X + 90.f, G.Y + 420.f, Ground(G.X + 90.f, G.Y + 420.f) - 2.f), 1.2f, Facing(FVector2D(G.X, G.Y)), true);
-		AddPumpkin(FVector(G.X - 90.f, G.Y - 420.f, Ground(G.X - 90.f, G.Y - 420.f) - 2.f), 1.0f, Facing(FVector2D(G.X, G.Y)), true);
+		AddPumpkin(FVector(G.X + 90.f, G.Y + 420.f, Ground(G.X + 90.f, G.Y + 420.f) - 2.f), 1.2f, Facing(FVector2D(G.X, G.Y)), true, true);
+		AddPumpkin(FVector(G.X - 90.f, G.Y - 420.f, Ground(G.X - 90.f, G.Y - 420.f) - 2.f), 1.0f, Facing(FVector2D(G.X, G.Y)), true, true);
 	}
 
 	// ---------------- Fallen leaves: mostly under the trees, a thin scatter in the open, and leaf piles ----------------
@@ -625,6 +649,7 @@ void AAutumnDecor::BeginPlay()
 		};
 
 		// One candle hanging from the cord at P: two fine wires to a brass cup, a wax candle with a melted rim, and a flame
+		int32 CandleIdx = 0;
 		auto Candle = [&](const FVector& P, const FVector& AlongDir)
 		{
 			const FVector Dh = FVector(AlongDir.X, AlongDir.Y, 0.f).GetSafeNormal();
@@ -638,7 +663,9 @@ void AAutumnDecor::BeginPlay()
 			Add(CandleBody, FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 2.f + H * 0.5f), FVector(0.044f, 0.044f, H / 100.f)));
 			Add(CandleBody, FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 2.f + H + 0.5f), FVector(0.056f, 0.056f, 0.012f)));   // melted wax pool on top
 			const FVector F(P.X, P.Y, BaseZ + 2.f + H + 4.2f);
-			Add(Flame, FTransform(FQuat::Identity, F, FVector(0.027f, 0.027f, 0.065f)));
+			Add(Flame, FTransform(FQuat::Identity, F, FVector(0.04f, 0.04f, 0.09f)));
+			Add(CandleHalo, FTransform(FQuat::Identity, F + FVector(0.f, 0.f, 1.f), FVector(0.34f)));   // soft glow round the flame
+			if ((CandleIdx++ % 4) == 0) AddFlickerLight(F + FVector(0.f, 0.f, 8.f), 320.f, 300.f, FLinearColor(1.0f, 0.6f, 0.25f), 0.3f, 1.9f * CandleIdx);
 			FlameBase.Add(F);
 			FlamePhase.Add(Rand.FRandRange(0.f, 6.28f));
 		};
@@ -750,6 +777,25 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 		FlickerLights[i]->SetIntensity(FlickerBase[i] * (1.f + FlickerAmt[i] * W));
 	}
 
+	// Carved pumpkin faces and lantern glass flicker like candlelight (every carved face shares the flicker; their halos each have their own beat)
+	{
+		const float G1 = 1.f + 0.22f * FMath::Sin(Time * 9.f) + 0.12f * FMath::Sin(Time * 21.f + 1.3f) + 0.06f * FMath::Sin(Time * 37.f);
+		const float G2 = 1.f + 0.22f * FMath::Sin(Time * 8.2f + 2.f) + 0.12f * FMath::Sin(Time * 19.f) + 0.06f * FMath::Sin(Time * 33.f + 0.7f);
+		if (GlowMid) GlowMid->SetVectorParameterValue(TEXT("Color"), FLinearColor(4.5f, 2.6f, 0.5f) * G1);
+		if (GlowConeMid) GlowConeMid->SetVectorParameterValue(TEXT("Color"), FLinearColor(4.5f, 2.6f, 0.5f) * G2);
+		PumpkinTimer += DeltaSeconds;
+		if (PumpkinTimer >= 0.06f && PHaloPos.Num() > 0 && PumpkinHalo)
+		{
+			PumpkinTimer = 0.f;
+			for (int32 i = 0; i < PHaloPos.Num(); ++i)
+			{
+				const float Ph = PHaloPhase[i] * 5.f;
+				const float F = 1.f + 0.20f * FMath::Sin(Time * 9.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
+				PumpkinHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, PHaloPos[i], FVector(PHaloScale[i] * (0.86f + 0.22f * F))), true, i == PHaloPos.Num() - 1, true);
+			}
+		}
+	}
+
 	// Candle flames flicker (about 12 times a second is plenty)
 	FlameTimer += DeltaSeconds;
 	if (FlameTimer >= 0.08f && FlameBase.Num() > 0)
@@ -760,7 +806,8 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Ph = FlamePhase[i];
 			const float Flicker = 1.f + 0.20f * FMath::Sin(Time * 11.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
 			const FVector P = FlameBase[i] + FVector(0.4f * FMath::Sin(Time * 7.f + Ph), 0.4f * FMath::Cos(Time * 6.f + Ph), 3.2f * (Flicker - 1.f));
-			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.027f, 0.027f, 0.065f * Flicker)), true, i == FlameBase.Num() - 1, true);
+			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.04f, 0.04f, 0.09f * Flicker)), true, i == FlameBase.Num() - 1, true);
+			CandleHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, FlameBase[i] + FVector(0.f, 0.f, 1.f), FVector(0.34f * (0.82f + 0.3f * Flicker))), true, i == FlameBase.Num() - 1, true);
 		}
 		// Torch flames lick and sway
 		for (int32 i = 0; i < TorchFlamePos.Num(); ++i)

@@ -4,6 +4,8 @@
 #include "GameFramework/Actor.h"
 #include "AutumnDecor.generated.h"
 
+class UMaterialInstanceDynamic;
+
 class UInstancedStaticMeshComponent;
 
 // The Autumn Realm's finishing touches: carved pumpkins, hay bales, scarecrows, lamp posts, a graveyard,
@@ -38,6 +40,10 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* CandleBody = nullptr;   // candle wax (cylinders)
 	UPROPERTY() UInstancedStaticMeshComponent* CandleCup = nullptr;    // little brass holders
 	UPROPERTY() UInstancedStaticMeshComponent* Flame = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* CandleHalo = nullptr;    // soft additive glow round each candle flame (M_Flame)
+	UPROPERTY() UInstancedStaticMeshComponent* PumpkinHalo = nullptr;   // soft glow spilling out of a carved face
+	UPROPERTY() UMaterialInstanceDynamic* GlowMid = nullptr;            // carved faces and lantern glass: flickered each frame
+	UPROPERTY() UMaterialInstanceDynamic* GlowConeMid = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* Rope = nullptr;         // string-light cord, wires and the poles' finials
 	UPROPERTY() UInstancedStaticMeshComponent* Iron = nullptr;         // torch brackets and cups
 	UPROPERTY() UInstancedStaticMeshComponent* TorchFlame = nullptr;
@@ -53,10 +59,12 @@ private:
 	TArray<FVector> FlameBase;
 	TArray<float> FlamePhase;
 	float FlameTimer = 0.f;
+	float PumpkinTimer = 0.f;
+	TArray<FVector> PHaloPos; TArray<float> PHaloScale, PHaloPhase;   // glow round each carved pumpkin face
 	TArray<float> FlickerBase, FlickerAmt, FlickerPhase;
 	TArray<FVector> TorchFlamePos;
 	TArray<float> TorchPhase;
-	void AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker);
+	void AddFlickerLight(const FVector& P, float Intensity, float Radius, const FLinearColor& Col, float Flicker, float Phase = -1.f);   // Phase < 0 draws one from Rand
 	void TorchHead(const FVector& Top);
 	void WallTorch(const FVector2D& WallPt, const FVector2D& Out, float OutOff, float Height);
 	void PostTorch(const FVector2D& P);

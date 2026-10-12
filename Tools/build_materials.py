@@ -420,28 +420,56 @@ def build_star():
 
 
 def build_wood(name, tex, vertical):
-    # Wood for the village palisade and its walkways. The bark picture is laid on in world space (so it does not stretch with a
-    # log's length or a beam's scale), with the grain running up the logs (vertical) or along the beams and planks (horizontal);
-    # each log is shifted along the picture, so no two look alike. The colour comes from a Color parameter, like M_Color.
+    # Wood for the village palisade, walkways and beams. Vertical (logs, stakes): the grain runs up the log; the picture goes once
+    # round the log's own UVs and up by world height, so it never smears. Horizontal (beams, planks): the grain runs along the
+    # piece, found from the piece's own long axis, so it follows a beam whichever way the wall faces. Each piece is shifted to a
+    # different slice of the picture. The colour comes from a Color parameter, like M_Color.
     mat = fresh_material(name)
     set_flags(mat, ("used_with_instanced_static_meshes",))
     g = Graph(mat)
     wp = g.node(unreal.MaterialExpressionWorldPosition)
-    wx = g.mask(wp, True, False, False)
-    wy = g.mask(wp, False, True, False)
-    wz = g.mask(wp, False, False, True)
     rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
-    along = g.addn(g.mul(g.addn(wx, wy), 1.0 / 150.0), g.mul(rnd, 5.3))   # across the grain, a different slice for each piece
-    up = g.mul(wz, 1.0 / 170.0)
     uv = g.node(unreal.MaterialExpressionAppendVector)
-    g.link(along if vertical else up, uv, "A")
-    g.link(up if vertical else along, uv, "B")
+    if vertical:
+        wz = g.mask(wp, False, False, True)
+        around = g.addn(g.mask(g.node(unreal.MaterialExpressionTextureCoordinate), True, False), g.mul(rnd, 5.3))
+        g.link(around, uv, "A")
+        g.link(g.mul(wz, 1.0 / 260.0), uv, "B")
+    else:
+        def world_axis(x, y, z):
+            ax = g.node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(x, y, z, 0.0))
+            tr = g.node(unreal.MaterialExpressionTransform)
+            tr.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
+            tr.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+            g.link(ax, tr, "")
+            return g.one(unreal.MaterialExpressionNormalize, tr)
+
+        def dot(a, b):
+            n = g.node(unreal.MaterialExpressionDotProduct); g.link(a, n, "A"); g.link(b, n, "B"); return n
+
+        along = dot(wp, world_axis(1.0, 0.0, 0.0))          # the piece's long axis
+        wide = dot(wp, world_axis(0.0, 1.0, 0.0))
+        wz = g.mask(wp, False, False, True)
+        across = g.addn(g.addn(wide, wz), g.mul(rnd, 150.0 * 5.3))   # top faces vary with the width, side faces with the height
+        g.link(g.mul(across, 1.0 / 150.0), uv, "A")
+        g.link(g.mul(along, 1.0 / 260.0), uv, "B")
     col = g.mul(g.muln(g.tex(tex, uv), g.vector("Color", (0.3, 0.17, 0.08)), "RGB"), 2.0)
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.mul(col, 0.04), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # deep shade stays a readable brown
     g.out(g.node(unreal.MaterialExpressionConstant, r=1.0), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.node(unreal.MaterialExpressionConstant, r=0.0), unreal.MaterialProperty.MP_SPECULAR)
     finish(mat, name)
+
+
+def build_flame_glow():
+    # A soft ball of warm light for candle flames and carved pumpkins: additive and see-through, brightest in the middle and
+    # fading to nothing at the rim (a view-angle falloff), and fading out where it meets the ground. Tint and Intensity are parameters.
+    mat, g = unlit("M_Flame", unreal.BlendMode.BLEND_ADDITIVE)
+    rim = g.node(unreal.MaterialExpressionFresnel, exponent=1.0, base_reflect_fraction=0.0)
+    core = g.power(g.one(unreal.MaterialExpressionOneMinus, rim), 2.2)
+    glow = g.muln(g.muln(core, g.vector("Tint", (1.0, 0.5, 0.14))), g.scalar("Intensity", 3.0))
+    g.out(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_Flame")
 
 
 def build_smoke():
@@ -615,12 +643,13 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves stay bright even in shade
 build_bark(imported(gen_textures.bark(), "T_Bark"))
-bark_tex = unreal.EditorAssetLibrary.load_asset("/Game/T_Bark")
+bark_tex = imported(gen_textures.wood(), "T_Wood")   # a proper wood grain, not the tree bark
 build_wood("M_WoodV", bark_tex, True)    # logs and stakes: grain runs up
 build_wood("M_WoodH", bark_tex, False)   # beams and planks: grain runs along
 
 build_star()
 build_smoke()
+build_flame_glow()
 build_streak()
 build_moon(imported(gen_textures.moon(), "T_Moon"))
 build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
