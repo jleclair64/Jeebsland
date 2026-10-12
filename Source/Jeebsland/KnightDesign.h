@@ -257,7 +257,7 @@ namespace KnightDesign
 			D.bFixedColor = true; D.Fixed = FLinearColor(0.62f, 0.035f, 0.025f);
 			const double T0 = 0.03, T1 = 0.93;
 			Ribbon(D.Mesh, 40, [&](double T) {
-				const double Tc = T0 + (T1 - T0) * T, S = FMath::Pow(FMath::Sin(PI * T), 0.55);
+				const double Tc = T0 + (T1 - T0) * T, S = FMath::Pow(FMath::Max(0.0, FMath::Sin(PI * T)), 0.55);
 				FVector P, N; double H;
 				CrestAt(Tc, P, N, H);
 				const double Bh = 2.0 + 11.0 * S, Wb = 1.4 + 1.4 * S, B0 = H + 0.4;
