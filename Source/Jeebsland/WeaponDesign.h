@@ -47,7 +47,8 @@ namespace WeaponDesign
 	{
 		switch (Kind)
 		{
-		case JeebItems::K_Spear: case JeebItems::K_Staff: case JeebItems::K_Wand: case JeebItems::K_Bow: case JeebItems::K_Rod: return 62.f;
+		case JeebItems::K_Staff: return 35.f;   // held upright, the arm a little out
+		case JeebItems::K_Spear: case JeebItems::K_Wand: case JeebItems::K_Bow: case JeebItems::K_Rod: return 62.f;
 		default: return 25.f;
 		}
 	}

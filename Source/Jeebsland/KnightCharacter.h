@@ -246,6 +246,8 @@ private:
 	// A sword held at ease: the blade turned in the hand so its tip rests in front, between the feet. Blends out for attacks.
 	TArray<UProceduralMeshComponent*> EaseComps;
 	float EaseAlpha = 0.f;
+	int32 EaseKind = -1;
+	float ShieldHoldA = 1.f;
 	void HoldWeaponAtEase(float Dt, bool bBusy);
 	// Stepping in the shield-up stance: the way the legs step (forward/back, and sideways), eased
 	float StepFw = 1.f, StepSd = 0.f;

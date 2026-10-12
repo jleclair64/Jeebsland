@@ -602,7 +602,8 @@ void AKnightCharacter::RebuildHeld()
 	{
 		const int32 First = HeldComps.Num();
 		Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
-		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana)   // swords can be held at ease
+		EaseKind = K;
+		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana || K == JeebItems::K_Staff)   // held at ease
 			for (int32 i = First; i < HeldComps.Num(); ++i) EaseComps.Add(HeldComps[i]);
 	}
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), FVector(0, -20, 0)));
@@ -698,17 +699,28 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 	if (EaseComps.Num() == 0) return;
 	// The blade leaves the hand pointing down and forward (built that way); at ease it turns in so the tip rests in front
 	// of the knight, between his feet (worked out for the arm's relaxed bend)
-	static const FQuat EaseQ = []()
+	static const FQuat SwordQ = []()
 	{
 		const FVector Blade = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0));
 		const FVector Want = FVector(0.32, -0.45, -0.83).GetSafeNormal();   // tip further out in front
 		// then twisted in the wrist like turning a key: 40 degrees about the blade itself
 		return FQuat(Want, FMath::DegreesToRadians(-40.f)) * FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
 	}();
-	const FQuat Q = FQuat::Slerp(FQuat::Identity, EaseQ, EaseAlpha);
+	// The wizard staff stands upright, held round the middle of its shaft with the arm a little out, its foot on the ground
+	// (worked out for the staff's relaxed elbow bend, see WeaponDesign::IdleElbow)
+	static const FVector StaffHead = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0)).GetSafeNormal();
+	static const FQuat StaffQ = []()
+	{
+		const float Bend = WeaponDesign::IdleElbow(JeebItems::K_Staff) + 4.f;   // the elbow, plus the arms' relaxed lean
+		const FVector Up(FMath::Sin(FMath::DegreesToRadians(Bend)), 0.0, FMath::Cos(FMath::DegreesToRadians(Bend)));   // world up, in the forearm's frame
+		return FQuat::FindBetweenNormals(StaffHead, Up);
+	}();
+	const bool bStaff = EaseKind == JeebItems::K_Staff;
+	const FQuat Q = FQuat::Slerp(FQuat::Identity, bStaff ? StaffQ : SwordQ, EaseAlpha);
+	const FVector Slide = bStaff ? -StaffHead * (40.f * EaseAlpha) : FVector::ZeroVector;   // slid down through the hand to grip the middle
 	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowR);
 	for (UProceduralMeshComponent* C : EaseComps)
-		if (C) C->SetRelativeLocationAndRotation(G - PE - Q.RotateVector(G), Q);
+		if (C) C->SetRelativeLocationAndRotation(G - PE - Q.RotateVector(G) + Q.RotateVector(Slide), Q);
 }
 
 void AKnightCharacter::EquipFromInventory(int32 Idx)
@@ -2473,9 +2485,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float ArmAirSpread = FMath::Lerp(20.f, 50.f, F01);
 
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
+	ShieldHoldA = FMath::FInterpTo(ShieldHoldA, (ShieldActive() && !bStowed) ? 1.f : 0.f, Dt, 8.f);   // no shield: the left arm hangs normally
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
 	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground;   // at rest the left hand rests on the inside of the shield
+	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground * ShieldHoldA;   // at rest the left hand rests on the inside of the shield (when there is one)
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
 	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
@@ -2485,13 +2498,13 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, ShieldRest().ElbowYaw * Ground * (1.f - BlockAlpha), ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha)));   // the forearm flat behind the shield
+	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, ShieldRest().ElbowYaw * Ground * (1.f - BlockAlpha) * ShieldHoldA, ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha) * ShieldHoldA));   // the forearm flat behind the shield
 	HoldShield();
 
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
 	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;   // arms hang a touch forward (relaxed shoulders)
 	float TargetYaw = 0.f;
-	float RollR = -Air * ArmAirSpread - 1.2f * BreathS * IdleAmt;   // the arms ease out a little with each breath
+	float RollR = -Air * ArmAirSpread - 1.2f * BreathS * IdleAmt - (EaseKind == JeebItems::K_Staff ? 14.f * EaseAlpha : 0.f);   // the arms ease out a little with each breath (and out to the side to hold a staff)
 	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
 	float ArmSpeed = 25.f;
 
