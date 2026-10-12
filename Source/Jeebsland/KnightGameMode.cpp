@@ -25,6 +25,8 @@
 #include "Castle.h"
 #include "Horse.h"
 #include "SmokeCloud.h"
+#include "Cat.h"
+#include "Fireflies.h"
 #include "KnightHUD.h"
 #include "Terrain.h"
 #include "Engine/World.h"
@@ -200,6 +202,23 @@ void AKnightGameMode::BeginPlay()
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
+
+	// Three cats that roam near the town: an orange tabby, a black cat and a grey-and-white one
+	{
+		const FVector2D VC = JeebTerrain::VillageCenter();
+		struct FCatDef { FVector2D Off; FLinearColor Fur, Belly; };
+		const FCatDef Cats[3] = {
+			{ FVector2D(2400.f, 500.f),   FLinearColor(0.72f, 0.36f, 0.10f), FLinearColor(0.95f, 0.85f, 0.7f) },
+			{ FVector2D(-600.f, 2500.f),  FLinearColor(0.04f, 0.04f, 0.05f), FLinearColor(0.08f, 0.08f, 0.09f) },
+			{ FVector2D(-1200.f, -2500.f), FLinearColor(0.45f, 0.45f, 0.48f), FLinearColor(0.93f, 0.93f, 0.93f) },
+		};
+		for (int32 i = 0; i < 3; ++i)
+		{
+			const FVector2D H = VC + Cats[i].Off;
+			if (ACat* C = World->SpawnActor<ACat>(FVector(H.X, H.Y, JeebTerrain::HeightAt(H.X, H.Y)), FRotator(0.f, 120.f * i, 0.f))) C->Setup(H, 900.f, Cats[i].Fur, Cats[i].Belly, 77 + i * 31);
+		}
+	}
 
 	// Make sure the knight starts standing on the meadow
 	FVector2D Start(0.f, 0.f);
