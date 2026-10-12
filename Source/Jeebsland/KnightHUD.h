@@ -57,6 +57,8 @@ private:
 	UPROPERTY() UTexture2D* AnnulusTex = nullptr;
 	void DrawAnnulus(float X, float Y, float R, const FLinearColor& Col);
 	void DrawInventoryScreen(AKnightCharacter* Knight);
+	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
+	float PanelTop = 0.f;
 	void DrawShopScreen(AKnightCharacter* Knight);
 	void DrawSmithScreen(AKnightCharacter* Knight);
 	void DrawDialogue(AKnightCharacter* Knight);

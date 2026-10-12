@@ -670,6 +670,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);
 	InventoryAction = MakeBool(TEXT("KnightInventory"));
 	KnightContext->MapKey(InventoryAction, EKeys::Tab);
+	PanelTabAction = MakeBool(TEXT("KnightPanelTab"));
+	KnightContext->MapKey(PanelTabAction, EKeys::CapsLock);
 	SkillsAction = MakeBool(TEXT("KnightSkills"));
 	KnightContext->MapKey(SkillsAction, EKeys::K);
 	CallHorseAction = MakeBool(TEXT("KnightCallHorse"));
@@ -728,6 +730,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(RollAction, ETriggerEvent::Started, this, &AKnightCharacter::StartRoll);
 		EIC->BindAction(SitAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInteractKey);
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInventoryKey);
+		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
@@ -753,7 +756,7 @@ void AKnightCharacter::StopSprint()
 
 void AKnightCharacter::Interact()
 {
-	if (IsUIOpen() || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen; no attacks mid-move
+	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen (or the side panel); no attacks mid-move
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); return; }   // swinging: remember the click for the combo
 
@@ -1466,7 +1469,7 @@ void AKnightCharacter::SpawnDust(const FVector& Pos, float Size)
 
 void AKnightCharacter::RefreshUIMode()
 {
-	const bool bOpen = IsUIOpen();
+	const bool bOpen = IsUIOpen() || bPanelCursor;   // the side panel's cursor works like an open screen for the mouse
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->SetShowMouseCursor(bOpen);
@@ -2387,4 +2390,17 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 		AddMovementInput(-GetActorForwardVector(), 1.f);
 	}
 	else AddMovementInput(GetActorForwardVector(), FMath::Max(Forward, 0.f));
+}
+
+void AKnightCharacter::OnInventoryKey()
+{
+	// A screen is open (shop, smithy, bank, a conversation, the skills board): Tab closes it, as it always has
+	if (IsUIOpen())
+	{
+		if (!bSettingsOpen) ToggleInventory();
+		return;
+	}
+	// Otherwise Tab frees the mouse cursor to use the side panel, or puts it away again
+	bPanelCursor = !bPanelCursor;
+	RefreshUIMode();
 }

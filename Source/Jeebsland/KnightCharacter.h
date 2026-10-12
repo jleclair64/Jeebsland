@@ -62,7 +62,7 @@ public:
 	void BeginGathering(AResourceNode* Node, ESkillType Skill);
 	void EndGathering();
 
-	// Screens: Tab = inventory, E at the store / smithy = trade, O = settings
+	// Screens: Tab = side-panel cursor (or close a screen), K = skills board, E at the store / smithy = trade, O = settings
 	bool IsUIOpen() const { return bSettingsOpen || bSkillsOpen || bBankOpen || bInventoryOpen || bShopOpen || bSmithOpen || bDialogueOpen; }
 	bool IsInventoryOpen() const { return bInventoryOpen; }
 	bool IsSkillsOpen() const { return bSkillsOpen; }
@@ -75,6 +75,11 @@ public:
 	bool IsDialogueOpen() const { return bDialogueOpen; }
 	void ToggleInventory();
 	void ShowPackTab(bool bSkills);   // switch the open pack window between its Inventory and Skills tabs
+	// The side panel (lower left): Tab frees the cursor to use it, Caps Lock steps through its tabs (Inventory, Apparel, Skills)
+	bool IsPanelCursor() const { return bPanelCursor; }
+	int32 GetPanelTab() const { return PanelTab; }
+	void SetPanelTab(int32 T) { PanelTab = FMath::Clamp(T, 0, 2); }
+	void CyclePanelTab() { PanelTab = (PanelTab + 1) % 3; }
 	bool bPitchLimitsSet = false;
 	void OpenShop();
 	void CloseShop();
@@ -162,7 +167,7 @@ protected:
 	void Dismount();
 	void SitOnSeat(int32 SeatIdx);
 	void StandUp();
-	void OnInventoryKey() { ToggleInventory(); }
+	void OnInventoryKey();      // Tab: closes an open screen, otherwise frees or hides the cursor for the side panel
 	void OnSkillsKey() { ToggleSkills(); }
 	void RefreshUIMode();
 	void OnSettingsKey() { ToggleSettings(); }
@@ -215,6 +220,9 @@ private:
 	bool bSettingsOpen = false;
 	bool bInventoryOpen = false;
 	bool bSkillsOpen = false;
+	bool bPanelCursor = false;
+	int32 PanelTab = 0;
+	UPROPERTY() UInputAction* PanelTabAction = nullptr;
 	bool bBankOpen = false;
 	float PickCooldownUntil = 0.f;
 		mutable TWeakObjectPtr<ACottage> FoundCottage;

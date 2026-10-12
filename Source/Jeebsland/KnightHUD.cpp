@@ -403,12 +403,13 @@ void AKnightHUD::DrawHUD()
 	}
 
 	DrawText(TEXT("O  -  Settings / Controls / Dictionary"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 14.f, Font, 1.0f);
-	DrawText(TEXT("Tab  -  Inventory"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 34.f, Font, 1.0f);
+	DrawText(TEXT("Tab  -  Cursor    Caps Lock  -  Tabs"), FLinearColor(1.f, 1.f, 1.f, 0.55f), Canvas->ClipX - 340.f, 34.f, Font, 1.0f);
 	DrawIngot(Canvas->ClipX - 340.f, 58.f, 22.f);
 	DrawText(FString::Printf(TEXT("%d"), Skills->GetIngots()), FLinearColor(1.f, 0.85f, 0.3f), Canvas->ClipX - 308.f, 58.f, Font, 1.2f);
 
 	DrawMinimap(Pawn);
 	DrawWeaponBar(Knight);
+	if (!Knight->IsUIOpen()) DrawSidePanel(Knight);
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 
 	// Game messages, newest at the bottom, fading out
@@ -589,7 +590,7 @@ void AKnightHUD::DrawSkillPopup(const USkillComponent* Skills)
 	const float A = FMath::Clamp(FMath::Min(Since / 0.25f, (30.f - Since) / 1.5f), 0.f, 1.f);
 	UFont* Font = GEngine->GetMediumFont();
 	const float W = 330.f, H = 92.f;
-	const float X = 24.f - (1.f - A) * 40.f, Y = Canvas->ClipY - H - 24.f;
+	const float X = 16.f - (1.f - A) * 40.f, Y = (PanelTop > 0.f ? PanelTop : Canvas->ClipY) - H - 12.f;   // just above the side panel
 
 	const float SinceLevel = float(Now - Skills->LevelUpTime);
 	const bool bLevelGlow = SinceLevel < 4.f;
@@ -1921,6 +1922,136 @@ void AKnightHUD::DrawDialogue(AKnightCharacter* Knight)
 	if (bUIClick && Over(X, Y, W, H)) Knight->AdvanceDialogue();
 }
 
+
+// ===================================================================================================
+// The side panel (lower left, always there, like RuneScape's): three tabs, Inventory, Apparel and Skills.
+// Tab frees the mouse cursor to use it; Caps Lock moves to the next tab. Without the cursor it is just a display.
+// ===================================================================================================
+void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
+{
+	USkillComponent* Skills = Knight->GetSkills();
+	UFont* Font = GEngine->GetMediumFont();
+	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
+	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
+
+	const float SS = 58.f, Gap = 6.f, Pad = 14.f;
+	const float GridW = 4 * SS + 3 * Gap;
+	const float PW = GridW + 2.f * Pad, TabH = 30.f;
+	const float PH = Pad + TabH + 10.f + (4 * SS + 3 * Gap) + 26.f;
+	const float PX = 16.f, PY = Canvas->ClipY - PH - 16.f;
+	PanelTop = PY;
+	Panel(PX, PY, PW, PH, 1.f, Knight->IsPanelCursor());
+
+	// ---- Tabs ----
+	static const TCHAR* Names[3] = { TEXT("Inventory"), TEXT("Apparel"), TEXT("Skills") };
+	const float TW3 = (GridW - 2 * Gap) / 3.f;
+	for (int32 t = 0; t < 3; ++t)
+	{
+		const float X = PX + Pad + t * (TW3 + Gap), Y = PY + Pad;
+		const bool bOn = Knight->GetPanelTab() == t;
+		const bool bOver = Hot(X, Y, TW3, TabH);
+		Tile(X, Y, TW3, TabH, bOn ? FLinearColor(1.f, 0.78f, 0.35f) : (bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f)), bOn ? 0.5f : (bOver ? 0.36f : 0.18f));
+		float W = 0.f, H = 0.f;
+		GetTextSize(Names[t], W, H, Font, 0.8f);
+		DrawText(Names[t], bOn ? FLinearColor(1.f, 0.95f, 0.75f) : FLinearColor(0.85f, 0.88f, 0.95f), X + (TW3 - W) * 0.5f, Y + (TabH - H) * 0.5f, Font, 0.8f);
+		if (bOver && bUIClick) Knight->SetPanelTab(t);
+	}
+	const float GX = PX + Pad, GY = PY + Pad + TabH + 10.f;
+	auto SlotBox = [&](float X, float Y, float S, bool bOver)
+	{
+		Tile(X, Y, S, S, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.18f);
+	};
+
+	const int32 Tab = Knight->GetPanelTab();
+	if (Tab == 0)
+	{
+		// ---- Inventory: the 16-slot pack. Click gear to hold or wear it. ----
+		for (int32 i = 0; i < NumSlots; ++i)
+		{
+			const float X = GX + (i % 4) * (SS + Gap), Y = GY + (i / 4) * (SS + Gap);
+			const bool bOver = Hot(X, Y, SS, SS);
+			const FInvSlot S = Skills->Slots[i];
+			SlotBox(X, Y, SS, bOver);
+			if (S.Id == 0) continue;
+			DrawIcon(S.Id, X + 6.f, Y + 5.f, SS - 12.f);
+			if (StackSize(S.Id) > 1) DrawText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 24.f, Y + SS - 20.f, Font, 0.85f);
+			if (bOver)
+			{
+				ItemTip(S.Id);
+				if (bUIClick && IsGear(S.Id)) Knight->EquipFromInventory(i);
+			}
+		}
+	}
+	else if (Tab == 1)
+	{
+		// ---- Apparel: what you are wearing. Click to take it off (armour can only be swapped). ----
+		struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
+		static const FWornSlot Worn[10] = {
+			{ K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
+			{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Shield, false, TEXT("Shield") }, { K_Ring, false, TEXT("Misc") },
+			{ K_Ring, true, TEXT("Misc") }, { K_Amulet, false, TEXT("Misc") },
+		};
+		const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 16.f;
+		for (int32 w = 0; w < 10; ++w)
+		{
+			const float X = GX + (w % 4) * (WS + WG), Y = GY + (w / 4) * RowH;
+			const bool bOver = Hot(X, Y, WS, WS);
+			SlotBox(X, Y, WS, bOver);
+			float LW = 0.f, LH = 0.f;
+			GetTextSize(Worn[w].Label, LW, LH, Font, 0.62f);
+			DrawText(Worn[w].Label, FLinearColor(0.75f, 0.78f, 0.85f), X + (WS - LW) * 0.5f, Y + WS + 1.f, Font, 0.62f);
+			const int32 Id = Worn[w].bSecond ? Skills->RingB : Skills->Worn[Worn[w].Kind];
+			if (Id == 0) continue;
+			DrawIcon(Id, X + 5.f, Y + 4.f, WS - 10.f);
+			if (bOver)
+			{
+				ItemTip(Id);
+				if (bUIClick) Knight->UnequipWorn(Worn[w].Kind, Worn[w].bSecond);
+			}
+		}
+		// the numbers that matter
+		float Y = GY + 3 * RowH + 2.f;
+		DrawText(FString::Printf(TEXT("Defence  %d"), TotalDefense(Skills, false)), FLinearColor(0.6f, 0.78f, 1.f), GX, Y, Font, 0.9f);
+		if (Skills->Worn[K_Shield])
+			DrawText(FString::Printf(TEXT("Shield guard  %d"), DefenseOf(K_Shield, VariantOf(Skills->Worn[K_Shield]))), FLinearColor(0.6f, 0.78f, 1.f), GX + GridW * 0.5f, Y, Font, 0.9f);
+		const int32 Sel = Skills->SelectedItem();
+		if (IsGear(Sel) && IsWeaponKind(KindOf(Sel)))
+		{
+			int32 A, B;
+			HotbarDamage(Skills, Skills->Selected, A, B);
+			DrawText(FString::Printf(TEXT("In hand  %d - %d"), A, B), FLinearColor(1.f, 0.65f, 0.55f), GX, Y + 20.f, Font, 0.9f);
+		}
+	}
+	else
+	{
+		// ---- Skills: a 3 x 3 board, icon and level; hover for the XP ----
+		static const ESkillType Order[9] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking };
+		const float BW = (GridW - 2 * Gap) / 3.f, BH = (4 * SS + 3 * Gap - 2 * Gap) / 3.f;
+		for (int32 i = 0; i < 9; ++i)
+		{
+			const ESkillType T = Order[i];
+			const float X = GX + (i % 3) * (BW + Gap), Y = GY + (i / 3) * (BH + Gap);
+			const bool bOver = Hot(X, Y, BW, BH);
+			Tile(X, Y, BW, BH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.18f);
+			int32 Lv, Into, Need;
+			Skills->GetProgress(T, Lv, Into, Need);
+			DrawSkillIcon(static_cast<int32>(T), X + 6.f, Y + 6.f, BH - 26.f);
+			const FString LvS = FString::FromInt(Lv);
+			float LW = 0.f, LH = 0.f;
+			GetTextSize(LvS, LW, LH, Font, 1.25f);
+			DrawText(LvS, FLinearColor(1.f, 0.9f, 0.45f), X + BW - LW - 6.f, Y + BH - LH - 14.f, Font, 1.25f);
+			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
+			Gauge(X + 6.f, Y + BH - 8.f, BW - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
+			if (bOver)
+				SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d / %d XP  (%d to level %d)"), Into, Need, FMath::Max(0, Need - Into), Lv + 1) });
+		}
+	}
+
+	// how to use it
+	DrawText(Knight->IsPanelCursor() ? TEXT("Tab: back to the game    Caps Lock: next tab") : TEXT("Tab: use the panel    Caps Lock: next tab"),
+		FLinearColor(0.8f, 0.82f, 0.9f, 0.7f), PX + Pad, PY + PH - 22.f, Font, 0.62f);
+}
 
 // ---------------------------------------------------------------------------------------------------
 // Skills screen (K): one icon per skill in a grid, the level on top of it, a thin bar for progress

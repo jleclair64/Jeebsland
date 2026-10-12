@@ -44,12 +44,14 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 
 **Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
 
-## Pending: do these in a fresh Opus 5.5 (high effort) session, and remind the owner at the end of every session until done
+## Combat and UI systems (built 2026-10-11, Opus session; not yet seen in-game by the owner)
 
-1. Cape: fix the white thing showing under the cape (the knight's lower back), and give the cape more weight so it looks heavy.
-2. Shield and weapon stowing: during any action like climbing or riding the horse, the shield goes on the back behind the cape, and the sword sits diagonal on the back, under the shield.
-3. RuneScape-style side panel: replace the Tab menu with a panel that is always visible in the lower-left of the screen, with three tabs: Inventory (left, default), Apparel (middle: what is equipped), Skills (right). Pressing Tab frees the mouse cursor so the panel can be clicked; pressing Caps Lock cycles the tabs left to right. (Liquid-glass style, like the rest of the UI.)
-4. Stepping animations for the shield-up stance: proper sidestep (left and right) and backwards-walk animations (or convincing procedural leans) for the knight while the shield is up. The stance movement itself is built (face the camera, sidestep, back up, see `DoMove`), but it currently plays the forward walk animation, so it looks like gliding.
+- **Side panel** (`AKnightHUD::DrawSidePanel`): always visible lower left, tabs Inventory / Apparel / Skills. Tab frees the cursor (camera look and attack clicks pause, movement still works); Caps Lock cycles tabs. Tab still closes any open screen first. The old centred inventory window is no longer opened by Tab. The skill popup sits just above the panel.
+- **Shield guard** (`Hurt` in KnightCharacter.cpp): a raised shield facing the blow stops damage up to the shield's Defence (the guard pool); once spent the guard is broken and stops only 50% of each blow until fully recovered (10 s after the last blocked blow, then 10 s to refill, like health). Armour then softens what gets through. A thin steel bar above the health bar shows it (orange and throbbing when broken).
+- **Stowing**: while climbing, riding or sitting, the shield goes on the back (over the sword, under the cape) and the weapon sits diagonally on the back (`PlaceShield`, `RebuildHeld` with `bStowed`).
+- **Shield stance stepping**: legs step backwards or sideways in the shield-up stance (`StepFw`/`StepSd` in Tick).
+- **Pen knight** (`AFoeKnight`, FoeKnight.cpp): replaces the pigs. Iron armour, sword and kite shield, 90 HP, hits 11-15 raw, 0.65 s overhead windup tell, sometimes raises his shield after being hit (stops 70%), never leaves the pen, drops a small purse and respawns 20 s after defeat. Tuning constants are at the top of FoeKnight.h. (Pigs, and with them pork, are gone; `APig` is unused.)
+- Cape: heavier cloth settings; the pale back panel of the tabard was removed (it showed as a white patch under the cape).
 
 ## Checking visuals
 
