@@ -1340,12 +1340,14 @@ void AKnightCharacter::Mount(AHorse* H)
 	bHorseTired = false;
 	GetCharacterMovement()->StopMovementImmediately();
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 2.f;
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 130.f, 0.f);   // a horse turns in a wide, smooth arc, not on the spot
 }
 
 void AKnightCharacter::Dismount()
 {
 	if (!bMounted) return;
 	bMounted = false;
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);   // back to the knight's quick turning
 	if (AHorse* H = MyHorse.Get()) H->SetRider(nullptr);
 	// Hop off to the right of the horse
 	SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));

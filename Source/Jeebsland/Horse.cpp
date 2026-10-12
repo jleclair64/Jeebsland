@@ -121,7 +121,9 @@ void AHorse::Tick(float DeltaSeconds)
 	{
 		// Carried along by the rider
 		const FVector L = R->GetActorLocation();
-		SetActorLocationAndRotation(FVector(L.X, L.Y, L.Z - 96.f), FRotator(0.f, R->GetActorRotation().Yaw, 0.f));
+		// the horse eases round after the rider, so a turn never looks like a jerk
+		const FRotator Turned = FMath::RInterpTo(GetActorRotation(), FRotator(0.f, R->GetActorRotation().Yaw, 0.f), Dt, 7.f);
+		SetActorLocationAndRotation(FVector(L.X, L.Y, L.Z - 96.f), Turned);
 	}
 	else if (bCalled && CallTarget.IsValid())
 	{
