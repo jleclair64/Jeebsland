@@ -566,8 +566,8 @@ void AKnightCharacter::HoldShield()
 		const FVector Want = FVector(0.251, -0.966, -0.067);                // face out to the left, a little forward, upright (not leaning in)
 		const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromXZ(N, Up).ToQuat();         // the shield's face (+X) and its top (+Z)
-		const FVector Strap(14.0, -41.0, 10.0);                              // a point on the shield's back, a third of the way down
-		const FVector Target = -Fore * 6.0 + N * 11.0;                         // just below the elbow, outside the forearm
+		const FVector Strap(14.0, -41.0, -8.0);                               // a point on the shield's back, a third of the way down
+		const FVector Target = -Fore * 2.0 + N * 9.5;                         // just below the elbow, outside the forearm
 		return FTransform(Q, Target - Q.RotateVector(Strap));
 	}();
 	// Raised: exactly where the guard always put it (in front of the arm, turning with the shoulder)
