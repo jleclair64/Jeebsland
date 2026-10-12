@@ -1734,7 +1734,11 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || SelectedKind() != JeebItems::K_Spear) bCharging = false;
 	}
 
-	// Health: your maximum grows with Defence and the Vitality amulet; you recover slowly when left alone
+	// The horse heals the same way: 10 s after its last hit, a full bar takes 10 s. (Not in PvP areas, once those exist.)
+	if (HorseHealth < HorseMaxHealth && GetWorld()->GetTimeSeconds() - LastHorseHurtTime > 10.f)
+		HorseHealth = FMath::Min(HorseMaxHealth, HorseHealth + HorseMaxHealth * 0.1f * Dt);
+
+	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s
 	if (Skills)
 	{
 		const int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
@@ -1743,9 +1747,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 			Health = FMath::Max(1.f, Health + (NewMax - MaxHealth));
 			MaxHealth = NewMax;
 		}
-		if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastHurtTime > 6.f)
+		if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastHurtTime > 10.f)   // 10 s after the last hit it starts to heal
 		{
-			Health = FMath::Min((float)MaxHealth, Health + MaxHealth * 0.02f * Dt);
+			Health = FMath::Min((float)MaxHealth, Health + MaxHealth * 0.1f * Dt);   // a full bar takes 10 s
 		}
 	}
 
@@ -2167,4 +2171,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		}
 		DustISM->UpdateInstanceTransform(i, T, true, i == Dust.Num() - 1, true);
 	}
+}
+
+void AKnightCharacter::HurtHorse(float Amount)
+{
+	HorseHealth = FMath::Clamp(HorseHealth - Amount, 0.f, HorseMaxHealth);
+	LastHorseHurtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 }

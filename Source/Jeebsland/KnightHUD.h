@@ -33,6 +33,10 @@ private:
 	void DrawTip();
 	static FLinearColor Lift(const FLinearColor& C, float F);
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
+	UPROPERTY() UTexture2D* QuarterTex = nullptr;
+	UPROPERTY() UTexture2D* RingTex[2] = {};
+	void EnsureGlassTex();
+	void Corner(UTexture2D* Tex, float X, float Y, float R, int32 C, const FLinearColor& Col);
 	void FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt);
 	void RimLight(float X, float Y, float W, float H, float R, float Alpha, const FLinearColor& Tint);
 	void Tile(float X, float Y, float W, float H, const FLinearColor& Tint, float Alpha = 0.35f, bool bRim = true);

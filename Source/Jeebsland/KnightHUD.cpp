@@ -71,54 +71,98 @@ float AKnightHUD::Wrapped(const FString& Text, float X, float Y, float MaxW, flo
 // left and fades round to the lower right, with a slow glint travelling along the top.
 // ---------------------------------------------------------------------------------------------------
 
-// A rounded rectangle filled with a colour that varies from the top (t = 0) to the bottom (t = 1)
+// Two small anti-aliased corner pictures (the top-left quarter of a disc, and of a ring), made once. Every rounded corner on the
+// glass is one of these scaled to size and flipped, so the curves are smooth instead of stair-stepped.
+void AKnightHUD::EnsureGlassTex()
+{
+	if (QuarterTex && RingTex[0] && RingTex[1]) return;
+	const int32 N = 48;
+	auto Make = [&](float RingWidth) -> UTexture2D*   // RingWidth 0 = a filled disc
+	{
+		UTexture2D* T = UTexture2D::CreateTransient(N, N, PF_B8G8R8A8);
+		if (!T) return nullptr;
+		T->SRGB = false;
+		T->Filter = TF_Bilinear;
+		T->AddressX = TA_Clamp;
+		T->AddressY = TA_Clamp;
+		FColor* Px = static_cast<FColor*>(T->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
+		for (int32 y = 0; y < N; ++y)
+			for (int32 x = 0; x < N; ++x)
+			{
+				const float D = FMath::Sqrt(FMath::Square(x + 0.5f - N) + FMath::Square(y + 0.5f - N));   // from the corner the arc curves round
+				const float A = RingWidth <= 0.f ? FMath::Clamp(N - D + 0.5f, 0.f, 1.f)
+				                                 : FMath::Clamp(RingWidth * 0.5f + 0.5f - FMath::Abs(D - (N - RingWidth * 0.5f)), 0.f, 1.f);
+				Px[y * N + x] = FColor(255, 255, 255, uint8(A * 255.f));
+			}
+		T->GetPlatformData()->Mips[0].BulkData.Unlock();
+		T->UpdateResource();
+		return T;
+	};
+	QuarterTex = Make(0.f);
+	RingTex[0] = Make(3.5f);   // for big corners
+	RingTex[1] = Make(9.f);    // for small corners, so the rim does not vanish
+}
+
+// One corner picture, scaled to R x R and flipped into the corner c (0 top left, 1 top right, 2 bottom left, 3 bottom right)
+void AKnightHUD::Corner(UTexture2D* Tex, float X, float Y, float R, int32 C, const FLinearColor& Col)
+{
+	if (!Tex || R < 0.5f) return;
+	const float U = (C & 1) ? 1.f : 0.f, V = (C & 2) ? 1.f : 0.f;
+	const float Uw = (C & 1) ? -1.f : 1.f, Vh = (C & 2) ? -1.f : 1.f;
+	DrawTexture(Tex, X, Y, R, R, U, V, Uw, Vh, Col, BLEND_Translucent);
+}
+
+// A rounded rectangle filled with a colour that varies from the top (t = 0) to the bottom (t = 1). The edges are snapped to
+// whole pixels and nothing overlaps (an overlap of translucent pieces would show as a bright line).
 void AKnightHUD::FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt)
 {
-	R = FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f);
-	const int32 N = FMath::Max(1, FMath::CeilToInt(R / 1.5f));
-	const float Row = R / N;
-	for (int32 i = 0; i < N; ++i)
+	EnsureGlassTex();
+	X = FMath::RoundToFloat(X); Y = FMath::RoundToFloat(Y); W = FMath::RoundToFloat(W); H = FMath::RoundToFloat(H);
+	if (W < 1.f || H < 1.f) return;
+	R = FMath::RoundToFloat(FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f));
+	if (R >= 1.f)
 	{
-		const float Dy = (i + 0.5f) * Row;
-		const float Inset = R - FMath::Sqrt(FMath::Max(0.f, R * R - (R - Dy) * (R - Dy)));
-		const float Ty = Y + i * Row, By = Y + H - (i + 1) * Row;
-		DrawRect(ColorAt((Ty + Row * 0.5f - Y) / H), X + Inset, Ty, W - 2.f * Inset, Row + 0.4f);
-		DrawRect(ColorAt((By + Row * 0.5f - Y) / H), X + Inset, By, W - 2.f * Inset, Row + 0.4f);
+		Corner(QuarterTex, X, Y, R, 0, ColorAt(R * 0.5f / H));
+		Corner(QuarterTex, X + W - R, Y, R, 1, ColorAt(R * 0.5f / H));
+		Corner(QuarterTex, X, Y + H - R, R, 2, ColorAt(1.f - R * 0.5f / H));
+		Corner(QuarterTex, X + W - R, Y + H - R, R, 3, ColorAt(1.f - R * 0.5f / H));
 	}
-	const float MidTop = Y + R, MidH = H - 2.f * R;
-	if (MidH > 0.f)
+	// bands: the top and bottom R rows are narrower (between the corners); the middle is the full width
+	auto Bands = [&](float Y0, float Y1, float X0, float X1)
 	{
-		const int32 Bands = FMath::Max(1, FMath::CeilToInt(MidH / 8.f));
-		for (int32 b = 0; b < Bands; ++b)
+		const float L = Y1 - Y0;
+		if (L < 1.f || X1 - X0 < 1.f) return;
+		const int32 Nb = FMath::Max(1, FMath::CeilToInt(L / 8.f));
+		for (int32 b = 0; b < Nb; ++b)
 		{
-			const float By = MidTop + MidH * b / Bands, Bh = MidH / Bands;
-			DrawRect(ColorAt((By + Bh * 0.5f - Y) / H), X, By, W, Bh + 0.4f);
+			const float A = FMath::RoundToFloat(Y0 + L * b / Nb), B = FMath::RoundToFloat(Y0 + L * (b + 1) / Nb);
+			if (B > A) DrawRect(ColorAt(((A + B) * 0.5f - Y) / H), X0, A, X1 - X0, B - A);
 		}
-	}
+	};
+	Bands(Y, Y + R, X + R, X + W - R);
+	Bands(Y + R, Y + H - R, X, X + W);
+	Bands(Y + H - R, Y + H, X + R, X + W - R);
 }
 
 // The rim of light round a rounded rectangle: bright upper left, fading to the lower right
 void AKnightHUD::RimLight(float X, float Y, float W, float H, float R, float Alpha, const FLinearColor& Tint)
 {
-	R = FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f);
-	const float Th = 1.6f;
+	EnsureGlassTex();
+	X = FMath::RoundToFloat(X); Y = FMath::RoundToFloat(Y); W = FMath::RoundToFloat(W); H = FMath::RoundToFloat(H);
+	R = FMath::RoundToFloat(FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f));
+	const bool bBig = R >= 14.f;
+	const float Th = FMath::Max(1.f, FMath::RoundToFloat(R * (bBig ? 3.5f : 9.f) / 48.f));
 	auto C = [&](float A) { return FLinearColor(Tint.R, Tint.G, Tint.B, A * Alpha); };
 	DrawRect(C(0.62f), X + R, Y, W - 2.f * R, Th);                 // top
 	DrawRect(C(0.18f), X + R, Y + H - Th, W - 2.f * R, Th);        // bottom
 	DrawRect(C(0.42f), X, Y + R, Th, H - 2.f * R);                 // left
 	DrawRect(C(0.14f), X + W - Th, Y + R, Th, H - 2.f * R);        // right
-	const int32 N = FMath::Max(5, FMath::CeilToInt(R / 1.4f));
-	const float Strength[4] = { 0.62f, 0.30f, 0.30f, 0.14f };       // top left, top right, bottom left, bottom right
-	for (int32 c = 0; c < 4; ++c)
-	{
-		const float Cx = (c & 1) ? X + W - R : X + R, Cy = (c & 2) ? Y + H - R : Y + R;
-		const float Sx = (c & 1) ? 1.f : -1.f, Sy = (c & 2) ? 1.f : -1.f;
-		for (int32 k = 0; k <= N; ++k)
-		{
-			const float A = 0.5f * PI * k / N;
-			DrawRect(C(Strength[c]), Cx + Sx * R * FMath::Cos(A) - Th * 0.5f, Cy + Sy * R * FMath::Sin(A) - Th * 0.5f, Th, Th);
-		}
-	}
+	if (R < 1.f) return;
+	UTexture2D* Ring = RingTex[bBig ? 0 : 1];
+	Corner(Ring, X, Y, R, 0, C(0.62f));
+	Corner(Ring, X + W - R, Y, R, 1, C(0.30f));
+	Corner(Ring, X, Y + H - R, R, 2, C(0.30f));
+	Corner(Ring, X + W - R, Y + H - R, R, 3, C(0.14f));
 }
 
 void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
@@ -130,7 +174,7 @@ void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGl
 		FillRR(X - k * 2.f, Y + 5.f - k, W + k * 4.f, H + k * 4.f, R + k * 2.f, [&](float) { return FLinearColor(0.f, 0.f, 0.02f, 0.07f * Alpha); });
 	FillRR(X, Y, W, H, R, [&](float t)   // the body: cool and clear, deeper toward the bottom
 	{
-		return FLinearColor(FMath::Lerp(0.10f, 0.04f, t), FMath::Lerp(0.15f, 0.07f, t), FMath::Lerp(0.22f, 0.12f, t), FMath::Lerp(0.50f, 0.64f, t) * Alpha);
+		return FLinearColor(FMath::Lerp(0.10f, 0.04f, t), FMath::Lerp(0.15f, 0.07f, t), FMath::Lerp(0.22f, 0.12f, t), FMath::Lerp(0.44f, 0.54f, t) * Alpha);
 	});
 	FillRR(X + 2.f, Y + 2.f, W - 4.f, H * 0.55f, R - 2.f, [&](float t)   // sheen pouring down from the top edge
 	{
@@ -176,10 +220,10 @@ void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinea
 		const float FR = FMath::Min(R, FW * 0.5f);
 		FillRR(X, Y, FW, H, FR, [&](float t)
 		{
-			const float L = FMath::Lerp(1.2f, 0.62f, t) * Glow;
+			const float L = FMath::Lerp(1.0f, 0.6f, t) * Glow;   // soft, not bright
 			return FLinearColor(FMath::Min(Fill.R * L, 1.f), FMath::Min(Fill.G * L, 1.f), FMath::Min(Fill.B * L, 1.f), 0.95f);
 		});
-		FillRR(X + 1.f, Y + 1.f, FW - 2.f, H * 0.42f, FMath::Max(0.f, FR - 1.f), [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.5f, 0.1f, t)); });   // gloss
+		FillRR(X + 1.f, Y + 1.f, FW - 2.f, H * 0.42f, FMath::Max(0.f, FR - 1.f), [&](float t) { return FLinearColor(1.f, 1.f, 1.f, FMath::Lerp(0.26f, 0.04f, t)); });   // gloss
 		const float Sw = FMath::Fmod(T * 0.35f, 1.5f);
 		if (Sw < 1.f && FW > 40.f) FillRR(X + (FW - 30.f) * Sw, Y, 30.f, H, FMath::Min(R, 15.f), [&](float) { return FLinearColor(1.f, 1.f, 1.f, 0.26f * FMath::Sin(Sw * PI)); });
 	}
@@ -363,25 +407,17 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// Stamina bar (bottom centre)
-	{
-		const float BW = 260.f, BH = 12.f;
-		const float BX = (Canvas->ClipX - BW) * 0.5f;
-		const float BY = Canvas->ClipY - 36.f;
-		const float F = Knight->GetStaminaFraction();
-		const FLinearColor Fill = Knight->IsExhausted() ? FLinearColor(0.85f, 0.15f, 0.1f) : FLinearColor(0.35f, 0.8f, 0.3f);
-		Gauge(BX, BY, BW, BH, F, Fill, Knight->IsExhausted());
-	}
+	// The stamina bar is hidden (stamina still works, it just is not drawn)
 
-	// Health bar (above the stamina bar)
+	// Health bars: thin, long, soft in colour and low on the screen. Yours is the lowest; the horse's sits above it while you ride.
+	const float BarW = 480.f, BarH = 6.f;
+	const float BarX = (Canvas->ClipX - BarW) * 0.5f;
 	{
-		const float BW = 260.f, BH = 14.f;
-		const float BX = (Canvas->ClipX - BW) * 0.5f;
-		const float BY = Canvas->ClipY - 56.f;
+		const float BY = Canvas->ClipY - 28.f;
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
-		const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.85f, 0.12f, 0.10f) : (F < 0.5f ? FLinearColor(0.95f, 0.78f, 0.12f) : FLinearColor(0.15f, 0.42f, 0.95f));
-		Gauge(BX, BY, BW, BH, F, HpCol, F < 0.2f);   // throbs when nearly dead
-		DrawText(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(Knight->GetHealth()), Knight->GetMaxHealth()), FLinearColor::White, BX + BW * 0.5f - 22.f, BY - 1.f, Font, 0.8f);
+		const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.5f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.22f, 0.42f, 0.78f));
+		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.2f);   // throbs when nearly dead
+		DrawText(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(Knight->GetHealth()), Knight->GetMaxHealth()), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
 	}
 
 	// Enemy health bars (15 s after a hit, or under half health) and floating damage numbers
@@ -421,16 +457,22 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// Horse stamina: a bar counting 100 down while you gallop, then refilling before the next sprint
+	// While riding: the horse's health (above yours), and its gallop energy, a bar counting 100 down while you gallop, then refilling
 	if (Knight->IsMounted())
 	{
-		const float BW = 260.f, BH = 12.f;
-		const float BX = (Canvas->ClipX - BW) * 0.5f;
-		const float BY = Canvas->ClipY - 84.f;
-		const float F = FMath::Clamp(Knight->GetHorseEnergy() / 100.f, 0.f, 1.f);
-		const FLinearColor Fill = Knight->IsHorseTired() ? FLinearColor(0.85f, 0.35f, 0.1f) : FLinearColor(0.95f, 0.75f, 0.2f);
-		Gauge(BX, BY, BW, BH, F, Fill, Knight->IsHorseTired());
-		DrawText(FString::Printf(TEXT("Horse  %d"), FMath::RoundToInt(Knight->GetHorseEnergy())), FLinearColor::White, BX + BW + 12.f, BY - 3.f, Font, 1.0f);
+		{
+			const float BY = Canvas->ClipY - 44.f;
+			const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
+			const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.5f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.32f, 0.62f, 0.32f));
+			Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.2f);
+			DrawText(FString::Printf(TEXT("Horse  %d / %d"), FMath::CeilToInt(Knight->GetHorseHealth()), FMath::RoundToInt(Knight->GetHorseMaxHealth())), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
+		}
+		{
+			const float BY = Canvas->ClipY - 58.f;
+			const float F = FMath::Clamp(Knight->GetHorseEnergy() / 100.f, 0.f, 1.f);
+			const FLinearColor Fill = Knight->IsHorseTired() ? FLinearColor(0.72f, 0.30f, 0.10f) : FLinearColor(0.80f, 0.64f, 0.22f);
+			Gauge(BarX, BY, BarW, 4.f, F, Fill, Knight->IsHorseTired());
+		}
 	}
 
 	// "Press E" prompt
@@ -545,7 +587,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	const float SS = 66.f, Gap = 8.f;
 	const float TotalW = 5 * SS + 4 * Gap;
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f - 40.f;
-	const float Y0 = Canvas->ClipY - 98.f - SS;   // clear of the health, stamina and horse bars
+	const float Y0 = Canvas->ClipY - 76.f - SS;   // clear of the (low, thin) health bars
 
 	int32 Arrows = 0;
 	for (int32 T = 0; T < NumTiers; ++T) Arrows += Skills->CountItem(ArrowId(T));
@@ -693,10 +735,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			float Dx, Dy;
 			Rot(FVector2D(WX, WY), Dx, Dy);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(T, TW, TH, Font, 0.85f);
-			const float X = Cx + Dx * (Half + 3.f), Y = Cy + Dy * (Half + 3.f);
-			DrawCircle(X, Y, 9.f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
-			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 0.85f);
+			GetTextSize(T, TW, TH, Font, 1.7f);
+			const float X = Cx + Dx * (Half + 6.f), Y = Cy + Dy * (Half + 6.f);
+			DrawCircle(X, Y, 18.f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
+			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
 		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.35f, 0.3f, 1.f));   // north is world +X, east +Y

@@ -97,6 +97,10 @@ public:
 	// Riding: T calls the horse, E beside it mounts. The bar counts 100 down while sprinting, then refills before the next sprint.
 	bool IsMounted() const { return bMounted; }
 	float GetHorseEnergy() const { return HorseEnergy; }   // 0 - 100
+	float GetHorseHealth() const { return HorseHealth; }
+	float GetHorseMaxHealth() const { return HorseMaxHealth; }
+	// The horse is hurt separately from the knight (its own hit boxes come later). Heals only after 10 s unhurt.
+	void HurtHorse(float Amount);
 	bool IsHorseTired() const { return bHorseTired; }
 	USkillComponent* GetSkills() const { return Skills; }
 	// Text for the "Press E ..." prompt, or false if nothing is in reach
@@ -209,6 +213,8 @@ private:
 	bool bMounted = false;
 	float MountAlpha = 0.f;
 	float HorseEnergy = 100.f;
+	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
+	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;
 	bool bFancyLighting = false;   // Lumen global illumination, reflections and volumetric clouds
