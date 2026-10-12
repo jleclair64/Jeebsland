@@ -328,7 +328,8 @@ void AKnightCharacter::TickCape(float Dt)
 			UV.Add(FVector2D(float(i) / (CapeNX - 1), float(j) / (CapeNY - 1)));
 		}
 	// a thick, heavy cloth: a second layer 1.6 cm inside, joined round the edges, so it never reads as a sheet of paper
-	for (int32 k = 0; k < N; ++k) { V.Add(V[k] - Nrm[k] * 1.6f); Nrm.Add(-Nrm[k]); UV.Add(UV[k]); }
+	V.Reserve(2 * N); Nrm.Reserve(2 * N); UV.Reserve(2 * N);
+	for (int32 k = 0; k < N; ++k) { const FVector P = V[k] - Nrm[k] * 1.6f, Nk = -Nrm[k]; const FVector2D Uk = UV[k]; V.Add(P); Nrm.Add(Nk); UV.Add(Uk); }
 	if (!bCapeMeshMade)
 	{
 		TArray<int32> Tris;
