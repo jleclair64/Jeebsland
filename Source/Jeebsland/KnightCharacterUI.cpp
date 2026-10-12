@@ -209,25 +209,37 @@ bool AKnightCharacter::GetDialogue(FString& OutName, FString& OutLine, bool& bOu
 void AKnightCharacter::ApplyGraphics()
 {
 	if (!GEngine || !GetWorld()) return;
+	// Only your own knight sets the graphics (other players' knights on your screen must not reset them), never on a server
+	if (!IsLocallyControlled() || IsNetMode(NM_DedicatedServer)) return;
+	bGraphicsApplied = true;
 	UWorld* W = GetWorld();
-	// 1 = Lumen (pretty, heavy); 0 = off, with simple sky ambient light (much faster)
-	GEngine->Exec(W, *FString::Printf(TEXT("r.DynamicGlobalIlluminationMethod %d"), bFancyLighting ? 1 : 0));
-	GEngine->Exec(W, *FString::Printf(TEXT("r.ReflectionMethod %d"), bFancyLighting ? 1 : 2));
-	GEngine->Exec(W, TEXT("r.VolumetricCloud 1"));   // the sky's clouds are always on (drawn at half resolution, so they stay affordable)
-	GEngine->Exec(W, *FString::Printf(TEXT("r.VolumetricFog %d"), bFancyLighting ? 1 : 0));
-	GEngine->Exec(W, *FString::Printf(TEXT("r.ScreenPercentage %d"), FMath::RoundToInt(RenderScale * 100.f)));
+	const bool bFancy = GraphicsLevel >= 2, bLowest = GraphicsLevel <= 0;
+	auto Set = [&](const TCHAR* Var, int32 V) { GEngine->Exec(W, *FString::Printf(TEXT("%s %d"), Var, V)); };
+	// Fancy: Lumen bounce light and reflections, misty air. Otherwise plain sky light (much faster) and screen-space reflections,
+	// none at all on Lowest.
+	Set(TEXT("r.DynamicGlobalIlluminationMethod"), bFancy ? 1 : 0);
+	Set(TEXT("r.ReflectionMethod"), bFancy ? 1 : (bLowest ? 0 : 2));
+	Set(TEXT("r.VolumetricFog"), bFancy ? 1 : 0);
+	// Lowest, for weak PCs: no volumetric clouds, ordinary (cheaper) shadow maps instead of virtual ones, short shadow range,
+	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
+	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
+	Set(TEXT("r.Shadow.Virtual.Enable"), bLowest ? 0 : 1);
+	Set(TEXT("sg.ShadowQuality"), bLowest ? 1 : 3);
+	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 1 : 4);
+	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 3);
+	Set(TEXT("sg.EffectsQuality"), bLowest ? 0 : 3);
+	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));
 }
 
-void AKnightCharacter::SetFancyLighting(bool bOn)
+void AKnightCharacter::SetGraphicsLevel(int32 Level)
 {
-	bFancyLighting = bOn;
-	if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("FancyLighting"), bOn, GGameUserSettingsIni);
+	GraphicsLevel = FMath::Clamp(Level, 0, 2);
 	ApplyGraphics();
 }
 
 void AKnightCharacter::SetRenderScale(float Value)
 {
-	const float New = FMath::Clamp(Value, 0.5f, 1.0f);
+	const float New = FMath::Clamp(Value, 0.35f, 1.0f);
 	if (FMath::IsNearlyEqual(New, RenderScale, 0.005f)) return;
 	RenderScale = New;
 	if (GConfig) GConfig->SetFloat(TEXT("Jeebsland"), TEXT("RenderScale"), RenderScale, GGameUserSettingsIni);

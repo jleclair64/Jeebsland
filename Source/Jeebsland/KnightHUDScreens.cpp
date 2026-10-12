@@ -77,15 +77,11 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 				if (DraggingSlider < 0 && OverSlider(ScaleY)) DraggingSlider = 1;
 				const float T = FMath::Clamp((MX - SX) / SW, 0.f, 1.f);
 				if (DraggingSlider == 0) Knight->SetLookSensitivity(FMath::Lerp(0.1f, 2.0f, T));
-				if (DraggingSlider == 1) Knight->SetRenderScale(FMath::Lerp(0.5f, 1.0f, T));
+				if (DraggingSlider == 1) Knight->SetRenderScale(FMath::Lerp(0.35f, 1.0f, T));
 
 				// Checkbox: toggles once per click
-				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 560.f && MY >= BoxY + 46.f && MY <= BoxY + 82.f)
+				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 560.f && MY >= BoxY + 86.f && MY <= BoxY + 122.f)
 					Knight->SetPanelAlways(!Knight->GetPanelAlways());
-				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 460.f && MY >= BoxY - 4.f && MY <= BoxY + 32.f)
-				{
-					Knight->SetFancyLighting(!Knight->GetFancyLighting());
-				}
 			}
 			else
 			{
@@ -114,17 +110,26 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 
 		const float RS = Knight->GetRenderScale();
 		HDText(FString::Printf(TEXT("Render resolution:  %d%%   (lower = faster)"), FMath::RoundToInt(RS * 100.f)), FLinearColor::White, PX + 40.f, PY + 186.f, Font, Scale);
-		Slider(ScaleY, FMath::Clamp((RS - 0.5f) / 0.5f, 0.f, 1.f), FLinearColor(0.3f, 0.7f, 0.9f));
+		Slider(ScaleY, FMath::Clamp((RS - 0.35f) / 0.65f, 0.f, 1.f), FLinearColor(0.3f, 0.7f, 0.9f));
 
-		DrawRect(FLinearColor::White, BoxX, BoxY, 26.f, 26.f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 2.f, 22.f, 22.f);
-		if (Knight->GetFancyLighting()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 5.f, 16.f, 16.f);
-		HDText(TEXT("Fancy lighting (bounce light, misty air) - slower"), FLinearColor::White, BoxX + 38.f, BoxY + 2.f, Font, 1.1f);
+		// Graphics: three levels, one click each
+		static const TCHAR* LevelNames[3] = { TEXT("LOWEST"), TEXT("LOW"), TEXT("FANCY") };
+		static const TCHAR* LevelText[3] = {
+			TEXT("For weaker computers: no clouds, simple shadows and edges"),
+			TEXT("Clouds and soft shadows, plain lighting"),
+			TEXT("Bounce light, reflections and misty air - slowest") };
+		HDText(TEXT("Graphics:"), FLinearColor::White, BoxX, BoxY + 4.f, Font, 1.1f);
+		for (int32 L = 0; L < 3; ++L)
+		{
+			if (Btn(BoxX + 130.f + L * 140.f, BoxY, 130.f, 32.f, LevelNames[L], true, Knight->GetGraphicsLevel() == L, 1.05f))
+				Knight->SetGraphicsLevel(L);
+		}
+		HDText(LevelText[FMath::Clamp(Knight->GetGraphicsLevel(), 0, 2)], FLinearColor(0.75f, 0.75f, 0.75f), BoxX + 130.f, BoxY + 42.f, Font, 1.0f);
 		// Side panel: always on screen, or only while the cursor is out (Tab)
-		DrawRect(FLinearColor::White, BoxX, BoxY + 50.f, 26.f, 26.f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 52.f, 22.f, 22.f);
-		if (Knight->GetPanelAlways()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 55.f, 16.f, 16.f);
-		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 52.f, Font, 1.1f);
+		DrawRect(FLinearColor::White, BoxX, BoxY + 90.f, 26.f, 26.f);
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 92.f, 22.f, 22.f);
+		if (Knight->GetPanelAlways()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 95.f, 16.f, 16.f);
+		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 92.f, Font, 1.1f);
 
 	}
 	else if (SettingsTab == 1)

@@ -155,8 +155,9 @@ public:
 	void SetLookSensitivity(float Value);
 
 	// Graphics options (also in the settings screen)
-	bool GetFancyLighting() const { return bFancyLighting; }
-	void SetFancyLighting(bool bOn);
+	// Graphics: 0 Lowest (for weak PCs: no clouds, simple shadows, FXAA), 1 Low (the start), 2 Fancy (Lumen bounce light, misty air)
+	int32 GetGraphicsLevel() const { return GraphicsLevel; }
+	void SetGraphicsLevel(int32 Level);
 	float GetRenderScale() const { return RenderScale; }
 	void SetRenderScale(float Value);
 
@@ -311,8 +312,9 @@ private:
 	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;
-	bool bFancyLighting = false;   // Lumen global illumination, reflections and volumetric clouds
-	float RenderScale = 0.6f;     // 0.5 - 1.0 of the screen resolution
+	int32 GraphicsLevel = 1;      // see GetGraphicsLevel
+	bool bGraphicsApplied = false;
+	float RenderScale = 0.6f;     // 0.35 - 1.0 of the screen resolution
 	void ApplyGraphics();
 	float LookSensitivity = 0.5f; // 1.0 = the original (fast) speed
 	FVector GatherStart = FVector::ZeroVector;

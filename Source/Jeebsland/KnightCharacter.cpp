@@ -147,7 +147,7 @@ void AKnightCharacter::BeginPlay()
 		// (resolution is not loaded either: the game always starts on low graphics, and you raise them in Settings)
 		GConfig->GetBool(TEXT("Jeebsland"), TEXT("PanelAlways"), bPanelAlways, GGameUserSettingsIni);
 	}
-	bFancyLighting = false;   // fancy lighting starts off every time
+	GraphicsLevel = 1;        // graphics start on Low every time
 	RenderScale = 0.6f;       // and a low render resolution
 	ApplyGraphics();
 	UpperBase = UpperPivot->GetRelativeLocation();
@@ -419,6 +419,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
 	if (IsLocallyControlled()) SendLook();   // online: let everyone see what we now wear and hold
+	if (!bGraphicsApplied && IsLocallyControlled()) ApplyGraphics();   // online, our knight may only become ours after BeginPlay
 
 	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
 	if (!bPitchLimitsSet)
