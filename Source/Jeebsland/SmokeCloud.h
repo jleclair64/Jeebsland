@@ -18,7 +18,7 @@ public:
 
 	float Radius = 300.f;          // how far across the poison reaches
 	float HitEvery = 0.5f;         // seconds between hits
-	int32 KnightHit = 20;          // raw damage to the knight per hit (armour still helps a little)
+	int32 KnightHit = 14;          // damage to the knight per hit: it ignores armour and shields
 	float HorseHit = 18.f;         // damage to the horse per hit (of 100)
 
 protected:

@@ -112,7 +112,8 @@ public:
 	float GetHealth() const { return Health; }
 	int32 GetMaxHealth() const { return MaxHealth; }
 	// Something hits you for Raw points; armour, Defence level and a raised shield soak some of it
-	void Hurt(int32 Raw, AActor* From);
+	// bEnvironmental: a hazard (poison smoke, fire): armour and shields do not stop it, and it trains no Defence.
+	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false);
 	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP
 	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill);
 

@@ -54,6 +54,8 @@ private:
 	void DrawMinimap(APawn* Pawn);
 	void DrawCircle(float X, float Y, float R, const FLinearColor& Col);
 	UPROPERTY() UTexture2D* CircleTex = nullptr;
+	UPROPERTY() UTexture2D* AnnulusTex = nullptr;
+	void DrawAnnulus(float X, float Y, float R, const FLinearColor& Col);
 	void DrawInventoryScreen(AKnightCharacter* Knight);
 	void DrawShopScreen(AKnightCharacter* Knight);
 	void DrawSmithScreen(AKnightCharacter* Knight);

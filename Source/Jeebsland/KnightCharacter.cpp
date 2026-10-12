@@ -880,20 +880,20 @@ void AKnightCharacter::AttackLands()
 	}
 }
 
-void AKnightCharacter::Hurt(int32 Raw, AActor* From)
+void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 {
 	if (Health <= 0.f || Raw <= 0 || !Skills) return;
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < InvulnUntil) return;
 
 	bool bFront = false;
-	if (bBlocking && ShieldActive() && From)
+	if (!bEnvironmental && bBlocking && ShieldActive() && From)
 	{
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) > 0.1f;
 	}
-	const int32 Armor = JeebItems::TotalDefense(Skills, false) / 3;
-	const int32 FromSkill = Skills->GetLevel(ESkillType::Defense) / 5;
+	const int32 Armor = bEnvironmental ? 0 : JeebItems::TotalDefense(Skills, false) / 3;   // smoke seeps through armour
+	const int32 FromSkill = bEnvironmental ? 0 : Skills->GetLevel(ESkillType::Defense) / 5;
 	const int32 Shield = bFront ? JeebItems::DefenseOf(JeebItems::K_Shield, JeebItems::VariantOf(Skills->Worn[JeebItems::K_Shield])) : 0;
 	const int32 Taken = FMath::Max(bFront ? 0 : 1, Raw - (Armor + FromSkill + Shield));
 	const int32 Absorbed = Raw - Taken;
@@ -904,7 +904,9 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From)
 	Health -= Taken;
 	LastHurtTime = Now;
 	InvulnUntil = Now + 0.4f;
-	Skills->AddXP(ESkillType::Defense, 2 + Raw / 2);   // defence trains from being hit and from blocking
+	// Defence trains only from weapon blows your armour or shield actually stops: a blocked blow (shield up, facing it) trains most,
+	// armour soaking a hit trains a little. Hazards like poison smoke train nothing, and nothing is learned from damage that got through.
+	if (!bEnvironmental && Absorbed > 0) Skills->AddXP(ESkillType::Defense, bFront ? 2 + Absorbed / 2 : 1 + Absorbed / 4);
 
 	if (Health <= 0.f)
 	{

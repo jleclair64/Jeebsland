@@ -467,10 +467,10 @@ void AKnightHUD::DrawHUD()
 			if (Age < 0.f || Age > 1.2f) { Nums.RemoveAt(i); continue; }
 			FVector2D SP;
 			if (!PC->ProjectWorldLocationToScreen(Nums[i].Loc + FVector(0.f, 0.f, 70.f * Age), SP)) continue;
-			FLinearColor Col(1.f, 0.15f, 0.12f);
-			float Sc = 1.6f;
+			FLinearColor Col(1.f, 0.07f, 0.05f);   // a strong red
+			float Sc = 2.9f;   // 1.8x the old size
 			if (Nums[i].Type == JeebCombat::N_Blocked) Col = FLinearColor(0.3f, 0.55f, 1.f);
-			else if (Nums[i].Type == JeebCombat::N_Crit) { Col = FLinearColor(1.f, 0.82f, 0.1f); Sc = 2.3f; }
+			else if (Nums[i].Type == JeebCombat::N_Crit) { Col = FLinearColor(1.f, 0.82f, 0.1f); Sc = 4.1f; }
 			Col.A = FMath::Clamp((1.2f - Age) / 0.4f, 0.f, 1.f);
 			const FString Txt = FString::FromInt(Nums[i].Amount);
 			float TW = 0.f, TH = 0.f;
@@ -676,13 +676,12 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	const float K = Half / Range;
 	const FVector PL = Pawn->GetActorLocation();
 
-	// Backdrop: a gold ring round a dark disc (smooth, anti-aliased circles)
-	DrawCircle(Cx, Cy, Half + 7.f, FLinearColor(0.f, 0.f, 0.f, 0.75f));
-	DrawCircle(Cx, Cy, Half + 5.f, FLinearColor(0.62f, 0.44f, 0.18f, 1.f));
-	DrawCircle(Cx, Cy, Half + 1.5f, FLinearColor(0.04f, 0.04f, 0.04f, 1.f));
-	DrawCircle(Cx, Cy, Half, FLinearColor(0.12f, 0.13f, 0.12f, 0.92f));
-	DrawCircle(Cx, Cy, Half * 0.5f + 0.75f, FLinearColor(1.f, 1.f, 1.f, 0.06f));   // a faint inner ring at half range
-	DrawCircle(Cx, Cy, Half * 0.5f - 0.75f, FLinearColor(0.12f, 0.13f, 0.12f, 1.f));
+	// Backdrop: the map itself is a half-see-through grey disc (50%), inside a thin gold ring with a dark edge, so the
+	// world shows through it. Everything on top (ring, markers, letters) stays solid.
+	DrawCircle(Cx, Cy, Half, FLinearColor(0.12f, 0.13f, 0.12f, 0.5f));
+	DrawAnnulus(Cx, Cy, Half + 7.5f, FLinearColor(0.f, 0.f, 0.f, 0.7f));
+	DrawAnnulus(Cx, Cy, Half + 5.5f, FLinearColor(0.62f, 0.44f, 0.18f, 1.f));
+	DrawAnnulus(Cx, Cy, Half * 0.5f + 1.f, FLinearColor(1.f, 1.f, 1.f, 0.12f));   // a faint inner ring at half range
 
 	// The map turns with the camera: whatever the camera faces is at the top
 	float CamYaw = Pawn->GetActorRotation().Yaw;
@@ -780,11 +779,37 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 			DrawText(T, Col, X - TW * 0.5f, Y - TH * 0.5f, Font, 1.7f);
 		};
 		const FLinearColor CC(1.f, 1.f, 1.f, 0.85f);
-		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.35f, 0.3f, 1.f));   // north is world +X, east +Y
+		Letter(TEXT("N"), 1.f, 0.f, FLinearColor(1.f, 0.82f, 0.28f, 1.f));   // north is world +X, east +Y
 		Letter(TEXT("S"), -1.f, 0.f, CC);
 		Letter(TEXT("W"), 0.f, -1.f, CC);
 		Letter(TEXT("E"), 0.f, 1.f, CC);
 	}
+}
+
+// A smooth thin ring (an anti-aliased annulus texture; its thickness is 4% of its radius), so a ring can be drawn without
+// a solid disc under it and whatever is inside it stays see-through
+void AKnightHUD::DrawAnnulus(float X, float Y, float R, const FLinearColor& Col)
+{
+	if (!AnnulusTex)
+	{
+		const int32 N = 256;
+		AnnulusTex = UTexture2D::CreateTransient(N, N, PF_B8G8R8A8);
+		if (!AnnulusTex) return;
+		AnnulusTex->SRGB = false;
+		AnnulusTex->Filter = TF_Bilinear;
+		FColor* Px = static_cast<FColor*>(AnnulusTex->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
+		const float C = N * 0.5f, Out = N * 0.5f - 1.f, In = Out * 0.96f;
+		for (int32 y = 0; y < N; ++y)
+			for (int32 x = 0; x < N; ++x)
+			{
+				const float D = FMath::Sqrt(FMath::Square(x + 0.5f - C) + FMath::Square(y + 0.5f - C));
+				const float A = FMath::Clamp(Out - D + 0.5f, 0.f, 1.f) * FMath::Clamp(D - In + 0.5f, 0.f, 1.f);
+				Px[y * N + x] = FColor(255, 255, 255, uint8(A * 255.f));
+			}
+		AnnulusTex->GetPlatformData()->Mips[0].BulkData.Unlock();
+		AnnulusTex->UpdateResource();
+	}
+	DrawTexture(AnnulusTex, X - R, Y - R, 2.f * R, 2.f * R, 0.f, 0.f, 1.f, 1.f, Col, BLEND_Translucent);
 }
 
 // A smooth filled circle (an anti-aliased disc texture, so it moves smoothly between pixels)

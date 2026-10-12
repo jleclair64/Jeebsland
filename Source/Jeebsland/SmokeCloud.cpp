@@ -62,7 +62,7 @@ void ASmokeCloud::Tick(float DeltaSeconds)
 	const FVector Here = GetActorLocation();
 	auto Inside = [&](const FVector& P) { return FVector::Dist2D(P, Here) < Radius && FMath::Abs(P.Z - Here.Z) < Radius; };
 	const bool bKnightIn = Inside(Knight->GetActorLocation());
-	if (bKnightIn) Knight->Hurt(KnightHit, this);
+	if (bKnightIn) Knight->Hurt(KnightHit, this, true);
 	bool bHorseIn = bKnightIn && Knight->IsMounted();   // riding, the horse is in it with you
 	for (TActorIterator<AHorse> It(GetWorld()); It && !bHorseIn; ++It) bHorseIn = Inside(It->GetActorLocation());   // or standing in it
 	if (bHorseIn) Knight->HurtHorse(HorseHit);

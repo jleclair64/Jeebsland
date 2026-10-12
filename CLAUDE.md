@@ -29,6 +29,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.
+- Defence XP comes only from weapon blows armour or a raised shield actually stops (shield blocks most). Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
 - `ASmokeCloud` (purple poison smoke test hazard) sits beside the horse spawn; delete the spawn line in KnightGameMode.cpp when the owner is done with it.
 - Health (knight and horse) heals only after 10 s without a hit, and a full bar takes 10 s. In PvP areas health must NOT regenerate (not built yet). The horse is meant to get its own hit boxes and take damage separately from the knight (`HurtHorse`); not built yet. The stamina bar is hidden on purpose but stamina still works.
 - Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
