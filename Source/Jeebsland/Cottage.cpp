@@ -267,6 +267,14 @@ void ACottage::Unlock()
 	ShowLootAndLock();
 }
 
+void ACottage::SetDoorState(bool bInOpen, bool bInLocked)
+{
+	const bool bLockChanged = bInLocked != bLocked;
+	bOpen = bInOpen;
+	bLocked = bInLocked;
+	if (bLockChanged) ShowLootAndLock();
+}
+
 void ACottage::ToggleDoor()
 {
 	if (bLocked) return;

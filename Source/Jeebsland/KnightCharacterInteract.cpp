@@ -321,7 +321,13 @@ void AKnightCharacter::OnInteractKey()
 void AKnightCharacter::UseDoor(ACottage* Hut)
 {
 	if (!Hut || !Skills) return;
-	if (!Hut->IsLocked()) { Hut->ToggleDoor(); return; }
+	if (!Hut->IsLocked())
+	{
+		// online the server's door is the real one: ours swings at once, and the server opens its own (and everyone's)
+		if (!HasAuthority()) Hut->ToggleDoor();
+		Inv(EInvOp::ToggleDoor, 0, 0, 0, nullptr, Hut->GetActorLocation());
+		return;
+	}
 	// Picking the lock: the server rolls it and awards the XP (DoInv, EInvOp::PickLock)
 	Inv(EInvOp::PickLock, 0, 0, 0, nullptr, Hut->GetActorLocation());
 }

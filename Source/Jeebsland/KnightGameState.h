@@ -4,6 +4,16 @@
 #include "GameFramework/GameStateBase.h"
 #include "KnightGameState.generated.h"
 
+// A cottage door the server has changed (open, or unlocked), sent to every player
+USTRUCT()
+struct FDoorState
+{
+	GENERATED_BODY()
+	UPROPERTY() FVector_NetQuantize Loc = FVector::ZeroVector;
+	UPROPERTY() bool bOpen = false;
+	UPROPERTY() bool bLocked = false;
+};
+
 // One rock, tree or fishing spot that is not full (online: the server's count, sent to every player)
 USTRUCT()
 struct FNodeCharge
@@ -31,6 +41,8 @@ public:
 	// Online, every machine has its own copy of the rocks, trees and fishing spots, but the server's charges are the real ones.
 	// The server lists every node that is not full here; each player's machine sets its copies to match.
 	void SetNodeCharges(const FVector& Loc, int32 Charges, int32 Max);
+	// Cottage doors: the server's are the real ones; players' machines copy them (OnRep_Doors)
+	void SyncDoor(class ACottage* Hut);
 
 	// The trading post's stock this hour, as the server has it (so everyone sees the same "3 left")
 	UPROPERTY(Replicated) int64 StoreHour = -1;
@@ -49,6 +61,8 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Nodes) TArray<FNodeCharge> NodeCharges;
 	UFUNCTION() void OnRep_Nodes();
+	UPROPERTY(ReplicatedUsing = OnRep_Doors) TArray<FDoorState> Doors;
+	UFUNCTION() void OnRep_Doors();
 
 	TWeakObjectPtr<class AExponentialHeightFog> FogActor;
 	float FogNow = 0.012f;

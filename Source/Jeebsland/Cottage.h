@@ -29,6 +29,7 @@ public:
 	int32 GetLockLevel() const { return LockLevel; }
 	void Unlock();                // picked: unlocks and swings open
 	void ToggleDoor();            // E: open or close. Closing a hut that has a lock locks it again.
+	void SetDoorState(bool bInOpen, bool bInLocked);   // online: the server's door, copied onto this machine's cottage
 	bool HasLoot() const { return bLootThere && LootAmount > 0; }
 	int32 TakeLoot();             // returns the ingots, empties the stash
 

@@ -233,13 +233,14 @@ void AKnightGameState::BuildWorld()
 	if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
 
 	// Online: the server's rock and tree counts may have arrived before the world was built
-	if (!HasAuthority()) OnRep_Nodes();
+	if (!HasAuthority()) { OnRep_Nodes(); OnRep_Doors(); }
 }
 
 void AKnightGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AKnightGameState, NodeCharges);
+	DOREPLIFETIME(AKnightGameState, Doors);
 	DOREPLIFETIME(AKnightGameState, StoreHour);
 	DOREPLIFETIME(AKnightGameState, StoreLeft);
 }
@@ -273,6 +274,23 @@ void JeebCombat::SendToAll(const UWorld* World, const FVector& Loc, int32 Amount
 void AKnightGameState::MulticastNumber_Implementation(FVector_NetQuantize Loc, int32 Amount, uint8 Type)
 {
 	if (!IsNetMode(NM_DedicatedServer)) JeebCombat::AddLocal(GetWorld(), Loc, Amount, Type);
+}
+
+void AKnightGameState::SyncDoor(ACottage* Hut)
+{
+	if (!Hut || !HasAuthority() || GetNetMode() == NM_Standalone) return;
+	const FVector L = Hut->GetActorLocation();
+	FDoorState* D = Doors.FindByPredicate([&](const FDoorState& S) { return FVector::DistSquared2D(S.Loc, L) < 9.f; });
+	if (!D) { D = &Doors.AddDefaulted_GetRef(); D->Loc = L; }
+	D->bOpen = Hut->IsDoorOpen();
+	D->bLocked = Hut->IsLocked();
+}
+
+void AKnightGameState::OnRep_Doors()
+{
+	for (const FDoorState& S : Doors)
+		for (TActorIterator<ACottage> It(GetWorld()); It; ++It)
+			if (FVector::DistSquared2D(It->GetActorLocation(), S.Loc) < 9.f) { It->SetDoorState(S.bOpen, S.bLocked); break; }
 }
 
 void AKnightGameState::SyncStore()

@@ -300,6 +300,13 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 
 	// ---- cottages: a stash of ingots, and picking a lock ----
+	case EInvOp::ToggleDoor:
+		if (ACottage* Hut = FindCottage())
+		{
+			Hut->ToggleDoor();
+			if (AKnightGameState* GS = GetWorld()->GetGameState<AKnightGameState>()) GS->SyncDoor(Hut);
+		}
+		break;
 	case EInvOp::HutLoot:
 		if (ACottage* Hut = FindCottage())
 		{
@@ -322,7 +329,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		if (FMath::FRand() < Chance)
 		{
 			Hut->Unlock();
-			if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientUnlockHut(Hut->GetActorLocation());
+			if (AKnightGameState* GS = GetWorld()->GetGameState<AKnightGameState>()) GS->SyncDoor(Hut);   // (everyone sees it open)
 			Sk->AddXP(ESkillType::Lockpicking, 15 + 6 * Need);
 			Sk->Say(3.f, FColor::Green, TEXT("Click. The lock gives way."));
 		}
