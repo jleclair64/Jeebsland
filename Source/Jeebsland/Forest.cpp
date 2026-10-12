@@ -314,9 +314,9 @@ AForest::AForest()
 	}
 	// needle boughs (or cones if the needle material is missing); pines fade out a little further away than leafy crowns,
 	// redwoods much further (they stand over the forest)
-	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, true, 9000, 12000, true));
-	Pine.Add(MakeISM(TEXT("PineB"), ConeMesh.Object, true, 9000, 12000, true));
-	RedCone  = MakeISM(TEXT("RedCone"), ConeMesh.Object, true, 20000, 25000, true);
+	Pine.Add(MakeISM(TEXT("PineA"), ConeMesh.Object, false, 9000, 12000, true));   // (needle boughs cast no shadow: too many of them)
+	Pine.Add(MakeISM(TEXT("PineB"), ConeMesh.Object, false, 9000, 12000, true));
+	RedCone  = MakeISM(TEXT("RedCone"), ConeMesh.Object, false, 20000, 25000, true);
 	RedTaper = MakeISM(TEXT("RedTaper"), CylMesh.Object, true, 0, 0);
 	RedFortTrunk = MakeISM(TEXT("RedFortTrunk"), CylMesh.Object, true, 0, 0);
 	NeedleFill.Add(MakeISM(TEXT("PineFillA"), ConeMesh.Object, false, 9000, 12000, true));

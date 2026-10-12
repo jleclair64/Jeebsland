@@ -225,7 +225,7 @@ void AKnightCharacter::ApplyGraphics()
 	// Lowest, for weak PCs: no volumetric clouds, ordinary (cheaper) shadow maps instead of virtual ones, short shadow range,
 	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
 	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
-	Set(TEXT("r.Shadow.Virtual.Enable"), bLowest ? 0 : 1);
+	Set(TEXT("r.Shadow.Virtual.Enable"), 0);   // standard shadow maps on both levels (virtual ones overloaded in the pine woods)
 	Set(TEXT("sg.ShadowQuality"), bLowest ? 1 : 3);
 	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 1 : 4);
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 3);
