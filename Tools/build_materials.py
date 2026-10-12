@@ -466,7 +466,7 @@ def build_flame_glow():
     # fading to nothing at the rim (a view-angle falloff), and fading out where it meets the ground. Tint and Intensity are parameters.
     mat, g = unlit("M_Flame", unreal.BlendMode.BLEND_ADDITIVE)
     rim = g.node(unreal.MaterialExpressionFresnel, exponent=1.0, base_reflect_fraction=0.0)
-    core = g.power(g.one(unreal.MaterialExpressionOneMinus, rim), 2.2)
+    core = g.power(g.one(unreal.MaterialExpressionOneMinus, rim), 5.0)   # steep falloff: no visible disc edge
     glow = g.muln(g.muln(core, g.vector("Tint", (1.0, 0.5, 0.14))), g.scalar("Intensity", 3.0))
     g.out(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Flame")

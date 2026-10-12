@@ -219,7 +219,7 @@ void AAutumnDecor::BeginPlay()
 	if (UMaterialInterface* FlameMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Flame.M_Flame")))
 	{
 		UMaterialInstanceDynamic* C = UMaterialInstanceDynamic::Create(FlameMat, this);
-		C->SetScalarParameterValue(TEXT("Intensity"), 0.8f);
+		C->SetScalarParameterValue(TEXT("Intensity"), 0.22f);
 		CandleHalo->SetMaterial(0, C);
 		UMaterialInstanceDynamic* P = UMaterialInstanceDynamic::Create(FlameMat, this);
 		P->SetScalarParameterValue(TEXT("Intensity"), 0.35f);
@@ -664,7 +664,7 @@ void AAutumnDecor::BeginPlay()
 			Add(CandleBody, FTransform(FQuat::Identity, FVector(P.X, P.Y, BaseZ + 2.f + H + 0.5f), FVector(0.056f, 0.056f, 0.012f)));   // melted wax pool on top
 			const FVector F(P.X, P.Y, BaseZ + 2.f + H + 4.2f);
 			Add(Flame, FTransform(FQuat::Identity, F, FVector(0.04f, 0.04f, 0.09f)));
-			Add(CandleHalo, FTransform(FQuat::Identity, F + FVector(0.f, 0.f, 1.f), FVector(0.14f)));   // soft glow round the flame
+			Add(CandleHalo, FTransform(FQuat::Identity, F + FVector(0.f, 0.f, 1.f), FVector(0.10f)));   // a faint glow round the flame
 			if ((CandleIdx++ % 4) == 0) AddFlickerLight(F + FVector(0.f, 0.f, 8.f), 320.f, 300.f, FLinearColor(1.0f, 0.6f, 0.25f), 0.3f, 1.9f * CandleIdx);
 			FlameBase.Add(F);
 			FlamePhase.Add(Rand.FRandRange(0.f, 6.28f));
@@ -807,7 +807,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Flicker = 1.f + 0.20f * FMath::Sin(Time * 11.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
 			const FVector P = FlameBase[i] + FVector(0.4f * FMath::Sin(Time * 7.f + Ph), 0.4f * FMath::Cos(Time * 6.f + Ph), 3.2f * (Flicker - 1.f));
 			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.04f, 0.04f, 0.09f * Flicker)), true, i == FlameBase.Num() - 1, true);
-			CandleHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, FlameBase[i] + FVector(0.f, 0.f, 1.f), FVector(0.14f * (0.85f + 0.25f * Flicker))), true, i == FlameBase.Num() - 1, true);
+			CandleHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, FlameBase[i] + FVector(0.f, 0.f, 1.f), FVector(0.10f * (0.85f + 0.25f * Flicker))), true, i == FlameBase.Num() - 1, true);
 		}
 		// Torch flames lick and sway
 		for (int32 i = 0; i < TorchFlamePos.Num(); ++i)
