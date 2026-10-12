@@ -346,7 +346,7 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				const int32 k = Idx(i, j);
 				if (CapeNrmPrev.Num() != N) CapeNrmPrev.Init(Nm, N);
-				Nm = FMath::Lerp(CapeNrmPrev[k], Nm, FMath::Clamp(Dt * 12.f, 0.f, 1.f)).GetSafeNormal();
+				Nm = FMath::Lerp(CapeNrmPrev[k], Nm, FMath::Clamp(Dt * 7.f, 0.f, 1.f)).GetSafeNormal();
 				CapeNrmPrev[k] = Nm;
 			}
 			Nrm.Add(Nm);

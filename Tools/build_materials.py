@@ -621,8 +621,8 @@ def build_cloth():
     mat.set_editor_property("two_sided", True)
     g = Graph(mat)
     g.out(g.vector("Color", (0.6, 0.1, 0.08)), unreal.MaterialProperty.MP_BASE_COLOR)
-    g.out(g.node(unreal.MaterialExpressionConstant, r=0.85), unreal.MaterialProperty.MP_ROUGHNESS)
-    g.out(g.node(unreal.MaterialExpressionConstant, r=0.2), unreal.MaterialProperty.MP_SPECULAR)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=1.0), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.04), unreal.MaterialProperty.MP_SPECULAR)
     g.out(g.muln(g.const3((0.0, 0.0, 1.0)), g.node(unreal.MaterialExpressionTwoSidedSign)), unreal.MaterialProperty.MP_NORMAL)
     finish(mat, "M_Cloth")
 
