@@ -15,7 +15,7 @@ The owner wants a recommendation on model and effort for each request, to balanc
 
 ## Ending a session
 
-When the owner says goodbye, goodnight or anything similar, don't just sign off: first ask if they'd like you to commit and refresh the "Current state" notes below for their next chat. If they say yes, update that section (what was just done, what's unfinished, known issues, decisions, anything they want carried over), remove stale lines, keep it to about a screen, and commit.
+When the owner says goodbye, goodnight or anything similar, don't just sign off: first ask if they'd like you to commit and refresh the "Current state" notes below for their next chat. If they say yes, update that section (what was just done, what's unfinished, known issues, decisions, anything they want carried over), remove stale lines, keep it to about a screen, and commit. In the same question, also ask whether to repackage the game (only if code or content changed since the last package; then make `Packaged/Jeebsland.zip` without the `.pdb`, and remind them to restart the worlds with `Tools/HostWorlds.bat` and send friends the new zip).
 
 ## Current state
 
