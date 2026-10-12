@@ -35,6 +35,11 @@ private:
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
 	UPROPERTY() UTexture2D* QuarterTex = nullptr;
 	UPROPERTY() UTexture2D* RingTex[2] = {};
+	void Outline(float X, float Y, float W, float H, float R, const FLinearColor& Col);
+	float PromptAlpha = 0.f;
+	FVector PromptAnchor = FVector::ZeroVector;
+	FString PromptText;
+	bool bPromptE = false;
 	void EnsureGlassTex();
 	void Corner(UTexture2D* Tex, float X, float Y, float R, int32 C, const FLinearColor& Col);
 	void FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt);

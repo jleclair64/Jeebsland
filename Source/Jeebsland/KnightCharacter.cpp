@@ -1144,8 +1144,7 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 {
 	if (IsUIOpen() || bRolling || bSliding || bClimbing) return false;
-	if (bSitting) { OutText = TEXT("Press E to stand up"); return true; }
-	if (bMounted) { OutText = TEXT("Press E to dismount"); return true; }
+	if (bSitting || bMounted) return false;   // E to stand up or dismount still works; it just shows no prompt
 	if (GetCharacterMovement()->IsFalling()) return false;
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
@@ -1192,6 +1191,63 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	}
 	return false;
 }
+
+bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
+{
+	if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || bMounted || GetCharacterMovement()->IsFalling()) return false;
+	const FVector Me = GetActorLocation();
+	auto Float = [&](const FVector& P, float Up)   // a little toward the knight and up, so it hangs in front of the thing
+	{
+		FVector To = Me - P;
+		To.Z = 0.f;
+		Out = P + To.GetSafeNormal() * 35.f + FVector(0.f, 0.f, Up);
+	};
+	bOutE = true;
+	int32 Idx = -1;
+	ANpc* Npc = nullptr;
+	AHorse* Horse = nullptr;
+	switch (FindInteractable(Idx, Npc, Horse))
+	{
+	case EInteract::Horse: Float(Horse->GetActorLocation(), 150.f); return true;
+	case EInteract::Npc:   Float(Npc->GetActorLocation(), 130.f); return true;
+	case EInteract::Bench:
+	{
+		const FVector2D P = JeebTerrain::Seats()[Idx].Pos;
+		Float(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y)), 90.f);
+		return true;
+	}
+	case EInteract::Loot:
+		if (const ACottage* Hut = FoundCottage.Get()) { Float(Hut->LootPos(), 70.f); return true; }
+		return false;
+	case EInteract::Drop:
+		if (const ALootDrop* Drop = FoundDrop.Get()) { Float(Drop->GetActorLocation(), 60.f); return true; }
+		return false;
+	case EInteract::Door:
+	{
+		const ACottage* Hut = FoundCottage.Get();
+		if (!Hut) return false;
+		Float(Hut->DoorPos(), 105.f);   // door handle height
+		if (Hut->IsLocked() && !(Skills && Skills->GetLevel(ESkillType::Lockpicking) >= Hut->GetLockLevel())) bOutE = false;
+		return true;
+	}
+	default: break;
+	}
+	if (!bFishing)
+	{
+		for (TActorIterator<AFishingSpot> It(GetWorld()); It; ++It)
+		{
+			const FVector To = It->GetActorLocation() - Me;
+			if (To.Size2D() < It->ReachRadius() && FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To.GetSafeNormal2D()) > It->MinFacing())
+			{
+				Float(It->GetActorLocation(), 60.f);
+				bOutE = false;   // fishing is a click, not an E
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 
 void AKnightCharacter::OnInteractKey()
 {
@@ -1779,7 +1835,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling;
 		if (bAsk && HorseEnergy > 0.f)
 		{
-			HorseEnergy = FMath::Max(0.f, HorseEnergy - (25.f / 100.f) * Dt);
+			// the horse never tires: its gallop energy does not drain
 			bHorseSprint = true;
 			if (HorseEnergy <= 0.f) bHorseTired = true;
 		}

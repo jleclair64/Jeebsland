@@ -132,7 +132,7 @@ void AKnightHUD::FillRR(float X, float Y, float W, float H, float R, TFunctionRe
 	{
 		const float L = Y1 - Y0;
 		if (L < 1.f || X1 - X0 < 1.f) return;
-		const int32 Nb = FMath::Max(1, FMath::CeilToInt(L / 8.f));
+		const int32 Nb = FMath::Max(1, FMath::CeilToInt(L / 2.f));   // 2 px steps: a smooth fade, no visible bands
 		for (int32 b = 0; b < Nb; ++b)
 		{
 			const float A = FMath::RoundToFloat(Y0 + L * b / Nb), B = FMath::RoundToFloat(Y0 + L * (b + 1) / Nb);
@@ -163,6 +163,20 @@ void AKnightHUD::RimLight(float X, float Y, float W, float H, float R, float Alp
 	Corner(Ring, X + W - R, Y, R, 1, C(0.30f));
 	Corner(Ring, X, Y + H - R, R, 2, C(0.30f));
 	Corner(Ring, X + W - R, Y + H - R, R, 3, C(0.14f));
+}
+
+// A plain outline round a rounded rectangle, the same light all the way round
+void AKnightHUD::Outline(float X, float Y, float W, float H, float R, const FLinearColor& Col)
+{
+	EnsureGlassTex();
+	X = FMath::RoundToFloat(X); Y = FMath::RoundToFloat(Y); W = FMath::RoundToFloat(W); H = FMath::RoundToFloat(H);
+	R = FMath::RoundToFloat(FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f));
+	const float Th = FMath::Max(1.f, FMath::RoundToFloat(R * 9.f / 48.f));
+	DrawRect(Col, X + R, Y, W - 2.f * R, Th);
+	DrawRect(Col, X + R, Y + H - Th, W - 2.f * R, Th);
+	DrawRect(Col, X, Y + R, Th, H - 2.f * R);
+	DrawRect(Col, X + W - Th, Y + R, Th, H - 2.f * R);
+	for (int32 c = 0; c < 4; ++c) Corner(RingTex[1], (c & 1) ? X + W - R : X, (c & 2) ? Y + H - R : Y, R, c, Col);
 }
 
 void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
@@ -415,8 +429,8 @@ void AKnightHUD::DrawHUD()
 	{
 		const float BY = Canvas->ClipY - 28.f;
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
-		const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.5f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.22f, 0.42f, 0.78f));
-		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.2f);   // throbs when nearly dead
+		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
+		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);   // throbs when nearly dead
 		DrawText(FString::Printf(TEXT("%d / %d"), FMath::CeilToInt(Knight->GetHealth()), Knight->GetMaxHealth()), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
 	}
 
@@ -457,34 +471,50 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// While riding: the horse's health (above yours), and its gallop energy, a bar counting 100 down while you gallop, then refilling
+	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)
 	if (Knight->IsMounted())
 	{
-		{
-			const float BY = Canvas->ClipY - 44.f;
-			const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
-			const FLinearColor HpCol = (F < 0.2f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.5f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.32f, 0.62f, 0.32f));
-			Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.2f);
-			DrawText(FString::Printf(TEXT("Horse  %d / %d"), FMath::CeilToInt(Knight->GetHorseHealth()), FMath::RoundToInt(Knight->GetHorseMaxHealth())), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
-		}
-		{
-			const float BY = Canvas->ClipY - 58.f;
-			const float F = FMath::Clamp(Knight->GetHorseEnergy() / 100.f, 0.f, 1.f);
-			const FLinearColor Fill = Knight->IsHorseTired() ? FLinearColor(0.72f, 0.30f, 0.10f) : FLinearColor(0.80f, 0.64f, 0.22f);
-			Gauge(BarX, BY, BarW, 4.f, F, Fill, Knight->IsHorseTired());
-		}
+		const float BY = Canvas->ClipY - 46.f - 46.f - 22.f;
+		const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
+		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
+		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);
+		DrawText(FString::Printf(TEXT("Horse  %d / %d"), FMath::CeilToInt(Knight->GetHorseHealth()), FMath::RoundToInt(Knight->GetHorseMaxHealth())), FLinearColor(0.85f, 0.88f, 0.95f, 0.85f), BarX + BarW + 14.f, BY - 5.f, Font, 0.75f);
 	}
 
-	// "Press E" prompt
+	// The E prompt: an outlined square with an E in it, floating just in front of and above whatever you can use. It fades in
+	// as you get close and out as you leave. Things that are not an E action (a lock you cannot pick, a fishing spot) and
+	// drops (what is lying there) get a small caption under it instead.
 	{
 		FString Prompt;
-		if (!Knight->IsUIOpen() && Knight->GetInteractPrompt(Prompt))
+		FVector Anchor;
+		bool bE = false;
+		const bool bHave = PC && !Knight->IsUIOpen() && Knight->GetInteractPrompt(Prompt) && Knight->GetInteractAnchor(Anchor, bE);
+		const float Dt = GetWorld()->GetDeltaSeconds();
+		PromptAlpha = FMath::FInterpTo(PromptAlpha, bHave ? 1.f : 0.f, Dt, 12.f);
+		if (bHave) { PromptAnchor = Anchor; PromptText = Prompt; bPromptE = bE; }
+		FVector2D SP;
+		if (PromptAlpha > 0.02f && PC && PC->ProjectWorldLocationToScreen(PromptAnchor, SP))
 		{
-			float TW = 0.f, TH = 0.f;
-			GetTextSize(Prompt, TW, TH, Font, 1.5f);
-			const float PX2 = (Canvas->ClipX - TW) * 0.5f, PY2 = Canvas->ClipY * 0.6f;
-			Panel(PX2 - 14.f, PY2 - 6.f, TW + 28.f, TH + 12.f, 0.95f, true);
-			DrawText(Prompt, FLinearColor(1.f, 0.9f, 0.4f), PX2, PY2, Font, 1.5f);
+			const float T = GetWorld()->GetTimeSeconds();
+			const float A = PromptAlpha;
+			const float S = 36.f;
+			const float X = SP.X - S * 0.5f, Y = SP.Y - S * 0.5f - 4.f * FMath::Sin(T * 2.2f) - (1.f - A) * 8.f;   // bobs gently, settles in as it appears
+			if (bPromptE)
+			{
+				FillRR(X, Y, S, S, 9.f, [&](float) { return FLinearColor(0.f, 0.02f, 0.05f, 0.22f * A); });
+				Outline(X, Y, S, S, 9.f, FLinearColor(1.f, 1.f, 1.f, 0.9f * A));
+				float TW = 0.f, TH = 0.f;
+				GetTextSize(TEXT("E"), TW, TH, Font, 1.5f);
+				DrawText(TEXT("E"), FLinearColor(1.f, 1.f, 1.f, A), X + (S - TW) * 0.5f, Y + (S - TH) * 0.5f, Font, 1.5f);
+			}
+			if (!bPromptE || !PromptText.StartsWith(TEXT("Press E")))
+			{
+				float TW = 0.f, TH = 0.f;
+				GetTextSize(PromptText, TW, TH, Font, 1.0f);
+				const float CY = bPromptE ? Y + S + 6.f : Y;
+				Tile(SP.X - TW * 0.5f - 10.f, CY - 2.f, TW + 20.f, TH + 6.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.5f * A, false);
+				DrawText(PromptText, FLinearColor(1.f, 1.f, 1.f, A), SP.X - TW * 0.5f, CY + 1.f, Font, 1.0f);
+			}
 		}
 	}
 
@@ -584,10 +614,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 {
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const float SS = 66.f, Gap = 8.f;
+	const float SS = 46.f, Gap = 6.f;   // small slots, low on the screen
 	const float TotalW = 5 * SS + 4 * Gap;
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f - 40.f;
-	const float Y0 = Canvas->ClipY - 76.f - SS;   // clear of the (low, thin) health bars
+	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 
 	int32 Arrows = 0;
 	for (int32 T = 0; T < NumTiers; ++T) Arrows += Skills->CountItem(ArrowId(T));
@@ -598,30 +628,30 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const bool bSel = (Skills->Selected == i);
 		const int32 Id = Skills->Hotbar[i];
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f, 1.f, bSel);
-		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.85f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f), X + 4.f, Y0 + 2.f, Font, 0.95f);
+		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.85f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f), X + 4.f, Y0 + 1.f, Font, 0.7f);
 		if (Id == 0) continue;
-		DrawIcon(Id, X + 6.f, Y0 + 4.f, SS - 12.f);
+		DrawIcon(Id, X + 5.f, Y0 + 3.f, SS - 10.f);
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
 		{
 			const FString Txt = FString::Printf(TEXT("%d-%d"), A, B);
 			float TW = 0.f, TH = 0.f;
-			GetTextSize(Txt, TW, TH, Font, 0.95f);
-			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.7f), X + SS - TW - 8.f, Y0 + SS - TH - 4.f, TW + 6.f, TH + 2.f);
-			DrawText(Txt, FLinearColor(1.f, 0.55f, 0.45f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 0.95f);
+			GetTextSize(Txt, TW, TH, Font, 0.7f);
+			Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+			DrawText(Txt, FLinearColor(1.f, 0.55f, 0.45f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 0.7f);
 		}
 		if (IsGear(Id) && KindOf(Id) == K_Bow)
-			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), X + SS - 34.f, Y0 + 2.f, Font, 0.95f);
+			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), X + SS - 26.f, Y0 + 1.f, Font, 0.7f);
 		if (Over(X, Y0, SS, SS)) ItemTip(Id);
 	}
 
 	// Defence total, to the right of the bar
 	{
 		const float X = X0 + TotalW + 22.f;
-		Panel(X, Y0, 92.f, SS);
+		Panel(X, Y0, 74.f, SS);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
-		DrawText(TEXT("DEFENCE"), FLinearColor(0.7f, 0.75f, 0.9f), X + 8.f, Y0 + 6.f, Font, 0.9f);
-		DrawText(FString::Printf(TEXT("%d"), Def), FLinearColor(0.55f, 0.75f, 1.f), X + 8.f, Y0 + 28.f, Font, 1.8f);
+		DrawText(TEXT("DEFENCE"), FLinearColor(0.7f, 0.75f, 0.9f), X + 7.f, Y0 + 4.f, Font, 0.7f);
+		DrawText(FString::Printf(TEXT("%d"), Def), FLinearColor(0.55f, 0.75f, 1.f), X + 7.f, Y0 + 17.f, Font, 1.4f);
 	}
 }
 

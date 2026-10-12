@@ -77,42 +77,56 @@ def add_wind(mat, strength, tip_only, lift):
     flutter_amp = add(mul(gust2, 0.35), 0.15)
     total = addn(gust2, muln(flutter, flutter_amp))           # lean downwind as a gust passes, plus the flutter
 
-    # Gust fronts: thin ripples of wind running through the grass. Each is a line about half a metre thick and 20-40 m wide that
-    # travels downwind at 3.5 m/s. Everything is laid out in the wind's own frame (p = distance along the wind minus the
-    # distance it has travelled), so a front keeps its shape and its place in its group and runs on for hundreds of metres.
-    # Fronts come in groups of 2-4 about 30 m apart (the gate), each gust is really two lines a few metres apart that
-    # cover different stretches of the land and drift a little relative to each other, and the lines wander as they go.
-    warp = mul(sine(addn(mul(wx, 0.00004), addn(mul(wy, 0.00003), mul(t, 0.01)))), 0.12)
-    bend = mul(sine(addn(mul(wy, 0.00016), mul(t, 0.004))), 0.10)
-    p = addn(addn(addn(mul(wx, 0.000313), mul(wy, 0.000113)), mul(t, -0.1167)), addn(warp, bend))   # 30 m between fronts
-    perp = addn(mul(wy, 0.94), mul(wx, -0.34))
+    # Gust field, in the manner of Breath of the Wild: not lines, but broad, soft, wobbly patches of stronger wind that roll
+    # across the land with the breeze. Two layers of different size and speed (a big slow one, and a finer faster one riding
+    # inside it) are laid out in the wind's own frame (along the wind, and across it) and bent by slow sine warps so no edge is
+    # straight. Where a patch passes, the grass leans further downwind, the lean direction swings a little, and the blades
+    # catch more light (so you see the gust roll through the field as a pale wave, not just a shear).
+    ux = addn(mul(wx, 0.94), mul(wy, 0.34))          # distance along the wind (cm)
+    sx = addn(mul(wy, 0.94), mul(wx, -0.34))         # distance across it
 
-    def ripple(phase):
-        s = sine(add(phase, -0.25))                         # crest where the sine peaks
-        c = node(unreal.MaterialExpressionSaturate); link(mul(add(s, -0.9975), 400.0), c)   # about 0.6 m thick
-        return muln(c, c)
+    def half(a):                                       # sine mapped to 0..1
+        return add(mul(sine(a), 0.5), 0.5)
 
-    def stretch(period, shift, p_lock, lock):
-        s = sine(addn(mul(perp, period), add(mul(p_lock, lock), shift)))
-        m = node(unreal.MaterialExpressionSaturate); link(add(mul(s, 1.8), -0.1), m)       # a run of 20-40 m, then a gap
-        return m
+    def patch_layer(along_len, across_len, speed, lag, seed):
+        u = addn(mul(ux, 1.0 / along_len), mul(t, -speed * 100.0 / along_len))      # cycles; the pattern travels at `speed` m/s
+        s = mul(sx, 1.0 / across_len)
+        # wobbly fronts: the front line is bent by a slow sine of its position across the wind, itself bent by one along it
+        wob_s = mul(sine(addn(s, add(mul(sine(add(mul(u, 0.45), seed)), 0.17), seed * 0.7))), 0.30)
+        front = half(addn(u, wob_s))
+        # which stretches of the field catch it: also wavering, and slowly drifting
+        wob_u = mul(sine(add(mul(u, 0.4), seed * 1.3)), 0.25)
+        reach = half(add(addn(mul(s, 0.7), wob_u), seed))
+        both = muln(front, reach)
+        soft = node(unreal.MaterialExpressionSaturate); link(mul(add(both, -lag), 3.2), soft)   # patches with soft edges
+        return muln(soft, soft)
 
-    p_b = add(mul(p, 0.97), 0.11)                           # the second line: slightly longer spacing, a few metres behind
-    line_a = muln(ripple(p), stretch(0.000125, 0.0, p, 0.37))
-    line_b = muln(ripple(p_b), stretch(0.00011, 0.5, p_b, 0.23))
-    gate = node(unreal.MaterialExpressionSaturate)
-    link(mul(add(sine(addn(addn(mul(p, 0.154), mul(perp, 0.00002)), mul(t, 0.0015))), 0.1), 3.0), gate)   # groups of 2-4 fronts
-    front = muln(addn(line_a, line_b), gate)
-    total = addn(total, mul(front, 1.4 if tip_only else 0.4))   # half the lean it had; trees only ripple a little
+    big = patch_layer(7500.0, 5200.0, 3.2, 0.26, 0.13)      # ~75 m long, ~50 m across, drifting at 3.2 m/s
+    fine = patch_layer(2600.0, 1900.0, 4.6, 0.33, 0.61)     # ~26 m ripples, 4.6 m/s
+    # the fine ripples live inside the big patches and ride on the open grass a little too
+    gust_field = node(unreal.MaterialExpressionSaturate)
+    link(addn(muln(big, add(mul(fine, 0.8), 0.45)), mul(fine, 0.12)), gust_field)
+    tip_amp = 1.6 if tip_only else 0.5
+    total = addn(total, mul(gust_field, tip_amp))
+    # lean direction swings a little as the gusts pass (about 20 to 45 degrees off the +X axis)
+    swing = add(mul(sine(addn(addn(mul(wx, 0.00006), mul(wy, 0.00004)), mul(t, 0.013))), 0.045), 0.06)
+    cos_a = node(unreal.MaterialExpressionCosine, period=1.0); link(swing, cos_a)
+    sin_a = sine(swing)
+    # lighten the blades where a gust is passing: returned so the colour can use it
+    shade = add(mul(gust_field, 0.20 if tip_only else 0.10), 1.0)
 
     if tip_only:
         uv = node(unreal.MaterialExpressionTextureCoordinate)
         tip = node(unreal.MaterialExpressionOneMinus); link(mask(uv, False, True, False), tip)   # V = 0 at the top of the card
         total = muln(total, tip)
+        shade = add(mul(muln(gust_field, tip), 0.22), 1.0)
 
-    dirv = node(unreal.MaterialExpressionConstant3Vector, constant=unreal.LinearColor(1.0, 0.45, lift, 0.0))
-    final = muln(mul(total, strength), dirv)
+    dirv = node(unreal.MaterialExpressionAppendVector); link(cos_a, dirv, "A"); link(sin_a, dirv, "B")
+    dirv3 = node(unreal.MaterialExpressionAppendVector); link(dirv, dirv3, "A")
+    link(node(unreal.MaterialExpressionConstant, r=lift), dirv3, "B")
+    final = muln(mul(total, strength), dirv3)
     lib.connect_material_property(final, "", unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    return shade
 
 
 def soft_edges(mat, ts):
@@ -224,7 +238,12 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     fluffy_normal(mat)
 
     if wind:
-        add_wind(mat, strength, tip_only, lift)
+        shade = add_wind(mat, strength, tip_only, lift)
+        lit = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -150, -100)   # blades catch more light where a gust passes
+        lib.connect_material_expressions(col, "", lit, "A")
+        lib.connect_material_expressions(shade, "", lit, "B")
+        lib.connect_material_property(lit, "", unreal.MaterialProperty.MP_BASE_COLOR)
+        lib.connect_material_property(lit, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
     unreal.log("MATDIAG built " + name)

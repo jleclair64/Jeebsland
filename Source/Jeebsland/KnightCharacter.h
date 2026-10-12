@@ -105,6 +105,8 @@ public:
 	USkillComponent* GetSkills() const { return Skills; }
 	// Text for the "Press E ..." prompt, or false if nothing is in reach
 	bool GetInteractPrompt(FString& OutText) const;
+	// Where the floating E prompt hangs: just in front of and above the thing you can use. bOutE is false for things that are not an E action (a locked door you cannot pick, a place to fish).
+	bool GetInteractAnchor(FVector& Out, bool& bOutE) const;
 
 	// Combat: health, damage dealt and taken
 	float GetHealth() const { return Health; }
