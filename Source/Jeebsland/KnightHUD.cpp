@@ -634,23 +634,34 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const float X = X0 + i * (SS + Gap);
 		const bool bSel = (Skills->Selected == i);
 		const int32 Id = Skills->Hotbar[i];
-		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f, 1.f, bSel);
-		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.85f, 0.4f) : FLinearColor(0.75f, 0.75f, 0.75f), X + 4.f, Y0 + 1.f, Font, 0.7f);
-		if (Id == 0) continue;
-		IconTiltDeg = 35.f; IconPivot = FVector2D(X + SS * 0.5f, Y0 + SS * 0.5f);   // icons lean diagonally and fill the slot
-		DrawIcon(Id, X - 4.f, Y0 - 4.f, SS + 8.f);
+		// The chosen slot stands out: it is lifted and bigger, tinted gold with a bright gold outline, while the others are dimmed
+		const float Sx = bSel ? X - 4.f : X, Sy = bSel ? Y0 - 13.f : Y0, Ss = bSel ? SS + 8.f : SS;
+		Panel(Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f, 1.f, bSel);
+		if (bSel)
+		{
+			FillRR(Sx, Sy, Ss, Ss, 13.f, [&](float t) { return FLinearColor(1.f, 0.72f, 0.2f, FMath::Lerp(0.30f, 0.12f, t)); });
+			Outline(Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f, 15.f, FLinearColor(1.f, 0.8f, 0.3f, 1.f));
+			Outline(Sx - 1.f, Sy - 1.f, Ss + 2.f, Ss + 2.f, 13.f, FLinearColor(1.f, 0.92f, 0.6f, 0.7f));
+		}
+		DrawText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.7f, 0.7f, 0.7f), Sx + 4.f, Sy + 1.f, Font, bSel ? 0.9f : 0.7f);
+		if (Id == 0) { if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.25f); }); continue; }
+		// icons lean diagonally and fill the slot (the fishing rod is drawn already leaning, so it needs less)
+		IconTiltDeg = (IsGear(Id) && KindOf(Id) == K_Rod) ? -9.f : 35.f;
+		IconPivot = FVector2D(Sx + Ss * 0.5f, Sy + Ss * 0.5f);
+		DrawIcon(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f);
 		IconTiltDeg = 0.f;
+		if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.30f); });   // dim the ones not in hand
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
 		{
 			const FString Txt = FString::FromInt(FMath::RoundToInt(0.5f * (A + B)));   // one number: the middle of the range
 			float TW = 0.f, TH = 0.f;
 			GetTextSize(Txt, TW, TH, Font, 1.15f);
-			Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
-			DrawText(Txt, FLinearColor(1.f, 0.55f, 0.45f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
+			Tile(Sx + Ss - TW - 9.f, Sy + Ss - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+			DrawText(Txt, bSel ? FLinearColor(1.f, 0.7f, 0.55f) : FLinearColor(0.85f, 0.5f, 0.42f), Sx + Ss - TW - 5.f, Sy + Ss - TH - 3.f, Font, 1.15f);
 		}
 		if (IsGear(Id) && KindOf(Id) == K_Bow)
-			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), X + SS - 26.f, Y0 + 1.f, Font, 0.7f);
+			DrawText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), Sx + Ss - 26.f, Sy + 1.f, Font, 0.7f);
 		if (Over(X, Y0, SS, SS)) ItemTip(Id);
 	}
 

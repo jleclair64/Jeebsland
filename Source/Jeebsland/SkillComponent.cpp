@@ -91,14 +91,18 @@ void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 	XP[static_cast<int32>(Skill)] += Amount;
 	const int32 NewLevel = GetLevel(Skill);
 
-	// The HUD shows a progress bar for the skill you last trained, for 30 seconds
+	// The HUD shows a progress bar for the skill you last trained, for 30 seconds (but not for Attack and Defence: those level quietly)
 	const double Now = FPlatformTime::Seconds();
-	LastSkill = Skill;
-	LastSkillTime = Now;
-	LastXPGain = Amount;
+	const bool bQuiet = (Skill == ESkillType::Attack || Skill == ESkillType::Defense);
+	if (!bQuiet)
+	{
+		LastSkill = Skill;
+		LastSkillTime = Now;
+		LastXPGain = Amount;
+	}
 	if (NewLevel > OldLevel)
 	{
-		LevelUpTime = Now;
+		if (!bQuiet) LevelUpTime = Now;
 		JeebMsg::Post(5.f, FColor::Green, FString::Printf(TEXT("Level up! %s is now level %d."), *SkillName(Skill), NewLevel));
 	}
 }

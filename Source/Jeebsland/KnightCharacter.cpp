@@ -904,9 +904,9 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 	Health -= Taken;
 	LastHurtTime = Now;
 	InvulnUntil = Now + 0.4f;
-	// Defence trains only from weapon blows your armour or shield actually stops: a blocked blow (shield up, facing it) trains most,
-	// armour soaking a hit trains a little. Hazards like poison smoke train nothing, and nothing is learned from damage that got through.
-	if (!bEnvironmental && Absorbed > 0) Skills->AddXP(ESkillType::Defense, bFront ? 2 + Absorbed / 2 : 1 + Absorbed / 4);
+	// Defence trains only from blows you block with a raised shield, facing the attacker.
+	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
+	if (!bEnvironmental && bFront && Absorbed > 0) Skills->AddXP(ESkillType::Defense, 2 + Absorbed / 2);
 
 	if (Health <= 0.f)
 	{

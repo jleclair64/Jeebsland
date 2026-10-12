@@ -29,7 +29,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 - UI is "liquid glass" (Apple style): rounded translucent panels with a sheen and a rim of light (`Panel`, `Tile`, `Gauge` in KnightHUD.cpp). Use them for every new menu or HUD element; never plain opaque rectangles.
 - Rings and amulets share three miscellaneous slots (any mix).
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.
-- Defence XP comes only from weapon blows armour or a raised shield actually stops (shield blocks most). Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
+- Defence XP comes only from blows blocked with a raised shield (armour hits and hazards train nothing). Attack and Defence level quietly: no skill popup. Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
 - `ASmokeCloud` (purple poison smoke test hazard) sits beside the horse spawn; delete the spawn line in KnightGameMode.cpp when the owner is done with it.
 - Health (knight and horse) heals only after 10 s without a hit, and a full bar takes 10 s. In PvP areas health must NOT regenerate (not built yet). The horse is meant to get its own hit boxes and take damage separately from the knight (`HurtHorse`); not built yet. The stamina bar is hidden on purpose but stamina still works.
 - Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
@@ -45,6 +45,7 @@ Last updated 2026-10-11. Everything below is built and committed; the owner chec
 
 1. Cape: fix the white thing showing under the cape (the knight's lower back), and give the cape more weight so it looks heavy.
 2. Shield and weapon stowing: during any action like climbing or riding the horse, the shield goes on the back behind the cape, and the sword sits diagonal on the back, under the shield.
+3. RuneScape-style side panel: replace the Tab menu with a panel that is always visible in the lower-left of the screen, with three tabs: Inventory (left, default), Apparel (middle: what is equipped), Skills (right). Pressing Tab frees the mouse cursor so the panel can be clicked; pressing Caps Lock cycles the tabs left to right. (Liquid-glass style, like the rest of the UI.)
 
 ## Checking visuals
 
