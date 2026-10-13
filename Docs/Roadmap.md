@@ -32,7 +32,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 ## PvP rules (decided 2026-10-12)
 - Black and white: no depth rating, no kept items. Inside a PvP area you can be killed and looted (the death sack). Death respawn is ALWAYS Blackrock (start over); from there the player can fast travel away.
 - A warning zone before the border, no bigger than about 30 m, with ample warning (screen message, sign or wall). New players have little to lose and will learn.
-- On entering PvP you get a short immunity with a visible COUNTDOWN on screen; it exists so players can get clear of campers (and of the safe-zone defences). Same short immunity when leaving a safe town through a gate, enough to get out of range of the town's weapons and away from campers. (Open: exact seconds; does attacking end it early.)
+- On entering PvP you get a short immunity with a visible COUNTDOWN on screen; it exists so players can get clear of campers (and of the safe-zone defences). Same short immunity when leaving a safe town through a gate, enough to get out of range of the town's weapons and away from campers. Attacking someone ENDS the immunity early (decided). (Open: exact seconds.)
 - The PvP border is marked in the world by a glowing red line on the ground with a see-through red curtain a few metres high [S-M, cull by distance], and on the world map as a red line [S].
 - Safe-town fortifications (Birch Grove first): crossbows and cannons with grapeshot that let players inside the walls harass campers outside. DECIDED: player-operated, and tuned to harass rather than kill: short range (the gate pocket and a little beyond), slow reload, grapeshot spread or slow bolts that are hard to hit, low damage; kills by a gun give no overall-rank points and no loot priority (the sack still drops), so there is nothing to farm. Owner likes being able to be safe and shoot at campers. (Fallback if it is abused: NPC-crewed guns firing only at players who recently attacked someone.) [M-L]
 - Several gates per safe town; a short safe pocket outside each gate.
@@ -67,7 +67,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Ideas: towns at odds for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; Silver Point as the wizards' school; Birch Grove as the trolls' home.
 
 ## Open questions
-- Where exactly do the PvP borders sit relative to Blackrock? Immunity length, and whether attacking ends it early.
+- Where exactly do the PvP borders sit relative to Blackrock? Immunity length (seconds).
 - Trials for Birch Grove and Palmer Square.
 - Item tiers beyond bronze and iron, and their looks.
 - Combat: which of the unpicked shield ideas, and anything new.
