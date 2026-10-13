@@ -59,9 +59,22 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Ideas:
 
 ## Combat mechanics
-- Current: swings, shield guard pool, rolls, crouch, potions; unpicked: parry, guard break, shield bash, heavy-weapon guard drain.
+- Current: swings, shield guard pool, rolls, crouch, potions.
+- Direction (owner, 2026-10-12): fights should feel OFFENSIVE-focused, not defensive. A mix of skill and stats: players grind for better loot, but a skilled fighter in worse gear still has a real shot. Tuning guideline: a sloppy player loses to an equal-gear skilled one; a skilled player has a real chance against someone a tier up. Keep the gap between gear tiers narrow (rare items are small steps up). [S]
+- **Parry (perfect block):** raise the shield just before a hit lands: no guard damage and the attacker staggers briefly. Short timing window decided on the server so it works with lag. [M]
+- **Guard break:** heavy weapons drain guard faster; a broken guard stuns briefly. A reason to pick the hammer. [S-M]
+- NO shield bash (owner finds it lame and defensive).
+- **Hit reactions:** short flinch and hit-pause on strong blows. [S]
+- **Poise:** heavy hits stagger, light ones do not. [M]
+- **Weapon types with distinct rules:** spear reach and thrust, hammer guard breaks, katana fast chains, bow range. [M]
+- **Special attack bar for rare weapons** (RuneScape): side-quest rare items could carry a unique move, tying the reward to combat. [M]
+- **Hunger Games traps and environmental kills** in The Hunt: snares, poison smoke (exists), falling logs. [S-M]
+- **Classes** (all [L], later; build as NPCs first):
+  - Knights: current system; sturdy all-rounders (melee, shield, rolls).
+  - Trolls: slow, heavy swings, huge reach; hits cannot be interrupted and break guards; easy to roll around.
+  - Wizards: low health (glass cannon), ranged spells, a mana or focus bar instead of stamina; a few named spells rather than a long list. Defence is a timed resource: a limited-time translucent blue bubble that soaks set damage then pops (Smash Bros style, with a cooldown); movement (blink or hover-dash instead of rolls); control (stun, slow, pull-in). Ideas: one spell per hand that combine (Skyrim); fire burning grass and wind blowing it (Zelda, uses the wind and grass); gravity push and pull (Red Rising).
+  - PvP triangle: knights beat wizards by closing in with shield and roll; wizards beat trolls with range; trolls beat knights by breaking guards.
 - Needed for PvP: player-versus-player hits, no regen in PvP zones.
-- Ideas:
 
 ## Lore
 - Ideas: towns at odds for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; Silver Point as the wizards' school; Birch Grove as the trolls' home.
