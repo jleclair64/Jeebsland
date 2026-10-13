@@ -18,8 +18,8 @@ Cost tags: [S] small (fits current procedural style), [M] moderate, [L] big new 
 - **Oak Hill (forest): The Hunt.** Timed Hunger Games-style trial; a group is released into a zone with a few rules; last one standing or best haul wins.
 - **Steele Creek (marsh): The Wade.** Endurance course of hazards (the poison smoke cloud is the obstacle); no PvP, race the clock.
 - **Silver Point (mountain): The Climb.** Vertical course using the ladder and climbing systems.
-- **Carlyle (scholar town): The Examination.** Where wizards come from; puzzle or spell test.
-- Backup names: Birch Grove, Deerpath (forest); Anchorage (marsh); Stone Point, Highbridge (mountain); Barings, Palmer Square (scholar).
+- **Birch Grove (scholar town): The Examination.** Where wizards come from; puzzle or spell test.
+- Backup names: Deerpath (forest); Anchorage (marsh); Stone Point, Highbridge (mountain); Carlyle, Barings, Palmer Square (scholar).
 
 ## Items and ranks
 - Current: bronze start, iron (pen knight), shields in Kite / Round / Tower styles, potions, Red Helm Brush.
@@ -31,7 +31,7 @@ Cost tags: [S] small (fits current procedural style), [M] moderate, [L] big new 
 - Ideas:
 
 ## Lore
-- Ideas: neighbouring towns at odds with Blackrock for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; a hedge-wizard school at Carlyle.
+- Ideas: neighbouring towns at odds with Blackrock for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; a hedge-wizard school at Birch Grove.
 
 ## Map beyond Blackrock
 - Four towns above; regions to fit: forest, marsh, mountain, scholar town. Layout not yet decided.
