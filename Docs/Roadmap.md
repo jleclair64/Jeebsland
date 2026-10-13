@@ -27,7 +27,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - **War:** Blackrock and Oak Hill are at war; NPC skirmishes at set spots (bridge, road), small scripted groups, not a roaming army (server cost).
 - **Two PvP areas ("wild west")**: players kill and loot each other (the death sack is mostly built); the most dangerous and rewarding bosses and side quests live here; no health regeneration there; no fast travel.
   - PvP 1: the mountains in the northeast, east of Silver Point and north of the Anchorage road, running to the coast.
-  - PvP 2: the plains in the middle south, a big loop below the east river branch, and Birch Grove sits INSIDE it (see open questions).
+  - PvP 2: the plains in the middle south, a big loop below the east river branch, and Birch Grove sits INSIDE it. DECIDED: Birch Grove is a huge walled town (much bigger than Blackrock) that looks under siege; everything inside the walls is a safe zone with Bank, Store and Smith; everything outside is PvP. Fast travel INTO Birch Grove is allowed (you arrive safe); the PvP ground next door is for players who want it. Siege look: broken catapults, scorch marks, banners, bonfires, troll watchtowers [S-M]. Risks to design: gate camping (several gates, a few seconds of spawn protection, a safe pocket outside each gate); a big wall is a load cost (simple outline wall, detail only near shops).
 
 ## Towns, Trials and people (first expansion: six towns)
 | Town | Place | Role | Trial | Knights / Wizards / Trolls |
@@ -57,7 +57,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Ideas: towns at odds for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; Silver Point as the wizards' school; Birch Grove as the trolls' home.
 
 ## Open questions
-- Birch Grove sits inside PvP 2: does it have a safe zone around its walls? Where do the PvP borders sit relative to Blackrock?
+- Where do the PvP borders sit relative to Blackrock? Death respawn: always Blackrock, or the nearest safe town? Outer-ring PvP rules for new players (depth-based danger, keep items near the edge)?
 - Trials for Birch Grove and Palmer Square.
 - Item tiers beyond bronze and iron, and their looks.
 - Combat: which of the unpicked shield ideas, and anything new.
