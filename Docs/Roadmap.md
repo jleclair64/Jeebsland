@@ -88,6 +88,13 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
   - Staff (wizard): 1 spell shoots out; 2 a zone of ground damage in front that can be short-hopped or full-hopped over; 3 lightning strike; 4 a different, stronger and faster spell.
   - Spear: 1 jab; 2 low sweep right to left, then left to right if clicked again; 3 high poke; 4 a flurry of long-range jabs, lots of damage.
   - Other weapons: later.
+- **Knockdown (trip) from a down tilt:** a knight hit by a low sweep is tripped and lies there in hit stun, then chooses how to get up: W or S = normal get-up; left click = get-up attack; A or D = roll left or right. Each choice beats or loses to a different follow-up, so the attacker has a combo read (Smash-style, no new button).
+- **Design notes from the chat (to address when building):**
+  - Online lag: combos only feel good if hits land when they look like they do; the server decides every hit, so tune with real playtests. Build hit stun and combos AFTER the basic attacks work.
+  - Combo escape: hit stun shrinks with each hit in a combo so long combos run out; plus a guess-based option for the victim (roll away vs block), not a new button. The knockdown get-up choice above is another read.
+  - Strafe-only facing is the biggest feel change: test it as a toggle first before removing free facing.
+  - The wizard's ground zone you hop over makes the short hop matter.
+  - Suggested build order: 1 short and full hop; 2 scroll attacks and R cycling; 3 charge hits; 4 grab and knockback; 5 hit stun, combos and knockdown; 6 crouch block and strafe mode.
 - Needed for PvP: player-versus-player hits, no regen in PvP zones.
 
 ## Lore
