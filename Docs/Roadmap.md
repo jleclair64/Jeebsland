@@ -56,7 +56,11 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 ## Items and ranks
 - Current: bronze start, iron (pen knight), shields in Kite / Round / Tower styles, potions, Red Helm Brush.
 - Idea: tiers named after the towns that make them (Blackrock bronze, Steele Creek iron...), so gear and map progress together. [S]
-- Ideas:
+- **Tier ladder (decided):** Bronze (Blackrock, start) > Iron (Oak Hill and the war supplies) > Steel (Steele Creek, troll-forged) > Silver (Silver Point's mountains, wizard-enchanted, special effects) > **Diamond** (top tier; best materials and bosses live in the PvP zones). Tier names may follow towns. Tiers are palette and trim on existing faceted shapes, not new models. [S]
+- **Level gates (decided):** gear needs a level to equip (RuneScape-style). Keep tier gaps narrow enough that skill can still beat better gear.
+- **Rare variants:** side-quest rewards; same model, distinct tint, a name, small extra damage, later a special move. [S]
+- **Overall rank (decided):** earned from winning Trials (Ladder, Hunt, Wade...), separate from skill levels, shown on the character as helm brush colour or cape trim; win more Trials, climb higher. [M]
+- **Three profiles per account (decided):** a player's account holds a Knight, a Wizard and a Troll, each a whole separate character with its own progression, gear and skills; the player can switch profile at any town. Wizard and troll gear are their own shapes and progression. Needs: per-profile saves on the server (today one file per account in Saved/Characters), a profile picker in town. [M-L]
 
 ## Combat mechanics
 - Current: swings, shield guard pool, rolls, crouch, potions.
