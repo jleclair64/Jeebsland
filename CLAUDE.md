@@ -19,14 +19,16 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
-Last updated 2026-10-12 (end of the third session: online foundations). Everything below is built and committed; the owner checks visuals themselves and sends screenshots. Details of each system are in the dated sections further down.
+Last updated 2026-10-12 (end of the third session: online foundations, then a design chat that produced Docs/Roadmap.md). Everything below is built and committed; the owner checks visuals themselves and sends screenshots. Details of each system are in the dated sections further down.
 
 **Just done (2026-10-12, third session):** server-owned characters (every pack/gear/money change is a request the server checks: `AKnightCharacter::Inv` / `EInvOp`, KnightCharacterNet.cpp); accounts, per-account server saves, autosave, two worlds and a starting screen (see "Online systems"); shared combat (the server lands blows; pen knight and scarecrows are server-owned); the Escape screen opening on a simple world map (KnightHUDMap.cpp) with Save and Back to menu; Tailscale hosting (`Tools/HostWorlds.bat`, `Tools/OpenFirewall.bat`, `Docs/PlayWithFriends.md`); testing cheat sheet `Docs/HowToTest.md`. Fixes after the owner's tests: mouse look after joining, the big "snap back to spawn" bug (unshared ground as movement base; `SetBase` override), ladders (client-trusted climbing), shared cottage doors, no horse anywhere for now. Also: deep-squat crouch (helm level; shield works while crouched), drag weapons from the bar into the bank, pines and redwoods rebuilt with needle boughs (M_PineNeedle; redwoods tapered), standard (not virtual) shadows with soft PCSS, Lowest: no leaf shadows + TAA. Repackaged at the end of the session (`Packaged/Jeebsland.zip`).
+
+**START HERE next session: `Docs/Roadmap.md` is the owner's design plan** (map of six towns, PvP rules, tier ladder tin to diamond, three profiles per account, cape ranks, Smash-style combat, build order at the bottom). Docs/MapSketch.jpg is their hand-drawn map. A long design chat on 2026-10-12 (no code changed) produced it. The owner is ready to start IMPLEMENTING: open by reminding them of the suggested build order (performance pass and online glitches first, then the tier redo, then the Smash-style combat in stages, and so on), ask which to begin with, and give the model and effort recommendation for it (most of these are Opus, high effort). The roadmap says "do not start without asking". Design points still open are listed under "Open questions" in the roadmap. Keep the roadmap up to date as things get built or decisions change.
 
 **To do when the owner is back (added 2026-10-12):**
 - Walk through the glitchy online behaviour with the owner (they will describe what they saw) and fix it.
 - Performance pass: balance graphics quality against frame rate, and how much of the world loads at once (draw distance, streaming, culling).
-- Design talk (no code) is tracked in `Docs/Roadmap.md`: items and ranks, combat ideas, lore, map beyond Blackrock. Keep adding to it during design chats.
+- Then work through `Docs/Roadmap.md` (see START HERE above).
 
 **Confirmed by the owner (2026-10-12):** soft branch shadows and Lowest frame rate, no Lowest shadow blinking, redwoods and fort decks, pen knight swings landing, ladders and tower jumps online, and the deep crouch as it is (about 3/4 height) all look good.
 
