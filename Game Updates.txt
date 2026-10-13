@@ -1,12 +1,9 @@
 
-Make crouching much lower so the knight goes down to half his height by bending his knees the way a normal human would crouch down low, keep the helmet in the same orientation at the low point of the crouch. Allow shielding while crouching 
-
-
-Make a world map and a starting screen. Will need to set up profile saves and auto saving eventually. I want to press the escape key to go back to the menu, save profile, and on the right pull up the world map 
 
 
 
-Fix the pine trees so they look real 
+
+
 
 
 
@@ -18,7 +15,7 @@ Be able to charge up a strong attack
 Be able to throw your weapons like spears and swords?
 Add parries from perfect blocks
 
-
+Do this GitHub account setup to backup and also backup the Accounts and Characters folders in my google drive from time to time
 
 Each class can only use certain weapons, some are shared. Vary their speeds, health, damage output, jump height, climb walls ability? Ninja double jump and can hit crits? Make certain skills increase faster aka the viking gets 20% increase xp for sailing and fishing skill, give them different abilities like the ninja can hit crits and double jump, the wizard can float for a while, etc. Keep the users skills and inventory the same as they change classes, give them the options to switch at the beginning of the game. At the beginning of the game the user can choose where to spawn in at select points on the map, they start with one and have to explore to unlock more. 
 
@@ -30,6 +27,18 @@ Wizard (mysterious faction) - defensive crystal ball held in left hand (bubble t
 Viking
 Pirate
 Ninja
+
+'------------------------------------
+ - Game -
+User: Randy
+Pass: 64Jeebsland!64
+
+ - Gmail/Drive -
+User: jeebsland@gmail.com
+Pass: 64Jeebsland!64
+
+
+'------------------------------------
 
 
 
