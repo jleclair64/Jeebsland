@@ -23,6 +23,11 @@ Last updated 2026-10-12 (end of the third session: online foundations). Everythi
 
 **Just done (2026-10-12, third session):** server-owned characters (every pack/gear/money change is a request the server checks: `AKnightCharacter::Inv` / `EInvOp`, KnightCharacterNet.cpp); accounts, per-account server saves, autosave, two worlds and a starting screen (see "Online systems"); shared combat (the server lands blows; pen knight and scarecrows are server-owned); the Escape screen opening on a simple world map (KnightHUDMap.cpp) with Save and Back to menu; Tailscale hosting (`Tools/HostWorlds.bat`, `Tools/OpenFirewall.bat`, `Docs/PlayWithFriends.md`); testing cheat sheet `Docs/HowToTest.md`. Fixes after the owner's tests: mouse look after joining, the big "snap back to spawn" bug (unshared ground as movement base; `SetBase` override), ladders (client-trusted climbing), shared cottage doors, no horse anywhere for now. Also: deep-squat crouch (helm level; shield works while crouched), drag weapons from the bar into the bank, pines and redwoods rebuilt with needle boughs (M_PineNeedle; redwoods tapered), standard (not virtual) shadows with soft PCSS, Lowest: no leaf shadows + TAA. Repackaged at the end of the session (`Packaged/Jeebsland.zip`).
 
+**To do when the owner is back (added 2026-10-12):**
+- Walk through the glitchy online behaviour with the owner (they will describe what they saw) and fix it.
+- Performance pass: balance graphics quality against frame rate, and how much of the world loads at once (draw distance, streaming, culling).
+- Design talk (no code) is tracked in `Docs/Roadmap.md`: items and ranks, combat ideas, lore, map beyond Blackrock. Keep adding to it during design chats.
+
 **Confirmed by the owner (2026-10-12):** soft branch shadows and Lowest frame rate, no Lowest shadow blinking, redwoods and fort decks, pen knight swings landing, ladders and tower jumps online, and the deep crouch as it is (about 3/4 height) all look good.
 
 **Reminders for the owner (bring these up at the start of each session until done):**
