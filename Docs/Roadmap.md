@@ -29,6 +29,16 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
   - PvP 1: the mountains in the northeast, east of Silver Point and north of the Anchorage road, running to the coast.
   - PvP 2: the plains in the middle south, a big loop below the east river branch, and Birch Grove sits INSIDE it. DECIDED: Birch Grove is a huge walled town (much bigger than Blackrock) that looks under siege; everything inside the walls is a safe zone with Bank, Store and Smith; everything outside is PvP. Fast travel INTO Birch Grove is allowed (you arrive safe); the PvP ground next door is for players who want it. Siege look: broken catapults, scorch marks, banners, bonfires, troll watchtowers [S-M]. Risks to design: gate camping (several gates, a few seconds of spawn protection, a safe pocket outside each gate); a big wall is a load cost (simple outline wall, detail only near shops).
 
+## PvP rules (decided 2026-10-12)
+- Black and white: no depth rating, no kept items. Inside a PvP area you can be killed and looted (the death sack). Death respawn is ALWAYS Blackrock (start over); from there the player can fast travel away.
+- A warning zone before the border, no bigger than about 30 m, with ample warning (screen message, sign or wall). New players have little to lose and will learn.
+- On entering PvP you get a short immunity with a visible COUNTDOWN on screen; it exists so players can get clear of campers (and of the safe-zone defences). Same short immunity when leaving a safe town through a gate, enough to get out of range of the town's weapons and away from campers. (Open: exact seconds; does attacking end it early.)
+- The PvP border is marked in the world by a glowing red line on the ground with a see-through red curtain a few metres high [S-M, cull by distance], and on the world map as a red line [S].
+- Safe-town fortifications (Birch Grove first): crossbows and cannons with grapeshot that let players inside the walls harass campers outside. Risk: safe players farming kills for free. Options: NPC-crewed guns that only fire at players who recently attacked someone; or player-operated guns with limited range, slow reload and a cooldown. Decide when building. [M-L]
+- Several gates per safe town; a short safe pocket outside each gate.
+- A big bridge over the river between Blackrock and Oak Hill (the contested crossing of the war). [M]
+- Needs building: PvP hits, no health regen in PvP, zone and immunity checks on the server, fast-travel block in PvP.
+
 ## Towns, Trials and people (first expansion: six towns)
 | Town | Place | Role | Trial | Knights / Wizards / Trolls |
 |---|---|---|---|---|
@@ -57,7 +67,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Ideas: towns at odds for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; Silver Point as the wizards' school; Birch Grove as the trolls' home.
 
 ## Open questions
-- Where do the PvP borders sit relative to Blackrock? Death respawn: always Blackrock, or the nearest safe town? Outer-ring PvP rules for new players (depth-based danger, keep items near the edge)?
+- Where exactly do the PvP borders sit relative to Blackrock? Immunity length. Safe-town gun design (NPC or player operated).
 - Trials for Birch Grove and Palmer Square.
 - Item tiers beyond bronze and iron, and their looks.
 - Combat: which of the unpicked shield ideas, and anything new.
