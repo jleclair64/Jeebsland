@@ -2,7 +2,7 @@
 
 Running lists from design conversations. Inspirations: Skyrim, Harry Potter, Lord of the Rings, Red Rising, Hunger Games, RuneScape, Zelda.
 Cost tags: [S] small (fits current procedural style), [M] moderate, [L] big new system or art.
-The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask them to resend it if needed.
+The owner's hand-drawn map sketch (2026-10-12) is saved as `Docs/MapSketch.jpg` (the reference for layout, PvP circles and who lives where).
 
 ## Decided (2026-10-12 design chat)
 - The sun stays as it is; it is a visual choice with no lore behind it.
@@ -10,7 +10,6 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Many knights, no hero: quest givers have their own arcs and the player is a helper.
 - Every town has one **Trial**, central to the town; all of that town's side quests feed into it. Trials are OPTIONAL prestige.
 - Every side quest ends with a **rare variant** of a normal item (e.g. a bronze sword averaging +3 damage). Same model, tint or trim. [S]
-- An **overall rank**, separate from skill levels, is visible to everyone on the character. The Red Helm Brush could be the first rung. [M]
 - Town names come from CLO managers with a medieval feel.
 - NPCs are only wizards, knights or trolls for now. Wizards and trolls (NPC and playable, own weapons, moves, looks) come later [L]; build them once as NPCs and reuse for players. Trolls as players need camera, doorway and ladder rework.
 - **Every town has a Bank, a Store and a Smith** (towns may add unique stores later). Trolls always run smithing shops, wizards always run banks, knights always run trading stores.
@@ -54,8 +53,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Backup names: Deerpath (forest), Stone Point / Highbridge (mountain), Carlyle / Barings (scholar).
 
 ## Items and ranks
-- Current: bronze start, iron (pen knight), shields in Kite / Round / Tower styles, potions, Red Helm Brush.
-- Idea: tiers named after the towns that make them (Blackrock bronze, Steele Creek iron...), so gear and map progress together. [S]
+- Current (before the tier redo): bronze start suit, iron (pen knight), shields in Kite / Round / Tower styles, potions, Red Helm Brush.
 - **Tier ladder (REDONE 2026-10-12, replaces the old bronze/iron/steel/silver/diamond list):** 1 Tin (grey, no shine), 2 Iron (black, no shine), 3 Bronze (shine; the colour we already have), 4 Silver (shiny metal), 5 Gold (golden, shine), 6 Diamond (blue, shine). EVERY weapon follows this colour progression. Palette and trim on existing faceted shapes, not new models. [S]
   - Suggested homes: Tin Blackrock (start), Iron Oak Hill and Steele Creek (mines, forges), Bronze Blackrock smiths, Silver Silver Point, Gold Anchorage, Diamond the PvP bosses. DECIDED: the starting kit is TIN (full tin suit); bronze is earned. Town-level link: towns stay open to everyone, but what you can get is gated: equip level for every tier; stores hide or grey out items above your level (shows a "needs level X" tag); mining and smithing need the matching skill level for each ore; handed-over or looted gear still cannot be equipped until the level is met (no hard town entry gate). [S-M]
   - Code impact: gear ids encode the tier (1000 + kind*100 + variant), so saves, the store, the practice pack and icons all change. Owner said to do it later; do it as one step and check old character saves still load.
@@ -81,7 +79,6 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
   - Wizards: low health (glass cannon), ranged spells, a mana or focus bar instead of stamina; a few named spells rather than a long list. Defence is a timed resource: a limited-time translucent blue bubble that soaks set damage then pops (Smash Bros style, with a cooldown); movement (blink or hover-dash instead of rolls); control (stun, slow, pull-in). Ideas: one spell per hand that combine (Skyrim); fire burning grass and wind blowing it (Zelda, uses the wind and grass); gravity push and pull (Red Rising).
   - PvP triangle (mild, max 65/35): knights beat wizards by closing in with shield and roll; wizards beat trolls with range; trolls beat knights by breaking guards.
 - **Parry REMOVED** (owner, 2026-10-12): it leans defensive. Can be added back later.
-- Triangle advantage is mild: at most a 65/35 fight instead of 50/50.
 
 ## Smash-style combat plan (owner's vision: "a 3D Super Smash Bros", combos, offensive; all [L] together, Opus work, build in stages)
 - **Short hop / full hop:** tap Space = hop only to knee height with an AUTOMATIC fast fall; hold a little longer = full jump with NO fast fall.
@@ -111,7 +108,17 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - Ideas: towns at odds for small human reasons (a stolen bell, a boundary stone), player can take either side; a fallen old kingdom whose ruins and relics feed side quests; Silver Point as the wizards' school; Birch Grove as the trolls' home.
 
 ## Open questions
-- Where exactly do the PvP borders sit relative to Blackrock? Tune the immunity length.
-- Trials for Birch Grove and Palmer Square.
-- Item tiers beyond bronze and iron, and their looks.
-- Combat: which of the unpicked shield ideas, and anything new.
+- Where exactly do the PvP borders sit relative to Blackrock (see the sketch)? Tune the immunity length (10 s to start).
+- Trials for Birch Grove (idea: a troll strength contest, boulder lift or hammer toss) and Palmer Square (idea: a potion-brewing contest).
+- Skill level needed for each gear tier (starting guess: tin 1, iron 10, bronze 20, silver 30, gold 40, diamond 50).
+- Weapons for each class and the rare-item list; more combat ideas the owner wants to add; lore beyond the notes above.
+- Parry was removed; guard break is kept.
+
+## Suggested order for building (when the owner is back; do not start without asking)
+1. Performance pass and the online glitches (already on the to-do list in CLAUDE.md).
+2. Tier redo (tin to diamond) and level gates, one step, with the saves checked.
+3. Smash-style combat in stages (see the plan above: short and full hop, scroll attacks and R cycling, charge hits, grab and knockback, then hit stun, combos and knockdown, then crouch block and strafe mode).
+4. Oak Hill, the river and the big bridge, the Blackrock-Oak Hill war skirmishes.
+5. Profiles per account, fast-travel screen, shared bank in every town.
+6. PvP zones: border markers, immunity, no regen, PvP hits, Birch Grove's walls and guns.
+7. Trolls, then wizards; Steele Creek, Silver Point, Birch Grove, Anchorage, Palmer Square.
