@@ -61,9 +61,7 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 ## Combat mechanics
 - Current: swings, shield guard pool, rolls, crouch, potions.
 - Direction (owner, 2026-10-12): fights should feel OFFENSIVE-focused, not defensive. A mix of skill and stats: players grind for better loot, but a skilled fighter in worse gear still has a real shot. Tuning guideline: a sloppy player loses to an equal-gear skilled one; a skilled player has a real chance against someone a tier up. Keep the gap between gear tiers narrow (rare items are small steps up). [S]
-- **Parry (perfect block):** raise the shield just before a hit lands: no guard damage and the attacker staggers briefly. Short timing window decided on the server so it works with lag. [M]
 - **Guard break:** heavy weapons drain guard faster; a broken guard stuns briefly. A reason to pick the hammer. [S-M]
-- NO shield bash (owner finds it lame and defensive).
 - **Hit reactions:** short flinch and hit-pause on strong blows. [S]
 - **Poise:** heavy hits stagger, light ones do not. [M]
 - **Weapon types with distinct rules:** spear reach and thrust, hammer guard breaks, katana fast chains, bow range. [M]
@@ -73,7 +71,23 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
   - Knights: current system; sturdy all-rounders (melee, shield, rolls).
   - Trolls: slow, heavy swings, huge reach; hits cannot be interrupted and break guards; easy to roll around.
   - Wizards: low health (glass cannon), ranged spells, a mana or focus bar instead of stamina; a few named spells rather than a long list. Defence is a timed resource: a limited-time translucent blue bubble that soaks set damage then pops (Smash Bros style, with a cooldown); movement (blink or hover-dash instead of rolls); control (stun, slow, pull-in). Ideas: one spell per hand that combine (Skyrim); fire burning grass and wind blowing it (Zelda, uses the wind and grass); gravity push and pull (Red Rising).
-  - PvP triangle: knights beat wizards by closing in with shield and roll; wizards beat trolls with range; trolls beat knights by breaking guards.
+  - PvP triangle (mild, max 65/35): knights beat wizards by closing in with shield and roll; wizards beat trolls with range; trolls beat knights by breaking guards.
+- **Parry REMOVED** (owner, 2026-10-12): it leans defensive. Can be added back later.
+- Triangle advantage is mild: at most a 65/35 fight instead of 50/50.
+
+## Smash-style combat plan (owner's vision: "a 3D Super Smash Bros", combos, offensive; all [L] together, Opus work, build in stages)
+- **Short hop / full hop:** tap Space = hop only to knee height with an AUTOMATIC fast fall; hold a little longer = full jump with NO fast fall.
+- **Grab:** close enough = grab, even through a shield. Hits cause small knockback (about half a body length) so running in to grab risks being hit and pushed away. Rough order: hit beats grab, grab beats shield, shield beats hit.
+- **Hit stun and combos:** characters can combo, but the victim eventually gets an "out" or a read (rock-paper-scissors like Smash). No air dodge. Ideas to pick from later: hit stun shrinks with each hit in a combo; a directional escape or roll-out after a few hits; guess-based options (roll away vs stand and block). Server decides everything (hit stun, who is stuck).
+- **Crouch block (Street Fighter style):** a low shield stops low sweeps but not high or jump attacks; a high shield stops high attacks but not low sweeps. Needs a height flag on every attack.
+- **Controls:** R cycles the equipped weapon left to right (replaces scrolling). Mouse wheel is now attacks: scroll DOWN = low sweep (Marth/Ike down tilt), scroll UP = overhead powerful downward slash (more damage, leaves him a little vulnerable). Left click = normal. Holding left click = charge hit.
+- **Charge hit (smash attack):** only on the left-click swing (not on the scroll attacks). Same animation as a normal swing until full charge, then a new stronger animation for the full-charge hit. A red charge bar shows progress; weapons have different full-charge times.
+- **Facing:** idea to remove free facing and lock the knight like Fortnite so he strafes left and right without turning. Plan to build and test it; maybe a key (X) toggles between strafe mode and free move mode.
+- **Every weapon gets four moves:** 1 left click, 2 scroll-down (low), 3 scroll-up (high), 4 charge hit.
+  - Sword: 1 normal swipe; 2 Marth/Ike-style down tilt; 3 swing over the head and crash down; 4 bigger two-handed swing.
+  - Staff (wizard): 1 spell shoots out; 2 a zone of ground damage in front that can be short-hopped or full-hopped over; 3 lightning strike; 4 a different, stronger and faster spell.
+  - Spear: 1 jab; 2 low sweep right to left, then left to right if clicked again; 3 high poke; 4 a flurry of long-range jabs, lots of damage.
+  - Other weapons: later.
 - Needed for PvP: player-versus-player hits, no regen in PvP zones.
 
 ## Lore
