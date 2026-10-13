@@ -61,6 +61,8 @@ The owner's hand-drawn map sketch (2026-10-12) is the reference for layout; ask 
 - **Rare variants:** side-quest rewards; same model, distinct tint, a name, small extra damage, later a special move. [S]
 - **Overall rank (decided):** earned from winning Trials (Ladder, Hunt, Wade...), separate from skill levels, shown on the character as helm brush colour or cape trim; win more Trials, climb higher. [M]
 - **Three profiles per account (decided):** a player's account holds a Knight, a Wizard and a Troll, each a whole separate character with its own progression, gear and skills; the player can switch profile at any town. Wizard and troll gear are their own shapes and progression. Needs: per-profile saves on the server (today one file per account in Saved/Characters), a profile picker in town. [M-L]
+  - Shared across the three profiles: the BANK and money. Separate per profile: gear, skills, level, overall rank (a level 70 knight and a level 38 troll on one account). A profile that dies in PvP loses its own gear only; the others are untouched.
+  - **Switching profile:** built into the fast-travel screen, so a player can fast travel AND change profile in one step (e.g. from Blackrock as a knight to Oak Hill as a wizard). Same limits as fast travel: out of combat, never in PvP.
 
 ## Combat mechanics
 - Current: swings, shield guard pool, rolls, crouch, potions.
