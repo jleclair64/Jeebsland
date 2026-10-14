@@ -192,7 +192,7 @@ The owner's hand-drawn map sketch (2026-10-12) is saved as `Docs/MapSketch.jpg` 
   | 3 | Anchorage | High Places |
   | 4 | Steele Creek | Hard Rocks |
   | 5 | Palmer Square | Beach Day |
-  | 6 | Blackrock recruitment (after Palmer Square; place to pick) | Undercover |
+  | 6 | Blackrock recruitment (likely: back to Blackrock for his first job, black cape given) | Undercover |
   | 7 | Palmer Square | Denial |
   | 8 | Steele Creek | Anger |
   | 9 | Anchorage | Bargaining |
@@ -201,7 +201,7 @@ The owner's hand-drawn map sketch (2026-10-12) is saved as `Docs/MapSketch.jpg` 
   | 12 | Oak Hill | Regret |
   | 13 | Blackrock (castle ceremony, final battle) | Revenge |
   - Oak Hill has no first-half chapter: its first mission is the tutorial (chapter 0) and its return is chapter 12 (the Queen). Chapter 11 is the library burning with the headmaster; chapter 9 is the bank/wealthy man; chapter 12 is killing the Queen; chapters 7, 8 and 10 (Palmer Square, Steele Creek, Birch Grove returns) are still to be designed. Chapter 6 is where the black cape is given (just before the first regretful mission).
-  - Chapter 6's place: the owner named it "Blackrock Recruitment"; it follows working with the nice Blackrock man in Palmer Square (chapter 5). Where it plays (Palmer Square or a first look inside Blackrock) is still to pick.
+  - Chapter 6's place (owner's leaning, 2026-10-13, not final): he MEETS the recruiter in Palmer Square (chapter 5). Chapter 6 is probably the knight travelling back to BLACKROCK to take his first Blackrock job, where he is given the black cape (just before the first regretful mission, chapter 7). It would be his first look inside Blackrock as one of them.
   - Naming note (DECIDED): chapters 7 to 11 follow the five stages of grief in the classic order (Denial, Anger, Bargaining, Grief, Acceptance). The library burning (chapter 11) is therefore "Acceptance". Chapters 10 (Birch Grove, "Grief") and 11 (Silver Point, "Acceptance") were swapped on 2026-10-13. Mentions of "Silver Point chapter 11, Grief" elsewhere now mean Acceptance.
   - **Cape colours per chapter (CONFIRMED 2026-10-13):** white at the start, silver after chapter 1, green after 2, purple after 3, blue after 4, red after 5, black at 6 (through 12), gold after 13. Each chapter is gated by finishing the one before.
   - Troll starts at chapter 2's town in cape colour (green) and skips chapter 1's stage; wizard starts silver, skipping white. Their own chapter lists come later.
