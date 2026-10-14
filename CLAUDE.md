@@ -69,7 +69,7 @@ Last updated 2026-10-12 (end of the third session: online foundations, then a de
 - Health (knight and horse) heals only after 10 s without a hit, and a full bar takes 10 s. In PvP areas health must NOT regenerate (not built yet). The horse is meant to get its own hit boxes and take damage separately from the knight (`HurtHorse`); not built yet. The stamina bar is hidden on purpose but stamina still works.
 - Look: soft, natural, "Breath of the Wild" feel; nothing pointy or jagged. Autumn palette, leaves a little brighter than before but not glowing.
 - Sun never sets: lowest point 11 degrees, noon 41. Day loop is 60 s per half for preview; owner will ask to change it to 1200 s.
-- Armour can be swapped but never removed (starts as a full bronze suit); cape starts black.
+- Armour can be swapped but never removed (starts as a full bronze suit); cape starts black. (Planned, roadmap 2026-10-13: the cape becomes a locked main-quest stage starting WHITE, with a PvP-rank cross on it, and gear moves to the eight colour tiers white to gold.)
 - Minimap rotates with the camera. Store restocks hourly with a mystery satchel.
 - Always keep grass near buildings (fort, cottages, castle, etc.) a bit shorter than open-field grass (about 22% shorter, the owner found 40% too short and the crossed cards showed), with wider overlapping tufts there to hide the cards, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
 - Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
