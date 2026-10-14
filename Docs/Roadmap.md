@@ -223,6 +223,10 @@ The owner's hand-drawn map sketch (2026-10-12) is saved as `Docs/MapSketch.jpg` 
   - Does the "no hero" side-quest tone stay alongside a hero main story?
   - Slot cap per zone and the wait when full.
 
+## Tools to revisit
+- **Blender (+ a Blender MCP so Claude can drive it) (owner, 2026-10-13):** REMIND THE OWNER to look at setting it up when work reaches trolls, wizards, faces for the story cast (princess, king, Queen) or the chapter 0 cutscene and real skinned animation. Suggested first step then: a small trial (one troll, or the king's crown and cape) to see if it is worth the token cost and the new import workflow (models exported into `/Game`). Not needed before then; the world stays procedural C++.
+- **Nanite:** already switched on for the project (`r.Nanite.ProjectEnabled=True`, Nanite foliage off), but it only helps imported static-mesh assets; the procedural runtime meshes do not use it. Matters again if Blender models arrive or during the performance pass.
+
 ## Suggested order for building (when the owner is back; do not start without asking)
 1. Performance pass and the online glitches (already on the to-do list in CLAUDE.md).
 2. Tier redo (now the eight colours, white to gold, replacing tin to diamond) and level gates, one step, with the saves checked.
