@@ -35,7 +35,6 @@ Last updated 2026-10-12 (end of the third session: online foundations, then a de
 **Confirmed by the owner (2026-10-12):** soft branch shadows and Lowest frame rate, no Lowest shadow blinking, redwoods and fort decks, pen knight swings landing, ladders and tower jumps online, and the deep crouch as it is (about 3/4 height) all look good.
 
 **Reminders for the owner (bring these up at the start of each session until done):**
-- GitHub backup NOT set up yet (2026-10-12 GitHub blocked their network with "Access is temporarily restricted"). Remind them to make an empty PRIVATE repo named Jeebsland (no README) on github.com, or on gitlab.com if GitHub still refuses, and paste the address; then add it as the remote and push (Saved/ and Packaged/ are git-ignored, so player data stays off it). The gh CLI is not installed.
 - Every so often (about weekly, or before risky changes), remind them to copy `Saved/Accounts` and `Saved/Characters` to their Google Drive: that is the only copy of every player's account and character. They chose to do this by hand for now (no automatic backup).
 
 **Next steps / open online work:** the owner is about to test with friends over Tailscale (Windows only; a Mac build needs a Mac with Xcode). Not shared yet: the horse (removed until it is; idea: each player only sees their own), cats, NPC animations, time of day, sitting, cottage loot stash timers; no PvP hitting; other players' health bars not shown. Passwords travel unencrypted (fine over Tailscale; must fix before public hosting). Password hashing runs on the server's game thread (~50 ms per login). Rented hosting later: needs a source-built engine for a Linux dedicated-server build; Hetzner suggested; measure a world's memory first.
@@ -160,7 +159,7 @@ Runtime log: `Saved/Logs/Jeebsland.log`
 
 ## Version control
 
-Local git repo (no remote). Commit after each change that builds successfully, with a plain-English message describing the gameplay change. If `git` isn't on PATH, use `C:\Program Files\Git\cmd\git.exe`.
+Remote: private GitHub repo https://github.com/jleclair64/Jeebsland (set up 2026-10-29). Commit after each change that builds successfully, with a plain-English message describing the gameplay change, and push to origin main. Pushing from the Bash/PowerShell tool can't prompt for sign-in; if it fails with an auth error, run `git push` in a terminal tab (run_in_terminal) so the owner can sign in. If `git` isn't on PATH, use `C:\Program Files\Git\cmd\git.exe`.
 
 ## Legacy scripts
 
