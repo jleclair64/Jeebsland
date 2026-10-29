@@ -8,7 +8,7 @@ class UMaterialInstanceDynamic;
 
 class UInstancedStaticMeshComponent;
 
-// The Autumn Realm's finishing touches: carved pumpkins, hay bales, scarecrows, lamp posts, a graveyard,
+// The world's autumn finishing touches: carved pumpkins, hay bales, scarecrows, lamp posts, a graveyard,
 // candle string lights in the village, fallen leaves and leaf piles under the trees, and a few leaves drifting down around the player.
 // Everything is drawn with shared instanced meshes, so it stays cheap.
 UCLASS()

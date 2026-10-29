@@ -119,13 +119,14 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// Realm title that fades in and out when the game starts
+	// Name of the town you appear in, fading in and out when the game starts
+	// (Blackrock for now; switch to the class's home town when Oak Hill and fast travel are built)
 	{
 		const float T = GetWorld()->GetTimeSeconds();
 		const float Alpha = FMath::Clamp(FMath::Min(T / 1.2f, (7.f - T) / 1.5f), 0.f, 1.f);
 		if (Alpha > 0.f)
 		{
-			NorseText(TEXT("THE AUTUMN REALM"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
+			NorseText(TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
 		}
 	}
 

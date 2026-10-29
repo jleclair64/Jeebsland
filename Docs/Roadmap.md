@@ -22,8 +22,8 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 
 ## Map
 - Mountains north and northeast; ocean along the east edge; woods south and west; rock country southwest; plains middle south; tropics southeast (islands as backdrop).
-- **River:** starts in the northern mountains, runs south past Blackrock, forks just south of it: the east branch runs through woods to Anchorage; the south branch swings southwest past Steele Creek, then east along the south to the coast near Palmer Square.
-- **Blackrock** in the centre. **Oak Hill MOVED (2026-10-29) to the EAST side of the river** (it was west). See Open questions: does the river still separate the two towns?
+- **River:** starts in the northern mountains, runs south between Blackrock and Oak Hill, forks just south of them: the east branch runs through woods to Anchorage; the south branch swings southwest past Steele Creek, then east along the south to the coast near Palmer Square.
+- **Swapped sides (decided 2026-10-29):** BLACKROCK is now on the WEST side of the river, OAK HILL on the EAST side. The river still divides the two warring towns, and the big bridge between them is the front line. (The sketch shows the old sides; in today's code the river runs past Blackrock's west side, so moving the river to Blackrock's east is part of the Oak Hill step.)
 - **Stone bridges over the rivers (2026-10-29) [S-M]:** arched stone bridges wherever roads cross water, built in code like the rest of the world. One big bridge on the Blackrock to Oak Hill road is the contested crossing of the war.
 - **War:** Blackrock and Oak Hill are at war; small scripted NPC skirmishes at set spots (bridge, road), not a roaming army.
 - **Two PvP areas ("wild west"):** players kill and loot each other (death sack); the richest bosses and quests live here; no health regen; no fast travel.
@@ -34,7 +34,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 ## Towns
 | Town | Place | Role | Trial | Knights / Wizards / Trolls |
 |---|---|---|---|---|
-| Blackrock | centre | rich, cold walled town; open and friendly to players; the current start | The Ladder: ranked arena (PvE first, PvP later) | 70 / 15 / 15 |
+| Blackrock | centre, WEST of the river | rich, cold walled town; open and friendly to players; the current start | The Ladder: ranked arena (PvE first, PvP later) | 70 / 15 / 15 |
 | Oak Hill | EAST of the river (moved 2026-10-29) | poor, kind forest town at war with Blackrock; the knights' home and respawn town; has the Boxing Ring | The Hunt: timed last-one-standing zone | 70 / 15 / 15 |
 | Silver Point | northern mountains | wizard school; wizards' home and respawn | The Examination: puzzle or spell test | 15 / 80 / 5 |
 | Birch Grove | central plains, inside PvP 2 | troll town under siege; trolls' home and respawn | to be decided | 5 / 5 / 90 |
@@ -57,8 +57,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 - **Three profiles per account:** a Knight, a Wizard and a Troll, each a separate character (own gear, skills, level). Bank and money are shared. Switching character goes through the fast-travel screen. Visited towns are per account [M-L].
 - Home and respawn towns: knights Oak Hill, wizards Silver Point, trolls Birch Grove. (The code still sends deaths and new players to Blackrock: change it when Oak Hill is built.)
 - **Cape = PvP level (2026-10-29):** ONE colour on the cape shows the player's PvP level. No main-quest stages, no separate cross. The cape is locked to the character (not an item, never dropped or traded). Colour order still to confirm (see Open questions); the old eight-colour order was white, silver, green, purple, blue, red, black, gold.
-- **Gear tiers:** EIGHT tiers (see Open questions for names). Equip level gates: weapons need Attack, armour and shields need Defence. Gaps between tiers stay narrow so skill can beat a tier of gear. Gear ids, saves, store, practice pack and icons all change, so do it as ONE step and check old saves load.
-- Later, after the game is complete: possible diamond / onyx / emerald tiers above the top one (remind the owner then).
+- **Gear tiers (decided 2026-10-29):** TIN, IRON, BRONZE, STEEL, SILVER, GOLD, then one rare LEGENDARY tier per class above gold: **ONYX for knights, EMERALD for trolls, DIAMOND for wizards** (each is that class's top gear, equal in strength, only usable by that class). Equip level gates: weapons need Attack, armour and shields need Defence (suggested levels: tin 1, iron 5, bronze 10, steel 20, silver 30, gold 40, legendary 50-60; to tune). Gaps stay narrow so skill can beat a tier of gear. Colours: tin grey matte, iron dark matte, bronze shine (today's colour), steel bright grey, silver shiny, gold golden, onyx glossy black, emerald deep green, diamond icy blue. Starting kit becomes TIN (today it is bronze). Gear ids, saves, store, practice pack and icons all change, so do it as ONE step and check old saves load.
 
 ## PvP
 - Inside a PvP area you can be killed and looted (death sack); outside you cannot.
@@ -106,8 +105,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 - **Nanite:** on for the project, but it only helps imported meshes (Blender models, the performance pass).
 
 ## Open questions
-- **Oak Hill east of the river:** the river runs past Blackrock's west side today. Does the river move east of Blackrock, so it still divides the two warring towns (and the big bridge is still the front line)? Or do the two towns sit on the same side?
-- **Gear tier names:** Claude's view: eight tiers is a good number for a RuneScape grind (RuneScape's metals run about eight steps, bronze to dragon). Since the CAPE colour now shows PvP level, giving gear the same colour names would confuse the two, so material names are suggested, e.g. Tin, Iron, Bronze, Steel, Silver, Gold, plus two rare top tiers, with the equip levels spread out (e.g. 1, 5, 10, 20, 30, 40, 50, 60). Owner to decide.
+- Where do legendary items come from (bosses, Trials, long quest chains, or smithing at a high level)?
 - **Cape colours for PvP levels:** how many levels, which colours, and what moves you up or down (kills, wins, losses)?
 - Boxing ring details (see PvP).
 - Boss loot sharing (see Bosses).
@@ -120,8 +118,8 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 2. **Online glitches and performance pass** (the owner describes what they saw).
 3. **Player chat** (with filter and mute).
 4. **Radar potion.**
-5. **Tier redo** (eight tiers, names decided) and level gates, one step.
-6. **Oak Hill** on its new side of the river, the big bridge, the war skirmishes; respawn moves to Oak Hill.
+5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step.
+6. **Oak Hill** east of the river (move the river so Blackrock is west of it), the big bridge, the war skirmishes; respawn moves to Oak Hill.
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.
 9. **Profiles per account,** fast-travel screen, shared bank in every town.

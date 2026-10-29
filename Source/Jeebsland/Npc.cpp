@@ -228,7 +228,7 @@ TArray<FString> ANpc::MakeConversation(int32* OutLore)
 	switch (Role)
 	{
 	case ENpcRole::Shopkeeper:
-		Lines.Add(bFirst ? TEXT("Well met, traveller! Welcome to the Autumn Realm Trading Post.") : TEXT("Back again! Welcome, welcome."));
+		Lines.Add(bFirst ? TEXT("Well met, traveller! Welcome to the Blackrock Trading Post.") : TEXT("Back again! Welcome, welcome."));
 		break;
 	case ENpcRole::Blacksmith:
 		Lines.Add(bFirst ? TEXT("Hmph. A customer. Mind the sparks.") : TEXT("Back at my forge, are you?"));
