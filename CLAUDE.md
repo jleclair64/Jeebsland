@@ -35,7 +35,7 @@ Last updated 2026-10-12 (end of the third session: online foundations, then a de
 **Confirmed by the owner (2026-10-12):** soft branch shadows and Lowest frame rate, no Lowest shadow blinking, redwoods and fort decks, pen knight swings landing, ladders and tower jumps online, and the deep crouch as it is (about 3/4 height) all look good.
 
 **Reminders for the owner (bring these up at the start of each session until done):**
-- Every so often (about weekly, or before risky changes), remind them to copy `Saved/Accounts` and `Saved/Characters` to their Google Drive: that is the only copy of every player's account and character. They chose to do this by hand for now (no automatic backup).
+- Every so often (about weekly, or before risky changes), remind them to copy `Saved/Accounts` and `Saved/Characters` to their Google Drive (account jeebsland@gmail.com; a dated folder each time): that is the only copy of every player's account and character. They chose to do this by hand for now (no automatic backup).
 
 **Next steps / open online work:** the owner is about to test with friends over Tailscale (Windows only; a Mac build needs a Mac with Xcode). Not shared yet: the horse (removed until it is; idea: each player only sees their own), cats, NPC animations, time of day, sitting, cottage loot stash timers; no PvP hitting; other players' health bars not shown. Passwords travel unencrypted (fine over Tailscale; must fix before public hosting). Password hashing runs on the server's game thread (~50 ms per login). Rented hosting later: needs a source-built engine for a Linux dedicated-server build; Hetzner suggested; measure a world's memory first.
 
