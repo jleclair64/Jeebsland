@@ -1,5 +1,7 @@
 #include "KnightHUD.h"
 #include "KnightCharacter.h"
+#include "SkillComponent.h"
+#include "Misc/Crc.h"
 #include "JeebGameInstance.h"
 #include "Terrain.h"
 #include "Forest.h"
@@ -166,9 +168,42 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 	Tile(X - 6.f, Y - 6.f, S + 12.f, S + 12.f, FLinearColor(0.8f, 0.7f, 0.5f), 0.3f);
 	DrawTexture(MapTex, X, Y, S, S, 0.f, 0.f, 1.f, 1.f);
 
+	// Fog over the ground this character has not seen yet: soft grey cloud, repainted only when the explored grid changes
+	if (USkillComponent* Sk = Knight->GetSkills())
+	{
+		constexpr int32 FogPx = 128;
+		const uint32 Hash = FCrc::MemCrc32(Sk->Explored.GetData(), Sk->Explored.Num()) ^ uint32(Sk->Explored.Num());
+		if (!FogTex || Hash != FogHash)
+		{
+			FogHash = Hash;
+			if (!FogTex)
+			{
+				FogTex = UTexture2D::CreateTransient(FogPx, FogPx, PF_B8G8R8A8);
+				if (FogTex) { FogTex->SRGB = true; FogTex->Filter = TF_Bilinear; FogTex->AddressX = TA_Clamp; FogTex->AddressY = TA_Clamp; }
+			}
+			if (FogTex)
+			{
+				const float Cell = MapSize / FogPx;
+				FColor* Out = static_cast<FColor*>(FogTex->GetPlatformData()->Mips[0].BulkData.Lock(LOCK_READ_WRITE));
+				for (int32 V = 0; V < FogPx; ++V)
+					for (int32 U = 0; U < FogPx; ++U)
+					{
+						const float WX = MapMin.X + (FogPx - 1 - V + 0.5f) * Cell, WY = MapMin.Y + (U + 0.5f) * Cell;
+						const float N = 0.5f + 0.5f * FMath::PerlinNoise2D(FVector2D(U, V) * 0.09f);   // cloudy, not flat
+						const uint8 G = uint8(FMath::Lerp(150.f, 190.f, N));
+						Out[V * FogPx + U] = Sk->IsExplored(WX, WY) ? FColor(G, G, G, 0) : FColor(G, G, uint8(G * 1.03f), 250);
+					}
+				FogTex->GetPlatformData()->Mips[0].BulkData.Unlock();
+				FogTex->UpdateResource();
+			}
+		}
+		if (FogTex) DrawTexture(FogTex, X, Y, S, S, 0.f, 0.f, 1.f, 1.f, FLinearColor::White, BLEND_Translucent);
+	}
+
 	auto ToScreen = [&](const FVector2D& P) { return FVector2D(X + (P.Y - MapMin.Y) / MapSize * S, Y + (1.f - (P.X - MapMin.X) / MapSize) * S); };
 	auto Label = [&](const FString& T, const FVector2D& P, float Scale)
 	{
+		if (Knight->GetSkills() && !Knight->GetSkills()->IsExplored(P.X, P.Y)) return;   // no names under the fog
 		const FVector2D At = ToScreen(P);
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(T, TW, TH, Font, Scale);

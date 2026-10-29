@@ -183,7 +183,7 @@ void AKnightHUD::DrawStartScreen()
 	// ---- Right: which world ----
 	Panel(RX, PY, PW, PH);
 	{
-		HDText(TEXT("Choose a world"), FLinearColor(1.f, 0.88f, 0.6f), RX + 26.f, PY + 26.f, Font, 1.35f);
+		NorseTitle(TEXT("Choose a world"), RX + 26.f, PY + 26.f, 1.35f);
 		float Y = PY + 74.f;
 		for (int32 i = 0; i < GI->Worlds.Num(); ++i)
 		{

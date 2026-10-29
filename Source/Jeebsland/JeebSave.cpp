@@ -52,6 +52,7 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->PotionId = Skills->PotionSlot.Id;
 	S->PotionCount = Skills->PotionSlot.Count;
 	S->LoreFound = Skills->LoreFound;
+	S->Explored = Skills->Explored;
 	S->LastGambleHour = Skills->LastGambleHour;
 	if (Body)
 	{
@@ -97,6 +98,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->RestoreSkills(XP, Known, FMath::Max(0, Ingots));
 	Skills->LoreFound.Empty();
 	for (int32 L : LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
+	Skills->Explored = Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8 ? Explored : TArray<uint8>();
 	Skills->LastGambleHour = LastGambleHour;
 	return true;
 }

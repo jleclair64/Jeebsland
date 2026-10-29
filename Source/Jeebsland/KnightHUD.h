@@ -52,7 +52,11 @@ private:
 	void SetTip(const TArray<FString>& Lines) { TipLines = Lines; }
 	void ItemTip(int32 Id);
 	void DrawTip();
-	void NorseText(const FString& Text, float Y, float H, float Alpha);   // place names, lettered in a Norse hand (gold, rune-cut strokes), centred
+	void NorseText(const FString& Text, float Y, float H, float Alpha) { NorseTextAt(Text, -1.f, Y, H, Alpha); }
+	// The same Norse lettering at X (X < 0 centres it across the screen); returns its width. Used for every window title.
+	float NorseTextAt(const FString& Text, float X, float Y, float H, float Alpha = 1.f);
+	// A window title in the Norse hand, sized to stand in for HDText at Scale with the medium font (top-left at X, Y)
+	float NorseTitle(const FString& Text, float X, float Y, float Scale) { return NorseTextAt(Text, X, Y + 3.f * Scale, 12.f * Scale); }   // place names, lettered in a Norse hand (gold, rune-cut strokes), centred
 	void DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha);   // a tooltip-style panel centred over a point (dropped things)
 	static FLinearColor Lift(const FLinearColor& C, float F);
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
@@ -144,6 +148,8 @@ private:
 	float SavedNoteUntil = 0.f;  // "Saved" shows on the button for a moment
 	// The world map (KnightHUDMap.cpp): painted once into a texture; north (+X) is up
 	UPROPERTY() UTexture2D* MapTex = nullptr;
+	UPROPERTY() UTexture2D* FogTex = nullptr;   // map fog over unexplored ground, repainted when the explored grid changes
+	uint32 FogHash = 0;
 	FVector2D MapMin = FVector2D::ZeroVector;
 	float MapSize = 1.f;
 	void BuildMapTex();

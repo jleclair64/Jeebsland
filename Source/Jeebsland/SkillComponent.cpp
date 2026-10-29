@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Inventory.h"
 #include "Lore.h"
+#include "Terrain.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
 
@@ -210,6 +211,7 @@ void USkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION(USkillComponent, Known, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(USkillComponent, Ingots, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(USkillComponent, LoreFound, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, Explored, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(USkillComponent, LastGambleHour, COND_OwnerOnly);
 }
 
@@ -417,6 +419,35 @@ bool USkillComponent::DiscoverLore(int32 Index)
 	LoreFound.Add(Index);
 	Say(5.f, FColor(255, 200, 90), FString::Printf(TEXT("New lore: %s  (press Esc, Lore tab)"), E[Index].Title));
 	return true;
+}
+
+// ---- Map fog ----
+void USkillComponent::Explore(const FVector& At)
+{
+	if (!HasAuth()) return;   // the server decides what has been seen
+	if (Explored.Num() != FogN * FogN / 8) Explored.SetNumZeroed(FogN * FogN / 8);
+	const float Cell = 2.f * JeebTerrain::GroundHalf / FogN;
+	const int32 R = FMath::CeilToInt(FogRevealRadius / Cell);
+	const int32 CI = FMath::FloorToInt((At.X + JeebTerrain::GroundHalf) / Cell), CJ = FMath::FloorToInt((At.Y + JeebTerrain::GroundHalf) / Cell);
+	for (int32 I = CI - R; I <= CI + R; ++I)
+		for (int32 J = CJ - R; J <= CJ + R; ++J)
+		{
+			if (I < 0 || J < 0 || I >= FogN || J >= FogN) continue;
+			const FVector2D Mid(-JeebTerrain::GroundHalf + (I + 0.5f) * Cell, -JeebTerrain::GroundHalf + (J + 0.5f) * Cell);
+			if (FVector2D::DistSquared(Mid, FVector2D(At)) > FMath::Square(FogRevealRadius)) continue;
+			const int32 Bit = I * FogN + J;
+			const uint8 Mask = uint8(1 << (Bit & 7));
+			if (!(Explored[Bit >> 3] & Mask)) Explored[Bit >> 3] |= Mask;   // (only touch it when it changes, so it replicates only then)
+		}
+}
+
+bool USkillComponent::IsExplored(float X, float Y) const
+{
+	const float Cell = 2.f * JeebTerrain::GroundHalf / FogN;
+	const int32 I = FMath::FloorToInt((X + JeebTerrain::GroundHalf) / Cell), J = FMath::FloorToInt((Y + JeebTerrain::GroundHalf) / Cell);
+	if (I < 0 || J < 0 || I >= FogN || J >= FogN) return false;
+	const int32 Bit = I * FogN + J;
+	return Explored.IsValidIndex(Bit >> 3) && (Explored[Bit >> 3] & (1 << (Bit & 7)));
 }
 
 namespace

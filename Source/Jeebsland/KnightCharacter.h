@@ -351,6 +351,7 @@ private:
 	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
 	// each blow until it has fully recovered (it recovers like health: 10 s after the last blocked hit, then a full bar in 10 s)
 	// (online: the server's numbers, sent to this knight's player)
+	float NextExploreTime = 0.f;   // the server clears the map fog round the knight a couple of times a second
 	UPROPERTY(Replicated) float GuardPool = 0.f;
 	UPROPERTY(Replicated) float GuardMax = 0.f;
 	float LastGuardHitTime = -100.f;

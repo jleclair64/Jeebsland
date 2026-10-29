@@ -306,7 +306,7 @@ void AKnightHUD::DrawSkills(const USkillComponent* Skills)
 	const float Y = Canvas->ClipY - H - 24.f;
 
 	Panel(X, Y, W, H);
-	HDText(TEXT("SKILLS"), FLinearColor(1.f, 0.85f, 0.3f), X + 16.f, Y + 8.f, Font, 1.3f);
+	NorseTitle(TEXT("SKILLS"), X + 16.f, Y + 8.f, 1.3f);
 
 	auto SkillRow = [&](float RowY, const TCHAR* Name, ESkillType Skill, const FLinearColor& BarColor)
 	{
@@ -527,8 +527,10 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 		OutY = Cy + dy;
 		return true;
 	};
+	const AKnightCharacter* MapKnight = Cast<AKnightCharacter>(Pawn);
 	auto Marker = [&](const FVector2D& W, float R, const FLinearColor& Col, bool bClamp)
 	{
+		if (MapKnight && MapKnight->GetSkills() && !MapKnight->GetSkills()->IsExplored(W.X, W.Y)) return;   // hidden under the map fog
 		float X, Y;
 		if (!ToMap(W, R, bClamp, X, Y)) return;
 		DrawCircle(X, Y, R + 1.5f, FLinearColor(0.f, 0.f, 0.f, 0.85f));

@@ -37,6 +37,7 @@ public:
 	UPROPERTY() int32 PotionId = 0;
 	UPROPERTY() int32 PotionCount = 0;
 	UPROPERTY() TArray<int32> LoreFound;
+	UPROPERTY() TArray<uint8> Explored;   // map fog (USkillComponent::Explored)
 	UPROPERTY() int64 LastGambleHour = -1;
 
 	// Where the knight stood (online: you log back in where you logged out)

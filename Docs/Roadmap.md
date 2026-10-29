@@ -23,7 +23,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 ## Map
 - Mountains north and northeast; ocean along the east edge; woods south and west; rock country southwest; plains middle south; tropics southeast (islands as backdrop).
 - **River:** starts in the northern mountains, runs south between Blackrock and Oak Hill, forks just south of them: the east branch runs through woods to Anchorage; the south branch swings southwest past Steele Creek, then east along the south to the coast near Palmer Square.
-- **Swapped sides (decided 2026-10-29):** BLACKROCK is now on the WEST side of the river, OAK HILL on the EAST side. The river still divides the two warring towns, and the big bridge between them is the front line. (The sketch shows the old sides; in today's code the river runs past Blackrock's west side, so moving the river to Blackrock's east is part of the Oak Hill step.)
+- **Swapped sides (decided 2026-10-29):** BLACKROCK is now on the WEST side of the river, OAK HILL on the EAST side. The river still divides the two warring towns, and the big bridge between them is the front line. (The sketch shows the old sides. There is NO river in the game yet, only the pond and the castle moat: the river, with Blackrock west of it, is built in the Oak Hill step, and the stone bridges come with it.)
 - **Stone bridges over the rivers (2026-10-29) [S-M]:** arched stone bridges wherever roads cross water, built in code like the rest of the world. One big bridge on the Blackrock to Oak Hill road is the contested crossing of the war.
 - **War:** Blackrock and Oak Hill are at war; small scripted NPC skirmishes at set spots (bridge, road), not a roaming army.
 - **Two PvP areas ("wild west"):** players kill and loot each other (death sack); the richest bosses and quests live here; no health regen; no fast travel.
@@ -114,12 +114,12 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 - The first quests: which town, which skills, how long each takes.
 
 ## Suggested build order (2026-10-29; ask before starting each step)
-1. **Quick wins:** shield movement speed plus guard drain; Norse title font; stone bridges; map fog.
+1. **Quick wins:** shield movement speed plus guard drain; Norse title font; map fog (done 2026-10-29). Stone bridges moved to step 6 (no river yet).
 2. **Online glitches and performance pass** (the owner describes what they saw).
 3. **Player chat** (with filter and mute).
 4. **Radar potion.**
 5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step.
-6. **Oak Hill** east of the river (move the river so Blackrock is west of it), the big bridge, the war skirmishes; respawn moves to Oak Hill.
+6. **The river** (Blackrock west of it, forking south) with **stone bridges**, then **Oak Hill** east of it, the big bridge, the war skirmishes; respawn moves to Oak Hill.
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.
 9. **Profiles per account,** fast-travel screen, shared bank in every town.

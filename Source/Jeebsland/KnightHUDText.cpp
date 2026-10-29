@@ -82,10 +82,10 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 }
 
 // Place names in a Norse hand: every letter built from straight, angular strokes with chisel-cut ends, like carved runes,
-// in gold with a dark bronze edge, a soft shadow and a pale sheen. Centred across the screen, its top at Y, H tall.
-void AKnightHUD::NorseText(const FString& Text, float Y, float H, float Alpha)
+// in gold with a dark bronze edge, a soft shadow and a pale sheen. Its top at Y, H tall; at X, or centred if X < 0.
+float AKnightHUD::NorseTextAt(const FString& Text, float X, float Y, float H, float Alpha)
 {
-	if (Alpha <= 0.01f) return;
+	if (Alpha <= 0.01f) return 0.f;
 	struct FSeg { float X0, Y0, X1, Y1; };
 	auto Line = [](TArray<FSeg>& G, std::initializer_list<FVector2f> Pts) { const FVector2f* P = Pts.begin(); for (size_t i = 1; i < Pts.size(); ++i) G.Add({ P[i - 1].X, P[i - 1].Y, P[i].X, P[i].Y }); };
 	auto Glyph = [&](TCHAR Ch) -> TArray<FSeg>
@@ -126,7 +126,7 @@ void AKnightHUD::NorseText(const FString& Text, float Y, float H, float Alpha)
 	auto Adv = [&](TCHAR Ch) { const TCHAR U = FChar::ToUpper(Ch); return H * (U == ' ' ? 0.55f : U == 'I' ? 0.5f : (U == 'M' || U == 'W') ? 0.98f : 0.86f); };
 	float Total = 0.f;
 	for (int32 i = 0; i < Text.Len(); ++i) Total += Adv(Text[i]);
-	const float X0 = (Canvas->ClipX - (Total - H * 0.2f)) * 0.5f, Wd = H * 0.12f;
+	const float X0 = X >= 0.f ? X + H * 0.1f : (Canvas->ClipX - (Total - H * 0.2f)) * 0.5f, Wd = H * 0.12f;
 	auto Stroke = [&](const FSeg& S, float Ox, float Oy, float Width, const FLinearColor& C)
 	{
 		const FVector2D P0(X0 + Ox + S.X0 * H, Y + Oy + S.Y0 * H), P1(X0 + Ox + S.X1 * H, Y + Oy + S.Y1 * H);
@@ -148,5 +148,6 @@ void AKnightHUD::NorseText(const FString& Text, float Y, float H, float Alpha)
 			Ox += Adv(Text[i]);
 		}
 	}
+	return Total;
 }
 

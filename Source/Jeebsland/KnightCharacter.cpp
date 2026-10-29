@@ -604,11 +604,30 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// 10 s after the last blow it took, a full bar in 10 s. A broken guard is mended only once it is full again.
 	if (HasAuthority())   // (online: the server's job; the player's machine is sent the numbers)
 	{
+		if (Skills && GetWorld()->GetTimeSeconds() >= NextExploreTime)   // map fog
+		{
+			NextExploreTime = GetWorld()->GetTimeSeconds() + 0.5f;
+			Skills->Explore(GetActorLocation());
+		}
 		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
 		const float NewMax = ShieldId ? float(JeebItems::ShieldGuard(ShieldId)) : 0.f;
 		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 10.f;   // the round shield recovers sooner
 		if (!FMath::IsNearlyEqual(NewMax, GuardMax)) { GuardMax = NewMax; GuardPool = NewMax; bGuardBroken = false; }
-		if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > RecoverDelay)
+		// Holding the shield up drains the guard slowly (Smash Bros style): a full guard lasts GuardDrainSeconds of holding,
+		// and it never refills while raised. Lowered, it recovers as before.
+		constexpr float GuardDrainSeconds = 15.f;
+		if (bBlocking && GuardMax > 0.f && !bGuardBroken)
+		{
+			GuardPool -= GuardMax / GuardDrainSeconds * Dt;
+			if (GuardPool < 1.f)
+			{
+				GuardPool = 0.f;
+				bGuardBroken = true;
+				LastGuardHitTime = GetWorld()->GetTimeSeconds();
+				if (Skills) Skills->Say(2.5f, FColor::Orange, TEXT("Guard broken! Your shield stops only half a blow until it recovers."));
+			}
+		}
+		else if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > RecoverDelay)
 		{
 			GuardPool = FMath::Min(GuardMax, GuardPool + GuardMax * 0.1f * Dt);
 			if (GuardPool >= GuardMax && bGuardBroken)
@@ -652,7 +671,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
 	}
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
-	// points and sidestep or back up instead of turning round, a little slower than walking (forward 60%, sidestep 50%, back 40%).
+	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
 	if (bStance && HasAuthority() && !IsLocallyControlled() && GetController())
@@ -668,8 +687,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
-	const float StanceFactor = StanceFwd < -0.1f ? 0.4f : (StanceFwd > 0.1f ? 0.6f : (FMath::Abs(StanceRight) > 0.1f ? 0.5f : 0.6f));
-	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield])) : 1.f;   // round: quicker, tower: slower
+	const float StanceFactor = 1.f;
+	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? FMath::Min(1.f, JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield]))) : 1.f;   // tower: slower; nothing beats a walk
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
 	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : (bWantSprint ? SprintSpeed : WalkSpeed))) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f)   // swiftness potion
 	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush

@@ -54,7 +54,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	};
 
 	// ----- The pack: 16 slots -----
-	HDText(TEXT("PACK"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 64.f, Font, 1.2f);
+	NorseTitle(TEXT("PACK"), PX + 30.f, PY + 64.f, 1.2f);
 	const float SS = 84.f, Gap = 8.f;
 	const float GX = PX + 30.f, GY = PY + 92.f;
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -98,7 +98,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	}
 
 	// ----- Worn gear -----
-	HDText(TEXT("WORN"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 170.f, Font, 1.2f);
+	NorseTitle(TEXT("WORN"), EX, PY + 170.f, 1.2f);
 	struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
 	static const FWornSlot Worn[10] = {
 		{ K_Shield, false, TEXT("Shield") }, { K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
@@ -601,7 +601,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 	const float LX = IX - PW - 12.f, LY = IY + (Pad + GridH + Pad) - LH;
 	Panel(LX, LY, PW, LH, 1.f, false);
 	AddRect(LX, LY, PW, LH);
-	HDText(TEXT("Sack"), FLinearColor(1.f, 0.9f, 0.65f), LX + Pad + 2.f, LY + Pad + 2.f, Font, 1.15f);
+	NorseTitle(TEXT("Sack"), LX + Pad + 2.f, LY + Pad + 2.f, 1.15f);
 	if (Btn(LX + PW - Pad - 96.f, LY + Pad - 2.f, 96.f, 26.f, TEXT("Take all"), true, false, 0.9f)) { Knight->Inv(EInvOp::LootTakeAll, 0, 0, 0, Sack); return; }
 	{
 		const float GX = LX + Pad, GY = LY + Pad + TitleH;

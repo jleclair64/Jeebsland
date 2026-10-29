@@ -100,6 +100,14 @@ public:
 	// Lore fragments heard so far (indices into JeebLore::Entries()). Returns true the first time.
 	UPROPERTY(Replicated) TArray<int32> LoreFound;
 	bool DiscoverLore(int32 Index);
+
+	// Map fog: the ground this character has seen, as a FogN x FogN grid over the whole ground (one bit per 5 m cell).
+	// The server marks it as the knight walks (Explore); it is saved with the character and never lost on death.
+	static constexpr int32 FogN = 64;
+	static constexpr float FogRevealRadius = 4500.f;   // how far around you the fog clears
+	UPROPERTY(Replicated) TArray<uint8> Explored;
+	void Explore(const FVector& At);
+	bool IsExplored(float X, float Y) const;
 	int32 GetXPTotal(ESkillType Skill) const { return XP[static_cast<int32>(Skill)]; }
 
 	// The bank: 300 slots, kept at the vault. Click a pack item to deposit it, click a bank item to take it out.

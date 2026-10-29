@@ -39,7 +39,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	HDText(TEXT("THE TRADING POST"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	NorseTitle(TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
@@ -50,7 +50,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseShop(); return; }
 
 	// ----- Sell (left) -----
-	HDText(TEXT("SELL"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 62.f, Font, 1.3f);
+	NorseTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
 		static const EItemType Sellable[12] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::CopperOre, EItemType::Coal, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
 	static const TCHAR* SellNames[12] = { TEXT("Logs"), TEXT("Pine logs"), TEXT("Redwood logs"), TEXT("Copper ore"), TEXT("Coal"), TEXT("Diamond"), TEXT("Raw pork"), TEXT("Perch"), TEXT("Trout"), TEXT("Golden carp"), TEXT("Beast hide"), TEXT("Bones") };
 	for (int32 r = 0; r < 12; ++r)
@@ -188,7 +188,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	HDText(TEXT("THE SMITHY"), FLinearColor(1.f, 0.6f, 0.25f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	NorseTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
 	const int32 Logs = Skills->CountWood();
@@ -305,7 +305,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	const float PW = 1090.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH);
-	HDText(TEXT("THE VAULT"), FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, PY + 14.f, Font, 1.8f);
+	NorseTitle(TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver)
