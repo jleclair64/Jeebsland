@@ -158,12 +158,15 @@ namespace JeebWorld
 
 	// ------------------------------------------------------------------ the land's shape
 	inline float Noise(const FVector2D& P, float Scale) { return FMath::PerlinNoise2D(P / Scale); }   // about -1 .. 1
-	inline float Ridged(const FVector2D& P)   // sharp crests and valleys: mountain ridges
+	inline float Ridged(const FVector2D& P)   // mountain ridges: rounded crests and broad valleys, soft rather than jagged (2026-10-30)
 	{
-		const float A = 1.f - FMath::Abs(Noise(P + FVector2D(1234.f, 567.f), 6500.f));
-		const float B = 1.f - FMath::Abs(Noise(P + FVector2D(-890.f, 4321.f), 2600.f));
-		return 0.62f * A * A + 0.30f * B * B + 0.08f * (0.5f + 0.5f * Noise(P, 900.f));
+		const float A = 1.f - FMath::Abs(Noise(P + FVector2D(1234.f, 567.f), 9000.f));
+		const float B = 0.5f + 0.5f * Noise(P + FVector2D(-890.f, 4321.f), 4200.f);
+		const float Soft = FMath::SmoothStep(0.f, 1.f, A);   // rounds the crest over instead of a knife edge
+		return 0.55f * Soft + 0.35f * B + 0.10f * (0.5f + 0.5f * Noise(P, 1500.f));
 	}
+	// How high the mountains stand (cm): MountainBase where they start, up to MountainBase + MountainRise on the tallest crests
+	constexpr float MountainBase = 1600.f, MountainRise = 5000.f;
 	// 0 .. 1: how much a point is "in the mountains" (soft union of every peak on the sketch, and walls along the west,
 	// south and north edges of the world)
 	inline float MountainMask(const FVector2D& P)
@@ -191,9 +194,9 @@ namespace JeebWorld
 		const FVector2D P(X, Y);
 		float H = 120.f + 170.f * (0.5f + 0.5f * Noise(P, 9000.f)) + 60.f * Noise(P + FVector2D(300.f, 900.f), 2500.f);
 		const float M = MountainMask(P);
-		if (M > 0.001f) H += FMath::Pow(M, 1.3f) * (4500.f + 11500.f * Ridged(P));
+		if (M > 0.001f) H += FMath::Pow(M, 1.6f) * (MountainBase + MountainRise * Ridged(P));
 		const float Rk = RockMask(P);
-		if (Rk > 0.001f) H += Rk * (400.f + 1300.f * Ridged(P * 1.7f));
+		if (Rk > 0.001f) H += Rk * (250.f + 700.f * Ridged(P * 1.7f));
 		for (const FTown& T : Towns())
 		{
 			if (T.Fade <= 0.f) continue;
@@ -206,7 +209,7 @@ namespace JeebWorld
 				const FVector2D C = T.Pos;
 				float Lv = 120.f + 170.f * (0.5f + 0.5f * Noise(C, 9000.f));
 				const float Mc = MountainMask(C);
-				if (Mc > 0.001f) Lv += FMath::Pow(Mc, 1.3f) * (4500.f + 11500.f * 0.35f);   // a shelf partway up, not on a crest
+				if (Mc > 0.001f) Lv += FMath::Pow(Mc, 1.6f) * (MountainBase + MountainRise * 0.35f);   // a shelf partway up, not on a crest
 				L = &Levels.Add(T.Name, Lv);
 			}
 			const float W = 1.f - FMath::SmoothStep(T.Flat, T.Fade, D);

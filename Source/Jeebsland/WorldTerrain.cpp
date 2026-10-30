@@ -70,10 +70,10 @@ void AWorldTerrain::BuildLand()
 					// colour: green lowland, browner hills, grey rock on steep or high ground, snow up top, sand by the sea,
 					// darker mud in the river beds
 					const float Slope = 1.f - Nrm.Z;   // 0 flat .. 1 vertical
-					FLinearColor C = FMath::Lerp(FLinearColor(0.16f, 0.27f, 0.09f), FLinearColor(0.30f, 0.30f, 0.14f), FMath::SmoothStep(300.f, 2500.f, Z));
-					C = FMath::Lerp(C, FLinearColor(0.30f, 0.29f, 0.27f), FMath::Max(FMath::SmoothStep(0.25f, 0.45f, Slope), FMath::SmoothStep(3500.f, 6500.f, Z)));
-					C = FMath::Lerp(C, FLinearColor(0.85f, 0.87f, 0.90f), FMath::SmoothStep(10500.f, 12500.f, Z) * (1.f - FMath::SmoothStep(0.45f, 0.65f, Slope)));
-					C = FMath::Lerp(C, FLinearColor(0.38f, 0.34f, 0.28f), RockMask(FVector2D(X, Y)) * 0.6f * (1.f - FMath::SmoothStep(3500.f, 6500.f, Z)));
+					FLinearColor C = FMath::Lerp(FLinearColor(0.16f, 0.27f, 0.09f), FLinearColor(0.30f, 0.30f, 0.14f), FMath::SmoothStep(300.f, 2000.f, Z));
+					C = FMath::Lerp(C, FLinearColor(0.30f, 0.29f, 0.27f), FMath::Max(FMath::SmoothStep(0.25f, 0.45f, Slope), FMath::SmoothStep(2600.f, 4500.f, Z)));
+					C = FMath::Lerp(C, FLinearColor(0.85f, 0.87f, 0.90f), FMath::SmoothStep(5200.f, 6200.f, Z) * (1.f - FMath::SmoothStep(0.45f, 0.65f, Slope)));
+					C = FMath::Lerp(C, FLinearColor(0.38f, 0.34f, 0.28f), RockMask(FVector2D(X, Y)) * 0.6f * (1.f - FMath::SmoothStep(2600.f, 4500.f, Z)));
 					const float Shore = FMath::SmoothStep(SeaLevel + 160.f, SeaLevel + 40.f, Z) * FMath::SmoothStep(-4000.f, -500.f, Y - CoastY(X));
 					C = FMath::Lerp(C, FLinearColor(0.62f, 0.56f, 0.40f), Shore);
 					float Half;

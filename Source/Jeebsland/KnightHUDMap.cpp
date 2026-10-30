@@ -77,8 +77,8 @@ void AKnightHUD::BuildMapTex()
 			const float Zl = H[V * MapN + FMath::Max(U - 1, 0)], Zu = H[FMath::Max(V - 1, 0) * MapN + U];
 			const float Light = FMath::Clamp(1.f + ((Z - Zl) * -0.5f + (Z - Zu) * 0.5f) / Cell * 1.2f, 0.6f, 1.3f);
 			FLinearColor C = Mix(FLinearColor(0.32f, 0.42f, 0.17f), FLinearColor(0.50f, 0.48f, 0.28f), FMath::SmoothStep(300.f, 2500.f, Z));
-			C = Mix(C, FLinearColor(0.50f, 0.48f, 0.45f), FMath::SmoothStep(3000.f, 7000.f, Z));
-			C = Mix(C, FLinearColor(0.92f, 0.93f, 0.95f), FMath::SmoothStep(10500.f, 13000.f, Z));
+			C = Mix(C, FLinearColor(0.50f, 0.48f, 0.45f), FMath::SmoothStep(2400.f, 4500.f, Z));
+			C = Mix(C, FLinearColor(0.92f, 0.93f, 0.95f), FMath::SmoothStep(5200.f, 6300.f, Z));
 			Px[V * MapN + U] = C * Light;
 		}
 

@@ -41,6 +41,7 @@ static FVector2D DiscUV(float Y, float Z, float R) { return FVector2D(0.5f + 0.5
 void AMoon::BeginPlay()
 {
 	Super::BeginPlay();
+	SetActorScale3D(FVector(SkyScale));   // (drawn 25 times further out and bigger: behind the mountains, same size on screen)
 
 	// The whole disc (a fan of triangles), facing +X. At night it is a dark, faintly earth-lit shape that hides the stars behind it.
 	{
@@ -174,6 +175,6 @@ void AMoon::Tick(float DeltaSeconds)
 	{
 		const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
 		const FQuat Face = FRotationMatrix::MakeFromXZ(-SkyDir, FVector::UpVector).ToQuat() * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(25.f));
-		SetActorLocationAndRotation(Cam + SkyDir * SkyDistance, Face);
+		SetActorLocationAndRotation(Cam + SkyDir * SkyDistance * SkyScale, Face);
 	}
 }

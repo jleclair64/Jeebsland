@@ -99,6 +99,9 @@ FTransform ANightSky::StreakTransform(const FVector& HeadDir, const FVector& Tai
 void ANightSky::BeginPlay()
 {
 	Super::BeginPlay();
+	// (2026-10-30: the world grew to over 2 km, so the whole sky is drawn 25 times further out and 25 times bigger: the same
+	// size on screen, but behind every mountain)
+	SetActorScale3D(FVector(SkyScale));
 	UMaterialInterface* StarMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Star.M_Star"));
 	UMaterialInterface* StreakMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Streak.M_Streak"));
 	UMaterialInterface* CloudMat = nullptr;   // the painted sprite clouds are retired: the sky now has real volumetric clouds (see DayNight.cpp)

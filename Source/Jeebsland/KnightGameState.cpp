@@ -100,7 +100,7 @@ void AKnightGameState::BuildWorld()
 		Fog->SetFogDensity(0.026f);   // thick enough that the far hills and grass melt into haze
 		Fog->SetStartDistance(600.f);
 		FogActor = *It;
-		Fog->FogCutoffDistance = 16000.f; // the faraway moon is not hidden by haze
+		Fog->FogCutoffDistance = 400000.f; // the faraway sky (about 5 km out) is not hidden by haze; the whole world is (since 2026-10-30)
 	}
 
 	// The land (hills and grass)

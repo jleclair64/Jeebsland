@@ -29,6 +29,7 @@ private:
 
 	static constexpr float PhaseLegSeconds = 300.f;   // full moon to fingernail
 	static constexpr float SkyDistance = 20000.f;
+	static constexpr float SkyScale = 25.f;   // the moon is drawn this much further out and bigger (see NightSky.h)
 	static constexpr float MoonRadius = 1100.f;       // about 6 degrees across: a big storybook moon
 
 	float Age = 0.f;
