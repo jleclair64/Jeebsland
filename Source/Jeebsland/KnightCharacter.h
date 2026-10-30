@@ -135,6 +135,9 @@ public:
 	// Potions: Q drinks the one in the potion slot, if that kind is ready (each kind has its own cooldown)
 	void DrinkPotion();
 	float GetPotionCooldownLeft(int32 Type) const;
+	// Radar potion, for the minimap: seconds left (0 = off) and the red dots to draw (world X, Y)
+	float GetRadarLeft() const;
+	const TArray<FVector2D>& GetRadarDots() const { return RadarDots; }
 	// A sack on the ground opened with E: its windows show beside yours until you walk away or put the cursor away
 	class ALootDrop* GetLootTarget() const { return LootTarget.Get(); }
 	void OpenLoot(class ALootDrop* Drop);
@@ -369,8 +372,12 @@ private:
 	bool bSkillsOpen = false;
 	bool bPanelCursor = false;
 	bool bPanelAlways = true;
-	float PotionReadyAt[3] = { 0.f, 0.f, 0.f };
-	float SpeedUntil = -1.f, VigourUntil = -1.f;
+	float PotionReadyAt[4] = { 0.f, 0.f, 0.f, 0.f };
+	float SpeedUntil = -1.f, VigourUntil = -1.f, RadarUntil = -1.f;
+	// Radar potion: the server finds who is near (enemies and other players) twice a second and sends the spots to the drinker only
+	UPROPERTY(Replicated) TArray<FVector2D> RadarDots;
+	double LastRadarScan = -10.0;
+	void UpdateRadar();
 	TWeakObjectPtr<class ALootDrop> LootTarget;
 	UPROPERTY() UInputAction* PotionAction = nullptr;
 	int32 PanelTab = 0;

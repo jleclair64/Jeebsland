@@ -235,6 +235,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardMax, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bGuardBroken, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RadarDots, COND_OwnerOnly);
 }
 
 void AKnightCharacter::SendLook()
@@ -429,6 +430,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void AKnightCharacter::Tick(float DeltaSeconds)
 {
+	if (HasAuthority()) UpdateRadar();
 	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
 	SendState();                      // online: our sprint / crouch / shield button, to the server
 	if (!bGraphicsApplied && IsLocallyControlled()) ApplyGraphics();   // online, our knight may only become ours after BeginPlay

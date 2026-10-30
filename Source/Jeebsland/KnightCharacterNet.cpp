@@ -108,6 +108,7 @@ void AKnightCharacter::ApplyPotion(int32 T)
 	case P_Speed:  SpeedUntil = Now + 8.f; break;
 	case P_Heal:   Health = (float)MaxHealth; break;
 	case P_Vigour: VigourUntil = Now + 60.f; break;   // the bigger bar is worked out in Tick (the extra comes full)
+	case P_Radar:  RadarUntil = Now + RadarSeconds; LastRadarScan = -10.0; break;
 	}
 	PotionReadyAt[T] = Now + PotionCooldown(T);
 }
@@ -496,7 +497,7 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	EndGathering();
 	CloseLoot();
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bRolling = false; bSliding = false;
-	SpeedUntil = -1.f; VigourUntil = -1.f;
+	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	SetActorLocation(Wake);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));

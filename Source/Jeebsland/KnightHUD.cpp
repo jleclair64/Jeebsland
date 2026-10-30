@@ -67,7 +67,7 @@ void AKnightHUD::DrawHUD()
 	// No knight: the starting screen, or (online) waiting for the server to let us in
 	APawn* Pawn = GetOwningPawn();
 	if (!Pawn) { DrawNoKnight(); return; }
-	HideTyping();
+	if (!bChatOpen) HideTyping();
 	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
 	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
 	if (!Skills || !Knight) return;
@@ -147,6 +147,7 @@ void AKnightHUD::DrawHUD()
 
 
 	DrawMinimap(Pawn);
+	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
 	DrawWeaponBar(Knight);
 	if (!Knight->IsUIOpen() && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
@@ -589,6 +590,21 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	{
 		if (*It == Pawn || It->IsA<AKnightCharacter>()) continue;   // (other players never show)
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor(0.95f, 0.15f, 0.1f), false);
+	}
+
+	// Radar potion: red dots for the enemies and players the server found near you (they ignore the map fog), with a ring that
+	// sweeps outwards every couple of seconds while it lasts
+	if (MapKnight && MapKnight->GetRadarLeft() > 0.f)
+	{
+		const float Sweep = FMath::Frac(GetWorld()->GetRealTimeSeconds() * 0.45f);
+		DrawAnnulus(Cx, Cy, Half * Sweep, FLinearColor(1.f, 0.2f, 0.15f, 0.35f * (1.f - Sweep)));
+		for (const FVector2D& D : MapKnight->GetRadarDots())
+		{
+			float X, Y;
+			if (!ToMap(D, 3.5f, false, X, Y)) continue;
+			DrawCircle(X, Y, 5.5f, FLinearColor(0.f, 0.f, 0.f, 0.85f));
+			DrawCircle(X, Y, 4.f, FLinearColor(1.f, 0.12f, 0.08f));
+		}
 	}
 
 	// You: a filled arrow pointing the way you face (relative to the camera)

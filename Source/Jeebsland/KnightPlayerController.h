@@ -25,6 +25,13 @@ public:
 	UFUNCTION(Server, Reliable) void ServerLogin(const FString& Name, const FString& Password, bool bCreate, bool bDev);
 	UFUNCTION(Client, Reliable) void ClientLoginResult(bool bOk, const FString& Message);
 
+	// Chat: the player's machine asks (ServerChat); the server cleans, filters and relays the message to everyone who should hear
+	// it (players within JeebChat::NearbyRange, or the whole world for bWorld); each machine shows it (AKnightHUD::AddChatLine).
+	// An empty From is a note from the game (shown only to that player).
+	UFUNCTION(Server, Reliable) void ServerChat(const FString& Text, bool bWorld);
+	UFUNCTION(Client, Reliable) void ClientChat(const FString& From, const FString& Text, bool bWorld, AActor* Speaker);
+	double LastChatTime = -10.0;
+
 	// Server side
 	bool bLoggedIn = false;
 	FString AccountKey;            // which account (file name) this player is

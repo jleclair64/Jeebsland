@@ -579,6 +579,7 @@ void USkillComponent::FillPracticePack()
 	// and one of each new shield style to try (iron)
 	Slots[2].Id = JeebItems::ShieldId(1, JeebItems::T_Iron); Slots[2].Count = 1;
 	Slots[3].Id = JeebItems::ShieldId(2, JeebItems::T_Iron); Slots[3].Count = 1;
+	Slots[4].Id = JeebItems::PotionId(JeebItems::P_Radar); Slots[4].Count = 3;   // (to try the radar)
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;

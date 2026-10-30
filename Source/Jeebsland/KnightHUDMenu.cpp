@@ -43,6 +43,7 @@ private:
 
 void AKnightHUD::TypeChar(TCHAR C)
 {
+	if (bChatOpen) { ChatChar(C); return; }
 	if (C < 32 || C == 127) return;   // (control characters: Backspace, Tab and Enter come through TypeKey)
 	FString* F = TypeFocus == 0 ? &TypeName : TypeFocus == 1 ? &TypePass : TypeFocus == 2 ? &TypePass2 : &TypeAddr;
 	const int32 MaxLen = TypeFocus == 0 ? 12 : TypeFocus == 3 ? 64 : 64;
@@ -52,6 +53,7 @@ void AKnightHUD::TypeChar(TCHAR C)
 
 bool AKnightHUD::TypeKey(const FKey& Key)
 {
+	if (bChatOpen) return ChatKey(Key);
 	const int32 NumFields = bCreateMode ? 3 : 2;
 	auto Next = [&](int32 Dir)
 	{
@@ -73,6 +75,16 @@ bool AKnightHUD::TypeKey(const FKey& Key)
 	if (Key == EKeys::Tab) { Next(FSlateApplication::Get().GetModifierKeys().IsShiftDown() ? -1 : 1); return true; }
 	if (Key == EKeys::Enter) { bTypeEnter = true; return true; }
 	return Key != EKeys::Escape;   // (let Escape through)
+}
+
+void AKnightHUD::EnsureTyping()
+{
+	if (!Typing.IsValid() && GEngine && GEngine->GameViewport)
+	{
+		SAssignNew(Typing, SJeebTyping, this);
+		GEngine->GameViewport->AddViewportWidgetContent(Typing.ToSharedRef(), 50);
+	}
+	if (Typing.IsValid() && FSlateApplication::IsInitialized() && !Typing->HasKeyboardFocus()) FSlateApplication::Get().SetKeyboardFocus(Typing, EFocusCause::SetDirectly);
 }
 
 void AKnightHUD::HideTyping()

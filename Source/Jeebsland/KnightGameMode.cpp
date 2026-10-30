@@ -4,6 +4,7 @@
 #include "KnightPlayerController.h"
 #include "KnightHUD.h"
 #include "JeebAccounts.h"
+#include "JeebChat.h"
 #include "JeebSave.h"
 #include "JeebGameInstance.h"
 #include "Terrain.h"
@@ -127,6 +128,7 @@ void AKnightGameMode::TryLogin(AKnightPlayerController* PC, const FString& Name,
 	{
 		const FString Bad = JeebAccounts::CheckName(Display);
 		if (!Bad.IsEmpty()) { Refuse(Bad); return; }
+		if (JeebChat::IsBanned(Key)) { Refuse(TEXT("This account has been banned.")); return; }
 
 		// Too many wrong passwords for this name lately: wait a while
 		TArray<double>& Fails = FailedTries.FindOrAdd(Key);

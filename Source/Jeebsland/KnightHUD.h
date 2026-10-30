@@ -22,6 +22,13 @@ public:
 	void TypeChar(TCHAR C);
 	bool TypeKey(const FKey& Key);
 
+	// Chat (KnightHUDChat.cpp): Enter opens the typing line, Enter sends, Escape cancels. The same little Slate widget as the
+	// starting screen catches the keys. AddChatLine is called when the server relays a message to this player.
+	void AddChatLine(const FString& From, const FString& Text, bool bWorld, AActor* Speaker);
+	bool ChatKey(const FKey& Key);
+	void ChatChar(TCHAR C);
+	bool IsChatOpen() const { return bChatOpen; }
+
 	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
 	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
 
@@ -32,7 +39,22 @@ private:
 	void DrawTextField(float X, float Y, float W, const TCHAR* Label, const FString& Value, int32 Field, bool bSecret);
 	void TryPlay();
 	void HideTyping();
+	void EnsureTyping();   // puts the typing widget on screen and gives it the keyboard
 	TSharedPtr<class SJeebTyping> Typing;
+
+	// Chat
+	struct FChatLine { FString From, Text; bool bWorld = false; double Born = 0.0; };
+	struct FChatBubble { TWeakObjectPtr<AActor> Who; FString Text; double Until = 0.0; };
+	TArray<FChatLine> ChatLog;
+	TArray<FChatBubble> ChatBubbles;
+	bool bChatOpen = false;
+	FString ChatText;
+	void DrawChat(AKnightCharacter* Knight, APlayerController* PC);
+	void OpenChat();
+	void CloseChat();
+	void SubmitChat();
+	void ChatNote(const FString& Text) { AddChatLine(FString(), Text, false, nullptr); }
+	void WrapChat(const FString& Text, float MaxW, float Scale, TArray<FString>& Out) const;
 	FString TypeName, TypePass, TypePass2, TypeAddr;
 	int32 TypeFocus = 0;              // 0 name, 1 password, 2 password again, 3 server address
 	bool bTypeInit = false, bTypeEnter = false, bCreateMode = false;

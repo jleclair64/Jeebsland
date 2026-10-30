@@ -22,6 +22,7 @@
 #include "GrassField.h"
 #include "Canopy.h"
 #include "Pig.h"
+#include "FoeKnight.h"
 #include "Inventory.h"
 #include "Npc.h"
 #include "Horse.h"
@@ -231,7 +232,7 @@ void AKnightCharacter::Die()
 	RefreshEquipment();
 	CloseLoot();
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false;
-	SpeedUntil = -1.f; VigourUntil = -1.f;
+	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	const FVector2D VC = JeebTerrain::VillageCenter();
 	const FVector2D Wake(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
@@ -250,6 +251,33 @@ float AKnightCharacter::GetPotionCooldownLeft(int32 Type) const
 {
 	if (Type < 0 || Type >= JeebItems::NumPotions) return 0.f;
 	return FMath::Max(0.f, PotionReadyAt[Type] - GetWorld()->GetTimeSeconds());
+}
+
+float AKnightCharacter::GetRadarLeft() const
+{
+	return FMath::Max(0.f, RadarUntil - GetWorld()->GetTimeSeconds());
+}
+
+// Server: while the radar potion lasts, the spots of everything hostile (the pen knight) and every other player within the
+// minimap's reach, twice a second. Only the drinker receives them (owner-only replication); dots only, no names.
+void AKnightCharacter::UpdateRadar()
+{
+	if (!HasAuthority() || !GetWorld()) return;
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now < RadarUntil)
+	{
+		if (Now - LastRadarScan < 0.5) return;
+		LastRadarScan = Now;
+		const float Reach = 6600.f;   // a little beyond the minimap's 6500
+		const FVector Me = GetActorLocation();
+		TArray<FVector2D> Dots;
+		for (TActorIterator<AFoeKnight> It(GetWorld()); It; ++It)
+			if (!It->IsHidden() && FVector::Dist2D(It->GetActorLocation(), Me) < Reach) Dots.Add(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y));
+		for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+			if (*It != this && !It->IsHidden() && FVector::Dist2D(It->GetActorLocation(), Me) < Reach) Dots.Add(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y));
+		RadarDots = Dots;
+	}
+	else if (RadarDots.Num() > 0) RadarDots.Reset();   // over: clear the dots once
 }
 
 // The server checks the cooldown, takes the potion and runs its effect (DoInv, EInvOp::Drink)

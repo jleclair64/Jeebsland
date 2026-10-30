@@ -128,7 +128,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
-			else if (IsPotion(W.Id)) { static const TCHAR* S[NumPotions] = { TEXT("Speed for 8 s"), TEXT("Heals you fully"), TEXT("+50% health, 1 min") }; Stat = S[PotionType(W.Id)]; }
+			else if (IsPotion(W.Id)) { static const TCHAR* S[NumPotions] = { TEXT("Speed for 8 s"), TEXT("Heals you fully"), TEXT("+50% health, 1 min"), TEXT("Enemy radar, 2 min") }; Stat = S[PotionType(W.Id)]; }
 			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
 			DrawIngot(CX + 8.f, CY + CH - 30.f, 22.f);
 			HDText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);

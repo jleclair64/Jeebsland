@@ -162,7 +162,7 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	// ---------------- potions: a round flask with a cork, filled with its colour ----------------
 	if (IsPotion(Id))
 	{
-		static const FLinearColor Fill[NumPotions] = { FLinearColor(0.25f, 0.85f, 0.25f), FLinearColor(0.9f, 0.12f, 0.1f), FLinearColor(0.6f, 0.2f, 0.9f) };
+		static const FLinearColor Fill[NumPotions] = { FLinearColor(0.25f, 0.85f, 0.25f), FLinearColor(0.9f, 0.12f, 0.1f), FLinearColor(0.6f, 0.2f, 0.9f), FLinearColor(0.1f, 0.8f, 0.85f) };
 		const FLinearColor F = Fill[PotionType(Id)];
 		const FLinearColor Glass(0.75f, 0.85f, 0.95f, 0.55f), Cork(0.55f, 0.36f, 0.18f);
 		DiscP(32, 42, 18, 18, Glass);                                      // the bulb

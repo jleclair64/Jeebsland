@@ -2,6 +2,9 @@
 #include "KnightGameMode.h"
 #include "JeebGameInstance.h"
 #include "JeebSave.h"
+#include "JeebChat.h"
+#include "KnightHUD.h"
+#include "GameFramework/PlayerState.h"
 #include "Terrain.h"
 #include "Camera/CameraActor.h"
 #include "Engine/World.h"
@@ -51,6 +54,34 @@ void AKnightPlayerController::ClientLoginResult_Implementation(bool bOk, const F
 		return;
 	}
 	if (GI) GI->ReturnToMenu(Message);   // refused: back to the starting screen with the reason
+}
+
+void AKnightPlayerController::ServerChat_Implementation(const FString& Text, bool bWorld)
+{
+	if (GetNetMode() != NM_Standalone && !bLoggedIn) return;   // (online: only players who are in)
+	APawn* Me = GetPawn();
+	if (!Me) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastChatTime < JeebChat::MinGap) { ClientChat(FString(), TEXT("You are talking too fast."), false, nullptr); return; }
+	LastChatTime = Now;
+	if (!AccountKey.IsEmpty() && JeebChat::IsMuted(AccountKey)) { ClientChat(FString(), TEXT("You have been muted: nobody can hear you."), false, nullptr); return; }
+
+	const FString Clean = JeebChat::Censor(JeebChat::Clean(Text));
+	if (Clean.IsEmpty()) return;
+	const FString From = (PlayerState && GetNetMode() != NM_Standalone) ? PlayerState->GetPlayerName() : FString(TEXT("Knight"));
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AKnightPlayerController* Other = Cast<AKnightPlayerController>(It->Get());
+		if (!Other || !Other->GetPawn()) continue;
+		if (GetNetMode() != NM_Standalone && !Other->bLoggedIn) continue;
+		if (Other != this && !bWorld && FVector::Dist(Other->GetPawn()->GetActorLocation(), Me->GetActorLocation()) > JeebChat::NearbyRange) continue;
+		Other->ClientChat(From, Clean, bWorld, Me);
+	}
+}
+
+void AKnightPlayerController::ClientChat_Implementation(const FString& From, const FString& Text, bool bWorld, AActor* Speaker)
+{
+	if (AKnightHUD* H = Cast<AKnightHUD>(GetHUD())) H->AddChatLine(From, Text, bWorld, Speaker);
 }
 
 void AKnightPlayerController::Tick(float DeltaSeconds)
