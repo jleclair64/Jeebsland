@@ -1,4 +1,5 @@
 #include "MiningRock.h"
+#include "Inventory.h"
 #include "GemMesh.h"
 #include "Math/RotationMatrix.h"
 #include "UObject/ConstructorHelpers.h"
@@ -178,27 +179,37 @@ void AMiningRock::BeginPlay()
 
 void AMiningRock::RollOre()
 {
-	const float Roll = FMath::FRand();
-	bDiamond = Roll < 0.10f;                    // 10% diamond
-	const bool bCoal = !bDiamond && Roll < 0.30f; // 20% coal, the other 70% is copper
+	// Which ore the rock holds (2026-10-30, the tier redo: nine kinds). Normally fixed by the world builder (SetOre), the same
+	// on every machine; a rock placed without one picks by where it stands, which every machine also agrees on.
+	struct FOreChance { EItemType T; float Weight; int32 XP; const TCHAR* Text; };
+	static const FOreChance Table[] = {
+		{ EItemType::TinOre,    24.f,  5, TEXT("You mine some tin ore.") },
+		{ EItemType::CopperOre, 22.f,  5, TEXT("You mine some copper ore.") },
+		{ EItemType::Coal,      14.f, 10, TEXT("You mine some coal.") },
+		{ EItemType::IronOre,   16.f, 12, TEXT("You mine some iron ore.") },
+		{ EItemType::SilverOre, 10.f, 20, TEXT("You mine some silver ore.") },
+		{ EItemType::GoldOre,    7.f, 30, TEXT("You mine some gold ore!") },
+		{ EItemType::Onyx,       2.5f, 50, TEXT("You mine a gleaming black onyx!") },
+		{ EItemType::Emerald,    2.5f, 50, TEXT("You mine a bright emerald!") },
+		{ EItemType::Diamond,    2.f,  50, TEXT("You mine a sparkling diamond!") },
+	};
+	const FVector L = GetActorLocation();
+	FRandomStream R(int32(FMath::RoundToInt(L.X) * 73856093 ^ FMath::RoundToInt(L.Y) * 19349663));
+	float Total = 0.f;
+	for (const FOreChance& C : Table) Total += C.Weight;
+	float Roll = R.FRandRange(0.f, Total);
+	const FOreChance* Pick = &Table[0];
+	for (const FOreChance& C : Table) { if (Roll < C.Weight) { Pick = &C; break; } Roll -= C.Weight; }
+	if (bFixedOre) for (const FOreChance& C : Table) if (C.T == FixedOre) Pick = &C;
 
-	if (bDiamond)
-	{
-		ItemType = EItemType::Diamond;
-		XPReward = 30;
-		SuccessText = TEXT("You mine a sparkling diamond!");
-	}
-	else
-	{
-		ItemType = bCoal ? EItemType::Coal : EItemType::CopperOre;
-		XPReward = bCoal ? 10 : 5;
-		SuccessText = bCoal ? TEXT("You mine some coal.") : TEXT("You mine some copper ore.");
-
-		const FLinearColor Color = bCoal ? FLinearColor(0.01f, 0.01f, 0.01f) : FLinearColor(0.80f, 0.40f, 0.12f);
-		for (UMaterialInstanceDynamic* M : OreMats) if (M) M->SetVectorParameterValue(TEXT("Color"), Color);
-	}
+	ItemType = Pick->T;
+	XPReward = Pick->XP;
+	SuccessText = Pick->Text;
+	bDiamond = JeebItems::IsGem(ItemType);
+	const FLinearColor Color = JeebItems::OreColor(ItemType);
+	if (bDiamond) { for (UMaterialInstanceDynamic* M : GemMats) if (M) M->SetVectorParameterValue(TEXT("Color"), Color); }
+	else { for (UMaterialInstanceDynamic* M : OreMats) if (M) M->SetVectorParameterValue(TEXT("Color"), Color); }
 }
-
 void AMiningRock::UpdateVisuals(int32 Remaining, int32 Max)
 {
 	// The chunks shrink with each mining and vanish when the rock is empty
@@ -221,7 +232,7 @@ void AMiningRock::UpdateVisuals(int32 Remaining, int32 Max)
 
 void AMiningRock::OnChargesChanged(int32 Remaining, int32 Max)
 {
-	// A freshly refilled rock rolls new ore
+	// A freshly refilled rock shows its ore again
 	if (Remaining == Max)
 	{
 		RollOre();

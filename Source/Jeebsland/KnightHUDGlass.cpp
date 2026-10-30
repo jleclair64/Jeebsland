@@ -334,11 +334,17 @@ void AKnightHUD::ItemTip(int32 Id)
 	if (!IsGear(Id)) return;
 	const int32 K = KindOf(Id), V = VariantOf(Id);
 	L.Add(ItemName(Id));
+	if (IsWeaponKind(K) || IsArmorKind(K) || K == K_Shield)   // the level it needs (or why you can't use it)
+	{
+		const USkillComponent* Sk = GetOwningPawn() ? GetOwningPawn()->FindComponentByClass<USkillComponent>() : nullptr;
+		FString Why;
+		L.Add(CanEquip(Sk, Id, &Why) ? FString::Printf(TEXT("Needs %s %d"), SkillNameOf(EquipSkill(K)), EquipLevel(V)) : Why);
+	}
 	if (IsWeaponKind(K))
 	{
 		int32 A, B; WeaponDamage(K, V, A, B, V);
 		L.Add(FString::Printf(TEXT("Damage %d-%d%s"), A, B, K == K_Bow ? TEXT(" with same-tier arrows") : TEXT("")));
-		if (K == K_Pickaxe || K == K_Axe || K == K_Rod) L.Add(FString::Printf(TEXT("Gathers %d%% quicker than wood"), FMath::RoundToInt((1.f - ToolTimeMult(V)) * 100.f)));
+		if (K == K_Pickaxe || K == K_Axe || K == K_Rod) L.Add(FString::Printf(TEXT("Gathers %d%% quicker than tin"), FMath::RoundToInt((1.f - ToolTimeMult(V)) * 100.f)));
 		if (!AllowsShield(K)) L.Add(TEXT("Two-handed: cannot be used with a shield"));
 	}
 	else if (K == K_Shield)

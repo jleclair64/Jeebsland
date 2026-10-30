@@ -70,8 +70,8 @@ void AProjectile::ApplyLaunch()
 	{
 		Body->SetWorldScale3D(FVector(0.7f, 0.025f, 0.025f));
 		static const FLinearColor Tips[JeebItems::NumTiers] = {
-			FLinearColor(0.35f, 0.2f, 0.08f), FLinearColor(0.7f, 0.4f, 0.2f), FLinearColor(0.35f, 0.35f, 0.4f),
-			FLinearColor(0.6f, 0.6f, 0.7f), FLinearColor(0.4f, 1.2f, 1.6f) };
+			FLinearColor(0.5f, 0.52f, 0.54f), FLinearColor(0.35f, 0.35f, 0.4f), FLinearColor(0.7f, 0.4f, 0.2f), FLinearColor(0.6f, 0.6f, 0.7f),
+			FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.05f, 0.05f, 0.06f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.4f, 1.2f, 1.6f) };   // tin ... diamond
 		Col = Tips[FMath::Clamp<int32>(L.Tier, 0, JeebItems::NumTiers - 1)];
 	}
 	if (!IsNetMode(NM_DedicatedServer))

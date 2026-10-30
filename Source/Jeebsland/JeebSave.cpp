@@ -19,14 +19,34 @@ bool UJeebSave::Exists()
 bool UJeebSave::ValidId(int32 Id)
 {
 	if (Id == 0) return true;
-	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::Bones;
+	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::Emerald;   // (the last material; new ones go after it)
 	if (IsArrow(Id) || IsPotion(Id)) return true;
 	return IsGear(Id) && KindOf(Id) < K_Count;
 }
 
 void UJeebSave::Migrate()
 {
-	// Version 1 is the first: nothing to convert yet
+	// Version 1 -> 2 (2026-10-30, the tier redo): the old tiers Wood, Bronze, Iron, Steel, Diamond become Tin, Bronze, Iron,
+	// Steel, Gold (Diamond is now the wizards' legendary, so old diamond gear becomes the best a knight can still wear). Applies
+	// to every weapon, tool, armour piece and shield (whose tier is the last digit) and to arrows, wherever they are kept.
+	if (SaveVersion < 2)
+	{
+		static const int32 NewTier[5] = { T_Tin, T_Bronze, T_Iron, T_Steel, T_Gold };
+		auto Fix = [](int32& Id)
+		{
+			if (Id >= IdArrowBase && Id < IdArrowBase + 5) { Id = IdArrowBase + NewTier[Id - IdArrowBase]; return; }
+			if (!IsGear(Id)) return;
+			const int32 K = KindOf(Id);
+			if (!(IsWeaponKind(K) || IsArmorKind(K) || K == K_Shield)) return;   // capes, rings, amulets and the brush have no tier
+			const int32 Old = VariantOf(Id);
+			if (Old < 0 || Old > 4) return;
+			Id += NewTier[Old] - Old;
+		};
+		for (int32& Id : SlotIds) Fix(Id);
+		for (int32& Id : BankIds) Fix(Id);
+		for (int32& Id : Hotbar) Fix(Id);
+		for (int32& Id : Worn) Fix(Id);
+	}
 	SaveVersion = CurrentVersion;
 }
 

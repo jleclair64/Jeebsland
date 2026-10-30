@@ -32,7 +32,14 @@ enum class EItemType : uint8
 	Trout,
 		GoldenCarp,
 	Hide,
-	Bones
+	Bones,
+	// (2026-10-30, the tier redo: new ores and gems; always add at the END, saves store these as numbers)
+	TinOre,
+	IronOre,
+	SilverOre,
+	GoldOre,
+	Onyx,
+	Emerald
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)

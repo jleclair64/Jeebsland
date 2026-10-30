@@ -51,16 +51,19 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 
 	// ----- Sell (left) -----
 	NorseTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
-		static const EItemType Sellable[12] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::CopperOre, EItemType::Coal, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
-	static const TCHAR* SellNames[12] = { TEXT("Logs"), TEXT("Pine logs"), TEXT("Redwood logs"), TEXT("Copper ore"), TEXT("Coal"), TEXT("Diamond"), TEXT("Raw pork"), TEXT("Perch"), TEXT("Trout"), TEXT("Golden carp"), TEXT("Beast hide"), TEXT("Bones") };
-	for (int32 r = 0; r < 12; ++r)
+		static const EItemType Sellable[18] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::CopperOre, EItemType::IronOre, EItemType::Coal,
+			EItemType::SilverOre, EItemType::GoldOre, EItemType::Onyx, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
+	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
+	int32 Row = 0;
+	for (int32 m = 0; m < UE_ARRAY_COUNT(Sellable) && Row < 10; ++m)
 	{
-		const EItemType T = Sellable[r];
-		const float RY = PY + 94.f + r * 38.f;
+		const EItemType T = Sellable[m];
 		const int32 N = Skills->GetItemCount(T);
+		if (N <= 0) continue;
+		const float RY = PY + 94.f + Row++ * 38.f;
 		Tile(PX + 30.f, RY, 510.f, 34.f, FLinearColor(0.6f, 0.72f, 0.88f), 0.16f, false);
 		DrawIcon(MaterialId(T), PX + 34.f, RY + 1.f, 32.f);
-		HDText(SellNames[r], FLinearColor::White, PX + 74.f, RY + 8.f, Font, 1.0f);
+		HDText(MaterialName(T), FLinearColor::White, PX + 74.f, RY + 8.f, Font, 1.0f);
 		HDText(FString::Printf(TEXT("x %d"), N), FLinearColor(0.85f, 0.85f, 0.85f), PX + 210.f, RY + 8.f, Font, 1.05f);
 		DrawIngot(PX + 280.f, RY + 4.f, 24.f);
 		HDText(FString::Printf(TEXT("%d each"), SellValue(T)), FLinearColor(1.f, 0.85f, 0.3f), PX + 310.f, RY + 8.f, Font, 1.0f);
@@ -184,34 +187,28 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 {
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const float PW = 1190.f, PH = 690.f;
+	const float PW = 1500.f, PH = 690.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
 	NorseTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
-	const int32 Logs = Skills->CountWood();
-	const int32 Copper = Skills->GetItemCount(EItemType::CopperOre);
-	const int32 Coal = Skills->GetItemCount(EItemType::Coal);
-	const int32 Gems = Skills->GetItemCount(EItemType::Diamond);
-
-	// Materials you carry, and your smithing level
+	// Materials you carry (every ore and gem a knight smiths with), and your smithing level
 	{
-		struct FMat { EItemType T; const TCHAR* N; int32 Have; };
-		const FMat Mats[4] = { { EItemType::Logs, TEXT("Logs"), Logs }, { EItemType::CopperOre, TEXT("Copper"), Copper }, { EItemType::Coal, TEXT("Coal"), Coal }, { EItemType::Diamond, TEXT("Diamond"), Gems } };
-		for (int32 m = 0; m < 4; ++m)
+		static const EItemType Mats[8] = { EItemType::TinOre, EItemType::CopperOre, EItemType::IronOre, EItemType::Coal, EItemType::SilverOre, EItemType::GoldOre, EItemType::Onyx, EItemType::Diamond };
+		for (int32 m = 0; m < 8; ++m)
 		{
-			const float X = PX + 30.f + m * 150.f;
-			DrawIcon(MaterialId(Mats[m].T), X, PY + 58.f, 34.f);
-			HDText(FString::Printf(TEXT("%s  %d"), Mats[m].N, Mats[m].Have), FLinearColor::White, X + 40.f, PY + 66.f, Font, 1.1f);
+			const float X = PX + 30.f + m * 128.f;
+			DrawIcon(MaterialId(Mats[m]), X, PY + 58.f, 32.f);
+			HDText(FString::Printf(TEXT("%d"), Skills->GetItemCount(Mats[m])), FLinearColor::White, X + 38.f, PY + 64.f, Font, 1.1f);
+			if (Over(X, PY + 58.f, 110.f, 34.f)) TipLines = { MaterialName(Mats[m]) };
 		}
 		int32 Lv, Into, Need;
 		Skills->GetProgress(ESkillType::Smithing, Lv, Into, Need);
 		HDText(FString::Printf(TEXT("Smithing  Lv %d"), Lv), FLinearColor(1.f, 0.7f, 0.4f), PX + PW - 330.f, PY + 56.f, Font, 1.2f);
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
-
 	// Kind list (two columns)
 	static const int32 Kinds[18] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, -1 };
 	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 17);
@@ -225,9 +222,9 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const bool bArrows = Kind < 0;
 	const int32 BKind = bArrows ? K_Bow : Kind;
 
-	const float CW = 150.f, CH = 500.f, CGap = 10.f;
+	const float CW = 150.f, CH = 500.f, CGap = 8.f;
 	const float CX0 = PX + 370.f, CY = PY + 112.f;
-	for (int32 t = 0; t < NumTiers; ++t)
+	for (int32 t = 0; t < NumTiersKnight; ++t)   // Tin to Onyx (Emerald and Diamond are for trolls and wizards)
 	{
 		const float CX = CX0 + t * (CW + CGap);
 		const FRecipe R = SmithRecipe(BKind, t, bArrows);
@@ -261,19 +258,16 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		// Materials: have / need
 		HDText(TEXT("MATERIALS"), FLinearColor(0.65f, 0.65f, 0.65f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
 		bool bHaveAll = true;
-		auto MatLine = [&](EItemType Ty, const TCHAR* Name, int32 Have, int32 Need)
+		for (int32 i = 0; i < 2; ++i)
 		{
-			if (Need <= 0) return;
-			const bool bOk = Have >= Need;
+			if (R.Num[i] <= 0) continue;
+			const int32 Have = Skills->GetItemCount(R.Mat[i]);
+			const bool bOk = Have >= R.Num[i];
 			if (!bOk) bHaveAll = false;
-			DrawIcon(MaterialId(Ty), CX + 6.f, Y - 3.f, 24.f);
-			HDText(FString::Printf(TEXT("%s %d/%d"), Name, Have, Need), bOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.95f);
+			DrawIcon(MaterialId(R.Mat[i]), CX + 6.f, Y - 3.f, 24.f);
+			HDText(FString::Printf(TEXT("%s %d/%d"), MaterialName(R.Mat[i]), Have, R.Num[i]), bOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.85f);
 			Y += 26.f;
-		};
-		MatLine(EItemType::Logs, TEXT("Logs"), Logs, R.Logs);
-		MatLine(EItemType::CopperOre, TEXT("Copper"), Copper, R.Copper);
-		MatLine(EItemType::Coal, TEXT("Coal"), Coal, R.Coal);
-		MatLine(EItemType::Diamond, TEXT("Diamond"), Gems, R.Diamonds);
+		}
 
 		const int32 Lv = Skills->GetLevel(ESkillType::Smithing);
 		const bool bLevelOk = Lv >= R.Level;
@@ -291,7 +285,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
 	}
 	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	HDText(TEXT("Wood uses logs, bronze copper, iron coal, steel coal and copper, diamond diamonds and coal.   Press E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	HDText(TEXT("Tin: tin ore. Iron: iron ore. Bronze: copper and tin. Steel: iron ore and coal. Silver and gold: their ores. Onyx: onyx and gold.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 

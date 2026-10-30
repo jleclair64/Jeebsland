@@ -17,6 +17,8 @@ class AMiningRock : public AResourceNode
 
 public:
 	AMiningRock();
+	// Each rock always holds the same ore, like RuneScape's (chosen by the world builder; the same on every machine)
+	void SetOre(EItemType T) { FixedOre = T; bFixedOre = true; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -35,7 +37,9 @@ private:
 	FVector GemScaleA;
 	FVector GemScaleB;
 	FVector GemScaleC;
-	bool bDiamond = false;
+	bool bDiamond = false;   // a gem rock (diamond, onyx or emerald): crystals instead of lumps
+	EItemType FixedOre = EItemType::TinOre;   // set by the world builder before the rock begins play
+	bool bFixedOre = false;
 
 	void RollOre();
 	void UpdateVisuals(int32 Remaining, int32 Max);

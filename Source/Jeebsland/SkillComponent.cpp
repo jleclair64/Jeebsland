@@ -52,7 +52,7 @@ void USkillComponent::ResetToStartingKit()
 	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 5);   // black
-	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, 1);   // bronze: real metal plate from the start
+	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, JeebItems::T_Tin);   // tin: the lowest tier (was bronze before the 2026-10-30 tier redo)
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
@@ -356,6 +356,7 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 	if (!JeebItems::IsGear(S.Id)) return false;
 	const int32 Id = S.Id;
 	const int32 K = JeebItems::KindOf(Id);
+	{ FString Why; if (!JeebItems::CanEquip(this, Id, &Why)) { Say(3.f, FColor::Orange, Why); return false; } }   // level gates
 
 	auto Swap = [&](int32& Target)
 	{
@@ -515,6 +516,7 @@ bool USkillComponent::SwapInvHotbar(int32 InvIdx, int32 H)
 	if (!Slots.IsValidIndex(InvIdx) || H < 0 || H >= 5) return false;
 	FInvSlot& S = Slots[InvIdx];
 	if (S.Id != 0 && !(JeebItems::IsGear(S.Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(S.Id)))) return false;   // only weapons go on the bar
+	if (S.Id != 0) { FString Why; if (!JeebItems::CanEquip(this, S.Id, &Why)) { Say(3.f, FColor::Orange, Why); return false; } }   // level gates
 	if (S.Id == 0 && Hotbar[H] == 0) return false;
 	const int32 FromBar = Hotbar[H];
 	Hotbar[H] = S.Id;
@@ -551,13 +553,13 @@ void USkillComponent::FillPracticePack()
 	Slots[1].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[1].Count = 3;
 	PotionSlot.Id = JeebItems::PotionId(JeebItems::P_Heal); PotionSlot.Count = 3;
 	// and one of each new shield style to try (iron)
-	Slots[2].Id = JeebItems::ShieldId(1, 2); Slots[2].Count = 1;
-	Slots[3].Id = JeebItems::ShieldId(2, 2); Slots[3].Count = 1;
+	Slots[2].Id = JeebItems::ShieldId(1, JeebItems::T_Iron); Slots[2].Count = 1;
+	Slots[3].Id = JeebItems::ShieldId(2, JeebItems::T_Iron); Slots[3].Count = 1;
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;
 		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
-		Slots[i].Id = GearId(K, R.RandRange(0, 4));
+		Slots[i].Id = GearId(K, R.RandRange(T_Tin, T_Onyx));   // (some will need higher levels to use: the level gates)
 		Slots[i].Count = 1;
 	}
 }
@@ -578,6 +580,7 @@ bool USkillComponent::SwapInvWorn(int32 InvIdx, int32 Kind, bool bSecond)
 	const int32 IK = JeebItems::KindOf(S.Id);
 	const bool bMiscSlot = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
 	if (bMiscSlot ? !JeebItems::IsAccessoryKind(IK) : IK != Kind) return false;   // the item has to belong in that slot
+	{ FString Why; if (!JeebItems::CanEquip(this, S.Id, &Why)) { Say(3.f, FColor::Orange, Why); return false; } }   // level gates
 	int32* Target = WornSlotPtr(Kind, bSecond);
 	if (!Target) return false;
 	const int32 Old = *Target;

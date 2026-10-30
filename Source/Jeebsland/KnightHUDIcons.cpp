@@ -394,6 +394,10 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	{
 	case EItemType::CopperOre:
 	case EItemType::Coal:
+	case EItemType::TinOre:
+	case EItemType::IronOre:
+	case EItemType::SilverOre:
+	case EItemType::GoldOre:
 	{
 		const bool bCoal = MaterialType(Id) == EItemType::Coal;
 		const FLinearColor Body = bCoal ? FLinearColor(0.10f, 0.10f, 0.12f) : FLinearColor(0.38f, 0.34f, 0.32f);
@@ -407,20 +411,27 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		}
 		else
 		{
-			const FLinearColor Cu(0.88f, 0.48f, 0.16f);
+			const FLinearColor Cu = OreColor(MaterialType(Id)) * 1.08f;   // the ore showing through the rock (copper, tin, iron, silver, gold)
 			Poly({ P(22, 28), P(32, 25), P(34, 34), P(24, 37) }, Cu);
 			Poly({ P(38, 36), P(48, 36), P(46, 46), P(37, 45) }, Cu);
-			Poly({ P(18, 42), P(26, 41), P(26, 49), P(18, 49) }, FLinearColor(0.72f, 0.38f, 0.12f));
+			Poly({ P(18, 42), P(26, 41), P(26, 49), P(18, 49) }, OreColor(MaterialType(Id)) * 0.82f);
 		}
 		break;
 	}
 	case EItemType::Diamond:
-		Poly({ P(20, 12), P(44, 12), P(56, 28), P(32, 58), P(8, 28) }, FLinearColor(0.35f, 0.82f, 0.96f));
-		Poly({ P(8, 28), P(20, 12), P(32, 28) }, FLinearColor(0.72f, 0.97f, 1.f));
-		Poly({ P(56, 28), P(44, 12), P(32, 28) }, FLinearColor(0.55f, 0.92f, 1.f));
-		Poly({ P(20, 12), P(44, 12), P(32, 28) }, FLinearColor(0.85f, 1.f, 1.f));
-		Poly({ P(8, 28), P(32, 58), P(32, 28) }, FLinearColor(0.20f, 0.62f, 0.85f));
+	case EItemType::Onyx:
+	case EItemType::Emerald:
+	{
+		// a cut gem in its own colour (diamond icy blue, onyx glossy black, emerald green)
+		const FLinearColor G = OreColor(MaterialType(Id));
+		auto Sh = [&](float K) { return FLinearColor(FMath::Min(G.R * K + (K > 1.f ? 0.12f : 0.f), 1.f), FMath::Min(G.G * K + (K > 1.f ? 0.12f : 0.f), 1.f), FMath::Min(G.B * K + (K > 1.f ? 0.12f : 0.f), 1.f)); };
+		Poly({ P(20, 12), P(44, 12), P(56, 28), P(32, 58), P(8, 28) }, Sh(0.78f));
+		Poly({ P(8, 28), P(20, 12), P(32, 28) }, Sh(1.35f));
+		Poly({ P(56, 28), P(44, 12), P(32, 28) }, Sh(1.15f));
+		Poly({ P(20, 12), P(44, 12), P(32, 28) }, Sh(1.6f));
+		Poly({ P(8, 28), P(32, 58), P(32, 28) }, Sh(0.5f));
 		break;
+	}
 	case EItemType::Logs:
 		Quad(6, 22, 48, 46, FLinearColor(0.50f, 0.30f, 0.14f));
 		Quad(6, 28, 48, 30, FLinearColor(0.38f, 0.22f, 0.10f));

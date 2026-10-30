@@ -7,13 +7,23 @@
 // Everything about items: ids, names, stack sizes, damage and defence numbers, prices, smithing recipes,
 // rings and amulets. Header only; shared by the character, the shops and the HUD.
 //
-// TIERS (weakest to strongest): Wood (trees), Bronze (copper), Iron (coal), Steel (coal + copper), Diamond.
+// TIERS (weakest to strongest; redone 2026-10-30): Tin, Iron, Bronze, Steel, Silver, Gold, then one LEGENDARY tier per
+// class, all equally strong: Onyx (knights), Emerald (trolls), Diamond (wizards). Only knights exist so far, so Emerald and
+// Diamond gear can be found and sold but not worn yet. Gear needs a skill level to equip (EquipLevel). Save version 2
+// moved old ids (Wood, Bronze, Iron, Steel, Diamond) onto these (UJeebSave::Migrate).
 // ===================================================================================================
 namespace JeebItems
 {
 	constexpr int32 NumSlots = 24;      // inventory slots (the side panel is 5 x 5: ingots in a fixed top-left cell, then these)
 	constexpr int32 NumHotbar = 5;      // weapons and tools you carry ready
-	constexpr int32 NumTiers = 5;
+	constexpr int32 NumTiers = 9;
+	enum ETier : int32 { T_Tin, T_Iron, T_Bronze, T_Steel, T_Silver, T_Gold, T_Onyx, T_Emerald, T_Diamond };
+	// Which class may use a tier: 0 everyone, 1 knights (Onyx), 2 trolls (Emerald), 3 wizards (Diamond)
+	inline int32 TierClass(int32 T) { return T == T_Onyx ? 1 : T == T_Emerald ? 2 : T == T_Diamond ? 3 : 0; }
+	inline bool KnightCanUseTier(int32 T) { const int32 C = TierClass(T); return C == 0 || C == 1; }
+	// The skill level needed to wear or wield a tier
+	inline int32 EquipLevel(int32 T) { static const int32 L[NumTiers] = { 1, 5, 10, 20, 30, 40, 50, 50, 50 }; return L[FMath::Clamp(T, 0, NumTiers - 1)]; }
+	constexpr int32 NumTiersKnight = 7;   // the tiers a knight can use (Tin to Onyx): what the smithy and the dictionary list
 	constexpr int32 NumCapeColors = 7;
 
 	// What kind of thing a piece of gear is
@@ -30,7 +40,7 @@ namespace JeebItems
 
 	// Ids: 0 = empty; 1..99 = materials and fish (EItemType + 1); 900..904 = arrows by tier; 950..952 potions;
 	// 1000 + kind * 100 + variant = gear (shields also carry a style: 1000 + kind * 100 + style * 10 + tier).
-	// The variant is the tier (0-4) for weapons and armour, the colour for capes, the particular piece for rings and amulets.
+	// The variant is the tier (0-8, see ETier) for weapons and armour, the colour for capes, the particular piece for rings and amulets.
 	constexpr int32 IdArrowBase = 900;
 	constexpr int32 IdGearBase = 1000;
 
@@ -82,7 +92,13 @@ namespace JeebItems
 		{
 		case EItemType::CopperOre: return 10;
 		case EItemType::Coal:      return 10;
+		case EItemType::TinOre:    return 10;
+		case EItemType::IronOre:   return 10;
+		case EItemType::SilverOre: return 10;
+		case EItemType::GoldOre:   return 10;
 		case EItemType::Diamond:   return 5;
+		case EItemType::Onyx:      return 5;
+		case EItemType::Emerald:   return 5;
 		case EItemType::Perch:     return 10;
 		case EItemType::Trout:     return 10;
 		case EItemType::GoldenCarp:return 5;
@@ -97,7 +113,13 @@ namespace JeebItems
 		{
 		case EItemType::CopperOre:   return 3;
 		case EItemType::Coal:        return 5;
-		case EItemType::Diamond:     return 50;
+		case EItemType::Diamond:     return 60;
+		case EItemType::TinOre:      return 2;
+		case EItemType::IronOre:     return 6;
+		case EItemType::SilverOre:   return 15;
+		case EItemType::GoldOre:     return 25;
+		case EItemType::Onyx:        return 60;
+		case EItemType::Emerald:     return 60;
 		case EItemType::Logs:        return 2;   // ordinary trees
 		case EItemType::PineLogs:    return 4;
 		case EItemType::RedwoodLogs: return 8;
@@ -112,14 +134,38 @@ namespace JeebItems
 	}
 	inline const TCHAR* MaterialName(EItemType T)
 	{
-		static const TCHAR* N[] = { TEXT("Copper Ore"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Raw Pork"), TEXT("Pine Logs"), TEXT("Redwood Logs"), TEXT("Perch"), TEXT("Trout"), TEXT("Golden Carp"), TEXT("Beast Hide"), TEXT("Bones") };
-		return N[FMath::Clamp(static_cast<int32>(T), 0, 11)];
+		static const TCHAR* N[] = { TEXT("Copper Ore"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Raw Pork"), TEXT("Pine Logs"), TEXT("Redwood Logs"), TEXT("Perch"), TEXT("Trout"), TEXT("Golden Carp"), TEXT("Beast Hide"), TEXT("Bones"),
+			TEXT("Tin Ore"), TEXT("Iron Ore"), TEXT("Silver Ore"), TEXT("Gold Ore"), TEXT("Onyx"), TEXT("Emerald") };
+		return N[FMath::Clamp(static_cast<int32>(T), 0, int32(UE_ARRAY_COUNT(N)) - 1)];
+	}
+	inline bool IsOreOrGem(EItemType T)
+	{
+		return T == EItemType::CopperOre || T == EItemType::Coal || T == EItemType::Diamond || T == EItemType::TinOre || T == EItemType::IronOre
+			|| T == EItemType::SilverOre || T == EItemType::GoldOre || T == EItemType::Onyx || T == EItemType::Emerald;
+	}
+	inline bool IsGem(EItemType T) { return T == EItemType::Diamond || T == EItemType::Onyx || T == EItemType::Emerald; }
+	// The colour of an ore's lumps or a gem's crystals (rocks, icons, dropped stacks)
+	inline FLinearColor OreColor(EItemType T)
+	{
+		switch (T)
+		{
+		case EItemType::CopperOre: return FLinearColor(0.80f, 0.40f, 0.12f);
+		case EItemType::Coal:      return FLinearColor(0.02f, 0.02f, 0.02f);
+		case EItemType::TinOre:    return FLinearColor(0.62f, 0.64f, 0.62f);
+		case EItemType::IronOre:   return FLinearColor(0.45f, 0.20f, 0.10f);
+		case EItemType::SilverOre: return FLinearColor(0.86f, 0.88f, 0.92f);
+		case EItemType::GoldOre:   return FLinearColor(0.98f, 0.74f, 0.20f);
+		case EItemType::Diamond:   return FLinearColor(0.45f, 0.92f, 1.00f);
+		case EItemType::Onyx:      return FLinearColor(0.05f, 0.04f, 0.06f);
+		case EItemType::Emerald:   return FLinearColor(0.08f, 0.80f, 0.32f);
+		default:                   return FLinearColor(0.5f, 0.5f, 0.5f);
+		}
 	}
 
 	// ---------------------------------------------------------------- names
 	inline const TCHAR* TierName(int32 T)
 	{
-		static const TCHAR* N[NumTiers] = { TEXT("Wood"), TEXT("Bronze"), TEXT("Iron"), TEXT("Steel"), TEXT("Diamond") };
+		static const TCHAR* N[NumTiers] = { TEXT("Tin"), TEXT("Iron"), TEXT("Bronze"), TEXT("Steel"), TEXT("Silver"), TEXT("Gold"), TEXT("Onyx"), TEXT("Emerald"), TEXT("Diamond") };
 		return N[FMath::Clamp(T, 0, NumTiers - 1)];
 	}
 	inline const TCHAR* KindName(int32 K)
@@ -169,30 +215,38 @@ namespace JeebItems
 	inline FLinearColor Palette(int32 Tier, int32 Role)
 	{
 		static const FLinearColor T[NumTiers][7] = {
-			// Wood: planks and leather
-			{ {0.50f,0.34f,0.17f,1.f}, {0.18f,0.12f,0.07f,1.f}, {0.33f,0.20f,0.09f,1.f}, {0.62f,0.52f,0.36f,1.f}, {0.62f,0.25f,0.10f,1.f}, {0.26f,0.15f,0.07f,1.f}, {0.36f,0.23f,0.11f,1.f} },
-			// Bronze (from copper)
-			{ {0.72f,0.45f,0.20f,1.f}, {0.22f,0.14f,0.07f,1.f}, {0.88f,0.74f,0.34f,1.f}, {0.90f,0.84f,0.70f,1.f}, {0.70f,0.20f,0.08f,1.f}, {0.28f,0.15f,0.07f,1.f}, {0.50f,0.30f,0.13f,1.f} },
-			// Iron (from coal): dark grey
+			// Tin: pale grey, dull
+			{ {0.52f,0.54f,0.55f,1.f}, {0.16f,0.16f,0.17f,1.f}, {0.66f,0.67f,0.68f,1.f}, {0.80f,0.80f,0.78f,1.f}, {0.45f,0.30f,0.20f,1.f}, {0.26f,0.16f,0.08f,1.f}, {0.40f,0.41f,0.43f,1.f} },
+			// Iron: dark grey
 			{ {0.34f,0.35f,0.40f,1.f}, {0.10f,0.10f,0.12f,1.f}, {0.55f,0.57f,0.62f,1.f}, {0.78f,0.80f,0.86f,1.f}, {0.55f,0.08f,0.10f,1.f}, {0.20f,0.12f,0.07f,1.f}, {0.26f,0.27f,0.31f,1.f} },
+			// Bronze: warm, with a shine
+			{ {0.72f,0.45f,0.20f,1.f}, {0.22f,0.14f,0.07f,1.f}, {0.88f,0.74f,0.34f,1.f}, {0.90f,0.84f,0.70f,1.f}, {0.70f,0.20f,0.08f,1.f}, {0.28f,0.15f,0.07f,1.f}, {0.50f,0.30f,0.13f,1.f} },
 			// Steel: bright
 			{ {0.66f,0.69f,0.76f,1.f}, {0.20f,0.21f,0.25f,1.f}, {0.86f,0.68f,0.26f,1.f}, {0.93f,0.93f,0.89f,1.f}, {0.80f,0.07f,0.07f,1.f}, {0.28f,0.15f,0.07f,1.f}, {0.40f,0.42f,0.48f,1.f} },
-			// Diamond: icy blue
+			// Silver: shiny, near white
+			{ {0.84f,0.86f,0.90f,1.f}, {0.22f,0.23f,0.27f,1.f}, {0.95f,0.96f,1.00f,1.f}, {0.95f,0.95f,0.95f,1.f}, {0.20f,0.35f,0.80f,1.f}, {0.30f,0.20f,0.12f,1.f}, {0.60f,0.62f,0.68f,1.f} },
+			// Gold: golden
+			{ {0.95f,0.72f,0.25f,1.f}, {0.25f,0.17f,0.06f,1.f}, {1.00f,0.88f,0.45f,1.f}, {0.95f,0.90f,0.75f,1.f}, {0.75f,0.10f,0.10f,1.f}, {0.32f,0.18f,0.07f,1.f}, {0.70f,0.50f,0.16f,1.f} },
+			// Onyx (knights' legendary): glossy black with gold edges
+			{ {0.06f,0.06f,0.07f,1.f}, {0.03f,0.03f,0.03f,1.f}, {0.95f,0.75f,0.30f,1.f}, {0.25f,0.25f,0.27f,1.f}, {0.70f,0.08f,0.08f,1.f}, {0.10f,0.07f,0.05f,1.f}, {0.05f,0.05f,0.06f,1.f} },
+			// Emerald (trolls' legendary): deep green
+			{ {0.08f,0.55f,0.28f,1.f}, {0.03f,0.15f,0.08f,1.f}, {0.55f,0.95f,0.60f,1.f}, {0.70f,0.92f,0.72f,1.f}, {0.90f,0.80f,0.20f,1.f}, {0.15f,0.20f,0.10f,1.f}, {0.06f,0.40f,0.20f,1.f} },
+			// Diamond (wizards' legendary): icy blue
 			{ {0.42f,0.86f,0.96f,1.f}, {0.10f,0.28f,0.38f,1.f}, {0.80f,0.96f,1.00f,1.f}, {0.88f,0.97f,1.00f,1.f}, {0.10f,0.50f,0.80f,1.f}, {0.18f,0.30f,0.38f,1.f}, {0.30f,0.70f,0.82f,1.f} },
 		};
 		return T[FMath::Clamp(Tier, 0, NumTiers - 1)][FMath::Clamp(Role, 0, 6)];
 	}
 	inline FLinearColor GemColor(int32 Tier)
 	{
-		static const FLinearColor G[NumTiers] = { {0.25f,0.95f,0.35f,1.f}, {1.0f,0.55f,0.10f,1.f}, {0.45f,0.60f,1.0f,1.f}, {0.90f,0.97f,1.0f,1.f}, {0.40f,0.95f,1.0f,1.f} };
+		static const FLinearColor G[NumTiers] = { {0.70f,0.72f,0.75f,1.f}, {0.55f,0.60f,0.70f,1.f}, {1.0f,0.55f,0.10f,1.f}, {0.90f,0.97f,1.0f,1.f}, {0.80f,0.85f,1.0f,1.f}, {1.0f,0.80f,0.25f,1.f}, {0.70f,0.15f,0.90f,1.f}, {0.10f,0.95f,0.40f,1.f}, {0.40f,0.95f,1.0f,1.f} };
 		return G[FMath::Clamp(Tier, 0, NumTiers - 1)];
 	}
-	inline bool TierIsMetal(int32 Tier) { return Tier >= 1; }
+	inline bool TierIsMetal(int32 Tier) { return Tier >= 0; }   // (every tier is metal or gem since the redo; Wood is gone)
 
 	// ---------------------------------------------------------------- weapon and armour numbers
 	// Damage is a range: every hit is a random whole number from Min to Max.
 	struct FWeaponBase { int32 Min, Max; float Range; float Cooldown; };
-	// Numbers are for BRONZE; other tiers scale by TierMult.
+	// Numbers are for TIN, the lowest tier; better tiers add steps (TierSteps).
 	inline FWeaponBase WeaponBase(int32 Kind)
 	{
 		switch (Kind)
@@ -213,11 +267,17 @@ namespace JeebItems
 	}
 	inline float TierMult(int32 Tier)
 	{
-		static const float M[NumTiers] = { 0.6f, 1.0f, 1.35f, 1.8f, 2.4f };
+		static const float M[NumTiers] = { 0.6f, 0.85f, 1.0f, 1.35f, 1.7f, 2.1f, 2.6f, 2.6f, 2.6f };
 		return M[FMath::Clamp(Tier, 0, NumTiers - 1)];
 	}
-	// Each tier above wood adds a flat step to both ends of the range: half the weapon's average damage
-	// (sword: wood 8-12, bronze 13-17, iron 18-22, steel 23-27, diamond 28-32).
+	// How many damage steps a tier adds (narrow gaps, so skill can beat a tier of gear; the three legendaries are equal)
+	inline float TierSteps(int32 Tier)
+	{
+		static const float S[NumTiers] = { 0.f, 0.8f, 1.6f, 2.5f, 3.4f, 4.3f, 5.3f, 5.3f, 5.3f };
+		return S[FMath::Clamp(Tier, 0, NumTiers - 1)];
+	}
+	// Each step adds to both ends of the range: a quarter of the weapon's tin range
+	// (sword: tin 8-12, iron 12-16, bronze 16-20, steel 20-24, silver 25-29, gold 30-34, legendary 35-39).
 	inline int32 TierStep(int32 Kind)
 	{
 		const FWeaponBase B = WeaponBase(Kind);
@@ -227,7 +287,7 @@ namespace JeebItems
 	inline void WeaponDamage(int32 Kind, int32 Tier, int32& OutMin, int32& OutMax, int32 ArrowTierForBow = 0)
 	{
 		const FWeaponBase B = WeaponBase(Kind);
-		const float Steps = (Kind == K_Bow) ? (ArrowTierForBow + 0.5f * Tier) : (float)Tier;
+		const float Steps = (Kind == K_Bow) ? (TierSteps(ArrowTierForBow) + 0.5f * TierSteps(Tier)) : TierSteps(Tier);
 		const int32 Add = FMath::RoundToInt(TierStep(Kind) * Steps);
 		OutMin = B.Min + Add;
 		OutMax = B.Max + Add;
@@ -255,11 +315,11 @@ namespace JeebItems
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 Tier)
 	{
-		static const float M[NumTiers] = { 1.0f, 1.1f, 1.25f, 1.5f, 2.0f };
+		static const float M[NumTiers] = { 1.0f, 1.08f, 1.15f, 1.25f, 1.4f, 1.6f, 1.9f, 1.9f, 1.9f };
 		return M[FMath::Clamp(Tier, 0, NumTiers - 1)];
 	}
-	// Tools make gathering faster: 1.0 for a wooden tool, down to 0.45 for diamond
-	inline float ToolTimeMult(int32 Tier) { return 1.f - 0.14f * Tier; }
+	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a legendary one
+	inline float ToolTimeMult(int32 Tier) { return 1.f - 0.4f * TierSteps(Tier) / TierSteps(T_Onyx); }
 
 	// ---------------------------------------------------------------- rings and amulets
 	struct FMods
@@ -316,7 +376,7 @@ namespace JeebItems
 	}
 
 	// ---------------------------------------------------------------- prices (ingots)
-	// The store sells wood, bronze and iron gear. Steel and diamond gear have to be smithed.
+	// The store sells tin, iron and bronze gear. Steel and better have to be smithed.
 	inline int32 BaseBuyPrice(int32 Kind)
 	{
 		static const int32 P[K_Count] = { 40, 45, 35, 40, 90, 100, 110, 80, 100, 60, 30, 50, 40, 90, 55, 30, 45, 25, 0, 0 };
@@ -324,7 +384,7 @@ namespace JeebItems
 	}
 	inline float TierPriceMult(int32 Tier)
 	{
-		static const float M[NumTiers] = { 0.4f, 1.0f, 2.2f, 4.5f, 10.f };
+		static const float M[NumTiers] = { 0.4f, 0.75f, 1.0f, 2.2f, 4.0f, 7.0f, 15.f, 15.f, 15.f };
 		return M[FMath::Clamp(Tier, 0, NumTiers - 1)];
 	}
 	inline int32 AccessoryPrice(int32 Kind, int32 V)
@@ -334,7 +394,7 @@ namespace JeebItems
 		static const int32 A[NumAmulets] = { 200, 180, 160, 150, 150 };
 		return Kind == K_Ring ? R[FMath::Clamp(V, 0, NumRings - 1)] : A[FMath::Clamp(V, 0, NumAmulets - 1)];
 	}
-	constexpr int32 StoreMaxTier = 2;   // store sells wood, bronze and iron
+	constexpr int32 StoreMaxTier = T_Bronze;   // the store sells tin, iron and bronze
 	inline int32 BuyPrice(int32 Kind, int32 Variant)
 	{
 		if (IsAccessoryKind(Kind)) return AccessoryPrice(Kind, Variant);
@@ -345,43 +405,103 @@ namespace JeebItems
 	inline int32 ArrowBundlePrice(int32 Tier) { return FMath::Max(2, FMath::RoundToInt(8.f * TierPriceMult(Tier))); }
 
 	// ---------------------------------------------------------------- smithing
-	// How much raw material a piece takes ("mass"), and which materials the tier uses:
-	//   Wood: logs.  Bronze: copper.  Iron: coal.  Steel: coal + copper.  Diamond: diamonds + coal.
+	// How much raw material a piece takes ("mass"), and which materials each tier uses (2026-10-30):
+	//   Tin: tin ore.  Iron: iron ore.  Bronze: copper + tin.  Steel: iron ore + coal.  Silver: silver ore.  Gold: gold ore.
+	//   Onyx / Emerald / Diamond (the legendaries): their gem + gold ore, at a very high Smithing level.
 	inline bool CanSmith(int32 Kind) { return IsWeaponKind(Kind) || Kind == K_Shield || IsArmorKind(Kind); }
 	inline int32 Mass(int32 Kind)
 	{
 		static const int32 M[K_Count] = { 4, 5, 4, 4, 8, 9, 6, 3, 5, 4, 3, 6, 5, 10, 6, 3, 5, 0, 0, 0 };
 		return M[FMath::Clamp(Kind, 0, K_Count - 1)];
 	}
-	struct FRecipe { int32 Logs = 0, Copper = 0, Coal = 0, Diamonds = 0; int32 Level = 1; int32 XP = 0; };
+	// A recipe: up to two materials (Num 0 = unused), the Smithing level it needs and the XP it gives
+	struct FRecipe { EItemType Mat[2] = { EItemType::TinOre, EItemType::TinOre }; int32 Num[2] = { 0, 0 }; int32 Level = 1; int32 XP = 0; };
 	inline FRecipe SmithRecipe(int32 Kind, int32 Tier, bool bArrows = false)
 	{
 		FRecipe R;
 		const int32 M = bArrows ? 2 : Mass(Kind);   // arrows: a bundle of 10 costs 2 mass
+		const int32 H = (M + 1) / 2;
+		auto Set = [&](EItemType A, int32 NA, EItemType B = EItemType::TinOre, int32 NB = 0) { R.Mat[0] = A; R.Num[0] = NA; R.Mat[1] = B; R.Num[1] = NB; };
 		switch (Tier)
 		{
-		case 0: R.Logs = M; break;
-		case 1: R.Copper = M; break;
-		case 2: R.Coal = M; break;
-		case 3: R.Coal = M; R.Copper = (M + 1) / 2; break;
-		default: R.Diamonds = (M + 1) / 2; R.Coal = (M + 1) / 2; break;
+		case T_Tin:     Set(EItemType::TinOre, M); break;
+		case T_Iron:    Set(EItemType::IronOre, M); break;
+		case T_Bronze:  Set(EItemType::CopperOre, M, EItemType::TinOre, H); break;
+		case T_Steel:   Set(EItemType::IronOre, M, EItemType::Coal, H); break;
+		case T_Silver:  Set(EItemType::SilverOre, M); break;
+		case T_Gold:    Set(EItemType::GoldOre, M); break;
+		case T_Onyx:    Set(EItemType::Onyx, H, EItemType::GoldOre, H); break;
+		case T_Emerald: Set(EItemType::Emerald, H, EItemType::GoldOre, H); break;
+		default:        Set(EItemType::Diamond, H, EItemType::GoldOre, H); break;
 		}
-		static const int32 TierLevel[NumTiers] = { 1, 4, 10, 18, 28 };
-		static const int32 TierXP[NumTiers] = { 4, 8, 16, 32, 64 };
+		static const int32 TierLevel[NumTiers] = { 1, 5, 10, 18, 26, 34, 50, 50, 50 };
+		static const int32 TierXP[NumTiers] = { 4, 8, 12, 20, 30, 45, 90, 90, 90 };
 		int32 Extra = 0;
 		if (Kind == K_Chest || Kind == K_Broadsword || Kind == K_BattleAxe || Kind == K_Katana) Extra = 2;
 		else if (Kind == K_Wand || Kind == K_Staff || Kind == K_Bow || Kind == K_Shoulders) Extra = 1;
-		R.Level = TierLevel[FMath::Clamp(Tier, 0, NumTiers - 1)] + (Tier == 0 ? 0 : Extra);
+		R.Level = TierLevel[FMath::Clamp(Tier, 0, NumTiers - 1)] + (Tier == T_Tin ? 0 : Extra);
 		R.XP = M * TierXP[FMath::Clamp(Tier, 0, NumTiers - 1)];
 		return R;
 	}
 
 	// Levels needed to gather things
-	inline int32 MiningLevelFor(EItemType T) { return T == EItemType::Diamond ? 15 : (T == EItemType::Coal ? 6 : 1); }
+	inline int32 MiningLevelFor(EItemType T)
+	{
+		switch (T)
+		{
+		case EItemType::Coal:      return 6;
+		case EItemType::IronOre:   return 8;
+		case EItemType::SilverOre: return 20;
+		case EItemType::GoldOre:   return 30;
+		case EItemType::Onyx: case EItemType::Emerald: case EItemType::Diamond: return 45;
+		default:                   return 1;   // tin and copper
+		}
+	}
 	inline int32 WoodcuttingLevelFor(EItemType T) { return T == EItemType::RedwoodLogs ? 15 : (T == EItemType::PineLogs ? 6 : 1); }
 	inline int32 FishingLevelFor(EItemType T) { return T == EItemType::GoldenCarp ? 12 : (T == EItemType::Trout ? 5 : 1); }
 	inline int32 FishXP(EItemType T) { return T == EItemType::GoldenCarp ? 60 : (T == EItemType::Trout ? 20 : 8); }
 
+	// ---------------------------------------------------------------- equipping: level gates (2026-10-30)
+	// Weapons need their combat skill (Attack; Archery for bows; Magic for wands and staffs); the gathering tools need their
+	// gathering skill (axe Woodcutting, pickaxe Mining, fishing pole Fishing); armour and shields need Defence.
+	inline ESkillType EquipSkill(int32 Kind)
+	{
+		switch (Kind)
+		{
+		case K_Axe:     return ESkillType::Woodcutting;
+		case K_Pickaxe: return ESkillType::Mining;
+		case K_Rod:     return ESkillType::Fishing;
+		case K_Bow:     return ESkillType::Archery;
+		case K_Wand: case K_Staff: return ESkillType::Magic;
+		default:        return IsWeaponKind(Kind) ? ESkillType::Attack : ESkillType::Defense;
+		}
+	}
+	inline const TCHAR* SkillNameOf(ESkillType S)
+	{
+		static const TCHAR* N[] = { TEXT("Mining"), TEXT("Woodcutting"), TEXT("Smithing"), TEXT("Fishing"), TEXT("Attack"), TEXT("Defence"), TEXT("Archery"), TEXT("Magic"), TEXT("Lockpicking") };
+		return N[FMath::Clamp(static_cast<int32>(S), 0, int32(UE_ARRAY_COUNT(N)) - 1)];
+	}
+	// Can this player wear or wield this item? If not, OutWhy says why. (Capes, rings, amulets and the brush have no gate.)
+	inline bool CanEquip(const USkillComponent* S, int32 Id, FString* OutWhy = nullptr)
+	{
+		if (!IsGear(Id)) return true;
+		const int32 K = KindOf(Id);
+		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
+		const int32 T = VariantOf(Id);
+		if (!KnightCanUseTier(T))
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s gear is made for %s. A knight can't use it."), TierName(T), TierClass(T) == 2 ? TEXT("trolls") : TEXT("wizards"));
+			return false;
+		}
+		const ESkillType Sk = EquipSkill(K);
+		const int32 Need = EquipLevel(T);
+		if (S && S->GetLevel(Sk) < Need)
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("You need %s level %d to use %s."), SkillNameOf(Sk), Need, *ItemName(Id));
+			return false;
+		}
+		return true;
+	}
 	// ---------------------------------------------------------------- selling gear back
 	inline int32 GearSellPrice(int32 Id)
 	{
@@ -489,11 +609,15 @@ namespace JeebItems
 	{
 		switch (T)
 		{
-		case 0: return TEXT("WOOD  - from logs. Weak and cheap: the starting rank.");
-		case 1: return TEXT("BRONZE  - from copper ore. A solid first upgrade.");
-		case 2: return TEXT("IRON  - from coal. Dark and tough.");
-		case 3: return TEXT("STEEL  - coal forged with copper. Bright, strong, smithed only.");
-		default: return TEXT("DIAMOND  - from diamonds and coal. The best there is, smithed only.");
+		case T_Tin:     return TEXT("TIN  - from tin ore. Dull and soft: the starting rank. Level 1.");
+		case T_Iron:    return TEXT("IRON  - from iron ore. Dark and tough. Level 5.");
+		case T_Bronze:  return TEXT("BRONZE  - copper with a little tin. Warm and shining. Level 10.");
+		case T_Steel:   return TEXT("STEEL  - iron ore forged with coal. Bright and strong, smithed only. Level 20.");
+		case T_Silver:  return TEXT("SILVER  - from silver ore. Gleaming, smithed only. Level 30.");
+		case T_Gold:    return TEXT("GOLD  - from gold ore. Golden and rare, smithed only. Level 40.");
+		case T_Onyx:    return TEXT("ONYX  - the knights' legendary: onyx and gold, glossy black. Level 50, Smithing 50.");
+		case T_Emerald: return TEXT("EMERALD  - the trolls' legendary: emerald and gold. Trolls only.");
+		default:        return TEXT("DIAMOND  - the wizards' legendary: diamond and gold. Wizards only.");
 		}
 	}
 	// Short material text for a recipe, e.g. "6 Copper"
@@ -501,10 +625,7 @@ namespace JeebItems
 	{
 		FString S;
 		auto Add = [&](int32 N, const TCHAR* Name) { if (N > 0) { if (!S.IsEmpty()) S += TEXT(", "); S += FString::Printf(TEXT("%d %s"), N, Name); } };
-		Add(R.Logs, TEXT("Logs"));
-		Add(R.Copper, TEXT("Copper"));
-		Add(R.Coal, TEXT("Coal"));
-		Add(R.Diamonds, TEXT("Diamond"));
+		for (int32 i = 0; i < 2; ++i) Add(R.Num[i], MaterialName(R.Mat[i]));
 		return S;
 	}
 }

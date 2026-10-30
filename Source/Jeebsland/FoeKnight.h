@@ -29,7 +29,7 @@ public:
 	// Tuning
 	static constexpr int32 MaxHp = 90;
 	static constexpr int32 HitMin = 11, HitMax = 15;   // raw damage of his swing (your armour softens it)
-	static constexpr int32 Tier = 2;                   // iron
+	static constexpr int32 Tier = 1;                   // iron (tier 1 since the 2026-10-30 redo)
 	static constexpr float BlockStops = 0.7f;          // a blow on his raised shield loses 70%
 
 protected:

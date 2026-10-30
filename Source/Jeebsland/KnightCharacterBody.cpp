@@ -283,7 +283,7 @@ namespace
 {
 	bool PartIsMetal(int32 Tier, EArmorRole Role)
 	{
-		return Tier >= 1 && (Role == EArmorRole::Plate || Role == EArmorRole::Trim || Role == EArmorRole::BootBody);
+		return Tier >= 0 && (Role == EArmorRole::Plate || Role == EArmorRole::Trim || Role == EArmorRole::BootBody);
 	}
 	// The kind of gear that belongs in each knight slot
 	int32 KindForSlot(int32 Slot)

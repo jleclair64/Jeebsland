@@ -256,6 +256,7 @@ bool ALootDrop::EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool 
 	if (!Sk || !HasAuthority() || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
 	const int32 Id = Items[Index].Id;
 	if (!Fits(Id, Hot, Kind)) return false;   // it has to belong in that slot
+	{ FString Why; if (!JeebItems::CanEquip(Sk, Id, &Why)) { Sk->Say(3.f, FColor::Orange, Why); return false; } }   // level gates
 	int32* Target = Hot >= 0 ? &Sk->Hotbar[Hot] : Sk->WornSlotPtr(Kind, bSecond);
 	if (!Target) return false;
 	const int32 Old = *Target;

@@ -4,6 +4,7 @@
 #include "GrassField.h"
 #include "Meadow.h"
 #include "MiningRock.h"
+#include "Inventory.h"
 #include "ChoppableTree.h"
 #include "Forest.h"
 #include "AutumnDecor.h"
@@ -111,17 +112,34 @@ void AKnightGameState::BuildWorld()
 		FVector(CottageSpot.X, CottageSpot.Y, JeebTerrain::HeightAt(CottageSpot.X, CottageSpot.Y)),
 		FRotator(0.f, (-CottageSpot).Rotation().Yaw, 0.f));
 
-	auto SpawnRock = [&](float X, float Y)
+	// Every rock holds one kind of ore for good (2026-10-30, the tier redo). The mix is fixed and shuffled from a fixed seed,
+	// so every machine builds the same world: lots of tin, copper, iron and coal, fewer silver and gold, and only a few gems.
+	TArray<EItemType> OreMix;
 	{
-		World->SpawnActor<AMiningRock>(
-			FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 8.f),
-			FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f));
+		auto Put = [&](EItemType T, int32 N) { for (int32 i = 0; i < N; ++i) OreMix.Add(T); };
+		Put(EItemType::TinOre, 7); Put(EItemType::CopperOre, 6); Put(EItemType::Coal, 5); Put(EItemType::IronOre, 6);
+		Put(EItemType::SilverOre, 4); Put(EItemType::GoldOre, 3); Put(EItemType::Onyx, 2); Put(EItemType::Emerald, 1); Put(EItemType::Diamond, 1);
+		FRandomStream Shuffle(777);
+		for (int32 i = OreMix.Num() - 1; i > 0; --i) OreMix.Swap(i, Shuffle.RandRange(0, i));
+		// the rare ones first: a few scatter spots get skipped (roads, fences), and those must never be the only gem rocks
+		auto Rare = [](EItemType T) { return T == EItemType::SilverOre || T == EItemType::GoldOre || JeebItems::IsGem(T); };
+		OreMix.StableSort([&](EItemType A, EItemType B) { return Rare(A) && !Rare(B); });
+	}
+	int32 NextOre = 0;
+	auto SpawnRock = [&](float X, float Y, EItemType Ore)
+	{
+		const FTransform Xf(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 8.f));
+		if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf))
+		{
+			Rock->SetOre(Ore);
+			Rock->FinishSpawning(Xf);
+		}
 	};
 
-	// A few copper rocks near the starting point...
-	SpawnRock(650.f, -100.f);
-	SpawnRock(900.f, -300.f);
-	SpawnRock(1150.f, 100.f);
+	// A few tin and copper rocks near the starting point (what the starting kit's level needs)...
+	SpawnRock(650.f, -100.f, EItemType::TinOre);
+	SpawnRock(900.f, -300.f, EItemType::CopperOre);
+	SpawnRock(1150.f, 100.f, EItemType::TinOre);
 
 	// ...and plenty more scattered around the hills
 	FRandomStream Rand(4242);
@@ -134,7 +152,7 @@ void AKnightGameState::BuildWorld()
 		if (FVector2D::Distance(FVector2D(X, Y), FVector2D(CottageSpot.X, CottageSpot.Y)) < 800.f) continue;
 		if (JeebTerrain::TreeBlocked(X, Y)) continue; // no rocks on roads, in the village or on hut plots
 		if (JeebTerrain::PropBlocked(X, Y, 120.f)) continue; // nor against fences
-		SpawnRock(X, Y);
+		SpawnRock(X, Y, OreMix[NextOre++ % OreMix.Num()]);
 	}
 
 	// Dirt roads and the walled village with its huts

@@ -254,13 +254,12 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		const int32 Id = bArrows ? ArrowId(B) : GearId(A, B);
 		const int32 Count = bArrows ? ArrowBundle : 1;
 		if (Sk->GetLevel(ESkillType::Smithing) < R.Level) { ShopNote(FString::Printf(TEXT("You need Smithing level %d."), R.Level)); break; }
-		if (Sk->CountWood() < R.Logs || Sk->GetItemCount(EItemType::CopperOre) < R.Copper || Sk->GetItemCount(EItemType::Coal) < R.Coal
-			|| Sk->GetItemCount(EItemType::Diamond) < R.Diamonds) { ShopNote(TEXT("You don't have the materials.")); break; }
+		if (!KnightCanUseTier(B)) { ShopNote(FString::Printf(TEXT("%s is for %s; the smith won't make it for a knight."), TierName(B), TierClass(B) == 2 ? TEXT("trolls") : TEXT("wizards"))); break; }
+		bool bHave = true;
+		for (int32 i = 0; i < 2; ++i) if (R.Num[i] > 0 && Sk->GetItemCount(R.Mat[i]) < R.Num[i]) bHave = false;
+		if (!bHave) { ShopNote(TEXT("You don't have the materials.")); break; }
 		if (!Sk->CanAdd(Id, Count)) { ShopNote(TEXT("Your pack is full.")); break; }
-		if (R.Logs > 0) Sk->TakeWood(R.Logs);
-		if (R.Copper > 0) Sk->RemoveItems(MaterialId(EItemType::CopperOre), R.Copper);
-		if (R.Coal > 0) Sk->RemoveItems(MaterialId(EItemType::Coal), R.Coal);
-		if (R.Diamonds > 0) Sk->RemoveItems(MaterialId(EItemType::Diamond), R.Diamonds);
+		for (int32 i = 0; i < 2; ++i) if (R.Num[i] > 0) Sk->RemoveItems(MaterialId(R.Mat[i]), R.Num[i]);
 		Sk->AddInvItem(Id, Count);
 		Sk->AddXP(ESkillType::Smithing, R.XP);
 		ShopNote(FString::Printf(TEXT("Smithed %s. It is in your pack (Tab)."), bArrows ? *FString::Printf(TEXT("%d %s arrows"), ArrowBundle, TierName(B)) : *ItemName(Id)));

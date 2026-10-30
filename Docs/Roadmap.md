@@ -119,7 +119,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
    - **Also done 2026-10-29/30 (not on the original list):** the knight is now the owner's Meshy model (Tools/BuildKnight.ps1), a realistic walk/jog/sprint with no foot sliding, proper sword grip, bigger amulet, and Fortnite-style strafe mode (wheel click / X).
 3. **Player chat** (with filter and mute).
 4. **Radar potion.**
-5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step.
+5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step. DONE 2026-10-30: nine tiers, new ores (tin, iron, silver, gold, onyx, emerald) on fixed-ore rocks, level gates 1/5/10/20/30/40/50, legendaries by smithing at Smithing 50 (onyx only for knights), saves migrated (version 2).
 6. **The river** (Blackrock west of it, forking south) with **stone bridges**, then **Oak Hill** east of it, the big bridge, the war skirmishes; respawn moves to Oak Hill.
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.

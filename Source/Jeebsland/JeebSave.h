@@ -17,7 +17,7 @@ class UJeebSave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 1;
+	static constexpr int32 CurrentVersion = 2;   // 2: the tier redo (Migrate converts version 1)
 	static const FString SlotName;
 
 	UPROPERTY() int32 SaveVersion = CurrentVersion;

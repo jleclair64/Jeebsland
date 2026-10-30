@@ -58,7 +58,7 @@ namespace JeebItemModel
 			{
 				P.Color = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 				P.Color.R *= D.Shade; P.Color.G *= D.Shade; P.Color.B *= D.Shade;
-				P.bMetal = Tier >= 1 && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
+				P.bMetal = Tier >= 0 && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
 			}
 			Out.Add(P);
 		}
@@ -104,10 +104,14 @@ namespace JeebItemModel
 				break;
 			}
 			case EItemType::CopperOre:
+			case EItemType::TinOre:
+			case EItemType::IronOre:
+			case EItemType::SilverOre:
+			case EItemType::GoldOre:
 			{
-				// a grey chunk of rock with copper showing through
+				// a grey chunk of rock with the ore showing through
 				RBox(NewPart(Out, FLinearColor(0.36f, 0.34f, 0.32f)).Mesh, 6.5, 5.5, 4.5, 0.7, Xf(V3(0, 0, 0), V3(10, -8, 25)), true);
-				FMD& C = NewPart(Out, FLinearColor(0.85f, 0.45f, 0.22f), true).Mesh;
+				FMD& C = NewPart(Out, JeebItems::OreColor(MaterialType(Id)), true).Mesh;
 				Blob(C, 2.4, 2.0, 1.6, Xf(V3(3.5, 2.5, 3.6)));
 				Blob(C, 2.0, 1.8, 1.4, Xf(V3(-3.0, -2.0, 3.8)));
 				Blob(C, 1.6, 1.6, 1.4, Xf(V3(1.0, -3.6, 2.6)));
@@ -122,8 +126,10 @@ namespace JeebItemModel
 				break;
 			}
 			case EItemType::Diamond:
+			case EItemType::Onyx:
+			case EItemType::Emerald:
 			{
-				FMD& G = NewPart(Out, FLinearColor(0.55f, 1.15f, 1.3f), true).Mesh;   // a cluster of pale blue crystals
+				FMD& G = NewPart(Out, MaterialType(Id) == EItemType::Diamond ? FLinearColor(0.55f, 1.15f, 1.3f) : JeebItems::OreColor(MaterialType(Id)) * 1.2f, true).Mesh;   // a cluster of crystals in the gem's colour
 				Crystal(G, 2.6, 9.0, V3(0, 0, 0), V3(0, 0, 0));
 				Crystal(G, 1.9, 6.5, V3(2.6, 1.2, -0.5), V3(-18, 22, 0));
 				Crystal(G, 1.6, 5.0, V3(-2.4, -1.4, -0.5), V3(20, -24, 0));
