@@ -773,29 +773,42 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * Hz * Dt, 2.f * PI);
 	IdleTime += Dt;
 	FlutterTime += Dt * (1.f + 1.5f * Stream);
-	auto LegCycle = [&](float U, float& Hip, float& Knee, bool& bPlanted, float& Follow, float& ToeOff)
+	// Every hand-over flows (2026-10-30, it looked rigid where one foot takes over from the other): the swing starts with
+	// the leg still moving back and ends with it already drawing back to land (part of the planted sweep's speed carried
+	// through), the standing knee eases in and out of its give, the foot rolls from heel-up straight into its swing, and
+	// each foot's hold on the body (Weight) fades in and out instead of switching.
+	const float SweepRate = FMath::RadiansToDegrees(SinAf + SinAb) * (1.f - GContact) / FMath::Max(GContact, 0.05f);   // planted hip speed, per unit of swing
+	const float CarryEnd = -0.3f * SweepRate / FMath::Cos(FMath::DegreesToRadians(GAb));
+	const float CarryStart = -0.3f * SweepRate / FMath::Cos(FMath::DegreesToRadians(GAf));
+	auto LegCycle = [&](float U, float& Hip, float& Knee, float& Weight, float& Follow, float& ToeOff)
 	{
 		if (U < GContact)
 		{
 			const float T = U / GContact;
 			Hip = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(SinAf - (SinAf + SinAb) * T, -1.f, 1.f)));
-			Knee = -4.f - GStanceKnee * FMath::Sin(PI * T);
-			bPlanted = true; Follow = 0.f; ToeOff = FMath::SmoothStep(0.72f, 1.f, T);
+			Knee = -4.f - GStanceKnee * FMath::Square(FMath::Sin(PI * T));
+			Weight = FMath::SmoothStep(0.f, 0.18f, T) * (1.f - FMath::SmoothStep(0.82f, 1.f, T));
+			Follow = 0.f; ToeOff = FMath::SmoothStep(0.65f, 1.f, T);
 		}
 		else
 		{
 			const float T = (U - GContact) / (1.f - GContact);
-			Hip = FMath::Lerp(-GAb, GAf, T * T * (3.f - 2.f * T));
-			Knee = -4.f - GSwingKnee * FMath::Sin(PI * FMath::Pow(T, 0.8f));
-			bPlanted = false; Follow = 1.f - FMath::SmoothStep(0.45f, 0.95f, T); ToeOff = 0.f;
+			const float T2 = T * T, T3 = T2 * T;   // Hermite: from trailing (-Ab) to reaching (+Af), carrying the sweep's speed
+			Hip = (2.f * T3 - 3.f * T2 + 1.f) * -GAb + (T3 - 2.f * T2 + T) * CarryEnd + (-2.f * T3 + 3.f * T2) * GAf + (T3 - T2) * CarryStart;
+			Knee = -4.f - GSwingKnee * FMath::Square(FMath::Sin(PI * FMath::Pow(T, 0.75f)));
+			Weight = 0.f;
+			const float Roll = FMath::SmoothStep(0.f, 0.3f, T);   // heel-up push-off rolling into the trailing swing foot
+			Follow = Roll * (1.f - FMath::SmoothStep(0.5f, 0.95f, T)); ToeOff = 1.f - Roll;
 		}
 	};
 	const float UR = GaitPhase / (2.f * PI), UL = FMath::Fmod(UR + 0.5f, 1.f);
-	float GHipR, GKneeR, GFollowR, GToeR, GHipL, GKneeL, GFollowL, GToeL;
-	bool bPlantR, bPlantL;
-	LegCycle(UR, GHipR, GKneeR, bPlantR, GFollowR, GToeR);
-	LegCycle(UL, GHipL, GKneeL, bPlantL, GFollowL, GToeL);
-	if (MoveBlend < 0.3f) { bPlantR = bPlantL = true; }   // standing: both feet down
+	float GHipR, GKneeR, GFollowR, GToeR, GHipL, GKneeL, GFollowL, GToeL, WR, WL;
+	LegCycle(UR, GHipR, GKneeR, WR, GFollowR, GToeR);
+	LegCycle(UL, GHipL, GKneeL, WL, GFollowL, GToeL);
+	{
+		const float Still = 1.f - FMath::SmoothStep(0.15f, 0.45f, MoveBlend);   // standing: both feet hold him
+		WR = FMath::Lerp(WR, 1.f, Still); WL = FMath::Lerp(WL, 1.f, Still);
+	}
 	const float S = FMath::Clamp(GHipR / FMath::Max(GAf, 1.f), -1.f, 1.f);   // right leg forward when positive (for the arms and hips)
 	const float C = FMath::Cos(GaitPhase);
 
@@ -900,13 +913,14 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		const float Arc = 0.5f * 980.f * FMath::Square(0.5f * TAir);
 		FlightZ = FMath::Lerp(LegHeight(-GAb, -4.f), LegHeight(GAf, -4.f), F) + 4.f * Arc * F * (1.f - F);
 	}
-	const float GroundZ = (bPlantR && bPlantL) ? FMath::Min(HR, HL) : bPlantR ? HR : bPlantL ? HL : FlightZ;
+	const float WAir = FMath::Max(0.f, 1.f - WR - WL);   // neither foot holding him: the float
+	const float GroundZ = (WR * HR + WL * HL + WAir * FlightZ) / FMath::Max(WR + WL + WAir, 0.01f);
 	float BodyZ = FMath::Lerp(GroundZ, 0.f, Air);
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle
 	BodyZ = FMath::Lerp(BodyZ, -45.f, TuckAlpha);
-	SmoothBodyZ = FMath::FInterpTo(SmoothBodyZ, BodyZ, Dt, 22.f); // soften any remaining steps
+	SmoothBodyZ = FMath::FInterpTo(SmoothBodyZ, BodyZ, Dt, 14.f); // soften any remaining steps
 	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, SmoothBodyZ));
 
 	// ---------- Chest: lean into the run, twist against the hips, lean into turns ----------
