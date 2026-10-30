@@ -765,7 +765,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float GAf         = G3(32.f, 40.f, 52.f) * StepScale;   // hip reaching forward at the start of contact
 	const float GAb         = G3(22.f, 32.f, 40.f) * StepScale;   // hip trailing behind at toe-off
 	const float GStanceKnee = G3(8.f, 26.f, 32.f);         // how much the standing knee gives
-	const float GSwingKnee  = G3(58.f, 80.f, 95.f) * StepScale;   // how far the swinging knee folds
+	const float GSwingKnee  = G3(42.f, 50.f, 95.f) * StepScale;   // how far the swinging knee folds (normal speed: about half the sprint, the heels stay low)
 	const float LegReach    = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
 	const float SinAf = FMath::Sin(FMath::DegreesToRadians(GAf)), SinAb = FMath::Sin(FMath::DegreesToRadians(GAb));
 	const float Sweep = LegReach * (SinAf + SinAb);        // ground a planted foot covers
