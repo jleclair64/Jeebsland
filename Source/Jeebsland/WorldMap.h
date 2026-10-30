@@ -11,6 +11,14 @@
 // east is +Y (the sketch's up and right). Blackrock's sketch spot is the existing village.
 namespace JeebWorld
 {
+	// A smooth 0 .. 1 ramp from A to B that works either way round (A > B ramps down). Unreal's Smooth only works with
+	// A < B: called the other way it returns 1 almost everywhere, which once turned the whole world into mountains.
+	inline float Smooth(float A, float B, float X)
+	{
+		const float T = FMath::Clamp((X - A) / ((B - A) == 0.f ? 1.f : (B - A)), 0.f, 1.f);
+		return T * T * (3.f - 2.f * T);
+	}
+
 	constexpr float SketchScale = 130.f;   // cm per sketch pixel
 	inline FVector2D FromSketch(float Px, float Py) { return FVector2D(-2900.f + (870.f - Py) * SketchScale, -300.f + (Px - 400.f) * SketchScale); }
 
@@ -162,11 +170,11 @@ namespace JeebWorld
 	{
 		const float A = 1.f - FMath::Abs(Noise(P + FVector2D(1234.f, 567.f), 9000.f));
 		const float B = 0.5f + 0.5f * Noise(P + FVector2D(-890.f, 4321.f), 4200.f);
-		const float Soft = FMath::SmoothStep(0.f, 1.f, A);   // rounds the crest over instead of a knife edge
+		const float Soft = Smooth(0.f, 1.f, A);   // rounds the crest over instead of a knife edge
 		return 0.55f * Soft + 0.35f * B + 0.10f * (0.5f + 0.5f * Noise(P, 1500.f));
 	}
 	// How high the mountains stand (cm): MountainBase where they start, up to MountainBase + MountainRise on the tallest crests
-	constexpr float MountainBase = 1600.f, MountainRise = 5000.f;
+	constexpr float MountainBase = 1200.f, MountainRise = 3600.f;   // (about 50 m at most: Breath of the Wild / Skyrim scale for a world this size)
 	// 0 .. 1: how much a point is "in the mountains" (soft union of every peak on the sketch, and walls along the west,
 	// south and north edges of the world)
 	inline float MountainMask(const FVector2D& P)
@@ -175,24 +183,26 @@ namespace JeebWorld
 		for (const FVector2D& M : MountainPoints())
 		{
 			const float D = FVector2D::Distance(P, M);
-			if (D < 17000.f) Clear *= 1.f - FMath::SmoothStep(17000.f, 3000.f, D);
+			if (D < 17000.f) Clear *= 1.f - Smooth(17000.f, 3000.f, D);
 		}
 		float Mask = 1.f - Clear;
 		const float Edge = FMath::Min3(P.Y - MinY, P.X - MinX, MaxX - P.X);   // (the east edge is the ocean)
-		Mask = FMath::Max(Mask, FMath::SmoothStep(11000.f, 0.f, Edge));
+		Mask = FMath::Max(Mask, Smooth(11000.f, 0.f, Edge));
 		return Mask;
 	}
 	inline float RockMask(const FVector2D& P)
 	{
 		float Clear = 1.f;
-		for (const FVector2D& R : RockPoints()) Clear *= 1.f - FMath::SmoothStep(15000.f, 2000.f, float(FVector2D::Distance(P, R)));
+		for (const FVector2D& R : RockPoints()) Clear *= 1.f - Smooth(15000.f, 2000.f, float(FVector2D::Distance(P, R)));
 		return 1.f - Clear;
 	}
 	// The land before the rivers and the sea: rolling lowland, mountains and rocky hills, with each town on level ground
 	inline float LandHeight(float X, float Y)
 	{
 		const FVector2D P(X, Y);
-		float H = 120.f + 170.f * (0.5f + 0.5f * Noise(P, 9000.f)) + 60.f * Noise(P + FVector2D(300.f, 900.f), 2500.f);
+		// open country: broad rolling hills a few metres high (like Hyrule Field), with gentle bumps on them
+		float H = 120.f + 170.f * (0.5f + 0.5f * Noise(P, 9000.f)) + 60.f * Noise(P + FVector2D(300.f, 900.f), 2500.f)
+			+ 420.f * (0.5f + 0.5f * Noise(P + FVector2D(-5000.f, 2200.f), 26000.f));
 		const float M = MountainMask(P);
 		if (M > 0.001f) H += FMath::Pow(M, 1.6f) * (MountainBase + MountainRise * Ridged(P));
 		const float Rk = RockMask(P);
@@ -207,12 +217,12 @@ namespace JeebWorld
 			if (!L)
 			{
 				const FVector2D C = T.Pos;
-				float Lv = 120.f + 170.f * (0.5f + 0.5f * Noise(C, 9000.f));
+				float Lv = 120.f + 170.f * (0.5f + 0.5f * Noise(C, 9000.f)) + 420.f * (0.5f + 0.5f * Noise(C + FVector2D(-5000.f, 2200.f), 26000.f));
 				const float Mc = MountainMask(C);
 				if (Mc > 0.001f) Lv += FMath::Pow(Mc, 1.6f) * (MountainBase + MountainRise * 0.35f);   // a shelf partway up, not on a crest
 				L = &Levels.Add(T.Name, Lv);
 			}
-			const float W = 1.f - FMath::SmoothStep(T.Flat, T.Fade, D);
+			const float W = 1.f - Smooth(T.Flat, T.Fade, D);
 			H = FMath::Lerp(H, *L, W);
 		}
 		return H;
@@ -226,8 +236,8 @@ namespace JeebWorld
 		const float D = Y - CoastY(X);   // > 0 out at sea
 		if (D > -3500.f)
 		{
-			if (D <= 0.f) H = FMath::Lerp(H, SeaLevel + 30.f, FMath::SmoothStep(-3500.f, 0.f, D));
-			else H = SeaLevel + 30.f - 1900.f * FMath::SmoothStep(0.f, 5000.f, D);
+			if (D <= 0.f) H = FMath::Lerp(H, SeaLevel + 30.f, Smooth(-3500.f, 0.f, D));
+			else H = SeaLevel + 30.f - 1900.f * Smooth(0.f, 5000.f, D);
 			for (const FVector2D& I : Islands())   // little islands off the coast
 			{
 				const float Di = FVector2D::Distance(P, I);
@@ -240,7 +250,7 @@ namespace JeebWorld
 		if (Dr < 6000.f)
 		{
 			const float Floor = RiverLevel + 130.f;
-			H = FMath::Lerp(H, FMath::Min(H, Floor), FMath::SmoothStep(6000.f, Half + 500.f, Dr));
+			H = FMath::Lerp(H, FMath::Min(H, Floor), Smooth(6000.f, Half + 500.f, Dr));
 			if (Dr < Half + 200.f)
 			{
 				const float U = FMath::Clamp(Dr / (Half + 200.f), 0.f, 1.f);

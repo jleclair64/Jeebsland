@@ -70,15 +70,15 @@ void AWorldTerrain::BuildLand()
 					// colour: green lowland, browner hills, grey rock on steep or high ground, snow up top, sand by the sea,
 					// darker mud in the river beds
 					const float Slope = 1.f - Nrm.Z;   // 0 flat .. 1 vertical
-					FLinearColor C = FMath::Lerp(FLinearColor(0.16f, 0.27f, 0.09f), FLinearColor(0.30f, 0.30f, 0.14f), FMath::SmoothStep(300.f, 2000.f, Z));
-					C = FMath::Lerp(C, FLinearColor(0.30f, 0.29f, 0.27f), FMath::Max(FMath::SmoothStep(0.25f, 0.45f, Slope), FMath::SmoothStep(2600.f, 4500.f, Z)));
-					C = FMath::Lerp(C, FLinearColor(0.85f, 0.87f, 0.90f), FMath::SmoothStep(5200.f, 6200.f, Z) * (1.f - FMath::SmoothStep(0.45f, 0.65f, Slope)));
-					C = FMath::Lerp(C, FLinearColor(0.38f, 0.34f, 0.28f), RockMask(FVector2D(X, Y)) * 0.6f * (1.f - FMath::SmoothStep(2600.f, 4500.f, Z)));
-					const float Shore = FMath::SmoothStep(SeaLevel + 160.f, SeaLevel + 40.f, Z) * FMath::SmoothStep(-4000.f, -500.f, Y - CoastY(X));
+					FLinearColor C = FMath::Lerp(FLinearColor(0.16f, 0.27f, 0.09f), FLinearColor(0.30f, 0.30f, 0.14f), JeebWorld::Smooth(300.f, 2000.f, Z));
+					C = FMath::Lerp(C, FLinearColor(0.30f, 0.29f, 0.27f), FMath::Max(JeebWorld::Smooth(0.25f, 0.45f, Slope), JeebWorld::Smooth(2200.f, 3800.f, Z)));
+					C = FMath::Lerp(C, FLinearColor(0.85f, 0.87f, 0.90f), JeebWorld::Smooth(4300.f, 5000.f, Z) * (1.f - JeebWorld::Smooth(0.45f, 0.65f, Slope)));
+					C = FMath::Lerp(C, FLinearColor(0.38f, 0.34f, 0.28f), RockMask(FVector2D(X, Y)) * 0.6f * (1.f - JeebWorld::Smooth(2200.f, 3800.f, Z)));
+					const float Shore = JeebWorld::Smooth(SeaLevel + 160.f, SeaLevel + 40.f, Z) * JeebWorld::Smooth(-4000.f, -500.f, Y - CoastY(X));
 					C = FMath::Lerp(C, FLinearColor(0.62f, 0.56f, 0.40f), Shore);
 					float Half;
 					const float Dr = RiverDistance(X, Y, Half);
-					C = FMath::Lerp(C, FLinearColor(0.20f, 0.18f, 0.13f), FMath::SmoothStep(Half + 300.f, Half - 100.f, Dr));
+					C = FMath::Lerp(C, FLinearColor(0.20f, 0.18f, 0.13f), JeebWorld::Smooth(Half + 300.f, Half - 100.f, Dr));
 					Col.Add(C);
 				}
 			for (int32 i = CI; i < I1; ++i)
