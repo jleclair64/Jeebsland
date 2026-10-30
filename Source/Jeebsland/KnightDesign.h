@@ -39,16 +39,16 @@ namespace KnightDesign
 		case P_CapeU:  return FVector(-26, 0, 13);
 		case P_CapeL:  return FVector(-26, 0, -19);
 		// (moved 2026-10-29 to the joints of the Meshy model, see KnightModel.h and Tools\knight_blender_export.py)
-		case P_ArmL:   return FVector(0, -29, 14);     // shoulders: broad, under the big pauldrons
-		case P_ArmR:   return FVector(0, 29, 14);
-		case P_ElbowL: return FVector(-1, -35, -6);    // the arms hang a little out from the body
-		case P_ElbowR: return FVector(-1, 35, -6);
+		case P_ArmL:   return FVector(-3, -29, 14);    // shoulders: broad, under the big pauldrons
+		case P_ArmR:   return FVector(-3, 29, 14);
+		case P_ElbowL: return FVector(-5, -34.5, -6);  // the arms hang a little out from the body
+		case P_ElbowR: return FVector(-5, 34.5, -6);
 		case P_HipL:   return FVector(0, -13, -26);
 		case P_HipR:   return FVector(0, 13, -26);
-		case P_KneeL:  return FVector(2, -14, -51);
-		case P_KneeR:  return FVector(2, 14, -51);
-		case P_AnkleL: return FVector(0, -14, -82);    // the feet turn here, so they can stay flat while the knees bend
-		case P_AnkleR: return FVector(0, 14, -82);
+		case P_KneeL:  return FVector(-1, -13, -51);   // (the model's legs are straightened to hang under the hips)
+		case P_KneeR:  return FVector(-1, 13, -51);
+		case P_AnkleL: return FVector(-4, -13, -82);   // the feet turn here, so they can stay flat while the knees bend
+		case P_AnkleR: return FVector(-4, 13, -82);
 		}
 		return FVector(0, 0, 0);
 	}
@@ -56,7 +56,7 @@ namespace KnightDesign
 	// (measured on the model's fists, 2026-10-29)
 	inline FVector FistPos(int32 Side) { return FVector(0.5, Side * 36.5, -38.5); }
 	inline FVector GripPos(bool bLeft) { return FVector(1.0, bLeft ? -36.5 : 36.5, -37.0); }
-	inline FVector WristPos(int32 Side) { return FVector(0.0, Side * 36.5, -29.0); }
+	inline FVector WristPos(int32 Side) { return FVector(-2.0, Side * 37.0, -29.0); }
 	// Lengths of the thigh and the shin (for keeping the feet on the ground as the knees bend)
 	inline double ThighLen() { return FVector::Dist(PivotPos(P_HipR), PivotPos(P_KneeR)); }
 	inline double ShinLen() { return FVector::Dist(PivotPos(P_KneeR), PivotPos(P_AnkleR)); }

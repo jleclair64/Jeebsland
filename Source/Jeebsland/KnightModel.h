@@ -99,6 +99,39 @@ namespace KnightModel
 		return C;
 	}
 
+	// The body inside the armour: dark padded cloth, so wherever the plates part at a joint (a swinging knee, a turning
+	// ankle) you see the man inside instead of the hollow shell. A rounded rod along each limb, a ball in every joint, and
+	// a chest, hips and neck; all sit inside the model's plates at rest.
+	inline void AddCores(TArray<KnightDesign::FDef>& Out)
+	{
+		using namespace KnightDesign;
+		auto Def = [&](int32 Pivot) -> FDef&
+		{
+			FDef D; D.Pivot = Pivot; D.Slot = SlotBody; D.Role = EArmorRole::Under;
+			D.bFixedColor = true; D.Fixed = FLinearColor(0.035f, 0.035f, 0.04f);
+			Out.Add(D);
+			return Out.Last();
+		};
+		// a rod of radius R from A to B with rounded ends (built pointing down, turned to run from A to B)
+		auto Rod = [](KM::FMD& M, const FVector& A, const FVector& B, double R)
+		{
+			const double L = FVector::Dist(A, B);
+			KM::Lathe(M, Prof({ 0, R, R * 0.71, R * 0.71, R, 0, R, -L, R * 0.71, -L - R * 0.71, 0, -L - R }), 14, 1.0, 1.0, KM::Xf(A, KM::DownTo(B - A)));
+		};
+		{ FDef& D = Def(P_Upper); KM::Ellipsoid(D.Mesh, 16.0, 15.5, 19.0, 1.0, 1.0, 20, 14, KM::Xf(FVector(-3, 0, 2))); }      // chest
+		{ FDef& D = Def(P_Body); KM::Ellipsoid(D.Mesh, 14.0, 15.0, 11.0, 1.0, 1.0, 20, 12, KM::Xf(FVector(-1, 0, -26))); }    // hips
+		{ FDef& D = Def(P_Head); Rod(D.Mesh, FVector(-1, 0, 32), FVector(-1, 0, 16), 7.0); }                                   // neck
+		for (int32 sd = -1; sd <= 1; sd += 2)
+		{
+			const int32 Arm = sd < 0 ? P_ArmL : P_ArmR, Elb = sd < 0 ? P_ElbowL : P_ElbowR, Hip = sd < 0 ? P_HipL : P_HipR, Knee = sd < 0 ? P_KneeL : P_KneeR, Ank = sd < 0 ? P_AnkleL : P_AnkleR;
+			{ FDef& D = Def(Arm); Rod(D.Mesh, PivotPos(Arm), PivotPos(Elb), 4.5); }
+			{ FDef& D = Def(Elb); Rod(D.Mesh, PivotPos(Elb), WristPos(sd), 4.8); }
+			{ FDef& D = Def(Hip); Rod(D.Mesh, PivotPos(Hip), PivotPos(Knee), 7.0); }
+			{ FDef& D = Def(Knee); Rod(D.Mesh, PivotPos(Knee), PivotPos(Ank), 6.0); }
+			{ FDef& D = Def(Ank); KM::Ellipsoid(D.Mesh, 9.0, 5.5, 5.5, 1.0, 1.0, 14, 10, KM::Xf(PivotPos(Ank) + FVector(2.0, 0, -4.0))); }   // the foot inside the sabaton
+		}
+	}
+
 	inline void Paint(UPrimitiveComponent* C, int32 Tier)
 	{
 		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Knight/M_Knight.M_Knight"));

@@ -28,7 +28,19 @@ def nrm_game(n): return Vector((-n.y, -n.x, n.z)).normalized()
 P_BODY, P_UPPER, P_HEAD, P_ARML, P_ARMR, P_ELBL, P_ELBR, P_HIPL, P_HIPR, P_KNEEL, P_KNEER, P_ANKL, P_ANKR = 0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 S_HELM, S_BODY, S_SHOULDERS, S_BOOTS, S_GLOVES = 0, 1, 2, 3, 5
 HIP  = lambda sd: Vector((0.0, sd * 13.0, -26.0))
-KNEE = lambda sd: Vector((2.0, sd * 14.0, -51.0))
+KNEE = lambda sd: Vector((-1.0, sd * 17.5, -51.0))   # (where the model's knee is before the legs are straightened)
+ANKLE_Z = -82.0
+
+# The model stands with its legs angled out (knees 4.5 cm, ankles 8 cm wider than the hips) and its toes turned out: that
+# read as a waddle once the legs swing. The leg pieces are slid in so each leg hangs straight under its hip, and each foot
+# is turned to point straight ahead about its ankle.
+LEG_Y = 13.0
+def leg_out(z):   # how far the model's leg centre stands outside the hip line at height z
+    if z >= -26.0: return 0.0
+    if z >= -51.0: return 4.5 * (-26.0 - z) / 25.0
+    if z >= ANKLE_Z: return 4.5 + 3.5 * (-51.0 - z) / 31.0
+    return 8.0
+LEG_PIVOTS = (P_HIPL, P_HIPR, P_KNEEL, P_KNEER, P_ANKL, P_ANKR)
 
 def seg_dist(p, a, b):
     ab = b - a
@@ -69,6 +81,35 @@ uvl = me.uv_layers.active.data
 cn = me.corner_normals
 parts = {}
 gpos = [to_game(v.co) for v in me.vertices]
+
+# each foot's toe-out: the long axis of the sole (principal direction of the lowest points), measured per side
+foot_yaw = {}
+for sd in (-1, 1):
+    pts = [p for p in gpos if p.z < -90.0 and p.y * sd > 4.0]
+    mx = sum(p.x for p in pts) / len(pts); my = sum(p.y for p in pts) / len(pts)
+    sxx = sum((p.x - mx) ** 2 for p in pts); syy = sum((p.y - my) ** 2 for p in pts); sxy = sum((p.x - mx) * (p.y - my) for p in pts)
+    ang = 0.5 * math.atan2(2.0 * sxy, sxx - syy)   # angle of the long axis from +X
+    foot_yaw[sd] = ang
+    print("FOOT side %d toe-out %.1f degrees" % (sd, math.degrees(ang)))
+
+def rot_z(v, a):
+    c, s = math.cos(a), math.sin(a)
+    return Vector((v.x * c - v.y * s, v.x * s + v.y * c, v.z))
+
+def place(p, key):
+    if key[0] not in LEG_PIVOTS: return p
+    sd = 1 if key[0] in (P_HIPR, P_KNEER, P_ANKR) else -1
+    q = Vector((p.x, p.y - sd * leg_out(p.z), p.z))
+    if key[0] in (P_ANKL, P_ANKR):   # turn the foot about its ankle so the toes point ahead
+        a = Vector((-4.0, sd * LEG_Y, ANKLE_Z))
+        q = a + rot_z(q - a, -foot_yaw[sd])
+    return q
+
+def turn(v, key):
+    if key[0] in (P_ANKL, P_ANKR):
+        sd = 1 if key[0] == P_ANKR else -1
+        return rot_z(v, -foot_yaw[sd])
+    return v
 for lt in me.loop_triangles:
     c = (gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0
     key = classify(c)
@@ -76,11 +117,11 @@ for lt in me.loop_triangles:
     tri = []
     for li in lt.loops:
         vi = me.loops[li].vertex_index
-        p = gpos[vi]
-        n = nrm_game(cn[li].vector)
+        p = place(gpos[vi], key)
+        n = turn(nrm_game(cn[li].vector), key)
         uv = uvl[li].uv
         lp = me.loops[li]
-        tg = nrm_game(lp.tangent)
+        tg = turn(nrm_game(lp.tangent), key)
         # the model is mirrored on its way into Unreal's axes, so the texture's up direction needs Unreal's tangent Y
         # flipped exactly when Blender's bitangent sign is +1 (the normal map stays in its own OpenGL form)
         fy = -1.0 if lp.bitangent_sign > 0 else 1.0

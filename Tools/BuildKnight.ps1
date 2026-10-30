@@ -12,7 +12,7 @@ New-Item -ItemType Directory -Force $work | Out-Null
 $glb = Join-Path $proj 'Art\Knight\knight.glb'
 
 & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_prep.py') -- $proj $work 2>&1 | Select-String 'TRIS|Error' | ForEach-Object { Write-Host $_.Line }
-& $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work 2>&1 | Select-String 'PART|Error' | ForEach-Object { Write-Host $_.Line }
+& $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work 2>&1 | Select-String 'PART|FOOT|Error' | ForEach-Object { Write-Host $_.Line }
 
 # The pictures inside the .glb: images 0 (colour), 1 (metal/roughness) and 2 (normal map)
 $b = [IO.File]::ReadAllBytes($glb)

@@ -22,11 +22,41 @@ bm = bmesh.new(); bm.from_mesh(obj.data)
 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.00002)
 bm.to_mesh(obj.data); bm.free()
 
+# The helmet keeps three times the detail of the rest (its slits and visor edges are what people look at): it is split off
+# above the collar, cut down on its own, and joined back
 tris = sum(len(p.vertices) - 2 for p in obj.data.polygons)
-mod = obj.modifiers.new("Dec", 'DECIMATE')
-mod.ratio = min(1.0, target_tris / max(tris, 1))
-bpy.ops.object.modifier_apply(modifier="Dec")
-print("TRIS", tris, "->", sum(len(p.vertices) - 2 for p in obj.data.polygons))
+zs0 = [v.co.z for v in obj.data.vertices]
+head_cut = min(zs0) + (max(zs0) - min(zs0)) * 0.765   # just under the chin
+head_tris = 14000
+bpy.ops.object.mode_set(mode='EDIT')
+bpy.ops.mesh.select_all(action='DESELECT')
+bpy.ops.object.mode_set(mode='OBJECT')
+for p in obj.data.polygons:
+    p.select = p.center.z > head_cut
+bpy.ops.object.mode_set(mode='EDIT')
+bpy.ops.mesh.separate(type='SELECTED')
+bpy.ops.object.mode_set(mode='OBJECT')
+pieces = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+for o in pieces:
+    n = sum(len(p.vertices) - 2 for p in o.data.polygons)
+    is_head = max(v.co.z for v in o.data.vertices) > head_cut + 0.2 and min(v.co.z for v in o.data.vertices) > head_cut - 0.05
+    want = head_tris if is_head else target_tris
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    mod = o.modifiers.new("Dec", 'DECIMATE')
+    mod.ratio = min(1.0, want / max(n, 1))
+    bpy.ops.object.modifier_apply(modifier="Dec")
+    print("TRIS", "head" if is_head else "body", n, "->", sum(len(p.vertices) - 2 for p in o.data.polygons))
+bpy.ops.object.select_all(action='DESELECT')
+for o in pieces:
+    o.select_set(True)
+bpy.context.view_layer.objects.active = pieces[0]
+bpy.ops.object.join()
+obj = bpy.context.active_object
+bm = bmesh.new(); bm.from_mesh(obj.data)
+bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0005)   # close the seam under the chin
+bm.to_mesh(obj.data); bm.free()
 
 # Bounds after import (Blender: Z up). Report which way it faces: glTF front (+Z) becomes Blender -Y.
 vs = [obj.matrix_world @ v.co for v in obj.data.vertices]

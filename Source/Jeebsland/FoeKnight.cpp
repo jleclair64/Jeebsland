@@ -128,6 +128,13 @@ void AFoeKnight::BeginPlay()
 		Meshes.Add(C);
 		KnightModel::Paint(C, Tier);
 	}
+	if (Model.Num() > 0)   // the dark body inside the armour
+	{
+		TArray<FDef> Cores;
+		KnightModel::AddCores(Cores);
+		for (const FDef& D : Cores)
+			if (Pivots[D.Pivot]) Paint(MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh), D.Fixed, false);
+	}
 	for (const FDef& D : Defs)
 	{
 		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0 || D.Slot >= SlotBrush) continue;   // (he carries the kite shield, and no brush)

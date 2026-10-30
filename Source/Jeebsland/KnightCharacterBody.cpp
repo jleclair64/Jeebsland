@@ -53,6 +53,19 @@ void AKnightCharacter::BuildKnight()
 
 	// The armour itself comes from the Meshy model when it is there; the code-built pieces for those slots are left out
 	const TArray<KnightModel::FPart>& Model = KnightModel::Parts();
+	if (Model.Num() > 0)
+	{
+		TArray<KnightDesign::FDef> Cores;
+		KnightModel::AddCores(Cores);
+		for (const KnightDesign::FDef& D : Cores)
+		{
+			if (!Pivots[D.Pivot]) continue;
+			FArmorPart P;
+			P.Comp = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
+			P.Slot = D.Slot; P.Role = D.Role; P.Fixed = D.Fixed; P.bFixedColor = true;
+			ArmorParts.Add(P);
+		}
+	}
 	for (const KnightModel::FPart& MP : Model)
 	{
 		if (!Pivots[MP.Pivot]) continue;
