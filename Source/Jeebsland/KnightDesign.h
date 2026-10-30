@@ -55,9 +55,11 @@ namespace KnightDesign
 	// The middle of each fist, and where a held weapon's grip sits in it
 	// (measured on the model's fists, 2026-10-29, after they were tipped 20 degrees forward to line up with a weapon's grip)
 	inline FVector FistPos(int32 Side) { return FVector(3.6, Side * 36.5, -37.0); }
-	inline FVector GripPos(bool bLeft) { return FVector(3.5, bLeft ? -36.5 : 36.5, -36.0); }
-	// Which way a held blade points out of the fist (Side +1 right hand): across the fist from the thumb side, forward and in
-	inline FVector BladeDir(int32 Side) { return FVector(0.6, -Side * 0.6, -0.3).GetSafeNormal(); }
+	// The sword's grip: through the curl of the fingers, which close front to back (palm to the thigh, back of the hand out,
+	// thumb over the front). Lined up in Blender renders of the model's fist, 2026-10-30.
+	inline FVector GripPos(bool bLeft) { return FVector(-1.0, bLeft ? -38.5 : 38.5, -37.5); }
+	// Which way a held blade points out of the fist (Side +1 right hand): out past the thumb, forward and a little down
+	inline FVector BladeDir(int32 Side) { return FVector(0.97, -Side * 0.06, -0.21).GetSafeNormal(); }
 	inline FVector WristPos(int32 Side) { return FVector(-2.0, Side * 37.0, -29.0); }
 	// Lengths of the thigh and the shin (for keeping the feet on the ground as the knees bend)
 	inline double ThighLen() { return FVector::Dist(PivotPos(P_HipR), PivotPos(P_KneeR)); }

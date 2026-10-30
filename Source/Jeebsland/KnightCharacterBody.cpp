@@ -558,10 +558,8 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 	// of the knight, between his feet (worked out for the arm's relaxed bend)
 	static const FQuat SwordQ = []()
 	{
-		// (the grip still crosses the fist diagonally: the blade only dips further, its tip to the ground in front of him)
-		const FVector Blade = KnightDesign::BladeDir(1);
-		const FVector Want = FVector(0.30, -0.62, -0.72).GetSafeNormal();
-		return FQuat::FindBetweenNormals(Blade, Want);
+		// (since 2026-10-30 a blade stays exactly as gripped: turning it in the hand pulled the grip out of the fist)
+		return FQuat::Identity;
 	}();
 	// The wizard staff stands upright, held round the middle of its shaft with the arm a little out, its foot on the ground
 	// (worked out for the staff's relaxed elbow bend, see WeaponDesign::IdleElbow)

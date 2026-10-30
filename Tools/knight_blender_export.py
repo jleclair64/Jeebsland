@@ -98,7 +98,7 @@ def rot_z(v, a):
     c, s = math.cos(a), math.sin(a)
     return Vector((v.x * c - v.y * s, v.x * s + v.y * c, v.z))
 
-FIST_LEAN = math.radians(-20.0)   # the fists tip forward 20 degrees about the wrist, in line with a held weapon's grip
+FIST_LEAN = math.radians(25.0)   # the fists tip 25 degrees about the wrist, thumb end down, so a sword gripped through them (front to back) carries forward and down
 def rot_y(v, a):
     c, s = math.cos(a), math.sin(a)
     return Vector((v.x * c + v.z * s, v.y, -v.x * s + v.z * c))
