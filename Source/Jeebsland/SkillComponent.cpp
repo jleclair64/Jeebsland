@@ -9,18 +9,30 @@
 
 namespace
 {
-	// Level 1 costs Base XP; each later level costs 20% more than the previous one.
+	// Levels run 1 to 99 (2026-10-30) on RuneScape's curve shape: reaching level L takes the sum over l = 1 .. L-1 of
+	// floor(l + 300 x 2^(l / 7)), divided by 4 (83 XP for level 2, about 13 million for 99), scaled so level 2 costs this
+	// skill's Base XP (level 99 is then about 4.7 million XP for Attack). (The old curve, 20% more per level, could not reach 99.)
+	double RSTotal(int32 L)
+	{
+		static double T[USkillComponent::MaxLevel + 1] = {};
+		static bool bMade = false;
+		if (!bMade)
+		{
+			bMade = true;
+			double Acc = 0.0;
+			T[1] = 0.0;
+			for (int32 l = 1; l < USkillComponent::MaxLevel; ++l) { Acc += FMath::FloorToDouble(l + 300.0 * FMath::Pow(2.0, l / 7.0)); T[l + 1] = FMath::FloorToDouble(Acc / 4.0); }
+		}
+		return T[FMath::Clamp(L, 1, USkillComponent::MaxLevel)];
+	}
 	void ComputeLevel(float Base, int32 XP, int32& Level, float& IntoLevel, float& Needed)
 	{
+		const double K = Base / 83.0;
 		Level = 1;
-		Needed = Base;
-		IntoLevel = static_cast<float>(XP);
-		while (IntoLevel >= Needed)
-		{
-			IntoLevel -= Needed;
-			Needed *= 1.2f;
-			++Level;
-		}
+		while (Level < USkillComponent::MaxLevel && XP >= RSTotal(Level + 1) * K) ++Level;
+		if (Level >= USkillComponent::MaxLevel) { IntoLevel = 1.f; Needed = 1.f; return; }   // maxed: a full bar
+		IntoLevel = float(XP - RSTotal(Level) * K);
+		Needed = float((RSTotal(Level + 1) - RSTotal(Level)) * K);
 	}
 }
 
@@ -98,6 +110,18 @@ FString USkillComponent::SkillName(ESkillType Skill)
 	case ESkillType::Lockpicking: return TEXT("Lockpicking");
 	default:                      return TEXT("Fishing");
 	}
+}
+
+int32 USkillComponent::XPForLevel(ESkillType Skill, int32 Level)
+{
+	return int32(FMath::CeilToDouble(RSTotal(Level) * BaseXP(Skill) / 83.0));
+}
+
+// Testing only (accounts listed under MaxLevelAccounts in DefaultGame.ini): every skill at level 99
+void USkillComponent::SetAllMaxLevel()
+{
+	if (!HasAuth()) return;
+	for (int32 i = 0; i < NumSkills; ++i) { XP[i] = XPForLevel(static_cast<ESkillType>(i), MaxLevel); Known[i] = true; }
 }
 
 int32 USkillComponent::GetLevel(ESkillType Skill) const

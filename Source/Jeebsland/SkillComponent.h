@@ -173,6 +173,9 @@ public:
 	int32 TakeBestArrow();                            // uses one arrow of the best tier; -1 if none
 
 	int32 GetItemCount(EItemType Item) const;
+	static constexpr int32 MaxLevel = 99;
+	static int32 XPForLevel(ESkillType Skill, int32 Level);   // total XP needed to reach a level
+	void SetAllMaxLevel();   // testing only: every skill at 99 (see MaxLevelAccounts in DefaultGame.ini)
 	int32 GetLevel(ESkillType Skill) const;
 	// XPIntoLevel / XPNeeded describe progress through the current level
 	void GetProgress(ESkillType Skill, int32& Level, int32& XPIntoLevel, int32& XPNeeded) const;

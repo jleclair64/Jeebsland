@@ -163,6 +163,16 @@ void AKnightGameMode::TryLogin(AKnightPlayerController* PC, const FString& Name,
 	if (AKnightCharacter* Knight = Cast<AKnightCharacter>(PC->GetPawn()))
 	{
 		if (PC->PendingSave && PC->PendingSave->ApplyTo(Knight->GetSkills())) Knight->RefreshEquipment();
+		// TESTING ONLY: accounts listed in DefaultGame.ini ([Jeebsland.Testing] +MaxLevelAccounts=name) get every skill at 99
+		// when they log in, to try all the gear. Remove the line there to turn it off.
+		TArray<FString> MaxLevelAccounts;
+		if (GConfig) GConfig->GetArray(TEXT("Jeebsland.Testing"), TEXT("MaxLevelAccounts"), MaxLevelAccounts, GGameIni);
+		if (MaxLevelAccounts.ContainsByPredicate([&](const FString& A) { return A.Equals(Key, ESearchCase::IgnoreCase); }) && Knight->GetSkills())
+		{
+			Knight->GetSkills()->SetAllMaxLevel();
+			Knight->GetSkills()->Say(5.f, FColor(255, 215, 90), TEXT("Test account: every skill set to level 99."));
+			UE_LOG(LogTemp, Log, TEXT("Jeebsland: %s is a max-level test account"), *Key);
+		}
 	}
 	PC->PendingSave = nullptr;
 	SaveCharacter(PC);   // (a new character gets its file straight away)
