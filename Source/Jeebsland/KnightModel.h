@@ -21,6 +21,7 @@ namespace KnightModel
 		int32 Pivot = 0, Slot = 0;
 		TArray<FVector> V, N;
 		TArray<FVector2D> UV;
+		TArray<FProcMeshTangent> T;   // (for the normal map)
 		TArray<int32> I;
 	};
 
@@ -36,20 +37,21 @@ namespace KnightModel
 		auto Read = [&](void* Dst, int64 Bytes) { if (Bytes < 0 || Pos + Bytes > B.Num()) return false; FMemory::Memcpy(Dst, B.GetData() + Pos, Bytes); Pos += Bytes; return true; };
 		char Magic[4];
 		int32 Ver = 0, Num = 0;
-		if (!Read(Magic, 4) || FMemory::Memcmp(Magic, "JKNT", 4) != 0 || !Read(&Ver, 4) || Ver != 1 || !Read(&Num, 4)) return Cache;
+		if (!Read(Magic, 4) || FMemory::Memcmp(Magic, "JKNT", 4) != 0 || !Read(&Ver, 4) || Ver != 2 || !Read(&Num, 4)) return Cache;
 		for (int32 p = 0; p < Num; ++p)
 		{
 			FPart P;
 			int32 NV = 0, NI = 0;
 			if (!Read(&P.Pivot, 4) || !Read(&P.Slot, 4) || !Read(&NV, 4) || !Read(&NI, 4) || P.Pivot < 0 || P.Pivot >= KnightDesign::P_Count) { Cache.Empty(); return Cache; }
-			P.V.SetNum(NV); P.N.SetNum(NV); P.UV.SetNum(NV);
+			P.V.SetNum(NV); P.N.SetNum(NV); P.UV.SetNum(NV); P.T.SetNum(NV);
 			for (int32 i = 0; i < NV; ++i)
 			{
-				float F[8];
+				float F[12];
 				if (!Read(F, sizeof(F))) { Cache.Empty(); return Cache; }
 				P.V[i] = FVector(F[0], F[1], F[2]);
 				P.N[i] = FVector(F[3], F[4], F[5]);
 				P.UV[i] = FVector2D(F[6], F[7]);
+				P.T[i] = FProcMeshTangent(FVector(F[8], F[9], F[10]), F[11] < 0.f);
 			}
 			P.I.SetNum(NI);
 			if (!Read(P.I.GetData(), int64(NI) * 4)) { Cache.Empty(); return Cache; }
@@ -66,11 +68,15 @@ namespace KnightModel
 		return Slot == SlotHelmet || Slot == SlotBody || Slot == SlotShoulders || Slot == SlotBoots || Slot == SlotGloves;
 	}
 
-	// The model is painted steel: the tint that turns its metal into a tier's plate colour
+	// The model is painted steel: the tint that turns its metal into a tier's plate colour. Its brightness is pulled halfway
+	// back towards the steel's, so warm tiers (bronze) stay bright metal instead of going dark brown
 	inline FLinearColor TierTint(int32 Tier)
 	{
 		const FLinearColor Steel = JeebItems::Palette(3, 0), C = JeebItems::Palette(Tier, 0);
-		return FLinearColor(FMath::Min(C.R / Steel.R, 2.f), FMath::Min(C.G / Steel.G, 2.f), FMath::Min(C.B / Steel.B, 2.f), 1.f);
+		FLinearColor T(C.R / Steel.R, C.G / Steel.G, C.B / Steel.B, 1.f);
+		const float Lum = FMath::Max(0.2126f * T.R + 0.7152f * T.G + 0.0722f * T.B, 0.05f);
+		T *= 1.f / FMath::Sqrt(Lum);
+		return FLinearColor(FMath::Min(T.R, 2.f), FMath::Min(T.G, 2.f), FMath::Min(T.B, 2.f), 1.f);
 	}
 
 	// One piece as a mesh component on its joint (its shape is in capsule space, so it is moved back by the joint's position)
@@ -89,7 +95,7 @@ namespace KnightModel
 			Tris.Add(P.I[t]); Tris.Add(P.I[t + 1]); Tris.Add(P.I[t + 2]);
 			Tris.Add(P.I[t]); Tris.Add(P.I[t + 2]); Tris.Add(P.I[t + 1]);
 		}
-		C->CreateMeshSection_LinearColor(0, P.V, Tris, P.N, P.UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		C->CreateMeshSection_LinearColor(0, P.V, Tris, P.N, P.UV, TArray<FLinearColor>(), P.T, false);
 		return C;
 	}
 

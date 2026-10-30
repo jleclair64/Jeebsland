@@ -108,7 +108,7 @@ FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-16.f, 16.f, float(i) / (CapeNX - 1));
 	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-22.f + 0.028f * Y * Y, Y, 61.f));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-26.5f + 0.012f * Y * Y, Y, 61.f));
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -210,8 +210,8 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				float Lim = FMath::Lerp(-21.5f, -20.5f, FMath::Clamp((L.Z - 5.f) / 10.f, 0.f, 1.f));   // the back of the breastplate, easing into the mail skirt (no sudden step for points to jump across)
-				if (bStowed && L.Z > -9.f) Lim = -34.f;   // and over the shield when it is on the back
+				float Lim = -27.5f;   // the back of the armour (it stands out to about -23.6 at the shoulder blades), plus the cloth's 3 cm thickness
+				if (bStowed && L.Z > -9.f) Lim = -38.f;   // and over the shield when it is on the back
 				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
 			}
 		}
@@ -461,7 +461,7 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		if (bOnBack)
 		{
 			P.Comp->AttachToComponent(UpperPivot, FAttachmentTransformRules::KeepRelativeTransform);
-			P.Comp->SetRelativeLocationAndRotation(FVector(-10.f, -41.f, 41.f), FRotator(0.f, 180.f, 0.f));
+			P.Comp->SetRelativeLocationAndRotation(FVector(-14.f, -41.f, 41.f), FRotator(0.f, 180.f, 0.f));
 		}
 		else
 		{
@@ -488,7 +488,7 @@ const FShieldRest& ShieldRest()
 			const FVector N = (Want - Up * FVector::DotProduct(Want, Up)).GetSafeNormal();
 			const FQuat Q = FQuat(N, FMath::DegreesToRadians(-30.f)) * FRotationMatrix::MakeFromXZ(N, Up).ToQuat();
 			const FVector Strap(14.0, -41.0, -8.0);
-			const FVector Target = -Fore * 2.0 + N * 11.5 + FVector(5.0, 4.0, 0.0);
+			const FVector Target = -Fore * 10.0 + N * 11.5 + FVector(5.0, 4.0, 0.0);   // (8 cm further down the forearm since the model's fists, 2026-10-29)
 			const FTransform InElbow(Q, Target - Q.RotateVector(Strap));
 			const FTransform ElbowInArm(FRotator(15.f, 0.f, -22.f).Quaternion(), PE - PA);
 			Out.InArm = InElbow * ElbowInArm;

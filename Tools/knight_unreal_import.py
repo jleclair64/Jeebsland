@@ -2,6 +2,7 @@
 # Run by Tools\BuildKnight.ps1 inside a windowless editor (the editor must be closed).
 #   T_Knight_Base: the painted colour (steel plate, dark cloth, brown belt)
 #   T_Knight_MR:   glTF metal/roughness (green = roughness, blue = metal)
+#   T_Knight_N:    the normal map (the crisp bevels and panel lines); kept in its own OpenGL form, the mesh's tangents allow for it
 # M_Knight tints only the metal (where blue is high) by its Tint parameter, so each armour tier recolours the plate while
 # the cloth and the belt keep their own colours. Roughness never drops below MinRough: a near-mirror finish reflected the
 # grass and turned the plate green.
@@ -14,7 +15,7 @@ proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 art = os.path.join(proj, "Art", "Knight")
 
 
-def import_texture(path, name, srgb):
+def import_texture(path, name, srgb, normal=False):
     task = unreal.AssetImportTask()
     task.filename = path
     task.destination_path = "/Game/Knight"
@@ -27,7 +28,10 @@ def import_texture(path, name, srgb):
     if tex is None:
         raise RuntimeError("KNIGHTDIAG the picture " + name + " did not import")
     tex.set_editor_property("srgb", srgb)
-    if not srgb:
+    if normal:
+        tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+        tex.set_editor_property("flip_green_channel", False)
+    elif not srgb:
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
     unreal.EditorAssetLibrary.save_asset("/Game/Knight/" + name)
     return tex
@@ -35,6 +39,7 @@ def import_texture(path, name, srgb):
 
 base = import_texture(os.path.join(art, "T_Knight_Base.jpg"), "T_Knight_Base", True)
 mr = import_texture(os.path.join(art, "T_Knight_MR.jpg"), "T_Knight_MR", False)
+nm = import_texture(os.path.join(art, "T_Knight_N.jpg"), "T_Knight_N", False, normal=True)
 
 if unreal.EditorAssetLibrary.does_asset_exist("/Game/Knight/M_Knight"):
     unreal.EditorAssetLibrary.delete_asset("/Game/Knight/M_Knight")
@@ -72,11 +77,14 @@ lib.connect_material_expressions(metal, "", mm, "A")
 lib.connect_material_expressions(ms, "", mm, "B")
 lib.connect_material_property(mm, "", unreal.MaterialProperty.MP_METALLIC)
 
-mn = node(unreal.MaterialExpressionScalarParameter, -500, 650, parameter_name="MinRough", default_value=0.5)
+mn = node(unreal.MaterialExpressionScalarParameter, -500, 650, parameter_name="MinRough", default_value=0.38)
 rough = node(unreal.MaterialExpressionMax, -250, 600)
 lib.connect_material_expressions(tm, "G", rough, "A")
 lib.connect_material_expressions(mn, "", rough, "B")
 lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+
+tn = node(unreal.MaterialExpressionTextureSample, -900, 800, texture=nm, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+lib.connect_material_property(tn, "RGB", unreal.MaterialProperty.MP_NORMAL)
 
 lib.recompile_material(mat)
 unreal.EditorAssetLibrary.save_asset("/Game/Knight/M_Knight")

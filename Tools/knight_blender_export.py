@@ -4,8 +4,9 @@
 # It also renders front and side pictures with each piece in its own colour, to check the cuts.
 # Run: blender -b -P Tools/knight_blender_export.py -- <project dir> <dir holding knight_dec.blend>
 #
-# KnightParts.bin (little endian): 'JKNT', int32 version (1), int32 part count; per part: int32 pivot, int32 slot,
-# int32 vertex count, int32 index count, then per vertex 8 floats (position xyz, normal xyz, uv), then the indices.
+# KnightParts.bin (little endian): 'JKNT', int32 version (2), int32 part count; per part: int32 pivot, int32 slot,
+# int32 vertex count, int32 index count, then per vertex 12 floats (position xyz, normal xyz, uv, tangent xyz, tangent-y sign:
+# -1 means Unreal must flip its tangent Y), then the indices.
 import bpy, sys, os, struct, math
 from mathutils import Vector
 
@@ -58,8 +59,12 @@ def classify(c):
         return (P_KNEER if sd > 0 else P_KNEEL, S_BOOTS)
     return (P_ANKR if sd > 0 else P_ANKL, S_BOOTS)
 
+# ---- Crisp plate edges: faces meeting at more than 40 degrees get their own normals ----
+me.set_sharp_from_angle(angle=math.radians(40.0))
+
 # ---- Gather triangles per piece ----
 me.calc_loop_triangles()
+me.calc_tangents(uvmap=me.uv_layers.active.name)
 uvl = me.uv_layers.active.data
 cn = me.corner_normals
 parts = {}
@@ -74,12 +79,17 @@ for lt in me.loop_triangles:
         p = gpos[vi]
         n = nrm_game(cn[li].vector)
         uv = uvl[li].uv
-        k = (vi, round(uv.x, 5), round(uv.y, 5), round(n.x, 3), round(n.y, 3), round(n.z, 3))
+        lp = me.loops[li]
+        tg = nrm_game(lp.tangent)
+        # the model is mirrored on its way into Unreal's axes, so the texture's up direction needs Unreal's tangent Y
+        # flipped exactly when Blender's bitangent sign is +1 (the normal map stays in its own OpenGL form)
+        fy = -1.0 if lp.bitangent_sign > 0 else 1.0
+        k = (vi, round(uv.x, 5), round(uv.y, 5), round(n.x, 3), round(n.y, 3), round(n.z, 3), round(tg.x, 2), round(tg.y, 2), round(tg.z, 2), fy)
         idx = P["map"].get(k)
         if idx is None:
             idx = len(P["v"])
             P["map"][k] = idx
-            P["v"].append((p.x, p.y, p.z, n.x, n.y, n.z, uv.x, 1.0 - uv.y))   # V flipped back to the texture's own (top-left) origin
+            P["v"].append((p.x, p.y, p.z, n.x, n.y, n.z, uv.x, 1.0 - uv.y, tg.x, tg.y, tg.z, fy))   # V flipped back to the texture's own (top-left) origin
         tri.append(idx)
     P["i"].extend(tri)
 
@@ -87,11 +97,11 @@ out_dir = os.path.join(proj, "Content", "Knight")
 os.makedirs(out_dir, exist_ok=True)
 with open(os.path.join(out_dir, "KnightParts.bin"), "wb") as f:
     f.write(b"JKNT")
-    f.write(struct.pack("<ii", 1, len(parts)))
+    f.write(struct.pack("<ii", 2, len(parts)))
     for (pivot, slot), P in sorted(parts.items()):
         f.write(struct.pack("<iiii", pivot, slot, len(P["v"]), len(P["i"])))
         for v in P["v"]:
-            f.write(struct.pack("<8f", *v))
+            f.write(struct.pack("<12f", *v))
         f.write(struct.pack("<%di" % len(P["i"]), *P["i"]))
         print("PART pivot %2d slot %d: %6d verts %6d tris" % (pivot, slot, len(P["v"]), len(P["i"]) // 3))
 

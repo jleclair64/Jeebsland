@@ -14,13 +14,13 @@ $glb = Join-Path $proj 'Art\Knight\knight.glb'
 & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_prep.py') -- $proj $work 2>&1 | Select-String 'TRIS|Error' | ForEach-Object { Write-Host $_.Line }
 & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work 2>&1 | Select-String 'PART|Error' | ForEach-Object { Write-Host $_.Line }
 
-# The pictures inside the .glb: images 0 (colour) and 1 (metal/roughness)
+# The pictures inside the .glb: images 0 (colour), 1 (metal/roughness) and 2 (normal map)
 $b = [IO.File]::ReadAllBytes($glb)
 $jl = [BitConverter]::ToUInt32($b, 12)
 $j = [Text.Encoding]::UTF8.GetString($b, 20, $jl) | ConvertFrom-Json
 $bin = 20 + $jl + 8
-$names = @('T_Knight_Base.jpg', 'T_Knight_MR.jpg')
-for ($i = 0; $i -lt 2; $i++) {
+$names = @('T_Knight_Base.jpg', 'T_Knight_MR.jpg', 'T_Knight_N.jpg')
+for ($i = 0; $i -lt 3; $i++) {
     $bv = $j.bufferViews[$j.images[$i].bufferView]
     $off = $bin + [int]$bv.byteOffset
     [IO.File]::WriteAllBytes((Join-Path $proj "Art\Knight\$($names[$i])"), $b[$off..($off + $bv.byteLength - 1)])
