@@ -232,10 +232,16 @@ void AKnightCharacter::ApplyGraphics()
 	// Soft shadows that blur with distance from the caster (the sun's size sets how much): high branches leave soft dapples
 	// on the ground instead of a sharp dark web
 	Set(TEXT("r.Shadow.FilterMethod"), 1);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
-	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 2 : 4);   // Lowest: plain temporal smoothing (calms flicker; FXAA did not)
+	// Speed pass (2026-10-29, owner wants high frame rates): plain temporal smoothing (TAA) on both levels instead of TSR
+	// (about 2 ms less on the graphics card), cheaper post-processing, cached sun shadows with fewer cascades and a shorter reach
+	Set(TEXT("r.AntiAliasingMethod"), 2);
 	for (TActorIterator<AForest> It(W); It; ++It) It->SetLeafShadows(!bLowest);   // Lowest: no swaying leaf shadows (they blinked)
-	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 3);
-	Set(TEXT("sg.EffectsQuality"), bLowest ? 0 : 3);
+	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 1);
+	Set(TEXT("r.AmbientOcclusionLevels"), 0);
+	Set(TEXT("sg.EffectsQuality"), bLowest ? 0 : 2);
+	Set(TEXT("r.Shadow.CSMCaching"), 1);
+	Set(TEXT("r.Shadow.CSM.MaxCascades"), bLowest ? 1 : 2);
+	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.7"));
 	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));
 }
 
