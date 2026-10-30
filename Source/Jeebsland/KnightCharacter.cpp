@@ -855,11 +855,28 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
 		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
 	}
-	const float HipRg = GHipR * MoveBlend * StepFw;
-	const float HipLg = GHipL * MoveBlend * StepFw;
+	// Facing the camera (strafe mode, shield stance), like Fortnite: the shoulders and back stay square to the camera while the
+	// hips and legs turn up to 45 degrees toward the way you are going (backing up, toward the way straight behind) and run
+	// that way; whatever is left over (moving straight sideways) is a sidestep. The chest turns back by the same amount.
+	float LegFw = StepFw, LegSd = StepSd;
+	{
+		float WantYaw = 0.f;
+		if (bFaceCam && (FMath::Abs(StepFw) + FMath::Abs(StepSd)) > 0.2f)
+		{
+			const float Ang = FMath::RadiansToDegrees(FMath::Atan2(StepSd, StepFw));   // 0 ahead, +90 right, 180 behind
+			const float Toward = FMath::Abs(Ang) <= 90.f ? Ang : Ang - 180.f * FMath::Sign(Ang);
+			WantYaw = FMath::Clamp(Toward, -45.f, 45.f);
+		}
+		LegYaw = FMath::FInterpTo(LegYaw, WantYaw * MoveBlend, Dt, 8.f);
+		const float Rel = FMath::DegreesToRadians(FMath::RadiansToDegrees(FMath::Atan2(StepSd, StepFw)) - LegYaw);
+		const float Mag = FMath::Min(1.f, FMath::Sqrt(StepFw * StepFw + StepSd * StepSd));
+		if (bFaceCam) { LegFw = FMath::Cos(Rel) * Mag; LegSd = FMath::Sin(Rel) * Mag; }
+	}
+	const float HipRg = GHipR * MoveBlend * LegFw;
+	const float HipLg = GHipL * MoveBlend * LegFw;
 	const float SideAmp = 24.f * MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float HipRroll = SideAmp * StepSd * (0.5f + 0.5f * S);   // positive roll swings a hanging leg to the right
-	const float HipLroll = SideAmp * StepSd * (0.5f - 0.5f * S);
+	const float HipRroll = SideAmp * LegSd * (0.5f + 0.5f * S);   // positive roll swings a hanging leg to the right
+	const float HipLroll = SideAmp * LegSd * (0.5f - 0.5f * S);
 	const float KneeRg = GKneeR * MoveBlend;
 	const float KneeLg = GKneeL * MoveBlend;
 	// In the air: knees tuck on the way up, legs reach forward on the way down
@@ -958,7 +975,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
 	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
-	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground, TurnRoll + Sway));
+	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
 	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
@@ -974,7 +991,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
 		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
 	}
-	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground, 2.5f * MoveBlend * C * Ground));
+	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw, 2.5f * MoveBlend * C * Ground));
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;

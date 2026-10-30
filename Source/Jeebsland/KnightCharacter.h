@@ -470,6 +470,7 @@ private:
 	// Moves and stances
 	bool bCrouched = false;
 	bool bBlocking = false;
+	float LegYaw = 0.f;   // facing the camera (strafe mode, shield stance): how far the hips and legs turn toward the way you move (Fortnite style)
 	bool bStrafeMode = false;   // strafe mode (wheel click or X): always face where the camera looks, sidestep and back up instead of turning
 	void ToggleStrafe();
 	bool bBlockHeld = false;   // the block button is down (the shield drops during a swing and comes back after it if still held)
