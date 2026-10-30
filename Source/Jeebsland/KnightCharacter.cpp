@@ -304,12 +304,15 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	BlockAction  = MakeBool(TEXT("KnightBlock"));
 	SlideAction  = MakeBool(TEXT("KnightSlide"));
 	RollAction   = MakeBool(TEXT("KnightRoll"));
+	StrafeAction = MakeBool(TEXT("KnightStrafe"));
 	SitAction    = MakeBool(TEXT("KnightSit"));
 	KnightContext->MapKey(CrouchAction, EKeys::LeftControl);
 	KnightContext->MapKey(BlockAction, EKeys::RightMouseButton);
 	KnightContext->MapKey(SlideAction, EKeys::C);
 	KnightContext->MapKey(RollAction, EKeys::V);
 	KnightContext->MapKey(RollAction, EKeys::LeftAlt);
+	KnightContext->MapKey(StrafeAction, EKeys::MiddleMouseButton);   // strafe mode; X does the same (laptops have no wheel click)
+	KnightContext->MapKey(StrafeAction, EKeys::X);
 	DodgeLAction = MakeBool(TEXT("KnightDodgeL"));
 	KnightContext->MapKey(DodgeLAction, EKeys::A);
 	DodgeRAction = MakeBool(TEXT("KnightDodgeR"));
@@ -395,6 +398,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(BlockAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopBlock);
 		EIC->BindAction(SlideAction, ETriggerEvent::Started, this, &AKnightCharacter::StartSlide);
 		EIC->BindAction(RollAction, ETriggerEvent::Started, this, &AKnightCharacter::StartRoll);
+		EIC->BindAction(StrafeAction, ETriggerEvent::Started, this, &AKnightCharacter::ToggleStrafe);
 		EIC->BindAction(SitAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInteractKey);
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInventoryKey);
 		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
@@ -674,7 +678,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
-	if (bStance && HasAuthority() && !IsLocallyControlled() && GetController())
+	const bool bFaceCam = (bStance || bStrafeMode) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed
+	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
 	{
 		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)
 		const FVector Acc = Move->GetCurrentAcceleration().GetSafeNormal2D();
@@ -683,9 +688,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
 	}
 	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0);
-	if (bStance && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
-	else if (!bStance && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
-	if (bStance && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
+	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
+	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
+	if (bFaceCam && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
 	const float StanceFactor = 1.f;
 	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? FMath::Min(1.f, JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield]))) : 1.f;   // tower: slower; nothing beats a walk
@@ -831,7 +836,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	{
 		const FVector LV = GetActorRotation().UnrotateVector(FVector(Vel.X, Vel.Y, 0.f));
 		float Fw = 1.f, Sd = 0.f;
-		if (bBlockHeld && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
+		if ((bBlockHeld || bStrafeMode) && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
 		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
 		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
 	}

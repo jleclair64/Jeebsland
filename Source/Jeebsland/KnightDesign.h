@@ -57,7 +57,7 @@ namespace KnightDesign
 	inline FVector FistPos(int32 Side) { return FVector(3.6, Side * 36.5, -37.0); }
 	// The sword's grip: through the curl of the fingers, which close front to back (palm to the thigh, back of the hand out,
 	// thumb over the front). Lined up in Blender renders of the model's fist, 2026-10-30.
-	inline FVector GripPos(bool bLeft) { return FVector(-1.0, bLeft ? -38.5 : 38.5, -37.5); }
+	inline FVector GripPos(bool bLeft) { return FVector(-3.9, bLeft ? -38.7 : 38.7, -36.9); }   // (slid 3 cm back along the blade so the guard clears the thumb)
 	// Which way a held blade points out of the fist (Side +1 right hand): out past the thumb, forward and a little down
 	inline FVector BladeDir(int32 Side) { return FVector(0.97, -Side * 0.06, -0.21).GetSafeNormal(); }
 	inline FVector WristPos(int32 Side) { return FVector(-2.0, Side * 37.0, -29.0); }
@@ -570,19 +570,24 @@ namespace KnightDesign
 			{ FDef& D = Add(Elb, Slot, EArmorRole::Accent); D.bFixedColor = true; D.Fixed = FLinearColor(0.8f, 0.05f, 0.08f);
 			  Bead(D.Mesh, 1.1, F + V3(7.9, -sd * 1.6, -1.2)); }
 		}
+		// The amulet (2026-10-30: bigger, and sitting on the Meshy model's breastplate): a heavy gold chain that goes right round
+		// the collar, under the back of the helmet, and down the chest to a large medallion with a blue stone. Measured on the
+		// model: the chest stands out to about x 23 at the medallion, the collar about 21 round the back at neck height.
 		{
 			FDef& D = Add(P_Upper, SlotAmulet, EArmorRole::Trim); D.bFixedColor = true; D.Fixed = FLinearColor(1.0f, 0.72f, 0.22f);
-			for (int32 sd = -1; sd <= 1; sd += 2)
-			{
-				TArray<FVector> Path; TArray<FVector2D> AB;
-				Path.Add(V3(13.0, sd * 10.0, 19.5)); Path.Add(V3(18.5, sd * 6.0, 15.5)); Path.Add(V3(21.2, sd * 1.5, 12.8));
-				for (int32 i = 0; i < 3; ++i) AB.Add(FVector2D(0.4, 0.4));
-				Sweep(D.Mesh, Path, AB, V3(0, 0, 1), 6, 1.0, Xf(O0));
-			}
-			Ellipsoid(D.Mesh, 0.8, 3.0, 3.6, 1.0, 1.0, 16, 10, Xf(V3(21.6, 0, 9.5)));
+			static const FVector Half[] = { V3(24.6, 1.3, 14.0), V3(23.4, 3.6, 17.2), V3(20.6, 7.2, 21.0), V3(16.8, 14.6, 24.2), V3(6.5, 20.4, 25.8),
+			                                V3(-5.0, 21.2, 26.4), V3(-14.8, 17.0, 26.8), V3(-20.6, 9.0, 26.8), V3(-22.0, 0.0, 26.8) };
+			TArray<FVector> Path; TArray<FVector2D> AB;
+			for (const FVector& P : Half) Path.Add(P);                                                  // right side, round to the back
+			for (int32 i = UE_ARRAY_COUNT(Half) - 2; i >= 0; --i) Path.Add(V3(Half[i].X, -Half[i].Y, Half[i].Z));   // and the left side back to the front
+			for (int32 i = 0; i < Path.Num(); ++i) AB.Add(FVector2D(0.6, 0.6));
+			Sweep(D.Mesh, Path, AB, V3(0, 0, 1), 6, 1.0, Xf(O0));
+			Torus(D.Mesh, 1.6, 0.55, 12, 6, 1.0, 1.0, Xf(V3(24.9, 0, 13.6), V3(0, 90, 0)));   // the bail the chain runs through
+			// the medallion: a thick gold disc facing forward with a raised rim
+			Lathe(D.Mesh, Prof({ 0, -0.8, 5.4, -0.8, 6.0, 0.0, 5.6, 0.9, 4.6, 0.9, 4.4, 0.5, 0, 0.6 }), 24, 1.0, 1.0, Xf(V3(25.0, 0, 8.0), V3(0, 90, 0)), false);
 		}
 		{ FDef& D = Add(P_Upper, SlotAmulet, EArmorRole::Accent); D.bFixedColor = true; D.Fixed = FLinearColor(0.1f, 0.35f, 0.9f);
-		  Bead(D.Mesh, 1.4, V3(22.5, 0, 9.5)); }
+		  Ellipsoid(D.Mesh, 1.2, 2.6, 2.6, 1.0, 1.0, 16, 10, Xf(V3(26.0, 0, 8.0))); }   // the blue stone
 
 		// =========================================================================================
 		// SHIELDS (left arm; weapons are modelled in WeaponDesign.h). The cape is cloth, simulated by the character

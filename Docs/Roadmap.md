@@ -82,7 +82,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
   3. Charge hit on held left click, with a red charge bar.
   4. Grab (beats shield) and small knockback on hits (hit beats grab, shield beats hit).
   5. Hit stun, combos with escapes, and the knockdown from a low sweep (get up / get-up attack / roll, buffered; speed and knockback scale with health percentage).
-  6. Crouch block (low shield stops sweeps, high shield stops overheads) and the strafe-mode toggle on wheel click (X twin).
+  6. Crouch block (low shield stops sweeps, high shield stops overheads). (The strafe-mode toggle on wheel click, X twin, was BUILT 2026-10-30: AKnightCharacter::ToggleStrafe.)
   - Every weapon gets four moves (left click, scroll down, scroll up, charge). Sword, staff and spear moves are listed in the shelved file's combat section (unchanged).
 - **Classes [L, later, build as NPCs first]:** knights (all-rounders), trolls (slow, huge reach, break guards), wizards (glass cannon, spells, a bubble shield). Mild PvP triangle: knights beat wizards, wizards beat trolls, trolls beat knights.
 

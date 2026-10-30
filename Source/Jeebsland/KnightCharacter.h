@@ -320,6 +320,7 @@ private:
 	UPROPERTY() UInputAction* BlockAction = nullptr;
 	UPROPERTY() UInputAction* SlideAction = nullptr;
 	UPROPERTY() UInputAction* RollAction = nullptr;
+	UPROPERTY() UInputAction* StrafeAction = nullptr;   // mouse wheel click (or X): strafe mode on/off
 	UPROPERTY() UInputAction* DodgeLAction = nullptr;
 	UPROPERTY() UInputAction* DodgeRAction = nullptr;
 	UPROPERTY() UInputAction* DodgeFAction = nullptr;
@@ -469,6 +470,8 @@ private:
 	// Moves and stances
 	bool bCrouched = false;
 	bool bBlocking = false;
+	bool bStrafeMode = false;   // strafe mode (wheel click or X): always face where the camera looks, sidestep and back up instead of turning
+	void ToggleStrafe();
 	bool bBlockHeld = false;   // the block button is down (the shield drops during a swing and comes back after it if still held)
 	bool bSliding = false;
 	bool bRolling = false;

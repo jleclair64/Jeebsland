@@ -410,7 +410,7 @@ void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, flo
 void AKnightCharacter::SendState()
 {
 	if (HasAuthority() || !IsLocallyControlled()) return;
-	const uint8 F = (bSprinting ? 1 : 0) | (bCrouched ? 2 : 0) | (bBlockHeld ? 4 : 0);
+	const uint8 F = (bSprinting ? 1 : 0) | (bCrouched ? 2 : 0) | (bBlockHeld ? 4 : 0) | (bStrafeMode ? 8 : 0);
 	if (F == SentState) return;
 	SentState = F;
 	ServerState(F);
@@ -424,6 +424,7 @@ void AKnightCharacter::ServerState_Implementation(uint8 Flags)
 	if (bCrouch != bCrouched) { if (bCrouch) StartCrouch(); else StopCrouch(); }
 	const bool bHold = (Flags & 4) != 0;
 	if (bHold != bBlockHeld) { if (bHold) StartBlock(); else StopBlock(); }
+	bStrafeMode = (Flags & 8) != 0;
 }
 
 void AKnightCharacter::ServerRoll_Implementation(FVector_NetQuantizeNormal Dir)

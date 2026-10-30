@@ -243,6 +243,15 @@ void AKnightCharacter::AddControllerPitchInput(float Val)
 	Super::AddControllerPitchInput(Val * LookSensitivity);
 }
 
+// Strafe mode (wheel click or X): on or off. Movement keeps going where you press; the knight just stops turning to face it
+// and keeps facing where the camera looks (Tick), sidestepping and backing up like the shield stance but at full speed.
+void AKnightCharacter::ToggleStrafe()
+{
+	if (IsUIOpen()) return;
+	bStrafeMode = !bStrafeMode;
+	if (Skills) Skills->Say(1.5f, FColor(200, 220, 255), bStrafeMode ? TEXT("Strafe mode on") : TEXT("Strafe mode off"));
+}
+
 void AKnightCharacter::DoMove(float Right, float Forward)
 {
 	const double Now = GetWorld()->GetTimeSeconds();

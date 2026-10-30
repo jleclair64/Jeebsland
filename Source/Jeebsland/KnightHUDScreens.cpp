@@ -179,6 +179,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Right click (hold)"), TEXT("Raise your shield and duck (needs a shield; not with two-handed weapons)") },
 			{ TEXT("C while sprinting"), TEXT("Slide") },
 			{ TEXT("V or Alt"),       TEXT("Dodge roll") },
+		{ TEXT("Wheel click or X"), TEXT("Strafe mode on/off: keep facing where you look, step sideways and back") },
 			{ TEXT("Tab"),            TEXT("Inventory: click gear to wear or hold it, click worn gear to take it off") },
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
