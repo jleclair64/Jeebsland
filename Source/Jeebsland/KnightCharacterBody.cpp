@@ -34,6 +34,7 @@
 #include "Combat.h"
 #include "WeaponDesign.h"
 #include "ProceduralMeshComponent.h"
+#include "KnightModel.h"
 #include "Misc/ConfigCacheIni.h"
 
 // ---------------- The knight's body parts ----------------
@@ -50,9 +51,21 @@ void AKnightCharacter::BuildKnight()
 	TArray<KnightDesign::FDef> Defs;
 	KnightDesign::Build(Defs);
 
+	// The armour itself comes from the Meshy model when it is there; the code-built pieces for those slots are left out
+	const TArray<KnightModel::FPart>& Model = KnightModel::Parts();
+	for (const KnightModel::FPart& MP : Model)
+	{
+		if (!Pivots[MP.Pivot]) continue;
+		FArmorPart P;
+		P.Comp = KnightModel::MakeComp(this, Pivots[MP.Pivot], MP);
+		P.Slot = MP.Slot;
+		P.bModel = true;
+		ArmorParts.Add(P);
+	}
 	for (const KnightDesign::FDef& D : Defs)
 	{
 		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot]) continue;
+		if (Model.Num() > 0 && KnightModel::IsModelSlot(D.Slot)) continue;
 		UProceduralMeshComponent* C = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
 
 		FArmorPart P;
@@ -95,7 +108,7 @@ FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-16.f, 16.f, float(i) / (CapeNX - 1));
 	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-19.f + 0.028f * Y * Y, Y, 57.f));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-22.f + 0.028f * Y * Y, Y, 61.f));
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -333,8 +346,10 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		else if (bAlways) bVisible = true;
 		else bVisible = bWorn && (Slot == KnightDesign::SlotCape || (Var >= P.MinTier && Var <= P.MaxTier));
 		if (Slot == KnightDesign::SlotShield && bWorn && P.Style != JeebItems::StyleOf(Id)) bVisible = false;   // only the worn shield style
+		if (P.bModel) bVisible = true;   // (armour is never taken off; the model has no bare-skin version)
 		P.Comp->SetVisibility(bVisible);
 		if (!bVisible) continue;
+		if (P.bModel) { KnightModel::Paint(P.Comp, Var); continue; }
 
 		FLinearColor Color;
 		bool bMetal = false;
@@ -464,7 +479,7 @@ const FShieldRest& ShieldRest()
 	{
 		FShieldRest Out;
 		const FVector PA = KnightDesign::PivotPos(KnightDesign::P_ArmL), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowL);
-		const FVector W(6.0, -34.6, -24.5);
+		const FVector W = KnightDesign::WristPos(-1);
 		// where the shield sat (strapped to the forearm bent 15 degrees forward and turned 22 degrees in): keep exactly that
 		{
 			const FVector Fore = (PE - W).GetSafeNormal();

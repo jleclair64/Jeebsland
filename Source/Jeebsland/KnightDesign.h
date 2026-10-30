@@ -38,22 +38,27 @@ namespace KnightDesign
 		case P_Plume:  return FVector(-2, 0, 71);
 		case P_CapeU:  return FVector(-26, 0, 13);
 		case P_CapeL:  return FVector(-26, 0, -19);
-		case P_ArmL:   return FVector(0, -28, 6);      // shoulders: broad
-		case P_ArmR:   return FVector(0, 28, 6);
-		case P_ElbowL: return FVector(0, -32, -13);    // the arms hang a little out from the body
-		case P_ElbowR: return FVector(0, 32, -13);
-		case P_HipL:   return FVector(0, -11.5, -40);
-		case P_HipR:   return FVector(0, 11.5, -40);
-		case P_KneeL:  return FVector(0, -12, -63);
-		case P_KneeR:  return FVector(0, 12, -63);
-		case P_AnkleL: return FVector(1, -12.5, -86.5);   // the feet turn here, so they can stay flat while the knees bend
-		case P_AnkleR: return FVector(1, 12.5, -86.5);
+		// (moved 2026-10-29 to the joints of the Meshy model, see KnightModel.h and Tools\knight_blender_export.py)
+		case P_ArmL:   return FVector(0, -29, 14);     // shoulders: broad, under the big pauldrons
+		case P_ArmR:   return FVector(0, 29, 14);
+		case P_ElbowL: return FVector(-1, -35, -6);    // the arms hang a little out from the body
+		case P_ElbowR: return FVector(-1, 35, -6);
+		case P_HipL:   return FVector(0, -13, -26);
+		case P_HipR:   return FVector(0, 13, -26);
+		case P_KneeL:  return FVector(2, -14, -51);
+		case P_KneeR:  return FVector(2, 14, -51);
+		case P_AnkleL: return FVector(0, -14, -82);    // the feet turn here, so they can stay flat while the knees bend
+		case P_AnkleR: return FVector(0, 14, -82);
 		}
 		return FVector(0, 0, 0);
 	}
 	// The middle of each fist, and where a held weapon's grip sits in it
-	inline FVector FistPos(int32 Side) { return FVector(7, Side * 35.0, -30); }
-	inline FVector GripPos(bool bLeft) { return FVector(8, bLeft ? -35.0 : 35.0, -26); }
+	inline FVector FistPos(int32 Side) { return FVector(8, Side * 36.0, -36); }
+	inline FVector GripPos(bool bLeft) { return FVector(9, bLeft ? -36.0 : 36.0, -32); }
+	inline FVector WristPos(int32 Side) { return FVector(5, Side * 36.0, -27); }
+	// Lengths of the thigh and the shin (for keeping the feet on the ground as the knees bend)
+	inline double ThighLen() { return FVector::Dist(PivotPos(P_HipR), PivotPos(P_KneeR)); }
+	inline double ShinLen() { return FVector::Dist(PivotPos(P_KneeR), PivotPos(P_AnkleR)); }
 
 	struct FDef
 	{
@@ -417,7 +422,7 @@ namespace KnightDesign
 		{
 			const int32 Arm = (sd < 0) ? P_ArmL : P_ArmR, Elb = (sd < 0) ? P_ElbowL : P_ElbowR;
 			const FVector J = PivotPos(Arm), E = PivotPos(Elb), F = FistPos(sd);
-			const FVector W(6.0, sd * 34.6, -24.5);                 // the wrist
+			const FVector W = WristPos(sd);
 			const FXf UpperX = Xf(J, DownTo(E - J)), ForeX = Xf(E, DownTo(W - E));
 			const FVector Cd = V3(-0.55, sd * 0.8, -0.1).GetSafeNormal();   // the point of the elbow: back and out
 			{

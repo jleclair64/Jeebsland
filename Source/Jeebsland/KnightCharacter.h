@@ -35,6 +35,7 @@ struct FArmorPart
 	bool bFixedColor = false;        // always its Fixed colour, matte (black eye openings, the red brush)
 	int32 Style = 0;                 // shields: which shield style the piece belongs to
 	float Shade = 1.f;
+	bool bModel = false;             // a piece of the Meshy model (KnightModel.h): painted by M_Knight, tinted for the tier
 };
 
 // Everything a player can do to their pack, gear and money. ONLINE the player's machine only asks (AKnightCharacter::Inv sends a

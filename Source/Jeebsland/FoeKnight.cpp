@@ -8,6 +8,7 @@
 #include "Terrain.h"
 #include "Messages.h"
 #include "ProceduralMeshComponent.h"
+#include "KnightModel.h"
 #include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
@@ -118,9 +119,19 @@ void AFoeKnight::BeginPlay()
 	// A full suit of iron (dark grey plate, red accents), shield included; no bare skin
 	TArray<FDef> Defs;
 	Build(Defs);
+	// the armour from the Meshy model when it is there (the same as the player's), tinted for his tier
+	const TArray<KnightModel::FPart>& Model = KnightModel::Parts();
+	for (const KnightModel::FPart& MP : Model)
+	{
+		if (!Pivots[MP.Pivot]) continue;
+		UProceduralMeshComponent* C = KnightModel::MakeComp(this, Pivots[MP.Pivot], MP);
+		Meshes.Add(C);
+		KnightModel::Paint(C, Tier);
+	}
 	for (const FDef& D : Defs)
 	{
 		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0 || D.Slot >= SlotBrush) continue;   // (he carries the kite shield, and no brush)
+		if (Model.Num() > 0 && KnightModel::IsModelSlot(D.Slot)) continue;
 		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));

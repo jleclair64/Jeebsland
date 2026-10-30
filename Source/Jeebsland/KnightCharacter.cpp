@@ -849,7 +849,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// flat feet stay on the ground (thigh 23 cm, shin 23.5 cm)
 	const float PoseH = 35.f * Squash + DuckHip + Stance * Relax;
 	const float PoseK = -70.f * Squash + DuckKnee - 2.f * Stance * Relax;
-	const float LegDrop = 23.f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + 23.5f * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
+	const float LegDrop = float(KnightDesign::ThighLen()) * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + float(KnightDesign::ShinLen()) * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
 	float BodyZ = FMath::Lerp(Bounce, 0.f, Air) - LegDrop;
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
