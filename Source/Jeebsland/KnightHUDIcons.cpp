@@ -162,8 +162,7 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	// ---------------- potions: a round flask with a cork, filled with its colour ----------------
 	if (IsPotion(Id))
 	{
-		static const FLinearColor Fill[NumPotions] = { FLinearColor(0.25f, 0.85f, 0.25f), FLinearColor(0.9f, 0.12f, 0.1f), FLinearColor(0.6f, 0.2f, 0.9f), FLinearColor(0.1f, 0.8f, 0.85f) };
-		const FLinearColor F = Fill[PotionType(Id)];
+		const FLinearColor F = PotionRow(PotionType(Id)).Color;   // (Potions.csv)
 		const FLinearColor Glass(0.75f, 0.85f, 0.95f, 0.55f), Cork(0.55f, 0.36f, 0.18f);
 		DiscP(32, 42, 18, 18, Glass);                                      // the bulb
 		DiscP(32, 46, 15, 11, F);                                          // the potion inside, filling the lower part
@@ -206,15 +205,13 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		}
 		if (K == K_Ring || K == K_Amulet)
 		{
-			static const FLinearColor RingBand[NumRings] = { {0.80f,0.82f,0.88f,1.f}, {0.95f,0.75f,0.20f,1.f}, {0.72f,0.45f,0.20f,1.f}, {0.80f,0.82f,0.88f,1.f}, {0.95f,0.75f,0.20f,1.f} };
-			static const FLinearColor RingGem[NumRings] = { {0.95f,0.95f,1.f,1.f}, {1.f,0.95f,0.6f,1.f}, {1.f,0.55f,0.15f,1.f}, {0.2f,0.45f,1.f,1.f}, {0.95f,0.1f,0.2f,1.f} };
-			static const FLinearColor AmGem[NumAmulets] = { {1.f,0.7f,0.1f,1.f}, {0.1f,0.8f,0.35f,1.f}, {0.65f,0.2f,0.95f,1.f}, {0.3f,0.5f,1.f,1.f}, {0.95f,0.2f,0.3f,1.f} };
+			const FAccessoryRow& Acc = AccessoryRow(K, V);   // (Accessories.csv: Band and Gem colours)
 			if (K == K_Ring)
 			{
-				DiscP(32, 38, 19, 19, RingBand[V]);
+				DiscP(32, 38, 19, 19, Acc.Band);
 				DiscP(32, 38, 12, 12, FLinearColor(0.10f, 0.09f, 0.08f));
-				Poly({ P(32, 8), P(42, 17), P(32, 27), P(22, 17) }, RingGem[V]);
-				Poly({ P(32, 8), P(42, 17), P(32, 17) }, Lift(RingGem[V], 1.3f));
+				Poly({ P(32, 8), P(42, 17), P(32, 27), P(22, 17) }, Acc.Gem);
+				Poly({ P(32, 8), P(42, 17), P(32, 17) }, Lift(Acc.Gem, 1.3f));
 			}
 			else
 			{
@@ -224,8 +221,8 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 					const float T = k / 8.f;
 					DiscP(8.f + 48.f * T, 6.f + 30.f * (1.f - FMath::Abs(2.f * T - 1.f)) * 1.f, 2.4f, 2.4f, Chain);
 				}
-				Poly({ P(32, 30), P(46, 42), P(32, 60), P(18, 42) }, AmGem[V]);
-				Poly({ P(32, 30), P(46, 42), P(32, 42) }, Lift(AmGem[V], 1.35f));
+				Poly({ P(32, 30), P(46, 42), P(32, 60), P(18, 42) }, Acc.Gem);
+				Poly({ P(32, 30), P(46, 42), P(32, 42) }, Lift(Acc.Gem, 1.35f));
 				Poly({ P(32, 30), P(36, 28), P(32, 24), P(28, 28) }, Chain);
 			}
 			return;

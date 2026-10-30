@@ -1,0 +1,17 @@
+Kind,Name,Price,AttackMul,DefenceMul,CritChance,DamageFloor,DamageCeiling,Wild,SpeedMul,MaxHealth,Band,Gem,Text
+# Rings, amulets and the helm brush. Saves remember each ring and amulet by its place among its own Kind, so never delete or reorder rows:
+# add new ones at the END of their Kind (up to 10 rings and 10 amulets). Only the first crest row is used.
+# AttackMul / DefenceMul: damage and defence x this (1 = no change). CritChance: share of hits that are critical (+50%). DamageFloor / DamageCeiling: added to the lowest / highest hit.
+# Wild: yes = every hit is multiplied by a random 0.5 to 2.0. SpeedMul: walking and running speed x this. MaxHealth: added to your health.
+# Band / Gem: icon colours (red green blue, 0 to 1). Text: the description.
+ring,Silver Ring,120,1.15,0.95,0,0,0,no,1,0,0.80 0.82 0.88,0.95 0.95 1.0,"+15% attack, -5% defence"
+ring,Gold Ring,100,0.95,1.10,0,0,0,no,1,0,0.95 0.75 0.20,1.0 0.95 0.6,"+10% defence, -5% attack"
+ring,Bronze Band,60,1.05,1.05,0,0,0,no,1,0,0.72 0.45 0.20,1.0 0.55 0.15,"+5% attack, +5% defence"
+ring,Sapphire Ring,130,0.90,1.20,0,0,0,no,1,0,0.80 0.82 0.88,0.2 0.45 1.0,"+20% defence, -10% attack"
+ring,Ruby Ring,140,1.25,0.85,0,0,0,no,1,0,0.95 0.75 0.20,0.95 0.1 0.2,"+25% attack, -15% defence"
+amulet,Hawk's Eye Amulet,200,1,1,0.20,0,0,no,1,0,0.85 0.85 0.9,1.0 0.7 0.1,20% of hits are critical: +50% damage
+amulet,Emerald Necklace,180,1,1,0,0,0,yes,1,0,0.85 0.85 0.9,0.1 0.8 0.35,Every hit is multiplied by 0.5 to 2.0
+amulet,Chaos Pendant,160,1,1,0,-3,5,no,1,0,0.85 0.85 0.9,0.65 0.2 0.95,"Lowest damage -3, highest damage +5"
+amulet,Guardian Amulet,150,1,1.15,0,0,0,no,1,0,0.85 0.85 0.9,0.3 0.5 1.0,+15% defence
+amulet,Vitality Amulet,150,1,1,0,0,0,no,1,25,0.85 0.85 0.9,0.95 0.2 0.3,+25 maximum health
+crest,Red Helm Brush,120,1,1,0,0,0,no,1.05,0,0.80 0.10 0.10,0.80 0.10 0.10,+5% speed. A red horsehair brush along the crest of your helm

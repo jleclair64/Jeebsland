@@ -1,0 +1,6 @@
+Name,GuardMul,MoveMul,RecoverDelay,Note
+# Shield styles. Each has its own model in the code, so keep these three rows in this order (kite, round, tower); every column can be changed.
+# GuardMul: the guard is the shield's Defence x this. MoveMul: speed in the shield stance x this. RecoverDelay: seconds after the last blocked blow before the guard refills.
+Kite Shield,1,1,10,Kite: the all-rounder
+Round Shield,0.75,1.15,5,"Round: a smaller guard, but it recovers twice as soon and you move 15% quicker behind it"
+Tower Shield,1.5,0.8,10,"Tower: a guard half as big again, but you move 20% slower behind it"

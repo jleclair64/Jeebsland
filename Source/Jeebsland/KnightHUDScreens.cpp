@@ -279,7 +279,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 
 	if (K == K_Cape)
 	{
-		for (int32 c = 0; c < NumCapeColors; ++c)
+		for (int32 c = 0; c < NumCapeColors(); ++c)
 		{
 			DrawIcon(GearId(K_Cape, c), CX, Y - 4.f, 30.f);
 			HDText(CapeColorName(c), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
@@ -290,7 +290,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	}
 	if (IsAccessoryKind(K))
 	{
-		const int32 N = (K == K_Ring) ? NumRings : NumAmulets;
+		const int32 N = (K == K_Ring) ? NumRings() : NumAmulets();
 		for (int32 v = 0; v < N; ++v)
 		{
 			DrawIcon(GearId(K, v), CX, Y - 6.f, 36.f);

@@ -1,0 +1,22 @@
+Key,Name,Group,StackSize,SellValue,Color,GatherLevel,FishXP
+# Ores, gems, logs, fish and animal drops. Keep the Key values (saves store these by number); every other column can be changed.
+# Group: ore / gem / wood / fish / animal. StackSize: how many fit in one pack slot. SellValue: ingots the store pays for one.
+# Color: red green blue (0 to 1) for the rock lumps, icons and dropped stacks. GatherLevel: the Mining, Woodcutting or Fishing level needed. FishXP: Fishing XP per catch.
+CopperOre,Copper Ore,ore,10,3,0.80 0.40 0.12,1,0
+Coal,Coal,ore,10,5,0.02 0.02 0.02,6,0
+Logs,Logs,wood,5,2,0.5 0.5 0.5,1,0
+Diamond,Diamond,gem,5,60,0.45 0.92 1.00,45,0
+Bacon,Raw Pork,animal,5,6,0.5 0.5 0.5,1,0
+PineLogs,Pine Logs,wood,5,4,0.5 0.5 0.5,6,0
+RedwoodLogs,Redwood Logs,wood,5,8,0.5 0.5 0.5,15,0
+Perch,Perch,fish,10,4,0.5 0.5 0.5,1,8
+Trout,Trout,fish,10,10,0.5 0.5 0.5,5,20
+GoldenCarp,Golden Carp,fish,5,35,0.5 0.5 0.5,12,60
+Hide,Beast Hide,animal,5,9,0.5 0.5 0.5,1,0
+Bones,Bones,animal,5,4,0.5 0.5 0.5,1,0
+TinOre,Tin Ore,ore,10,2,0.62 0.64 0.62,1,0
+IronOre,Iron Ore,ore,10,6,0.45 0.20 0.10,8,0
+SilverOre,Silver Ore,ore,10,15,0.86 0.88 0.92,20,0
+GoldOre,Gold Ore,ore,10,25,0.98 0.74 0.20,30,0
+Onyx,Onyx,gem,5,60,0.05 0.04 0.06,45,0
+Emerald,Emerald,gem,5,60,0.08 0.80 0.32,45,0

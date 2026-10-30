@@ -1,0 +1,10 @@
+Name,Effect,Amount,Seconds,Cooldown,Price,StackSize,Color,Shop,Text
+# Potions. Saves remember potions by their ROW, so never delete or reorder rows: add new potions at the END (up to 50).
+# Effect: what drinking it does (the effects are in the code): speed (run Amount times as fast for Seconds), heal (heal Amount x your full health at once),
+#   vigour (health bar Amount times as big for Seconds; the extra comes full), radar (enemies and players on your minimap for Seconds).
+# Cooldown: seconds before that potion can be drunk again. Price: ingots at the store (it always stocks every potion). Color: the liquid (red green blue, 0 to 1).
+# Shop: the short line in the store. Text: the description when you hover over it.
+Swiftness Potion,speed,1.5,8,60,25,10,0.25 0.85 0.25,Speed for 8 s,You run 50% faster for 8 seconds. Ready again after 1 minute.
+Healing Potion,heal,1,0,120,40,10,0.9 0.12 0.1,Heals you fully,Heals you to full at once. Ready again after 2 minutes.
+Vigour Potion,vigour,1.5,60,60,35,10,0.6 0.2 0.9,"+50% health, 1 min",Your health bar grows by 50% for 1 minute (the extra comes full). Ready again after 1 minute.
+Radar Potion,radar,0,120,180,60,10,0.1 0.8 0.85,"Enemy radar, 2 min",Enemies and other players near you show as red dots on your minimap for 2 minutes. Ready again after 3 minutes.

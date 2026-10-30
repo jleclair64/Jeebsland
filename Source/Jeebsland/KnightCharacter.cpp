@@ -570,7 +570,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	if (Skills && HasAuthority())
 	{
 		int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
-		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * 1.5f);   // vigour potion: a bigger bar for a minute
+		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * VigourMul);   // vigour potion: a bigger bar for a while
 		if (NewMax != MaxHealth)
 		{
 			if (NewMax > MaxHealth) Health += NewMax - MaxHealth;   // a bigger bar comes with the extra already full
@@ -724,7 +724,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
 	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f)   // swiftness potion
+	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f)   // swiftness potion
 	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush
 	if (bFalling && !bSpecial)
 	{

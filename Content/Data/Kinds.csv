@@ -1,0 +1,26 @@
+Key,Name,DamageMin,DamageMax,Range,Cooldown,Defence,BuyPrice,Mass,SmithExtraLevel,TwoHanded,Blurb
+# Every kind of gear. Keep the Key values (the game finds each row by its Key, and how each kind fights is in the code); every other column can be changed.
+# DamageMin / DamageMax: a TIN weapon's damage (better tiers add steps, see Tiers.csv). Range: reach in centimetres. Cooldown: seconds between swings.
+# Defence: a TIN armour piece's or shield's defence (x the tier's DefenceMult). BuyPrice: a BRONZE piece's store price (x the tier's PriceMult; capes use it as is).
+# Mass: how much material smithing it takes. SmithExtraLevel: added to the tier's Smithing level (not for tin). TwoHanded: yes = no shield with it.
+Sword,Sword,8,12,230,0.55,0,40,4,0,no,"The all-rounder: quick, reliable hits. Swing left to right, then right to left for a fast combo. A shield can be carried with it."
+Axe,Axe,9,13,220,0.70,0,45,5,0,no,"Hits harder than a sword and chops trees faster. Equip it (or let it auto-select) to chop. A shield can be carried with it."
+Pickaxe,Pickaxe,6,9,210,0.75,0,35,4,0,no,A mining tool first and a weapon only in a pinch. Better pickaxes mine faster and unlock harder ore.
+Spear,Spear,6,9,380,0.65,0,40,4,0,no,Long reach. Hold the attack button to charge a lunge. A shield can be carried with it.
+Broadsword,Broadsword,15,22,260,0.95,0,90,8,2,yes,"A heavy two-handed blade: slow swings, big damage. Cannot be used with a shield."
+BattleAxe,Battle Axe,17,25,250,1.05,0,100,9,2,yes,"The biggest hitter and the slowest. Two-handed, no shield."
+Katana,Katana,6,9,225,0.38,0,110,6,2,yes,"A pair of light curved blades, one in each hand. Very fast, modest hits. No shield."
+Wand,Wand,7,11,1800,0.55,0,80,3,1,no,Fires small magic bolts at range. Light and quick.
+Staff,Wizard Staff,11,17,2200,1.00,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."
+Bow,Bow,5,7,4000,0.80,0,60,4,1,no,"Fires arrows from a distance. Arrows run out: buy them at the store or smith them. Better arrows hit harder. A shield can be carried with it."
+Rod,Fishing Pole,2,3,200,0.80,0,30,3,0,no,A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.
+Shield,Shield,1,2,200,1,8,50,6,0,no,"Hold right-click to block blows from the front. A shield's guard stops damage up to its Defence; once spent, the guard is broken and stops only half of each blow until it recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons."
+Helmet,Helmet,1,2,200,1,3,40,5,0,no,Protects the head. Defence adds to the total of all worn armour.
+Chest,Chestplate,1,2,200,1,7,90,10,2,no,The heaviest armour piece and the biggest defence bonus.
+Shoulders,Shoulders,1,2,200,1,4,55,6,1,no,Layered pauldrons for the shoulders.
+Gloves,Gloves,1,2,200,1,2,30,3,0,no,Armoured gauntlets for the hands.
+Boots,Boots,1,2,200,1,3,45,5,0,no,"Armoured boots. Better boots also give you more stamina: it lasts longer and returns faster."
+Cape,Cape,1,2,200,1,0,25,0,0,no,A cloak in your choice of colour. Purely for style.
+Ring,Ring,1,2,200,1,0,0,0,0,no,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."
+Amulet,Amulet,1,2,200,1,0,0,0,0,no,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."
+Crest,Helm Brush,1,2,200,1,0,0,0,0,no,

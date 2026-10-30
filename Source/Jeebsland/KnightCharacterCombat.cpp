@@ -249,7 +249,7 @@ void AKnightCharacter::Die()
 // ---------------- Potions ----------------
 float AKnightCharacter::GetPotionCooldownLeft(int32 Type) const
 {
-	if (Type < 0 || Type >= JeebItems::NumPotions) return 0.f;
+	if (!PotionReadyAt.IsValidIndex(Type)) return 0.f;
 	return FMath::Max(0.f, PotionReadyAt[Type] - GetWorld()->GetTimeSeconds());
 }
 

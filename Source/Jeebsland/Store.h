@@ -64,19 +64,19 @@ namespace JeebStore
 		};
 
 		// Cheap: always a bundle of plain arrows, then tin and iron bits and a cape (tiers since 2026-10-30: tin, iron, bronze)
-		// Potions are always in stock: swiftness, healing and vigour
-		for (int32 T = 0; T < NumPotions; ++T) Push(PotionWare(T), 5, 5);
+		// Every potion is always in stock (Potions.csv)
+		for (int32 T = 0; T < NumPotions(); ++T) Push(PotionWare(T), 5, 5);
 		Push(ArrowWare(R.RandRange(T_Tin, T_Iron)), 5, 5);
 		for (int32 Guard = 0; Out.Num() < 6 && Guard < 50; ++Guard)
 		{
-			if (R.FRand() < 0.25f) Push(GearWare(K_Cape, R.RandRange(0, NumCapeColors - 1)), 1, 2);
+			if (R.FRand() < 0.25f) Push(GearWare(K_Cape, R.RandRange(0, NumCapeColors() - 1)), 1, 2);
 			else Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);
 		}
 		// Middling: bronze pieces, iron heavy weapons, rings, bronze arrows
 		for (int32 Guard = 0; Out.Num() < 9 && Guard < 50; ++Guard)
 		{
 			const float P = R.FRand();
-			if (P < 0.30f) Push(GearWare(K_Ring, R.RandRange(0, NumRings - 1)), 1, 2);
+			if (P < 0.30f) Push(GearWare(K_Ring, R.RandRange(0, FMath::Max(1, NumRings()) - 1)), 1, 2);
 			else if (P < 0.42f) Push(ArrowWare(T_Bronze), 3, 3);
 			else if (P < 0.52f) { const int32 T = R.RandRange(T_Iron, T_Bronze); FWare W = GearWare(K_Shield, T); W.Id = ShieldId(R.RandRange(1, 2), T); Push(W, 1, 2); }   // a round or a tower shield
 			else if (P < 0.70f) Push(GearWare(AnyKind(false), T_Bronze), 1, 2);
@@ -86,7 +86,7 @@ namespace JeebStore
 		for (int32 Guard = 0; Out.Num() < 12 && Guard < 50; ++Guard)
 		{
 			const float P = R.FRand();
-			if (P < 0.35f) Push(GearWare(K_Amulet, R.RandRange(0, NumAmulets - 1)), 1, 1);
+			if (P < 0.35f) Push(GearWare(K_Amulet, R.RandRange(0, FMath::Max(1, NumAmulets()) - 1)), 1, 1);
 			else if (P < 0.80f) Push(GearWare(AnyKind(true), T_Bronze), 1, 1);
 			else Push(GearWare(AnyKind(R.FRand() < 0.5f), T_Steel, 1.25f), 1, 1);
 		}
@@ -143,10 +143,10 @@ namespace JeebStore
 		case 0: OutId = ArrowId(T_Iron); OutCount = ArrowBundle; break;
 		case 1: OutId = GearId(Pick(Tools, UE_ARRAY_COUNT(Tools)), R.RandRange(T_Tin, T_Iron)); break;
 		case 2: OutId = 0; OutCount = 40; break;
-		case 3: OutId = GearId(K_Cape, R.RandRange(0, NumCapeColors - 1)); break;
+		case 3: OutId = GearId(K_Cape, R.RandRange(0, NumCapeColors() - 1)); break;
 		case 4: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Bronze); break;
-		case 5: OutId = GearId(K_Ring, R.RandRange(0, NumRings - 1)); break;
-		case 6: OutId = GearId(K_Amulet, R.RandRange(0, NumAmulets - 1)); break;
+		case 5: OutId = GearId(K_Ring, R.RandRange(0, FMath::Max(1, NumRings()) - 1)); break;
+		case 6: OutId = GearId(K_Amulet, R.RandRange(0, FMath::Max(1, NumAmulets()) - 1)); break;
 		case 7: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Steel); break;
 		default: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Silver); break;
 		}

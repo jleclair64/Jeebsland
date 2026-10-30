@@ -101,16 +101,19 @@ void AKnightCharacter::ClientUnlockHut_Implementation(FVector_NetQuantize At)
 
 void AKnightCharacter::ApplyPotion(int32 T)
 {
-	if (T < 0 || T >= NumPotions) return;
+	if (T < 0 || T >= NumPotions()) return;
+	const FPotionRow& P = PotionRow(T);   // what it does and how strongly: Potions.csv
 	const float Now = GetWorld()->GetTimeSeconds();
-	switch (T)
+	switch (P.Effect)
 	{
-	case P_Speed:  SpeedUntil = Now + 8.f; break;
-	case P_Heal:   Health = (float)MaxHealth; break;
-	case P_Vigour: VigourUntil = Now + 60.f; break;   // the bigger bar is worked out in Tick (the extra comes full)
-	case P_Radar:  RadarUntil = Now + RadarSeconds; LastRadarScan = -10.0; break;
+	case PE_Speed:  SpeedUntil = Now + P.Seconds; SpeedPotionMul = P.Amount; break;
+	case PE_Heal:   Health = FMath::Min((float)MaxHealth, Health + MaxHealth * P.Amount); break;
+	case PE_Vigour: VigourUntil = Now + P.Seconds; VigourMul = P.Amount; break;   // the bigger bar is worked out in Tick (the extra comes full)
+	case PE_Radar:  RadarUntil = Now + P.Seconds; LastRadarScan = -10.0; break;
+	default: break;
 	}
-	PotionReadyAt[T] = Now + PotionCooldown(T);
+	if (PotionReadyAt.Num() <= T) PotionReadyAt.SetNumZeroed(T + 1);
+	PotionReadyAt[T] = Now + P.Cooldown;
 }
 
 void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, const FVector& At)
@@ -273,10 +276,10 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		FInvSlot& P = Sk->PotionSlot;
 		if (P.Id == 0 || !IsPotion(P.Id) || P.Count <= 0) { Sk->Say(2.f, Warn, TEXT("No potion in the potion slot.")); break; }
 		const int32 T = PotionType(P.Id);
-		const float Now = GetWorld()->GetTimeSeconds();
-		if (Now < PotionReadyAt[T])
+		const float Left = GetPotionCooldownLeft(T);
+		if (Left > 0.f)
 		{
-			Sk->Say(2.f, Warn, FString::Printf(TEXT("%s is not ready yet (%d s)."), PotionName(T), FMath::CeilToInt(PotionReadyAt[T] - Now)));
+			Sk->Say(2.f, Warn, FString::Printf(TEXT("%s is not ready yet (%d s)."), PotionName(T), FMath::CeilToInt(Left)));
 			break;
 		}
 		ApplyPotion(T);

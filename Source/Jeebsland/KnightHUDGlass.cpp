@@ -350,8 +350,7 @@ void AKnightHUD::ItemTip(int32 Id)
 	else if (K == K_Shield)
 	{
 		L.Add(FString::Printf(TEXT("Guard %d: stops that much damage while raised, then half until it recovers"), ShieldGuard(Id)));
-		static const TCHAR* StyleNote[NumShieldStyles] = { TEXT("Kite: the all-rounder"), TEXT("Round: a smaller guard, but it recovers twice as soon and you move 15% quicker behind it"), TEXT("Tower: a guard half as big again, but you move 20% slower behind it") };
-		L.Add(StyleNote[StyleOf(Id)]);
+		L.Add(ShieldStyleRow(StyleOf(Id)).Note);
 	}
 	else if (IsArmorKind(K))
 	{

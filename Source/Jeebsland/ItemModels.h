@@ -216,8 +216,7 @@ namespace JeebItemModel
 		// ---------------- potions: a round flask with a cork ----------------
 		if (IsPotion(Id))
 		{
-			static const FLinearColor Fill[NumPotions] = { FLinearColor(0.2f, 0.85f, 0.25f), FLinearColor(0.9f, 0.1f, 0.08f), FLinearColor(0.55f, 0.15f, 0.9f), FLinearColor(0.1f, 0.8f, 0.85f) };
-			Blob(NewPart(Out, Fill[PotionType(Id)] * 1.2f).Mesh, 4.6, 4.6, 4.6, Xf(V3(0, 0, 4.6)));
+			Blob(NewPart(Out, PotionRow(PotionType(Id)).Color * 1.2f).Mesh, 4.6, 4.6, 4.6, Xf(V3(0, 0, 4.6)));
 			Lathe(NewPart(Out, FLinearColor(0.75f, 0.85f, 0.9f), true).Mesh, Prof({ 0, 8.0, 1.5, 8.0, 1.5, 11.5, 0, 11.5 }), 10, 1.0, 1.0, Xf(FVector::ZeroVector));
 			Lathe(NewPart(Out, FLinearColor(0.55f, 0.36f, 0.18f)).Mesh, Prof({ 0, 11.3, 1.7, 11.3, 1.6, 13.3, 0, 13.3 }), 10, 1.0, 1.0, Xf(FVector::ZeroVector));
 			Settle(Out);

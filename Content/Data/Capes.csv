@@ -1,0 +1,10 @@
+Name,Color,ExtraPrice
+# Cape colours. Saves remember capes by their ROW, so never delete or reorder rows: add new colours at the END (up to 10).
+# Color: red green blue (0 to 1). ExtraPrice: ingots on top of the cape's BuyPrice in Kinds.csv.
+Red,0.80 0.07 0.07,0
+Blue,0.12 0.25 0.70,0
+Green,0.10 0.45 0.15,0
+Purple,0.35 0.12 0.50,0
+Gold,0.90 0.68 0.12,20
+Black,0.06 0.06 0.08,0
+White,0.90 0.90 0.88,0

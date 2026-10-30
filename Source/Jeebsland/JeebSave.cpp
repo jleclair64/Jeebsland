@@ -20,7 +20,7 @@ bool UJeebSave::ValidId(int32 Id)
 {
 	if (Id == 0) return true;
 	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::Emerald;   // (the last material; new ones go after it)
-	if (IsArrow(Id) || IsPotion(Id)) return true;
+	if (IsArrow(Id) || IsPotionRange(Id)) return true;   // (any potion number: a shorter Potions.csv never loses saved potions)
 	return IsGear(Id) && KindOf(Id) < K_Count;
 }
 
@@ -113,7 +113,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (Worn.IsValidIndex(i) && ValidId(Worn[i])) ? Worn[i] : 0;
 	Skills->RingB = ValidId(RingB) ? RingB : 0;
 	Skills->PotionSlot = FInvSlot();
-	if (PotionId != 0 && IsPotion(PotionId)) { Skills->PotionSlot.Id = PotionId; Skills->PotionSlot.Count = FMath::Clamp(PotionCount, 1, StackSize(PotionId)); }
+	if (PotionId != 0 && IsPotionRange(PotionId)) { Skills->PotionSlot.Id = PotionId; Skills->PotionSlot.Count = FMath::Clamp(PotionCount, 1, StackSize(PotionId)); }
 
 	Skills->RestoreSkills(XP, Known, FMath::Max(0, Ingots));
 	Skills->LoreFound.Empty();

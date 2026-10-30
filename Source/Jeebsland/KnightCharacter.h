@@ -372,8 +372,9 @@ private:
 	bool bSkillsOpen = false;
 	bool bPanelCursor = false;
 	bool bPanelAlways = true;
-	float PotionReadyAt[4] = { 0.f, 0.f, 0.f, 0.f };
+	TArray<float> PotionReadyAt;   // per potion row (Potions.csv)
 	float SpeedUntil = -1.f, VigourUntil = -1.f, RadarUntil = -1.f;
+	float SpeedPotionMul = 1.5f, VigourMul = 1.5f;   // how strong the last speed / vigour potion was
 	// Radar potion: the server finds who is near (enemies and other players) twice a second and sends the spots to the drinker only
 	UPROPERTY(Replicated) TArray<FVector2D> RadarDots;
 	double LastRadarScan = -10.0;
