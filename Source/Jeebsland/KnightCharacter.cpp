@@ -697,20 +697,24 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Strafe mode works like Fortnite: you can only sprint while heading roughly forward (within about 45 degrees of where
 	// you face). Sidestepping and backing up stay at normal speed even with sprint held, and backing up is a bit slower
 	// (full speed ahead, 90% sideways, 75% straight back). Read from the knight's actual acceleration, so the server agrees.
+	// The sprint fades in rather than switching: none at 60 degrees off straight ahead, all of it within about 20 degrees,
+	// and the change itself eases over a fraction of a second.
 	float StrafeMul = 1.f;
-	bool bStrafeSprintOK = true;
+	float WantSprintFrac = 1.f;
 	if (bFaceCam && !bStance)
 	{
 		const FVector Acc = Move->GetCurrentAcceleration().GetSafeNormal2D();
 		if (!Acc.IsNearlyZero())
 		{
 			const float Fw = FVector::DotProduct(Acc, GetActorForwardVector().GetSafeNormal2D());
-			bStrafeSprintOK = Fw > 0.7f;
+			WantSprintFrac = FMath::SmoothStep(0.5f, 0.94f, Fw);
 			StrafeMul = Fw >= 0.f ? FMath::Lerp(0.9f, 1.f, Fw) : FMath::Lerp(0.9f, 0.75f, -Fw);
 		}
 	}
+	StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
+	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : ((bWantSprint && bStrafeSprintOK) ? SprintSpeed : WalkSpeed) * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f)   // swiftness potion
+	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? 1.5f : 1.f)   // swiftness potion
 	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush
 	if (bFalling && !bSpecial)
 	{
