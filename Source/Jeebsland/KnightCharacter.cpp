@@ -137,6 +137,14 @@ void AKnightCharacter::BeginPlay()
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 	}
+	// TESTING ONLY: editor Play in single player on the owner's PC gets every skill at 99 while MaxLevelInEditor is on
+	// ([Jeebsland.Testing] in DefaultGame.ini; online logins are handled by AKnightGameMode). Never in a packaged game.
+	if (Skills && HasAuthority() && UsesLocalSave() && GetWorld() && GetWorld()->IsPlayInEditor())
+	{
+		bool bEditorMax = false;
+		if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("MaxLevelInEditor"), bEditorMax, GGameIni);
+		if (bEditorMax) { Skills->SetAllMaxLevel(); Skills->Say(5.f, FColor(255, 215, 90), TEXT("Editor test: every skill set to level 99.")); }
+	}
 	if (Skills) { MaxHealth = 100 + JeebItems::CombinedMods(Skills).MaxHealthBonus; Health = (float)MaxHealth; }
 	if (UsesLocalSave()) GetWorldTimerManager().SetTimer(AutosaveTimer, this, &AKnightCharacter::Autosave, 60.f, true);
 

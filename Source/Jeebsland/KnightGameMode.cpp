@@ -167,7 +167,10 @@ void AKnightGameMode::TryLogin(AKnightPlayerController* PC, const FString& Name,
 		// when they log in, to try all the gear. Remove the line there to turn it off.
 		TArray<FString> MaxLevelAccounts;
 		if (GConfig) GConfig->GetArray(TEXT("Jeebsland.Testing"), TEXT("MaxLevelAccounts"), MaxLevelAccounts, GGameIni);
-		if (MaxLevelAccounts.ContainsByPredicate([&](const FString& A) { return A.Equals(Key, ESearchCase::IgnoreCase); }) && Knight->GetSkills())
+		bool bEditorMax = false;   // editor Play on the owner's PC (its "Tester" accounts) counts too, when MaxLevelInEditor is on
+		if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("MaxLevelInEditor"), bEditorMax, GGameIni);
+		bEditorMax = bEditorMax && GetWorld() && GetWorld()->IsPlayInEditor();
+		if ((bEditorMax || MaxLevelAccounts.ContainsByPredicate([&](const FString& A) { return A.Equals(Key, ESearchCase::IgnoreCase); })) && Knight->GetSkills())
 		{
 			Knight->GetSkills()->SetAllMaxLevel();
 			Knight->GetSkills()->Say(5.f, FColor(255, 215, 90), TEXT("Test account: every skill set to level 99."));
