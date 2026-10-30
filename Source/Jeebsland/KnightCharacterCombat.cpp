@@ -287,3 +287,125 @@ void AKnightCharacter::DrinkPotion()
 	Inv(EInvOp::Drink);
 }
 
+// ---------------- Tick steps (see AKnightCharacter::Tick) ----------------
+// A swing landing and ending (and the follow-up swing), and the spear's charge
+void AKnightCharacter::TickAttack(float Dt)
+{
+	if (bAttacking)
+	{
+		AttackT += Dt;
+		const float HitFrac = (AtkStyle == EAtkStyle::Slash) ? 0.43f : (AtkStyle == EAtkStyle::Thrust ? 0.5f : 0.3f);
+		if (!bAttackHit && AttackT >= AttackDur * HitFrac)
+		{
+			bAttackHit = true;
+			AttackLands();
+		}
+		if (AttackT >= AttackDur)
+		{
+			bAttacking = false;
+			const float Now = GetWorld()->GetTimeSeconds();
+			LastSwingEnd = Now;
+			LastSwingDir = AttackDir;
+			LastStyle = AtkStyle;
+			// Clicked during the swing (within 0.3 s of it ending): go straight into the left-to-right follow-up
+			if (AtkStyle == EAtkStyle::Slash && AttackDir > 0 && Now - QueuedClick <= 0.3f && !IsUIOpen())
+			{
+				StartAttack(EAtkStyle::Slash, -1, 0.f);
+			}
+		}
+	}
+
+	// Spear: charging builds up while the button is held
+	if (bCharging)
+	{
+		ChargeT += Dt;
+		if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || SelectedKind() != JeebItems::K_Spear) bCharging = false;
+	}
+}
+
+// Health (and the horse's): the bigger bar from Defence, the Vitality amulet and the vigour potion; healing after 10 s unhurt
+void AKnightCharacter::TickHealth(float Dt)
+{
+	// The horse heals the same way: 10 s after its last hit, a full bar takes 10 s. (Not in PvP areas, once those exist.)
+	if (HorseHealth < HorseMaxHealth && GetWorld()->GetTimeSeconds() - LastHorseHurtTime > 10.f)
+		HorseHealth = FMath::Min(HorseMaxHealth, HorseHealth + HorseMaxHealth * 0.1f * Dt);
+	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s (the server's job online)
+	if (Skills && HasAuthority())
+	{
+		int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
+		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * VigourMul);   // vigour potion: a bigger bar for a while
+		if (NewMax != MaxHealth)
+		{
+			if (NewMax > MaxHealth) Health += NewMax - MaxHealth;   // a bigger bar comes with the extra already full
+			else Health = FMath::Clamp(Health, 1.f, (float)NewMax);   // a smaller one only trims what does not fit
+			MaxHealth = NewMax;
+		}
+		if (Health < MaxHealth && GetWorld()->GetTimeSeconds() - LastHurtTime > 10.f)   // 10 s after the last hit it starts to heal
+		{
+			Health = FMath::Min((float)MaxHealth, Health + MaxHealth * 0.1f * Dt);   // a full bar takes 10 s
+		}
+	}
+}
+
+// An open sack closing, the shield and weapon going on the back, the map fog, the shield guard draining and recovering, and
+// whether the shield is up
+void AKnightCharacter::TickGear(float Dt)
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	// An open sack closes when you walk away from it, or put the cursor away
+	if (LootTarget.IsValid() && (!bPanelCursor || FVector::Dist2D(GetActorLocation(), LootTarget->GetActorLocation()) > 400.f)) LootTarget = nullptr;
+
+	// Climbing, riding or sitting: the shield and the weapon go on the back; they come back to the hands afterwards
+	{
+		const bool bWantStow = bClimbing || bMounted || bSitting;
+		if (bWantStow != bStowed)
+		{
+			bStowed = bWantStow;
+			PlaceShield(bStowed);
+			RebuildHeld();
+			if (bStowed) bBlocking = false;
+		}
+	}
+
+	// Shield guard: its size is the shield's Defence; a new or changed shield starts full. It recovers like health:
+	// 10 s after the last blow it took, a full bar in 10 s. A broken guard is mended only once it is full again.
+	if (HasAuthority())   // (online: the server's job; the player's machine is sent the numbers)
+	{
+		if (Skills && GetWorld()->GetTimeSeconds() >= NextExploreTime)   // map fog
+		{
+			NextExploreTime = GetWorld()->GetTimeSeconds() + 0.5f;
+			Skills->Explore(GetActorLocation());
+		}
+		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
+		const float NewMax = ShieldId ? float(JeebItems::ShieldGuard(ShieldId)) : 0.f;
+		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 10.f;   // the round shield recovers sooner
+		if (!FMath::IsNearlyEqual(NewMax, GuardMax)) { GuardMax = NewMax; GuardPool = NewMax; bGuardBroken = false; }
+		// Holding the shield up drains the guard slowly (Smash Bros style): a full guard lasts GuardDrainSeconds of holding,
+		// and it never refills while raised. Lowered, it recovers as before.
+		constexpr float GuardDrainSeconds = 15.f;
+		if (bBlocking && GuardMax > 0.f && !bGuardBroken)
+		{
+			GuardPool -= GuardMax / GuardDrainSeconds * Dt;
+			if (GuardPool < 1.f)
+			{
+				GuardPool = 0.f;
+				bGuardBroken = true;
+				LastGuardHitTime = GetWorld()->GetTimeSeconds();
+				if (Skills) Skills->Say(2.5f, FColor::Orange, TEXT("Guard broken! Your shield stops only half a blow until it recovers."));
+			}
+		}
+		else if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > RecoverDelay)
+		{
+			GuardPool = FMath::Min(GuardMax, GuardPool + GuardMax * 0.1f * Dt);
+			if (GuardPool >= GuardMax && bGuardBroken)
+			{
+				bGuardBroken = false;
+				if (Skills) Skills->Say(2.5f, FColor(140, 200, 255), TEXT("Your shield guard is back to full."));
+			}
+		}
+	}
+
+	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
+	if (bAttacking || bRolling || Move->IsFalling()) bBlocking = false;   // no guard mid-swing, mid-roll or in the air
+	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
+}

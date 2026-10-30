@@ -144,3 +144,46 @@ void AKnightCharacter::TickBits(TArray<FBit>& Bits, UInstancedStaticMeshComponen
 	}
 }
 
+// Dust puffs, clods, grass blades and leaves (Tick step; S and C are where the stride is)
+void AKnightCharacter::TickDust(float Dt, bool bFalling, bool bSpecial, float S, float C)
+{
+	// ---------- Dust puffs: footfalls when running, landings, slides ----------
+	const FVector FeetBase = GetActorLocation() + FVector(0.f, 0.f, -94.f);
+	if (!bFalling && !bSpecial && MoveBlend > 0.6f && RunAlpha > 0.3f && ((C > 0.f) != (PrevC > 0.f)))
+	{
+		const float Side = (S > 0.f) ? 13.f : -13.f;
+		Kick(FeetBase + GetActorForwardVector() * 8.f + GetActorRightVector() * Side, 0.7f + 0.4f * RunAlpha);
+	}
+	PrevC = C;
+	if (!bFalling && bWasFalling == false && LandTimer > LandDuration - Dt * 1.5f && LandImpact > 0.45f)
+	{
+		Kick(FeetBase + GetActorRightVector() * 13.f, 0.8f + 1.0f * LandImpact);
+		Kick(FeetBase - GetActorRightVector() * 13.f, 0.8f + 1.0f * LandImpact);
+	}
+	if (bSliding)
+	{
+		SlideDustTimer += Dt;
+		if (SlideDustTimer > 0.12f)
+		{
+			SlideDustTimer = 0.f;
+			Kick(FeetBase - SlideDir * 20.f + GetActorRightVector() * FMath::FRandRange(-15.f, 15.f), 0.6f);
+		}
+	}
+	for (int32 i = 0; i < Dust.Num(); ++i)
+	{
+		FDust& D = Dust[i];
+		D.Age += Dt;
+		FTransform T(FQuat::Identity, FVector(0.f, 0.f, -9000.f), FVector(0.001f));
+		if (D.Age < D.Life)
+		{
+			const float K = D.Age / D.Life;
+			const float Sz = D.Size * (0.4f + 0.9f * FMath::Sqrt(K)) * (1.f - K * K) / 100.f;
+			T = FTransform(FQuat::Identity, D.Pos + FVector(0.f, 0.f, 30.f * K), FVector(FMath::Max(Sz, 0.001f)));
+		}
+		DustISM->UpdateInstanceTransform(i, T, true, i == Dust.Num() - 1, true);
+	}
+	TickBits(Clods, ClodISM, Dt, 980.f, 0.6f);    // clods: heavy, they drop straight back
+	TickBits(Blades, BladeISM, Dt, 520.f, 2.4f);  // blades: light, they flutter down
+	TickBits(LeavesA, LeafAISM, Dt, 380.f, 3.2f);  // leaves: lightest, they drift down
+	TickBits(LeavesB, LeafBISM, Dt, 380.f, 3.2f);
+}

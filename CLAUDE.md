@@ -79,7 +79,7 @@ Last updated 2026-10-30 (end of the fifth session, a long build session). Everyt
 - Always keep grass near buildings (fort, cottages, castle, etc.) a bit shorter than open-field grass (about 22% shorter, the owner found 40% too short and the crossed cards showed), with wider overlapping tufts there to hide the cards, and taper the height gradually with distance from the building so it never reads as tall-then-suddenly-short. Apply this to any new building or grass work.
 - Owner disliked: the Milky Way, streaky cirrus clouds, hay-coloured grass, flat-colour ground.
 
-**Open ideas:** breaking up the ~660-line `AKnightCharacter::Tick`; a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
+**Open ideas:** a thicker layer of ground leaves under trees if they still hide in the grass; cheaper cloud settings if needed; moving the model/effort preference to the user-level CLAUDE.md.
 
 ## Combat and UI systems (built 2026-10-11, Opus session; not yet seen in-game by the owner)
 
@@ -97,6 +97,18 @@ Last updated 2026-10-30 (end of the fifth session, a long build session). Everyt
 - **Potions** (ids 950-952): swiftness (+50% speed 8 s, 1 min cooldown), healing (full heal, 2 min), vigour (+50% health bar for 60 s, extra comes full, 1 min). A potion slot sits between the weapon bar and the defence slot; Q drinks (or click it with the cursor out); drag potions in and out. The slot darkens and counts down while that kind cools. The store always stocks all three.
 - **Shields**: three styles share the shield slot, encoded in the id (gear ids are now 1000 + kind*100 + variant; shields 1000 + 1100 + style*10 + tier; `StyleOf`, `ShieldId`, `ShieldGuard`). Kite (all-rounder), Round (guard x0.75, recovers after 5 s instead of 10, 15% quicker in the stance), Tower (guard x1.5, 20% slower in the stance). Each has its own model (`KnightDesign` shields, `FDef::Style`) and icon. The store sometimes sells round and tower shields; the practice pack has one of each.
 - Optional shield ideas still unpicked: perfect block (parry), guard-break stagger, shield bash, heavy-weapon guard drain. Shield guard numbers are still low against the pen knight (maybe 3-4x).
+
+## Items are data (2026-10-30)
+
+Every item number and text lives in CSV spreadsheets in `Content/Data/` (Tiers, Kinds, Materials, Potions, Accessories, ShieldStyles, Capes), read by `JeebItemData.cpp` (`JeebItems::Tables()`); `Inventory.h` keeps the ids and rules and answers from the tables (`TierRow`, `KindRow`, `MaterialRow`, `PotionRow`, `AccessoryRow`, `CapeRow`, `ShieldStyleRow`). The owner's guide is `Docs/EditingItems.md`. Saves store items by number: never reorder or delete rows in Potions, Accessories or Capes (add at the end); Tiers, Kinds and Materials rows are found by their Key. A new item number or value goes in the CSV, not in code. Potion effects (speed, heal, vigour, radar) are code; their strength and duration are data. `Content/Data` is staged as UFS (DefaultGame.ini). Store stocking rules (Store.h) and arrows are still in code.
+
+## Chat and radar (2026-10-30)
+
+Chat: `AKnightPlayerController::ServerChat` / `ClientChat`; `JeebChat.h` (swear filter, the owner's `Saved/Moderation.txt` mute/ban file, each player's own `Saved/ChatMuted.txt`); drawn in `KnightHUDChat.cpp` (Enter, `/w`, `/mute`). Radar potion: `AKnightCharacter::UpdateRadar` (server, owner-only `RadarDots`), drawn on the minimap.
+
+## Animation direction (owner, 2026-10-30)
+
+Keep the code-driven pose for the knight (and other humanoid player classes). Bosses and NPCs will use standard skinned models with animation clips (skeletal meshes), not the joint-piece system.
 
 ## How to test
 
@@ -137,7 +149,7 @@ The owner dropped the single-player story mode: Jeebsland is becoming an online 
 
 `AKnightHUD` (header `KnightHUD.h`): `KnightHUD.cpp` main DrawHUD, bars, weapon bar, minimap; `KnightHUDGlass.cpp` liquid-glass drawing helpers, buttons, tooltips; `KnightHUDIcons.cpp` Poly/Disc and all item icons; `KnightHUDInventory.cpp` inventory, side panel, badges, drag and drop, drop box, loot windows; `KnightHUDShops.cpp` store, smithy, bank; `KnightHUDScreens.cpp` settings, dictionary, lore, skills screen, dialogue; `KnightHUDText.cpp` HDText, DrawLinesAt, NorseText.
 
-`AKnightCharacter` (header `KnightCharacter.h`): `KnightCharacter.cpp` constructor, BeginPlay, input setup and the big Tick; `...Body.cpp` mesh building, cape, armour, shield and weapon holding (`ShieldRest()` is declared in `KnightShieldRest.h`); `...Combat.cpp` attacks, Hurt, block, Die, potions; `...Movement.cpp` sprint, crouch, climb, slide, roll, jump, DoMove; `...Interact.cpp` interaction prompts, doors, horse, seats, gathering; `...Inventory.cpp` hotbar, equip, drops; `...UI.cpp` screens opening/closing, dialogue, graphics settings; `...Fx.cpp` dust and footfall bits. Put new code in the matching file; `Tick` is still ~660 lines and is the next candidate to break up.
+`AKnightCharacter` (header `KnightCharacter.h`): `KnightCharacter.cpp` constructor, BeginPlay, input setup and the big Tick; `...Body.cpp` mesh building, cape, armour, shield and weapon holding (`ShieldRest()` is declared in `KnightShieldRest.h`); `...Combat.cpp` attacks, Hurt, block, Die, potions; `...Movement.cpp` sprint, crouch, climb, slide, roll, jump, DoMove; `...Interact.cpp` interaction prompts, doors, horse, seats, gathering; `...Inventory.cpp` hotbar, equip, drops; `...UI.cpp` screens opening/closing, dialogue, graphics settings; `...Fx.cpp` dust and footfall bits; `...Pose.cpp` the whole body pose every frame (PosePrep, PoseLegs, PoseBody, PoseCape, PoseArms, sharing values through `FKnightPose`). Put new code in the matching file. `Tick` (split 2026-10-30) is now a short list of steps (TickHousekeeping, TickRollSlide, TickAttack, TickHealth, TickStamina, TickGear, TickGroundSpeed, TickPose, TickDust); the comment above it says which file each lives in.
 
 Save/load is planned in `Docs/SaveLoadPlan.md` (not built yet).
 

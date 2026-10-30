@@ -312,3 +312,165 @@ void AKnightCharacter::TapKey(int32 Key)
 	PendingRollDir = FVector::ZeroVector;
 }
 
+// ---------------- Tick steps (see AKnightCharacter::Tick) ----------------
+// Rolls and slides carry the knight along by themselves. Returns true while one is going; OutSpecialSpeed is its speed.
+bool AKnightCharacter::TickRollSlide(float Dt, bool bFalling, float& OutSpecialSpeed)
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	SlideCooldown = FMath::Max(0.f, SlideCooldown - Dt);
+	RollCooldown = FMath::Max(0.f, RollCooldown - Dt);
+	float SpecialSpeed = 0.f;
+
+	if (bRolling)
+	{
+		RollT += Dt;
+		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
+		SpecialSpeed = FMath::Lerp(900.f, 380.f, K * K);
+		Move->Velocity.X = RollDir.X * SpecialSpeed;
+		Move->Velocity.Y = RollDir.Y * SpecialSpeed;
+		if (RollT >= RollDur || bFalling)
+		{
+			bRolling = false;
+			RollCooldown = 1.0f;   // one second before the next roll (every kind of roll)
+			Move->bOrientRotationToMovement = bSavedOrient;
+		}
+	}
+	if (bSliding)
+	{
+		SlideT += Dt;
+		// Downhill keeps the slide going; flat ground slows it
+		float Downhill = 0.f;
+		if (Move->CurrentFloor.IsWalkableFloor())
+		{
+			Downhill = FMath::Max(0.f, FVector::DotProduct(Move->CurrentFloor.HitResult.ImpactNormal, SlideDir));
+		}
+		SlideSpeed = FMath::Clamp(SlideSpeed + (-650.f + 2600.f * Downhill) * Dt, 0.f, 1100.f);
+		SpecialSpeed = SlideSpeed + 50.f;
+		Move->Velocity.X = SlideDir.X * SlideSpeed;
+		Move->Velocity.Y = SlideDir.Y * SlideSpeed;
+		if (SlideSpeed < 190.f || SlideT > 3.f || AirAlpha > 0.8f)
+		{
+			bSliding = false;
+			SlideCooldown = 0.9f;
+			Move->bOrientRotationToMovement = bSavedOrient;
+		}
+	}
+	OutSpecialSpeed = SpecialSpeed;
+	return bRolling || bSliding;
+}
+
+// Sprint stamina. Returns whether the knight is trying to sprint (and may).
+bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bSpecial)
+{
+	const bool bWantSprint = !bMounted && bSprinting && !bCrouched && !bBlocking && !bExhausted;
+	const bool bDrain = bWantSprint && Speed > 330.f && !bFalling && !bSpecial;
+	if (bDrain)
+	{
+		Stamina = FMath::Max(0.f, Stamina - 16.f * Dt / GetStaminaMult());   // better boots: it lasts longer...
+		StaminaDelay = 1.0f;
+		if (Stamina <= 0.f) bExhausted = true;
+	}
+	else
+	{
+		StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
+		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
+	}
+	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+	return bWantSprint;
+}
+
+// How fast the knight may go this frame (on foot, on the horse, in the shield stance, strafing, in the air), and turning to
+// face the camera. Returns whether the knight faces the camera (strafe mode or the shield stance).
+bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, bool bSpecial, float SpecialSpeed, bool bWantSprint)
+{
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float AirMul = 0.69f;
+	// Riding: twice the walking speed, and twice the sprint. The horse sprints for about four seconds, then needs
+	// its 100-point bar to refill completely before the next gallop.
+	bool bHorseSprint = false;
+	if (bMounted)
+	{
+		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling && (GetWorld()->GetTimeSeconds() - LastBackTime > 0.15);
+		if (bAsk && HorseEnergy > 0.f)
+		{
+			// the horse never tires: its gallop energy does not drain
+			bHorseSprint = true;
+			if (HorseEnergy <= 0.f) bHorseTired = true;
+		}
+		else
+		{
+			HorseEnergy = FMath::Min(100.f, HorseEnergy + (bHorseTired ? 10.f : 16.f) * Dt);
+			if (bHorseTired && HorseEnergy >= 4.f) bHorseTired = false;
+		}
+	}
+	// The horse is 20% slower than before, and builds up to a gallop: it does not jump to full speed when you sprint
+	float HorseTarget = 0.8f * (bHorseSprint ? 2.f * SprintSpeed : 2.f * WalkSpeed);
+	if (!bMounted) HorseSpeedNow = 0.f;
+	else
+	{
+		if (HorseSpeedNow < 1.f) HorseSpeedNow = 0.8f * 2.f * WalkSpeed;
+		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
+	}
+	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
+	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
+	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
+	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
+	const bool bFaceCam = (bStance || bStrafeMode) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed
+	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
+	{
+		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)
+		const FVector Acc = Move->GetCurrentAcceleration().GetSafeNormal2D();
+		const FRotator CamYaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		StanceFwd = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X));
+		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
+	}
+	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0);
+	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
+	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
+	if (bFaceCam && GetController())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn)
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
+	const float StanceFactor = 1.f;
+	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? FMath::Min(1.f, JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield]))) : 1.f;   // tower: slower; nothing beats a walk
+	// Strafe mode works like Fortnite: you can only sprint while heading roughly forward (within about 45 degrees of where
+	// you face). Sidestepping and backing up stay at normal speed even with sprint held, and backing up is a bit slower
+	// (full speed ahead, 90% sideways, 75% straight back). Read from the knight's actual acceleration, so the server agrees.
+	// The sprint fades in rather than switching: none at 60 degrees off straight ahead, all of it within about 20 degrees,
+	// and the change itself eases over a fraction of a second.
+	float StrafeMul = 1.f;
+	float WantSprintFrac = 1.f;
+	if (bFaceCam && !bStance)
+	{
+		const FVector Acc = Move->GetCurrentAcceleration().GetSafeNormal2D();
+		if (!Acc.IsNearlyZero())
+		{
+			const float Fw = FVector::DotProduct(Acc, GetActorForwardVector().GetSafeNormal2D());
+			WantSprintFrac = FMath::SmoothStep(0.5f, 0.94f, Fw);
+			StrafeMul = Fw >= 0.f ? FMath::Lerp(0.9f, 1.f, Fw) : FMath::Lerp(0.9f, 0.75f, -Fw);
+		}
+	}
+	StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
+	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
+	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
+	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f)   // swiftness potion
+	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush
+	if (bFalling && !bSpecial)
+	{
+		AirSpeedMul = AirMul;
+		const float AirCap = BaseSpeed * AirMul;
+		FVector Horizontal(Move->Velocity.X, Move->Velocity.Y, 0.f);
+		const float HSpeed = Horizontal.Size();
+		if (HSpeed > AirCap)
+		{
+			const float NewSpeed = FMath::FInterpConstantTo(HSpeed, AirCap, Dt, 1500.f); // about 0.2 s to go from a sprint to the air speed
+			Horizontal *= NewSpeed / HSpeed;
+			Move->Velocity.X = Horizontal.X;
+			Move->Velocity.Y = Horizontal.Y;
+		}
+	}
+	else if (!bFalling)
+	{
+		AirSpeedMul = FMath::FInterpTo(AirSpeedMul, 1.f, Dt, 6.f); // speeding back up after landing, as before
+	}
+	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
+	return bFaceCam;
+}

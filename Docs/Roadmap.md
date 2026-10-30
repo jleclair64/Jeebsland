@@ -128,3 +128,5 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 11. **Bosses and monsters** with loot.
 12. **Trolls, then wizards,** and the remaining towns.
 13. Message board (once there is a rented server); key rebinding screen.
+14. **Groundwork (agreed 2026-10-30):** items as data (DONE 2026-10-30: Content/Data CSVs, Docs/EditingItems.md); splitting the knight's Tick (DONE 2026-10-30). Later, once online play is working with friends: a server stress test with fake players, then accounts in a database and encrypted logins (before public hosting). Quests, NPCs and villagers should be data from the start, the same way.
+15. **Animation (owner, 2026-10-30):** the knight keeps its code-driven pose; bosses and NPCs get standard skinned models with animation clips.

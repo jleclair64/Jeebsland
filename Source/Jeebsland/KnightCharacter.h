@@ -379,6 +379,23 @@ private:
 	UPROPERTY(Replicated) TArray<FVector2D> RadarDots;
 	double LastRadarScan = -10.0;
 	void UpdateRadar();
+
+	// The steps of Tick, in order (see AKnightCharacter::Tick for which file each lives in)
+	void TickHousekeeping();
+	void TickGatherReach();
+	bool TickRollSlide(float Dt, bool bFalling, float& OutSpecialSpeed);
+	void TickAttack(float Dt);
+	void TickHealth(float Dt);
+	bool TickStamina(float Dt, float Speed, bool bFalling, bool bSpecial);
+	void TickGear(float Dt);
+	bool TickGroundSpeed(float Dt, float Speed, bool bFalling, bool bSpecial, float SpecialSpeed, bool bWantSprint);
+	void TickPose(float Dt, const FVector& Vel, float Speed, bool bFalling, bool bFaceCam, float& OutS, float& OutC);
+	void PosePrep(struct FKnightPose& P);
+	void PoseLegs(struct FKnightPose& P);
+	void PoseBody(struct FKnightPose& P);
+	void PoseCape(struct FKnightPose& P);
+	void PoseArms(struct FKnightPose& P);
+	void TickDust(float Dt, bool bFalling, bool bSpecial, float S, float C);
 	TWeakObjectPtr<class ALootDrop> LootTarget;
 	UPROPERTY() UInputAction* PotionAction = nullptr;
 	int32 PanelTab = 0;
