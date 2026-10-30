@@ -117,8 +117,8 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 1. **Quick wins:** shield movement speed plus guard drain; Norse title font; map fog (done 2026-10-29). Stone bridges moved to step 6 (no river yet).
 2. **Online glitches and performance pass** (the owner describes what they saw). Performance DONE 2026-10-29 (packaged: 140 fps HIGH, 175 LOW; frame-rate counter in Settings). Online glitches still to walk through. Still open: sharper knight (TSR on HIGH and/or a higher default render scale).
    - **Also done 2026-10-29/30 (not on the original list):** the knight is now the owner's Meshy model (Tools/BuildKnight.ps1), a realistic walk/jog/sprint with no foot sliding, proper sword grip, bigger amulet, and Fortnite-style strafe mode (wheel click / X).
-3. **Player chat** (with filter and mute).
-4. **Radar potion.**
+3. **Player chat** (with filter and mute). DONE 2026-10-30 (Enter to talk, nearby bubbles, /w world, /mute; swear filter; owner mute/ban file Saved/Moderation.txt). Later: private messages, friends, channels.
+4. **Radar potion.** DONE 2026-10-30 (4th potion; red dots for enemies and players for 2 min, 3 min cooldown).
 5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step. DONE 2026-10-30: nine tiers, new ores (tin, iron, silver, gold, onyx, emerald) on fixed-ore rocks, level gates 1/5/10/20/30/40/50, legendaries by smithing at Smithing 50 (onyx only for knights), saves migrated (version 2).
 6. **The river** (Blackrock west of it, forking south) with **stone bridges**, then **Oak Hill** east of it (the full-size bare world with mountains, the river, coast and sea was BUILT 2026-10-30: WorldMap.h; still to do here: bridges, Oak Hill itself), the big bridge, the war skirmishes; respawn moves to Oak Hill.
 7. **Quest system**, then the first batch of side quests (plan them together first).
