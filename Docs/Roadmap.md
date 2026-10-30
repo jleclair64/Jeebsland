@@ -115,7 +115,8 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 
 ## Suggested build order (2026-10-29; ask before starting each step)
 1. **Quick wins:** shield movement speed plus guard drain; Norse title font; map fog (done 2026-10-29). Stone bridges moved to step 6 (no river yet).
-2. **Online glitches and performance pass** (the owner describes what they saw).
+2. **Online glitches and performance pass** (the owner describes what they saw). Performance DONE 2026-10-29 (packaged: 140 fps HIGH, 175 LOW; frame-rate counter in Settings). Online glitches still to walk through. Still open: sharper knight (TSR on HIGH and/or a higher default render scale).
+   - **Also done 2026-10-29/30 (not on the original list):** the knight is now the owner's Meshy model (Tools/BuildKnight.ps1), a realistic walk/jog/sprint with no foot sliding, proper sword grip, bigger amulet, and Fortnite-style strafe mode (wheel click / X).
 3. **Player chat** (with filter and mute).
 4. **Radar potion.**
 5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step.
