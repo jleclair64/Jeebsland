@@ -47,7 +47,7 @@ def seg_dist(p, a, b):
     t = max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
     return (p - (a + ab * t)).length
 
-def classify(c):
+def classify(c, metal=1.0):
     sd = 1 if c.y > 0 else -1
     ay = abs(c.y)
     # the helmet sits above a sloping cut: low under the chin, higher at the back of the neck, so the tall collar stays
@@ -62,12 +62,14 @@ def classify(c):
         return (P_ELBR if sd > 0 else P_ELBL, S_GLOVES)
     if c.z >= -20.0:
         return (P_UPPER, S_BODY)
-    if c.z > -45.0:
-        # inside the fauld: the thigh if close to its line, otherwise the plates and skirt hanging from the belt
-        if c.z > -43.0 and seg_dist(c, HIP(sd), KNEE(sd)) > 11.0:
+    if c.z > -44.0:
+        # under the belt: the steel plates hanging from it (front plate, tassets, back plates) stay with the body; the dark
+        # cloth of the trousers goes with the thigh. The model's own metal map tells them apart (by position alone the
+        # two were mixed up and the trousers tore open above the knees).
+        if metal > 0.5 and seg_dist(c, HIP(sd), KNEE(sd)) > 8.0:
             return (P_UPPER, S_BODY)
         return (P_HIPR if sd > 0 else P_HIPL, S_BODY)
-    if c.z > -82.0:
+    if c.z > -78.0:   # (the cut sits on the seam where the greave meets the boot cuff, which turns with the foot)
         return (P_KNEER if sd > 0 else P_KNEEL, S_BOOTS)
     return (P_ANKR if sd > 0 else P_ANKL, S_BOOTS)
 
@@ -132,10 +134,41 @@ def turn(v, p, key):
 # ---- Which piece each triangle belongs to; then tidy up: small scraps cut off from the rest of their piece (they float
 # when that joint moves) join the piece around them ----
 tris = list(me.loop_triangles)
-keys = [classify((gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0) for lt in tris]
+# how metal each triangle is, from the model's metal/roughness picture (blue = metal)
+import numpy as np
+mr_img = bpy.data.images.load(os.path.join(proj, "Art", "Knight", "T_Knight_MR.jpg"))
+mw, mh = mr_img.size
+mr_px = np.empty(mw * mh * 4, dtype=np.float32); mr_img.pixels.foreach_get(mr_px); mr_px = mr_px.reshape(mh, mw, 4)
+def metal_at(uv):
+    x = min(mw - 1, max(0, int(uv.x * mw))); y = min(mh - 1, max(0, int(uv.y * mh)))
+    return float(mr_px[y, x, 2])
+tri_metal = [sum(metal_at(uvl[li].uv) for li in lt.loops) / 3.0 for lt in tris]
+keys = [classify((gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0, tri_metal[ti]) for ti, lt in enumerate(tris)]
 vert_tris = [[] for _ in me.vertices]
 for ti, lt in enumerate(tris):
     for vi in lt.vertices: vert_tris[vi].append(ti)
+# Smooth the cut lines: a triangle whose edge neighbours mostly belong to another piece joins it (no saw-tooth edges)
+edge_tris = {}
+for ti, lt in enumerate(tris):
+    v = lt.vertices
+    for a, b in ((v[0], v[1]), (v[1], v[2]), (v[2], v[0])):
+        edge_tris.setdefault((min(a, b), max(a, b)), []).append(ti)
+nbrs = [[] for _ in tris]
+for ts in edge_tris.values():
+    for a in ts:
+        for b in ts:
+            if a != b: nbrs[a].append(b)
+for _pass in range(4):
+    changed = 0
+    new = list(keys)
+    for ti in range(len(tris)):
+        votes = {}
+        for tj in nbrs[ti]: votes[keys[tj]] = votes.get(keys[tj], 0) + 1
+        if votes:
+            best = max(votes, key=votes.get)
+            if best != keys[ti] and votes[best] >= 2: new[ti] = best; changed += 1
+    keys = new
+    print("SMOOTH pass %d: %d triangles changed" % (_pass, changed))
 for _pass in range(3):
     seen = [False] * len(tris)
     moved = 0
@@ -199,10 +232,9 @@ with open(os.path.join(out_dir, "KnightParts.bin"), "wb") as f:
 cols = {}
 palette = [(0.9, 0.2, 0.2), (0.2, 0.8, 0.2), (0.2, 0.4, 0.95), (0.95, 0.85, 0.2), (0.85, 0.3, 0.9), (0.2, 0.9, 0.9), (1.0, 0.55, 0.1), (0.6, 0.6, 0.6)]
 attr = me.color_attributes.new("PartCol", 'FLOAT_COLOR', 'CORNER')
-keys = sorted(parts.keys())
-for lt in me.loop_triangles:
-    c = (gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0
-    col = palette[keys.index(classify(c)) % len(palette)]
+final_keys = keys
+for ti, lt in enumerate(tris):
+    col = palette[sorted(parts.keys()).index(final_keys[ti]) % len(palette)]
     for li in lt.loops:
         attr.data[li].color = (*col, 1.0)
 scene = bpy.context.scene

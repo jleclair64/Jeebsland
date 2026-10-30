@@ -128,8 +128,8 @@ namespace KnightModel
 			{ FDef& D = Def(P_Upper); KM::Blob(D.Mesh, 9.0, 8.0, 9.0, KM::Xf(PivotPos(Arm) + FVector(0, -sd * 2.0, 0))); }   // the shoulder joint, seen when the arm swings high
 			{ FDef& D = Def(Arm); KM::Blob(D.Mesh, 8.0, 8.0, 8.0, KM::Xf(PivotPos(Arm))); }
 			{ FDef& D = Def(Elb); Rod(D.Mesh, PivotPos(Elb), WristPos(sd), 4.8); }
-			{ FDef& D = Def(Hip); Rod(D.Mesh, PivotPos(Hip), PivotPos(Knee), 7.0); }
-			{ FDef& D = Def(Knee); Rod(D.Mesh, PivotPos(Knee), PivotPos(Ank), 6.0); }
+			{ FDef& D = Def(Hip); Rod(D.Mesh, PivotPos(Hip), PivotPos(Knee), 8.5); }
+			{ FDef& D = Def(Knee); Rod(D.Mesh, PivotPos(Knee), PivotPos(Ank), 7.5); }
 			{ FDef& D = Def(Ank); KM::Ellipsoid(D.Mesh, 9.0, 5.5, 5.5, 1.0, 1.0, 14, 10, KM::Xf(PivotPos(Ank) + FVector(2.0, 0, -4.0))); }   // the foot inside the sabaton
 		}
 	}
