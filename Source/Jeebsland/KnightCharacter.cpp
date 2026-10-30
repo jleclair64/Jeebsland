@@ -750,23 +750,56 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float DuckLean = FMath::Max(14.f * DuckB, 24.f * DuckC);   // a person squatting low leans forward to keep balance
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
-	// ---------- Gait clock: driven by the ground covered, so planted feet never slide ----------
-	// One full cycle (a step with each leg) moves the body by the distance a planted foot travels back under it: 4 x leg
-	// length x sin(hip swing), stretched when running by the moment both feet are off the ground.
-	const float StepScale  = 1.f - 0.4f * CrouchAlpha; // smaller steps when crouched
-	const float StrideDeg  = FMath::Lerp(48.f, 80.f, RunAlpha) * StepScale;
-	const float LegReach   = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
-	const float StrideLen  = 4.f * LegReach * FMath::Sin(FMath::DegreesToRadians(StrideDeg)) * FMath::Lerp(1.f, 1.5f, RunAlpha);
-	const float Hz = FMath::Clamp(Speed / FMath::Max(StrideLen, 1.f), 0.6f, 3.2f);
+	// ---------- Gait: a real stride (rewritten 2026-10-30) ----------
+	// Each leg runs its own cycle U (0 to 1; the left half a cycle behind the right) in two parts, like a person:
+	//  CONTACT: the foot is planted while the hip sweeps from reaching forward (Af) to trailing behind (Ab). The hip moves at
+	//    exactly the body's speed, so a planted foot never slides; the standing knee gives a little mid-step.
+	//  SWING: the foot lifts, the knee folds (most early in the swing), and the leg swings forward to land nearly straight.
+	// Walking has a long contact (both feet down for a moment) and small swings; jogging (the normal speed) and sprinting
+	// have a short contact and a moment in the air. The clock runs on the ground covered, not on time.
+	const float JogT = FMath::Clamp((Speed - 150.f) / 250.f, 0.f, 1.f);   // walk ... jog (400, the normal speed)
+	const float SprT = FMath::Clamp((Speed - 400.f) / 350.f, 0.f, 1.f);   // jog ... sprint (750)
+	auto G3 = [&](float W, float J, float Sp) { return SprT > 0.f ? FMath::Lerp(J, Sp, SprT) : FMath::Lerp(W, J, JogT); };
+	const float StepScale   = 1.f - 0.35f * CrouchAlpha;   // smaller steps when crouched
+	const float GContact    = G3(0.62f, 0.36f, 0.30f);     // share of the cycle each foot is planted
+	const float GAf         = G3(28.f, 38.f, 48.f) * StepScale;   // hip reaching forward at the start of contact
+	const float GAb         = G3(20.f, 30.f, 36.f) * StepScale;   // hip trailing behind at toe-off
+	const float GStanceKnee = G3(8.f, 22.f, 28.f);         // how much the standing knee gives
+	const float GSwingKnee  = G3(58.f, 80.f, 95.f) * StepScale;   // how far the swinging knee folds
+	const float LegReach    = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
+	const float SinAf = FMath::Sin(FMath::DegreesToRadians(GAf)), SinAb = FMath::Sin(FMath::DegreesToRadians(GAb));
+	const float Sweep = LegReach * (SinAf + SinAb);        // ground a planted foot covers
+	const float Hz = FMath::Clamp(GContact * Speed / FMath::Max(Sweep, 1.f), 0.5f, 3.4f);
 	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * Hz * Dt, 2.f * PI);
 	IdleTime += Dt;
 	FlutterTime += Dt * (1.f + 1.5f * Stream);
-	const float S = FMath::Sin(GaitPhase); // right leg forward when positive
+	auto LegCycle = [&](float U, float& Hip, float& Knee, bool& bPlanted, float& Follow, float& ToeOff)
+	{
+		if (U < GContact)
+		{
+			const float T = U / GContact;
+			Hip = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(SinAf - (SinAf + SinAb) * T, -1.f, 1.f)));
+			Knee = -4.f - GStanceKnee * FMath::Sin(PI * T);
+			bPlanted = true; Follow = 0.f; ToeOff = FMath::SmoothStep(0.72f, 1.f, T);
+		}
+		else
+		{
+			const float T = (U - GContact) / (1.f - GContact);
+			Hip = FMath::Lerp(-GAb, GAf, T * T * (3.f - 2.f * T));
+			Knee = -4.f - GSwingKnee * FMath::Sin(PI * FMath::Pow(T, 0.8f));
+			bPlanted = false; Follow = 1.f - FMath::SmoothStep(0.45f, 0.95f, T); ToeOff = 0.f;
+		}
+	};
+	const float UR = GaitPhase / (2.f * PI), UL = FMath::Fmod(UR + 0.5f, 1.f);
+	float GHipR, GKneeR, GFollowR, GToeR, GHipL, GKneeL, GFollowL, GToeL;
+	bool bPlantR, bPlantL;
+	LegCycle(UR, GHipR, GKneeR, bPlantR, GFollowR, GToeR);
+	LegCycle(UL, GHipL, GKneeL, bPlantL, GFollowL, GToeL);
+	if (MoveBlend < 0.3f) { bPlantR = bPlantL = true; }   // standing: both feet down
+	const float S = FMath::Clamp(GHipR / FMath::Max(GAf, 1.f), -1.f, 1.f);   // right leg forward when positive (for the arms and hips)
 	const float C = FMath::Cos(GaitPhase);
 
 	// ---------- Strength of each motion ----------
-	const float HipAmp     = StrideDeg * MoveBlend;   // (longer strides since the Meshy model: 48 degrees walking, was 32)
-	const float KneeAmp    = FMath::Lerp(38.f, 72.f, RunAlpha) * MoveBlend * StepScale;   // (running was 105: with the model's longer shins the heels kicked his seat)
 	const float ArmAmp     = FMath::Lerp(22.f, 55.f, RunAlpha) * MoveBlend;
 	const float ElbowBase  = FMath::Lerp(12.f, 70.f, RunAlpha) * MoveBlend;
 	const float ElbowSwing = FMath::Lerp(8.f, 25.f, RunAlpha) * MoveBlend;
@@ -780,8 +813,6 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// ---------- Legs ----------
 	// On the ground: legs swing opposite each other; the knee bends most as a leg passes under the body
 	// (smooth everywhere: no sharp corners in the curve, so no jerks)
-	const float SwingR = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f + C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f - C));
-	const float SwingL = 0.1f + 0.9f * FMath::Pow(0.5f * (1.f - C), 2.5f) + 0.22f * RunAlpha * FMath::Square(0.5f * (1.f + C));
 	// Shield-up stance: the legs step the way you are actually moving. Backing up runs the stride in reverse; a sidestep
 	// swings the legs out to the side instead (the leading leg reaches out, the other closes up after it).
 	{
@@ -791,13 +822,13 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
 		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
 	}
-	const float HipRg = HipAmp * S * StepFw;
-	const float HipLg = -HipAmp * S * StepFw;
+	const float HipRg = GHipR * MoveBlend * StepFw;
+	const float HipLg = GHipL * MoveBlend * StepFw;
 	const float SideAmp = 24.f * MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
 	const float HipRroll = SideAmp * StepSd * (0.5f + 0.5f * S);   // positive roll swings a hanging leg to the right
 	const float HipLroll = SideAmp * StepSd * (0.5f - 0.5f * S);
-	const float KneeRg = -KneeAmp * SwingR;
-	const float KneeLg = -KneeAmp * SwingL;
+	const float KneeRg = GKneeR * MoveBlend;
+	const float KneeLg = GKneeL * MoveBlend;
 	// In the air: knees tuck on the way up, legs reach forward on the way down
 	const float HipRa  = FMath::Lerp(FMath::Lerp(30.f, 60.f, Asym), FMath::Lerp(15.f, 35.f, Asym), F01);
 	const float HipLa  = FMath::Lerp(FMath::Lerp(30.f, -15.f, Asym), FMath::Lerp(15.f, 0.f, Asym), F01);
@@ -813,7 +844,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float BreathS = FMath::Sin(IdleTime * 1.65f);   // one breath every 3.8 s
 	const float Stance = StanceHip - 1.5f * BreathS * IdleAmt;
 	// A relaxed stance: on the ground the knees are always a little bent (eased out as he crouches, which bends them anyway)
-	const float Relax = Ground * (1.f - Duck);
+	const float Relax = Ground * (1.f - Duck) * (1.f - MoveBlend);
 	HipRf += Stance * Relax;   HipLf += Stance * Relax;
 	KneeRf -= 2.f * Stance * Relax;   KneeLf -= 2.f * Stance * Relax;
 	// Sliding: one leg stretched out in front, the other folded under
@@ -838,28 +869,29 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
 	// Feet stay flat on the ground (a running stride lets them tip a little); in the air, sitting, riding, climbing,
 	// sliding and rolling they follow the shins as before
-	const float Level = Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha) * (1.f - 0.4f * RunAlpha * MoveBlend);
-	// A foot swinging through (its knee bending) leaves the ground: it follows the shin, heel up and toes pointing down,
-	// instead of staying flat; it flattens again as it reaches forward to land
-	const float Gait = MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float LiftR = FMath::SmoothStep(0.25f, 0.8f, SwingR) * Gait, LiftL = FMath::SmoothStep(0.25f, 0.8f, SwingL) * Gait;
-	AnkleR->SetRelativeRotation(FRotator(-(HipRf + KneeRf) * Level * (1.f - LiftR) - 18.f * LiftR, 0.f, 0.f));
-	AnkleL->SetRelativeRotation(FRotator(-(HipLf + KneeLf) * Level * (1.f - LiftL) - 18.f * LiftL, 0.f, 0.f));
+	const float Level = Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
+	// Walking feet: flat while planted, the heel rising as the foot pushes off, then following the shin (toes trailing)
+	// through the swing and levelling out again to land
+	const float Gait = MoveBlend * Level;
+	auto FootPitch = [&](float H, float K, float Follow, float Toe)
+	{
+		return Level * FMath::Lerp(-(H + K), -8.f, Follow * Gait) - 20.f * Toe * Gait;
+	};
+	AnkleR->SetRelativeRotation(FRotator(FootPitch(HipRf, KneeRf, GFollowR, GToeR), 0.f, 0.f));
+	AnkleL->SetRelativeRotation(FRotator(FootPitch(HipLf, KneeLf, GFollowL, GToeL), 0.f, 0.f));
 
 	// ---------- Body bounce ----------
 	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
 	// Walking: the hips dip when the legs spread. Running: the body is lowest mid-stance and floats up
 	// while the legs are spread, so there is a brief moment with both feet off the ground.
-	const float LegLen = LegReach;   // hip to ankle (the feet stay flat, so the ankle is what rises and falls)
-	const float WalkBounce = -LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
-	const float RunBounce  = -0.75f * LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
-	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);
-	// Bent knees (relaxed stance, crouching, guarding, landing): the body sinks exactly as far as the legs fold, so the
-	// flat feet stay on the ground (thigh 23 cm, shin 23.5 cm)
-	const float PoseH = 35.f * Squash + DuckHip + Stance * Relax;
-	const float PoseK = -70.f * Squash + DuckKnee - 2.f * Stance * Relax;
-	const float LegDrop = float(KnightDesign::ThighLen()) * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH))) + float(KnightDesign::ShinLen()) * (1.f - FMath::Cos(FMath::DegreesToRadians(PoseH + PoseK)));
-	float BodyZ = FMath::Lerp(Bounce, 0.f, Air) - LegDrop;
+	// The hips ride exactly as high as the planted leg holds them (its thigh and shin angles), so a planted foot stays on
+	// the ground: highest as the body passes over a straight leg, lowest as the feet spread, a little lower again as a
+	// running knee gives. Both feet down: the lower of the two. Both up (running): between the two, floating.
+	const float Thigh = float(KnightDesign::ThighLen()), Shin = float(KnightDesign::ShinLen());
+	auto LegHeight = [&](float H, float K) { return Thigh * FMath::Cos(FMath::DegreesToRadians(H)) + Shin * FMath::Cos(FMath::DegreesToRadians(H + K)) - LegReach; };
+	const float HR = LegHeight(HipRf, KneeRf), HL = LegHeight(HipLf, KneeLf);
+	const float GroundZ = (bPlantR && bPlantL) ? FMath::Min(HR, HL) : bPlantR ? HR : bPlantL ? HL : 0.5f * (HR + HL) + 1.5f;
+	float BodyZ = FMath::Lerp(GroundZ, 0.f, Air);
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle
@@ -886,7 +918,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
 	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
-	const float BobAmp = FMath::Lerp(4.f, 16.f, RunAlpha) * MoveBlend;
+	const float BobAmp = FMath::Lerp(0.8f, 3.f, RunAlpha) * MoveBlend;   // (the hips carry the real rise and fall now)
 	const float ChestTarget = (Ground * (-BobAmp * (1.f - S * S)) + Air * FMath::Lerp(5.f, -4.f, F01)) * (1.f - FMath::Max(SlideAlpha, SitAlpha)) + 0.6f * BreathS * IdleAmt;   // the chest rises as he breathes in
 	SmoothChestZ = FMath::FInterpTo(SmoothChestZ, ChestTarget, Dt, 30.f);
 	UpperPivot->SetRelativeLocation(UpperBase + FVector(0.f, 0.f, SmoothChestZ));
@@ -901,7 +933,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground, 2.5f * MoveBlend * C * Ground));
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
-	const float Nod = 2.5f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
+	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
 	// (crouched, the head also takes back the rest of the squat's lean, so the helm looks the same way as when standing)
 	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
 
