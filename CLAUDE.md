@@ -174,7 +174,9 @@ Remote: private GitHub repo https://github.com/jleclair64/Jeebsland (set up 2026
 - Dragging from the sack's weapon window onto your weapon bar, or from its armour window onto your Armor window / shield slot, equips it (`ALootDrop::EquipTo`). The old piece goes to your pack, or into the sack's cell if your pack is full. The sack's own armour window still shows its owner's shield.
 - Pumpkin halo and point lights are about 60% dimmer (halo Intensity 0.14, lights 360).
 
-## Knight redesign (2026-10-12; not yet seen in-game)
+## Knight redesign (2026-10-12; REPLACED 2026-10-29)
+
+- 2026-10-29: the armour was rebuilt from the owner's ChatGPT concept sheet (KnightDesign.h header describes it): armet with pointed visor, eye slit, breathing slits and ear rosettes; tall collar; V-neck breastplate; leather belt with round buckle; pointed front plate and square tassets; big pauldrons; dark charcoal cloth sleeves, trousers and gloves (fixed colour); big vambraces, knee cops, greaves and broad sabatons. No gold trim any more. Pivots, slots, the brush, rings, amulet and shields are unchanged. The notes below describe the older look.
 
 - Agreed from four sketches with the owner: broad, stocky, crisp faceted plate (eight-sided, flat-shaded), bronze with gold edges, "cartoony but sharp". No tabard or belt. Owner liked the sharper, less rounded look; wanted shorter legs, a deep (wide from the side) body and a visible neck.
 - `KnightDesign.h` was rewritten: round sixteen-faced great helm (gold crest, brow dipping to a point, raised nose guard, gold frames under the eyes, cheek sweeps, closed cheeks with small vents; no plume), gorget, octagonal breastplate with a centre ridge and a gold-V plackart, hip lames, tassets, mail skirt, compact shoulder caps (cap on the chest pivot, three lames on the arm), fan-winged elbow and knee cops, flared gauntlet cuffs rising to points, knuckle plates, ankle rings, long sabatons with overlapping plates. New mesh helpers in `KnightMesh.h`: `Ribbon`, `Prism`, `Bead`, `DownTo`; `FOct` lays bands flat on faceted plates.
