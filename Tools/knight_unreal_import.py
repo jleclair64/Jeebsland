@@ -28,6 +28,9 @@ def import_texture(path, name, srgb, normal=False):
     if tex is None:
         raise RuntimeError("KNIGHTDIAG the picture " + name + " did not import")
     tex.set_editor_property("srgb", srgb)
+    # always at full size: the knight is close to the camera and his picture is spread thin over the whole body
+    tex.set_editor_property("never_stream", True)
+    tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_CHARACTER)
     if normal:
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
         tex.set_editor_property("flip_green_channel", False)

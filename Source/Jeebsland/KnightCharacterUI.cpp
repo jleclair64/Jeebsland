@@ -243,6 +243,8 @@ void AKnightCharacter::ApplyGraphics()
 	Set(TEXT("r.Shadow.CSM.MaxCascades"), bLowest ? 1 : 2);
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.7"));
 	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));
+	// a light sharpening of the final picture, which takes the softness out of TAA's upscaling (almost free)
+	GEngine->Exec(W, TEXT("r.Tonemapper.Sharpen 0.9"));
 }
 
 void AKnightCharacter::SetGraphicsLevel(int32 Level)
