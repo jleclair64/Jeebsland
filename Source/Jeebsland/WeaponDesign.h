@@ -66,12 +66,13 @@ namespace WeaponDesign
 		{
 		case K_Sword:
 		{
-			Lathe(Add(Leather), KnightDesign::Prof({ 0, 10, 2.1, 9.6, 2.4, 5, 2.1, 0, 2.4, -5, 2.1, -9.6, 0, -10 }), 14, 1.0, 1.0, Pl);
+			// (a longer grip since the Meshy model's big fists: the guard and the pommel both show either side of the hand)
+			Lathe(Add(Leather), KnightDesign::Prof({ 0, 13.5, 2.2, 13.1, 2.5, 7, 2.2, 0, 2.5, -7, 2.2, -13.1, 0, -13.5 }), 14, 1.0, 1.0, Pl);
 			{ FMD& M = Add(Trim);
-			  Blob(M, 3.4, 3.4, 3.4, At(0, 0, 12.5));
-			  RBox(M, 1.8, 11.0, 1.7, 0.5, At(0, 0, -12.5));
-			  Blob(M, 2.5, 2.5, 2.5, At(0, 11.4, -12.5)); Blob(M, 2.5, 2.5, 2.5, At(0, -11.4, -12.5)); }
-			BladeSolid(Add(Plate), { {-13.5, 4.8, 1.4, 0}, {-55, 4.3, 1.2, 0}, {-65, 3.1, 0.9, 0}, {-72, 1.4, 0.6, 0}, {-76, 0, 0, 0} }, Pl);
+			  Blob(M, 3.6, 3.6, 3.6, At(0, 0, 16.0));
+			  RBox(M, 1.9, 11.5, 1.8, 0.5, At(0, 0, -16.0));
+			  Blob(M, 2.6, 2.6, 2.6, At(0, 11.9, -16.0)); Blob(M, 2.6, 2.6, 2.6, At(0, -11.9, -16.0)); }
+			BladeSolid(Add(Plate), { {-17.0, 4.8, 1.4, 0}, {-58.5, 4.3, 1.2, 0}, {-68.5, 3.1, 0.9, 0}, {-75.5, 1.4, 0.6, 0}, {-79.5, 0, 0, 0} }, Pl);
 			break;
 		}
 		case K_Broadsword:

@@ -150,7 +150,7 @@ void AFoeKnight::BeginPlay()
 	// His sword, in the right hand, held the way the player holds one
 	{
 		TArray<WeaponDesign::FWPart> Parts;
-		WeaponDesign::Build(JeebItems::K_Sword, Parts, KM::Xf(GripPos(false), FVector(0, -20, 0)));
+		WeaponDesign::Build(JeebItems::K_Sword, Parts, KM::Xf(GripPos(false), KM::DownTo(BladeDir(1))));
 		for (const WeaponDesign::FWPart& WP : Parts)
 		{
 			if (WP.Mesh.V.Num() == 0) continue;

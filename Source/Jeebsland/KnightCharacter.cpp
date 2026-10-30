@@ -750,8 +750,14 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float DuckLean = FMath::Max(14.f * DuckB, 24.f * DuckC);   // a person squatting low leans forward to keep balance
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
-	// ---------- Gait clock: faster strides when running ----------
-	const float Hz = FMath::Lerp(1.3f, 2.1f, RunAlpha) * FMath::Lerp(1.f, 0.7f, CrouchAlpha); // crouch-walking is about 40% slower
+	// ---------- Gait clock: driven by the ground covered, so planted feet never slide ----------
+	// One full cycle (a step with each leg) moves the body by the distance a planted foot travels back under it: 4 x leg
+	// length x sin(hip swing), stretched when running by the moment both feet are off the ground.
+	const float StepScale  = 1.f - 0.4f * CrouchAlpha; // smaller steps when crouched
+	const float StrideDeg  = FMath::Lerp(48.f, 80.f, RunAlpha) * StepScale;
+	const float LegReach   = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
+	const float StrideLen  = 4.f * LegReach * FMath::Sin(FMath::DegreesToRadians(StrideDeg)) * FMath::Lerp(1.f, 1.5f, RunAlpha);
+	const float Hz = FMath::Clamp(Speed / FMath::Max(StrideLen, 1.f), 0.6f, 3.2f);
 	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * Hz * Dt, 2.f * PI);
 	IdleTime += Dt;
 	FlutterTime += Dt * (1.f + 1.5f * Stream);
@@ -759,8 +765,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float C = FMath::Cos(GaitPhase);
 
 	// ---------- Strength of each motion ----------
-	const float StepScale  = 1.f - 0.4f * CrouchAlpha; // smaller steps when crouched
-	const float HipAmp     = FMath::Lerp(32.f, 80.f, RunAlpha) * MoveBlend * StepScale;
+	const float HipAmp     = StrideDeg * MoveBlend;   // (longer strides since the Meshy model: 48 degrees walking, was 32)
 	const float KneeAmp    = FMath::Lerp(38.f, 72.f, RunAlpha) * MoveBlend * StepScale;   // (running was 105: with the model's longer shins the heels kicked his seat)
 	const float ArmAmp     = FMath::Lerp(22.f, 55.f, RunAlpha) * MoveBlend;
 	const float ElbowBase  = FMath::Lerp(12.f, 70.f, RunAlpha) * MoveBlend;
@@ -834,14 +839,18 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// Feet stay flat on the ground (a running stride lets them tip a little); in the air, sitting, riding, climbing,
 	// sliding and rolling they follow the shins as before
 	const float Level = Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha) * (1.f - 0.4f * RunAlpha * MoveBlend);
-	AnkleR->SetRelativeRotation(FRotator(-(HipRf + KneeRf) * Level, 0.f, 0.f));
-	AnkleL->SetRelativeRotation(FRotator(-(HipLf + KneeLf) * Level, 0.f, 0.f));
+	// A foot swinging through (its knee bending) leaves the ground: it follows the shin, heel up and toes pointing down,
+	// instead of staying flat; it flattens again as it reaches forward to land
+	const float Gait = MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
+	const float LiftR = FMath::SmoothStep(0.25f, 0.8f, SwingR) * Gait, LiftL = FMath::SmoothStep(0.25f, 0.8f, SwingL) * Gait;
+	AnkleR->SetRelativeRotation(FRotator(-(HipRf + KneeRf) * Level * (1.f - LiftR) - 18.f * LiftR, 0.f, 0.f));
+	AnkleL->SetRelativeRotation(FRotator(-(HipLf + KneeLf) * Level * (1.f - LiftL) - 18.f * LiftL, 0.f, 0.f));
 
 	// ---------- Body bounce ----------
 	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
 	// Walking: the hips dip when the legs spread. Running: the body is lowest mid-stance and floats up
 	// while the legs are spread, so there is a brief moment with both feet off the ground.
-	const float LegLen = 46.5f;   // hip to ankle (the feet stay flat, so the ankle is what rises and falls)
+	const float LegLen = LegReach;   // hip to ankle (the feet stay flat, so the ankle is what rises and falls)
 	const float WalkBounce = -LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S)));
 	const float RunBounce  = -0.75f * LegLen * (1.f - FMath::Cos(FMath::DegreesToRadians(HipAmp * S))) + 6.f * S * S;
 	const float Bounce = FMath::Lerp(WalkBounce, RunBounce, RunAlpha);

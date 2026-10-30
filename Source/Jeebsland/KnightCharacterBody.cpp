@@ -121,7 +121,7 @@ FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-16.f, 16.f, float(i) / (CapeNX - 1));
 	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-26.5f + 0.012f * Y * Y, Y, 61.f));
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-25.5f + 0.012f * Y * Y, Y, 66.f));   // (5 cm higher, 2026-10-30)
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -450,10 +450,15 @@ void AKnightCharacter::RebuildHeld()
 		Make(UpperPivot, KnightDesign::P_Upper, KM::Xf(FVector::ZeroVector));
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
-			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-21.5f, 14.f, 41.f + 16.f), Q);   // chest pivot sits 41 below the body's centre
+			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-27.5f, 14.f, 41.f + 16.f), Q);   // (clear of the Meshy model's back)   // chest pivot sits 41 below the body's centre
 		return;
 	}
-	const KM::FXf Tilt = KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
+	// Blades are held the way a hand really grips a sword: the grip runs across the closed fist (the Meshy model's fists close
+	// side to side, knuckles forward), so the blade leaves from the thumb side, forward and in, with the pommel showing on the
+	// little-finger side. Other things (tools, bows, spears, staffs) keep the old hold, pointing down and forward.
+	const bool bBlade = K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana;
+	const KM::FXf Tilt = bBlade ? KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1)))
+	                            : KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
 	{
 		const int32 First = HeldComps.Num();
 		Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
@@ -461,7 +466,7 @@ void AKnightCharacter::RebuildHeld()
 		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana || K == JeebItems::K_Staff)   // held at ease
 			for (int32 i = First; i < HeldComps.Num(); ++i) EaseComps.Add(HeldComps[i]);
 	}
-	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), FVector(0, -20, 0)));
+	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), KM::DownTo(KnightDesign::BladeDir(-1))));
 }
 
 // The shield on the arm, or on the back: turned to face backwards, its inner face just behind the sword on the back,
@@ -553,10 +558,10 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 	// of the knight, between his feet (worked out for the arm's relaxed bend)
 	static const FQuat SwordQ = []()
 	{
-		const FVector Blade = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0));
-		const FVector Want = FVector(0.32, -0.45, -0.83).GetSafeNormal();   // tip further out in front
-		// then twisted in the wrist like turning a key: 40 degrees about the blade itself
-		return FQuat(Want, FMath::DegreesToRadians(-40.f)) * FQuat::FindBetweenNormals(Blade.GetSafeNormal(), Want);
+		// (the grip still crosses the fist diagonally: the blade only dips further, its tip to the ground in front of him)
+		const FVector Blade = KnightDesign::BladeDir(1);
+		const FVector Want = FVector(0.30, -0.62, -0.72).GetSafeNormal();
+		return FQuat::FindBetweenNormals(Blade, Want);
 	}();
 	// The wizard staff stands upright, held round the middle of its shaft with the arm a little out, its foot on the ground
 	// (worked out for the staff's relaxed elbow bend, see WeaponDesign::IdleElbow)
