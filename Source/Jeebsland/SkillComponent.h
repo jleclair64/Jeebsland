@@ -108,9 +108,9 @@ public:
 	UPROPERTY(Replicated) TArray<int32> LoreFound;
 	bool DiscoverLore(int32 Index);
 
-	// Map fog: the ground this character has seen, as a FogN x FogN grid over the whole ground (one bit per 5 m cell).
-	// The server marks it as the knight walks (Explore); it is saved with the character and never lost on death.
-	static constexpr int32 FogN = 64;
+	// Map fog: the ground this character has seen, as a FogN x FogN grid over the whole world (JeebWorld bounds; about 12 m
+	// cells). The server marks it as the knight walks (Explore); it is saved with the character and never lost on death.
+	static constexpr int32 FogN = 192;
 	static constexpr float FogRevealRadius = 4500.f;   // how far around you the fog clears
 	UPROPERTY(Replicated) TArray<uint8> Explored;
 	void Explore(const FVector& At);

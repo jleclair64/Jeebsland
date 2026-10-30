@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "WorldMap.h"
 
 // Shared description of the land, so the ground mesh, trees, rocks, huts, paths and walls all agree.
 namespace JeebTerrain
@@ -152,6 +153,7 @@ namespace JeebTerrain
 		for (const FVector2D& St : Stalls) if (RectSD(P, St, FVector2D(270.f, 260.f)) < 0.f) return true;
 		if (FVector2D::Distance(P, CastlePos()) < CastleMoatOut + 80.f) return true;
 				if (FVector2D::Distance(P, PondCenter()) < PondWaterR) return true;
+		if (JeebWorld::InWater(X, Y)) return true;   // the river (it runs through the east side of the square)
 		
 		return false;
 	}
@@ -212,8 +214,8 @@ namespace JeebTerrain
 	inline float PondRim() { static const float Rim = HeightNoPond(PondCenter().X, PondCenter().Y); return Rim; }
 	inline float PondWaterZ() { return PondRim() - PondWaterDrop; }
 
-	// The ground, including the pond bowl
-	inline float HeightAt(float X, float Y)
+	// The original square round the start (the meadow, Blackrock, the castle, the pond), exactly as it was built
+	inline float HomeHeight(float X, float Y)
 	{
 		float H = HeightNoPond(X, Y);
 		const float D = FVector2D::Distance(FVector2D(X, Y), PondCenter());
@@ -234,6 +236,20 @@ namespace JeebTerrain
 			H -= CastleMoatDepth * Tm * Tm * (3.f - 2.f * Tm);
 		}
 		return H;
+	}
+
+	// The ground anywhere in the world (2026-10-30): the original square round the start, blending over its outer 40 m into the
+	// whole world's land (WorldMap.h: mountains, the rocky south-west, level town sites), then the sea, the coast and the river
+	// valleys and channels everywhere (the river runs down through the east side of the original square).
+	constexpr float GroundHalfForBlend = 16000.f;
+	inline float HeightAt(float X, float Y)
+	{
+		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
+		float H;
+		if (Cheb < 12000.f) H = HomeHeight(X, Y);
+		else if (Cheb >= GroundHalfForBlend - 400.f) H = JeebWorld::LandHeight(X, Y);
+		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
+		return JeebWorld::SeaAndRivers(X, Y, H);
 	}
 
 	// The height of the ground mesh as actually drawn (GrassField: a 200 cm grid, each cell split along its B-C diagonal).

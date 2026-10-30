@@ -451,14 +451,14 @@ void USkillComponent::Explore(const FVector& At)
 {
 	if (!HasAuth()) return;   // the server decides what has been seen
 	if (Explored.Num() != FogN * FogN / 8) Explored.SetNumZeroed(FogN * FogN / 8);
-	const float Cell = 2.f * JeebTerrain::GroundHalf / FogN;
+	const float Side = FMath::Max(JeebWorld::MaxX - JeebWorld::MinX, JeebWorld::MaxY - JeebWorld::MinY), Cell = Side / FogN;
 	const int32 R = FMath::CeilToInt(FogRevealRadius / Cell);
-	const int32 CI = FMath::FloorToInt((At.X + JeebTerrain::GroundHalf) / Cell), CJ = FMath::FloorToInt((At.Y + JeebTerrain::GroundHalf) / Cell);
+	const int32 CI = FMath::FloorToInt((At.X - JeebWorld::MinX) / Cell), CJ = FMath::FloorToInt((At.Y - JeebWorld::MinY) / Cell);
 	for (int32 I = CI - R; I <= CI + R; ++I)
 		for (int32 J = CJ - R; J <= CJ + R; ++J)
 		{
 			if (I < 0 || J < 0 || I >= FogN || J >= FogN) continue;
-			const FVector2D Mid(-JeebTerrain::GroundHalf + (I + 0.5f) * Cell, -JeebTerrain::GroundHalf + (J + 0.5f) * Cell);
+			const FVector2D Mid(JeebWorld::MinX + (I + 0.5f) * Cell, JeebWorld::MinY + (J + 0.5f) * Cell);
 			if (FVector2D::DistSquared(Mid, FVector2D(At)) > FMath::Square(FogRevealRadius)) continue;
 			const int32 Bit = I * FogN + J;
 			const uint8 Mask = uint8(1 << (Bit & 7));
@@ -468,8 +468,8 @@ void USkillComponent::Explore(const FVector& At)
 
 bool USkillComponent::IsExplored(float X, float Y) const
 {
-	const float Cell = 2.f * JeebTerrain::GroundHalf / FogN;
-	const int32 I = FMath::FloorToInt((X + JeebTerrain::GroundHalf) / Cell), J = FMath::FloorToInt((Y + JeebTerrain::GroundHalf) / Cell);
+	const float Side = FMath::Max(JeebWorld::MaxX - JeebWorld::MinX, JeebWorld::MaxY - JeebWorld::MinY), Cell = Side / FogN;
+	const int32 I = FMath::FloorToInt((X - JeebWorld::MinX) / Cell), J = FMath::FloorToInt((Y - JeebWorld::MinY) / Cell);
 	if (I < 0 || J < 0 || I >= FogN || J >= FogN) return false;
 	const int32 Bit = I * FogN + J;
 	return Explored.IsValidIndex(Bit >> 3) && (Explored[Bit >> 3] & (1 << (Bit & 7)));

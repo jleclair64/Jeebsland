@@ -29,13 +29,8 @@ void AKnightHUD::BuildMapTex()
 	UWorld* W = GetWorld();
 	if (!W) return;
 
-	// What the map covers: everything built (paths, trees, the town, the castle), with a margin, as a square
-	FBox2D B(ForceInit);
-	for (const JeebTerrain::FPathDef& P : JeebTerrain::PathDefs()) for (const FVector2D& Pt : P.Pts) B += Pt;
+	// What the map covers: the whole world (WorldMap.h), as a square
 	const FVector2D VC = JeebTerrain::VillageCenter(), CP = JeebTerrain::CastlePos();
-	B += VC + FVector2D(JeebTerrain::VillageHalf()); B += VC - FVector2D(JeebTerrain::VillageHalf());
-	B += CP + FVector2D(JeebTerrain::CastleMoatOut); B += CP - FVector2D(JeebTerrain::CastleMoatOut);
-	B += JeebTerrain::PondCenter();
 	TArray<FVector2D> Broadleaf, Conifer;
 	for (TActorIterator<AForest> It(W); It; ++It)
 	{
@@ -55,12 +50,7 @@ void AKnightHUD::BuildMapTex()
 		}
 	}
 	for (TActorIterator<AChoppableTree> It(W); It; ++It) Broadleaf.Add(FVector2D(It->GetActorLocation()));
-	for (const FVector2D& P : Broadleaf) B += P;
-	for (const FVector2D& P : Conifer) B += P;
-	B = B.ExpandBy(1500.f);
-	const float GH = JeebTerrain::GroundHalf;
-	B.Min.X = FMath::Max(B.Min.X, -GH); B.Min.Y = FMath::Max(B.Min.Y, -GH);
-	B.Max.X = FMath::Min(B.Max.X, GH);  B.Max.Y = FMath::Min(B.Max.Y, GH);
+	const FBox2D B(FVector2D(JeebWorld::MinX, JeebWorld::MinY), FVector2D(JeebWorld::MaxX, JeebWorld::MaxY));
 	MapSize = FMath::Max(B.GetSize().X, B.GetSize().Y);
 	MapMin = B.GetCenter() - FVector2D(MapSize * 0.5f);
 	const float Cell = MapSize / MapN;
@@ -69,7 +59,7 @@ void AKnightHUD::BuildMapTex()
 	auto ToWorld = [&](int32 U, int32 V) { return FVector2D(MapMin.X + (MapN - 1 - V + 0.5f) * Cell, MapMin.Y + (U + 0.5f) * Cell); };
 	auto ToPixel = [&](const FVector2D& P, float& U, float& V) { U = (P.Y - MapMin.Y) / Cell - 0.5f; V = MapN - 1 - ((P.X - MapMin.X) / Cell - 0.5f); };
 
-	// ---- The ground: grass, lit from the north-west so the hills show ----
+	// ---- The ground: green lowland, brown hills, grey mountains, snowy peaks, lit from the north-west so the shapes show ----
 	TArray<float> H;
 	H.SetNumUninitialized(MapN * MapN);
 	for (int32 V = 0; V < MapN; ++V)
@@ -80,16 +70,16 @@ void AKnightHUD::BuildMapTex()
 		}
 	TArray<FLinearColor> Px;
 	Px.SetNumUninitialized(MapN * MapN);
-	const FLinearColor GrassLow(0.30f, 0.40f, 0.16f), GrassHigh(0.52f, 0.56f, 0.26f);
-	float HMin = 1.0e9f, HMax = -1.0e9f;
-	for (float Z : H) { HMin = FMath::Min(HMin, Z); HMax = FMath::Max(HMax, Z); }
 	for (int32 V = 0; V < MapN; ++V)
 		for (int32 U = 0; U < MapN; ++U)
 		{
 			const float Z = H[V * MapN + U];
 			const float Zl = H[V * MapN + FMath::Max(U - 1, 0)], Zu = H[FMath::Max(V - 1, 0) * MapN + U];
-			const float Light = FMath::Clamp(1.f + ((Z - Zl) * -0.5f + (Z - Zu) * 0.5f) / Cell * 1.6f, 0.7f, 1.25f);
-			Px[V * MapN + U] = Mix(GrassLow, GrassHigh, (Z - HMin) / FMath::Max(HMax - HMin, 1.f)) * Light;
+			const float Light = FMath::Clamp(1.f + ((Z - Zl) * -0.5f + (Z - Zu) * 0.5f) / Cell * 1.2f, 0.6f, 1.3f);
+			FLinearColor C = Mix(FLinearColor(0.32f, 0.42f, 0.17f), FLinearColor(0.50f, 0.48f, 0.28f), FMath::SmoothStep(300.f, 2500.f, Z));
+			C = Mix(C, FLinearColor(0.50f, 0.48f, 0.45f), FMath::SmoothStep(3000.f, 7000.f, Z));
+			C = Mix(C, FLinearColor(0.92f, 0.93f, 0.95f), FMath::SmoothStep(10500.f, 13000.f, Z));
+			Px[V * MapN + U] = C * Light;
 		}
 
 	auto Stamp = [&](const FVector2D& P, float RadiusWorld, const FLinearColor& Col, float Alpha)
@@ -118,7 +108,7 @@ void AKnightHUD::BuildMapTex()
 		Stamp(Broadleaf[i], 260.f, (i % 3 == 0) ? FLinearColor(0.62f, 0.30f, 0.08f) : FLinearColor(0.48f, 0.24f, 0.09f), 0.75f);
 	for (const FVector2D& P : Conifer) Stamp(P, 200.f, FLinearColor(0.12f, 0.24f, 0.13f), 0.85f);
 
-	// ---- Water: the pond and the castle moat ----
+	// ---- Water: the sea, the rivers, the pond and the castle moat ----
 	const float WaterZ = JeebTerrain::PondWaterZ();
 	const FLinearColor WaterCol(0.22f, 0.45f, 0.70f);
 	for (int32 V = 0; V < MapN; ++V)
@@ -128,7 +118,11 @@ void AKnightHUD::BuildMapTex()
 			const float Dc = FVector2D::Distance(P, CP);
 			const bool bPond = FVector2D::Distance(P, JeebTerrain::PondCenter()) < 3000.f && H[V * MapN + U] < WaterZ;
 			const bool bMoat = Dc > JeebTerrain::CastleMoatIn && Dc < JeebTerrain::CastleMoatOut;
-			if (bPond || bMoat) Px[V * MapN + U] = WaterCol;
+			const bool bSea = H[V * MapN + U] < JeebWorld::SeaLevel;
+			float Half;
+			const bool bRiver = JeebWorld::RiverDistance(P.X, P.Y, Half) < Half + Cell * 0.6f;   // (at least a pixel wide on the map)
+			if (bPond || bMoat || bRiver) Px[V * MapN + U] = WaterCol;
+			else if (bSea) Px[V * MapN + U] = Mix(WaterCol, FLinearColor(0.10f, 0.22f, 0.42f), FMath::SmoothStep(JeebWorld::SeaLevel, JeebWorld::SeaLevel - 1500.f, H[V * MapN + U]));
 		}
 
 	// ---- Blackrock (a walled square) and the castle (a walled square inside its moat) ----
@@ -210,9 +204,7 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 		HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.6f), At.X - TW * 0.5f + 1.5f, At.Y - TH * 0.5f + 1.5f, Font, Scale);
 		HDText(T, FLinearColor(1.f, 0.93f, 0.75f), At.X - TW * 0.5f, At.Y - TH * 0.5f, Font, Scale);
 	};
-	Label(TEXT("Blackrock"), JeebTerrain::VillageCenter(), 1.25f);
-	Label(TEXT("Castle"), JeebTerrain::CastlePos(), 1.05f);
-	Label(TEXT("Pond"), JeebTerrain::PondCenter(), 0.95f);
+	for (const JeebWorld::FTown& T : JeebWorld::Towns()) Label(T.Name, T.Pos, 1.1f);   // every town, once you have seen it
 	HDText(TEXT("N"), FLinearColor(1.f, 0.93f, 0.75f), X + S - 26.f, Y + 8.f, Font, 1.2f);
 
 	// You: an arrow pointing the way you face (only you: never other players)

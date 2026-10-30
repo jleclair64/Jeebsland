@@ -123,6 +123,13 @@ The owner dropped the single-player story mode: Jeebsland is becoming an online 
 - Saving: on login, every 60 s, when a player leaves (`PawnLeavingGame`) and when the world shuts down; the Save button asks the server.
 - Worlds: listed in DefaultGame.ini (`[/Script/Jeebsland.JeebGameInstance] +Worlds=...`: World 1 port 7777, World 2 port 7778, MaxPlayers 200); each answers `<players> <max>` over HTTP on port + 100 (`HTTPServer`, bound to all addresses in DefaultEngine.ini).
 
+## The whole world (2026-10-30)
+
+- WorldMap.h (namespace JeebWorld) traces the owner's sketch (Docs/MapSketch.jpg; Blackrock WEST of the river, Oak Hill east): 1 sketch px = 1.3 m (FromSketch), north +X, east +Y, Blackrock's sketch spot = the existing village. Bounds X -126400..105600, Y -36000..134400 (about 2.3 x 1.7 km). Mountains (soft union of every sketched peak, ridged Perlin up to ~160 m) plus walls on the west, south and north edges; rocky south-west; town shelves (Towns()); the east coast (CoastY), sea at SeaLevel -60 and islands; the river and its two branches (Rivers()) carved as valleys and channels, water at RiverLevel.
+- JeebTerrain::HeightAt = the original square (HomeHeight, unchanged) blending over 12000..15600 into JeebWorld::LandHeight, then SeaAndRivers everywhere (the river crosses the east side of the original square around Y 12000-13500).
+- AWorldTerrain (spawned by KnightGameState on every machine) draws it: 8 m grid in 40x40-cell chunks with collision and a hole over the original square, vertex-coloured with M_WorldGround (Tools/BuildWorldMaterial.ps1); water sheets for the ocean and rivers (clients only). No trees or grass outside the original square yet (owner: blank slate).
+- Map fog grid and the Escape-screen world map now cover the whole world (fog reset once for everyone).
+
 ## Code layout (split 2026-10-12; function bodies unchanged)
 
 `AKnightHUD` (header `KnightHUD.h`): `KnightHUD.cpp` main DrawHUD, bars, weapon bar, minimap; `KnightHUDGlass.cpp` liquid-glass drawing helpers, buttons, tooltips; `KnightHUDIcons.cpp` Poly/Disc and all item icons; `KnightHUDInventory.cpp` inventory, side panel, badges, drag and drop, drop box, loot windows; `KnightHUDShops.cpp` store, smithy, bank; `KnightHUDScreens.cpp` settings, dictionary, lore, skills screen, dialogue; `KnightHUDText.cpp` HDText, DrawLinesAt, NorseText.

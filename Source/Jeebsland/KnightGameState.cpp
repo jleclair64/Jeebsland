@@ -2,6 +2,7 @@
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
 #include "GrassField.h"
+#include "WorldTerrain.h"
 #include "Meadow.h"
 #include "MiningRock.h"
 #include "Inventory.h"
@@ -105,6 +106,7 @@ void AKnightGameState::BuildWorld()
 	// The land (hills and grass)
 		World->SpawnActor<AGrassField>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
+	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
 
 	// The cottage, with its door facing the starting point
 	const FVector CottageSpot = JeebTerrain::CottagePos();

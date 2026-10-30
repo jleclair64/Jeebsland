@@ -120,7 +120,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 3. **Player chat** (with filter and mute).
 4. **Radar potion.**
 5. **Tier redo** (tin to gold plus the three class legendaries) and level gates, one step. DONE 2026-10-30: nine tiers, new ores (tin, iron, silver, gold, onyx, emerald) on fixed-ore rocks, level gates 1/5/10/20/30/40/50, legendaries by smithing at Smithing 50 (onyx only for knights), saves migrated (version 2).
-6. **The river** (Blackrock west of it, forking south) with **stone bridges**, then **Oak Hill** east of it, the big bridge, the war skirmishes; respawn moves to Oak Hill.
+6. **The river** (Blackrock west of it, forking south) with **stone bridges**, then **Oak Hill** east of it (the full-size bare world with mountains, the river, coast and sea was BUILT 2026-10-30: WorldMap.h; still to do here: bridges, Oak Hill itself), the big bridge, the war skirmishes; respawn moves to Oak Hill.
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.
 9. **Profiles per account,** fast-travel screen, shared bank in every town.
