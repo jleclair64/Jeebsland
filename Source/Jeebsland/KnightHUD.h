@@ -150,6 +150,10 @@ private:
 	UPROPERTY() UTexture2D* MapTex = nullptr;
 	UPROPERTY() UTexture2D* FogTex = nullptr;   // map fog over unexplored ground, repainted when the explored grid changes
 	uint32 FogHash = 0;
+	// Frame rate counter (Settings checkbox, remembered in the user settings)
+	bool bShowFps = false, bFpsLoaded = false;
+	float FpsSmooth = 0.f;
+	void DrawFps();
 	FVector2D MapMin = FVector2D::ZeroVector;
 	float MapSize = 1.f;
 	void BuildMapTex();

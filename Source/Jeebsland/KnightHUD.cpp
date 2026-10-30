@@ -62,6 +62,7 @@ void AKnightHUD::DrawHUD()
 	bUIRightClick = bRightNow && !bRightWasDown;
 	bRightWasDown = bRightNow;
 	TipLines.Reset();
+	DrawFps();
 
 	// No knight: the starting screen, or (online) waiting for the server to let us in
 	APawn* Pawn = GetOwningPawn();
@@ -481,6 +482,29 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Defence %d in all, every bonus counted"), Def) });
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Frame rate in the top right corner (Settings: "Show the frame rate"), smoothed so it is readable
+void AKnightHUD::DrawFps()
+{
+	if (!bFpsLoaded)
+	{
+		bFpsLoaded = true;
+		if (GConfig) GConfig->GetBool(TEXT("Jeebsland"), TEXT("ShowFps"), bShowFps, GGameUserSettingsIni);
+	}
+	if (!bShowFps) return;
+	const float Dt = FApp::GetDeltaTime();
+	if (Dt <= 0.f) return;
+	FpsSmooth = FpsSmooth <= 0.f ? 1.f / Dt : FMath::Lerp(FpsSmooth, 1.f / Dt, FMath::Clamp(Dt * 4.f, 0.f, 1.f));
+	UFont* Font = GEngine->GetMediumFont();
+	const FString T = FString::Printf(TEXT("%d FPS"), FMath::RoundToInt(FpsSmooth));
+	float TW = 0.f, TH = 0.f;
+	HDTextSize(T, TW, TH, Font, 1.2f);
+	const float X = Canvas->ClipX - TW - 20.f, Y = 14.f;
+	const FLinearColor C = FpsSmooth >= 100.f ? FLinearColor(0.5f, 1.f, 0.5f) : FpsSmooth >= 50.f ? FLinearColor(1.f, 0.9f, 0.4f) : FLinearColor(1.f, 0.45f, 0.35f);
+	HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.7f), X + 1.5f, Y + 1.5f, Font, 1.2f);
+	HDText(T, C, X, Y, Font, 1.2f);
 }
 
 // ---------------------------------------------------------------------------------------------------

@@ -106,6 +106,11 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 				// Checkbox: toggles once per click
 				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 560.f && MY >= BoxY + 86.f && MY <= BoxY + 122.f)
 					Knight->SetPanelAlways(!Knight->GetPanelAlways());
+				if (bClicked && MX >= BoxX - 4.f && MX <= BoxX + 560.f && MY >= BoxY + 132.f && MY <= BoxY + 168.f)
+				{
+					bShowFps = !bShowFps;
+					if (GConfig) GConfig->SetBool(TEXT("Jeebsland"), TEXT("ShowFps"), bShowFps, GGameUserSettingsIni);
+				}
 			}
 			else
 			{
@@ -137,7 +142,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		Slider(ScaleY, FMath::Clamp((RS - 0.35f) / 0.65f, 0.f, 1.f), FLinearColor(0.3f, 0.7f, 0.9f));
 
 		// Graphics: two levels, one click each
-		static const TCHAR* LevelNames[2] = { TEXT("LOWEST"), TEXT("LOW") };
+		static const TCHAR* LevelNames[2] = { TEXT("LOW"), TEXT("HIGH") };
 		static const TCHAR* LevelText[2] = {
 			TEXT("For weaker computers: no clouds, simple shadows and edges"),
 			TEXT("Clouds and soft shadows") };
@@ -153,6 +158,11 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 92.f, 22.f, 22.f);
 		if (Knight->GetPanelAlways()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 95.f, 16.f, 16.f);
 		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 92.f, Font, 1.1f);
+		// Frame rate counter in the top right corner
+		DrawRect(FLinearColor::White, BoxX, BoxY + 136.f, 26.f, 26.f);
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 138.f, 22.f, 22.f);
+		if (bShowFps) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 141.f, 16.f, 16.f);
+		HDText(TEXT("Show the frame rate"), FLinearColor::White, BoxX + 38.f, BoxY + 138.f, Font, 1.1f);
 
 	}
 	else if (SettingsTab == 2)
