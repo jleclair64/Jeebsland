@@ -761,10 +761,10 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float SprT = FMath::Clamp((Speed - 400.f) / 350.f, 0.f, 1.f);   // jog ... sprint (750)
 	auto G3 = [&](float W, float J, float Sp) { return SprT > 0.f ? FMath::Lerp(J, Sp, SprT) : FMath::Lerp(W, J, JogT); };
 	const float StepScale   = 1.f - 0.35f * CrouchAlpha;   // smaller steps when crouched
-	const float GContact    = G3(0.62f, 0.36f, 0.30f);     // share of the cycle each foot is planted
-	const float GAf         = G3(28.f, 38.f, 48.f) * StepScale;   // hip reaching forward at the start of contact
-	const float GAb         = G3(20.f, 30.f, 36.f) * StepScale;   // hip trailing behind at toe-off
-	const float GStanceKnee = G3(8.f, 22.f, 28.f);         // how much the standing knee gives
+	const float GContact    = G3(0.60f, 0.26f, 0.21f);     // share of the cycle each foot is planted (short when running: a long float between footfalls, like BotW)
+	const float GAf         = G3(32.f, 40.f, 52.f) * StepScale;   // hip reaching forward at the start of contact
+	const float GAb         = G3(22.f, 32.f, 40.f) * StepScale;   // hip trailing behind at toe-off
+	const float GStanceKnee = G3(8.f, 26.f, 32.f);         // how much the standing knee gives
 	const float GSwingKnee  = G3(58.f, 80.f, 95.f) * StepScale;   // how far the swinging knee folds
 	const float LegReach    = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
 	const float SinAf = FMath::Sin(FMath::DegreesToRadians(GAf)), SinAb = FMath::Sin(FMath::DegreesToRadians(GAb));
@@ -890,7 +890,17 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const float Thigh = float(KnightDesign::ThighLen()), Shin = float(KnightDesign::ShinLen());
 	auto LegHeight = [&](float H, float K) { return Thigh * FMath::Cos(FMath::DegreesToRadians(H)) + Shin * FMath::Cos(FMath::DegreesToRadians(H + K)) - LegReach; };
 	const float HR = LegHeight(HipRf, KneeRf), HL = LegHeight(HipLf, KneeLf);
-	const float GroundZ = (bPlantR && bPlantL) ? FMath::Min(HR, HL) : bPlantR ? HR : bPlantL ? HL : 0.5f * (HR + HL) + 1.5f;
+	// In the float between running steps the body follows a real arc: from the height at push-off to the height at landing,
+	// lifted by how long it is in the air
+	float FlightZ = 0.f;
+	{
+		const float Half = FMath::Fmod(UR, 0.5f);
+		const float F = FMath::Clamp((Half - GContact) / FMath::Max(0.5f - GContact, 0.01f), 0.f, 1.f);
+		const float TAir = FMath::Max(0.5f - GContact, 0.f) / FMath::Max(Hz, 0.1f);
+		const float Arc = 0.5f * 980.f * FMath::Square(0.5f * TAir);
+		FlightZ = FMath::Lerp(LegHeight(-GAb, -4.f), LegHeight(GAf, -4.f), F) + 4.f * Arc * F * (1.f - F);
+	}
+	const float GroundZ = (bPlantR && bPlantL) ? FMath::Min(HR, HL) : bPlantR ? HR : bPlantL ? HL : FlightZ;
 	float BodyZ = FMath::Lerp(GroundZ, 0.f, Air);
 	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
 	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
