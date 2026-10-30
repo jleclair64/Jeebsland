@@ -761,7 +761,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// ---------- Strength of each motion ----------
 	const float StepScale  = 1.f - 0.4f * CrouchAlpha; // smaller steps when crouched
 	const float HipAmp     = FMath::Lerp(32.f, 80.f, RunAlpha) * MoveBlend * StepScale;
-	const float KneeAmp    = FMath::Lerp(40.f, 105.f, RunAlpha) * MoveBlend * StepScale;
+	const float KneeAmp    = FMath::Lerp(38.f, 72.f, RunAlpha) * MoveBlend * StepScale;   // (running was 105: with the model's longer shins the heels kicked his seat)
 	const float ArmAmp     = FMath::Lerp(22.f, 55.f, RunAlpha) * MoveBlend;
 	const float ElbowBase  = FMath::Lerp(12.f, 70.f, RunAlpha) * MoveBlend;
 	const float ElbowSwing = FMath::Lerp(8.f, 25.f, RunAlpha) * MoveBlend;

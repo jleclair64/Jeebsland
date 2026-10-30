@@ -53,9 +53,9 @@ namespace KnightDesign
 		return FVector(0, 0, 0);
 	}
 	// The middle of each fist, and where a held weapon's grip sits in it
-	// (measured on the model's fists, 2026-10-29)
-	inline FVector FistPos(int32 Side) { return FVector(0.5, Side * 36.5, -38.5); }
-	inline FVector GripPos(bool bLeft) { return FVector(1.0, bLeft ? -36.5 : 36.5, -37.0); }
+	// (measured on the model's fists, 2026-10-29, after they were tipped 20 degrees forward to line up with a weapon's grip)
+	inline FVector FistPos(int32 Side) { return FVector(3.6, Side * 36.5, -37.0); }
+	inline FVector GripPos(bool bLeft) { return FVector(3.5, bLeft ? -36.5 : 36.5, -36.0); }
 	inline FVector WristPos(int32 Side) { return FVector(-2.0, Side * 37.0, -29.0); }
 	// Lengths of the thigh and the shin (for keeping the feet on the ground as the knees bend)
 	inline double ThighLen() { return FVector::Dist(PivotPos(P_HipR), PivotPos(P_KneeR)); }

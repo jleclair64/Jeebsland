@@ -96,32 +96,81 @@ def rot_z(v, a):
     c, s = math.cos(a), math.sin(a)
     return Vector((v.x * c - v.y * s, v.x * s + v.y * c, v.z))
 
+FIST_LEAN = math.radians(-20.0)   # the fists tip forward 20 degrees about the wrist, in line with a held weapon's grip
+def rot_y(v, a):
+    c, s = math.cos(a), math.sin(a)
+    return Vector((v.x * c + v.z * s, v.y, -v.x * s + v.z * c))
+def fist_angle(p):   # full lean below the cuff, easing in over 4 cm so the glove does not tear from the vambrace
+    return FIST_LEAN * max(0.0, min(1.0, (-27.0 - p.z) / 4.0))
+
 def place(p, key):
-    if key[0] not in LEG_PIVOTS: return p
-    sd = 1 if key[0] in (P_HIPR, P_KNEER, P_ANKR) else -1
+    pv = key[0]
+    if pv in (P_ELBL, P_ELBR):
+        sd = 1 if pv == P_ELBR else -1
+        w = Vector((-2.0, sd * 37.0, -29.0))   # the wrist (KnightDesign::WristPos)
+        return w + rot_y(p - w, fist_angle(p))
+    if pv == P_UPPER and p.z < -26.0:
+        # the plates and skirt round the thighs follow the straightened legs (easing to nothing at the middle)
+        sd = 1 if p.y > 0 else -1
+        return Vector((p.x, p.y - sd * leg_out(p.z) * min(1.0, abs(p.y) / 8.0), p.z))
+    if pv not in LEG_PIVOTS: return p
+    sd = 1 if pv in (P_HIPR, P_KNEER, P_ANKR) else -1
     q = Vector((p.x, p.y - sd * leg_out(p.z), p.z))
-    if key[0] in (P_ANKL, P_ANKR):   # turn the foot about its ankle so the toes point ahead
+    if pv in (P_ANKL, P_ANKR):   # turn the foot about its ankle so the toes point ahead
         a = Vector((-4.0, sd * LEG_Y, ANKLE_Z))
         q = a + rot_z(q - a, -foot_yaw[sd])
     return q
 
-def turn(v, key):
+def turn(v, p, key):
     if key[0] in (P_ANKL, P_ANKR):
         sd = 1 if key[0] == P_ANKR else -1
         return rot_z(v, -foot_yaw[sd])
+    if key[0] in (P_ELBL, P_ELBR):
+        return rot_y(v, fist_angle(p))
     return v
-for lt in me.loop_triangles:
-    c = (gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0
-    key = classify(c)
+
+# ---- Which piece each triangle belongs to; then tidy up: small scraps cut off from the rest of their piece (they float
+# when that joint moves) join the piece around them ----
+tris = list(me.loop_triangles)
+keys = [classify((gpos[lt.vertices[0]] + gpos[lt.vertices[1]] + gpos[lt.vertices[2]]) / 3.0) for lt in tris]
+vert_tris = [[] for _ in me.vertices]
+for ti, lt in enumerate(tris):
+    for vi in lt.vertices: vert_tris[vi].append(ti)
+for _pass in range(3):
+    seen = [False] * len(tris)
+    moved = 0
+    for start in range(len(tris)):
+        if seen[start]: continue
+        k = keys[start]; comp = [start]; seen[start] = True; i = 0
+        while i < len(comp):
+            for vi in tris[comp[i]].vertices:
+                for tj in vert_tris[vi]:
+                    if not seen[tj] and keys[tj] == k: seen[tj] = True; comp.append(tj)
+            i += 1
+        if len(comp) >= 80: continue
+        votes = {}
+        cs = set(comp)
+        for ti in comp:
+            for vi in tris[ti].vertices:
+                for tj in vert_tris[vi]:
+                    if tj not in cs: votes[keys[tj]] = votes.get(keys[tj], 0) + 1
+        if votes:
+            best = max(votes, key=votes.get)
+            for ti in comp: keys[ti] = best
+            moved += len(comp)
+    print("SCRAPS pass %d: %d triangles moved" % (_pass, moved))
+
+for ti, lt in enumerate(tris):
+    key = keys[ti]
     P = parts.setdefault(key, {"v": [], "map": {}, "i": []})
     tri = []
     for li in lt.loops:
         vi = me.loops[li].vertex_index
         p = place(gpos[vi], key)
-        n = turn(nrm_game(cn[li].vector), key)
+        n = turn(nrm_game(cn[li].vector), gpos[vi], key)
         uv = uvl[li].uv
         lp = me.loops[li]
-        tg = turn(nrm_game(lp.tangent), key)
+        tg = turn(nrm_game(lp.tangent), gpos[vi], key)
         # the model is mirrored on its way into Unreal's axes, so the texture's up direction needs Unreal's tangent Y
         # flipped exactly when Blender's bitangent sign is +1 (the normal map stays in its own OpenGL form)
         fy = -1.0 if lp.bitangent_sign > 0 else 1.0
