@@ -553,7 +553,6 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	//   2 backhand: from his left, the same sweep back the other way, ending where hit 1 winds up
 	// The knees and lean are in PosePrep (JabBodyNow).
 	float ForearmTarget = 0.f;
-	float WristFlipNow = 0.f;   // first slash supinates the sword hand so the palm faces up in the wind-up
 	SwingBodyWant = 0.f;
 	SwingLeanWant = 0.f;
 	SwingLoadWant = 0.f;
@@ -570,9 +569,10 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			{ 0.43f,  0.f, -100.f,  -62.f,  0.f, -22.f,    0.f,  -4.f, true  },   // hit timing: reach through the front with the elbow open and blade aimed ahead
 			{ 0.62f,-12.f,  -88.f,  -48.f, 10.f, -38.f,  -42.f, -16.f, false },   // keep the tip forward through the long, low follow-through
 			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
-			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f,  -96.f, -22.f, false } }; // settle ready for the backhand
+			{ 0.92f, 20.f,  -35.f,  -66.f, 48.f, -34.f, -112.f, -30.f, false },   // fold into a compact transition across the front
+			{ 1.00f, 56.f,    0.f,  -72.f, 68.f, -42.f, -138.f, -38.f, false } }; // elbow forward; sword angles back behind the left leg for hit 2
 				static const FKey Hit2[] = {
-			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
+			{ 0.00f, 56.f,    0.f,  -72.f, 68.f, -42.f, -138.f, -38.f, false },   // continuous from hit 1: elbow forward, blade back behind the left leg
 			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -50.f, -120.f,   5.f, false },   // load the torso over the left side with the drawn-back blade
 			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,  14.f,    0.f,  -3.f, true  },   // the impact: hips and chest turn through the front
 			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  42.f,  110.f,   5.f, false },   // follow-through carries the whole torso round to his right
@@ -580,12 +580,6 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
 		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
-		if (AttackDir != JabSecond)
-		{
-			const float FlipIn = FMath::SmoothStep(0.10f, 0.28f, T);
-			const float FlipOut = 1.f - FMath::SmoothStep(0.29f, 0.40f, T);
-			WristFlipNow = 180.f * FlipIn * FlipOut;
-		}
 		if (AttackDir != JabSecond)
 		{
 			const float Windup = FMath::SmoothStep(0.04f, 0.22f, T);
@@ -725,12 +719,6 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			Local = Twist.Inverse() * Local;
 			Local = FQuat::Slerp(FQuat::Identity, Local, BladeAlpha);
 			ForearmTwistNow = FMath::RadiansToDegrees(Twist.GetTwistAngle(ForearmAxisW));
-		}
-		// Supinate the first swing's wrist in the wind-up (palm skyward), then unwind it into the cut.
-		if (WristFlipNow > 0.01f)
-		{
-			static const FVector WristFlipAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
-			Local = FQuat(WristFlipAxis, FMath::DegreesToRadians(WristFlipNow)) * Local;
 		}
 		WristR->SetRelativeRotation(Local);
 		WristBendNow = FMath::RadiansToDegrees(Local.GetAngle());
