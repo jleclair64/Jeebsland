@@ -112,6 +112,34 @@ void UJeebSave::Migrate()
 			else if (Empty >= 0) Hotbar[Empty] = BowId;
 		}
 	}
+	// Version 7 -> 8 (2026-10-31): everyone has at least the starting arrows (steel and fire). A full pack (the 4 step could not
+	// fit them) sends its last things that are not arrows to the bank to make room.
+	if (SaveVersion < 8)
+	{
+		auto Count = [this](int32 Id) { int32 N = 0; for (int32 i = 0; i < SlotIds.Num(); ++i) if (SlotIds[i] == Id && SlotCounts.IsValidIndex(i)) N += SlotCounts[i]; return N; };
+		auto MakeRoom = [this]()
+		{
+			if (SlotIds.Contains(0)) return true;
+			for (int32 i = SlotIds.Num() - 1; i >= 0; --i)
+			{
+				if (IsArrow(SlotIds[i]) || !SlotCounts.IsValidIndex(i)) continue;
+				int32 B = BankIds.IndexOfByKey(0);
+				if (B == INDEX_NONE && BankIds.Num() < USkillComponent::NumBankSlots) { B = BankIds.Add(0); BankCounts.SetNum(BankIds.Num()); }
+				if (B == INDEX_NONE || !BankCounts.IsValidIndex(B)) return false;
+				BankIds[B] = SlotIds[i]; BankCounts[B] = SlotCounts[i];
+				SlotIds[i] = 0; SlotCounts[i] = 0;
+				return true;
+			}
+			return false;
+		};
+		const int32 Want[2][2] = { { ArrowId(T_Steel), USkillComponent::StartSteelArrows }, { IdFireArrow, USkillComponent::StartFireArrows } };
+		for (const auto& W : Want)
+		{
+			const int32 Have = Count(W[0]);
+			if (Have >= W[1] || (Have == 0 && !MakeRoom())) continue;
+			AddToPack(W[0], W[1] - Have);
+		}
+	}
 	SaveVersion = CurrentVersion;
 }
 
