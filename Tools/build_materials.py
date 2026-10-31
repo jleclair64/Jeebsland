@@ -518,6 +518,23 @@ def build_streak():
     finish(mat, "M_Streak")
 
 
+def build_sword_trail():
+    # The wind trail behind a sword cut (BotW style): a soft, pale ribbon. The trail's own vertices carry its fade (vertex
+    # alpha: older parts and slow parts are fainter); across the ribbon (texture V: 0 the inner edge, 1 the blade tip) it is
+    # faint on the inside and fullest just inside the outer edge, with a few faint streaks along it like moving air.
+    mat, g = unlit("M_SwordTrail", unreal.BlendMode.BLEND_TRANSLUCENT)
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    v = g.mask(uv, False, True)
+    inner = g.power(v, 1.6)
+    outer = g.one(unreal.MaterialExpressionOneMinus, g.power(v, 10.0))
+    streak = g.add(g.mul(g.one(unreal.MaterialExpressionSine, g.mul(v, 7.0)), 0.18), 0.82)
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    a = g.muln(g.muln(g.muln(inner, outer), streak), g.muln(vc, g.scalar("Opacity", 0.8), "A"))
+    g.out(g.one(unreal.MaterialExpressionSaturate, a), unreal.MaterialProperty.MP_OPACITY)
+    g.out(g.muln(g.vector("Tint", (0.90, 0.95, 1.0)), g.scalar("Bright", 1.3)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_SwordTrail")
+
+
 def build_moon(tex):
     # The lit part of the moon: its painted face, glowing (added on top of the sky so it looks right by day too)
     mat, g = unlit("M_Moon", unreal.BlendMode.BLEND_ADDITIVE)
@@ -659,6 +676,7 @@ build_star()
 build_smoke()
 build_flame_glow()
 build_streak()
+build_sword_trail()
 build_moon(imported(gen_textures.moon(), "T_Moon"))
 build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
 for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out

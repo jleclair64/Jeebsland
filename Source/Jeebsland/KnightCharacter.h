@@ -174,6 +174,7 @@ public:
 	void SelectHotbar(int32 H);
 	// Test pictures (-JeebShot -ShotMove=...): the knight faces FaceYaw (not the camera) and does the move with a sword
 	void ShotPlayMove(const FString& Move, float FaceYaw);
+	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
 	bool ShieldActive() const;                   // a shield is worn and the weapon in hand allows one
@@ -365,6 +366,13 @@ private:
 	float LastGuardHitTime = -100.f;
 	UPROPERTY(Replicated) bool bGuardBroken = false;
 	UPROPERTY() UInstancedStaticMeshComponent* DustISM = nullptr;
+	// The wind trail behind a sword cut (BotW style): a soft pale ribbon between the middle of the blade and its tip, drawn
+	// from the last moments of the blade's path (KnightCharacterFx.cpp, TickSwordTrail; material M_SwordTrail)
+	UPROPERTY() class UProceduralMeshComponent* SwordTrail = nullptr;
+	struct FTrailSample { FVector In, Out; float Time = 0.f, Strength = 0.f; };
+	TArray<FTrailSample> TrailSamples;
+	FVector TrailPrevTip = FVector::ZeroVector; bool bTrailPrev = false;
+	void TickSwordTrail(float Dt);
 	UPROPERTY() UInstancedStaticMeshComponent* ClodISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* BladeISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* LeafAISM = nullptr;

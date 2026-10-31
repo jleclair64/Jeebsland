@@ -187,3 +187,64 @@ void AKnightCharacter::TickDust(float Dt, bool bFalling, bool bSpecial, float S,
 	TickBits(LeavesA, LeafAISM, Dt, 380.f, 3.2f);  // leaves: lightest, they drift down
 	TickBits(LeavesB, LeafBISM, Dt, 380.f, 3.2f);
 }
+
+// The wind trail behind a sword cut (BotW style). Every frame of a sword slash the blade's middle and tip are noted; the last
+// moments of that path are drawn as a soft ribbon (material M_SwordTrail), smoothed between frames, fading with age and only
+// where the blade was really moving (a slow wind-up leaves no smear). Purely visual: each machine draws its own.
+void AKnightCharacter::TickSwordTrail(float Dt)
+{
+	if (IsNetMode(NM_DedicatedServer)) return;
+	if (!SwordTrail)
+	{
+		SwordTrail = NewObject<UProceduralMeshComponent>(this, TEXT("SwordTrail"));
+		SwordTrail->SetupAttachment(RootComponent);
+		SwordTrail->SetUsingAbsoluteLocation(true); SwordTrail->SetUsingAbsoluteRotation(true); SwordTrail->SetUsingAbsoluteScale(true);
+		SwordTrail->SetWorldTransform(FTransform::Identity);   // (its points are world positions)
+		SwordTrail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SwordTrail->SetCastShadow(false);
+		SwordTrail->RegisterComponent();
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) SwordTrail->SetMaterial(0, M);
+	}
+	const float Now = GetWorld()->GetTimeSeconds();
+	const float Slow = SwingSpeedScale();
+	const float Life = 0.16f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
+	if (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && WristR)
+	{
+		const FTransform W = WristR->GetComponentTransform();
+		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
+		const FVector Tip = Along(79.5f), In = Along(30.f);   // (the sword's tip is 79.5 cm from the grip)
+		const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
+		TrailPrevTip = Tip; bTrailPrev = true;
+		FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
+		TrailSamples.Add(S);
+	}
+	else bTrailPrev = false;
+	TrailSamples.RemoveAll([&](const FTrailSample& S) { return Now - S.Time > Life; });
+	if (TrailSamples.Num() < 2) { if (SwordTrail->GetNumSections() > 0) SwordTrail->ClearAllMeshSections(); return; }
+
+	// Smooth curves through the noted points (Catmull-Rom), four steps between each pair
+	TArray<FVector> V; TArray<FVector2D> UV; TArray<FLinearColor> Col; TArray<int32> Tri;
+	auto CR = [](const FVector& P0, const FVector& P1, const FVector& P2, const FVector& P3, float T)
+	{
+		const float T2 = T * T, T3 = T2 * T;
+		return 0.5f * ((2.f * P1) + (-P0 + P2) * T + (2.f * P0 - 5.f * P1 + 4.f * P2 - P3) * T2 + (-P0 + 3.f * P1 - 3.f * P2 + P3) * T3);
+	};
+	const int32 N = TrailSamples.Num(), Steps = 4;
+	for (int32 i = 0; i < N - 1; ++i)
+	{
+		const FTrailSample& A = TrailSamples[FMath::Max(i - 1, 0)];
+		const FTrailSample& B = TrailSamples[i];
+		const FTrailSample& C = TrailSamples[i + 1];
+		const FTrailSample& D = TrailSamples[FMath::Min(i + 2, N - 1)];
+		for (int32 s = 0; s < Steps || (i == N - 2 && s == Steps); ++s)
+		{
+			const float T = float(s) / Steps;
+			const float Age = FMath::Clamp((Now - FMath::Lerp(B.Time, C.Time, T)) / Life, 0.f, 1.f);
+			const float Alpha = FMath::Lerp(B.Strength, C.Strength, T) * FMath::Pow(1.f - Age, 1.5f);
+			V.Add(CR(A.In, B.In, C.In, D.In, T));   UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+			V.Add(CR(A.Out, B.Out, C.Out, D.Out, T)); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+		}
+	}
+	for (int32 k = 0; k + 3 < V.Num(); k += 2) Tri.Append({ k, k + 1, k + 3, k, k + 3, k + 2 });
+	SwordTrail->CreateMeshSection_LinearColor(0, V, Tri, TArray<FVector>(), UV, Col, TArray<FProcMeshTangent>(), false);
+}

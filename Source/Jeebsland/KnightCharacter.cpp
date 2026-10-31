@@ -465,6 +465,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);
 	if (bShotFace && bAttacking) LogSwordTip();   // (test pictures only: the sword tip's path, for checking a move)
 	TickDust(Dt, bFalling, bSpecial, S, C);
+	TickSwordTrail(Dt);
 }
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader

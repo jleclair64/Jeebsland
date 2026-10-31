@@ -67,7 +67,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	if (Style == EAtkStyle::Slash && K == JeebItems::K_Sword)
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward
-		AttackDur = Cd * (Dir == JabSecond ? 0.72f : 0.8f);
+		AttackDur = Cd * (Dir == JabSecond ? 0.72f : 0.8f) / SwingSpeedScale();   // (testing: DefaultGame.ini SwingSpeed slows it)
 		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow; SwingFrom[6] = BladeYawNow; SwingFrom[7] = BladePitchNow;   // (the key poses start from here)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 210.f, true, false);   // (the player's machine and the server step together)
@@ -90,6 +90,19 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 		if (IsLocallyControlled() && !HasAuthority()) ServerAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
 		else if (HasAuthority()) MulticastAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
 	}
+}
+
+// Testing: sword swings can be played slowly (DefaultGame.ini, [Jeebsland.Testing] SwingSpeed=0.2 is 80% slower). 1 = normal.
+float AKnightCharacter::SwingSpeedScale()
+{
+	static float Scale = -1.f;
+	if (Scale < 0.f)
+	{
+		Scale = 1.f;
+		if (GConfig) GConfig->GetFloat(TEXT("Jeebsland.Testing"), TEXT("SwingSpeed"), Scale, GGameIni);
+		Scale = FMath::Clamp(Scale, 0.05f, 4.f);
+	}
+	return Scale;
 }
 
 void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
