@@ -525,6 +525,8 @@ private:
 	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); the sword adds +2, the jab's finisher
 	static constexpr int32 JabFirst = 1, JabSecond = -1, JabThird = 2;   // the sword's three-hit jab (Link's, Smash Ultimate)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
+	int32 QueuedJabs = 0;           // clicks made during a sword swing, each one more swing of the jab (up to the finisher)
+	float SwingFlatA = 0.f, SwingRollNow = 0.f;   // a sword swing turns the forearm so the blade lies flat (degrees)
 	int32 LastSwingDir = 0;
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;

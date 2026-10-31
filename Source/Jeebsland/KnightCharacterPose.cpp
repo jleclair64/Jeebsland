@@ -583,6 +583,27 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	ArmYaw = FMath::FInterpTo(ArmYaw, TargetYaw, Dt, ArmSpeed);
 	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, RollR));
 	ElbowRCur = FMath::FInterpTo(ElbowRCur, ElbowRdeg, Dt, 18.f);
-	ElbowR->SetRelativeRotation(FRotator(ElbowRCur, 0.f, 0.f));
+	// A sword swing turns the forearm (fist and all, so the grip never leaves the fingers) so the blade lies flat and points
+	// out in front, the way Link holds it through his jab, instead of standing straight up once the arm is raised. Each frame
+	// it finds the turn that keeps the blade most level and forward, and eases in and out of it.
+	const FQuat Bend(FRotator(ElbowRCur, 0.f, 0.f));
+	const FVector ForearmAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
+	const bool bFlat = bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword;
+	SwingFlatA = FMath::FInterpTo(SwingFlatA, bFlat ? 1.f : 0.f, Dt, 14.f);
+	if (bFlat)
+	{
+		const FQuat ArmQ = ArmPivot->GetComponentQuat();
+		const FVector Blade = KnightDesign::BladeDir(1);
+		const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
+		float BestRoll = SwingRollNow, BestScore = -1.0e9f;
+		for (int32 r = -180; r < 180; r += 5)
+		{
+			const FVector D = ArmQ.RotateVector(Bend.RotateVector(FQuat(ForearmAxis, FMath::DegreesToRadians(float(r))).RotateVector(Blade)));
+			const float Score = -2.5f * FMath::Abs(D.Z) + FVector::DotProduct(FVector(D.X, D.Y, 0.f), Fwd) - 0.004f * FMath::Abs(FMath::FindDeltaAngleDegrees(SwingRollNow, float(r)));
+			if (Score > BestScore) { BestScore = Score; BestRoll = float(r); }
+		}
+		SwingRollNow += FMath::FindDeltaAngleDegrees(SwingRollNow, BestRoll) * FMath::Clamp(Dt * 20.f, 0.f, 1.f);
+	}
+	ElbowR->SetRelativeRotation(Bend * FQuat(ForearmAxis, FMath::DegreesToRadians(SwingRollNow * SwingFlatA)));
 	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
 }

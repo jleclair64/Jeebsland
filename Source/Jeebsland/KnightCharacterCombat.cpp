@@ -76,6 +76,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	bAttackHit = false;
 	AttackT = 0.f;
 	QueuedClick = -10.f;
+	QueuedJabs = 0;   // (TickAttack carries the rest of the clicks over into the next swing of the jab)
 	if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
 	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
 	if (GetNetMode() != NM_Standalone)
@@ -325,7 +326,9 @@ void AKnightCharacter::TickAttack(float Dt)
 				if (SelectedKind() == JeebItems::K_Sword)
 				{
 					const int32 Next = (AttackDir == JabFirst) ? JabSecond : (AttackDir == JabSecond ? JabThird : 0);
-					if (Next != 0 && QueuedClick > 0.f) StartAttack(EAtkStyle::Slash, Next, 0.f);
+					// (every click counts: three quick clicks during the first swing still give all three)
+					if (Next != 0 && QueuedJabs > 0) { const int32 Left = QueuedJabs - 1; StartAttack(EAtkStyle::Slash, Next, 0.f); QueuedJabs = Left; }
+					else QueuedJabs = 0;
 				}
 				else if (AttackDir > 0 && Now - QueuedClick <= 0.3f) StartAttack(EAtkStyle::Slash, -1, 0.f);
 			}
