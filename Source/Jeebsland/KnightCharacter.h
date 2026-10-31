@@ -208,7 +208,9 @@ public:
 	// bEnvironmental: a hazard (poison smoke, fire): armour and shields do not stop it, and it trains no Defence.
 	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false);
 	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP
-	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill);
+	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes = false);
+	// A raised shield's wedge (HitBoxes.h), for the box view; false while the shield is down
+	bool GetShieldWedge(JeebHit::FShieldWedge& Out) const;
 
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)
@@ -569,8 +571,17 @@ private:
 	// past SmashHoldDelay (so a slow click is still a jab) hit 1 stops at its pull-back and charges at half walking speed: full
 	// in SmashChargeTime, then it stays full for SmashHoldMax and goes by itself. Let go any time: hit 1's swipe, 1x to 2.5x
 	// by the charge, then a fixed end lag (he stops at the end of the swipe; no moving, blocking, rolling or jumping).
-	enum class ESmash : uint8 { None, Deciding, Charging, Swing, EndLag };
+	// Rebound is not part of a smash: any sword hit stopped by a raised shield bounces off (StartRebound).
+	enum class ESmash : uint8 { None, Deciding, Charging, Swing, EndLag, Rebound };
 	static constexpr float SmashHoldDelay = 0.25f, SmashChargeTime = 1.f, SmashHoldMax = 2.f, SmashEndPause = 0.4f;
+	// Hitting a shield (owner, 2026-10-31): the blade bounces back (ReboundBack s) and he staggers back a step, open and unable
+	// to move, swing, block, roll or jump for a fixed time: a jab hit ReboundJab s, a smash attack ReboundSmash s (longer than
+	// its own end lag). A press in the last moment comes out right after, as after a smash.
+	static constexpr float ReboundJab = 0.45f, ReboundSmash = 0.8f, ReboundBack = 0.15f;
+	float ReboundDur = 0.f;
+	void StartRebound();                 // (server) a hit box of this swing struck a raised shield
+	void BeginRebound(float Dur);        // (every machine) the bounce itself
+	UFUNCTION(NetMulticast, Reliable) void MulticastRebound(float Dur);
 	static constexpr float SmashApexT = 0.25f, SmashPauseT = 0.62f;   // where hit 1 waits while charging (its pull-back) and where the end lag pauses
 	ESmash Smash = ESmash::None;
 	float SmashT = 0.f;            // time in this phase
@@ -585,7 +596,7 @@ private:
 	float SmashTimeLeft() const;   // how long until the smash's end lag is over
 	UFUNCTION(Server, Reliable) void ServerSmash(uint8 Phase, float Charge);
 	UFUNCTION(NetMulticast, Unreliable) void MulticastSmash(uint8 Phase, float Charge);
-	bool SmashLocked() const { return Smash == ESmash::Swing || Smash == ESmash::EndLag; }   // no moving
+	bool SmashLocked() const { return Smash == ESmash::Swing || Smash == ESmash::EndLag || Smash == ESmash::Rebound; }   // no moving
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;
 	bool bCharging = false;

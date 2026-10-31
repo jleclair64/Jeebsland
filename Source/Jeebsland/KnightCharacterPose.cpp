@@ -630,6 +630,15 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			BladeYawNow += 1.2f * Shake * FMath::Sin(Ph * 19.f + 0.7f);
 			BladePitchNow += Shake * FMath::Sin(Ph * 15.f + 2.1f);
 		}
+		// Bounced off a shield (StartRebound): the chest rocks back and the sword arm judders, settling over the stuck time
+		if (Smash == ESmash::Rebound)
+		{
+			const float K = 1.f - FMath::SmoothStep(0.f, FMath::Max(ReboundDur, 0.01f), SmashT);
+			const float Ph = 2.f * PI * GetWorld()->GetTimeSeconds();
+			SwingLeanWant += 12.f * K;
+			TargetPitch += 3.f * K * FMath::Sin(Ph * 11.f);
+			BladePitchNow += 4.f * K * FMath::Sin(Ph * 13.f + 0.9f);
+		}
 		// The second stroke remains as before; the first stroke's body and load curves are keyed separately above.
 		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
 		// so the wrist stays natural): the forehand travels to his left, the backhand to his right

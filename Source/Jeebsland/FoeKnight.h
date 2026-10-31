@@ -29,6 +29,10 @@ public:
 	// A still sparring knight (MoveLab): he stands where he was put, never fights back, walks or falls; his health fills
 	// again 3 s after the last blow (Smash's training mode). Set before FinishSpawning.
 	bool bStill = false;
+	// ... holding his shield up the whole time (MoveLab's second one). His shield guards the way a player's does: it stops
+	// blows up to its guard (an iron kite shield's), then, broken, only half of each until it is full again (3 s after the
+	// last blow here, like his health). Set before FinishSpawning.
+	bool bStillGuard = false;
 
 	// Tuning
 	static constexpr int32 MaxHp = 90;
@@ -75,7 +79,9 @@ private:
 	FVector2D WanderTo = FVector2D::ZeroVector;
 	float WanderWait = 0.f;
 	float HitFlash = 0.f;
-	float DeathT = 0.f;            // 0 = alive; counts up while falling, then waits for the respawn
+	float GuardPool = 0.f, GuardMax = 0.f;   // the still guarding knight's shield guard
+	bool bGuardBroken = false;
+	float DeathT = 0.f;           // 0 = alive; counts up while falling, then waits for the respawn
 	float RespawnT = 0.f;
 	float GaitPhase = 0.f, MoveBlend = 0.f;
 	bool bStruck = false;

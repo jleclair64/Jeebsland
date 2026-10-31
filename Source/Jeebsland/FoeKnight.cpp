@@ -184,6 +184,39 @@ void AFoeKnight::BeginPlay()
 		JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Stopped, JeebCombat::N_Blocked);
 		return Amount - Stopped;
 	};
+	// His raised shield as hit boxes see it: the 90-degree wedge in front of him (HitBoxes.h). A sword's hit box that touches it
+	// is stopped there: the pen knight's shield stops 70% of it; the still guarding one's has a guard, like a player's
+	Hp->GatherShield = [this](JeebHit::FShieldWedge& Out)
+	{
+		if (BlockAlpha < 0.6f || DeathT > 0.f) return false;
+		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector());
+		return true;
+	};
+	GuardMax = GuardPool = float(JeebItems::ShieldGuard(JeebItems::ShieldId(0, Tier)));   // (an iron kite shield)
+	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
+	{
+		int32 Stopped = FMath::RoundToInt(Amount * BlockStops);
+		if (bStillGuard)
+		{
+			if (!bGuardBroken)
+			{
+				Stopped = FMath::Min(Amount, FMath::FloorToInt(GuardPool));
+				GuardPool -= Stopped;
+				if (GuardPool < 1.f)
+				{
+					GuardPool = 0.f;
+					bGuardBroken = true;
+					if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
+						Sk->Say(2.5f, FColor::Orange, TEXT("His guard is broken! His shield stops only half a blow until it recovers."));
+				}
+			}
+			else Stopped = Amount / 2;
+			Hp->LastHitTime = GetWorld()->GetTimeSeconds();   // (his guard and health come back 3 s after the last blow)
+		}
+		if (Stopped > 0) JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 180.f), Stopped, JeebCombat::N_Blocked);   // (above the damage number)
+		HitFlash = 0.2f;
+		return Amount - Stopped;
+	};
 	LastLoc = GetActorLocation();
 	if (HasAuthority() && !bStill) Rise();
 }
@@ -335,6 +368,9 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	else if (bStill)
 	{
 		if (Hp->Cur < Hp->Max && Now - Hp->LastHitTime > 3.f) Hp->Reset();   // (training mode: full again after a pause)
+		if ((GuardPool < GuardMax || bGuardBroken) && Now - Hp->LastHitTime > 3.f) { GuardPool = GuardMax; bGuardBroken = false; }   // (and his guard)
+		BlockT = bStillGuard ? 1.f : -1.f;
+		bRepBlock = bStillGuard;
 	}
 	else
 	{

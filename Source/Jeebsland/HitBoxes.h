@@ -50,4 +50,20 @@ namespace JeebHit
 
 	// Adds a capsule to a mesh being built (the view), in one see-through colour
 	void AddCapsuleMesh(const FCapsule& C, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors);
+
+	// A raised SHIELD (owner, 2026-10-31): a 90-degree wedge in front of the body, like a little baseball diamond with home plate
+	// at his centre and walls standing up from the two foul lines (45 degrees either side of straight ahead) and along the
+	// outfield fence (an arc Radius out). Checked BEFORE the hurt boxes, as Smash checks shields first: a hit box that touches
+	// the wedge is blocked, even if it touches a hurt box on the same frame. Blows from outside it reach the body.
+	struct FShieldWedge
+	{
+		FVector Apex = FVector::ZeroVector;     // his centre (home plate), at the capsule's middle height
+		FVector Fwd = FVector::ForwardVector;   // straight ahead (flat)
+		float Radius = 100.f, HalfAngle = 45.f; // cm, degrees
+		float ZLow = -96.f, ZHigh = 80.f;       // from his feet to above the helm, relative to the apex
+	};
+	inline FShieldWedge KnightShield(const FVector& Centre, const FVector& Forward) { FShieldWedge W; W.Apex = Centre; W.Fwd = Forward.GetSafeNormal2D(); return W; }
+	bool TouchWedge(const FCapsule& Hit, const FShieldWedge& W);
+	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors);
+	bool ShieldOf(const UHealthComponent* H, FShieldWedge& Out);   // anything with health whose shield is up (UHealthComponent::GatherShield)
 }

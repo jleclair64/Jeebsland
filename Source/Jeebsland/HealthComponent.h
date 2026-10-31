@@ -29,12 +29,18 @@ public:
 	TFunction<void()> OnHitSeen;
 	// Optional: the owner's hurt boxes (HitBoxes.h), where a hit box must touch for a blow to land. Unset: an upright capsule
 	TFunction<void(TArray<JeebHit::FCapsule>& Out)> GatherHurt;
+	// Optional: a raised shield's wedge (HitBoxes.h); returns false while the shield is down. Hit boxes check it first.
+	TFunction<bool(JeebHit::FShieldWedge& Out)> GatherShield;
+	// A hit box struck the raised shield (server): the owner works out how much the shield stops (and shows it); returns the
+	// damage that still gets through
+	TFunction<int32(int32 Amount, AActor* From)> ShieldBlock;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }
 	void Reset() { Cur = Max; LastHitTime = -1000.f; }
 	// Returns the damage applied. Spawns the floating number and calls OnDamaged.
-	int32 ApplyDamage(int32 Amount, AActor* From, bool bCrit);
+	// bHitBoxes: it came through hit boxes, which have already dealt with the shield (ModifyDamage is skipped)
+	int32 ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes = false);
 	// Bars show for 15 seconds after a hit, and whenever health is under half
 	bool ShowBar(float Now) const;
 	FVector HitCentre() const;

@@ -53,10 +53,10 @@ bool UHealthComponent::ShowBar(float Now) const
 	return (Now - LastHitTime < 15.f) || (Cur * 2 < Max);
 }
 
-int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit)
+int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes)
 {
 	if (Cur <= 0 || Amount <= 0 || !GetOwner() || !GetOwner()->HasAuthority()) return 0;   // (damage is the server's to deal)
-	if (ModifyDamage) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
+	if (ModifyDamage && !bHitBoxes) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
 	const int32 Dealt = FMath::Min(Amount, Cur);
 	Cur -= Dealt;
 	if (UWorld* W = GetWorld())

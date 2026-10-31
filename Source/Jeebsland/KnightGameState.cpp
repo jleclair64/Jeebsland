@@ -312,19 +312,26 @@ void AKnightGameState::BuildMoveLab()
 		Box(FVector(0.f, i * 100.f, 0.3f), FVector(4000.f, W, 0.6f), C, false);
 	}
 	// A still sparring knight straight ahead of where you start (the pen knight's body, standing still: for hit boxes and hurt
-	// boxes, HitBoxes.h), and a straw dummy to either side
+	// boxes, HitBoxes.h), a second one 3.5 m to the right of him (as you look from the start) holding his shield up (the shield's
+	// wedge, and its guard), both facing where you start, and a straw dummy to either side of the start
 	if (World->GetNetMode() != NM_Client)
 	{
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		float Ahead = 300.f;
 		FParse::Value(FCommandLine::Get(), TEXT("LabKnight="), Ahead);   // (test pictures: -LabKnight=150 stands him within reach)
-		const FTransform Xf(FRotator(0.f, 180.f, 0.f), FVector(Ahead, 0.f, Z + 97.f));
-		if (AFoeKnight* K = World->SpawnActorDeferred<AFoeKnight>(AFoeKnight::StaticClass(), Xf))
+		const bool bGuardFirst = FParse::Param(FCommandLine::Get(), TEXT("LabGuardFirst"));   // (test pictures: the guarding one straight ahead)
+		for (int32 g = 0; g < 2; ++g)
 		{
-			K->bStill = true;
-			K->Setup(FVector2D(Ahead, 0.f), FVector2D(100.f, 100.f));
-			K->FinishSpawning(Xf);
+			const float Y = ((g == 1) != bGuardFirst) ? 350.f : 0.f;
+			const FTransform Xf(FRotator(0.f, 180.f, 0.f), FVector(Ahead, Y, Z + 97.f));
+			if (AFoeKnight* K = World->SpawnActorDeferred<AFoeKnight>(AFoeKnight::StaticClass(), Xf))
+			{
+				K->bStill = true;
+				K->bStillGuard = (g == 1);
+				K->Setup(FVector2D(Ahead, Y), FVector2D(100.f, 100.f));
+				K->FinishSpawning(Xf);
+			}
 		}
 	}
 	for (const FVector2D& P : { FVector2D(0.f, -300.f), FVector2D(0.f, 300.f) })

@@ -132,11 +132,11 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
-	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash0.4 = 0.4 s of charge
+	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash40 = 0.4 s of charge (hundredths: the command line stops at a dot)
 	{
 		StartAttack(EAtkStyle::Slash, JabFirst, 0.f);
 		SetSmash(ESmash::Deciding);
-		ShotSmashHold = (Move.Len() > 5) ? FCString::Atof(*Move.Mid(5)) : SmashChargeTime;
+		ShotSmashHold = (Move.Len() > 5) ? FCString::Atoi(*Move.Mid(5)) / 100.f : SmashChargeTime;
 	}
 }
 
@@ -158,10 +158,10 @@ void AKnightCharacter::LogSwordTip()
 		FMath::RadiansToDegrees(FMath::Atan2(Fa.Y, Fa.X)), FMath::RadiansToDegrees(FMath::Asin(Fa.Z)), FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X)), FMath::RadiansToDegrees(FMath::Asin(Bl.Z)));
 }
 
-void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill)
+void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes)
 {
 	if (!Target || !Target->IsAlive()) return;
-	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit);
+	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit, bHitBoxes);
 	if (Dealt > 0 && Skills) Skills->AddXP(Skill, 3 + Dealt / 3);
 }
 
@@ -234,8 +234,9 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 	bool bFront = false;
 	if (!bEnvironmental && bBlocking && ShieldActive() && From)
 	{
+		// (the shield's wedge: 45 degrees either side of straight ahead, HitBoxes.h)
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) > 0.1f;
+		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) >= FMath::Cos(FMath::DegreesToRadians(JeebHit::FShieldWedge().HalfAngle));
 	}
 	const int32 Armor = bEnvironmental ? 0 : JeebItems::TotalDefense(Skills, false) / 3;   // smoke seeps through armour
 	const int32 FromSkill = bEnvironmental ? 0 : Skills->GetLevel(ESkillType::Defense) / 5;
@@ -390,7 +391,8 @@ void AKnightCharacter::TickAttack(float Dt)
 		float Step = Dt;
 		if (Smash == ESmash::Deciding || Smash == ESmash::Charging) Step = FMath::Clamp(SmashApexT * AttackDur - AttackT, 0.f, Dt);
 		else if (Smash == ESmash::EndLag && SmashT < SmashEndPause) Step = 0.f;
-		AttackT += Step;
+		else if (Smash == ESmash::Rebound) Step = (SmashT < ReboundBack) ? -Dt * 0.12f * AttackDur / ReboundBack : 0.f;   // bounced off a shield: the blade springs back the way it came, then he is stuck
+		AttackT = FMath::Max(0.f, AttackT + Step);
 		if (Smash == ESmash::Swing && AttackT >= SmashPauseT * AttackDur) { AttackT = SmashPauseT * AttackDur; SetSmash(ESmash::EndLag, SmashCharge, false); }
 		const float HitFrac = (AtkStyle == EAtkStyle::Slash) ? 0.43f : (AtkStyle == EAtkStyle::Thrust ? 0.5f : 0.3f);
 		if (!bAttackHit && AttackT >= AttackDur * HitFrac)
@@ -398,10 +400,10 @@ void AKnightCharacter::TickAttack(float Dt)
 			bAttackHit = true;
 			AttackLands();
 		}
-		if (AttackT >= AttackDur)
+		if (AttackT >= AttackDur || (Smash == ESmash::Rebound && SmashT >= ReboundDur))
 		{
 			bAttacking = false;
-			const bool bWasSmash = bSmashSwing;
+			const bool bWasSmash = bSmashSwing || Smash == ESmash::Rebound;   // (a rebound ends like a smash: only a late press comes out)
 			Smash = ESmash::None; bSmashSwing = false;
 			const float Now = GetWorld()->GetTimeSeconds();
 			LastSwingEnd = Now;
@@ -499,6 +501,7 @@ void AKnightCharacter::MulticastSmash_Implementation(uint8 Phase, float Charge)
 
 float AKnightCharacter::SmashTimeLeft() const
 {
+	if (Smash == ESmash::Rebound) return FMath::Max(0.f, ReboundDur - SmashT);
 	if (Smash != ESmash::Swing && Smash != ESmash::EndLag) return 0.f;
 	return FMath::Max(0.f, AttackDur - AttackT) + (Smash == ESmash::EndLag ? FMath::Max(0.f, SmashEndPause - SmashT) : SmashEndPause);
 }
@@ -506,7 +509,7 @@ float AKnightCharacter::SmashTimeLeft() const
 void AKnightCharacter::TickSmash(float Dt)
 {
 	if (Smash == ESmash::None) return;
-	if (!bAttacking || AtkStyle != EAtkStyle::Slash || AttackDir != JabFirst || SelectedKind() != JeebItems::K_Sword)
+	if (!bAttacking || AtkStyle != EAtkStyle::Slash || (AttackDir != JabFirst && Smash != ESmash::Rebound) || SelectedKind() != JeebItems::K_Sword)
 	{
 		Smash = ESmash::None; bSmashSwing = false;   // (cut short: a weapon change, a death, a ladder ...)
 		return;
@@ -526,6 +529,48 @@ void AKnightCharacter::TickSmash(float Dt)
 		if (bShotFace && ShotSmashHold >= 0.f && SmashT >= ShotSmashHold) SetSmash(ESmash::Swing, SmashCharge);
 		else if (SmashT >= SmashChargeTime + SmashHoldMax) SetSmash(ESmash::Swing, 1.f, bMine);   // held too long: it goes by itself
 	}
+}
+
+// ---------------- Bouncing off a shield ----------------
+// The server sees a hit box of this swing strike a raised shield: the swing is over, the blade springs back and the knight is
+// stuck for a fixed time (longer after a smash attack). Everyone is told, the player's own machine too (its swing may already
+// have ended there: it gets the same stuck time from its last swing's follow-through).
+void AKnightCharacter::StartRebound()
+{
+	const float Dur = bSmashSwing ? ReboundSmash : ReboundJab;
+	BeginRebound(Dur);
+	if (GetNetMode() != NM_Standalone) MulticastRebound(Dur);
+}
+
+void AKnightCharacter::MulticastRebound_Implementation(float Dur)
+{
+	if (!HasAuthority()) BeginRebound(Dur);
+}
+
+void AKnightCharacter::BeginRebound(float Dur)
+{
+	if (SelectedKind() != JeebItems::K_Sword) return;
+	if (!bAttacking)   // (online: the swing had already finished on the player's machine)
+	{
+		bAttacking = true; AtkStyle = EAtkStyle::Slash; bAttackHit = true;
+		AttackDir = (LastSwingDir == JabSecond) ? JabSecond : JabFirst;
+		AttackT = 0.6f * AttackDur;
+	}
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBSMASH rebound %.2f s, swing T %.2f"), Dur, AttackT / FMath::Max(AttackDur, 0.01f));   // (test pictures)
+	Smash = ESmash::Rebound;
+	SmashT = 0.f;
+	ReboundDur = Dur;
+	QueuedJabs = 0;   // (the combo is broken: a buffered press is lost unless it comes in the last moment)
+	QueuedClick = -10.f;
+	if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
+		LaunchCharacter(-GetActorForwardVector().GetSafeNormal2D() * 260.f, true, false);   // knocked back a step
+}
+
+bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
+{
+	if (!bBlocking || !ShieldActive() || Health <= 0.f) return false;
+	Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector());
+	return true;
 }
 
 // ---------------- Hit boxes and hurt boxes (Smash style, HitBoxes.h) ----------------
@@ -574,6 +619,12 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				Hurt.Reset();
 				JeebHit::HurtOf(H, Hurt);
 				int32 Hit = -1;   // the lowest ID that touches
+				// A raised shield first (as in Smash): a hit box in its wedge is blocked, even if it reaches the body this frame too
+				JeebHit::FShieldWedge Shield;
+				const bool bShieldUp = JeebHit::ShieldOf(H, Shield);
+				for (int32 i = 0; bShieldUp && i < HitLive.Num() && Hit < 0; ++i)
+					if (JeebHit::TouchWedge(HitLive[i], Shield)) Hit = i;
+				const bool bBlocked = Hit >= 0;
 				for (int32 i = 0; i < HitLive.Num() && Hit < 0; ++i)
 					for (const JeebHit::FCapsule& Hc : Hurt)
 						if (JeebHit::Touch(HitLive[i], Hc)) { Hit = i; break; }
@@ -581,7 +632,14 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				HitThisSwing.Add(H);
 				bool bCrit = false;
 				const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
-				DealDamage(H, Dmg, bCrit, JeebItems::CombatSkillFor(JeebItems::K_Sword));
+				if (bBlocked)
+				{
+					const int32 Through = H->ShieldBlock ? H->ShieldBlock(Dmg, this) : 0;
+					if (Through > 0) DealDamage(H, Through, false, JeebItems::CombatSkillFor(JeebItems::K_Sword), true);
+					StartRebound();   // the blade bounces off: the rest of this swing is lost
+					break;
+				}
+				DealDamage(H, Dmg, bCrit, JeebItems::CombatSkillFor(JeebItems::K_Sword), true);
 			}
 		}
 	}
@@ -620,9 +678,10 @@ void AKnightCharacter::DrawBoxes()
 		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_HitBox.M_HitBox"))) BoxView->SetMaterial(0, M);
 	}
 	BoxView->SetVisibility(true);
-	static const FLinearColor HurtCol(1.f, 0.82f, 0.08f, 0.22f), HitCol(1.f, 0.08f, 0.04f, 0.45f);
+	static const FLinearColor HurtCol(1.f, 0.82f, 0.08f, 0.22f), HitCol(1.f, 0.08f, 0.04f, 0.45f), ShieldCol(0.15f, 0.5f, 1.f, 0.16f);
 	TArray<FVector> V, N; TArray<int32> I; TArray<FLinearColor> Cols;
 	TArray<JeebHit::FCapsule> Caps;
+	JeebHit::FShieldWedge Wedge;
 	const FVector Me = GetActorLocation();
 	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
 	{
@@ -631,6 +690,7 @@ void AKnightCharacter::DrawBoxes()
 		It->GatherHurt(Caps);
 		for (const JeebHit::FCapsule& C : Caps) JeebHit::AddCapsuleMesh(C, HurtCol, V, N, I, Cols);
 		for (const JeebHit::FCapsule& C : It->LiveHitboxes()) JeebHit::AddCapsuleMesh(C, HitCol, V, N, I, Cols);
+		if (It->GetShieldWedge(Wedge)) JeebHit::AddWedgeMesh(Wedge, ShieldCol, V, N, I, Cols);   // a raised shield: blue walls
 	}
 	for (UHealthComponent* H : UHealthComponent::All())
 	{
@@ -639,6 +699,7 @@ void AKnightCharacter::DrawBoxes()
 		Caps.Reset();
 		JeebHit::HurtOf(H, Caps);
 		for (const JeebHit::FCapsule& C : Caps) JeebHit::AddCapsuleMesh(C, HurtCol, V, N, I, Cols);
+		if (JeebHit::ShieldOf(H, Wedge)) JeebHit::AddWedgeMesh(Wedge, ShieldCol, V, N, I, Cols);
 	}
 	BoxView->CreateMeshSection_LinearColor(0, V, I, N, TArray<FVector2D>(), Cols, TArray<FProcMeshTangent>(), false);
 }
