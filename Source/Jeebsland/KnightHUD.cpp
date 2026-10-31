@@ -405,7 +405,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			Outline(Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f, 15.f, FLinearColor(1.f, 0.8f, 0.3f, 1.f));
 			Outline(Sx - 1.f, Sy - 1.f, Ss + 2.f, Ss + 2.f, 13.f, FLinearColor(1.f, 0.92f, 0.6f, 0.7f));
 		}
-		HDText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.7f, 0.7f, 0.7f), Sx + 4.f, Sy + 1.f, Font, bSel ? 0.9f : 0.7f);
+		HDText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f), Sx + 4.f, Sy + 1.f, Font, bSel ? 1.05f : 0.9f);   // (the key that takes it in hand)
 		if (Id == 0) { if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.25f); }); continue; }
 		// (every weapon icon leans the same way everywhere: see DrawIcon)
 		DrawIcon(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f);

@@ -330,8 +330,8 @@ protected:
 	void Select3() { SelectHotbar(2); }
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
-	void ScrollUp() { StartKick(); }   // (the wheel up kicks; the wheel down still picks the next weapon)
-	void ScrollDown() { CycleHotbar(1); }
+	void ScrollUp() { StartKick(); }   // (the wheel up kicks)
+	void NextWeapon() { CycleHotbar(1); }   // R: the next weapon on the bar, left to right (round to the first again)
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
 	void BuildKnight();   // creates every armour part from KnightDesign.h
@@ -359,7 +359,7 @@ private:
 	UPROPERTY() UInputAction* CallHorseAction = nullptr;
 		UPROPERTY() UInputAction* SkillsAction = nullptr;
 	UPROPERTY() UInputAction* ScrollUpAction = nullptr;
-	UPROPERTY() UInputAction* ScrollDownAction = nullptr;
+	UPROPERTY() UInputAction* NextWeaponAction = nullptr;
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;

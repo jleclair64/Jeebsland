@@ -416,6 +416,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
 			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
 			else if (DragKind == 5 && Knight->GetLootTarget()) Knight->Inv(EInvOp::LootTakeOne, DragIdx, 0, 0, Knight->GetLootTarget());   // a click takes it
+			else if (DragKind == 2) Knight->SelectHotbar(DragIdx);   // a click on a weapon bar slot takes that weapon in hand
 			else if (DragKind == 6) Knight->DrinkPotion();   // a click on the potion slot drinks
 			else if (DragKind == 7) Knight->UnequipWorn(K_Shield);   // a click on the shield slot puts the shield away
 		}
