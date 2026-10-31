@@ -34,6 +34,8 @@ public:
 	// A hit box struck the raised shield (server): the owner works out how much the shield stops (and shows it); returns the
 	// damage that still gets through
 	TFunction<int32(int32 Amount, AActor* From)> ShieldBlock;
+	// Optional: a kick struck it while its shield was up (server): it is knocked down
+	TFunction<void(AActor* From)> KnockDown;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }

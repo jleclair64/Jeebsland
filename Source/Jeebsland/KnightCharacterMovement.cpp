@@ -196,7 +196,7 @@ void AKnightCharacter::StartRoll()
 {
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	if (bRolling || bSliding || bSitting || bClimbing || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
-	if (Smash == ESmash::Charging || SmashLocked()) return;   // (nor rolled out of)
+	if (Smash == ESmash::Charging || MoveLocked()) return;   // (nor rolled out of, nor out of a kick; knocked down, A or D rolls: GetUp)
 	static const bool bShotMode = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
 	if (bShotMode) return;   // (test pictures: a stray Alt as the window opens would roll him)
 
@@ -220,7 +220,8 @@ void AKnightCharacter::StartRoll()
 
 void AKnightCharacter::Jump()
 {
-	if (Smash == ESmash::Charging || SmashLocked()) return;   // (a smash attack can't be jumped out of)
+	if (bKnockedDown) { GetUp(0); return; }   // (Space gets straight up)
+	if (Smash == ESmash::Charging || MoveLocked()) return;   // (a smash attack or a kick can't be jumped out of)
 	if (Smash == ESmash::Deciding) SetSmash(ESmash::None);   // (jumping before it charges: just hit 1)
 		if (bClimbing)
 	{
@@ -262,7 +263,13 @@ void AKnightCharacter::ToggleStrafe()
 void AKnightCharacter::DoMove(float Right, float Forward)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
-	if (SmashLocked()) return;   // a smash attack's swipe and end lag: rooted to the spot
+	// Knocked down: once he has landed, A or D rolls away that way, W or S gets straight up
+	if (bKnockedDown)
+	{
+		if (Right > 0.5f) GetUp(2); else if (Right < -0.5f) GetUp(1); else if (FMath::Abs(Forward) > 0.5f) GetUp(0);
+		return;
+	}
+	if (MoveLocked()) return;   // a smash attack's swipe and end lag, a kick: rooted to the spot
 	if (!bMounted)
 	{
 		// Shield up: a combat stance. Move relative to the camera (which is where you face), so A and D sidestep and S backs up.
@@ -435,7 +442,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0);
 	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
-	if (bFaceCam && GetController() && !SmashLocked())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
+	if (bFaceCam && GetController() && !MoveLocked())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
 	const float StanceFactor = 1.f;
 	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? FMath::Min(1.f, JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield]))) : 1.f;   // tower: slower; nothing beats a walk

@@ -349,7 +349,7 @@ void AKnightHUD::ItemTip(int32 Id)
 	}
 	else if (K == K_Shield)
 	{
-		L.Add(FString::Printf(TEXT("Guard %d: stops that much damage while raised, then half until it recovers"), ShieldGuard(Id)));
+		L.Add(FString::Printf(TEXT("Guard %d: a raised shield takes every blow on it; the one that empties the guard drops it until it recovers"), ShieldGuard(Id)));
 		L.Add(ShieldStyleRow(StyleOf(Id)).Note);
 	}
 	else if (IsArmorKind(K))

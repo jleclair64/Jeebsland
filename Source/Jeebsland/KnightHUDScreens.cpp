@@ -179,11 +179,13 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Right click (hold)"), TEXT("Raise your shield and duck (needs a shield; not with two-handed weapons)") },
 			{ TEXT("C while sprinting"), TEXT("Slide") },
 			{ TEXT("V or Alt"),       TEXT("Dodge roll") },
-		{ TEXT("Wheel click or X"), TEXT("Strafe mode on/off: keep facing where you look, step sideways and back") },
+			{ TEXT("Wheel click or X"), TEXT("Strafe mode on/off (on from the start): keep facing where you look, step sideways and back") },
 			{ TEXT("Tab"),            TEXT("Inventory: click gear to wear or hold it, click worn gear to take it off") },
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
-			{ TEXT("Click (spear)"),  TEXT("Hold to charge, let go to thrust. Swords: click again within 0.3 s for a quick sweeping follow-up") },
+			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (click on to chain), hold to charge a smash attack. Spear: hold, let go to thrust") },
+			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks him down (the wheel down picks the next weapon)") },
+			{ TEXT("Knocked down"),   TEXT("A or D rolls away that way; W, S, Space or a click gets straight up") },
 			{ TEXT("E"),              TEXT("Talk to the shopkeeper, blacksmith and others; sit on benches") },
 			{ TEXT("W / S at a ladder"), TEXT("Climb up / down (walk into it)") },
 			{ TEXT("Esc (or O)"),     TEXT("The world map, saving, settings, controls, dictionary and the lore you have collected") },
@@ -193,7 +195,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		{
 			HDText(R.Key, FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, RowY, Font, 1.1f);
 			HDText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
-			RowY += 30.f;
+			RowY += 27.f;   // (20 rows)
 		}
 		HDText(TEXT("Press Esc to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}

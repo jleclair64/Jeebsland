@@ -46,6 +46,7 @@ namespace JeebHit
 
 	// Whether the boxes are drawn (H flips it; until then: on in MoveLab, off in the game)
 	bool ShowBoxes(const UWorld* World);
+	bool InMoveLab(const UWorld* World);   // the move test area (players' kicks can hit each other only there, until PvP exists)
 	void ToggleShow(const UWorld* World);
 
 	// Adds a capsule to a mesh being built (the view), in one see-through colour
@@ -64,6 +65,11 @@ namespace JeebHit
 	};
 	inline FShieldWedge KnightShield(const FVector& Centre, const FVector& Forward) { FShieldWedge W; W.Apex = Centre; W.Fwd = Forward.GetSafeNormal2D(); return W; }
 	bool TouchWedge(const FCapsule& Hit, const FShieldWedge& W);
+	// How far along a hit box's sweep this frame (0 = where it was last frame, 1 = where it is now) it first touches the wedge,
+	// or any of the hurt boxes; above 1: it doesn't. Whichever comes first is what the blow meets (a blade that reaches the
+	// body before the shield hits the body, owner 2026-10-31).
+	float FirstTouchWedge(const FCapsule& Hit, const FShieldWedge& W);
+	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt);
 	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors);
 	bool ShieldOf(const UHealthComponent* H, FShieldWedge& Out);   // anything with health whose shield is up (UHealthComponent::GatherShield)
 }

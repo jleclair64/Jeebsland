@@ -38,6 +38,7 @@
 void AKnightCharacter::Interact()
 {
 	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
+	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen (or the side panel); no attacks mid-move
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)

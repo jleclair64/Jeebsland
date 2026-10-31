@@ -50,10 +50,15 @@ namespace JeebHit
 
 	static int32 GShow = -1;   // -1: not chosen yet (on in MoveLab only)
 
+	bool InMoveLab(const UWorld* World)
+	{
+		return World && World->GetMapName().Contains(TEXT("MoveLab"));
+	}
+
 	bool ShowBoxes(const UWorld* World)
 	{
 		if (GShow >= 0) return GShow > 0;
-		return World && World->GetMapName().Contains(TEXT("MoveLab"));
+		return InMoveLab(World);
 	}
 
 	void ToggleShow(const UWorld* World)
@@ -121,14 +126,35 @@ namespace JeebHit
 		return FMath::Sqrt(Flat * Flat + Up * Up);
 	}
 
+	// (points along the hit box's sweep, close enough together that it can't slip past a wall or a limb between two of them)
+	static int32 SweepSteps(const FCapsule& Hit)
+	{
+		return FMath::Clamp(FMath::CeilToInt(FVector::Dist(Hit.A, Hit.B) / FMath::Max(Hit.R * 0.5f, 1.f)), 1, 32);
+	}
+
+	float FirstTouchWedge(const FCapsule& Hit, const FShieldWedge& W)
+	{
+		const int32 N = SweepSteps(Hit);
+		for (int32 i = 0; i <= N; ++i)
+			if (WedgeDist(FMath::Lerp(Hit.A, Hit.B, (float)i / N), W) <= Hit.R) return (float)i / N;
+		return 2.f;
+	}
+
+	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt)
+	{
+		const int32 N = SweepSteps(Hit);
+		for (int32 i = 0; i <= N; ++i)
+		{
+			const FVector P = FMath::Lerp(Hit.A, Hit.B, (float)i / N);
+			for (const FCapsule& C : Hurt)
+				if (FMath::PointDistToSegment(P, C.A, C.B) <= Hit.R + C.R) return (float)i / N;
+		}
+		return 2.f;
+	}
+
 	bool TouchWedge(const FCapsule& Hit, const FShieldWedge& W)
 	{
-		// (points along the hit box's sweep, close enough together that it can't slip past a wall between two of them)
-		const float Len = FVector::Dist(Hit.A, Hit.B);
-		const int32 N = FMath::Clamp(FMath::CeilToInt(Len / FMath::Max(Hit.R * 0.5f, 1.f)), 1, 32);
-		for (int32 i = 0; i <= N; ++i)
-			if (WedgeDist(FMath::Lerp(Hit.A, Hit.B, (float)i / N), W) <= Hit.R) return true;
-		return false;
+		return FirstTouchWedge(Hit, W) <= 1.f;
 	}
 
 	bool ShieldOf(const UHealthComponent* H, FShieldWedge& Out)

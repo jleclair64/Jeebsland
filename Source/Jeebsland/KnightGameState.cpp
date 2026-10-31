@@ -321,10 +321,12 @@ void AKnightGameState::BuildMoveLab()
 		float Ahead = 300.f;
 		FParse::Value(FCommandLine::Get(), TEXT("LabKnight="), Ahead);   // (test pictures: -LabKnight=150 stands him within reach)
 		const bool bGuardFirst = FParse::Param(FCommandLine::Get(), TEXT("LabGuardFirst"));   // (test pictures: the guarding one straight ahead)
+		float KnightYaw = 180.f;
+		FParse::Value(FCommandLine::Get(), TEXT("LabKnightYaw="), KnightYaw);   // (test pictures: 0 turns their backs to you)
 		for (int32 g = 0; g < 2; ++g)
 		{
 			const float Y = ((g == 1) != bGuardFirst) ? 350.f : 0.f;
-			const FTransform Xf(FRotator(0.f, 180.f, 0.f), FVector(Ahead, Y, Z + 97.f));
+			const FTransform Xf(FRotator(0.f, KnightYaw, 0.f), FVector(Ahead, Y, Z + 97.f));
 			if (AFoeKnight* K = World->SpawnActorDeferred<AFoeKnight>(AFoeKnight::StaticClass(), Xf))
 			{
 				K->bStill = true;

@@ -174,49 +174,31 @@ void AFoeKnight::BeginPlay()
 		J.HipL = HipL; J.HipR = HipR; J.KneeL = KneeL; J.KneeR = KneeR; J.AnkleL = AnkleL; J.AnkleR = AnkleR;
 		JeebHit::KnightHurt(J, Out);
 	};
-	// A raised shield, facing the blow, stops most of it
+	// Blows that don't come through hit boxes (arrows, other weapons' swings): his raised shield, facing the blow (its 90-degree
+	// wedge), takes the whole of it
 	Hp->ModifyDamage = [this](int32 Amount, AActor* From) -> int32
 	{
-		if (BlockAlpha < 0.6f || !From) return Amount;
+		if (BlockAlpha < 0.6f || bGuardBroken || KnockT >= 0.f || !From) return Amount;
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
-		if (FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) < 0.2f) return Amount;
-		const int32 Stopped = FMath::RoundToInt(Amount * BlockStops);
-		JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Stopped, JeebCombat::N_Blocked);
-		return Amount - Stopped;
+		if (FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) < FMath::Cos(FMath::DegreesToRadians(JeebHit::FShieldWedge().HalfAngle))) return Amount;
+		return TakeOnShield(Amount, From) ? 0 : Amount;
 	};
-	// His raised shield as hit boxes see it: the 90-degree wedge in front of him (HitBoxes.h). A sword's hit box that touches it
-	// is stopped there: the pen knight's shield stops 70% of it; the still guarding one's has a guard, like a player's
+	// His raised shield as hit boxes see it: the 90-degree wedge in front of him (HitBoxes.h). A sword's hit box that meets it
+	// before his body is stopped there, and the shield takes all of it
 	Hp->GatherShield = [this](JeebHit::FShieldWedge& Out)
 	{
-		if (BlockAlpha < 0.6f || DeathT > 0.f) return false;
+		if (BlockAlpha < 0.6f || DeathT > 0.f || bGuardBroken || KnockT >= 0.f) return false;
 		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector());
 		return true;
 	};
 	GuardMax = GuardPool = float(JeebItems::ShieldGuard(JeebItems::ShieldId(0, Tier)));   // (an iron kite shield)
 	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
 	{
-		int32 Stopped = FMath::RoundToInt(Amount * BlockStops);
-		if (bStillGuard)
-		{
-			if (!bGuardBroken)
-			{
-				Stopped = FMath::Min(Amount, FMath::FloorToInt(GuardPool));
-				GuardPool -= Stopped;
-				if (GuardPool < 1.f)
-				{
-					GuardPool = 0.f;
-					bGuardBroken = true;
-					if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
-						Sk->Say(2.5f, FColor::Orange, TEXT("His guard is broken! His shield stops only half a blow until it recovers."));
-				}
-			}
-			else Stopped = Amount / 2;
-			Hp->LastHitTime = GetWorld()->GetTimeSeconds();   // (his guard and health come back 3 s after the last blow)
-		}
-		if (Stopped > 0) JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 180.f), Stopped, JeebCombat::N_Blocked);   // (above the damage number)
-		HitFlash = 0.2f;
-		return Amount - Stopped;
+		TakeOnShield(Amount, From);
+		return 0;
 	};
+	Hp->KnockDown = [this](AActor* From) { KnockDown(From); };
+	if (bStill) { Post = GetActorLocation(); PostYaw = GetActorRotation().Yaw; }
 	LastLoc = GetActorLocation();
 	if (HasAuthority() && !bStill) Rise();
 }
@@ -227,6 +209,93 @@ void AFoeKnight::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AFoeKnight, RepAct);
 	DOREPLIFETIME(AFoeKnight, bRepBlock);
 	DOREPLIFETIME(AFoeKnight, bRepDown);
+	DOREPLIFETIME(AFoeKnight, RepKnock);
+}
+
+bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
+{
+	if (bGuardBroken || Amount <= 0) return false;
+	const float Now = GetWorld()->GetTimeSeconds();
+	GuardPool -= Amount;   // (all of it: none reaches him)
+	GuardHitTime = Now;
+	if (bStill) Hp->LastHitTime = Now;   // (the still knight's guard and health come back 3 s after the last blow)
+	JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Amount, JeebCombat::N_Blocked);
+	HitFlash = 0.2f;
+	if (GuardPool < 1.f)
+	{
+		GuardPool = 0.f;
+		bGuardBroken = true;
+		BlockT = -1.f;   // the shield drops
+		bRepBlock = false;
+		if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
+			Sk->Say(2.5f, FColor::Orange, TEXT("His guard is broken! His shield is down until it recovers."));
+	}
+	return true;
+}
+
+// (server) A kick on his raised shield
+void AFoeKnight::KnockDown(AActor* From)
+{
+	if (!HasAuthority() || KnockT >= 0.f || DeathT > 0.f) return;
+	KnockOpt = bStill ? uint8(KnockCount % 3) : uint8(Rand.RandRange(0, 2));   // (the still one shows each way of getting up in turn)
+	++KnockCount;
+	RepKnock = uint8(((KnockCount & 63) << 2) | KnockOpt);
+	KnockT = 0.f;
+	Act = EAct::Idle; ActT = 0.f;
+	BlockT = -1.f; bRepBlock = false;
+	RepAct = static_cast<uint8>(Act);
+	AttackCool = FMath::Max(AttackCool, 1.f);
+	// knocked back a little, away from the kicker
+	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation() + GetActorForwardVector())).GetSafeNormal2D();
+	if (bStill) SetActorLocation(GetActorLocation() + Away * 50.f, true);
+	else MoveTowards(FVector2D(GetActorLocation()) + FVector2D(Away.X, Away.Y) * 50.f, 1.0e5f, 1.f);
+}
+
+void AFoeKnight::OnRep_Knock()
+{
+	KnockOpt = RepKnock & 3;
+	KnockT = 0.f;
+	Act = EAct::Idle;
+}
+
+void AFoeKnight::TickKnock(float Dt)
+{
+	if (KnockT < 0.f) return;
+	const float Before = KnockT;
+	KnockT += Dt;
+	const float RollEnd = KnockLie + (KnockOpt ? KnockRoll : 0.f), End = RollEnd + KnockRise;
+	// how far down (1 lying)
+	const float Down = (KnockT < KnockFall) ? FMath::SmoothStep(0.f, 1.f, KnockT / KnockFall) : (KnockT < RollEnd ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (KnockT - RollEnd) / KnockRise));
+	// rolling over sideways along the ground (his length lies along his facing), to his left or right
+	const float Side = (KnockOpt == 1) ? -1.f : 1.f;
+	float RollK = 0.f;
+	if (KnockOpt && KnockT > KnockLie) RollK = FMath::SmoothStep(0.f, 1.f, FMath::Min(1.f, (KnockT - KnockLie) / KnockRoll));
+	if (KnockOpt && HasAuthority() && Before < RollEnd && Before >= KnockLie)
+	{
+		const float K0 = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((Before - KnockLie) / KnockRoll, 0.f, 1.f));
+		const float K1 = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((KnockT - KnockLie) / KnockRoll, 0.f, 1.f));
+		const FVector By = GetActorRightVector().GetSafeNormal2D() * Side * KnockRollDist * (K1 - K0);
+		if (bStill) SetActorLocation(GetActorLocation() + By, true);
+		else MoveTowards(FVector2D(GetActorLocation() + By), 1.0e5f, 1.f);
+	}
+	if (KnockT >= End)
+	{
+		KnockT = -1.f;
+		BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
+		BodyRoot->SetRelativeLocation(FVector::ZeroVector);
+		return;
+	}
+	// the pose: flat on his back (the top tipped back), legs out straight, arms flung wide
+	const FQuat Lie = FQuat(FVector::ForwardVector, -Side * 2.f * PI * RollK) * FQuat(FRotator(80.f * Down, 0.f, 0.f));
+	BodyRoot->SetRelativeRotation(Lie);
+	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -78.f * Down));
+	auto Toward = [Down](USceneComponent* C, const FRotator& R) { C->SetRelativeRotation(FMath::Lerp(C->GetRelativeRotation(), R, Down)); };
+	Toward(HipR, FRotator(8.f, 0.f, -6.f));   Toward(HipL, FRotator(14.f, 0.f, 6.f));
+	Toward(KneeR, FRotator(-12.f, 0.f, 0.f)); Toward(KneeL, FRotator(-24.f, 0.f, 0.f));
+	Toward(AnkleR, FRotator(20.f, 0.f, 0.f)); Toward(AnkleL, FRotator(20.f, 0.f, 0.f));
+	Toward(ArmR, FRotator(15.f, 0.f, -55.f)); Toward(ArmL, FRotator(15.f, 0.f, 55.f));
+	Toward(ElbowR, FRotator(20.f, 0.f, 0.f)); Toward(ElbowL, FRotator(20.f, 0.f, 0.f));
+	Toward(HeadPivot, FRotator(-28.f, 0.f, 0.f));
 }
 
 void AFoeKnight::OnRep_Act()
@@ -240,6 +309,7 @@ void AFoeKnight::OnRep_Down()
 	if (bRepDown)
 	{
 		if (DeathT <= 0.f) DeathT = 0.001f;   // topple
+		KnockT = -1.f;
 		Act = EAct::Idle;
 		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		return;
@@ -293,6 +363,7 @@ void AFoeKnight::Rise()
 	HitFlash = 0.f;
 	Act = EAct::Idle;
 	BlockT = 0.f;
+	KnockT = -1.f; GuardPool = GuardMax; bGuardBroken = false;
 	AttackCool = 2.f;
 	const FVector2D P = PenCenter;
 	SetActorLocation(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 98.f));
@@ -315,6 +386,7 @@ void AFoeKnight::OnHurt(AActor* From)
 		if (DeathT <= 0.f)
 		{
 			DeathT = 0.001f;
+			KnockT = -1.f;
 			bRepDown = true;
 			RespawnT = 20.f;
 			Act = EAct::Idle;
@@ -330,7 +402,7 @@ void AFoeKnight::OnHurt(AActor* From)
 	// Knocked back a step, and sometimes he gets his shield up for the next blows (never in the middle of his own swing)
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation())).GetSafeNormal2D();
 	MoveTowards(FVector2D(GetActorLocation()) + FVector2D(Away.X, Away.Y) * 35.f, 1.0e5f, 1.f);
-	if (Act == EAct::Idle && BlockT <= 0.f && Rand.FRand() < 0.4f) BlockT = Rand.FRandRange(0.9f, 1.6f);
+	if (Act == EAct::Idle && BlockT <= 0.f && !bGuardBroken && KnockT < 0.f && Rand.FRand() < 0.4f) BlockT = Rand.FRandRange(0.9f, 1.6f);
 }
 
 void AFoeKnight::Tick(float DeltaSeconds)
@@ -369,11 +441,24 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	{
 		if (Hp->Cur < Hp->Max && Now - Hp->LastHitTime > 3.f) Hp->Reset();   // (training mode: full again after a pause)
 		if ((GuardPool < GuardMax || bGuardBroken) && Now - Hp->LastHitTime > 3.f) { GuardPool = GuardMax; bGuardBroken = false; }   // (and his guard)
-		BlockT = bStillGuard ? 1.f : -1.f;
-		bRepBlock = bStillGuard;
+		BlockT = (bStillGuard && !bGuardBroken && KnockT < 0.f) ? 1.f : -1.f;
+		bRepBlock = BlockT > 0.f;
+		if (KnockT < 0.f)   // back on his feet away from his spot: he walks back to it and turns to face the way he did
+		{
+			const FVector To = Post - GetActorLocation();
+			if (To.Size2D() > 4.f) SetActorLocation(GetActorLocation() + FVector(To.X, To.Y, 0.f).GetClampedToMaxSize(160.f * Dt), true);
+			SetActorRotation(FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, PostYaw, 200.f * Dt), 0.f));
+		}
+	}
+	else if (KnockT >= 0.f)   // knocked down: nothing but getting up
+	{
+		BlockT = -1.f;
+		bRepBlock = false;
+		RepAct = static_cast<uint8>(EAct::Idle);
 	}
 	else
 	{
+	if ((bGuardBroken || GuardPool < GuardMax) && Now - GuardHitTime > GuardBack) { GuardPool = GuardMax; bGuardBroken = false; }   // (his guard comes back after a pause)
 	float Dist = 1.0e9f;
 	AKnightCharacter* Knight = FindTarget(Dist);
 	const FVector Me = GetActorLocation();
@@ -456,6 +541,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	}
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
 	RepAct = static_cast<uint8>(Act);
+	if (bGuardBroken) BlockT = FMath::Min(BlockT, -0.01f);   // (a broken guard: the shield stays down)
 	bRepBlock = BlockT > 0.f;
 	}
 
@@ -501,4 +587,5 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	const float Flinch = HitFlash / 0.35f;
 	UpperPivot->SetRelativeRotation(FRotator((Act == EAct::Strike ? -10.f : (Act == EAct::Windup ? 6.f : 0.f)) + 12.f * Flinch * FMath::Sin(Flinch * 9.f), 0.f, 0.f));
 	HeadPivot->SetRelativeRotation(FRotator(0.f, 0.f, 2.f * FMath::Sin(Now * 1.3f)));
+	TickKnock(Dt);   // (knocked down: over all of that)
 }

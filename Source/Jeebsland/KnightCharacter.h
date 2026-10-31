@@ -278,8 +278,27 @@ protected:
 	void StartCrouch();         // hold Ctrl
 	void StopCrouch();
 	void InteractReleased();    // letting go of left click: a charged spear thrust
-	enum class EAtkStyle : uint8 { Slash, Thrust, Cast };
+	enum class EAtkStyle : uint8 { Slash, Thrust, Cast, Kick };
 	void StartAttack(EAtkStyle Style, int32 Dir, float Charge);
+	// The kick (wheel up; KnightCharacterCombat.cpp): the right leg, the whole body turning to his left like Ken's forward smash.
+	// Rock-paper-scissors: the sword is stopped by a raised shield, the kick goes through it and knocks the shielding knight
+	// down (KnockDownBy). It has end lag: once the foot is out he can't move or act until the leg is back down.
+	void StartKick();
+	static constexpr float KickDur = 0.8f, KickActiveFrom = 0.27f, KickActiveTo = 0.5f, KickDamage = 0.6f;
+	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a kick hits each knight once)
+	// Knocked down (a kick on his raised shield): he falls on his back; once down, A or D rolls that way, W, S, Space or a click
+	// gets straight up (he gets up by himself after KnockAuto s). Getting up and rolling away can't be hit for a moment.
+	bool bKnockedDown = false;
+	uint8 KnockPhase = 0;          // 0 falling and lying, 1 getting up
+	float KnockT = 0.f, KnockAlpha = 0.f;
+	static constexpr float KnockFall = 0.35f, KnockAuto = 2.f, KnockRise = 0.45f;
+	void KnockDownBy(AActor* From);   // (server)
+	void GetUp(uint8 Opt);            // 0 straight up, 1 roll to his left, 2 roll to his right (the player's machine, or the server)
+	void ApplyGetUp(uint8 Opt);
+	void TickKnock(float Dt);
+	UFUNCTION(Server, Reliable) void ServerGetUp(uint8 Opt);
+	UFUNCTION(NetMulticast, Reliable) void MulticastKnock(bool bDown, uint8 Opt);
+	bool MoveLocked() const;          // a smash attack's swipe and end lag, a rebound, a kick, lying knocked down: no moving or turning
 	void AttackLands();         // the moment a swing, thrust or cast lands
 	void TryStartClimb();       // walking into a ladder
 	void UpdateClimb(float Dt);
@@ -311,7 +330,7 @@ protected:
 	void Select3() { SelectHotbar(2); }
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
-	void ScrollUp() { CycleHotbar(-1); }
+	void ScrollUp() { StartKick(); }   // (the wheel up kicks; the wheel down still picks the next weapon)
 	void ScrollDown() { CycleHotbar(1); }
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
@@ -409,6 +428,8 @@ private:
 	void PoseBody(struct FKnightPose& P);
 	void PoseCape(struct FKnightPose& P);
 	void PoseArms(struct FKnightPose& P);
+	void PoseKick(struct FKnightPose& P);   // the kick and lying knocked down, over the legs and body
+	float KickGuard() const;                // 0 - 1: how far the fists are up in the kick's guard
 	void TickDust(float Dt, bool bFalling, bool bSpecial, float S, float C);
 	TWeakObjectPtr<class ALootDrop> LootTarget;
 	UPROPERTY() UInputAction* PotionAction = nullptr;
@@ -513,7 +534,7 @@ private:
 	bool bBlocking = false;
 	float StrafeSprint = 1.f;   // strafe mode: how much of the sprint applies, eased (it fades in as you turn toward straight ahead)
 	float LegYaw = 0.f;   // facing the camera (strafe mode, shield stance): how far the hips and legs turn toward the way you move (Fortnite style)
-	bool bStrafeMode = false;   // strafe mode (wheel click or X): always face where the camera looks, sidestep and back up instead of turning
+	bool bStrafeMode = true;    // strafe mode (wheel click or X; on from the start, owner 2026-10-31): always face where the camera looks, sidestep and back up instead of turning
 	void ToggleStrafe();
 	bool bBlockHeld = false;   // the block button is down (the shield drops during a swing and comes back after it if still held)
 	bool bSliding = false;

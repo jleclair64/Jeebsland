@@ -457,6 +457,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	float SpecialSpeed = 0.f;
 	const bool bSpecial = TickRollSlide(Dt, bFalling, SpecialSpeed);
 	TickAttack(Dt);
+	TickKnock(Dt);
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
 	TickGear(Dt);

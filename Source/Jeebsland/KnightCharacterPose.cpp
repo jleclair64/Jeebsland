@@ -70,6 +70,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	PosePrep(P);
 	PoseLegs(P);
 	PoseBody(P);
+	PoseKick(P);
 	PoseCape(P);
 	PoseArms(P);
 	OutS = P.S; OutC = P.C;
@@ -391,6 +392,74 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	P.TurnRoll = TurnRoll;
 }
 
+// The kick (wheel up) and lying knocked down, laid over the legs and body (the arms' guard is in PoseArms).
+// The kick is Ken's forward smash kick with the right leg (owner, 2026-10-31): the knee comes up and across, the whole body
+// turns to his left until his right side faces the target, the chest leans back away from it, the head turns to watch, and
+// the leg drives out straight at hip height with the sole leading; then it folds back and sets down (the end lag).
+float AKnightCharacter::KickGuard() const
+{
+	if (!bAttacking || AtkStyle != EAtkStyle::Kick) return 0.f;
+	const float T = AttackT / FMath::Max(AttackDur, 0.01f);
+	return FMath::SmoothStep(0.f, 0.15f, T) * (1.f - FMath::SmoothStep(0.8f, 1.f, T));
+}
+
+void AKnightCharacter::PoseKick(FKnightPose& P)
+{
+	auto Add = [](USceneComponent* C, float Pitch, float Yaw, float Roll)
+	{
+		FRotator R = C->GetRelativeRotation();
+		R.Pitch += Pitch; R.Yaw += Yaw; R.Roll += Roll;
+		C->SetRelativeRotation(R);
+	};
+	if (bAttacking && AtkStyle == EAtkStyle::Kick)
+	{
+		// (fraction of the kick; right hip pitch and roll, right knee, the hips' turn, the chest's lean and turn, the head's turn)
+		struct FKey { float T, HipP, HipRoll, Knee, BodyYaw, ChestRoll, ChestYaw, HeadYaw; };
+		static const FKey Keys[] = {
+			{ 0.00f,  0.f,  0.f,    0.f,   0.f,  0.f,  0.f,  0.f },
+			{ 0.18f, 55.f, 35.f, -105.f, -45.f,  8.f, 10.f, 30.f },   // chamber: the knee up and across, turning
+			{ 0.30f, 10.f, 92.f,   -4.f, -85.f, 26.f, 18.f, 60.f },   // the foot out, side-on, leaning back
+			{ 0.50f, 10.f, 95.f,   -4.f, -85.f, 28.f, 18.f, 60.f },   // held out
+			{ 0.66f, 45.f, 45.f,  -95.f, -60.f, 12.f, 12.f, 45.f },   // folded back
+			{ 0.85f,  5.f,  5.f,  -15.f, -15.f,  2.f,  4.f, 12.f },   // set down, turning back
+			{ 1.00f,  0.f,  0.f,    0.f,   0.f,  0.f,  0.f,  0.f } };
+		const float T = FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f);
+		int32 i = 0;
+		while (i + 2 < (int32)UE_ARRAY_COUNT(Keys) && T > Keys[i + 1].T) ++i;
+		const FKey& A = Keys[i];
+		const FKey& B = Keys[i + 1];
+		const float U = FMath::SmoothStep(0.f, 1.f, (T - A.T) / (B.T - A.T));
+		auto L = [&](float FKey::* M) { return FMath::Lerp(A.*M, B.*M, U); };
+		Add(HipR, L(&FKey::HipP), 0.f, -L(&FKey::HipRoll));   // (a hip's roll is negative out to his right: measured from above)
+		Add(KneeR, L(&FKey::Knee), 0.f, 0.f);
+		Add(BodyRoot, 0.f, L(&FKey::BodyYaw), 0.f);
+		Add(UpperPivot, 0.f, L(&FKey::ChestYaw), -L(&FKey::ChestRoll));   // (roll + tips the top to his right: negative leans him away to his left)
+		Add(HeadPivot, 0.f, L(&FKey::HeadYaw), 0.6f * L(&FKey::ChestRoll));   // (the head stays nearly level)
+		const float G = KickGuard();   // the kicking foot flexed, square to the shin, so the sole leads
+		FRotator Ar = AnkleR->GetRelativeRotation();
+		Ar.Pitch = FMath::Lerp(Ar.Pitch, 0.f, G);
+		AnkleR->SetRelativeRotation(Ar);
+	}
+	// Knocked down: flat on his back, legs nearly straight (eased in as he falls, out as he gets up)
+	if (KnockAlpha > 0.001f)
+	{
+		const float A = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);
+		auto Toward = [&](USceneComponent* C, float Pitch, float Roll)
+		{
+			FRotator R = C->GetRelativeRotation();
+			R.Pitch = FMath::Lerp(R.Pitch, Pitch, A); R.Roll = FMath::Lerp(R.Roll, Roll, A);
+			C->SetRelativeRotation(R);
+		};
+		Toward(HipR, 8.f, -6.f);  Toward(HipL, 14.f, 6.f);   // (legs a little apart)
+		Toward(KneeR, -12.f, 0.f); Toward(KneeL, -24.f, 0.f);
+		Toward(AnkleR, 20.f, 0.f); Toward(AnkleL, 20.f, 0.f);
+		Add(BodyRoot, 80.f * A, 0.f, 0.f);   // (pitch up: the top tips back)
+		BodyRoot->SetRelativeLocation(BodyRoot->GetRelativeLocation() + FVector(0.f, 0.f, -78.f * A));   // down to the ground
+		Add(UpperPivot, 6.f * A, 0.f, 0.f);
+		Add(HeadPivot, -28.f * A, 0.f, 0.f);   // (chin tucked: looking down his body)
+	}
+}
+
 void AKnightCharacter::PoseCape(FKnightPose& P)
 {
 	const float Dt = P.Dt, Stream = P.Stream, F01 = P.F01, Air = P.Air, TurnRoll = P.TurnRoll;
@@ -441,6 +510,12 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		const float Counter = FMath::Sin(PI * FMath::Clamp(T / 0.78f, 0.f, 1.f));
 		const float CounterSign = (AttackDir == JabSecond) ? -1.f : 1.f;
 		PitchL -= 12.f * Counter * CounterSign; RollL -= 16.f * Counter * CounterSign; ElbowLdeg += 18.f * Counter;
+	}
+	{
+		const float G = KickGuard();   // kicking: both fists up in a guard
+		PitchL = FMath::Lerp(PitchL, 40.f, G); ElbowLdeg = FMath::Lerp(ElbowLdeg, 85.f, G); RollL = FMath::Lerp(RollL, 6.f, G);
+		const float K = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);   // knocked down: the arms flung out
+		PitchL = FMath::Lerp(PitchL, 15.f, K); RollL = FMath::Lerp(RollL, 55.f, K); ElbowLdeg = FMath::Lerp(ElbowLdeg, 20.f, K);
 	}
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
@@ -494,6 +569,12 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			const float A = FMath::Clamp(T / 0.3f, 0.f, 1.f);
 			const float E = A * A * (3.f - 2.f * A);
 			TargetPitch = FMath::Lerp(20.f, 92.f, E);  TargetYaw = 0.f;  ElbowRdeg = FMath::Lerp(50.f, 8.f, E);
+		}
+		else if (AtkStyle == EAtkStyle::Kick)
+		{
+			// Kicking: the sword fist up by the chin in a guard
+			const float G = KickGuard();
+			TargetPitch = FMath::Lerp(TargetPitch, 40.f, G); TargetYaw = FMath::Lerp(0.f, -15.f, G); ElbowRdeg = FMath::Lerp(ElbowRdeg, 100.f, G);
 		}
 		else if (AttackDir > 0)
 		{
@@ -701,6 +782,10 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		ArmSpeed = 30.f;
 	}
 
+	{
+		const float K = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);   // knocked down: the arms flung out
+		TargetPitch = FMath::Lerp(TargetPitch, 15.f, K); TargetYaw = FMath::Lerp(TargetYaw, 0.f, K); RollR = FMath::Lerp(RollR, -55.f, K); ElbowRdeg = FMath::Lerp(ElbowRdeg, 20.f, K);
+	}
 	ArmPitch = FMath::FInterpTo(ArmPitch, TargetPitch, Dt, ArmSpeed);
 	ArmYaw = FMath::FInterpTo(ArmYaw, TargetYaw, Dt, ArmSpeed);
 	ArmRollR = FMath::FInterpTo(ArmRollR, RollR, Dt, ArmSpeed);   // (eased like the pitch and yaw: the jab raises the arm out to the side)

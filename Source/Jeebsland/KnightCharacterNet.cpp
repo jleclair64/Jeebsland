@@ -386,7 +386,7 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
-	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Cast) || Health <= 0.f) return;
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Kick) || Health <= 0.f || bKnockedDown) return;
 	const double Now = FPlatformTime::Seconds();
 	if (Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
 	if (SmashTimeLeft() > 0.3f) return;   // nor before a smash attack's end lag is over (give or take the network)
@@ -407,7 +407,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
 	if (HasAuthority() || IsLocallyControlled()) return;   // (the server and the swinging player already swing)
-	if (Style > static_cast<uint8>(EAtkStyle::Cast)) return;
+	if (Style > static_cast<uint8>(EAtkStyle::Kick)) return;
 	StartAttack(static_cast<EAtkStyle>(Style), Dir < 0 ? -1 : 1, Charge);
 }
 

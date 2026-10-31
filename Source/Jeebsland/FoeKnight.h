@@ -29,16 +29,20 @@ public:
 	// A still sparring knight (MoveLab): he stands where he was put, never fights back, walks or falls; his health fills
 	// again 3 s after the last blow (Smash's training mode). Set before FinishSpawning.
 	bool bStill = false;
-	// ... holding his shield up the whole time (MoveLab's second one). His shield guards the way a player's does: it stops
-	// blows up to its guard (an iron kite shield's), then, broken, only half of each until it is full again (3 s after the
-	// last blow here, like his health). Set before FinishSpawning.
+	// ... holding his shield up the whole time (MoveLab's second one). Set before FinishSpawning.
 	bool bStillGuard = false;
+	// Both knights' shields guard the way a player's does (owner, 2026-10-31): a blow on the raised shield never hurts him; the
+	// shield's guard (an iron kite shield's) takes all of it. The blow that empties it breaks the guard: the shield drops and
+	// stays down until the guard is full again (GuardBack s after the last blow on it; the still knight 3 s, like his health).
+	// A kick on the raised shield knocks him down (KnockDown): he falls on his back, lies a moment, then gets straight up or
+	// rolls away to one side first (the still knight takes each in turn and walks back to his spot; the pen knight picks).
 
 	// Tuning
 	static constexpr int32 MaxHp = 90;
 	static constexpr int32 HitMin = 11, HitMax = 15;   // raw damage of his swing (your armour softens it)
 	static constexpr int32 Tier = 1;                   // iron (tier 1 since the 2026-10-30 redo)
-	static constexpr float BlockStops = 0.7f;          // a blow on his raised shield loses 70%
+	static constexpr float GuardBack = 6.f;            // the pen knight's broken guard is whole again this long after the last blow on it
+	static constexpr float KnockFall = 0.35f, KnockLie = 1.f, KnockRoll = 0.5f, KnockRise = 0.45f, KnockRollDist = 130.f;
 
 protected:
 	virtual void BeginPlay() override;
@@ -79,8 +83,19 @@ private:
 	FVector2D WanderTo = FVector2D::ZeroVector;
 	float WanderWait = 0.f;
 	float HitFlash = 0.f;
-	float GuardPool = 0.f, GuardMax = 0.f;   // the still guarding knight's shield guard
+	float GuardPool = 0.f, GuardMax = 0.f;   // his shield's guard
 	bool bGuardBroken = false;
+	float GuardHitTime = -100.f;
+	bool TakeOnShield(int32 Amount, AActor* From);   // (server) the shield takes a blow; returns false if it isn't up and facing it
+	// Knocked down by a kick (all machines play it from RepKnock: a count of knockdowns, times 4, plus how he gets up)
+	float KnockT = -1.f;           // < 0 on his feet; seconds since the kick
+	uint8 KnockOpt = 0;            // 0 straight up, 1 roll to his left, 2 to his right
+	int32 KnockCount = 0;
+	FVector Post = FVector::ZeroVector; float PostYaw = 0.f;   // (the still knight's spot)
+	UPROPERTY(ReplicatedUsing = OnRep_Knock) uint8 RepKnock = 0;
+	UFUNCTION() void OnRep_Knock();
+	void KnockDown(AActor* From);
+	void TickKnock(float Dt);      // the knockdown's timeline and pose (after the rest of the pose)
 	float DeathT = 0.f;           // 0 = alive; counts up while falling, then waits for the respawn
 	float RespawnT = 0.f;
 	float GaitPhase = 0.f, MoveBlend = 0.f;
