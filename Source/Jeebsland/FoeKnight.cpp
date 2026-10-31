@@ -57,6 +57,7 @@ AFoeKnight::AFoeKnight()
 	ArmR       = MakePivot(TEXT("ArmR"),       UpperPivot, PivotPos(P_ArmR));
 	ArmL       = MakePivot(TEXT("ArmL"),       UpperPivot, PivotPos(P_ArmL));
 	ElbowR     = MakePivot(TEXT("ElbowR"),     ArmR,       PivotPos(P_ElbowR));
+	WristR     = MakePivot(TEXT("WristR"),     ElbowR,     PivotPos(P_WristR));
 	ElbowL     = MakePivot(TEXT("ElbowL"),     ArmL,       PivotPos(P_ElbowL));
 
 	Hp = CreateDefaultSubobject<UHealthComponent>(TEXT("Hp"));
@@ -117,7 +118,7 @@ void AFoeKnight::BeginPlay()
 	Pivots[P_CapeU] = CapeUpper; Pivots[P_CapeL] = CapeLower;  Pivots[P_ArmL] = ArmL;      Pivots[P_ArmR] = ArmR;
 	Pivots[P_ElbowL] = ElbowL;   Pivots[P_ElbowR] = ElbowR;    Pivots[P_HipL] = HipL;      Pivots[P_HipR] = HipR;
 	Pivots[P_KneeL] = KneeL;     Pivots[P_KneeR] = KneeR;
-	Pivots[P_AnkleL] = AnkleL;   Pivots[P_AnkleR] = AnkleR;
+	Pivots[P_AnkleL] = AnkleL;   Pivots[P_AnkleR] = AnkleR;   Pivots[P_WristR] = WristR;
 
 	// A full suit of iron (dark grey plate, red accents), shield included; no bare skin
 	TArray<FDef> Defs;

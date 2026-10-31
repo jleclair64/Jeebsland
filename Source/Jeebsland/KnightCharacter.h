@@ -457,6 +457,7 @@ private:
 	UPROPERTY() USceneComponent* ArmPivot = nullptr;    // right shoulder (sword arm); mining and chopping drive this
 	UPROPERTY() USceneComponent* ArmPivotL = nullptr;   // left shoulder (shield arm)
 	UPROPERTY() USceneComponent* ElbowR = nullptr;
+	UPROPERTY() USceneComponent* WristR = nullptr;   // the sword hand turns here (the held weapon hangs off it)
 	UPROPERTY() USceneComponent* ElbowL = nullptr;
 
 	// The cape: a small cloth simulation (a grid of points pinned across the shoulders), redrawn every frame

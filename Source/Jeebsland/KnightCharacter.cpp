@@ -119,6 +119,7 @@ AKnightCharacter::AKnightCharacter()
 	ArmPivotL  = MakePivot(TEXT("ArmPivotL"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmL));    // left shoulder (shield arm)
 	ElbowR     = MakePivot(TEXT("ElbowR"),     ArmPivot,  KnightDesign::PivotPos(KnightDesign::P_ElbowR));
 	ElbowL     = MakePivot(TEXT("ElbowL"),     ArmPivotL, KnightDesign::PivotPos(KnightDesign::P_ElbowL));
+	WristR     = MakePivot(TEXT("WristR"),     ElbowR,    KnightDesign::PivotPos(KnightDesign::P_WristR));   // (2026-10-31) the sword hand
 }
 
 void AKnightCharacter::BeginPlay()

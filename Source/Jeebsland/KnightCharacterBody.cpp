@@ -46,7 +46,7 @@ void AKnightCharacter::BuildKnight()
 	Pivots[KnightDesign::P_ArmL] = ArmPivotL;    Pivots[KnightDesign::P_ArmR] = ArmPivot;     Pivots[KnightDesign::P_ElbowL] = ElbowL;
 	Pivots[KnightDesign::P_ElbowR] = ElbowR;     Pivots[KnightDesign::P_HipL] = HipL;         Pivots[KnightDesign::P_HipR] = HipR;
 	Pivots[KnightDesign::P_KneeL] = KneeL;       Pivots[KnightDesign::P_KneeR] = KneeR;
-	Pivots[KnightDesign::P_AnkleL] = AnkleL;     Pivots[KnightDesign::P_AnkleR] = AnkleR;
+	Pivots[KnightDesign::P_AnkleL] = AnkleL;     Pivots[KnightDesign::P_AnkleR] = AnkleR;     Pivots[KnightDesign::P_WristR] = WristR;
 
 	TArray<KnightDesign::FDef> Defs;
 	KnightDesign::Build(Defs);
@@ -482,7 +482,7 @@ void AKnightCharacter::RebuildHeld()
 	                            : KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
 	{
 		const int32 First = HeldComps.Num();
-		Make(ElbowR, KnightDesign::P_ElbowR, Tilt);
+		Make(WristR, KnightDesign::P_WristR, Tilt);   // (held in the fist, which turns at the wrist)
 		EaseKind = K;
 		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana || K == JeebItems::K_Staff)   // held at ease
 			for (int32 i = First; i < HeldComps.Num(); ++i) EaseComps.Add(HeldComps[i]);
@@ -594,7 +594,7 @@ void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
 	const bool bStaff = EaseKind == JeebItems::K_Staff;
 	const FQuat Q = FQuat::Slerp(FQuat::Identity, bStaff ? StaffQ : SwordQ, EaseAlpha);
 	const FVector Slide = bStaff ? -StaffHead * (40.f * EaseAlpha) : FVector::ZeroVector;   // slid down through the hand to grip the middle
-	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_ElbowR);
+	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_WristR);   // (the blade hangs off the wrist)
 	for (UProceduralMeshComponent* C : EaseComps)
 		if (C) C->SetRelativeLocationAndRotation(G - PE - Q.RotateVector(G) + Q.RotateVector(Slide), Q);
 }

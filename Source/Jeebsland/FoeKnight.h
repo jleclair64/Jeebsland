@@ -45,6 +45,7 @@ private:
 	UPROPERTY() USceneComponent* ArmR = nullptr;
 	UPROPERTY() USceneComponent* ElbowL = nullptr;
 	UPROPERTY() USceneComponent* ElbowR = nullptr;
+	UPROPERTY() USceneComponent* WristR = nullptr;   // (the model's right fist hangs off it; it never turns on the pen knight)
 	UPROPERTY() USceneComponent* HipL = nullptr;
 	UPROPERTY() USceneComponent* HipR = nullptr;
 	UPROPERTY() USceneComponent* KneeL = nullptr;

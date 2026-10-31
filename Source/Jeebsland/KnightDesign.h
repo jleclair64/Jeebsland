@@ -22,7 +22,9 @@ namespace KnightDesign
 
 	enum EPivot : int32
 	{
-		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_AnkleL, P_AnkleR, P_Count
+		P_Body, P_Upper, P_Head, P_Plume, P_CapeU, P_CapeL, P_ArmL, P_ArmR, P_ElbowL, P_ElbowR, P_HipL, P_HipR, P_KneeL, P_KneeR, P_AnkleL, P_AnkleR,
+		P_WristR,   // (2026-10-31) the sword hand's wrist: the right fist and the held weapon turn here (animation clips drive it)
+		P_Count
 	};
 	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotBrush = 7, SlotRingR = 8, SlotRingL = 9, SlotAmulet = 10, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
 	constexpr int32 NumSlots = 11;
@@ -49,6 +51,7 @@ namespace KnightDesign
 		case P_KneeR:  return FVector(-1, 13, -51);
 		case P_AnkleL: return FVector(-4, -13, -82);   // the feet turn here, so they can stay flat while the knees bend
 		case P_AnkleR: return FVector(-4, 13, -82);
+		case P_WristR: return FVector(-2.0, 37.0, -29.0);   // = WristPos(1)
 		}
 		return FVector(0, 0, 0);
 	}
@@ -585,7 +588,7 @@ namespace KnightDesign
 		// fist (first ring right hand, second left), and a gold pendant hung on a chain over the chest
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
-			const int32 Elb = (sd < 0) ? P_ElbowL : P_ElbowR, Slot = (sd < 0) ? SlotRingL : SlotRingR;
+			const int32 Elb = (sd < 0) ? P_ElbowL : P_WristR, Slot = (sd < 0) ? SlotRingL : SlotRingR;   // (the right fist turns at its wrist)
 			const FVector F = FistPos(sd);
 			{ FDef& D = Add(Elb, Slot, EArmorRole::Trim); D.bFixedColor = true; D.Fixed = FLinearColor(1.0f, 0.72f, 0.22f);
 			  Torus(D.Mesh, 2.1, 0.7, 12, 6, 1.0, 1.0, Xf(F + V3(5.6, -sd * 1.6, -1.2), V3(90, 0, 0))); }

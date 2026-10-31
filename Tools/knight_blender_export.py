@@ -26,6 +26,8 @@ def nrm_game(n): return Vector((-n.y, -n.x, n.z)).normalized()
 
 # ---- The joints (must match KnightDesign::PivotPos) ----
 P_BODY, P_UPPER, P_HEAD, P_ARML, P_ARMR, P_ELBL, P_ELBR, P_HIPL, P_HIPR, P_KNEEL, P_KNEER, P_ANKL, P_ANKR = 0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
+P_WRISTR = 16   # (2026-10-31) the sword hand: the right fist hangs off its own wrist joint, so animation can turn it
+WRIST_CUT_Z = -28.5   # the cut, just under the rim of the gauntlet cuff (which hides the seam when the wrist turns)
 S_HELM, S_BODY, S_SHOULDERS, S_BOOTS, S_GLOVES = 0, 1, 2, 3, 5
 HIP  = lambda sd: Vector((0.0, sd * 13.0, -26.0))
 KNEE = lambda sd: Vector((-1.0, sd * 17.5, -51.0))   # (where the model's knee is before the legs are straightened)
@@ -59,6 +61,7 @@ def classify(c, metal=1.0):
     if is_arm:
         if c.z > -3.5:
             return (P_ARMR if sd > 0 else P_ARML, S_SHOULDERS)
+        if sd > 0 and c.z < WRIST_CUT_Z: return (P_WRISTR, S_GLOVES)
         return (P_ELBR if sd > 0 else P_ELBL, S_GLOVES)
     if c.z >= -20.0:
         return (P_UPPER, S_BODY)
@@ -107,8 +110,8 @@ def fist_angle(p):   # full lean below the cuff, easing in over 4 cm so the glov
 
 def place(p, key):
     pv = key[0]
-    if pv in (P_ELBL, P_ELBR):
-        sd = 1 if pv == P_ELBR else -1
+    if pv in (P_ELBL, P_ELBR, P_WRISTR):
+        sd = -1 if pv == P_ELBL else 1
         w = Vector((-2.0, sd * 37.0, -29.0))   # the wrist (KnightDesign::WristPos)
         return w + rot_y(p - w, fist_angle(p))
     if pv == P_UPPER and p.z < -26.0:
@@ -127,7 +130,7 @@ def turn(v, p, key):
     if key[0] in (P_ANKL, P_ANKR):
         sd = 1 if key[0] == P_ANKR else -1
         return rot_z(v, -foot_yaw[sd])
-    if key[0] in (P_ELBL, P_ELBR):
+    if key[0] in (P_ELBL, P_ELBR, P_WRISTR):
         return rot_y(v, fist_angle(p))
     return v
 
