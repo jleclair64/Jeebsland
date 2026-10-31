@@ -345,7 +345,9 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
 	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
-	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
+	// a sword swing turns the chest with the arm (a third of the arm's sweep), so the body puts weight behind it
+	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword) ? 0.33f * ArmYaw : 0.f, Dt, 12.f);
+	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw + SwingTwistNow, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
 	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
@@ -366,7 +368,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
 	// (crouched, the head also takes back the rest of the squat's lean, so the helm looks the same way as when standing)
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground, -0.5f * TurnRoll - 0.7f * Sway));
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground - 0.8f * SwingTwistNow, -0.5f * TurnRoll - 0.7f * Sway));   // (the head keeps looking ahead through a swing)
 
 	P.TurnRoll = TurnRoll;
 }
@@ -467,6 +469,27 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			const float A = FMath::Clamp(T / 0.3f, 0.f, 1.f);
 			const float E = A * A * (3.f - 2.f * A);
 			TargetPitch = FMath::Lerp(20.f, 92.f, E);  TargetYaw = 0.f;  ElbowRdeg = FMath::Lerp(50.f, 8.f, E);
+		}
+		else if (AttackDir == JabThird)
+		{
+			// The jab's finisher (Link's third hit): from where the backhand ended, out to the right, the arm draws further back
+			// and bends, then whips through a wide flat sweep all the way across as the knight steps in (StartAttack)
+			if (T < 0.35f)
+			{
+				const float A = T / 0.35f;
+				const float E = A * A * (3.f - 2.f * A);
+				TargetPitch = FMath::Lerp(84.f, 74.f, E);
+				TargetYaw = FMath::Lerp(75.f, 105.f, E);
+				ElbowRdeg = FMath::Lerp(5.f, 62.f, E);
+			}
+			else if (T < 0.55f)
+			{
+				const float A = (T - 0.35f) / 0.2f;
+				TargetPitch = FMath::Lerp(74.f, 86.f, A);
+				TargetYaw = FMath::Lerp(105.f, -90.f, A * A);
+				ElbowRdeg = FMath::Lerp(62.f, 0.f, A);
+			}
+			else { TargetPitch = 86.f; TargetYaw = -90.f; ElbowRdeg = 0.f; }
 		}
 		else if (AttackDir > 0)
 		{

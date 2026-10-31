@@ -398,7 +398,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 		PendingArrowTier = Tier;
 	}
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
-	StartAttack(S, Dir < 0 ? -1 : 1, C);
+	StartAttack(S, Dir == JabThird ? JabThird : (Dir < 0 ? -1 : 1), C);
 	if (S == EAtkStyle::Thrust && !GetCharacterMovement()->IsFalling())
 		LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (200.f + 700.f * C), true, false);   // the spear lunge, as on the player's machine
 }
@@ -407,7 +407,7 @@ void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, flo
 {
 	if (HasAuthority() || IsLocallyControlled()) return;   // (the server and the swinging player already swing)
 	if (Style > static_cast<uint8>(EAtkStyle::Cast)) return;
-	StartAttack(static_cast<EAtkStyle>(Style), Dir < 0 ? -1 : 1, Charge);
+	StartAttack(static_cast<EAtkStyle>(Style), Dir == JabThird ? JabThird : (Dir < 0 ? -1 : 1), Charge);
 }
 
 void AKnightCharacter::SendState()

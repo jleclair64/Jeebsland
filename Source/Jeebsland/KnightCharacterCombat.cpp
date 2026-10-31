@@ -64,6 +64,13 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	AtkCharge = Charge;
 	AttackDur = (Style == EAtkStyle::Thrust) ? 0.45f : (Style == EAtkStyle::Cast ? FMath::Max(0.45f, Cd * 1.1f) : Cd * 1.25f);
 	if (Dir < 0) AttackDur *= 0.85f;           // the follow-up swing is 15% faster
+	if (Style == EAtkStyle::Slash && K == JeebItems::K_Sword)
+	{
+		// The sword's jab: two quick swings and a bigger, slower finisher that steps forward
+		AttackDur = Cd * (Dir == JabThird ? 1.35f : Dir == JabSecond ? 0.85f : 0.95f);
+		if (Dir == JabThird && (IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
+			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 330.f, true, false);   // (the player's machine and the server step together)
+	}
 	bAttacking = true;
 	bBlocking = false;   // the shield drops for the swing; Tick raises it again afterwards if the block button is still held
 	bAttackHit = false;
@@ -114,7 +121,10 @@ void AKnightCharacter::AttackLands()
 	}
 
 	const bool bThrust = (AtkStyle == EAtkStyle::Thrust);
-	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f);
+	// The sword's jab: the two quick swings hit a little softer, the finisher harder and a little further
+	const bool bJab = (AtkStyle == EAtkStyle::Slash && K == JeebItems::K_Sword);
+	const float JabMul = !bJab ? 1.f : (AttackDir == JabThird ? 1.3f : 0.85f);
+	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f) + ((bJab && AttackDir == JabThird) ? 30.f : 0.f);
 	const float MinDot = bThrust ? 0.8f : 0.2f;
 	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
 
@@ -136,7 +146,7 @@ void AKnightCharacter::AttackLands()
 	for (UHealthComponent* H : Targets)
 	{
 		bool bCrit = false;
-		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, 0, bCrit, bThrust ? (1.f + AtkCharge) : 1.f);
+		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, 0, bCrit, (bThrust ? (1.f + AtkCharge) : 1.f) * JabMul);
 		DealDamage(H, Dmg, bCrit, Sk);
 	}
 }
@@ -307,10 +317,17 @@ void AKnightCharacter::TickAttack(float Dt)
 			LastSwingEnd = Now;
 			LastSwingDir = AttackDir;
 			LastStyle = AtkStyle;
-			// Clicked during the swing (within 0.3 s of it ending): go straight into the left-to-right follow-up
-			if (AtkStyle == EAtkStyle::Slash && AttackDir > 0 && Now - QueuedClick <= 0.3f && !IsUIOpen())
+			// Clicked during the swing: go straight into the next one. The sword chains three (Link's jab: forehand, backhand,
+			// a big finishing sweep), and any click during a swing counts, so one click = one swing, two = two, three = all
+			// three. Other blades chain two, and the click must come in the last 0.3 s.
+			if (AtkStyle == EAtkStyle::Slash && !IsUIOpen())
 			{
-				StartAttack(EAtkStyle::Slash, -1, 0.f);
+				if (SelectedKind() == JeebItems::K_Sword)
+				{
+					const int32 Next = (AttackDir == JabFirst) ? JabSecond : (AttackDir == JabSecond ? JabThird : 0);
+					if (Next != 0 && QueuedClick > 0.f) StartAttack(EAtkStyle::Slash, Next, 0.f);
+				}
+				else if (AttackDir > 0 && Now - QueuedClick <= 0.3f) StartAttack(EAtkStyle::Slash, -1, 0.f);
 			}
 		}
 	}

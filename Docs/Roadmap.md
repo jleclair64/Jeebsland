@@ -84,6 +84,16 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
   5. Hit stun, combos with escapes, and the knockdown from a low sweep (get up / get-up attack / roll, buffered; speed and knockback scale with health percentage).
   6. Crouch block (low shield stops sweeps, high shield stops overheads). (The strafe-mode toggle on wheel click, X twin, was BUILT 2026-10-30: AKnightCharacter::ToggleStrafe.)
   - Every weapon gets four moves (left click, scroll down, scroll up, charge). Sword, staff and spear moves are listed in the shelved file's combat section (unchanged).
+  - **The knight's sword moves (owner, 2026-10-30; SWORD ONLY for now, other weapons keep their attacks):**
+    - Left click: Link's three-hit jab (Ultimate), one swing per click: 1 click = swing 1 only, 2 = two, 3 = all three.
+    - Scroll down: Link's down tilt (crouched low sweep). Scroll up: Link's forward tilt angled down (overhead chop).
+    - Running + click: Marth's dash attack, but swung SIDE TO SIDE (a flat sweep while sliding), not low to high.
+    - Running, jump, forward + click: Corrin's side B as a lunging stab forward and down, then fall back down (no sword in the ground, no pause).
+    - Both running attacks only after running for a moment (a tap of forward + click is a jab).
+    - Hold left click: Roy's forward smash (charge with a red bar, then a big overhead slash). No flame.
+    - Grab and throws: Roy-style. E grabs an opponent in reach, taking priority over picking up items; W/S/A/D picks the throw.
+    - The shield stays on the arm through every move: any two-handed motion becomes a natural one-handed one.
+    - Build order: jab; scroll down and up; charge slash; dash attack; jumping lunge; grab and throws (with knockback).
 - **Classes [L, later, build as NPCs first]:** knights (all-rounders), trolls (slow, huge reach, break guards), wizards (glass cannon, spells, a bubble shield). Mild PvP triangle: knights beat wizards, wizards beat trolls, trolls beat knights.
 
 ## Bosses and monsters (2026-10-29) [L]

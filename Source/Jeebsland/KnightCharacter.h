@@ -522,7 +522,9 @@ private:
 	float AttackT = 0.f, AttackDur = 0.7f;
 	EAtkStyle AtkStyle = EAtkStyle::Slash;
 	EAtkStyle LastStyle = EAtkStyle::Cast;
-	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing)
+	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); the sword adds +2, the jab's finisher
+	static constexpr int32 JabFirst = 1, JabSecond = -1, JabThird = 2;   // the sword's three-hit jab (Link's, Smash Ultimate)
+	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
 	int32 LastSwingDir = 0;
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;
