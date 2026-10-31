@@ -5,6 +5,8 @@
 #include "HitBoxes.h"
 #include "HealthComponent.generated.h"
 
+class UPrimitiveComponent;
+
 // Hit points for anything you can hit (pigs, scarecrows). Every live one registers itself so the HUD can draw bars
 // and the knight's swings and arrows can find targets. The owner reacts through OnDamaged.
 UCLASS()
@@ -40,6 +42,8 @@ public:
 	TFunction<void(AActor* From, const JeebHit::FReact& R)> React;
 	// Optional: its own blow is coming (wound up or swinging). Attack beats kick: a kick into it loses (the kicker falls).
 	TFunction<bool()> IsSwinging;
+	// Optional: the raised shield's own mesh parts (arrows that reach it stick in it; the same order on every machine)
+	TFunction<void(TArray<UPrimitiveComponent*>& Out)> ShieldParts;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }

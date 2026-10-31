@@ -46,7 +46,8 @@ void AKnightCharacter::CycleHotbar(int32 Dir)
 	for (int32 Step = 1; Step <= 5; ++Step)
 	{
 		const int32 Next = ((Skills->Selected + Dir * Step) % 5 + 5) % 5;
-		if (Skills->Hotbar[Next] != 0) { SelectHotbar(Next); return; }
+		const int32 Id = Skills->Hotbar[Next];
+		if (JeebItems::IsGear(Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(Id))) { SelectHotbar(Next); return; }   // (never an empty slot)
 	}
 }
 
@@ -61,6 +62,7 @@ void AKnightCharacter::SelectHotbar(int32 H)
 		Skills->LocalSelectTime = FPlatformTime::Seconds();
 		Inv(EInvOp::Select, H);
 	}
+	CancelDraw();   // (a drawn bow is let down without shooting)
 	bAttacking = false;
 	bCharging = false;
 	RefreshEquipment();

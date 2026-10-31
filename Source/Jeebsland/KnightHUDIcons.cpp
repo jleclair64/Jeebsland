@@ -175,7 +175,8 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	if (IsArrow(Id))
 	{
 		const int32 T = ArrowTier(Id);
-		const FLinearColor Head = Lift(Palette(T, 0), 1.3f), Shaft(0.50f, 0.34f, 0.17f), Fl(0.92f, 0.92f, 0.88f);
+		const bool bFire = IsFireArrow(Id);   // (fire arrows: a flame-orange head and red fletching)
+		const FLinearColor Head = bFire ? FLinearColor(1.f, 0.45f, 0.08f) : Lift(Palette(T, 0), 1.3f), Shaft(0.50f, 0.34f, 0.17f), Fl = bFire ? FLinearColor(0.85f, 0.18f, 0.08f) : FLinearColor(0.92f, 0.92f, 0.88f);
 		for (int32 k = 0; k < 3; ++k)
 		{
 			const float Ox = (k - 1) * 11.f;

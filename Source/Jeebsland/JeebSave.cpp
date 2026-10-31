@@ -68,6 +68,50 @@ void UJeebSave::Migrate()
 		for (int32& Id : BankIds) SellCape(Id);
 		for (int32& Id : Hotbar) SellCape(Id);
 	}
+	// Version 3 -> 4 (2026-10-31): the bow joined the starting kit, right of the sword on the weapon bar, with steel and fire
+	// arrows: everyone gets the starting arrows. Version 4 -> 7: characters without a bow on the weapon bar (one kept in the
+	// pack or bank does not count) get a tin one there; the weapons from that slot on move one step right into the first empty
+	// slot, and on a full bar the last one goes to the pack, trading places with a bow already there if any (a full pack with no
+	// bow: no bow). (5 and 6 were short-lived test versions of this step.)
+	auto AddToPack = [this](int32 Id, int32 Count)
+	{
+		const int32 Stack = StackSize(Id);
+		for (int32 i = 0; i < SlotIds.Num() && Count > 0; ++i)
+			if (SlotIds[i] == Id && SlotCounts.IsValidIndex(i) && SlotCounts[i] < Stack) { const int32 N = FMath::Min(Stack - SlotCounts[i], Count); SlotCounts[i] += N; Count -= N; }
+		for (int32 i = 0; i < SlotIds.Num() && Count > 0; ++i)
+			if (SlotIds[i] == 0 && SlotCounts.IsValidIndex(i)) { const int32 N = FMath::Min(Stack, Count); SlotIds[i] = Id; SlotCounts[i] = N; Count -= N; }
+	};
+	if (SaveVersion < 4)
+	{
+		AddToPack(ArrowId(T_Steel), USkillComponent::StartSteelArrows);
+		AddToPack(IdFireArrow, USkillComponent::StartFireArrows);
+	}
+	if (SaveVersion < 7)
+	{
+		bool bHasBow = false;
+		for (int32 Id : Hotbar) bHasBow |= IsGear(Id) && KindOf(Id) == K_Bow;
+		if (!bHasBow && Hotbar.Num() == 5)
+		{
+			int32 Sword = 0;
+			for (int32 h = 0; h < 5; ++h) if (IsGear(Hotbar[h]) && KindOf(Hotbar[h]) == K_Sword) { Sword = h; break; }
+			const int32 At = FMath::Min(Sword + 1, 4);
+			int32 Empty = -1;
+			for (int32 h = At; h < 5 && Empty < 0; ++h) if (Hotbar[h] == 0) Empty = h;
+			for (int32 h = 0; h < At && Empty < 0; ++h) if (Hotbar[h] == 0) Empty = h;
+			int32 BowId = GearId(K_Bow, 0);
+			if (Empty < 0)   // a full bar: the last weapon makes room (it trades places with a bow already in the pack, if any)
+			{
+				int32 PackBow = INDEX_NONE;   // (the lowest tier: one he can surely use)
+				for (int32 i = 0; i < SlotIds.Num(); ++i)
+					if (IsGear(SlotIds[i]) && KindOf(SlotIds[i]) == K_Bow && (PackBow == INDEX_NONE || VariantOf(SlotIds[i]) < VariantOf(SlotIds[PackBow]))) PackBow = i;
+				if (PackBow != INDEX_NONE) { BowId = SlotIds[PackBow]; SlotIds[PackBow] = Hotbar[4]; Empty = 4; }
+				else if (SlotIds.Contains(0)) { AddToPack(Hotbar[4], 1); Empty = 4; }
+				if (Empty == 4) Hotbar[4] = 0;
+			}
+			if (Empty >= At) { for (int32 h = Empty; h > At; --h) Hotbar[h] = Hotbar[h - 1]; Hotbar[At] = BowId; }
+			else if (Empty >= 0) Hotbar[Empty] = BowId;
+		}
+	}
 	SaveVersion = CurrentVersion;
 }
 

@@ -52,8 +52,15 @@ namespace JeebItems
 	inline bool IsMaterial(int32 Id) { return Id >= 1 && Id < 100; }
 	inline EItemType MaterialType(int32 Id) { return static_cast<EItemType>(Id - 1); }
 	inline int32 ArrowId(int32 Tier) { return IdArrowBase + Tier; }
-	inline bool IsArrow(int32 Id) { return Id >= IdArrowBase && Id < IdArrowBase + NumTiers; }
-	inline int32 ArrowTier(int32 Id) { return Id - IdArrowBase; }
+	// Fire arrows (2026-10-31): steel arrows that burn what they hit (a few points of fire damage over the next seconds) and glow
+	// in flight. They count as steel for damage. Later kinds (poison ...) go after it (909, 910 ...), below the potions.
+	constexpr int32 IdFireArrow = IdArrowBase + NumTiers;   // 909
+	inline bool IsFireArrow(int32 Id) { return Id == IdFireArrow; }
+	inline bool IsArrow(int32 Id) { return (Id >= IdArrowBase && Id < IdArrowBase + NumTiers) || Id == IdFireArrow; }
+	inline int32 ArrowTier(int32 Id) { return Id == IdFireArrow ? T_Steel : Id - IdArrowBase; }
+	// Every kind of arrow, in the order the arrow slot steps through them (F)
+	inline int32 NumArrowKinds() { return NumTiers + 1; }
+	inline int32 ArrowKindId(int32 i) { return i < NumTiers ? ArrowId(i) : IdFireArrow; }
 	// Potions: 950 + the row in Potions.csv. The first four rows are swiftness, healing, vigour and radar (the starting pack
 	// and the practice pack name them by these numbers).
 	constexpr int32 IdPotionBase = 950;
@@ -134,6 +141,7 @@ namespace JeebItems
 
 	inline FString ItemName(int32 Id)
 	{
+		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (!IsGear(Id)) return FString();

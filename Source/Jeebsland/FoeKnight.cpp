@@ -145,6 +145,7 @@ void AFoeKnight::BeginPlay()
 		if (Model.Num() > 0 && KnightModel::IsModelSlot(D.Slot)) continue;
 		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
+		if (D.Slot == SlotShield) ShieldMeshes.Add(C);   // (arrows stick in these)
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
 		if (D.bFixedColor) Col = D.Fixed;
@@ -198,6 +199,7 @@ void AFoeKnight::BeginPlay()
 		return 0;
 	};
 	Hp->KnockDown = [this](AActor* From) { KnockDown(From); };
+	Hp->ShieldParts = [this](TArray<UPrimitiveComponent*>& Out) { for (UProceduralMeshComponent* C : ShieldMeshes) Out.Add(C); };
 	Hp->React = [this](AActor* From, const JeebHit::FReact& R) { OnReact(From, R); };
 	Hp->IsSwinging = [this]() { return KnockT < 0.f && DeathT <= 0.f && (Act == EAct::Windup || Act == EAct::Strike); };   // (a kick into his swing loses)
 	if (bStill) { Post = GetActorLocation(); PostYaw = GetActorRotation().Yaw; }

@@ -74,6 +74,7 @@ enum class EInvOp : uint8
 	Lore,           // A lore entry (heard from a villager)
 	BankDepositHot, // A bar slot: that weapon into the bank
 	ToggleDoor,     // At: the cottage (open or shut its door)
+	PickArrow,      // Target: an arrow lying in the world (E)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -217,6 +218,20 @@ public:
 	// Your sword is coming (a jab, smash or sweep before the end of its hit frames): a kick into you loses
 	bool BladeComing() const;
 	bool IsKicking() const { return bAttacking && AtkStyle == EAtkStyle::Kick; }
+	// The raised shield's own mesh parts (arrows stick in them), in the same order on every machine
+	void GetShieldParts(TArray<UPrimitiveComponent*>& Out) const;
+
+	// ---------------- The bow (2026-10-31, Breath of the Wild style; KnightCharacterBow.cpp) ----------------
+	// Hold the attack button to draw: the knight turns side-on, the bow up in his left fist, the string pulled back to his face,
+	// walking at half speed while the camera closes in over his right shoulder and a reticle shows where the arrow goes. The
+	// draw fills in BowDrawTime, stays full for BowHoldMax (trembling), then looses by itself; let go any time to shoot. The
+	// fuller the draw, the faster (so further) and harder the arrow flies. Switching weapons, rolling, a kick, being hit or
+	// knocked down lets the string down without shooting. The arrow slot (next to the shield slot) picks the arrows (F).
+	bool IsDrawingBow() const { return Bow == EBow::Drawing; }
+	float BowDrawFrac() const { return BowCharge; }
+	float BowAimAmount() const { return BowAimAlpha; }
+	int32 ArrowSlotId() const;   // the arrows the next shot uses (0: none left)
+	void CycleArrows();          // F: the next kind of arrows you carry
 
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)
@@ -284,7 +299,7 @@ protected:
 	void StartCrouch();         // hold Ctrl
 	void StopCrouch();
 	void InteractReleased();    // letting go of left click: a charged spear thrust
-	enum class EAtkStyle : uint8 { Slash, Thrust, Cast, Kick, Sweep };
+	enum class EAtkStyle : uint8 { Slash, Thrust, Cast, Kick, Sweep, Dash };
 	void StartAttack(EAtkStyle Style, int32 Dir, float Charge);
 	// The kick (wheel up; KnightCharacterCombat.cpp): the right leg, the whole body turning to his left like Ken's forward smash.
 	// Rock-paper-scissors: the sword is stopped by a raised shield, the kick goes through it and knocks the shielding knight
@@ -292,12 +307,28 @@ protected:
 	void StartKick();
 	static constexpr float KickDur = 0.65f, KickActiveFrom = 0.18f, KickActiveTo = 0.5f, KickDamage = 0.6f;   // (out in about 0.12 s)
 	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a move hits each other knight once: MoveLab)
+	// A kick that lands (owner, 2026-10-31): the rest of it plays KickLandedSpeed times faster, and the low sweep can cut it short at
+	// once (kick, then sweep him as he falls: the combo). A wheel-down pressed during the kick comes out the moment it lands.
+	bool bKickLanded = false;
+	static constexpr float KickLandedSpeed = 2.2f;
+	float QueuedSweep = -10.f;
+	float KickFade = 0.f, KickFadeT = 0.f;   // a kick cut short by the sweep: its leg pose fades out quickly from where it was (PoseKick)
+	void KickLanded();                       // (server) this kick hit someone: everyone is told
+	void ApplyKickLanded();
+	UFUNCTION(NetMulticast, Reliable) void MulticastKickLanded();
 	// The low sweep (wheel down; sword only), like Link's down tilt in Smash Ultimate: he drops into a squat and sweeps the blade
 	// along the ground in front, right to left. It reaches a knight lying on the ground (after a kick: read which way he rolls
 	// and sweep there) and launches whoever it hits up into the air and a little back (bent by his DI); he lands on his back
 	// again. Rooted until it is over.
 	void StartSweep();
-	static constexpr float SweepDur = 0.55f, SweepActiveFrom = 0.36f, SweepActiveTo = 0.7f, SweepDamage = 0.8f;
+	static constexpr float SweepDur = 0.55f, SweepActiveFrom = 0.24f, SweepActiveTo = 0.6f, SweepDamage = 0.8f;   // (out in about 0.13 s: was 0.2)
+	// The dash attack (owner, 2026-10-31): sprinting forward and clicking with a sword, a lunge with the blade stabbed straight out
+	// at full reach like a spear. Out at DashActiveFrom s, hits until DashActiveTo s; damage, hitstun and end lag of a smash
+	// attack charged DashCharge (the end lag: DashLag()). Rooted, sliding on with the lunge, until it is over.
+	static constexpr float DashActiveFrom = 0.11f, DashActiveTo = 0.28f, DashCharge = 0.2f, DashLunge = 1100.f;
+	float DashLag() const;
+	float DashU() const;   // where the dash is in its key poses (0 - 1): the thrust in the first 0.3 s, the recovery over the lag
+	bool IsDashing() const { return bAttacking && AtkStyle == EAtkStyle::Dash; }
 	// Hitstun (2026-10-31 balance pass): a clean hit stops whatever you are doing and you can't move, swing, block, roll or
 	// jump for this long. Jab hit 1 is long enough for hit 2 to follow for sure; hit 2 pushes you clear (the string ends there).
 	static constexpr float StunJab1 = 0.45f, StunJab2 = 0.32f, StunSmash = 0.5f, StunSmashFull = 0.8f;
@@ -387,6 +418,7 @@ private:
 	UPROPERTY() UInputAction* ScrollUpAction = nullptr;
 	UPROPERTY() UInputAction* ScrollDownAction = nullptr;
 	UPROPERTY() UInputAction* NextWeaponAction = nullptr;
+	UPROPERTY() UInputAction* ArrowsAction = nullptr;   // F: the next kind of arrows
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
@@ -466,13 +498,14 @@ private:
 	float PickCooldownUntil = 0.f;
 		mutable TWeakObjectPtr<ACottage> FoundCottage;
 	mutable TWeakObjectPtr<ALootDrop> FoundDrop;
+	mutable TWeakObjectPtr<class AProjectile> FoundArrow;   // an arrow lying in reach (E picks it up)
 	bool bShopOpen = false;
 	bool bSmithOpen = false;
 	bool bDialogueOpen = false;
 	TWeakObjectPtr<ANpc> TradeNpc;
 	TArray<FString> DialogueLines;
 	int32 DialogueIdx = 0;
-	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop };
+	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop, Arrow };
 	EInteract FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const;
 	TWeakObjectPtr<AHorse> MyHorse;
 	bool bMounted = false;
@@ -639,6 +672,8 @@ private:
 	bool bAttackDown = false;      // the attack button is held (the player's own machine)
 	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
 	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
+	float ShotBowAt = -1.f;        // test pictures (bow60): let the string go at this time
+	bool ShotSideOn() const;       // test pictures taken from the side: the bow aims straight ahead and the camera stays put
 	void SetSmash(ESmash P, float Charge = 0.f, bool bTell = true);
 	bool SmashInputOk(ESmash P) const;   // a phase change the player's machine asked for fits what this machine is doing
 	void TickSmash(float Dt);
@@ -651,6 +686,40 @@ private:
 	bool bCharging = false;
 	float ChargeT = 0.f;
 	int32 PendingArrowTier = 0;
+	// The bow (see IsDrawingBow above). The player's machine decides the draw and the shot from the button and tells the server,
+	// which checks them (it keeps its own draw timer: never more charge than it has seen) and fires the arrow; everyone else is
+	// shown the draw.
+	enum class EBow : uint8 { None, Drawing, Recover };
+	EBow Bow = EBow::None;
+	float BowT = 0.f;              // time in this phase
+	float BowCharge = 0.f;         // 0 - 1: how far drawn
+	float BowAimAlpha = 0.f;       // the aiming pose and camera, eased in and out
+	float BowEaseAlpha = 0.f;      // the bow in his hand (the left forearm turns so it lies forward and back at his side)
+	float BowCamAlpha = 0.f;
+	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
+	static constexpr float BowDrawTime = 1.f, BowHoldMax = 2.f, BowRecover = 0.3f;   // (like the smash attack's charge)
+	static constexpr float BowSpeedMin = 2000.f, BowSpeedMax = 4800.f;                // the arrow's speed, barely drawn to full
+	static constexpr float BowDamageMin = 0.45f, BowDamageMax = 1.3f;                 // times the bow's damage, the same way
+	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
+	void StartDraw();
+	void ReleaseDraw();
+	void CancelDraw();
+	void SetBow(EBow P);
+	void TickBow(float Dt);
+	void PoseBow(float Dt);        // (end of PoseArms) the aiming arms, the side-on chest and the turned head
+	FVector ArrowStart() const;    // where arrows leave from (the same on every machine)
+	FVector BowAimDir() const;     // the player's machine: from ArrowStart through what is under the reticle; elsewhere where he looks
+	void FireArrow(const FVector& Dir, float Charge, int32 ArrowId);   // (server)
+	UFUNCTION(Server, Reliable) void ServerBowDraw();
+	UFUNCTION(Server, Reliable) void ServerBowShoot(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId);
+	UFUNCTION(Server, Reliable) void ServerBowCancel();
+	UFUNCTION(NetMulticast, Reliable) void MulticastBow(uint8 Phase);
+	UPROPERTY() USceneComponent* BowHold = nullptr;              // the bow in the left fist, built at its grip (RebuildHeld)
+	UPROPERTY() UProceduralMeshComponent* BowString = nullptr;   // its straight string, hidden while drawn (BowBits take over)
+	UPROPERTY() TArray<UStaticMeshComponent*> BowBits;           // the drawn string's two halves, the nocked arrow and its head
+	UPROPERTY() TArray<UStaticMeshComponent*> QuiverParts;       // the quiver of arrows on his back while the bow is in hand
+	void UpdateBowBits();
+	void UpdateQuiver();
 	// (online: the server's numbers, sent to everyone)
 	UPROPERTY(Replicated) float Health = 100.f;
 	UPROPERTY(Replicated) int32 MaxHealth = 100;

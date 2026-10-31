@@ -183,11 +183,12 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Tab"),            TEXT("Inventory: click gear to wear or hold it, click worn gear to take it off") },
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
-			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (click on to chain), hold to charge a smash attack. Spear: hold, let go to thrust") },
+			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (chain), hold to charge a smash; sprinting ahead: a dash lunge. Bow: hold to draw, let go to shoot") },
 			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks anyone down (but loses to a sword swing)") },
-			{ TEXT("Wheel down"),     TEXT("Low sweep (sword): hits a knight on the ground and launches him; hold a direction when launched to drift") },
+			{ TEXT("Wheel down"),     TEXT("Low sweep (sword): hits a knight on the ground and launches him (a kick that lands goes straight into it)") },
+			{ TEXT("F"),              TEXT("Pick the arrows your bow shoots (the arrow slot, right of the shield slot)") },
 			{ TEXT("Knocked down"),   TEXT("A or D rolls away that way; W, S, Space or a click gets straight up") },
-			{ TEXT("E"),              TEXT("Talk to the shopkeeper, blacksmith and others; sit on benches") },
+			{ TEXT("E"),              TEXT("Talk to the shopkeeper, blacksmith and others; sit on benches; pick up arrows you shot") },
 			{ TEXT("W / S at a ladder"), TEXT("Climb up / down (walk into it)") },
 			{ TEXT("Esc (or O)"),     TEXT("The world map, saving, settings, controls, dictionary and the lore you have collected") },
 		};
@@ -196,7 +197,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		{
 			HDText(R.Key, FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, RowY, Font, 1.1f);
 			HDText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
-			RowY += 26.f;   // (21 rows)
+			RowY += 25.f;   // (22 rows)
 		}
 		HDText(TEXT("Press Esc to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}

@@ -3,6 +3,8 @@
 #include "KnightDesign.h"
 #include "Components/SceneComponent.h"
 #include "Engine/World.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 namespace JeebHit
 {
@@ -58,6 +60,8 @@ namespace JeebHit
 	bool ShowBoxes(const UWorld* World)
 	{
 		if (GShow >= 0) return GShow > 0;
+		static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotBoxes"));   // (test pictures: off unless -ShotBoxes)
+		if (bShot) return false;
 		return InMoveLab(World);
 	}
 

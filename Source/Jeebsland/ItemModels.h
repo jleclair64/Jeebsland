@@ -203,7 +203,7 @@ namespace JeebItemModel
 			{
 				const FVector At(0, k * 1.6, 0);
 				Lathe(NewPart(Out, FLinearColor(0.5f, 0.34f, 0.17f)).Mesh, Prof({ 0, 20, 0.45, 19.5, 0.45, -19.5, 0, -20 }), 8, 1.0, 1.0, Xf(At, V3(0, 90, k * 4.0)));
-				Lathe(NewPart(Out, Palette(T, 0), T >= 1).Mesh, Prof({ 0, 4.0, 1.1, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
+				Lathe(NewPart(Out, IsFireArrow(Id) ? FLinearColor(1.f, 0.45f, 0.08f) : Palette(T, 0), T >= 1 && !IsFireArrow(Id)).Mesh, Prof({ 0, 4.0, 1.1, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
 				FMD& F = NewPart(Out, FLinearColor(0.92f, 0.9f, 0.86f)).Mesh;
 				const FVector Back = At + RotateEuler(V3(-17, 0, 0), V3(0, 0, k * 4.0));
 				TArray<FVector> Fl = { Back + V3(-2.5, 0, 0), Back + V3(2.5, 0, 0), Back + V3(-3.0, 0, 1.6) };

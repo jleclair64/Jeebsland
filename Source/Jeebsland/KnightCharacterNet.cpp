@@ -4,6 +4,7 @@
 #include "Inventory.h"
 #include "Store.h"
 #include "Loot.h"
+#include "Projectile.h"
 #include "Npc.h"
 #include "Cottage.h"
 #include "ResourceNode.h"
@@ -290,6 +291,14 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 
 	// ---- drops and sacks on the ground (within reach) ----
+	case EInvOp::PickArrow:
+	{
+		AProjectile* Arrow = Cast<AProjectile>(Target);
+		if (!Arrow || Arrow->IsActorBeingDestroyed() || !Arrow->CanPickUp() || FVector::Dist(Arrow->GetActorLocation(), GetActorLocation()) > 400.f) break;
+		if (Skills->AddInvItem(Arrow->GetArrowId(), 1)) Arrow->Destroy();
+		else Skills->Say(2.f, FColor::Orange, TEXT("Your pack is full."));
+		break;
+	}
 	case EInvOp::LootTakeAll:
 	case EInvOp::LootTakeOne:
 	case EInvOp::LootEquip:
@@ -386,19 +395,15 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
-	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Sweep) || Health <= 0.f || bKnockedDown) return;
-	if (Style == static_cast<uint8>(EAtkStyle::Sweep) && SelectedKind() != K_Sword) return;   // (the low sweep is a sword move)
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown) return;
+	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && SelectedKind() != K_Sword) return;   // (the low sweep and the dash attack are sword moves)
 	const double Now = FPlatformTime::Seconds();
-	if (Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
-	if (SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
+	const bool bCombo = Style == static_cast<uint8>(EAtkStyle::Sweep) && IsKicking() && bKickLanded && StunLeft <= 0.f;   // (a landed kick cut short by the sweep)
+	if (!bCombo && Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
+	if (!bCombo && SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
-	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow)
-	{
-		const int32 Tier = Skills->TakeBestArrow();
-		if (Tier < 0) { Skills->Say(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
-		PendingArrowTier = Tier;
-	}
+	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow) return;   // (the bow shoots through ServerBowShoot)
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	StartAttack(S, Dir < 0 ? -1 : 1, C);
 	if (S == EAtkStyle::Thrust && !GetCharacterMovement()->IsFalling())
@@ -408,7 +413,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
 	if (HasAuthority() || IsLocallyControlled()) return;   // (the server and the swinging player already swing)
-	if (Style > static_cast<uint8>(EAtkStyle::Sweep)) return;
+	if (Style > static_cast<uint8>(EAtkStyle::Dash)) return;
 	StartAttack(static_cast<EAtkStyle>(Style), Dir < 0 ? -1 : 1, Charge);
 }
 

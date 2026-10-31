@@ -422,6 +422,8 @@ void AKnightCharacter::RebuildHeld()
 	}
 	HeldComps.Reset();
 	EaseComps.Reset();
+	if (BowHold) { BowHold->DestroyComponent(); BowHold = nullptr; }
+	BowString = nullptr;
 	HeldElbow = 25.f;
 	if (!Skills) return;
 	const int32 Id = Skills->SelectedItem();
@@ -472,6 +474,30 @@ void AKnightCharacter::RebuildHeld()
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
 			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-27.5f, 14.f, 41.f + 16.f), Q);   // (clear of the Meshy model's back)   // chest pivot sits 41 below the body's centre
+		return;
+	}
+	// The bow is held in the LEFT fist (2026-10-31, as Link holds his), built at its own grip on BowHold, which sits in the fist:
+	// its limbs run along the fist's grip (side to side across the closed fist, as the sword's grip does) and the string faces
+	// back up the arm. PoseBow turns the arm (and at ease the forearm) so the bow stands up when aiming and lies forward and
+	// back at his side otherwise.
+	if (K == JeebItems::K_Bow && ElbowL)
+	{
+		BowHold = NewObject<USceneComponent>(this);
+		BowHold->SetupAttachment(ElbowL);
+		BowHold->SetRelativeLocation(KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
+		{
+			const FVector A0 = (KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ArmL)).GetSafeNormal();   // (the straight arm, at rest)
+			const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
+			const FVector G0 = FVector::CrossProduct(A0, B0);   // across the fist
+			const FVector Z = -A0;                               // the string's side: back toward the shoulder
+			BowHold->SetRelativeRotation(FQuat(FMatrix(G0, FVector::CrossProduct(Z, G0), Z, FVector::ZeroVector)));
+		}
+		BowHold->RegisterComponent();
+		const int32 First = HeldComps.Num();
+		Make(BowHold, KnightDesign::P_ElbowL, KM::Xf(FVector::ZeroVector));
+		for (int32 i = First; i < HeldComps.Num(); ++i) HeldComps[i]->SetRelativeLocation(FVector::ZeroVector);   // (built at the grip)
+		if (HeldComps.Num() > First) BowString = HeldComps.Last();   // (WeaponDesign builds the string last)
+		EaseKind = K;
 		return;
 	}
 	// Blades are held the way a hand really grips a sword: the grip runs across the closed fist (the Meshy model's fists close

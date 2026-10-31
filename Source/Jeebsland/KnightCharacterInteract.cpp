@@ -76,19 +76,16 @@ void AKnightCharacter::Interact()
 		}
 		else if (K == JeebItems::K_Bow)
 		{
-			// (online, combat is not on the server yet: a player's own machine shoots without using up the arrow)
-			const int32 Tier = !Skills ? -1 : HasAuthority() ? Skills->TakeBestArrow() : Skills->BestArrowTier();
-			if (Tier < 0)
-			{
-				if (GEngine) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows."));
-				return;
-			}
-			PendingArrowTier = Tier;
-			StartAttack(EAtkStyle::Cast, 1, 0.f);
+			StartDraw();   // hold to draw, let go to shoot (KnightCharacterBow.cpp)
 		}
 		else if (K == JeebItems::K_Wand || K == JeebItems::K_Staff)
 		{
 			StartAttack(EAtkStyle::Cast, 1, 0.f);
+		}
+		else if (K == JeebItems::K_Sword && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkSpeed * 1.15f
+			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
+		{
+			StartAttack(EAtkStyle::Dash, 1, 0.f);   // sprinting forward: the dash attack, a lunge
 		}
 		else if (K == JeebItems::K_Sword)
 		{
@@ -111,6 +108,7 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
+	if (Bow == EBow::Drawing) { ReleaseDraw(); return; }   // the bow: the arrow goes
 	// The sword's smash attack: let go before it starts charging and it was just hit 1; let go while charging and it swings
 	if (Smash == ESmash::Deciding) { SetSmash(ESmash::None); return; }
 	if (Smash == ESmash::Charging) { SetSmash(ESmash::Swing, SmashCharge); return; }
@@ -155,6 +153,18 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 			if (D < BestDrop && FMath::Abs(GetActorLocation().Z - 90.f - It->GetActorLocation().Z) < 150.f) { BestDrop = D; FoundDrop = *It; }
 		}
 		if (FoundDrop.IsValid()) return EInteract::Drop;
+	}
+	// Arrows lying in the world (spent ones, in a shield or armour, are never offered)
+	FoundArrow = nullptr;
+	{
+		float BestArrow = 170.f;
+		for (TActorIterator<AProjectile> It(GetWorld()); It; ++It)
+		{
+			if (!It->CanPickUp()) continue;
+			const float D = FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y));
+			if (D < BestArrow && FMath::Abs(GetActorLocation().Z - 60.f - It->GetActorLocation().Z) < 170.f) { BestArrow = D; FoundArrow = *It; }
+		}
+		if (FoundArrow.IsValid()) return EInteract::Arrow;
 	}
 	// Doors of huts, and the ingot stash inside the locked ones
 	FoundCottage = nullptr;
@@ -205,6 +215,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 		return true;
 	case EInteract::Bench: OutText = TEXT("Press E to sit"); return true;
 		case EInteract::Loot:  OutText = TEXT("Press E to take the ingots"); return true;
+	case EInteract::Arrow: OutText = TEXT("Press E to pick up the arrow"); return true;
 	case EInteract::Drop:
 		if (const ALootDrop* Drop = FoundDrop.Get()) { OutText = Drop->IsSack() ? FString(TEXT("Press E to open the sack")) : Drop->Describe(); return true; }
 		return false;
@@ -267,6 +278,9 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	case EInteract::Loot:
 		if (const ACottage* Hut = FoundCottage.Get()) { Float(Hut->LootPos(), 70.f); return true; }
 		return false;
+	case EInteract::Arrow:
+		if (const AProjectile* Arrow = FoundArrow.Get()) { Float(Arrow->GetActorLocation(), 40.f); return true; }
+		return false;
 	case EInteract::Drop:
 		if (const ALootDrop* Drop = FoundDrop.Get()) { Float(Drop->GetActorLocation(), 60.f); return true; }
 		return false;
@@ -315,6 +329,13 @@ void AKnightCharacter::OnInteractKey()
 	case EInteract::Npc:   StartDialogue(Npc); break;
 	case EInteract::Bench: SitOnSeat(Idx); break;
 		case EInteract::Door:  UseDoor(FoundCottage.Get()); break;
+	case EInteract::Arrow:
+		if (AProjectile* Arrow = FoundArrow.Get())
+		{
+			if (!HasAuthority()) Arrow->SetActorHiddenInGame(true);   // (gone from our view at once; the server hands it over)
+			Inv(EInvOp::PickArrow, 0, 0, 0, Arrow);
+		}
+		break;
 	case EInteract::Drop:
 		if (ALootDrop* Drop = FoundDrop.Get())
 		{

@@ -328,6 +328,7 @@ void AKnightHUD::ItemTip(int32 Id)
 		L.Add(ItemName(Id));
 		int32 A, B; WeaponDamage(K_Bow, ArrowTier(Id), A, B, ArrowTier(Id));
 		L.Add(FString::Printf(TEXT("Fired from a bow. Bow damage with these: %d-%d"), A, B));
+		if (IsFireArrow(Id)) L.Add(TEXT("Sets what it hits burning for a few seconds"));
 		SetTip(L);
 		return;
 	}

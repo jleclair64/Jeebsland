@@ -12,7 +12,7 @@ BattleAxe,Battle Axe,17,25,250,1.05,0,100,9,2,yes,"The biggest hitter and the sl
 Katana,Katana,6,9,225,0.38,0,110,6,2,yes,"A pair of light curved blades, one in each hand. Very fast, modest hits. No shield."
 Wand,Wand,7,11,1800,0.55,0,80,3,1,no,Fires small magic bolts at range. Light and quick.
 Staff,Wizard Staff,11,17,2200,1.00,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."
-Bow,Bow,5,7,4000,0.80,0,60,4,1,no,"Fires arrows from a distance. Arrows run out: buy them at the store or smith them. Better arrows hit harder. A shield can be carried with it."
+Bow,Bow,5,7,4000,0.80,0,60,4,1,yes,"Fires arrows from a distance: hold the attack button to draw (the longer the draw, the further and harder the shot), let go to shoot. Arrows run out: buy them at the store or smith them, or pick up the ones you shot (E). Better arrows hit harder. Needs both hands: no shield."
 Rod,Fishing Pole,2,3,200,0.80,0,30,3,0,no,A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.
 Shield,Shield,1,2,200,1,8,50,6,0,no,"Hold right-click to block blows from the front. A shield's guard stops damage up to its Defence; once spent, the guard is broken and stops only half of each blow until it recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons."
 Helmet,Helmet,1,2,200,1,3,40,5,0,no,Protects the head. Defence adds to the total of all worn armour.

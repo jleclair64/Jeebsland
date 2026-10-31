@@ -349,6 +349,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);   // (the low sweep)
 	NextWeaponAction = MakeBool(TEXT("KnightNextWeapon"));
 	KnightContext->MapKey(NextWeaponAction, EKeys::R);   // (R steps through the weapon bar; the wheel no longer does)
+	ArrowsAction = MakeBool(TEXT("KnightArrows"));
+	KnightContext->MapKey(ArrowsAction, EKeys::F);   // (F picks the arrows: the arrow slot)
 	InventoryAction = MakeBool(TEXT("KnightInventory"));
 	KnightContext->MapKey(InventoryAction, EKeys::Tab);
 	PanelTabAction = MakeBool(TEXT("KnightPanelTab"));
@@ -424,6 +426,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
 		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);
 		EIC->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AKnightCharacter::NextWeapon);
+		EIC->BindAction(ArrowsAction, ETriggerEvent::Started, this, &AKnightCharacter::CycleArrows);
 		EIC->BindAction(HotbarActions[0], ETriggerEvent::Started, this, &AKnightCharacter::Select1);
 		EIC->BindAction(HotbarActions[1], ETriggerEvent::Started, this, &AKnightCharacter::Select2);
 		EIC->BindAction(HotbarActions[2], ETriggerEvent::Started, this, &AKnightCharacter::Select3);
@@ -436,6 +439,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 //   KnightCharacter.cpp            TickHousekeeping, TickGatherReach (and the ladders, here)
 //   KnightCharacterMovement.cpp    TickRollSlide, TickStamina, TickGroundSpeed
 //   KnightCharacterCombat.cpp      TickAttack, TickHealth, TickGear (the shield guard, stowing, map fog)
+//   KnightCharacterBow.cpp         TickBow: the bow's draw, the camera over the shoulder, the string and the quiver
 //   KnightCharacterPose.cpp        TickPose: the whole body's pose (legs and stride, body, cape, arms)
 //   KnightCharacterFx.cpp          TickDust: footfall dust, clods, grass and leaves
 void AKnightCharacter::Tick(float DeltaSeconds)
@@ -460,6 +464,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	float SpecialSpeed = 0.f;
 	const bool bSpecial = TickRollSlide(Dt, bFalling, SpecialSpeed);
 	TickAttack(Dt);
+	TickBow(Dt);
 	TickKnock(Dt);
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);

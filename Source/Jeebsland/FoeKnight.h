@@ -70,6 +70,7 @@ private:
 	UPROPERTY() USceneComponent* CapeUpper = nullptr;
 	UPROPERTY() USceneComponent* CapeLower = nullptr;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Meshes;
+	UPROPERTY() TArray<UProceduralMeshComponent*> ShieldMeshes;   // his shield's parts
 	UPROPERTY() UHealthComponent* Hp = nullptr;
 
 	FVector2D PenCenter = FVector2D::ZeroVector;

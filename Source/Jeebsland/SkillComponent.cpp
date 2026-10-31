@@ -49,7 +49,8 @@ USkillComponent::USkillComponent()
 	ResetToStartingKit();
 }
 
-// The kit you begin with (and wake up with after dying): a wooden sword, axe, pickaxe and fishing pole on the weapon bar, a wooden
+// The kit you begin with (and wake up with after dying): a sword, bow, axe, pickaxe and fishing pole on the weapon bar, steel and
+// fire arrows in the pack, a
 // shield, the cape of your PvP rank and a full suit of tin armour (pieces can be swapped for others, never taken off)
 void USkillComponent::ResetToStartingKit()
 {
@@ -59,9 +60,12 @@ void USkillComponent::ResetToStartingKit()
 	RingB = 0;
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
-	Hotbar[1] = JeebItems::GearId(JeebItems::K_Axe, 0);
-	Hotbar[2] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
-	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
+	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword, 2026-10-31, with steel and fire arrows)
+	Hotbar[2] = JeebItems::GearId(JeebItems::K_Axe, 0);
+	Hotbar[3] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
+	Hotbar[4] = JeebItems::GearId(JeebItems::K_Rod, 0);
+	AddInvItem(JeebItems::ArrowId(JeebItems::T_Steel), StartSteelArrows);
+	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, JeebItems::T_Tin);   // tin: the lowest tier (was bronze before the 2026-10-30 tier redo)
 	RefreshCape();

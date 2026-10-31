@@ -149,6 +149,7 @@ void AKnightHUD::DrawHUD()
 	DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
 	DrawWeaponBar(Knight);
+	DrawReticle(Knight);
 	if (!Knight->IsUIOpen() && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 
@@ -387,9 +388,6 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f - 40.f;
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 
-	int32 Arrows = 0;
-	for (int32 T = 0; T < NumTiers; ++T) Arrows += Skills->CountItem(ArrowId(T));
-
 	for (int32 i = 0; i < NumHotbar; ++i)
 	{
 		const float X = X0 + i * (SS + Gap);
@@ -419,8 +417,6 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			Tile(Sx + Ss - TW - 9.f, Sy + Ss - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
 			HDText(Txt, bSel ? FLinearColor(1.f, 0.7f, 0.55f) : FLinearColor(0.85f, 0.5f, 0.42f), Sx + Ss - TW - 5.f, Sy + Ss - TH - 3.f, Font, 1.15f);
 		}
-		if (IsGear(Id) && KindOf(Id) == K_Bow)
-			HDText(FString::Printf(TEXT("x%d"), Arrows), Arrows > 0 ? FLinearColor(0.9f, 0.9f, 0.6f) : FLinearColor(1.f, 0.3f, 0.3f), Sx + Ss - 26.f, Sy + 1.f, Font, 0.7f);
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(Id);   // hover with the cursor out (Tab) to read about it
 	}
 
@@ -483,6 +479,62 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Defence %d in all, every bonus counted"), Def) });
 		}
 	}
+
+	// The arrow slot, right of the shield slot: the arrows the bow shoots next and how many of them are left. F (or a click on
+	// it with the cursor out) picks the next kind you carry.
+	{
+		const float X = X0 + TotalW + 18.f + 2.f * (SS + 14.f);
+		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
+		HDText(TEXT("F"), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y0 + 1.f, Font, 0.7f);
+		const int32 Id = Knight->ArrowSlotId();
+		if (Id != 0)
+		{
+			DrawIcon(Id, X + 3.f, Y0 + 3.f, SS - 6.f);
+			const FString Txt = FString::FromInt(Skills->CountItem(Id));
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(Txt, TW, TH, Font, 1.15f);
+			Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+			HDText(Txt, FLinearColor(1.f, 0.92f, 0.7f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
+		}
+		else
+		{
+			float LW = 0.f, LH = 0.f;
+			HDTextSize(TEXT("Arrows"), LW, LH, Font, 0.7f);
+			HDText(TEXT("Arrows"), FLinearColor(0.6f, 0.6f, 0.62f), X + (SS - LW) * 0.5f, Y0 + (SS - LH) * 0.5f, Font, 0.7f);
+		}
+		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
+		{
+			if (Id != 0) SetTip({ ItemName(Id), TEXT("The arrows your bow shoots next. F or a click picks the next kind you carry") });
+			else SetTip({ TEXT("Arrow slot"), TEXT("No arrows: buy them at the store or smith them, or pick up the ones you shot (E)") });
+			if (APlayerController* PC = GetOwningPlayerController())
+				if (PC->WasInputKeyJustPressed(EKeys::LeftMouseButton)) Knight->CycleArrows();
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------------------------------
+// The bow's reticle (Breath of the Wild style): in the middle of the screen while drawing, a ring that closes in as the draw
+// fills, with a dot where the arrow goes
+void AKnightHUD::DrawReticle(AKnightCharacter* Knight)
+{
+	if (!Knight->IsDrawingBow() || Knight->BowAimAmount() < 0.3f) return;
+	const float Cx = Canvas->ClipX * 0.5f, Cy = Canvas->ClipY * 0.5f;
+	const float F = Knight->BowDrawFrac();
+	const float A = FMath::Clamp((Knight->BowAimAmount() - 0.3f) / 0.5f, 0.f, 1.f);
+	const FLinearColor Col = F >= 1.f ? FLinearColor(1.f, 0.85f, 0.4f, 0.9f * A) : FLinearColor(1.f, 1.f, 1.f, 0.8f * A);
+	const float R = FMath::Lerp(30.f, 11.f, F);
+	for (int32 q = 0; q < 4; ++q)   // four short arcs of a ring (each drawn as small four-sided pieces: Poly fills convex shapes)
+	{
+		const float Mid = q * 90.f + 45.f;
+		for (int32 s = 0; s < 6; ++s)
+		{
+			const float A0 = FMath::DegreesToRadians(Mid - 22.f + 44.f * s / 6.f), A1 = FMath::DegreesToRadians(Mid - 22.f + 44.f * (s + 1) / 6.f);
+			Poly({ FVector2D(Cx + (R + 1.6f) * FMath::Cos(A0), Cy + (R + 1.6f) * FMath::Sin(A0)), FVector2D(Cx + (R + 1.6f) * FMath::Cos(A1), Cy + (R + 1.6f) * FMath::Sin(A1)),
+			       FVector2D(Cx + (R - 1.6f) * FMath::Cos(A1), Cy + (R - 1.6f) * FMath::Sin(A1)), FVector2D(Cx + (R - 1.6f) * FMath::Cos(A0), Cy + (R - 1.6f) * FMath::Sin(A0)) }, Col);
+		}
+	}
+	Disc(Cx, Cy, 3.f, 3.f, FLinearColor(0.f, 0.f, 0.f, 0.5f * A));
+	Disc(Cx, Cy, 2.f, 2.f, Col);
 }
 
 // ---------------------------------------------------------------------------------------------------
