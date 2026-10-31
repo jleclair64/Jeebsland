@@ -565,9 +565,9 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			{ 0.12f, 30.f,   18.f,  -78.f, 44.f,  18.f,  142.f,  24.f, false },   // shoulder draws back; chest and hips coil behind it
 			{ 0.25f, 72.f,   46.f, -100.f, 72.f,  40.f,  126.f,  42.f, false },   // loaded over the right shoulder, elbow bent and palm turned skyward
 			{ 0.32f, 56.f,   24.f,  -82.f, 50.f,  22.f,   76.f,  30.f, true  },   // hips start unwinding; shoulder and wrist accelerate first
-			{ 0.43f, 18.f,  -30.f,  -62.f, 20.f, -22.f,  -18.f,  -6.f, true  },   // hit timing: cut through the front as the torso turns left
-			{ 0.62f,-32.f,  -82.f,  -48.f, 16.f, -38.f, -112.f, -36.f, false },   // long diagonal carry to a low left finish
-			{ 0.82f,-22.f,  -72.f,  -56.f, 26.f, -24.f,  -98.f, -22.f, false },   // recover low without stopping the body's turn
+			{ 0.43f,  0.f,  -82.f,  -62.f,  8.f, -22.f,    0.f,  -4.f, true  },   // hit timing: arm reaches across and forward, blade points out in front
+			{ 0.62f,-12.f,  -88.f,  -48.f, 10.f, -38.f,  -42.f, -16.f, false },   // keep the tip forward through the long, low follow-through
+			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
 			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f,  -96.f, -22.f, false } }; // settle ready for the backhand
 				static const FKey Hit2[] = {
 			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
