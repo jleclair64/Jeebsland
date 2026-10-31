@@ -37,6 +37,7 @@
 
 void AKnightCharacter::Interact()
 {
+	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen (or the side panel); no attacks mid-move
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)
@@ -95,6 +96,7 @@ void AKnightCharacter::Interact()
 			int32 Next = JabFirst;
 			if (LastStyle == EAtkStyle::Slash && Now - LastSwingEnd <= 0.3f && LastSwingDir == JabFirst) Next = JabSecond;
 			StartAttack(EAtkStyle::Slash, Next, 0.f);
+			if (Next == JabFirst && !GetCharacterMovement()->IsFalling()) SetSmash(ESmash::Deciding);   // (not in the air)   // (held long enough, hit 1 becomes the smash attack)
 		}
 		else
 		{
@@ -107,6 +109,10 @@ void AKnightCharacter::Interact()
 
 void AKnightCharacter::InteractReleased()
 {
+	bAttackDown = false;
+	// The sword's smash attack: let go before it starts charging and it was just hit 1; let go while charging and it swings
+	if (Smash == ESmash::Deciding) { SetSmash(ESmash::None); return; }
+	if (Smash == ESmash::Charging) { SetSmash(ESmash::Swing, SmashCharge); return; }
 	if (!bCharging) return;
 	bCharging = false;
 	if (IsUIOpen() || bAttacking || bSitting || bRolling || bSliding || bClimbing) return;

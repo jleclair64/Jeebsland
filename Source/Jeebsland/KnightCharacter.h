@@ -565,6 +565,27 @@ private:
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)
 	int32 QueuedJabs = 0;           // the attack buffer (Smash style): 1 if the attack button was pressed during this swing; extra presses don't stack
 	int32 LastSwingDir = 0;
+	// The sword's smash attack (Smash Ultimate style; KnightCharacterCombat.cpp, TickSmash). A press starts hit 1 as usual; held
+	// past SmashHoldDelay (so a slow click is still a jab) hit 1 stops at its pull-back and charges at half walking speed: full
+	// in SmashChargeTime, then it stays full for SmashHoldMax and goes by itself. Let go any time: hit 1's swipe, 1x to 2.5x
+	// by the charge, then a fixed end lag (he stops at the end of the swipe; no moving, blocking, rolling or jumping).
+	enum class ESmash : uint8 { None, Deciding, Charging, Swing, EndLag };
+	static constexpr float SmashHoldDelay = 0.25f, SmashChargeTime = 1.f, SmashHoldMax = 2.f, SmashEndPause = 0.4f;
+	static constexpr float SmashApexT = 0.25f, SmashPauseT = 0.62f;   // where hit 1 waits while charging (its pull-back) and where the end lag pauses
+	ESmash Smash = ESmash::None;
+	float SmashT = 0.f;            // time in this phase
+	float SmashCharge = 0.f;       // 0 - 1: how charged (while charging, then what the swipe was let go with)
+	float SmashCoilNow = 0.f;      // the extra coil of the charge in the pose (eased out into the swipe)
+	bool bSmashSwing = false;      // this swing is a smash (its own hit boxes and damage)
+	bool bAttackDown = false;      // the attack button is held (the player's own machine)
+	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
+	void SetSmash(ESmash P, float Charge = 0.f, bool bTell = true);
+	bool SmashInputOk(ESmash P) const;   // a phase change the player's machine asked for fits what this machine is doing
+	void TickSmash(float Dt);
+	float SmashTimeLeft() const;   // how long until the smash's end lag is over
+	UFUNCTION(Server, Reliable) void ServerSmash(uint8 Phase, float Charge);
+	UFUNCTION(NetMulticast, Unreliable) void MulticastSmash(uint8 Phase, float Charge);
+	bool SmashLocked() const { return Smash == ESmash::Swing || Smash == ESmash::EndLag; }   // no moving
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;
 	bool bCharging = false;

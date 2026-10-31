@@ -389,6 +389,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Cast) || Health <= 0.f) return;
 	const double Now = FPlatformTime::Seconds();
 	if (Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
+	if (SmashTimeLeft() > 0.3f) return;   // nor before a smash attack's end lag is over (give or take the network)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
 	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow)

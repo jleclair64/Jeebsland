@@ -617,6 +617,19 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		SwingBodyWant = FMath::Lerp(K0.Body, K1.Body, E);
 		BladeYawNow = FMath::Lerp(K0.BladeYaw, K1.BladeYaw, E);
 		BladePitchNow = FMath::Lerp(K0.BladePitch, K1.BladePitch, E);
+		// The smash attack's charge (TickSmash): hit 1 waits at its pull-back and coils a little further as the charge builds (it
+		// eases back out into the swipe), with Smash's tremble: a small shake that grows with the charge and stays once it is full
+		SmashCoilNow = FMath::FInterpTo(SmashCoilNow, Smash == ESmash::Charging ? SmashCharge : 0.f, Dt, Smash == ESmash::Charging ? 6.f : 18.f);
+		SwingBodyWant += 12.f * SmashCoilNow; TargetYaw += 8.f * SmashCoilNow; BladeYawNow += 12.f * SmashCoilNow; SwingLeanWant += 4.f * SmashCoilNow;
+		if (Smash == ESmash::Charging)
+		{
+			const float Shake = 0.6f + 0.8f * SmashCharge + (SmashCharge >= 1.f ? 0.5f : 0.f);   // degrees
+			const float Ph = 2.f * PI * GetWorld()->GetTimeSeconds();
+			TargetPitch += Shake * FMath::Sin(Ph * 17.f);
+			TargetYaw += Shake * FMath::Sin(Ph * 13.f + 1.3f);
+			BladeYawNow += 1.2f * Shake * FMath::Sin(Ph * 19.f + 0.7f);
+			BladePitchNow += Shake * FMath::Sin(Ph * 15.f + 2.1f);
+		}
 		// The second stroke remains as before; the first stroke's body and load curves are keyed separately above.
 		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
 		// so the wrist stays natural): the forehand travels to his left, the backhand to his right
