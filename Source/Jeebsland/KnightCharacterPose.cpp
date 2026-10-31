@@ -243,6 +243,8 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 		const float Mag = FMath::Min(1.f, FMath::Sqrt(StepFw * StepFw + StepSd * StepSd));
 		if (bFaceCam) { LegFw = FMath::Cos(Rel) * Mag; LegSd = FMath::Sin(Rel) * Mag; }
 	}
+	SwingLoadNow = FMath::FInterpTo(SwingLoadNow, SwingLoadWant, Dt, 22.f);
+	const float SwingLoad = SwingLoadNow * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
 	const float HipRg = GHipR * MoveBlend * LegFw;
 	const float HipLg = GHipL * MoveBlend * LegFw;
 	const float SideAmp = 24.f * MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
@@ -283,6 +285,9 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 	// Rolling: tucked into a ball
 	HipRf = FMath::Lerp(HipRf, 105.f, TuckAlpha);   KneeRf = FMath::Lerp(KneeRf, -125.f, TuckAlpha);
 	HipLf = FMath::Lerp(HipLf, 105.f, TuckAlpha);   KneeLf = FMath::Lerp(KneeLf, -125.f, TuckAlpha);
+	// Load the right side during anticipation, then pass the weight across as the blade follows through.
+	HipRf += 8.f * SwingLoad; HipLf -= 8.f * SwingLoad;
+	KneeRf -= 10.f * FMath::Abs(SwingLoad); KneeLf -= 10.f * FMath::Abs(SwingLoad);
 
 	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, HipRroll));
 	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll));
@@ -354,9 +359,11 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
+	SwingLeanNow = FMath::FInterpTo(SwingLeanNow, SwingLeanWant, Dt, 20.f);
+	UpperPitch += SwingLeanNow * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
 	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
 	// a sword swing turns the chest with the arm (a third of the arm's sweep), so the body puts weight behind it
-	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, SwingBodyWant, Dt, 14.f);   // (the jab's key poses set it: PoseArms)
+	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, SwingBodyWant, Dt, 22.f);   // (the jab's key poses set it: PoseArms)
 	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw + SwingTwistNow, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
@@ -374,7 +381,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
 	}
 	// (a sword swing turns the hips too, a little behind the chest: SwingTwistNow, worked out above)
-	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + 0.4f * SwingTwistNow, 2.5f * MoveBlend * C * Ground));
+	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + 0.55f * SwingTwistNow, 2.5f * MoveBlend * C * Ground));
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
@@ -428,6 +435,12 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	PitchL = FMath::Lerp(PitchL, 38.f, MountAlpha);    ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, MountAlpha);    // holding the reins
 	PitchL = FMath::Lerp(PitchL, 85.f, TuckAlpha);     ElbowLdeg = FMath::Lerp(ElbowLdeg, 100.f, TuckAlpha);
 	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
+	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
+	{
+		const float T = FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f);
+		const float Counter = FMath::Sin(PI * FMath::Clamp(T / 0.78f, 0.f, 1.f));
+		PitchL -= 12.f * Counter; RollL -= 16.f * Counter; ElbowLdeg += 18.f * Counter;
+	}
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
 	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, ShieldRest().ElbowYaw * Ground * (1.f - BlockAlpha) * ShieldHoldA, ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha) * ShieldHoldA));   // the forearm flat behind the shield
@@ -546,13 +559,14 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	{
 		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
-			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // (replaced by where the arm and blade are)
-			{ 0.20f, 34.f,   18.f,  -78.f, 42.f,  18.f,  138.f,  28.f, false },   // shoulder and chest coil; sword rises behind the right shoulder
-			{ 0.32f, 62.f,   38.f,  -92.f, 58.f,  32.f,  128.f,  38.f, false },   // high side-arm wind-up, wrist leads and blade trails over the right
-			{ 0.43f, 48.f,   20.f,  -76.f, 44.f,  20.f,   72.f,  24.f, true  },   // drop the wrist into the cut; blade arcs down and across
-			{ 0.52f, 18.f,  -18.f,  -62.f, 24.f,  -8.f,  -12.f,   2.f, true  },   // pass through the front at impact
-			{ 0.72f,-28.f,  -78.f,  -52.f, 18.f, -30.f,-108.f, -34.f, false },   // diagonal follow-through to the lower left
-			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f, -96.f, -22.f, false } }; // settle low on the left, ready for the backhand
+			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
+			{ 0.12f, 30.f,   18.f,  -78.f, 44.f,  18.f,  142.f,  24.f, false },   // shoulder draws back; chest and hips coil behind it
+			{ 0.25f, 72.f,   46.f, -100.f, 72.f,  40.f,  126.f,  42.f, false },   // loaded over the right shoulder, elbow bent and palm turned skyward
+			{ 0.32f, 56.f,   24.f,  -82.f, 50.f,  22.f,   76.f,  30.f, true  },   // hips start unwinding; shoulder and wrist accelerate first
+			{ 0.43f, 18.f,  -30.f,  -62.f, 20.f, -22.f,  -18.f,  -6.f, true  },   // hit timing: cut through the front as the torso turns left
+			{ 0.62f,-32.f,  -82.f,  -48.f, 16.f, -38.f, -112.f, -36.f, false },   // long diagonal carry to a low left finish
+			{ 0.82f,-22.f,  -72.f,  -56.f, 26.f, -24.f,  -98.f, -22.f, false },   // recover low without stopping the body's turn
+			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f,  -96.f, -22.f, false } }; // settle ready for the backhand
 				static const FKey Hit2[] = {
 			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
 			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -40.f, -120.f,   5.f, false },   // drawn across to his left, blade back over the left side
@@ -567,6 +581,15 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			const float FlipIn = FMath::SmoothStep(0.10f, 0.28f, T);
 			const float FlipOut = 1.f - FMath::SmoothStep(0.38f, 0.52f, T);
 			WristFlipNow = 180.f * FlipIn * FlipOut;
+		}
+		if (AttackDir != JabSecond)
+		{
+			const float Windup = FMath::SmoothStep(0.04f, 0.22f, T);
+			const float Release = FMath::SmoothStep(0.28f, 0.44f, T);
+			const float Follow = FMath::SmoothStep(0.43f, 0.64f, T);
+			const float Recover = FMath::SmoothStep(0.78f, 1.00f, T);
+			SwingLeanWant = 7.f * Windup - 17.f * Release - 5.f * Follow + 15.f * Recover;
+			SwingLoadWant = Windup * (1.f - 2.f * FMath::SmoothStep(0.30f, 0.62f, T)) * (1.f - Recover);
 		}
 		int32 i = 0;
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
@@ -586,6 +609,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		SwingBodyWant = FMath::Lerp(K0.Body, K1.Body, E);
 		BladeYawNow = FMath::Lerp(K0.BladeYaw, K1.BladeYaw, E);
 		BladePitchNow = FMath::Lerp(K0.BladePitch, K1.BladePitch, E);
+		// The second stroke remains as before; the first stroke's body and load curves are keyed separately above.
 		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
 		// so the wrist stays natural): the forehand travels to his left, the backhand to his right
 		BladeLeadSign = (AttackDir == JabSecond) ? -1.f : 1.f;
