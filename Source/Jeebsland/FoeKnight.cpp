@@ -73,8 +73,11 @@ void AFoeKnight::Setup(const FVector2D& InPenCenter, const FVector2D& InPenHalf)
 	WanderTo = PenCenter;
 }
 
-UProceduralMeshComponent* AFoeKnight::MakePart(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md)
+UProceduralMeshComponent* AFoeKnight::MakePart(USceneComponent* Attach, int32 PivotId, const KM::FMD& InMd)
 {
+	KM::FMD Shrunk;   // the feet are drawn smaller (KnightDesign::FootScale)
+	if (KnightDesign::IsFootPivot(PivotId)) { Shrunk = InMd; for (FVector& P : Shrunk.V) P = KnightDesign::FootVertex(PivotId, P); }
+	const KM::FMD& Md = KnightDesign::IsFootPivot(PivotId) ? Shrunk : InMd;
 	UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
 	C->SetupAttachment(Attach);
 	C->SetRelativeLocation(-KnightDesign::PivotPos(PivotId));   // shapes are modelled around the body's centre

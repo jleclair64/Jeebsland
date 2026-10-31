@@ -95,6 +95,13 @@ namespace KnightModel
 			Tris.Add(P.I[t]); Tris.Add(P.I[t + 1]); Tris.Add(P.I[t + 2]);
 			Tris.Add(P.I[t]); Tris.Add(P.I[t + 2]); Tris.Add(P.I[t + 1]);
 		}
+		if (KnightDesign::IsFootPivot(P.Pivot))   // the feet are drawn smaller (KnightDesign::FootScale)
+		{
+			TArray<FVector> V = P.V, N = P.N;
+			for (int32 i = 0; i < V.Num(); ++i) { N[i] = KnightDesign::FootNormal(P.Pivot, P.V[i], P.N[i]); V[i] = KnightDesign::FootVertex(P.Pivot, P.V[i]); }
+			C->CreateMeshSection_LinearColor(0, V, Tris, N, P.UV, TArray<FLinearColor>(), P.T, false);
+			return C;
+		}
 		C->CreateMeshSection_LinearColor(0, P.V, Tris, P.N, P.UV, TArray<FLinearColor>(), P.T, false);
 		return C;
 	}

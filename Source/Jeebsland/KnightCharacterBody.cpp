@@ -90,8 +90,11 @@ void AKnightCharacter::BuildKnight()
 	}
 }
 
-UProceduralMeshComponent* AKnightCharacter::MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md)
+UProceduralMeshComponent* AKnightCharacter::MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& InMd)
 {
+	KM::FMD Shrunk;   // the feet are drawn smaller (KnightDesign::FootScale)
+	if (KnightDesign::IsFootPivot(PivotId)) { Shrunk = InMd; for (FVector& P : Shrunk.V) P = KnightDesign::FootVertex(PivotId, P); }
+	const KM::FMD& Md = KnightDesign::IsFootPivot(PivotId) ? Shrunk : InMd;
 	UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
 	C->SetupAttachment(Attach);
 	// The shape is modelled around the knight's centre; move it back so it sits right on its pivot
@@ -159,10 +162,11 @@ void AKnightCharacter::TickCape(float Dt)
 
 	constexpr float H = 1.f / 90.f;   // fixed small steps, so it behaves the same at any frame rate
 	CapeAccum = FMath::Min(CapeAccum + Dt, 8.f * H);
-	// The cloth is carried up and down with most of the body's own rise and fall (a jump, a landing), so it only has to
-	// swing with what is left: no sudden stretching and snapping back when the knight leaps
+	// The cloth is carried up and down with most of the body's own rise and fall (a jump, a landing, and since 2026-10-30
+	// the bounce of every running step, which used to jerk it several times a second), so it only has to swing with what
+	// is left: no sudden stretching and snapping back
 	{
-		const FVector Root = GetActorLocation();
+		const FVector Root = UpperPivot->GetComponentLocation();
 		if (bCapeRootSet)
 		{
 			const FVector Carry(0.f, 0.f, (Root.Z - CapeRootPrev.Z) * 0.8f);   // up and down only: running still trails it behind
@@ -190,9 +194,11 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				const int32 k = Idx(i, j);
 				const float Down = float(j) / (CapeNY - 1);
-				// A very heavy cloth (twice the old weight): slow, low ripples, and the wind of running barely lifts it (gravity wins)
-				const FVector Ripple = (Side * FMath::Sin(CapeTime * 3.6f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 2.6f - j * 0.5f) * 0.4f)
-				                     * (7.f + 0.17f * Speed) * Down;
+				// A very heavy cloth (twice the old weight): slow, low ripples, and the wind of running barely lifts it (gravity wins).
+				// (2026-10-30: the ripple runs at half its old speed and grows far less with running speed, so it no longer
+				// looks glitchy at a run)
+				const FVector Ripple = (Side * FMath::Sin(CapeTime * 1.8f - j * 0.7f + i * 0.5f) * 0.6f + Back * FMath::Sin(CapeTime * 1.3f - j * 0.5f) * 0.4f)
+				                     * (7.f + 0.07f * Speed) * Down;
 				const FVector Force = FVector(0.f, 0.f, -2200.f) - Fwd * (0.4f * Speed) + FVector(0.f, 0.f, 0.06f * Speed) + Ripple;
 				const FVector V = (CapeP[k] - CapePrev[k]) * 0.9f;   // more drag: it swings slowly and settles quickly
 				CapePrev[k] = CapeP[k];

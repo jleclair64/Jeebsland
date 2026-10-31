@@ -64,6 +64,28 @@ namespace KnightDesign
 	// Lengths of the thigh and the shin (for keeping the feet on the ground as the knees bend)
 	inline double ThighLen() { return FVector::Dist(PivotPos(P_HipR), PivotPos(P_KneeR)); }
 	inline double ShinLen() { return FVector::Dist(PivotPos(P_KneeR), PivotPos(P_AnkleR)); }
+	// The feet are drawn smaller than the model made them (owner, 2026-10-30: 30% smaller). Everything hanging off an ankle
+	// is shrunk in length and width towards the ankle, easing in over the first 8 cm under it so it still meets the greave;
+	// heights are kept, so the soles stay on the ground. Used wherever a piece's mesh is made (player, pen knight, model).
+	constexpr double FootScale = 0.7;
+	inline bool IsFootPivot(int32 P) { return P == P_AnkleL || P == P_AnkleR; }
+	inline double FootShrink(int32 P, double Z)
+	{
+		if (!IsFootPivot(P)) return 1.0;
+		const double W = FMath::SmoothStep(0.0, 1.0, FMath::Clamp((PivotPos(P).Z + 2.0 - Z) / 8.0, 0.0, 1.0));
+		return FMath::Lerp(1.0, FootScale, W);
+	}
+	inline FVector FootVertex(int32 P, const FVector& V)
+	{
+		const double S = FootShrink(P, V.Z);
+		const FVector A = PivotPos(P);
+		return FVector(A.X + (V.X - A.X) * S, A.Y + (V.Y - A.Y) * S, V.Z);
+	}
+	inline FVector FootNormal(int32 P, const FVector& V, const FVector& N)
+	{
+		const double S = FootShrink(P, V.Z);
+		return FVector(N.X / S, N.Y / S, N.Z).GetSafeNormal();
+	}
 
 	struct FDef
 	{
