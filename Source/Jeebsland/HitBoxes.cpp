@@ -100,29 +100,60 @@ namespace JeebHit
 			}
 	}
 
-	// How far a point is from the wedge (0 inside), worked out flat (the 90-degree sector) and upright (its floor and top)
+	float HelmTop(const USceneComponent* Head)
+	{
+		using namespace KnightDesign;
+		if (!Head) return -1.0e9f;
+		return float(Head->GetComponentTransform().TransformPosition(FVector(3, 0, 50) - PivotPos(P_Head)).Z) + 17.f;   // (the helm capsule's top: KnightHurt)
+	}
+
+	// The infield's back edges (first or third base to second base), folded onto his right (Y >= 0): a point on them and the
+	// outward normal (away from home plate)
+	static void InfieldEdge(const FShieldWedge& W, FVector2D& OutOn, FVector2D& OutN)
+	{
+		const float Ha = FMath::DegreesToRadians(W.HalfAngle), S = W.Radius * W.Infield;
+		OutOn = FVector2D(W.Radius, 0.f);   // second base
+		OutN = FVector2D(S * FMath::Sin(Ha), W.Radius - S * FMath::Cos(Ha)).GetSafeNormal();
+	}
+
+	// The top's height over a flat point (relative to the apex): the helm's top, rounded down near the left and right walls
+	static float WedgeTop(const FVector2D& Q, const FShieldWedge& W)
+	{
+		const float Ha = FMath::DegreesToRadians(W.HalfAngle);
+		const float Side = FMath::Max(0.f, Q.X * FMath::Sin(Ha) - FMath::Abs(Q.Y) * FMath::Cos(Ha));   // how far in from the nearer wall
+		if (Side >= W.Round) return W.ZHigh;
+		const float K = W.Round - Side;
+		return W.ZHigh - (W.Round - FMath::Sqrt(FMath::Max(0.f, W.Round * W.Round - K * K)));
+	}
+
+	// How far a point is from the shield (0 inside), worked out flat (the outfield band) and upright (its floor and rounded top)
 	static float WedgeDist(const FVector& P, const FShieldWedge& W)
 	{
 		const FVector Right = FVector::UpVector ^ W.Fwd;   // (his right, with X forward and Z up)
 		const FVector D = P - W.Apex;
 		const FVector2D Q(FVector::DotProduct(D, W.Fwd), FVector::DotProduct(D, Right));
+		const FVector2D Qa(Q.X, FMath::Abs(Q.Y));   // (the two halves are mirror images)
 		const float Len = Q.Size();
-		const float Ang = FMath::RadiansToDegrees(FMath::Atan2(Q.Y, Q.X));
+		const float Ang = FMath::RadiansToDegrees(FMath::Atan2(Qa.Y, Qa.X));
+		const float Ha = FMath::DegreesToRadians(W.HalfAngle);
 		float Flat = 0.f;
-		if (FMath::Abs(Ang) > W.HalfAngle || Len > W.Radius)
+		if (Ang <= W.HalfAngle && Len <= W.Radius)
 		{
-			const float Ha = FMath::DegreesToRadians(W.HalfAngle);
-			auto ToLine = [&](float Side)   // the foul line on that side, from home plate to the fence
-			{
-				const FVector2D E(FMath::Cos(Ha) * W.Radius, Side * FMath::Sin(Ha) * W.Radius);
-				const float T = FMath::Clamp(FVector2D::DotProduct(Q, E) / E.SizeSquared(), 0.f, 1.f);
-				return (Q - E * T).Size();
-			};
-			Flat = FMath::Min(ToLine(1.f), ToLine(-1.f));
-			if (FMath::Abs(Ang) <= W.HalfAngle) Flat = FMath::Min(Flat, Len - W.Radius);   // beyond the fence
+			// inside the 90 degrees: in the cut-out infield, the way out to the band is across its back edge
+			FVector2D On, N;
+			InfieldEdge(W, On, N);
+			Flat = FMath::Max(0.f, -FVector2D::DotProduct(Qa - On, N));
+		}
+		else
+		{
+			// outside: the nearest of the foul line's outfield part (first base to the fence) and the fence itself
+			const FVector2D E(FMath::Cos(Ha), FMath::Sin(Ha));
+			const float T = FMath::Clamp(FVector2D::DotProduct(Qa, E), W.Radius * W.Infield, W.Radius);
+			Flat = (Qa - E * T).Size();
+			if (Ang <= W.HalfAngle) Flat = FMath::Min(Flat, Len - W.Radius);   // beyond the fence
 		}
 		const float Z = float(D.Z);
-		const float Up = FMath::Max3(0.f, W.ZLow - Z, Z - W.ZHigh);
+		const float Up = FMath::Max3(0.f, W.ZLow - Z, Z - WedgeTop(Q, W));
 		return FMath::Sqrt(Flat * Flat + Up * Up);
 	}
 
@@ -162,29 +193,47 @@ namespace JeebHit
 		return H && H->GatherShield && H->GatherShield(Out);
 	}
 
-	// The view: the two foul-line walls and the curved outfield wall, see-through
+	// The view: the outfield band as a closed see-through solid (its rounded top, floor, fence, the cut-out infield's back
+	// edges and the two foul-line ends), laid out on a grid round the arc (across) and from the infield edge to the fence (out)
 	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors)
 	{
+		constexpr int32 NA = 32, NO = 6;   // across, out
 		const FVector Right = FVector::UpVector ^ W.Fwd;
 		const float Ha = FMath::DegreesToRadians(W.HalfAngle);
-		auto Dir = [&](float A) { return W.Fwd * FMath::Cos(A) + Right * FMath::Sin(A); };
-		auto Wall = [&](const FVector& P0, const FVector& P1, const FVector& Nrm)   // an upright quad from P0 to P1 (flat points)
+		FVector2D On, En;
+		InfieldEdge(W, On, En);
+		auto Flat = [&](int32 a, int32 o)   // a grid point, flat, in the wedge's frame
 		{
-			const int32 B = V.Num();
-			V.Add(P0 + FVector(0, 0, W.ZLow)); V.Add(P1 + FVector(0, 0, W.ZLow)); V.Add(P1 + FVector(0, 0, W.ZHigh)); V.Add(P0 + FVector(0, 0, W.ZHigh));
-			for (int32 k = 0; k < 4; ++k) { N.Add(Nrm); Colors.Add(Col); }
-			I.Add(B); I.Add(B + 1); I.Add(B + 2); I.Add(B); I.Add(B + 2); I.Add(B + 3);
+			const float Th = FMath::Lerp(-Ha, Ha, (float)a / NA);
+			const FVector2D Dir(FMath::Cos(Th), FMath::Abs(FMath::Sin(Th)));
+			const float In = FVector2D::DotProduct(On, En) / FMath::Max(FVector2D::DotProduct(Dir, En), 0.01f);   // where the ray leaves the infield
+			const float Rho = FMath::Lerp(FMath::Min(In, W.Radius), W.Radius, (float)o / NO);
+			return FVector2D(FMath::Cos(Th) * Rho, FMath::Sin(Th) * Rho);
 		};
-		for (int32 sd = -1; sd <= 1; sd += 2)   // the foul lines
+		auto World = [&](const FVector2D& Q, float Z) { return W.Apex + W.Fwd * Q.X + Right * Q.Y + FVector(0, 0, Z); };
+		const int32 Top = V.Num();
+		for (int32 a = 0; a <= NA; ++a)
+			for (int32 o = 0; o <= NO; ++o) { const FVector2D Q = Flat(a, o); V.Add(World(Q, WedgeTop(Q, W))); N.Add(FVector::UpVector); Colors.Add(Col); }
+		const int32 Bot = V.Num();
+		for (int32 a = 0; a <= NA; ++a)
+			for (int32 o = 0; o <= NO; ++o) { V.Add(World(Flat(a, o), W.ZLow)); N.Add(-FVector::UpVector); Colors.Add(Col); }
+		auto Id = [&](int32 Base, int32 a, int32 o) { return Base + a * (NO + 1) + o; };
+		auto Quad = [&](int32 A, int32 B, int32 C, int32 D) { I.Add(A); I.Add(B); I.Add(C); I.Add(A); I.Add(C); I.Add(D); };
+		for (int32 a = 0; a < NA; ++a)
+			for (int32 o = 0; o < NO; ++o)
+			{
+				Quad(Id(Top, a, o), Id(Top, a, o + 1), Id(Top, a + 1, o + 1), Id(Top, a + 1, o));   // the top
+				Quad(Id(Bot, a, o), Id(Bot, a + 1, o), Id(Bot, a + 1, o + 1), Id(Bot, a, o + 1));   // the floor
+			}
+		for (int32 a = 0; a < NA; ++a)   // the fence, and the infield's back edges
 		{
-			const FVector E = Dir(sd * Ha);
-			Wall(W.Apex, W.Apex + E * W.Radius, (FVector::UpVector ^ E) * float(sd));
+			Quad(Id(Bot, a, NO), Id(Bot, a + 1, NO), Id(Top, a + 1, NO), Id(Top, a, NO));
+			Quad(Id(Bot, a, 0), Id(Top, a, 0), Id(Top, a + 1, 0), Id(Bot, a + 1, 0));
 		}
-		constexpr int32 Seg = 16;   // the outfield fence
-		for (int32 s = 0; s < Seg; ++s)
+		for (int32 o = 0; o < NO; ++o)   // the foul-line ends, first and third base out to the fence
 		{
-			const float A0 = FMath::Lerp(-Ha, Ha, (float)s / Seg), A1 = FMath::Lerp(-Ha, Ha, (float)(s + 1) / Seg);
-			Wall(W.Apex + Dir(A0) * W.Radius, W.Apex + Dir(A1) * W.Radius, Dir(0.5f * (A0 + A1)));
+			Quad(Id(Bot, 0, o), Id(Top, 0, o), Id(Top, 0, o + 1), Id(Bot, 0, o + 1));
+			Quad(Id(Bot, NA, o), Id(Bot, NA, o + 1), Id(Top, NA, o + 1), Id(Top, NA, o));
 		}
 	}
 }

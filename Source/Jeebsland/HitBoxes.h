@@ -56,14 +56,27 @@ namespace JeebHit
 	// at his centre and walls standing up from the two foul lines (45 degrees either side of straight ahead) and along the
 	// outfield fence (an arc Radius out). Checked BEFORE the hurt boxes, as Smash checks shields first: a hit box that touches
 	// the wedge is blocked, even if it touches a hurt box on the same frame. Blows from outside it reach the body.
+	// Only the OUTFIELD is shield (owner, 2026-10-31): the infield diamond is cut out (home plate at his centre, first and third
+	// base on the foul lines Infield x Radius out, second base on the fence straight ahead), so his body stands in the hollow and
+	// the shield is a band round the front, thickest at the sides and thinning to nothing straight ahead. Its top is the top of
+	// his helm, rounded down (Round cm) along the left and right walls.
 	struct FShieldWedge
 	{
 		FVector Apex = FVector::ZeroVector;     // his centre (home plate), at the capsule's middle height
 		FVector Fwd = FVector::ForwardVector;   // straight ahead (flat)
 		float Radius = 100.f, HalfAngle = 45.f; // cm, degrees
-		float ZLow = -96.f, ZHigh = 80.f;       // from his feet to above the helm, relative to the apex
+		float Infield = 0.7071f;                // first and third base, as a share of Radius (a square infield: second base on the fence)
+		float ZLow = -96.f, ZHigh = 68.f;       // from his feet to the top of his helm, relative to the apex
+		float Round = 30.f;                     // the rounding of the top's left and right corners (cm)
 	};
-	inline FShieldWedge KnightShield(const FVector& Centre, const FVector& Forward) { FShieldWedge W; W.Apex = Centre; W.Fwd = Forward.GetSafeNormal2D(); return W; }
+	// TopZ: the top of his helm (world height; HelmTop), or below the apex for the default height
+	inline FShieldWedge KnightShield(const FVector& Centre, const FVector& Forward, float TopZ = -1.0e9f)
+	{
+		FShieldWedge W; W.Apex = Centre; W.Fwd = Forward.GetSafeNormal2D();
+		if (TopZ > Centre.Z) W.ZHigh = TopZ - float(Centre.Z);
+		return W;
+	}
+	float HelmTop(const USceneComponent* Head);   // the top of a knight's helm hurt box (world height), as posed now (crouching lowers it)
 	bool TouchWedge(const FCapsule& Hit, const FShieldWedge& W);
 	// How far along a hit box's sweep this frame (0 = where it was last frame, 1 = where it is now) it first touches the wedge,
 	// or any of the hurt boxes; above 1: it doesn't. Whichever comes first is what the blow meets (a blade that reaches the

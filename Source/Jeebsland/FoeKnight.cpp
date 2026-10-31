@@ -188,7 +188,7 @@ void AFoeKnight::BeginPlay()
 	Hp->GatherShield = [this](JeebHit::FShieldWedge& Out)
 	{
 		if (BlockAlpha < 0.6f || DeathT > 0.f || bGuardBroken || KnockT >= 0.f) return false;
-		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector());
+		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
 		return true;
 	};
 	GuardMax = GuardPool = float(JeebItems::ShieldGuard(JeebItems::ShieldId(0, Tier)));   // (an iron kite shield)

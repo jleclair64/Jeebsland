@@ -676,7 +676,7 @@ void AKnightCharacter::BeginRebound(float Dur)
 bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
 {
 	if (!bBlocking || !ShieldActive() || Health <= 0.f) return false;
-	Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector());
+	Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
 	return true;
 }
 
