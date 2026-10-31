@@ -542,7 +542,7 @@ private:
 	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1)
 	float AttackYaw = 0.f;          // the heading a swing started with (a sword hit keeps it)
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)
-	int32 QueuedJabs = 0;           // clicks made during a sword swing, each one more swing of the jab (up to the finisher)
+	int32 QueuedJabs = 0;           // the attack buffer (Smash style): 1 if the attack button was pressed during this swing; extra presses don't stack
 	int32 LastSwingDir = 0;
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;

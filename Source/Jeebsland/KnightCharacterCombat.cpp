@@ -77,7 +77,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	bAttackHit = false;
 	AttackT = 0.f;
 	QueuedClick = -10.f;
-	QueuedJabs = 0;   // (TickAttack carries the rest of the clicks over into the next swing of the jab)
+	QueuedJabs = 0;   // (a new swing starts with an empty buffer: presses made before it began are used up)
 	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
 	// Face where you aim: always for shots (bow, wand, staff fly where the camera points); a melee swing or thrust only in
 	// strafe mode, otherwise it goes the way the knight already faces (owner, 2026-10-31)
@@ -100,7 +100,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	SetActorRotation(FRotator(0.f, FaceYaw, 0.f));
 	for (int32 h = 0; h < 5; ++h)   // a sword in hand
 		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
-	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 2; }   // three hits: 1, 2, 1 (shows the loop)
+	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
 }
@@ -365,9 +365,9 @@ void AKnightCharacter::TickAttack(float Dt)
 			{
 				if (SelectedKind() == JeebItems::K_Sword)
 				{
-					// (every click counts; the two hits alternate for as long as you keep clicking)
+					// (one buffered press per swing, Smash style; the two hits alternate for as long as you keep clicking)
 					const int32 Next = (AttackDir == JabFirst) ? JabSecond : JabFirst;
-					if (QueuedJabs > 0) { const int32 Left = QueuedJabs - 1; StartAttack(EAtkStyle::Slash, Next, 0.f); QueuedJabs = Left; }
+					if (QueuedJabs > 0) StartAttack(EAtkStyle::Slash, Next, 0.f);   // (the buffered press; StartAttack empties the buffer)
 				}
 				else if (AttackDir > 0 && Now - QueuedClick <= 0.3f) StartAttack(EAtkStyle::Slash, -1, 0.f);
 			}

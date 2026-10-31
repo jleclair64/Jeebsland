@@ -39,7 +39,7 @@ void AKnightCharacter::Interact()
 {
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing) return; // clicks belong to the open screen (or the side panel); no attacks mid-move
 	if (ActiveNode.IsValid()) return;                               // already working
-	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = FMath::Min(QueuedJabs + 1, 2); return; }   // swinging: remember the click for the combo (the sword counts every click)
+	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)
 
 	// Gather from the closest rock or tree within reach that the knight is facing
 		AResourceNode* Best = nullptr;
