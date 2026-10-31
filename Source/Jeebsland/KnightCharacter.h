@@ -172,6 +172,9 @@ public:
 	void UnequipHotbar(int32 H);
 	void UnequipWorn(int32 Kind, bool bSecondRing = false);
 	void SelectHotbar(int32 H);
+	// Test pictures (-JeebShot -ShotMove=...): the knight faces FaceYaw (not the camera) and does the move with a sword
+	void ShotPlayMove(const FString& Move, float FaceYaw);
+	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
 	bool ShieldActive() const;                   // a shield is worn and the weapon in hand allows one
 	int32 SelectedKind() const;                  // kind of the weapon in hand, or -1
@@ -525,6 +528,7 @@ private:
 	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); the sword adds +2, the jab's finisher
 	static constexpr int32 JabFirst = 1, JabSecond = -1, JabThird = 2;   // the sword's three-hit jab (Link's, Smash Ultimate)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
+	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)
 	int32 QueuedJabs = 0;           // clicks made during a sword swing, each one more swing of the jab (up to the finisher)
 	int32 LastSwingDir = 0;
 	float AtkCharge = 0.f;

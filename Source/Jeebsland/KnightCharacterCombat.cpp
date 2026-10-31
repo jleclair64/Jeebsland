@@ -77,13 +77,25 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	AttackT = 0.f;
 	QueuedClick = -10.f;
 	QueuedJabs = 0;   // (TickAttack carries the rest of the clicks over into the next swing of the jab)
-	if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
+	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
+	else if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
 	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
 	if (GetNetMode() != NM_Standalone)
 	{
 		if (IsLocallyControlled() && !HasAuthority()) ServerAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
 		else if (HasAuthority()) MulticastAttack(static_cast<uint8>(Style), static_cast<int8>(Dir), Charge);
 	}
+}
+
+void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
+{
+	if (!Skills) return;
+	bShotFace = true;
+	ShotFaceYaw = FaceYaw;
+	SetActorRotation(FRotator(0.f, FaceYaw, 0.f));
+	for (int32 h = 0; h < 5; ++h)   // a sword in hand
+		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
+	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 2; }   // all three hits
 }
 
 void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill)
@@ -126,7 +138,7 @@ void AKnightCharacter::AttackLands()
 	const bool bJab = (AtkStyle == EAtkStyle::Slash && K == JeebItems::K_Sword);
 	const float JabMul = !bJab ? 1.f : (AttackDir == JabThird ? 1.3f : 0.85f);
 	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f) + ((bJab && AttackDir == JabThird) ? 30.f : 0.f);
-	const float MinDot = bThrust ? 0.8f : 0.2f;
+	const float MinDot = bThrust ? 0.8f : ((bJab && AttackDir == JabThird) ? -1.f : 0.2f);   // (the jab's spinning finisher hits all round)
 	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
 
 	TArray<UHealthComponent*> Targets;

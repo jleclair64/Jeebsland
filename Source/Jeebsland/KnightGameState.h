@@ -73,4 +73,8 @@ private:
 	float ShotClock = 0.f;
 	FRotator ShotRot = FRotator::ZeroRotator;
 	FString ShotName = TEXT("shot");
-};
+	// -ShotMove=jab: instead of one picture, the knight (turned -ShotFacing degrees from the camera, 90 = side-on) does that
+	// move and a picture is saved every other frame (run with -benchmark -fps=30 for even steps): Saved/Shots/<name>_000.png ...
+	FString ShotMove;
+	float ShotFacing = 90.f, ShotMoveClock = -1.f;
+	int32 ShotFrame = 0;};

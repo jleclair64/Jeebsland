@@ -363,7 +363,12 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
 		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
 	}
-	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw, 2.5f * MoveBlend * C * Ground));
+	// The sword jab's finisher: the whole knight spins once round, sword held out level (Link's third hit), turning towards
+	// the sword's edge. (At the end -360 is the same as 0, so nothing jumps.)
+	float SpinYaw = 0.f;
+	if (bAttacking && AtkStyle == EAtkStyle::Slash && AttackDir == JabThird && SelectedKind() == JeebItems::K_Sword)
+		SpinYaw = -360.f * FMath::SmoothStep(0.22f, 0.72f, AttackT / FMath::Max(AttackDur, 0.01f));
+	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + SpinYaw, 2.5f * MoveBlend * C * Ground));
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
@@ -470,27 +475,6 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			const float E = A * A * (3.f - 2.f * A);
 			TargetPitch = FMath::Lerp(20.f, 92.f, E);  TargetYaw = 0.f;  ElbowRdeg = FMath::Lerp(50.f, 8.f, E);
 		}
-		else if (AttackDir == JabThird)
-		{
-			// The jab's finisher (Link's third hit): from where the backhand ended, out to the right, the arm draws further back
-			// and bends, then whips through a wide flat sweep all the way across as the knight steps in (StartAttack)
-			if (T < 0.35f)
-			{
-				const float A = T / 0.35f;
-				const float E = A * A * (3.f - 2.f * A);
-				TargetPitch = FMath::Lerp(84.f, 74.f, E);
-				TargetYaw = FMath::Lerp(75.f, 105.f, E);
-				ElbowRdeg = FMath::Lerp(5.f, 62.f, E);
-			}
-			else if (T < 0.55f)
-			{
-				const float A = (T - 0.35f) / 0.2f;
-				TargetPitch = FMath::Lerp(74.f, 86.f, A);
-				TargetYaw = FMath::Lerp(105.f, -90.f, A * A);
-				ElbowRdeg = FMath::Lerp(62.f, 0.f, A);
-			}
-			else { TargetPitch = 86.f; TargetYaw = -90.f; ElbowRdeg = 0.f; }
-		}
 		else if (AttackDir > 0)
 		{
 						// First swing, right to left: the arm comes up to shoulder height and swings out to the right,
@@ -534,6 +518,48 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		}
 		RollR = 0.f;
 		ArmSpeed = 38.f;
+	}
+
+	// The sword's three-hit jab, posed from Link's in Smash Ultimate (frames studied 2026-10-30; mirrored, as Link is
+	// left-handed). The blade stays LEVEL throughout: the arm is raised out to the SIDE (roll), which keeps a forward-pointing
+	// blade flat, and then swept round (yaw); raising it forward would stand the blade up. Each hit is a few key poses the
+	// arm blends between (shoulder pitch, sweep yaw, raise roll, elbow bend, forearm turn).
+	//   1 forehand: wound up high on the right, cut down and across to the left, blade level
+	//   2 backhand: the forearm turns over as it draws across, then the blade leads back out to the right
+	//   3 finisher: arm held out level, and the whole body spins once round (the spin is in PoseBody); hits all round
+	float ForearmTarget = 0.f;
+	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
+	{
+		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Forearm; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
+		static const FKey Hit1[] = {
+			{ 0.00f, 4.f,    0.f,  -10.f, 25.f,   0.f, false },
+			{ 0.30f, 0.f,   35.f, -130.f, 55.f,   0.f, false },   // wound up high and back on the right
+			{ 0.55f, 0.f,  -80.f,  -75.f, 15.f,   0.f, true  },   // cut down and across, blade level, pointing left
+			{ 1.00f, 0.f,  -80.f,  -75.f, 15.f,   0.f, false } };
+		static const FKey Hit2[] = {
+			{ 0.00f, 0.f,  -80.f,  -75.f, 15.f,   0.f, false },
+			{ 0.30f, 0.f, -130.f,  -70.f, 45.f, 180.f, false },   // drawn across the body, the forearm turned over
+			{ 0.55f, 0.f,  -55.f,  -85.f,  5.f, 180.f, true  },   // swept back out, the blade leading to the right
+			{ 1.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false } };
+		static const FKey Hit3[] = {
+			{ 0.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false },
+			{ 0.22f, 0.f,   -5.f,  -95.f,  5.f, 360.f, false },   // arm out level to the side, blade pointing ahead: then the spin
+			{ 1.00f, 0.f,   -5.f,  -95.f,  5.f, 360.f, false } };
+		const FKey* Keys = AttackDir == JabThird ? Hit3 : (AttackDir == JabSecond ? Hit2 : Hit1);
+		const int32 Num = AttackDir == JabThird ? UE_ARRAY_COUNT(Hit3) : (AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1));
+		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
+		int32 i = 0;
+		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
+		const FKey& K0 = Keys[i];
+		const FKey& K1 = Keys[i + 1];
+		const float A = FMath::Clamp((T - K0.T) / FMath::Max(K1.T - K0.T, 0.001f), 0.f, 1.f);
+		const float E = K1.bAccel ? A * A : A * A * (3.f - 2.f * A);
+		TargetPitch = FMath::Lerp(K0.Pitch, K1.Pitch, E);
+		TargetYaw = FMath::Lerp(K0.Yaw, K1.Yaw, E);
+		RollR = FMath::Lerp(K0.Roll, K1.Roll, E);
+		ElbowRdeg = FMath::Lerp(K0.Elbow, K1.Elbow, E);
+		ForearmTarget = FMath::Lerp(K0.Forearm, K1.Forearm, E);
+		ArmSpeed = 30.f;
 	}
 
 	if (bFishing)
@@ -581,8 +607,16 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 
 	ArmPitch = FMath::FInterpTo(ArmPitch, TargetPitch, Dt, ArmSpeed);
 	ArmYaw = FMath::FInterpTo(ArmYaw, TargetYaw, Dt, ArmSpeed);
-	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, RollR));
+	ArmRollR = FMath::FInterpTo(ArmRollR, RollR, Dt, ArmSpeed);   // (eased like the pitch and yaw: the jab raises the arm out to the side)
+	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, ArmRollR));
 	ElbowRCur = FMath::FInterpTo(ElbowRCur, ElbowRdeg, Dt, 18.f);
-	ElbowR->SetRelativeRotation(FRotator(ElbowRCur, 0.f, 0.f));
+	// The forearm turns about its own length (fist and all, so the grip stays in the fingers): the jab's backhand turns it over.
+	// Always the short way round, so 360 is the same as 0.
+	ForearmNow += FMath::FindDeltaAngleDegrees(ForearmNow, ForearmTarget) * FMath::Clamp(Dt * 22.f, 0.f, 1.f);
+	ForearmNow = FRotator::NormalizeAxis(ForearmNow);
+	{
+		static const FVector ForearmAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
+		ElbowR->SetRelativeRotation(FQuat(FRotator(ElbowRCur, 0.f, 0.f)) * FQuat(ForearmAxis, FMath::DegreesToRadians(ForearmNow)));
+	}
 	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
 }

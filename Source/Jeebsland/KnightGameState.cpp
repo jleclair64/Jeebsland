@@ -235,6 +235,8 @@ void AKnightGameState::BuildWorld()
 		FParse::Value(Cmd, TEXT("ShotYaw="), Yaw);
 		FParse::Value(Cmd, TEXT("ShotPitch="), Pitch);
 		FParse::Value(Cmd, TEXT("ShotName="), ShotName);
+		FParse::Value(Cmd, TEXT("ShotMove="), ShotMove);
+		FParse::Value(Cmd, TEXT("ShotFacing="), ShotFacing);
 		FString PosS;
 		if (FParse::Value(Cmd, TEXT("ShotPos="), PosS))
 		{
@@ -342,7 +344,20 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		ShotClock += DeltaSeconds;
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC) PC->SetControlRotation(ShotRot);
-		if (ShotClock > 9.f && !bShotTaken)
+		if (!ShotMove.IsEmpty())
+		{
+			// A move, picture by picture
+			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
+			if (K && ShotClock > 7.f && ShotMoveClock < 0.f) { ShotMoveClock = 0.f; K->ShotPlayMove(ShotMove, ShotRot.Yaw + ShotFacing); }
+			if (ShotMoveClock >= 0.f)
+			{
+				ShotMoveClock += DeltaSeconds;
+				if (ShotMoveClock < 2.6f && (ShotFrame++ % 2) == 0)
+					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%03d.png"), *ShotName, ShotFrame / 2), false, false);
+				if (ShotMoveClock > 2.8f && PC) PC->ConsoleCommand(TEXT("quit"));
+			}
+		}
+		else if (ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
