@@ -554,6 +554,8 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	float ForearmTarget = 0.f;
 	float WristFlipNow = 0.f;   // first slash supinates the sword hand so the palm faces up in the wind-up
 	SwingBodyWant = 0.f;
+	SwingLeanWant = 0.f;
+	SwingLoadWant = 0.f;
 	bool bBladeLead = false;   // a sword slash is on: the wrist sets the blade's heading
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
 	{
