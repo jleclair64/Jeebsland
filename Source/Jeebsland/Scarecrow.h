@@ -18,6 +18,7 @@ class AScarecrow : public AActor
 public:
 	AScarecrow();
 	virtual void Tick(float DeltaSeconds) override;
+	bool bDummy = false;   // a training dummy (the MoveLab test area): it stands still and never shoves
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:

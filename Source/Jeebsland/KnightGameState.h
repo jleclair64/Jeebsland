@@ -58,6 +58,8 @@ protected:
 
 private:
 	void BuildWorld();
+	void BuildMoveLab();     // the MoveLab map: a small flat test area for working on moves
+	void SetupShotMode();    // -JeebShot test pictures
 
 	UPROPERTY(ReplicatedUsing = OnRep_Nodes) TArray<FNodeCharge> NodeCharges;
 	UFUNCTION() void OnRep_Nodes();

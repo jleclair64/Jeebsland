@@ -45,6 +45,10 @@
 #include "ResourceNode.h"
 #include "Store.h"
 #include "Combat.h"
+#include "Scarecrow.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -101,6 +105,16 @@ void AKnightGameState::BuildWorld()
 		Fog->SetStartDistance(600.f);
 		FogActor = *It;
 		Fog->FogCutoffDistance = 400000.f; // the faraway sky (about 5 km out) is not hidden by haze; the whole world is (since 2026-10-30)
+	}
+
+	// The MoveLab map (a copy of Field) is a small test area for working on moves: only a flat floor with a 1 m grid and two
+	// training dummies, so Play starts in seconds. The knight is the same knight as in the game: nothing to carry over.
+	if (World->GetMapName().Contains(TEXT("MoveLab")))
+	{
+		World->SpawnActor<ADayNight>(FVector::ZeroVector, FRotator::ZeroRotator);   // (the sun and its light, as in the game)
+		BuildMoveLab();
+		if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
+		return;
 	}
 
 	// The land (hills and grass)
@@ -221,41 +235,94 @@ void AKnightGameState::BuildWorld()
 		}
 	}
 
-	// Where players appear is chosen by the game mode (AKnightGameMode::SpawnDefaultPawnFor); this only moves the camera's
-	// knight for a test screenshot
-	FVector2D Start(0.f, 0.f);
-
-	// Test screenshot mode: -JeebShot -ShotName=x -ShotPhase=0.2 -ShotPos=X,Y -ShotYaw=deg -ShotPitch=deg
-	const TCHAR* Cmd = FCommandLine::Get();
-	if (FParse::Param(Cmd, TEXT("JeebShot")))
-	{
-		bShotMode = true;
-		float Ph = -1.f, Yaw = 0.f, Pitch = -10.f;
-		FParse::Value(Cmd, TEXT("ShotPhase="), Ph);
-		FParse::Value(Cmd, TEXT("ShotYaw="), Yaw);
-		FParse::Value(Cmd, TEXT("ShotPitch="), Pitch);
-		FParse::Value(Cmd, TEXT("ShotName="), ShotName);
-		FParse::Value(Cmd, TEXT("ShotMove="), ShotMove);
-		FParse::Value(Cmd, TEXT("ShotFacing="), ShotFacing);
-		FString PosS;
-		if (FParse::Value(Cmd, TEXT("ShotPos="), PosS))
-		{
-			FString A, B;
-			if (PosS.Split(TEXT(","), &A, &B)) Start = FVector2D(FCString::Atof(*A), FCString::Atof(*B));
-		}
-		ADayNight::FixedPhase = Ph;
-		ShotRot = FRotator(Pitch, Yaw, 0.f);
-		if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
-		{
-			Player->SetActorLocation(FVector(Start.X, Start.Y, JeebTerrain::HeightAt(Start.X, Start.Y) + 130.f));
-		}
-	}
+	SetupShotMode();
 
 	// Game messages are drawn by the HUD; keep the engine's debug text off the screen
 	if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
 
 	// Online: the server's rock and tree counts may have arrived before the world was built
 	if (!HasAuthority()) { OnRep_Nodes(); OnRep_Doors(); }
+}
+
+// Test screenshot mode: -JeebShot -ShotName=x -ShotPhase=0.2 -ShotPos=X,Y -ShotYaw=deg -ShotPitch=deg (-ShotMove=jab ...)
+void AKnightGameState::SetupShotMode()
+{
+	// Where players appear is chosen by the game mode (AKnightGameMode::SpawnDefaultPawnFor); this only moves the camera's
+	// knight for a test screenshot
+	FVector2D Start(0.f, 0.f);
+	const TCHAR* Cmd = FCommandLine::Get();
+	if (!FParse::Param(Cmd, TEXT("JeebShot"))) return;
+	bShotMode = true;
+	float Ph = -1.f, Yaw = 0.f, Pitch = -10.f;
+	FParse::Value(Cmd, TEXT("ShotPhase="), Ph);
+	FParse::Value(Cmd, TEXT("ShotYaw="), Yaw);
+	FParse::Value(Cmd, TEXT("ShotPitch="), Pitch);
+	FParse::Value(Cmd, TEXT("ShotName="), ShotName);
+	FParse::Value(Cmd, TEXT("ShotMove="), ShotMove);
+	FParse::Value(Cmd, TEXT("ShotFacing="), ShotFacing);
+	FString PosS;
+	if (FParse::Value(Cmd, TEXT("ShotPos="), PosS))
+	{
+		FString A, B;
+		if (PosS.Split(TEXT(","), &A, &B)) Start = FVector2D(FCString::Atof(*A), FCString::Atof(*B));
+	}
+	ADayNight::FixedPhase = Ph;
+	ShotRot = FRotator(Pitch, Yaw, 0.f);
+	if (APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0))
+	{
+		Player->SetActorLocation(FVector(Start.X, Start.Y, JeebTerrain::HeightAt(Start.X, Start.Y) + 130.f));
+	}
+}
+
+// The MoveLab test area: a flat 40 x 40 m floor at the height of the game's starting point, with a darker line every metre
+// and a bright one every 5 m (to judge steps and reach), and two training dummies 3 m ahead and 3 m to the right
+void AKnightGameState::BuildMoveLab()
+{
+	UWorld* World = GetWorld();
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	const float Z = JeebTerrain::HeightAt(0.f, 0.f);
+	AActor* Floor = World->SpawnActor<AActor>(AActor::StaticClass(), FVector(0.f, 0.f, Z), FRotator::ZeroRotator);
+	if (!Floor || !Cube) return;
+	USceneComponent* Root = NewObject<USceneComponent>(Floor);
+	Floor->SetRootComponent(Root);
+	Root->RegisterComponent();
+	auto Box = [&](const FVector& Centre, const FVector& Size, const FLinearColor& Col, bool bCollide)
+	{
+		UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Floor);
+		M->SetStaticMesh(Cube);
+		M->SetupAttachment(Root);
+		M->SetRelativeLocation(Centre);
+		M->SetRelativeScale3D(Size / 100.f);   // (the basic cube is 1 m)
+		M->SetCollisionEnabled(bCollide ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+		M->SetCollisionResponseToAllChannels(ECR_Block);
+		M->SetCastShadow(bCollide);
+		M->RegisterComponent();
+		if (Base)
+			if (UMaterialInstanceDynamic* Mi = M->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), Col);
+	};
+	Box(FVector(0.f, 0.f, -50.f), FVector(4000.f, 4000.f, 100.f), FLinearColor(0.32f, 0.34f, 0.30f), true);   // the floor (top at Z)
+	for (int32 i = -20; i <= 20; ++i)
+	{
+		const bool bFive = (i % 5) == 0;
+		const FLinearColor C = bFive ? FLinearColor(0.75f, 0.72f, 0.55f) : FLinearColor(0.18f, 0.19f, 0.17f);
+		const float W = bFive ? 4.f : 2.f;
+		Box(FVector(i * 100.f, 0.f, 0.3f), FVector(W, 4000.f, 0.6f), C, false);
+		Box(FVector(0.f, i * 100.f, 0.3f), FVector(4000.f, W, 0.6f), C, false);
+	}
+	// Two dummies: one straight ahead of where you start, one to your right
+	for (const FVector2D& P : { FVector2D(300.f, 0.f), FVector2D(0.f, 300.f) })
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FTransform Xf(FRotator(0.f, (FVector(-P.X, -P.Y, 0.f)).Rotation().Yaw, 0.f), FVector(P.X, P.Y, Z));
+		if (AScarecrow* D = World->SpawnActorDeferred<AScarecrow>(AScarecrow::StaticClass(), Xf))
+		{
+			D->bDummy = true;
+			D->FinishSpawning(Xf);
+		}
+	}
+	SetupShotMode();
 }
 
 void AKnightGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

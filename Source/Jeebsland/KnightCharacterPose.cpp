@@ -354,7 +354,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
 	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
 	// a sword swing turns the chest with the arm (a third of the arm's sweep), so the body puts weight behind it
-	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword) ? 0.45f * ArmYaw : 0.f, Dt, 12.f);
+	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, SwingBodyWant, Dt, 14.f);   // (the jab's key poses set it: PoseArms)
 	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw + SwingTwistNow, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
@@ -524,38 +524,43 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		ArmSpeed = 38.f;
 	}
 
-	// The sword's three-hit jab, posed from Link's in Smash Ultimate (frames studied 2026-10-30; mirrored, as Link is
-	// left-handed). The blade stays LEVEL throughout: the arm is raised out to the SIDE (roll), which keeps a forward-pointing
-	// blade flat, and then swept round (yaw); raising it forward would stand the blade up. Each hit is a few key poses the
-	// arm blends between (shoulder pitch, sweep yaw, raise roll, elbow bend, forearm turn).
-	//   1 forehand: drawn back to the right, a flat cut right to left across the front
-	//   2 backhand: the forearm turns over and lies across the front, then the elbow opens: a flat cut left to right
-	//   (owner, 2026-10-30: no third hit, no spin; the two loop)
-	// The whole body moves with each hit (JabBodyNow: PosePrep sinks the knees and leans in, PoseBody turns the hips and chest).
+	// The sword's jab: two flat slashes that loop for as long as you click (posed from Link's jab in Smash Ultimate, frames
+	// studied 2026-10-30, mirrored as Link is left-handed; owner: no third hit, no spin, both SLASHES across the FRONT). The
+	// blade stays level: the arm is raised out to the SIDE (roll), which keeps a forward-pointing blade flat, and swept round
+	// (yaw); raising it forward would stand the blade up. Each hit is a few key poses: shoulder pitch, sweep yaw, raise roll,
+	// elbow bend, forearm turn, and the chest's turn (Body; PoseBody turns the hips with it). Each hit starts from wherever the
+	// arm really is (SwingFrom, caught in StartAttack), so 1-2-1-2 flows without a jerk.
+	//   1 forehand: the arm, nearly straight, drawn back to the right with the chest coiled right, then swept flat right to left
+	//   2 backhand: the elbow folds so the forearm lies across the front, turned over (blade ahead), then opens: a flat cut left
+	//     to right; the chest turns back to the middle, so the blade crosses straight in front of him
+	// The knees and lean are in PosePrep (JabBodyNow).
 	float ForearmTarget = 0.f;
+	SwingBodyWant = 0.f;
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
 	{
-		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Forearm; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
-		// (owner, 2026-10-30: two hits that loop for as long as you click; both cut flat across the FRONT of the knight. Hit 2
-		// ends about where hit 1 winds up, so 1-2-1-2 flows.) The blade's heading, seen from above: arm sweep (yaw) and elbow
-		// bend turn it together; with the forearm turned over (180) it points the other way across the forearm.
+		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Forearm, Body; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
-			{ 0.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f, false },   // (where hit 2 ends)
-			{ 0.30f, 0.f,   25.f,  -85.f, 45.f,   0.f, false },   // drawn back to the right at shoulder height, elbow cocked, blade ahead
-			{ 0.55f, 0.f,  -80.f,  -80.f, 10.f,   0.f, true  },   // a flat cut from right to left across the front
-			{ 1.00f, 0.f,  -80.f,  -80.f, 10.f,   0.f, false } };
+			{ 0.00f, 0.f,    0.f,  -85.f, 15.f,   0.f,   0.f, false },   // (replaced by where the arm is: SwingFrom)
+			{ 0.30f, 0.f,   25.f,  -85.f, 15.f,   0.f,  25.f, false },   // drawn back to the right, arm nearly straight, chest coiled
+			{ 0.55f, 0.f,  -80.f,  -82.f,  8.f,   0.f, -15.f, true  },   // swept flat from right to left across the front
+			{ 1.00f, 0.f,  -80.f,  -82.f,  8.f,   0.f, -15.f, false } };
 		static const FKey Hit2[] = {
-			{ 0.00f, 0.f,  -80.f,  -80.f, 10.f,   0.f, false },
-			{ 0.30f, 0.f,  -90.f,  -80.f, 95.f, 180.f, false },   // elbow folded so the forearm lies across the front, turned over: blade ahead
-			{ 0.55f, 0.f,  -75.f,  -85.f, 40.f, 180.f, true  },   // the elbow opens: a flat cut from left to right, still in front
-			{ 1.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f, false } };
+			{ 0.00f, 0.f,    0.f,  -85.f, 15.f,   0.f,   0.f, false },   // (replaced by where the arm is)
+			{ 0.30f, 0.f,  -90.f,  -80.f, 95.f, 180.f, -10.f, false },   // elbow folded, forearm across the front, turned over: blade ahead
+			{ 0.55f, 0.f,  -75.f,  -85.f, 40.f, 180.f,  20.f, true  },   // the elbow opens: a flat cut left to right, straight in front
+			{ 1.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f,  20.f, false } };
 		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
 		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
 		int32 i = 0;
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
-		const FKey& K0 = Keys[i];
+		FKey K0 = Keys[i];
 		const FKey& K1 = Keys[i + 1];
+		if (i == 0)   // the start pose is wherever the arm was when the swing began
+		{
+			K0.Pitch = SwingFrom[0]; K0.Yaw = SwingFrom[1]; K0.Roll = SwingFrom[2]; K0.Elbow = SwingFrom[3];
+			K0.Forearm = K1.Forearm + FMath::FindDeltaAngleDegrees(K1.Forearm, SwingFrom[4]); K0.Body = SwingFrom[5];
+		}
 		const float A = FMath::Clamp((T - K0.T) / FMath::Max(K1.T - K0.T, 0.001f), 0.f, 1.f);
 		const float E = K1.bAccel ? A * A : A * A * (3.f - 2.f * A);
 		TargetPitch = FMath::Lerp(K0.Pitch, K1.Pitch, E);
@@ -563,6 +568,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		RollR = FMath::Lerp(K0.Roll, K1.Roll, E);
 		ElbowRdeg = FMath::Lerp(K0.Elbow, K1.Elbow, E);
 		ForearmTarget = FMath::Lerp(K0.Forearm, K1.Forearm, E);
+		SwingBodyWant = FMath::Lerp(K0.Body, K1.Body, E);
 		ArmSpeed = 40.f;   // (follows the key poses tightly)
 	}
 

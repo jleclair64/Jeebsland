@@ -157,7 +157,7 @@ void AScarecrow::Tick(float DeltaSeconds)
 	AKnightCharacter* Knight = nullptr;
 	float Yaw = GetActorRotation().Yaw;
 	float Dist = 1.0e9f;
-	if (HasAuthority())
+	if (HasAuthority() && !bDummy)   // (a training dummy never turns or shoves)
 		for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
 		{
 			const float D = FVector::Dist2D(It->GetActorLocation(), GetActorLocation());

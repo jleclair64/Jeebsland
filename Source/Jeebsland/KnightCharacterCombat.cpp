@@ -68,6 +68,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward
 		AttackDur = Cd * (Dir == JabSecond ? 0.72f : 0.8f);
+		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow;   // (the key poses start from here)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 210.f, true, false);   // (the player's machine and the server step together)
 	}
@@ -317,8 +318,9 @@ void AKnightCharacter::TickAttack(float Dt)
 {
 	if (bAttacking)
 	{
-		// A sword hit keeps facing the way it started (as in Smash): sliding along a wall or being steered never turns him mid-swing
-		if (AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword) SetActorRotation(FRotator(0.f, AttackYaw, 0.f));
+		// A sword hit keeps facing the way it started (as in Smash): sliding along a wall or being steered never turns him
+		// mid-swing. Not in strafe mode or the shield stance: there he keeps turning with the camera, swing or not.
+		if (AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && !bStrafeMode && !bBlockHeld) SetActorRotation(FRotator(0.f, AttackYaw, 0.f));
 		AttackT += Dt;
 		const float HitFrac = (AtkStyle == EAtkStyle::Slash) ? 0.43f : (AtkStyle == EAtkStyle::Thrust ? 0.5f : 0.3f);
 		if (!bAttackHit && AttackT >= AttackDur * HitFrac)

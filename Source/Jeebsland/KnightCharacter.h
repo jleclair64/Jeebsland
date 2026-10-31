@@ -529,6 +529,8 @@ private:
 	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); (the sword's jab uses the same two)
 	static constexpr int32 JabFirst = 1, JabSecond = -1;   // the sword's two-hit jab (forehand, backhand; they loop)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
+	float SwingBodyWant = 0.f;      // the chest turn the jab's key poses ask for
+	float SwingFrom[6] = {};        // where the arm was when a sword swing began (pitch, yaw, roll, elbow, forearm, chest turn)
 	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1)
 	float AttackYaw = 0.f;          // the heading a swing started with (a sword hit keeps it)
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)
