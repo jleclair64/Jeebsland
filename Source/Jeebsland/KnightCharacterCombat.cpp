@@ -79,7 +79,10 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	QueuedClick = -10.f;
 	QueuedJabs = 0;   // (TickAttack carries the rest of the clicks over into the next swing of the jab)
 	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
-	else if (AController* C = GetController()) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));   // face where you aim
+	// Face where you aim: always for shots (bow, wand, staff fly where the camera points); a melee swing or thrust only in
+	// strafe mode, otherwise it goes the way the knight already faces (owner, 2026-10-31)
+	else if (AController* C = GetController())
+		if (Style == EAtkStyle::Cast || bStrafeMode) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));
 	AttackYaw = GetActorRotation().Yaw;   // (a sword hit keeps this heading: TickAttack)
 	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
 	if (GetNetMode() != NM_Standalone)
