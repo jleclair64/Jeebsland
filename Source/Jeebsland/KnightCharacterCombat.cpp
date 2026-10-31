@@ -69,6 +69,16 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 		// The sword's jab: two quick swings that alternate, each with a small step forward
 		AttackDur = Cd * (Dir == JabSecond ? 0.72f : 0.8f) / SwingSpeedScale();   // (testing: DefaultGame.ini SwingSpeed slows it)
 		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow; SwingFrom[6] = BladeYawNow; SwingFrom[7] = BladePitchNow;   // (the key poses start from here)
+		if (BladeAlpha <= 0.5f && WristR)   // (from rest the wrist is not steering the blade: start from where the blade really points)
+		{
+			const FVector Bl = GetActorTransform().InverseTransformVector(WristR->GetComponentTransform().TransformVector(KnightDesign::BladeDir(1))).GetSafeNormal();
+			SwingFrom[6] = FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X));
+			SwingFrom[7] = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Bl.Z, -1.f, 1.f)));
+		}
+		// Mid-combo the hand turns over from the last hit's grip (PoseArms blends from it). The two hits lead with opposite
+		// edges, so the same grip is the old cant plus half a turn
+		const float NewSign = (Dir == JabSecond) ? -1.f : 1.f;
+		CantFrom = (BladeAlpha > 0.5f) ? BladeCantNow + (NewSign != BladeLeadSign ? 180.f : 0.f) : -999.f;
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 210.f, true, false);   // (the player's machine and the server step together)
 	}

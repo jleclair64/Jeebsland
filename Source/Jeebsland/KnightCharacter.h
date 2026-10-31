@@ -544,6 +544,7 @@ private:
 	float SwingFrom[8] = {};        // where the arm was when a sword swing began (pitch, yaw, roll, elbow, forearm, chest turn, blade heading, blade tilt)
 	float BladeYawNow = 0.f, BladePitchNow = 0.f, BladeLeadSign = -1.f;   // a sword slash: where the blade points (knight's frame, degrees) and which way it travels
 	float BladeCantNow = 0.f;       // the blade's cant about its own length (degrees; 0 = edge level)
+	float CantFrom = 0.f;           // the cant a sword swing starts from (the previous hit's, seen with this hit's leading edge), or below -900: none
 	float BladeAlpha = 0.f;         // how much the wrist is steering the blade (fades in and out of a slash)
 	float WristBendNow = 0.f, ForearmTwistNow = 0.f;   // how far the wrist is bent and the forearm twisted for the blade (degrees; for checking a move)
 	void LogSwordTip();             // test pictures: the sword tip and edge, frame by frame, in the knight's frame (log: JEEBTIP)
