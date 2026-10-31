@@ -184,7 +184,8 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
 			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (click on to chain), hold to charge a smash attack. Spear: hold, let go to thrust") },
-			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks him down") },
+			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks anyone down (but loses to a sword swing)") },
+			{ TEXT("Wheel down"),     TEXT("Low sweep (sword): hits a knight on the ground and launches him; hold a direction when launched to drift") },
 			{ TEXT("Knocked down"),   TEXT("A or D rolls away that way; W, S, Space or a click gets straight up") },
 			{ TEXT("E"),              TEXT("Talk to the shopkeeper, blacksmith and others; sit on benches") },
 			{ TEXT("W / S at a ladder"), TEXT("Climb up / down (walk into it)") },
@@ -195,7 +196,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		{
 			HDText(R.Key, FLinearColor(1.f, 0.85f, 0.3f), PX + 30.f, RowY, Font, 1.1f);
 			HDText(R.Action, FLinearColor::White, PX + 250.f, RowY, Font, 1.05f);
-			RowY += 27.f;   // (20 rows)
+			RowY += 26.f;   // (21 rows)
 		}
 		HDText(TEXT("Press Esc to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}

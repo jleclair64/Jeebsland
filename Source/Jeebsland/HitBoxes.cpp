@@ -177,6 +177,17 @@ namespace JeebHit
 		return H && H->GatherShield && H->GatherShield(Out);
 	}
 
+	FVector LaunchVelocity(const FVector& Away, const FVector& DI)
+	{
+		const FVector Base = Away.GetSafeNormal2D() * LaunchBack + FVector(0.f, 0.f, LaunchUp);
+		const FVector Dir = Base.GetSafeNormal();
+		const FVector D = FVector(DI.X, DI.Y, 0.f).GetClampedToMaxSize(1.f);
+		const FVector Square = D - Dir * FVector::DotProduct(D, Dir);   // (the part of the DI square to the launch)
+		if (Square.SizeSquared() < 1.0e-4f) return Base;
+		const float A = FMath::DegreesToRadians(DIAngle) * FMath::Min(Square.Size(), 1.f);
+		return (Dir * FMath::Cos(A) + Square.GetSafeNormal() * FMath::Sin(A)) * Base.Size();
+	}
+
 	// The view: the band as a closed see-through solid (its arched top, floor, outer and inner faces and the two ends), laid
 	// out on a grid round the arc (across) and from its inner face to its outer face (out)
 	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors)

@@ -211,6 +211,12 @@ public:
 	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes = false);
 	// A raised shield's wedge (HitBoxes.h), for the box view; false while the shield is down
 	bool GetShieldWedge(JeebHit::FShieldWedge& Out) const;
+	// A clean hit moves you (server; HitBoxes.h FReact): hitstun with a push, or the low sweep's launch. Everyone is told.
+	// Kept out while you can't be hit (getting up). Hit during your kick, you are knocked down instead (attack beats kick: Hurt).
+	void TakeReact(AActor* From, const JeebHit::FReact& R);
+	// Your sword is coming (a jab, smash or sweep before the end of its hit frames): a kick into you loses
+	bool BladeComing() const;
+	bool IsKicking() const { return bAttacking && AtkStyle == EAtkStyle::Kick; }
 
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)
@@ -278,20 +284,39 @@ protected:
 	void StartCrouch();         // hold Ctrl
 	void StopCrouch();
 	void InteractReleased();    // letting go of left click: a charged spear thrust
-	enum class EAtkStyle : uint8 { Slash, Thrust, Cast, Kick };
+	enum class EAtkStyle : uint8 { Slash, Thrust, Cast, Kick, Sweep };
 	void StartAttack(EAtkStyle Style, int32 Dir, float Charge);
 	// The kick (wheel up; KnightCharacterCombat.cpp): the right leg, the whole body turning to his left like Ken's forward smash.
 	// Rock-paper-scissors: the sword is stopped by a raised shield, the kick goes through it and knocks the shielding knight
 	// down (KnockDownBy). It has end lag: once the foot is out he can't move or act until the leg is back down.
 	void StartKick();
 	static constexpr float KickDur = 0.65f, KickActiveFrom = 0.18f, KickActiveTo = 0.5f, KickDamage = 0.6f;   // (out in about 0.12 s)
-	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a kick hits each knight once)
+	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a move hits each other knight once: MoveLab)
+	// The low sweep (wheel down; sword only), like Link's down tilt in Smash Ultimate: he drops into a squat and sweeps the blade
+	// along the ground in front, right to left. It reaches a knight lying on the ground (after a kick: read which way he rolls
+	// and sweep there) and launches whoever it hits up into the air and a little back (bent by his DI); he lands on his back
+	// again. Rooted until it is over.
+	void StartSweep();
+	static constexpr float SweepDur = 0.55f, SweepActiveFrom = 0.36f, SweepActiveTo = 0.7f, SweepDamage = 0.8f;
+	// Hitstun (2026-10-31 balance pass): a clean hit stops whatever you are doing and you can't move, swing, block, roll or
+	// jump for this long. Jab hit 1 is long enough for hit 2 to follow for sure; hit 2 pushes you clear (the string ends there).
+	static constexpr float StunJab1 = 0.45f, StunJab2 = 0.32f, StunSmash = 0.5f, StunSmashFull = 0.8f;
+	float StunLeft = 0.f;
+	void ApplyReact(float Stun, const FVector& Vel, bool bLaunch);   // (every machine)
+	UFUNCTION(NetMulticast, Reliable) void MulticastReact(float Stun, FVector Vel, bool bLaunch);
+	// DI (Smash's directional influence): the direction you hold (camera-relative, flat), noted every frame you hold one, even
+	// while you can't move; the server is sent it and bends a launch by it (JeebHit::LaunchVelocity)
+	FVector DIDir = FVector::ZeroVector;
+	float DITime = -10.f, DISent = -10.f;
+	void NoteDI(const FVector& Dir);
+	FVector HeldDI() const;   // (server) what you are holding now, or zero
+	UFUNCTION(Server, Unreliable) void ServerDI(FVector_NetQuantizeNormal Dir);
 	// Knocked down (a kick on his raised shield): he falls on his back; once down, A or D rolls that way, W, S, Space or a click
 	// gets straight up (he gets up by himself after KnockAuto s). Getting up and rolling away can't be hit for a moment.
 	bool bKnockedDown = false;
 	uint8 KnockPhase = 0;          // 0 falling and lying, 1 getting up
 	float KnockT = 0.f, KnockAlpha = 0.f;
-	static constexpr float KnockFall = 0.35f, KnockAuto = 2.f, KnockRise = 0.45f;
+	static constexpr float KnockFall = 0.35f, KnockAuto = 1.5f, KnockRise = 0.45f;   // (KnockAuto counts from landing)
 	void KnockDownBy(AActor* From);   // (server)
 	void GetUp(uint8 Opt);            // 0 straight up, 1 roll to his left, 2 roll to his right (the player's machine, or the server)
 	void ApplyGetUp(uint8 Opt);
@@ -331,6 +356,7 @@ protected:
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
 	void ScrollUp() { StartKick(); }   // (the wheel up kicks)
+	void ScrollDown() { StartSweep(); }   // (the wheel down sweeps low)
 	void NextWeapon() { CycleHotbar(1); }   // R: the next weapon on the bar, left to right (round to the first again)
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
@@ -359,6 +385,7 @@ private:
 	UPROPERTY() UInputAction* CallHorseAction = nullptr;
 		UPROPERTY() UInputAction* SkillsAction = nullptr;
 	UPROPERTY() UInputAction* ScrollUpAction = nullptr;
+	UPROPERTY() UInputAction* ScrollDownAction = nullptr;
 	UPROPERTY() UInputAction* NextWeaponAction = nullptr;
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 	TArray<FArmorPart> ArmorParts;
@@ -598,7 +625,7 @@ private:
 	// Hitting a shield (owner, 2026-10-31): the blade bounces back (ReboundBack s) and he staggers back a step, open and unable
 	// to move, swing, block, roll or jump for a fixed time: a jab hit ReboundJab s, a smash attack ReboundSmash s (longer than
 	// its own end lag). A press in the last moment comes out right after, as after a smash.
-	static constexpr float ReboundJab = 0.45f, ReboundSmash = 0.8f, ReboundBack = 0.15f;
+	static constexpr float ReboundJab = 0.3f, ReboundSmash = 0.6f, ReboundBack = 0.15f;   // (balance pass 2026-10-31: was 0.45 / 0.8)
 	float ReboundDur = 0.f;
 	void StartRebound();                 // (server) a hit box of this swing struck a raised shield
 	void BeginRebound(float Dur);        // (every machine) the bounce itself
@@ -611,6 +638,7 @@ private:
 	bool bSmashSwing = false;      // this swing is a smash (its own hit boxes and damage)
 	bool bAttackDown = false;      // the attack button is held (the player's own machine)
 	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
+	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
 	void SetSmash(ESmash P, float Charge = 0.f, bool bTell = true);
 	bool SmashInputOk(ESmash P) const;   // a phase change the player's machine asked for fits what this machine is doing
 	void TickSmash(float Dt);

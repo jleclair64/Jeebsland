@@ -190,6 +190,10 @@ namespace JeebItems
 		return FMath::RoundToInt(DefenseOf(K_Shield, VariantOf(ShieldItemId)) * ShieldGuardMul(StyleOf(ShieldItemId)));
 	}
 	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
+	// The guard pool a raised shield blocks with (2026-10-31 balance pass): three times its Defence, so a shield takes about three
+	// sword jabs before it breaks (its Defence alone was one jab). Its Defence (armour totals, badges) is unchanged.
+	constexpr float GuardPoolMul = 3.f;
+	inline float GuardPool(int32 ShieldItemId) { return float(ShieldGuard(ShieldItemId)) * GuardPoolMul; }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
 	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a legendary one

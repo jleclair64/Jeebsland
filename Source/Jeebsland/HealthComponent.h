@@ -34,8 +34,12 @@ public:
 	// A hit box struck the raised shield (server): the owner works out how much the shield stops (and shows it); returns the
 	// damage that still gets through
 	TFunction<int32(int32 Amount, AActor* From)> ShieldBlock;
-	// Optional: a kick struck it while its shield was up (server): it is knocked down
+	// Optional: a kick struck it (server): it is knocked down
 	TFunction<void(AActor* From)> KnockDown;
+	// Optional: how a clean hit moves it (server; hitstun and push, or the low sweep's launch: JeebHit::FReact)
+	TFunction<void(AActor* From, const JeebHit::FReact& R)> React;
+	// Optional: its own blow is coming (wound up or swinging). Attack beats kick: a kick into it loses (the kicker falls).
+	TFunction<bool()> IsSwinging;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }

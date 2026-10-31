@@ -386,10 +386,11 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
-	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Kick) || Health <= 0.f || bKnockedDown) return;
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Sweep) || Health <= 0.f || bKnockedDown) return;
+	if (Style == static_cast<uint8>(EAtkStyle::Sweep) && SelectedKind() != K_Sword) return;   // (the low sweep is a sword move)
 	const double Now = FPlatformTime::Seconds();
 	if (Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
-	if (SmashTimeLeft() > 0.3f) return;   // nor before a smash attack's end lag is over (give or take the network)
+	if (SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
 	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow)
@@ -407,7 +408,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
 	if (HasAuthority() || IsLocallyControlled()) return;   // (the server and the swinging player already swing)
-	if (Style > static_cast<uint8>(EAtkStyle::Kick)) return;
+	if (Style > static_cast<uint8>(EAtkStyle::Sweep)) return;
 	StartAttack(static_cast<EAtkStyle>(Style), Dir < 0 ? -1 : 1, Charge);
 }
 

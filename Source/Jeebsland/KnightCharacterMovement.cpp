@@ -263,6 +263,12 @@ void AKnightCharacter::ToggleStrafe()
 void AKnightCharacter::DoMove(float Right, float Forward)
 {
 	const double Now = GetWorld()->GetTimeSeconds();
+	// DI: the direction held, relative to the camera, noted even when he can't move (a launch is bent by it)
+	if (GetController() && !bMounted)
+	{
+		const FRotator CamYaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		NoteDI(FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X) * Forward + FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y) * Right);
+	}
 	// Knocked down: once he has landed, A or D rolls away that way, W or S gets straight up
 	if (bKnockedDown)
 	{

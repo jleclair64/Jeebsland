@@ -191,13 +191,15 @@ void AFoeKnight::BeginPlay()
 		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
 		return true;
 	};
-	GuardMax = GuardPool = float(JeebItems::ShieldGuard(JeebItems::ShieldId(0, Tier)));   // (an iron kite shield)
+	GuardMax = GuardPool = JeebItems::GuardPool(JeebItems::ShieldId(0, Tier));   // (an iron kite shield)
 	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
 	{
 		TakeOnShield(Amount, From);
 		return 0;
 	};
 	Hp->KnockDown = [this](AActor* From) { KnockDown(From); };
+	Hp->React = [this](AActor* From, const JeebHit::FReact& R) { OnReact(From, R); };
+	Hp->IsSwinging = [this]() { return KnockT < 0.f && DeathT <= 0.f && (Act == EAct::Windup || Act == EAct::Strike); };   // (a kick into his swing loses)
 	if (bStill) { Post = GetActorLocation(); PostYaw = GetActorRotation().Yaw; }
 	LastLoc = GetActorLocation();
 	if (HasAuthority() && !bStill) Rise();
@@ -233,11 +235,18 @@ bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
 	return true;
 }
 
-// (server) A kick on his raised shield
+// (server) A kick: down on his back. How he gets up is picked at random but never the same way twice running, so a player
+// has to read it (still knights too: practice for the sweep)
 void AFoeKnight::KnockDown(AActor* From)
 {
 	if (!HasAuthority() || KnockT >= 0.f || DeathT > 0.f) return;
-	KnockOpt = bStill ? uint8(KnockCount % 3) : uint8(Rand.RandRange(0, 2));   // (the still one shows each way of getting up in turn)
+	if (BlockT > 0.f && !bGuardBroken && GuardMax > 0.f)   // a kick on his raised shield crushes half its guard
+	{
+		GuardPool -= 0.5f * GuardMax; GuardHitTime = GetWorld()->GetTimeSeconds();
+		if (bStill) Hp->LastHitTime = GuardHitTime;
+		if (GuardPool < 1.f) { GuardPool = 0.f; bGuardBroken = true; }
+	}
+	KnockOpt = uint8((KnockOpt + 1 + Rand.RandRange(0, 1)) % 3);
 	++KnockCount;
 	RepKnock = uint8(((KnockCount & 63) << 2) | KnockOpt);
 	KnockT = 0.f;
@@ -251,10 +260,46 @@ void AFoeKnight::KnockDown(AActor* From)
 	else MoveTowards(FVector2D(GetActorLocation()) + FVector2D(Away.X, Away.Y) * 50.f, 1.0e5f, 1.f);
 }
 
+// (server) Hit by a low sweep: up into the air and a little back, bent by his DI (a random direction held, as a player might),
+// landing on his back. Already lying down: he is scooped up off the ground and lies there again when he lands.
+void AFoeKnight::Launch(AActor* From)
+{
+	if (!HasAuthority() || DeathT > 0.f) return;
+	const bool bWasDown = KnockT >= 0.f;
+	if (!bAir) GroundZ = GetActorLocation().Z;
+	KnockT = -1.f;
+	KnockDown(From);
+	if (bWasDown) KnockT = KnockFall;   // (stays flat)
+	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation() - GetActorForwardVector())).GetSafeNormal2D();
+	FVector DI = FVector::ZeroVector;
+	const int32 Pick = Rand.RandRange(0, 4);   // none, toward his left, his right, away, back in
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, Away);
+	if (Pick == 1) DI = -Side; else if (Pick == 2) DI = Side; else if (Pick == 3) DI = Away; else if (Pick == 4) DI = -Away;
+	AirVel = JeebHit::LaunchVelocity(Away, DI);
+	bAir = true;
+}
+
+// (server) A clean hit: hitstun cuts his swing short (your attack beat his), with a push back; or the sweep's launch
+void AFoeKnight::OnReact(AActor* From, const JeebHit::FReact& R)
+{
+	if (!HasAuthority() || DeathT > 0.f) return;
+	if (R.bLaunch) { Launch(From); return; }
+	if (KnockT >= 0.f || R.Stun <= 0.f) return;   // (lying down or flying: he stays down)
+	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation())).GetSafeNormal2D();
+	const FVector By = Away * R.Push * 0.18f;   // (about how far the push carries a player)
+	if (bStill) SetActorLocation(GetActorLocation() + By, true);
+	else MoveTowards(FVector2D(GetActorLocation() + By), 1.0e5f, 1.f);
+	if (bStill) return;   // (a training post: he never acts anyway)
+	Act = EAct::Stun; ActT = 0.f; StunDur = R.Stun;
+	BlockT = -1.f;
+	RepAct = static_cast<uint8>(Act);
+}
+
 void AFoeKnight::OnRep_Knock()
 {
 	KnockOpt = RepKnock & 3;
-	KnockT = 0.f;
+	KnockT = (KnockT >= 0.f) ? KnockFall : 0.f;   // (already down, e.g. swept off the ground: he stays flat)
+	GroundZ = GetActorLocation().Z;
 	Act = EAct::Idle;
 }
 
@@ -263,6 +308,7 @@ void AFoeKnight::TickKnock(float Dt)
 	if (KnockT < 0.f) return;
 	const float Before = KnockT;
 	KnockT += Dt;
+	if (HasAuthority() ? bAir : GetActorLocation().Z > GroundZ + 8.f) KnockT = FMath::Min(KnockT, KnockFall);   // (launched: lying back in the air; the rest waits until he lands)
 	const float RollEnd = KnockLie + (KnockOpt ? KnockRoll : 0.f), End = RollEnd + KnockRise;
 	// how far down (1 lying)
 	const float Down = (KnockT < KnockFall) ? FMath::SmoothStep(0.f, 1.f, KnockT / KnockFall) : (KnockT < RollEnd ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (KnockT - RollEnd) / KnockRise));
@@ -363,7 +409,7 @@ void AFoeKnight::Rise()
 	HitFlash = 0.f;
 	Act = EAct::Idle;
 	BlockT = 0.f;
-	KnockT = -1.f; GuardPool = GuardMax; bGuardBroken = false;
+	KnockT = -1.f; GuardPool = GuardMax; bGuardBroken = false; bAir = false;
 	AttackCool = 2.f;
 	const FVector2D P = PenCenter;
 	SetActorLocation(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 98.f));
@@ -386,6 +432,7 @@ void AFoeKnight::OnHurt(AActor* From)
 		if (DeathT <= 0.f)
 		{
 			DeathT = 0.001f;
+			if (bAir) { bAir = false; const FVector P = GetActorLocation(); SetActorLocation(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 98.f)); }   // (beaten in the air: down to the ground)
 			KnockT = -1.f;
 			bRepDown = true;
 			RespawnT = 20.f;
@@ -429,6 +476,17 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		}
 		LastLoc = GetActorLocation();
 		return;
+	}
+
+	// Launched by a sweep: he flies (the server moves him; everyone else sees it replicated) until he lands, on his back
+	if (HasAuthority() && bAir)
+	{
+		AirVel.Z -= 980.f * Dt;
+		FVector P = GetActorLocation() + AirVel * Dt;
+		if (!bStill) { const FVector2D C = ClampToPen(FVector2D(P.X, P.Y)); P.X = C.X; P.Y = C.Y; }
+		const float Floor = bStill ? GroundZ : JeebTerrain::HeightAt(P.X, P.Y) + 98.f;
+		if (P.Z <= Floor && AirVel.Z < 0.f) { P.Z = Floor; bAir = false; AirVel = FVector::ZeroVector; }
+		SetActorLocation(P, true);
 	}
 
 	// (on players' machines he is only drawn: the server decides what he does)
@@ -497,7 +555,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 				if (StrafeT <= 0.f) { StrafeDir = Rand.FRand() < 0.5f ? -1.f : 1.f; StrafeT = Rand.FRandRange(1.5f, 3.f); }
 				MoveTowards(FVector2D(Me) + FVector2D(-Dir.Y, Dir.X) * StrafeDir * 100.f, 90.f, Dt);
 			}
-			if (Dist < 230.f && AttackCool <= 0.f && BlockT <= 0.f) { Act = EAct::Windup; ActT = 0.f; bStruck = false; }
+			if (Dist < StrikeReach - 10.f && AttackCool <= 0.f && BlockT <= 0.f) { Act = EAct::Windup; ActT = 0.f; bStruck = false; }
 			else if (BlockT <= 0.f && AttackCool > 0.6f && Dist < 260.f && Rand.FRand() < 0.15f * Dt) BlockT = Rand.FRandRange(0.8f, 1.3f);   // now and then he guards
 		}
 		else
@@ -529,11 +587,19 @@ void AFoeKnight::Tick(float DeltaSeconds)
 			{
 				const FVector2D Fwd(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)));
 				const float D2 = FVector2D(Knight->GetActorLocation() - GetActorLocation()).Size();
-				if (D2 < 240.f && FVector2D::DotProduct(Fwd, ToP / FMath::Max(Dist, 1.f)) > 0.45f)
-					Knight->Hurt(Rand.RandRange(HitMin, HitMax), this);
+				if (D2 < StrikeReach && FVector2D::DotProduct(Fwd, ToP / FMath::Max(Dist, 1.f)) > 0.45f)
+				{
+					Knight->Hurt(Rand.RandRange(HitMin, HitMax), this);   // (during a kick: knocked down, Hurt)
+					JeebHit::FReact R; R.Stun = StrikeStun; R.Push = StrikePush;
+					Knight->TakeReact(this, R);
+				}
 			}
 		}
 		if (ActT >= 0.2f) { Act = EAct::Recover; ActT = 0.f; }
+		break;
+	case EAct::Stun:     // hit: he can do nothing for a moment (his swing, if any, is lost)
+		BlockT = -1.f;
+		if (ActT >= StunDur) { Act = EAct::Idle; ActT = 0.f; AttackCool = FMath::Max(AttackCool, 0.4f); }
 		break;
 	case EAct::Recover:  // a moment open after the swing: your chance to hit back
 		if (ActT >= 0.55f) { Act = EAct::Idle; ActT = 0.f; AttackCool = Rand.FRandRange(1.6f, 2.6f); }

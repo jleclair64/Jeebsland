@@ -101,7 +101,8 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
 	RunAlpha  = FMath::FInterpTo(RunAlpha, FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f), Dt, 6.f); // 0 = walk, 1 = full sprint
 	AirAlpha  = FMath::FInterpTo(AirAlpha, bFalling ? 1.f : 0.f, Dt, 14.f);
-	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, bCrouched ? 1.f : 0.f, Dt, 10.f);
+	const bool bSweepSquat = bAttacking && AtkStyle == EAtkStyle::Sweep && AttackT < 0.82f * AttackDur;   // (the low sweep drops him into the squat, quickly)
+	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, (bCrouched || bSweepSquat) ? 1.f : 0.f, Dt, bSweepSquat ? 22.f : 10.f);
 	BlockAlpha  = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
 	SlideAlpha  = FMath::FInterpTo(SlideAlpha, bSliding ? 1.f : 0.f, Dt, 12.f);
 	SitAlpha    = FMath::FInterpTo(SitAlpha, bSitting ? 1.f : 0.f, Dt, 8.f);
@@ -646,7 +647,8 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	SwingLeanWant = 0.f;
 	SwingLoadWant = 0.f;
 	bool bBladeLead = false;   // a sword slash is on: the wrist sets the blade's heading
-	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
+	const bool bSweepNow = bAttacking && AtkStyle == EAtkStyle::Sweep;
+	if (bAttacking && !bSwinging && (AtkStyle == EAtkStyle::Slash || bSweepNow) && SelectedKind() == JeebItems::K_Sword)
 	{
 		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
@@ -666,8 +668,18 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,  14.f,    0.f,  -3.f, true  },   // the impact: hips and chest turn through the front
 			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  42.f,  110.f,   5.f, false },   // follow-through carries the whole torso round to his right
 			{ 1.00f, 0.f,  -10.f, -100.f, 40.f,  34.f,  120.f,   5.f, false } }; // ending near where hit 1 winds up
-		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
-		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
+		// The low sweep (wheel down), Link's down tilt: down in the squat, the blade drawn back low on his right, then swept flat
+		// along the ground across his front to his left (the same grip and leading edge as hit 1)
+		static const FKey Sweep[] = {
+			{ 0.00f,  0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
+			{ 0.22f, 10.f,   30.f,  -70.f, 45.f,  24.f,  125.f, -12.f, false },   // dropping into the squat, the blade drawn back low on his right
+			{ 0.36f, 22.f,   22.f,  -55.f, 30.f,  16.f,   80.f, -10.f, false },   // the blade swings out low on his right
+			{ 0.50f, 30.f,   -6.f,  -12.f,  4.f, -18.f,    0.f,  -3.f, true  },   // impact: the arm reaches low and forward, the blade flat along the ground (tip about 15 cm up)
+			{ 0.66f, 24.f,  -40.f,  -16.f,  8.f, -36.f,  -70.f,  -3.f, false },   // through to his left, still low
+			{ 0.82f,  8.f,  -40.f,  -45.f, 30.f, -22.f, -110.f, -30.f, false },   // recover, rising out of the squat
+			{ 1.00f, -8.f,  -30.f,  -60.f, 42.f, -12.f, -130.f, -40.f, false } };
+		const FKey* Keys = bSweepNow ? Sweep : AttackDir == JabSecond ? Hit2 : Hit1;
+		const int32 Num = bSweepNow ? UE_ARRAY_COUNT(Sweep) : AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
 		if (AttackDir != JabSecond)
 		{

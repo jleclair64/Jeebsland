@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "KnightMesh.h"
+#include "HitBoxes.h"
 #include "FoeKnight.generated.h"
 
 class UCapsuleComponent;
@@ -43,6 +44,8 @@ public:
 	static constexpr int32 Tier = 1;                   // iron (tier 1 since the 2026-10-30 redo)
 	static constexpr float GuardBack = 6.f;            // the pen knight's broken guard is whole again this long after the last blow on it
 	static constexpr float KnockFall = 0.35f, KnockLie = 1.f, KnockRoll = 0.5f, KnockRise = 0.45f, KnockRollDist = 130.f;
+	static constexpr float StrikeReach = 200.f;        // (centre to centre; was 240, longer than a player's sword reaches)
+	static constexpr float StrikeStun = 0.35f, StrikePush = 260.f;   // his cut's hitstun and push on a player
 
 protected:
 	virtual void BeginPlay() override;
@@ -73,7 +76,14 @@ private:
 	FVector2D PenHalf = FVector2D(700.f, 450.f);
 
 	// State
-	enum class EAct : uint8 { Idle, Windup, Strike, Recover };
+	enum class EAct : uint8 { Idle, Windup, Strike, Recover, Stun };   // (Stun: hitstun, StunDur s)
+	float StunDur = 0.f;
+	// Launched by a low sweep: flying (the server moves him; AirVel), landing on his back. GroundZ: where he lands
+	bool bAir = false;
+	FVector AirVel = FVector::ZeroVector;
+	float GroundZ = 0.f;
+	void Launch(AActor* From);
+	void OnReact(AActor* From, const JeebHit::FReact& R);
 	EAct Act = EAct::Idle;
 	float ActT = 0.f;
 	float AttackCool = 1.5f;
@@ -89,7 +99,7 @@ private:
 	bool TakeOnShield(int32 Amount, AActor* From);   // (server) the shield takes a blow; returns false if it isn't up and facing it
 	// Knocked down by a kick (all machines play it from RepKnock: a count of knockdowns, times 4, plus how he gets up)
 	float KnockT = -1.f;           // < 0 on his feet; seconds since the kick
-	uint8 KnockOpt = 0;            // 0 straight up, 1 roll to his left, 2 to his right
+	uint8 KnockOpt = 0;            // 0 straight up, 1 roll to his left, 2 to his right (never the same twice running)
 	int32 KnockCount = 0;
 	FVector Post = FVector::ZeroVector; float PostYaw = 0.f;   // (the still knight's spot)
 	UPROPERTY(ReplicatedUsing = OnRep_Knock) uint8 RepKnock = 0;

@@ -85,4 +85,18 @@ namespace JeebHit
 	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt);
 	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors);
 	bool ShieldOf(const UHealthComponent* H, FShieldWedge& Out);   // anything with health whose shield is up (UHealthComponent::GatherShield)
+
+	// What a clean hit does to whoever it lands on, fighting-game style (2026-10-31): hitstun (Stun s of being unable to act,
+	// cut out of any move) with a push away from the attacker, or a launch (the low sweep: up into the air and a little back,
+	// bent by the victim's DI, landing on his back as after a kick)
+	struct FReact
+	{
+		float Stun = 0.f;     // seconds
+		float Push = 0.f;     // cm/s away from the attacker
+		bool bLaunch = false;
+	};
+	// The low sweep's launch: up and a little away, turned up to DIAngle degrees toward the direction the victim holds (Smash's
+	// DI: only the part of it square to the launch counts). Away and DI are flat; DI zero = no DI.
+	constexpr float LaunchUp = 450.f, LaunchBack = 150.f, DIAngle = 18.f;   // (about 1 m up at the top, nearly 1 s in the air)
+	FVector LaunchVelocity(const FVector& Away, const FVector& DI);
 }

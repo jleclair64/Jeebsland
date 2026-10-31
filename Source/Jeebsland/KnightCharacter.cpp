@@ -345,6 +345,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	}
 		ScrollUpAction = MakeBool(TEXT("KnightScrollUp"));
 	KnightContext->MapKey(ScrollUpAction, EKeys::MouseScrollUp);
+	ScrollDownAction = MakeBool(TEXT("KnightScrollDown"));
+	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);   // (the low sweep)
 	NextWeaponAction = MakeBool(TEXT("KnightNextWeapon"));
 	KnightContext->MapKey(NextWeaponAction, EKeys::R);   // (R steps through the weapon bar; the wheel no longer does)
 	InventoryAction = MakeBool(TEXT("KnightInventory"));
@@ -419,7 +421,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
-				EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
+		EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
+		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);
 		EIC->BindAction(NextWeaponAction, ETriggerEvent::Started, this, &AKnightCharacter::NextWeapon);
 		EIC->BindAction(HotbarActions[0], ETriggerEvent::Started, this, &AKnightCharacter::Select1);
 		EIC->BindAction(HotbarActions[1], ETriggerEvent::Started, this, &AKnightCharacter::Select2);
