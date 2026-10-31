@@ -112,7 +112,7 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	{
 		const bool bJab = bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword;
 		const float JT = AttackT / FMath::Max(AttackDur, 0.01f);
-		const float Want = bJab ? (0.55f + 0.45f * FMath::SmoothStep(0.25f, 0.55f, JT)) * (AttackDir == JabThird ? 1.2f : 1.f) : 0.f;
+		const float Want = bJab ? (0.55f + 0.45f * FMath::SmoothStep(0.25f, 0.55f, JT)) : 0.f;
 		JabBodyNow = FMath::FInterpTo(JabBodyNow, Want, Dt, 10.f);
 	}
 	const float DuckJ = JabBodyNow * Ground;
@@ -528,32 +528,29 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	// left-handed). The blade stays LEVEL throughout: the arm is raised out to the SIDE (roll), which keeps a forward-pointing
 	// blade flat, and then swept round (yaw); raising it forward would stand the blade up. Each hit is a few key poses the
 	// arm blends between (shoulder pitch, sweep yaw, raise roll, elbow bend, forearm turn).
-	//   1 forehand: wound up high on the right, cut down and across to the left, blade level
-	//   2 backhand: the forearm turns over as it draws across, then the blade leads back out to the right
-	//   3 finisher: drawn far back and high on the right, then a big wide cut all the way across with a step in
-	//     (owner, 2026-10-30: no spin)
+	//   1 forehand: drawn back to the right, a flat cut right to left across the front
+	//   2 backhand: the forearm turns over and lies across the front, then the elbow opens: a flat cut left to right
+	//   (owner, 2026-10-30: no third hit, no spin; the two loop)
 	// The whole body moves with each hit (JabBodyNow: PosePrep sinks the knees and leans in, PoseBody turns the hips and chest).
 	float ForearmTarget = 0.f;
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
 	{
 		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Forearm; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
+		// (owner, 2026-10-30: two hits that loop for as long as you click; both cut flat across the FRONT of the knight. Hit 2
+		// ends about where hit 1 winds up, so 1-2-1-2 flows.) The blade's heading, seen from above: arm sweep (yaw) and elbow
+		// bend turn it together; with the forearm turned over (180) it points the other way across the forearm.
 		static const FKey Hit1[] = {
-			{ 0.00f, 4.f,    0.f,  -10.f, 25.f,   0.f, false },
-			{ 0.30f, 0.f,   35.f, -130.f, 55.f,   0.f, false },   // wound up high and back on the right
-			{ 0.55f, 0.f,  -80.f,  -75.f, 15.f,   0.f, true  },   // cut down and across, blade level, pointing left
-			{ 1.00f, 0.f,  -80.f,  -75.f, 15.f,   0.f, false } };
+			{ 0.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f, false },   // (where hit 2 ends)
+			{ 0.30f, 0.f,   25.f,  -85.f, 45.f,   0.f, false },   // drawn back to the right at shoulder height, elbow cocked, blade ahead
+			{ 0.55f, 0.f,  -80.f,  -80.f, 10.f,   0.f, true  },   // a flat cut from right to left across the front
+			{ 1.00f, 0.f,  -80.f,  -80.f, 10.f,   0.f, false } };
 		static const FKey Hit2[] = {
-			{ 0.00f, 0.f,  -80.f,  -75.f, 15.f,   0.f, false },
-			{ 0.30f, 0.f, -130.f,  -70.f, 45.f, 180.f, false },   // drawn across the body, the forearm turned over
-			{ 0.55f, 0.f,  -55.f,  -85.f,  5.f, 180.f, true  },   // swept back out, the blade leading to the right
-			{ 1.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false } };
-		static const FKey Hit3[] = {
-			{ 0.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false },
-			{ 0.30f, 0.f,   45.f, -115.f, 50.f, 360.f, false },   // drawn far back and high on the right, the forearm turned back
-			{ 0.55f, 0.f, -115.f,  -78.f,  5.f, 360.f, true  },   // a big wide cut all the way across (with the step in StartAttack)
-			{ 1.00f, 0.f, -115.f,  -78.f,  5.f, 360.f, false } };
-		const FKey* Keys = AttackDir == JabThird ? Hit3 : (AttackDir == JabSecond ? Hit2 : Hit1);
-		const int32 Num = AttackDir == JabThird ? UE_ARRAY_COUNT(Hit3) : (AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1));
+			{ 0.00f, 0.f,  -80.f,  -80.f, 10.f,   0.f, false },
+			{ 0.30f, 0.f,  -90.f,  -80.f, 95.f, 180.f, false },   // elbow folded so the forearm lies across the front, turned over: blade ahead
+			{ 0.55f, 0.f,  -75.f,  -85.f, 40.f, 180.f, true  },   // the elbow opens: a flat cut from left to right, still in front
+			{ 1.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f, false } };
+		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
+		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
 		int32 i = 0;
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;

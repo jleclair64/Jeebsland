@@ -138,6 +138,9 @@ void AKnightCharacter::TickCape(float Dt)
 	auto Idx = [](int32 i, int32 j) { return j * CapeNX + i; };
 	const FTransform Up = UpperPivot->GetComponentTransform();
 	const FVector Back = -Up.GetUnitAxis(EAxis::X);
+	// A sudden jump (appearing in the world, waking up after a fall, any teleport) starts the cloth again hanging straight,
+	// instead of it being yanked across the gap and flipping over his head
+	if (bCapeInit && bCapeRootSet && FVector::Dist(UpperPivot->GetComponentLocation(), CapeRootPrev) > 80.f) bCapeInit = false;
 
 	if (!bCapeInit || CapeP.Num() != N)
 	{
@@ -151,6 +154,7 @@ void AKnightCharacter::TickCape(float Dt)
 		bCapeInit = true;
 		bCapeRootSet = false;
 		CapeAccum = 0.f;
+		CapeYawPrev = Up.Rotator().Yaw;
 	}
 
 	// Wind of moving: streams the cape back and lifts it when running, with a ripple running down it
@@ -171,8 +175,14 @@ void AKnightCharacter::TickCape(float Dt)
 		{
 			const FVector Carry(0.f, 0.f, (Root.Z - CapeRootPrev.Z) * 0.8f);   // up and down only: running still trails it behind
 			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] += Carry; CapePrev[k] += Carry; }
+			// (2026-10-30) Turning, and the chest turning into a sword swing, carry most of the cloth round with him, so a quick
+			// turn no longer leaves it behind to be flung out to the side like a board
+			const float Yaw = Up.Rotator().Yaw;
+			const FQuat Turn(FVector::UpVector, FMath::DegreesToRadians(0.85f * FMath::FindDeltaAngleDegrees(CapeYawPrev, Yaw)));
+			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] = Root + Turn.RotateVector(CapeP[k] - Root); CapePrev[k] = Root + Turn.RotateVector(CapePrev[k] - Root); }
 		}
 		CapeRootPrev = Root; bCapeRootSet = true;
+		CapeYawPrev = Up.Rotator().Yaw;
 	}
 	auto Link = [&](int32 a, int32 b, float Rest, float Stiff)
 	{
@@ -231,7 +241,12 @@ void AKnightCharacter::TickCape(float Dt)
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
 				float Lim = -27.5f;   // the back of the armour (it stands out to about -23.6 at the shoulder blades), plus the cloth's 3 cm thickness
 				if (bStowed && L.Z > -9.f) Lim = -38.f;   // and over the shield when it is on the back
-				if (L.X > Lim) { L.X = Lim; CapeP[k] = Up.TransformPosition(L); }
+				// and never far out to the side: at most a hand's width past the cloth's own edge (it hung out like a board)
+				const float Edge = 0.5f * FMath::Lerp(WTop, WBot, float(k / CapeNX) / (CapeNY - 1)) + 12.f;
+				const bool bFix = L.X > Lim || FMath::Abs(L.Y) > Edge;
+				L.X = FMath::Min(L.X, Lim);
+				L.Y = FMath::Clamp(L.Y, -Edge, Edge);
+				if (bFix) CapeP[k] = Up.TransformPosition(L);
 			}
 		}
 	}

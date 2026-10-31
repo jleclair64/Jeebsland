@@ -468,6 +468,7 @@ private:
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	FVector CapeRootPrev = FVector::ZeroVector; bool bCapeRootSet = false;
+	float CapeYawPrev = 0.f;   // the chest's heading last frame (the cloth is carried round when he turns)
 	TArray<FVector> CapeNrmPrev;
 	bool bCapeMeshMade = false;
 	float CapeAccum = 0.f;
@@ -525,10 +526,11 @@ private:
 	float AttackT = 0.f, AttackDur = 0.7f;
 	EAtkStyle AtkStyle = EAtkStyle::Slash;
 	EAtkStyle LastStyle = EAtkStyle::Cast;
-	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); the sword adds +2, the jab's finisher
-	static constexpr int32 JabFirst = 1, JabSecond = -1, JabThird = 2;   // the sword's three-hit jab (Link's, Smash Ultimate)
+	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); (the sword's jab uses the same two)
+	static constexpr int32 JabFirst = 1, JabSecond = -1;   // the sword's two-hit jab (forehand, backhand; they loop)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
-	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1.2)
+	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1)
+	float AttackYaw = 0.f;          // the heading a swing started with (a sword hit keeps it)
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)
 	int32 QueuedJabs = 0;           // clicks made during a sword swing, each one more swing of the jab (up to the finisher)
 	int32 LastSwingDir = 0;

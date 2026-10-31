@@ -90,11 +90,10 @@ void AKnightCharacter::Interact()
 		}
 		else if (K == JeebItems::K_Sword)
 		{
-			// Link's jab: one swing per click (a click during a swing is remembered, see TickAttack); a click just after a
-			// swing has ended still carries the chain on: forehand, backhand, then the big finisher
+			// The sword's jab: one swing per click (a click during a swing is remembered, see TickAttack); a click just after
+			// a swing has ended still carries on, forehand and backhand in turn
 			int32 Next = JabFirst;
-			if (LastStyle == EAtkStyle::Slash && Now - LastSwingEnd <= 0.3f)
-				Next = (LastSwingDir == JabFirst) ? JabSecond : (LastSwingDir == JabSecond ? JabThird : JabFirst);
+			if (LastStyle == EAtkStyle::Slash && Now - LastSwingEnd <= 0.3f && LastSwingDir == JabFirst) Next = JabSecond;
 			StartAttack(EAtkStyle::Slash, Next, 0.f);
 		}
 		else

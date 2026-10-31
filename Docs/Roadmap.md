@@ -85,7 +85,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
   6. Crouch block (low shield stops sweeps, high shield stops overheads). (The strafe-mode toggle on wheel click, X twin, was BUILT 2026-10-30: AKnightCharacter::ToggleStrafe.)
   - Every weapon gets four moves (left click, scroll down, scroll up, charge). Sword, staff and spear moves are listed in the shelved file's combat section (unchanged).
   - **The knight's sword moves (owner, 2026-10-30; SWORD ONLY for now, other weapons keep their attacks):**
-    - Left click: Link's three-hit jab (Ultimate), one swing per click: 1 click = swing 1 only, 2 = two, 3 = all three.
+    - Left click: a two-hit jab that loops while you keep clicking (built 2026-10-30, posed from Link's Ultimate jab): a flat forehand from right to left, then a flat backhand across the front; one swing per click. The owner dropped the third hit and the spin.
     - Scroll down: Link's down tilt (crouched low sweep). Scroll up: Link's forward tilt angled down (overhead chop).
     - Running + click: Marth's dash attack, but swung SIDE TO SIDE (a flat sweep while sliding), not low to high.
     - Running, jump, forward + click: Corrin's side B as a lunging stab forward and down, then fall back down (no sword in the ground, no pause).
