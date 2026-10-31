@@ -563,11 +563,11 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		static const FKey Hit1[] = {
 			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
 			{ 0.12f,-12.f,  -38.f,  -62.f, 48.f,   6.f, -132.f, -40.f, false },   // settle the hand low by the left hip, palm turned toward the ground
-			{ 0.25f, -6.f,  -28.f,  -70.f, 58.f,  18.f, -112.f, -28.f, false },   // compact load beside the hip; no high or behind-the-back loop
-			{ 0.32f, 18.f,   -8.f,  -78.f, 42.f,  14.f,  -58.f,  -4.f, false },   // bring the blade into the front arc
-			{ 0.38f, 28.f,  -52.f,  -68.f, 20.f,  -4.f,   18.f,   5.f, false },   // carry the hand across the chest before the fast contact
-			{ 0.43f,  0.f, -100.f,  -62.f,  0.f, -22.f,    0.f,  -4.f, true  },   // hit timing: reach through the front with the elbow open and blade aimed ahead
-			{ 0.62f,-12.f,  -88.f,  -48.f, 10.f, -38.f,  -42.f, -16.f, false },   // keep the tip forward through the long, low follow-through
+			{ 0.25f, 40.f,   18.f,  -86.f, 60.f,  26.f, -170.f,  -8.f, false },   // backswing apex: elbow bent, sword points back without looping behind the body
+			{ 0.32f, 54.f,    5.f,  -70.f, 40.f,  16.f,  -70.f,  12.f, false },   // drive the blade from the back pull into the front arc
+			{ 0.38f, 68.f,  -20.f,  -38.f, 14.f,  -4.f,  -24.f,   4.f, false },   // shoulder leads across the front as the elbow opens
+			{ 0.43f, 82.f,   -8.f,   -8.f,  0.f, -22.f,    0.f,   0.f, true  },   // impact: arm fully reaches, blade points straight ahead from the belt
+			{ 0.62f, 58.f,  -35.f,  -18.f, 10.f, -38.f,  -32.f,  -8.f, false },   // carry the extended arm through the front before recovery
 			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
 			{ 0.92f,-14.f,  -48.f,  -62.f, 44.f, -24.f, -112.f, -38.f, false },   // settle the sword toward the left hip for the next stroke
 			{ 1.00f,-12.f,  -38.f,  -62.f, 48.f, -25.f, -138.f, -42.f, false } }; // low, palm-down handoff into hit 2
@@ -621,7 +621,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
 		// so the wrist stays natural): the forehand travels to his left, the backhand to his right
 		BladeLeadSign = (AttackDir == JabSecond) ? -1.f : 1.f;
-		BladeCantNow = FMath::Lerp(-30.f, 45.f, FMath::SmoothStep(0.12f, 0.43f, T));   // palm-down low ready pose rolls smoothly into the cutting grip
+		BladeCantNow = FMath::Lerp(-30.f, 45.f, FMath::SmoothStep(0.30f, 0.43f, T));   // keep the palm down through the pull, then roll into the cutting grip
 		bBladeLead = true;
 		ArmSpeed = 40.f;   // (follows the key poses tightly)
 	}
