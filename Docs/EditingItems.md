@@ -4,16 +4,15 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 
 | File | What it holds |
 |---|---|
-| `Tiers.csv` | The nine ranks (Tin to Diamond): level needed, damage and defence steps, price multiplier, smithing level/XP/materials, armour colours, description |
+| `Tiers.csv` | The nine ranks (Tin to Diamond): level needed, damage and defence steps, price multiplier, smithing level/XP/materials, armour colours, the PvP-rank cape colour (CapeColor), description |
 | `Kinds.csv` | Each kind of gear: tin damage, reach, swing speed, defence, store price, smithing mass, two-handed, description |
 | `Materials.csv` | Ores, gems, logs, fish, animal drops: name, stack size, sell price, colour, gathering level, fishing XP |
 | `Potions.csv` | Potions: effect (speed, heal, vigour, radar), strength, seconds, cooldown, price, colour, store line, description |
 | `Accessories.csv` | Rings, amulets and the helm brush: attack/defence multipliers, crits, damage floor/ceiling, wild, speed, health, icon colours |
 | `ShieldStyles.csv` | Kite, round, tower: guard size, stance speed, recovery delay |
-| `Capes.csv` | Cape colours and extra price |
 
 **Rules** (each file repeats its own at the top):
-- Saves remember items by number. **Never delete or reorder rows** in Potions, Accessories and Capes: add new ones at the end.
+- Saves remember items by number. **Never delete or reorder rows** in Potions and Accessories: add new ones at the end.
 - In Tiers, Kinds and Materials keep the `Key` column as it is (the code finds rows by it); everything else can change.
 - A new potion can use any existing effect (for example a stronger swiftness potion: `speed`, Amount 1.75, Seconds 15). A brand-new kind of effect needs code.
 - Colours are three numbers from 0 to 1 (red green blue), e.g. `0.80 0.07 0.07`.

@@ -12,7 +12,6 @@
 //   Potions.csv       potions: effect, strength, cooldown, price, colour, text
 //   Accessories.csv   rings, amulets and the helm brush: their effects
 //   ShieldStyles.csv  kite, round, tower
-//   Capes.csv         cape colours
 // Each file says at its top which rows must stay as they are (saves remember items by number). Change a file, then restart the
 // game (and the world servers): the server's copy decides everything, so a world uses its own files; players' copies only
 // change what their screens show. A file that cannot be read keeps the game going with plain defaults and writes the problem
@@ -42,6 +41,7 @@ namespace JeebItems
 		float Share[2] = { 0.f, 0.f };   // share of the piece's mass (0 = unused)
 		FLinearColor Gem = FLinearColor::White;
 		FLinearColor Palette[7];         // EArmorRole order: Plate, Under, Trim, Cloth, Accent, Leather, BootBody
+		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the cape of a player at this PvP rank
 	};
 	struct FKindRow
 	{
@@ -77,7 +77,6 @@ namespace JeebItems
 		FLinearColor Band = FLinearColor::White, Gem = FLinearColor::White;
 	};
 	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 10.f; };
-	struct FCapeRow { FString Name; FLinearColor Color = FLinearColor::White; int32 ExtraPrice = 0; };
 
 	struct FItemTables
 	{
@@ -88,7 +87,6 @@ namespace JeebItems
 		TArray<FAccessoryRow> Rings, Amulets;
 		FAccessoryRow Crest;
 		TArray<FShieldStyleRow> ShieldStyles;   // always 3 rows (kite, round, tower)
-		TArray<FCapeRow> Capes;
 	};
 
 	// The tables (read from Content/Data the first time they are needed)

@@ -17,10 +17,12 @@ class UJeebSave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 2;   // 2: the tier redo (Migrate converts version 1)
+	static constexpr int32 CurrentVersion = 3;   // 2: the tier redo; 3: capes became the PvP rank (Migrate converts older ones)
 	static const FString SlotName;
 
-	UPROPERTY() int32 SaveVersion = CurrentVersion;
+	// 0 = "not in the file". (Unreal leaves out a value that equals its default, so while the default was CurrentVersion no
+	// file ever stored it and every old save read as current. Since 2026-10-30 Capture always writes it; see Migrate.)
+	UPROPERTY() int32 SaveVersion = 0;
 
 	// The player (everything USkillComponent holds)
 	UPROPERTY() TArray<int32> XP;

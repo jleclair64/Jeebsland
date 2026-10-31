@@ -358,6 +358,7 @@ void AKnightHUD::ItemTip(int32 Id)
 		if (K == K_Boots) L.Add(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(V)));
 	}
 	else if (IsAccessoryKind(K)) L.Add(AccessoryText(K, V));
+	if (K == K_Cape) { L.Add(TEXT("Shows your PvP rank. It is yours for good: never dropped, sold or traded")); SetTip(L); return; }
 	L.Add(FString::Printf(TEXT("Worth %d ingots"), GearSellPrice(Id)));
 	SetTip(L);
 }

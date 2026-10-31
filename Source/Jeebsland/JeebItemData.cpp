@@ -139,6 +139,7 @@ namespace JeebItems
 				Row.Gem = Tab.Color(r, TEXT("GemColor"), FLinearColor::White);
 				const TCHAR* Roles[7] = { TEXT("Plate"), TEXT("Under"), TEXT("Trim"), TEXT("Cloth"), TEXT("Accent"), TEXT("Leather"), TEXT("BootBody") };
 				for (int32 k = 0; k < 7; ++k) Row.Palette[k] = Tab.Color(r, Roles[k], Row.Palette[k]);
+				Row.CapeColor = Tab.Color(r, TEXT("CapeColor"), Row.CapeColor);
 			}
 		}
 
@@ -260,21 +261,6 @@ namespace JeebItems
 				Row.RecoverDelay = Tab.F(s, TEXT("RecoverDelay"), 10.f);
 			}
 		}
-
-		void LoadCapes(FItemTables& T)
-		{
-			FTable Tab;
-			if (Tab.Load(TEXT("Capes.csv")))
-				for (int32 r = 0; r < Tab.Rows.Num() && T.Capes.Num() < MaxVariants; ++r)
-				{
-					FCapeRow Row;
-					Row.Name = Tab.S(r, TEXT("Name"));
-					Row.Color = Tab.Color(r, TEXT("Color"), Row.Color);
-					Row.ExtraPrice = Tab.I(r, TEXT("ExtraPrice"), 0);
-					T.Capes.Add(Row);
-				}
-			if (T.Capes.Num() == 0) { FCapeRow Black; Black.Name = TEXT("Black"); Black.Color = FLinearColor(0.06f, 0.06f, 0.08f); T.Capes.Add(Black); }   // (a cape always has a colour)
-		}
 	}
 
 	const FItemTables& Tables()
@@ -290,8 +276,7 @@ namespace JeebItems
 			LoadPotions(T);
 			LoadAccessories(T);
 			LoadShieldStyles(T);
-			LoadCapes(T);
-			UE_LOG(LogJeebItems, Log, TEXT("Jeebsland items: read %d potions, %d rings, %d amulets, %d capes from Content/Data"), T.Potions.Num(), T.Rings.Num(), T.Amulets.Num(), T.Capes.Num());
+			UE_LOG(LogJeebItems, Log, TEXT("Jeebsland items: read %d potions, %d rings, %d amulets from Content/Data"), T.Potions.Num(), T.Rings.Num(), T.Amulets.Num());
 		}
 		return T;
 	}

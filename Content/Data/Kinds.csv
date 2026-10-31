@@ -20,7 +20,7 @@ Chest,Chestplate,1,2,200,1,7,90,10,2,no,The heaviest armour piece and the bigges
 Shoulders,Shoulders,1,2,200,1,4,55,6,1,no,Layered pauldrons for the shoulders.
 Gloves,Gloves,1,2,200,1,2,30,3,0,no,Armoured gauntlets for the hands.
 Boots,Boots,1,2,200,1,3,45,5,0,no,"Armoured boots. Better boots also give you more stamina: it lasts longer and returns faster."
-Cape,Cape,1,2,200,1,0,25,0,0,no,A cloak in your choice of colour. Purely for style.
+Cape,Cape,1,2,200,1,0,0,0,0,no,"Your cape shows your PvP rank: Tin, Iron, Bronze, Steel, Silver, Gold, then your class's legendary colour. It is yours for good: never dropped, sold or traded. (PvP ranks come later: for now every knight wears Tin.)"
 Ring,Ring,1,2,200,1,0,0,0,0,no,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."
 Amulet,Amulet,1,2,200,1,0,0,0,0,no,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."
 Crest,Helm Brush,1,2,200,1,0,0,0,0,no,

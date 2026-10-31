@@ -50,7 +50,7 @@ USkillComponent::USkillComponent()
 }
 
 // The kit you begin with (and wake up with after dying): a wooden sword, axe, pickaxe and fishing pole on the weapon bar, a wooden
-// shield, a black cape and a full suit of bronze armour (pieces can be swapped for others, never taken off)
+// shield, the cape of your PvP rank and a full suit of tin armour (pieces can be swapped for others, never taken off)
 void USkillComponent::ResetToStartingKit()
 {
 	if (!HasAuth()) return;   // only the server changes the pack
@@ -63,8 +63,15 @@ void USkillComponent::ResetToStartingKit()
 	Hotbar[2] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
 	Hotbar[3] = JeebItems::GearId(JeebItems::K_Rod, 0);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
-	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, 5);   // black
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, JeebItems::T_Tin);   // tin: the lowest tier (was bronze before the 2026-10-30 tier redo)
+	RefreshCape();
+}
+
+// The cape always shows the PvP rank (JeebItems::CapeRank); it is never an item you can hold
+void USkillComponent::RefreshCape()
+{
+	if (!HasAuth()) return;   // only the server changes the pack
+	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, JeebItems::CapeRank(this));
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
@@ -74,7 +81,7 @@ void USkillComponent::TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWh
 	auto Put = [&](int32 Id, int32 Count, uint8 W) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; Out.Add(D); OutWhere.Add(W); } };
 	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0); S.Id = 0; S.Count = 0; }
 	for (int32 i = 0; i < 5; ++i) { Put(Hotbar[i], 1, 1); Hotbar[i] = 0; }
-	for (int32 i = 0; i < NumWornKinds; ++i) { Put(Worn[i], 1, 2); Worn[i] = 0; }
+	for (int32 i = 0; i < NumWornKinds; ++i) { if (i == JeebItems::K_Cape) continue; Put(Worn[i], 1, 2); Worn[i] = 0; }   // (the cape stays: it shows your PvP rank)
 	Put(RingB, 1, 2); RingB = 0;
 	Put(PotionSlot.Id, PotionSlot.Count, 0); PotionSlot = FInvSlot();
 	OutIngots = Ingots;
@@ -431,6 +438,11 @@ bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 		Say(3.f, FColor::Orange, TEXT("Armour can't be taken off. Click a better piece in your pack to swap it."));
 		return false;
 	}
+	if (Kind == JeebItems::K_Cape)
+	{
+		Say(3.f, FColor::Orange, TEXT("Your cape shows your PvP rank. It can't be taken off."));
+		return false;
+	}
 	if (!AddInvItem(Target, 1)) return false;
 	Target = 0;
 	return true;
@@ -571,7 +583,7 @@ void USkillComponent::FillPracticePack()
 	FRandomStream R(5150);
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
-		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Cape, K_Ring, K_Amulet };
+		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Ring, K_Amulet };
 	// three of each potion: swiftness and vigour in the pack, healing in the potion slot
 	Slots[0].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[0].Count = 3;
 	Slots[1].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[1].Count = 3;

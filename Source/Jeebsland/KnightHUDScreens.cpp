@@ -279,11 +279,12 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 
 	if (K == K_Cape)
 	{
-		for (int32 c = 0; c < NumCapeColors(); ++c)
+		// the PvP ranks a knight can reach, lowest first (the cape colours come from Tiers.csv)
+		for (int32 c = 0; c < NumTiersKnight; ++c)
 		{
 			DrawIcon(GearId(K_Cape, c), CX, Y - 4.f, 30.f);
-			HDText(CapeColorName(c), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
-			HDText(FString::Printf(TEXT("%d ingots"), BuyPrice(K_Cape, c)), FLinearColor(1.f, 0.85f, 0.3f), CX + 200.f, Y, Font, 1.0f);
+			HDText(FString::Printf(TEXT("%s rank"), TierName(c)), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
+			if (c == NumTiersKnight - 1) HDText(TEXT("the knights' highest rank"), FLinearColor(1.f, 0.85f, 0.3f), CX + 200.f, Y, Font, 1.0f);
 			Y += 34.f;
 		}
 		return;

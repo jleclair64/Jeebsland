@@ -29,7 +29,6 @@ namespace JeebItems
 	// The skill level needed to wear or wield a tier
 	inline int32 EquipLevel(int32 T) { return TierRow(T).EquipLevel; }
 	constexpr int32 NumTiersKnight = 7;   // the tiers a knight can use (Tin to Onyx): what the smithy and the dictionary list
-	inline int32 NumCapeColors() { return Tables().Capes.Num(); }
 
 	// What kind of thing a piece of gear is
 	enum EKind : int32
@@ -114,9 +113,11 @@ namespace JeebItems
 	// ---------------------------------------------------------------- names
 	inline const TCHAR* TierName(int32 T) { return *TierRow(T).Name; }
 	inline const TCHAR* KindName(int32 K) { return *KindRow(K).Name; }
-	inline const FCapeRow& CapeRow(int32 C) { const TArray<FCapeRow>& A = Tables().Capes; return A[FMath::Clamp(C, 0, A.Num() - 1)]; }
-	inline const TCHAR* CapeColorName(int32 C) { return *CapeRow(C).Name; }
-	inline FLinearColor CapeColor(int32 C) { return CapeRow(C).Color; }
+	// The cape shows the PvP rank (2026-10-30): its variant is the rank, which uses the tier ladder (Tin ... Gold, then the
+	// class's legendary at the top), and its colour is that tier's CapeColor. It is locked to the character: the server sets
+	// it from the rank (USkillComponent::RefreshCape) and it is never taken off, dropped, sold or bought.
+	inline FLinearColor CapeColor(int32 Rank) { return TierRow(Rank).CapeColor; }
+	inline int32 CapeRank(const USkillComponent* S) { return T_Tin; }   // the player's PvP rank: PvP is not built yet, so every knight is Tin
 
 	// Rings and amulets (and the helm brush)
 	inline int32 NumRings() { return Tables().Rings.Num(); }
@@ -137,7 +138,7 @@ namespace JeebItems
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (!IsGear(Id)) return FString();
 		const int32 K = KindOf(Id), V = VariantOf(Id);
-		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), CapeColorName(V));
+		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), TierName(V));
 		if (K == K_Shield) return FString::Printf(TEXT("%s %s"), TierName(V), ShieldStyleName(StyleOf(Id)));
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
 		return FString::Printf(TEXT("%s %s"), TierName(V), KindName(K));
@@ -213,7 +214,7 @@ namespace JeebItems
 	inline int32 BuyPrice(int32 K, int32 Variant)
 	{
 		if (IsAccessoryKind(K)) return AccessoryPrice(K, Variant);
-		if (K == K_Cape) return BaseBuyPrice(K_Cape) + CapeRow(Variant).ExtraPrice;
+		if (K == K_Cape) return 0;   // (never sold: it shows your PvP rank)
 		return FMath::Max(1, FMath::RoundToInt(BaseBuyPrice(K) * TierPriceMult(Variant)));
 	}
 	constexpr int32 ArrowBundle = 10;

@@ -26,6 +26,12 @@ bool UJeebSave::ValidId(int32 Id)
 
 void UJeebSave::Migrate()
 {
+	// A file without its version was written before 2026-10-30's fix. Those written before the tier redo (version 1) still have
+	// the small map-fog grid; the full-size world, 21 minutes after the redo, made the grid 9 times bigger, so a full-size grid
+	// means version 2. (Every save there was at the time fits: randy and tester_1 from 10-29 are version 1, the single-player
+	// save from 10-30 evening is version 2.)
+	if (SaveVersion <= 0) SaveVersion = (Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8) ? 2 : 1;
+
 	// Version 1 -> 2 (2026-10-30, the tier redo): the old tiers Wood, Bronze, Iron, Steel, Diamond become Tin, Bronze, Iron,
 	// Steel, Gold (Diamond is now the wizards' legendary, so old diamond gear becomes the best a knight can still wear). Applies
 	// to every weapon, tool, armour piece and shield (whose tier is the last digit) and to arrows, wherever they are kept.
@@ -46,6 +52,21 @@ void UJeebSave::Migrate()
 		for (int32& Id : BankIds) Fix(Id);
 		for (int32& Id : Hotbar) Fix(Id);
 		for (int32& Id : Worn) Fix(Id);
+	}
+	// Version 2 -> 3 (2026-10-30): capes stopped being items; the cape now shows the PvP rank. A spare cape in the pack, the
+	// bank or on the weapon bar is sold for what the store used to pay (12 ingots, 22 for the old gold cape); the worn cape is
+	// replaced by the rank's cape when the save is loaded (USkillComponent::RefreshCape).
+	if (SaveVersion < 3)
+	{
+		auto SellCape = [this](int32& Id)
+		{
+			if (!IsGear(Id) || KindOf(Id) != K_Cape) return;
+			Ingots += (VariantOf(Id) == 4) ? 22 : 12;
+			Id = 0;
+		};
+		for (int32& Id : SlotIds) SellCape(Id);
+		for (int32& Id : BankIds) SellCape(Id);
+		for (int32& Id : Hotbar) SellCape(Id);
 	}
 	SaveVersion = CurrentVersion;
 }
@@ -120,6 +141,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	for (int32 L : LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
 	Skills->Explored = Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8 ? Explored : TArray<uint8>();
 	Skills->LastGambleHour = LastGambleHour;
+	Skills->RefreshCape();
 	return true;
 }
 

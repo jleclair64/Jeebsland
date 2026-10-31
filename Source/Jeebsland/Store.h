@@ -63,14 +63,13 @@ namespace JeebStore
 			return true;
 		};
 
-		// Cheap: always a bundle of plain arrows, then tin and iron bits and a cape (tiers since 2026-10-30: tin, iron, bronze)
+		// Cheap: always a bundle of plain arrows, then tin and iron bits (tiers since 2026-10-30: tin, iron, bronze)
 		// Every potion is always in stock (Potions.csv)
 		for (int32 T = 0; T < NumPotions(); ++T) Push(PotionWare(T), 5, 5);
 		Push(ArrowWare(R.RandRange(T_Tin, T_Iron)), 5, 5);
 		for (int32 Guard = 0; Out.Num() < 6 && Guard < 50; ++Guard)
 		{
-			if (R.FRand() < 0.25f) Push(GearWare(K_Cape, R.RandRange(0, NumCapeColors() - 1)), 1, 2);
-			else Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);
+			Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);   // (no capes: the cape shows your PvP rank)
 		}
 		// Middling: bronze pieces, iron heavy weapons, rings, bronze arrows
 		for (int32 Guard = 0; Out.Num() < 9 && Guard < 50; ++Guard)
@@ -113,7 +112,7 @@ namespace JeebStore
 			{ TEXT("10 iron arrows"),               28.0f },
 			{ TEXT("A tin or iron tool or weapon"), 22.0f },
 			{ TEXT("40 ingots"),                    15.0f },
-			{ TEXT("A cape"),                       12.0f },
+			{ TEXT("25 ingots"),                    12.0f },   // (was a cape, until capes became the PvP rank)
 			{ TEXT("A bronze piece of gear"),       10.0f },
 			{ TEXT("A ring"),                        7.0f },
 			{ TEXT("An amulet"),                     4.0f },
@@ -143,7 +142,7 @@ namespace JeebStore
 		case 0: OutId = ArrowId(T_Iron); OutCount = ArrowBundle; break;
 		case 1: OutId = GearId(Pick(Tools, UE_ARRAY_COUNT(Tools)), R.RandRange(T_Tin, T_Iron)); break;
 		case 2: OutId = 0; OutCount = 40; break;
-		case 3: OutId = GearId(K_Cape, R.RandRange(0, NumCapeColors() - 1)); break;
+		case 3: OutId = 0; OutCount = 25; break;
 		case 4: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Bronze); break;
 		case 5: OutId = GearId(K_Ring, R.RandRange(0, FMath::Max(1, NumRings()) - 1)); break;
 		case 6: OutId = GearId(K_Amulet, R.RandRange(0, FMath::Max(1, NumAmulets()) - 1)); break;
