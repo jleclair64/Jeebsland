@@ -99,6 +99,7 @@ void AProjectile::ApplyLaunch()
 	Velocity = FVector(L.Dir) * L.Speed;
 	SetActorRotation(Velocity.Rotation());
 	if (L.Seq > 0) bSpent = true;   // (relaunched: it glanced off a shield)
+	if (!L.bBolt) SetActorScale3D(FVector(FlyScale));
 	if (!bFirst || IsNetMode(NM_DedicatedServer)) return;
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	auto Paint = [&](UStaticMeshComponent* C, const FLinearColor& Col)
@@ -288,6 +289,7 @@ void AProjectile::ApplyStuck()
 		SetActorRelativeRotation(Stuck.Rot);
 	}
 	else SetActorLocationAndRotation(Stuck.Loc, Stuck.Rot);
+	SetActorScale3D(FVector(1.f));   // (flying it was drawn bigger)
 	// a fire arrow burns out a few seconds after it lands
 	if (Glow)
 	{
@@ -364,7 +366,7 @@ void AProjectile::Burn(AActor* Target)
 void AProjectile::TickTrail()
 {
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(GetActorLocation() - GetActorForwardVector() * 68.f, Now));
+	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(GetActorLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X, Now));
 	TrailPts.RemoveAll([&](const TPair<FVector, float>& P) { return Now - P.Value > TrailLife; });
 	if (!Trail)
 	{
@@ -376,7 +378,12 @@ void AProjectile::TickTrail()
 		Trail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Trail->SetCastShadow(false);
 		Trail->RegisterComponent();
-		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) Trail->SetMaterial(0, M);
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail")))
+			if (UMaterialInstanceDynamic* D = Trail->CreateDynamicMaterialInstance(0, M))   // (fuller and brighter than the sword's wisp: easy to follow)
+			{
+				D->SetScalarParameterValue(TEXT("Opacity"), 1.f);
+				D->SetScalarParameterValue(TEXT("Bright"), 1.3f);
+			}
 	}
 	if (TrailPts.Num() < 2) { if (Trail->GetNumSections() > 0) Trail->ClearAllMeshSections(); return; }
 	FVector Cam = GetActorLocation() + FVector(0.f, 0.f, 300.f);
@@ -391,8 +398,8 @@ void AProjectile::TickTrail()
 		FVector Side = FVector::CrossProduct(Along, (Cam - P).GetSafeNormal()).GetSafeNormal();
 		if (Side.IsNearlyZero()) Side = FVector::UpVector;
 		const float Age = FMath::Clamp((Now - TrailPts[i].Value) / TrailLife, 0.f, 1.f);
-		const float Half = 2.2f * (1.f - Age);
-		const float Alpha = 0.85f * FMath::Pow(1.f - Age, 1.5f);
+		const float Half = TrailWidth * (1.f - 0.7f * Age);
+		const float Alpha = FMath::Pow(1.f - Age, 1.2f);
 		V.Add(P - Side * Half); UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 		V.Add(P + Side * Half); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 	}

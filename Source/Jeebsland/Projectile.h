@@ -71,7 +71,9 @@ public:
 	static constexpr int32 BurnTicks = 3, BurnDamage = 2;   // fire arrows: BurnDamage points BurnTicks times, BurnEvery s apart, after the hit
 	static constexpr float BurnEvery = 0.7f;
 	static constexpr float ArrowSag = 300.f;   // cm/s/s: arrows drop a little (bolts fly straight)
-	static constexpr float TrailLife = 0.15f;   // s a bit of the white streak behind a flying arrow lasts
+	static constexpr float TrailLife = 0.35f;   // s a bit of the white streak behind a flying arrow lasts
+	static constexpr float TrailWidth = 4.5f;   // cm either side of its middle, where it is newest
+	static constexpr float FlyScale = 1.7f;     // arrows are drawn this much bigger while flying (easier to follow), true size once they land
 
 private:
 	UPROPERTY() USceneComponent* Root = nullptr;

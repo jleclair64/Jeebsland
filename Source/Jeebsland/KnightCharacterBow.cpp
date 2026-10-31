@@ -59,7 +59,7 @@ bool AKnightCharacter::ShotSideOn() const
 	return bShotFace && GetController() && FMath::Abs(FMath::FindDeltaAngleDegrees(ShotFaceYaw, GetController()->GetControlRotation().Yaw)) > 20.f;
 }
 
-FVector AKnightCharacter::BowAimDir() const
+FVector AKnightCharacter::BowAimDir(FVector* OutTarget) const
 {
 	const FVector Start = ArrowStart();
 	if (ShotSideOn()) return GetActorForwardVector();
@@ -72,14 +72,17 @@ FVector AKnightCharacter::BowAimDir() const
 				const FVector CamDir = PC->PlayerCameraManager->GetCameraRotation().Vector();
 				FHitResult Hit;
 				FCollisionQueryParams Q(SCENE_QUERY_STAT(BowAim), false, this);
-				const FVector From = CamLoc + CamDir * 150.f;
+				// (looking from abreast of the bow on: anything between the camera and the knight, such as a dummy he walks past, is
+				// behind the arrow and must not catch the aim)
+				const FVector From = CamLoc + CamDir * FMath::Max(150.f, FVector::DotProduct(Start - CamLoc, CamDir) + 20.f);
 				FVector Target = CamLoc + CamDir * 9000.f;
 				if (GetWorld()->LineTraceSingleByChannel(Hit, From, Target, ECC_Visibility, Q)) Target = Hit.ImpactPoint;
 				const float Body = AProjectile::FirstBodyAlong(GetWorld(), From, Target, this);   // (a knight or foe under the reticle: the trace sees through them)
 				if (Body <= 1.f) Target = From + (Target - From) * Body;
+				if (OutTarget) *OutTarget = Target;
 				const FVector D = Target - Start;
 				if (D.Size() > 200.f && FVector::DotProduct(D.GetSafeNormal(), CamDir) > 0.3f) return D.GetSafeNormal();
-				return CamDir;
+				return (CamLoc + CamDir * 3000.f - Start).GetSafeNormal();   // (something right in front of the bow: still cross the reticle's line, 30 m out)
 			}
 	return GetBaseAimRotation().Vector();   // (others: where he looks)
 }
@@ -107,7 +110,9 @@ void AKnightCharacter::StartDraw()
 void AKnightCharacter::ReleaseDraw()
 {
 	if (Bow != EBow::Drawing) return;
-	const FVector Dir = BowAimDir();
+	FVector Target = FVector::ZeroVector;
+	const FVector Dir = BowAimDir(&Target);
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *ArrowStart().ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
 	const float C = BowCharge;
 	const int32 Id = ArrowSlotId();
 	SetBow(EBow::Recover);
@@ -181,6 +186,7 @@ void AKnightCharacter::TickBow(float Dt)
 		|| (IsLocallyControlled() && IsUIOpen())))
 		CancelDraw();
 	BowT += Dt;
+	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)
 	if (Bow == EBow::Drawing)
 	{

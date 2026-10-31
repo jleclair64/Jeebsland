@@ -673,6 +673,7 @@ private:
 	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
 	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
 	float ShotBowAt = -1.f;        // test pictures (bow60): let the string go at this time
+	float ShotStrafe = 0.f;        // test pictures (-ShotStrafe=1): walk sideways to his right (-1 left) while shooting
 	bool ShotSideOn() const;       // test pictures taken from the side: the bow aims straight ahead and the camera stays put
 	void SetSmash(ESmash P, float Charge = 0.f, bool bTell = true);
 	bool SmashInputOk(ESmash P) const;   // a phase change the player's machine asked for fits what this machine is doing
@@ -712,7 +713,7 @@ private:
 	void TickBow(float Dt);
 	void PoseBow(float Dt);        // (end of PoseArms) the aiming arms, the side-on chest and the turned head
 	FVector ArrowStart() const;    // where arrows leave from (the same on every machine)
-	FVector BowAimDir() const;     // the player's machine: from ArrowStart through what is under the reticle; elsewhere where he looks
+	FVector BowAimDir(FVector* OutTarget = nullptr) const;     // the player's machine: from ArrowStart through what is under the reticle; elsewhere where he looks
 	void FireArrow(const FVector& Dir, float Charge, int32 ArrowId);   // (server)
 	UFUNCTION(Server, Reliable) void ServerBowDraw();
 	UFUNCTION(Server, Reliable) void ServerBowShoot(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId);
