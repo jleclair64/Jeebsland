@@ -1,4 +1,6 @@
 #include "KnightCharacter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -194,6 +196,8 @@ void AKnightCharacter::StartRoll()
 {
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	if (bRolling || bSliding || bSitting || bClimbing || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
+	static const bool bShotMode = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
+	if (bShotMode) return;   // (test pictures: a stray Alt as the window opens would roll him)
 
 	// Roll the way you are steering, or straight ahead if you are standing still
 	FVector Dir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;

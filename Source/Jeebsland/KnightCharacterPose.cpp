@@ -108,13 +108,21 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	const float CS = FMath::Sin(ClimbPhase);
 	const float Air = AirAlpha;
 	const float Ground = 1.f - Air;
-	const float Duck = FMath::Max(CrouchAlpha, BlockAlpha) * Ground; // how low the knight is sitting
+	// A sword jab moves the whole body: he sinks into his knees and leans into each cut, most as the blade comes through
+	{
+		const bool bJab = bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword;
+		const float JT = AttackT / FMath::Max(AttackDur, 0.01f);
+		const float Want = bJab ? (0.55f + 0.45f * FMath::SmoothStep(0.25f, 0.55f, JT)) * (AttackDir == JabThird ? 1.2f : 1.f) : 0.f;
+		JabBodyNow = FMath::FInterpTo(JabBodyNow, Want, Dt, 10.f);
+	}
+	const float DuckJ = JabBodyNow * Ground;
+	const float Duck = FMath::Max(FMath::Max(CrouchAlpha, BlockAlpha) * Ground, FMath::Min(DuckJ, 1.f)); // how low the knight is sitting
 	// Crouching (Ctrl) is a deep squat, thighs about level and knees well forward like a person squatting low; the shield
 	// guard keeps its own shallower crouch. Both can be on at once (the deeper legs win; the shield arm still comes up).
 	const float DuckC = CrouchAlpha * Ground, DuckB = BlockAlpha * Ground;
-	const float DuckHip = FMath::Max(55.f * DuckB, 100.f * DuckC);
-	const float DuckKnee = FMath::Min(-95.f * DuckB, -140.f * DuckC);
-	const float DuckLean = FMath::Max(14.f * DuckB, 24.f * DuckC);   // a person squatting low leans forward to keep balance
+	const float DuckHip = FMath::Max(FMath::Max(55.f * DuckB, 100.f * DuckC), 42.f * DuckJ);
+	const float DuckKnee = FMath::Min(FMath::Min(-95.f * DuckB, -140.f * DuckC), -78.f * DuckJ);
+	const float DuckLean = FMath::Max(FMath::Max(14.f * DuckB, 24.f * DuckC), 15.f * DuckJ);   // a person squatting low leans forward to keep balance
 	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
 
 	// ---------- Gait: a real stride (rewritten 2026-10-30) ----------
@@ -346,7 +354,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
 	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
 	// a sword swing turns the chest with the arm (a third of the arm's sweep), so the body puts weight behind it
-	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword) ? 0.33f * ArmYaw : 0.f, Dt, 12.f);
+	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword) ? 0.45f * ArmYaw : 0.f, Dt, 12.f);
 	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw + SwingTwistNow, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
 
 	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
@@ -363,17 +371,13 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
 		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
 	}
-	// The sword jab's finisher: the whole knight spins once round, sword held out level (Link's third hit), turning towards
-	// the sword's edge. (At the end -360 is the same as 0, so nothing jumps.)
-	float SpinYaw = 0.f;
-	if (bAttacking && AtkStyle == EAtkStyle::Slash && AttackDir == JabThird && SelectedKind() == JeebItems::K_Sword)
-		SpinYaw = -360.f * FMath::SmoothStep(0.22f, 0.72f, AttackT / FMath::Max(AttackDur, 0.01f));
-	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + SpinYaw, 2.5f * MoveBlend * C * Ground));
+	// (a sword swing turns the hips too, a little behind the chest: SwingTwistNow, worked out above)
+	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + 0.4f * SwingTwistNow, 2.5f * MoveBlend * C * Ground));
 
 	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
 	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
 	// (crouched, the head also takes back the rest of the squat's lean, so the helm looks the same way as when standing)
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground - 0.8f * SwingTwistNow, -0.5f * TurnRoll - 0.7f * Sway));   // (the head keeps looking ahead through a swing)
+	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground - 1.25f * SwingTwistNow, -0.5f * TurnRoll - 0.7f * Sway));   // (the head keeps looking ahead through a swing)
 
 	P.TurnRoll = TurnRoll;
 }
@@ -526,7 +530,9 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	// arm blends between (shoulder pitch, sweep yaw, raise roll, elbow bend, forearm turn).
 	//   1 forehand: wound up high on the right, cut down and across to the left, blade level
 	//   2 backhand: the forearm turns over as it draws across, then the blade leads back out to the right
-	//   3 finisher: arm held out level, and the whole body spins once round (the spin is in PoseBody); hits all round
+	//   3 finisher: drawn far back and high on the right, then a big wide cut all the way across with a step in
+	//     (owner, 2026-10-30: no spin)
+	// The whole body moves with each hit (JabBodyNow: PosePrep sinks the knees and leans in, PoseBody turns the hips and chest).
 	float ForearmTarget = 0.f;
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
 	{
@@ -543,8 +549,9 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			{ 1.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false } };
 		static const FKey Hit3[] = {
 			{ 0.00f, 0.f,  -55.f,  -85.f,  5.f, 180.f, false },
-			{ 0.22f, 0.f,   -5.f,  -95.f,  5.f, 360.f, false },   // arm out level to the side, blade pointing ahead: then the spin
-			{ 1.00f, 0.f,   -5.f,  -95.f,  5.f, 360.f, false } };
+			{ 0.30f, 0.f,   45.f, -115.f, 50.f, 360.f, false },   // drawn far back and high on the right, the forearm turned back
+			{ 0.55f, 0.f, -115.f,  -78.f,  5.f, 360.f, true  },   // a big wide cut all the way across (with the step in StartAttack)
+			{ 1.00f, 0.f, -115.f,  -78.f,  5.f, 360.f, false } };
 		const FKey* Keys = AttackDir == JabThird ? Hit3 : (AttackDir == JabSecond ? Hit2 : Hit1);
 		const int32 Num = AttackDir == JabThird ? UE_ARRAY_COUNT(Hit3) : (AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1));
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
@@ -559,7 +566,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		RollR = FMath::Lerp(K0.Roll, K1.Roll, E);
 		ElbowRdeg = FMath::Lerp(K0.Elbow, K1.Elbow, E);
 		ForearmTarget = FMath::Lerp(K0.Forearm, K1.Forearm, E);
-		ArmSpeed = 30.f;
+		ArmSpeed = 40.f;   // (follows the key poses tightly)
 	}
 
 	if (bFishing)

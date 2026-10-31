@@ -66,10 +66,10 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	if (Dir < 0) AttackDur *= 0.85f;           // the follow-up swing is 15% faster
 	if (Style == EAtkStyle::Slash && K == JeebItems::K_Sword)
 	{
-		// The sword's jab: two quick swings and a bigger, slower finisher that steps forward
-		AttackDur = Cd * (Dir == JabThird ? 1.35f : Dir == JabSecond ? 0.85f : 0.95f);
-		if (Dir == JabThird && (IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
-			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 330.f, true, false);   // (the player's machine and the server step together)
+		// The sword's jab: two quick swings and a bigger finisher, each with a step forward (a longer one on the finisher)
+		AttackDur = Cd * (Dir == JabThird ? 1.15f : Dir == JabSecond ? 0.72f : 0.8f);
+		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
+			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (Dir == JabThird ? 380.f : 210.f), true, false);   // (the player's machine and the server step together)
 	}
 	bAttacking = true;
 	bBlocking = false;   // the shield drops for the swing; Tick raises it again afterwards if the block button is still held
@@ -138,7 +138,7 @@ void AKnightCharacter::AttackLands()
 	const bool bJab = (AtkStyle == EAtkStyle::Slash && K == JeebItems::K_Sword);
 	const float JabMul = !bJab ? 1.f : (AttackDir == JabThird ? 1.3f : 0.85f);
 	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f) + ((bJab && AttackDir == JabThird) ? 30.f : 0.f);
-	const float MinDot = bThrust ? 0.8f : ((bJab && AttackDir == JabThird) ? -1.f : 0.2f);   // (the jab's spinning finisher hits all round)
+	const float MinDot = bThrust ? 0.8f : ((bJab && AttackDir == JabThird) ? 0.f : 0.2f);   // (the jab's wide finisher reaches a little further round)
 	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
 
 	TArray<UHealthComponent*> Targets;
