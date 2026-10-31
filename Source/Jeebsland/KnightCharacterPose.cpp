@@ -564,7 +564,8 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
 			{ 0.12f, 30.f,   18.f,  -78.f, 44.f,  18.f,  142.f,  24.f, false },   // shoulder draws back; chest and hips coil behind it
 			{ 0.25f, 72.f,   46.f, -100.f, 72.f,  40.f,  126.f,  42.f, false },   // loaded over the right shoulder, elbow bent and palm turned skyward
-			{ 0.32f, 56.f,   24.f,  -82.f, 50.f,  22.f,   76.f,  30.f, true  },   // hips start unwinding; shoulder and wrist accelerate first
+			{ 0.32f, 46.f,    0.f,  -80.f, 42.f,  16.f,   55.f,  24.f, false },   // turn the shoulder into the front of the cut, not around the body's right side
+			{ 0.38f, 28.f,  -40.f,  -68.f, 24.f,  -4.f,   18.f,   5.f, false },   // carry the hand across the chest before the fast contact
 			{ 0.43f,  0.f,  -82.f,  -62.f,  8.f, -22.f,    0.f,  -4.f, true  },   // hit timing: arm reaches across and forward, blade points out in front
 			{ 0.62f,-12.f,  -88.f,  -48.f, 10.f, -38.f,  -42.f, -16.f, false },   // keep the tip forward through the long, low follow-through
 			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
@@ -581,7 +582,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		if (AttackDir != JabSecond)
 		{
 			const float FlipIn = FMath::SmoothStep(0.10f, 0.28f, T);
-			const float FlipOut = 1.f - FMath::SmoothStep(0.38f, 0.52f, T);
+			const float FlipOut = 1.f - FMath::SmoothStep(0.29f, 0.40f, T);
 			WristFlipNow = 180.f * FlipIn * FlipOut;
 		}
 		if (AttackDir != JabSecond)
