@@ -213,26 +213,44 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
 		const FVector Tip = Along(79.5f), In = Along(67.f);   // a thin band at the tip (the sword's tip is 79.5 cm from the grip)
-		const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
-		TrailPrevTip = Tip; bTrailPrev = true;
-		// Only the cut itself leaves a trail (owner, 2026-10-31): hit 1's forward arc and hit 2's backward arc, from the end of
-		// the wind-up to the slowing of the follow-through (the parts of each swing in PoseArms' key tables), faded in and out
+		// Only the cut itself leaves a trail. Begin hit 1 once the blade is already moving across the front of the body.
 		const float T = AttackT / FMath::Max(AttackDur, 0.01f);
-		const float From = (AttackDir == JabSecond) ? 0.30f : 0.28f, To = (AttackDir == JabSecond) ? 0.74f : 0.64f;
+		const float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.68f;
 		const float Window = FMath::SmoothStep(From, From + 0.05f, T) * (1.f - FMath::SmoothStep(To - 0.08f, To, T));
-		FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
-		TrailSamples.Add(S);
+		if (Window > 0.001f)
+		{
+			// A fresh cut gets a fresh curve; never spline-connect the end of one swing to the start of the next.
+			if (!bTrailPrev) TrailSamples.Reset();
+			const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
+			TrailPrevTip = Tip; bTrailPrev = true;
+			FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
+			TrailSamples.Add(S);
+		}
+		else bTrailPrev = false;
 	}
 	else bTrailPrev = false;
 	TrailSamples.RemoveAll([&](const FTrailSample& S) { return Now - S.Time > Life; });
 	if (TrailSamples.Num() < 2) { if (SwordTrail->GetNumSections() > 0) SwordTrail->ClearAllMeshSections(); return; }
 
-	// Smooth curves through the noted points (Catmull-Rom), four steps between each pair
+	// Centripetal Catmull-Rom keeps the wisp smooth without overshooting at sharp turns or doubled end points.
 	TArray<FVector> V; TArray<FVector2D> UV; TArray<FLinearColor> Col; TArray<int32> Tri;
 	auto CR = [](const FVector& P0, const FVector& P1, const FVector& P2, const FVector& P3, float T)
 	{
-		const float T2 = T * T, T3 = T2 * T;
-		return 0.5f * ((2.f * P1) + (-P0 + P2) * T + (2.f * P0 - 5.f * P1 + 4.f * P2 - P3) * T2 + (-P0 + 3.f * P1 - 3.f * P2 + P3) * T3);
+		const float T0 = 0.f;
+		const float T1 = T0 + FMath::Sqrt(FMath::Max((P1 - P0).Size(), 0.0001f));
+		const float T2 = T1 + FMath::Sqrt(FMath::Max((P2 - P1).Size(), 0.0001f));
+		const float T3 = T2 + FMath::Sqrt(FMath::Max((P3 - P2).Size(), 0.0001f));
+		const float At = FMath::Lerp(T1, T2, T);
+		auto LerpAt = [](const FVector& A, const FVector& B, float Ta, float Tb, float X)
+		{
+			return FMath::Lerp(A, B, (X - Ta) / FMath::Max(Tb - Ta, 0.0001f));
+		};
+		const FVector A1 = LerpAt(P0, P1, T0, T1, At);
+		const FVector A2 = LerpAt(P1, P2, T1, T2, At);
+		const FVector A3 = LerpAt(P2, P3, T2, T3, At);
+		const FVector B1 = LerpAt(A1, A2, T0, T2, At);
+		const FVector B2 = LerpAt(A2, A3, T1, T3, At);
+		return LerpAt(B1, B2, T1, T2, At);
 	};
 	const int32 N = TrailSamples.Num(), Steps = 4;
 	for (int32 i = 0; i < N - 1; ++i)
