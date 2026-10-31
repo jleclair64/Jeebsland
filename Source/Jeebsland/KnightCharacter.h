@@ -284,7 +284,7 @@ protected:
 	// Rock-paper-scissors: the sword is stopped by a raised shield, the kick goes through it and knocks the shielding knight
 	// down (KnockDownBy). It has end lag: once the foot is out he can't move or act until the leg is back down.
 	void StartKick();
-	static constexpr float KickDur = 0.8f, KickActiveFrom = 0.27f, KickActiveTo = 0.5f, KickDamage = 0.6f;
+	static constexpr float KickDur = 0.65f, KickActiveFrom = 0.18f, KickActiveTo = 0.5f, KickDamage = 0.6f;   // (out in about 0.12 s)
 	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a kick hits each knight once)
 	// Knocked down (a kick on his raised shield): he falls on his back; once down, A or D rolls that way, W, S, Space or a click
 	// gets straight up (he gets up by himself after KnockAuto s). Getting up and rolling away can't be hit for a moment.

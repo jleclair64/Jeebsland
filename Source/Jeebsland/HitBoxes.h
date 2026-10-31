@@ -56,18 +56,18 @@ namespace JeebHit
 	// at his centre and walls standing up from the two foul lines (45 degrees either side of straight ahead) and along the
 	// outfield fence (an arc Radius out). Checked BEFORE the hurt boxes, as Smash checks shields first: a hit box that touches
 	// the wedge is blocked, even if it touches a hurt box on the same frame. Blows from outside it reach the body.
-	// Only the OUTFIELD is shield (owner, 2026-10-31): the infield diamond is cut out (home plate at his centre, first and third
-	// base on the foul lines Infield x Radius out, second base on the fence straight ahead), so his body stands in the hollow and
-	// the shield is a band round the front, thickest at the sides and thinning to nothing straight ahead. Its top is the top of
-	// his helm, rounded down (Round cm) along the left and right walls.
+	// The shield itself (owner, 2026-10-31, second pass): only a thin curved band of the wedge, at the distance the raised shield
+	// really is from his centre (measured: its face 56 - 83 cm out), still spanning the 90 degrees; his body stands well inside
+	// it. Seen from the front it is an arch: straight sides from his feet up to ArchFrom, then curving in (a half ellipse) to
+	// the top of his helm in the middle.
 	struct FShieldWedge
 	{
 		FVector Apex = FVector::ZeroVector;     // his centre (home plate), at the capsule's middle height
 		FVector Fwd = FVector::ForwardVector;   // straight ahead (flat)
-		float Radius = 100.f, HalfAngle = 45.f; // cm, degrees
-		float Infield = 0.7071f;                // first and third base, as a share of Radius (a square infield: second base on the fence)
+		float Inner = 58.f, Radius = 78.f;      // the band, from his centre (cm)
+		float HalfAngle = 45.f;                 // degrees either side of straight ahead
 		float ZLow = -96.f, ZHigh = 68.f;       // from his feet to the top of his helm, relative to the apex
-		float Round = 30.f;                     // the rounding of the top's left and right corners (cm)
+		float ArchFrom = -12.f;                 // where the sides start curving in to the top (about his belt)
 	};
 	// TopZ: the top of his helm (world height; HelmTop), or below the apex for the default height
 	inline FShieldWedge KnightShield(const FVector& Centre, const FVector& Forward, float TopZ = -1.0e9f)

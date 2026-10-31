@@ -415,14 +415,17 @@ void AKnightCharacter::PoseKick(FKnightPose& P)
 	{
 		// (fraction of the kick; right hip pitch and roll, right knee, the hips' turn, the chest's lean and turn, the head's turn)
 		struct FKey { float T, HipP, HipRoll, Knee, BodyYaw, ChestRoll, ChestYaw, HeadYaw; };
+		// (the leg's angles are the pose itself, taking over from the stance; the turns and leans are added to the body's.
+		//  Measured from above, 2026-10-31: at full stretch the hips are turned a full quarter to his left so the straight leg
+		//  points at the target, the sole leading and the toes pointing to his old left)
 		static const FKey Keys[] = {
 			{ 0.00f,  0.f,  0.f,    0.f,   0.f,  0.f,  0.f,  0.f },
-			{ 0.18f, 55.f, 35.f, -105.f, -45.f,  8.f, 10.f, 30.f },   // chamber: the knee up and across, turning
-			{ 0.30f, 10.f, 92.f,   -4.f, -85.f, 26.f, 18.f, 60.f },   // the foot out, side-on, leaning back
-			{ 0.50f, 10.f, 95.f,   -4.f, -85.f, 28.f, 18.f, 60.f },   // held out
+			{ 0.12f, 55.f, 35.f, -105.f, -50.f,  8.f, 10.f, 30.f },   // chamber: the knee up and across, turning
+			{ 0.22f, 10.f, 92.f,   -2.f, -90.f, 26.f, 18.f, 62.f },   // the foot out, side-on, leaning back
+			{ 0.50f, 10.f, 95.f,   -2.f, -90.f, 28.f, 18.f, 62.f },   // held out
 			{ 0.66f, 45.f, 45.f,  -95.f, -60.f, 12.f, 12.f, 45.f },   // folded back
-			{ 0.85f,  5.f,  5.f,  -15.f, -15.f,  2.f,  4.f, 12.f },   // set down, turning back
-			{ 1.00f,  0.f,  0.f,    0.f,   0.f,  0.f,  0.f,  0.f } };
+			{ 0.85f, 12.f,  5.f,  -24.f, -15.f,  2.f,  4.f, 12.f },   // set down, turning back
+			{ 1.00f, 12.f,  0.f,  -24.f,   0.f,  0.f,  0.f,  0.f } };
 		const float T = FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f);
 		int32 i = 0;
 		while (i + 2 < (int32)UE_ARRAY_COUNT(Keys) && T > Keys[i + 1].T) ++i;
@@ -430,14 +433,19 @@ void AKnightCharacter::PoseKick(FKnightPose& P)
 		const FKey& B = Keys[i + 1];
 		const float U = FMath::SmoothStep(0.f, 1.f, (T - A.T) / (B.T - A.T));
 		auto L = [&](float FKey::* M) { return FMath::Lerp(A.*M, B.*M, U); };
-		Add(HipR, L(&FKey::HipP), 0.f, -L(&FKey::HipRoll));   // (a hip's roll is negative out to his right: measured from above)
-		Add(KneeR, L(&FKey::Knee), 0.f, 0.f);
+		const float W = FMath::SmoothStep(0.f, 0.08f, T) * (1.f - FMath::SmoothStep(0.85f, 1.f, T));   // how far the kicking leg's own pose has taken over
+		FRotator Hr = HipR->GetRelativeRotation();
+		Hr.Pitch = FMath::Lerp(Hr.Pitch, L(&FKey::HipP), W); Hr.Yaw = FMath::Lerp(Hr.Yaw, 0.f, W);
+		Hr.Roll = FMath::Lerp(Hr.Roll, -L(&FKey::HipRoll), W);   // (a hip's roll is negative out to his right: measured from above)
+		HipR->SetRelativeRotation(Hr);
+		FRotator Kr = KneeR->GetRelativeRotation();
+		Kr.Pitch = FMath::Lerp(Kr.Pitch, L(&FKey::Knee), W);
+		KneeR->SetRelativeRotation(Kr);
 		Add(BodyRoot, 0.f, L(&FKey::BodyYaw), 0.f);
 		Add(UpperPivot, 0.f, L(&FKey::ChestYaw), -L(&FKey::ChestRoll));   // (roll + tips the top to his right: negative leans him away to his left)
 		Add(HeadPivot, 0.f, L(&FKey::HeadYaw), 0.6f * L(&FKey::ChestRoll));   // (the head stays nearly level)
-		const float G = KickGuard();   // the kicking foot flexed, square to the shin, so the sole leads
-		FRotator Ar = AnkleR->GetRelativeRotation();
-		Ar.Pitch = FMath::Lerp(Ar.Pitch, 0.f, G);
+		FRotator Ar = AnkleR->GetRelativeRotation();   // the kicking foot flexed, square to the shin, so the sole leads
+		Ar.Pitch = FMath::Lerp(Ar.Pitch, 0.f, W);
 		AnkleR->SetRelativeRotation(Ar);
 	}
 	// Knocked down: flat on his back, legs nearly straight (eased in as he falls, out as he gets up)

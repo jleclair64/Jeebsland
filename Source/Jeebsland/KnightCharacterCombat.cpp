@@ -139,6 +139,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("kick")) StartAttack(EAtkStyle::Kick, 1, 0.f);                             // the kick (wheel up)
+	if (Move == TEXT("block")) { bBlockHeld = true; StartBlock(); }                              // the shield held up
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
 	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash40 = 0.4 s of charge (hundredths: the command line stops at a dot)
 	{
@@ -693,7 +694,7 @@ static constexpr float SwordSmashDamage = 1.f, SwordSmashFullMul = 2.5f;
 
 // The kick: three spheres on the kicking (right) leg, the foot first. It goes straight through a raised shield (its wedge counts
 // as a touch too) and knocks the shielding knight down; an unguarded one just takes the blow.
-static const JeebHit::FHitSphere KickBoxes[] = { { 0, 0.f, 13.f, 1.f }, { 1, 0.f, 11.f, 0.9f }, { 2, 0.f, 10.f, 0.8f } };   // foot, ankle, knee (Along unused)
+static const JeebHit::FHitSphere KickBoxes[] = { { 0, 0.f, 13.f, 1.f }, { 1, 0.f, 12.f, 0.9f }, { 2, 0.f, 10.f, 0.8f } };   // in front of the sole, the foot, the knee (Along unused)
 
 void AKnightCharacter::TickHitboxes(float Dt)
 {
@@ -715,8 +716,14 @@ void AKnightCharacter::TickHitboxes(float Dt)
 			const JeebHit::FHitSphere& S = Boxes[i];
 			FVector Now;
 			if (!bKick) Now = W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * S.Along - KnightDesign::PivotPos(KnightDesign::P_WristR));
-			else if (i == 0) Now = AnkleR->GetComponentTransform().TransformPosition(FVector(10.f, 13.f, -90.f) - KnightDesign::PivotPos(KnightDesign::P_AnkleR));   // the sole
-			else Now = (i == 1 ? AnkleR : KneeR)->GetComponentLocation();
+			else
+			{
+				// a little out in front of the sole (the way the shin points: at full stretch, straight at the target), then the
+				// foot itself, then the knee
+				const FVector Shin = (AnkleR->GetComponentLocation() - KneeR->GetComponentLocation()).GetSafeNormal();
+				const FVector Foot = AnkleR->GetComponentLocation() + AnkleR->GetForwardVector() * 6.f;   // (the middle of the foot)
+				Now = (i == 0) ? Foot + Shin * 24.f : (i == 1) ? Foot + Shin * 8.f : KneeR->GetComponentLocation();
+			}
 			JeebHit::FCapsule C;
 			C.A = bHitPrevValid ? HitPrev[i] : Now; C.B = Now; C.R = S.Radius;
 			HitLive.Add(C);
@@ -797,6 +804,25 @@ void AKnightCharacter::TickHitboxes(float Dt)
 		}
 	}
 	else bHitPrevValid = false;
+	if (bShotFace)   // test pictures: the raised shield's extent and the kicking leg's joints, in the knight's frame (log: JEEBGEO)
+	{
+		const FTransform A = GetActorTransform();
+		auto L = [&](const USceneComponent* C) { return C ? A.InverseTransformPosition(C->GetComponentLocation()) : FVector::ZeroVector; };
+		if (BlockAlpha > 0.95f)
+		{
+			FBox B(ForceInit);
+			for (const FArmorPart& P : ArmorParts)
+				if (P.Slot == KnightDesign::SlotShield && P.Comp && P.Comp->IsVisible())
+				{
+					const FBox W = P.Comp->Bounds.GetBox();
+					for (int32 k = 0; k < 8; ++k) B += A.InverseTransformPosition(FVector(k & 1 ? W.Max.X : W.Min.X, k & 2 ? W.Max.Y : W.Min.Y, k & 4 ? W.Max.Z : W.Min.Z));
+				}
+			UE_LOG(LogTemp, Log, TEXT("JEEBGEO shield min %s max %s"), *B.Min.ToCompactString(), *B.Max.ToCompactString());
+		}
+		if (bAttacking && AtkStyle == EAtkStyle::Kick)
+			UE_LOG(LogTemp, Log, TEXT("JEEBGEO kick T %.2f hip %s knee %s ankle %s toe %s"), AttackT / FMath::Max(AttackDur, 0.01f), *L(HipR).ToCompactString(), *L(KneeR).ToCompactString(), *L(AnkleR).ToCompactString(),
+				*A.InverseTransformPosition(AnkleR->GetComponentTransform().TransformPosition(FVector(25.f, 13.f, -90.f) - KnightDesign::PivotPos(KnightDesign::P_AnkleR))).ToCompactString());
+	}
 	DrawBoxes();
 }
 
