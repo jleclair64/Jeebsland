@@ -439,7 +439,8 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	{
 		const float T = FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f);
 		const float Counter = FMath::Sin(PI * FMath::Clamp(T / 0.78f, 0.f, 1.f));
-		PitchL -= 12.f * Counter; RollL -= 16.f * Counter; ElbowLdeg += 18.f * Counter;
+		const float CounterSign = (AttackDir == JabSecond) ? -1.f : 1.f;
+		PitchL -= 12.f * Counter * CounterSign; RollL -= 16.f * Counter * CounterSign; ElbowLdeg += 18.f * Counter;
 	}
 	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
 	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
@@ -562,20 +563,20 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
 			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
-			{ 0.12f, 30.f,   18.f,  -78.f, 44.f,  18.f,  142.f,  24.f, false },   // shoulder draws back; chest and hips coil behind it
-			{ 0.25f, 72.f,   46.f, -100.f, 72.f,  40.f,  126.f,  42.f, false },   // loaded over the right shoulder, elbow bent and palm turned skyward
+			{ 0.12f, 28.f,   12.f,  -76.f, 42.f,  14.f,  108.f,  20.f, false },   // shoulder starts drawing back, keeping the sword beside the head
+			{ 0.25f, 64.f,   24.f,  -88.f, 56.f,  26.f,   84.f,  32.f, false },   // compact high-side load; sword stays beside him instead of behind his back
 			{ 0.32f, 46.f,    0.f,  -80.f, 42.f,  16.f,   55.f,  24.f, false },   // turn the shoulder into the front of the cut, not around the body's right side
-			{ 0.38f, 28.f,  -40.f,  -68.f, 24.f,  -4.f,   18.f,   5.f, false },   // carry the hand across the chest before the fast contact
-			{ 0.43f,  0.f,  -82.f,  -62.f,  8.f, -22.f,    0.f,  -4.f, true  },   // hit timing: arm reaches across and forward, blade points out in front
+			{ 0.38f, 28.f,  -52.f,  -68.f, 20.f,  -4.f,   18.f,   5.f, false },   // carry the hand across the chest before the fast contact
+			{ 0.43f,  0.f, -100.f,  -62.f,  0.f, -22.f,    0.f,  -4.f, true  },   // hit timing: reach through the front with the elbow open and blade aimed ahead
 			{ 0.62f,-12.f,  -88.f,  -48.f, 10.f, -38.f,  -42.f, -16.f, false },   // keep the tip forward through the long, low follow-through
 			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
 			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f,  -96.f, -22.f, false } }; // settle ready for the backhand
 				static const FKey Hit2[] = {
 			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
-			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -40.f, -120.f,   5.f, false },   // drawn across to his left, blade back over the left side
-			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,   5.f,    0.f,  -3.f, true  },   // the impact: straight ahead, edge first (the forearm trails ~60 to the left)
-			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  28.f,  110.f,   5.f, false },   // follow-through round to his right
-			{ 1.00f, 0.f,  -10.f, -100.f, 40.f,  30.f,  120.f,   5.f, false } }; // ending near where hit 1 winds up
+			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -50.f, -120.f,   5.f, false },   // load the torso over the left side with the drawn-back blade
+			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,  14.f,    0.f,  -3.f, true  },   // the impact: hips and chest turn through the front
+			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  42.f,  110.f,   5.f, false },   // follow-through carries the whole torso round to his right
+			{ 1.00f, 0.f,  -10.f, -100.f, 40.f,  34.f,  120.f,   5.f, false } }; // ending near where hit 1 winds up
 		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
 		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
@@ -593,6 +594,16 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			const float Recover = FMath::SmoothStep(0.78f, 1.00f, T);
 			SwingLeanWant = 7.f * Windup - 17.f * Release - 5.f * Follow + 15.f * Recover;
 			SwingLoadWant = Windup * (1.f - 2.f * FMath::SmoothStep(0.30f, 0.62f, T)) * (1.f - Recover);
+		}
+		else
+		{
+			const float Windup = FMath::SmoothStep(0.04f, 0.28f, T);
+			const float Release = FMath::SmoothStep(0.28f, 0.50f, T);
+			const float Follow = FMath::SmoothStep(0.50f, 0.72f, T);
+			const float Recover = FMath::SmoothStep(0.78f, 1.00f, T);
+			// The backhand coils left, then transfers the brace through the hips as the chest and blade turn right.
+			SwingLeanWant = 8.f * Windup - 18.f * Release - 4.f * Follow + 14.f * Recover;
+			SwingLoadWant = -Windup * (1.f - 2.f * FMath::SmoothStep(0.30f, 0.62f, T)) * (1.f - Recover);
 		}
 		int32 i = 0;
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
