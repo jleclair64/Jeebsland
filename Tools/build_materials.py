@@ -519,19 +519,19 @@ def build_streak():
 
 
 def build_sword_trail():
-    # The wind trail behind a sword cut (BotW style): a soft, pale ribbon. The trail's own vertices carry its fade (vertex
-    # alpha: older parts and slow parts are fainter); across the ribbon (texture V: 0 the inner edge, 1 the blade tip) it is
-    # faint on the inside and fullest just inside the outer edge, with a few faint streaks along it like moving air.
+    # The wind trail behind a sword cut (BotW style): a thin, soft, pale wisp along the tip's path. The trail's own vertices
+    # carry its fade (vertex alpha: older parts and slow parts are fainter); across the ribbon (texture V: 0 inner edge, 1
+    # outer) it is fullest in the middle and fades smoothly to both edges. No streaks (owner, 2026-10-31: no lines), and only
+    # a little brighter than the daylight round it: a wisp of air, not a light.
     mat, g = unlit("M_SwordTrail", unreal.BlendMode.BLEND_TRANSLUCENT)
     uv = g.node(unreal.MaterialExpressionTextureCoordinate)
     v = g.mask(uv, False, True)
-    inner = g.power(v, 1.6)
-    outer = g.one(unreal.MaterialExpressionOneMinus, g.power(v, 10.0))
-    streak = g.add(g.mul(g.one(unreal.MaterialExpressionSine, g.mul(v, 7.0)), 0.18), 0.82)
+    across = g.mul(g.muln(v, g.one(unreal.MaterialExpressionOneMinus, v)), 4.0)   # 0 at the edges, 1 in the middle
+    soft = g.muln(across, across)                                               # (squared: a soft, rounded edge)
     vc = g.node(unreal.MaterialExpressionVertexColor)
-    a = g.muln(g.muln(g.muln(inner, outer), streak), g.muln(vc, g.scalar("Opacity", 0.8), "A"))
+    a = g.muln(soft, g.muln(vc, g.scalar("Opacity", 0.55), "A"))
     g.out(g.one(unreal.MaterialExpressionSaturate, a), unreal.MaterialProperty.MP_OPACITY)
-    g.out(g.muln(g.vector("Tint", (0.90, 0.95, 1.0)), g.scalar("Bright", 1.3)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.muln(g.vector("Tint", (0.92, 0.95, 1.0)), g.scalar("Bright", 0.5)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_SwordTrail")
 
 

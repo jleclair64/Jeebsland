@@ -207,15 +207,20 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 	}
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
-	const float Life = 0.16f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
+	const float Life = 0.09f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
 	if (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && WristR)
 	{
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
-		const FVector Tip = Along(79.5f), In = Along(30.f);   // (the sword's tip is 79.5 cm from the grip)
+		const FVector Tip = Along(79.5f), In = Along(67.f);   // a thin band at the tip (the sword's tip is 79.5 cm from the grip)
 		const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
 		TrailPrevTip = Tip; bTrailPrev = true;
-		FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
+		// Only the cut itself leaves a trail (owner, 2026-10-31): hit 1's forward arc and hit 2's backward arc, from the end of
+		// the wind-up to the slowing of the follow-through (the parts of each swing in PoseArms' key tables), faded in and out
+		const float T = AttackT / FMath::Max(AttackDur, 0.01f);
+		const float From = (AttackDir == JabSecond) ? 0.30f : 0.28f, To = (AttackDir == JabSecond) ? 0.74f : 0.64f;
+		const float Window = FMath::SmoothStep(From, From + 0.05f, T) * (1.f - FMath::SmoothStep(To - 0.08f, To, T));
+		FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
 		TrailSamples.Add(S);
 	}
 	else bTrailPrev = false;
