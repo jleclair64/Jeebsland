@@ -120,6 +120,8 @@ The owner's cheat sheet is `Docs/HowToTest.md` (editor Play never needs the worl
 
 Don't launch the game to take test screenshots (`-JeebShot` mode): it's slow and the owner prefers to check visuals themselves and send screenshots. Build, rebuild materials, commit, reopen the editor, and say what to look for.
 
+Exception, ANIMATION and moves (owner, 2026-10-30, after a guessed jab looked bad): compare against reference frames instead of guessing. The owner records clips with Win+Alt+R (Videos\Captures); ffmpeg (installed with winget, Gyan.FFmpeg; full path under %LOCALAPPDATA%\Microsoft\WinGet\Packages) cuts them into tiled frame sheets in the scratchpad. Our side of it: `UnrealEditor.exe Jeebsland.uproject /Game/Field -game -JeebShot -ShotMove=jab -ShotName=jab -ShotFacing=-90 (side-on; 0 = from behind) -ShotYaw=0 -ShotPitch=-8 -ShotPhase=0.25 -windowed -ResX=1280 -ResY=720 -benchmark -fps=30 -nosound` saves the move every other frame to Saved/Shots (pictures come out 2560x1440). Add new moves to `AKnightCharacter::ShotPlayMove`. Moves are built from fixed key poses (see the jab's table in PoseArms), never searched per frame. A sword blade stays level when the arm is raised out to the SIDE (roll) and swept (yaw); raising the arm forward (pitch) stands the blade up.
+
 ## Direction: online multiplayer (decided 2026-10-12)
 
 The owner dropped the single-player story mode: Jeebsland is becoming an online game set up like RuneScape (many players in a shared world, server-owned characters, several world servers). Build everything with that in mind.
