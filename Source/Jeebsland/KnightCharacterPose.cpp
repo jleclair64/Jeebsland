@@ -539,6 +539,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	//   2 backhand: from his left, the same sweep back the other way, ending where hit 1 winds up
 	// The knees and lean are in PosePrep (JabBodyNow).
 	float ForearmTarget = 0.f;
+	float WristFlipNow = 0.f;   // first slash supinates the sword hand so the palm faces up in the wind-up
 	SwingBodyWant = 0.f;
 	bool bBladeLead = false;   // a sword slash is on: the wrist sets the blade's heading
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
@@ -561,6 +562,12 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
 		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
+		if (AttackDir != JabSecond)
+		{
+			const float FlipIn = FMath::SmoothStep(0.10f, 0.28f, T);
+			const float FlipOut = 1.f - FMath::SmoothStep(0.38f, 0.52f, T);
+			WristFlipNow = 180.f * FlipIn * FlipOut;
+		}
 		int32 i = 0;
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
 		FKey K0 = Keys[i];
@@ -680,6 +687,12 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 			Local = Twist.Inverse() * Local;
 			Local = FQuat::Slerp(FQuat::Identity, Local, BladeAlpha);
 			ForearmTwistNow = FMath::RadiansToDegrees(Twist.GetTwistAngle(ForearmAxisW));
+		}
+		// Supinate the first swing's wrist in the wind-up (palm skyward), then unwind it into the cut.
+		if (WristFlipNow > 0.01f)
+		{
+			static const FVector WristFlipAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
+			Local = FQuat(WristFlipAxis, FMath::DegreesToRadians(WristFlipNow)) * Local;
 		}
 		WristR->SetRelativeRotation(Local);
 		WristBendNow = FMath::RadiansToDegrees(Local.GetAngle());
