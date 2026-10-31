@@ -546,11 +546,13 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
 			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // (replaced by where the arm and blade are)
-			{ 0.28f, 0.f,   30.f, -100.f, 40.f,  30.f,  125.f,   8.f, false },   // wound up: coiled right, blade back over the right side
-			{ 0.50f, 0.f,  -15.f,  -82.f, 20.f,  -5.f,    0.f,  -3.f, true  },   // the impact: straight ahead, edge first (the forearm trails ~60 to the right)
-			{ 0.72f, 0.f,  -90.f,  -78.f, 20.f, -30.f, -105.f,  -8.f, false },   // follow-through round to his left
-			{ 1.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false } }; // settling
-		static const FKey Hit2[] = {
+			{ 0.20f, 34.f,   18.f,  -78.f, 42.f,  18.f,  138.f,  28.f, false },   // shoulder and chest coil; sword rises behind the right shoulder
+			{ 0.32f, 62.f,   38.f,  -92.f, 58.f,  32.f,  128.f,  38.f, false },   // high side-arm wind-up, wrist leads and blade trails over the right
+			{ 0.43f, 48.f,   20.f,  -76.f, 44.f,  20.f,   72.f,  24.f, true  },   // drop the wrist into the cut; blade arcs down and across
+			{ 0.52f, 18.f,  -18.f,  -62.f, 24.f,  -8.f,  -12.f,   2.f, true  },   // pass through the front at impact
+			{ 0.72f,-28.f,  -78.f,  -52.f, 18.f, -30.f,-108.f, -34.f, false },   // diagonal follow-through to the lower left
+			{ 1.00f,-18.f,  -68.f,  -58.f, 30.f, -24.f, -96.f, -22.f, false } }; // settle low on the left, ready for the backhand
+				static const FKey Hit2[] = {
 			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
 			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -40.f, -120.f,   5.f, false },   // drawn across to his left, blade back over the left side
 			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,   5.f,    0.f,  -3.f, true  },   // the impact: straight ahead, edge first (the forearm trails ~60 to the left)
