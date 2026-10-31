@@ -463,6 +463,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);
+	if (bShotFace && bAttacking) LogSwordTip();   // (test pictures only: the sword tip's path, for checking a move)
 	TickDust(Dt, bFalling, bSpecial, S, C);
 }
 

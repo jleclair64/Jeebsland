@@ -68,7 +68,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward
 		AttackDur = Cd * (Dir == JabSecond ? 0.72f : 0.8f);
-		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow;   // (the key poses start from here)
+		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow; SwingFrom[6] = BladeYawNow; SwingFrom[7] = BladePitchNow;   // (the key poses start from here)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 210.f, true, false);   // (the player's machine and the server step together)
 	}
@@ -98,6 +98,26 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	for (int32 h = 0; h < 5; ++h)   // a sword in hand
 		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 2; }   // three hits: 1, 2, 1 (shows the loop)
+	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
+	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
+}
+
+// Test pictures: where the sword's tip is and which way its cutting edge faces, frame by frame, in the knight's own frame
+// (forward, right, up; cm from his centre), from the real joints and the real weapon placement (RebuildHeld)
+void AKnightCharacter::LogSwordTip()
+{
+	if (!WristR) return;
+	const FVector Blade = KnightDesign::BladeDir(1);
+	const FVector TipCapsule = KnightDesign::GripPos(false) + Blade * 79.5f;    // (WeaponDesign: the sword's tip, 79.5 cm out)
+	const FVector EdgeCapsule = KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(Blade));   // (the guard and the edges)
+	const FTransform W = WristR->GetComponentTransform();
+	const FTransform A = GetActorTransform();
+	const FVector Tip = A.InverseTransformPosition(W.TransformPosition(TipCapsule - KnightDesign::PivotPos(KnightDesign::P_WristR)));
+	const FVector Edge = A.InverseTransformVector(W.TransformVector(EdgeCapsule)).GetSafeNormal();
+	const FVector Fa = A.InverseTransformVector(ElbowR->GetComponentTransform().TransformVector(KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR))).GetSafeNormal();
+	const FVector Bl = A.InverseTransformVector(W.TransformVector(Blade)).GetSafeNormal();
+	UE_LOG(LogTemp, Log, TEXT("JEEBTIP %d %.3f tip %.0f %.0f %.0f edge %.2f %.2f %.2f | wrist bend %.0f twist %.0f | forearm heading %.0f tilt %.0f | blade heading %.0f tilt %.0f"), AttackDir, AttackT / FMath::Max(AttackDur, 0.01f), Tip.X, Tip.Y, Tip.Z, Edge.X, Edge.Y, Edge.Z, WristBendNow, ForearmTwistNow,
+		FMath::RadiansToDegrees(FMath::Atan2(Fa.Y, Fa.X)), FMath::RadiansToDegrees(FMath::Asin(Fa.Z)), FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X)), FMath::RadiansToDegrees(FMath::Asin(Bl.Z)));
 }
 
 void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill)

@@ -531,7 +531,12 @@ private:
 	static constexpr int32 JabFirst = 1, JabSecond = -1;   // the sword's two-hit jab (forehand, backhand; they loop)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
 	float SwingBodyWant = 0.f;      // the chest turn the jab's key poses ask for
-	float SwingFrom[6] = {};        // where the arm was when a sword swing began (pitch, yaw, roll, elbow, forearm, chest turn)
+	float SwingFrom[8] = {};        // where the arm was when a sword swing began (pitch, yaw, roll, elbow, forearm, chest turn, blade heading, blade tilt)
+	float BladeYawNow = 0.f, BladePitchNow = 0.f, BladeLeadSign = -1.f;   // a sword slash: where the blade points (knight's frame, degrees) and which way it travels
+	float BladeCantNow = 0.f;       // the blade's cant about its own length (degrees; 0 = edge level)
+	float BladeAlpha = 0.f;         // how much the wrist is steering the blade (fades in and out of a slash)
+	float WristBendNow = 0.f, ForearmTwistNow = 0.f;   // how far the wrist is bent and the forearm twisted for the blade (degrees; for checking a move)
+	void LogSwordTip();             // test pictures: the sword tip and edge, frame by frame, in the knight's frame (log: JEEBTIP)
 	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1)
 	float AttackYaw = 0.f;          // the heading a swing started with (a sword hit keeps it)
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)

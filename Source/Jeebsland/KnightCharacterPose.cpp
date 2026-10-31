@@ -1,4 +1,6 @@
 #include "KnightCharacter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "KnightShieldRest.h"
 #include "JeebSave.h"
 #include "Net/UnrealNetwork.h"
@@ -524,31 +526,36 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		ArmSpeed = 38.f;
 	}
 
-	// The sword's jab: two flat slashes that loop for as long as you click (posed from Link's jab in Smash Ultimate, frames
-	// studied 2026-10-30, mirrored as Link is left-handed; owner: no third hit, no spin, both SLASHES across the FRONT). The
-	// blade stays level: the arm is raised out to the SIDE (roll), which keeps a forward-pointing blade flat, and swept round
-	// (yaw); raising it forward would stand the blade up. Each hit is a few key poses: shoulder pitch, sweep yaw, raise roll,
-	// elbow bend, forearm turn, and the chest's turn (Body; PoseBody turns the hips with it). Each hit starts from wherever the
-	// arm really is (SwingFrom, caught in StartAttack), so 1-2-1-2 flows without a jerk.
-	//   1 forehand: the arm, nearly straight, drawn back to the right with the chest coiled right, then swept flat right to left
-	//   2 backhand: the elbow folds so the forearm lies across the front, turned over (blade ahead), then opens: a flat cut left
-	//     to right; the chest turns back to the middle, so the blade crosses straight in front of him
+	// The sword's jab: two horizontal SLASHES that loop for as long as you click (owner, 2026-10-31: a genuine sweep, the tip
+	// travelling a wide arc from one side of the knight to the other, edge first; not a thrust). Each hit is a few key poses:
+	//   the arm: shoulder pitch, sweep yaw, raise roll (raised out to the side), elbow bend, and the chest's turn (Body; PoseBody
+	//     turns the hips with it), which carry the hand round;
+	//   the BLADE: its heading round the knight (BladeYaw: 0 straight ahead, +90 his right, -90 his left) and tilt (BladePitch).
+	//     The wrist turns the hand so the blade points that way, lying flat with its edge leading the way it travels (worked out
+	//     in closed form below, from the real forearm). Sweeping the heading from one side to the other makes the tip sweep.
+	// Each hit starts from wherever the arm and blade are (SwingFrom), so 1-2-1-2 flows. Measured with -ShotMove=jab2 (JEEBTIP).
+	//   1 forehand: coiled right, the blade pointing back over his right side; a sweep across the front, straight ahead at the
+	//     impact, round to his left; follow-through, then easing down
+	//   2 backhand: from his left, the same sweep back the other way, ending where hit 1 winds up
 	// The knees and lean are in PosePrep (JabBodyNow).
 	float ForearmTarget = 0.f;
 	SwingBodyWant = 0.f;
+	bool bBladeLead = false;   // a sword slash is on: the wrist sets the blade's heading
 	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
 	{
-		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Forearm, Body; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
+		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
 		static const FKey Hit1[] = {
-			{ 0.00f, 0.f,    0.f,  -85.f, 15.f,   0.f,   0.f, false },   // (replaced by where the arm is: SwingFrom)
-			{ 0.30f, 0.f,   25.f,  -85.f, 15.f,   0.f,  25.f, false },   // drawn back to the right, arm nearly straight, chest coiled
-			{ 0.55f, 0.f,  -80.f,  -82.f,  8.f,   0.f, -15.f, true  },   // swept flat from right to left across the front
-			{ 1.00f, 0.f,  -80.f,  -82.f,  8.f,   0.f, -15.f, false } };
+			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // (replaced by where the arm and blade are)
+			{ 0.28f, 0.f,   30.f, -100.f, 40.f,  30.f,  125.f,   8.f, false },   // wound up: coiled right, blade back over the right side
+			{ 0.50f, 0.f,  -15.f,  -82.f, 20.f,  -5.f,    0.f,  -3.f, true  },   // the impact: straight ahead, edge first (the forearm trails ~60 to the right)
+			{ 0.72f, 0.f,  -90.f,  -78.f, 20.f, -30.f, -105.f,  -8.f, false },   // follow-through round to his left
+			{ 1.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false } }; // settling
 		static const FKey Hit2[] = {
-			{ 0.00f, 0.f,    0.f,  -85.f, 15.f,   0.f,   0.f, false },   // (replaced by where the arm is)
-			{ 0.30f, 0.f,  -90.f,  -80.f, 95.f, 180.f, -10.f, false },   // elbow folded, forearm across the front, turned over: blade ahead
-			{ 0.55f, 0.f,  -75.f,  -85.f, 40.f, 180.f,  20.f, true  },   // the elbow opens: a flat cut left to right, straight in front
-			{ 1.00f, 0.f,  -75.f,  -85.f, 40.f, 180.f,  20.f, false } };
+			{ 0.00f, 0.f,  -70.f,  -70.f, 30.f, -25.f,  -95.f, -10.f, false },   // (replaced by where the arm and blade are)
+			{ 0.28f, 0.f, -125.f,  -78.f, 55.f, -40.f, -120.f,   5.f, false },   // drawn across to his left, blade back over the left side
+			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,   5.f,    0.f,  -3.f, true  },   // the impact: straight ahead, edge first (the forearm trails ~60 to the left)
+			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  28.f,  110.f,   5.f, false },   // follow-through round to his right
+			{ 1.00f, 0.f,  -10.f, -100.f, 40.f,  30.f,  120.f,   5.f, false } }; // ending near where hit 1 winds up
 		const FKey* Keys = AttackDir == JabSecond ? Hit2 : Hit1;
 		const int32 Num = AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
 		const float T = FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
@@ -556,10 +563,10 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
 		FKey K0 = Keys[i];
 		const FKey& K1 = Keys[i + 1];
-		if (i == 0)   // the start pose is wherever the arm was when the swing began
+		if (i == 0)   // the start pose is wherever the arm (and, mid-combo, the blade) was when the swing began
 		{
-			K0.Pitch = SwingFrom[0]; K0.Yaw = SwingFrom[1]; K0.Roll = SwingFrom[2]; K0.Elbow = SwingFrom[3];
-			K0.Forearm = K1.Forearm + FMath::FindDeltaAngleDegrees(K1.Forearm, SwingFrom[4]); K0.Body = SwingFrom[5];
+			K0.Pitch = SwingFrom[0]; K0.Yaw = SwingFrom[1]; K0.Roll = SwingFrom[2]; K0.Elbow = SwingFrom[3]; K0.Body = SwingFrom[5];
+			if (BladeAlpha > 0.5f) { K0.BladeYaw = SwingFrom[6]; K0.BladePitch = SwingFrom[7]; }
 		}
 		const float A = FMath::Clamp((T - K0.T) / FMath::Max(K1.T - K0.T, 0.001f), 0.f, 1.f);
 		const float E = K1.bAccel ? A * A : A * A * (3.f - 2.f * A);
@@ -567,8 +574,14 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 		TargetYaw = FMath::Lerp(K0.Yaw, K1.Yaw, E);
 		RollR = FMath::Lerp(K0.Roll, K1.Roll, E);
 		ElbowRdeg = FMath::Lerp(K0.Elbow, K1.Elbow, E);
-		ForearmTarget = FMath::Lerp(K0.Forearm, K1.Forearm, E);
 		SwingBodyWant = FMath::Lerp(K0.Body, K1.Body, E);
+		BladeYawNow = FMath::Lerp(K0.BladeYaw, K1.BladeYaw, E);
+		BladePitchNow = FMath::Lerp(K0.BladePitch, K1.BladePitch, E);
+		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
+		// so the wrist stays natural): the forehand travels to his left, the backhand to his right
+		BladeLeadSign = (AttackDir == JabSecond) ? -1.f : 1.f;
+		BladeCantNow = 45.f;   // (measured: at 45 the forehand's wrist bends only 20-30 through impact and follow-through)
+		bBladeLead = true;
 		ArmSpeed = 40.f;   // (follows the key poses tightly)
 	}
 
@@ -627,6 +640,47 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	{
 		static const FVector ForearmAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
 		ElbowR->SetRelativeRotation(FQuat(FRotator(ElbowRCur, 0.f, 0.f)) * FQuat(ForearmAxis, FMath::DegreesToRadians(ForearmNow)));
+	}
+	// The sword hand turns at the wrist (2026-10-31). During a sword slash it points the blade along the keyed heading, lying
+	// flat with its cutting edge leading the way it travels. Closed form: the hand's turn W must carry the blade's rest
+	// direction and edge (as RebuildHeld places them) onto the wanted ones; the wrist's own turn is W seen from the forearm.
+	// It fades in and out (BladeAlpha), so outside a slash the wrist rests straight.
+	BladeAlpha = FMath::FInterpTo(BladeAlpha, bBladeLead ? 1.f : 0.f, Dt, 14.f);
+	if (WristR)
+	{
+		FQuat Local = FQuat::Identity;
+		if (BladeAlpha > 0.001f)
+		{
+			static const FVector B0 = KnightDesign::BladeDir(1);
+			static const FVector E0 = (KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(B0)) - B0 * FVector::DotProduct(KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(B0)), B0)).GetSafeNormal();
+			const float Yr = FMath::DegreesToRadians(BladeYawNow), Pr = FMath::DegreesToRadians(BladePitchNow);
+			const FVector D(FMath::Cos(Pr) * FMath::Cos(Yr), FMath::Cos(Pr) * FMath::Sin(Yr), FMath::Sin(Pr));   // in the knight's frame
+			FVector Ed = FVector(-D.Y, D.X, 0.f) * BladeLeadSign;                                                  // level, square to the blade: the way it travels
+			Ed = (Ed - D * FVector::DotProduct(Ed, D)).GetSafeNormal();
+			// canted about the blade's own length (a real cut leads with the edge a little tilted; it keeps the wrist natural)
+			static float CantTest = -999.f, CantTest2 = -999.f;
+			if (CantTest < -998.f) { CantTest = CantTest2 = -500.f; FParse::Value(FCommandLine::Get(), TEXT("JeebBladeCant="), CantTest); FParse::Value(FCommandLine::Get(), TEXT("JeebBladeCant2="), CantTest2); }   // (test pictures: try a cant for hit 1 / hit 2)
+			const float CantT = (BladeLeadSign < 0.f) ? CantTest2 : CantTest;
+			const float Cant = FMath::DegreesToRadians(CantT > -400.f ? CantT : BladeCantNow);
+			Ed = (Ed * FMath::Cos(Cant) + (D ^ Ed) * FMath::Sin(Cant)).GetSafeNormal();
+			const FQuat Actor = GetActorQuat();
+			const FQuat Want = FQuat(FMatrix(Actor.RotateVector(D), Actor.RotateVector(Ed), Actor.RotateVector(D ^ Ed), FVector::ZeroVector));
+			const FQuat Rest = FQuat(FMatrix(B0, E0, B0 ^ E0, FVector::ZeroVector));
+			const FQuat HandWorld = Want * Rest.Inverse();
+			Local = ElbowR->GetComponentQuat().Inverse() * HandWorld;
+			// The part of that turn that is a twist along the forearm belongs to the forearm (a real arm turns there), so the
+			// wrist itself only bends: the forearm takes the twist, and the wrist what is left
+			static const FVector ForearmAxisW = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
+			FQuat Swing, Twist;
+			Local.ToSwingTwist(ForearmAxisW, Swing, Twist);
+			Twist = FQuat::Slerp(FQuat::Identity, Twist, BladeAlpha);
+			ElbowR->SetRelativeRotation(ElbowR->GetRelativeRotation().Quaternion() * Twist);
+			Local = Twist.Inverse() * Local;
+			Local = FQuat::Slerp(FQuat::Identity, Local, BladeAlpha);
+			ForearmTwistNow = FMath::RadiansToDegrees(Twist.GetTwistAngle(ForearmAxisW));
+		}
+		WristR->SetRelativeRotation(Local);
+		WristBendNow = FMath::RadiansToDegrees(Local.GetAngle());
 	}
 	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
 }
