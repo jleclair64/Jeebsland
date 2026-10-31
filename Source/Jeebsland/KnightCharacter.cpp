@@ -464,6 +464,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);
 	if (bShotFace && bAttacking) LogSwordTip();   // (test pictures only: the sword tip's path, for checking a move)
+	TickHitboxes(Dt);   // (after the pose: the hit boxes and hurt boxes follow the joints as posed this frame)
 	TickDust(Dt, bFalling, bSpecial, S, C);
 	TickSwordTrail(Dt);
 }

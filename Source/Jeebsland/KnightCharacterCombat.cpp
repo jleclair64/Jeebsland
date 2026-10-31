@@ -15,6 +15,9 @@
 #include "ResourceNode.h"
 #include "EngineUtils.h"
 #include "Engine/Engine.h"
+#include "HealthComponent.h"
+#include "HitBoxes.h"
+#include "ProceduralMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -85,6 +88,8 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	bAttacking = true;
 	bBlocking = false;   // the shield drops for the swing; Tick raises it again afterwards if the block button is still held
 	bAttackHit = false;
+	HitThisSwing.Reset();     // (a new move can hit everyone again)
+	bHitPrevValid = false;
 	AttackT = 0.f;
 	QueuedClick = -10.f;
 	QueuedJabs = 0;   // (a new swing starts with an empty buffer: presses made before it began are used up)
@@ -184,7 +189,8 @@ void AKnightCharacter::AttackLands()
 	const bool bThrust = (AtkStyle == EAtkStyle::Thrust);
 	// The sword's jab hits softer than a full swing (it is much quicker, and it loops)
 	const bool bJab = (AtkStyle == EAtkStyle::Slash && K == JeebItems::K_Sword);
-	const float JabMul = bJab ? 0.75f : 1.f;
+	if (bJab) return;   // (the sword's jab lands through its hit boxes: TickHitboxes)
+	const float JabMul = 1.f;
 	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f);
 	const float MinDot = bThrust ? 0.8f : 0.2f;
 	const FVector Fwd = GetActorForwardVector().GetSafeNormal2D();
@@ -403,6 +409,114 @@ void AKnightCharacter::TickAttack(float Dt)
 		ChargeT += Dt;
 		if (IsUIOpen() || bRolling || bSliding || bClimbing || bSitting || SelectedKind() != JeebItems::K_Spear) bCharging = false;
 	}
+}
+
+// ---------------- Hit boxes and hurt boxes (Smash style, HitBoxes.h) ----------------
+// The sword's jab: three spheres along the blade (tip first: the lowest ID wins when two touch the same target), live only in
+// each hit's active frames, round the impact. Each is swept from where it was the frame before. The server lands the blows
+// (every machine poses the knight the same way, so the boxes match what everyone sees).
+static const JeebHit::FHitSphere SwordJabBoxes[] = { { 0, 68.f, 9.f, 1.f }, { 1, 46.f, 9.f, 1.f }, { 2, 24.f, 9.f, 1.f } };
+static constexpr float SwordJabDamage = 0.75f;   // (the jab hits softer than a full swing: it is much quicker, and it loops)
+
+void AKnightCharacter::TickHitboxes(float Dt)
+{
+	HitLive.Reset();
+	const bool bJab = bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && WristR;
+	const float T = bJab ? AttackT / FMath::Max(AttackDur, 0.01f) : 0.f;
+	// the active frames: the blade sweeping across the front, round the impact (hit 1 at 0.43, hit 2 at 0.50)
+	const float From = (AttackDir == JabSecond) ? 0.42f : 0.34f, To = (AttackDir == JabSecond) ? 0.64f : 0.56f;
+	if (bJab && T >= From && T <= To)
+	{
+		const FTransform W = WristR->GetComponentTransform();
+		for (int32 i = 0; i < UE_ARRAY_COUNT(SwordJabBoxes); ++i)
+		{
+			const JeebHit::FHitSphere& S = SwordJabBoxes[i];
+			const FVector Now = W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * S.Along - KnightDesign::PivotPos(KnightDesign::P_WristR));
+			JeebHit::FCapsule C;
+			C.A = bHitPrevValid ? HitPrev[i] : Now; C.B = Now; C.R = S.Radius;
+			HitLive.Add(C);
+			HitPrev[i] = Now;
+		}
+		bHitPrevValid = true;
+		if (HasAuthority() && Skills)
+		{
+			const int32 Id = Skills->SelectedItem();
+			const int32 Tier = JeebItems::IsGear(Id) ? JeebItems::VariantOf(Id) : 0;
+			TArray<JeebHit::FCapsule> Hurt;
+			for (UHealthComponent* H : UHealthComponent::All())
+			{
+				if (!H || !H->IsAlive() || H->GetOwner() == this || HitThisSwing.Contains(H)) continue;
+				if (FVector::DistSquared(H->GetOwner()->GetActorLocation(), GetActorLocation()) > FMath::Square(450.f)) continue;
+				Hurt.Reset();
+				JeebHit::HurtOf(H, Hurt);
+				int32 Hit = -1;   // the lowest ID that touches
+				for (int32 i = 0; i < HitLive.Num() && Hit < 0; ++i)
+					for (const JeebHit::FCapsule& Hc : Hurt)
+						if (JeebHit::Touch(HitLive[i], Hc)) { Hit = i; break; }
+				if (Hit < 0) continue;
+				HitThisSwing.Add(H);
+				bool bCrit = false;
+				const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, SwordJabDamage * SwordJabBoxes[Hit].DamageMul);
+				DealDamage(H, Dmg, bCrit, JeebItems::CombatSkillFor(JeebItems::K_Sword));
+			}
+		}
+	}
+	else bHitPrevValid = false;
+	DrawBoxes();
+}
+
+void AKnightCharacter::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
+{
+	JeebHit::FKnightJoints J;
+	J.Upper = UpperPivot; J.Head = HeadPivot; J.ArmL = ArmPivotL; J.ArmR = ArmPivot; J.ElbowL = ElbowL; J.ElbowR = ElbowR; J.WristR = WristR;
+	J.HipL = HipL; J.HipR = HipR; J.KneeL = KneeL; J.KneeR = KneeR; J.AnkleL = AnkleL; J.AnkleR = AnkleR;
+	JeebHit::KnightHurt(J, Out);
+}
+
+// The view (H turns it on and off; MoveLab starts with it on): every hurt box yellow and every live hit box red, see-through and
+// over the bodies, drawn by the player's own knight for everyone nearby
+void AKnightCharacter::DrawBoxes()
+{
+	if (!IsLocallyControlled() || IsNetMode(NM_DedicatedServer)) return;
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+		if (PC->WasInputKeyJustPressed(EKeys::H) && !IsUIOpen()) JeebHit::ToggleShow(GetWorld());
+	const bool bShow = JeebHit::ShowBoxes(GetWorld());
+	if (!bShow) { if (BoxView) BoxView->SetVisibility(false); return; }
+	if (!BoxView)
+	{
+		BoxView = NewObject<UProceduralMeshComponent>(this);
+		BoxView->SetUsingAbsoluteLocation(true);
+		BoxView->SetUsingAbsoluteRotation(true);
+		BoxView->SetUsingAbsoluteScale(true);
+		BoxView->SetupAttachment(GetRootComponent());
+		BoxView->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		BoxView->SetCastShadow(false);
+		BoxView->RegisterComponent();
+		BoxView->SetWorldLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_HitBox.M_HitBox"))) BoxView->SetMaterial(0, M);
+	}
+	BoxView->SetVisibility(true);
+	static const FLinearColor HurtCol(1.f, 0.82f, 0.08f, 0.22f), HitCol(1.f, 0.08f, 0.04f, 0.45f);
+	TArray<FVector> V, N; TArray<int32> I; TArray<FLinearColor> Cols;
+	TArray<JeebHit::FCapsule> Caps;
+	const FVector Me = GetActorLocation();
+	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+	{
+		if (It->IsHidden() || FVector::DistSquared(It->GetActorLocation(), Me) > FMath::Square(3000.f)) continue;
+		Caps.Reset();
+		It->GatherHurt(Caps);
+		for (const JeebHit::FCapsule& C : Caps) JeebHit::AddCapsuleMesh(C, HurtCol, V, N, I, Cols);
+		for (const JeebHit::FCapsule& C : It->LiveHitboxes()) JeebHit::AddCapsuleMesh(C, HitCol, V, N, I, Cols);
+	}
+	for (UHealthComponent* H : UHealthComponent::All())
+	{
+		if (!H || !H->IsAlive() || !H->GetOwner() || H->GetOwner()->IsHidden()) continue;
+		if (FVector::DistSquared(H->GetOwner()->GetActorLocation(), Me) > FMath::Square(3000.f)) continue;
+		Caps.Reset();
+		JeebHit::HurtOf(H, Caps);
+		for (const JeebHit::FCapsule& C : Caps) JeebHit::AddCapsuleMesh(C, HurtCol, V, N, I, Cols);
+	}
+	BoxView->CreateMeshSection_LinearColor(0, V, I, N, TArray<FVector2D>(), Cols, TArray<FProcMeshTangent>(), false);
 }
 
 // Health (and the horse's): the bigger bar from Defence, the Vitality amulet and the vigour potion; healing after 10 s unhurt

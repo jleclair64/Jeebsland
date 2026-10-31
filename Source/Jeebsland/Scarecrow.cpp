@@ -81,6 +81,16 @@ void AScarecrow::BeginPlay()
 	}
 	Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
 	Hp->OnHitSeen = [this]() { HitFlash = 0.3f; };
+	// Hurt boxes (HitBoxes.h): the post, the stuffed shirt, the arms across and the pumpkin head, carried by the body as it sways
+	Hp->GatherHurt = [this](TArray<JeebHit::FCapsule>& Out)
+	{
+		const FTransform B = BodyPivot->GetComponentTransform();
+		auto Add = [&](const FVector& A, const FVector& E, float R) { JeebHit::FCapsule C; C.A = B.TransformPosition(A); C.B = B.TransformPosition(E); C.R = R; Out.Add(C); };
+		Add(FVector(0, 0, 10), FVector(0, 0, 90), 8.f);
+		Add(FVector(0, 0, 112), FVector(0, 0, 148), 22.f);
+		Add(FVector(0, -88, 150), FVector(0, 88, 150), 9.f);
+		Add(FVector(0, 0, 178), FVector(0, 0, 178), 22.f);
+	};
 }
 
 void AScarecrow::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

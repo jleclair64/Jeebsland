@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "HitBoxes.h"
 #include "HealthComponent.generated.h"
 
 // Hit points for anything you can hit (pigs, scarecrows). Every live one registers itself so the HUD can draw bars
@@ -26,6 +27,8 @@ public:
 	TFunction<int32(int32 Amount, AActor* From)> ModifyDamage;
 	// On players' machines (online): the server says it was hit (for the flinch). OnDamaged only runs on the server.
 	TFunction<void()> OnHitSeen;
+	// Optional: the owner's hurt boxes (HitBoxes.h), where a hit box must touch for a blow to land. Unset: an upright capsule
+	TFunction<void(TArray<JeebHit::FCapsule>& Out)> GatherHurt;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }

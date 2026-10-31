@@ -108,6 +108,10 @@ Every item number and text lives in CSV spreadsheets in `Content/Data/` (Tiers, 
 
 Chat: `AKnightPlayerController::ServerChat` / `ClientChat`; `JeebChat.h` (swear filter, the owner's `Saved/Moderation.txt` mute/ban file, each player's own `Saved/ChatMuted.txt`); drawn in `KnightHUDChat.cpp` (Enter, `/w`, `/mute`). Radar potion: `AKnightCharacter::UpdateRadar` (server, owner-only `RadarDots`), drawn on the minimap.
 
+## Hit boxes and hurt boxes (2026-10-31, Smash Ultimate style)
+
+`HitBoxes.h` (namespace JeebHit). Hurt boxes are capsules on the joints (`KnightHurt`: helm, torso, upper arms, forearms, thighs, shins; anything with health can give its own through `UHealthComponent::GatherHurt`, else an upright capsule). Hit boxes are spheres on the weapon, live only in a move's active frames, swept from the last frame, lowest ID wins, one hit per target per move (`AKnightCharacter::TickHitboxes`, server lands the blow). Only the sword's jab uses them so far (`SwordJabBoxes`; its old cone check in `AttackLands` is skipped); new moves should get their own hit box tables and active windows. View: `DrawBoxes`, material M_HitBox (see-through, no depth test); H toggles, on by default in MoveLab only. MoveLab has a still sparring knight (`AFoeKnight::bStill`; `-LabKnight=170` moves him closer for test pictures).
+
 ## Animation direction (owner, 2026-10-30)
 
 Keep the code-driven pose for the knight (and other humanoid player classes). Bosses and NPCs will use standard skinned models with animation clips (skeletal meshes), not the joint-piece system.

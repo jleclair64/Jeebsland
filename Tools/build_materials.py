@@ -535,6 +535,23 @@ def build_sword_trail():
     finish(mat, "M_SwordTrail")
 
 
+def build_hit_box():
+    # The hit box and hurt box view (HitBoxes.h, Smash style): flat see-through colour from the vertices (rgb colour, alpha
+    # opacity), drawn over everything (no depth test) so the boxes inside the body show; a little denser at the rim so each
+    # capsule's outline reads (two-sided: the far side of each capsule shows through too, as a slightly denser middle)
+    mat, g = unlit("M_HitBox", unreal.BlendMode.BLEND_TRANSLUCENT)
+    try:
+        mat.set_editor_property("disable_depth_test", True)
+    except Exception as e:
+        unreal.log("MATDIAG hit box depth test kept: " + str(e))
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    rim = g.node(unreal.MaterialExpressionFresnel, exponent=2.0, base_reflect_fraction=0.0)
+    a = g.muln(vc, g.add(g.mul(rim, 0.5), 0.75), "A")
+    g.out(g.one(unreal.MaterialExpressionSaturate, a), unreal.MaterialProperty.MP_OPACITY)
+    g.out(g.mul(vc, 1.0), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_HitBox")
+
+
 def build_moon(tex):
     # The lit part of the moon: its painted face, glowing (added on top of the sky so it looks right by day too)
     mat, g = unlit("M_Moon", unreal.BlendMode.BLEND_ADDITIVE)
@@ -677,6 +694,7 @@ build_smoke()
 build_flame_glow()
 build_streak()
 build_sword_trail()
+build_hit_box()
 build_moon(imported(gen_textures.moon(), "T_Moon"))
 build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
 for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out

@@ -5,6 +5,7 @@
 #include "SkillComponent.h"
 #include "KnightDesign.h"
 #include "Inventory.h"
+#include "HitBoxes.h"
 #include "KnightCharacter.generated.h"
 
 class UStaticMeshComponent;
@@ -548,6 +549,17 @@ private:
 	float BladeAlpha = 0.f;         // how much the wrist is steering the blade (fades in and out of a slash)
 	float WristBendNow = 0.f, ForearmTwistNow = 0.f;   // how far the wrist is bent and the forearm twisted for the blade (degrees; for checking a move)
 	void LogSwordTip();             // test pictures: the sword tip and edge, frame by frame, in the knight's frame (log: JEEBTIP)
+	// Smash-style hit boxes and hurt boxes (HitBoxes.h; KnightCharacterCombat.cpp, TickHitboxes)
+	TArray<JeebHit::FCapsule> HitLive;                         // the sword's hit boxes this frame (swept from the last frame); empty outside the active frames
+	FVector HitPrev[4]; bool bHitPrevValid = false;            // where each hit box was the frame before
+	TArray<TWeakObjectPtr<class UHealthComponent>> HitThisSwing;   // a move hits each target once
+	UPROPERTY() class UProceduralMeshComponent* BoxView = nullptr;   // the boxes, drawn see-through (M_HitBox)
+	void TickHitboxes(float Dt);
+	void DrawBoxes();
+public:
+	void GatherHurt(TArray<JeebHit::FCapsule>& Out) const;    // this knight's hurt boxes, from his joints as posed this frame
+	const TArray<JeebHit::FCapsule>& LiveHitboxes() const { return HitLive; }
+private:
 	float JabBodyNow = 0.f;         // how far into the knees and the lean a sword jab has taken him (0 - 1)
 	float AttackYaw = 0.f;          // the heading a swing started with (a sword hit keeps it)
 	float ArmRollR = 0.f, ForearmNow = 0.f;   // the sword arm raised out to the side, and the forearm's turn (degrees)

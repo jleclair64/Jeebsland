@@ -26,6 +26,10 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void Setup(const FVector2D& InPenCenter, const FVector2D& InPenHalf);
 
+	// A still sparring knight (MoveLab): he stands where he was put, never fights back, walks or falls; his health fills
+	// again 3 s after the last blow (Smash's training mode). Set before FinishSpawning.
+	bool bStill = false;
+
 	// Tuning
 	static constexpr int32 MaxHp = 90;
 	static constexpr int32 HitMin = 11, HitMax = 15;   // raw damage of his swing (your armour softens it)

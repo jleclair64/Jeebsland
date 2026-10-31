@@ -46,6 +46,7 @@
 #include "Store.h"
 #include "Combat.h"
 #include "Scarecrow.h"
+#include "FoeKnight.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -275,7 +276,7 @@ void AKnightGameState::SetupShotMode()
 }
 
 // The MoveLab test area: a flat 40 x 40 m floor at the height of the game's starting point, with a darker line every metre
-// and a bright one every 5 m (to judge steps and reach), and two training dummies 3 m ahead and 3 m to the right
+// and a bright one every 5 m (to judge steps and reach), a still sparring knight 3 m ahead and straw dummies 3 m to each side
 void AKnightGameState::BuildMoveLab()
 {
 	UWorld* World = GetWorld();
@@ -310,8 +311,23 @@ void AKnightGameState::BuildMoveLab()
 		Box(FVector(i * 100.f, 0.f, 0.3f), FVector(W, 4000.f, 0.6f), C, false);
 		Box(FVector(0.f, i * 100.f, 0.3f), FVector(4000.f, W, 0.6f), C, false);
 	}
-	// Two dummies: one straight ahead of where you start, one to your right
-	for (const FVector2D& P : { FVector2D(300.f, 0.f), FVector2D(0.f, 300.f) })
+	// A still sparring knight straight ahead of where you start (the pen knight's body, standing still: for hit boxes and hurt
+	// boxes, HitBoxes.h), and a straw dummy to either side
+	if (World->GetNetMode() != NM_Client)
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		float Ahead = 300.f;
+		FParse::Value(FCommandLine::Get(), TEXT("LabKnight="), Ahead);   // (test pictures: -LabKnight=150 stands him within reach)
+		const FTransform Xf(FRotator(0.f, 180.f, 0.f), FVector(Ahead, 0.f, Z + 97.f));
+		if (AFoeKnight* K = World->SpawnActorDeferred<AFoeKnight>(AFoeKnight::StaticClass(), Xf))
+		{
+			K->bStill = true;
+			K->Setup(FVector2D(Ahead, 0.f), FVector2D(100.f, 100.f));
+			K->FinishSpawning(Xf);
+		}
+	}
+	for (const FVector2D& P : { FVector2D(0.f, -300.f), FVector2D(0.f, 300.f) })
 	{
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

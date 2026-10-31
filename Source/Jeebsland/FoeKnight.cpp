@@ -166,6 +166,14 @@ void AFoeKnight::BeginPlay()
 
 	Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
 	Hp->OnHitSeen = [this]() { HitFlash = 0.35f; };
+	// His hurt boxes follow his joints (HitBoxes.h)
+	Hp->GatherHurt = [this](TArray<JeebHit::FCapsule>& Out)
+	{
+		JeebHit::FKnightJoints J;
+		J.Upper = UpperPivot; J.Head = HeadPivot; J.ArmL = ArmL; J.ArmR = ArmR; J.ElbowL = ElbowL; J.ElbowR = ElbowR; J.WristR = WristR;
+		J.HipL = HipL; J.HipR = HipR; J.KneeL = KneeL; J.KneeR = KneeR; J.AnkleL = AnkleL; J.AnkleR = AnkleR;
+		JeebHit::KnightHurt(J, Out);
+	};
 	// A raised shield, facing the blow, stops most of it
 	Hp->ModifyDamage = [this](int32 Amount, AActor* From) -> int32
 	{
@@ -177,7 +185,7 @@ void AFoeKnight::BeginPlay()
 		return Amount - Stopped;
 	};
 	LastLoc = GetActorLocation();
-	if (HasAuthority()) Rise();
+	if (HasAuthority() && !bStill) Rise();
 }
 
 void AFoeKnight::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -264,6 +272,11 @@ void AFoeKnight::Rise()
 void AFoeKnight::OnHurt(AActor* From)
 {
 	HitFlash = 0.35f;
+	if (bStill)   // a sparring post: never falls, never steps back (his health fills again in Tick)
+	{
+		if (Hp->Cur <= 0) Hp->Cur = 1;
+		return;
+	}
 	if (Hp->Cur <= 0)
 	{
 		if (DeathT <= 0.f)
@@ -318,6 +331,10 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	{
 		if (Act != EAct::Idle) ActT += Dt;
 		BlockT = bRepBlock ? 1.f : -1.f;
+	}
+	else if (bStill)
+	{
+		if (Hp->Cur < Hp->Max && Now - Hp->LastHitTime > 3.f) Hp->Reset();   // (training mode: full again after a pause)
 	}
 	else
 	{
