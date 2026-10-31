@@ -25,6 +25,7 @@ struct FProjLaunch
 	UPROPERTY() bool bPurple = false;
 	UPROPERTY() int32 ArrowId = 0;   // which arrows (0: a bolt): fire arrows glow and burn
 	UPROPERTY() uint8 Seq = 0;
+	UPROPERTY() float Sag = 300.f;   // cm/s/s it drops (a weakly drawn arrow drops fast and lands close)
 };
 
 // Where an arrow ended up (owner, 2026-10-31): stuck in the ground, a tree, a shield or a body for StuckSeconds. On (with Comp)
@@ -54,7 +55,11 @@ public:
 	AProjectile();
 
 	// bMagic: glowing bolt that flies straight; otherwise an arrow that drops a little. ArrowId: which arrows (fire arrows burn).
-	void Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId = 0);
+	void Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId = 0, float InSag = ArrowSag);
+
+	// What the reticle is on: how far along A..B (0..1; 2 = nothing) the first body or raised shield with hit boxes lies, other
+	// than Ignore. (Knights and foes are not solid to the world's traces, so aiming with a trace alone looks straight through them.)
+	static float FirstBodyAlong(UWorld* World, const FVector& A, const FVector& B, const AActor* Ignore);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -66,6 +71,7 @@ public:
 	static constexpr int32 BurnTicks = 3, BurnDamage = 2;   // fire arrows: BurnDamage points BurnTicks times, BurnEvery s apart, after the hit
 	static constexpr float BurnEvery = 0.7f;
 	static constexpr float ArrowSag = 300.f;   // cm/s/s: arrows drop a little (bolts fly straight)
+	static constexpr float TrailLife = 0.15f;   // s a bit of the white streak behind a flying arrow lasts
 
 private:
 	UPROPERTY() USceneComponent* Root = nullptr;
@@ -73,6 +79,9 @@ private:
 	UPROPERTY() UStaticMeshComponent* Head = nullptr;    // the arrowhead (the tip is the actor's own position)
 	UPROPERTY() UStaticMeshComponent* Fletch = nullptr;
 	UPROPERTY() UPointLightComponent* Glow = nullptr;   // (fire arrows, players' machines only)
+	UPROPERTY() class UProceduralMeshComponent* Trail = nullptr;   // the white streak behind it (players' machines only)
+	TArray<TPair<FVector, float>> TrailPts;   // where its tail was, and when
+	void TickTrail();
 	UPROPERTY(Replicated) AKnightCharacter* Shooter = nullptr;
 	UPROPERTY(ReplicatedUsing = OnRep_Launch) FProjLaunch L;
 	UPROPERTY(ReplicatedUsing = OnRep_Stuck) FProjStuck Stuck;

@@ -1,4 +1,6 @@
 #include "KnightCharacter.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "KnightShieldRest.h"
 #include "JeebSave.h"
 #include "Net/UnrealNetwork.h"
@@ -218,7 +220,8 @@ void AKnightCharacter::EndPlay(const EEndPlayReason::Type Reason)
 
 void AKnightCharacter::Autosave()
 {
-	if (Skills && UsesLocalSave()) UJeebSave::Save(Skills);
+	static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));   // (test pictures never change the save: they fire arrows, swap weapons ...)
+	if (Skills && UsesLocalSave() && !bShot) UJeebSave::Save(Skills);
 }
 
 bool AKnightCharacter::UsesLocalSave() const

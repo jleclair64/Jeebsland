@@ -12,6 +12,14 @@
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Inventory.h"
+#include "ProceduralMeshComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Camera/PlayerCameraManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+
+// (test pictures: say where each arrow ended up)
+static bool ArrowLog() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")); return b; }
 
 AProjectile::AProjectile()
 {
@@ -54,7 +62,7 @@ void AProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifet
 	DOREPLIFETIME(AProjectile, Stuck);
 }
 
-void AProjectile::Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId)
+void AProjectile::Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId, float InSag)
 {
 	Shooter = InShooter;
 	Damage = InDamage;
@@ -69,6 +77,7 @@ void AProjectile::Launch(AKnightCharacter* InShooter, const FVector& Dir, float 
 	L.bPurple = bMagic && InSkill == ESkillType::Magic && Tier >= 100;
 	L.ArrowId = bMagic ? 0 : InArrowId;
 	L.Seq = 0;
+	L.Sag = bMagic ? 0.f : InSag;
 	if (HasAuthority()) SetLifeSpan(8.f);   // (a miss into the sky; landing makes it StuckSeconds)
 	ApplyLaunch();
 }
@@ -130,8 +139,9 @@ void AProjectile::ApplyLaunch()
 void AProjectile::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (!IsNetMode(NM_DedicatedServer) && !L.bBolt) TickTrail();
 	if (!bFlying || IsHidden()) return;
-	if (!L.bBolt) Velocity.Z -= ArrowSag * DeltaSeconds;
+	Velocity.Z -= L.Sag * DeltaSeconds;
 	const FVector From = GetActorLocation();   // (the tip)
 	const FVector To = From + Velocity * DeltaSeconds;
 	const bool bAuth = HasAuthority();
@@ -172,6 +182,7 @@ void AProjectile::Tick(float DeltaSeconds)
 		if (Best <= 1.f)
 		{
 			AActor* Target = BestK ? static_cast<AActor*>(BestK) : BestH->GetOwner();
+			if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW hit %s shield %d"), *Target->GetName(), bOnShield ? 1 : 0);
 			const FVector At = From + (To - From) * Best;
 			if (bOnShield)
 			{
@@ -244,6 +255,7 @@ void AProjectile::StickAt(const FVector& Tip, AActor* On, USceneComponent* Comp,
 {
 	const FVector Dir = Velocity.IsNearlyZero() ? GetActorForwardVector() : Velocity.GetSafeNormal();
 	const FTransform W(Dir.Rotation(), Tip + Dir * 7.f);   // (sunk 7 cm in)
+	if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW stuck at %s on %s / %s (dmg %d)"), *Tip.ToCompactString(), On ? *On->GetName() : TEXT("-"), *CompName.ToString(), Damage);
 	Stuck.bStuck = true;
 	Stuck.On = Comp ? On : nullptr;
 	Stuck.Comp = CompName;
@@ -345,4 +357,68 @@ void AProjectile::Burn(AActor* Target)
 			}
 		}), BurnEvery * i, false);
 	}
+}
+
+// (players' machines) A thin white streak behind a flying arrow, like the sword's: the tail's last moments, turned to face the
+// camera, thinning and fading out behind it. It fades away once the arrow lands.
+void AProjectile::TickTrail()
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(GetActorLocation() - GetActorForwardVector() * 68.f, Now));
+	TrailPts.RemoveAll([&](const TPair<FVector, float>& P) { return Now - P.Value > TrailLife; });
+	if (!Trail)
+	{
+		if (TrailPts.Num() < 2) return;
+		Trail = NewObject<UProceduralMeshComponent>(this, TEXT("Trail"));
+		Trail->SetupAttachment(Root);
+		Trail->SetUsingAbsoluteLocation(true); Trail->SetUsingAbsoluteRotation(true); Trail->SetUsingAbsoluteScale(true);
+		Trail->SetWorldTransform(FTransform::Identity);   // (its points are world positions)
+		Trail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Trail->SetCastShadow(false);
+		Trail->RegisterComponent();
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) Trail->SetMaterial(0, M);
+	}
+	if (TrailPts.Num() < 2) { if (Trail->GetNumSections() > 0) Trail->ClearAllMeshSections(); return; }
+	FVector Cam = GetActorLocation() + FVector(0.f, 0.f, 300.f);
+	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())   // (only for the look: whoever is watching here)
+		if (PC->PlayerCameraManager) Cam = PC->PlayerCameraManager->GetCameraLocation();
+	TArray<FVector> V; TArray<FVector2D> UV; TArray<FLinearColor> Col; TArray<int32> Tri;
+	const int32 N = TrailPts.Num();
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FVector P = TrailPts[i].Key;
+		const FVector Along = (TrailPts[FMath::Min(i + 1, N - 1)].Key - TrailPts[FMath::Max(i - 1, 0)].Key).GetSafeNormal();
+		FVector Side = FVector::CrossProduct(Along, (Cam - P).GetSafeNormal()).GetSafeNormal();
+		if (Side.IsNearlyZero()) Side = FVector::UpVector;
+		const float Age = FMath::Clamp((Now - TrailPts[i].Value) / TrailLife, 0.f, 1.f);
+		const float Half = 2.2f * (1.f - Age);
+		const float Alpha = 0.85f * FMath::Pow(1.f - Age, 1.5f);
+		V.Add(P - Side * Half); UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+		V.Add(P + Side * Half); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+	}
+	for (int32 k = 0; k + 3 < V.Num(); k += 2) Tri.Append({ k, k + 1, k + 3, k, k + 3, k + 2 });
+	Trail->CreateMeshSection_LinearColor(0, V, Tri, TArray<FVector>(), UV, Col, TArray<FProcMeshTangent>(), false);
+}
+
+float AProjectile::FirstBodyAlong(UWorld* World, const FVector& A, const FVector& B, const AActor* Ignore)
+{
+	if (!World) return 2.f;
+	JeebHit::FCapsule Seg;
+	Seg.A = A; Seg.B = B; Seg.R = 3.f;
+	float Best = 2.f;
+	TArray<JeebHit::FCapsule> Hurt;
+	auto Consider = [&](UHealthComponent* H, AKnightCharacter* K)
+	{
+		Hurt.Reset();
+		JeebHit::FShieldWedge W;
+		bool bW;
+		if (K) { K->GatherHurt(Hurt); bW = K->GetShieldWedge(W); }
+		else { JeebHit::HurtOf(H, Hurt); bW = JeebHit::ShieldOf(H, W); }
+		Best = FMath::Min3(Best, bW ? JeebHit::FirstTouchWedge(Seg, W) : 2.f, JeebHit::FirstTouch(Seg, Hurt));
+	};
+	for (UHealthComponent* H : UHealthComponent::All())
+		if (H && H->IsAlive() && H->GetOwner() && H->GetOwner() != Ignore) Consider(H, nullptr);
+	for (TActorIterator<AKnightCharacter> It(World); It; ++It)
+		if (*It != Ignore && It->GetHealth() > 0.f) Consider(nullptr, *It);
+	return Best;
 }

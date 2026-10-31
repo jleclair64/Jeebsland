@@ -698,9 +698,13 @@ private:
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
 	static constexpr float BowDrawTime = 1.f, BowHoldMax = 2.f, BowRecover = 0.3f;   // (like the smash attack's charge)
-	static constexpr float BowSpeedMin = 2000.f, BowSpeedMax = 4800.f;                // the arrow's speed, barely drawn to full
-	static constexpr float BowDamageMin = 0.45f, BowDamageMax = 1.3f;                 // times the bow's damage, the same way
+	// By the draw (none, half, full; straight lines between): a level shot lands about 3 m out barely drawn, 12 m half drawn,
+	// 44 m full (owner, 2026-10-31: 10 ft, 40 ft, as before); the speed and how fast it drops together set that
+	static constexpr float BowSpeedMin = 1000.f, BowSpeedMid = 2400.f, BowSpeedMax = 4800.f;   // cm/s
+	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 300.f;          // cm/s/s it drops
+	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
+	static constexpr float BowAnchorUp = 6.f, BowAnchorSide = 16.f;   // the full draw's anchor: this far above his neck joint and out to his right (beside the helm's cheek)
 	void StartDraw();
 	void ReleaseDraw();
 	void CancelDraw();

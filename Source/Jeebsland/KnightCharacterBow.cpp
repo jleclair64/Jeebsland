@@ -72,8 +72,11 @@ FVector AKnightCharacter::BowAimDir() const
 				const FVector CamDir = PC->PlayerCameraManager->GetCameraRotation().Vector();
 				FHitResult Hit;
 				FCollisionQueryParams Q(SCENE_QUERY_STAT(BowAim), false, this);
-				const FVector End = CamLoc + CamDir * 9000.f;
-				const FVector Target = GetWorld()->LineTraceSingleByChannel(Hit, CamLoc + CamDir * 150.f, End, ECC_Visibility, Q) ? Hit.ImpactPoint : End;
+				const FVector From = CamLoc + CamDir * 150.f;
+				FVector Target = CamLoc + CamDir * 9000.f;
+				if (GetWorld()->LineTraceSingleByChannel(Hit, From, Target, ECC_Visibility, Q)) Target = Hit.ImpactPoint;
+				const float Body = AProjectile::FirstBodyAlong(GetWorld(), From, Target, this);   // (a knight or foe under the reticle: the trace sees through them)
+				if (Body <= 1.f) Target = From + (Target - From) * Body;
 				const FVector D = Target - Start;
 				if (D.Size() > 200.f && FVector::DotProduct(D.GetSafeNormal(), CamDir) > 0.3f) return D.GetSafeNormal();
 				return CamDir;
@@ -162,11 +165,12 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	const int32 BowTier = JeebItems::IsGear(BowId) ? JeebItems::VariantOf(BowId) : 0;
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	bool bCrit = false;
-	const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Bow, BowTier, JeebItems::ArrowTier(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, C));
+	const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Bow, BowTier, JeebItems::ArrowTier(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, FMath::Pow(C, 1.5f)));
+	auto ByDraw = [C](float Min, float Mid, float Max) { return C < 0.5f ? FMath::Lerp(Min, Mid, C * 2.f) : FMath::Lerp(Mid, Max, C * 2.f - 1.f); };
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), ArrowStart(), Dir.Rotation(), SP))
-		P->Launch(this, Dir, FMath::Lerp(BowSpeedMin, BowSpeedMax, C), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id);
+		P->Launch(this, Dir, ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id, ByDraw(BowSagMin, BowSagMid, BowSagMax));
 }
 
 void AKnightCharacter::TickBow(float Dt)
@@ -225,13 +229,27 @@ void AKnightCharacter::PoseBow(float Dt)
 	const FVector Up = FVector::UpVector;
 	const FQuat Chest = UpperPivot->GetComponentQuat();
 
-	// Left arm: straight along the aim, the bow upright
+	// The arrow runs from the bow back to the anchor, beside his right cheek, so the string hand stays clear of his body and helm
+	// (an archer's draw: the bow arm reaches out across, the arrow passes beside the face)
+	FVector Right = FVector::CrossProduct(Up, Aim).GetSafeNormal();
+	if (Right.IsNearlyZero()) Right = GetActorRightVector();
+	const FVector UpA = FVector::CrossProduct(Aim, Right);
+	const FVector Anchor = HeadPivot ? HeadPivot->GetComponentLocation() + UpA * BowAnchorUp + Right * BowAnchorSide : ArrowStart();
+	// Left arm: straight, the fist on the arrow's line where the arm just reaches it, the bow upright
+	FVector GripWant;
 	{
 		static const FVector A0 = (GripPos(true) - PivotPos(P_ArmL)).GetSafeNormal();
 		static const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
-		FVector Bw = FVector::CrossProduct(Up, Aim).GetSafeNormal();   // (the fist's grip then runs up and down)
+		static const float Reach = (GripPos(true) - PivotPos(P_ArmL)).Size();
+		const FVector S = ArmPivotL->GetComponentLocation();
+		const FVector D = Anchor - S;   // (|D + Aim*L| = Reach, the far answer)
+		const float B = FVector::DotProduct(D, Aim);
+		const float L = -B + FMath::Sqrt(FMath::Max(B * B - D.SizeSquared() + Reach * Reach, 0.f));
+		GripWant = Anchor + Aim * FMath::Max(L, 30.f);
+		const FVector ArmDir = (GripWant - S).GetSafeNormal();
+		FVector Bw = Perp(Right, ArmDir);   // (the fist's grip then runs up and down)
 		if (Bw.IsNearlyZero()) Bw = GetActorRightVector();
-		const FQuat Want = Chest.Inverse() * Frame(Aim, Bw) * Frame(A0, B0).Inverse();
+		const FQuat Want = Chest.Inverse() * Frame(ArmDir, Bw) * Frame(A0, B0).Inverse();
 		ArmPivotL->SetRelativeRotation(FQuat::Slerp(ArmPivotL->GetRelativeRotation().Quaternion(), Want, A));
 		ElbowL->SetRelativeRotation(FQuat::Slerp(ElbowL->GetRelativeRotation().Quaternion(), FQuat(FRotator(3.f, 0.f, 0.f)), A));
 	}
@@ -240,9 +258,10 @@ void AKnightCharacter::PoseBow(float Dt)
 		const FVector Grip = BowHold->GetComponentLocation();
 		const FVector StringRest = BowHold->GetComponentTransform().TransformPosition(FVector(0.f, 0.f, 28.8f));
 		const float Draw = (Bow == EBow::Drawing) ? BowCharge : (Bow == EBow::Recover ? 0.f : BowCharge);
-		const float Pull = FMath::Lerp(32.f, 66.f, FMath::Sqrt(FMath::Clamp(Draw, 0.f, 1.f)));
-		FVector Hand = Grip - Aim * Pull;
-		if (Bow == EBow::Recover) Hand = FMath::Lerp(Grip - Aim * 66.f, StringRest, FMath::Clamp(BowT / BowRecover, 0.f, 1.f));   // (the string snaps forward; the hand follows)
+		const FVector Back = Anchor - Grip;   // (from the bow to the anchor: full draw puts the fist there)
+		const float Pull = FMath::Lerp(FMath::Min(32.f, Back.Size()), Back.Size(), FMath::Sqrt(FMath::Clamp(Draw, 0.f, 1.f)));
+		FVector Hand = Grip + Back.GetSafeNormal() * Pull;
+		if (Bow == EBow::Recover) Hand = FMath::Lerp(Anchor, StringRest, FMath::Clamp(BowT / BowRecover, 0.f, 1.f));   // (the string snaps forward; the hand follows)
 		static const float Lu = (PivotPos(P_ElbowR) - PivotPos(P_ArmR)).Size();
 		static const float Lf = (GripPos(false) - PivotPos(P_ElbowR)).Size();
 		const FVector S = ArmPivot->GetComponentLocation();
@@ -331,18 +350,19 @@ void AKnightCharacter::UpdateBowBits()
 	}
 }
 
-// The quiver: a leather tube slung across his back, its mouth over his right shoulder with fletched arrows showing, while the
-// bow is his weapon
+// The quiver: a leather tube hung on his right hip like a sword's sheath (clear of the cape; owner, 2026-10-31), its mouth
+// tipped forward with fletched arrows showing, while the bow is his weapon
 void AKnightCharacter::UpdateQuiver()
 {
-	const bool bShow = SelectedKind() == JeebItems::K_Bow && UpperPivot;
+	const bool bShow = SelectedKind() == JeebItems::K_Bow && BodyRoot;
 	if (!bShow) { for (UStaticMeshComponent* C : QuiverParts) if (C) C->SetVisibility(false); return; }
 	if (QuiverParts.Num() == 0)
 	{
-		// (in the chest's frame: the back is about 24 cm behind it; tipped so the mouth sits behind the right shoulder)
+		// (in the hips' frame: outside the right hip, a little behind it; pitch -: the mouth leans forward; roll -: the bottom
+		// swings out from the leg)
 		USceneComponent* Q = NewObject<USceneComponent>(this);
-		Q->SetupAttachment(UpperPivot);
-		Q->SetRelativeLocationAndRotation(FVector(-27.f, 4.f, 44.f), FRotator(0.f, 0.f, 26.f));   // (roll +: the top leans to his right)
+		Q->SetupAttachment(BodyRoot);
+		Q->SetRelativeLocationAndRotation(FVector(-8.f, 31.f, -38.f), FRotator(-22.f, 0.f, -6.f));
 		Q->RegisterComponent();
 		auto Bit = [&](const TCHAR* MeshPath, const FLinearColor& Col, const FVector& At, const FRotator& Rot, const FVector& Scale)
 		{
@@ -353,13 +373,13 @@ void AKnightCharacter::UpdateQuiver()
 		};
 		const TCHAR* Cyl = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 		const TCHAR* Cube = TEXT("/Engine/BasicShapes/Cube.Cube");
-		Bit(Cyl, FLinearColor(0.32f, 0.19f, 0.09f), FVector::ZeroVector, FRotator::ZeroRotator, FVector(0.13f, 0.13f, 0.52f));               // the tube
-		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, 25.f), FRotator::ZeroRotator, FVector(0.145f, 0.145f, 0.04f));          // the rim
-		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, -24.f), FRotator::ZeroRotator, FVector(0.14f, 0.14f, 0.04f));           // the bottom
+		Bit(Cyl, FLinearColor(0.32f, 0.19f, 0.09f), FVector::ZeroVector, FRotator::ZeroRotator, FVector(0.13f, 0.13f, 0.44f));               // the tube
+		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, 21.f), FRotator::ZeroRotator, FVector(0.145f, 0.145f, 0.04f));          // the rim
+		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, -20.f), FRotator::ZeroRotator, FVector(0.14f, 0.14f, 0.04f));           // the bottom
 		static const FVector2D Spots[5] = { { 2.5f, 0.f }, { -2.5f, 2.f }, { -1.f, -3.f }, { 0.f, 3.5f }, { 3.f, -2.5f } };
 		for (int32 i = 0; i < 5; ++i)
 		{
-			const FVector P(Spots[i].X, Spots[i].Y, 33.f + 2.f * (i % 3));
+			const FVector P(Spots[i].X, Spots[i].Y, 29.f + 2.f * (i % 3));
 			Bit(Cyl, FLinearColor(0.5f, 0.34f, 0.17f), P - FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, FVector(0.012f, 0.012f, 0.3f));      // shaft
 			Bit(Cube, FLinearColor(0.92f, 0.9f, 0.86f), P + FVector(0.f, 0.f, 3.f), FRotator(0.f, i * 37.f, 0.f), FVector(0.05f, 0.004f, 0.09f));   // fletching
 		}
