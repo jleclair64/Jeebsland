@@ -94,6 +94,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
     - Grab and throws: Roy-style. E grabs an opponent in reach, taking priority over picking up items; W/S/A/D picks the throw.
     - The shield stays on the arm through every move: any two-handed motion becomes a natural one-handed one.
     - Build order: jab; scroll down and up; charge slash; dash attack; jumping lunge; grab and throws (with knockback).
+    - **Built 2026-10-31 (sixth session):** hit boxes and hurt boxes; the jab; the charged smash (hold click); scroll down = the low sweep (launches, with DI); scroll UP became a kick (beats shields, knocks down; replaces the overhead chop); hitstun and knockdowns with get-ups; the kick-into-sweep combo; the dash attack as a straight poke (not side to side). Rock-paper-scissors: attack > kick > shield > attack. Also the bow and arrows (BotW style). Still to build: jumping lunge, grab and throws, short hop, crouch block; moves for the other weapons.
 - **Classes [L, later, build as NPCs first]:** knights (all-rounders), trolls (slow, huge reach, break guards), wizards (glass cannon, spells, a bubble shield). Mild PvP triangle: knights beat wizards, wizards beat trolls, trolls beat knights.
 
 ## Bosses and monsters (2026-10-29) [L]
@@ -134,7 +135,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.
 9. **Profiles per account,** fast-travel screen, shared bank in every town.
-10. **Smash-style combat** in its six stages.
+10. **Smash-style combat** in its six stages. Mostly BUILT 2026-10-31 for the sword (see the sword moves list above); still to do: jumping lunge, grab and throws, short hop, crouch block, other weapons.
 11. **Bosses and monsters** with loot.
 12. **Trolls, then wizards,** and the remaining towns.
 13. Message board (once there is a rented server); key rebinding screen.
