@@ -211,14 +211,21 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
 	const float Life = 0.09f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
-	if (bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && WristR)
+	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
+	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
+	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && SelectedKind() == JeebItems::K_Sword && WristR)
 	{
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
-		const FVector Tip = Along(79.5f), In = Along(67.f);   // a thin band at the tip (the sword's tip is 79.5 cm from the grip)
-		// Only the cut itself leaves a trail. Begin hit 1 once the blade is already moving across the front of the body.
+		FVector Tip = Along(79.5f), In = Along(67.f);   // a thin band at the tip (the sword's tip is 79.5 cm from the grip)
+		if (bDash) { const FVector Mid = Tip; In = Mid + FVector(0.f, 0.f, 5.f); Tip = Mid - FVector(0.f, 0.f, 5.f); }   // (a stab runs along the blade: a streak behind the point instead)
+		// Only the cut itself leaves a trail (the hit boxes' active part). Begin hit 1 once the blade is already moving across the
+		// front of the body.
 		const float T = AttackT / FMath::Max(AttackDur, 0.01f);
-		const float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.68f;
+		float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.68f;
+		if (bSweep) { From = SweepActiveFrom; To = SweepActiveTo; }
+		if (bDash) { From = (DashActiveFrom - 0.06f) / FMath::Max(AttackDur, 0.01f);   // (from the thrust itself, just before it can hit)
+ To = DashActiveTo / FMath::Max(AttackDur, 0.01f) + 0.08f; }
 		const float Window = FMath::SmoothStep(From, From + 0.05f, T) * (1.f - FMath::SmoothStep(To - 0.08f, To, T));
 		if (Window > 0.001f)
 		{

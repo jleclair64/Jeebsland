@@ -490,9 +490,13 @@ void AKnightCharacter::RebuildHeld()
 			const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
 			FVector Out = FVector(0.f, -1.f, 0.f);   // (out from his left leg)
 			Out = (Out - A0 * FVector::DotProduct(Out, A0)); Out = (Out - B0 * FVector::DotProduct(Out, B0)).GetSafeNormal();
+			// the string's side: in toward his body and up into the gap between the arm and his side (owner, 2026-11-01: the bow
+			// outside, the string between arm and body)
+			const FVector Z = (-Out * 0.8f - A0 * 0.6f).GetSafeNormal();
 			const float Tip = FMath::DegreesToRadians(25.f);
-			const FVector X = (B0 * FMath::Cos(Tip) - A0 * FMath::Sin(Tip)).GetSafeNormal();   // the limbs: forward and tipped up
-			BowHoldRest = FQuat(FMatrix(X, FVector::CrossProduct(Out, X), Out, FVector::ZeroVector));   // (the string's side out)
+			FVector X = B0 * FMath::Cos(Tip) - A0 * FMath::Sin(Tip);   // the limbs: forward and tipped up
+			X = (X - Z * FVector::DotProduct(X, Z)).GetSafeNormal();
+			BowHoldRest = FQuat(FMatrix(X, FVector::CrossProduct(Z, X), Z, FVector::ZeroVector));
 			BowHold->SetRelativeRotation(BowHoldRest);
 		}
 		BowHold->RegisterComponent();

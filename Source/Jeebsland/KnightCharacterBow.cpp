@@ -185,6 +185,14 @@ void AKnightCharacter::MulticastBow_Implementation(uint8 Phase)
 	SetBow(static_cast<EBow>(Phase));
 }
 
+// TESTING: [Jeebsland.Testing] UnlimitedArrows=True in DefaultGame.ini: arrows are never used up, and everyone is kept at 99
+// steel and 99 fire arrows (owner, 2026-11-01)
+static bool UnlimitedArrows()
+{
+	static const bool b = []() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("UnlimitedArrows"), v, GGameIni); return v; }();
+	return b;
+}
+
 // (server) One arrow from the pack, out of the bow
 void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId, const FVector& From)
 {
@@ -192,7 +200,7 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	int32 Id = (JeebItems::IsArrow(ArrowId) && Skills->CountItem(ArrowId) > 0) ? ArrowId : 0;
 	if (Id == 0) { const int32 Saved = ArrowPick; ArrowPick = 0; Id = ArrowSlotId(); ArrowPick = Saved; }
 	if (Id == 0) { Skills->Say(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
-	Skills->RemoveItems(Id, 1);
+	if (!UnlimitedArrows()) Skills->RemoveItems(Id, 1);
 	const int32 BowId = Skills->SelectedItem();
 	const int32 BowTier = JeebItems::IsGear(BowId) ? JeebItems::VariantOf(BowId) : 0;
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
@@ -217,6 +225,9 @@ void AKnightCharacter::TickBow(float Dt)
 		|| (IsLocallyControlled() && IsUIOpen())))
 		CancelDraw();
 	BowT += Dt;
+	if (HasAuthority() && Skills && UnlimitedArrows())   // (testing: topped up to a full stack of each)
+		for (const int32 Id : { JeebItems::ArrowId(JeebItems::T_Steel), JeebItems::IdFireArrow })
+			if (const int32 Have = Skills->CountItem(Id); Have < USkillComponent::StartSteelArrows) Skills->AddInvItem(Id, USkillComponent::StartSteelArrows - Have);
 	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
 	if (bShotFace && bShotWalk) AddMovementInput(FRotator(0.f, ShotFaceYaw, 0.f).Vector(), 1.f);
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)
