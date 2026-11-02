@@ -497,5 +497,9 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * AirSpeedMul;
 	else if (!bSpecial && !bMounted && Bow == EBow::Drawing) Move->MaxWalkSpeed = 0.5f * WalkSpeed * AirSpeedMul;   // drawing a bow: half the walking speed
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
+	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk
+	// to sprint) the usual acceleration keeps the sprint's ramp. Worked out from the velocity, so the server agrees.
+	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > WalkSpeed ? WalkSpeed * AirSpeedMul : Move->MaxWalkSpeed);
+	Move->MaxAcceleration = (!bFalling && !bSpecial && !bMounted && Move->Velocity.Size2D() < WalkCap - 5.f) ? WalkAccel : SprintAccel;
 	return bFaceCam;
 }

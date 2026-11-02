@@ -136,8 +136,8 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	//  SWING: the foot lifts, the knee folds (most early in the swing), and the leg swings forward to land nearly straight.
 	// Walking has a long contact (both feet down for a moment) and small swings; jogging (the normal speed) and sprinting
 	// have a short contact and a moment in the air. The clock runs on the ground covered, not on time.
-	const float JogT = FMath::Clamp((Speed - 150.f) / 250.f, 0.f, 1.f);   // walk ... jog (400, the normal speed)
-	const float SprT = FMath::Clamp((Speed - 400.f) / 350.f, 0.f, 1.f);   // jog ... sprint (750)
+	const float JogT = FMath::Clamp((Speed - 150.f) / (WalkSpeed - 150.f), 0.f, 1.f);   // walk ... jog (WalkSpeed, the normal speed)
+	const float SprT = FMath::Clamp((Speed - WalkSpeed) / (SprintSpeed - WalkSpeed), 0.f, 1.f);   // jog ... sprint
 	auto G3 = [&](float W, float J, float Sp) { return SprT > 0.f ? FMath::Lerp(J, Sp, SprT) : FMath::Lerp(W, J, JogT); };
 	const float StepScale   = 1.f - 0.35f * CrouchAlpha;   // smaller steps when crouched
 	const float GContact    = G3(0.60f, 0.26f, 0.21f);     // share of the cycle each foot is planted (short when running: a long float between footfalls, like BotW)

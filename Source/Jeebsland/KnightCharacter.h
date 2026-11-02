@@ -528,8 +528,10 @@ private:
 	FVector GatherStart = FVector::ZeroVector;
 	float ElbowRCur = 0.f;
 
-	float WalkSpeed = 400.f;
-	float CrouchSpeed = 240.f; // 40% slower than walking
+	float WalkSpeed = 500.f;   // 5 m/s (owner, 2026-11-01; was 4)
+	float CrouchSpeed = 240.f;
+	float WalkAccel = 30000.f;    // starting up to walking speed is instant (about 1/60 s)
+	float SprintAccel = 2048.f;   // walk to sprint keeps its ramp (the engine's usual acceleration)
 	float SprintSpeed = 750.f;
 
 

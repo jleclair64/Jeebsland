@@ -234,7 +234,9 @@ void AKnightCharacter::ApplyGraphics()
 	Set(TEXT("r.Shadow.FilterMethod"), 1);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
 	// Speed pass (2026-10-29, owner wants high frame rates): plain temporal smoothing (TAA) on both levels instead of TSR
 	// (about 2 ms less on the graphics card), cheaper post-processing, cached sun shadows with fewer cascades and a shorter reach
-	Set(TEXT("r.AntiAliasingMethod"), 2);
+	// (2026-11-01, owner wanted a sharper knight: HIGH uses TSR again, which rebuilds fine detail from the 60% render far
+	// better than TAA for about 1-2 ms; LOW keeps TAA)
+	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 2 : 4);
 	for (TActorIterator<AForest> It(W); It; ++It) It->SetLeafShadows(!bLowest);   // Lowest: no swaying leaf shadows (they blinked)
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 1);
 	Set(TEXT("r.AmbientOcclusionLevels"), 0);

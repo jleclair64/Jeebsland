@@ -26,12 +26,9 @@ Last updated 2026-11-01 (end of the sixth session, a long combat build session, 
 **START HERE next session:** remind the owner of the build order at the bottom of `Docs/Roadmap.md` and ask which to begin, with the model/effort recommendation. Likely next: test the new package with friends and walk through the online glitches (step 2); the rest of the sword moves (overhead chop on scroll up was replaced by the kick; still to build: jumping lunge, grab and throws, short hop, crouch block); the river's stone bridges and Oak Hill; the quest system; PvP (players' moves hit other players only in MoveLab until then). "Ask before starting each step." Keep the roadmap current.
 
 **Still waiting on the owner:**
-- Sharper knight: A (TSR on HIGH), B (default render scale ~80%) or C (both)?
-- Walking speed: keep 4 m/s or lower it (calmer steps)?
 - Where legendary gear comes from beyond smithing (bosses, Trials, quests)?
 - Other open questions in the roadmap (PvP cape colours, boxing ring rules, boss loot sharing, PvP borders, first quests).
 - Shapes in the new world (mountain height, hill size, any river bend or town spot to move): `WorldMap.h`.
-- Arrows while moving: the camera lags, so a flying arrow drifts across the screen though it lands where the reticle was at release. Offered: arrows inherit the knight's sideways speed (they would then miss still targets slightly to the side walked). No answer yet.
 
 **TEMPORARY test settings to remove when the owner is done testing gear:** `[Jeebsland.Testing]` in Config/DefaultGame.ini (`+MaxLevelAccounts=randy`, `MaxLevelInEditor=True`) give every skill level 99; the 99s are saved to the characters, so offer to restore real levels afterwards (backups of the pre-redo saves: `Saved/*_before_tier_redo_2026-10-30`). `FillPracticePack()` still fills new characters with random gear (now Tin to Onyx).
 
@@ -49,6 +46,7 @@ Last updated 2026-11-01 (end of the sixth session, a long combat build session, 
 **Cleanup still waiting on the owner's word:** `FillPracticePack()` (temporary random gear) and the `ASmokeCloud` test hazard. (Guard break and the 3x guard pool are built; parry was dropped; the kick replaces a shield bash.)
 
 **Decisions and preferences:**
+- Movement (owner, 2026-11-01): walking 5 m/s (`WalkSpeed` 500); starting to walk is instant (`WalkAccel`, set each frame at the end of the speed code in KnightCharacterMovement.cpp), walk to sprint keeps its ramp (`SprintAccel`). Arrows do NOT carry the knight's speed: they go to the reticle. HIGH graphics uses TSR (LOW keeps TAA), render scale still 60%.
 - Icon pictures are drawn with an anti-aliased fill (`AKnightHUD::Poly`): keep using it for any new icon.
 - HUD text must go through `HDText` / `HDTextSize` (sharp, size-matched font copies), never `DrawText` directly.
 - The Escape screen (also O; in the editor's preview window Escape stops Play) is opaque dark grey and always opens on the MAP tab (Save, Back to menu), then Settings, Controls, Dictionary, Lore. Graphics: two levels, shown to players as LOW and HIGH (code: GraphicsLevel 0 and 1; renamed 2026-10-29 from Lowest/Low); ALWAYS start on HIGH at render scale 60% (slider 35-100%), not loaded from the saved config. Both use standard shadow maps (virtual shadows overloaded in the pines) with soft PCSS shadows; Lowest: medium shadow quality, no leaf shadows, TAA.
