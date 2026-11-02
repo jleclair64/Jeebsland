@@ -103,7 +103,7 @@ namespace JeebItems
 	inline const FMaterialRow& MaterialRow(EItemType T) { const TArray<FMaterialRow>& M = Tables().Materials; return M[FMath::Clamp(static_cast<int32>(T), 0, M.Num() - 1)]; }
 	inline int32 StackSize(int32 Id)
 	{
-		if (IsArrow(Id)) return 30;
+		if (IsArrow(Id)) return 99;   // (owner, 2026-11-01; was 30)
 		if (IsPotionRange(Id)) return IsPotion(Id) ? PotionRow(PotionType(Id)).StackSize : 10;
 		if (!IsMaterial(Id)) return 1;
 		return MaterialRow(MaterialType(Id)).StackSize;

@@ -114,8 +114,21 @@ void UJeebSave::Migrate()
 	}
 	// Version 7 -> 8 (2026-10-31): everyone has at least the starting arrows (steel and fire). A full pack (the 4 step could not
 	// fit them) sends its last things that are not arrows to the bank to make room.
-	if (SaveVersion < 8)
+	// Version 8 -> 9 (2026-11-01): arrows stack to 99 and the starting arrows are 99 steel and 99 fire: the arrow stacks are
+	// merged, then topped up the same way (making room as above).
+	if (SaveVersion < 9)
 	{
+		for (int32 i = 0; i < SlotIds.Num(); ++i)
+		{
+			if (!IsArrow(SlotIds[i]) || !SlotCounts.IsValidIndex(i)) continue;
+			for (int32 j = i + 1; j < SlotIds.Num(); ++j)
+				if (SlotIds[j] == SlotIds[i] && SlotCounts.IsValidIndex(j))
+				{
+					const int32 N = FMath::Min(SlotCounts[j], StackSize(SlotIds[i]) - SlotCounts[i]);
+					SlotCounts[i] += N; SlotCounts[j] -= N;
+					if (SlotCounts[j] <= 0) { SlotIds[j] = 0; SlotCounts[j] = 0; }
+				}
+		}
 		auto Count = [this](int32 Id) { int32 N = 0; for (int32 i = 0; i < SlotIds.Num(); ++i) if (SlotIds[i] == Id && SlotCounts.IsValidIndex(i)) N += SlotCounts[i]; return N; };
 		auto MakeRoom = [this]()
 		{

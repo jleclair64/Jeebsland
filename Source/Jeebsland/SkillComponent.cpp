@@ -588,14 +588,18 @@ void USkillComponent::FillPracticePack()
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Ring, K_Amulet };
+	// a full stack of steel and fire arrows first (this used to write over the starting kit's arrows)
+	Slots[0].Id = JeebItems::ArrowId(JeebItems::T_Steel); Slots[0].Count = StartSteelArrows;
+	Slots[1].Id = JeebItems::IdFireArrow; Slots[1].Count = StartFireArrows;
+	for (int32 i = 2; i < Slots.Num(); ++i) if (JeebItems::IsArrow(Slots[i].Id)) { Slots[i].Id = 0; Slots[i].Count = 0; }
 	// three of each potion: swiftness and vigour in the pack, healing in the potion slot
-	Slots[0].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[0].Count = 3;
-	Slots[1].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[1].Count = 3;
+	Slots[2].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[2].Count = 3;
+	Slots[3].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[3].Count = 3;
 	PotionSlot.Id = JeebItems::PotionId(JeebItems::P_Heal); PotionSlot.Count = 3;
 	// and one of each new shield style to try (iron)
-	Slots[2].Id = JeebItems::ShieldId(1, JeebItems::T_Iron); Slots[2].Count = 1;
-	Slots[3].Id = JeebItems::ShieldId(2, JeebItems::T_Iron); Slots[3].Count = 1;
-	Slots[4].Id = JeebItems::PotionId(JeebItems::P_Radar); Slots[4].Count = 3;   // (to try the radar)
+	Slots[4].Id = JeebItems::ShieldId(1, JeebItems::T_Iron); Slots[4].Count = 1;
+	Slots[5].Id = JeebItems::ShieldId(2, JeebItems::T_Iron); Slots[5].Count = 1;
+	Slots[6].Id = JeebItems::PotionId(JeebItems::P_Radar); Slots[6].Count = 3;   // (to try the radar)
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;
