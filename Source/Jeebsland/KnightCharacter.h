@@ -715,10 +715,12 @@ private:
 	void TickBow(float Dt);
 	void PoseBow(float Dt);        // (end of PoseArms) the aiming arms, the side-on chest and the turned head
 	FVector ArrowStart() const;    // where arrows leave from (the same on every machine)
-	FVector BowAimDir(FVector* OutTarget = nullptr) const;     // the player's machine: from ArrowStart through what is under the reticle; elsewhere where he looks
-	void FireArrow(const FVector& Dir, float Charge, int32 ArrowId);   // (server)
+	FVector BowAimDir(FVector* OutTarget = nullptr) const;     // the player's machine: from ShotStart through what is under the reticle; elsewhere where he looks
+	FVector ShotStart() const;     // the player's machine: where the arrow really flies from, on the reticle's line abreast of the bow (else ArrowStart)
+	FVector CheckShotStart(const FVector& Asked) const;   // the server: that point if it is near the bow and nothing solid is between, else ArrowStart
+	void FireArrow(const FVector& Dir, float Charge, int32 ArrowId, const FVector& From);   // (server; From: CheckShotStart's answer)
 	UFUNCTION(Server, Reliable) void ServerBowDraw();
-	UFUNCTION(Server, Reliable) void ServerBowShoot(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId);
+	UFUNCTION(Server, Reliable) void ServerBowShoot(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId, FVector_NetQuantize10 From);
 	UFUNCTION(Server, Reliable) void ServerBowCancel();
 	UFUNCTION(NetMulticast, Reliable) void MulticastBow(uint8 Phase);
 	UPROPERTY() USceneComponent* BowHold = nullptr;              // the bow in the left fist, built at its grip (RebuildHeld)

@@ -1,4 +1,4 @@
-#include "KnightCharacter.h"
+﻿#include "KnightCharacter.h"
 #include "KnightDesign.h"
 #include "Messages.h"
 #include "SkillComponent.h"
@@ -54,6 +54,30 @@ FVector AKnightCharacter::ArrowStart() const
 	return GetActorTransform().TransformPosition(FVector(55.f, -8.f, 32.f));
 }
 
+// The camera sits over his right shoulder, so an arrow from the bow toward a far point crosses the reticle's line only out there:
+// anything just left of the reticle on the way got hit (owner, 2026-11-01). The arrow really flies from the reticle's line,
+// level with the bow, and is drawn leaving the bow and merging onto that line over its first few metres (AProjectile::ShowFrom).
+FVector AKnightCharacter::ShotStart() const
+{
+	const FVector BowAt = ArrowStart();
+	if (ShotSideOn() || !IsLocallyControlled()) return BowAt;
+	const APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || !PC->PlayerCameraManager) return BowAt;
+	const FVector CamLoc = PC->PlayerCameraManager->GetCameraLocation();
+	const FVector CamDir = PC->PlayerCameraManager->GetCameraRotation().Vector();
+	return CheckShotStart(CamLoc + CamDir * FMath::Max(0.f, FVector::DotProduct(BowAt - CamLoc, CamDir)));
+}
+
+FVector AKnightCharacter::CheckShotStart(const FVector& Asked) const
+{
+	const FVector BowAt = ArrowStart();
+	if (FVector::Dist(Asked, BowAt) > 200.f) return BowAt;
+	FHitResult Hit;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(BowStart), false, this);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, BowAt, Asked, ECC_Visibility, Q)) return BowAt;   // (a wall at his right shoulder)
+	return Asked;
+}
+
 bool AKnightCharacter::ShotSideOn() const
 {
 	return bShotFace && GetController() && FMath::Abs(FMath::FindDeltaAngleDegrees(ShotFaceYaw, GetController()->GetControlRotation().Yaw)) > 20.f;
@@ -61,7 +85,7 @@ bool AKnightCharacter::ShotSideOn() const
 
 FVector AKnightCharacter::BowAimDir(FVector* OutTarget) const
 {
-	const FVector Start = ArrowStart();
+	const FVector Start = ShotStart();
 	if (ShotSideOn()) return GetActorForwardVector();
 	if (IsLocallyControlled())
 		if (const APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -112,12 +136,13 @@ void AKnightCharacter::ReleaseDraw()
 	if (Bow != EBow::Drawing) return;
 	FVector Target = FVector::ZeroVector;
 	const FVector Dir = BowAimDir(&Target);
-	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *ArrowStart().ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
+	const FVector From = ShotStart();
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *From.ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
 	const float C = BowCharge;
 	const int32 Id = ArrowSlotId();
 	SetBow(EBow::Recover);
-	if (HasAuthority()) { FireArrow(Dir, C, Id); if (GetNetMode() != NM_Standalone) MulticastBow(2); }
-	else ServerBowShoot(Dir, C, Id);
+	if (HasAuthority()) { FireArrow(Dir, C, Id, From); if (GetNetMode() != NM_Standalone) MulticastBow(2); }
+	else ServerBowShoot(Dir, C, Id, From);
 }
 
 void AKnightCharacter::CancelDraw()
@@ -136,14 +161,14 @@ void AKnightCharacter::ServerBowDraw_Implementation()
 	StartDraw();
 }
 
-void AKnightCharacter::ServerBowShoot_Implementation(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId)
+void AKnightCharacter::ServerBowShoot_Implementation(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId, FVector_NetQuantize10 From)
 {
 	if (Bow != EBow::Drawing || SelectedKind() != JeebItems::K_Bow) return;
 	const float C = FMath::Clamp(FMath::Min(Charge, BowT / BowDrawTime + 0.15f), 0.f, 1.f);   // (never more draw than we have seen)
 	FVector D = FVector(Dir).GetSafeNormal();
 	if (FVector::DotProduct(D, GetActorForwardVector()) < 0.2f) D = GetBaseAimRotation().Vector();   // (only ahead of him)
 	SetBow(EBow::Recover);
-	FireArrow(D, C, ArrowId);
+	FireArrow(D, C, ArrowId, CheckShotStart(From));
 	MulticastBow(2);
 }
 
@@ -159,7 +184,7 @@ void AKnightCharacter::MulticastBow_Implementation(uint8 Phase)
 }
 
 // (server) One arrow from the pack, out of the bow
-void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId)
+void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId, const FVector& From)
 {
 	if (!Skills || !HasAuthority()) return;
 	int32 Id = (JeebItems::IsArrow(ArrowId) && Skills->CountItem(ArrowId) > 0) ? ArrowId : 0;
@@ -174,8 +199,11 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	auto ByDraw = [C](float Min, float Mid, float Max) { return C < 0.5f ? FMath::Lerp(Min, Mid, C * 2.f) : FMath::Lerp(Mid, Max, C * 2.f - 1.f); };
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), ArrowStart(), Dir.Rotation(), SP))
+	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), From, Dir.Rotation(), SP))
+	{
 		P->Launch(this, Dir, ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id, ByDraw(BowSagMin, BowSagMid, BowSagMax));
+		P->ShowFrom(ArrowStart());   // (drawn leaving the bow)
+	}
 }
 
 void AKnightCharacter::TickBow(float Dt)

@@ -28,6 +28,8 @@ AProjectile::AProjectile()
 	SetReplicateMovement(false);   // (each machine flies its own copy from the launch)
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
+	Vis = CreateDefaultSubobject<USceneComponent>(TEXT("Vis"));
+	Vis->SetupAttachment(Root);
 	ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	ConstructorHelpers::FObjectFinder<UStaticMesh> Cyl(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	ConstructorHelpers::FObjectFinder<UStaticMesh> Cone(TEXT("/Engine/BasicShapes/Cone.Cone"));
@@ -37,7 +39,7 @@ AProjectile::AProjectile()
 	auto Part = [&](const TCHAR* Name, UStaticMesh* Mesh)
 	{
 		UStaticMeshComponent* C = CreateDefaultSubobject<UStaticMeshComponent>(Name);
-		C->SetupAttachment(Root);
+		C->SetupAttachment(Vis);
 		C->SetStaticMesh(Mesh);
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->SetCastShadow(false);
@@ -82,6 +84,20 @@ void AProjectile::Launch(AKnightCharacter* InShooter, const FVector& Dir, float 
 	ApplyLaunch();
 }
 
+void AProjectile::ShowFrom(const FVector& DrawnStart)
+{
+	L.ShowOff = DrawnStart - GetActorLocation();
+	PlaceVis();
+}
+
+void AProjectile::PlaceVis()
+{
+	if (!Vis) return;
+	const float K = (bFlying && L.Seq == 0) ? 1.f - FMath::SmoothStep(0.f, ShowFade, Travelled) : 0.f;
+	if (K <= 0.f) { Vis->SetRelativeLocation(FVector::ZeroVector); return; }
+	Vis->SetWorldLocation(GetActorLocation() + FVector(L.ShowOff) * K);
+}
+
 void AProjectile::OnRep_Launch()
 {
 	if (Stuck.bStuck) return;
@@ -100,6 +116,7 @@ void AProjectile::ApplyLaunch()
 	SetActorRotation(Velocity.Rotation());
 	if (L.Seq > 0) bSpent = true;   // (relaunched: it glanced off a shield)
 	if (!L.bBolt) SetActorScale3D(FVector(FlyScale));
+	PlaceVis();
 	if (!bFirst || IsNetMode(NM_DedicatedServer)) return;
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	auto Paint = [&](UStaticMeshComponent* C, const FLinearColor& Col)
@@ -127,7 +144,7 @@ void AProjectile::ApplyLaunch()
 	if (bFire)
 	{
 		Glow = NewObject<UPointLightComponent>(this);
-		Glow->SetupAttachment(Root);
+		Glow->SetupAttachment(Vis);
 		Glow->SetRelativeLocation(FVector(-4.f, 0.f, 0.f));
 		Glow->SetLightColor(FLinearColor(1.f, 0.45f, 0.12f));
 		Glow->SetIntensity(900.f);
@@ -248,6 +265,7 @@ void AProjectile::Tick(float DeltaSeconds)
 	SetActorLocation(To);
 	SetActorRotation(Velocity.Rotation());
 	Travelled += (To - From).Size();
+	PlaceVis();
 	if (L.bBolt && Travelled > L.Range) { if (bAuth) Destroy(); else Wait(); }   // (bolts fade out at their range; arrows fly on until they land)
 }
 
@@ -290,6 +308,7 @@ void AProjectile::ApplyStuck()
 	}
 	else SetActorLocationAndRotation(Stuck.Loc, Stuck.Rot);
 	SetActorScale3D(FVector(1.f));   // (flying it was drawn bigger)
+	if (Vis) Vis->SetRelativeLocation(FVector::ZeroVector);
 	// a fire arrow burns out a few seconds after it lands
 	if (Glow)
 	{
@@ -366,7 +385,7 @@ void AProjectile::Burn(AActor* Target)
 void AProjectile::TickTrail()
 {
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(GetActorLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X, Now));
+	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(Vis->GetComponentLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X, Now));
 	TrailPts.RemoveAll([&](const TPair<FVector, float>& P) { return Now - P.Value > TrailLife; });
 	if (!Trail)
 	{
