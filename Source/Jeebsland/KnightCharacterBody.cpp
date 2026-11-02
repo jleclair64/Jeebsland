@@ -477,28 +477,16 @@ void AKnightCharacter::RebuildHeld()
 		return;
 	}
 	// The bow is held in the LEFT fist (2026-10-31, as Link holds his), built at its own grip on BowHold, which sits in the fist:
-	// at ease (Kingdom Come: Deliverance style, owner 2026-11-01) it hangs at his side through the fist, the top limb forward
-	// and tipped up, the bottom one back, the string facing out from his leg so neither limb crosses his arm or elbow.
+	// at ease it lies forward and back through the fist, the bow below and its string above, tipped in so the string runs between
+	// the elbow and his body (owner's drawing, 2026-11-01; BowRestQuat).
 	// PoseBow turns it upright in the fist with the string toward him to aim.
 	if (K == JeebItems::K_Bow && ElbowL)
 	{
 		BowHold = NewObject<USceneComponent>(this);
 		BowHold->SetupAttachment(ElbowL);
 		BowHold->SetRelativeLocation(KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
-		{
-			const FVector A0 = (KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ArmL)).GetSafeNormal();   // (the straight arm, at rest)
-			const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
-			FVector Out = FVector(0.f, -1.f, 0.f);   // (out from his left leg)
-			Out = (Out - A0 * FVector::DotProduct(Out, A0)); Out = (Out - B0 * FVector::DotProduct(Out, B0)).GetSafeNormal();
-			// the string's side: in toward his body and up into the gap between the arm and his side (owner, 2026-11-01: the bow
-			// outside, the string between arm and body)
-			const FVector Z = (-Out * 0.8f - A0 * 0.6f).GetSafeNormal();
-			const float Tip = FMath::DegreesToRadians(25.f);
-			FVector X = B0 * FMath::Cos(Tip) - A0 * FMath::Sin(Tip);   // the limbs: forward and tipped up
-			X = (X - Z * FVector::DotProduct(X, Z)).GetSafeNormal();
-			BowHoldRest = FQuat(FMatrix(X, FVector::CrossProduct(Z, X), Z, FVector::ZeroVector));
-			BowHold->SetRelativeRotation(BowHoldRest);
-		}
+		BowHoldRest = BowRestQuat();
+		BowHold->SetRelativeRotation(BowHoldRest);
 		BowHold->RegisterComponent();
 		const int32 First = HeldComps.Num();
 		Make(BowHold, KnightDesign::P_ElbowL, KM::Xf(FVector::ZeroVector));

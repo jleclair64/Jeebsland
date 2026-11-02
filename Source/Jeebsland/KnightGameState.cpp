@@ -444,6 +444,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			if (ShotMoveClock >= 0.f)
 			{
 				ShotMoveClock += DeltaSeconds;
+				if (ShotMoveClock < 2.6f && (ShotFrame % 2) == 0 && K) K->LogClearance(ShotFrame / 2);
 				if (ShotMoveClock < 2.6f && (ShotFrame++ % 2) == 0)
 					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%03d.png"), *ShotName, ShotFrame / 2), false, false);
 				if (ShotMoveClock > 2.8f && PC) PC->ConsoleCommand(TEXT("quit"));

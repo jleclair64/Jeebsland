@@ -176,6 +176,7 @@ public:
 	void SelectHotbar(int32 H);
 	// Test pictures (-JeebShot -ShotMove=...): the knight faces FaceYaw (not the camera) and does the move with a sword
 	void ShotPlayMove(const FString& Move, float FaceYaw);
+	void LogClearance(int32 Frame);   // test pictures: what the bow, string, arrow and quiver pass through on his own body (log JEEBCLEAR)
 	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
@@ -712,7 +713,6 @@ private:
 	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
 	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
-	static constexpr float BowAnchorUp = 6.f, BowAnchorSide = 16.f;   // the full draw's anchor: this far above his neck joint and out to his right (beside the helm's cheek)
 	void StartDraw();
 	void ReleaseDraw();
 	void CancelDraw();
@@ -730,8 +730,8 @@ private:
 	UFUNCTION(NetMulticast, Reliable) void MulticastBow(uint8 Phase);
 	UPROPERTY() USceneComponent* BowHold = nullptr;              // the bow in the left fist, built at its grip (RebuildHeld)
 	int32 LookArrows = 0;                                        // other players' knights: the arrows they have (RepLook), for their quivers
+	FQuat BowRestQuat() const;                                  // the bow's turn in the fist at ease (KnightCharacterBow.cpp)
 	FQuat BowHoldRest = FQuat::Identity;                        // how it sits in the fist at ease (PoseBow turns it upright to aim)
-	static constexpr float BowArrowRest = 7.5f;                  // the arrow rests this far above the middle of the fist (on top of it, not through it)
 	UPROPERTY() UProceduralMeshComponent* BowString = nullptr;   // its straight string, hidden while drawn (BowBits take over)
 	UPROPERTY() TArray<UStaticMeshComponent*> BowBits;           // the drawn string's two halves, the nocked arrow and its head
 	UPROPERTY() TArray<UStaticMeshComponent*> QuiverParts;       // the quiver of arrows on his back while the bow is in hand

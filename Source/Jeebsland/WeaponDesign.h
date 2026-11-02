@@ -42,6 +42,10 @@ namespace WeaponDesign
 		Solid(M, Rings, false, true, false, Pl, true);
 	}
 
+	// The bow's string stands this far from the grip, its tips 48 cm either side (was 28.8: much deeper than a real braced bow,
+	// so at ease the string could not sit between his arm and his side without cutting through him; owner, 2026-11-01)
+	constexpr float BowBrace = 14.f;
+
 	// How far the elbow is bent when the weapon is just held (long weapons are carried pointing forward)
 	inline float IdleElbow(int32 Kind)
 	{
@@ -173,16 +177,16 @@ namespace WeaponDesign
 			for (int32 i = 0; i <= N; ++i)
 			{
 				const double X = -48.0 + 96.0 * double(i) / double(N);
-				Path.Add(V3(X, 0, 0.0125 * X * X));
+				Path.Add(V3(X, 0, BowBrace * X * X / (48.0 * 48.0)));
 				AB.Add(FVector2D(1.5 + 1.2 * (1.0 - FMath::Abs(X) / 48.0), 1.5 + 1.1 * (1.0 - FMath::Abs(X) / 48.0)));
 			}
 			Sweep(Add(Plate), Path, AB, V3(0, 1, 0), 8, 1.0, Pl);
 			{ FMD& M = Add(Leather);
 			  RBox(M, 7.5, 2.4, 2.8, 0.6, At(0, 0, 0)); }
 			{ FMD& M = Add(Trim);
-			  Blob(M, 1.4, 1.4, 1.4, At(-48, 0, 28.8)); Blob(M, 1.4, 1.4, 1.4, At(48, 0, 28.8)); }
+			  Blob(M, 1.4, 1.4, 1.4, At(-48, 0, BowBrace)); Blob(M, 1.4, 1.4, 1.4, At(48, 0, BowBrace)); }
 			{ TArray<FVector> SP; TArray<FVector2D> SA; // string
-			  for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-48.0 + 48.0 * i, 0, 28.8)); SA.Add(FVector2D(0.28, 0.28)); }
+			  for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-48.0 + 48.0 * i, 0, BowBrace)); SA.Add(FVector2D(0.28, 0.28)); }
 			  Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl); }
 			break;
 		}
