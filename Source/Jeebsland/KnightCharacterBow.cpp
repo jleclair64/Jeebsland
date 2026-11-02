@@ -13,6 +13,10 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/SkinnedMeshComponent.h"
+#include "Rendering/SkeletalMeshRenderData.h"
+#include "Rendering/SkeletalMeshLODRenderData.h"
+#include "KnightModel.h"
 #include "Engine/World.h"
 
 // ---------------- The bow (2026-10-31, Breath of the Wild style) ----------------
@@ -521,6 +525,27 @@ void AKnightCharacter::LogClearance(int32 Frame)
 						X.TransformPosition(S->ProcVertexBuffer[S->ProcIndexBuffer[t + 2]].Position), Part });
 	};
 	for (const FArmorPart& P : ArmorParts) AddMesh(Cast<UProceduralMeshComponent>(P.Comp));
+	// the skinned knight: its triangles as bent this frame, each named after the bone its first corner follows most
+	if (USkinnedMeshComponent* Sk = Skin ? Cast<USkinnedMeshComponent>(ArmorParts.Num() ? ArmorParts[0].Comp : nullptr) : nullptr)
+		if (FSkeletalMeshRenderData* RD = Sk->GetSkeletalMeshRenderData())
+			if (RD->LODRenderData.Num() > 0 && RD->LODRenderData[0].StaticVertexBuffers.PositionVertexBuffer.GetAllowCPUAccess())
+			{
+				const FSkeletalMeshLODRenderData& Lod = RD->LODRenderData[0];
+				TArray<FMatrix44f> RefToLocal;
+				Sk->CacheRefToLocalMatrices(RefToLocal);
+				TArray<FVector3f> Pos;
+				USkinnedMeshComponent::ComputeSkinnedPositions(Sk, Pos, RefToLocal, Lod, Lod.SkinWeightVertexBuffer);
+				const FTransform X = Sk->GetComponentTransform();
+				const FRawStaticIndexBuffer16or32Interface* Ib = Lod.MultiSizeIndexContainer.GetIndexBuffer();
+				for (const FSkelMeshRenderSection& Sec : Lod.RenderSections)
+					for (uint32 t = 0; t < Sec.NumTriangles; ++t)
+					{
+						const uint32 I0 = Ib->Get(Sec.BaseIndex + t * 3), I1 = Ib->Get(Sec.BaseIndex + t * 3 + 1), I2 = Ib->Get(Sec.BaseIndex + t * 3 + 2);
+						const int32 Local = Lod.SkinWeightVertexBuffer.GetBoneIndex(I0, 0);
+						const FName Part = Sec.BoneMap.IsValidIndex(Local) ? Sk->GetBoneName(Sec.BoneMap[Local]) : NAME_None;
+						Tris.Add({ X.TransformPosition(FVector(Pos[I0])), X.TransformPosition(FVector(Pos[I1])), X.TransformPosition(FVector(Pos[I2])), Part });
+					}
+			}
 	AddMesh(CapeCloth);
 	// the left fist's top along the bow (where the arrow should rest): the glove's furthest point up the bow, close to its line
 	float FistTop = -1000.f;

@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "KnightModel.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "KnightShieldRest.h"
@@ -73,6 +74,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	PoseKick(P);
 	PoseCape(P);
 	PoseArms(P);
+	if (Skin) KnightModel::UpdateSkin(*Skin);   // (the skinned knight's bones follow the joints just posed)
 	OutS = P.S; OutC = P.C;
 }
 

@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "KnightMesh.h"
 #include "HitBoxes.h"
+namespace KnightModel { struct FSkin; }
 #include "FoeKnight.generated.h"
 
 class UCapsuleComponent;
@@ -70,6 +71,7 @@ private:
 	UPROPERTY() USceneComponent* CapeUpper = nullptr;
 	UPROPERTY() USceneComponent* CapeLower = nullptr;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Meshes;
+	TSharedPtr<KnightModel::FSkin> Skin;   // the skinned knight, as the player's (KnightModel.h; null with the cut pieces)
 	UPROPERTY() TArray<UProceduralMeshComponent*> ShieldMeshes;   // his shield's parts
 	UPROPERTY() UHealthComponent* Hp = nullptr;
 

@@ -252,3 +252,111 @@ for name, loc, rot in [("front", (0, -5, 0), (math.radians(90), 0, 0)), ("side",
     cam.location = loc; cam.rotation_euler = rot
     scene.render.filepath = os.path.join(work, "parts_%s.png" % name)
     bpy.ops.render.render(write_still=True)
+
+# ---- The skinned knight (2026-11-01): the same model as ONE mesh on a skeleton, written to Saved\KnightBuild\SK_Knight.fbx
+# for knight_unreal_skin.py. The bones sit on the knight's joints (KnightDesign::PivotPos, named by KnightModel::BoneName);
+# the game copies its joint pivots onto them every frame, so every pose and move carries over. Each vertex starts weighted to
+# the piece its triangles were cut into above, then the weights are blended a few centimetres across every cut, so a bending
+# elbow or knee stretches smoothly instead of opening a gap between rigid pieces.
+SKIN_SMOOTH = 6   # blending passes across each cut (about 1.5 cm each)
+BONES = {P_BODY: "Body", P_UPPER: "Upper", P_HEAD: "Head", P_ARML: "ArmL", P_ARMR: "ArmR", P_ELBL: "ElbowL", P_ELBR: "ElbowR",
+         P_WRISTR: "WristR", P_HIPL: "HipL", P_HIPR: "HipR", P_KNEEL: "KneeL", P_KNEER: "KneeR", P_ANKL: "AnkleL", P_ANKR: "AnkleR"}
+PARENT = {"Upper": "Body", "Head": "Upper", "ArmL": "Upper", "ArmR": "Upper", "ElbowL": "ArmL", "ElbowR": "ArmR", "WristR": "ElbowR",
+          "HipL": "Body", "HipR": "Body", "KneeL": "HipL", "KneeR": "HipR", "AnkleL": "KneeL", "AnkleR": "KneeR"}
+PIVOT_POS = {P_BODY: (0, 0, 0), P_UPPER: (0, 0, -41), P_HEAD: (0, 0, 23), P_ARML: (-3, -29, 14), P_ARMR: (-3, 29, 14),
+             P_ELBL: (-5, -34.5, -6), P_ELBR: (-5, 34.5, -6), P_WRISTR: (-2, 37, -29), P_HIPL: (0, -13, -26), P_HIPR: (0, 13, -26),
+             P_KNEEL: (-1, -13, -51), P_KNEER: (-1, 13, -51), P_ANKL: (-4, -13, -82), P_ANKR: (-4, 13, -82)}
+SLOT_MAT = {S_HELM: "Helm", S_BODY: "Body", S_SHOULDERS: "Shoulders", S_BOOTS: "Boots", S_GLOVES: "Gloves"}
+FOOT_SCALE = 0.7   # KnightDesign::FootScale: the feet are drawn 30% narrower, easing in over 8 cm under the ankle
+
+nv = len(me.vertices)
+acc = [Vector((0.0, 0.0, 0.0)) for _ in range(nv)]
+cnt = [0] * nv
+W = [dict() for _ in range(nv)]
+for ti, lt in enumerate(tris):
+    k = keys[ti]
+    for vi in lt.vertices:
+        acc[vi] += place(gpos[vi], k)   # (where a vertex sits on two pieces, between the two placings: the seam closes)
+        cnt[vi] += 1
+        W[vi][k[0]] = W[vi].get(k[0], 0.0) + 1.0
+pos = [acc[i] / cnt[i] if cnt[i] else gpos[i] for i in range(nv)]
+W = [{p: c / sum(d.values()) for p, c in d.items()} if d else {P_BODY: 1.0} for d in W]
+adj = [[] for _ in range(nv)]
+for e in me.edges:
+    a, b = e.vertices
+    adj[a].append(b); adj[b].append(a)
+for _pass in range(SKIN_SMOOTH):
+    new = []
+    for i in range(nv):
+        if not adj[i]: new.append(W[i]); continue
+        m = {}
+        for j in adj[i]:
+            for p, w in W[j].items(): m[p] = m.get(p, 0.0) + w
+        n = float(len(adj[i]))
+        new.append({p: 0.5 * W[i].get(p, 0.0) + 0.5 * m.get(p, 0.0) / n for p in set(W[i]) | set(m)})
+    W = new
+for i in range(nv):   # at most four bones per vertex, none under 3%
+    top = sorted(W[i].items(), key=lambda kv: -kv[1])[:4]
+    top = [(p, w) for p, w in top if w >= 0.03] or top[:1]
+    s = sum(w for _, w in top)
+    W[i] = {p: w / s for p, w in top}
+    # the narrower feet, by how much the vertex follows an ankle
+    for ap in (P_ANKL, P_ANKR):
+        wa = W[i].get(ap, 0.0)
+        if wa > 0.0:
+            az = PIVOT_POS[ap][2]
+            t = max(0.0, min(1.0, (az + 2.0 - pos[i].z) / 8.0)); t = t * t * (3.0 - 2.0 * t)
+            sc = 1.0 + (FOOT_SCALE - 1.0) * t * wa
+            pos[i] = Vector((pos[i].x, PIVOT_POS[ap][1] + (pos[i].y - PIVOT_POS[ap][1]) * sc, pos[i].z))
+
+def to_blend(p): return Vector((p[0] * 0.01, -p[1] * 0.01, p[2] * 0.01))   # (game cm -> Blender metres; Unreal flips Y back on import)
+
+skin_me = bpy.data.meshes.new("SK_Knight")
+skin_me.from_pydata([to_blend(p) for p in pos], [], [tuple(lt.vertices) for lt in tris])
+uvs = skin_me.uv_layers.new(name="UVMap")
+for ti, lt in enumerate(tris):
+    poly = skin_me.polygons[ti]
+    for c in range(3):
+        u = uvl[lt.loops[c]].uv
+        uvs.data[poly.loop_start + c].uv = (u.x, u.y)
+slot_order = sorted(SLOT_MAT.keys())
+for s in slot_order:
+    skin_me.materials.append(bpy.data.materials.get(SLOT_MAT[s]) or bpy.data.materials.new(SLOT_MAT[s]))
+for ti in range(len(tris)):
+    skin_me.polygons[ti].material_index = slot_order.index(keys[ti][1])
+skin_me.update()
+skin_me.set_sharp_from_angle(angle=math.radians(40.0))
+skin_obj = bpy.data.objects.new("SK_Knight", skin_me)
+scene.collection.objects.link(skin_obj)
+
+rig = bpy.data.armatures.new("KnightRig")
+arm = bpy.data.objects.new("Armature", rig)
+scene.collection.objects.link(arm)
+for o in bpy.context.view_layer.objects: o.select_set(False)
+bpy.context.view_layer.objects.active = arm
+arm.select_set(True)
+bpy.ops.object.mode_set(mode='EDIT')
+for pv, name in BONES.items():
+    b = rig.edit_bones.new(name)
+    b.head = to_blend(PIVOT_POS[pv])
+    b.tail = b.head + Vector((0.0, 0.0, 0.06))
+for name, par in PARENT.items():
+    rig.edit_bones[name].parent = rig.edit_bones[par]
+bpy.ops.object.mode_set(mode='OBJECT')
+skin_obj.parent = arm
+mod = skin_obj.modifiers.new("Armature", 'ARMATURE')
+mod.object = arm
+groups = {pv: skin_obj.vertex_groups.new(name=name) for pv, name in BONES.items()}
+for i in range(nv):
+    for p, w in W[i].items(): groups[p].add([i], w, 'REPLACE')
+inf = [len(W[i]) for i in range(nv)]
+print("SKIN %d verts, %d tris; vertices with 1/2/3/4 bones: %d %d %d %d" % (nv, len(tris), inf.count(1), inf.count(2), inf.count(3), inf.count(4)))
+
+for o in bpy.context.view_layer.objects: o.select_set(False)
+arm.select_set(True); skin_obj.select_set(True)
+bpy.context.view_layer.objects.active = arm
+fbx = os.path.join(work, "SK_Knight.fbx")
+bpy.ops.export_scene.fbx(filepath=fbx, use_selection=True, object_types={'ARMATURE', 'MESH'}, add_leaf_bones=False, bake_anim=False,
+                         apply_scale_options='FBX_SCALE_ALL', axis_forward='-Y', axis_up='Z', mesh_smooth_type='OFF', colors_type='NONE',
+                         use_armature_deform_only=True, primary_bone_axis='Y', secondary_bone_axis='X')
+print("SKIN written %s" % fbx)

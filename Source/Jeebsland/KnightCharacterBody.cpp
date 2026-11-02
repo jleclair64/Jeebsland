@@ -51,8 +51,25 @@ void AKnightCharacter::BuildKnight()
 	TArray<KnightDesign::FDef> Defs;
 	KnightDesign::Build(Defs);
 
-	// The armour itself comes from the Meshy model when it is there; the code-built pieces for those slots are left out
-	const TArray<KnightModel::FPart>& Model = KnightModel::Parts();
+	// The armour itself comes from the Meshy model when it is there; the code-built pieces for those slots are left out.
+	// Best: the skinned knight, one mesh bending at every joint (2026-11-01, KnightModel::MakeSkin); else the model cut into
+	// rigid pieces on the joints, with a dark body inside to fill the gaps they open
+	Skin = MakeShared<KnightModel::FSkin>();
+	UPoseableMeshComponent* SkinComp = IsNetMode(NM_DedicatedServer) ? nullptr : KnightModel::MakeSkin(*Skin, this, RootComponent, Pivots);
+	if (SkinComp)
+		for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGloves })
+		{
+			FArmorPart P;
+			P.Comp = SkinComp;
+			P.Slot = Slot;
+			P.bModel = true;
+			P.Mat = SkinComp->GetMaterialIndex(FName(KnightModel::SlotMaterial(Slot)));
+			ArmorParts.Add(P);
+		}
+	else Skin.Reset();
+	static const TArray<KnightModel::FPart> NoPieces;
+	const TArray<KnightModel::FPart>& Model = SkinComp ? NoPieces : KnightModel::Parts();
+	const bool bModelArmour = SkinComp || Model.Num() > 0;
 	if (Model.Num() > 0)
 	{
 		TArray<KnightDesign::FDef> Cores;
@@ -78,7 +95,7 @@ void AKnightCharacter::BuildKnight()
 	for (const KnightDesign::FDef& D : Defs)
 	{
 		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot]) continue;
-		if (Model.Num() > 0 && KnightModel::IsModelSlot(D.Slot)) continue;
+		if (bModelArmour && KnightModel::IsModelSlot(D.Slot)) continue;
 		UProceduralMeshComponent* C = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
 
 		FArmorPart P;
@@ -383,7 +400,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		if (P.bModel) bVisible = true;   // (armour is never taken off; the model has no bare-skin version)
 		P.Comp->SetVisibility(bVisible);
 		if (!bVisible) continue;
-		if (P.bModel) { KnightModel::Paint(P.Comp, Var); continue; }
+		if (P.bModel) { KnightModel::Paint(P.Comp, Var, P.Mat); continue; }
 
 		FLinearColor Color;
 		bool bMetal = false;

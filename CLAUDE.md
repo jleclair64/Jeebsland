@@ -237,6 +237,20 @@ Remote: private GitHub repo https://github.com/jleclair64/Jeebsland (set up 2026
 
 - The armour (helmet, body, shoulders, gloves, boots slots) is now a real model: the owner made it in Meshy (free tier, Meshy 6 Lite, CC BY 4.0: credit Meshy in the game's credits) from their ChatGPT concept sheet. Source: Art/Knight/knight.glb. `Tools/BuildKnight.ps1` (editor closed; needs Blender 5.2, installed 2026-10-29) welds and cuts it to 30k triangles, slices it into one piece per joint (`Tools/knight_blender_export.py`, the cut rules are in `classify`) into Content/Knight/KnightParts.bin (staged as UFS in DefaultGame.ini), and imports T_Knight_Base / T_Knight_MR and builds M_Knight (tints only the metal by `Tint`; MinRough 0.5 so the plate does not mirror the green grass). `KnightModel.h` loads the pieces; the player knight and the pen knight use them (`FArmorPart::bModel`). Joints in `KnightDesign::PivotPos` were moved to the model's joints (shoulders 14, elbows -6, hips -26, knees -51, ankles -82; fist -36). Shields, cape, brush and jewellery are still code-built; loot and item pictures still show the old code-built armour.
 
+## Skinned knight (2026-11-02)
+
+- The armour is now ONE skinned mesh, `/Game/Knight/SK_Knight`, on a 14-bone skeleton. The bones are Body, Upper, Head, ArmL/R, ElbowL/R, WristR, HipL/R, KneeL/R and AnkleL/R, and each sits on its `KnightDesign::PivotPos` joint. The code-driven pose still moves the pivot scene components. Each frame `KnightModel::UpdateSkin` copies them onto the bones of a `UPoseableMeshComponent` (made by `MakeSkin`, in component space, `Bind = RefPose * FTransform(-PivotPos)`). It is called at the end of `TickPose` for the player and at the end of `AFoeKnight::Tick` for the pen knight.
+- Material slots: Helm, Body, Shoulders, Boots, Gloves (`SlotMaterial`). Each armour slot is an `FArmorPart` with `Mat` = its material index, tinted per tier through `KnightModel::Paint`. The material is `M_KnightSkin`: two-sided, used with skeletal meshes (needed in packaged builds), with the DirectX normal map `T_Knight_N_DX`. There is no skin on a dedicated server. If SK_Knight is missing, the old cut pieces (KnightParts.bin) come back.
+- How it is built (`Tools/BuildKnight.ps1`, editor closed):
+  - The end of `knight_blender_export.py` writes `Saved/KnightBuild/SK_Knight.fbx`. Weights start from the `classify` pieces and are smoothed over 6 passes (`SKIN_SMOOTH`), with at most 4 influences per vertex. The foot narrowing is baked in.
+  - `knight_unreal_import.py` imports it.
+  - Import gotchas: use the legacy FBX importer (`Interchange.FeatureFlags.Import.FBX False`) with `import_uniform_scale` 100, or it comes in at 1/100 size. Delete the old SK assets before reimporting, because a replace keeps the old settings. Use `save_directory` so the skeleton gets saved.
+  - Running the export also rewrites KnightParts.bin.
+- Reviewer notes (2026-11-02):
+  - At 50+ knights on screen, `SetBoneTransformByName` in component space costs about 20-50 µs per knight. If that becomes a problem, switch to local space or skip knights that are off screen.
+  - There is no LOD yet (44k triangles per knight in every pass).
+  - Keep the skin cache off (`r.SkinCache.CompileShaders=0`).
+
 ## Knight redesign (2026-10-12; REPLACED 2026-10-29)
 
 - 2026-10-29: the armour was rebuilt from the owner's ChatGPT concept sheet (KnightDesign.h header describes it): armet with pointed visor, eye slit, breathing slits and ear rosettes; tall collar; V-neck breastplate; leather belt with round buckle; pointed front plate and square tassets; big pauldrons; dark charcoal cloth sleeves, trousers and gloves (fixed colour); big vambraces, knee cops, greaves and broad sabatons. No gold trim any more. Pivots, slots, the brush, rings, amulet and shields are unchanged. The notes below describe the older look.

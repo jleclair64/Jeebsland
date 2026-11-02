@@ -14,6 +14,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h"
+#include "Misc/ScopeExit.h"
 
 AFoeKnight::AFoeKnight()
 {
@@ -123,8 +124,17 @@ void AFoeKnight::BeginPlay()
 	// A full suit of iron (dark grey plate, red accents), shield included; no bare skin
 	TArray<FDef> Defs;
 	Build(Defs);
-	// the armour from the Meshy model when it is there (the same as the player's), tinted for his tier
-	const TArray<KnightModel::FPart>& Model = KnightModel::Parts();
+	// the armour from the Meshy model when it is there (the same as the player's), tinted for his tier: the skinned knight
+	// bending at every joint, else the model cut into pieces on the joints
+	Skin = MakeShared<KnightModel::FSkin>();
+	UPoseableMeshComponent* SkinComp = IsNetMode(NM_DedicatedServer) ? nullptr : KnightModel::MakeSkin(*Skin, this, GetRootComponent(), Pivots);
+	if (SkinComp)
+		for (int32 Slot : { SlotHelmet, SlotBody, SlotShoulders, SlotBoots, SlotGloves })
+			KnightModel::Paint(SkinComp, Tier, SkinComp->GetMaterialIndex(FName(KnightModel::SlotMaterial(Slot))));
+	else Skin.Reset();
+	static const TArray<KnightModel::FPart> NoPieces;
+	const TArray<KnightModel::FPart>& Model = SkinComp ? NoPieces : KnightModel::Parts();
+	const bool bModelArmour = SkinComp || Model.Num() > 0;
 	for (const KnightModel::FPart& MP : Model)
 	{
 		if (!Pivots[MP.Pivot]) continue;
@@ -142,7 +152,7 @@ void AFoeKnight::BeginPlay()
 	for (const FDef& D : Defs)
 	{
 		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0 || D.Slot >= SlotBrush) continue;   // (he carries the kite shield, and no brush)
-		if (Model.Num() > 0 && KnightModel::IsModelSlot(D.Slot)) continue;
+		if (bModelArmour && KnightModel::IsModelSlot(D.Slot)) continue;
 		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
 		if (D.Slot == SlotShield) ShieldMeshes.Add(C);   // (arrows stick in these)
@@ -457,6 +467,7 @@ void AFoeKnight::OnHurt(AActor* From)
 void AFoeKnight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	ON_SCOPE_EXIT { if (Skin) KnightModel::UpdateSkin(*Skin); };   // (once the pose is done, whichever way Tick ends)
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
 	const float Now = GetWorld()->GetTimeSeconds();
 

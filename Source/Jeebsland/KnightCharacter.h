@@ -6,6 +6,7 @@
 #include "KnightDesign.h"
 #include "Inventory.h"
 #include "HitBoxes.h"
+namespace KnightModel { struct FSkin; }
 #include "KnightCharacter.generated.h"
 
 class UStaticMeshComponent;
@@ -37,6 +38,7 @@ struct FArmorPart
 	int32 Style = 0;                 // shields: which shield style the piece belongs to
 	float Shade = 1.f;
 	bool bModel = false;             // a piece of the Meshy model (KnightModel.h): painted by M_Knight, tinted for the tier
+	int32 Mat = 0;                   // which of its component's materials (the skinned knight: one per armour set)
 };
 
 // Everything a player can do to their pack, gear and money. ONLINE the player's machine only asks (AKnightCharacter::Inv sends a
@@ -393,6 +395,7 @@ protected:
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
 	void BuildKnight();   // creates every armour part from KnightDesign.h
+	TSharedPtr<KnightModel::FSkin> Skin;   // the skinned knight and the joints its bones follow (KnightModel.h; null with the cut pieces)
 	void RebuildHeld();   // the weapon(s) in your hands
 	UProceduralMeshComponent* MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);
 	void ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal);

@@ -5,6 +5,8 @@
 #include "Misc/Paths.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Components/PoseableMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "KnightDesign.h"
 #include "Inventory.h"
 
@@ -141,11 +143,93 @@ namespace KnightModel
 		}
 	}
 
-	inline void Paint(UPrimitiveComponent* C, int32 Tier)
+	inline void Paint(UPrimitiveComponent* C, int32 Tier, int32 MatIndex = 0)
 	{
-		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Knight/M_Knight.M_Knight"));
+		UMaterialInterface* Mat = C && C->IsA<UPoseableMeshComponent>() ? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Knight/M_KnightSkin.M_KnightSkin"))
+			: LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Knight/M_Knight.M_Knight"));   // (the skinned knight: one material slot per armour set)
 		if (!C || !Mat) return;
-		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Mat))
+		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(MatIndex, Mat))
 			M->SetVectorParameterValue(TEXT("Tint"), TierTint(Tier));
+	}
+
+	// ---- The skinned knight (2026-11-01) ----
+	// /Game/Knight/SK_Knight (Tools\BuildKnight.ps1) is the same model as ONE mesh on a skeleton whose bones sit on the knight's
+	// joints, weighted across each joint so the plates and cloth bend there instead of parting. Every pose is still worked out
+	// on the joint pivots as before; UpdateSkin copies them onto the bones each frame, so all moves carry over. Its material
+	// slots are the armour sets (Helm, Body, Shoulders, Boots, Gloves), tinted one by one for their tiers. When the asset is
+	// missing the knight falls back to the cut pieces above.
+	inline const TCHAR* BoneName(int32 Pivot)
+	{
+		using namespace KnightDesign;
+		switch (Pivot)
+		{
+		case P_Body: return TEXT("Body");     case P_Upper: return TEXT("Upper");   case P_Head: return TEXT("Head");
+		case P_ArmL: return TEXT("ArmL");     case P_ArmR: return TEXT("ArmR");     case P_ElbowL: return TEXT("ElbowL");
+		case P_ElbowR: return TEXT("ElbowR"); case P_WristR: return TEXT("WristR"); case P_HipL: return TEXT("HipL");
+		case P_HipR: return TEXT("HipR");     case P_KneeL: return TEXT("KneeL");   case P_KneeR: return TEXT("KneeR");
+		case P_AnkleL: return TEXT("AnkleL"); case P_AnkleR: return TEXT("AnkleR");
+		default: return nullptr;
+		}
+	}
+	inline const TCHAR* SlotMaterial(int32 Slot)
+	{
+		using namespace KnightDesign;
+		switch (Slot)
+		{
+		case SlotHelmet: return TEXT("Helm"); case SlotBody: return TEXT("Body"); case SlotShoulders: return TEXT("Shoulders");
+		case SlotBoots: return TEXT("Boots"); case SlotGloves: return TEXT("Gloves");
+		default: return nullptr;
+		}
+	}
+
+	struct FSkin
+	{
+		UPoseableMeshComponent* Comp = nullptr;
+		TArray<FName> Bone;                   // the bones that follow a joint, parents first
+		TArray<USceneComponent*> Joint;       // ... the joint pivot each one follows
+		TArray<FTransform> Bind;              // ... and its rest pose with the joint's position taken out
+	};
+
+	// The skinned knight on Attach (the capsule: the joints' positions are in its space), its bones following Pivots
+	// (indexed by KnightDesign::EPivot). Null when SK_Knight is missing.
+	inline UPoseableMeshComponent* MakeSkin(FSkin& S, AActor* Owner, USceneComponent* Attach, USceneComponent* const* Pivots)
+	{
+		USkeletalMesh* M = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Knight/SK_Knight.SK_Knight"));
+		if (!M || !Attach) return nullptr;
+		UPoseableMeshComponent* C = NewObject<UPoseableMeshComponent>(Owner);
+		C->SetupAttachment(Attach);
+		C->SetSkinnedAssetAndUpdate(M);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetBoundsScale(1.5f);   // (the arms and legs reach well past the standing pose's bounds in a swing or a kick)
+		C->PrimaryComponentTick.AddPrerequisite(Owner, Owner->PrimaryActorTick);   // (the bones follow this frame's pose, not last frame's)
+		C->RegisterComponent();
+		const FReferenceSkeleton& Ref = M->GetRefSkeleton();
+		TArray<FTransform> CS;
+		CS.SetNum(Ref.GetNum());
+		for (int32 b = 0; b < Ref.GetNum(); ++b)
+		{
+			const int32 Parent = Ref.GetParentIndex(b);
+			CS[b] = Parent >= 0 ? Ref.GetRefBonePose()[b] * CS[Parent] : Ref.GetRefBonePose()[b];
+			for (int32 p = 0; p < KnightDesign::P_Count; ++p)
+				if (BoneName(p) && Pivots[p] && Ref.GetBoneName(b) == FName(BoneName(p)))
+				{
+					S.Bone.Add(Ref.GetBoneName(b));
+					S.Joint.Add(Pivots[p]);
+					S.Bind.Add(CS[b] * FTransform(-KnightDesign::PivotPos(p)));
+					static int32 Logged = 0;   // (once: the bones must sit on their joints, or the import axes are wrong)
+					if (Logged++ < KnightDesign::P_Count) UE_LOG(LogTemp, Log, TEXT("JEEBSKIN bone %s at %s, joint at %s"), BoneName(p), *CS[b].GetLocation().ToCompactString(), *KnightDesign::PivotPos(p).ToCompactString());
+				}
+		}
+		S.Comp = C;
+		return C;
+	}
+
+	// Every frame once the pose is done: each bone goes where its joint is (the joint at rest = the bone at rest)
+	inline void UpdateSkin(FSkin& S)
+	{
+		if (!S.Comp) return;
+		const FTransform ToComp = S.Comp->GetComponentTransform().Inverse();
+		for (int32 i = 0; i < S.Bone.Num(); ++i)
+			S.Comp->SetBoneTransformByName(S.Bone[i], S.Bind[i] * S.Joint[i]->GetComponentTransform() * ToComp, EBoneSpaces::ComponentSpace);
 	}
 }

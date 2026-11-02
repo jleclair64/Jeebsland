@@ -1,8 +1,9 @@
 # Rebuilds the knight from the Meshy model in Art\Knight\knight.glb:
 #   1. Blender cuts it down to a game-sized mesh (knight_blender_prep.py) and slices it into the pieces that hang off the
-#      knight's joints, written to Content\Knight\KnightParts.bin (knight_blender_export.py)
-#   2. its pictures are taken out of the .glb, and a windowless editor imports them and builds M_Knight
-#      (knight_unreal_import.py)
+#      knight's joints, written to Content\Knight\KnightParts.bin (knight_blender_export.py), and also writes the whole
+#      model as one skinned mesh on a 14-bone skeleton to Saved\KnightBuild\SK_Knight.fbx
+#   2. its pictures are taken out of the .glb, and a windowless editor imports them, builds M_Knight and M_KnightSkin
+#      and imports SK_Knight (knight_unreal_import.py)
 # The Unreal editor must be closed. Blender 5.2 must be installed.
 $proj = Split-Path $PSScriptRoot -Parent
 if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }
