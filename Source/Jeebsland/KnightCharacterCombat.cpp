@@ -147,7 +147,13 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down)
 	if (Move == TEXT("dash")) StartAttack(EAtkStyle::Dash, 1, 0.f);                              // the dash attack (sprint + click): the lunge
 	if (Move == TEXT("kickcombo")) { StartAttack(EAtkStyle::Kick, 1, 0.f); QueuedSweep = GetWorld()->GetTimeSeconds() + 0.1f; }   // a kick with the wheel-down buffered: the sweep cuts in when it lands
-	if (Move.StartsWith(TEXT("bow")))   // the bow: bow = a full draw that goes by itself, bow60 = let go after 0.6 s
+	if (Move == TEXT("bowidle") || Move == TEXT("bowwalk"))   // the bow in hand, not drawn: standing, or walking ahead
+	{
+		for (int32 h = 0; h < 5; ++h)
+			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Bow) { SelectHotbar(h); break; }
+		bShotWalk = Move == TEXT("bowwalk");
+	}
+	else if (Move.StartsWith(TEXT("bow")))   // the bow: bow = a full draw that goes by itself, bow60 = let go after 0.6 s
 	{
 		for (int32 h = 0; h < 5; ++h)
 			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Bow) { SelectHotbar(h); break; }

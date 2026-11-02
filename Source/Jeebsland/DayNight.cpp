@@ -14,6 +14,7 @@
 float ADayNight::Phase = 0.f;
 float ADayNight::SunElevation = 54.f;
 float ADayNight::Dusk = 0.f;
+FLinearColor ADayNight::TrailLight = FLinearColor::White;
 FVector ADayNight::SunDir = FVector::UpVector;
 FVector ADayNight::MoonDir = FRotator(15.f, 205.f, 0.f).Vector();
 float ADayNight::FixedPhase = -1.f;
@@ -104,6 +105,9 @@ void ADayNight::Tick(float DeltaSeconds)
 	const float E = SunElevation;
 	const float High = FMath::SmoothStep(14.f, 41.f, E);   // 0 at the golden low point, 1 at noon
 	Dusk = 1.f - FMath::SmoothStep(13.f, 24.f, E);        // 1 while the sun is near the horizon (stars come out)
+	// The trails are drawn with their own light, so in the low sun they glowed against the darker world (owner, 2026-11-01): they
+	// follow the sunlight instead, about 40% as bright and a soft gold at the low point, full white at noon
+	TrailLight = FMath::Lerp(FLinearColor(0.42f, 0.34f, 0.27f), FLinearColor::White, High);
 
 	if (ADirectionalLight* S = Sun.Get())
 	{

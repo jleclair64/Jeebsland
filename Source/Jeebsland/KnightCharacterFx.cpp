@@ -1,7 +1,8 @@
-#include "KnightCharacter.h"
+﻿#include "KnightCharacter.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "DayNight.h"
 #include "UObject/ConstructorHelpers.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -203,8 +204,10 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		SwordTrail->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		SwordTrail->SetCastShadow(false);
 		SwordTrail->RegisterComponent();
-		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) SwordTrail->SetMaterial(0, M);
+		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) SwordTrail->CreateDynamicMaterialInstance(0, M);
 	}
+	if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(SwordTrail->GetMaterial(0)))   // (dimmer and warmer in the low sun)
+		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.92f, 0.95f, 1.0f) * ADayNight::TrailLight);
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
 	const float Life = 0.09f / Slow;   // how long a bit of the trail lasts (longer in slow motion)

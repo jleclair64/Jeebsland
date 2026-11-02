@@ -218,6 +218,7 @@ void AKnightCharacter::TickBow(float Dt)
 		CancelDraw();
 	BowT += Dt;
 	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
+	if (bShotFace && bShotWalk) AddMovementInput(FRotator(0.f, ShotFaceYaw, 0.f).Vector(), 1.f);
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)
 	if (Bow == EBow::Drawing)
 	{
@@ -258,7 +259,7 @@ void AKnightCharacter::PoseBow(float Dt)
 	auto Frame = [](const FVector& X, const FVector& Y) { return FQuat(FMatrix(X, Y, FVector::CrossProduct(X, Y), FVector::ZeroVector)); };
 	auto Perp = [](const FVector& V, const FVector& To) { return (V - To * FVector::DotProduct(V, To)).GetSafeNormal(); };
 
-	if (A <= 0.001f) return;   // (at ease the bow already lies forward and back in the hanging fist: it runs through the fingers' curl)
+	if (A <= 0.001f) { if (BowHold) BowHold->SetRelativeRotation(BowHoldRest); return; }
 
 	const FVector Aim = BowAimDir();
 	const FVector Up = FVector::UpVector;
@@ -277,21 +278,26 @@ void AKnightCharacter::PoseBow(float Dt)
 		static const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
 		static const float Reach = (GripPos(true) - PivotPos(P_ArmL)).Size();
 		const FVector S = ArmPivotL->GetComponentLocation();
-		const FVector D = Anchor - S;   // (|D + Aim*L| = Reach, the far answer)
+		const FVector D = Anchor - UpA * BowArrowRest - S;   // (|D + Aim*L| = Reach, the far answer; the fist just under the arrow's line)
 		const float B = FVector::DotProduct(D, Aim);
 		const float L = -B + FMath::Sqrt(FMath::Max(B * B - D.SizeSquared() + Reach * Reach, 0.f));
-		GripWant = Anchor + Aim * FMath::Max(L, 30.f);
+		GripWant = Anchor - UpA * BowArrowRest + Aim * FMath::Max(L, 30.f);
 		const FVector ArmDir = (GripWant - S).GetSafeNormal();
 		FVector Bw = Perp(Up, ArmDir);   // (the fist's grip, and the bow in it, then runs up and down, the thumb on top)
 		if (Bw.IsNearlyZero()) Bw = GetActorRightVector();
 		const FQuat Want = Chest.Inverse() * Frame(ArmDir, Bw) * Frame(A0, B0).Inverse();
 		ArmPivotL->SetRelativeRotation(FQuat::Slerp(ArmPivotL->GetRelativeRotation().Quaternion(), Want, A));
 		ElbowL->SetRelativeRotation(FQuat::Slerp(ElbowL->GetRelativeRotation().Quaternion(), FQuat(FRotator(3.f, 0.f, 0.f)), A));
+		// the bow turns in the fist to stand upright, its string straight back toward him along the arrow (in front of his face,
+		// not leaning across toward his helm: owner, 2026-11-01)
+		const FVector BX = Perp(Up, Aim), BZ = -Aim;
+		const FQuat BowWorld(FMatrix(BX, FVector::CrossProduct(BZ, BX), BZ, FVector::ZeroVector));
+		BowHold->SetRelativeRotation(FQuat::Slerp(BowHoldRest, ElbowL->GetComponentQuat().Inverse() * BowWorld, A));
 	}
-	// Right arm: the fist on the string, drawn back from where it rests on the bow toward his face as the draw fills
+	// Right arm: the fist on the string, drawn back from where the arrow rests on the bow toward his face as the draw fills
 	{
-		const FVector Grip = BowHold->GetComponentLocation();
-		const FVector StringRest = BowHold->GetComponentTransform().TransformPosition(FVector(0.f, 0.f, 28.8f));
+		const FVector Grip = BowHold->GetComponentTransform().TransformPosition(FVector(BowArrowRest, 0.f, 0.f));
+		const FVector StringRest = BowHold->GetComponentTransform().TransformPosition(FVector(BowArrowRest, 0.f, 28.8f));
 		const float Draw = (Bow == EBow::Drawing) ? BowCharge : (Bow == EBow::Recover ? 0.f : BowCharge);
 		const FVector Back = Anchor - Grip;   // (from the bow to the anchor: full draw puts the fist there)
 		const float Pull = FMath::Lerp(FMath::Min(32.f, Back.Size()), Back.Size(), FMath::Sqrt(FMath::Clamp(Draw, 0.f, 1.f)));
@@ -324,7 +330,7 @@ void AKnightCharacter::PoseBow(float Dt)
 	}
 	// side-on: the chest turned to his right (PoseBody turns it, next frame; the head already turns back against it to look
 	// along the arrow)
-	SwingBodyWant += 55.f * A;
+	SwingBodyWant += 70.f * A;   // (more side-on: the bow arm out in front, the string before his face)
 }
 
 // ---------------- The drawn string, the nocked arrow and the quiver ----------------
@@ -364,7 +370,7 @@ void AKnightCharacter::UpdateBowBits()
 	}
 	const FTransform B = BowHold->GetComponentTransform();
 	const FVector TipA = B.TransformPosition(FVector(-48.f, 0.f, 28.8f)), TipB = B.TransformPosition(FVector(48.f, 0.f, 28.8f));
-	const FVector Rest = B.TransformPosition(FVector(0.f, 0.f, 28.8f));
+	const FVector Rest = B.TransformPosition(FVector(BowArrowRest, 0.f, 28.8f));   // (the nocking point: level with the arrow rest, just above the fist)
 	// the nock: in the drawing fist while drawn, back on the bow as it is let go
 	FVector Nock = Rest;
 	if (WristR) Nock = FMath::Lerp(Rest, WristR->GetComponentTransform().TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR)), FMath::Clamp(BowAimAlpha * 1.4f - 0.2f, 0.f, 1.f));
@@ -375,7 +381,7 @@ void AKnightCharacter::UpdateBowBits()
 	BowBits[3]->SetVisibility(bArrow);
 	if (bArrow)
 	{
-		const FVector Along = (B.GetLocation() - Nock).GetSafeNormal();
+		const FVector Along = (B.TransformPosition(FVector(BowArrowRest, 0.f, 0.f)) - Nock).GetSafeNormal();   // (over the top of the fist)
 		const FVector Tip = Nock + Along * 74.f;
 		Rod(BowBits[2], Nock, Tip, 0.6f);
 		BowBits[3]->SetWorldLocationAndRotation(Tip + Along * 2.f, FRotationMatrix::MakeFromZ(Along).Rotator());
@@ -393,11 +399,12 @@ void AKnightCharacter::UpdateQuiver()
 	if (!bShow) { for (UStaticMeshComponent* C : QuiverParts) if (C) C->SetVisibility(false); return; }
 	if (QuiverParts.Num() == 0)
 	{
-		// (in the hips' frame: outside the right hip, a little behind it; pitch -: the mouth leans forward; roll -: the bottom
-		// swings out from the leg)
+		// (in the hips' frame: at the back of the right hip, behind where the arm hangs and swings, as Kingdom Come: Deliverance's
+		// archers wear it (2026-11-01: the arm used to pass through it at the side); pitch -: the mouth leans forward; roll -:
+		// the bottom swings out from the leg)
 		USceneComponent* Q = NewObject<USceneComponent>(this);
 		Q->SetupAttachment(BodyRoot);
-		Q->SetRelativeLocationAndRotation(FVector(-8.f, 31.f, -38.f), FRotator(-22.f, 0.f, -6.f));
+		Q->SetRelativeLocationAndRotation(FVector(-17.f, 25.f, -36.f), FRotator(-24.f, 0.f, -12.f));
 		Q->RegisterComponent();
 		auto Bit = [&](const TCHAR* MeshPath, const FLinearColor& Col, const FVector& At, const FRotator& Rot, const FVector& Scale)
 		{
@@ -419,5 +426,7 @@ void AKnightCharacter::UpdateQuiver()
 			Bit(Cube, FLinearColor(0.92f, 0.9f, 0.86f), P + FVector(0.f, 0.f, 3.f), FRotator(0.f, i * 37.f, 0.f), FVector(0.05f, 0.004f, 0.09f));   // fletching
 		}
 	}
-	for (UStaticMeshComponent* C : QuiverParts) if (C) C->SetVisibility(true);
+	// the arrows in it only while he has some (the tube, rim and bottom are the first three parts)
+	const bool bArrows = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() != 0 : LookArrows != 0;
+	for (int32 i = 0; i < QuiverParts.Num(); ++i) if (QuiverParts[i]) QuiverParts[i]->SetVisibility(i < 3 || bArrows);
 }

@@ -1,4 +1,4 @@
-#include "Projectile.h"
+﻿#include "Projectile.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "DayNight.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -388,6 +389,8 @@ void AProjectile::TickTrail()
 			}
 	}
 	if (TrailPts.Num() < 2) { if (Trail->GetNumSections() > 0) Trail->ClearAllMeshSections(); return; }
+	if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(Trail->GetMaterial(0)))   // (dimmer and warmer in the low sun)
+		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.92f, 0.95f, 1.0f) * ADayNight::TrailLight);
 	FVector Cam = GetActorLocation() + FVector(0.f, 0.f, 300.f);
 	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())   // (only for the look: whoever is watching here)
 		if (PC->PlayerCameraManager) Cam = PC->PlayerCameraManager->GetCameraLocation();

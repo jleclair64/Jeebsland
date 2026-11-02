@@ -557,6 +557,11 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	float TargetYaw = 0.f;
 	float RollR = -Air * ArmAirSpread - 1.2f * BreathS * IdleAmt - (EaseKind == JeebItems::K_Staff ? 14.f * EaseAlpha : 0.f);   // the arms ease out a little with each breath (and out to the side to hold a staff)
 	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
+	if (EaseKind == JeebItems::K_Bow && !bStowed)   // the bow in his left hand: the empty right arm hangs and swings like the left one, not as if holding something (owner, 2026-11-01)
+	{
+		TargetPitch = FMath::Lerp(-0.6f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
+		ElbowRdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(-S, 0.f), 15.f, Air);
+	}
 	float ArmSpeed = 25.f;
 
 	TargetPitch = FMath::Lerp(TargetPitch, -35.f, SlideAlpha);   RollR = FMath::Lerp(RollR, -30.f, SlideAlpha);

@@ -30,6 +30,7 @@ public:
 	static float SunElevation;   // degrees above the horizon (11 to 41)
 	static float Dusk;           // 0 = broad day, 1 = the sun down by the horizon
 	static FVector SunDir;       // unit vector toward the sun
+	static FLinearColor TrailLight;   // how glowing things that make their own light (sword and arrow trails) should look right now: white at noon, dimmer and warmer as the sun sinks
 	static FVector MoonDir;      // unit vector toward the moon (it hangs low in the south-west)
 	static float FixedPhase;     // >= 0 freezes the clock at that phase (used for test screenshots)
 	static constexpr float CloudWindSpeed = 1.f;   // how fast the clouds drift; raise it if they crawl, lower it if they race
