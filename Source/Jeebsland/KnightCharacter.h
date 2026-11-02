@@ -705,6 +705,12 @@ private:
 	// 44 m full (owner, 2026-10-31: 10 ft, 40 ft, as before); the speed and how fast it drops together set that
 	static constexpr float BowSpeedMin = 1000.f, BowSpeedMid = 2400.f, BowSpeedMax = 4800.f;   // cm/s
 	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 300.f;          // cm/s/s it drops
+	// Breath of the Wild style (owner, 2026-11-01): a full draw flies dead straight for BowStraight (no drop at all), then falls
+	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle
+	static constexpr float BowStraight = 5000.f, BowSagFull = 980.f;
+	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
+	static constexpr float BowCamHold = 1.f;   // s the aiming camera stays put after a shot (it used to pull back mid-flight)
+	float BowShotAt = -10.f;
 	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
 	static constexpr float BowAnchorUp = 6.f, BowAnchorSide = 16.f;   // the full draw's anchor: this far above his neck joint and out to his right (beside the helm's cheek)

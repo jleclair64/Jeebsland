@@ -26,7 +26,7 @@ struct FProjLaunch
 	UPROPERTY() int32 ArrowId = 0;   // which arrows (0: a bolt): fire arrows glow and burn
 	UPROPERTY() uint8 Seq = 0;
 	UPROPERTY() float Sag = 300.f;   // cm/s/s it drops (a weakly drawn arrow drops fast and lands close)
-	UPROPERTY() FVector_NetQuantize10 ShowOff = FVector::ZeroVector;   // drawn this far off its real path at the start (the bow), fading out over ShowFade
+	UPROPERTY() float Straight = 0.f;   // cm it flies dead straight before it starts to drop (a full draw, Breath of the Wild style)
 };
 
 // Where an arrow ended up (owner, 2026-10-31): stuck in the ground, a tree, a shield or a body for StuckSeconds. On (with Comp)
@@ -56,14 +56,10 @@ public:
 	AProjectile();
 
 	// bMagic: glowing bolt that flies straight; otherwise an arrow that drops a little. ArrowId: which arrows (fire arrows burn).
-	void Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId = 0, float InSag = ArrowSag);
+	void Launch(AKnightCharacter* InShooter, const FVector& Dir, float InSpeed, float MaxRange, int32 InDamage, bool bInCrit, ESkillType InSkill, bool bMagic, int32 Tier, int32 InArrowId = 0, float InSag = ArrowSag, float InStraight = 0.f);
 
 	// What the reticle is on: how far along A..B (0..1; 2 = nothing) the first body or raised shield with hit boxes lies, other
 	// than Ignore. (Knights and foes are not solid to the world's traces, so aiming with a trace alone looks straight through them.)
-	// (server, right after Launch) Drawn leaving from there (the bow) and merging onto its real path over its first ShowFade cm
-	void ShowFrom(const FVector& DrawnStart);
-	static constexpr float ShowFade = 500.f;
-
 	static float FirstBodyAlong(UWorld* World, const FVector& A, const FVector& B, const AActor* Ignore);
 
 	virtual void Tick(float DeltaSeconds) override;
@@ -82,8 +78,6 @@ public:
 
 private:
 	UPROPERTY() USceneComponent* Root = nullptr;
-	UPROPERTY() USceneComponent* Vis = nullptr;   // carries the drawn arrow (off the real path at first: ShowFrom)
-	void PlaceVis();
 	UPROPERTY() UStaticMeshComponent* Body = nullptr;    // the shaft (or the bolt's ball)
 	UPROPERTY() UStaticMeshComponent* Head = nullptr;    // the arrowhead (the tip is the actor's own position)
 	UPROPERTY() UStaticMeshComponent* Fletch = nullptr;

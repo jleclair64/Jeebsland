@@ -55,8 +55,8 @@ FVector AKnightCharacter::ArrowStart() const
 }
 
 // The camera sits over his right shoulder, so an arrow from the bow toward a far point crosses the reticle's line only out there:
-// anything just left of the reticle on the way got hit (owner, 2026-11-01). The arrow really flies from the reticle's line,
-// level with the bow, and is drawn leaving the bow and merging onto that line over its first few metres (AProjectile::ShowFrom).
+// anything just left of the reticle on the way got hit (owner, 2026-11-01). The arrow leaves from just left of and below the
+// middle of the screen, level with the bow, and flies in one straight line toward the reticle.
 FVector AKnightCharacter::ShotStart() const
 {
 	const FVector BowAt = ArrowStart();
@@ -65,7 +65,9 @@ FVector AKnightCharacter::ShotStart() const
 	if (!PC || !PC->PlayerCameraManager) return BowAt;
 	const FVector CamLoc = PC->PlayerCameraManager->GetCameraLocation();
 	const FVector CamDir = PC->PlayerCameraManager->GetCameraRotation().Vector();
-	return CheckShotStart(CamLoc + CamDir * FMath::Max(0.f, FVector::DotProduct(BowAt - CamLoc, CamDir)));
+	const FRotationMatrix CamM(PC->PlayerCameraManager->GetCameraRotation());
+	return CheckShotStart(CamLoc + CamDir * FMath::Max(0.f, FVector::DotProduct(BowAt - CamLoc, CamDir))
+		- CamM.GetUnitAxis(EAxis::Y) * ShotLeft - CamM.GetUnitAxis(EAxis::Z) * ShotDown);
 }
 
 FVector AKnightCharacter::CheckShotStart(const FVector& Asked) const
@@ -137,6 +139,7 @@ void AKnightCharacter::ReleaseDraw()
 	FVector Target = FVector::ZeroVector;
 	const FVector Dir = BowAimDir(&Target);
 	const FVector From = ShotStart();
+	BowShotAt = GetWorld()->GetTimeSeconds();
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *From.ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
 	const float C = BowCharge;
 	const int32 Id = ArrowSlotId();
@@ -201,8 +204,9 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), From, Dir.Rotation(), SP))
 	{
-		P->Launch(this, Dir, ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id, ByDraw(BowSagMin, BowSagMid, BowSagMax));
-		P->ShowFrom(ArrowStart());   // (drawn leaving the bow)
+		const bool bFull = C >= 1.f;
+		P->Launch(this, Dir, ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id,
+			bFull ? BowSagFull : ByDraw(BowSagMin, BowSagMid, BowSagMax), bFull ? BowStraight : 0.f);
 	}
 }
 
@@ -227,10 +231,13 @@ void AKnightCharacter::TickBow(float Dt)
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, Bow == EBow::Drawing ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 7.f : 5.f);
+		// (it stays in for a moment after the shot, so the arrow's flight is seen from where it was aimed)
+		const bool bAimCam = Bow == EBow::Drawing || (SelectedKind() == JeebItems::K_Bow && GetWorld()->GetTimeSeconds() - BowShotAt < BowCamHold);
+		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{
 			const float A = BowCamAlpha * BowCamAlpha * (3.f - 2.f * BowCamAlpha);
+			Boom->CameraLagSpeed = FMath::Lerp(8.f, 80.f, A);   // aiming: the camera keeps up with him (its lag made arrows seem to curve as he moved)
 			Boom->TargetArmLength = FMath::Lerp(540.f, BowCamLength, A);
 			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
 		}
