@@ -709,8 +709,6 @@ private:
 	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle
 	static constexpr float BowStraight = 5000.f, BowSagFull = 980.f;
 	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
-	static constexpr float BowCamHold = 1.f;   // s the aiming camera stays put after a shot (it used to pull back mid-flight)
-	float BowShotAt = -10.f;
 	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
 	static constexpr float BowAnchorUp = 6.f, BowAnchorSide = 16.f;   // the full draw's anchor: this far above his neck joint and out to his right (beside the helm's cheek)

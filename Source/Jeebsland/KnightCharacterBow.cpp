@@ -139,7 +139,6 @@ void AKnightCharacter::ReleaseDraw()
 	FVector Target = FVector::ZeroVector;
 	const FVector Dir = BowAimDir(&Target);
 	const FVector From = ShotStart();
-	BowShotAt = GetWorld()->GetTimeSeconds();
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *From.ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
 	const float C = BowCharge;
 	const int32 Id = ArrowSlotId();
@@ -231,8 +230,7 @@ void AKnightCharacter::TickBow(float Dt)
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		// (it stays in for a moment after the shot, so the arrow's flight is seen from where it was aimed)
-		const bool bAimCam = Bow == EBow::Drawing || (SelectedKind() == JeebItems::K_Bow && GetWorld()->GetTimeSeconds() - BowShotAt < BowCamHold);
+		const bool bAimCam = Bow == EBow::Drawing;   // (it pulls back out as soon as the arrow is away: owner, 2026-11-01)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{
