@@ -477,9 +477,9 @@ void AKnightCharacter::RebuildHeld()
 		return;
 	}
 	// The bow is held in the LEFT fist (2026-10-31, as Link holds his), built at its own grip on BowHold, which sits in the fist:
-	// its limbs run along the fist's grip (side to side across the closed fist, as the sword's grip does) and the string faces
-	// back up the arm. PoseBow turns the arm (and at ease the forearm) so the bow stands up when aiming and lies forward and
-	// back at his side otherwise.
+	// its limbs run through the curl of the fingers (front to back in the hanging fist, where a sword's grip runs; 2026-11-01,
+	// it used to cross the fist and sat beside the hand) and the string faces back up the arm. Hanging, the bow lies forward
+	// and back at his side; PoseBow raises the arm toward the target, which stands it upright with the thumb on top.
 	if (K == JeebItems::K_Bow && ElbowL)
 	{
 		BowHold = NewObject<USceneComponent>(this);
@@ -488,9 +488,8 @@ void AKnightCharacter::RebuildHeld()
 		{
 			const FVector A0 = (KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ArmL)).GetSafeNormal();   // (the straight arm, at rest)
 			const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
-			const FVector G0 = FVector::CrossProduct(A0, B0);   // across the fist
 			const FVector Z = -A0;                               // the string's side: back toward the shoulder
-			BowHold->SetRelativeRotation(FQuat(FMatrix(G0, FVector::CrossProduct(Z, G0), Z, FVector::ZeroVector)));
+			BowHold->SetRelativeRotation(FQuat(FMatrix(B0, FVector::CrossProduct(Z, B0), Z, FVector::ZeroVector)));   // (limbs along B0)
 		}
 		BowHold->RegisterComponent();
 		const int32 First = HeldComps.Num();

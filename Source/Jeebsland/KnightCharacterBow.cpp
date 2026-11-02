@@ -258,11 +258,7 @@ void AKnightCharacter::PoseBow(float Dt)
 	auto Frame = [](const FVector& X, const FVector& Y) { return FQuat(FMatrix(X, Y, FVector::CrossProduct(X, Y), FVector::ZeroVector)); };
 	auto Perp = [](const FVector& V, const FVector& To) { return (V - To * FVector::DotProduct(V, To)).GetSafeNormal(); };
 
-	// At ease the left forearm turns a quarter about its length, so the bow lies forward and back in the hanging fist
-	static const FVector ForearmL = (GripPos(true) - PivotPos(P_ElbowL)).GetSafeNormal();
-	const float Ease = BowEaseAlpha * (1.f - A);
-	if (Ease > 0.001f) ElbowL->SetRelativeRotation(ElbowL->GetRelativeRotation().Quaternion() * FQuat(ForearmL, FMath::DegreesToRadians(-90.f * Ease)));
-	if (A <= 0.001f) return;
+	if (A <= 0.001f) return;   // (at ease the bow already lies forward and back in the hanging fist: it runs through the fingers' curl)
 
 	const FVector Aim = BowAimDir();
 	const FVector Up = FVector::UpVector;
@@ -286,7 +282,7 @@ void AKnightCharacter::PoseBow(float Dt)
 		const float L = -B + FMath::Sqrt(FMath::Max(B * B - D.SizeSquared() + Reach * Reach, 0.f));
 		GripWant = Anchor + Aim * FMath::Max(L, 30.f);
 		const FVector ArmDir = (GripWant - S).GetSafeNormal();
-		FVector Bw = Perp(Right, ArmDir);   // (the fist's grip then runs up and down)
+		FVector Bw = Perp(Up, ArmDir);   // (the fist's grip, and the bow in it, then runs up and down, the thumb on top)
 		if (Bw.IsNearlyZero()) Bw = GetActorRightVector();
 		const FQuat Want = Chest.Inverse() * Frame(ArmDir, Bw) * Frame(A0, B0).Inverse();
 		ArmPivotL->SetRelativeRotation(FQuat::Slerp(ArmPivotL->GetRelativeRotation().Quaternion(), Want, A));
@@ -307,7 +303,7 @@ void AKnightCharacter::PoseBow(float Dt)
 		const FVector D = Hand - S;
 		const float Dist = FMath::Clamp(D.Size(), 6.f, Lu + Lf - 0.5f);
 		const FVector N = D.GetSafeNormal();
-		const FVector Pole = Perp(GetActorRightVector() * 0.7f + Up * 0.35f - Aim * 0.5f, N);   // (the drawing elbow out to the right and back, a little up)
+		const FVector Pole = Perp(-Aim + Up * 0.15f + Right * 0.2f, N);   // (the drawing elbow behind the hand, in line with the arrow, as an archer's: owner, 2026-11-01)
 		const float CosA = FMath::Clamp((Lu * Lu + Dist * Dist - Lf * Lf) / (2.f * Lu * Dist), -1.f, 1.f);
 		const FVector Au = (N * CosA + Pole * FMath::Sqrt(1.f - CosA * CosA)).GetSafeNormal();
 		const FVector Elbow = S + Au * Lu;
