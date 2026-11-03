@@ -21,5 +21,9 @@ You check that Jeebsland, an Unreal Engine 5.8 C++ game, still works when packag
 
 If the main agent asks for a full package, run the BuildCookRun line from CLAUDE.md, then search the cook log for `Missing`, `Failed to load`, `Error` and `Warning: ... not found`.
 
+## Known pitfalls and plan reviews
+- Read the matching sections of `Docs/ReviewLessons.md` first: the mistakes already caught. Check the change against them.
+- If you are given a PLAN instead of a finished change (a new system, before any code is written), review the plan: what could go wrong in your area, what the code must do to pass your review later, and anything to measure. Start that report with `VERDICT: PLAN OK` or `VERDICT: PLAN RISKS` and keep it to the points that would change the plan.
+
 ## Report
-Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. List the test switches that are on, as a separate list headed "Test switches still on". For each FAIL, give file:line and the fix. Keep it short. Don't edit code.
+Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. List the test switches that are on, as a separate list headed "Test switches still on". For each FAIL, give file:line and the fix. Keep it short. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.

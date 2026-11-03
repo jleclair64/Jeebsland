@@ -33,5 +33,9 @@ Read the timing constants for the move in `KnightCharacter.h` (e.g. `SweepDur`, 
 - The arms looked like they held something while empty. Natural swing when walking.
 - The bow and string went through the body or elbow during the draw or at rest.
 
+## Known pitfalls and plan reviews
+- Read the matching sections of `Docs/ReviewLessons.md` first: the mistakes already caught. Check the change against them.
+- If you are given a PLAN instead of a finished change (a new system, before any code is written), review the plan: what could go wrong in your area, what the code must do to pass your review later, and anything to measure. Start that report with `VERDICT: PLAN OK` or `VERDICT: PLAN RISKS` and keep it to the points that would change the plan.
+
 ## Report
-Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. For each FAIL, give the frame numbers, the side, what is wrong and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code.
+Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. For each FAIL, give the frame numbers, the side, what is wrong and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.

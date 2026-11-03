@@ -26,5 +26,9 @@ You review Jeebsland changes for online play. It is an Unreal Engine 5.8 C++ gam
    - Delete the test accounts' files (`Saved/Accounts/reva*`, `Saved/Characters/reva*`, same for revb) after the test, and only those.
 3. If a live test isn't possible, say why and review by reading only.
 
+## Known pitfalls and plan reviews
+- Read the matching sections of `Docs/ReviewLessons.md` first: the mistakes already caught. Check the change against them.
+- If you are given a PLAN instead of a finished change (a new system, before any code is written), review the plan: what could go wrong in your area, what the code must do to pass your review later, and anything to measure. Start that report with `VERDICT: PLAN OK` or `VERDICT: PLAN RISKS` and keep it to the points that would change the plan.
+
 ## Report
-Start with `VERDICT: PASS` or `VERDICT: FAIL`. List each rule that is broken, with file:line, how a cheating or lagging client could exploit it or what other players would see wrong, and the fix. Say what you tested live. Keep it short. Don't edit code.
+Start with `VERDICT: PASS` or `VERDICT: FAIL`. List each rule that is broken, with file:line, how a cheating or lagging client could exploit it or what other players would see wrong, and the fix. Say what you tested live. Keep it short. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.

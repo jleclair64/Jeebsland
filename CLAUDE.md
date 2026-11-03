@@ -179,6 +179,9 @@ How to keep changes fast (owner, 2026-11-02; a batch used to take about 20 minut
 4. Only the views that matter (a jump or a dash: one side view frame sheet; a held item: the sides it can clip on).
 5. Reopen the editor once, at the end. Measure with log lines (JEEBJUMP, JEEBDASH, JEEBSWEEP, JEEBCLEAR...) before taking pictures, so a wrong number costs a rebuild, not a review round.
 
+Lessons and plan reviews (owner, 2026-11-02):
+- `Docs/ReviewLessons.md` lists what reviewers have caught before, by area. Read the matching sections BEFORE building a change. Each reviewer ends every FAIL with a `LESSON:` line; add it to that file (one general rule, merged with similar ones) in the same commit as the fix.
+- New systems (the Opus-level work: dungeons, PvP, quests, enemies, new moves): before writing code, send the plan to the matching reviewers in plan mode (online-reviewer for anything the server decides; motion-reviewer for the key poses and timing of a move). Fix the plan, then build. Small changes and tweaks skip this: build first, then review.
 Measure clipping instead of guessing (2026-11-01): every test-picture frame logs `JEEBCLEAR` (`AKnightCharacter::LogClearance`, KnightCharacterBow.cpp): where the bow, string, nocked arrow and quiver cross the armour or cape triangles, and `fisttop` (the left glove's top along the bow). Pose numbers can be tried without a rebuild (`-BowTune=...`, `-QuiverTune=...`, see the code), and `-QuiverSearch` tries thousands of quiver spots in one run. Extend LogClearance to any new held or worn item, sweep numbers until it reads clear, and only then take pictures for the reviewers.
 
 ## Checking visuals

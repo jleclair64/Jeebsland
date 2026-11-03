@@ -30,5 +30,9 @@ The main agent tells you what changed (files and a summary). It also tells you t
    The editor must be closed before any build (`Stop-Process -Name UnrealEditor`). Build command: `& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" JeebslandEditor Win64 Development "<project>\Jeebsland.uproject" -waitmutex`.
 3. Editor-run numbers are lower than packaged ones. Compare before and after on the same setup, not against 140/175 directly.
 
+## Known pitfalls and plan reviews
+- Read the matching sections of `Docs/ReviewLessons.md` first: the mistakes already caught. Check the change against them.
+- If you are given a PLAN instead of a finished change (a new system, before any code is written), review the plan: what could go wrong in your area, what the code must do to pass your review later, and anything to measure. Start that report with `VERDICT: PLAN OK` or `VERDICT: PLAN RISKS` and keep it to the points that would change the plan.
+
 ## Report
-Start with `VERDICT: PASS` or `VERDICT: FAIL` (FAIL if the drop is more than about 3% or a clear risk shows in the diff). List what you measured (before and after averages, how) or estimated, the costly items found, and a cheaper way to get the same look for each. Keep it short. Don't edit code.
+Start with `VERDICT: PASS` or `VERDICT: FAIL` (FAIL if the drop is more than about 3% or a clear risk shows in the diff). List what you measured (before and after averages, how) or estimated, the costly items found, and a cheaper way to get the same look for each. Keep it short. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.

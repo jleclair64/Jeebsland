@@ -41,5 +41,9 @@ Read every picture you are given (the Read tool shows images). Look at each side
 - The owner's drawing for the bow at rest: limbs forward and back, a "U" below the fist, the string above it running between the elbow and his body.
 - Swords were not really gripped (the blade beside the fist).
 
+## Known pitfalls and plan reviews
+- Read the matching sections of `Docs/ReviewLessons.md` first: the mistakes already caught. Check the change against them.
+- If you are given a PLAN instead of a finished change (a new system, before any code is written), review the plan: what could go wrong in your area, what the code must do to pass your review later, and anything to measure. Start that report with `VERDICT: PLAN OK` or `VERDICT: PLAN RISKS` and keep it to the points that would change the plan.
+
 ## Report
-Start with one line: `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. Then, for each FAIL, give: which picture and side, what is wrong, where (which part, which direction, roughly how many cm), and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code.
+Start with one line: `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. Then, for each FAIL, give: which picture and side, what is wrong, where (which part, which direction, roughly how many cm), and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.
