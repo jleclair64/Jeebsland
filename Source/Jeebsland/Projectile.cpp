@@ -2,6 +2,7 @@
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
+#include "Combat.h"
 #include "Terrain.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
@@ -161,6 +162,7 @@ void AProjectile::Tick(float DeltaSeconds)
 		UHealthComponent* BestH = nullptr;
 		AKnightCharacter* BestK = nullptr;
 		bool bOnShield = false;
+		uint8 BestZone = JeebHit::Z_None;   // (the body part it meets: armour, and headshots)
 		JeebHit::FShieldWedge BestWedge;
 		TArray<JeebHit::FCapsule> Hurt;
 		auto Consider = [&](UHealthComponent* H, AKnightCharacter* K, AActor* Who)
@@ -172,10 +174,11 @@ void AProjectile::Tick(float DeltaSeconds)
 			if (K) { K->GatherHurt(Hurt); bW = K->GetShieldWedge(W); }
 			else { JeebHit::HurtOf(H, Hurt); bW = JeebHit::ShieldOf(H, W); }
 			const float Tw = bW ? JeebHit::FirstTouchWedge(Seg, W) : 2.f;
-			const float Tb = JeebHit::FirstTouch(Seg, Hurt);
+			uint8 Zone = JeebHit::Z_None;
+			const float Tb = JeebHit::FirstTouch(Seg, Hurt, &Zone);
 			const float T = FMath::Min(Tw, Tb);
 			if (T > 1.f || T >= Best) return;
-			Best = T; BestH = H; BestK = K; bOnShield = Tw <= Tb; BestWedge = W;
+			Best = T; BestH = H; BestK = K; bOnShield = Tw <= Tb; BestWedge = W; BestZone = Zone;
 		};
 		for (UHealthComponent* H : UHealthComponent::All())
 			if (H && H->IsAlive() && H->GetOwner() && H->GetOwner() != Shooter) Consider(H, nullptr, H->GetOwner());
@@ -212,8 +215,11 @@ void AProjectile::Tick(float DeltaSeconds)
 				return;
 			}
 			if (!bAuth) { SetActorLocation(At); Wait(); return; }
-			if (BestK) BestK->Hurt(Damage, Shooter);
-			else if (Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
+			// A headshot (owner, 2026-11-02): arrows and bolts to the head do 1.5x, before the helmet takes its share
+			const bool bHead = BestZone == JeebHit::Z_Head;
+			const int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul) : Damage;
+			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead);
+			else if (Shooter) Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead);
 			if (JeebItems::IsFireArrow(L.ArrowId)) Burn(Target);
 			// stuck in him at the joint nearest the tip (his armour: spent)
 			USceneComponent* Joint = nullptr;

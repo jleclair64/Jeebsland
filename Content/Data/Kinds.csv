@@ -14,12 +14,12 @@ Wand,Wand,7,11,1800,0.55,0,80,3,1,no,Fires small magic bolts at range. Light and
 Staff,Wizard Staff,11,17,2200,1.00,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."
 Bow,Bow,5,7,4000,0.80,0,60,4,1,yes,"Fires arrows from a distance: hold the attack button to draw (the longer the draw, the further and harder the shot), let go to shoot. Arrows run out: buy them at the store or smith them, or pick up the ones you shot (E). Better arrows hit harder. Needs both hands: no shield."
 Rod,Fishing Pole,2,3,200,0.80,0,30,3,0,no,A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.
-Shield,Shield,1,2,200,1,8,50,6,0,no,"Hold right-click to block blows from the front. A shield's guard stops damage up to its Defence; once spent, the guard is broken and stops only half of each blow until it recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons."
-Helmet,Helmet,1,2,200,1,3,40,5,0,no,Protects the head. Defence adds to the total of all worn armour.
-Chest,Chestplate,1,2,200,1,7,90,10,2,no,The heaviest armour piece and the biggest defence bonus.
-Shoulders,Shoulders,1,2,200,1,4,55,6,1,no,Layered pauldrons for the shoulders.
-Gloves,Gloves,1,2,200,1,2,30,3,0,no,Armoured gauntlets for the hands.
-Boots,Boots,1,2,200,1,3,45,5,0,no,"Armoured boots. Better boots also give you more stamina: it lasts longer and returns faster."
+Shield,Shield,1,2,200,1,8,50,6,0,no,"Hold right-click to block blows from the front. A raised shield takes every blow on it out of your guard (its size grows with your Defence level; better shields lose less of it per blow). The blow that empties the guard breaks it: the shield drops until the guard recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons."
+Helmet,Helmet,1,2,200,1,3,40,5,0,no,Protects the head: blows to the head go through it. Arrows to the head do 1.5x damage.
+Chest,Chestplate,1,2,200,1,7,90,10,2,no,Protects the chest and belly: blows to the body go through it.
+Shoulders,Shoulders,1,2,200,1,4,55,6,1,no,Layered pauldrons: blows to the upper arms go through them.
+Gloves,Gloves,1,2,200,1,2,30,3,0,no,Armoured gauntlets: blows to the forearms and hands go through them.
+Boots,Boots,1,2,200,1,3,45,5,0,no,"Armoured boots: blows to the legs go through them. Better boots also give you more stamina: it lasts longer and returns faster."
 Cape,Cape,1,2,200,1,0,0,0,0,no,"Your cape shows your PvP rank: Tin, Iron, Bronze, Steel, Silver, Gold, then your class's legendary colour. It is yours for good: never dropped, sold or traded. (PvP ranks come later: for now every knight wears Tin.)"
 Ring,Ring,1,2,200,1,0,0,0,0,no,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."
 Amulet,Amulet,1,2,200,1,0,0,0,0,no,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."

@@ -40,6 +40,7 @@
 #include "WeaponDesign.h"
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
+#include "TimerManager.h"
 
 bool AKnightCharacter::ShieldActive() const
 {
@@ -165,6 +166,13 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	}
 	if (Move == TEXT("kicksweep")) { StartAttack(EAtkStyle::Kick, 1, 0.f); ShotSweepAt = GetWorld()->GetTimeSeconds() + KickDur + 0.02f; }   // a kick, then the sweep on him lying there
 	if (Move == TEXT("block")) { bBlockHeld = true; StartBlock(); }                              // the shield held up
+	if (Move == TEXT("jump") || Move == TEXT("hop"))   // a full jump (Space held 0.5 s) or a short hop (Space tapped); log JEEBJUMP gives the height
+	{
+		Jump();
+		ShotJumpFrom = GetActorLocation().Z;
+		FTimerHandle T;
+		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StopJumping(); }), Move == TEXT("hop") ? 0.02f : 0.5f, false);
+	}
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
 	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash40 = 0.4 s of charge (hundredths: the command line stops at a dot)
 	{
@@ -192,10 +200,10 @@ void AKnightCharacter::LogSwordTip()
 		FMath::RadiansToDegrees(FMath::Atan2(Fa.Y, Fa.X)), FMath::RadiansToDegrees(FMath::Asin(Fa.Z)), FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X)), FMath::RadiansToDegrees(FMath::Asin(Bl.Z)));
 }
 
-void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes)
+void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes, uint8 Zone, bool bHeadshot)
 {
 	if (!Target || !Target->IsAlive()) return;
-	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit, bHitBoxes);
+	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit, bHitBoxes, Zone, bHeadshot);
 	if (Dealt > 0 && Skills) Skills->AddXP(Skill, 3 + Dealt / 3);
 }
 
@@ -260,7 +268,7 @@ void AKnightCharacter::AttackLands()
 	}
 }
 
-void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
+void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 Zone, bool bHeadshot)
 {
 	if (Health <= 0.f || Raw <= 0 || !Skills || !HasAuthority()) return;   // (only the server hurts anyone)
 	const float Now = GetWorld()->GetTimeSeconds();
@@ -273,15 +281,14 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) >= FMath::Cos(FMath::DegreesToRadians(JeebHit::FShieldWedge().HalfAngle));
 	}
-	const int32 Armor = bEnvironmental ? 0 : JeebItems::TotalDefense(Skills, false) / 3;   // smoke seeps through armour
-	const int32 FromSkill = bEnvironmental ? 0 : Skills->GetLevel(ESkillType::Defense) / 5;
-	// The shield takes the blow (owner, 2026-10-31): a blow on a raised shield never hurts the knight; the shield's guard takes
-	// all of it. The blow that empties the guard breaks it: the shield drops and can't be raised until the guard is full again.
+	// The shield takes the blow (owner, 2026-10-31): a blow on a raised shield never hurts the knight; the guard takes it, as
+	// much of it as the shield lets through to the guard (JeebItems::ShieldDrain, 2026-11-02: Tin all of it, a legendary half).
+	// The blow that empties the guard breaks it: the shield drops and can't be raised until the guard is full again.
 	int32 ShieldStop = 0;
 	if (bFront && !bGuardBroken)
 	{
 		ShieldStop = Raw;
-		GuardPool -= Raw;
+		GuardPool -= Raw * JeebItems::ShieldDrain(Skills->Worn[JeebItems::K_Shield]);
 		if (GuardPool < 1.f)
 		{
 			GuardPool = 0.f;
@@ -292,11 +299,14 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental)
 		LastGuardHitTime = Now;
 	}
 	const int32 Through = Raw - ShieldStop;
-	const int32 Taken = (Through <= 0) ? 0 : FMath::Max(1, Through - (Armor + FromSkill));
+	// Armour by body part (owner, 2026-11-02): the piece covering where it landed lets only part of it through (smoke seeps
+	// through armour). The Defence level no longer softens blows: it sizes the shield's guard.
+	const float Take = bEnvironmental ? 1.f : JeebItems::ZoneTake(Skills, Zone);
+	const int32 Taken = (Through <= 0) ? 0 : FMath::Max(1, FMath::RoundToInt(Through * Take));
 
 	const FVector Head = GetActorLocation() + FVector(0.f, 0.f, 120.f);
 	if (ShieldStop > 0) JeebCombat::AddNumber(GetWorld(), Head + FVector(0.f, 0.f, 25.f), ShieldStop, JeebCombat::N_Blocked);
-	if (Taken > 0) JeebCombat::AddNumber(GetWorld(), Head, Taken, JeebCombat::N_Damage);
+	if (Taken > 0) JeebCombat::AddNumber(GetWorld(), Head, Taken, bHeadshot ? JeebCombat::N_Headshot : JeebCombat::N_Damage);
 	Health -= Taken;
 	LastHurtTime = Now;
 	// (hazards tick: a short safe spell after each. Blows don't: each move hits once anyway, and combos must be able to land)
@@ -416,6 +426,25 @@ void AKnightCharacter::TickAttack(float Dt)
 	TickSmash(Dt);
 	if (StunLeft > 0.f) StunLeft = FMath::Max(0.f, StunLeft - Dt);   // (hitstun wears off: ApplyReact)
 	if (ShotSweepAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotSweepAt && !bAttacking) { ShotSweepAt = -1.f; StartAttack(EAtkStyle::Sweep, 1, 0.f); }   // (test pictures)
+	if (bShotFace && ShotJumpFrom > -1.0e8f && GetCharacterMovement()->IsFalling())   // (test pictures: how high the jump goes)
+		UE_LOG(LogTemp, Log, TEXT("JEEBJUMP up %.1f vz %.0f"), GetActorLocation().Z - ShotJumpFrom, GetCharacterMovement()->Velocity.Z);
+	// The dash slides on after its stab is out instead of stopping dead (owner, 2026-11-02): for the whole dash the ground brakes
+	// him steadily (no friction, DashSlideBrake), so he reaches the stab about as far as before and skids on about 40 cm. The player's machine and the server
+	// both brake the same way, so the slide is predicted like any walk.
+	{
+		const bool bSlide = IsDashing();
+		if (bSlide != bDashSliding)
+		{
+			UCharacterMovementComponent* M = GetCharacterMovement();
+			bDashSliding = bSlide;
+			M->bUseSeparateBrakingFriction = bSlide;
+			M->BrakingFriction = 0.f;
+			if (bSlide) { SavedBrakeDecel = M->BrakingDecelerationWalking; M->BrakingDecelerationWalking = DashSlideBrake; }
+			else M->BrakingDecelerationWalking = SavedBrakeDecel;
+		}
+	}
+	if (bShotFace && bAttacking && AtkStyle == EAtkStyle::Dash)   // (test pictures: how far the dash carries him)
+		UE_LOG(LogTemp, Log, TEXT("JEEBDASH t %.2f at %s speed %.0f"), AttackT, *GetActorLocation().ToCompactString(), GetVelocity().Size2D());
 	if (bAttacking)
 	{
 		// A sword hit keeps facing the way it started (as in Smash): sliding along a wall or being steered never turns him
@@ -632,6 +661,7 @@ void AKnightCharacter::TakeReact(AActor* From, const JeebHit::FReact& R)
 	if (!HasAuthority() || Health <= 0.f || bMounted || bClimbing || bSitting) return;
 	if (GetWorld()->GetTimeSeconds() < InvulnUntil) return;   // (getting up: safe)
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation() - GetActorForwardVector())).GetSafeNormal2D();
+	if (R.bDrop) { KnockDownBy(From, true); return; }   // the low sweep: down on the spot, then up or a roll (GetUp)
 	if (R.bLaunch)
 	{
 		const FVector Vel = JeebHit::LaunchVelocity(Away, HeldDI());
@@ -694,9 +724,10 @@ FVector AKnightCharacter::HeldDI() const
 }
 
 // (server) A kick (or a blow during his own kick): he goes down on his back, pushed away from whoever did it
-void AKnightCharacter::KnockDownBy(AActor* From)
+void AKnightCharacter::KnockDownBy(AActor* From, bool bDrop)
 {
 	if (!HasAuthority() || bKnockedDown || Health <= 0.f || bMounted || bClimbing || bSitting) return;
+	if (bDrop) { MulticastKnock(true, 1); return; }   // (Opt 1: dropped where he stands)
 	if (bBlocking && !bGuardBroken && GuardMax > 0.f)   // a kick on a raised shield crushes half its guard (balance pass 2026-10-31)
 	{
 		GuardPool -= 0.5f * GuardMax;
@@ -721,7 +752,10 @@ void AKnightCharacter::MulticastKnock_Implementation(bool bDown, uint8 Opt)
 	bBlocking = false; bCrouched = false; bSprinting = false;
 	if (bRolling) { bRolling = false; GetCharacterMovement()->bOrientRotationToMovement = bSavedOrient; }
 	if (IsLocallyControlled() || HasAuthority())
-		LaunchCharacter(-GetActorForwardVector().GetSafeNormal2D() * 300.f + FVector(0.f, 0.f, 100.f), true, true);   // knocked back off his feet (landing before KnockFall is over)
+	{
+		if (Opt == 1) GetCharacterMovement()->StopMovementImmediately();   // swept: his feet go and he drops straight down on the spot (a zero launch would be ignored)
+		else LaunchCharacter(-GetActorForwardVector().GetSafeNormal2D() * 300.f + FVector(0.f, 0.f, 100.f), true, true);   // knocked back off his feet (landing before KnockFall is over)
+	}
 }
 
 void AKnightCharacter::GetUp(uint8 Opt)
@@ -890,7 +924,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 	const float Power = bKick ? KickDamage : bSweep ? SweepDamage : bDash ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, DashCharge) : bSmashSwing ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, SmashCharge) : SwordJabDamage;
 	// what a clean sword hit does to whoever it lands on
 	JeebHit::FReact React;
-	if (bSweep) React.bLaunch = true;
+	if (bSweep) React.bDrop = true;   // (owner, 2026-11-02: straight down where he stands, no launch)
 	else if (bDash) { React.Stun = FMath::Lerp(StunSmash, StunSmashFull, DashCharge); React.Push = FMath::Lerp(PushSmash, PushSmashFull, DashCharge); }
 	else if (bSmashSwing) { React.Stun = FMath::Lerp(StunSmash, StunSmashFull, SmashCharge); React.Push = FMath::Lerp(PushSmash, PushSmashFull, SmashCharge); }
 	else if (AttackDir == JabSecond) { React.Stun = StunJab2; React.Push = PushJab2; }
@@ -927,16 +961,18 @@ void AKnightCharacter::TickHitboxes(float Dt)
 			TArray<JeebHit::FCapsule> Hurt;
 			// What a hit box meets first along its sweep this frame: the shield's wedge or the body. The body first (from the side
 			// or behind) is a clean hit; the wedge first is a block (at the same moment, the shield: Smash checks shields first).
-			// Hit: the box that meets it (the lowest ID among those touching the body). Returns false if nothing is touched.
-			auto Meet = [&](const TArray<JeebHit::FCapsule>& HurtBoxes, const JeebHit::FShieldWedge* Shield, int32& OutHit, bool& bOutShield)
+			// Hit: the box that meets it (the lowest ID among those touching the body), and Zone the body part it meets (armour).
+			// Returns false if nothing is touched.
+			auto Meet = [&](const TArray<JeebHit::FCapsule>& HurtBoxes, const JeebHit::FShieldWedge* Shield, int32& OutHit, bool& bOutShield, uint8& OutZone)
 			{
-				float FirstWedge = 2.f, FirstBody = 2.f; int32 WedgeBox = -1; OutHit = -1;
+				float FirstWedge = 2.f, FirstBody = 2.f; int32 WedgeBox = -1; OutHit = -1; OutZone = JeebHit::Z_None;
 				for (int32 i = 0; i < HitLive.Num(); ++i)
 				{
+					uint8 Z = JeebHit::Z_None;
 					const float Tw = Shield ? JeebHit::FirstTouchWedge(HitLive[i], *Shield) : 2.f;
-					const float Tb = JeebHit::FirstTouch(HitLive[i], HurtBoxes);
+					const float Tb = JeebHit::FirstTouch(HitLive[i], HurtBoxes, &Z);
 					if (Tw < FirstWedge) { FirstWedge = Tw; WedgeBox = i; }
-					if (Tb <= 1.f && OutHit < 0) OutHit = i;
+					if (Tb <= 1.f && OutHit < 0) { OutHit = i; OutZone = Z; }
 					FirstBody = FMath::Min(FirstBody, Tb);
 				}
 				bOutShield = WedgeBox >= 0 && FirstWedge <= 1.f && FirstWedge <= FirstBody;
@@ -952,8 +988,8 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				JeebHit::HurtOf(H, Hurt);
 				JeebHit::FShieldWedge Shield;
 				const bool bShieldUp = JeebHit::ShieldOf(H, Shield);
-				int32 Hit = -1; bool bOnShield = false;
-				if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield)) continue;
+				int32 Hit = -1; bool bOnShield = false; uint8 Zone = JeebHit::Z_None;
+				if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield, Zone)) continue;
 				HitThisSwing.Add(H);
 				bool bCrit = false;
 				const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
@@ -962,7 +998,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 					if (H->IsSwinging && H->IsSwinging()) { KnockDownBy(H->GetOwner()); bOver = true; break; }   // attack beats kick: the kicker falls
 					if (H->KnockDown) H->KnockDown(this);   // kick beats shield (and knocks anyone down)
 					KickLanded();
-					DealDamage(H, Dmg, bCrit, Sk, true);
+					DealDamage(H, Dmg, bCrit, Sk, true, bOnShield ? JeebHit::Z_None : Zone);
 					continue;
 				}
 				if (bOnShield)
@@ -973,7 +1009,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 					bOver = true;
 					break;
 				}
-				DealDamage(H, Dmg, bCrit, Sk, true);
+				DealDamage(H, Dmg, bCrit, Sk, true, Zone);
 				if (H->React && H->IsAlive()) H->React(this, React);
 			}
 			// Other players' knights: only in MoveLab for now (no PvP yet)
@@ -987,8 +1023,8 @@ void AKnightCharacter::TickHitboxes(float Dt)
 					K->GatherHurt(Hurt);
 					JeebHit::FShieldWedge Shield;
 					const bool bShieldUp = K->GetShieldWedge(Shield);
-					int32 Hit = -1; bool bOnShield = false;
-					if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield)) continue;
+					int32 Hit = -1; bool bOnShield = false; uint8 Zone = JeebHit::Z_None;
+					if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield, Zone)) continue;
 					KickedKnights.Add(K);
 					bool bCrit = false;
 					const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
@@ -997,10 +1033,10 @@ void AKnightCharacter::TickHitboxes(float Dt)
 						if (K->BladeComing()) { KnockDownBy(K); break; }   // attack beats kick
 						K->KnockDownBy(this);   // (his shield is down now, so the blow lands)
 						KickLanded();
-						K->Hurt(Dmg, this);
+						K->Hurt(Dmg, this, false, bOnShield ? JeebHit::Z_None : Zone);
 						continue;
 					}
-					K->Hurt(Dmg, this);   // (on his shield: the guard takes it, Hurt)
+					K->Hurt(Dmg, this, false, Zone);   // (on his shield: the guard takes it, Hurt)
 					if (bOnShield) { StartRebound(); break; }
 					K->TakeReact(this, React);
 				}
@@ -1140,9 +1176,15 @@ void AKnightCharacter::TickGear(float Dt)
 			Skills->Explore(GetActorLocation());
 		}
 		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
-		const float NewMax = ShieldId ? JeebItems::GuardPool(ShieldId) : 0.f;
+		// (the guard's size comes from the Defence level alone, owner 2026-11-02; the shield sets how much each blow costs it)
+		const float NewMax = ShieldId ? JeebItems::GuardForLevel(Skills->GetLevel(ESkillType::Defense)) : 0.f;
 		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 10.f;   // the round shield recovers sooner
-		if (!FMath::IsNearlyEqual(NewMax, GuardMax)) { GuardMax = NewMax; GuardPool = NewMax; bGuardBroken = false; }
+		if (!FMath::IsNearlyEqual(NewMax, GuardMax))
+		{
+			if (GuardMax > 0.f && NewMax > 0.f) GuardPool *= NewMax / GuardMax;   // (a Defence level up: the bar grows, as full as it was)
+			else { GuardPool = NewMax; bGuardBroken = false; }                    // (a shield taken up or put away)
+			GuardMax = NewMax;
+		}
 		// Holding the shield up drains the guard slowly (Smash Bros style): a full guard lasts GuardDrainSeconds of holding,
 		// and it never refills while raised. Lowered, it recovers as before.
 		constexpr float GuardDrainSeconds = 15.f;

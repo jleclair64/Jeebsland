@@ -3,11 +3,13 @@
 #include "CoreMinimal.h"
 #include "Engine/World.h"
 
-// Floating damage numbers: red = damage taken or dealt, blue = damage blocked, gold = critical hit.
+// Floating damage numbers: red = damage taken or dealt, blue = damage blocked, gold = critical hit, bigger gold that pops in
+// = a headshot (arrows and bolts to the head, 1.5x).
 // Header only; the HUD draws and expires them. Online the server makes them and sends each one to every player.
 namespace JeebCombat
 {
-	enum ENumberType : int32 { N_Damage = 0, N_Blocked = 1, N_Crit = 2, N_Heal = 3 };
+	enum ENumberType : int32 { N_Damage = 0, N_Blocked = 1, N_Crit = 2, N_Heal = 3, N_Headshot = 4 };
+	constexpr float HeadshotMul = 1.5f;   // projectiles to the head (owner, 2026-11-02), before armour
 	struct FNumber { FVector Loc; float Born; int32 Amount; int32 Type; };
 	inline TArray<FNumber>& Numbers()
 	{

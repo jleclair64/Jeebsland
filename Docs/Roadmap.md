@@ -75,14 +75,15 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 - Direction: OFFENSIVE, a mix of skill and stats; a skilled player in worse gear has a real chance.
 - **Shield movement (2026-10-29) [S]:** with the shield up the knight moves forward, backward and sideways at normal running (jog) speed, not 50-60% as now. Sprinting is still impossible with the shield up. **The guard drains slowly while the shield is held up** (like the Smash Bros shield), on top of what blocked blows take, so holding it forever is not free. Drain rate to tune.
 - Guard break: heavy weapons drain guard faster; a broken guard stuns briefly [S-M]. Parry removed.
+- **Armour by body part (BUILT 2026-11-02):** each hurt box goes through the armour piece covering it (helmet head, chestplate body, shoulders upper arms, gloves forearms, boots legs). Its tier lets a share through (Tiers.csv ArmourTakes: Tin 80% to legendary 50%; never below 50% even with rings). Damage numbers show what got through. Projectile headshots x1.5 (gold number that pops). The Defence level no longer softens blows. **Shields:** the guard's size comes only from the Defence level (20 at level 1 to 40 at 99); the shield's tier and style decide how much of each blow comes out of the guard (Tiers.csv ShieldTakes: Tin 100% to legendary 50%, divided by the style's GuardMul). The shield's size never changes. Numbers to tune after play.
 - Hit reactions, poise, weapon types with their own rules, special attack bar for rare weapons [S-M each].
 - **Smash-style combat plan [L, in stages]:**
-  1. Short hop (tap Space, knee height, automatic fast fall) and full hop (hold, no fast fall).
+  1. Short hop: BUILT 2026-11-02 (tap Space = half height, hold = full jump; same fall speed, no fast fall for now).
   2. Scroll attacks: scroll DOWN = low sweep, scroll UP = overhead slash; R cycles weapons.
   3. Charge hit on held left click, with a red charge bar.
-  4. Grab (beats shield) and small knockback on hits (hit beats grab, shield beats hit).
+  4. ~~Grab~~ DROPPED 2026-11-02 (owner: the kick already beats shields). Knockback on hits is built.
   5. Hit stun, combos with escapes, and the knockdown from a low sweep (get up / get-up attack / roll, buffered; speed and knockback scale with health percentage).
-  6. Crouch block (low shield stops sweeps, high shield stops overheads). (The strafe-mode toggle on wheel click, X twin, was BUILT 2026-10-30: AKnightCharacter::ToggleStrafe.)
+  6. ~~Crouch block~~ DROPPED 2026-11-02 (owner: the shield covers down to the feet; keep combat simple, maybe revisit if it feels boring). (The strafe-mode toggle on wheel click, X twin, was BUILT 2026-10-30: AKnightCharacter::ToggleStrafe.)
   - Every weapon gets four moves (left click, scroll down, scroll up, charge). Sword, staff and spear moves are listed in the shelved file's combat section (unchanged).
   - **The knight's sword moves (owner, 2026-10-30; SWORD ONLY for now, other weapons keep their attacks):**
     - Left click: a two-hit jab that loops while you keep clicking (built 2026-10-30, posed from Link's Ultimate jab): a flat forehand from right to left, then a flat backhand across the front; one swing per click. The owner dropped the third hit and the spin.
@@ -91,10 +92,10 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
     - Running, jump, forward + click: Corrin's side B as a lunging stab forward and down, then fall back down (no sword in the ground, no pause).
     - Both running attacks only after running for a moment (a tap of forward + click is a jab).
     - Hold left click: Roy's forward smash (charge with a red bar, then a big overhead slash). No flame.
-    - Grab and throws: Roy-style. E grabs an opponent in reach, taking priority over picking up items; W/S/A/D picks the throw.
+    - ~~Grab and throws~~: dropped 2026-11-02 (the kick fills that role).
     - The shield stays on the arm through every move: any two-handed motion becomes a natural one-handed one.
-    - Build order: jab; scroll down and up; charge slash; dash attack; jumping lunge; grab and throws (with knockback).
-    - **Built 2026-10-31 (sixth session):** hit boxes and hurt boxes; the jab; the charged smash (hold click); scroll down = the low sweep (launches, with DI); scroll UP became a kick (beats shields, knocks down; replaces the overhead chop); hitstun and knockdowns with get-ups; the kick-into-sweep combo; the dash attack as a straight poke (not side to side). Rock-paper-scissors: attack > kick > shield > attack. Also the bow and arrows (BotW style). Still to build: jumping lunge, grab and throws, short hop, crouch block; moves for the other weapons.
+    - Build order: jab; scroll down and up; charge slash; dash attack; jumping lunge.
+    - **Built 2026-10-31 (sixth session):** hit boxes and hurt boxes; the jab; the charged smash (hold click); scroll down = the low sweep (launches, with DI); scroll UP became a kick (beats shields, knocks down; replaces the overhead chop); hitstun and knockdowns with get-ups; the kick-into-sweep combo; the dash attack as a straight poke (not side to side). Rock-paper-scissors: attack > kick > shield > attack. Also the bow and arrows (BotW style). Still to build: jumping lunge; moves for the other weapons. **2026-11-02:** short hop built; the low sweep now drops the target on the spot (no launch); the dash slides on after its stab; grab and crouch block dropped.
 - **Classes [L, later, build as NPCs first]:** knights (all-rounders), trolls (slow, huge reach, break guards), wizards (glass cannon, spells, a bubble shield). Mild PvP triangle: knights beat wizards, wizards beat trolls, trolls beat knights.
 
 ## Bosses and monsters (2026-10-29) [L]
@@ -135,10 +136,13 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 7. **Quest system**, then the first batch of side quests (plan them together first).
 8. **PvP:** hits, zones, borders, immunity, no regen; then the **Boxing Ring**.
 9. **Profiles per account,** fast-travel screen, shared bank in every town.
-10. **Smash-style combat** in its six stages. Mostly BUILT 2026-10-31 for the sword (see the sword moves list above); still to do: jumping lunge, grab and throws, short hop, crouch block, other weapons.
+10. **Smash-style combat** in its six stages. Mostly BUILT 2026-10-31 for the sword (see the sword moves list above); still to do: jumping lunge, other weapons (short hop built, grab and crouch block dropped, 2026-11-02).
 11. **Bosses and monsters** with loot.
 12. **Trolls, then wizards,** and the remaining towns.
 13. Message board (once there is a rented server); key rebinding screen.
 14. **Groundwork (agreed 2026-10-30):** items as data (DONE 2026-10-30: Content/Data CSVs, Docs/EditingItems.md); splitting the knight's Tick (DONE 2026-10-30). Later, once online play is working with friends: a server stress test with fake players, then accounts in a database and encrypted logins (before public hosting). Quests, NPCs and villagers should be data from the start, the same way.
 15. **Animation (owner, 2026-10-30):** the knight keeps its code-driven pose; bosses and NPCs get standard skinned models with animation clips.
 16. **Cape = PvP rank on the tier ladder (owner, 2026-10-30, BUILT):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
+
+## Sound (added 2026-11-02, later)
+- The game has no sound yet. When it gets some: a sharp "tink" on headshots, footsteps, sword hits and blocks, the bow, ambient wind and birds, music.

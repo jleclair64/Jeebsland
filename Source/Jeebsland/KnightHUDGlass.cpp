@@ -350,12 +350,14 @@ void AKnightHUD::ItemTip(int32 Id)
 	}
 	else if (K == K_Shield)
 	{
-		L.Add(FString::Printf(TEXT("Guard %d: a raised shield takes every blow on it; the one that empties the guard drops it until it recovers"), ShieldGuard(Id)));
+		L.Add(FString::Printf(TEXT("Strength %d: each blow on it costs your guard %d%% of its damage"), ShieldGuard(Id), FMath::RoundToInt(ShieldDrain(Id) * 100.f)));
+		L.Add(TEXT("Your guard grows with your Defence level; the blow that empties it drops the shield until it recovers"));
 		L.Add(ShieldStyleRow(StyleOf(Id)).Note);
 	}
 	else if (IsArmorKind(K))
 	{
-		L.Add(FString::Printf(TEXT("Defence +%d"), DefenseOf(K, V)));
+		L.Add(FString::Printf(TEXT("Stops %d%% of blows to the %s"), ArmourProtect(V),
+			K == K_Helmet ? TEXT("head") : K == K_Chest ? TEXT("body") : K == K_Shoulders ? TEXT("upper arms") : K == K_Gloves ? TEXT("forearms") : TEXT("legs")));
 		if (K == K_Boots) L.Add(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(V)));
 	}
 	else if (IsAccessoryKind(K)) L.Add(AccessoryText(K, V));

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "SkillComponent.h"
 #include "JeebItemData.h"
+#include "HitBoxes.h"
 
 // ===================================================================================================
 // Everything about items: ids, names, stack sizes, damage and defence numbers, prices, smithing recipes,
@@ -191,17 +192,25 @@ namespace JeebItems
 	}
 	// Defence points of a shield (flat damage blocked) or armour piece (adds to the total)
 	inline int32 DefenseOf(int32 K, int32 T) { return FMath::RoundToInt(KindRow(K).Defence * TierMult(T)); }
-	// A shield's guard (the damage it can stop while raised): its Defence, scaled by its style
+	// Shields (owner, 2026-11-02): the guard's SIZE comes only from the Defence level (GuardForLevel); the shield decides how much
+	// of each blow on it comes out of the guard: its tier's ShieldTakes (Tin all of it, down to half for a legendary), divided by
+	// its style's GuardMul (a tower loses less per blow, a round shield more). The shield's size never changes.
+	inline float ShieldDrain(int32 ShieldItemId)
+	{
+		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 1.f;
+		return TierRow(VariantOf(ShieldItemId)).ShieldTakes / FMath::Max(0.1f, ShieldGuardMul(StyleOf(ShieldItemId)));
+	}
+	// The number a shield shows (badges, tooltips, the store): its strength, 10 for a tin kite shield, higher the less each blow
+	// costs the guard (a gold kite shield 17, a legendary 20)
 	inline int32 ShieldGuard(int32 ShieldItemId)
 	{
 		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 0;
-		return FMath::RoundToInt(DefenseOf(K_Shield, VariantOf(ShieldItemId)) * ShieldGuardMul(StyleOf(ShieldItemId)));
+		return FMath::RoundToInt(10.f / FMath::Max(0.05f, ShieldDrain(ShieldItemId)));
 	}
 	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
-	// The guard pool a raised shield blocks with (2026-10-31 balance pass): three times its Defence, so a shield takes about three
-	// sword jabs before it breaks (its Defence alone was one jab). Its Defence (armour totals, badges) is unchanged.
-	constexpr float GuardPoolMul = 3.f;
-	inline float GuardPool(int32 ShieldItemId) { return float(ShieldGuard(ShieldItemId)) * GuardPoolMul; }
+	// The guard bar's size from the Defence level: 20 at level 1 up to 40 at level 99
+	constexpr float GuardAtLevel1 = 20.f, GuardAtLevel99 = 40.f;
+	inline float GuardForLevel(int32 DefenceLevel) { return FMath::Lerp(GuardAtLevel1, GuardAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)); }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
 	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a legendary one
@@ -331,15 +340,49 @@ namespace JeebItems
 		}
 		return M;
 	}
-	// Armour total (shield counted only when bShield). Rings and amulets scale it.
+	// ---------------------------------------------------------------- armour by body part (owner, 2026-11-02)
+	// A blow that lands on the body goes through the piece covering where it hit (JeebHit::EZone): helmet the head, chestplate
+	// the body, shoulders the upper arms, gloves the forearms and hands, boots the legs. That piece's tier says how much of the
+	// blow gets through (Tiers.csv ArmourTakes: Tin 80%, down to 50% for a legendary). Rings and amulets with a defence bonus
+	// cut the part that is stopped further, but never below MinTake: even the best armour lets half of a blow through.
+	// The damage number shows what got through.
+	constexpr float MinTake = 0.5f;
+	inline int32 ZoneArmour(uint8 Zone)
+	{
+		switch (Zone)
+		{
+		case JeebHit::Z_Head:     return K_Helmet;
+		case JeebHit::Z_UpperArm: return K_Shoulders;
+		case JeebHit::Z_Forearm:  return K_Gloves;
+		case JeebHit::Z_Leg:      return K_Boots;
+		default:                  return K_Chest;
+		}
+	}
+	// What one tier lets through, with a defence multiplier from rings (1 = none)
+	inline float TierTake(int32 Tier, float DefenseMul = 1.f)
+	{
+		const float Stop = (1.f - TierRow(Tier).ArmourTakes) * DefenseMul;
+		return FMath::Clamp(1.f - Stop, MinTake, 1.f);
+	}
+	// What gets through this player's armour at Zone. Z_None (blows without hit boxes): the average of all five pieces.
+	inline float ZoneTake(const USkillComponent* S, uint8 Zone)
+	{
+		if (!S) return 1.f;
+		const float Mul = CombinedMods(S).DefenseMul;
+		auto PieceTake = [&](int32 K) { return S->Worn[K] ? TierTake(VariantOf(S->Worn[K]), Mul) : 1.f; };
+		if (Zone != JeebHit::Z_None) return PieceTake(ZoneArmour(Zone));
+		float Sum = 0.f;
+		for (int32 K = K_Helmet; K <= K_Boots; ++K) Sum += PieceTake(K);
+		return Sum / float(K_Boots - K_Helmet + 1);
+	}
+	// An armour piece's protection as shown in badges and tooltips: the share of a blow it stops, in percent (Tin 20, Gold 45)
+	inline int32 ArmourProtect(int32 Tier) { return FMath::RoundToInt((1.f - TierTake(Tier)) * 100.f); }
+	// The protection total shown on screen: the average share of a blow stopped over the five pieces, rings counted, in percent.
+	// (bShield is ignored now: shields keep their own guard.)
 	inline int32 TotalDefense(const USkillComponent* S, bool bShield)
 	{
 		if (!S) return 0;
-		int32 D = 0;
-		for (int32 K = K_Helmet; K <= K_Boots; ++K)
-			if (S->Worn[K]) D += DefenseOf(K, VariantOf(S->Worn[K]));
-		if (bShield && S->Worn[K_Shield]) D += ShieldGuard(S->Worn[K_Shield]);
-		return FMath::RoundToInt(D * CombinedMods(S).DefenseMul);
+		return FMath::RoundToInt((1.f - ZoneTake(S, JeebHit::Z_None)) * 100.f);
 	}
 	// Full damage range: weapon, then rings and amulets, then + (skill level / 5) on both ends. Kind -1 = bare fists.
 	inline void DamageRange(const USkillComponent* S, int32 Kind, int32 Tier, int32 ArrowTier, int32& Min, int32& Max)

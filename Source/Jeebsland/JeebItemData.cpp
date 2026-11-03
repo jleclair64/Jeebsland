@@ -140,6 +140,8 @@ namespace JeebItems
 				const TCHAR* Roles[7] = { TEXT("Plate"), TEXT("Under"), TEXT("Trim"), TEXT("Cloth"), TEXT("Accent"), TEXT("Leather"), TEXT("BootBody") };
 				for (int32 k = 0; k < 7; ++k) Row.Palette[k] = Tab.Color(r, Roles[k], Row.Palette[k]);
 				Row.CapeColor = Tab.Color(r, TEXT("CapeColor"), Row.CapeColor);
+				Row.ArmourTakes = FMath::Clamp(Tab.F(r, TEXT("ArmourTakes"), 1.f), 0.f, 1.f);
+				Row.ShieldTakes = FMath::Clamp(Tab.F(r, TEXT("ShieldTakes"), 1.f), 0.f, 2.f);
 			}
 		}
 

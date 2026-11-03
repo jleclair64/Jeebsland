@@ -124,7 +124,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	{
 		const float Y0 = PY + 198.f + 2 * (HS + 34.f) + 4.f;
 		const FMods M = CombinedMods(Skills);
-		HDText(FString::Printf(TEXT("Defence: %d%s"), TotalDefense(Skills, Knight->ShieldActive()), Knight->ShieldActive() ? TEXT("  (shield included)") : TEXT("")), FLinearColor(0.6f, 0.78f, 1.f), EX, Y0, Font, 1.1f);
+		HDText(FString::Printf(TEXT("Armour stops %d%% of a blow (on average)"), TotalDefense(Skills, false)), FLinearColor(0.6f, 0.78f, 1.f), EX, Y0, Font, 1.1f);
 		const int32 Sel = Skills->SelectedItem();
 		if (IsGear(Sel) && IsWeaponKind(KindOf(Sel)))
 		{
@@ -166,7 +166,7 @@ void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
 	}
 	else if (K == K_Shield || IsArmorKind(K))
 	{
-		const int32 D = (K == K_Shield) ? ShieldGuard(Id) : DefenseOf(K, V);
+		const int32 D = (K == K_Shield) ? ShieldGuard(Id) : ArmourProtect(V);
 		if (D > 0) Def = FString::Printf(TEXT("+%d"), D);
 	}
 	else if (IsAccessoryKind(K))
@@ -312,10 +312,10 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			HDText(Num, Col, SX + IconS + 6.f, TY + (BoxH - NH) * 0.5f, Font, 1.7f);
 		};
 		Total(GX, OffIcon, FString::FromInt(Offence), FLinearColor(1.f, 0.42f, 0.36f), FLinearColor(1.f, 0.45f, 0.4f));
-		Total(GX + Half + 3.f, DefIcon, Guard > 0 ? FString::Printf(TEXT("%d+%d"), Defence, Guard) : FString::FromInt(Defence), FLinearColor(0.5f, 0.75f, 1.f), FLinearColor(0.45f, 0.65f, 1.f));
+		Total(GX + Half + 3.f, DefIcon, FString::Printf(TEXT("%d%%"), Defence), FLinearColor(0.5f, 0.75f, 1.f), FLinearColor(0.45f, 0.65f, 1.f));
 		if (Hot(GX, TY, Half, BoxH)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
-		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Armour %d, all bonuses counted"), Defence),
-			Guard > 0 ? FString::Printf(TEXT("Shield guard %d (stops that much while raised)"), Guard) : FString(TEXT("No shield ready")) });
+		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Your armour stops %d%% of a blow on average (each body part goes through its own piece)"), Defence),
+			Guard > 0 ? FString::Printf(TEXT("Shield strength %d, guard %d from your Defence level"), Guard, FMath::RoundToInt(Knight->GetGuardMax())) : FString(TEXT("No shield ready")) });
 	}
 
 	// ================= Skills (down the left side of the screen) =================

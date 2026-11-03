@@ -52,7 +52,17 @@ AKnightCharacter::AKnightCharacter()
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);
-	GetCharacterMovement()->JumpZVelocity *= 0.894f; // about 20% lower jump (height grows with the square of launch speed)
+	// The jump (about 1 m) with a Smash Bros short hop (owner, 2026-11-02): a quick tap of Space jumps half as high. He leaves
+	// the ground at the short hop's speed; holding Space keeps him rising at that speed for up to JumpMaxHoldTime, which adds
+	// the other half (Unreal's own jump hold, so it is predicted and checked online like any jump). Falling is unchanged.
+	// Full height = v*v/2g + v*T; with v = full/sqrt(2) and T = v/2g each part is half the old jump.
+	{
+		UCharacterMovementComponent* M = GetCharacterMovement();
+		const float Full = M->JumpZVelocity * 0.894f;   // the old full jump's take-off speed (about 20% lower than the template's)
+		const float G = 980.f * M->GravityScale;   // (the world's gravity; no world to ask yet in the constructor)
+		M->JumpZVelocity = Full / UE_SQRT_2;
+		JumpMaxHoldTime = M->JumpZVelocity / (2.f * G);
+	}
 
 	// Camera: a bit further back and higher, with gentle lag for a smooth follow
 	if (USpringArmComponent* Boom = GetCameraBoom())

@@ -213,6 +213,11 @@ void AKnightHUD::DrawHUD()
 			float Sc = 2.9f;   // 1.8x the old size
 			if (Nums[i].Type == JeebCombat::N_Blocked) Col = FLinearColor(0.3f, 0.55f, 1.f);
 			else if (Nums[i].Type == JeebCombat::N_Crit) { Col = FLinearColor(1.f, 0.82f, 0.1f); Sc = 4.1f; }
+			else if (Nums[i].Type == JeebCombat::N_Headshot)   // a headshot: gold, popping in half as big again and settling over 0.18 s
+			{
+				Col = FLinearColor(1.f, 0.78f, 0.12f);
+				Sc = 4.6f * (1.f + 0.5f * FMath::Clamp(1.f - Age / 0.18f, 0.f, 1.f));
+			}
 			Col.A = FMath::Clamp((1.2f - Age) / 0.4f, 0.f, 1.f);
 			const FString Txt = FString::FromInt(Nums[i].Amount);
 			float TW = 0.f, TH = 0.f;
@@ -476,7 +481,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
 		{
 			if (ShieldId != 0) ItemTip(ShieldId);
-			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Defence %d in all, every bonus counted"), Def) });
+			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Your armour stops %d%% of a blow on average, every bonus counted"), Def) });
 		}
 	}
 

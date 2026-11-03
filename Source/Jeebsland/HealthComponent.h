@@ -44,13 +44,17 @@ public:
 	TFunction<bool()> IsSwinging;
 	// Optional: the raised shield's own mesh parts (arrows that reach it stick in it; the same order on every machine)
 	TFunction<void(TArray<UPrimitiveComponent*>& Out)> ShieldParts;
+	// Optional: armour by body part (owner, 2026-11-02): the share of a blow that gets through at that body part (JeebHit::EZone;
+	// Z_None = no part known). Unset: all of it.
+	TFunction<float(uint8 Zone)> ZoneTake;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool IsAlive() const { return Cur > 0; }
 	void Reset() { Cur = Max; LastHitTime = -1000.f; }
 	// Returns the damage applied. Spawns the floating number and calls OnDamaged.
 	// bHitBoxes: it came through hit boxes, which have already dealt with the shield (ModifyDamage is skipped)
-	int32 ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes = false);
+	// Zone: the body part it landed on (armour, ZoneTake). bHeadshot: a projectile to the head (its number is drawn gold and pops)
+	int32 ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes = false, uint8 Zone = 0, bool bHeadshot = false);
 	// Bars show for 15 seconds after a hit, and whenever health is under half
 	bool ShowBar(float Now) const;
 	FVector HitCentre() const;

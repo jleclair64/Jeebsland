@@ -20,8 +20,11 @@ namespace JeebHit
 		using namespace KnightDesign;
 		// a point given in capsule space (where the body is modelled), carried by the joint it hangs off
 		auto At = [](const USceneComponent* C, int32 Pivot, const FVector& P) { return C->GetComponentTransform().TransformPosition(P - PivotPos(Pivot)); };
-		auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R; Out.Add(C); };
+		uint8 Zone = Z_None;
+		auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R; C.Zone = Zone; Out.Add(C); };
+		Zone = Z_Head;
 		if (J.Head)  Add(At(J.Head, P_Head, FVector(3, 0, 36)), At(J.Head, P_Head, FVector(3, 0, 50)), 17.f);      // the helm
+		Zone = Z_Torso;
 		if (J.Upper) Add(At(J.Upper, P_Upper, FVector(0, 0, -34)), At(J.Upper, P_Upper, FVector(0, 0, 4)), 22.f); // chest down to the hips
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
@@ -30,12 +33,15 @@ namespace JeebHit
 			const USceneComponent* Hip = sd < 0 ? J.HipL : J.HipR;
 			const USceneComponent* Knee = sd < 0 ? J.KneeL : J.KneeR;
 			const USceneComponent* Ankle = sd < 0 ? J.AnkleL : J.AnkleR;
+			Zone = Z_UpperArm;
 			if (Arm && Elb) Add(Arm->GetComponentLocation(), Elb->GetComponentLocation(), 9.f);                     // upper arm
+			Zone = Z_Forearm;
 			if (Elb)                                                                                                // forearm to the fist
 			{
 				const FVector Fist = (sd > 0 && J.WristR) ? At(J.WristR, P_WristR, FistPos(1)) : At(Elb, sd < 0 ? P_ElbowL : P_ElbowR, FistPos(sd));
 				Add(Elb->GetComponentLocation(), Fist, 8.f);
 			}
+			Zone = Z_Leg;
 			if (Hip && Knee) Add(Hip->GetComponentLocation(), Knee->GetComponentLocation(), 10.f);                  // thigh
 			if (Knee && Ankle) Add(Knee->GetComponentLocation(), At(Ankle, sd < 0 ? P_AnkleL : P_AnkleR, FVector(2, sd * 13, -90)), 8.f);   // shin, down to the sole
 		}
@@ -159,14 +165,14 @@ namespace JeebHit
 		return 2.f;
 	}
 
-	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt)
+	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt, uint8* OutZone)
 	{
 		const int32 N = SweepSteps(Hit);
 		for (int32 i = 0; i <= N; ++i)
 		{
 			const FVector P = FMath::Lerp(Hit.A, Hit.B, (float)i / N);
 			for (const FCapsule& C : Hurt)
-				if (FMath::PointDistToSegment(P, C.A, C.B) <= Hit.R + C.R) return (float)i / N;
+				if (FMath::PointDistToSegment(P, C.A, C.B) <= Hit.R + C.R) { if (OutZone) *OutZone = C.Zone; return (float)i / N; }
 		}
 		return 2.f;
 	}

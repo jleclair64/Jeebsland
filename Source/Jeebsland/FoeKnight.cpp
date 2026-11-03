@@ -202,13 +202,14 @@ void AFoeKnight::BeginPlay()
 		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
 		return true;
 	};
-	GuardMax = GuardPool = JeebItems::GuardPool(JeebItems::ShieldId(0, Tier));   // (an iron kite shield)
+	GuardMax = GuardPool = JeebItems::GuardForLevel(GuardLevel);   // (his guard: a Defence level 10 knight's; he carries an iron kite shield)
 	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
 	{
 		TakeOnShield(Amount, From);
 		return 0;
 	};
 	Hp->KnockDown = [this](AActor* From) { KnockDown(From); };
+	Hp->ZoneTake = [](uint8 Zone) { return JeebItems::TierTake(Tier); };   // (his iron armour, the same everywhere)
 	Hp->ShieldParts = [this](TArray<UPrimitiveComponent*>& Out) { for (UProceduralMeshComponent* C : ShieldMeshes) Out.Add(C); };
 	Hp->React = [this](AActor* From, const JeebHit::FReact& R) { OnReact(From, R); };
 	Hp->IsSwinging = [this]() { return KnockT < 0.f && DeathT <= 0.f && (Act == EAct::Windup || Act == EAct::Strike); };   // (a kick into his swing loses)
@@ -230,7 +231,7 @@ bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
 {
 	if (bGuardBroken || Amount <= 0) return false;
 	const float Now = GetWorld()->GetTimeSeconds();
-	GuardPool -= Amount;   // (all of it: none reaches him)
+	GuardPool -= Amount * JeebItems::ShieldDrain(JeebItems::ShieldId(0, Tier));   // (none reaches him; his iron kite shield takes part of it from the guard)
 	GuardHitTime = Now;
 	if (bStill) Hp->LastHitTime = Now;   // (the still knight's guard and health come back 3 s after the last blow)
 	JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Amount, JeebCombat::N_Blocked);
@@ -249,10 +250,10 @@ bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
 
 // (server) A kick: down on his back. How he gets up is picked at random but never the same way twice running, so a player
 // has to read it (still knights too: practice for the sweep)
-void AFoeKnight::KnockDown(AActor* From)
+void AFoeKnight::KnockDown(AActor* From, bool bDrop)
 {
 	if (!HasAuthority() || KnockT >= 0.f || DeathT > 0.f) return;
-	if (BlockT > 0.f && !bGuardBroken && GuardMax > 0.f)   // a kick on his raised shield crushes half its guard
+	if (!bDrop && BlockT > 0.f && !bGuardBroken && GuardMax > 0.f)   // a kick on his raised shield crushes half its guard
 	{
 		GuardPool -= 0.5f * GuardMax; GuardHitTime = GetWorld()->GetTimeSeconds();
 		if (bStill) Hp->LastHitTime = GuardHitTime;
@@ -266,6 +267,7 @@ void AFoeKnight::KnockDown(AActor* From)
 	BlockT = -1.f; bRepBlock = false;
 	RepAct = static_cast<uint8>(Act);
 	AttackCool = FMath::Max(AttackCool, 1.f);
+	if (bDrop) return;   // (swept: down on the spot)
 	// knocked back a little, away from the kicker
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation() + GetActorForwardVector())).GetSafeNormal2D();
 	if (bStill) SetActorLocation(GetActorLocation() + Away * 50.f, true);
@@ -295,6 +297,7 @@ void AFoeKnight::Launch(AActor* From)
 void AFoeKnight::OnReact(AActor* From, const JeebHit::FReact& R)
 {
 	if (!HasAuthority() || DeathT > 0.f) return;
+	if (R.bDrop) { KnockDown(From, true); return; }   // the low sweep (owner, 2026-11-02): down on the spot
 	if (R.bLaunch) { Launch(From); return; }
 	if (KnockT >= 0.f || R.Stun <= 0.f) return;   // (lying down or flying: he stays down)
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation())).GetSafeNormal2D();

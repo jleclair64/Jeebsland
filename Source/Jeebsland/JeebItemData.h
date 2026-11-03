@@ -42,6 +42,8 @@ namespace JeebItems
 		FLinearColor Gem = FLinearColor::White;
 		FLinearColor Palette[7];         // EArmorRole order: Plate, Under, Trim, Cloth, Accent, Leather, BootBody
 		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the cape of a player at this PvP rank
+		float ArmourTakes = 1.f;   // share of a blow that gets through an armour piece of this tier, where it covers
+		float ShieldTakes = 1.f;   // share of a blow on a raised shield of this tier that comes out of the guard
 	};
 	struct FKindRow
 	{

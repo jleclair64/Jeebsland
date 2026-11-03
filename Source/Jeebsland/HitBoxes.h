@@ -16,10 +16,15 @@ class UHealthComponent;
 //    starts with it on.
 namespace JeebHit
 {
+	// Which body part a hurt box is (armour by body part, owner 2026-11-02: each part goes through its own armour piece,
+	// JeebItems::ZoneArmour). Z_None: not a body part (hit boxes, or a plain capsule round something without joints).
+	enum EZone : uint8 { Z_None = 0, Z_Head, Z_Torso, Z_UpperArm, Z_Forearm, Z_Leg };
+
 	struct FCapsule
 	{
 		FVector A = FVector::ZeroVector, B = FVector::ZeroVector;   // the two ends (equal: a sphere)
 		float R = 10.f;
+		uint8 Zone = Z_None;
 	};
 
 	// One hit box of a move: a sphere Along cm out along the blade from the grip
@@ -82,7 +87,8 @@ namespace JeebHit
 	// or any of the hurt boxes; above 1: it doesn't. Whichever comes first is what the blow meets (a blade that reaches the
 	// body before the shield hits the body, owner 2026-10-31).
 	float FirstTouchWedge(const FCapsule& Hit, const FShieldWedge& W);
-	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt);
+	// (OutZone: the body part of the hurt box it touches first, when it touches one)
+	float FirstTouch(const FCapsule& Hit, const TArray<FCapsule>& Hurt, uint8* OutZone = nullptr);
 	void AddWedgeMesh(const FShieldWedge& W, const FLinearColor& Col, TArray<FVector>& V, TArray<FVector>& N, TArray<int32>& I, TArray<FLinearColor>& Colors);
 	bool ShieldOf(const UHealthComponent* H, FShieldWedge& Out);   // anything with health whose shield is up (UHealthComponent::GatherShield)
 
@@ -94,6 +100,7 @@ namespace JeebHit
 		float Stun = 0.f;     // seconds
 		float Push = 0.f;     // cm/s away from the attacker
 		bool bLaunch = false;
+		bool bDrop = false;   // the low sweep (owner, 2026-11-02): his feet go out and he drops straight to the ground where he stands (no launch)
 	};
 	// The low sweep's launch: up and a little away, turned up to DIAngle degrees toward the direction the victim holds (Smash's
 	// DI: only the part of it square to the launch counts). Away and DI are flat; DI zero = no DI.

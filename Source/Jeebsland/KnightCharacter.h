@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "JeebslandCharacter.h"
@@ -197,6 +197,7 @@ public:
 	bool IsHorseTired() const { return bHorseTired; }
 	// Shield guard, for the HUD
 	float GetGuardFraction() const { return GuardMax > 0.f ? GuardPool / GuardMax : 0.f; }
+	float GetGuardMax() const { return GuardMax; }
 	bool IsGuardBroken() const { return bGuardBroken; }
 	bool IsBlocking() const { return bBlocking; }
 	USkillComponent* GetSkills() const { return Skills; }
@@ -208,11 +209,13 @@ public:
 	// Combat: health, damage dealt and taken
 	float GetHealth() const { return Health; }
 	int32 GetMaxHealth() const { return MaxHealth; }
-	// Something hits you for Raw points; armour, Defence level and a raised shield soak some of it
+	// Something hits you for Raw points. A raised shield facing it takes all of it out of the guard; otherwise the armour piece
+	// covering Zone (JeebHit::EZone, where it landed; Z_None: the average of your armour) lets only part through
+	// (JeebItems::ZoneTake). bHeadshot: a projectile to the head (already x1.5; its number is drawn as a headshot).
 	// bEnvironmental: a hazard (poison smoke, fire): armour and shields do not stop it, and it trains no Defence.
-	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false);
-	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP
-	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes = false);
+	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false, uint8 Zone = 0, bool bHeadshot = false);
+	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP (Zone, bHeadshot: as for Hurt)
+	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes = false, uint8 Zone = 0, bool bHeadshot = false);
 	// A raised shield's wedge (HitBoxes.h), for the box view; false while the shield is down
 	bool GetShieldWedge(JeebHit::FShieldWedge& Out) const;
 	// A clean hit moves you (server; HitBoxes.h FReact): hitstun with a push, or the low sweep's launch. Everyone is told.
@@ -321,14 +324,19 @@ protected:
 	UFUNCTION(NetMulticast, Reliable) void MulticastKickLanded();
 	// The low sweep (wheel down; sword only), like Link's down tilt in Smash Ultimate: he drops into a squat and sweeps the blade
 	// along the ground in front, right to left. It reaches a knight lying on the ground (after a kick: read which way he rolls
-	// and sweep there) and launches whoever it hits up into the air and a little back (bent by his DI); he lands on his back
-	// again. Rooted until it is over.
+	// and sweep there) and takes his feet: whoever it hits drops straight to the ground where he stands (owner, 2026-11-02; it used
+	// to launch him) and gets up or rolls away as after a kick. Rooted until it is over.
 	void StartSweep();
 	static constexpr float SweepDur = 0.55f, SweepActiveFrom = 0.24f, SweepActiveTo = 0.6f, SweepDamage = 0.8f;   // (out in about 0.13 s: was 0.2)
 	// The dash attack (owner, 2026-10-31): sprinting forward and clicking with a sword, a lunge with the blade stabbed straight out
 	// at full reach like a spear. Out at DashActiveFrom s, hits until DashActiveTo s; damage, hitstun and end lag of a smash
-	// attack charged DashCharge (the end lag: DashLag()). Rooted, sliding on with the lunge, until it is over.
+	// attack charged DashCharge (the end lag: DashLag()). Rooted, sliding on with the lunge, until it is over. Once the stab is
+	// out he keeps sliding (owner, 2026-11-02: no dead stop), braked from the start of the lunge only by a steady DashSlideBrake
+	// cm/s/s with no ground friction: about 95 cm out at the stab, then about 40 cm more (TickAttack)
 	static constexpr float DashActiveFrom = 0.11f, DashActiveTo = 0.28f, DashCharge = 0.2f, DashLunge = 1100.f;
+	static constexpr float DashSlideBrake = 4500.f;
+	bool bDashSliding = false;
+	float SavedBrakeDecel = 2000.f;
 	float DashLag() const;
 	float DashU() const;   // where the dash is in its key poses (0 - 1): the thrust in the first 0.3 s, the recovery over the lag
 	bool IsDashing() const { return bAttacking && AtkStyle == EAtkStyle::Dash; }
@@ -351,7 +359,7 @@ protected:
 	uint8 KnockPhase = 0;          // 0 falling and lying, 1 getting up
 	float KnockT = 0.f, KnockAlpha = 0.f;
 	static constexpr float KnockFall = 0.35f, KnockAuto = 1.5f, KnockRise = 0.45f;   // (KnockAuto counts from landing)
-	void KnockDownBy(AActor* From);   // (server)
+	void KnockDownBy(AActor* From, bool bDrop = false);   // (server; bDrop: the low sweep, straight down where he stands, his guard untouched)
 	void GetUp(uint8 Opt);            // 0 straight up, 1 roll to his left, 2 roll to his right (the player's machine, or the server)
 	void ApplyGetUp(uint8 Opt);
 	void TickKnock(float Dt);
@@ -678,6 +686,7 @@ private:
 	bool bAttackDown = false;      // the attack button is held (the player's own machine)
 	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
 	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
+	float ShotJumpFrom = -1.0e9f;  // test pictures (jump, hop): his height at take-off
 	float ShotBowAt = -1.f;        // test pictures (bow60): let the string go at this time
 	float ShotStrafe = 0.f;        // test pictures (-ShotStrafe=1): walk sideways to his right (-1 left) while shooting
 	bool bShotWalk = false;        // test pictures (-ShotMove=bowwalk): walk straight ahead with the bow in hand
@@ -711,8 +720,9 @@ private:
 	static constexpr float BowSpeedMin = 1000.f, BowSpeedMid = 2400.f, BowSpeedMax = 4800.f;   // cm/s
 	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 300.f;          // cm/s/s it drops
 	// Breath of the Wild style (owner, 2026-11-01): a full draw flies dead straight for BowStraight (no drop at all), then falls
-	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle
-	static constexpr float BowStraight = 5000.f, BowSagFull = 980.f;
+	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle. (2026-11-02, owner:
+	// the straight part cut from 50 m to 20 m, so long shots drop and must be aimed a little high.)
+	static constexpr float BowStraight = 2000.f, BowSagFull = 980.f;
 	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
 	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)

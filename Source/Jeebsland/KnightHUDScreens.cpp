@@ -324,7 +324,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 			int32 A, B; WeaponDamage(K, t, A, B, t);
 			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
 		}
-		else HDText(FString::Printf(TEXT("%d"), DefenseOf(K, t)), FLinearColor(0.55f, 0.75f, 1.f), CX + Xs[1], Y, Font, 1.0f);
+		else HDText(K == K_Shield ? FString::FromInt(ShieldGuard(ShieldId(0, t))) : FString::Printf(TEXT("%d%%"), ArmourProtect(t)), FLinearColor(0.55f, 0.75f, 1.f), CX + Xs[1], Y, Font, 1.0f);
 		HDText(FString::Printf(TEXT("%s %d"), SkillNameOf(EquipSkill(K)), EquipLevel(t)), FLinearColor(0.85f, 0.85f, 1.f), CX + Xs[2], Y, Font, 0.9f);
 		HDText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[3], Y, Font, 1.0f);
 		HDText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[4], Y, Font, 0.9f);
