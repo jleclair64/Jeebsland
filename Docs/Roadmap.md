@@ -79,7 +79,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
  - **Armour weight (BUILT 2026-11-02):** every armour piece also has a weight (piece size x its material: gold strongest but heaviest, silver nearly as strong and light, iron heavy for what it stops, diamond the lightest legendary). A suit over 18 kg slows walking, sprinting and crouching 1% per kg, at most 30% (full gold about 13% slower; full tin and silver not at all). Mixing pieces is the balancing act. Numbers in Tiers.csv, Kinds.csv and Tuning.ini [Weight], to tune after play.
 - Hit reactions, poise, weapon types with their own rules, special attack bar for rare weapons [S-M each].
 - **Smash-style combat plan [L, in stages]:**
-  1. Short hop: BUILT 2026-11-02. Space leaves the ground at once; the height grows with how long it is held (tap up to 0.1 s = 25 cm hop, 0.25 s = full 91 cm, in between = in between); same fall speed. Idea for later: a faster fall after a hop if it feels floaty.
+  1. Short hop: BUILT 2026-11-02. Space leaves the ground at once; the height grows with how long it is held (tap up to 0.1 s = 25 cm hop, 0.16 s = full 75 cm, in between = in between); same fall speed. Idea for later: a faster fall after a hop if it feels floaty.
   2. Scroll attacks: scroll DOWN = low sweep, scroll UP = overhead slash; R cycles weapons.
   3. Charge hit on held left click, with a red charge bar.
   4. ~~Grab~~ DROPPED 2026-11-02 (owner: the kick already beats shields). Knockback on hits is built.
