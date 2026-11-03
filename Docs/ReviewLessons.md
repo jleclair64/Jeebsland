@@ -26,7 +26,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - MoveLab views: B faces +X; R faces +Y (that is where the guarding knight stands). Use `-LabKnight=` and `-LabKnightYaw=` to put the target in shot and in reach.
 - Ground friction kills a slide: use separate braking with no friction for a skid.
 - `LaunchCharacter` with a zero vector does nothing; use `StopMovementImmediately` to stop someone.
-- Test taps just under and just over every input threshold (e.g. `-ShotMove=hop60` / `hop100` around the 0.08 s jump squat), not only a quick tap and a long hold.
+- Test taps just under and just over every input threshold (e.g. `-ShotMove=hop60` / `hop100` around the jump squat), not only a quick tap and a long hold.
 
 ## Online (online-reviewer)
 - Anything that changes game state is decided on the server; the client only asks.
