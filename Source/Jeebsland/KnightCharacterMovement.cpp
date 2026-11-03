@@ -241,47 +241,58 @@ void AKnightCharacter::Jump()
 	Super::Jump();
 }
 
-// The jump squat (owner, 2026-11-02; Smash Bros style): Space on the ground keeps him in a quick knee dip for JumpSquat
-// (Tuning.ini; it is JumpMaxHoldTime). Let go before it ends: the short hop leaves at once. Still held when it ends (Unreal
-// lets go for us then, in ClearJumpInput): the full jump. Each leaves at the speed that carries it to its height (ApplyTuning).
-// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime, JumpCurrentCount), here, which the
-// player's machine, the server and correction replays all run. The live move is recorded AFTER this function, so the hold time
-// stays set on the launch move (a replay launches again from it) and is cleared in ClearJumpInput, after the move is recorded.
-// The engine's reset of grounded jump state during replays is off (p.ResetJumpStateDuringResimIfNotFalling=0, DefaultEngine.ini)
-// so replayed squat moves get their own hold time back.
+// The jump grows with the hold (owner, 2026-11-02): Space leaves the ground at once at the short hop's speed (HopSpeed). Let go
+// within HopHold (Tuning.ini): the 25 cm hop. Held on, each move adds height in step with the hold, up to the full jump at
+// FullJumpHold (it is JumpMaxHoldTime: Unreal lets go for us then, in ClearJumpInput); letting go in between keeps the height
+// reached so far. The height is exact: in flight the top of his arc is h + v*v/2g, so raising the top by dH takes v*v + 2g*dH.
+// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime, JumpCurrentCount) and each move's
+// time, here, which the player's machine, the server and correction replays all run (the live move is recorded AFTER this
+// function and the hold time is cleared in ClearJumpInput, after it). p.ResetJumpStateDuringResimIfNotFalling=0
+// (DefaultEngine.ini) so replays get each move's own jump state back.
 void AKnightCharacter::CheckJumpInput(float DeltaTime)
 {
 	JumpCurrentCountPreJump = JumpCurrentCount;   // (the saved move records this one)
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	if (!M) return;
-	if (M->IsFalling())   // no jumping in the air, and no press carried down into a jump on landing
+	// Raise the top of the arc for the part of this move's hold that falls between HopHold and FullJumpHold
+	auto Grow = [&](float From, float Dt)
 	{
-		bPressedJump = false;
-		JumpKeyHoldTime = 0.f;
+		const float H0 = FMath::Min(JeebTune::V().HopHold, JumpMaxHoldTime - 0.01f), H1 = JumpMaxHoldTime;
+		const float Share = (FMath::Clamp(From + Dt, H0, H1) - FMath::Clamp(From, H0, H1)) / (H1 - H0);
+		if (Share <= 0.f) return;
+		const float G = -M->GetGravityZ();
+		const float Extra = (FullJumpSpeed * FullJumpSpeed - HopSpeed * HopSpeed) / (2.f * G);   // full height minus the hop's
+		M->Velocity.Z = FMath::Sqrt(M->Velocity.Z * M->Velocity.Z + 2.f * G * Extra * Share);
+	};
+	if (M->IsFalling())
+	{
+		if (bPressedJump && JumpKeyHoldTime <= 0.f) bPressedJump = false;   // a new press in the air: no jumping there
+		else if (bPressedJump && !bKnockedDown) Grow(JumpKeyHoldTime, DeltaTime);   // still holding (not JumpCurrentCount: a replay's is one move behind)
+		else if (!bPressedJump) JumpKeyHoldTime = 0.f;   // let go: the height so far stays
 		return;
 	}
-	if (bPressedJump || JumpKeyHoldTime <= 0.f) return;   // squatting (ClearJumpInput counts the time), or nothing to do
-	// Let go during the squat (a hop) or held through it (the full jump): leave the ground, unless something stops him now
+	if (!bPressedJump || JumpKeyHoldTime > 0.f) return;   // nothing new
+	// Space just went down: leave the ground at the hop's speed, unless something stops him
 	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
 	{
-		JumpKeyHoldTime = 0.f;
+		bPressedJump = false;
 		return;
 	}
-	const float Hold = JumpKeyHoldTime;
 	const float Was = M->JumpZVelocity;
-	M->JumpZVelocity = (Hold >= JumpMaxHoldTime - 1.e-4f) ? FullJumpSpeed : HopSpeed;
+	M->JumpZVelocity = HopSpeed;
 	const bool bDid = M->DoJump(bClientUpdating, DeltaTime);
 	M->JumpZVelocity = Was;
-	JumpKeyHoldTime = bDid ? Hold : 0.f;   // (switching to falling reset it; the recorded move needs it to replay this launch)
 	if (bDid)
 	{
 		JumpCurrentCount++;
 		OnJumped();
+		Grow(0.f, DeltaTime);   // (this move's hold counts too)
 	}
+	else bPressedJump = false;
 }
 
-// After the move is recorded: the squat is over once he has let go (launched or not). A tap shorter than one frame is let go
-// here, after one move has carried the press, so the server sees it too.
+// After the move is recorded: the hold is over once he has let go. A tap shorter than one frame is let go here, after one
+// move has carried the press, so the server sees it too.
 void AKnightCharacter::ClearJumpInput(float DeltaTime)
 {
 	const bool bWasPressed = bPressedJump;

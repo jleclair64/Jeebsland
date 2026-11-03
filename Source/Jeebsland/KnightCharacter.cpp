@@ -485,9 +485,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader
 // Numbers from Content/Data/Tuning.ini that the engine keeps itself (the jump), set again whenever the file is reloaded.
-// The jump with a Smash Bros short hop and jump squat (owner, 2026-11-02; KnightCharacterMovement.cpp, CheckJumpInput): both
-// jumps leave the ground at the speed that carries them to their height (h = v*v/2g), so the full jump is quick. JumpMaxHoldTime
-// is the squat: Unreal lets go of Space for us when it runs out, which is what starts the full jump.
+// The jump with a Smash Bros short hop (owner, 2026-11-02; KnightCharacterMovement.cpp, CheckJumpInput): he leaves the ground at
+// once at the hop's speed and, still holding after JumpMaxHoldTime (Unreal lets go of Space for us then), is pushed up to the
+// full jump's height. Speeds for a height: h = v*v/2g.
 void AKnightCharacter::ApplyTuning()
 {
 	const JeebTune::FValues& T = JeebTune::V();
@@ -499,7 +499,7 @@ void AKnightCharacter::ApplyTuning()
 	FullJumpSpeed = FMath::Sqrt(2.f * G * Full);
 	HopSpeed = FMath::Sqrt(2.f * G * Full * FMath::Clamp(T.HopShare, 0.05f, 1.f));
 	M->JumpZVelocity = FullJumpSpeed;
-	JumpMaxHoldTime = FMath::Clamp(T.JumpSquat, 0.01f, 0.3f);
+	JumpMaxHoldTime = FMath::Clamp(T.FullJumpHold, 0.01f, 0.3f);
 }
 
 void AKnightCharacter::TickHousekeeping()

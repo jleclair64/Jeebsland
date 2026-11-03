@@ -54,7 +54,7 @@ struct FKnightPose
 	FVector Vel = FVector::ZeroVector;
 	bool bFalling = false, bFaceCam = false;
 	// from PosePrep
-	float Squash = 0.f, Dip = 0.f, CS = 0.f, Air = 0.f, Ground = 0.f, Duck = 0.f, DuckC = 0.f, DuckHip = 0.f, DuckKnee = 0.f, DuckLean = 0.f, Stream = 0.f;
+	float Squash = 0.f, CS = 0.f, Air = 0.f, Ground = 0.f, Duck = 0.f, DuckC = 0.f, DuckHip = 0.f, DuckKnee = 0.f, DuckLean = 0.f, Stream = 0.f;
 	float GContact = 0.f, GAf = 0.f, GAb = 0.f, LegReach = 0.f, Hz = 0.f, UR = 0.f, WR = 0.f, WL = 0.f, S = 0.f, C = 0.f;
 	float GHipR = 0.f, GKneeR = 0.f, GFollowR = 0.f, GToeR = 0.f, GHipL = 0.f, GKneeL = 0.f, GFollowL = 0.f, GToeL = 0.f;
 	float ArmAmp = 0.f, ElbowBase = 0.f, ElbowSwing = 0.f, Lean = 0.f, Twist = 0.f, F01 = 0.f, Asym = 0.f;
@@ -98,10 +98,6 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	bWasFalling = bFalling;
 	LandTimer = FMath::Max(0.f, LandTimer - Dt);
 	const float Squash = LandImpact * (LandTimer / LandDuration);
-	// The jump squat's knee dip (CheckJumpInput, KnightCharacterMovement.cpp): eases in over the squat, out as he rises. Half a hard landing.
-	const bool bJumpSquat = !bFalling && (bPressedJump || JumpKeyHoldTime > 0.f);
-	JumpDip = FMath::FInterpTo(JumpDip, bJumpSquat ? 1.f : 0.f, Dt, bJumpSquat ? 30.f : 16.f);
-	const float Dip = 0.5f * JumpDip;
 
 	// ---------- Blends (everything eases in and out) ----------
 	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
@@ -208,7 +204,7 @@ void AKnightCharacter::PosePrep(FKnightPose& P)
 	const float F01 = FMath::Clamp(0.5f - Vel.Z / 1000.f, 0.f, 1.f);
 	const float Asym = FMath::Clamp(Speed / 250.f, 0.f, 1.f); // running leap (one knee up) vs standing jump (both tucked)
 
-	P.Squash = Squash; P.Dip = Dip; P.CS = CS; P.Air = Air; P.Ground = Ground; P.Duck = Duck; P.DuckC = DuckC; P.DuckHip = DuckHip; P.DuckKnee = DuckKnee; P.DuckLean = DuckLean; P.Stream = Stream;
+	P.Squash = Squash; P.CS = CS; P.Air = Air; P.Ground = Ground; P.Duck = Duck; P.DuckC = DuckC; P.DuckHip = DuckHip; P.DuckKnee = DuckKnee; P.DuckLean = DuckLean; P.Stream = Stream;
 	P.GContact = GContact; P.GAf = GAf; P.GAb = GAb; P.LegReach = LegReach; P.Hz = Hz; P.UR = UR; P.WR = WR; P.WL = WL; P.S = S; P.C = C;
 	P.GHipR = GHipR; P.GKneeR = GKneeR; P.GFollowR = GFollowR; P.GToeR = GToeR; P.GHipL = GHipL; P.GKneeL = GKneeL; P.GFollowL = GFollowL; P.GToeL = GToeL;
 	P.ArmAmp = ArmAmp; P.ElbowBase = ElbowBase; P.ElbowSwing = ElbowSwing; P.Lean = Lean; P.Twist = Twist; P.F01 = F01; P.Asym = Asym;
@@ -219,7 +215,7 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 	const float Dt = P.Dt;
 	const FVector Vel = P.Vel;
 	const bool bFaceCam = P.bFaceCam;
-	const float Ground = P.Ground, S = P.S, Asym = P.Asym, F01 = P.F01, Air = P.Air, Squash = P.Squash, Dip = P.Dip, DuckHip = P.DuckHip, DuckKnee = P.DuckKnee, Duck = P.Duck, CS = P.CS;
+	const float Ground = P.Ground, S = P.S, Asym = P.Asym, F01 = P.F01, Air = P.Air, Squash = P.Squash, DuckHip = P.DuckHip, DuckKnee = P.DuckKnee, Duck = P.Duck, CS = P.CS;
 	const float GHipR = P.GHipR, GHipL = P.GHipL, GKneeR = P.GKneeR, GKneeL = P.GKneeL, GFollowR = P.GFollowR, GToeR = P.GToeR, GFollowL = P.GFollowL, GToeL = P.GToeL;
 
 	// ---------- Legs ----------
@@ -266,10 +262,10 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 	const float KneeRa = -FMath::Lerp(FMath::Lerp(55.f, 85.f, Asym), 25.f, F01);
 	const float KneeLa = -FMath::Lerp(FMath::Lerp(55.f, 40.f, Asym), 20.f, F01);
 
-	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * (Squash + Dip) + DuckHip;
-	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * (Squash + Dip) + DuckHip;
-	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * (Squash + Dip) + DuckKnee;
-	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * (Squash + Dip) + DuckKnee;
+	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * Squash + DuckHip;
+	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + DuckHip;
+	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash + DuckKnee;
+	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash + DuckKnee;
 	// Standing still: slow breathing (the chest rises, the knees ease a little), like the idle in Breath of the Wild
 	const float IdleAmt = (1.f - MoveBlend) * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
 	const float BreathS = FMath::Sin(IdleTime * 1.65f);   // one breath every 3.8 s
@@ -321,7 +317,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 {
 	const float Dt = P.Dt;
 	const float HipRf = P.HipRf, HipLf = P.HipLf, KneeRf = P.KneeRf, KneeLf = P.KneeLf, LegReach = P.LegReach, UR = P.UR, GContact = P.GContact, Hz = P.Hz, GAb = P.GAb, GAf = P.GAf, WR = P.WR, WL = P.WL;
-	const float Air = P.Air, Stream = P.Stream, F01 = P.F01, Lean = P.Lean, Ground = P.Ground, Squash = P.Squash, Dip = P.Dip, DuckLean = P.DuckLean, BreathS = P.BreathS, IdleAmt = P.IdleAmt, Twist = P.Twist, S = P.S, C = P.C, DuckC = P.DuckC;
+	const float Air = P.Air, Stream = P.Stream, F01 = P.F01, Lean = P.Lean, Ground = P.Ground, Squash = P.Squash, DuckLean = P.DuckLean, BreathS = P.BreathS, IdleAmt = P.IdleAmt, Twist = P.Twist, S = P.S, C = P.C, DuckC = P.DuckC;
 
 	// ---------- Body bounce ----------
 	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
@@ -362,7 +358,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 
 	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
 	// at ease the chest leans a little forward (not standing against a wall) and lifts with each breath
-	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * (Squash + Dip) - DuckLean - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
+	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - DuckLean - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
 	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
 	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
 	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
