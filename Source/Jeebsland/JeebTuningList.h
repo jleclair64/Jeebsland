@@ -11,7 +11,8 @@ JEEB_TUNE(Movement, CrouchSpeed, 240.f)
 JEEB_TUNE(Movement, WalkAccel, 30000.f)
 JEEB_TUNE(Movement, SprintAccel, 2048.f)
 JEEB_TUNE(Movement, JumpHeight, 102.f)
-JEEB_TUNE(Movement, HopShare, 0.5f)
+JEEB_TUNE(Movement, HopShare, 0.28f)
+JEEB_TUNE(Movement, JumpSquat, 0.08f)
 
 // [Bow]
 JEEB_TUNE(Bow, BowDrawTime, 1.f)

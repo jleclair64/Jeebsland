@@ -26,9 +26,11 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - MoveLab views: B faces +X; R faces +Y (that is where the guarding knight stands). Use `-LabKnight=` and `-LabKnightYaw=` to put the target in shot and in reach.
 - Ground friction kills a slide: use separate braking with no friction for a skid.
 - `LaunchCharacter` with a zero vector does nothing; use `StopMovementImmediately` to stop someone.
+- Test taps just under and just over every input threshold (e.g. `-ShotMove=hop60` / `hop100` around the 0.08 s jump squat), not only a quick tap and a long hold.
 
 ## Online (online-reviewer)
 - Anything that changes game state is decided on the server; the client only asks.
+- Anything decided inside the engine's movement prediction (CheckJumpInput and the like) must be reproducible from what `FSavedMove_Character` records, and the live move is recorded AFTER CheckJumpInput: keep per-move state alive until the move is done (clear it in ClearJumpInput), and plan how server and client both learn every choice. (2026-11-02, the jump squat.)
 - Speeds the client predicts must come from state the owner's machine also has (owner-replicated `Worn`, shared CSVs and Tuning.ini), or every step gets corrected.
 - Test-only code lives inside `-JeebShot` (`bShotMode`) branches.
 - Servers and players must run the same Tuning.ini and CSVs: repackage after changing movement numbers.

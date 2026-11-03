@@ -166,12 +166,14 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	}
 	if (Move == TEXT("kicksweep")) { StartAttack(EAtkStyle::Kick, 1, 0.f); ShotSweepAt = GetWorld()->GetTimeSeconds() + KickDur + 0.02f; }   // a kick, then the sweep on him lying there
 	if (Move == TEXT("block")) { bBlockHeld = true; StartBlock(); }                              // the shield held up
-	if (Move == TEXT("jump") || Move == TEXT("hop"))   // a full jump (Space held 0.5 s) or a short hop (Space tapped); log JEEBJUMP gives the height
+	if (Move == TEXT("jump") || Move.StartsWith(TEXT("hop")))   // a full jump (Space held 0.5 s) or a short hop (tapped 0.02 s; hop60 = held 60 ms); log JEEBJUMP gives the height
 	{
 		Jump();
 		ShotJumpFrom = GetActorLocation().Z;
+		ShotJumpT = GetWorld()->GetTimeSeconds();
+		const float Hold = Move == TEXT("jump") ? 0.5f : Move.Len() > 3 ? FCString::Atoi(*Move.Mid(3)) / 1000.f : 0.02f;
 		FTimerHandle T;
-		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StopJumping(); }), Move == TEXT("hop") ? 0.02f : 0.5f, false);
+		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StopJumping(); }), Hold, false);
 	}
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
 	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash40 = 0.4 s of charge (hundredths: the command line stops at a dot)
@@ -427,7 +429,7 @@ void AKnightCharacter::TickAttack(float Dt)
 	if (StunLeft > 0.f) StunLeft = FMath::Max(0.f, StunLeft - Dt);   // (hitstun wears off: ApplyReact)
 	if (ShotSweepAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotSweepAt && !bAttacking) { ShotSweepAt = -1.f; StartAttack(EAtkStyle::Sweep, 1, 0.f); }   // (test pictures)
 	if (bShotFace && ShotJumpFrom > -1.0e8f && GetCharacterMovement()->IsFalling())   // (test pictures: how high the jump goes)
-		UE_LOG(LogTemp, Log, TEXT("JEEBJUMP up %.1f vz %.0f"), GetActorLocation().Z - ShotJumpFrom, GetCharacterMovement()->Velocity.Z);
+		UE_LOG(LogTemp, Log, TEXT("JEEBJUMP up %.1f vz %.0f t %.3f"), GetActorLocation().Z - ShotJumpFrom, GetCharacterMovement()->Velocity.Z, GetWorld()->GetTimeSeconds() - ShotJumpT);
 	// The dash slides on after its stab is out instead of stopping dead (owner, 2026-11-02): for the whole dash the ground brakes
 	// him steadily (no friction, DashSlideBrake), so he reaches the stab about as far as before and skids on about 40 cm. The player's machine and the server
 	// both brake the same way, so the slide is predicted like any walk.

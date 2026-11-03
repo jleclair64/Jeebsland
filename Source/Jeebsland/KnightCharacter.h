@@ -94,6 +94,9 @@ public:
 	// On a horse, steering is like a car: W goes forward along the horse, A and D turn it (it cannot slide sideways), S only brakes.
 	virtual void DoMove(float Right, float Forward) override;
 	virtual void Jump() override; // also stands you up from a bench, and ends a slide
+	virtual void StopJumping() override;                     // the jump squat (KnightCharacterMovement.cpp): keeps the hold time for the hop
+	virtual void CheckJumpInput(float DeltaTime) override;   // ...leaves the ground at the end of the squat or on letting go
+	virtual void ClearJumpInput(float DeltaTime) override;
 	// Online: what the knight stands on is never used as its "movement base" unless it is a shared (replicated) actor. The
 	// ground, Blackrock, the towers and forts are built separately on every machine, so the server can't name them to the
 	// player's machine: a correction that names one is thrown away there, and the two copies of the knight drift apart
@@ -709,6 +712,10 @@ private:
 	float ShotSmashHold = -1.f;    // test pictures: charge this long, then let go
 	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
 	float ShotJumpFrom = -1.0e9f;  // test pictures (jump, hop): his height at take-off
+	float ShotJumpT = 0.f;         // ...and when Space went down
+	float HopSpeed = 0.f, FullJumpSpeed = 0.f;   // take-off speeds of the short hop and the full jump (ApplyTuning)
+	bool bReleaseAfterMove = false;              // a tap shorter than one frame: let go once a move has carried the press
+	float JumpDip = 0.f;                         // the jump squat's knee dip (pose)
 	float ShotBowAt = -1.f;        // test pictures (bow60): let the string go at this time
 	float ShotStrafe = 0.f;        // test pictures (-ShotStrafe=1): walk sideways to his right (-1 left) while shooting
 	bool bShotWalk = false;        // test pictures (-ShotMove=bowwalk): walk straight ahead with the bow in hand

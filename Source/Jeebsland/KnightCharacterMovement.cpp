@@ -241,6 +241,70 @@ void AKnightCharacter::Jump()
 	Super::Jump();
 }
 
+// The jump squat (owner, 2026-11-02; Smash Bros style): Space on the ground keeps him in a quick knee dip for JumpSquat
+// (Tuning.ini; it is JumpMaxHoldTime). Let go before it ends: the short hop leaves at once. Still held when it ends (Unreal
+// lets go for us then, in ClearJumpInput): the full jump. Each leaves at the speed that carries it to its height (ApplyTuning).
+// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime, JumpCurrentCount), here, which the
+// player's machine, the server and correction replays all run. The live move is recorded AFTER this function, so the hold time
+// stays set on the launch move (a replay launches again from it) and is cleared in ClearJumpInput, after the move is recorded.
+// The engine's reset of grounded jump state during replays is off (p.ResetJumpStateDuringResimIfNotFalling=0, DefaultEngine.ini)
+// so replayed squat moves get their own hold time back.
+void AKnightCharacter::CheckJumpInput(float DeltaTime)
+{
+	JumpCurrentCountPreJump = JumpCurrentCount;   // (the saved move records this one)
+	UCharacterMovementComponent* M = GetCharacterMovement();
+	if (!M) return;
+	if (M->IsFalling())   // no jumping in the air, and no press carried down into a jump on landing
+	{
+		bPressedJump = false;
+		JumpKeyHoldTime = 0.f;
+		return;
+	}
+	if (bPressedJump || JumpKeyHoldTime <= 0.f) return;   // squatting (ClearJumpInput counts the time), or nothing to do
+	// Let go during the squat (a hop) or held through it (the full jump): leave the ground, unless something stops him now
+	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
+	{
+		JumpKeyHoldTime = 0.f;
+		return;
+	}
+	const float Hold = JumpKeyHoldTime;
+	const float Was = M->JumpZVelocity;
+	M->JumpZVelocity = (Hold >= JumpMaxHoldTime - 1.e-4f) ? FullJumpSpeed : HopSpeed;
+	const bool bDid = M->DoJump(bClientUpdating, DeltaTime);
+	M->JumpZVelocity = Was;
+	JumpKeyHoldTime = bDid ? Hold : 0.f;   // (switching to falling reset it; the recorded move needs it to replay this launch)
+	if (bDid)
+	{
+		JumpCurrentCount++;
+		OnJumped();
+	}
+}
+
+// After the move is recorded: the squat is over once he has let go (launched or not). A tap shorter than one frame is let go
+// here, after one move has carried the press, so the server sees it too.
+void AKnightCharacter::ClearJumpInput(float DeltaTime)
+{
+	const bool bWasPressed = bPressedJump;
+	Super::ClearJumpInput(DeltaTime);
+	if (!bWasPressed) JumpKeyHoldTime = 0.f;
+	if (bReleaseAfterMove && !bClientUpdating)
+	{
+		bReleaseAfterMove = false;
+		bPressedJump = false;
+	}
+}
+
+// Letting go of Space. Unlike Unreal's, it keeps JumpKeyHoldTime: the next move needs it to tell a hop.
+void AKnightCharacter::StopJumping()
+{
+	if (bPressedJump && JumpKeyHoldTime <= 0.f && !GetCharacterMovement()->IsFalling())
+	{
+		bReleaseAfterMove = true;   // no move has carried the press yet
+		return;
+	}
+	bPressedJump = false;
+}
+
 void AKnightCharacter::AddControllerYawInput(float Val)
 {
 	Super::AddControllerYawInput(Val * LookSensitivity);
