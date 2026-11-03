@@ -718,11 +718,11 @@ private:
 	// By the draw (none, half, full; straight lines between): a level shot lands about 3 m out barely drawn, 12 m half drawn,
 	// 44 m full (owner, 2026-10-31: 10 ft, 40 ft, as before); the speed and how fast it drops together set that
 	static constexpr float BowSpeedMin = 1000.f, BowSpeedMid = 2400.f, BowSpeedMax = 4800.f;   // cm/s
-	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 300.f;          // cm/s/s it drops
+	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 980.f;          // cm/s/s it drops (from half a draw up, about real gravity: owner 2026-11-02, was 300 near full)
 	// Breath of the Wild style (owner, 2026-11-01): a full draw flies dead straight for BowStraight (no drop at all), then falls
 	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle. (2026-11-02, owner:
-	// the straight part cut from 50 m to 20 m, so long shots drop and must be aimed a little high.)
-	static constexpr float BowStraight = 2000.f, BowSagFull = 980.f;
+	// the straight part cut from 50 m to 20 m, then to 5 m the same day, so long shots drop and must be aimed high.)
+	static constexpr float BowStraight = 500.f, BowSagFull = 980.f;
 	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
 	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
 	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
