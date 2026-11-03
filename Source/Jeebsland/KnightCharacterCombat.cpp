@@ -769,6 +769,7 @@ void AKnightCharacter::GetUp(uint8 Opt)
 void AKnightCharacter::ServerGetUp_Implementation(uint8 Opt)
 {
 	if (!bKnockedDown || KnockPhase != 0 || Opt > 2) return;
+	if (KnockT < KnockFall - 0.2f) return;   // (not before he has fallen: the player's own check, with a little room for the network)
 	ApplyGetUp(Opt);
 	MulticastKnock(false, Opt);
 }
@@ -890,19 +891,26 @@ bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
 // 2026-10-31). Each is swept from where it was the frame before. The server lands the blows (every machine poses the knight
 // the same way, so the boxes match what everyone sees).
 static const JeebHit::FHitSphere SwordJabBoxes[] = { { 0, 68.f, 9.f, 1.f }, { 1, 46.f, 9.f, 1.f }, { 2, 24.f, 9.f, 1.f } };
-static constexpr float SwordJabDamage = 0.75f;   // (the jab hits softer than a full swing: it is much quicker, and it loops)
+static const float& SwordJabDamage = JeebTune::Storage().SwordJabDamage;   // (the jab hits softer than a full swing: it is much quicker, and it loops)
 // The smash attack: hit 1's swipe with bigger boxes reaching a little past the tip. Uncharged it hits like a full sword swing;
 // a full charge hits 2.5 times as hard (in between by how long it was charged).
 static const JeebHit::FHitSphere SwordSmashBoxes[] = { { 0, 72.f, 12.f, 1.f }, { 1, 48.f, 11.f, 1.f }, { 2, 24.f, 10.f, 1.f } };
-static constexpr float SwordSmashDamage = 1.f, SwordSmashFullMul = 2.5f;
+static const float& SwordSmashDamage = JeebTune::Storage().SwordSmashDamage;
+static const float& SwordSmashFullMul = JeebTune::Storage().SwordSmashFullMul;
 // The low sweep: a little bigger at the tip (it has to find a knight lying on the ground)
 static const JeebHit::FHitSphere SweepBoxes[] = { { 0, 72.f, 12.f, 1.f }, { 1, 48.f, 11.f, 1.f }, { 2, 24.f, 10.f, 0.9f } };
 // The jab's hit frames (fractions of the swing): hit 1 from the blade swinging out on his right to the end of its follow-through
 // low on his left; hit 2 the same, the other way
-static constexpr float Jab1From = 0.30f, Jab1To = 0.80f, Jab2From = 0.36f, Jab2To = 0.74f;
+static const float& Jab1From = JeebTune::Storage().Jab1From;
+static const float& Jab1To = JeebTune::Storage().Jab1To;
+static const float& Jab2From = JeebTune::Storage().Jab2From;
+static const float& Jab2To = JeebTune::Storage().Jab2To;
 // Pushes (cm/s away from the attacker) with each hit's hitstun (StunJab1 ...): hit 1 keeps him close for hit 2; hit 2 sends
 // him clear; a smash further the more it was charged
-static constexpr float PushJab1 = 120.f, PushJab2 = 320.f, PushSmash = 300.f, PushSmashFull = 700.f;
+static const float& PushJab1 = JeebTune::Storage().PushJab1;
+static const float& PushJab2 = JeebTune::Storage().PushJab2;
+static const float& PushSmash = JeebTune::Storage().PushSmash;
+static const float& PushSmashFull = JeebTune::Storage().PushSmashFull;
 
 // The kick: three spheres on the kicking (right) leg, the foot first. Kick beats shield: it goes straight through a raised
 // shield (its wedge counts as a touch too) and knocks anyone it hits down, shield or not. Attack beats kick: a kick into a
@@ -1187,7 +1195,7 @@ void AKnightCharacter::TickGear(float Dt)
 		}
 		// Holding the shield up drains the guard slowly (Smash Bros style): a full guard lasts GuardDrainSeconds of holding,
 		// and it never refills while raised. Lowered, it recovers as before.
-		constexpr float GuardDrainSeconds = 15.f;
+		static const float& GuardDrainSeconds = JeebTune::Storage().GuardDrainSeconds;
 		if (bBlocking && GuardMax > 0.f && !bGuardBroken)
 		{
 			GuardPool -= GuardMax / GuardDrainSeconds * Dt;

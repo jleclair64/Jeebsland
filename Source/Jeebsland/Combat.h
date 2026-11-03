@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/World.h"
+#include "JeebTuning.h"
 
 // Floating damage numbers: red = damage taken or dealt, blue = damage blocked, gold = critical hit, bigger gold that pops in
 // = a headshot (arrows and bolts to the head, 1.5x).
@@ -9,7 +10,7 @@
 namespace JeebCombat
 {
 	enum ENumberType : int32 { N_Damage = 0, N_Blocked = 1, N_Crit = 2, N_Heal = 3, N_Headshot = 4 };
-	constexpr float HeadshotMul = 1.5f;   // projectiles to the head (owner, 2026-11-02), before armour
+	inline float HeadshotMul() { return JeebTune::V().HeadshotMul; }   // projectiles to the head (owner, 2026-11-02), before armour (Tuning.ini [Bow])
 	struct FNumber { FVector Loc; float Born; int32 Amount; int32 Type; };
 	inline TArray<FNumber>& Numbers()
 	{

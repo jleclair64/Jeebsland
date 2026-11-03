@@ -52,17 +52,7 @@ AKnightCharacter::AKnightCharacter()
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);
-	// The jump (about 1 m) with a Smash Bros short hop (owner, 2026-11-02): a quick tap of Space jumps half as high. He leaves
-	// the ground at the short hop's speed; holding Space keeps him rising at that speed for up to JumpMaxHoldTime, which adds
-	// the other half (Unreal's own jump hold, so it is predicted and checked online like any jump). Falling is unchanged.
-	// Full height = v*v/2g + v*T; with v = full/sqrt(2) and T = v/2g each part is half the old jump.
-	{
-		UCharacterMovementComponent* M = GetCharacterMovement();
-		const float Full = M->JumpZVelocity * 0.894f;   // the old full jump's take-off speed (about 20% lower than the template's)
-		const float G = 980.f * M->GravityScale;   // (the world's gravity; no world to ask yet in the constructor)
-		M->JumpZVelocity = Full / UE_SQRT_2;
-		JumpMaxHoldTime = M->JumpZVelocity / (2.f * G);
-	}
+	ApplyTuning();
 
 	// Camera: a bit further back and higher, with gentle lag for a smooth follow
 	if (USpringArmComponent* Boom = GetCameraBoom())
@@ -494,8 +484,27 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 }
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader
+// Numbers from Content/Data/Tuning.ini that the engine keeps itself (the jump), set again whenever the file is reloaded.
+// The jump with a Smash Bros short hop (owner, 2026-11-02): a quick tap of Space jumps HopShare of the way (half). He leaves
+// the ground at the short hop's speed; holding Space keeps him rising at that speed for up to JumpMaxHoldTime, which adds
+// the rest (Unreal's own jump hold, so it is predicted and checked online like any jump). Falling is unchanged.
+// Hop height h = v*v/2g; held for T it adds v*T, so T = (JumpHeight - h) / v.
+void AKnightCharacter::ApplyTuning()
+{
+	const JeebTune::FValues& T = JeebTune::V();
+	TunedVersion = JeebTune::Version();
+	UCharacterMovementComponent* M = GetCharacterMovement();
+	if (!M) return;
+	const float G = 980.f * M->GravityScale;   // (the world's gravity; the constructor has no world to ask)
+	const float Hop = FMath::Max(1.f, T.JumpHeight * FMath::Clamp(T.HopShare, 0.05f, 1.f));
+	M->JumpZVelocity = FMath::Sqrt(2.f * G * Hop);
+	JumpMaxHoldTime = FMath::Max(0.f, T.JumpHeight - Hop) / M->JumpZVelocity;
+}
+
 void AKnightCharacter::TickHousekeeping()
 {
+	JeebTune::Poll();   // (Tuning.ini saved while playing: the new numbers take over at once)
+	if (TunedVersion != JeebTune::Version()) ApplyTuning();
 	if (HasAuthority()) UpdateRadar();
 	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
 	SendState();                      // online: our sprint / crouch / shield button, to the server

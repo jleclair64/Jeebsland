@@ -115,6 +115,14 @@ Every item number and text lives in CSV spreadsheets in `Content/Data/` (Tiers, 
 
 Chat: `AKnightPlayerController::ServerChat` / `ClientChat`; `JeebChat.h` (swear filter, the owner's `Saved/Moderation.txt` mute/ban file, each player's own `Saved/ChatMuted.txt`); drawn in `KnightHUDChat.cpp` (Enter, `/w`, `/mute`). Radar potion: `AKnightCharacter::UpdateRadar` (server, owner-only `RadarDots`), drawn on the minimap.
 
+## Tuning numbers live in Content/Data/Tuning.ini (2026-11-02)
+
+- How fast, far, strong and long things are (movement and jump, the bow, jab, smash, kick, sweep, dash, knockdowns, guard, the armour cap, headshots) are in `Content/Data/Tuning.ini`, explained line by line. Code says how a move works; the file holds its numbers. Change a number there, never in code: NO BUILD needed.
+- Live: while a knight exists (editor Play, test pictures), the file is checked twice a second (`JeebTune::Poll` in TickHousekeeping) and the next jump, swing or arrow uses the new value. Numbers the engine keeps (the jump) are re-set by `ApplyTuning` on each reload.
+- Code: `JeebTune::V().Name`; the list is `JeebTuningList.h` (one line each: section, name, fallback). AKnightCharacter and KnightCharacterCombat.cpp keep their old names as `static inline const float&` references, so old code reads live values. A missing, misspelled or non-number line is logged ("Jeebsland tuning:") and keeps its fallback.
+- To make a new number tunable: a line in JeebTuningList.h AND a commented line in Tuning.ini (one home: the file). Only tuning numbers go in, never behaviour; pose and key-pose numbers stay in code.
+- Tuning by request: edit the file, measure with a test-picture run (log lines), no rebuild. Online, worlds and players must run the same file (repackage after movement changes).
+
 ## Armour, shields and moves (2026-11-02)
 
 - Armour by body part: hurt boxes carry a zone (`JeebHit::EZone`, set in `KnightHurt`); `FirstTouch` reports it and every blow passes it to `Hurt` / `DealDamage` / `ApplyDamage`. The piece covering it (helmet head, chestplate torso, shoulders upper arms, gloves forearms, boots legs: `JeebItems::ZoneArmour`) lets through its tier's `ArmourTakes` (Tiers.csv: Tin 0.8 to legendary 0.5; rings' DefenseMul cut the stopped part further, never below `MinTake` 0.5). Blows with no zone use the average of the five pieces. The old flat armour and Defence-level subtraction is gone. Damage numbers show what got through. Badges and tooltips show armour as "stops N%" (`ArmourProtect`).

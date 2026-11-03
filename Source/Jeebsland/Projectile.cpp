@@ -1,4 +1,4 @@
-﻿#include "Projectile.h"
+#include "Projectile.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
@@ -217,7 +217,7 @@ void AProjectile::Tick(float DeltaSeconds)
 			if (!bAuth) { SetActorLocation(At); Wait(); return; }
 			// A headshot (owner, 2026-11-02): arrows and bolts to the head do 1.5x, before the helmet takes its share
 			const bool bHead = BestZone == JeebHit::Z_Head;
-			const int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul) : Damage;
+			const int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul()) : Damage;
 			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead);
 			else if (Shooter) Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead);
 			if (JeebItems::IsFireArrow(L.ArrowId)) Burn(Target);

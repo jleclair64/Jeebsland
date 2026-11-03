@@ -6,6 +6,7 @@
 #include "KnightDesign.h"
 #include "Inventory.h"
 #include "HitBoxes.h"
+#include "JeebTuning.h"
 namespace KnightModel { struct FSkin; }
 #include "KnightCharacter.generated.h"
 
@@ -311,12 +312,15 @@ protected:
 	// Rock-paper-scissors: the sword is stopped by a raised shield, the kick goes through it and knocks the shielding knight
 	// down (KnockDownBy). It has end lag: once the foot is out he can't move or act until the leg is back down.
 	void StartKick();
-	static constexpr float KickDur = 0.65f, KickActiveFrom = 0.18f, KickActiveTo = 0.5f, KickDamage = 0.6f;   // (out in about 0.12 s)
+	static inline const float& KickDur = JeebTune::Storage().KickDur;   // (out in about 0.12 s)
+	static inline const float& KickActiveFrom = JeebTune::Storage().KickActiveFrom;
+	static inline const float& KickActiveTo = JeebTune::Storage().KickActiveTo;
+	static inline const float& KickDamage = JeebTune::Storage().KickDamage;
 	TArray<TWeakObjectPtr<class AKnightCharacter>> KickedKnights;   // (a move hits each other knight once: MoveLab)
 	// A kick that lands (owner, 2026-10-31): the rest of it plays KickLandedSpeed times faster, and the low sweep can cut it short at
 	// once (kick, then sweep him as he falls: the combo). A wheel-down pressed during the kick comes out the moment it lands.
 	bool bKickLanded = false;
-	static constexpr float KickLandedSpeed = 2.2f;
+	static inline const float& KickLandedSpeed = JeebTune::Storage().KickLandedSpeed;
 	float QueuedSweep = -10.f;
 	float KickFade = 0.f, KickFadeT = 0.f;   // a kick cut short by the sweep: its leg pose fades out quickly from where it was (PoseKick)
 	void KickLanded();                       // (server) this kick hit someone: everyone is told
@@ -327,14 +331,20 @@ protected:
 	// and sweep there) and takes his feet: whoever it hits drops straight to the ground where he stands (owner, 2026-11-02; it used
 	// to launch him) and gets up or rolls away as after a kick. Rooted until it is over.
 	void StartSweep();
-	static constexpr float SweepDur = 0.55f, SweepActiveFrom = 0.24f, SweepActiveTo = 0.6f, SweepDamage = 0.8f;   // (out in about 0.13 s: was 0.2)
+	static inline const float& SweepDur = JeebTune::Storage().SweepDur;   // (out in about 0.13 s: was 0.2)
+	static inline const float& SweepActiveFrom = JeebTune::Storage().SweepActiveFrom;
+	static inline const float& SweepActiveTo = JeebTune::Storage().SweepActiveTo;
+	static inline const float& SweepDamage = JeebTune::Storage().SweepDamage;
 	// The dash attack (owner, 2026-10-31): sprinting forward and clicking with a sword, a lunge with the blade stabbed straight out
 	// at full reach like a spear. Out at DashActiveFrom s, hits until DashActiveTo s; damage, hitstun and end lag of a smash
 	// attack charged DashCharge (the end lag: DashLag()). Rooted, sliding on with the lunge, until it is over. Once the stab is
 	// out he keeps sliding (owner, 2026-11-02: no dead stop), braked from the start of the lunge only by a steady DashSlideBrake
 	// cm/s/s with no ground friction: about 95 cm out at the stab, then about 40 cm more (TickAttack)
-	static constexpr float DashActiveFrom = 0.11f, DashActiveTo = 0.28f, DashCharge = 0.2f, DashLunge = 1100.f;
-	static constexpr float DashSlideBrake = 4500.f;
+	static inline const float& DashActiveFrom = JeebTune::Storage().DashActiveFrom;
+	static inline const float& DashActiveTo = JeebTune::Storage().DashActiveTo;
+	static inline const float& DashCharge = JeebTune::Storage().DashCharge;
+	static inline const float& DashLunge = JeebTune::Storage().DashLunge;
+	static inline const float& DashSlideBrake = JeebTune::Storage().DashSlideBrake;
 	bool bDashSliding = false;
 	float SavedBrakeDecel = 2000.f;
 	float DashLag() const;
@@ -342,7 +352,10 @@ protected:
 	bool IsDashing() const { return bAttacking && AtkStyle == EAtkStyle::Dash; }
 	// Hitstun (2026-10-31 balance pass): a clean hit stops whatever you are doing and you can't move, swing, block, roll or
 	// jump for this long. Jab hit 1 is long enough for hit 2 to follow for sure; hit 2 pushes you clear (the string ends there).
-	static constexpr float StunJab1 = 0.45f, StunJab2 = 0.32f, StunSmash = 0.5f, StunSmashFull = 0.8f;
+	static inline const float& StunJab1 = JeebTune::Storage().StunJab1;
+	static inline const float& StunJab2 = JeebTune::Storage().StunJab2;
+	static inline const float& StunSmash = JeebTune::Storage().StunSmash;
+	static inline const float& StunSmashFull = JeebTune::Storage().StunSmashFull;
 	float StunLeft = 0.f;
 	void ApplyReact(float Stun, const FVector& Vel, bool bLaunch);   // (every machine)
 	UFUNCTION(NetMulticast, Reliable) void MulticastReact(float Stun, FVector Vel, bool bLaunch);
@@ -358,7 +371,9 @@ protected:
 	bool bKnockedDown = false;
 	uint8 KnockPhase = 0;          // 0 falling and lying, 1 getting up
 	float KnockT = 0.f, KnockAlpha = 0.f;
-	static constexpr float KnockFall = 0.35f, KnockAuto = 1.5f, KnockRise = 0.45f;   // (KnockAuto counts from landing)
+	static inline const float& KnockFall = JeebTune::Storage().KnockFall;   // (KnockAuto counts from landing)
+	static inline const float& KnockAuto = JeebTune::Storage().KnockAuto;
+	static inline const float& KnockRise = JeebTune::Storage().KnockRise;
 	void KnockDownBy(AActor* From, bool bDrop = false);   // (server; bDrop: the low sweep, straight down where he stands, his guard untouched)
 	void GetUp(uint8 Opt);            // 0 straight up, 1 roll to his left, 2 roll to his right (the player's machine, or the server)
 	void ApplyGetUp(uint8 Opt);
@@ -486,6 +501,8 @@ private:
 
 	// The steps of Tick, in order (see AKnightCharacter::Tick for which file each lives in)
 	void TickHousekeeping();
+	void ApplyTuning();          // (Tuning.ini numbers the engine keeps itself: the jump; again on each reload)
+	int32 TunedVersion = -1;
 	void TickGatherReach();
 	bool TickRollSlide(float Dt, bool bFalling, float& OutSpecialSpeed);
 	void TickAttack(float Dt);
@@ -540,11 +557,11 @@ private:
 	FVector GatherStart = FVector::ZeroVector;
 	float ElbowRCur = 0.f;
 
-	float WalkSpeed = 500.f;   // 5 m/s (owner, 2026-11-01; was 4)
-	float CrouchSpeed = 240.f;
-	float WalkAccel = 30000.f;    // starting up to walking speed is instant (about 1/60 s)
-	float SprintAccel = 2048.f;   // walk to sprint keeps its ramp (the engine's usual acceleration)
-	float SprintSpeed = 750.f;
+	static inline const float& WalkSpeed = JeebTune::Storage().WalkSpeed;   // 5 m/s (owner, 2026-11-01; was 4)
+	static inline const float& CrouchSpeed = JeebTune::Storage().CrouchSpeed;
+	static inline const float& WalkAccel = JeebTune::Storage().WalkAccel;    // starting up to walking speed is instant (about 1/60 s)
+	static inline const float& SprintAccel = JeebTune::Storage().SprintAccel;   // walk to sprint keeps its ramp (the engine's usual acceleration)
+	static inline const float& SprintSpeed = JeebTune::Storage().SprintSpeed;
 
 
 	// The skeleton: every body part hangs off one of these pivots
@@ -668,11 +685,16 @@ private:
 	// by the charge, then a fixed end lag (he stops at the end of the swipe; no moving, blocking, rolling or jumping).
 	// Rebound is not part of a smash: any sword hit stopped by a raised shield bounces off (StartRebound).
 	enum class ESmash : uint8 { None, Deciding, Charging, Swing, EndLag, Rebound };
-	static constexpr float SmashHoldDelay = 0.25f, SmashChargeTime = 1.f, SmashHoldMax = 2.f, SmashEndPause = 0.4f;
+	static inline const float& SmashHoldDelay = JeebTune::Storage().SmashHoldDelay;
+	static inline const float& SmashChargeTime = JeebTune::Storage().SmashChargeTime;
+	static inline const float& SmashHoldMax = JeebTune::Storage().SmashHoldMax;
+	static inline const float& SmashEndPause = JeebTune::Storage().SmashEndPause;
 	// Hitting a shield (owner, 2026-10-31): the blade bounces back (ReboundBack s) and he staggers back a step, open and unable
 	// to move, swing, block, roll or jump for a fixed time: a jab hit ReboundJab s, a smash attack ReboundSmash s (longer than
 	// its own end lag). A press in the last moment comes out right after, as after a smash.
-	static constexpr float ReboundJab = 0.3f, ReboundSmash = 0.6f, ReboundBack = 0.15f;   // (balance pass 2026-10-31: was 0.45 / 0.8)
+	static constexpr float ReboundBack = 0.15f;
+	static inline const float& ReboundJab = JeebTune::Storage().ReboundJab;   // (balance pass 2026-10-31: was 0.45 / 0.8)
+	static inline const float& ReboundSmash = JeebTune::Storage().ReboundSmash;
 	float ReboundDur = 0.f;
 	void StartRebound();                 // (server) a hit box of this swing struck a raised shield
 	void BeginRebound(float Dur);        // (every machine) the bounce itself
@@ -714,18 +736,26 @@ private:
 	float BowEaseAlpha = 0.f;      // the bow in his hand (the left forearm turns so it lies forward and back at his side)
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
-	static constexpr float BowDrawTime = 1.f, BowHoldMax = 2.f, BowRecover = 0.3f;   // (like the smash attack's charge)
+	static inline const float& BowDrawTime = JeebTune::Storage().BowDrawTime;   // (like the smash attack's charge)
+	static inline const float& BowHoldMax = JeebTune::Storage().BowHoldMax;
+	static inline const float& BowRecover = JeebTune::Storage().BowRecover;
 	// By the draw (none, half, full; straight lines between): a level shot lands about 3 m out barely drawn, 12 m half drawn,
 	// 44 m full (owner, 2026-10-31: 10 ft, 40 ft, as before); the speed and how fast it drops together set that
-	static constexpr float BowSpeedMin = 1000.f, BowSpeedMid = 2400.f, BowSpeedMax = 4800.f;   // cm/s
-	static constexpr float BowSagMin = 2900.f, BowSagMid = 1000.f, BowSagMax = 980.f;          // cm/s/s it drops (from half a draw up, about real gravity: owner 2026-11-02, was 300 near full)
+	static inline const float& BowSpeedMin = JeebTune::Storage().BowSpeedMin;   // cm/s
+	static inline const float& BowSpeedMid = JeebTune::Storage().BowSpeedMid;
+	static inline const float& BowSpeedMax = JeebTune::Storage().BowSpeedMax;
+	static inline const float& BowSagMin = JeebTune::Storage().BowSagMin;          // cm/s/s it drops (from half a draw up, about real gravity: owner 2026-11-02, was 300 near full)
+	static inline const float& BowSagMid = JeebTune::Storage().BowSagMid;
+	static inline const float& BowSagMax = JeebTune::Storage().BowSagMax;
 	// Breath of the Wild style (owner, 2026-11-01): a full draw flies dead straight for BowStraight (no drop at all), then falls
 	// at BowSagFull; anything less drops from the start (the numbers above) and falls short of the reticle. (2026-11-02, owner:
 	// the straight part cut from 50 m to 20 m, then to 5 m the same day, so long shots drop and must be aimed high.)
-	static constexpr float BowStraight = 500.f, BowSagFull = 980.f;
+	static inline const float& BowStraight = JeebTune::Storage().BowStraight;
+	static inline const float& BowSagFull = JeebTune::Storage().BowSagFull;
 	static constexpr float ShotLeft = 12.f, ShotDown = 8.f;   // the arrow leaves this far left of and below the middle of the screen
-	static constexpr float BowDamageMin = 0.12f, BowDamageMax = 1.3f;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
-	static constexpr float BowCamLength = 220.f;                                      // the camera's distance while aiming (540 normally)
+	static inline const float& BowDamageMin = JeebTune::Storage().BowDamageMin;   // times the bow's damage, by the draw to the power 1.5 (half drawn: x0.54)
+	static inline const float& BowDamageMax = JeebTune::Storage().BowDamageMax;
+	static inline const float& BowCamLength = JeebTune::Storage().BowCamLength;                                      // the camera's distance while aiming (540 normally)
 	void StartDraw();
 	void ReleaseDraw();
 	void CancelDraw();

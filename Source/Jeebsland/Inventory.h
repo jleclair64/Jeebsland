@@ -4,6 +4,7 @@
 #include "SkillComponent.h"
 #include "JeebItemData.h"
 #include "HitBoxes.h"
+#include "JeebTuning.h"
 
 // ===================================================================================================
 // Everything about items: ids, names, stack sizes, damage and defence numbers, prices, smithing recipes,
@@ -209,8 +210,8 @@ namespace JeebItems
 	}
 	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
 	// The guard bar's size from the Defence level: 20 at level 1 up to 40 at level 99
-	constexpr float GuardAtLevel1 = 20.f, GuardAtLevel99 = 40.f;
-	inline float GuardForLevel(int32 DefenceLevel) { return FMath::Lerp(GuardAtLevel1, GuardAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)); }
+	// (the two ends: Tuning.ini [Guard])
+	inline float GuardForLevel(int32 DefenceLevel) { return FMath::Lerp(JeebTune::V().GuardAtLevel1, JeebTune::V().GuardAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)); }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
 	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a legendary one
@@ -346,7 +347,7 @@ namespace JeebItems
 	// blow gets through (Tiers.csv ArmourTakes: Tin 80%, down to 50% for a legendary). Rings and amulets with a defence bonus
 	// cut the part that is stopped further, but never below MinTake: even the best armour lets half of a blow through.
 	// The damage number shows what got through.
-	constexpr float MinTake = 0.5f;
+	inline float MinTake() { return JeebTune::V().MinTake; }   // (Tuning.ini [Armour])
 	inline int32 ZoneArmour(uint8 Zone)
 	{
 		switch (Zone)
@@ -362,7 +363,7 @@ namespace JeebItems
 	inline float TierTake(int32 Tier, float DefenseMul = 1.f)
 	{
 		const float Stop = (1.f - TierRow(Tier).ArmourTakes) * DefenseMul;
-		return FMath::Clamp(1.f - Stop, MinTake, 1.f);
+		return FMath::Clamp(1.f - Stop, MinTake(), 1.f);
 	}
 	// What gets through this player's armour at Zone. Z_None (blows without hit boxes): the average of all five pieces.
 	inline float ZoneTake(const USkillComponent* S, uint8 Zone)
