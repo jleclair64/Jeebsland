@@ -329,8 +329,9 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		HDText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[3], Y, Font, 1.0f);
 		HDText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[4], Y, Font, 0.9f);
 		HDText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), BuyPrice(K, t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[5], Y, Font, 1.0f);
-		if (K == K_Boots) HDText(FString::Printf(TEXT("stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + Xs[1], Y + 18.f, Font, 0.85f);
-		Y += (K == K_Boots) ? 42.f : 38.f;
+		if (IsArmorKind(K)) HDText(WeightText(PieceWeight(K, t)), FLinearColor(0.85f, 0.8f, 0.7f), CX + Xs[1], Y + 18.f, Font, 0.85f);
+		if (K == K_Boots) HDText(FString::Printf(TEXT("stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + Xs[2], Y + 18.f, Font, 0.85f);
+		Y += IsArmorKind(K) ? 42.f : 38.f;
 	}
 	if (K == K_Pickaxe || K == K_Axe || K == K_Rod)
 		Wrapped(TEXT("Better tools gather faster: up to 40% less time with an onyx tool than a tin one."), CX, Y + 6.f, CW, 0.95f, FLinearColor(0.7f, 0.9f, 0.7f));

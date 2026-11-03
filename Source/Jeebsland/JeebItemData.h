@@ -44,6 +44,7 @@ namespace JeebItems
 		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the cape of a player at this PvP rank
 		float ArmourTakes = 1.f;   // share of a blow that gets through an armour piece of this tier, where it covers
 		float ShieldTakes = 1.f;   // share of a blow on a raised shield of this tier that comes out of the guard
+		float WeightMult = 1.f;    // x an armour piece's Weight: how heavy this material is
 	};
 	struct FKindRow
 	{
@@ -51,6 +52,7 @@ namespace JeebItems
 		int32 DamageMin = 1, DamageMax = 2;
 		float Range = 200.f, Cooldown = 1.f;
 		int32 Defence = 0, BuyPrice = 0, Mass = 0, SmithExtraLevel = 0;
+		float Weight = 0.f;   // an armour piece's weight in kg before its material (x the tier's WeightMult)
 		bool bTwoHanded = false;
 	};
 	enum EMaterialGroup : int32 { MG_Ore, MG_Gem, MG_Wood, MG_Fish, MG_Animal };

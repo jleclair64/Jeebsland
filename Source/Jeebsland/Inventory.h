@@ -385,6 +385,29 @@ namespace JeebItems
 		if (!S) return 0;
 		return FMath::RoundToInt((1.f - ZoneTake(S, JeebHit::Z_None)) * 100.f);
 	}
+	// ---------------------------------------------------------------- armour weight (owner, 2026-11-02)
+	// Each armour piece weighs its kind's Weight (Kinds.csv, kg) x its tier's WeightMult (Tiers.csv). Strength and weight are
+	// not tied together on purpose, so pieces are worth having for different reasons: gold stops the most but is the heaviest,
+	// silver nearly as much and light, iron heavy for what it stops. A suit heavier than FreeWeight (Tuning.ini [Weight]) slows
+	// walking, sprinting and crouching by SlowPerKg for each kg over, at most MaxSlow. Shields, weapons and the pack weigh nothing.
+	inline float PieceWeight(int32 Kind, int32 Tier) { return IsArmorKind(Kind) ? KindRow(Kind).Weight * TierRow(Tier).WeightMult : 0.f; }
+	inline float ItemWeight(int32 Id) { return Id >= IdGearBase ? PieceWeight(KindOf(Id), VariantOf(Id)) : 0.f; }
+	inline float TotalWeight(const USkillComponent* S)
+	{
+		if (!S) return 0.f;
+		float Kg = 0.f;
+		for (int32 K = K_Helmet; K <= K_Boots; ++K) Kg += ItemWeight(S->Worn[K]);
+		return Kg;
+	}
+	// The share of speed a suit this heavy takes away (0.1 = 10% slower)
+	inline float WeightSlow(float Kg)
+	{
+		const JeebTune::FValues& T = JeebTune::V();
+		return FMath::Clamp((Kg - T.FreeWeight) * T.SlowPerKg, 0.f, FMath::Min(T.MaxSlow, 0.9f));
+	}
+	inline float WeightSpeedMul(const USkillComponent* S) { return 1.f - WeightSlow(TotalWeight(S)); }
+	// Text for tooltips and the store: "4.5 kg"
+	inline FString WeightText(float Kg) { return FString::Printf(TEXT("%.1f kg"), Kg); }
 	// Full damage range: weapon, then rings and amulets, then + (skill level / 5) on both ends. Kind -1 = bare fists.
 	inline void DamageRange(const USkillComponent* S, int32 Kind, int32 Tier, int32 ArrowTier, int32& Min, int32& Max)
 	{

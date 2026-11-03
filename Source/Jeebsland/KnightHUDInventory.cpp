@@ -140,6 +140,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		if (!FMath::IsNearlyEqual(M.AttackMul, 1.f)) Extra += FString::Printf(TEXT("Attack %+d%%.  "), FMath::RoundToInt((M.AttackMul - 1.f) * 100.f));
 		if (!FMath::IsNearlyEqual(M.DefenseMul, 1.f)) Extra += FString::Printf(TEXT("Defence %+d%%.  "), FMath::RoundToInt((M.DefenseMul - 1.f) * 100.f));
 		if (Skills->Worn[K_Boots]) Extra += FString::Printf(TEXT("Stamina x%.2f.  "), BootStaminaMult(VariantOf(Skills->Worn[K_Boots])));
+		Extra += FString::Printf(TEXT("Armour weighs %s (%d%% slower).  "), *WeightText(TotalWeight(Skills)), FMath::RoundToInt(WeightSlow(TotalWeight(Skills)) * 100.f));
 		if (!Extra.IsEmpty()) Wrapped(Extra, EX, Y0 + 54.f, PW - (EX - PX) - 30.f, 0.95f, FLinearColor(0.7f, 0.9f, 0.7f));
 	}
 
@@ -290,6 +291,29 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			ItemBadges(Id, X, Y, WS);
 			if (bOver) ItemTip(Id);
 		}
+		// The armour's weight, in the empty corner under the gloves: kg, and how much slower it makes him (JeebItems::WeightSlow)
+		{
+			const float X = GX - 2.f, Y = GY + 2 * RowH;
+			const float Kg = TotalWeight(Skills);
+			const int32 Slow = FMath::RoundToInt(WeightSlow(Kg) * 100.f);
+			Tile(X, Y, WS, WS, FLinearColor(0.75f, 0.7f, 0.6f), 0.2f, false);
+			auto Centred = [&](const FString& T, float TY, float Sc, const FLinearColor& Col)
+			{
+				float W = 0.f, H = 0.f;
+				HDTextSize(T, W, H, Font, Sc);
+				HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.6f), X + (WS - W) * 0.5f + 1.f, TY + 1.f, Font, Sc);   // a dark edge, like the badges
+				HDText(T, Col, X + (WS - W) * 0.5f, TY, Font, Sc);
+			};
+			Centred(FString::Printf(TEXT("%d kg"), FMath::RoundToInt(Kg)), Y + 6.f, 1.3f, FLinearColor(1.f, 0.96f, 0.86f));
+			Centred(Slow > 0 ? FString::Printf(TEXT("-%d%%"), Slow) : FString(TEXT("light")), Y + 28.f, 1.3f, Slow > 0 ? FLinearColor(1.f, 0.74f, 0.3f) : FLinearColor(0.55f, 0.95f, 0.55f));
+			if (Hot(X, Y, WS, WS))
+			{
+				const JeebTune::FValues& T = JeebTune::V();
+				SetTip({ TEXT("Armour weight"), FString::Printf(TEXT("Your armour weighs %s"), *WeightText(Kg)),
+					Slow > 0 ? FString::Printf(TEXT("You walk, sprint and crouch %d%% slower"), Slow) : FString::Printf(TEXT("Light enough to move at full speed (up to %d kg)"), FMath::RoundToInt(T.FreeWeight)),
+					FString::Printf(TEXT("Over %d kg, each kg slows you %d%% (at most %d%%)"), FMath::RoundToInt(T.FreeWeight), FMath::RoundToInt(T.SlowPerKg * 100.f), FMath::RoundToInt(T.MaxSlow * 100.f)) });
+			}
+		}
 		// Totals: offence is what the weapon in hand deals with every bonus counted (the middle of its range);
 		// defence is your armour with every bonus counted, plus your shield's guard when one is ready.
 		const float TY = GY + 3 * RowH + 2.f, Half = GridW * 0.5f;
@@ -315,7 +339,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		Total(GX + Half + 3.f, DefIcon, FString::Printf(TEXT("%d%%"), Defence), FLinearColor(0.5f, 0.75f, 1.f), FLinearColor(0.45f, 0.65f, 1.f));
 		if (Hot(GX, TY, Half, BoxH)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
 		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Your armour stops %d%% of a blow on average (each body part goes through its own piece)"), Defence),
-			Guard > 0 ? FString::Printf(TEXT("Shield strength %d, guard %d from your Defence level"), Guard, FMath::RoundToInt(Knight->GetGuardMax())) : FString(TEXT("No shield ready")) });
+			Guard > 0 ? FString::Printf(TEXT("Shield strength %d, guard %d from your Defence level"), Guard, FMath::RoundToInt(Knight->GetGuardMax())) : FString(TEXT("No shield ready")),
+			FString::Printf(TEXT("Armour weight %s: %d%% slower"), *WeightText(TotalWeight(Skills)), FMath::RoundToInt(WeightSlow(TotalWeight(Skills)) * 100.f)) });
 	}
 
 	// ================= Skills (down the left side of the screen) =================

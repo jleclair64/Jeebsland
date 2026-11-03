@@ -142,6 +142,7 @@ namespace JeebItems
 				Row.CapeColor = Tab.Color(r, TEXT("CapeColor"), Row.CapeColor);
 				Row.ArmourTakes = FMath::Clamp(Tab.F(r, TEXT("ArmourTakes"), 1.f), 0.f, 1.f);
 				Row.ShieldTakes = FMath::Clamp(Tab.F(r, TEXT("ShieldTakes"), 1.f), 0.f, 2.f);
+				Row.WeightMult = FMath::Clamp(Tab.F(r, TEXT("WeightMult"), 1.f), 0.f, 10.f);
 			}
 		}
 
@@ -163,6 +164,7 @@ namespace JeebItems
 				Row.Range = Tab.F(r, TEXT("Range"), 200.f);
 				Row.Cooldown = FMath::Max(0.05f, Tab.F(r, TEXT("Cooldown"), 1.f));
 				Row.Defence = Tab.I(r, TEXT("Defence"), 0);
+				Row.Weight = FMath::Max(0.f, Tab.F(r, TEXT("Weight"), 0.f));
 				Row.BuyPrice = Tab.I(r, TEXT("BuyPrice"), 0);
 				Row.Mass = Tab.I(r, TEXT("Mass"), 0);
 				Row.SmithExtraLevel = Tab.I(r, TEXT("SmithExtraLevel"), 0);

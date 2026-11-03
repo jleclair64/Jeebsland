@@ -50,6 +50,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -450,7 +451,25 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (ShotMoveClock > 2.8f && PC) PC->ConsoleCommand(TEXT("quit"));
 			}
 		}
-		else if (ShotClock > 9.f && !bShotTaken)
+
+		// (test pictures: -ShotWear=5 puts on a full suit of that tier, -ShotPanel opens the Tab windows; JEEBWEIGHT logs the slow)
+		static const bool bShotPanel = FParse::Param(FCommandLine::Get(), TEXT("ShotPanel"));
+		static int32 ShotWear = -1;
+		static bool bShotDressed = false;
+		if (!bShotDressed && ShotClock > 6.f)
+			if (AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr))
+			{
+				bShotDressed = true;
+				USkillComponent* S = K->GetSkills();
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotWear="), ShotWear))
+					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = JeebItems::GearId(Kd, FMath::Clamp(ShotWear, 0, JeebItems::NumTiers - 1));
+				if (bShotPanel) K->SetPanelCursor(true);
+				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
+			}
+		if (bShotDressed && ShotClock > 8.f && ShotClock < 8.1f)
+			if (ACharacter* C = Cast<ACharacter>(PC ? PC->GetPawn() : nullptr))
+				UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT MaxWalkSpeed=%.1f"), C->GetCharacterMovement()->MaxWalkSpeed);
+		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);

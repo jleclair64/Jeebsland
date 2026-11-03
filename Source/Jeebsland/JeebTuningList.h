@@ -87,3 +87,8 @@ JEEB_TUNE(Guard, GuardDrainSeconds, 15.f)
 
 // [Armour]
 JEEB_TUNE(Armour, MinTake, 0.5f)
+
+// [Weight]
+JEEB_TUNE(Weight, FreeWeight, 18.f)
+JEEB_TUNE(Weight, SlowPerKg, 0.01f)
+JEEB_TUNE(Weight, MaxSlow, 0.3f)

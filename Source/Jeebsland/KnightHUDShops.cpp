@@ -124,7 +124,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				const int32 K = KindOf(W.Id), V = VariantOf(W.Id);
 				if (IsWeaponKind(K)) { int32 A, B; WeaponDamage(K, V, A, B, V); Stat = FString::Printf(TEXT("Damage %d-%d"), A, B); }
 				else if (K == K_Shield) Stat = FString::Printf(TEXT("Strength %d"), ShieldGuard(W.Id));
-				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Stops %d%%"), ArmourProtect(V));
+				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(V), *WeightText(PieceWeight(K, V)));
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
@@ -250,7 +250,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		}
 		else
 		{
-			HDText(Kind == K_Shield ? FString::Printf(TEXT("Strength %d"), ShieldGuard(ShieldId(0, t))) : FString::Printf(TEXT("Stops %d%%"), ArmourProtect(t)), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+			HDText(Kind == K_Shield ? FString::Printf(TEXT("Strength %d"), ShieldGuard(ShieldId(0, t))) : FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(t), *WeightText(PieceWeight(Kind, t))), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
 			if (Kind == K_Boots) HDText(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + 8.f, Y, Font, 0.85f);
 			Y += 20.f;
 		}

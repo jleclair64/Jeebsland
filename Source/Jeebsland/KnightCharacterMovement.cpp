@@ -470,10 +470,13 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 		}
 	}
 	StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
+	// Heavy armour slows him on foot (JeebItems::WeightSpeedMul; Worn reaches the owner's machine, so it predicts the same)
+	const float Burden = (!bMounted && Skills) ? JeebItems::WeightSpeedMul(Skills) : 1.f;
 	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
 	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
 	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f)   // swiftness potion
-	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f);   // the Red Helm Brush
+	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f)   // the Red Helm Brush
+	                                 * Burden;                                                                    // heavy armour
 	if (bFalling && !bSpecial)
 	{
 		AirSpeedMul = AirMul;
@@ -494,12 +497,12 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	}
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
-	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * AirSpeedMul;
-	else if (!bSpecial && !bMounted && Bow == EBow::Drawing) Move->MaxWalkSpeed = 0.5f * WalkSpeed * AirSpeedMul;   // drawing a bow: half the walking speed
+	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
+	else if (!bSpecial && !bMounted && Bow == EBow::Drawing) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk
 	// to sprint) the usual acceleration keeps the sprint's ramp. Worked out from the velocity, so the server agrees.
-	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > WalkSpeed ? WalkSpeed * AirSpeedMul : Move->MaxWalkSpeed);
+	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > WalkSpeed * Burden ? WalkSpeed * Burden * AirSpeedMul : Move->MaxWalkSpeed);
 	Move->MaxAcceleration = (!bFalling && !bSpecial && !bMounted && Move->Velocity.Size2D() < WalkCap - 5.f) ? WalkAccel : SprintAccel;
 	return bFaceCam;
 }

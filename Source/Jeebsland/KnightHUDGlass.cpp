@@ -358,6 +358,7 @@ void AKnightHUD::ItemTip(int32 Id)
 	{
 		L.Add(FString::Printf(TEXT("Stops %d%% of blows to the %s"), ArmourProtect(V),
 			K == K_Helmet ? TEXT("head") : K == K_Chest ? TEXT("body") : K == K_Shoulders ? TEXT("upper arms") : K == K_Gloves ? TEXT("forearms") : TEXT("legs")));
+		L.Add(FString::Printf(TEXT("Weighs %s (heavy armour slows you)"), *WeightText(PieceWeight(K, V))));
 		if (K == K_Boots) L.Add(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(V)));
 	}
 	else if (IsAccessoryKind(K)) L.Add(AccessoryText(K, V));
