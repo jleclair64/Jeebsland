@@ -336,7 +336,7 @@ void AKnightCharacter::PoseBody(FKnightPose& P)
 		const float Half = FMath::Fmod(UR, 0.5f);
 		const float F = FMath::Clamp((Half - GContact) / FMath::Max(0.5f - GContact, 0.01f), 0.f, 1.f);
 		const float TAir = FMath::Max(0.5f - GContact, 0.f) / FMath::Max(Hz, 0.1f);
-		const float Arc = 0.5f * 980.f * FMath::Square(0.5f * TAir);
+		const float Arc = 0.5f * 980.f * GetCharacterMovement()->GravityScale * FMath::Square(0.5f * TAir);
 		FlightZ = FMath::Lerp(LegHeight(-GAb, -4.f), LegHeight(GAf, -4.f), F) + 4.f * Arc * F * (1.f - F);
 	}
 	const float WAir = FMath::Max(0.f, 1.f - WR - WL);   // neither foot holding him: the float

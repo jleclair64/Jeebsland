@@ -494,6 +494,7 @@ void AKnightCharacter::ApplyTuning()
 	TunedVersion = JeebTune::Version();
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	if (!M) return;
+	M->GravityScale = FMath::Clamp(T.Weight, 0.5f, 3.f);   // a heavier knight: he rises and falls faster at the same heights
 	const float G = 980.f * M->GravityScale;   // (the world's gravity; the constructor has no world to ask)
 	const float Full = FMath::Max(1.f, T.JumpHeight);
 	FullJumpSpeed = FMath::Sqrt(2.f * G * Full);
