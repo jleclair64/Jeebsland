@@ -7,6 +7,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/PoseableMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 #include "KnightDesign.h"
 #include "Inventory.h"
 
@@ -182,20 +184,58 @@ namespace KnightModel
 		}
 	}
 
+	// ---- Armour styles (2026-11-03) ----
+	// Every armour style is its own skinned model on the SAME skeleton (Tools\BuildKnight.ps1): Classic (the gold armour),
+	// Light (the crusader tunic), Heavy (the original knight, SK_Knight) and the chain mail worn under all of them. The mail is
+	// the leader: it is always drawn whole (pulled just inside the plate, so it fills any gap where two styles meet) and its
+	// bones are the ones posed each frame; a style's mesh is made the first time a piece of that style is worn and simply
+	// follows the mail's bones (SetLeaderPoseComponent: no second bone copy). Each worn slot shows only its own section of its
+	// style's mesh, tinted for its tier; a style with nothing shown is hidden.
+	enum ESet : int32 { Set_Classic, Set_Light, Set_Heavy, Set_Mail, Set_Count };   // (the first three = JeebItems::EArmourStyle)
+	inline const TCHAR* SetMeshPath(int32 Set)
+	{
+		static const TCHAR* P[Set_Count] = { TEXT("/Game/Knight/SK_Knight_Classic.SK_Knight_Classic"), TEXT("/Game/Knight/SK_Knight_Light.SK_Knight_Light"),
+			TEXT("/Game/Knight/SK_Knight.SK_Knight"), TEXT("/Game/Knight/SK_Knight_Mail.SK_Knight_Mail") };
+		return P[FMath::Clamp(Set, 0, Set_Count - 1)];
+	}
+	inline const TCHAR* SetMaterialPath(int32 Set)
+	{
+		static const TCHAR* P[Set_Count] = { TEXT("/Game/Knight/Classic/MI_KnightSkin_Classic.MI_KnightSkin_Classic"), TEXT("/Game/Knight/Light/MI_KnightSkin_Light.MI_KnightSkin_Light"),
+			TEXT("/Game/Knight/Heavy/MI_KnightSkin_Heavy.MI_KnightSkin_Heavy"), TEXT("/Game/Knight/Mail/MI_KnightSkin_Mail.MI_KnightSkin_Mail") };
+		return P[FMath::Clamp(Set, 0, Set_Count - 1)];
+	}
+	constexpr float ClassicGreyGain = 1.25f;   // the Classic model's greyed gold, brightened to about the Heavy model's steel before the tint
+	constexpr int32 NumModelSlots = 5;
+	inline int32 ModelSlotIndex(int32 Slot)
+	{
+		using namespace KnightDesign;
+		return Slot == SlotHelmet ? 0 : Slot == SlotBody ? 1 : Slot == SlotShoulders ? 2 : Slot == SlotBoots ? 3 : Slot == SlotGloves ? 4 : -1;
+	}
+
 	struct FSkin
 	{
-		UPoseableMeshComponent* Comp = nullptr;
+		UPoseableMeshComponent* Comp = nullptr;   // the leader (the chain mail; SK_Knight when the mail is missing)
+		int32 LeaderSet = Set_Mail;
 		TArray<FName> Bone;                   // the bones that follow a joint, parents first
 		TArray<USceneComponent*> Joint;       // ... the joint pivot each one follows
 		TArray<FTransform> Bind;              // ... and its rest pose with the joint's position taken out
+		AActor* Owner = nullptr;
+		USceneComponent* Attach = nullptr;
+		USkinnedMeshComponent* Sets[Set_Count] = {};       // the style meshes made so far (the leader is one of them)
+		TArray<UMaterialInstanceDynamic*> Mids[Set_Count];  // per style, its tintable material per material index
+		int32 Worn[NumModelSlots] = { -2, -2, -2, -2, -2 }; // the armour id each slot shows (0 = bare: only the mail); -2 = not set yet
 	};
 
 	// The skinned knight on Attach (the capsule: the joints' positions are in its space), its bones following Pivots
-	// (indexed by KnightDesign::EPivot). Null when SK_Knight is missing.
+	// (indexed by KnightDesign::EPivot). Null when no skinned model is there (then the cut pieces are used).
 	inline UPoseableMeshComponent* MakeSkin(FSkin& S, AActor* Owner, USceneComponent* Attach, USceneComponent* const* Pivots)
 	{
-		USkeletalMesh* M = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/Knight/SK_Knight.SK_Knight"));
+		USkeletalMesh* M = LoadObject<USkeletalMesh>(nullptr, SetMeshPath(Set_Mail));
+		S.LeaderSet = Set_Mail;
+		if (!M) { M = LoadObject<USkeletalMesh>(nullptr, SetMeshPath(Set_Heavy)); S.LeaderSet = Set_Heavy; }
 		if (!M || !Attach) return nullptr;
+		S.Owner = Owner;
+		S.Attach = Attach;
 		UPoseableMeshComponent* C = NewObject<UPoseableMeshComponent>(Owner);
 		C->SetupAttachment(Attach);
 		C->SetSkinnedAssetAndUpdate(M);
@@ -221,10 +261,86 @@ namespace KnightModel
 				}
 		}
 		S.Comp = C;
+		S.Sets[S.LeaderSet] = C;
+		if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, SetMaterialPath(S.LeaderSet)))
+			for (int32 m = 0; m < C->GetNumMaterials(); ++m) C->SetMaterial(m, Mi);
 		return C;
 	}
 
-	// Every frame once the pose is done: each bone goes where its joint is (the joint at rest = the bone at rest)
+	// Shows or hides one material's sections of a style mesh (LOD 0; the knight has no other)
+	inline void ShowSection(USkinnedMeshComponent* C, int32 MatIndex, bool bShow)
+	{
+		const FSkeletalMeshRenderData* RD = C ? C->GetSkeletalMeshRenderData() : nullptr;
+		if (!RD || RD->LODRenderData.Num() == 0 || MatIndex == INDEX_NONE) return;
+		const TArray<FSkelMeshRenderSection>& Secs = RD->LODRenderData[0].RenderSections;
+		for (int32 i = 0; i < Secs.Num(); ++i)
+			if (Secs[i].MaterialIndex == MatIndex) C->ShowMaterialSection(MatIndex, i, bShow, 0);
+	}
+
+	// The style mesh for Set, made the first time it is needed (it follows the leader's bones). Null if its asset is missing.
+	inline USkinnedMeshComponent* SetComp(FSkin& S, int32 Set)
+	{
+		if (Set < 0 || Set >= Set_Count) return nullptr;
+		if (S.Sets[Set]) return S.Sets[Set];
+		USkeletalMesh* M = LoadObject<USkeletalMesh>(nullptr, SetMeshPath(Set));
+		if (!M || !S.Comp || !S.Owner) return nullptr;
+		USkeletalMeshComponent* C = NewObject<USkeletalMeshComponent>(S.Owner);
+		C->SetupAttachment(S.Attach);
+		C->SetSkinnedAssetAndUpdate(M);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetBoundsScale(1.5f);
+		C->SetLeaderPoseComponent(S.Comp);   // (the same skeleton: it draws with the leader's bones)
+		C->RegisterComponent();
+		if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, SetMaterialPath(Set)))
+			for (int32 m = 0; m < C->GetNumMaterials(); ++m) C->SetMaterial(m, Mi);
+		for (int32 m = 0; m < C->GetNumMaterials(); ++m) ShowSection(C, m, false);   // (nothing until a slot shows its piece)
+		S.Sets[Set] = C;
+		return C;
+	}
+
+	// The tint of one style's slot for a tier. Classic is painted gold, so its metal is greyed (Desat, set in its material)
+	// and brightened, then tinted like the steel-painted Heavy; the mail is never tinted.
+	inline void PaintSet(FSkin& S, int32 Set, int32 MatIndex, int32 Tier)
+	{
+		USkinnedMeshComponent* C = S.Sets[Set];
+		if (!C || MatIndex == INDEX_NONE) return;
+		TArray<UMaterialInstanceDynamic*>& Mids = S.Mids[Set];
+		if (Mids.Num() <= MatIndex) Mids.SetNumZeroed(MatIndex + 1);
+		if (!Mids[MatIndex]) Mids[MatIndex] = C->CreateDynamicMaterialInstance(MatIndex, C->GetMaterial(MatIndex));
+		if (UMaterialInstanceDynamic* M = Mids[MatIndex])
+		{
+			M->SetVectorParameterValue(TEXT("Tint"), Set == Set_Mail ? FLinearColor::White : TierTint(Tier));
+			if (Set == Set_Classic) M->SetScalarParameterValue(TEXT("DesatGain"), ClassicGreyGain);
+		}
+	}
+
+	// What one armour slot shows: Id is the worn armour piece (0 = none: only the chain mail). Calling it again with the same
+	// piece changes nothing.
+	inline void Wear(FSkin& S, int32 Slot, int32 Id)
+	{
+		const int32 i = ModelSlotIndex(Slot);
+		if (i < 0 || !S.Comp || S.Worn[i] == Id) return;
+		S.Worn[i] = Id;
+		const FName MatName(SlotMaterial(Slot));
+		const int32 Style = Id ? FMath::Clamp(JeebItems::StyleOf(Id), 0, JeebItems::NumArmourStyles - 1) : -1;
+		for (int32 Set = 0; Set < Set_Count; ++Set)
+		{
+			if (Set == Set_Mail) continue;   // (the mail always shows whole)
+			const bool bThis = Set == Style;
+			USkinnedMeshComponent* C = bThis ? SetComp(S, Set) : S.Sets[Set];
+			if (!C) continue;
+			const int32 Mat = C->GetMaterialIndex(MatName);
+			ShowSection(C, Mat, bThis);
+			if (bThis) PaintSet(S, Set, Mat, JeebItems::VariantOf(Id));
+			// a style with no slot showing is not drawn at all (except the leader, whose bones the others follow)
+			bool bAny = false;
+			for (int32 k = 0; k < NumModelSlots; ++k) bAny |= S.Worn[k] > 0 && JeebItems::StyleOf(S.Worn[k]) == Set;
+			if (C != S.Comp) C->SetVisibility(bAny);
+		}
+	}
+
+	// Every frame once the pose is done: each bone goes where its joint is (the joint at rest = the bone at rest). The style
+	// meshes follow the leader by themselves.
 	inline void UpdateSkin(FSkin& S)
 	{
 		if (!S.Comp) return;

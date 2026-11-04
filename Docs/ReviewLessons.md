@@ -18,6 +18,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Swords are really gripped: through the curl of the fingers, blade out past the thumb.
 - Check every side an item can clip on (the quiver against arm, cape and fist; the bow and string against body and elbow).
 - Trails follow the sunlight; nothing glows brightly at dusk.
+- Variant pictures (styles, tiers, slots): check each differs from the last before sending; an identical picture means the test switch never reached the model (gear set by test code must also tell the knight to redraw: OnGearChanged).
+- A board or picker that offers several styles shows the real models of each style, never shared placeholders, or the choices cannot be told apart.
 
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.

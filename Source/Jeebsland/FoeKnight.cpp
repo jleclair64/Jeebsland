@@ -130,7 +130,7 @@ void AFoeKnight::BeginPlay()
 	UPoseableMeshComponent* SkinComp = IsNetMode(NM_DedicatedServer) ? nullptr : KnightModel::MakeSkin(*Skin, this, GetRootComponent(), Pivots);
 	if (SkinComp)
 		for (int32 Slot : { SlotHelmet, SlotBody, SlotShoulders, SlotBoots, SlotGloves })
-			KnightModel::Paint(SkinComp, Tier, SkinComp->GetMaterialIndex(FName(KnightModel::SlotMaterial(Slot))));
+			KnightModel::Wear(*Skin, Slot, JeebItems::ArmourId(JeebItems::K_Helmet, JeebItems::AS_Heavy, Tier));   // (heavy, the original knight, in his tier; only the style and tier matter to the look)
 	else Skin.Reset();
 	static const TArray<KnightModel::FPart> NoPieces;
 	const TArray<KnightModel::FPart>& Model = SkinComp ? NoPieces : KnightModel::Parts();

@@ -167,7 +167,7 @@ void AKnightHUD::ItemBadges(int32 Id, float X, float Y, float S)
 	}
 	else if (K == K_Shield || IsArmorKind(K))
 	{
-		const int32 D = (K == K_Shield) ? ShieldGuard(Id) : ArmourProtect(V);
+		const int32 D = (K == K_Shield) ? ShieldGuard(Id) : ArmourProtect(FullVariant(Id));
 		if (D > 0) Def = FString::Printf(TEXT("+%d"), D);
 	}
 	else if (IsAccessoryKind(K))
@@ -475,7 +475,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			}
 			else if (DragKind == 4)
 			{
-				// a worn piece back to the pack: onto an empty cell it comes off (armour cannot be taken off, only swapped); onto a piece that belongs in that slot they swap
+				// a worn piece back to the pack: onto an empty cell it comes off (armour too, since 2026-11-03: the chain mail shows); onto a piece that belongs in that slot they swap
 				if (ToInv >= 0)
 				{
 					if (Sk->Slots[ToInv].Id == 0) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);

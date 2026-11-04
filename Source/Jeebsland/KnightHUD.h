@@ -162,6 +162,7 @@ private:
 	// Store and smithy
 	int32 ShopCat = 0, ShopKindIdx = 0;
 	int32 SmithKindIdx = 0;
+	int32 SmithStyle = 0;   // the smithy's style picker: armour classic/light/heavy, shields kite/round/tower
 	FString ShopMsg;
 	float ShopMsgUntil = 0.f;
 

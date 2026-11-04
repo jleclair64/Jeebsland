@@ -265,6 +265,25 @@ namespace JeebItems
 				Row.RecoverDelay = Tab.F(s, TEXT("RecoverDelay"), 10.f);
 			}
 		}
+
+		void LoadArmourStyles(FItemTables& T)
+		{
+			T.ArmourStyles.SetNum(NumArmourStyles);
+			const TCHAR* Names[NumArmourStyles] = { TEXT("Classic"), TEXT("Light"), TEXT("Heavy") };
+			for (int32 s = 0; s < NumArmourStyles; ++s) T.ArmourStyles[s].Name = Names[s];
+			FTable Tab;
+			if (!Tab.Load(TEXT("ArmourStyles.csv"))) return;
+			if (Tab.Rows.Num() < NumArmourStyles) Problem(TEXT("ArmourStyles.csv needs three rows: classic, light, heavy"));
+			for (int32 s = 0; s < NumArmourStyles && s < Tab.Rows.Num(); ++s)
+			{
+				FArmourStyleRow& Row = T.ArmourStyles[s];
+				Row.Name = Tab.S(s, TEXT("Name"));
+				Row.Note = Tab.S(s, TEXT("Note"));
+				Row.StopMul = FMath::Max(0.f, Tab.F(s, TEXT("StopMul"), 1.f));
+				Row.WeightMul = FMath::Max(0.f, Tab.F(s, TEXT("WeightMul"), 1.f));
+				Row.PriceMul = FMath::Max(0.f, Tab.F(s, TEXT("PriceMul"), 1.f));
+			}
+		}
 	}
 
 	const FItemTables& Tables()
@@ -280,6 +299,7 @@ namespace JeebItems
 			LoadPotions(T);
 			LoadAccessories(T);
 			LoadShieldStyles(T);
+			LoadArmourStyles(T);
 			UE_LOG(LogJeebItems, Log, TEXT("Jeebsland items: read %d potions, %d rings, %d amulets from Content/Data"), T.Potions.Num(), T.Rings.Num(), T.Amulets.Num());
 		}
 		return T;

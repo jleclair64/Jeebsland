@@ -30,6 +30,7 @@
 #include "Pond.h"
 #include "HealthComponent.h"
 #include "Projectile.h"
+#include "GearWall.h"
 #include "Combat.h"
 #include "WeaponDesign.h"
 #include "ProceduralMeshComponent.h"
@@ -154,6 +155,20 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 		}
 		if (FoundDrop.IsValid()) return EInteract::Drop;
 	}
+	// The MoveLab gear wall: the peg the camera looks at, within reach
+	FoundWall = nullptr;
+	FoundPeg = -1;
+	if (Controller)
+	{
+		FVector From;
+		FRotator Rot;
+		Controller->GetPlayerViewPoint(From, Rot);
+		for (TActorIterator<AGearWall> It(GetWorld()); It; ++It)
+		{
+			const int32 Peg = It->PegAt(From, Rot.Vector(), GetActorLocation(), 260.f);
+			if (Peg >= 0) { FoundWall = *It; FoundPeg = Peg; return EInteract::GearWall; }
+		}
+	}
 	// Arrows lying in the world (spent ones, in a shield or armour, are never offered)
 	FoundArrow = nullptr;
 	{
@@ -216,6 +231,14 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	case EInteract::Bench: OutText = TEXT("Press E to sit"); return true;
 		case EInteract::Loot:  OutText = TEXT("Press E to take the ingots"); return true;
 	case EInteract::Arrow: OutText = TEXT("Press E to pick up the arrow"); return true;
+	case EInteract::GearWall:
+		if (const AGearWall* W = FoundWall.Get(); W && W->GetPegs().IsValidIndex(FoundPeg))
+		{
+			const AGearWall::FPeg& P = W->GetPegs()[FoundPeg];
+			OutText = P.Count > 1 ? FString::Printf(TEXT("Press E to take %d %s"), P.Count, *JeebItems::ItemName(P.Id)) : FString::Printf(TEXT("Press E to take the %s"), *JeebItems::ItemName(P.Id));
+			return true;
+		}
+		return false;
 	case EInteract::Drop:
 		if (const ALootDrop* Drop = FoundDrop.Get()) { OutText = Drop->IsSack() ? FString(TEXT("Press E to open the sack")) : Drop->Describe(); return true; }
 		return false;
@@ -281,6 +304,9 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	case EInteract::Arrow:
 		if (const AProjectile* Arrow = FoundArrow.Get()) { Float(Arrow->GetActorLocation(), 40.f); return true; }
 		return false;
+	case EInteract::GearWall:
+		if (const AGearWall* W = FoundWall.Get(); W && W->GetPegs().IsValidIndex(FoundPeg)) { Float(W->GetPegs()[FoundPeg].Pos, 25.f); return true; }
+		return false;
 	case EInteract::Drop:
 		if (const ALootDrop* Drop = FoundDrop.Get()) { Float(Drop->GetActorLocation(), 60.f); return true; }
 		return false;
@@ -335,6 +361,9 @@ void AKnightCharacter::OnInteractKey()
 			if (!HasAuthority()) Arrow->SetActorHiddenInGame(true);   // (gone from our view at once; the server hands it over)
 			Inv(EInvOp::PickArrow, 0, 0, 0, Arrow);
 		}
+		break;
+	case EInteract::GearWall:
+		if (FoundPeg >= 0) Inv(EInvOp::TakeFromWall, FoundPeg, 0, 0, nullptr);
 		break;
 	case EInteract::Drop:
 		if (ALootDrop* Drop = FoundDrop.Get())

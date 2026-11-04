@@ -10,6 +10,7 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 | `Potions.csv` | Potions: effect (speed, heal, vigour, radar), strength, seconds, cooldown, price, colour, store line, description |
 | `Accessories.csv` | Rings, amulets and the helm brush: attack/defence multipliers, crits, damage floor/ceiling, wild, speed, health, icon colours |
 | `ShieldStyles.csv` | Kite, round, tower: GuardMul (blows cost the guard x 1/GuardMul; the guard's size comes from the Defence level), stance speed, recovery delay |
+| `ArmourStyles.csv` | Classic (the gold model), Light (the tunic), Heavy (the original knight): StopMul (how much more or less of a blow it stops than its tier says), WeightMul, PriceMul. Rows are found by position: never reorder them; a fourth style goes at the end (and needs its own model) |
 | `Tuning.ini` | Not items: how fast, far, strong and long the moves are (walking, jumping, the bow, every sword move, knockdowns, the guard, the armour cap, headshots, how much heavy armour slows you). Each line is explained in the file. Saved while the game runs, it takes effect within half a second: no restart needed. |
 
 **Rules** (each file repeats its own at the top):

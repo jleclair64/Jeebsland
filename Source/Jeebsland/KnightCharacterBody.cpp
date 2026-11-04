@@ -387,6 +387,8 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 	for (FArmorPart& P : ArmorParts)
 	{
 		if (P.Slot != Slot) continue;
+		// the skinned knight: the slot shows its piece in its style and tier, or only the chain mail when bare (2026-11-03)
+		if (P.bModel && Skin && Skin->Comp) { KnightModel::Wear(*Skin, Slot, bWorn ? Id : 0); continue; }
 
 		// Underclothes, belt and boots are always there; everything else shows only while worn
 		bool bAlways = false;
@@ -397,10 +399,9 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		else if (bAlways) bVisible = true;
 		else bVisible = bWorn && (Slot == KnightDesign::SlotCape || (Var >= P.MinTier && Var <= P.MaxTier));
 		if (Slot == KnightDesign::SlotShield && bWorn && P.Style != JeebItems::StyleOf(Id)) bVisible = false;   // only the worn shield style
-		if (P.bModel) bVisible = true;   // (armour is never taken off; the model has no bare-skin version)
 		P.Comp->SetVisibility(bVisible);
 		if (!bVisible) continue;
-		if (P.bModel) { KnightModel::Paint(P.Comp, Var, P.Mat); continue; }
+		if (P.bModel) { KnightModel::Paint(P.Comp, Var, P.Mat); continue; }   // (the cut pieces of the old rigid knight, when no skinned model is there)
 
 		FLinearColor Color;
 		bool bMetal = false;

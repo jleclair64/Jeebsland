@@ -67,7 +67,7 @@ void USkillComponent::ResetToStartingKit()
 	AddInvItem(JeebItems::ArrowId(JeebItems::T_Steel), StartSteelArrows);
 	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
-	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::GearId(K, JeebItems::T_Tin);   // tin: the lowest tier (was bronze before the 2026-10-30 tier redo)
+	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo)
 	RefreshCape();
 }
 
@@ -437,11 +437,7 @@ bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 	if (Kind < 0 || Kind >= NumWornKinds) return false;
 	int32& Target = (bSecondRing && Kind == JeebItems::K_Ring) ? RingB : Worn[Kind];
 	if (Target == 0) return false;
-	if (JeebItems::IsArmorKind(Kind))
-	{
-		Say(3.f, FColor::Orange, TEXT("Armour can't be taken off. Click a better piece in your pack to swap it."));
-		return false;
-	}
+	// (armour comes off since 2026-11-03: the chain mail underneath shows, and that slot stops nothing)
 	if (Kind == JeebItems::K_Cape)
 	{
 		Say(3.f, FColor::Orange, TEXT("Your cape shows your PvP rank. It can't be taken off."));
@@ -604,7 +600,7 @@ void USkillComponent::FillPracticePack()
 	{
 		if (Slots[i].Id != 0) continue;
 		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
-		Slots[i].Id = GearId(K, R.RandRange(T_Tin, T_Onyx));   // (some will need higher levels to use: the level gates)
+		Slots[i].Id = IsArmorKind(K) ? ArmourId(K, R.RandRange(0, NumArmourStyles - 1), R.RandRange(T_Tin, T_Diamond)) : GearId(K, R.RandRange(T_Tin, T_Diamond));   // (some will need higher levels to use: the level gates; armour in any style)
 		Slots[i].Count = 1;
 	}
 }

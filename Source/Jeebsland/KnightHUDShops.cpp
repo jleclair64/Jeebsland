@@ -124,7 +124,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				const int32 K = KindOf(W.Id), V = VariantOf(W.Id);
 				if (IsWeaponKind(K)) { int32 A, B; WeaponDamage(K, V, A, B, V); Stat = FString::Printf(TEXT("Damage %d-%d"), A, B); }
 				else if (K == K_Shield) Stat = FString::Printf(TEXT("Strength %d"), ShieldGuard(W.Id));
-				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(V), *WeightText(PieceWeight(K, V)));
+				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(FullVariant(W.Id)), *WeightText(PieceWeight(K, FullVariant(W.Id))));
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
@@ -221,19 +221,32 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const int32 Kind = Kinds[SmithKindIdx];
 	const bool bArrows = Kind < 0;
 	const int32 BKind = bArrows ? K_Bow : Kind;
+	// the style picker under the kinds (2026-11-03): armour classic / light / heavy, shields kite / round / tower
+	const bool bStyled = IsArmorKind(Kind) || Kind == K_Shield;
+	if (bStyled)
+	{
+		SmithStyle = FMath::Clamp(SmithStyle, 0, 2);
+		for (int32 s = 0; s < 3; ++s)
+		{
+			const FString Nm = Kind == K_Shield ? FString(ShieldStyleName(s)).Replace(TEXT(" Shield"), TEXT("")) : ArmourStyleRow(s).Name;
+			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, true, SmithStyle == s, 1.0f)) SmithStyle = s;
+		}
+	}
+	const int32 Style = bStyled ? SmithStyle : 0;
 
-	const float CW = 150.f, CH = 500.f, CGap = 8.f;
+	const float CGap = 6.f, CH = 500.f;
 	const float CX0 = PX + 370.f, CY = PY + 112.f;
-	for (int32 t = 0; t < NumTiersKnight; ++t)   // Tin to Onyx (Emerald and Diamond are for trolls and wizards)
+	const float CW = (PW - 370.f - 24.f - CGap * (NumTiersKnight - 1)) / NumTiersKnight;   // (all nine tiers since 2026-11-03)
+	for (int32 t = 0; t < NumTiersKnight; ++t)
 	{
 		const float CX = CX0 + t * (CW + CGap);
-		const FRecipe R = SmithRecipe(BKind, t, bArrows);
-		const int32 Id = bArrows ? ArrowId(t) : GearId(Kind, t);
+		const FRecipe R = SmithRecipe(BKind, t, bArrows, IsArmorKind(Kind) ? Style : 0);
+		const int32 Id = bArrows ? ArrowId(t) : IsArmorKind(Kind) ? ArmourId(Kind, Style, t) : Kind == K_Shield ? ShieldId(Style, t) : GearId(Kind, t);
 		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
 		DrawRect(Palette(t, 0), CX, CY, CW, 5.f);
-		DrawIcon(Id, CX + 25.f, CY + 14.f, 100.f);
+		DrawIcon(Id, CX + (CW - 90.f) * 0.5f, CY + 14.f, 90.f);
 		float Y = CY + 120.f;
-		HDText(bArrows ? FString::Printf(TEXT("%s Arrows"), TierName(t)) : ItemName(Id), FLinearColor(1.f, 0.9f, 0.6f), CX + 8.f, Y, Font, 1.05f);
+		Y += Wrapped(bArrows ? FString::Printf(TEXT("%s Arrows"), TierName(t)) : ItemName(Id), CX + 8.f, Y, CW - 14.f, 0.9f, FLinearColor(1.f, 0.9f, 0.6f)) - 26.f;
 		Y += 26.f;
 		if (bArrows)
 		{
@@ -250,7 +263,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		}
 		else
 		{
-			HDText(Kind == K_Shield ? FString::Printf(TEXT("Strength %d"), ShieldGuard(ShieldId(0, t))) : FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(t), *WeightText(PieceWeight(Kind, t))), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+			HDText(Kind == K_Shield ? FString::Printf(TEXT("Strength %d"), ShieldGuard(Id)) : FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(FullVariant(Id)), *WeightText(PieceWeight(Kind, FullVariant(Id)))), FLinearColor(0.6f, 0.78f, 1.f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
 			if (Kind == K_Boots) HDText(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(t)), FLinearColor(0.6f, 0.9f, 0.6f), CX + 8.f, Y, Font, 0.85f);
 			Y += 20.f;
 		}
@@ -280,12 +293,12 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		{
 			const int32 Count = bArrows ? ArrowBundle : 1;
 			if (!Skills->CanAdd(Id, Count)) { ShopMsg = TEXT("Your pack is full."); ShopMsgUntil = Now + 3.f; }
-			else Knight->Inv(EInvOp::Smith, bArrows ? -1 : Kind, t);   // the server checks the recipe and makes it
+			else Knight->Inv(EInvOp::Smith, bArrows ? -1 : Kind, t, Style);   // the server checks the recipe and makes it
 		}
 		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
 	}
 	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	HDText(TEXT("Tin: tin ore. Iron: iron ore. Bronze: copper and tin. Steel: iron ore and coal. Silver and gold: their ores. Onyx: onyx and gold.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	HDText(TEXT("Tin: tin ore. Iron: iron ore. Bronze: copper and tin. Steel: iron ore and coal. Silver and gold: their ores. Onyx, emerald, diamond: the gem and gold.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 

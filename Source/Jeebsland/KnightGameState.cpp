@@ -1,6 +1,7 @@
 #include "KnightGameState.h"
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
+#include "GearWall.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "Meadow.h"
@@ -348,6 +349,8 @@ void AKnightGameState::BuildMoveLab()
 			D->FinishSpawning(Xf);
 		}
 	}
+	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon
+	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();
 }
 
@@ -461,8 +464,17 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			{
 				bShotDressed = true;
 				USkillComponent* S = K->GetSkills();
+				// (-ShotStyle=0/1/2 picks classic, light or heavy for that suit; -ShotMix wears one of each style across the slots;
+				// -ShotBare takes the armour off, showing the chain mail)
+				int32 ShotStyle = 0;
+				FParse::Value(FCommandLine::Get(), TEXT("ShotStyle="), ShotStyle);
+				const bool bMix = FParse::Param(FCommandLine::Get(), TEXT("ShotMix"));
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotWear="), ShotWear))
-					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = JeebItems::GearId(Kd, FMath::Clamp(ShotWear, 0, JeebItems::NumTiers - 1));
+					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd)
+						S->Worn[Kd] = JeebItems::ArmourId(Kd, bMix ? (Kd - JeebItems::K_Helmet) % JeebItems::NumArmourStyles : ShotStyle, FMath::Clamp(ShotWear, 0, JeebItems::NumTiers - 1));
+				if (S && FParse::Param(FCommandLine::Get(), TEXT("ShotBare")))
+					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = 0;
+				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
 			}

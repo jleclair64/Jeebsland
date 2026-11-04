@@ -5,6 +5,8 @@
 #include "Store.h"
 #include "Loot.h"
 #include "Projectile.h"
+#include "GearWall.h"
+#include "EngineUtils.h"
 #include "Npc.h"
 #include "Cottage.h"
 #include "ResourceNode.h"
@@ -131,17 +133,19 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		return nullptr;
 	};
 	auto Named = [](int32 Id, int32 Count) { return Count > 1 ? FString::Printf(TEXT("%d %s"), Count, *ItemName(Id)) : ItemName(Id); };
+	auto ArmourBusy = [&](bool bArmour) { if (bArmour && (StunLeft > 0.f || MoveLocked())) { Sk->Say(2.f, Warn, TEXT("Not in the middle of a fight.")); return true; } return false; };
 
 	switch (Op)
 	{
 	// ---- the pack, the weapon bar and worn gear ----
-	case EInvOp::Equip:         bGear = Sk->EquipFromSlot(A); break;
+	// (2026-11-03: armour can be taken off, so changing it is refused while stunned or knocked down: no mid-combo gear tricks)
+	case EInvOp::Equip:         if (ArmourBusy(Sk->Slots.IsValidIndex(A) && IsGear(Sk->Slots[A].Id) && IsArmorKind(KindOf(Sk->Slots[A].Id)))) break; bGear = Sk->EquipFromSlot(A); break;
 	case EInvOp::UnequipHot:    if (Sk->UnequipHotbar(A)) bGear = true; else Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
-	case EInvOp::UnequipWorn:   if (Sk->UnequipWorn(A, B != 0)) bGear = true; else if (!IsArmorKind(A)) Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
+	case EInvOp::UnequipWorn:   if (ArmourBusy(IsArmorKind(A))) break; if (Sk->UnequipWorn(A, B != 0)) bGear = true; else if (A != K_Cape) Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
 	case EInvOp::SwapInvHot:    bGear = Sk->SwapInvHotbar(A, B); break;
 	case EInvOp::SwapInv:       Sk->SwapInv(A, B); break;
 	case EInvOp::SwapHot:       bGear = Sk->SwapHotbar(A, B); break;
-	case EInvOp::SwapInvWorn:   bGear = Sk->SwapInvWorn(A, B, C != 0); break;
+	case EInvOp::SwapInvWorn:   if (ArmourBusy(IsArmorKind(B))) break; bGear = Sk->SwapInvWorn(A, B, C != 0); break;
 	case EInvOp::SwapInvPotion: Sk->SwapInvPotion(A); break;
 	case EInvOp::Select:
 		if (A >= 0 && A < 5 && A != Sk->Selected) { Sk->SetSelected(A); bAttacking = false; bCharging = false; bGear = true; }
@@ -249,14 +253,17 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		break;
 	}
 
-	// ---- the smithy (beside the blacksmith): A kind (-1 arrows), B tier ----
+	// ---- the smithy (beside the blacksmith): A kind (-1 arrows), B tier, C style (armour: classic/light/heavy; shields:
+	// kite/round/tower; 0 for everything else) ----
 	case EInvOp::Smith:
 	{
 		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith)) || B < 0 || B >= NumTiers) break;
 		const bool bArrows = A < 0;
 		if (!bArrows && !(IsWeaponKind(A) || IsArmorKind(A) || A == K_Shield)) break;
-		const FRecipe R = SmithRecipe(bArrows ? K_Bow : A, B, bArrows);
-		const int32 Id = bArrows ? ArrowId(B) : GearId(A, B);
+		const bool bStyled = !bArrows && (IsArmorKind(A) || A == K_Shield);
+		if (C < 0 || C >= (bStyled ? (A == K_Shield ? NumShieldStyles : NumArmourStyles) : 1)) break;   // (never trust the style sent)
+		const FRecipe R = SmithRecipe(bArrows ? K_Bow : A, B, bArrows, IsArmorKind(A) ? C : 0);
+		const int32 Id = bArrows ? ArrowId(B) : IsArmorKind(A) ? ArmourId(A, C, B) : A == K_Shield ? ShieldId(C, B) : GearId(A, B);
 		const int32 Count = bArrows ? ArrowBundle : 1;
 		if (Sk->GetLevel(ESkillType::Smithing) < R.Level) { ShopNote(FString::Printf(TEXT("You need Smithing level %d."), R.Level)); break; }
 		if (!KnightCanUseTier(B)) { ShopNote(FString::Printf(TEXT("%s is for %s; the smith won't make it for a knight."), TierName(B), TierClass(B) == 2 ? TEXT("trolls") : TEXT("wizards"))); break; }
@@ -299,6 +306,26 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		else Skills->Say(2.f, FColor::Orange, TEXT("Your pack is full."));
 		break;
 	}
+	case EInvOp::TakeFromWall:
+	{
+#if !UE_BUILD_SHIPPING
+		// The MoveLab gear wall (test builds only). The wall exists only in MoveLab, built by the server too: the item comes
+		// from the server's own peg, and the knight must stand by it. A refused take does not use up the 0.2 s wait.
+		const double Now = GetWorld()->GetTimeSeconds();
+		if (Now - LastWallTake < 0.2) break;
+		for (TActorIterator<AGearWall> It(GetWorld()); It; ++It)
+		{
+			if (!It->GetPegs().IsValidIndex(A)) continue;
+			const AGearWall::FPeg& P = It->GetPegs()[A];
+			if (FVector::Dist(P.Pos, GetActorLocation()) > 350.f) break;
+			LastWallTake = Now;
+			if (Sk->AddInvItem(P.Id, P.Count)) Sk->Say(1.5f, FColor::White, FString::Printf(TEXT("Took the %s."), *JeebItems::ItemName(P.Id)));
+			else Sk->Say(2.f, Warn, TEXT("Your pack is full."));
+			break;
+		}
+#endif
+		break;
+	}
 	case EInvOp::LootTakeAll:
 	case EInvOp::LootTakeOne:
 	case EInvOp::LootEquip:
@@ -307,7 +334,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		if (!Drop || Drop->IsActorBeingDestroyed() || FVector::Dist2D(Drop->GetActorLocation(), GetActorLocation()) > 500.f) break;
 		if (Op == EInvOp::LootTakeAll) Drop->TakeAll(this);
 		else if (Op == EInvOp::LootTakeOne) { if (A < 0) Drop->TakeIngots(this); else Drop->TakeOne(A, this); }
-		else bGear = Drop->EquipTo(A, this, B, C % 100, C >= 100);
+		else if (!ArmourBusy(true)) bGear = Drop->EquipTo(A, this, B, C % 100, C >= 100);   // (no changing gear from a sack mid-fight either)
 		break;
 	}
 

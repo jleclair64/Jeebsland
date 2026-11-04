@@ -30,7 +30,7 @@ namespace JeebItems
 	inline bool KnightCanUseTier(int32 T) { const int32 C = TierClass(T); return C == 0 || C == 1; }
 	// The skill level needed to wear or wield a tier
 	inline int32 EquipLevel(int32 T) { return TierRow(T).EquipLevel; }
-	constexpr int32 NumTiersKnight = 7;   // the tiers a knight can use (Tin to Onyx): what the smithy and the dictionary list
+	constexpr int32 NumTiersKnight = 9;   // the tiers a knight can use: all nine since 2026-11-03 (the legendaries are open to every class); what the smithy and the dictionary list
 
 	// What kind of thing a piece of gear is
 	enum EKind : int32
@@ -93,6 +93,14 @@ namespace JeebItems
 	inline float ShieldMoveMul(int32 Style) { return ShieldStyleRow(Style).MoveMul; }
 	inline float ShieldRecoverDelay(int32 Style) { return ShieldStyleRow(Style).RecoverDelay; }
 	inline int32 TierOf(int32 Id) { return IsArrow(Id) ? ArrowTier(Id) : VariantOf(Id); }
+	// Armour comes in three styles too (2026-11-03), packed the same way (variant = style x 10 + tier): 0 classic (the gold
+	// armour model; every armour id before the styles is classic), 1 light (the crusader tunic: lighter, stops less), 2 heavy
+	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
+	constexpr int32 NumArmourStyles = 3;
+	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy };
+	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { return IdGearBase + Kind * 100 + FMath::Clamp(Style, 0, NumArmourStyles - 1) * 10 + Tier; }
+	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
+	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
 	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
 	inline bool IsArmorKind(int32 K) { return K >= K_Helmet && K <= K_Boots; }
@@ -151,6 +159,7 @@ namespace JeebItems
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), TierName(V));
 		if (K == K_Shield) return FString::Printf(TEXT("%s %s"), TierName(V), ShieldStyleName(StyleOf(Id)));
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
+		if (IsArmorKind(K) && StyleOf(Id) != AS_Classic) return FString::Printf(TEXT("%s %s %s"), TierName(V), *ArmourStyleRow(StyleOf(Id)).Name, KindName(K));   // "Iron Light Helmet"
 		return FString::Printf(TEXT("%s %s"), TierName(V), KindName(K));
 	}
 
@@ -233,11 +242,13 @@ namespace JeebItems
 	inline float TierPriceMult(int32 T) { return TierRow(T).PriceMult; }
 	inline int32 AccessoryPrice(int32 K, int32 V) { return AccessoryRow(K, V).Price; }
 	constexpr int32 StoreMaxTier = T_Bronze;   // the store sells tin, iron and bronze
+	// Variant: the tier, or for armour style x 10 + tier (FullVariant), so a style's PriceMul counts
 	inline int32 BuyPrice(int32 K, int32 Variant)
 	{
 		if (IsAccessoryKind(K)) return AccessoryPrice(K, Variant);
 		if (K == K_Cape) return 0;   // (never sold: it shows your PvP rank)
-		return FMath::Max(1, FMath::RoundToInt(BaseBuyPrice(K) * TierPriceMult(Variant)));
+		const float StyleMul = IsArmorKind(K) ? ArmourStyleRow(Variant / 10).PriceMul : 1.f;
+		return FMath::Max(1, FMath::RoundToInt(BaseBuyPrice(K) * TierPriceMult(Variant % 10) * StyleMul));
 	}
 	constexpr int32 ArrowBundle = 10;
 	inline int32 ArrowBundlePrice(int32 T) { return FMath::Max(2, FMath::RoundToInt(8.f * TierPriceMult(T))); }
@@ -250,11 +261,12 @@ namespace JeebItems
 	inline int32 Mass(int32 K) { return KindRow(K).Mass; }
 	// A recipe: up to two materials (Num 0 = unused), the Smithing level it needs and the XP it gives
 	struct FRecipe { EItemType Mat[2] = { EItemType::TinOre, EItemType::TinOre }; int32 Num[2] = { 0, 0 }; int32 Level = 1; int32 XP = 0; };
-	inline FRecipe SmithRecipe(int32 K, int32 T, bool bArrows = false)
+	// ArmourStyle: armour only; the style's WeightMul scales the mass (a light piece takes less metal, a heavy one more)
+	inline FRecipe SmithRecipe(int32 K, int32 T, bool bArrows = false, int32 ArmourStyle = 0)
 	{
 		FRecipe R;
 		const FTierRow& TR = TierRow(T);
-		const int32 M = bArrows ? 2 : Mass(K);   // arrows: a bundle of 10 costs 2 mass
+		const int32 M = bArrows ? 2 : IsArmorKind(K) ? FMath::Max(1, FMath::CeilToInt(Mass(K) * ArmourStyleRow(ArmourStyle).WeightMul - 0.001f)) : Mass(K);   // arrows: a bundle of 10 costs 2 mass
 		for (int32 i = 0; i < 2; ++i)
 		{
 			R.Mat[i] = TR.Mat[i];
@@ -317,7 +329,7 @@ namespace JeebItems
 	{
 		if (IsArrow(Id)) return 1;
 		if (!IsGear(Id)) return 0;
-		return FMath::Max(1, BuyPrice(KindOf(Id), VariantOf(Id)) / 2);
+		return FMath::Max(1, BuyPrice(KindOf(Id), IsArmorKind(KindOf(Id)) ? FullVariant(Id) : VariantOf(Id)) / 2);
 	}
 
 	// ---------------------------------------------------------------- what you carry adds up
@@ -359,25 +371,28 @@ namespace JeebItems
 		default:                  return K_Chest;
 		}
 	}
-	// What one tier lets through, with a defence multiplier from rings (1 = none)
-	inline float TierTake(int32 Tier, float DefenseMul = 1.f)
+	// What one piece lets through, with a defence multiplier from rings (1 = none). Variant: the tier, or for armour
+	// style x 10 + tier (the style's StopMul scales what the tier stops). MinTake caps only what the rings add (2026-11-03):
+	// a heavy piece's own stop may pass it, so a heavy legendary stops more than a classic one.
+	inline float TierTake(int32 Variant, float DefenseMul = 1.f)
 	{
-		const float Stop = (1.f - TierRow(Tier).ArmourTakes) * DefenseMul;
-		return FMath::Clamp(1.f - Stop, MinTake(), 1.f);
+		const float Stop = FMath::Clamp((1.f - TierRow(Variant % 10).ArmourTakes) * ArmourStyleRow(Variant / 10).StopMul, 0.f, 0.95f);
+		return FMath::Clamp(1.f - Stop * DefenseMul, FMath::Min(MinTake(), 1.f - Stop), 1.f);
 	}
 	// What gets through this player's armour at Zone. Z_None (blows without hit boxes): the average of all five pieces.
 	inline float ZoneTake(const USkillComponent* S, uint8 Zone)
 	{
 		if (!S) return 1.f;
 		const float Mul = CombinedMods(S).DefenseMul;
-		auto PieceTake = [&](int32 K) { return S->Worn[K] ? TierTake(VariantOf(S->Worn[K]), Mul) : 1.f; };
+		auto PieceTake = [&](int32 K) { return S->Worn[K] ? TierTake(FullVariant(S->Worn[K]), Mul) : 1.f; };
 		if (Zone != JeebHit::Z_None) return PieceTake(ZoneArmour(Zone));
 		float Sum = 0.f;
 		for (int32 K = K_Helmet; K <= K_Boots; ++K) Sum += PieceTake(K);
 		return Sum / float(K_Boots - K_Helmet + 1);
 	}
-	// An armour piece's protection as shown in badges and tooltips: the share of a blow it stops, in percent (Tin 20, Gold 45)
-	inline int32 ArmourProtect(int32 Tier) { return FMath::RoundToInt((1.f - TierTake(Tier)) * 100.f); }
+	// An armour piece's protection as shown in badges and tooltips: the share of a blow it stops, in percent (classic Tin 20,
+	// Gold 45). Variant as for TierTake (pass FullVariant of an armour id).
+	inline int32 ArmourProtect(int32 Variant) { return FMath::RoundToInt((1.f - TierTake(Variant)) * 100.f); }
 	// The protection total shown on screen: the average share of a blow stopped over the five pieces, rings counted, in percent.
 	// (bShield is ignored now: shields keep their own guard.)
 	inline int32 TotalDefense(const USkillComponent* S, bool bShield)
@@ -390,8 +405,9 @@ namespace JeebItems
 	// not tied together on purpose, so pieces are worth having for different reasons: gold stops the most but is the heaviest,
 	// silver nearly as much and light, iron heavy for what it stops. A suit heavier than FreeWeight (Tuning.ini [Weight]) slows
 	// walking, sprinting and crouching by SlowPerKg for each kg over, at most MaxSlow. Shields, weapons and the pack weigh nothing.
-	inline float PieceWeight(int32 Kind, int32 Tier) { return IsArmorKind(Kind) ? KindRow(Kind).Weight * TierRow(Tier).WeightMult : 0.f; }
-	inline float ItemWeight(int32 Id) { return Id >= IdGearBase ? PieceWeight(KindOf(Id), VariantOf(Id)) : 0.f; }
+	// (2026-11-03: x the armour style's WeightMul too; Variant = style x 10 + tier, as FullVariant gives it)
+	inline float PieceWeight(int32 Kind, int32 Variant) { return IsArmorKind(Kind) ? KindRow(Kind).Weight * TierRow(Variant % 10).WeightMult * ArmourStyleRow(Variant / 10).WeightMul : 0.f; }
+	inline float ItemWeight(int32 Id) { return Id >= IdGearBase ? PieceWeight(KindOf(Id), FullVariant(Id)) : 0.f; }
 	inline float TotalWeight(const USkillComponent* S)
 	{
 		if (!S) return 0.f;

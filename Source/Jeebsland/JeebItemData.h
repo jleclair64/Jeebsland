@@ -12,6 +12,7 @@
 //   Potions.csv       potions: effect, strength, cooldown, price, colour, text
 //   Accessories.csv   rings, amulets and the helm brush: their effects
 //   ShieldStyles.csv  kite, round, tower
+//   ArmourStyles.csv  classic, light, heavy: how much each armour style stops, weighs and costs
 // Each file says at its top which rows must stay as they are (saves remember items by number). Change a file, then restart the
 // game (and the world servers): the server's copy decides everything, so a world uses its own files; players' copies only
 // change what their screens show. A file that cannot be read keeps the game going with plain defaults and writes the problem
@@ -81,6 +82,7 @@ namespace JeebItems
 		FLinearColor Band = FLinearColor::White, Gem = FLinearColor::White;
 	};
 	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 10.f; };
+	struct FArmourStyleRow { FString Name, Note; float StopMul = 1.f, WeightMul = 1.f, PriceMul = 1.f; };
 
 	struct FItemTables
 	{
@@ -91,6 +93,7 @@ namespace JeebItems
 		TArray<FAccessoryRow> Rings, Amulets;
 		FAccessoryRow Crest;
 		TArray<FShieldStyleRow> ShieldStyles;   // always 3 rows (kite, round, tower)
+		TArray<FArmourStyleRow> ArmourStyles;   // always 3 rows (classic, light, heavy)
 	};
 
 	// The tables (read from Content/Data the first time they are needed)

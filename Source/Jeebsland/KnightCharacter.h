@@ -78,6 +78,7 @@ enum class EInvOp : uint8
 	BankDepositHot, // A bar slot: that weapon into the bank
 	ToggleDoor,     // At: the cottage (open or shut its door)
 	PickArrow,      // Target: an arrow lying in the world (E)
+	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -531,13 +532,16 @@ private:
 		mutable TWeakObjectPtr<ACottage> FoundCottage;
 	mutable TWeakObjectPtr<ALootDrop> FoundDrop;
 	mutable TWeakObjectPtr<class AProjectile> FoundArrow;   // an arrow lying in reach (E picks it up)
+	mutable TWeakObjectPtr<class AGearWall> FoundWall;   // the MoveLab gear wall and the peg looked at (E takes a copy)
+	mutable int32 FoundPeg = -1;
+	double LastWallTake = -10.0;   // (server: one take per 0.2 s)
 	bool bShopOpen = false;
 	bool bSmithOpen = false;
 	bool bDialogueOpen = false;
 	TWeakObjectPtr<ANpc> TradeNpc;
 	TArray<FString> DialogueLines;
 	int32 DialogueIdx = 0;
-	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop, Arrow };
+	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop, Arrow, GearWall };
 	EInteract FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const;
 	TWeakObjectPtr<AHorse> MyHorse;
 	bool bMounted = false;
