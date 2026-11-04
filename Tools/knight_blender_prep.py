@@ -1,15 +1,20 @@
 # Blender (background) step 1 for the Meshy knight: import Art/Knight/knight.glb, cut it down to a game-sized triangle
 # count, stand it on the ground facing +X (Unreal forward), and render front and side preview pictures.
-# Run: blender -b -P Tools/knight_blender_prep.py -- <project dir> <out dir>
+# Run: blender -b -P Tools/knight_blender_prep.py -- <project dir> <out dir> [<model .glb> <set name>]
+# (2026-11-03) Every armour set is its own Meshy model (Heavy = Art/Knight/knight.glb, the default; Light = the tunic, Classic = the gold armour, and the Mail
+# worn under them): each is prepared the same way into knight_dec_<set>.blend (Heavy keeps knight_dec.blend).
 import bpy, sys, math, os
 from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 proj, out = argv[0], argv[1]
-target_tris = 30000
+glb = argv[2] if len(argv) > 2 else os.path.join(proj, "Art", "Knight", "knight.glb")
+set_name = argv[3] if len(argv) > 3 else "Heavy"
+tag = "" if set_name == "Heavy" else "_" + set_name
+target_tris = 14000 if set_name == "Mail" else 30000   # (the mail is mostly hidden under the plate)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=os.path.join(proj, "Art", "Knight", "knight.glb"))
+bpy.ops.import_scene.gltf(filepath=glb)
 obj = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
 bpy.context.view_layer.objects.active = obj
 obj.select_set(True)
@@ -27,7 +32,7 @@ bm.to_mesh(obj.data); bm.free()
 tris = sum(len(p.vertices) - 2 for p in obj.data.polygons)
 zs0 = [v.co.z for v in obj.data.vertices]
 head_cut = min(zs0) + (max(zs0) - min(zs0)) * 0.765   # just under the chin
-head_tris = 14000
+head_tris = 4000 if set_name == "Mail" else 14000
 bpy.ops.object.mode_set(mode='EDIT')
 bpy.ops.mesh.select_all(action='DESELECT')
 bpy.ops.object.mode_set(mode='OBJECT')
@@ -72,7 +77,7 @@ for i in range(20):
     if sl:
         print("SLICE %2d z %.3f-%.3f  x %.3f..%.3f  y %.3f..%.3f" % (i, z0, z1, min(v.x for v in sl), max(v.x for v in sl), min(v.y for v in sl), max(v.y for v in sl)))
 
-bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "knight_dec.blend"))
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "knight_dec%s.blend" % tag))
 
 # Preview renders: orthographic, flat textured (Workbench), front (looking along +Y) and side (looking along -X)
 scene = bpy.context.scene
@@ -94,5 +99,5 @@ for name, loc, rot in [("front", (c.x, mn.y - 5, c.z), (math.radians(90), 0, 0))
                        ("side", (mx.x + 5, c.y, c.z), (math.radians(90), 0, math.radians(90)))]:
     cam.location = loc
     cam.rotation_euler = rot
-    scene.render.filepath = os.path.join(out, "knight_%s.png" % name)
+    scene.render.filepath = os.path.join(out, "knight%s_%s.png" % (tag, name))
     bpy.ops.render.render(write_still=True)

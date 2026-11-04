@@ -12,7 +12,17 @@ from mathutils import Vector
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 proj, work = argv[0], argv[1]
-bpy.ops.wm.open_mainfile(filepath=os.path.join(work, "knight_dec.blend"))
+# (2026-11-03) Armour sets: each is its own Meshy model cut the same way into the five slots and written as its own skinned
+# mesh on the SAME skeleton (SK_Knight_<Set>.fbx; Iron keeps SK_Knight.fbx and alone writes KnightParts.bin). Run with
+# -- <project dir> <work dir> <set> <metal/roughness picture>. Mail is the chain mail worn under every set: it is shown
+# whole, always, pulled MAIL_INSET cm inside along its normals so the plate sits over it (it fills any gap where pieces of
+# two different sets meet). Tin is the crusader tunic: its long skirt stays with the chest piece, hanging from the hips.
+SET = argv[2] if len(argv) > 2 else "Heavy"
+MR_PATH = argv[3] if len(argv) > 3 else os.path.join(proj, "Art", "Knight", "T_Knight_MR.jpg")
+TAG = "" if SET == "Heavy" else "_" + SET
+MAIL_INSET = 1.2
+OVERLAP_RINGS = 2   # each piece reaches this many triangles into its neighbours, so two sets meeting at a cut overlap
+bpy.ops.wm.open_mainfile(filepath=os.path.join(work, "knight_dec%s.blend" % TAG))
 obj = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
 me = obj.data
 
@@ -49,6 +59,14 @@ def seg_dist(p, a, b):
     t = max(0.0, min(1.0, (p - a).dot(ab) / ab.length_squared))
     return (p - (a + ab * t)).length
 
+SKIRT_GAP = 11.0   # the tunic: cloth further than this from the thigh's axis (hip to knee) is the skirt, not the trousers
+SKIRT_BOTTOM = -56.0   # (just under the hem: lower, bits of the leg mail above the knee were taken for skirt)
+def is_skirt(c):
+    if c.z >= -20.0 or c.z < SKIRT_BOTTOM: return False
+    sd = 1 if c.y > 0 else -1
+    knee = KNEE(sd) + Vector((0.0, 0.0, -12.0))   # (the axis runs on a little past the knee, under the hem)
+    return seg_dist(c, HIP(sd), knee) > SKIRT_GAP
+
 def classify(c, metal=1.0):
     sd = 1 if c.y > 0 else -1
     ay = abs(c.y)
@@ -65,6 +83,8 @@ def classify(c, metal=1.0):
         return (P_ELBR if sd > 0 else P_ELBL, S_GLOVES)
     if c.z >= -20.0:
         return (P_UPPER, S_BODY)
+    if SET == "Light" and is_skirt(c):
+        return (P_BODY, S_BODY)
     if c.z > -44.0:
         # under the belt: the steel plates hanging from it (front plate, tassets, back plates) stay with the body; the dark
         # cloth of the trousers goes with the thigh. The model's own metal map tells them apart (by position alone the
@@ -86,6 +106,43 @@ uvl = me.uv_layers.active.data
 cn = me.corner_normals
 parts = {}
 gpos = [to_game(v.co) for v in me.vertices]
+
+# ---- The arm fit (2026-11-03). The skeleton, the sword grip and every pose were made on the Heavy model, whose long
+# gauntlets put the fists about 13 cm lower than on the Classic, Light and Mail models (their elbows are at the same height).
+# Each of those is fitted: the hand is moved whole onto the Heavy model's fist and the forearm stretches from the elbow to
+# meet it, so a held sword sits in the glove and a piece of one set lines up with its neighbours from another.
+# FIST: the centre of the lowest 9 cm of arm surface well outside the body (|y| > 30) below the elbow.
+HEAVY_FIST = Vector((0.2, 37.8, -37.8))   # (measured by this same routine on the Heavy model; the left fist is its mirror)
+ELBOW_Z, ARM_Y = -10.0, 21.0
+def fist_of(sd):
+    pts = [p for p in gpos if p.y * sd > 30.0 and -50.0 < p.z < -12.0]
+    if not pts: return None
+    bot = min(p.z for p in pts)
+    low = [p for p in pts if p.z < bot + 9.0]
+    return sum(low, Vector()) / len(low)
+for sd in (1, -1):
+    f = fist_of(sd)
+    print("FIST side %d at %.1f %.1f %.1f" % (sd, f.x, f.y, f.z) if f else "FIST side %d not found" % sd)
+    if SET == "Heavy" or f is None: continue
+    target = Vector((HEAVY_FIST.x, sd * HEAVY_FIST.y, HEAVY_FIST.z))
+    move = target - f
+    # the forearm and hand: everything joined to the fist through the mesh's edges, staying below the elbow and outside the body
+    near = lambda i: gpos[i].z < ELBOW_Z and gpos[i].y * sd > ARM_Y
+    seed = min((i for i in range(len(gpos)) if near(i)), key=lambda i: (gpos[i] - f).length)
+    nb = [[] for _ in gpos]
+    for e in me.edges:
+        a, b = e.vertices
+        nb[a].append(b); nb[b].append(a)
+    arm, todo = {seed}, [seed]
+    while todo:
+        for j in nb[todo.pop()]:
+            if j not in arm and near(j): arm.add(j); todo.append(j)
+    wrist_z = f.z + 6.0   # (the top of the hand: from here down it moves whole)
+    for i in arm:
+        p = gpos[i]
+        t = max(0.0, min(1.0, (ELBOW_Z - p.z) / (ELBOW_Z - wrist_z))); t = t * t * (3.0 - 2.0 * t)
+        gpos[i] = p + move * t
+    print("ARMFIT side %d: %d vertices, hand moved %.1f %.1f %.1f" % (sd, len(arm), move.x, move.y, move.z))
 
 # each foot's toe-out: the long axis of the sole (principal direction of the lowest points), measured per side
 foot_yaw = {}
@@ -136,10 +193,13 @@ def turn(v, p, key):
 
 # ---- Which piece each triangle belongs to; then tidy up: small scraps cut off from the rest of their piece (they float
 # when that joint moves) join the piece around them ----
-tris = list(me.loop_triangles)
+class _Tri:   # (plain copies: Blender's own triangle list goes stale once the check picture adds a colour layer, and reading it then crashes)
+    __slots__ = ("vertices", "loops")
+    def __init__(self, lt): self.vertices = tuple(lt.vertices); self.loops = tuple(lt.loops)
+tris = [_Tri(lt) for lt in me.loop_triangles]
 # how metal each triangle is, from the model's metal/roughness picture (blue = metal)
 import numpy as np
-mr_img = bpy.data.images.load(os.path.join(proj, "Art", "Knight", "T_Knight_MR.jpg"))
+mr_img = bpy.data.images.load(MR_PATH)
 mw, mh = mr_img.size
 mr_px = np.empty(mw * mh * 4, dtype=np.float32); mr_img.pixels.foreach_get(mr_px); mr_px = mr_px.reshape(mh, mw, 4)
 def metal_at(uv):
@@ -196,6 +256,22 @@ for _pass in range(3):
             moved += len(comp)
     print("SCRAPS pass %d: %d triangles moved" % (_pass, moved))
 
+# The overlap (skinned sets only): triangles within OVERLAP_RINGS of another slot are also drawn in that slot, so where
+# a piece of one set meets a piece of another, each reaches a little under the other instead of leaving a crack
+extra = []   # (triangle, slot) pairs drawn a second time
+if SET != "Mail":
+    ring = {ti: set() for ti in range(len(tris))}
+    for ti in range(len(tris)):
+        for tj in nbrs[ti]:
+            if keys[tj][1] != keys[ti][1]: ring[ti].add(keys[tj][1])
+    for _r in range(OVERLAP_RINGS - 1):
+        grow = {ti: set(s) for ti, s in ring.items()}
+        for ti in range(len(tris)):
+            for tj in nbrs[ti]: grow[ti] |= {s for s in ring[tj] if s != keys[ti][1]}
+        ring = grow
+    extra = [(ti, s) for ti, ss in ring.items() for s in ss]
+    print("OVERLAP %d triangles drawn twice" % len(extra))
+
 for ti, lt in enumerate(tris):
     key = keys[ti]
     P = parts.setdefault(key, {"v": [], "map": {}, "i": []})
@@ -221,7 +297,7 @@ for ti, lt in enumerate(tris):
 
 out_dir = os.path.join(proj, "Content", "Knight")
 os.makedirs(out_dir, exist_ok=True)
-with open(os.path.join(out_dir, "KnightParts.bin"), "wb") as f:
+with open(os.path.join(out_dir, "KnightParts.bin") if SET == "Heavy" else os.path.join(work, "unused_parts%s.bin" % TAG), "wb") as f:   # (the rigid-piece fallback is the Heavy set's)
     f.write(b"JKNT")
     f.write(struct.pack("<ii", 2, len(parts)))
     for (pivot, slot), P in sorted(parts.items()):
@@ -250,7 +326,7 @@ cam_data = bpy.data.cameras.new("Cam"); cam_data.type = 'ORTHO'; cam_data.ortho_
 cam = bpy.data.objects.new("Cam", cam_data); scene.collection.objects.link(cam); scene.camera = cam
 for name, loc, rot in [("front", (0, -5, 0), (math.radians(90), 0, 0)), ("side", (5, 0, 0), (math.radians(90), 0, math.radians(90))), ("back", (0, 5, 0), (math.radians(90), 0, math.radians(180)))]:
     cam.location = loc; cam.rotation_euler = rot
-    scene.render.filepath = os.path.join(work, "parts_%s.png" % name)
+    scene.render.filepath = os.path.join(work, "parts%s_%s.png" % (TAG, name))
     bpy.ops.render.render(write_still=True)
 
 # ---- The skinned knight (2026-11-01): the same model as ONE mesh on a skeleton, written to Saved\KnightBuild\SK_Knight.fbx
@@ -309,21 +385,42 @@ for i in range(nv):   # at most four bones per vertex, none under 3%
             sc = 1.0 + (FOOT_SCALE - 1.0) * t * wa
             pos[i] = Vector((pos[i].x, PIVOT_POS[ap][1] + (pos[i].y - PIVOT_POS[ap][1]) * sc, pos[i].z))
 
+# The tunic's skirt hangs from the hips: down its length it follows the thigh on its own side more and more (half way at
+# the hem, the front and back centre sharing both thighs), so a stride or a kick swings it without tearing it from the belt
+if SET == "Light":
+    skirt_v = set()
+    for ti, lt in enumerate(tris):
+        if keys[ti] == (P_BODY, S_BODY): skirt_v.update(lt.vertices)
+    for i in skirt_v:
+        z = pos[i].z
+        t = max(0.0, min(1.0, (-22.0 - z) / (-22.0 - SKIRT_BOTTOM))); t = t * t * (3.0 - 2.0 * t)
+        right = max(0.0, min(1.0, 0.5 + pos[i].y / 14.0))
+        follow = 0.55 * t
+        W[i] = {p: w for p, w in {P_BODY: 1.0 - follow, P_HIPR: follow * right, P_HIPL: follow * (1.0 - right)}.items() if w >= 0.03}
+        s = sum(W[i].values()); W[i] = {p: w / s for p, w in W[i].items()}
+    print("SKIRT %d vertices hang from the hips" % len(skirt_v))
+
+# The chain mail sits just inside every set's plate
+if SET == "Mail":
+    for i in range(nv):
+        pos[i] = pos[i] - nrm_game(me.vertices[i].normal) * MAIL_INSET
+
 def to_blend(p): return Vector((p[0] * 0.01, -p[1] * 0.01, p[2] * 0.01))   # (game cm -> Blender metres; Unreal flips Y back on import)
 
 skin_me = bpy.data.meshes.new("SK_Knight")
-skin_me.from_pydata([to_blend(p) for p in pos], [], [tuple(lt.vertices) for lt in tris])
+faces = [(ti, keys[ti][1]) for ti in range(len(tris))] + extra   # (each triangle in its slot, then the overlaps)
+skin_me.from_pydata([to_blend(p) for p in pos], [], [tuple(tris[ti].vertices) for ti, _ in faces])
 uvs = skin_me.uv_layers.new(name="UVMap")
-for ti, lt in enumerate(tris):
-    poly = skin_me.polygons[ti]
+for fi, (ti, _) in enumerate(faces):
+    poly = skin_me.polygons[fi]
     for c in range(3):
-        u = uvl[lt.loops[c]].uv
+        u = uvl[tris[ti].loops[c]].uv
         uvs.data[poly.loop_start + c].uv = (u.x, u.y)
 slot_order = sorted(SLOT_MAT.keys())
 for s in slot_order:
     skin_me.materials.append(bpy.data.materials.get(SLOT_MAT[s]) or bpy.data.materials.new(SLOT_MAT[s]))
-for ti in range(len(tris)):
-    skin_me.polygons[ti].material_index = slot_order.index(keys[ti][1])
+for fi, (_, s) in enumerate(faces):
+    skin_me.polygons[fi].material_index = slot_order.index(s)
 skin_me.update()
 skin_me.set_sharp_from_angle(angle=math.radians(40.0))
 skin_obj = bpy.data.objects.new("SK_Knight", skin_me)
@@ -355,7 +452,7 @@ print("SKIN %d verts, %d tris; vertices with 1/2/3/4 bones: %d %d %d %d" % (nv, 
 for o in bpy.context.view_layer.objects: o.select_set(False)
 arm.select_set(True); skin_obj.select_set(True)
 bpy.context.view_layer.objects.active = arm
-fbx = os.path.join(work, "SK_Knight.fbx")
+fbx = os.path.join(work, "SK_Knight%s.fbx" % TAG)
 bpy.ops.export_scene.fbx(filepath=fbx, use_selection=True, object_types={'ARMATURE', 'MESH'}, add_leaf_bones=False, bake_anim=False,
                          apply_scale_options='FBX_SCALE_ALL', axis_forward='-Y', axis_up='Z', mesh_smooth_type='OFF', colors_type='NONE',
                          use_armature_deform_only=True, primary_bone_axis='Y', secondary_bone_axis='X')

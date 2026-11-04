@@ -16,16 +16,16 @@ proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 art = os.path.join(proj, "Art", "Knight")
 
 
-def import_texture(path, name, srgb, normal=False, flip_green=False):
+def import_texture(path, name, srgb, normal=False, flip_green=False, folder="/Game/Knight"):
     task = unreal.AssetImportTask()
     task.filename = path
-    task.destination_path = "/Game/Knight"
+    task.destination_path = folder
     task.destination_name = name
     task.replace_existing = True
     task.automated = True
     task.save = True
     tools.import_asset_tasks([task])
-    tex = unreal.EditorAssetLibrary.load_asset("/Game/Knight/" + name)
+    tex = unreal.EditorAssetLibrary.load_asset(folder + "/" + name)
     if tex is None:
         raise RuntimeError("KNIGHTDIAG the picture " + name + " did not import")
     tex.set_editor_property("srgb", srgb)
@@ -37,7 +37,7 @@ def import_texture(path, name, srgb, normal=False, flip_green=False):
         tex.set_editor_property("flip_green_channel", flip_green)
     elif not srgb:
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
-    unreal.EditorAssetLibrary.save_asset("/Game/Knight/" + name)
+    unreal.EditorAssetLibrary.save_asset(folder + "/" + name)
     return tex
 
 
@@ -65,8 +65,13 @@ def build_material(name, normal_tex, skin):
         return n
     
     
-    tb = node(unreal.MaterialExpressionTextureSample, -900, 0, texture=base)
-    tm = node(unreal.MaterialExpressionTextureSample, -900, 300, texture=mr, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    # (2026-11-03) the skinned knight's pictures are parameters, so each armour style's material instance gives its own
+    if skin:
+        tb = node(unreal.MaterialExpressionTextureSampleParameter2D, -900, 0, texture=base, parameter_name="BaseTex")
+        tm = node(unreal.MaterialExpressionTextureSampleParameter2D, -900, 300, texture=mr, parameter_name="MRTex", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
+    else:
+        tb = node(unreal.MaterialExpressionTextureSample, -900, 0, texture=base)
+        tm = node(unreal.MaterialExpressionTextureSample, -900, 300, texture=mr, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_MASKS)
     tint = node(unreal.MaterialExpressionVectorParameter, -900, -250, parameter_name="Tint", default_value=unreal.LinearColor(1, 1, 1, 1))
     one = node(unreal.MaterialExpressionConstant3Vector, -700, -350, constant=unreal.LinearColor(1, 1, 1, 1))
     # how much of the tint each pixel takes: the metal mask, pushed up a little so worn plate edges tint too
@@ -79,7 +84,28 @@ def build_material(name, normal_tex, skin):
     lib.connect_material_expressions(tint, "", mix, "B")
     lib.connect_material_expressions(metal, "", mix, "Alpha")
     col = node(unreal.MaterialExpressionMultiply, -250, 0)
-    lib.connect_material_expressions(tb, "RGB", col, "A")
+    if skin:
+        # Desat (0..1): the metal's own colour turned grey before the tint, for a model whose colour is baked into its picture
+        # (the Classic style is painted gold: steel or silver tinted over gold came out yellow). Gain brightens the grey.
+        ds = node(unreal.MaterialExpressionScalarParameter, -900, 150, parameter_name="Desat", default_value=0.0)
+        dsk = node(unreal.MaterialExpressionMultiply, -650, 150)
+        lib.connect_material_expressions(ds, "", dsk, "A")
+        lib.connect_material_expressions(metal, "", dsk, "B")
+        grey = node(unreal.MaterialExpressionDesaturation, -500, 50)
+        lib.connect_material_expressions(tb, "RGB", grey, "")
+        lib.connect_material_expressions(dsk, "", grey, "Fraction")
+        gain = node(unreal.MaterialExpressionScalarParameter, -650, 220, parameter_name="DesatGain", default_value=1.0)
+        gk = node(unreal.MaterialExpressionLinearInterpolate, -400, 100)   # (the gain only where the grey is used)
+        one_s = node(unreal.MaterialExpressionConstant, -650, 280, r=1.0)
+        lib.connect_material_expressions(one_s, "", gk, "A")
+        lib.connect_material_expressions(gain, "", gk, "B")
+        lib.connect_material_expressions(dsk, "", gk, "Alpha")
+        bright = node(unreal.MaterialExpressionMultiply, -350, 0)
+        lib.connect_material_expressions(grey, "", bright, "A")
+        lib.connect_material_expressions(gk, "", bright, "B")
+        lib.connect_material_expressions(bright, "", col, "A")
+    else:
+        lib.connect_material_expressions(tb, "RGB", col, "A")
     lib.connect_material_expressions(mix, "", col, "B")
     # The inside of the shell: each piece is a thin skin drawn from both sides, so through an opening (the top of a greave, the
     # gap at a bent knee) you would see its inner face lit like polished plate and read it as a hole. Wherever the surface's
@@ -117,7 +143,10 @@ def build_material(name, normal_tex, skin):
     lib.connect_material_expressions(mn, "", rough, "B")
     lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     
-    tn = node(unreal.MaterialExpressionTextureSample, -900, 800, texture=normal_tex, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    if skin:
+        tn = node(unreal.MaterialExpressionTextureSampleParameter2D, -900, 800, texture=normal_tex, parameter_name="NormalTex", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    else:
+        tn = node(unreal.MaterialExpressionTextureSample, -900, 800, texture=normal_tex, sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
     lib.connect_material_property(tn, "RGB", unreal.MaterialProperty.MP_NORMAL)
     
     lib.recompile_material(mat)
@@ -130,14 +159,55 @@ build_material("M_Knight", nm, False)
 nm_dx = import_texture(os.path.join(art, "T_Knight_N.jpg"), "T_Knight_N_DX", False, normal=True, flip_green=True)
 skin_mat = build_material("M_KnightSkin", nm_dx, True)
 
-# ---- The skinned knight (2026-11-01): Saved\KnightBuild\SK_Knight.fbx from knight_blender_export.py becomes the skeletal mesh
-# /Game/Knight/SK_Knight (with its skeleton SK_Knight_Skeleton). Its five material slots (Helm, Body, Shoulders, Boots, Gloves)
-# all get M_KnightSkin; the game tints each slot for its armour tier. The legacy FBX importer is used: it honours the options.
-fbx = os.path.join(proj, "Saved", "KnightBuild", "SK_Knight.fbx")
-if os.path.exists(fbx):
-    for old in ("/Game/Knight/SK_Knight", "/Game/Knight/SK_Knight_Skeleton", "/Game/Knight/SK_Knight_PhysicsAsset"):   # (a fresh import: replacing keeps the old options)
+
+# ---- The armour styles (2026-11-03). Each style is its own Meshy model and its own skinned mesh, all on ONE skeleton
+# (SK_Knight_Skeleton, made by the Heavy import; the others are imported onto it and never make their own):
+#   Heavy   = /Game/Knight/SK_Knight          (the original model; the skeleton was built on it)
+#   Classic = /Game/Knight/SK_Knight_Classic  (Art\Knight Gold Armor: its gold is baked into its picture, so Desat greys it)
+#   Light   = /Game/Knight/SK_Knight_Light    (Art\Knight Tunic)
+#   Mail    = /Game/Knight/SK_Knight_Mail     (Art\Knight Base Chainmail, worn under every style)
+# Each gets MI_KnightSkin_<Style> in /Game/Knight/<Style>/ (an instance of M_KnightSkin with its own pictures) on every
+# material slot (Helm, Body, Shoulders, Boots, Gloves); the game tints each slot for its tier at run time.
+flat = unreal.EditorAssetLibrary.load_asset("/Engine/EngineMaterials/FlatNormal")   # (the new models have no normal map)
+STYLES = [
+    ("Heavy",   "SK_Knight",         None,                          None,             0.0),
+    ("Classic", "SK_Knight_Classic", os.path.join(proj, "Art", "Knight Gold Armor"),     "T_Classic", 1.0),
+    ("Light",   "SK_Knight_Light",   os.path.join(proj, "Art", "Knight Tunic"),          "T_Light",   0.0),
+    ("Mail",    "SK_Knight_Mail",    os.path.join(proj, "Art", "Knight Base Chainmail"), "T_Mail",    0.0),
+]
+mel = unreal.MaterialEditingLibrary
+unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
+skel = None
+for style, mesh_name, pic_dir, pic, desat in STYLES:
+    fbx = os.path.join(proj, "Saved", "KnightBuild", mesh_name + ".fbx")
+    if not os.path.exists(fbx):
+        unreal.log_warning("KNIGHTDIAG %s: no %s, skipped" % (style, fbx))
+        continue
+    folder = "/Game/Knight/" + style
+    if pic_dir:
+        tb = import_texture(os.path.join(pic_dir, pic + "_Base.png"), pic + "_Base", True, folder=folder)
+        tm = import_texture(os.path.join(pic_dir, pic + "_MR.png"), pic + "_MR", False, folder=folder)
+        tn = flat
+    else:
+        tb, tm, tn = base, mr, nm_dx
+    mi_path = folder + "/MI_KnightSkin_" + style
+    if unreal.EditorAssetLibrary.does_asset_exist(mi_path): unreal.EditorAssetLibrary.delete_asset(mi_path)
+    mi = tools.create_asset("MI_KnightSkin_" + style, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+    mel.set_material_instance_parent(mi, skin_mat)
+    mel.set_material_instance_texture_parameter_value(mi, "BaseTex", tb)
+    mel.set_material_instance_texture_parameter_value(mi, "MRTex", tm)
+    mel.set_material_instance_texture_parameter_value(mi, "NormalTex", tn)
+    mel.set_material_instance_scalar_parameter_value(mi, "Desat", desat)
+    unreal.EditorAssetLibrary.save_asset(mi_path)
+
+    # A fresh import (replacing keeps the old options). Only Heavy may remake the skeleton; the others delete only their mesh.
+    olds = ["/Game/Knight/" + mesh_name, "/Game/Knight/" + mesh_name + "_PhysicsAsset"]
+    if style == "Heavy": olds.append("/Game/Knight/SK_Knight_Skeleton")
+    for old in olds:
         if unreal.EditorAssetLibrary.does_asset_exist(old): unreal.EditorAssetLibrary.delete_asset(old)
-    unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
+    if style != "Heavy" and skel is None:
+        skel = unreal.EditorAssetLibrary.load_asset("/Game/Knight/SK_Knight_Skeleton")
+        if skel is None: raise RuntimeError("KNIGHTDIAG no SK_Knight_Skeleton: build Heavy first")
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)
     ui.set_editor_property("import_as_skeletal", True)
@@ -146,6 +216,7 @@ if os.path.exists(fbx):
     ui.set_editor_property("import_textures", False)
     ui.set_editor_property("import_animations", False)
     ui.set_editor_property("create_physics_asset", False)
+    if style != "Heavy": ui.set_editor_property("skeleton", skel)
     sk = ui.get_editor_property("skeletal_mesh_import_data")
     sk.set_editor_property("import_morph_targets", False)
     sk.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
@@ -155,21 +226,28 @@ if os.path.exists(fbx):
     task = unreal.AssetImportTask()
     task.filename = fbx
     task.destination_path = "/Game/Knight"
-    task.destination_name = "SK_Knight"
+    task.destination_name = mesh_name
     task.replace_existing = True
     task.automated = True
     task.save = True
     task.options = ui
     tools.import_asset_tasks([task])
-    skm = unreal.EditorAssetLibrary.load_asset("/Game/Knight/SK_Knight")
+    skm = unreal.EditorAssetLibrary.load_asset("/Game/Knight/" + mesh_name)
     if skm is None:
-        raise RuntimeError("KNIGHTDIAG SK_Knight did not import")
+        raise RuntimeError("KNIGHTDIAG %s did not import" % mesh_name)
     mats = skm.get_editor_property("materials")
     for m in mats:
-        m.set_editor_property("material_interface", skin_mat)
+        m.set_editor_property("material_interface", mi)
     skm.set_editor_property("materials", mats)
-    unreal.EditorAssetLibrary.save_directory("/Game/Knight")   # (the mesh AND the skeleton the import made with it)
-    skel = skm.get_editor_property("skeleton")
-    unreal.log("KNIGHTDIAG skeleton %s" % (skel.get_path_name() if skel else None))
+    unreal.EditorAssetLibrary.save_directory("/Game/Knight")   # (the mesh AND, for Heavy, the skeleton the import made with it)
+    if style == "Heavy": skel = skm.get_editor_property("skeleton")
     b = skm.get_bounds()
-    unreal.log("KNIGHTDIAG SK_Knight imported: %d material slots %s, bounds origin %s extent %s" % (len(mats), [str(m.get_editor_property("material_slot_name")) for m in mats], b.origin, b.box_extent))
+    unreal.log("KNIGHTDIAG %s imported: skeleton %s, %d material slots %s, bounds origin %s extent %s" % (mesh_name, skm.get_editor_property("skeleton").get_path_name(), len(mats), [str(m.get_editor_property("material_slot_name")) for m in mats], b.origin, b.box_extent))
+
+# every style must sit on the one skeleton, or the game's bone copy would drive the wrong bones
+paths = set()
+for _, mesh_name, _, _, _ in STYLES:
+    skm = unreal.EditorAssetLibrary.load_asset("/Game/Knight/" + mesh_name)
+    if skm: paths.add(skm.get_editor_property("skeleton").get_path_name())
+if len(paths) == 1: unreal.log("KNIGHTDIAG all sets share one skeleton " + paths.pop())
+else: unreal.log_error("KNIGHTDIAG the sets are on different skeletons: %s" % sorted(paths))
