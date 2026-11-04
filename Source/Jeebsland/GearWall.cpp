@@ -182,8 +182,10 @@ void AGearWall::Build()
 
 int32 AGearWall::PegAt(const FVector& From, const FVector& Dir, const FVector& Near, float MaxDist) const
 {
+	// The peg nearest the middle of the screen by ANGLE (owner, 2026-11-03: aiming right at a piece often gave no prompt; the
+	// old test allowed 14 cm off the camera's line, a sliver from 6 m back). Within 5 degrees, or 25 cm, whichever is wider.
 	int32 Best = -1;
-	float BestOff = 14.f;   // how far off the view line a peg may be (cm)
+	float BestScore = 1.f;
 	for (int32 i = 0; i < Pegs.Num(); ++i)
 	{
 		const FVector& P = Pegs[i].Pos;
@@ -191,7 +193,9 @@ int32 AGearWall::PegAt(const FVector& From, const FVector& Dir, const FVector& N
 		const float Along = FVector::DotProduct(P - From, Dir);
 		if (Along <= 0.f) continue;
 		const float Off = FVector::Dist(P, From + Dir * Along);
-		if (Off < BestOff) { BestOff = Off; Best = i; }
+		const float Allow = FMath::Max(25.f, Along * 0.0875f);   // (tan 5 degrees)
+		const float Score = Off / Allow;
+		if (Score < BestScore) { BestScore = Score; Best = i; }
 	}
 	return Best;
 }
@@ -207,7 +211,7 @@ void AGearWall::AddMannequin(int32 Style, int32 Tier, const FVector& Local)
 		{ JeebItems::K_Chest, PivotPos(P_Upper) + FVector(0.f, 0.f, -12.f) },
 		{ JeebItems::K_Gloves, PivotPos(P_ElbowR) + FVector(0.f, 0.f, -28.f) },
 		{ JeebItems::K_Boots, PivotPos(P_AnkleL) + FVector(0.f, 0.f, -4.f) } };
-	for (const auto& S : Spots)
+	for (const auto& S : Spots) if (JeebItems::StyleHasPiece(S.Kind, Style))   // (no peg for a piece the style does not have)
 	{
 		FPeg P;
 		P.Id = JeebItems::ArmourId(S.Kind, Style, Tier);

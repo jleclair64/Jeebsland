@@ -165,7 +165,7 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 		Controller->GetPlayerViewPoint(From, Rot);
 		for (TActorIterator<AGearWall> It(GetWorld()); It; ++It)
 		{
-			const int32 Peg = It->PegAt(From, Rot.Vector(), GetActorLocation(), 260.f);
+			const int32 Peg = It->PegAt(From, Rot.Vector(), GetActorLocation(), 350.f);
 			if (Peg >= 0) { FoundWall = *It; FoundPeg = Peg; return EInteract::GearWall; }
 		}
 	}

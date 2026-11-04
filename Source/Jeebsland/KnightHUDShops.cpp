@@ -226,10 +226,12 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	if (bStyled)
 	{
 		SmithStyle = FMath::Clamp(SmithStyle, 0, 2);
+		if (Kind != K_Shield && !StyleHasPiece(Kind, SmithStyle)) SmithStyle = AS_Classic;
 		for (int32 s = 0; s < 3; ++s)
 		{
 			const FString Nm = Kind == K_Shield ? FString(ShieldStyleName(s)).Replace(TEXT(" Shield"), TEXT("")) : ArmourStyleRow(s).Name;
-			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, true, SmithStyle == s, 1.0f)) SmithStyle = s;
+			const bool bMade = Kind == K_Shield || StyleHasPiece(Kind, s);   // (no Light shoulders)
+			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, bMade, SmithStyle == s, 1.0f) && bMade) SmithStyle = s;
 		}
 	}
 	const int32 Style = bStyled ? SmithStyle : 0;

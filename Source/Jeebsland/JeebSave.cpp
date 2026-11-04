@@ -181,6 +181,13 @@ void UJeebSave::Migrate()
 		}
 		Selected = Hotbar[0] != 0 || Hotbar[1] == 0 ? 0 : 1;
 	}
+	// Every load (2026-11-03): Light shoulders were removed (the tunic has its own sleeves); any still in a save become
+	// Classic shoulders of the same tier
+	auto FixPiece = [](int32& Id)
+	{
+		if (IsGear(Id) && IsArmorKind(KindOf(Id)) && !StyleHasPiece(KindOf(Id), StyleOf(Id))) Id = ArmourId(KindOf(Id), AS_Classic, VariantOf(Id));
+	};
+	for (TArray<int32>* A : { &SlotIds, &BankIds, &Hotbar, &Worn }) for (int32& Id : *A) FixPiece(Id);
 	SaveVersion = CurrentVersion;
 }
 

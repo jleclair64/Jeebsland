@@ -98,7 +98,10 @@ namespace JeebItems
 	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
 	constexpr int32 NumArmourStyles = 3;
 	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy };
-	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { return IdGearBase + Kind * 100 + FMath::Clamp(Style, 0, NumArmourStyles - 1) * 10 + Tier; }
+	// Light (the tunic) has no shoulder piece (owner, 2026-11-03: its sleeves are part of the chest): a style that has no piece
+	// for a slot is never made; asked for anyway (an old save, a random roll), the Classic piece is made instead.
+	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light); }
+	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { Style = FMath::Clamp(Style, 0, NumArmourStyles - 1); if (!StyleHasPiece(Kind, Style)) Style = AS_Classic; return IdGearBase + Kind * 100 + Style * 10 + Tier; }
 	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 

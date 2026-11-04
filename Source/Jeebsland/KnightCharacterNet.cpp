@@ -1,4 +1,4 @@
-#include "KnightCharacter.h"
+﻿#include "KnightCharacter.h"
 #include "Messages.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
@@ -317,7 +317,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		{
 			if (!It->GetPegs().IsValidIndex(A)) continue;
 			const AGearWall::FPeg& P = It->GetPegs()[A];
-			if (FVector::Dist(P.Pos, GetActorLocation()) > 350.f) break;
+			if (FVector::Dist(P.Pos, GetActorLocation()) > 400.f) break;   // (the player's machine offers pegs within 350 cm; a little slack for lag)
 			LastWallTake = Now;
 			if (Sk->AddInvItem(P.Id, P.Count)) Sk->Say(1.5f, FColor::White, FString::Printf(TEXT("Took the %s."), *JeebItems::ItemName(P.Id)));
 			else Sk->Say(2.f, Warn, TEXT("Your pack is full."));

@@ -67,12 +67,16 @@ def is_skirt(c):
     knee = KNEE(sd) + Vector((0.0, 0.0, -12.0))   # (the axis runs on a little past the knee, under the hem)
     return seg_dist(c, HIP(sd), knee) > SKIRT_GAP
 
+# where each set's helmet ends (game cm at the middle of the neck; owner 2026-11-03: the new sets' helmets took in their
+# collars and gorgets, which belong to the chest piece). Measured on Saved/KnightBuild height-line pictures.
+HEAD_CUT = {"Heavy": (31.7, 0.32), "Classic": (35.5, 0.12), "Light": (36.5, 0.12)}   # (height, slope: lower at the chin)
 def classify(c, metal=1.0):
     sd = 1 if c.y > 0 else -1
     ay = abs(c.y)
     # the helmet sits above a sloping cut: low under the chin, higher at the back of the neck, so the tall collar stays
     # with the body
-    if c.z > 27.5 - 0.12 * c.x and ay < 19.0:
+    hc, hs = HEAD_CUT.get(SET, (27.5, 0.12))
+    if c.z > hc - hs * c.x and ay < 19.0:
         return (P_HEAD, S_HELM)
     # the arms, pauldrons included (they turn with the arm about the shoulder)
     is_arm = (5.0 <= c.z <= 34.0 and ay > 19.0) or (-20.0 <= c.z < 5.0 and ay > 21.5) or (-48.0 < c.z < -20.0 and ay > 27.5)
