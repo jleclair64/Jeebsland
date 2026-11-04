@@ -1,4 +1,4 @@
-# Blender (background) step 2 for the Meshy knight: take the cut-down model (knight_dec.blend from knight_blender_prep.py),
+﻿# Blender (background) step 2 for the Meshy knight: take the cut-down model (knight_dec.blend from knight_blender_prep.py),
 # move it into the game's knight space (cm; feet at Z = -96, forward +X, right +Y), cut it into the pieces that hang off
 # the knight's joints (KnightDesign::PivotPos) and write them to Content/Knight/KnightParts.bin for the game to load.
 # It also renders front and side pictures with each piece in its own colour, to check the cuts.
@@ -256,6 +256,12 @@ for _pass in range(3):
             moved += len(comp)
     print("SCRAPS pass %d: %d triangles moved" % (_pass, moved))
 
+# The tunic (Light) has no shoulder piece (owner, 2026-11-03: a cut shoulder never fitted): everything on its arms above
+# the gloves belongs to the chest piece, so the whole tunic comes on and off with the chest. (It still bends with the arm bones.)
+if SET == "Light":
+    keys = [(k[0], S_BODY) if k[1] == S_SHOULDERS else k for k in keys]
+    print("TUNIC shoulders joined to the chest piece")
+
 # The overlap (skinned sets only): triangles within OVERLAP_RINGS of another slot are also drawn in that slot, so where
 # a piece of one set meets a piece of another, each reaches a little under the other instead of leaving a crack
 extra = []   # (triangle, slot) pairs drawn a second time
@@ -414,7 +420,7 @@ SIZE_MIN, SIZE_MAX = 0.92, 1.3
 # set by eye against the Heavy model in the side-by-side picture (knight_blender_compare.py), where the measure falls short
 SIZE_SET = {}
 # sets remodelled in Meshy to the Heavy knight's build (2026-11-03): only measured (the SIZE lines), never reshaped
-MEASURE_ONLY = {"Classic"}
+MEASURE_ONLY = {"Classic", "Light"}
 def size_rule(b):
     c = Vector(PIVOT_POS[b])
     if b == P_HEAD: return (c + Vector((0.0, 0.0, 6.0)), lambda p: p.z > c.z + 6.0, (0, 1), True)
