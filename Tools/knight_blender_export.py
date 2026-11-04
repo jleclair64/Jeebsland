@@ -20,7 +20,8 @@ proj, work = argv[0], argv[1]
 SET = argv[2] if len(argv) > 2 else "Heavy"
 MR_PATH = argv[3] if len(argv) > 3 else os.path.join(proj, "Art", "Knight", "T_Knight_MR.jpg")
 TAG = "" if SET == "Heavy" else "_" + SET
-MAIL_INSET = 1.2
+MAIL_INSET = 2.0
+MAIL_LEG_EXTRA = 2.0
 OVERLAP_RINGS = 2   # each piece reaches this many triangles into its neighbours, so two sets meeting at a cut overlap
 bpy.ops.wm.open_mainfile(filepath=os.path.join(work, "knight_dec%s.blend" % TAG))
 obj = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
@@ -469,7 +470,8 @@ elif SET != "Mail" and os.path.exists(SIZE_FILE):
 # The chain mail sits just inside every set's plate
 if SET == "Mail":
     for i in range(nv):
-        pos[i] = pos[i] - nrm_game(me.vertices[i].normal) * MAIL_INSET
+        leg = sum(W[i].get(b, 0.0) for b in (P_KNEEL, P_KNEER, P_ANKL, P_ANKR))   # (deeper in the boots: the slim tunic boots showed it)
+        pos[i] = pos[i] - nrm_game(me.vertices[i].normal) * (MAIL_INSET + MAIL_LEG_EXTRA * leg)
 
 def to_blend(p): return Vector((p[0] * 0.01, -p[1] * 0.01, p[2] * 0.01))   # (game cm -> Blender metres; Unreal flips Y back on import)
 

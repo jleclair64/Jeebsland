@@ -323,11 +323,9 @@ namespace KnightModel
 		S.Worn[i] = Id;
 		const FName MatName(SlotMaterial(Slot));
 		const int32 Style = Id ? FMath::Clamp(JeebItems::StyleOf(Id), 0, JeebItems::NumArmourStyles - 1) : -1;
-		// the mail shows only where nothing is worn (2026-11-03: drawn whole, it poked through the front of the plate);
-		// each piece reaches a little under its neighbours (the export's overlap), so no gap opens where two styles meet
-		// (Light has no shoulder piece of its own, owner 2026-11-03: its sleeves are part of the tunic, so the mail stays under its shoulders)
-		const bool bNoPiece = Style == Set_Light && MatName == FName(TEXT("Shoulders"));
-		if (S.LeaderSet == Set_Mail && S.Sets[Set_Mail]) ShowSection(S.Sets[Set_Mail], S.Sets[Set_Mail]->GetMaterialIndex(MatName), Id == 0 || bNoPiece);
+		// the mail is always drawn whole, the body under every piece (owner, 2026-11-03); it sits MAIL_INSET inside the plate
+		// (knight_blender_export.py) so it does not poke through. Each piece reaches a little under its neighbours (the export's
+		// overlap), so no gap opens where two styles meet.
 		for (int32 Set = 0; Set < Set_Count; ++Set)
 		{
 			if (Set == Set_Mail) continue;   // (the mail always shows whole)
