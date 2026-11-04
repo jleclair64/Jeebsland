@@ -412,7 +412,9 @@ SIZE_FILE = os.path.join(work, "size_heavy.json")
 # pauldrons evenly; limbs and feet only in girth.
 SIZE_MIN, SIZE_MAX = 0.92, 1.3
 # set by eye against the Heavy model in the side-by-side picture (knight_blender_compare.py), where the measure falls short
-SIZE_SET = {"Classic": {P_HEAD: 1.16, P_ARML: 1.22, P_ARMR: 1.22}}
+SIZE_SET = {}
+# sets remodelled in Meshy to the Heavy knight's build (2026-11-03): only measured (the SIZE lines), never reshaped
+MEASURE_ONLY = {"Classic"}
 def size_rule(b):
     c = Vector(PIVOT_POS[b])
     if b == P_HEAD: return (c + Vector((0.0, 0.0, 6.0)), lambda p: p.z > c.z + 6.0, (0, 1), True)
@@ -443,7 +445,8 @@ elif SET != "Mail" and os.path.exists(SIZE_FILE):
         if even: s = SIZE_SET.get(SET, {}).get(b, sum(r) / len(r)); scale[b] = [s, s, s]
         else: scale[b] = [r[axes.index(a)] if a in axes else 1.0 for a in range(3)]
         centre[b] = c
-        print("SIZE bone %-7s x%.2f y%.2f z%.2f" % (BONES[b], *scale[b]))
+        print("SIZE bone %-7s x%.2f y%.2f z%.2f%s" % (BONES[b], *scale[b], " (measured only)" if SET in MEASURE_ONLY else ""))
+        if SET in MEASURE_ONLY: scale[b] = [1.0, 1.0, 1.0]
     for i in range(nv):
         d = Vector((0.0, 0.0, 0.0))
         for b, w in W[i].items():
