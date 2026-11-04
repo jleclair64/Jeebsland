@@ -72,6 +72,9 @@ def is_skirt(c):
 # collars and gorgets, which belong to the chest piece). Measured on Saved/KnightBuild height-line pictures. The mail's hood
 # ends high too, so its neck stays with its body: hidden under a helmet, the hood would otherwise leave the neck open.
 HEAD_CUT = {"Heavy": (31.7, 0.32), "Classic": (35.5, 0.12), "Light": (36.5, 0.12), "Mail": (37.0, 0.12)}   # (height, slope: lower at the chin)
+# owner 2026-11-03: the elbow armour belongs to the gloves (the shoulder piece ends above the elbow cop), and the plates that
+# hang from the belt are body armour all the way down (their low ends went to the boots and showed on bare legs)
+ELBOW_CUT_Z, HANG_LOW = 3.0, -50.0
 def classify(c, metal=1.0):
     sd = 1 if c.y > 0 else -1
     ay = abs(c.y)
@@ -83,8 +86,10 @@ def classify(c, metal=1.0):
     # the arms, pauldrons included (they turn with the arm about the shoulder)
     is_arm = (5.0 <= c.z <= 34.0 and ay > 19.0) or (-20.0 <= c.z < 5.0 and ay > 21.5) or (-48.0 < c.z < -20.0 and ay > 27.5)
     if is_arm:
-        if c.z > -3.5:
+        if c.z > ELBOW_CUT_Z:
             return (P_ARMR if sd > 0 else P_ARML, S_SHOULDERS)
+        if c.z > -3.5:   # (the elbow cop: in the gloves, but turning with the upper arm like before)
+            return (P_ARMR if sd > 0 else P_ARML, S_GLOVES)
         if sd > 0 and c.z < WRIST_CUT_Z: return (P_WRISTR, S_GLOVES)
         return (P_ELBR if sd > 0 else P_ELBL, S_GLOVES)
     if c.z >= -20.0:
@@ -98,6 +103,8 @@ def classify(c, metal=1.0):
         if metal > 0.5 and seg_dist(c, HIP(sd), KNEE(sd)) > 8.0:
             return (P_UPPER, S_BODY)
         return (P_HIPR if sd > 0 else P_HIPL, S_BODY)
+    if SET != "Mail" and c.z > HANG_LOW and metal > 0.5 and seg_dist(c, HIP(sd), KNEE(sd)) > 9.0 and (c - KNEE(sd)).length > 14.0:
+        return (P_UPPER, S_BODY)   # (the low ends of plates hanging from the belt: body armour, not boots)
     if c.z > -78.0:   # (the cut sits on the seam where the greave meets the boot cuff, which turns with the foot)
         return (P_KNEER if sd > 0 else P_KNEEL, S_BOOTS)
     return (P_ANKR if sd > 0 else P_ANKL, S_BOOTS)
@@ -468,10 +475,18 @@ elif SET != "Mail" and os.path.exists(SIZE_FILE):
         pos[i] = pos[i] + d
 
 # The chain mail sits just inside every set's plate
+# The mail's legs were cartoonishly thin bare (owner, 2026-11-03): they are thickened round each leg bone. Under worn boots
+# and gloves the game hides the mail's lower legs and forearms (KnightModel::Wear), so thicker mail never pokes through them.
+MAIL_GIRTH = {P_HIPL: 1.3, P_HIPR: 1.3, P_KNEEL: 1.2, P_KNEER: 1.2, P_ANKL: 1.1, P_ANKR: 1.1}
 if SET == "Mail":
     for i in range(nv):
-        leg = sum(W[i].get(b, 0.0) for b in (P_KNEEL, P_KNEER, P_ANKL, P_ANKR))   # (deeper in the boots: the slim tunic boots showed it)
-        pos[i] = pos[i] - nrm_game(me.vertices[i].normal) * (MAIL_INSET + MAIL_LEG_EXTRA * leg)
+        d = Vector((0.0, 0.0, 0.0))
+        for b, g in MAIL_GIRTH.items():
+            w = W[i].get(b, 0.0)
+            if w <= 0.0: continue
+            c = PIVOT_POS[b]
+            d += w * Vector(((pos[i].x - c[0]) * (g - 1.0), (pos[i].y - c[1]) * (g - 1.0), 0.0))
+        pos[i] = pos[i] + d - nrm_game(me.vertices[i].normal) * MAIL_INSET
 
 def to_blend(p): return Vector((p[0] * 0.01, -p[1] * 0.01, p[2] * 0.01))   # (game cm -> Blender metres; Unreal flips Y back on import)
 

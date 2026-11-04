@@ -325,7 +325,10 @@ namespace KnightModel
 		const int32 Style = Id ? FMath::Clamp(JeebItems::StyleOf(Id), 0, JeebItems::NumArmourStyles - 1) : -1;
 		// the mail is always drawn whole, the body under every piece (owner, 2026-11-03); it sits MAIL_INSET inside the plate
 		// (knight_blender_export.py) so it does not poke through. Each piece reaches a little under its neighbours (the export's
-		// overlap), so no gap opens where two styles meet.
+		// overlap), so no gap opens where two styles meet. Only under worn boots and gloves is the mail hidden: its legs were
+		// thickened (bare they looked too thin) and the slim boots and gauntlets fit closer than any plate.
+		const bool bTight = MatName == FName(TEXT("Boots")) || MatName == FName(TEXT("Gloves"));
+		if (bTight && S.LeaderSet == Set_Mail && S.Sets[Set_Mail]) ShowSection(S.Sets[Set_Mail], S.Sets[Set_Mail]->GetMaterialIndex(MatName), Id == 0);
 		for (int32 Set = 0; Set < Set_Count; ++Set)
 		{
 			if (Set == Set_Mail) continue;   // (the mail always shows whole)

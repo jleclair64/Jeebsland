@@ -1,4 +1,4 @@
-#include "KnightCharacter.h"
+﻿#include "KnightCharacter.h"
 #include "KnightModel.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -293,8 +293,12 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 	HipRf += 8.f * SwingLoad; HipLf -= 8.f * SwingLoad;
 	KneeRf -= 10.f * FMath::Abs(SwingLoad); KneeLf -= 10.f * FMath::Abs(SwingLoad);
 
-	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, HipRroll));
-	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll));
+	// Standing still, a natural stance (owner, 2026-11-03): heels a little closer (each leg rolls in HeelIn degrees; a hip's
+	// roll is NEGATIVE to swing a leg out to his right, measured 2026-10-31) and the toes turned out ToeOut degrees, so the toes
+	// stay about as far apart as before. Only when idle: walking with toes out read as a waddle.
+	constexpr float HeelIn = 1.5f, ToeOut = 12.f;
+	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, HipRroll + HeelIn * IdleAmt));
+	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll - HeelIn * IdleAmt));
 	KneeR->SetRelativeRotation(FRotator(KneeRf, 0.f, 0.f));
 	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
 	// Feet stay flat on the ground (a running stride lets them tip a little); in the air, sitting, riding, climbing,
@@ -307,8 +311,8 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 	{
 		return Level * FMath::Lerp(-(H + K), -8.f, Follow * Gait) - 20.f * Toe * Gait;
 	};
-	AnkleR->SetRelativeRotation(FRotator(FootPitch(HipRf, KneeRf, GFollowR, GToeR), 0.f, 0.f));
-	AnkleL->SetRelativeRotation(FRotator(FootPitch(HipLf, KneeLf, GFollowL, GToeL), 0.f, 0.f));
+	AnkleR->SetRelativeRotation(FRotator(FootPitch(HipRf, KneeRf, GFollowR, GToeR), ToeOut * IdleAmt, 0.f));
+	AnkleL->SetRelativeRotation(FRotator(FootPitch(HipLf, KneeLf, GFollowL, GToeL), -ToeOut * IdleAmt, 0.f));
 
 	P.HipRf = HipRf; P.HipLf = HipLf; P.KneeRf = KneeRf; P.KneeLf = KneeLf; P.IdleAmt = IdleAmt; P.BreathS = BreathS;
 }
@@ -527,7 +531,9 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
 	ShieldHoldA = FMath::FInterpTo(ShieldHoldA, (ShieldActive() && !bStowed) ? 1.f : 0.f, Dt, 8.f);   // no shield: the left arm hangs normally
 	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
-	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt;
+	// at rest the arms hang closer to the hips (owner, 2026-11-03): the model's arms stand out from its A-pose
+	constexpr float ArmRestIn = 7.f;
+	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt - ArmRestIn * Ground;
 	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground * ShieldHoldA;   // at rest the left hand rests on the inside of the shield (when there is one)
 	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
 	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
@@ -557,7 +563,7 @@ void AKnightCharacter::PoseArms(FKnightPose& P)
 	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
 	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;   // arms hang a touch forward (relaxed shoulders)
 	float TargetYaw = 0.f;
-	float RollR = -Air * ArmAirSpread - 1.2f * BreathS * IdleAmt - (EaseKind == JeebItems::K_Staff ? 14.f * EaseAlpha : 0.f);   // the arms ease out a little with each breath (and out to the side to hold a staff)
+	float RollR = ArmRestIn * Ground - Air * ArmAirSpread - 1.2f * BreathS * IdleAmt - (EaseKind == JeebItems::K_Staff ? 14.f * EaseAlpha : 0.f);   // the arms ease out a little with each breath (and out to the side to hold a staff)
 	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
 	if (EaseKind == JeebItems::K_Bow && !bStowed)   // the bow in his left hand: the empty right arm hangs and swings like the left one, not as if holding something (owner, 2026-11-01)
 	{
