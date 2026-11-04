@@ -312,6 +312,7 @@ void AKnightCharacter::PoseBow(float Dt)
 	const bool bBowIn = SelectedKind() == JeebItems::K_Bow && !bStowed && BowHold;
 	BowAimAlpha = FMath::FInterpTo(BowAimAlpha, (bBowIn && Bow != EBow::None) ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 12.f : 8.f);
 	BowEaseAlpha = FMath::FInterpTo(BowEaseAlpha, bBowIn ? 1.f : 0.f, Dt, 10.f);
+	if (!BowHold) { BowAimAlpha = 0.f; return; }   // (the bow was put away mid-draw: R, a drop, death)
 	if (!ArmPivotL || !ElbowL || !ArmPivot || !ElbowR || !UpperPivot) return;
 	using namespace KnightDesign;
 	const float A = BowAimAlpha * BowAimAlpha * (3.f - 2.f * BowAimAlpha);
