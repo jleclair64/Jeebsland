@@ -35,10 +35,14 @@ foreach ($s in $sets) {
     }
     Write-Host "== $($s.Name)"
     & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_prep.py') -- $proj $work $glb $s.Name 2>&1 | Select-String 'TRIS|Error' | ForEach-Object { Write-Host $_.Line }
-    & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work $s.Name (Join-Path $dir $s.Pics[1]) 2>&1 | Select-String 'FIST|ARMFIT|OVERLAP|SKIRT|SKIN|SIZE|Error|Traceback' | ForEach-Object { Write-Host $_.Line }
+    & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work $s.Name (Join-Path $dir $s.Pics[1]) 2>&1 | Select-String 'FIST|ARMFIT|OVERLAP|SKIRT|SKIN|SIZE|CUT|Error|Traceback' | ForEach-Object { Write-Host $_.Line }
 }
 
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'knight_unreal_import.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'KNIGHTDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'KNIGHTDIAG all sets share one skeleton') { Write-Host 'Knight built.'; exit 0 } else { Write-Host 'Knight build FAILED.'; exit 1 }
+
+# The import leaves the editor's Content Browser inside /Game/Knight; point it back at Content (owner, 2026-11-03)
+$ini = Join-Path $proj 'Saved\Config\WindowsEditor\EditorPerProjectUserSettings.ini'
+if (Test-Path $ini) { (Get-Content $ini) -replace '^ContentBrowserTab1\.SelectedPaths=.*', 'ContentBrowserTab1.SelectedPaths=/Game' | Set-Content -Encoding utf8 $ini }

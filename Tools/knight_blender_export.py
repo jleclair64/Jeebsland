@@ -462,15 +462,102 @@ if SET == "Mail":
 
 def to_blend(p): return Vector((p[0] * 0.01, -p[1] * 0.01, p[2] * 0.01))   # (game cm -> Blender metres; Unreal flips Y back on import)
 
+# ---- Smooth slot edges (2026-11-03, owner: the cut edges looked jagged, e.g. the Heavy chest's arm holes with the
+# shoulders off). Each triangle belongs to one slot, so a cut followed the triangles' saw-tooth. Instead each vertex gets a
+# share of every slot (how many of its triangles are in it), blurred over the mesh a few times; every slot keeps only the
+# surface where its share is at least CUT_AT, and triangles crossing that line are cut along it. The line is a smooth curve,
+# and with CUT_AT under a half both neighbours reach a little past it, so pieces from different sets still overlap.
+# The share is measured in SPACE, not along the mesh: the slots of every triangle within CUT_RADIUS of the vertex, by area,
+# nearer ones counting more. Plates here are several shells thick (outer face, inner face, rims); blurring along the mesh
+# cut each shell at a different place and left torn layers, while a share in space cuts every shell along the same line.
+CUT_RADIUS, CUT_AT = 7.0, 0.35
+tri_c = np.array([[*((pos[t.vertices[0]] + pos[t.vertices[1]] + pos[t.vertices[2]]) / 3.0)] for t in tris])
+tri_a = np.array([max(1e-4, ((pos[t.vertices[1]] - pos[t.vertices[0]]).cross(pos[t.vertices[2]] - pos[t.vertices[0]])).length * 0.5) for t in tris])
+slot_list = sorted(SLOT_MAT.keys())
+tri_s = np.array([slot_list.index(keys[ti][1]) for ti in range(len(tris))])
+cells = {}
+for ti, c in enumerate(tri_c):
+    cells.setdefault(tuple((c // CUT_RADIUS).astype(int)), []).append(ti)
+share = []
+for i in range(nv):
+    p = np.array([pos[i].x, pos[i].y, pos[i].z])
+    k = (p // CUT_RADIUS).astype(int)
+    cand = [ti for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1) for ti in cells.get((k[0] + dx, k[1] + dy, k[2] + dz), ())]
+    if not cand: share.append({}); continue
+    cand = np.array(cand)
+    d2 = ((tri_c[cand] - p) ** 2).sum(axis=1)
+    w = tri_a[cand] * np.clip(1.0 - d2 / (CUT_RADIUS * CUT_RADIUS), 0.0, None) ** 2
+    tot = w.sum()
+    if tot <= 0.0: share.append({}); continue
+    sums = np.bincount(tri_s[cand], weights=w, minlength=len(slot_list))
+    share.append({slot_list[j]: float(sums[j] / tot) for j in range(len(slot_list)) if sums[j] > 0.0})
+for ti, t in enumerate(tris):   # (a vertex with nothing near keeps its own triangles' slot)
+    for vi in t.vertices:
+        if not share[vi]: share[vi] = {keys[ti][1]: 1.0}
+out_pos, out_w = list(pos), list(W)
+out_tris = []   # (three output vertex indices, three uvs, slot)
+cut_vert = {}
+def cut_point(a, b, s, ua, ub):
+    k = (min(a, b), max(a, b), s)
+    ga, gb = share[a].get(s, 0.0) - CUT_AT, share[b].get(s, 0.0) - CUT_AT
+    t = ga / (ga - gb)
+    if k not in cut_vert:
+        cut_vert[k] = len(out_pos)
+        out_pos.append(pos[a].lerp(pos[b], t))
+        wa, wb = W[a], W[b]
+        w = {p: wa.get(p, 0.0) * (1.0 - t) + wb.get(p, 0.0) * t for p in set(wa) | set(wb)}
+        top = sorted(w.items(), key=lambda kv: -kv[1])[:4]
+        sw = sum(x for _, x in top)
+        out_w.append({p: x / sw for p, x in top if x > 0.0})
+    return cut_vert[k], ua.lerp(ub, t)
+dropped = cut = 0
+for ti, s in [(ti, keys[ti][1]) for ti in range(len(tris))] + extra:
+    vs = tris[ti].vertices
+    us = [Vector(uvl[li].uv) for li in tris[ti].loops]
+    inside = [share[v].get(s, 0.0) >= CUT_AT for v in vs]
+    if all(inside): out_tris.append((tuple(vs), us, s)); continue
+    if not any(inside): dropped += 1; continue
+    cut += 1
+    poly = []   # (vertex, uv) round the part of the triangle that is inside
+    for c in range(3):
+        a, b = vs[c], vs[(c + 1) % 3]
+        if inside[c]: poly.append((a, us[c]))
+        if inside[c] != inside[(c + 1) % 3]: poly.append(cut_point(a, b, s, us[c], us[(c + 1) % 3]))
+    for c in range(1, len(poly) - 1):
+        out_tris.append(((poly[0][0], poly[c][0], poly[c + 1][0]), [poly[0][1], poly[c][1], poly[c + 1][1]], s))
+# Shards: small loose bits left at the cut line (a sliver of an inner shell or a rim) are dropped. Only bits that touch the
+# line go; a small part that was always loose (a rivet, a buckle) stays.
+first_cut = nv
+by_slot = {}
+for oi, (t, _, s) in enumerate(out_tris): by_slot.setdefault(s, []).append(oi)
+shard_ids = set()
+for s, ois in by_slot.items():
+    vt = {}
+    for oi in ois:
+        for v in out_tris[oi][0]: vt.setdefault(v, []).append(oi)
+    seen = set()
+    for start in ois:
+        if start in seen: continue
+        comp, todo = [], [start]; seen.add(start)
+        while todo:
+            oi = todo.pop(); comp.append(oi)
+            for v in out_tris[oi][0]:
+                for oj in vt[v]:
+                    if oj not in seen: seen.add(oj); todo.append(oj)
+        if len(comp) < 40 and any(v >= first_cut for oi in comp for v in out_tris[oi][0]): shard_ids.update(comp)
+out_tris = [t for oi, t in enumerate(out_tris) if oi not in shard_ids]
+print("CUT smooth edges: %d triangles cut along the line, %d dropped, %d new vertices, %d shard triangles removed" % (cut, dropped, len(out_pos) - nv, len(shard_ids)))
+pos, W = out_pos, out_w
+nv = len(pos)
+
 skin_me = bpy.data.meshes.new("SK_Knight")
-faces = [(ti, keys[ti][1]) for ti in range(len(tris))] + extra   # (each triangle in its slot, then the overlaps)
-skin_me.from_pydata([to_blend(p) for p in pos], [], [tuple(tris[ti].vertices) for ti, _ in faces])
+faces = [(None, s) for _, _, s in out_tris]
+skin_me.from_pydata([to_blend(p) for p in pos], [], [t for t, _, _ in out_tris])
 uvs = skin_me.uv_layers.new(name="UVMap")
-for fi, (ti, _) in enumerate(faces):
+for fi, (_, us, _) in enumerate(out_tris):
     poly = skin_me.polygons[fi]
     for c in range(3):
-        u = uvl[tris[ti].loops[c]].uv
-        uvs.data[poly.loop_start + c].uv = (u.x, u.y)
+        uvs.data[poly.loop_start + c].uv = (us[c].x, us[c].y)
 slot_order = sorted(SLOT_MAT.keys())
 for s in slot_order:
     skin_me.materials.append(bpy.data.materials.get(SLOT_MAT[s]) or bpy.data.materials.new(SLOT_MAT[s]))

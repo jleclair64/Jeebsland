@@ -477,6 +477,9 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						S->Worn[Kd] = JeebItems::ArmourId(Kd, bMix ? (Kd - JeebItems::K_Helmet) % JeebItems::NumArmourStyles : ShotStyle, FMath::Clamp(ShotWear, 0, JeebItems::NumTiers - 1));
 				if (S && FParse::Param(FCommandLine::Get(), TEXT("ShotBare")))
 					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = 0;
+				int32 ShotOff = -1;   // (-ShotOff=<n> takes one piece off, counting from the helmet: 0 helmet, 1 chest, 2 shoulders, 3 gloves, 4 boots; to see a cut edge)
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotOff="), ShotOff) && ShotOff >= 0 && JeebItems::K_Helmet + ShotOff <= JeebItems::K_Boots)
+					S->Worn[JeebItems::K_Helmet + ShotOff] = 0;
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
