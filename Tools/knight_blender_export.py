@@ -68,8 +68,9 @@ def is_skirt(c):
     return seg_dist(c, HIP(sd), knee) > SKIRT_GAP
 
 # where each set's helmet ends (game cm at the middle of the neck; owner 2026-11-03: the new sets' helmets took in their
-# collars and gorgets, which belong to the chest piece). Measured on Saved/KnightBuild height-line pictures.
-HEAD_CUT = {"Heavy": (31.7, 0.32), "Classic": (35.5, 0.12), "Light": (36.5, 0.12)}   # (height, slope: lower at the chin)
+# collars and gorgets, which belong to the chest piece). Measured on Saved/KnightBuild height-line pictures. The mail's hood
+# ends high too, so its neck stays with its body: hidden under a helmet, the hood would otherwise leave the neck open.
+HEAD_CUT = {"Heavy": (31.7, 0.32), "Classic": (35.5, 0.12), "Light": (36.5, 0.12), "Mail": (37.0, 0.12)}   # (height, slope: lower at the chin)
 def classify(c, metal=1.0):
     sd = 1 if c.y > 0 else -1
     ay = abs(c.y)

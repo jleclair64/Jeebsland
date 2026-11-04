@@ -52,3 +52,4 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 
 - Text on any browse board (titles, headers, row labels) needs its own clear strip outside the item area and must be legible from where the player first sees it; check from the start spot as well as close up.
 - Judge slot cuts first on the flat-colour per-slot render (ragged cuts show as other-slot fringes at hems), and give reviewers crops where the knight fills at least half the frame.
+- When a slot's cut moves, check every OTHER set under it too (a helmet cut raised exposed a neck the mail's hidden hood used to cover): picture each style with the neighbouring piece off.
