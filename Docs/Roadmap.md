@@ -56,13 +56,14 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 ## Characters, capes and ranks
 - **Three profiles per account:** a Knight, a Wizard and a Troll, each a separate character (own gear, skills, level). Bank and money are shared. Switching character goes through the fast-travel screen. Visited towns are per account [M-L].
 - Home and respawn towns: knights Oak Hill, wizards Silver Point, trolls Birch Grove. (The code still sends deaths and new players to Blackrock: change it when Oak Hill is built.)
-- **Cape = PvP level (2026-10-29):** ONE colour on the cape shows the player's PvP level. No main-quest stages, no separate cross. The cape is locked to the character (not an item, never dropped or traded). Colour order still to confirm (see Open questions); the old eight-colour order was white, silver, green, purple, blue, red, black, gold.
+- **Capes are ordinary items (owner, 2026-11-03):** the cape no longer shows a PvP level; capes come in every tier's colour and are taken off, bought, sold, dropped and lost on death like other gear. How a PvP level is shown, if at all, is open again.
 - **Gear tiers (decided 2026-10-29):** TIN, IRON, BRONZE, STEEL, SILVER, GOLD, then one rare LEGENDARY tier per class above gold: **ONYX for knights, EMERALD for trolls, DIAMOND for wizards** (each is that class's top gear, equal in strength, only usable by that class). Equip level gates: weapons need Attack, armour and shields need Defence (suggested levels: tin 1, iron 5, bronze 10, steel 20, silver 30, gold 40, legendary 50-60; to tune). Gaps stay narrow so skill can beat a tier of gear. Colours: tin grey matte, iron dark matte, bronze shine (today's colour), steel bright grey, silver shiny, gold golden, onyx glossy black, emerald deep green, diamond icy blue. Starting kit becomes TIN (today it is bronze). Gear ids, saves, store, practice pack and icons all change, so do it as ONE step and check old saves load.
 
 ## PvP
 - Inside a PvP area you can be killed and looted (death sack); outside you cannot.
 - A warning zone (about 30 m) before the border; a glowing red line on the ground with a see-through red curtain, and a red line on the world map.
 - Short immunity on entering PvP and on leaving a safe town's gate (10 s to start, visible countdown); attacking someone ends it.
+- **Armour locks in PvP areas (owner, 2026-11-03):** inside a PvP area armour cannot be put on, taken off or swapped; weapons can still be switched (R and the pack). (RuneScape lets players switch everything in the Wilderness; the owner chose a middle way.) Build with the PvP zones: the server refuses the armour inventory ops while the player is inside one.
 - Birch Grove: several gates with safe pockets; player-operated crossbows and cannons that harass campers (short range, slow, low damage, no rank points from gun kills) [M-L].
 - **The Boxing Ring in Oak Hill (2026-10-29) [M-L]:** a ring where two players bet ingots on themselves and fight. Both stakes are held by the server and the winner takes the pot. Players bring any gear they like, and nobody drops items on death in the ring (no sack). Needs PvP hits first. To decide: health regen in the ring, a spectator area, minimum/maximum bets, what happens if a fighter logs off mid-fight (suggest: counts as a loss).
 - Needs building: PvP hits, no regen in PvP, zone and immunity checks on the server, fast-travel block.
@@ -119,7 +120,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 
 ## Open questions
 - Where do legendary items come from (bosses, Trials, long quest chains, or smithing at a high level)?
-- **Cape colours for PvP levels:** how many levels, which colours, and what moves you up or down (kills, wins, losses)?
+- **PvP levels:** how many, what moves you up or down (kills, wins, losses), and how others see them now that capes are ordinary items?
 - Boxing ring details (see PvP).
 - Boss loot sharing (see Bosses).
 - PvP border positions; immunity length (10 s to start).
@@ -143,7 +144,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 13. Message board (once there is a rented server); key rebinding screen.
 14. **Groundwork (agreed 2026-10-30):** items as data (DONE 2026-10-30: Content/Data CSVs, Docs/EditingItems.md); splitting the knight's Tick (DONE 2026-10-30). Later, once online play is working with friends: a server stress test with fake players, then accounts in a database and encrypted logins (before public hosting). Quests, NPCs and villagers should be data from the start, the same way.
 15. **Animation (owner, 2026-10-30):** the knight keeps its code-driven pose; bosses and NPCs get standard skinned models with animation clips.
-16. **Cape = PvP rank on the tier ladder (owner, 2026-10-30, BUILT):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
+16. **(REPLACED 2026-11-03: capes are ordinary items now.) Cape = PvP rank on the tier ladder (owner, 2026-10-30):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
 
 ## Sound (added 2026-11-02, later)
 - The game has no sound yet. When it gets some: a sharp "tink" on headshots, footsteps, sword hits and blocks, the bow, ambient wind and birds, music.

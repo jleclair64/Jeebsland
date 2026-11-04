@@ -1,4 +1,4 @@
-#include "GearWall.h"
+﻿#include "GearWall.h"
 #include "Inventory.h"
 #include "ItemModels.h"
 #include "KnightModel.h"
@@ -11,17 +11,16 @@
 
 namespace
 {
-	// The armour board faces the start (+X). One block per tier, three columns in it (Light, Classic, Heavy); rows from the
-	// top: helmet, shoulders, chest, gloves, boots, then the shield of the matching style (kite, round, tower).
-	constexpr float ColW = 66.f, TierGap = 45.f, ItemSize = 30.f, DollScale = 0.55f;
-	const float RowZ[6] = { 222.f, 188.f, 150.f, 112.f, 78.f, 62.f };   // (only the last, the shield, is still used)
-	const int32 RowKind[5] = { JeebItems::K_Helmet, JeebItems::K_Shoulders, JeebItems::K_Chest, JeebItems::K_Gloves, JeebItems::K_Boots };
+	// The armour board (2026-11-03, made bigger and lower at the owner's word) faces the start (+X), behind it. One block per
+	// tier, Tin to Diamond from left to right, three knights in it (Light, Classic, Heavy) standing on the floor at
+	// DollScale of life size, a peg on each piece; each knight's shield (kite, round, tower) hangs on the board above him.
+	constexpr float ColW = 115.f, TierGap = 55.f, DollScale = 1.f, DollZ = 96.f * DollScale + 4.f, ShieldZ = 262.f, ShieldSize = 50.f;
 	const int32 ColStyle[3] = { JeebItems::AS_Light, JeebItems::AS_Classic, JeebItems::AS_Heavy };
-	// The weapon board stands on the same line, to the right of the armour (seen from the start).
-	constexpr float ArmourMidY = 450.f, WeaponGap = 60.f, WeaponColW = 82.f, WeaponRowH = 28.f, WeaponZ0 = 26.f, WeaponSize = 58.f;
+	// The weapon board stands across the floor, WeaponX in front of the armour board, facing it (and the start): a column
+	// per weapon kind, then arrows by tier and fire arrows; a row per tier from the floor up.
+	constexpr float WeaponX = 1300.f, WeaponColW = 135.f, WeaponRowH = 40.f, WeaponZ0 = 30.f, WeaponSize = 95.f;
 	constexpr int32 ArrowCount = 20;
 }
-
 AGearWall::AGearWall()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -137,50 +136,48 @@ void AGearWall::Build()
 	Pegs.Reset();
 	const FLinearColor Wood(0.16f, 0.10f, 0.06f), Rail(0.30f, 0.20f, 0.12f);
 	const int32 NT = NumTiersKnight;
-	// Both boards face the start (+X) in one line. Seen from the start, -Y is on the right, so things run left to right with
-	// falling Y: the armour board on the left (Tin to Diamond), the weapon board on the right.
 
-	// ---- armour and shields ----
+	// ---- armour: seen from the start, -Y is on the right, so things run left to right with falling Y ----
 	const float TierW = 3.f * ColW + TierGap;
-	const float ArmLeft = ArmourMidY + 0.5f * NT * TierW;
-	AddBoard(FVector(-6.f, ArmourMidY, 140.f), FVector(4.f, 0.5f * NT * TierW + 20.f, 135.f), Wood);
-	AddSign(FVector(0.f, ArmourMidY, 300.f), FRotator::ZeroRotator, TEXT("ARMOUR  -  E takes a copy"), 18.f);
+	const float ArmLeft = 0.5f * NT * TierW;
+	AddBoard(FVector(-6.f, 0.f, 185.f), FVector(4.f, ArmLeft + 20.f, 185.f), Wood);
+	AddSign(FVector(0.f, 0.f, 352.f), FRotator::ZeroRotator, TEXT("ARMOUR  -  look at a piece, E takes a copy"), 30.f);
 	for (int32 t = 0; t < NT; ++t)
 	{
 		const float TL = ArmLeft - t * TierW - 0.5f * TierGap;   // the tier block's left edge
-		AddBoard(FVector(-1.f, TL - 1.5f * ColW, 140.f), FVector(1.5f, 1.5f * ColW + 6.f, 128.f), Rail);
-		AddSign(FVector(2.f, TL - 1.5f * ColW, 264.f), FRotator::ZeroRotator, TierName(t), 15.f);
+		AddBoard(FVector(-1.f, TL - 1.5f * ColW, 168.f), FVector(1.5f, 1.5f * ColW + 8.f, 160.f), Rail);
+		AddSign(FVector(2.f, TL - 1.5f * ColW, 312.f), FRotator::ZeroRotator, TierName(t), 34.f);
 		for (int32 c = 0; c < 3; ++c)
 		{
 			const float Y = TL - (c + 0.5f) * ColW;
-			AddSign(FVector(2.f, Y, 246.f), FRotator::ZeroRotator, ArmourStyleRow(ColStyle[c]).Name, 8.f);
-			AddMannequin(ColStyle[c], t, FVector(24.f, Y, 160.f));
-			AddItem(ShieldId(c, t), 1, FVector(16.f, Y, RowZ[5]), ItemSize * 1.3f, false);
+			AddSign(FVector(2.f, Y, 222.f), FRotator::ZeroRotator, ArmourStyleRow(ColStyle[c]).Name, 20.f);   // (just above his helmet)
+			AddMannequin(ColStyle[c], t, FVector(45.f, Y, DollZ));
+			AddItem(ShieldId(c, t), 1, FVector(14.f, Y, ShieldZ), ShieldSize, false);
 		}
 	}
 
-	// ---- weapons and arrows: a column per weapon kind, then arrows by tier and fire arrows; a row per tier from the ground up ----
-	const int32 NumCols = (K_Rod - K_Sword + 1) + 2;
+	// ---- weapons and arrows: across the floor, facing back toward the armour (-X); seen from the start, +Y is on the right ----
+	const FRotator Back(0.f, 180.f, 0.f);
+	const int32 NumCols = (K_Rod - K_Sword + 1) + 3;   // (then capes, arrows by tier, fire arrows)
 	const float Len = NumCols * WeaponColW;
-	const float WLeft = ArmourMidY - 0.5f * NT * TierW - WeaponGap;
-	AddBoard(FVector(-6.f, WLeft - 0.5f * Len, 140.f), FVector(4.f, 0.5f * Len + 20.f, 135.f), Wood);
-	AddBoard(FVector(-1.f, WLeft - 0.5f * Len, 140.f), FVector(1.5f, 0.5f * Len + 6.f, 128.f), Rail);
-	AddSign(FVector(0.f, WLeft - 0.5f * Len, 300.f), FRotator::ZeroRotator, TEXT("WEAPONS  -  E takes a copy"), 18.f);
+	AddBoard(FVector(WeaponX + 6.f, 0.f, 245.f), FVector(4.f, 0.5f * Len + 110.f, 245.f), Wood);
+	AddBoard(FVector(WeaponX + 1.f, 0.f, 200.f), FVector(1.5f, 0.5f * Len + 6.f, 190.f), Rail);
+	AddSign(FVector(WeaponX, 0.f, 462.f), Back, TEXT("WEAPONS  -  look at one, E takes a copy"), 34.f);   // (its own strip above the column names)
 	for (int32 col = 0; col < NumCols; ++col)
 	{
-		const float Y = WLeft - (col + 0.5f) * WeaponColW;
-		const bool bArrows = col == NumCols - 2, bFire = col == NumCols - 1;
-		const FString Head = bFire ? FString(TEXT("Fire arrows")) : bArrows ? FString(TEXT("Arrows")) : FString(KindName(K_Sword + col));
-		AddSign(FVector(2.f, Y, WeaponZ0 + NT * WeaponRowH + 4.f), FRotator::ZeroRotator, Head, 9.f);
+		const float Y = -0.5f * Len + (col + 0.5f) * WeaponColW;
+		const bool bCapes = col == NumCols - 3, bArrows = col == NumCols - 2, bFire = col == NumCols - 1;
+		const FString Head = bFire ? FString(TEXT("Fire arrows")) : bArrows ? FString(TEXT("Arrows")) : bCapes ? FString(TEXT("Capes")) : FString(KindName(K_Sword + col));
+		AddSign(FVector(WeaponX - 2.f, Y, WeaponZ0 + NT * WeaponRowH + 16.f), Back, Head, 22.f);
 		for (int32 t = 0; t < NT; ++t)
 		{
 			if (bFire && t > 0) break;
-			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : GearId(K_Sword + col, t);
-			AddItem(Id, (bFire || bArrows) ? ArrowCount : 1, FVector(16.f, Y, WeaponZ0 + t * WeaponRowH), (bArrows || bFire) ? WeaponSize * 0.7f : WeaponSize, true);
+			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : bCapes ? GearId(K_Cape, t) : GearId(K_Sword + col, t);
+			AddItem(Id, (bFire || bArrows) ? ArrowCount : 1, FVector(WeaponX - 14.f, Y, WeaponZ0 + t * WeaponRowH), (bArrows || bFire) ? WeaponSize * 0.7f : bCapes ? WeaponSize * 0.4f : WeaponSize, !bCapes);
 		}
 	}
 	for (int32 t = 0; t < NT; ++t)   // tier names down the left edge
-		AddSign(FVector(2.f, WLeft + 22.f, WeaponZ0 + t * WeaponRowH), FRotator::ZeroRotator, TierName(t), 8.f);
+		AddSign(FVector(WeaponX - 2.f, -0.5f * Len - 70.f, WeaponZ0 + t * WeaponRowH), Back, TierName(t), 26.f);
 }
 
 int32 AGearWall::PegAt(const FVector& From, const FVector& Dir, const FVector& Near, float MaxDist) const

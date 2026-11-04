@@ -36,6 +36,8 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
+#include "Components/SkinnedMeshComponent.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/SkyLight.h"
@@ -333,6 +335,7 @@ void AKnightGameState::BuildMoveLab()
 			{
 				K->bStill = true;
 				K->bStillGuard = (g == 1);
+				K->StillZ = Z + 97.f;   // (the flat test floor: the open world's ground under him is higher or lower)
 				K->Setup(FVector2D(Ahead, Y), FVector2D(100.f, 100.f));
 				K->FinishSpawning(Xf);
 			}
@@ -481,6 +484,14 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		if (bShotDressed && ShotClock > 8.f && ShotClock < 8.1f)
 			if (ACharacter* C = Cast<ACharacter>(PC ? PC->GetPawn() : nullptr))
 				UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT MaxWalkSpeed=%.1f"), C->GetCharacterMovement()->MaxWalkSpeed);
+		if (ShotClock > 8.f && ShotClock < 8.1f)   // (test pictures: JEEBFEET = how far each knight's left ankle bone sits above the floor)
+			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+				for (UActorComponent* Ac : It->GetComponents())
+					if (USkinnedMeshComponent* Sm = Cast<USkinnedMeshComponent>(Ac); Sm && Sm->IsVisible() && Sm->GetBoneIndex(TEXT("AnkleL")) != INDEX_NONE)
+					{
+						const FVector L = Sm->GetBoneLocation(TEXT("AnkleL"));
+						UE_LOG(LogTemp, Display, TEXT("JEEBFEET %s %s ankle %.1f above the MoveLab floor (standing: about 14)"), *It->GetName(), *Sm->GetName(), L.Z - JeebTerrain::HeightAt(0.f, 0.f));
+					}
 		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;

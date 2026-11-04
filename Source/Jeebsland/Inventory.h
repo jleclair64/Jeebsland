@@ -19,7 +19,7 @@
 namespace JeebItems
 {
 	constexpr int32 NumSlots = 24;      // inventory slots (the side panel is 5 x 5: ingots in a fixed top-left cell, then these)
-	constexpr int32 NumHotbar = 5;      // weapons and tools you carry ready
+	constexpr int32 NumHotbar = 2;      // the weapon bar (2026-11-03): slot 0 the hand (any weapon or tool but a bow), slot 1 the bow (USkillComponent::Hotbar keeps room for 5: saves)
 	constexpr int32 NumTiers = 9;
 	enum ETier : int32 { T_Tin, T_Iron, T_Bronze, T_Steel, T_Silver, T_Gold, T_Onyx, T_Emerald, T_Diamond };
 	constexpr int32 MaxPotions = 50;    // potion ids 950..999
@@ -103,6 +103,9 @@ namespace JeebItems
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
 	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
+	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
+	inline int32 BarSlotFor(int32 K) { return K == K_Bow ? 1 : 0; }
+	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }
 	inline bool IsArmorKind(int32 K) { return K >= K_Helmet && K <= K_Boots; }
 	inline bool IsAccessoryKind(int32 K) { return K == K_Ring || K == K_Amulet || K == K_Crest; }
 
@@ -130,11 +133,9 @@ namespace JeebItems
 	// ---------------------------------------------------------------- names
 	inline const TCHAR* TierName(int32 T) { return *TierRow(T).Name; }
 	inline const TCHAR* KindName(int32 K) { return *KindRow(K).Name; }
-	// The cape shows the PvP rank (2026-10-30): its variant is the rank, which uses the tier ladder (Tin ... Gold, then the
-	// class's legendary at the top), and its colour is that tier's CapeColor. It is locked to the character: the server sets
-	// it from the rank (USkillComponent::RefreshCape) and it is never taken off, dropped, sold or bought.
+	// Capes (an ordinary item since 2026-11-03; they showed the PvP rank before): the variant is the tier, its colour that
+	// tier's CapeColor (Tiers.csv). Just for looks: no defence, no weight.
 	inline FLinearColor CapeColor(int32 Rank) { return TierRow(Rank).CapeColor; }
-	inline int32 CapeRank(const USkillComponent* S) { return T_Tin; }   // the player's PvP rank: PvP is not built yet, so every knight is Tin
 
 	// Rings and amulets (and the helm brush)
 	inline int32 NumRings() { return Tables().Rings.Num(); }
@@ -246,7 +247,6 @@ namespace JeebItems
 	inline int32 BuyPrice(int32 K, int32 Variant)
 	{
 		if (IsAccessoryKind(K)) return AccessoryPrice(K, Variant);
-		if (K == K_Cape) return 0;   // (never sold: it shows your PvP rank)
 		const float StyleMul = IsArmorKind(K) ? ArmourStyleRow(Variant / 10).PriceMul : 1.f;
 		return FMath::Max(1, FMath::RoundToInt(BaseBuyPrice(K) * TierPriceMult(Variant % 10) * StyleMul));
 	}

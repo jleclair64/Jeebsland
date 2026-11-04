@@ -17,7 +17,7 @@ class UJeebSave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 9;   // 2: the tier redo; 3: capes became the PvP rank; 4: arrows for everyone; 7: a bow on the weapon bar; 8: at least the starting arrows; 9: arrows stack to 99, topped up to 99 of each (Migrate converts older ones)
+	static constexpr int32 CurrentVersion = 10;   // 2: the tier redo; 3: capes became the PvP rank; 4: arrows for everyone; 7: a bow on the weapon bar; 8: at least the starting arrows; 9: arrows stack to 99, topped up to 99 of each; 10: the two-slot weapon bar (Migrate converts older ones)
 	static const FString SlotName;
 
 	// 0 = "not in the file". (Unreal leaves out a value that equals its default, so while the default was CurrentVersion no

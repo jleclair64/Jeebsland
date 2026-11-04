@@ -40,20 +40,17 @@ void AKnightCharacter::EquipFromInventory(int32 Idx) { Inv(EInvOp::Equip, Idx); 
 void AKnightCharacter::UnequipHotbar(int32 H) { Inv(EInvOp::UnequipHot, H); }
 void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing) { Inv(EInvOp::UnequipWorn, Kind, bSecondRing ? 1 : 0); }
 
+// R (2026-11-03): the bar is the hand slot and the bow slot; R swaps between them (never to an empty one)
 void AKnightCharacter::CycleHotbar(int32 Dir)
 {
 	if (!Skills || IsUIOpen() || bClimbing) return;
-	for (int32 Step = 1; Step <= 5; ++Step)
-	{
-		const int32 Next = ((Skills->Selected + Dir * Step) % 5 + 5) % 5;
-		const int32 Id = Skills->Hotbar[Next];
-		if (JeebItems::IsGear(Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(Id))) { SelectHotbar(Next); return; }   // (never an empty slot)
-	}
+	const int32 Other = Skills->Selected == 0 ? 1 : 0;
+	if (Skills->Hotbar[Other] != 0) SelectHotbar(Other);
 }
 
 void AKnightCharacter::SelectHotbar(int32 H)
 {
-	if (!Skills || H < 0 || H > 4 || Skills->Selected == H) return;
+	if (!Skills || H < 0 || H >= JeebItems::NumHotbar || Skills->Selected == H || Skills->Hotbar[H] == 0) return;   // (an empty slot is never taken in hand: the server refuses it too)
 	// The hand changes here straight away; online the server is told and follows
 	if (HasAuthority()) Skills->SetSelected(H);
 	else
@@ -68,33 +65,26 @@ void AKnightCharacter::SelectHotbar(int32 H)
 	RefreshEquipment();
 }
 
+// Gathering needs the right tool in hand (2026-11-03: no more picking it off the bar for you; equip it from the pack).
+// Called on the server by the resource; better tools work faster.
 bool AKnightCharacter::PrepareTool(ESkillType Skill, float& OutTimeMult)
 {
 	OutTimeMult = 1.f;
 	if (!Skills) return true;
 	int32 Need;
 	const TCHAR* Name;
-	if (Skill == ESkillType::Mining) { Need = JeebItems::K_Pickaxe; Name = TEXT("pickaxe"); }
-	else if (Skill == ESkillType::Woodcutting) { Need = JeebItems::K_Axe; Name = TEXT("axe"); }
-	else if (Skill == ESkillType::Fishing) { Need = JeebItems::K_Rod; Name = TEXT("fishing pole"); }
+	const TCHAR* Verb;
+	if (Skill == ESkillType::Mining) { Need = JeebItems::K_Pickaxe; Name = TEXT("pickaxe"); Verb = TEXT("mine"); }
+	else if (Skill == ESkillType::Woodcutting) { Need = JeebItems::K_Axe; Name = TEXT("axe"); Verb = TEXT("chop trees"); }
+	else if (Skill == ESkillType::Fishing) { Need = JeebItems::K_Rod; Name = TEXT("fishing pole"); Verb = TEXT("fish"); }
 	else return true;
-
-	int32 Best = -1, BestTier = -1;
-	for (int32 i = 0; i < 5; ++i)
+	const int32 Id = Skills->Hotbar[0];
+	if (Skills->Selected != 0 || !JeebItems::IsGear(Id) || JeebItems::KindOf(Id) != Need)
 	{
-		const int32 Id = Skills->Hotbar[i];
-		if (!JeebItems::IsGear(Id) || JeebItems::KindOf(Id) != Need) continue;
-		// Keep the one already in hand if it is a tool of this kind
-		const int32 Tier = JeebItems::VariantOf(Id) + (i == Skills->Selected ? 100 : 0);
-		if (Tier > BestTier) { BestTier = Tier; Best = i; }
-	}
-	if (Best < 0)
-	{
-		if (GEngine) JeebMsg::Post(3.f, FColor::Orange, FString::Printf(TEXT("You need a %s on your weapon bar. Buy or smith one."), Name));
+		Skills->Say(3.f, FColor::Orange, FString::Printf(TEXT("Hold a %s to %s: equip one from your pack (Tab)."), Name, Verb));
 		return false;
 	}
-	if (Skills->Selected != Best) SelectHotbar(Best);
-	OutTimeMult = JeebItems::ToolTimeMult(JeebItems::VariantOf(Skills->Hotbar[Best]));
+	OutTimeMult = JeebItems::ToolTimeMult(JeebItems::VariantOf(Id));
 	return true;
 }
 

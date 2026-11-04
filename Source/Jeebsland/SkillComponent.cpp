@@ -49,9 +49,9 @@ USkillComponent::USkillComponent()
 	ResetToStartingKit();
 }
 
-// The kit you begin with (and wake up with after dying): a sword, bow, axe, pickaxe and fishing pole on the weapon bar, steel and
+// The kit you begin with (and wake up with after dying): a sword in hand and a bow on the weapon bar; an axe, pickaxe and fishing pole, steel and
 // fire arrows in the pack, a
-// shield, the cape of your PvP rank and a full suit of tin armour (pieces can be swapped for others, never taken off)
+// shield, a tin cape and a full suit of light tin armour
 void USkillComponent::ResetToStartingKit()
 {
 	if (!HasAuth()) return;   // only the server changes the pack
@@ -61,21 +61,12 @@ void USkillComponent::ResetToStartingKit()
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
 	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword, 2026-10-31, with steel and fire arrows)
-	Hotbar[2] = JeebItems::GearId(JeebItems::K_Axe, 0);
-	Hotbar[3] = JeebItems::GearId(JeebItems::K_Pickaxe, 0);
-	Hotbar[4] = JeebItems::GearId(JeebItems::K_Rod, 0);
+	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
 	AddInvItem(JeebItems::ArrowId(JeebItems::T_Steel), StartSteelArrows);
 	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo)
-	RefreshCape();
-}
-
-// The cape always shows the PvP rank (JeebItems::CapeRank); it is never an item you can hold
-void USkillComponent::RefreshCape()
-{
-	if (!HasAuth()) return;   // only the server changes the pack
-	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, JeebItems::CapeRank(this));
+	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, JeebItems::T_Tin);   // (a plain tin cape; capes are ordinary items since 2026-11-03)
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
@@ -85,7 +76,7 @@ void USkillComponent::TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWh
 	auto Put = [&](int32 Id, int32 Count, uint8 W) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; Out.Add(D); OutWhere.Add(W); } };
 	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0); S.Id = 0; S.Count = 0; }
 	for (int32 i = 0; i < 5; ++i) { Put(Hotbar[i], 1, 1); Hotbar[i] = 0; }
-	for (int32 i = 0; i < NumWornKinds; ++i) { if (i == JeebItems::K_Cape) continue; Put(Worn[i], 1, 2); Worn[i] = 0; }   // (the cape stays: it shows your PvP rank)
+	for (int32 i = 0; i < NumWornKinds; ++i) { Put(Worn[i], 1, 2); Worn[i] = 0; }
 	Put(RingB, 1, 2); RingB = 0;
 	Put(PotionSlot.Id, PotionSlot.Count, 0); PotionSlot = FInvSlot();
 	OutIngots = Ingots;
@@ -215,7 +206,7 @@ void USkillComponent::Say(float Seconds, const FColor& Color, const FString& Tex
 
 void USkillComponent::SetSelected(int32 H)
 {
-	Selected = FMath::Clamp(H, 0, 4);
+	Selected = FMath::Clamp(H, 0, JeebItems::NumHotbar - 1);
 	if (HasAuth()) RepSelected = Selected;
 }
 
@@ -402,9 +393,7 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 
 	if (JeebItems::IsWeaponKind(K))
 	{
-		int32 H = -1;
-		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] == 0) { H = i; break; }
-		if (H < 0) H = Selected;
+		const int32 H = JeebItems::BarSlotFor(K);   // (the bow slot for a bow, the hand for anything else; what was there goes to the pack)
 		Swap(Hotbar[H]);
 		SetSelected(H);
 		return true;
@@ -425,7 +414,7 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 bool USkillComponent::UnequipHotbar(int32 H)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack
-	if (H < 0 || H >= 5 || Hotbar[H] == 0) return false;
+	if (H < 0 || H >= JeebItems::NumHotbar || Hotbar[H] == 0) return false;
 	if (!AddInvItem(Hotbar[H], 1)) return false;
 	Hotbar[H] = 0;
 	return true;
@@ -437,12 +426,7 @@ bool USkillComponent::UnequipWorn(int32 Kind, bool bSecondRing)
 	if (Kind < 0 || Kind >= NumWornKinds) return false;
 	int32& Target = (bSecondRing && Kind == JeebItems::K_Ring) ? RingB : Worn[Kind];
 	if (Target == 0) return false;
-	// (armour comes off since 2026-11-03: the chain mail underneath shows, and that slot stops nothing)
-	if (Kind == JeebItems::K_Cape)
-	{
-		Say(3.f, FColor::Orange, TEXT("Your cape shows your PvP rank. It can't be taken off."));
-		return false;
-	}
+	// (armour and capes come off since 2026-11-03: the chain mail underneath shows, and that slot stops nothing)
 	if (!AddInvItem(Target, 1)) return false;
 	Target = 0;
 	return true;
@@ -521,7 +505,7 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 
 bool USkillComponent::BankDepositHot(int32 H)
 {
-	if (!HasAuth() || H < 0 || H >= 5 || Hotbar[H] == 0) return false;
+	if (!HasAuth() || H < 0 || H >= JeebItems::NumHotbar || Hotbar[H] == 0) return false;
 	if (PutInto(Bank, Hotbar[H], 1) > 0) return false;   // the bank is full
 	Hotbar[H] = 0;
 	return true;
@@ -549,9 +533,9 @@ int32 USkillComponent::BankUsed() const
 bool USkillComponent::SwapInvHotbar(int32 InvIdx, int32 H)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack
-	if (!Slots.IsValidIndex(InvIdx) || H < 0 || H >= 5) return false;
+	if (!Slots.IsValidIndex(InvIdx) || H < 0 || H >= JeebItems::NumHotbar) return false;
 	FInvSlot& S = Slots[InvIdx];
-	if (S.Id != 0 && !(JeebItems::IsGear(S.Id) && JeebItems::IsWeaponKind(JeebItems::KindOf(S.Id)))) return false;   // only weapons go on the bar
+	if (!JeebItems::FitsBarSlot(H, S.Id)) return false;   // a bow only in the bow slot, any other weapon or tool only in the hand
 	if (S.Id != 0) { FString Why; if (!JeebItems::CanEquip(this, S.Id, &Why)) { Say(3.f, FColor::Orange, Why); return false; } }   // level gates
 	if (S.Id == 0 && Hotbar[H] == 0) return false;
 	const int32 FromBar = Hotbar[H];
@@ -572,7 +556,8 @@ bool USkillComponent::SwapInv(int32 A, int32 B)
 bool USkillComponent::SwapHotbar(int32 A, int32 B)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack
-	if (A < 0 || B < 0 || A >= 5 || B >= 5 || A == B) return false;
+	if (A < 0 || B < 0 || A >= JeebItems::NumHotbar || B >= JeebItems::NumHotbar || A == B) return false;
+	if (!JeebItems::FitsBarSlot(A, Hotbar[B]) || !JeebItems::FitsBarSlot(B, Hotbar[A])) return false;   // (the hand and the bow slot never trade)
 	Swap(Hotbar[A], Hotbar[B]);
 	return true;
 }
@@ -584,6 +569,9 @@ void USkillComponent::FillPracticePack()
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Ring, K_Amulet };
+	// (the starting kit's tools are in the pack since 2026-11-03: kept, and put back after the fixed slots below)
+	TArray<int32> KeepGear;
+	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; }
 	// a full stack of steel and fire arrows first (this used to write over the starting kit's arrows)
 	Slots[0].Id = JeebItems::ArrowId(JeebItems::T_Steel); Slots[0].Count = StartSteelArrows;
 	Slots[1].Id = JeebItems::IdFireArrow; Slots[1].Count = StartFireArrows;
@@ -596,6 +584,7 @@ void USkillComponent::FillPracticePack()
 	Slots[4].Id = JeebItems::ShieldId(1, JeebItems::T_Iron); Slots[4].Count = 1;
 	Slots[5].Id = JeebItems::ShieldId(2, JeebItems::T_Iron); Slots[5].Count = 1;
 	Slots[6].Id = JeebItems::PotionId(JeebItems::P_Radar); Slots[6].Count = 3;   // (to try the radar)
+	for (int32 Id : KeepGear) AddInvItem(Id, 1);
 	for (int32 i = 0; i < Slots.Num() - 3; ++i)   // the last three pack slots stay empty
 	{
 		if (Slots[i].Id != 0) continue;

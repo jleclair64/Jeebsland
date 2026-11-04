@@ -31,6 +31,8 @@ public:
 	// A still sparring knight (MoveLab): he stands where he was put, never fights back, walks or falls; his health fills
 	// again 3 s after the last blow (Smash's training mode). Set before FinishSpawning.
 	bool bStill = false;
+	float StillZ = 0.f;   // (MoveLab) the height a still knight stands at: the flat test floor, not the open world's ground under it
+	float FloorZ(float X, float Y) const;   // where his middle stands at (X, Y)
 	// ... holding his shield up the whole time (MoveLab's second one). Set before FinishSpawning.
 	bool bStillGuard = false;
 	// Both knights' shields guard the way a player's does (owner, 2026-10-31): a blow on the raised shield never hurts him; the

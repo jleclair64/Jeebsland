@@ -76,7 +76,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 
 	// ----- Weapon bar -----
 	const float EX = GX + 4 * (SS + Gap) + 34.f;
-	HDText(TEXT("WEAPON BAR  (keys 1-5)"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 64.f, Font, 1.2f);
+	HDText(TEXT("WEAPON BAR  (R swaps)"), FLinearColor(1.f, 0.85f, 0.3f), EX, PY + 64.f, Font, 1.2f);
 	const float HS = 66.f, HG = 10.f;
 	for (int32 h = 0; h < NumHotbar; ++h)
 	{
@@ -409,7 +409,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		for (int32 i = 0; i < InvCellCount && DragKind == 0; ++i)
 			if (OverCell(InvCellX[i], InvCellY[i], InvCellS) && Sk->Slots[i].Id != 0) { DragKind = 1; DragIdx = i; DragId = Sk->Slots[i].Id; }
 		if (bHotCells)
-			for (int32 h = 0; h < 5 && DragKind == 0; ++h)
+			for (int32 h = 0; h < NumHotbar && DragKind == 0; ++h)
 				if (OverCell(HotCellX[h], HotCellY[h], HotCellS) && Sk->Hotbar[h] != 0) { DragKind = 2; DragIdx = h; DragId = Sk->Hotbar[h]; }
 		if (DragKind == 0 && InvCellCount > 0 && Sk->GetIngots() > 0 && OverCell(InvIngotX, InvIngotY, InvCellS)) { DragKind = 3; DragIdx = -1; DragId = 0; }
 		if (DragKind == 0)
@@ -449,7 +449,8 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 		{
 			int32 ToInv = -1, ToHot = -1, ToWorn = -1;
 			for (int32 i = 0; i < InvCellCount; ++i) if (OverCell(InvCellX[i], InvCellY[i], InvCellS)) ToInv = i;
-			if (bHotCells) for (int32 h = 0; h < 5; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
+			if (bHotCells) for (int32 h = 0; h < NumHotbar; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
+			if (ToHot >= 0 && IsGear(DragId) && IsWeaponKind(KindOf(DragId))) ToHot = BarSlotFor(KindOf(DragId));   // (dropped anywhere on the bar, it goes to its own slot: a bow to the bow slot, anything else to the hand)
 			for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
 			const bool bOnDef = bDefCell && OverCell(DefCellX, DefCellY, HotCellS);
 			if (DragKind == 1)

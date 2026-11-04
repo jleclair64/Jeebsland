@@ -412,7 +412,7 @@ bool AFoeKnight::MoveTowards(const FVector2D& To, float Speed, float Dt)
 	if (Len < 8.f) return true;
 	const FVector2D Step = D / Len * FMath::Min(Len, Speed * Dt);
 	const FVector2D N(Me.X + Step.X, Me.Y + Step.Y);
-	SetActorLocation(FVector(N.X, N.Y, JeebTerrain::HeightAt(N.X, N.Y) + 98.f), true);   // swept: he cannot walk through you
+	SetActorLocation(FVector(N.X, N.Y, FloorZ(N.X, N.Y)), true);   // swept: he cannot walk through you
 	return false;
 }
 
@@ -427,7 +427,7 @@ void AFoeKnight::Rise()
 	KnockT = -1.f; GuardPool = GuardMax; bGuardBroken = false; bAir = false;
 	AttackCool = 2.f;
 	const FVector2D P = PenCenter;
-	SetActorLocation(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 98.f));
+	SetActorLocation(FVector(P.X, P.Y, FloorZ(P.X, P.Y)));
 	BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
 	BodyRoot->SetRelativeLocation(FVector::ZeroVector);
 	SetActorHiddenInGame(false);
@@ -447,7 +447,7 @@ void AFoeKnight::OnHurt(AActor* From)
 		if (DeathT <= 0.f)
 		{
 			DeathT = 0.001f;
-			if (bAir) { bAir = false; const FVector P = GetActorLocation(); SetActorLocation(FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 98.f)); }   // (beaten in the air: down to the ground)
+			if (bAir) { bAir = false; const FVector P = GetActorLocation(); SetActorLocation(FVector(P.X, P.Y, FloorZ(P.X, P.Y))); }   // (beaten in the air: down to the ground)
 			KnockT = -1.f;
 			bRepDown = true;
 			RespawnT = 20.f;
@@ -500,7 +500,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		AirVel.Z -= 980.f * Dt;
 		FVector P = GetActorLocation() + AirVel * Dt;
 		if (!bStill) { const FVector2D C = ClampToPen(FVector2D(P.X, P.Y)); P.X = C.X; P.Y = C.Y; }
-		const float Floor = bStill ? GroundZ : JeebTerrain::HeightAt(P.X, P.Y) + 98.f;
+		const float Floor = bStill ? GroundZ : FloorZ(P.X, P.Y);
 		if (P.Z <= Floor && AirVel.Z < 0.f) { P.Z = Floor; bAir = false; AirVel = FVector::ZeroVector; }
 		SetActorLocation(P, true);
 	}
@@ -670,4 +670,9 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	UpperPivot->SetRelativeRotation(FRotator((Act == EAct::Strike ? -10.f : (Act == EAct::Windup ? 6.f : 0.f)) + 12.f * Flinch * FMath::Sin(Flinch * 9.f), 0.f, 0.f));
 	HeadPivot->SetRelativeRotation(FRotator(0.f, 0.f, 2.f * FMath::Sin(Now * 1.3f)));
 	TickKnock(Dt);   // (knocked down: over all of that)
+}
+
+float AFoeKnight::FloorZ(float X, float Y) const
+{
+	return bStill && StillZ != 0.f ? StillZ : JeebTerrain::HeightAt(X, Y) + 98.f;
 }

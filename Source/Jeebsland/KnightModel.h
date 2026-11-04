@@ -187,7 +187,7 @@ namespace KnightModel
 	// ---- Armour styles (2026-11-03) ----
 	// Every armour style is its own skinned model on the SAME skeleton (Tools\BuildKnight.ps1): Classic (the gold armour),
 	// Light (the crusader tunic), Heavy (the original knight, SK_Knight) and the chain mail worn under all of them. The mail is
-	// the leader: it is always drawn whole (pulled just inside the plate, so it fills any gap where two styles meet) and its
+	// the leader: each of its slots shows only while that slot is empty (it is pulled just inside the plate as well) and its
 	// bones are the ones posed each frame; a style's mesh is made the first time a piece of that style is worn and simply
 	// follows the mail's bones (SetLeaderPoseComponent: no second bone copy). Each worn slot shows only its own section of its
 	// style's mesh, tinted for its tier; a style with nothing shown is hidden.
@@ -323,6 +323,9 @@ namespace KnightModel
 		S.Worn[i] = Id;
 		const FName MatName(SlotMaterial(Slot));
 		const int32 Style = Id ? FMath::Clamp(JeebItems::StyleOf(Id), 0, JeebItems::NumArmourStyles - 1) : -1;
+		// the mail shows only where nothing is worn (2026-11-03: drawn whole, it poked through the front of the plate);
+		// each piece reaches a little under its neighbours (the export's overlap), so no gap opens where two styles meet
+		if (S.LeaderSet == Set_Mail && S.Sets[Set_Mail]) ShowSection(S.Sets[Set_Mail], S.Sets[Set_Mail]->GetMaterialIndex(MatName), Id == 0);
 		for (int32 Set = 0; Set < Set_Count; ++Set)
 		{
 			if (Set == Set_Mail) continue;   // (the mail always shows whole)

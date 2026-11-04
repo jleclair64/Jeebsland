@@ -141,14 +141,14 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// (2026-11-03: armour can be taken off, so changing it is refused while stunned or knocked down: no mid-combo gear tricks)
 	case EInvOp::Equip:         if (ArmourBusy(Sk->Slots.IsValidIndex(A) && IsGear(Sk->Slots[A].Id) && IsArmorKind(KindOf(Sk->Slots[A].Id)))) break; bGear = Sk->EquipFromSlot(A); break;
 	case EInvOp::UnequipHot:    if (Sk->UnequipHotbar(A)) bGear = true; else Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
-	case EInvOp::UnequipWorn:   if (ArmourBusy(IsArmorKind(A))) break; if (Sk->UnequipWorn(A, B != 0)) bGear = true; else if (A != K_Cape) Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
+	case EInvOp::UnequipWorn:   if (ArmourBusy(IsArmorKind(A))) break; if (Sk->UnequipWorn(A, B != 0)) bGear = true; else Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
 	case EInvOp::SwapInvHot:    bGear = Sk->SwapInvHotbar(A, B); break;
 	case EInvOp::SwapInv:       Sk->SwapInv(A, B); break;
 	case EInvOp::SwapHot:       bGear = Sk->SwapHotbar(A, B); break;
 	case EInvOp::SwapInvWorn:   if (ArmourBusy(IsArmorKind(B))) break; bGear = Sk->SwapInvWorn(A, B, C != 0); break;
 	case EInvOp::SwapInvPotion: Sk->SwapInvPotion(A); break;
 	case EInvOp::Select:
-		if (A >= 0 && A < 5 && A != Sk->Selected) { Sk->SetSelected(A); bAttacking = false; bCharging = false; bGear = true; }
+		if (A >= 0 && A < JeebItems::NumHotbar && A != Sk->Selected && Sk->Hotbar[A] != 0) { Sk->SetSelected(A); bAttacking = false; bCharging = false; bGear = true; }
 		break;
 
 	// ---- dropping things on the ground ----

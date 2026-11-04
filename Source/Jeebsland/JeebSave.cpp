@@ -55,7 +55,7 @@ void UJeebSave::Migrate()
 	}
 	// Version 2 -> 3 (2026-10-30): capes stopped being items; the cape now shows the PvP rank. A spare cape in the pack, the
 	// bank or on the weapon bar is sold for what the store used to pay (12 ingots, 22 for the old gold cape); the worn cape is
-	// replaced by the rank's cape when the save is loaded (USkillComponent::RefreshCape).
+	// replaced by the rank's cape when the save was loaded. (Since 2026-11-03 capes are ordinary items again: the worn one stays.)
 	if (SaveVersion < 3)
 	{
 		auto SellCape = [this](int32& Id)
@@ -153,6 +153,34 @@ void UJeebSave::Migrate()
 			AddToPack(W[0], W[1] - Have);
 		}
 	}
+	// Version 9 -> 10 (2026-11-03): the weapon bar is two slots, the hand (any weapon or tool but a bow) and the bow. The
+	// weapon that was in hand stays there if it fits (else the first sword, else the first other weapon or tool), the first
+	// bow goes to the bow slot, and everything else on the old bar goes to the pack, or the bank when the pack is full.
+	if (SaveVersion < 10)
+	{
+		TArray<int32> Old = Hotbar;
+		Old.SetNumZeroed(5);
+		auto IsBow = [](int32 Id) { return IsGear(Id) && KindOf(Id) == K_Bow; };
+		auto FitsHand = [](int32 Id) { return IsGear(Id) && IsWeaponKind(KindOf(Id)) && KindOf(Id) != K_Bow; };
+		int32 Hand = -1, BowAt = -1;
+		if (Old.IsValidIndex(Selected) && FitsHand(Old[Selected])) Hand = Selected;
+		for (int32 h = 0; h < 5 && Hand < 0; ++h) if (IsGear(Old[h]) && KindOf(Old[h]) == K_Sword) Hand = h;
+		for (int32 h = 0; h < 5 && Hand < 0; ++h) if (FitsHand(Old[h])) Hand = h;
+		for (int32 h = 0; h < 5 && BowAt < 0; ++h) if (IsBow(Old[h])) BowAt = h;
+		Hotbar.Init(0, 5);
+		if (Hand >= 0) Hotbar[0] = Old[Hand];
+		if (BowAt >= 0) Hotbar[1] = Old[BowAt];
+		for (int32 h = 0; h < 5; ++h)
+		{
+			if (h == Hand || h == BowAt || Old[h] == 0) continue;
+			const int32 P = SlotIds.IndexOfByKey(0);
+			if (P != INDEX_NONE && SlotCounts.IsValidIndex(P)) { SlotIds[P] = Old[h]; SlotCounts[P] = 1; continue; }
+			int32 B = BankIds.IndexOfByKey(0);
+			if (B == INDEX_NONE && BankIds.Num() < USkillComponent::NumBankSlots) { B = BankIds.Add(0); BankCounts.SetNum(BankIds.Num()); }
+			if (B != INDEX_NONE && BankCounts.IsValidIndex(B)) { BankIds[B] = Old[h]; BankCounts[B] = 1; }
+		}
+		Selected = Hotbar[0] != 0 || Hotbar[1] == 0 ? 0 : 1;
+	}
 	SaveVersion = CurrentVersion;
 }
 
@@ -226,7 +254,6 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	for (int32 L : LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
 	Skills->Explored = Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8 ? Explored : TArray<uint8>();
 	Skills->LastGambleHour = LastGambleHour;
-	Skills->RefreshCape();
 	return true;
 }
 

@@ -388,14 +388,17 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 {
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const float SS = 46.f, Gap = 6.f;   // small slots, low on the screen
-	const float TotalW = 5 * SS + 4 * Gap;
-	const float X0 = (Canvas->ClipX - TotalW) * 0.5f - 40.f;
+	// (2026-11-03) left to right: the hand (sword or whatever weapon or tool is equipped), the shield, the bow, the arrows, then
+	// the potion. R swaps the hand and the bow.
+	const float SS = 46.f, Step = SS + 12.f;   // small slots, low on the screen
+	const float TotalW = 4.f * Step + 18.f + SS;
+	const float X0 = (Canvas->ClipX - TotalW) * 0.5f;
+	auto SlotX = [&](int32 Pos) { return X0 + Pos * Step + (Pos >= 4 ? 18.f : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 
 	for (int32 i = 0; i < NumHotbar; ++i)
 	{
-		const float X = X0 + i * (SS + Gap);
+		const float X = SlotX(i == 0 ? 0 : 2);
 		HotCellX[i] = X; HotCellY[i] = Y0; HotCellS = SS; bHotCells = true;
 		const bool bSel = (Skills->Selected == i);
 		const int32 Id = Skills->Hotbar[i];
@@ -425,10 +428,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(Id);   // hover with the cursor out (Tab) to read about it
 	}
 
-	// The potion slot, between the weapons and the defence slot: Q drinks it. While that kind of potion is cooling down the slot
+	// The potion slot, at the right end: Q drinks it. While that kind of potion is cooling down the slot
 	// darkens from the top and shows the seconds left.
 	{
-		const float X = X0 + TotalW + 18.f;
+		const float X = SlotX(4);
 		PotionCellX = X; PotionCellY = Y0; bPotionCell = true;
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		HDText(TEXT("Q"), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y0 + 1.f, Font, 0.7f);
@@ -454,10 +457,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		else if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Potion slot"), TEXT("Drag a potion here, then press Q to drink it") });
 	}
 
-	// Defence total, to the right of the potion slot
+	// The shield slot with the defence total, right of the hand
 	{
 		// a slot like the weapon slots: your shield (or a plain one), leaning the same way, with your defence in blue
-		const float X = X0 + TotalW + 18.f + SS + 14.f;
+		const float X = SlotX(1);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
 		// this is the shield slot: drag a shield here to hold it, drag it off to put it away
@@ -485,10 +488,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		}
 	}
 
-	// The arrow slot, right of the shield slot: the arrows the bow shoots next and how many of them are left. F (or a click on
+	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F (or a click on
 	// it with the cursor out) picks the next kind you carry.
 	{
-		const float X = X0 + TotalW + 18.f + 2.f * (SS + 14.f);
+		const float X = SlotX(3);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
 		HDText(TEXT("F"), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y0 + 1.f, Font, 0.7f);
 		const int32 Id = Knight->ArrowSlotId();

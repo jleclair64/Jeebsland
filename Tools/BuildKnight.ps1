@@ -35,7 +35,7 @@ foreach ($s in $sets) {
     }
     Write-Host "== $($s.Name)"
     & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_prep.py') -- $proj $work $glb $s.Name 2>&1 | Select-String 'TRIS|Error' | ForEach-Object { Write-Host $_.Line }
-    & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work $s.Name (Join-Path $dir $s.Pics[1]) 2>&1 | Select-String 'FIST|ARMFIT|OVERLAP|SKIRT|SKIN|Error|Traceback' | ForEach-Object { Write-Host $_.Line }
+    & $blender -b -P (Join-Path $PSScriptRoot 'knight_blender_export.py') -- $proj $work $s.Name (Join-Path $dir $s.Pics[1]) 2>&1 | Select-String 'FIST|ARMFIT|OVERLAP|SKIRT|SKIN|SIZE|Error|Traceback' | ForEach-Object { Write-Host $_.Line }
 }
 
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'

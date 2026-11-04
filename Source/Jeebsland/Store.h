@@ -50,7 +50,7 @@ namespace JeebStore
 		TArray<FWare> Out;
 		auto AnyKind = [&](bool bHeavy) -> int32
 		{
-			static const int32 Light[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Wand, K_Bow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots };
+			static const int32 Light[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Wand, K_Bow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Cape };
 			static const int32 Heavy[] = { K_Broadsword, K_BattleAxe, K_Katana, K_Staff, K_Chest, K_Shield, K_Bow };
 			return bHeavy ? Heavy[R.RandRange(0, UE_ARRAY_COUNT(Heavy) - 1)] : Light[R.RandRange(0, UE_ARRAY_COUNT(Light) - 1)];
 		};
@@ -69,7 +69,7 @@ namespace JeebStore
 		Push(ArrowWare(R.RandRange(T_Tin, T_Iron)), 5, 5);
 		for (int32 Guard = 0; Out.Num() < 6 && Guard < 50; ++Guard)
 		{
-			Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);   // (no capes: the cape shows your PvP rank)
+			Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);
 		}
 		// Middling: bronze pieces, iron heavy weapons, rings, bronze arrows
 		for (int32 Guard = 0; Out.Num() < 9 && Guard < 50; ++Guard)

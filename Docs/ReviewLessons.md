@@ -20,6 +20,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Trails follow the sunlight; nothing glows brightly at dusk.
 - Variant pictures (styles, tiers, slots): check each differs from the last before sending; an identical picture means the test switch never reached the model (gear set by test code must also tell the knight to redraw: OnGearChanged).
 - A board or picker that offers several styles shows the real models of each style, never shared placeholders, or the choices cannot be told apart.
+- A board of items to browse is sized to read from where the player stands (life size or larger, big headers); check it with a picture from the start spot.
 
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.
@@ -31,6 +32,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Test taps just under and just over every input threshold (e.g. `-ShotMove=hop100` / `hop170` around the jump's hold times), not only a quick tap and a long hold.
 
 ## Online (online-reviewer)
+- When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
 - Anything that changes game state is decided on the server; the client only asks.
 - Anything decided inside the engine's movement prediction (CheckJumpInput and the like) must be reproducible from what `FSavedMove_Character` records, and the live move is recorded AFTER CheckJumpInput: keep per-move state alive until the move is done (clear it in ClearJumpInput), and plan how server and client both learn every choice. (2026-11-02, the jump squat.)
 - A prediction rule that runs on replayed moves may only read what the saved move restores for the START of that move (bPressedJump, JumpKeyHoldTime); derived counters like JumpCurrentCount are one move behind in a replay.
@@ -47,3 +49,5 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - `FMath::SmoothStep(A, B, X)` needs A < B; use `JeebWorld::Smooth` for ramps that go down.
 - Don't call `GetGravityZ` in a constructor (use 980 x GravityScale).
 - PowerShell: matching text in CRLF files needs `` `r`n ``, and short function names can clash with aliases (R, Rp); prefer the Edit tool for multi-line changes.
+
+- Text on any browse board (titles, headers, row labels) needs its own clear strip outside the item area and must be legible from where the player first sees it; check from the start spot as well as close up.

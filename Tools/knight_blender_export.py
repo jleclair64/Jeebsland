@@ -400,6 +400,58 @@ if SET == "Light":
         s = sum(W[i].values()); W[i] = {p: w / s for p, w in W[i].items()}
     print("SKIRT %d vertices hang from the hips" % len(skirt_v))
 
+# ---- The size fit (2026-11-03, owner: the new sets looked smaller than the original, the helmet most of all and the
+# shoulders thinner). Around each joint, how far the armour reaches (95th percentile of each axis, vertices that mostly follow
+# that bone) is measured; the Heavy set writes its numbers to size_heavy.json, and every other set (not the mail) is scaled
+# per bone and per axis to reach as far, blended by the skin weights so the pieces stay joined. Limbs and the body grow
+# only in girth (their length stays on the skeleton); the helmet and pauldrons grow in all three directions.
+import json
+SIZE_FILE = os.path.join(work, "size_heavy.json")
+# What is measured, per bone: (centre, which vertices, axes compared, uniform?). The helmet is measured above the neck only
+# (a mail hood under it must not count) and grows evenly, so its shape stays; the chest in a band round the ribs; the
+# pauldrons evenly; limbs and feet only in girth.
+SIZE_MIN, SIZE_MAX = 0.92, 1.3
+# set by eye against the Heavy model in the side-by-side picture (knight_blender_compare.py), where the measure falls short
+SIZE_SET = {"Classic": {P_HEAD: 1.16, P_ARML: 1.22, P_ARMR: 1.22}}
+def size_rule(b):
+    c = Vector(PIVOT_POS[b])
+    if b == P_HEAD: return (c + Vector((0.0, 0.0, 6.0)), lambda p: p.z > c.z + 6.0, (0, 1), True)
+    if b == P_UPPER: return (Vector((c.x, 0.0, 0.0)), lambda p: -15.0 < p.z < 22.0, (0, 1), False)
+    if b == P_BODY: return (Vector((c.x, 0.0, c.z)), lambda p: True, (0, 1), False)
+    if b in (P_ARML, P_ARMR): return (c, lambda p: True, (0, 1, 2), True)
+    return (c, lambda p: True, (0, 1), False)
+def reach(b):
+    c, keep, axes, _ = size_rule(b)
+    pts = [pos[i] - c for i in range(nv) if W[i].get(b, 0.0) > 0.6 and keep(pos[i])]
+    if len(pts) < 30: return None
+    out = []
+    for a in range(3):
+        v = sorted(abs(p[a]) for p in pts)
+        out.append(v[int(0.95 * (len(v) - 1))])
+    return out
+if SET == "Heavy":
+    json.dump({str(b): reach(b) for b in BONES}, open(SIZE_FILE, "w"))
+    print("SIZE written %s" % SIZE_FILE)
+elif SET != "Mail" and os.path.exists(SIZE_FILE):
+    heavy = {int(k): v for k, v in json.load(open(SIZE_FILE)).items()}
+    scale, centre = {}, {}
+    for b in BONES:
+        mine, ref = reach(b), heavy.get(b)
+        if not mine or not ref: continue
+        c, _, axes, even = size_rule(b)
+        r = [max(SIZE_MIN, min(SIZE_MAX, ref[a] / max(mine[a], 0.5))) for a in axes]
+        if even: s = SIZE_SET.get(SET, {}).get(b, sum(r) / len(r)); scale[b] = [s, s, s]
+        else: scale[b] = [r[axes.index(a)] if a in axes else 1.0 for a in range(3)]
+        centre[b] = c
+        print("SIZE bone %-7s x%.2f y%.2f z%.2f" % (BONES[b], *scale[b]))
+    for i in range(nv):
+        d = Vector((0.0, 0.0, 0.0))
+        for b, w in W[i].items():
+            if b not in scale: continue
+            r = pos[i] - centre[b]
+            d += w * Vector((r.x * (scale[b][0] - 1.0), r.y * (scale[b][1] - 1.0), r.z * (scale[b][2] - 1.0)))
+        pos[i] = pos[i] + d
+
 # The chain mail sits just inside every set's plate
 if SET == "Mail":
     for i in range(nv):

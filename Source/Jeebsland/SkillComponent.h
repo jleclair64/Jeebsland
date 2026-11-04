@@ -158,7 +158,6 @@ public:
 	void TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots);
 	void ResetToStartingKit();
 	static constexpr int32 StartSteelArrows = 99, StartFireArrows = 99;   // (the arrows in the starting kit)
-	void RefreshCape();   // the worn cape is always the one for your PvP rank
 	// Loading a save: puts back XP, which skills are known and the ingots (the rest is public)
 	void RestoreSkills(const TArray<int32>& InXP, const TArray<uint8>& InKnown, int32 InIngots);
 	// The potion slot (beside the weapon bar): one stack of potions ready to drink with Q

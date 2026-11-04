@@ -62,7 +62,7 @@ bool ALootDrop::Fits(int32 Id, int32 Hot, int32 Kind)
 {
 	if (!JeebItems::IsGear(Id)) return false;
 	const int32 IK = JeebItems::KindOf(Id);
-	if (Hot >= 0) return Hot < 5 && JeebItems::IsWeaponKind(IK);   // only weapons go on the bar
+	if (Hot >= 0) return Hot < JeebItems::NumHotbar && JeebItems::BarSlotFor(IK) == Hot && JeebItems::IsWeaponKind(IK);   // a bow only in the bow slot, other weapons and tools only in the hand
 	const bool bMisc = (Kind == JeebItems::K_Ring || Kind == JeebItems::K_Amulet);
 	return bMisc ? JeebItems::IsAccessoryKind(IK) : IK == Kind;
 }
