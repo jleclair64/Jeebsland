@@ -37,15 +37,17 @@ void ANewSuitTest::BeginPlay()
 	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/NewSuit/SK_NewSuit.SK_NewSuit"));
 	Walking = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/NewSuit/A_Walking.A_Walking"));
 	Running = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/NewSuit/A_Running.A_Running"));
+	Resting = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/NewSuit/A_Rest.A_Rest"));
 	if (!Mesh) { Destroy(); return; }
 	Body->SetSkeletalMeshAsset(Mesh);
 	Body->SetAnimationMode(EAnimationMode::AnimationSingleNode);
 
-	// Painted as silver, the way worn armour is (KnightModel::PaintSet); the mail is never tinted
+	// Painted as silver, the way worn armour is (KnightModel::PaintSet); the mail and the dark cloth under the skirt are never tinted
 	const TArray<FSkeletalMaterial>& Slots = Mesh->GetMaterials();
 	for (int32 i = 0; i < Slots.Num(); ++i)
 	{
-		if (Slots[i].MaterialSlotName.ToString().Contains(TEXT("Mail"))) continue;
+		const FString Slot = Slots[i].MaterialSlotName.ToString();
+		if (Slot.Contains(TEXT("Mail")) || Slot.Contains(TEXT("Under"))) continue;
 		if (UMaterialInstanceDynamic* M = Body->CreateDynamicMaterialInstance(i, Body->GetMaterial(i)))
 		{
 			M->SetVectorParameterValue(TEXT("Tint"), KnightModel::TierTint(JeebItems::T_Silver));
@@ -80,8 +82,8 @@ void ANewSuitTest::Play(int32 Clip, float Rate)
 	if (Clip != Playing)
 	{
 		Playing = Clip;
-		UAnimSequence* Seq = Clip == Show_Walk ? Walking.Get() : Clip == Show_Run ? Running.Get() : nullptr;
-		Body->PlayAnimation(Seq, true);   // (no clip: his reference pose)
+		UAnimSequence* Seq = Clip == Show_Walk ? Walking.Get() : Clip == Show_Run ? Running.Get() : Resting.Get();
+		Body->PlayAnimation(Seq, true);   // (standing: his rest pose, hands almost at his hips; made in knight_suit_export.py)
 	}
 	if (Playing != Show_Stand) Body->SetPlayRate(Rate);
 }

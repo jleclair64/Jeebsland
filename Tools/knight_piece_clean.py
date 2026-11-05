@@ -136,28 +136,61 @@ if "spot" in opts:
         im.pixels.foreach_set(Ip.ravel()); im.update(); im.pack()
 ZPIECE = None
 if FIT:
-    # fit=scale,x,y,z[,height scale]: a second number makes the piece slimmer than it is tall, and its shading follows
+    # fit=scale,x,y,z[,height scale[,break,height scale above it,...]]: a second number makes the piece slimmer than it is tall, and its shading follows.
+    # With breaks (heights on the piece, lowest first): the first goes to z, and each stretch between them has its own height scale.
     FZ = FIT[4] if len(FIT) > 4 else FIT[0]
+    BR = np.array(FIT[5::2]) if len(FIT) > 6 else np.array([0.0])
+    SC = np.array([FZ] + FIT[6::2]) if len(FIT) > 6 else np.array([FZ, FZ])
+    ZK = FIT[3] + np.concatenate([[0.0], np.cumsum(np.diff(BR) * SC[1:-1])])   # (where each break lands)
     n0 = np.array([c.vector[:] for c in me.corner_normals])
-    for v in me.vertices: v.co = Vector((v.co.x * FIT[0] + FIT[1], v.co.y * FIT[0] + FIT[2], v.co.z * FZ + FIT[3]))
-    nn = n0 / np.array([FIT[0], FIT[0], FZ]); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
+    Lf = np.empty(len(me.loops), dtype=np.int64); me.loops.foreach_get("vertex_index", Lf)
+    zr = np.array([v.co.z for v in me.vertices])
+    seg = np.searchsorted(BR, zr)   # (0: below the first break)
+    zn = np.where(seg == 0, ZK[0] + (zr - BR[0]) * SC[0], ZK[np.maximum(seg - 1, 0)] + (zr - BR[np.maximum(seg - 1, 0)]) * SC[seg])
+    for i, v in enumerate(me.vertices): v.co = Vector((v.co.x * FIT[0] + FIT[1], v.co.y * FIT[0] + FIT[2], zn[i]))
+    zs = SC[seg][Lf]
+    nn = np.stack([n0[:, 0] / FIT[0], n0[:, 1] / FIT[0], n0[:, 2] / zs], 1); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
     me.update(); me.normals_split_custom_set(nn.tolist()); me.update()
 if "place" in opts:
-    # place=scale, piece pivot x y z, piece axis x y z, knight axis x y z, knight spot x y z: for a pair of pieces (gauntlets, shoulders), given
-    # for the knight's left side (+X). The pivot goes on the spot and the piece's axis along his limb; the other side is the mirror image.
+    # place=scale, piece pivot x y z, piece axis x y z, knight axis x y z, knight spot x y z[, stretch x y z[, trail, hinge]]: for a pair of pieces (gauntlets, shoulders),
+    # given for the knight's left side (+X). The pivot goes on the spot and the piece's axis along his limb; the other side is the mirror image.
+    # The stretch multiplies the scale along each of the piece's own axes. The trail swings what hangs below the hinge (a height on the piece) back by
+    # this much per metre down, so a shoulder's plates follow the arm while its dome, above the hinge, stays exactly as round as it was made.
+    # Never shear a dome to tilt it (owner, 2026-11-05: it stops being round).
+    # squash=height,amount: below that height on the piece, the length is multiplied by the amount (a gauntlet's fingers).
     PL = [float(v) for v in opts["place"].split(",")]
     s_, piv_, ax_, bx_, tgt_ = PL[0], Vector(PL[1:4]), Vector(PL[4:7]).normalized(), Vector(PL[7:10]).normalized(), Vector(PL[10:13])
+    str_ = np.array(PL[13:16]) if len(PL) >= 16 else np.ones(3)
+    trail_, hinge_ = (PL[16], PL[17]) if len(PL) >= 18 else (0.0, 0.0)
     rot_ = ax_.rotation_difference(bx_).to_matrix()
     Pp = np.empty((len(me.vertices), 3)); me.vertices.foreach_get("co", Pp.ravel())
     ZPIECE = Pp[:, 2].copy()
+    if "squash" in opts:
+        zb_, k_ = [float(v) for v in opts["squash"].split(",")]
+        Pp[:, 2] = np.where(Pp[:, 2] < zb_, zb_ + (Pp[:, 2] - zb_) * k_, Pp[:, 2])
     Lp = np.empty(len(me.loops), dtype=np.int64); me.loops.foreach_get("vertex_index", Lp)
     n0 = np.array([c.vector[:] for c in me.corner_normals])
     Rm = np.array(rot_); side = np.where(Pp[:, 0] >= 0, 1.0, -1.0)[:, None]; flip = np.array([1.0, 0.0, 0.0])
     def mirror(p_, k_): return p_ * (1 - 2 * flip * (k_ < 0))
     Pq = mirror(Pp, side)
-    Pn = (Pq - np.array(piv_[:])) * s_; Pn = Pn @ Rm.T + np.array(tgt_[:])
+    if "dome" in opts:
+        # dome=centre x, half width, half depth, amount, swell's origin x, z (numbers on the piece): rounds a plate that Meshy made almost straight. Seen from above, an
+        # ellipse around the plate's middle swells outward, most at its centre and nothing at its edge, so the flange and the rim stay put. Shading is redone later from the shape.
+        dcx, dax, day, damt, dox, doz = [float(v) for v in opts["dome"].split(",")]
+        dw = np.clip(1 - ((Pq[:, 0] - dcx) / dax) ** 2 - (Pq[:, 1] / day) ** 2, 0.0, 1.0) * (Pq[:, 2] > 0.0)
+        dd = Pq - np.array([dox, 0.0, doz]); dd /= np.maximum(np.linalg.norm(dd, axis=1), 1e-9)[:, None]
+        Pq = Pq + dd * (dw * damt)[:, None]
+        print("PCL dome swelled: %d points, the most %.3f" % ((dw > 0).sum(), dw.max() * damt))
+    Pn = (Pq - np.array(piv_[:])) * s_ * str_
+    # the swing below the hinge, eased in over a few centimetres so the plates don't kink (+Y is his back)
+    HINGE_EASE = 0.04
+    below = np.maximum((hinge_ - Pq[:, 2]) * s_ * str_[2], 0.0)
+    Pn[:, 1] += trail_ * np.where(below < HINGE_EASE, below * below / (2 * HINGE_EASE), below - HINGE_EASE / 2)
+    Pn = Pn @ Rm.T + np.array(tgt_[:])
     Pn = mirror(Pn, side)
-    nn = mirror(mirror(n0, side[Lp]) @ Rm.T, side[Lp])
+    n1 = mirror(n0, side[Lp]) / str_
+    n1[:, 2] += trail_ * np.minimum(below[Lp] / HINGE_EASE, 1.0) * n1[:, 1]
+    nn = mirror(n1 @ Rm.T, side[Lp]); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
     me.vertices.foreach_set("co", Pn.ravel()); me.update()
     me.normals_split_custom_set(nn.tolist()); me.update()
 if LEG_FIT:
@@ -168,9 +201,10 @@ if LEG_FIT:
     LYO = [0.0, 0.005, -0.017, -0.048, -0.024, -0.08, -0.085]
     LFW = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]   # (boots can be narrowed around FOOT_X, if a thick leg ever makes clown feet)
     FOOT_X = 0.492
-    LSX, LTOPIN = 0.55, 0.027
-    # the knee plate's middle (0.254 on the piece) goes on the knight's real knee joint, or it levers away from the leg when he bends it
-    ZFROM, ZTO = [-1.2, -0.95, 0.254, 0.95, 1.2], [-0.113, 0.0, 0.545, 0.923, 1.06]
+    LSX, LTOPIN = 0.55, 0.04
+    # Heights on the piece -> heights on the knight, from the owner's reference pictures (2026-11-05): boot top, greave top, knee plate's middle and
+    # top, then the thigh's top. The pictures' knee plate sits higher than the knight's real knee joint (0.547), so this one rides a little above the joint.
+    ZFROM, ZTO = [-1.2, -0.95, -0.54, 0.013, 0.196, 0.36, 0.95, 1.2], [-0.163, 0.0, 0.268, 0.52, 0.62, 0.72, 0.923, 1.06]
     grid = np.linspace(-1.2, 1.2, 481); kern = np.ones(41) / 41   # no sudden bends between the numbers above
     def soft(vals):
         v_ = np.interp(grid, LZ, vals); return np.convolve(np.pad(v_, 20, mode="edge"), kern, mode="valid")

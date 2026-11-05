@@ -28,6 +28,12 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When a cut by position crosses thin or folded geometry (corners, flanges, collars), look closely at each place it crosses: tidy the ends so no teeth or slivers stay behind.
 - When asked to blunt or round a point, compare the silhouette before and after from the side: a change you can only measure is not one the owner will see.
 - Judge a new model's colour in the game, next to the same tier and in the SAME light (the same spot, worn the same way). A neutral Blender render shows nothing about the tint, and a suit in sunlight against one in shadow proves nothing.
+- Fit armour to the owner's reference pictures by measuring both at the same height, side by side, and look at the raw model in plain clay first: it may already have the shape you are about to force. A dome's fullness shows in its width halfway up, not its overall size.
+- Never shear a rounded plate to tilt it (a pad became a warped ramp, 2026-11-05): find which part really leans, usually what hangs below the rim, and move only that. Check a tilt's direction side-on against the picture: tipping a pad's bottom back drops its front.
+- What sits under armour is deleted, not set deeper. What stays in a gap between two plates must end inside both, on every side and in every clip: look from behind too, and check rims at full swing, not just standing (a sleeve covered a bracer's rim only at the back of the elbow, and webbing at the armpit counted as arm by its weights).
+- Keeping or dropping whole triangles leaves a saw-toothed edge. Where an edge can show, cut it with a plane and smooth it. Give anything tucked under a plate that plate's own weights near the rim, so the two can't part.
+- Meshy models are split along texture seams and may have inner shells: weld before asking what is connected, and remove faces that face inward before reshaping.
+- Judge armour in motion at full render scale or in Blender. The upscaler frays fast-moving edges at 60% and it reads as torn plate; test before believing either explanation (run the same frames at both scales).
 
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.

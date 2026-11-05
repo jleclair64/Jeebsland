@@ -9,11 +9,11 @@ $rig = (Get-ChildItem (Join-Path $proj 'Art\Knight Chainmail') -Filter '*rigged*
 $out = Join-Path $proj 'Saved\KnightBuild\Pieces'
 $pics = Join-Path $proj 'Saved\KnightBuild\PiecePictures'
 $pieces = @(
-    @{ Name = 'chest';     Glb = '*chestplate*'; Args = @('back', 'fit=0.42,0,0.008,1.193,0.46', 'slot=Chest') },
+    @{ Name = 'chest';     Glb = '*chestplate*'; Args = @('back', 'fit=0.386,0,0.008,1.111,0.377,-0.225,0.5,0.39,0.31', 'slot=Chest') },
     @{ Name = 'legs';      Glb = '*leg_boots*';  Args = @('back', 'fit=legs', 'slot=Legs') },
-    @{ Name = 'helmet';    Glb = '*helmet*';     Args = @('back', 'cut=helmetloop', 'fit=0.215,0,-0.02,1.644', 'slot=Helm') },
-    @{ Name = 'gauntlets'; Glb = '*gauntlets*';  Args = @('all', 'above=-0.22', 'spot=0.711,-0.281', 'place=0.24,0.6,-0.02,0.18,0,-0.164,-0.986,0.373,-0.28,-0.885,0.419,-0.013,0.935', 'slot=Gloves') },
-    @{ Name = 'shoulders'; Glb = '*pauldrons*';  Args = @('all', 'place=0.32,0.55,0,0.35,0,0,-1,0.2,0.05,-0.98,0.3,0.036,1.42', 'slot=Shoulders') }
+    @{ Name = 'helmet';    Glb = '*helmet*';     Args = @('back', 'cut=helmetloop', 'fit=0.18,0,-0.005,1.679', 'slot=Helm') },
+    @{ Name = 'gauntlets'; Glb = '*gauntlets*';  Args = @('all', 'above=-0.22', 'spot=0.711,-0.281', 'squash=-0.23,0.8', 'place=0.25,0.6,-0.082,-0.195,0,-0.164,-0.986,0.373,-0.28,-0.885,0.419,-0.013,0.935', 'slot=Gloves') },
+    @{ Name = 'shoulders'; Glb = '*pauldrons*';  Args = @('all', 'dome=0.7,0.2,0.29,0.085,0.35,0.1', 'place=0.35,0.183,0,0,0,0,-1,0,0,-1,0.113,0.05,1.426,1,1.4,0.95,0.19,-0.15', 'slot=Shoulders') }
 )
 foreach ($p in $pieces) {
     if ($Only -and $Only -notmatch $p.Name) { continue }

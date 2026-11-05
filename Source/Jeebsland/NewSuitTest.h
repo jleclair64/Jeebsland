@@ -9,8 +9,8 @@ class UAnimSequence;
 
 // The new armour suit on the Mixamo knight, for looking at in MoveLab (2026-11-05): nothing else in the game uses it yet.
 // Every machine makes its own; it is only something to look at and changes nothing in the game. Three stand in a row showing the
-// reference pose, the walk and the run, and a fourth is the local player's: N puts it on him (his old knight is hidden, and
-// it plays the walk or the run by his speed). Only the walk and run clips exist, so swings and jumps don't show in it.
+// rest pose, the walk and the run, and a fourth is the local player's: N puts it on him (his old knight is hidden, and
+// it plays the rest, walk or run by his speed). Only those clips exist, so swings and jumps don't show in it.
 UCLASS()
 class ANewSuitTest : public AActor
 {
@@ -31,6 +31,7 @@ private:
 	UPROPERTY() TObjectPtr<USkeletalMeshComponent> Body;
 	UPROPERTY() TObjectPtr<UAnimSequence> Walking;
 	UPROPERTY() TObjectPtr<UAnimSequence> Running;
+	UPROPERTY() TObjectPtr<UAnimSequence> Resting;
 	int32 Playing = -1;
 	int32 Forced = -1;     // test pictures: -SuitShow=stand, walk or run
 	bool bWorn = false;    // Show_Player: on the player now

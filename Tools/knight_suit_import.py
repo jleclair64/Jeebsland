@@ -41,6 +41,16 @@ for p in PIECES:
     mel.set_material_instance_texture_parameter_value(mi, "NormalTex", flat)
     lib.save_asset(path)
     mats[p] = mi
+# the dark cloth under the skirt: the mail's own pictures, greyed and darkened until only a trace of the weave is left
+under = tools.create_asset("MI_Suit_Under", folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+mel.set_material_instance_parent(under, parent)
+mel.set_material_instance_texture_parameter_value(under, "BaseTex", lib.load_asset(folder + "/T_Mail_Base"))
+mel.set_material_instance_texture_parameter_value(under, "MRTex", lib.load_asset(folder + "/T_Mail_MR"))
+mel.set_material_instance_texture_parameter_value(under, "NormalTex", flat)
+for name, value in (("Desat", 1.0), ("DesatGain", 0.12), ("MetalScale", 0.0), ("TierRough", 1.0), ("RoughMix", 1.0)):
+    mel.set_material_instance_scalar_parameter_value(under, name, value)
+lib.save_asset(folder + "/MI_Suit_Under")
+mats["Under"] = under
 
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
 ui = unreal.FbxImportUI()
@@ -74,7 +84,7 @@ tools.import_asset_tasks([task])
 skm = lib.load_asset(folder + "/SK_NewSuit")
 if skm is None: raise RuntimeError("SUITDIAG SK_NewSuit did not import")
 # the clips came with the mesh (with one spare copy per mesh part): keep one of each, under plain names
-for clip in ("Walking", "Running"):
+for clip in ("Walking", "Running", "Rest"):
     lib.rename_asset(folder + "/SK_NewSuit_Anim_Armature_" + clip, folder + "/A_" + clip)
     unreal.log("SUITDIAG clip A_%s: %.3f s" % (clip, lib.load_asset(folder + "/A_" + clip).get_play_length()))
 for path in lib.list_assets(folder, recursive=False):
@@ -84,7 +94,7 @@ skm = lib.load_asset(folder + "/SK_NewSuit")
 new_slots = []
 for m in skm.get_editor_property("materials"):
     nm = str(m.get_editor_property("material_slot_name"))
-    hit = [p for p in PIECES if p in nm]
+    hit = [p for p in mats if p in nm]
     if not hit: raise RuntimeError("SUITDIAG slot with no piece: " + nm)
     m.set_editor_property("material_interface", mats[hit[0]])
     new_slots.append(m)
