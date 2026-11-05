@@ -25,6 +25,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Every armour style must show its tier: where a model's cloth takes no tint, give it its own cue (trim, belt or a wash) or say plainly that it doesn't.
 - A very dark tier's icons need a backing or outline on the real glass panel, checked at actual size; a brightness floor is not enough, and icons must also be easy to tell from each other (a strong tonal gap between icon and backing). Two shiny tiers must differ in hue and polish, not just brightness.
 - Fit a combined piece per body part (thigh, shin, foot), checked front and side against the whole figure: a widening that suits the thigh makes the feet look oversized.
+- When a cut by position crosses thin or folded geometry (corners, flanges, collars), look closely at each place it crosses: tidy the ends so no teeth or slivers stay behind.
+- When asked to blunt or round a point, compare the silhouette before and after from the side: a change you can only measure is not one the owner will see.
+- Judge a new model's colour in the game, next to the same tier and in the SAME light (the same spot, worn the same way). A neutral Blender render shows nothing about the tint, and a suit in sunlight against one in shadow proves nothing.
 
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.

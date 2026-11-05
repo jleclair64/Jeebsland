@@ -51,6 +51,8 @@ THIGH_CAP = 0.5      # the most a chest piece's skirt may follow a thigh, at its
 SKIRT_TOP = 0.336    # where the skirt starts (just under the belt), as a share of the chest piece's height from its hem
 SKIRT_BLEND = 0.06   # the body's own weights fade into the skirt's over this
 KNEE_Y, KNEE_LO, KNEE_HI, KNEE_FADE = -0.015, 0.44, 0.655, 0.03   # (metres on the knight) where the leg armour's knee plate sits
+KNEE_BLUNT, KNEE_BLUNT_Y, KNEE_BLUNT_ZLO, KNEE_BLUNT_ZHI = 0.3, -0.04, 0.0, 0.42  # (numbers on the Meshy piece) how much of the depth stays, past where, and between which heights
+BLUNTED = None
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=path)
@@ -61,18 +63,112 @@ for x in list(bpy.data.objects):
     if x is not o: bpy.data.objects.remove(x)
 bpy.ops.object.select_all(action="DESELECT")
 piece_images = [n.image for n in o.material_slots[0].material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
+if opts.get("cut") == "helmetloop":
+    # The thin loop under the helmet's chin is one mesh with the collar, so it is cut by where it sits, seen from the side:
+    # under a line forward of the neck plate (the loop itself), and under a soft curve that takes the collar's front corner off,
+    # so the plate ends in a sweep instead of a tooth. The cut edge is laid on the curve so it runs smooth. (Numbers on the Meshy piece.)
+    LOOP_Y, LOOP_Z, LOOP_SLOPE = 0.0125, -0.655, 0.537
+    CURVE_Y, CURVE_Z = [-0.067, -0.013, 0.053, 0.147, 0.307], [-0.576, -0.615, -0.64, -0.649, -0.649]   # (never below the back rim, or its ends poke down from the front)
+    def curve_z(y): return float(np.interp(y, CURVE_Y, CURVE_Z))
+    def in_loop(c):
+        if c.y < LOOP_Y and c.z < LOOP_Z + LOOP_SLOPE * (c.y - LOOP_Y) + 0.012: return True
+        return CURVE_Y[0] <= c.y <= CURVE_Y[-1] and c.z < curve_z(c.y)
+    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    gone = [f for f in bm.faces if in_loop(f.calc_center_median())]
+    n_before = len(bm.faces)
+    touched = {v for f in gone for v in f.verts}
+    bmesh.ops.delete(bm, geom=gone, context="FACES")
+    key = lambda v: tuple(round(c / 1e-5) for c in v.co)
+    edge_keys = {key(v) for v in touched if v.is_valid and v.link_faces and CURVE_Y[0] <= v.co.y <= CURVE_Y[-1]}
+    laid = 0
+    for v in bm.verts:   # (the texture splits points along its seams: both copies move together)
+        if not CURVE_Y[0] <= v.co.y <= CURVE_Y[-1]: continue
+        cz = curve_z(v.co.y)
+        if v.co.z < cz or (key(v) in edge_keys and v.co.z - cz < 0.05):   # nothing is left hanging under the curve, or it shows as teeth
+            v.co.z = cz; laid += 1
+    bm.to_mesh(me); bm.free(); me.update()
+    print("PCL helmet loop cut: %d faces gone, %d edge points laid on the curve, %d faces now (from %d)" % (len(gone), laid, len(me.polygons), n_before))
+if "spot" in opts:
+    # Paints a stain out of the model's pictures: a ray from the front finds it, it grows over the dark pixels there, and the gap fills in from its edges.
+    sx, sz = [float(v) for v in opts["spot"].split(",")]
+    me.calc_loop_triangles()
+    tree = BVHTree.FromPolygons([v.co[:] for v in me.vertices], [t.vertices[:] for t in me.loop_triangles])
+    hit, _, fi, _ = tree.ray_cast(Vector((sx, -5.0, sz)), Vector((0, 1, 0)), 20.0)
+    tri = me.loop_triangles[fi]
+    vs = [me.vertices[v].co for v in tri.vertices]; uvs = [me.uv_layers.active.data[l].uv for l in tri.loops]
+    from mathutils.geometry import barycentric_transform
+    bary = barycentric_transform(hit, vs[0], vs[1], vs[2], Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1)))
+    uv = uvs[0] * bary[0] + uvs[1] * bary[1] + uvs[2] * bary[2]
+    base = next(im for im in piece_images if "metallic" not in im.name); mrim = next(im for im in piece_images if "metallic" in im.name)
+    w_, h_ = base.size
+    Bp = np.empty(w_ * h_ * 4, dtype=np.float32); base.pixels.foreach_get(Bp); Bp = Bp.reshape(h_, w_, 4)
+    cx, cy = int((uv.x % 1) * (w_ - 1)), int((uv.y % 1) * (h_ - 1))
+    R_ = 160
+    x0, x1, y0, y1 = max(cx - R_, 0), min(cx + R_, w_), max(cy - R_, 0), min(cy + R_, h_)
+    win = Bp[y0:y1, x0:x1, :3].mean(2)
+    px, py = cx - x0, cy - y0
+    med = float(win[py, px]); dark = win < med + 0.12   # the stain is one flat dark colour on lighter metal
+    mask = np.zeros_like(dark); st = [(py, px)]; mask[py, px] = True
+    while st:
+        yy, xx = st.pop()
+        for ny, nx in ((yy + 1, xx), (yy - 1, xx), (yy, xx + 1), (yy, xx - 1)):
+            if 0 <= ny < dark.shape[0] and 0 <= nx < dark.shape[1] and dark[ny, nx] and not mask[ny, nx]: mask[ny, nx] = True; st.append((ny, nx))
+    grow = mask.copy()
+    for _ in range(5):
+        g_ = grow.copy(); g_[1:] |= grow[:-1]; g_[:-1] |= grow[1:]; g_[:, 1:] |= grow[:, :-1]; g_[:, :-1] |= grow[:, 1:]; grow = g_
+    print("PCL spot: uv %.3f %.3f, %d dark pixels, painting %d (window median %.3f)" % (uv.x, uv.y, mask.sum(), grow.sum(), med))
+    for im in (base, mrim):
+        Ip = np.empty(w_ * h_ * 4, dtype=np.float32); im.pixels.foreach_get(Ip); Ip = Ip.reshape(h_, w_, 4)
+        pt = Ip[y0:y1, x0:x1].copy(); todo = grow.copy()
+        while todo.any():   # fill from the edge inward
+            ngh = np.zeros_like(pt); cnt = np.zeros(todo.shape, dtype=np.float32); known = (~todo).astype(np.float32)
+            for dy_, dx_ in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ngh += np.roll(pt * known[..., None], (dy_, dx_), (0, 1)); cnt += np.roll(known, (dy_, dx_), (0, 1))
+            edge = todo & (cnt > 0)
+            pt[edge] = ngh[edge] / cnt[edge][:, None]; todo[edge] = False
+        for _ in range(12):   # even out the fill's streaks, inside the patch only
+            even = (np.roll(pt, 1, 0) + np.roll(pt, -1, 0) + np.roll(pt, 1, 1) + np.roll(pt, -1, 1)) / 4
+            pt[grow] = even[grow]
+        # the faintest grain, so the patch isn't dead smooth next to the metal
+        noise = np.random.default_rng(7).normal(0, 0.006, grow.shape)
+        pt[..., :3][grow] = np.clip(pt[..., :3][grow] + noise[grow][:, None], 0, 1); pt[..., 3] = 1.0
+        Ip[y0:y1, x0:x1] = pt
+        im.pixels.foreach_set(Ip.ravel()); im.update(); im.pack()
+ZPIECE = None
 if FIT:
-    for v in me.vertices: v.co = Vector((v.co.x * FIT[0] + FIT[1], v.co.y * FIT[0] + FIT[2], v.co.z * FIT[0] + FIT[3]))
-    me.update()
+    # fit=scale,x,y,z[,height scale]: a second number makes the piece slimmer than it is tall, and its shading follows
+    FZ = FIT[4] if len(FIT) > 4 else FIT[0]
+    n0 = np.array([c.vector[:] for c in me.corner_normals])
+    for v in me.vertices: v.co = Vector((v.co.x * FIT[0] + FIT[1], v.co.y * FIT[0] + FIT[2], v.co.z * FZ + FIT[3]))
+    nn = n0 / np.array([FIT[0], FIT[0], FZ]); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
+    me.update(); me.normals_split_custom_set(nn.tolist()); me.update()
+if "place" in opts:
+    # place=scale, piece pivot x y z, piece axis x y z, knight axis x y z, knight spot x y z: for a pair of pieces (gauntlets, shoulders), given
+    # for the knight's left side (+X). The pivot goes on the spot and the piece's axis along his limb; the other side is the mirror image.
+    PL = [float(v) for v in opts["place"].split(",")]
+    s_, piv_, ax_, bx_, tgt_ = PL[0], Vector(PL[1:4]), Vector(PL[4:7]).normalized(), Vector(PL[7:10]).normalized(), Vector(PL[10:13])
+    rot_ = ax_.rotation_difference(bx_).to_matrix()
+    Pp = np.empty((len(me.vertices), 3)); me.vertices.foreach_get("co", Pp.ravel())
+    ZPIECE = Pp[:, 2].copy()
+    Lp = np.empty(len(me.loops), dtype=np.int64); me.loops.foreach_get("vertex_index", Lp)
+    n0 = np.array([c.vector[:] for c in me.corner_normals])
+    Rm = np.array(rot_); side = np.where(Pp[:, 0] >= 0, 1.0, -1.0)[:, None]; flip = np.array([1.0, 0.0, 0.0])
+    def mirror(p_, k_): return p_ * (1 - 2 * flip * (k_ < 0))
+    Pq = mirror(Pp, side)
+    Pn = (Pq - np.array(piv_[:])) * s_; Pn = Pn @ Rm.T + np.array(tgt_[:])
+    Pn = mirror(Pn, side)
+    nn = mirror(mirror(n0, side[Lp]) @ Rm.T, side[Lp])
+    me.vertices.foreach_set("co", Pn.ravel()); me.update()
+    me.normals_split_custom_set(nn.tolist()); me.update()
 if LEG_FIT:
     # Meshy's legs and the knight's differ along their length, so these numbers come from measuring both (scratch measure, 2026-11-05):
-    # by height on the Meshy piece, how deep to make it and how far forward to bring it. The knight's mail legs are thick.
+    # by height on the Meshy piece, how deep to make it and how far forward to bring it. (Redone on the thinner knight, 2026-11-05.)
     LZ = [-0.95, -0.75, -0.6, -0.25, 0.16, 0.65, 0.95]
-    LSY = [0.47, 0.47, 0.58, 0.58, 0.58, 0.58, 0.58]
-    LYO = [0.01, 0.005, 0.0, -0.042, -0.028, -0.096, -0.09]
-    LFW = [0.88, 0.88, 1.0, 1.0, 1.0, 1.0, 1.0]   # the boots are narrowed around FOOT_X, so the extra width for the thick legs doesn't make clown feet
+    LSY = [0.47, 0.47, 0.55, 0.55, 0.55, 0.55, 0.55]
+    LYO = [0.0, 0.005, -0.017, -0.048, -0.024, -0.08, -0.085]
+    LFW = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]   # (boots can be narrowed around FOOT_X, if a thick leg ever makes clown feet)
     FOOT_X = 0.492
-    LSX, LTOPIN = 0.583, 0.027
+    LSX, LTOPIN = 0.55, 0.027
     # the knee plate's middle (0.254 on the piece) goes on the knight's real knee joint, or it levers away from the leg when he bends it
     ZFROM, ZTO = [-1.2, -0.95, 0.254, 0.95, 1.2], [-0.113, 0.0, 0.545, 0.923, 1.06]
     grid = np.linspace(-1.2, 1.2, 481); kern = np.ones(41) / 41   # no sudden bends between the numbers above
@@ -85,6 +181,14 @@ if LEG_FIT:
     Pg = np.empty((len(me.vertices), 3)); me.vertices.foreach_get("co", Pg.ravel())
     L_ = np.empty(len(me.loops), dtype=np.int64); me.loops.foreach_get("vertex_index", L_)
     n0 = np.array([c.vector[:] for c in me.corner_normals])
+    # blunt the knee plates (owner, 2026-11-05): the part out in front is made shallower, so the plate keeps its ridge but stops looking like a beak
+    def ks(a_, b_, x_):
+        t_ = np.clip((x_ - a_) / (b_ - a_), 0, 1); return t_ * t_ * (3 - 2 * t_)
+    zone = ks(KNEE_BLUNT_ZLO, KNEE_BLUNT_ZLO + 0.05, Pg[:, 2]) * (1 - ks(KNEE_BLUNT_ZHI - 0.05, KNEE_BLUNT_ZHI, Pg[:, 2]))
+    past = np.maximum(KNEE_BLUNT_Y - Pg[:, 1], 0.0)
+    Pg[:, 1] += past * (1 - KNEE_BLUNT) * zone
+    BLUNTED = (zone * past) > 1e-6
+    print("PCL knee plates blunted: %d points" % BLUNTED.sum())
     Z_ = Pg[:, 2]; sign_ = np.sign(Pg[:, 0])
     absx = np.abs(Pg[:, 0])
     Pn = np.stack([sign_ * (LSX * (FOOT_X + (absx - FOOT_X) * np.interp(Z_, grid, gfw)) - np.interp(Z_, grid, gin)), Pg[:, 1] * np.interp(Z_, grid, gsy) + np.interp(Z_, grid, gyo), np.interp(Z_, grid, gzz)], 1)
@@ -252,7 +356,9 @@ if SMOOTH_BACK:
         np.add.at(c, vpairs[:, 0], 1); np.add.at(c, vpairs[:, 1], 1)
         facing = (facing + s) / (1 + c)
     wv = np.ones(len(X)) if SMOOTH_ALL else ramp(BACK_FROM * H, BACK_TO * H, X[:, 1] - cen.y) * ramp(0.15, 0.5, facing)
-    if ABOVE is not None: wv = wv * ramp(ABOVE - 0.03 * H, ABOVE, X[:, 2])
+    if ABOVE is not None:
+        if ZPIECE is None: wv = wv * ramp(ABOVE - 0.03 * H, ABOVE, X[:, 2])
+        else: wv = wv * ramp(ABOVE - 0.056, ABOVE, ZPIECE[first])   # (a placed piece: still by height on the piece as Meshy made it)
     # the rims stay where they are, and smoothing fades in away from them so nothing tears
     rim = np.unique(F[inner].ravel())
     vd = np.full(len(X), np.inf); vd[rim] = 0.0
@@ -319,9 +425,11 @@ if SMOOTH_BACK:
         a_, b_ = X[ids[(k + 1) % 3]] - X[v], X[ids[(k + 2) % 3]] - X[v]
         return math.atan2(np.linalg.norm(np.cross(a_, b_)), a_.dot(b_))
     new_n = orig_n.copy()
+    shade = wv.copy()
+    if BLUNTED is not None: shade[W[BLUNTED]] = 1.0   # the blunted knee's shape changed, so its shading must follow even on the front
     for fi in keep_f:
         for j in range(3):
-            v = int(F[fi, j]); w_ = wv[v]
+            v = int(F[fi, j]); w_ = shade[v]
             if w_ <= 0: continue
             s = np.zeros(3)
             for g in vall[v]:

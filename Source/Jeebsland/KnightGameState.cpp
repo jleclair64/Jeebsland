@@ -2,6 +2,7 @@
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
 #include "GearWall.h"
+#include "NewSuitTest.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "Meadow.h"
@@ -354,6 +355,22 @@ void AKnightGameState::BuildMoveLab()
 	}
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
+	// The new armour suit to look at (2026-11-05): standing, walking and running in a row left of the sparring knight, facing the
+	// start, plus one for the player (N puts it on). Only something to look at, so each machine makes its own.
+	if (World->GetNetMode() != NM_DedicatedServer)
+	{
+		const int32 Row[] = { ANewSuitTest::Show_Stand, ANewSuitTest::Show_Walk, ANewSuitTest::Show_Run, ANewSuitTest::Show_Player };
+		for (int32 i = 0; i < 4; ++i)
+		{
+			const float Drop = Row[i] == ANewSuitTest::Show_Walk ? 3.9f : Row[i] == ANewSuitTest::Show_Run ? 2.9f : 0.f;   // (see NewSuitTest.cpp)
+			const FTransform Xf(FRotator(0.f, 90.f, 0.f), FVector(300.f, -170.f - i * 170.f, Z - Drop));   // (his front is his +Y: 90 turns him toward the start)
+			if (ANewSuitTest* S = World->SpawnActorDeferred<ANewSuitTest>(ANewSuitTest::StaticClass(), Xf))
+			{
+				S->Show = Row[i];
+				S->FinishSpawning(Xf);
+			}
+		}
+	}
 	SetupShotMode();
 }
 
