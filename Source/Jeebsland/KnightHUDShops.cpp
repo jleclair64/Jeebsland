@@ -29,7 +29,7 @@
 using namespace JeebItems;
 
 // ===================================================================================================
-// The store: sell materials, fish, gear and arrows; buy wood / bronze / iron gear, arrows, rings and amulets
+// The store: sell materials, fish, gear and arrows; buy tin and iron gear, arrows, rings and amulets
 // ===================================================================================================
 void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 {
@@ -51,8 +51,8 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 
 	// ----- Sell (left) -----
 	NorseTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
-		static const EItemType Sellable[18] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::CopperOre, EItemType::IronOre, EItemType::Coal,
-			EItemType::SilverOre, EItemType::GoldOre, EItemType::Onyx, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
+		static const EItemType Sellable[15] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
+			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
 	int32 Row = 0;
 	for (int32 m = 0; m < UE_ARRAY_COUNT(Sellable) && Row < 10; ++m)
@@ -196,8 +196,8 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 
 	// Materials you carry (every ore and gem a knight smiths with), and your smithing level
 	{
-		static const EItemType Mats[8] = { EItemType::TinOre, EItemType::CopperOre, EItemType::IronOre, EItemType::Coal, EItemType::SilverOre, EItemType::GoldOre, EItemType::Onyx, EItemType::Diamond };
-		for (int32 m = 0; m < 8; ++m)
+		static const EItemType Mats[6] = { EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond };
+		for (int32 m = 0; m < 6; ++m)
 		{
 			const float X = PX + 30.f + m * 128.f;
 			DrawIcon(MaterialId(Mats[m]), X, PY + 58.f, 32.f);
@@ -238,7 +238,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 
 	const float CGap = 6.f, CH = 500.f;
 	const float CX0 = PX + 370.f, CY = PY + 112.f;
-	const float CW = (PW - 370.f - 24.f - CGap * (NumTiersKnight - 1)) / NumTiersKnight;   // (all nine tiers since 2026-11-03)
+	const float CW = (PW - 370.f - 24.f - CGap * (NumTiersKnight - 1)) / NumTiersKnight;   // (all six tiers)
 	for (int32 t = 0; t < NumTiersKnight; ++t)
 	{
 		const float CX = CX0 + t * (CW + CGap);
@@ -300,7 +300,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
 	}
 	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	HDText(TEXT("Tin: tin ore. Iron: iron ore. Bronze: copper and tin. Steel: iron ore and coal. Silver and gold: their ores. Onyx, emerald, diamond: the gem and gold.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	HDText(TEXT("Tin, iron, silver and gold: their ores. Emerald and diamond: the gem and gold ore.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 

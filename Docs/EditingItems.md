@@ -4,7 +4,7 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 
 | File | What it holds |
 |---|---|
-| `Tiers.csv` | The nine ranks (Tin to Diamond): level needed, damage and defence steps, price multiplier, smithing level/XP/materials, armour colours, the PvP-rank cape colour (CapeColor), how much of a blow gets through armour of this tier (ArmourTakes), how much of a blow on a shield of this tier comes out of the guard (ShieldTakes), how heavy armour of this material is (WeightMult, x the piece's Weight in Kinds.csv), description |
+| `Tiers.csv` | The six ranks (Tin, Iron, Silver, Gold, Emerald, Diamond): level needed, damage and defence steps, price multiplier, smithing level/XP/materials, armour colours, shine (Metal 1 or 0, Rough 0 mirror to 1 dull), the cape colour (CapeColor), how much of a blow gets through armour of this tier (ArmourTakes), how much of a blow on a shield of this tier comes out of the guard (ShieldTakes), how heavy armour of this material is (WeightMult, x the piece's Weight in Kinds.csv), description |
 | `Kinds.csv` | Each kind of gear: tin damage, reach, swing speed, defence, armour weight in kg before the material (Weight), store price, smithing mass, two-handed, description |
 | `Materials.csv` | Ores, gems, logs, fish, animal drops: name, stack size, sell price, colour, gathering level, fishing XP |
 | `Potions.csv` | Potions: effect (speed, heal, vigour, radar), strength, seconds, cooldown, price, colour, store line, description |

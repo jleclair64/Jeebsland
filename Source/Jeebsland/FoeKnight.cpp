@@ -106,7 +106,7 @@ void AFoeKnight::Paint(UProceduralMeshComponent* C, const FLinearColor& Color, b
 	if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, (bMetal && Metal) ? Metal : Base))
 	{
 		M->SetVectorParameterValue(TEXT("Color"), Color);
-		if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), 0.3f); }
+		if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), JeebItems::TierRough(Tier)); }
 	}
 }
 
@@ -159,7 +159,7 @@ void AFoeKnight::BeginPlay()
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
 		if (D.bFixedColor) Col = D.Fixed;
-		const bool bMetal = !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
+		const bool bMetal = JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
 		Paint(C, Col, bMetal);
 	}
 	// His sword, in the right hand, held the way the player holds one
@@ -170,7 +170,7 @@ void AFoeKnight::BeginPlay()
 		{
 			if (WP.Mesh.V.Num() == 0) continue;
 			UProceduralMeshComponent* C = MakePart(ElbowR, P_ElbowR, WP.Mesh);
-			const bool bMetal = !WP.bFixed && (WP.Role == 0 || WP.Role == 2);
+			const bool bMetal = JeebItems::TierIsMetal(Tier) && !WP.bFixed && (WP.Role == 0 || WP.Role == 2);
 			Paint(C, WP.bFixed ? WP.Fixed : JeebItems::Palette(Tier, WP.Role), bMetal);
 		}
 	}

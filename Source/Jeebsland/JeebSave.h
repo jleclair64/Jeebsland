@@ -17,7 +17,7 @@ class UJeebSave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 10;   // 2: the tier redo; 3: capes became the PvP rank; 4: arrows for everyone; 7: a bow on the weapon bar; 8: at least the starting arrows; 9: arrows stack to 99, topped up to 99 of each; 10: the two-slot weapon bar (Migrate converts older ones)
+	static constexpr int32 CurrentVersion = 11;   // 11: the six tiers; every save was reset (2026-11-04), and ApplyTo reads no other version
 	static const FString SlotName;
 
 	// 0 = "not in the file". (Unreal leaves out a value that equals its default, so while the default was CurrentVersion no
@@ -55,7 +55,7 @@ public:
 
 	// The building blocks (the server uses these per account). Body: the knight, for its position (may be null).
 	static UJeebSave* Capture(const USkillComponent* Skills, const AActor* Body);
-	bool ApplyTo(USkillComponent* Skills);   // checked on the way in; false (component untouched) if written by a newer game
+	bool ApplyTo(USkillComponent* Skills);   // checked on the way in; false (component untouched) if not written by this version
 	// A file of its own: written to a temporary file first and then swapped in, so a crash mid-write can't destroy the save
 	static bool WriteFile(UJeebSave* Save, const FString& Path);
 	static UJeebSave* ReadFile(const FString& Path);   // null if missing or unreadable

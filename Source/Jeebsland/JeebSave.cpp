@@ -26,161 +26,7 @@ bool UJeebSave::ValidId(int32 Id)
 
 void UJeebSave::Migrate()
 {
-	// A file without its version was written before 2026-10-30's fix. Those written before the tier redo (version 1) still have
-	// the small map-fog grid; the full-size world, 21 minutes after the redo, made the grid 9 times bigger, so a full-size grid
-	// means version 2. (Every save there was at the time fits: randy and tester_1 from 10-29 are version 1, the single-player
-	// save from 10-30 evening is version 2.)
-	if (SaveVersion <= 0) SaveVersion = (Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8) ? 2 : 1;
-
-	// Version 1 -> 2 (2026-10-30, the tier redo): the old tiers Wood, Bronze, Iron, Steel, Diamond become Tin, Bronze, Iron,
-	// Steel, Gold (Diamond is now the wizards' legendary, so old diamond gear becomes the best a knight can still wear). Applies
-	// to every weapon, tool, armour piece and shield (whose tier is the last digit) and to arrows, wherever they are kept.
-	if (SaveVersion < 2)
-	{
-		static const int32 NewTier[5] = { T_Tin, T_Bronze, T_Iron, T_Steel, T_Gold };
-		auto Fix = [](int32& Id)
-		{
-			if (Id >= IdArrowBase && Id < IdArrowBase + 5) { Id = IdArrowBase + NewTier[Id - IdArrowBase]; return; }
-			if (!IsGear(Id)) return;
-			const int32 K = KindOf(Id);
-			if (!(IsWeaponKind(K) || IsArmorKind(K) || K == K_Shield)) return;   // capes, rings, amulets and the brush have no tier
-			const int32 Old = VariantOf(Id);
-			if (Old < 0 || Old > 4) return;
-			Id += NewTier[Old] - Old;
-		};
-		for (int32& Id : SlotIds) Fix(Id);
-		for (int32& Id : BankIds) Fix(Id);
-		for (int32& Id : Hotbar) Fix(Id);
-		for (int32& Id : Worn) Fix(Id);
-	}
-	// Version 2 -> 3 (2026-10-30): capes stopped being items; the cape now shows the PvP rank. A spare cape in the pack, the
-	// bank or on the weapon bar is sold for what the store used to pay (12 ingots, 22 for the old gold cape); the worn cape is
-	// replaced by the rank's cape when the save was loaded. (Since 2026-11-03 capes are ordinary items again: the worn one stays.)
-	if (SaveVersion < 3)
-	{
-		auto SellCape = [this](int32& Id)
-		{
-			if (!IsGear(Id) || KindOf(Id) != K_Cape) return;
-			Ingots += (VariantOf(Id) == 4) ? 22 : 12;
-			Id = 0;
-		};
-		for (int32& Id : SlotIds) SellCape(Id);
-		for (int32& Id : BankIds) SellCape(Id);
-		for (int32& Id : Hotbar) SellCape(Id);
-	}
-	// Version 3 -> 4 (2026-10-31): the bow joined the starting kit, right of the sword on the weapon bar, with steel and fire
-	// arrows: everyone gets the starting arrows. Version 4 -> 7: characters without a bow on the weapon bar (one kept in the
-	// pack or bank does not count) get a tin one there; the weapons from that slot on move one step right into the first empty
-	// slot, and on a full bar the last one goes to the pack, trading places with a bow already there if any (a full pack with no
-	// bow: no bow). (5 and 6 were short-lived test versions of this step.)
-	auto AddToPack = [this](int32 Id, int32 Count)
-	{
-		const int32 Stack = StackSize(Id);
-		for (int32 i = 0; i < SlotIds.Num() && Count > 0; ++i)
-			if (SlotIds[i] == Id && SlotCounts.IsValidIndex(i) && SlotCounts[i] < Stack) { const int32 N = FMath::Min(Stack - SlotCounts[i], Count); SlotCounts[i] += N; Count -= N; }
-		for (int32 i = 0; i < SlotIds.Num() && Count > 0; ++i)
-			if (SlotIds[i] == 0 && SlotCounts.IsValidIndex(i)) { const int32 N = FMath::Min(Stack, Count); SlotIds[i] = Id; SlotCounts[i] = N; Count -= N; }
-	};
-	if (SaveVersion < 4)
-	{
-		AddToPack(ArrowId(T_Steel), USkillComponent::StartSteelArrows);
-		AddToPack(IdFireArrow, USkillComponent::StartFireArrows);
-	}
-	if (SaveVersion < 7)
-	{
-		bool bHasBow = false;
-		for (int32 Id : Hotbar) bHasBow |= IsGear(Id) && KindOf(Id) == K_Bow;
-		if (!bHasBow && Hotbar.Num() == 5)
-		{
-			int32 Sword = 0;
-			for (int32 h = 0; h < 5; ++h) if (IsGear(Hotbar[h]) && KindOf(Hotbar[h]) == K_Sword) { Sword = h; break; }
-			const int32 At = FMath::Min(Sword + 1, 4);
-			int32 Empty = -1;
-			for (int32 h = At; h < 5 && Empty < 0; ++h) if (Hotbar[h] == 0) Empty = h;
-			for (int32 h = 0; h < At && Empty < 0; ++h) if (Hotbar[h] == 0) Empty = h;
-			int32 BowId = GearId(K_Bow, 0);
-			if (Empty < 0)   // a full bar: the last weapon makes room (it trades places with a bow already in the pack, if any)
-			{
-				int32 PackBow = INDEX_NONE;   // (the lowest tier: one he can surely use)
-				for (int32 i = 0; i < SlotIds.Num(); ++i)
-					if (IsGear(SlotIds[i]) && KindOf(SlotIds[i]) == K_Bow && (PackBow == INDEX_NONE || VariantOf(SlotIds[i]) < VariantOf(SlotIds[PackBow]))) PackBow = i;
-				if (PackBow != INDEX_NONE) { BowId = SlotIds[PackBow]; SlotIds[PackBow] = Hotbar[4]; Empty = 4; }
-				else if (SlotIds.Contains(0)) { AddToPack(Hotbar[4], 1); Empty = 4; }
-				if (Empty == 4) Hotbar[4] = 0;
-			}
-			if (Empty >= At) { for (int32 h = Empty; h > At; --h) Hotbar[h] = Hotbar[h - 1]; Hotbar[At] = BowId; }
-			else if (Empty >= 0) Hotbar[Empty] = BowId;
-		}
-	}
-	// Version 7 -> 8 (2026-10-31): everyone has at least the starting arrows (steel and fire). A full pack (the 4 step could not
-	// fit them) sends its last things that are not arrows to the bank to make room.
-	// Version 8 -> 9 (2026-11-01): arrows stack to 99 and the starting arrows are 99 steel and 99 fire: the arrow stacks are
-	// merged, then topped up the same way (making room as above).
-	if (SaveVersion < 9)
-	{
-		for (int32 i = 0; i < SlotIds.Num(); ++i)
-		{
-			if (!IsArrow(SlotIds[i]) || !SlotCounts.IsValidIndex(i)) continue;
-			for (int32 j = i + 1; j < SlotIds.Num(); ++j)
-				if (SlotIds[j] == SlotIds[i] && SlotCounts.IsValidIndex(j))
-				{
-					const int32 N = FMath::Min(SlotCounts[j], StackSize(SlotIds[i]) - SlotCounts[i]);
-					SlotCounts[i] += N; SlotCounts[j] -= N;
-					if (SlotCounts[j] <= 0) { SlotIds[j] = 0; SlotCounts[j] = 0; }
-				}
-		}
-		auto Count = [this](int32 Id) { int32 N = 0; for (int32 i = 0; i < SlotIds.Num(); ++i) if (SlotIds[i] == Id && SlotCounts.IsValidIndex(i)) N += SlotCounts[i]; return N; };
-		auto MakeRoom = [this]()
-		{
-			if (SlotIds.Contains(0)) return true;
-			for (int32 i = SlotIds.Num() - 1; i >= 0; --i)
-			{
-				if (IsArrow(SlotIds[i]) || !SlotCounts.IsValidIndex(i)) continue;
-				int32 B = BankIds.IndexOfByKey(0);
-				if (B == INDEX_NONE && BankIds.Num() < USkillComponent::NumBankSlots) { B = BankIds.Add(0); BankCounts.SetNum(BankIds.Num()); }
-				if (B == INDEX_NONE || !BankCounts.IsValidIndex(B)) return false;
-				BankIds[B] = SlotIds[i]; BankCounts[B] = SlotCounts[i];
-				SlotIds[i] = 0; SlotCounts[i] = 0;
-				return true;
-			}
-			return false;
-		};
-		const int32 Want[2][2] = { { ArrowId(T_Steel), USkillComponent::StartSteelArrows }, { IdFireArrow, USkillComponent::StartFireArrows } };
-		for (const auto& W : Want)
-		{
-			const int32 Have = Count(W[0]);
-			if (Have >= W[1] || (Have == 0 && !MakeRoom())) continue;
-			AddToPack(W[0], W[1] - Have);
-		}
-	}
-	// Version 9 -> 10 (2026-11-03): the weapon bar is two slots, the hand (any weapon or tool but a bow) and the bow. The
-	// weapon that was in hand stays there if it fits (else the first sword, else the first other weapon or tool), the first
-	// bow goes to the bow slot, and everything else on the old bar goes to the pack, or the bank when the pack is full.
-	if (SaveVersion < 10)
-	{
-		TArray<int32> Old = Hotbar;
-		Old.SetNumZeroed(5);
-		auto IsBow = [](int32 Id) { return IsGear(Id) && KindOf(Id) == K_Bow; };
-		auto FitsHand = [](int32 Id) { return IsGear(Id) && IsWeaponKind(KindOf(Id)) && KindOf(Id) != K_Bow; };
-		int32 Hand = -1, BowAt = -1;
-		if (Old.IsValidIndex(Selected) && FitsHand(Old[Selected])) Hand = Selected;
-		for (int32 h = 0; h < 5 && Hand < 0; ++h) if (IsGear(Old[h]) && KindOf(Old[h]) == K_Sword) Hand = h;
-		for (int32 h = 0; h < 5 && Hand < 0; ++h) if (FitsHand(Old[h])) Hand = h;
-		for (int32 h = 0; h < 5 && BowAt < 0; ++h) if (IsBow(Old[h])) BowAt = h;
-		Hotbar.Init(0, 5);
-		if (Hand >= 0) Hotbar[0] = Old[Hand];
-		if (BowAt >= 0) Hotbar[1] = Old[BowAt];
-		for (int32 h = 0; h < 5; ++h)
-		{
-			if (h == Hand || h == BowAt || Old[h] == 0) continue;
-			const int32 P = SlotIds.IndexOfByKey(0);
-			if (P != INDEX_NONE && SlotCounts.IsValidIndex(P)) { SlotIds[P] = Old[h]; SlotCounts[P] = 1; continue; }
-			int32 B = BankIds.IndexOfByKey(0);
-			if (B == INDEX_NONE && BankIds.Num() < USkillComponent::NumBankSlots) { B = BankIds.Add(0); BankCounts.SetNum(BankIds.Num()); }
-			if (B != INDEX_NONE && BankCounts.IsValidIndex(B)) { BankIds[B] = Old[h]; BankCounts[B] = 1; }
-		}
-		Selected = Hotbar[0] != 0 || Hotbar[1] == 0 ? 0 : 1;
-	}
+	// The saves were reset for the six tiers (2026-11-04, owner); ApplyTo refuses anything older, so older conversions are gone.
 	// Every load (2026-11-03): Light shoulders were removed (the tunic has its own sleeves); any still in a save become
 	// Classic shoulders of the same tier
 	auto FixPiece = [](int32& Id)
@@ -227,7 +73,11 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 bool UJeebSave::ApplyTo(USkillComponent* Skills)
 {
 	if (!Skills) return false;
-	if (SaveVersion > CurrentVersion) return false;   // written by a newer game: leave it alone rather than damage it
+	if (SaveVersion != CurrentVersion)   // a newer game's, or from before the six tiers (its item numbers mean other things): never read it
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Jeebsland save: refused a file of version %d (this game reads %d); the character starts fresh."), SaveVersion, CurrentVersion);
+		return false;
+	}
 	Migrate();
 
 	// Everything is checked on the way in: unknown ids vanish, counts are held to the stack size

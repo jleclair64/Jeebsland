@@ -6,7 +6,7 @@
 // ===================================================================================================
 // The item tables: every number and line of text about items lives in spreadsheet files (CSV: open them in Excel or Google
 // Sheets) in Content/Data/, read once when the game starts. Inventory.h answers every question about items from them.
-//   Tiers.csv         the nine ranks (Tin ... Diamond): levels, damage and defence steps, prices, smithing, colours
+//   Tiers.csv         the six ranks (Tin ... Diamond): levels, damage and defence steps, prices, smithing, colours
 //   Kinds.csv         each kind of gear (sword, helmet, ...): damage, reach, defence, price, smithing mass, description
 //   Materials.csv     ores, gems, logs, fish, animal drops: names, stack sizes, prices, gathering levels
 //   Potions.csv       potions: effect, strength, cooldown, price, colour, text
@@ -42,10 +42,11 @@ namespace JeebItems
 		float Share[2] = { 0.f, 0.f };   // share of the piece's mass (0 = unused)
 		FLinearColor Gem = FLinearColor::White;
 		FLinearColor Palette[7];         // EArmorRole order: Plate, Under, Trim, Cloth, Accent, Leather, BootBody
-		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the cape of a player at this PvP rank
+		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the colour of this tier's cape
 		float ArmourTakes = 1.f;   // share of a blow that gets through an armour piece of this tier, where it covers
 		float ShieldTakes = 1.f;   // share of a blow on a raised shield of this tier that comes out of the guard
 		float WeightMult = 1.f;    // x an armour piece's Weight: how heavy this material is
+		float Metal = 1.f, Rough = 0.3f;   // how shiny it is: 1 metal or 0 none; how polished, 0 a mirror to 1 dull
 	};
 	struct FKindRow
 	{

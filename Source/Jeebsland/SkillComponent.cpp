@@ -49,7 +49,7 @@ USkillComponent::USkillComponent()
 	ResetToStartingKit();
 }
 
-// The kit you begin with (and wake up with after dying): a sword in hand and a bow on the weapon bar; an axe, pickaxe and fishing pole, steel and
+// The kit you begin with (and wake up with after dying): a sword in hand and a bow on the weapon bar; an axe, pickaxe and fishing pole, iron and
 // fire arrows in the pack, a
 // shield, a tin cape and a full suit of light tin armour
 void USkillComponent::ResetToStartingKit()
@@ -60,9 +60,9 @@ void USkillComponent::ResetToStartingKit()
 	RingB = 0;
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
-	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword, 2026-10-31, with steel and fire arrows)
+	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword, 2026-10-31, with iron and fire arrows)
 	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
-	AddInvItem(JeebItems::ArrowId(JeebItems::T_Steel), StartSteelArrows);
+	AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), StartIronArrows);
 	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
@@ -573,8 +573,8 @@ void USkillComponent::FillPracticePack()
 	// (the starting kit's tools are in the pack since 2026-11-03: kept, and put back after the fixed slots below)
 	TArray<int32> KeepGear;
 	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; }
-	// a full stack of steel and fire arrows first (this used to write over the starting kit's arrows)
-	Slots[0].Id = JeebItems::ArrowId(JeebItems::T_Steel); Slots[0].Count = StartSteelArrows;
+	// a full stack of iron and fire arrows first (this used to write over the starting kit's arrows)
+	Slots[0].Id = JeebItems::ArrowId(JeebItems::T_Iron); Slots[0].Count = StartIronArrows;
 	Slots[1].Id = JeebItems::IdFireArrow; Slots[1].Count = StartFireArrows;
 	for (int32 i = 2; i < Slots.Num(); ++i) if (JeebItems::IsArrow(Slots[i].Id)) { Slots[i].Id = 0; Slots[i].Count = 0; }
 	// three of each potion: swiftness and vigour in the pack, healing in the potion slot

@@ -10,7 +10,7 @@ namespace JeebItems
 	namespace
 	{
 		// The Key column of the fixed tables, in enum order
-		const TCHAR* const TierKeys[NumTiers] = { TEXT("Tin"), TEXT("Iron"), TEXT("Bronze"), TEXT("Steel"), TEXT("Silver"), TEXT("Gold"), TEXT("Onyx"), TEXT("Emerald"), TEXT("Diamond") };
+		const TCHAR* const TierKeys[NumTiers] = { TEXT("Tin"), TEXT("Iron"), TEXT("Silver"), TEXT("Gold"), TEXT("Emerald"), TEXT("Diamond") };
 		const TCHAR* const KindKeys[K_Count] = { TEXT("Sword"), TEXT("Axe"), TEXT("Pickaxe"), TEXT("Spear"), TEXT("Broadsword"), TEXT("BattleAxe"), TEXT("Katana"),
 			TEXT("Wand"), TEXT("Staff"), TEXT("Bow"), TEXT("Rod"), TEXT("Shield"), TEXT("Helmet"), TEXT("Chest"), TEXT("Shoulders"), TEXT("Gloves"), TEXT("Boots"),
 			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest") };
@@ -143,6 +143,8 @@ namespace JeebItems
 				Row.ArmourTakes = FMath::Clamp(Tab.F(r, TEXT("ArmourTakes"), 1.f), 0.f, 1.f);
 				Row.ShieldTakes = FMath::Clamp(Tab.F(r, TEXT("ShieldTakes"), 1.f), 0.f, 2.f);
 				Row.WeightMult = FMath::Clamp(Tab.F(r, TEXT("WeightMult"), 1.f), 0.f, 10.f);
+				Row.Metal = FMath::Clamp(Tab.F(r, TEXT("Metal"), 1.f), 0.f, 1.f);
+				Row.Rough = FMath::Clamp(Tab.F(r, TEXT("Rough"), 0.3f), 0.f, 1.f);
 			}
 		}
 

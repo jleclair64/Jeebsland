@@ -121,8 +121,8 @@ void AProjectile::ApplyLaunch()
 		return;
 	}
 	static const FLinearColor Tips[JeebItems::NumTiers] = {
-		FLinearColor(0.5f, 0.52f, 0.54f), FLinearColor(0.35f, 0.35f, 0.4f), FLinearColor(0.7f, 0.4f, 0.2f), FLinearColor(0.6f, 0.6f, 0.7f),
-		FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.05f, 0.05f, 0.06f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.4f, 1.2f, 1.6f) };   // tin ... diamond
+		FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.035f, 0.035f, 0.04f),
+		FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.7f, 1.1f, 1.5f) };   // tin ... diamond
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);
 	Paint(Body, FLinearColor(0.5f, 0.34f, 0.17f));
 	Paint(Head, bFire ? FLinearColor(4.f, 1.4f, 0.25f) : Tips[FMath::Clamp<int32>(L.Tier, 0, JeebItems::NumTiers - 1)]);   // (fire: a glowing head)

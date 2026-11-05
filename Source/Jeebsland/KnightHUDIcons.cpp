@@ -229,6 +229,9 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			return;
 		}
 
+		// A very dark tier (iron) is drawn black on a pale disc, so its icons stand out from the dark glass and from each other
+		if (Palette(V, 0).GetLuminance() < 0.15f) DiscP(32, 32, 31, 31, FLinearColor(0.80f, 0.82f, 0.86f, 0.85f));
+
 		if (K == K_Cape)
 		{
 			const FLinearColor Ac = CapeColor(V);
@@ -239,7 +242,8 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			return;
 		}
 
-		const FLinearColor Pl = Lift(Palette(V, 0), 1.25f), Dk = Palette(V, 1), Tr = Lift(Palette(V, 2), 1.1f), Ac = Palette(V, 4), Lt = Palette(V, 5);
+		auto Floor = [](const FLinearColor& C, float F) { return FLinearColor(FMath::Max(C.R, F), FMath::Max(C.G, F), FMath::Max(C.B, F)); };   // (iron's edge lines stay light enough to show the shape inside the black)
+		const FLinearColor Pl = Floor(Lift(Palette(V, 0), 1.25f), 0.03f), Dk = Palette(V, 1), Tr = Floor(Lift(Palette(V, 2), 1.1f), 0.30f), Ac = Palette(V, 4), Lt = Palette(V, 5);
 		const FLinearColor Wd(0.45f, 0.28f, 0.12f), Gem = GemColor(V);
 		const FLinearColor Edge = Lift(Palette(V, 3), 1.0f);
 		switch (K)

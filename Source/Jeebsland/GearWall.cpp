@@ -1,4 +1,4 @@
-﻿#include "GearWall.h"
+#include "GearWall.h"
 #include "Inventory.h"
 #include "ItemModels.h"
 #include "KnightModel.h"
@@ -125,7 +125,7 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, (Pt.bMetal && MetalMat) ? MetalMat : BaseMat))
 		{
 			M->SetVectorParameterValue(TEXT("Color"), Pt.Color);
-			if (Pt.bMetal && MetalMat) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), 0.28f); }
+			if (Pt.bMetal && MetalMat) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), Pt.Rough); }
 		}
 	}
 }

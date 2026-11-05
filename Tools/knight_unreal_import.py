@@ -141,7 +141,17 @@ def build_material(name, normal_tex, skin):
     rough = node(unreal.MaterialExpressionMax, -250, 600)
     lib.connect_material_expressions(tm, "G", rough, "A")
     lib.connect_material_expressions(mn, "", rough, "B")
-    lib.connect_material_property(rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    # (2026-11-04) each tier's own polish: on the metal only, a RoughMix share of TierRough over the picture's roughness
+    tr = node(unreal.MaterialExpressionScalarParameter, -500, 750, parameter_name="TierRough", default_value=0.3)
+    rm = node(unreal.MaterialExpressionScalarParameter, -500, 850, parameter_name="RoughMix", default_value=0.0)
+    rmk = node(unreal.MaterialExpressionMultiply, -350, 850)
+    lib.connect_material_expressions(rm, "", rmk, "A")
+    lib.connect_material_expressions(metal, "", rmk, "B")
+    final_rough = node(unreal.MaterialExpressionLinearInterpolate, -150, 650)
+    lib.connect_material_expressions(rough, "", final_rough, "A")
+    lib.connect_material_expressions(tr, "", final_rough, "B")
+    lib.connect_material_expressions(rmk, "", final_rough, "Alpha")
+    lib.connect_material_property(final_rough, "", unreal.MaterialProperty.MP_ROUGHNESS)
     
     if skin:
         tn = node(unreal.MaterialExpressionTextureSampleParameter2D, -900, 800, texture=normal_tex, parameter_name="NormalTex", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)

@@ -243,22 +243,22 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 
 	if (E.Kind == -1)
 	{
-		Y += Wrapped(TEXT("Every weapon, shield and piece of armour comes in ranks, weakest to strongest: tin, iron, bronze, steel, silver and gold, then three legendary ranks: onyx, emerald and diamond. Each rank is a different colour, a little stronger than the last, and needs a higher level to use. Armour also comes in three styles at every rank: light (a tunic and mail: lighter, stops less), classic plate, and heavy plate (stops more, heavier). Mix them as you like."), CX, Y, CW, 1.05f, FLinearColor::White) + 10.f;
+		Y += Wrapped(TEXT("Every weapon, shield and piece of armour comes in ranks, weakest to strongest: tin, iron, silver, gold, emerald and diamond. Each rank is a different colour, a little stronger than the last, and needs a higher level to use. Armour also comes in three styles at every rank: light (a tunic and mail: lighter, stops less), classic plate, and heavy plate (stops more, heavier). Mix them as you like."), CX, Y, CW, 1.05f, FLinearColor::White) + 10.f;
 		for (int32 t = 0; t < NumTiers; ++t)
 		{
 			DrawRect(Palette(t, 0), CX, Y + 4.f, 14.f, 14.f);
 			Y += Wrapped(TierBlurb(t), CX + 24.f, Y, CW - 24.f, 1.0f, FLinearColor(0.9f, 0.9f, 0.9f)) + 4.f;
 		}
 		Y += 8.f;
-		Y += Wrapped(TEXT("HOW IT WORKS: mine ore (each rock always holds one kind: tin, copper, iron, coal, silver, gold, or rarely a gem), then take it to the blacksmith. Tin uses tin ore, iron uses iron ore, bronze uses copper and tin, steel uses iron ore and coal, silver and gold use their ores, and the legendaries use their gem (onyx, emerald or diamond) and gold. Smithing earns Smithing XP, and higher ranks need a higher Smithing level. The store sells tin, iron and bronze gear and arrows; everything better has to be smithed.  LEVELS TO USE: weapons need Attack (bows Archery, wands and staffs Magic), axes Woodcutting, pickaxes Mining, fishing poles Fishing, and armour and shields Defence: tin 1, iron 5, bronze 10, steel 20, silver 30, gold 40, legendary 50."), CX, Y, CW, 1.0f, FLinearColor(0.85f, 0.95f, 0.85f)) + 8.f;
-		Y += Wrapped(TEXT("GATHERING LEVELS: coal needs Mining 6, iron ore 8, silver ore 20, gold ore 30 and the gems (onyx, emerald, diamond) 45. Pine needs Woodcutting 6 and redwood Woodcutting 15. Trout needs Fishing 5 and the golden carp Fishing 12. Better pickaxes, axes and fishing poles work faster."), CX, Y, CW, 1.0f, FLinearColor(0.9f, 0.85f, 0.7f)) + 8.f;
+		Y += Wrapped(TEXT("HOW IT WORKS: mine ore (each rock always holds one kind: tin, iron, silver, gold, or rarely a gem), then take it to the blacksmith. Tin, iron, silver and gold use their ores; emerald and diamond use their gem and gold ore. Smithing earns Smithing XP, and higher ranks need a higher Smithing level. The store sells tin and iron gear and arrows, and now and then a silver piece; everything else has to be smithed.  LEVELS TO USE: weapons need Attack (bows Archery, wands and staffs Magic), axes Woodcutting, pickaxes Mining, fishing poles Fishing, and armour and shields Defence: tin 1, iron 10, silver 20, gold 30, emerald 40, diamond 50."), CX, Y, CW, 1.0f, FLinearColor(0.85f, 0.95f, 0.85f)) + 8.f;
+		Y += Wrapped(TEXT("GATHERING LEVELS: iron ore needs Mining 10, silver ore 20, gold ore 30, emerald 40 and diamond 50. Pine needs Woodcutting 6 and redwood Woodcutting 15. Trout needs Fishing 5 and the golden carp Fishing 12. Better pickaxes, axes and fishing poles work faster."), CX, Y, CW, 1.0f, FLinearColor(0.9f, 0.85f, 0.7f)) + 8.f;
 		Wrapped(TEXT("DAMAGE: every hit rolls a number between a weapon's lowest and highest damage. Rings and amulets move or reshape that range."), CX, Y, CW, 1.0f, FLinearColor(0.9f, 0.8f, 0.8f));
 		return;
 	}
 
 	if (E.Kind == -2)
 	{
-		Y += Wrapped(TEXT("Arrows are limited: every shot uses one, and the bow uses the best arrows you carry. Better arrows hit harder. Buy bundles of ten at the store (tin, iron and bronze) or smith any rank up to onyx."), CX, Y, CW, 1.05f, FLinearColor::White) + 12.f;
+		Y += Wrapped(TEXT("Arrows are limited: every shot uses one, and the bow uses the best arrows you carry. Better arrows hit harder. Buy bundles of ten at the store (tin and iron) or smith any rank."), CX, Y, CW, 1.05f, FLinearColor::White) + 12.f;
 		const TCHAR* Heads[] = { TEXT("RANK"), TEXT("BOW DAMAGE"), TEXT("SMITH LV"), TEXT("MATERIALS (10)"), TEXT("STORE (10)") };
 		const float Xs[] = { 0.f, 110.f, 250.f, 360.f, 580.f };
 		for (int32 c = 0; c < 5; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
@@ -313,7 +313,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	const float Xs[] = { 44.f, 140.f, 225.f, 330.f, 420.f, 660.f };
 	for (int32 c = 0; c < 6; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
 	Y += 28.f;
-	for (int32 t = 0; t < NumTiersKnight; ++t)   // (tin to onyx: the ranks a knight can use)
+	for (int32 t = 0; t < NumTiersKnight; ++t)   // (all six ranks)
 	{
 		const FRecipe R = SmithRecipe(K, t);
 		DrawIcon(GearId(K, t), CX - 2.f, Y - 6.f, 36.f);
@@ -333,7 +333,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		Y += IsArmorKind(K) ? 42.f : 38.f;
 	}
 	if (K == K_Pickaxe || K == K_Axe || K == K_Rod)
-		Wrapped(TEXT("Better tools gather faster: up to 40% less time with a legendary tool than a tin one."), CX, Y + 6.f, CW, 0.95f, FLinearColor(0.7f, 0.9f, 0.7f));
+		Wrapped(TEXT("Better tools gather faster: up to 40% less time with a diamond tool than a tin one."), CX, Y + 6.f, CW, 0.95f, FLinearColor(0.7f, 0.9f, 0.7f));
 }
 
 

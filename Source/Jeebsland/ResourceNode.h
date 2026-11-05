@@ -36,7 +36,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Gathering") ESkillType Skill = ESkillType::Mining;
 	UPROPERTY(EditAnywhere, Category = "Gathering") float GatherSeconds = 2.f;
 	UPROPERTY(EditAnywhere, Category = "Gathering") float RespawnSeconds = 300.f; // 5 minutes
-	UPROPERTY(EditAnywhere, Category = "Gathering") EItemType ItemType = EItemType::CopperOre;
+	UPROPERTY(EditAnywhere, Category = "Gathering") EItemType ItemType = EItemType::TinOre;
 	UPROPERTY(EditAnywhere, Category = "Gathering") int32 XPReward = 5;        // per gather
 	UPROPERTY(EditAnywhere, Category = "Gathering") int32 ItemsPerGather = 1;  // per gather
 	UPROPERTY(EditAnywhere, Category = "Gathering") int32 MaxCharges = 1;      // gathers before empty

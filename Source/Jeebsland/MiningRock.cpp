@@ -179,17 +179,14 @@ void AMiningRock::BeginPlay()
 
 void AMiningRock::RollOre()
 {
-	// Which ore the rock holds (2026-10-30, the tier redo: nine kinds). Normally fixed by the world builder (SetOre), the same
+	// Which ore the rock holds (six kinds since 2026-11-04). Normally fixed by the world builder (SetOre), the same
 	// on every machine; a rock placed without one picks by where it stands, which every machine also agrees on.
 	struct FOreChance { EItemType T; float Weight; int32 XP; const TCHAR* Text; };
 	static const FOreChance Table[] = {
 		{ EItemType::TinOre,    24.f,  5, TEXT("You mine some tin ore.") },
-		{ EItemType::CopperOre, 22.f,  5, TEXT("You mine some copper ore.") },
-		{ EItemType::Coal,      14.f, 10, TEXT("You mine some coal.") },
 		{ EItemType::IronOre,   16.f, 12, TEXT("You mine some iron ore.") },
 		{ EItemType::SilverOre, 10.f, 20, TEXT("You mine some silver ore.") },
 		{ EItemType::GoldOre,    7.f, 30, TEXT("You mine some gold ore!") },
-		{ EItemType::Onyx,       2.5f, 50, TEXT("You mine a gleaming black onyx!") },
 		{ EItemType::Emerald,    2.5f, 50, TEXT("You mine a bright emerald!") },
 		{ EItemType::Diamond,    2.f,  50, TEXT("You mine a sparkling diamond!") },
 	};

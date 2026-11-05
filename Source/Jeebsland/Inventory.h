@@ -11,26 +11,25 @@
 // rings and amulets. Shared by the character, the shops and the HUD. The NUMBERS AND TEXT live in the spreadsheets in
 // Content/Data (see JeebItemData.h); this file holds the ids and the rules that use them.
 //
-// TIERS (weakest to strongest; redone 2026-10-30): Tin, Iron, Bronze, Steel, Silver, Gold, then one LEGENDARY tier per
-// class, all equally strong: Onyx (knights), Emerald (trolls), Diamond (wizards). Only knights exist so far, so Emerald and
-// Diamond gear can be found and sold but not worn yet. Gear needs a skill level to equip (EquipLevel). Save version 2
-// moved old ids (Wood, Bronze, Iron, Steel, Diamond) onto these (UJeebSave::Migrate).
+// TIERS (weakest to strongest; six since 2026-11-04, owner): Tin, Iron, Silver, Gold, Emerald, Diamond, open to everyone.
+// Each looks different at a glance: Tiers.csv gives its colours and shine (Metal, Rough). Class legendaries come later.
+// Gear needs a skill level to equip (EquipLevel: 1, 10, 20, 30, 40, 50).
 // ===================================================================================================
 namespace JeebItems
 {
 	constexpr int32 NumSlots = 24;      // inventory slots (the side panel is 5 x 5: ingots in a fixed top-left cell, then these)
 	constexpr int32 NumHotbar = 2;      // the weapon bar (2026-11-03): slot 0 the hand (any weapon or tool but a bow), slot 1 the bow (USkillComponent::Hotbar keeps room for 5: saves)
-	constexpr int32 NumTiers = 9;
-	enum ETier : int32 { T_Tin, T_Iron, T_Bronze, T_Steel, T_Silver, T_Gold, T_Onyx, T_Emerald, T_Diamond };
+	constexpr int32 NumTiers = 6;
+	enum ETier : int32 { T_Tin, T_Iron, T_Silver, T_Gold, T_Emerald, T_Diamond };
 	constexpr int32 MaxPotions = 50;    // potion ids 950..999
 	constexpr int32 MaxVariants = 10;   // rings, amulets and capes: the last digit of the id
 	inline const FTierRow& TierRow(int32 T) { return Tables().Tiers[FMath::Clamp(T, 0, NumTiers - 1)]; }
-	// Which class may use a tier: 0 everyone, 1 knights (Onyx), 2 trolls (Emerald), 3 wizards (Diamond)
+	// Which class may use a tier: 0 everyone, 1 knights, 2 trolls, 3 wizards (every tier is 0 for now)
 	inline int32 TierClass(int32 T) { return TierRow(T).Class; }
 	inline bool KnightCanUseTier(int32 T) { const int32 C = TierClass(T); return C == 0 || C == 1; }
 	// The skill level needed to wear or wield a tier
 	inline int32 EquipLevel(int32 T) { return TierRow(T).EquipLevel; }
-	constexpr int32 NumTiersKnight = 9;   // the tiers a knight can use: all nine since 2026-11-03 (the legendaries are open to every class); what the smithy and the dictionary list
+	constexpr int32 NumTiersKnight = NumTiers;   // the tiers a knight can use: all of them; what the smithy and the dictionary list
 
 	// What kind of thing a piece of gear is
 	enum EKind : int32
@@ -44,9 +43,9 @@ namespace JeebItems
 		K_Count
 	};
 
-	// Ids: 0 = empty; 1..99 = materials and fish (EItemType + 1); 900..904 = arrows by tier; 950..953 potions;
+	// Ids: 0 = empty; 1..99 = materials and fish (EItemType + 1); 900..905 = arrows by tier, 906 fire arrows; 950..953 potions;
 	// 1000 + kind * 100 + variant = gear (shields also carry a style: 1000 + kind * 100 + style * 10 + tier).
-	// The variant is the tier (0-8, see ETier) for weapons and armour, the colour for capes, the particular piece for rings and amulets.
+	// The variant is the tier (0-5, see ETier) for weapons and armour, the colour for capes, the particular piece for rings and amulets.
 	constexpr int32 IdArrowBase = 900;
 	constexpr int32 IdGearBase = 1000;
 
@@ -54,12 +53,12 @@ namespace JeebItems
 	inline bool IsMaterial(int32 Id) { return Id >= 1 && Id < 100; }
 	inline EItemType MaterialType(int32 Id) { return static_cast<EItemType>(Id - 1); }
 	inline int32 ArrowId(int32 Tier) { return IdArrowBase + Tier; }
-	// Fire arrows (2026-10-31): steel arrows that burn what they hit (a few points of fire damage over the next seconds) and glow
-	// in flight. They count as steel for damage. Later kinds (poison ...) go after it (909, 910 ...), below the potions.
-	constexpr int32 IdFireArrow = IdArrowBase + NumTiers;   // 909
+	// Fire arrows (2026-10-31): iron arrows that burn what they hit (a few points of fire damage over the next seconds) and glow
+	// in flight. They count as iron for damage. Later kinds (poison ...) go after it (907, 908 ...), below the potions.
+	constexpr int32 IdFireArrow = IdArrowBase + NumTiers;   // 906
 	inline bool IsFireArrow(int32 Id) { return Id == IdFireArrow; }
 	inline bool IsArrow(int32 Id) { return (Id >= IdArrowBase && Id < IdArrowBase + NumTiers) || Id == IdFireArrow; }
-	inline int32 ArrowTier(int32 Id) { return Id == IdFireArrow ? T_Steel : Id - IdArrowBase; }
+	inline int32 ArrowTier(int32 Id) { return Id == IdFireArrow ? T_Iron : Id - IdArrowBase; }
 	// Every kind of arrow, in the order the arrow slot steps through them (F)
 	inline int32 NumArrowKinds() { return NumTiers + 1; }
 	inline int32 ArrowKindId(int32 i) { return i < NumTiers ? ArrowId(i) : IdFireArrow; }
@@ -171,7 +170,10 @@ namespace JeebItems
 	// Roles follow EArmorRole: Plate, Under, Trim, Cloth, Accent, Leather, BootBody.
 	inline FLinearColor Palette(int32 T, int32 Role) { return TierRow(T).Palette[FMath::Clamp(Role, 0, 6)]; }
 	inline FLinearColor GemColor(int32 T) { return TierRow(T).Gem; }
-	inline bool TierIsMetal(int32 T) { return T >= 0; }   // (every tier is metal or gem since the redo; Wood is gone)
+	// Shine (Tiers.csv Metal, Rough; owner, 2026-11-04): tin and iron have none, the other four shine
+	inline float TierMetal(int32 T) { return TierRow(T).Metal; }
+	inline float TierRough(int32 T) { return TierRow(T).Rough; }
+	inline bool TierIsMetal(int32 T) { return TierMetal(T) > 0.5f; }
 
 	// ---------------------------------------------------------------- weapon and armour numbers (Kinds.csv, Tiers.csv)
 	// Damage is a range: every hit is a random whole number from Min to Max.
@@ -182,7 +184,7 @@ namespace JeebItems
 	// How many damage steps a tier adds (narrow gaps, so skill can beat a tier of gear; the three legendaries are equal)
 	inline float TierSteps(int32 T) { return TierRow(T).DamageSteps; }
 	// Each step adds to both ends of the range: a quarter of the weapon's tin range
-	// (sword: tin 8-12, iron 12-16, bronze 16-20, steel 20-24, silver 25-29, gold 30-34, legendary 35-39).
+	// (sword, a step is 5: tin 8-12, iron 13-17, silver 19-23, gold 25-29, emerald 30-34, diamond 35-39).
 	inline int32 TierStep(int32 K)
 	{
 		const FWeaponBase B = WeaponBase(K);
@@ -207,7 +209,7 @@ namespace JeebItems
 	// Defence points of a shield (flat damage blocked) or armour piece (adds to the total)
 	inline int32 DefenseOf(int32 K, int32 T) { return FMath::RoundToInt(KindRow(K).Defence * TierMult(T)); }
 	// Shields (owner, 2026-11-02): the guard's SIZE comes only from the Defence level (GuardForLevel); the shield decides how much
-	// of each blow on it comes out of the guard: its tier's ShieldTakes (Tin all of it, down to half for a legendary), divided by
+	// of each blow on it comes out of the guard: its tier's ShieldTakes (Tin all of it, down to half for diamond), divided by
 	// its style's GuardMul (a tower loses less per blow, a round shield more). The shield's size never changes.
 	inline float ShieldDrain(int32 ShieldItemId)
 	{
@@ -215,7 +217,7 @@ namespace JeebItems
 		return TierRow(VariantOf(ShieldItemId)).ShieldTakes / FMath::Max(0.1f, ShieldGuardMul(StyleOf(ShieldItemId)));
 	}
 	// The number a shield shows (badges, tooltips, the store): its strength, 10 for a tin kite shield, higher the less each blow
-	// costs the guard (a gold kite shield 17, a legendary 20)
+	// costs the guard (a gold kite shield 15, a diamond one 20)
 	inline int32 ShieldGuard(int32 ShieldItemId)
 	{
 		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 0;
@@ -227,8 +229,8 @@ namespace JeebItems
 	inline float GuardForLevel(int32 DefenceLevel) { return FMath::Lerp(JeebTune::V().GuardAtLevel1, JeebTune::V().GuardAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)); }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
-	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a legendary one
-	inline float ToolTimeMult(int32 T) { const float Top = TierSteps(T_Onyx); return Top > 0.f ? 1.f - 0.4f * TierSteps(T) / Top : 1.f; }
+	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a diamond one
+	inline float ToolTimeMult(int32 T) { const float Top = TierSteps(T_Diamond); return Top > 0.f ? 1.f - 0.4f * TierSteps(T) / Top : 1.f; }
 
 	// ---------------------------------------------------------------- rings and amulets (Accessories.csv)
 	inline FMods AccessoryMods(int32 K, int32 V) { return AccessoryRow(K, V).Mods; }
@@ -241,11 +243,11 @@ namespace JeebItems
 	}
 
 	// ---------------------------------------------------------------- prices (ingots)
-	// The store sells tin, iron and bronze gear. Steel and better have to be smithed.
+	// The store sells tin and iron gear, and now and then a silver piece. Better has to be smithed.
 	inline int32 BaseBuyPrice(int32 K) { return KindRow(K).BuyPrice; }
 	inline float TierPriceMult(int32 T) { return TierRow(T).PriceMult; }
 	inline int32 AccessoryPrice(int32 K, int32 V) { return AccessoryRow(K, V).Price; }
-	constexpr int32 StoreMaxTier = T_Bronze;   // the store sells tin, iron and bronze
+	constexpr int32 StoreMaxTier = T_Iron;   // what the store normally sells
 	// Variant: the tier, or for armour style x 10 + tier (FullVariant), so a style's PriceMul counts
 	inline int32 BuyPrice(int32 K, int32 Variant)
 	{
@@ -258,8 +260,8 @@ namespace JeebItems
 
 	// ---------------------------------------------------------------- smithing (Kinds.csv Mass and SmithExtraLevel, Tiers.csv)
 	// How much raw material a piece takes ("mass"), and which materials each tier uses (2026-10-30):
-	//   Tin: tin ore.  Iron: iron ore.  Bronze: copper + tin.  Steel: iron ore + coal.  Silver: silver ore.  Gold: gold ore.
-	//   Onyx / Emerald / Diamond (the legendaries): their gem + gold ore, at a very high Smithing level.
+	//   Tin: tin ore.  Iron: iron ore.  Silver: silver ore.  Gold: gold ore.
+	//   Emerald / Diamond: their gem + gold ore.
 	inline bool CanSmith(int32 K) { return IsWeaponKind(K) || K == K_Shield || IsArmorKind(K); }
 	inline int32 Mass(int32 K) { return KindRow(K).Mass; }
 	// A recipe: up to two materials (Num 0 = unused), the Smithing level it needs and the XP it gives

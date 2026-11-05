@@ -158,8 +158,8 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	{
 		for (int32 h = 0; h < 5; ++h)
 			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Bow) { SelectHotbar(h); break; }
-		if (ArrowSlotId() == 0 && !Skills->AddInvItem(JeebItems::ArrowId(JeebItems::T_Steel), 10) && Skills->Slots.Num() > 0)   // (test pictures are never saved)
-		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::T_Steel); Skills->Slots.Last().Count = 10; }
+		if (ArrowSlotId() == 0 && !Skills->AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), 10) && Skills->Slots.Num() > 0)   // (test pictures are never saved)
+		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::T_Iron); Skills->Slots.Last().Count = 10; }
 		FParse::Value(FCommandLine::Get(), TEXT("ShotStrafe="), ShotStrafe);
 		StartDraw();
 		ShotBowAt = (Move.Len() > 3) ? GetWorld()->GetTimeSeconds() + FCString::Atoi(*Move.Mid(3)) / 100.f : -1.f;

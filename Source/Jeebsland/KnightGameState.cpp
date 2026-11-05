@@ -134,12 +134,12 @@ void AKnightGameState::BuildWorld()
 		FRotator(0.f, (-CottageSpot).Rotation().Yaw, 0.f));
 
 	// Every rock holds one kind of ore for good (2026-10-30, the tier redo). The mix is fixed and shuffled from a fixed seed,
-	// so every machine builds the same world: lots of tin, copper, iron and coal, fewer silver and gold, and only a few gems.
+	// so every machine builds the same world: lots of tin and iron, fewer silver and gold, and only a few gems.
 	TArray<EItemType> OreMix;
 	{
 		auto Put = [&](EItemType T, int32 N) { for (int32 i = 0; i < N; ++i) OreMix.Add(T); };
-		Put(EItemType::TinOre, 7); Put(EItemType::CopperOre, 6); Put(EItemType::Coal, 5); Put(EItemType::IronOre, 6);
-		Put(EItemType::SilverOre, 4); Put(EItemType::GoldOre, 3); Put(EItemType::Onyx, 2); Put(EItemType::Emerald, 1); Put(EItemType::Diamond, 1);
+		Put(EItemType::TinOre, 13); Put(EItemType::IronOre, 11);
+		Put(EItemType::SilverOre, 5); Put(EItemType::GoldOre, 3); Put(EItemType::Emerald, 2); Put(EItemType::Diamond, 1);
 		FRandomStream Shuffle(777);
 		for (int32 i = OreMix.Num() - 1; i > 0; --i) OreMix.Swap(i, Shuffle.RandRange(0, i));
 		// the rare ones first: a few scatter spots get skipped (roads, fences), and those must never be the only gem rocks
@@ -157,9 +157,9 @@ void AKnightGameState::BuildWorld()
 		}
 	};
 
-	// A few tin and copper rocks near the starting point (what the starting kit's level needs)...
+	// A few tin rocks near the starting point (what the starting kit's level needs)...
 	SpawnRock(650.f, -100.f, EItemType::TinOre);
-	SpawnRock(900.f, -300.f, EItemType::CopperOre);
+	SpawnRock(900.f, -300.f, EItemType::TinOre);
 	SpawnRock(1150.f, 100.f, EItemType::TinOre);
 
 	// ...and plenty more scattered around the hills

@@ -330,7 +330,7 @@ void ALootDrop::BuildItemLook()
 			if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, (P.bMetal && MetalMat) ? MetalMat : BaseMat))
 			{
 				M->SetVectorParameterValue(TEXT("Color"), P.Color);
-				if (P.bMetal && MetalMat) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), 0.28f); }
+				if (P.bMetal && MetalMat) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), P.Rough); }
 			}
 			ItemComps.Add(C);
 		}

@@ -1,4 +1,4 @@
-﻿#include "KnightCharacter.h"
+#include "KnightCharacter.h"
 #include "KnightDesign.h"
 #include "WeaponDesign.h"
 #include "Messages.h"
@@ -128,7 +128,7 @@ void AKnightCharacter::SetBow(EBow P)
 
 void AKnightCharacter::StartDraw()
 {
-	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Steel)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Iron)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
 	if (!Skills || SelectedKind() != JeebItems::K_Bow || Bow != EBow::None) return;
 	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted) return;
 	if (ArrowSlotId() == 0) { if (IsLocallyControlled()) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
@@ -191,7 +191,7 @@ void AKnightCharacter::MulticastBow_Implementation(uint8 Phase)
 }
 
 // TESTING: [Jeebsland.Testing] UnlimitedArrows=True in DefaultGame.ini: arrows are never used up, and everyone is kept at 99
-// steel and 99 fire arrows (owner, 2026-11-01)
+// iron and 99 fire arrows (owner, 2026-11-01)
 static bool UnlimitedArrows()
 {
 	static const bool b = []() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("UnlimitedArrows"), v, GGameIni); return v; }();
@@ -231,8 +231,8 @@ void AKnightCharacter::TickBow(float Dt)
 		CancelDraw();
 	BowT += Dt;
 	if (HasAuthority() && Skills && UnlimitedArrows())   // (testing: topped up to a full stack of each)
-		for (const int32 Id : { JeebItems::ArrowId(JeebItems::T_Steel), JeebItems::IdFireArrow })
-			if (const int32 Have = Skills->CountItem(Id); Have < USkillComponent::StartSteelArrows) Skills->AddInvItem(Id, USkillComponent::StartSteelArrows - Have);
+		for (const int32 Id : { JeebItems::ArrowId(JeebItems::T_Iron), JeebItems::IdFireArrow })
+			if (const int32 Have = Skills->CountItem(Id); Have < USkillComponent::StartIronArrows) Skills->AddInvItem(Id, USkillComponent::StartIronArrows - Have);
 	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
 	if (bShotFace && bShotWalk) AddMovementInput(FRotator(0.f, ShotFaceYaw, 0.f).Vector(), 1.f);
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)

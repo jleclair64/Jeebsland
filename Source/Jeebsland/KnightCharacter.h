@@ -425,7 +425,7 @@ protected:
 	TSharedPtr<KnightModel::FSkin> Skin;   // the skinned knight and the joints its bones follow (KnightModel.h; null with the cut pieces)
 	void RebuildHeld();   // the weapon(s) in your hands
 	UProceduralMeshComponent* MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);
-	void ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal);
+	void ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal, float Rough = 0.28f);
 
 private:
 	UPROPERTY() UInputMappingContext* KnightContext = nullptr;

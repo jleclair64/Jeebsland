@@ -22,6 +22,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - A board or picker that offers several styles shows the real models of each style, never shared placeholders, or the choices cannot be told apart.
 - A board of items to browse is sized to read from where the player stands (life size or larger, big headers); check it with a picture from the start spot.
 
+- Every armour style must show its tier: where a model's cloth takes no tint, give it its own cue (trim, belt or a wash) or say plainly that it doesn't.
+- A very dark tier's icons need a backing or outline on the real glass panel, checked at actual size; a brightness floor is not enough, and icons must also be easy to tell from each other (a strong tonal gap between icon and backing). Two shiny tiers must differ in hue and polish, not just brightness.
+
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.
 - Judge walking from frames well into the walk (about 12 to 28), not the first frames.

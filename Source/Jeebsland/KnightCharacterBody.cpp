@@ -321,7 +321,7 @@ namespace
 {
 	bool PartIsMetal(int32 Tier, EArmorRole Role)
 	{
-		return Tier >= 0 && (Role == EArmorRole::Plate || Role == EArmorRole::Trim || Role == EArmorRole::BootBody);
+		return JeebItems::TierIsMetal(Tier) && (Role == EArmorRole::Plate || Role == EArmorRole::Trim || Role == EArmorRole::BootBody);
 	}
 	// The kind of gear that belongs in each knight slot
 	int32 KindForSlot(int32 Slot)
@@ -342,7 +342,7 @@ namespace
 	}
 }
 
-void AKnightCharacter::ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal)
+void AKnightCharacter::ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal, float Rough)
 {
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	// Metal parts use the shiny M_Metal if it exists (made once by MakeMetal.bat); otherwise plain colour
@@ -354,7 +354,7 @@ void AKnightCharacter::ApplyPartMaterial(FArmorPart& P, const FLinearColor& Colo
 		if (bMetal && Metal)
 		{
 			M->SetScalarParameterValue(TEXT("Metallic"), 1.0f);
-			M->SetScalarParameterValue(TEXT("Roughness"), 0.2f);   // polished plate
+			M->SetScalarParameterValue(TEXT("Roughness"), Rough);   // the tier's polish
 		}
 	}
 }
@@ -417,7 +417,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 			Color.R *= P.Shade; Color.G *= P.Shade; Color.B *= P.Shade;
 			bMetal = PartIsMetal(Var, P.Role);
 		}
-		ApplyPartMaterial(P, Color, bMetal);
+		ApplyPartMaterial(P, Color, bMetal, JeebItems::TierRough(Var));
 	}
 	if (Slot == KnightDesign::SlotCape && CapeCloth)
 	{
@@ -478,7 +478,7 @@ void AKnightCharacter::RebuildHeld()
 			if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Mat))
 			{
 				M->SetVectorParameterValue(TEXT("Color"), Color);
-				if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 0.9f); M->SetScalarParameterValue(TEXT("Roughness"), 0.28f); }
+				if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 0.9f); M->SetScalarParameterValue(TEXT("Roughness"), JeebItems::TierRough(T)); }
 			}
 		}
 	};

@@ -72,14 +72,12 @@ namespace KnightModel
 		return Slot == SlotHelmet || Slot == SlotBody || Slot == SlotShoulders || Slot == SlotBoots || Slot == SlotGloves;
 	}
 
-	// The model is painted steel: the tint that turns its metal into a tier's plate colour. Its brightness is pulled halfway
-	// back towards the steel's, so warm tiers (bronze) stay bright metal instead of going dark brown
+	// The models' metal is painted bright steel: the tint that turns it into a tier's plate colour, as it is in Tiers.csv (2026-11-04:
+	// no brightness correction any more, so iron can really be black). ModelSteel is that paint's colour.
 	inline FLinearColor TierTint(int32 Tier)
 	{
-		const FLinearColor Steel = JeebItems::Palette(3, 0), C = JeebItems::Palette(Tier, 0);
+		const FLinearColor Steel(0.90f, 0.97f, 1.0f), C = JeebItems::Palette(Tier, 0);
 		FLinearColor T(C.R / Steel.R, C.G / Steel.G, C.B / Steel.B, 1.f);
-		const float Lum = FMath::Max(0.2126f * T.R + 0.7152f * T.G + 0.0722f * T.B, 0.05f);
-		T *= 1.f / FMath::Sqrt(Lum);
 		return FLinearColor(FMath::Min(T.R, 2.f), FMath::Min(T.G, 2.f), FMath::Min(T.B, 2.f), 1.f);
 	}
 
@@ -151,7 +149,7 @@ namespace KnightModel
 			: LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Knight/M_Knight.M_Knight"));   // (the skinned knight: one material slot per armour set)
 		if (!C || !Mat) return;
 		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(MatIndex, Mat))
-			M->SetVectorParameterValue(TEXT("Tint"), TierTint(Tier));
+			{ M->SetVectorParameterValue(TEXT("Tint"), TierTint(Tier)); M->SetScalarParameterValue(TEXT("MetalScale"), JeebItems::TierMetal(Tier)); M->SetScalarParameterValue(TEXT("TierRough"), JeebItems::TierRough(Tier)); M->SetScalarParameterValue(TEXT("RoughMix"), 0.85f); }
 	}
 
 	// ---- The skinned knight (2026-11-01) ----
@@ -311,6 +309,12 @@ namespace KnightModel
 		{
 			M->SetVectorParameterValue(TEXT("Tint"), Set == Set_Mail ? FLinearColor::White : TierTint(Tier));
 			if (Set == Set_Classic) M->SetScalarParameterValue(TEXT("DesatGain"), ClassicGreyGain);
+			if (Set != Set_Mail)   // the tier's shine: how metal, and how polished (a little of the picture's own wear stays)
+			{
+				M->SetScalarParameterValue(TEXT("MetalScale"), JeebItems::TierMetal(Tier));
+				M->SetScalarParameterValue(TEXT("TierRough"), JeebItems::TierRough(Tier));
+				M->SetScalarParameterValue(TEXT("RoughMix"), 0.85f);
+			}
 		}
 	}
 

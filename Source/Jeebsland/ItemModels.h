@@ -20,6 +20,7 @@ namespace JeebItemModel
 		FMD Mesh;
 		FLinearColor Color = FLinearColor::White;
 		bool bMetal = false;
+		float Rough = 0.28f;   // how polished, when metal (Tiers.csv)
 	};
 
 	inline void Turn(TArray<FPart>& Parts, const FVector& Rot)
@@ -58,7 +59,8 @@ namespace JeebItemModel
 			{
 				P.Color = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 				P.Color.R *= D.Shade; P.Color.G *= D.Shade; P.Color.B *= D.Shade;
-				P.bMetal = Tier >= 0 && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
+				P.Rough = JeebItems::TierRough(Tier);
+				P.bMetal = JeebItems::TierIsMetal(Tier) && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
 			}
 			Out.Add(P);
 		}
@@ -203,7 +205,7 @@ namespace JeebItemModel
 			{
 				const FVector At(0, k * 1.6, 0);
 				Lathe(NewPart(Out, FLinearColor(0.5f, 0.34f, 0.17f)).Mesh, Prof({ 0, 20, 0.45, 19.5, 0.45, -19.5, 0, -20 }), 8, 1.0, 1.0, Xf(At, V3(0, 90, k * 4.0)));
-				Lathe(NewPart(Out, IsFireArrow(Id) ? FLinearColor(1.f, 0.45f, 0.08f) : Palette(T, 0), T >= 1 && !IsFireArrow(Id)).Mesh, Prof({ 0, 4.0, 1.1, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
+				Lathe(NewPart(Out, IsFireArrow(Id) ? FLinearColor(1.f, 0.45f, 0.08f) : Palette(T, 0), TierIsMetal(T) && !IsFireArrow(Id)).Mesh, Prof({ 0, 4.0, 1.1, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
 				FMD& F = NewPart(Out, FLinearColor(0.92f, 0.9f, 0.86f)).Mesh;
 				const FVector Back = At + RotateEuler(V3(-17, 0, 0), V3(0, 0, k * 4.0));
 				TArray<FVector> Fl = { Back + V3(-2.5, 0, 0), Back + V3(2.5, 0, 0), Back + V3(-3.0, 0, 1.6) };
@@ -236,7 +238,8 @@ namespace JeebItemModel
 				if (W.Mesh.V.Num() == 0) continue;
 				FPart& P = NewPart(Out, W.bFixed ? W.Fixed * W.Glow : Palette(V, W.Role));
 				P.Mesh = W.Mesh;
-				P.bMetal = !W.bFixed && V >= 1 && (W.Role == 0 || W.Role == 2 || W.Role == 6);
+				P.Rough = TierRough(V);
+				P.bMetal = !W.bFixed && TierIsMetal(V) && (W.Role == 0 || W.Role == 2 || W.Role == 6);
 			}
 			Turn(Out, K == K_Katana ? V3(90, 0, 30) : V3(0, 90, 30));   // blade flat on the ground, at a slant
 			Settle(Out);
