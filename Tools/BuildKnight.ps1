@@ -1,4 +1,5 @@
-﻿# Rebuilds the knight's armour styles from the Meshy models in Art (2026-11-03: one model per style, every tier tints it):
+﻿# OUT OF DATE (2026-11-05): the Art folders below were deleted (last in git commit a0f6b4f). This cannot run until it is rewritten for Art\Knight Classic.
+# Rebuilds the knight's armour styles from the Meshy models in Art (2026-11-03: one model per style, every tier tints it):
 #   Heavy = Art\Knight\knight.glb (the skeleton was made on it; also the rigid-piece fallback, KnightParts.bin),
 #   Classic = Art\Knight Gold Armor, Light = Art\Knight Tunic, Mail = Art\Knight Base Chainmail (worn under every style).
 #   Classic, Light and Mail have their forearms fitted to Heavy's fists in step 1.

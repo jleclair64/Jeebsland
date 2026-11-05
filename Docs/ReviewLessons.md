@@ -24,6 +24,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 
 - Every armour style must show its tier: where a model's cloth takes no tint, give it its own cue (trim, belt or a wash) or say plainly that it doesn't.
 - A very dark tier's icons need a backing or outline on the real glass panel, checked at actual size; a brightness floor is not enough, and icons must also be easy to tell from each other (a strong tonal gap between icon and backing). Two shiny tiers must differ in hue and polish, not just brightness.
+- Fit a combined piece per body part (thigh, shin, foot), checked front and side against the whole figure: a widening that suits the thigh makes the feet look oversized.
 
 ## Moves and movement (motion-reviewer)
 - Moves come from reference key poses (the owner's clips), never guessed.
@@ -33,6 +34,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Ground friction kills a slide: use separate braking with no friction for a skid.
 - `LaunchCharacter` with a zero vector does nothing; use `StopMovementImmediately` to stop someone.
 - Test taps just under and just over every input threshold (e.g. `-ShotMove=hop100` / `hop170` around the jump's hold times), not only a quick tap and a long hold.
+- Plates at a bending joint (knee, elbow cops): line the plate's middle up with the real joint first, then give it one even set of weights so it stays solid, and check it from the side, front and back at the fully bent frame, not only at rest: off-joint plates lever away from the limb, and one that looks solid from the side can still show stepped seams and a sharp tip from other angles.
 
 ## Online (online-reviewer)
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
