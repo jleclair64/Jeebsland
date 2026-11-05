@@ -18,10 +18,12 @@ from mathutils.bvhtree import BVHTree
 
 a = sys.argv[sys.argv.index("--") + 1:]
 path, name, out, pics = a[0], a[1], a[2], a[3]
-SMOOTH_BACK = "back" in a[4:]
+SMOOTH_ALL = "all" in a[4:]   # smooth every side, for pieces whose dents go all the way round (shoulders, forearms)
+SMOOTH_BACK = "back" in a[4:] or SMOOTH_ALL
 STRIP = "strip" in a[4:]
 opts = dict(x.split("=", 1) for x in a[4:] if "=" in x)
 RIG = opts.get("rig")
+ABOVE = float(opts["above"]) if "above" in opts else None   # (height on the piece) smoothing fades out below this, so a gauntlet's fingers stay as made
 LEG_FIT = opts.get("fit") == "legs"   # the leg armour's own fit, below; otherwise fit=scale,x,y,z
 FIT = [float(v) for v in opts["fit"].split(",")] if "fit" in opts and not LEG_FIT else None
 SLOT = opts.get("slot", "Chest")
@@ -219,7 +221,7 @@ def shot(name, az, mode, scale=1.1, cut=False):
     scene.display.shading.color_type = mode
     scene.render.filepath = os.path.join(pics, name + ".png"); bpy.ops.render.render(write_still=True)
 
-shot("before_back_clay", 180, "SINGLE"); shot("before_back_tex", 180, "TEXTURE"); shot("before_front_tex", 0, "TEXTURE")
+shot("before_back_clay", 180, "SINGLE"); shot("before_back_tex", 180, "TEXTURE"); shot("before_front_tex", 0, "TEXTURE"); shot("before_front_clay", 0, "SINGLE")
 shot("before_cut", 90, "SINGLE", cut=True)
 ca = me.color_attributes.new("what", "BYTE_COLOR", "CORNER")
 cols = np.tile(np.array([0.6, 0.6, 0.6, 1.0]), (nf, 1))
@@ -249,7 +251,8 @@ if SMOOTH_BACK:
         np.add.at(s, vpairs[:, 0], facing[vpairs[:, 1]]); np.add.at(s, vpairs[:, 1], facing[vpairs[:, 0]])
         np.add.at(c, vpairs[:, 0], 1); np.add.at(c, vpairs[:, 1], 1)
         facing = (facing + s) / (1 + c)
-    wv = ramp(BACK_FROM * H, BACK_TO * H, X[:, 1] - cen.y) * ramp(0.15, 0.5, facing)
+    wv = np.ones(len(X)) if SMOOTH_ALL else ramp(BACK_FROM * H, BACK_TO * H, X[:, 1] - cen.y) * ramp(0.15, 0.5, facing)
+    if ABOVE is not None: wv = wv * ramp(ABOVE - 0.03 * H, ABOVE, X[:, 2])
     # the rims stay where they are, and smoothing fades in away from them so nothing tears
     rim = np.unique(F[inner].ravel())
     vd = np.full(len(X), np.inf); vd[rim] = 0.0
@@ -340,7 +343,7 @@ for i in np.nonzero(~doomed)[0]:
 me.normals_split_custom_set(ln); me.update()
 print("PCL end: %d triangles (from %d, %.0f%% gone)" % (len(me.polygons), nf, 100 * (1 - len(me.polygons) / nf)))
 
-shot("after_back_clay", 180, "SINGLE"); shot("after_back_tex", 180, "TEXTURE"); shot("after_front_tex", 0, "TEXTURE")
+shot("after_back_clay", 180, "SINGLE"); shot("after_back_tex", 180, "TEXTURE"); shot("after_front_tex", 0, "TEXTURE"); shot("after_front_clay", 0, "SINGLE")
 shot("after_cut", 90, "SINGLE", cut=True)
 o.name = name
 if RIG:
