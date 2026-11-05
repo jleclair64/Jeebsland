@@ -25,7 +25,8 @@ opts = dict(x.split("=", 1) for x in a[4:] if "=" in x)
 RIG = opts.get("rig")
 ABOVE = float(opts["above"]) if "above" in opts else None   # (height on the piece) smoothing fades out below this, so a gauntlet's fingers stay as made
 LEG_FIT = opts.get("fit") == "legs"   # the leg armour's own fit, below; otherwise fit=scale,x,y,z
-FIT = [float(v) for v in opts["fit"].split(",")] if "fit" in opts and not LEG_FIT else None
+ARM_FIT = opts.get("fit") == "arm"    # the arm harness's own fit, below
+FIT = [float(v) for v in opts["fit"].split(",")] if "fit" in opts and not LEG_FIT and not ARM_FIT else None
 SLOT = opts.get("slot", "Chest")
 os.makedirs(out, exist_ok=True); os.makedirs(pics, exist_ok=True)
 ALLOWED = {
@@ -233,6 +234,98 @@ if LEG_FIT:
     nn = np.stack([n0[:, 0] / sx_, n0[:, 1] / sy_, nz_ / np.interp(pz, grid, dzz)], 1); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
     me.vertices.foreach_set("co", Pn.ravel()); me.update()
     me.normals_split_custom_set(nn.tolist()); me.update()
+ARM_W = None
+if ARM_FIT:
+    # A pair of whole arms, bent at the elbow, in one mesh (the arm harness, 2026-11-05). All numbers are for his left (+X); the other side is the mirror image.
+    # Meshy made them with the elbow plate facing out and the palm back: turned to the knight's own elbow, the plate faces back and the palm in, as in the owner's pictures.
+    # The upper arm and the forearm each turn as a solid onto their own bone. They bend less on the knight (21 degrees) than as made (about 40), so the difference is taken up at the elbow;
+    # the elbow plate itself stays solid and round, halfway between the two (ARM_W keeps these shares: the same ones become the weights, so it also moves halfway between the two bones).
+    RT, RE, RW = np.array([0.327, 0.1, 0.84]), np.array([0.6, 0.06, 0.37]), np.array([0.48, -0.045, -0.34])   # on the piece: the upper tube's top, the elbow, the wrist (the cuff's lower rim)
+    KS, KE, KW = np.array([0.244, 0.036, 1.409]), np.array([0.326, 0.057, 1.156]), np.array([0.419, -0.013, 0.935])   # on the knight: shoulder, elbow, wrist joints
+    RH = np.array([-0.2, -0.15, -0.97])   # on the piece: the hand's line, from the wrist down
+    DISC_C, DISC_IN, DISC_OUT = np.array([0.658, 0.02, 0.356]), 0.17, 0.22   # on the piece: the elbow plate's dome, on a line straight out (+X) through this point; solid out to the first radius, blending by the second. The collar below it is the forearm's: caught in this, it twisted into claws at a full bend
+    A_DISC_SHARE = 0.6    # how much of the dome follows the forearm, the rest the upper arm (the point of a real elbow belongs to the forearm)
+    A_SCALE = 0.35        # the size of it all, picked against the pictures: the forearm and the elbow plate
+    A_TUBE_FROM, A_TOP = 0.27, 0.154    # above this far from the elbow (on the piece) only the length changes, so the plate keeps round; the tube's top ends this far from the elbow joint (m), 3 cm inside the pauldron's plates
+    A_TUBE_AIM = np.array([0.04, 0.016, 0.014])   # (m) the tube points this far off the shoulder joint: the pauldron's plates sit outward and back of the bone, and the tube has to go up inside them
+    A_FORE_FROM = 0.25    # likewise below the elbow: the rest of the forearm is fitted so that the cuff lands on the wrist
+    A_FORE_R, A_TUBE_R = 1.0, 0.82   # how much wider the forearm and the upper tube are than the size above (each fades in past the two numbers before; the tube narrows to go inside the plates)
+    A_HAND_LEN, A_HAND_R = 0.8, 1.0   # the hand's length and width, on the size above
+    A_HAND_ROLL = 40.0    # (degrees) turns the hand on its own line to hang like the knight's: palm to the hip, thumb forward
+    A_ELBOW_BLEND, A_WRIST_BLEND = 0.06, 0.06   # (on the piece) over how far the upper arm becomes the forearm, either side of the elbow; and the forearm the hand, below the wrist
+    A_BLUNT_R, A_BLUNT_ANGLE, A_BLUNT_OFF, A_BLUNT_ROUNDS = 0.45, 285.0, 0.012, 8   # (on the piece) how far round the elbow points are blunted; what counts as sharp: degrees all round it, how far off its neighbours; at most this many passes
+    def unit_(v):
+        v = np.array(v, dtype=float); return v / np.linalg.norm(v)
+    def frame_(a, h):
+        h = unit_(h - a * a.dot(h)); return np.stack([a, h, np.cross(a, h)], 1)
+    def smooth_(t):
+        t = np.clip(t, 0.0, 1.0); return t * t * (3 - 2 * t)
+    Ur, Fr, Uk, Fk, Hr = unit_(RE - RT), unit_(RW - RE), unit_(KE - KS - A_TUBE_AIM), unit_(KW - KE), unit_(RH)
+    hr, hk = unit_(np.cross(Ur, Fr)), unit_(np.cross(unit_(KE - KS), Fk))   # (the hinge: the real bones')
+    Ru, Rf = frame_(Uk, hk) @ frame_(Ur, hr).T, frame_(Fk, hk) @ frame_(Fr, hr).T
+    ang = math.radians(A_HAND_ROLL); Kx = np.array([[0, -Hr[2], Hr[1]], [Hr[2], 0, -Hr[0]], [-Hr[1], Hr[0], 0]])
+    Rh = Rf @ (np.eye(3) + math.sin(ang) * Kx + (1 - math.cos(ang)) * Kx @ Kx)
+    Pp = np.empty((len(me.vertices), 3)); me.vertices.foreach_get("co", Pp.ravel())
+    ZPIECE = Pp[:, 2].copy()
+    Lp = np.empty(len(me.loops), dtype=np.int64); me.loops.foreach_get("vertex_index", Lp)
+    n0 = np.array([c.vector[:] for c in me.corner_normals])
+    # The sharp points round the elbow (a beak under the plate, the corners of the plates in the crook) stick out as shards at a full bend. Each is pulled onto the
+    # middle of its neighbours until none is left: a point is sharp if its faces add up to far less than a full turn and it stands well off its neighbours (scratch measure, 2026-11-05).
+    _, first_, Wv = np.unique(np.round(Pp / 1e-5).astype(np.int64), axis=0, return_index=True, return_inverse=True); Wv = Wv.ravel()
+    Xb = Pp[first_].copy(); Tw = Wv[Lp.reshape(-1, 3)]
+    Eb = np.unique(np.sort(np.concatenate([Tw[:, [0, 1]], Tw[:, [1, 2]], Tw[:, [2, 0]]]), axis=1), axis=0)
+    inzone = np.linalg.norm(np.c_[np.abs(Xb[:, 0]), Xb[:, 1:]] - RE, axis=1) < A_BLUNT_R
+    moved_ = np.zeros(len(Xb), bool); X0b = Xb.copy()
+    for _ in range(A_BLUNT_ROUNDS):
+        sum_ = np.zeros(len(Xb))
+        for i_, j_, k_ in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
+            u1, u2 = Xb[Tw[:, j_]] - Xb[Tw[:, i_]], Xb[Tw[:, k_]] - Xb[Tw[:, i_]]
+            np.add.at(sum_, Tw[:, i_], np.arctan2(np.linalg.norm(np.cross(u1, u2), axis=1), (u1 * u2).sum(1)))
+        nbs = np.zeros_like(Xb); cnt = np.zeros(len(Xb))
+        np.add.at(nbs, Eb[:, 0], Xb[Eb[:, 1]]); np.add.at(nbs, Eb[:, 1], Xb[Eb[:, 0]]); np.add.at(cnt, Eb[:, 0], 1); np.add.at(cnt, Eb[:, 1], 1)
+        nbs /= np.maximum(cnt, 1)[:, None]
+        tip_ = inzone & (sum_ < math.radians(A_BLUNT_ANGLE)) & (np.linalg.norm(Xb - nbs, axis=1) > A_BLUNT_OFF)
+        if not tip_.any(): break
+        Xb[tip_] = nbs[tip_]; moved_ |= tip_
+    near_ = moved_.copy(); near_[Eb[moved_[Eb[:, 1]], 0]] = True; near_[Eb[moved_[Eb[:, 0]], 1]] = True
+    Pp = Xb[Wv]; BLUNTED = near_[Wv]   # (so the shading follows the new shape there)
+    print("PCL arm blunted: %d points, the furthest moved %.3f on the piece" % (moved_.sum(), np.linalg.norm(Xb - X0b, axis=1).max()))
+    flip = np.array([1.0, 0.0, 0.0]); side = np.where(Pp[:, 0] >= 0, 1.0, -1.0)[:, None]
+    def mirror(p_, k_): return p_ * (1 - 2 * flip * (k_ < 0))
+    Pq = mirror(Pp, side)
+    q = Pq - RE
+    # who follows what
+    be = unit_(Ur + Fr); we = smooth_((q @ be) / (2 * A_ELBOW_BLEND) + 0.5)
+    dq = q + RE - DISC_C; rho = np.linalg.norm(dq[:, 1:], axis=1)
+    md = (1 - smooth_((rho - DISC_IN) / (DISC_OUT - DISC_IN))) * smooth_((Pq[:, 0] - 0.55) / 0.08)
+    we = we * (1 - md) + A_DISC_SHARE * md
+    qw = Pq - RW; wh = smooth_((qw @ Hr) / A_WRIST_BLEND)
+    # the upper arm
+    au = q @ -Ur; ru = q + Ur * au[:, None]   # (how far above the elbow; and what's across)
+    ku = (A_TOP - A_SCALE * A_TUBE_FROM) / (np.linalg.norm(RE - RT) - A_TUBE_FROM)
+    au2 = np.where(au <= A_TUBE_FROM, A_SCALE * au, A_SCALE * A_TUBE_FROM + (au - A_TUBE_FROM) * ku)
+    rt = 1 + (A_TUBE_R - 1) * smooth_((au - A_TUBE_FROM + 0.05) / 0.1)
+    Pu = KE + (ru * (A_SCALE * rt)[:, None] - Ur * au2[:, None]) @ Ru.T
+    # the forearm
+    bf = q @ Fr; rf = q - Fr * bf[:, None]
+    bl = np.linalg.norm(RW - RE)
+    kf = (np.linalg.norm(KW - KE) - A_SCALE * A_FORE_FROM) / (bl - A_FORE_FROM)
+    bf2 = np.where(bf <= A_FORE_FROM, A_SCALE * bf, A_SCALE * A_FORE_FROM + (bf - A_FORE_FROM) * kf)
+    rr = 1 + (A_FORE_R - 1) * smooth_((bf - A_FORE_FROM + 0.05) / 0.1)
+    Pf = KE + (rf * (A_SCALE * rr)[:, None] + Fr * bf2[:, None]) @ Rf.T
+    # the hand
+    ch = qw @ Hr; rh = qw - Hr * ch[:, None]
+    Ph = KW + (rh * A_SCALE * A_HAND_R + Hr[None, :] * (ch * A_SCALE * A_HAND_LEN)[:, None]) @ Rh.T
+    wu = (1 - we); wf = we * (1 - wh); wh2 = we * wh
+    Pn = Pu * wu[:, None] + Pf * wf[:, None] + Ph * wh2[:, None]
+    me.vertices.foreach_set("co", mirror(Pn, side).ravel()); me.update()
+    n1 = mirror(n0, side[Lp])
+    nh = n1 - Hr[None, :] * (n1 @ Hr)[:, None]; nh = nh / A_HAND_R + Hr[None, :] * ((n1 @ Hr) / A_HAND_LEN)[:, None]
+    nn = (n1 @ Ru.T) * wu[Lp, None] + (n1 @ Rf.T) * wf[Lp, None] + (nh @ Rh.T) * wh2[Lp, None]
+    nn = mirror(nn, side[Lp]); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
+    me.normals_split_custom_set(nn.tolist()); me.update()
+    ARM_W = np.stack([wu, wf, wh2], 1)
+    print("PCL arm fit: raw bend %.0f degrees, the knight's %.0f; the elbow plate faces %s, the palm %s; forearm length scale %.3f, tube %.3f" % (math.degrees(math.acos(Ur.dot(Fr))), math.degrees(math.acos(Uk.dot(Fk))), np.round((0.5 * Ru + 0.5 * Rf) @ np.array([1.0, 0, 0]), 2), np.round(Rh @ unit_([-0.367, 0.925, -0.067]), 2), kf, ku))
 arm = body = None; Vb = None; Fb = []
 if RIG:
     bpy.ops.import_scene.gltf(filepath=RIG)
@@ -552,6 +645,11 @@ if RIG:
                 mix = {n: top.get(n, 0.0) * (1 - k) + sk.get(n, 0.0) * k for n in set(top) | set(sk)}
                 top = dict(sorted(mix.items(), key=lambda kv: -kv[1])[:4])
                 tot = sum(top.values()); top = {n: wt / tot for n, wt in top.items()}
+        if ARM_W is not None:
+            # the same shares the fit used: solid on each bone, and the elbow plate half and half (it stays one piece and stays over the point of the elbow)
+            sd = "mixamorig:Left" if v.co.x > 0 else "mixamorig:Right"
+            top = {sd + b_: float(w_) for b_, w_ in zip(("Arm", "ForeArm", "Hand"), ARM_W[v.index]) if w_ > 1e-3}
+            tot = sum(top.values()); top = {n: wt / tot for n, wt in top.items()}
         for n, wt in top.items(): grp(n).add([v.index], wt, "REPLACE")
     # into the body's own space, under the armature
     me.transform(arm.matrix_world.inverted())

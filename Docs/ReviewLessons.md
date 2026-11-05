@@ -44,6 +44,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - `LaunchCharacter` with a zero vector does nothing; use `StopMovementImmediately` to stop someone.
 - Test taps just under and just over every input threshold (e.g. `-ShotMove=hop100` / `hop170` around the jump's hold times), not only a quick tap and a long hold.
 - Plates at a bending joint (knee, elbow cops): line the plate's middle up with the real joint first, then give it one even set of weights so it stays solid, and check it from the side, front and back at the fully bent frame, not only at rest: off-joint plates lever away from the limb, and one that looks solid from the side can still show stepped seams and a sharp tip from other angles.
+- Share only the plate itself between two bones, never part of a neighbouring ring. A forearm's collar half caught in the elbow plate's share turned at two speeds and twisted into claws at a full bend; blunting the points didn't help until the collar followed the forearm alone. (2026-11-05, the arm harness.)
+- Check every moving joint at full bend for loose pointed tips: pieces that look clean at rest develop spikes where plates overlap when they turn.
 
 ## Online (online-reviewer)
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.

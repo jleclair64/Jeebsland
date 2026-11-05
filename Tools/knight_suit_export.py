@@ -16,7 +16,7 @@ PIECES = [("chest", "Chest"), ("legs", "Legs"), ("helmet", "Helmet"), ("gauntlet
 TEX = 2048           # each piece has its own picture, so this is sharper than the old whole-knight 4096
 # His rest pose (the clip Rest, owner 2026-11-05: hands almost touching the hips; degrees). Each is how far that part hangs from straight down.
 REST_UPPER_OUT, REST_UPPER_FWD = 20, -4   # upper arm: out to his side, and a little back as in his own pose, so the pauldron stays straight over it
-REST_FORE_OUT, REST_FORE_FWD = 5, 12    # forearm
+REST_FORE_OUT, REST_FORE_FWD = 0, 12    # forearm
 REST_WRIST = 8                          # the hand turns in toward the hip from the wrist
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
