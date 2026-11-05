@@ -344,6 +344,7 @@ void AKnightGameState::BuildMoveLab()
 	}
 	for (const FVector2D& P : { FVector2D(0.f, -300.f), FVector2D(0.f, 300.f) })
 	{
+		if (FParse::Param(FCommandLine::Get(), TEXT("LabNoDummies"))) break;   // (test pictures: a clear run to either side)
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		const FTransform Xf(FRotator(0.f, (FVector(-P.X, -P.Y, 0.f)).Rotation().Yaw, 0.f), FVector(P.X, P.Y, Z));
@@ -468,10 +469,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			if (ShotMoveClock >= 0.f)
 			{
 				ShotMoveClock += DeltaSeconds;
-				if (ShotMoveClock < 2.6f && (ShotFrame % 2) == 0 && K) K->LogClearance(ShotFrame / 2);
-				if (ShotMoveClock < 2.6f && (ShotFrame++ % 2) == 0)
+				static float ShotSeconds = 2.6f;   // (-ShotSeconds=6: a longer series, for a chain of moves)
+				static const bool bReadSeconds = FParse::Value(FCommandLine::Get(), TEXT("ShotSeconds="), ShotSeconds);
+				if (ShotMoveClock < ShotSeconds && (ShotFrame % 2) == 0 && K) K->LogClearance(ShotFrame / 2);
+				if (ShotMoveClock < ShotSeconds && (ShotFrame++ % 2) == 0)
 					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%03d.png"), *ShotName, ShotFrame / 2), false, false);
-				if (ShotMoveClock > 2.8f && PC) PC->ConsoleCommand(TEXT("quit"));
+				if (ShotMoveClock > ShotSeconds + 0.2f && PC) PC->ConsoleCommand(TEXT("quit"));
 			}
 		}
 

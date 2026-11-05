@@ -88,6 +88,9 @@ class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
 
+	friend class FKnightAnimator;   // the new suit's animator (MoveLab only) reads what he is doing and moves his gear to its hands
+	friend class ANewSuitTest;
+
 public:
 	AKnightCharacter();
 
