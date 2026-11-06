@@ -3,8 +3,9 @@
 #if WITH_EDITOR
 #include "ShaderCompiler.h"
 #endif
-FTransform KnightFistPlace();
+
 #include "KnightAnimator.h"
+#include "Camera/CameraComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Messages.h"
@@ -90,7 +91,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward (the low sweep and the dash attack:
 		// one each, keyed the same way)
-		AttackDur = (Style == EAtkStyle::Sweep ? SweepDur : Style == EAtkStyle::Dash ? 0.3f + DashLag() : Cd * (Dir == JabSecond ? 0.72f : 0.8f)) / SwingSpeedScale();   // (testing: DefaultGame.ini SwingSpeed slows it)
+		AttackDur = (Style == EAtkStyle::Sweep ? SweepDur : Style == EAtkStyle::Dash ? 0.3f + DashLag() : Cd * (Dir == JabSecond ? JeebTune::V().Jab2Share : JeebTune::V().Jab1Share)) / SwingSpeedScale();   // (testing: DefaultGame.ini SwingSpeed slows it)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (Style == EAtkStyle::Sweep ? 120.f : Style == EAtkStyle::Dash ? DashLunge : 210.f), true, false);   // (the player's machine and the server step together; the dash lunges on)
 	}
@@ -140,11 +141,15 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	bShotFace = true;
 	ShotFaceYaw = FaceYaw;
 	SetActorRotation(FRotator(0.f, FaceYaw, 0.f));
+	{
+		float Fov = 0.f;   // (-ShotFov=30: a close look)
+		if (FParse::Value(FCommandLine::Get(), TEXT("ShotFov="), Fov) && GetFollowCamera()) GetFollowCamera()->SetFieldOfView(Fov);
+	}
 	for (int32 h = 0; h < 5; ++h)   // a sword in hand
 		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
 	{
 		int32 ShotKind = -1;   // (-ShotKind=<number>: that weapon in the first bar slot instead)
-		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, 0); SelectHotbar(0); RebuildHeld(); }
+		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, 0); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast(); }   // (and the armour redrawn: a two-handed weapon puts the shield away)
 	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
@@ -163,7 +168,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == TestBow) { SelectHotbar(h); break; }
 		bShotWalk = Move == TEXT("bowwalk");
 	}
-	else if (Move.StartsWith(TEXT("bow")))   // the bow: bow = a full draw that goes by itself, bow60 = let go after 0.6 s
+	else if (Move.StartsWith(TEXT("bow")))   // the bow: bow = a full draw held 2 s, then the shot; bow60 = shot after 0.6 s
 	{
 		for (int32 h = 0; h < 5; ++h)
 			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == TestBow) { SelectHotbar(h); break; }
@@ -171,7 +176,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::T_Iron); Skills->Slots.Last().Count = 10; }
 		FParse::Value(FCommandLine::Get(), TEXT("ShotStrafe="), ShotStrafe);
 		StartDraw();
-		ShotBowAt = (Move.Len() > 3) ? GetWorld()->GetTimeSeconds() + FCString::Atoi(*Move.Mid(3)) / 100.f : -1.f;
+		ShotBowAt = GetWorld()->GetTimeSeconds() + ((Move.Len() > 3) ? FCString::Atoi(*Move.Mid(3)) / 100.f : DrawTimeNow() + 2.f);
 	}
 	if (Move == TEXT("kicksweep")) { StartAttack(EAtkStyle::Kick, 1, 0.f); ShotSweepAt = GetWorld()->GetTimeSeconds() + KickDur + 0.02f; }   // a kick, then the sweep on him lying there
 	if (Move == TEXT("block")) { bBlockHeld = true; StartBlock(); }                              // the shield held up
@@ -359,7 +364,7 @@ void AKnightCharacter::Die()
 	Skills->ResetToStartingKit();
 	RefreshEquipment();
 	CloseLoot();
-	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false;
+	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	const FVector2D VC = JeebTerrain::VillageCenter();
@@ -437,6 +442,62 @@ bool AKnightCharacter::CanDrinkNow() const
 		&& !ActiveNode.IsValid() && GetWorld()->GetTimeSeconds() - LastDrinkStart >= 0.5f;   // (not over and over: each start is a message to everyone in range)
 }
 
+// The bottle's size in the hand, and how far up it the hand holds it (the middle of its belly, in cm from the model's origin at this size). Its belly is about this thick there.
+static constexpr float BottleScale = 0.9f, BottleGripZ = 8.55f, BottleR = 6.1f;
+
+// The open right hand round the bottle (owner 2026-11-06: the skeleton has no finger bones, so the fist can't open). Plated like the gauntlet, "a tiny bit cartoonish" with crisp bevels.
+// Its frame: Z along the bottle (the cork at -Z), the palm out along +X, the fingers run on round the bottle toward +Y, the wrist at FClipLib::DrinkInHand's (9.5, -8.5, 0), the thumb toward the cork.
+static void BuildOpenHand(KM::FMD& Out)
+{
+	// One plate: a rounded box lying along the circle round the bottle, from angle A to angle B (degrees, 0 = straight out through the palm) at radius R and height Z
+	auto Plate = [&Out](float A, float B, float R, float Z, float HalfWide, float HalfThick, float Round, float ZTo = TNumericLimits<float>::Max())
+	{
+		const float Mid = FMath::DegreesToRadians((A + B) * 0.5f), Z2 = ZTo == TNumericLimits<float>::Max() ? Z : ZTo;
+		const FVector P0(R * FMath::Cos(FMath::DegreesToRadians(A)), R * FMath::Sin(FMath::DegreesToRadians(A)), Z);
+		const FVector P1(R * FMath::Cos(FMath::DegreesToRadians(B)), R * FMath::Sin(FMath::DegreesToRadians(B)), Z2);
+		const FVector Along = (P1 - P0).GetSafeNormal(), Normal(FMath::Cos(Mid), FMath::Sin(Mid), 0.f);
+		const FQuat Q = FRotationMatrix::MakeFromXZ(Along, Normal).ToQuat();
+		KM::FMD S;
+		KM::RBox(S, FVector::Dist(P0, P1) * 0.5f + 0.25f, HalfWide, HalfThick, Round, KM::Xf(FVector::ZeroVector));
+		const int32 Base = Out.V.Num();
+		for (const FVector& V : S.V) Out.V.Add((P0 + P1) * 0.5f + Q.RotateVector(V));
+		for (const int32 I : S.I) Out.I.Add(Base + I);
+	};
+	const float FingerR = BottleR + 0.75f, PalmR = BottleR + 1.9f;
+	// The back of the hand: three plates from the wrist to the knuckles, bending round the bottle
+	Plate(-44.f, -24.f, PalmR + 0.3f, 0.f, 4.0f, 1.45f, 0.45f);
+	Plate(-27.f, -7.f, PalmR + 0.1f, 0.f, 4.5f, 1.5f, 0.45f);
+	Plate(-9.f, 10.f, PalmR, 0.f, 4.8f, 1.5f, 0.45f);
+	// The knuckles' ridge
+	Plate(10.f, 15.f, PalmR - 0.35f, 0.f, 4.9f, 1.25f, 0.6f);
+	// Four fingers, three plates each, closing round the bottle. Index at the thumb's side (toward the cork).
+	const float FingerZ[4] = { -3.45f, -1.15f, 1.15f, 3.35f }, FingerW[4] = { 1.13f, 1.18f, 1.12f, 0.98f }, Reach[4] = { 1.f, 1.08f, 1.f, 0.82f };
+	for (int32 f = 0; f < 4; ++f)
+	{
+		float A = 12.f;
+		const float Len[3] = { 34.f, 26.f, 22.f };
+		for (int32 s = 0; s < 3; ++s)
+		{
+			const float B = A + Len[s] * Reach[f];
+			Plate(A, B, FingerR, FingerZ[f], FingerW[f] * (1.f - s * 0.07f), 0.82f - s * 0.06f, 0.55f);
+			A = B;
+		}
+	}
+	// The thumb, the other way round the bottle and up toward the cork, over its shoulder
+	Plate(-30.f, -58.f, BottleR + 0.95f, -3.6f, 1.35f, 1.0f, 0.55f, -4.4f);
+	Plate(-58.f, -84.f, BottleR + 0.55f, -4.4f, 1.2f, 0.85f, 0.55f, -4.9f);
+	// Its root, joining it to the palm
+	Plate(-24.f, -38.f, PalmR - 0.4f, -3.2f, 1.6f, 1.2f, 0.6f, -3.6f);
+	// The wrist: over the stub of the folded fist, as far as the gauntlet's cuff
+	KM::FMD W;
+	KM::Ellipsoid(W, 4.9f, 5.4f, 5.5f, 0.75f, 0.75f, 16, 10, KM::Xf(FVector::ZeroVector));   // (as wide as the cuff's opening)
+	const FQuat WQ = FRotationMatrix::MakeFromX(FVector(0.64f, 0.77f, 0.f)).ToQuat();
+	const FVector WAt(9.5f, -8.5f, 0.f);
+	const int32 Base = Out.V.Num();
+	for (const FVector& V : W.V) Out.V.Add(WAt + WQ.RotateVector(V));
+	for (const int32 I : W.I) Out.I.Add(Base + I);
+}
+
 // Everyone sees it: the weapon goes away and a bottle in the potion's colour comes into the right hand (the bow's hand is the left, so it stays).
 void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 {
@@ -447,20 +508,42 @@ void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 	DrinkT = 0.f;
 	DrinkType = Type;
 	if (GetNetMode() == NM_DedicatedServer) return;
-	if (bStart && !BottleMesh && WristR)
-		if (UStaticMesh* Flask = JeebProps::PotionMesh())   // (through the fist as a sword's grip lies, the neck out past the thumb)
+	if (bStart && !BottleMesh)
+		if (UStaticMesh* Flask = JeebProps::PotionMesh())
 		{
+			DrinkGroup = NewObject<USceneComponent>(this);
+			DrinkGroup->SetupAttachment(GetRootComponent());
+			DrinkGroup->RegisterComponent();
 			BottleMesh = NewObject<UStaticMeshComponent>(this);
-			BottleMesh->SetupAttachment(WristR);
+			BottleMesh->SetupAttachment(DrinkGroup);
 			BottleMesh->SetStaticMesh(Flask);
 			BottleMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, 8.4f), FVector(0.9f)) * KnightFistPlace());   // (held by its long neck and upended to the mouth: the fist at the cork end, the neck showing between it and the body)
+			BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, -BottleGripZ), FVector(BottleScale)));   // (the model's cork is along -Z: the hand round its belly, the neck past the thumb)
 			BottleMesh->RegisterComponent();
+			KM::FMD Hand;
+			BuildOpenHand(Hand);
+			DrinkHand = MakeMeshComp(DrinkGroup, KnightDesign::P_WristR, Hand);
+			DrinkHand->SetRelativeLocation(FVector::ZeroVector);
 		}
 	if (BottleMesh)
 	{
-		if (bStart) JeebProps::Tint(BottleMesh, JeebItems::PotionRow(FMath::Clamp<int32>(Type, 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
+		if (bStart)
+		{
+			JeebProps::Tint(BottleMesh, JeebItems::PotionRow(FMath::Clamp<int32>(Type, 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
+			// (in the gauntlets' metal, or bare mail with none on. The suit's own texture is dark paint lifted and tinted, so the same tier colour on a plain surface has to be darkened to match it: HandPaint, by eye against tin and emerald)
+			static constexpr float HandPaint = 0.36f;
+			const int32 Tier = Anim ? Anim->WornTier(JeebAnim::Piece_Arms) : -1;
+			UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(DrinkHand->GetMaterial(0));
+			if (!M) M = DrinkHand->CreateDynamicMaterialInstance(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal")));
+			if (M)
+			{
+				M->SetVectorParameterValue(TEXT("Color"), Tier >= 0 ? JeebItems::Palette(Tier, 0) * HandPaint : FLinearColor(0.16f, 0.17f, 0.18f));
+				M->SetScalarParameterValue(TEXT("Metallic"), Tier >= 0 ? JeebItems::TierMetal(Tier) * 0.75f : 0.5f);
+				M->SetScalarParameterValue(TEXT("Roughness"), Tier >= 0 ? JeebItems::TierRough(Tier) : 0.6f);
+			}
+		}
 		BottleMesh->SetVisibility(bStart);
+		DrinkHand->SetVisibility(bStart);
 	}
 	if (!JeebItems::IsDrawnBow(SelectedKind()))
 	{
@@ -473,7 +556,7 @@ void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 void AKnightCharacter::UpdateBeltFlask()
 {
 	const int32 Id = (IsLocallyControlled() || GetNetMode() == NM_Standalone) ? (Skills ? Skills->PotionSlot.Id : 0) : LookPotion;
-	const bool bShow = !bStowed && !bDrinking && Id != 0 && JeebItems::IsPotion(Id);
+	const bool bShow = !bStowed && !bDrinking && Id != 0 && JeebItems::IsPotion(Id) && Anim && Anim->WornTier(JeebAnim::Piece_Chest) >= 0;   // (the belt is part of the chest plate: with that off there is nothing to hang it from)
 	if (!BeltFlask && bShow)
 		if (UStaticMesh* Flask = JeebProps::PotionMesh())
 		{
@@ -576,7 +659,8 @@ void AKnightCharacter::TickAttack(float Dt)
 			if (Smash == ESmash::Charging) AttackYaw = GetActorRotation().Yaw;
 			else SetActorRotation(FRotator(0.f, AttackYaw, 0.f));
 		}
-		if (AtkStyle == EAtkStyle::Kick || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) SetActorRotation(FRotator(0.f, AttackYaw, 0.f));   // (a kick, a sweep or a dash never turns: strafe mode or not)
+		// (the kick and the low sweep turn as a jab does, their hit boxes with him: owner 2026-11-06. The dash is a straight lunge and stays on its line.)
+		if (AtkStyle == EAtkStyle::Dash || ((AtkStyle == EAtkStyle::Kick || AtkStyle == EAtkStyle::Sweep) && !bStrafeMode && !bBlockHeld)) SetActorRotation(FRotator(0.f, AttackYaw, 0.f));
 		// The smash attack: hit 1 waits at its pull-back while deciding and charging, and the end lag waits at the end of the swipe
 		float Step = Dt;
 		if (Smash == ESmash::Deciding || Smash == ESmash::Charging) Step = FMath::Clamp(SmashApexT * AttackDur - AttackT, 0.f, Dt);
@@ -650,6 +734,13 @@ void AKnightCharacter::SetSmash(ESmash P, float Charge, bool bTell)
 	if (P == ESmash::Swing)
 	{
 		bSmashSwing = true;
+		// (hit 1 alone got quicker in Tuning.ini, owner 2026-11-06; the smash shares its wind-up but keeps its own swipe and end lag: the same share of a longer swing)
+		if (AttackDir == JabFirst && AtkStyle == EAtkStyle::Slash)
+		{
+			const float Longer = 0.8f / FMath::Max(JeebTune::V().Jab1Share, 0.1f);
+			AttackT *= Longer;
+			AttackDur *= Longer;
+		}
 		SmashCharge = FMath::Clamp(Charge, 0.f, 1.f);
 		HitThisSwing.Reset();   // (a new move: it can hit everyone again)
 		bHitPrevValid = false;
@@ -763,6 +854,12 @@ float AKnightCharacter::DashU() const
 bool AKnightCharacter::MoveLocked() const
 {
 	return SmashLocked() || bKnockedDown || StunLeft > 0.f || (bAttacking && (AtkStyle == EAtkStyle::Kick || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash));
+}
+
+// Can't turn to the camera: a smash's swipe and end lag, lying down, hitstun, the dash's lunge (a kick and a sweep stop his feet, not his turning)
+bool AKnightCharacter::TurnLocked() const
+{
+	return SmashLocked() || bKnockedDown || StunLeft > 0.f || (bAttacking && AtkStyle == EAtkStyle::Dash);
 }
 
 bool AKnightCharacter::BladeComing() const

@@ -377,7 +377,7 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			DiscP(19, 26, 4, 4, Tr);
 			DiscP(45, 26, 4, 4, Tr);
 			break;
-		case K_Gloves:
+		case K_Gauntlets:
 			for (int32 g = 0; g < 2; ++g)
 			{
 				const float Ox = g * 30.f;

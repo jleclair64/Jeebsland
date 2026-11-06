@@ -522,8 +522,8 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 	for (int32 i = 0; i < 9; ++i) if (Use[i]) CycleLen += W[i] * Use[i]->Len;
 	CycleLen = FMath::Max(CycleLen / FMath::Max(TotalW, 0.01f), 0.1f);
 	const float Rate = FMath::Clamp(Speed / FMath::Max(Stride, 1.f), 0.45f / CycleLen, 1.45f / CycleLen);
-	// In the air nothing pushes on the ground, so the legs have no stride to keep up with: they carry on at about a third of their pace and settle back on landing (owner, 2026-11-05)
-	AirLegs = FMath::FInterpTo(AirLegs, In.bFalling ? 0.33f : 1.f, Dt, In.bFalling ? 9.f : 14.f);
+	// In the air nothing pushes on the ground, so the legs have no stride to keep up with: they carry on at half their pace and settle back on landing (owner, 2026-11-05; 50% more on 2026-11-06)
+	AirLegs = FMath::FInterpTo(AirLegs, In.bFalling ? 0.5f : 1.f, Dt, In.bFalling ? 9.f : 14.f);
 	Phase = FMath::Fmod(Phase + Rate * AirLegs * Dt, 1.f);
 
 	for (int32 i = 0; i < 9; ++i)
@@ -670,7 +670,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	{
 		// (between his own walk and the sword-and-shield clips the hand turns furthest of all, and the blade shows it: never a whirl)
 		// (out of the low sweep the blade rises from the floor to the guard: one slow arc, never three heights in a few frames)
-		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? (StateKey == 34 || (bMoving && StateKey >= 30 && StateKey < 40) ? 0.48f : 0.34f) : 0.16f, Key == 30 ? 0.4f : Key == 34 ? 0.25f : 0.f);   // (the sweep's hips must be down by the cut, or the blade rides high)
+		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? (StateKey == 34 || (bMoving && StateKey >= 30 && StateKey < 40) ? 0.48f : 0.34f) : Key == 31 ? 0.2f : 0.16f, Key == 30 ? 0.4f : Key == 31 ? 0.3f : Key == 34 ? 0.25f : 0.f);   // (the sweep's hips must be down by the cut, or the blade rides high; the second jab's feet stand elsewhere than the first's, and they get there over its whole wind-up)
 		if ((StateKey >= 30 && StateKey < 40) || StateKey == 72) LiftWindow = 0.5f;
 		StateKey = Key;
 	}
@@ -706,7 +706,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 			{
 				Bones[b].SetRotation(Final.Rot[b]);
 				Bones[b].SetTranslation(b == HipB ? Final.Hip : RefPos[b]);
-				Bones[b].SetScale3D(FVector::OneVector);
+				Bones[b].SetScale3D(In.bDrinking && b == Bone[RHand] ? FVector(0.02f) : FVector::OneVector);   // (while he drinks the fist folds away: an open hand round the bottle takes its place, AKnightCharacter::DrinkHand)
 			}
 			Comp->MarkRefreshTransformDirty();
 			Comp->RefreshBoneTransforms();
@@ -1103,7 +1103,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	FallShare = FMath::FInterpTo(FallShare, bAir ? FMath::SmoothStep(0.55f, 1.2f, AirT) : 0.f, Dt, bAir ? 5.f : 12.f);
 	if (Key == 0)
 	{
-		const float Knees = AirShare * 0.22f + (LandT < 0.34f ? FMath::Sin(LandT / 0.34f * PI) * 0.8f * LandStrength : 0.f);
+		const float Knees = AirShare * 0.33f + (LandT < 0.34f ? FMath::Sin(LandT / 0.34f * PI) * 0.8f * LandStrength : 0.f);
 		if (Knees > 0.005f)
 			if (const FClip* C = Get(TEXT("FallLand")))
 			{
@@ -1178,10 +1178,11 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			float T = M->ClipHit;
 			if (In.Move == EMove::SmashCharge)
 			{
-				// the wind-up, then held, trembling as the charge fills (owner: half of what it first was)
+				// the wind-up, then held, trembling as the charge fills. (Its phase is added up frame by frame: Time times a growing charge made it shake faster the longer the game had been running.)
 				const float W = FMath::Clamp(ActionT / 0.3f, 0.f, 1.f);
+				ShakePhase = FMath::Fmod(ShakePhase + Dt * (5.85f + 6.5f * In.SmashCharge), 2.f * PI);
 				T = FMath::Lerp(M->ClipStart, M->ClipHit, FMath::InterpEaseOut(0.f, 1.f, W, 2.f))
-					+ (W >= 1.f ? FMath::Sin(Time * (9.f + 10.f * In.SmashCharge)) * (0.006f + 0.01f * In.SmashCharge) : 0.f);
+					+ (W >= 1.f ? FMath::Sin(ShakePhase) * (0.003f + 0.005f * In.SmashCharge) : 0.f);
 			}
 			else if (In.Move == EMove::SmashSwing)
 				T = FMath::Lerp(M->ClipHit, M->ClipFollow, In.SmashSwingU);
@@ -1304,10 +1305,16 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			TurnInMesh(B, Spine2, FQuat(FVector::YAxisVector, FMath::DegreesToRadians(10.f)));
 		}
 		break;
-	case 73: case 74:   // a tool at work: its wind-up over the first 55% of each swing, the blow by 70%, then a pause on it (the game's own swing timing)
-	{
+	case 73: case 74:   // a tool at work (owner 2026-11-06: it was a quick draw back and a very fast blow). Each swing starts with the tool up (ClipStart): a blow that gathers speed down to ClipFollow,
+	{                   // a moment stuck in the rock, then a long unhurried lift back up. ClipHit is not used here. (Both hands on the tool: the shield goes on his back meanwhile.)
 		const TCHAR* Nm = Key == 73 ? TEXT("Chop") : TEXT("Mine");
-		if (const FMove* M = Moves.Find(Nm)) PlayAt(Nm, MoveClipTime(*M, In.SwingU, 0.55f, 0.7f), Speed, B, &OutBlend);   // (both hands on the tool: the shield goes on his back meanwhile)
+		if (const FMove* M = Moves.Find(Nm))
+		{
+			constexpr float BlowEnds = 0.32f, LiftFrom = 0.42f;
+			const float U = In.SwingU;
+			const float A = U < BlowEnds ? FMath::Pow(U / BlowEnds, 2.f) : U < LiftFrom ? 1.f : 1.f - FMath::SmoothStep(LiftFrom, 1.f, U);
+			PlayAt(Nm, FMath::Lerp(M->ClipStart, M->ClipFollow, A), Speed, B, &OutBlend);
+		}
 		break;
 	}
 	case 75:   // fishing: the cast, then waiting
@@ -1385,6 +1392,21 @@ void FClipLib::SolveGear()
 			FClip& C = *It.Value;
 			for (int32 f = 0; f < C.NumFrames; ++f) C.Rot[f * NB + HandB] = (C.Rot[f * NB + HandB] * Fit).GetNormalized();
 		}
+		// The open hand round a bottle (owner 2026-11-06). There are no finger bones, so it is a hand of its own (BuildOpenHand), and this is where it goes on the hand bone. Its frame: Z along the
+		// bottle with the cork at -Z, X from the bottle's axis out through the palm, Y the way the fingers run; the wrist is at DrinkWrist. Read off the real hand's axes in the T-pose,
+		// carried through Fit as every clip's are: fingers along the arm, palm down, thumb forward.
+		{
+			const FVector F = NewF;
+			const FVector T = (FVector::ForwardVector - F * FVector::DotProduct(FVector::ForwardVector, F)).GetSafeNormal();
+			const FVector Pa = FVector::CrossProduct(F, T);   // (palm down, and T = Pa x F)
+			const FQuat ToHand = Fit.Inverse() * Hand.GetRotation().Inverse();
+			FVector Wrist(9.5f, -8.5f, 0.f); FRotator HandTurn(0.f, 0.f, -20.f);   // (the wrist bent so the cork comes to his visor's mouth: the clip was made for a small cup)
+			FString HS; TArray<FString> HP;   // (test pictures: -HandFit=X_Y_Z_Pitch_Yaw_Roll)
+			if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("HandFit="), HS) && HS.ParseIntoArray(HP, TEXT("_")) == 6)
+			{ Wrist = FVector(FCString::Atof(*HP[0]), FCString::Atof(*HP[1]), FCString::Atof(*HP[2])); HandTurn = FRotator(FCString::Atof(*HP[3]), FCString::Atof(*HP[4]), FCString::Atof(*HP[5])); }
+			const FQuat HQ = FQuat(FMatrix(ToHand.RotateVector(-Pa), ToHand.RotateVector(F), ToHand.RotateVector(-T), FVector::ZeroVector)) * HandTurn.Quaternion();
+			DrinkInHand = FTransform(HQ, -HQ.RotateVector(Wrist));
+		}
 	}
 	// The left hand's joint, the same way, for a second blade (the katana's): the blade leaves the fist forward as the forearm lies at rest
 	{
@@ -1402,11 +1424,18 @@ void FClipLib::SolveGear()
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
-			const FVector Mid = FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.55f);
-			const FQuat Q = ::ShieldRest().InArm.GetRotation();
-			const FVector Face = Q.RotateVector(FVector::ForwardVector);
-			const FVector At = Mid + Face * 11.f;
-			ShieldAtRest = FTransform(Q, At - Q.RotateVector(Strap)) * Fore.Inverse();
+			// (owner 2026-11-06: strapped to the outside of the forearm as a real shield is, its long axis along the bone and its back against the arm; it had come from the old knight's rest pose and hung off the back of the hand)
+			float Share = 0.5f, Out = 8.f, TurnFwd = 20.f, Tilt = 0.f;
+			FString S; TArray<FString> Pr;   // (test pictures: -ShieldRestTune=Share_Out_Turn_Tilt)
+			if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("ShieldRestTune="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 4)
+			{ Share = FCString::Atof(*Pr[0]); Out = FCString::Atof(*Pr[1]); TurnFwd = FCString::Atof(*Pr[2]); Tilt = FCString::Atof(*Pr[3]); }
+			const FVector Mid = FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), Share);
+			const FVector Along = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
+			FVector Face = (FVector(0.f, -1.f, 0.f) - Along * FVector::DotProduct(FVector(0.f, -1.f, 0.f), Along)).GetSafeNormal();   // (straight out to his left)
+			Face = FQuat(Along, -FMath::DegreesToRadians(TurnFwd)).RotateVector(Face);   // (and a little toward the front, as the arm hangs)
+			const FVector Up = FQuat(Face, FMath::DegreesToRadians(Tilt)).RotateVector(-Along);
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
+			ShieldAtRest = FTransform(Q, Mid + Face * Out - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
 		// Raised or in a sword clip: strapped as the Paladin's is (on the back of his forearm, thumb side up), carried through the same line-up
 		{
@@ -1469,7 +1498,10 @@ void FClipLib::SolveGear()
 	{
 		const FTransform Hip = BindInGame(P, Hips);
 		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		BeltFlaskOnHips = FTransform(FRotator(5.f, 0.f, 186.f).Quaternion(), FVector(-19.f, -19.f, 14.f) + Old + FVector(0.f, 0.f, 96.f), FVector(0.7f)) * Hip.Inverse();
+		FVector At(-14.f, -14.f, 14.f);   // (owner 2026-11-06: same height and spot on the belt, but touching it; it hung 5 cm clear of his back)
+		FString S; TArray<FString> Pr;   // (test pictures: -FlaskAt=X_Y_Z)
+		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
+		BeltFlaskOnHips = FTransform(FRotator(5.f, 0.f, 186.f).Quaternion(), At + Old + FVector(0.f, 0.f, 96.f), FVector(0.7f)) * Hip.Inverse();
 	}
 	// The crossbow in the right hand: as the rifle lies in the aiming clip, along the line from the right fist to the left
 	if (const FClip* C = Find(TEXT("CrossAim")))
@@ -1533,6 +1565,7 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 			for (int32 i = 0; i < Secs.Num(); ++i)
 				if (Secs[i].MaterialIndex == Mat) Comp->ShowMaterialSection(Mat, i, Tier >= 0, 0);
 		}
+	WornTiers[Piece] = Tier;
 	ShowBare(Piece, Tier < 0);
 	if (Tier < 0) return;
 	if (!PieceMid[Piece]) PieceMid[Piece] = Comp->CreateDynamicMaterialInstance(Mat, Comp->GetMaterial(Mat));
@@ -1550,10 +1583,11 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 }
 
 // An empty slot shows the mail body underneath. It is a whole mesh of its own, since the suit has no mail under its plate (it never shows through); it is drawn only while some slot is empty.
+// A join between two pieces (owner 2026-11-06: the shoulder with chest and gauntlets on, the neck with the helmet on and the chest off) belongs to both, so its mail shows when either of them is off:
+// the plates that are still on cover their own part of it, and what is between them is filled.
 void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 {
-	static const TCHAR* const BareSlots[Piece_Count] = { TEXT("Bare_Chest"), TEXT("Bare_Legs"), TEXT("Bare_Helmet"), TEXT("Bare_Gauntlets"), nullptr };   // (nothing under the shoulder plates but the arm and chest)
-	if (!BareSlots[Piece] || bBare[Piece] == bShow) return;
+	if (bBare[Piece] == bShow) return;
 	bBare[Piece] = bShow;
 	if (!BareComp)
 	{
@@ -1579,14 +1613,24 @@ void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 	const FSkeletalMeshRenderData* R = BareComp->GetSkinnedAsset()->GetResourceForRendering();
 	if (!R || R->LODRenderData.Num() == 0) return;
 	const TArray<FSkelMeshRenderSection>& Secs = R->LODRenderData[0].RenderSections;
+	const bool bChest = bBare[Piece_Chest], bHelm = bBare[Piece_Helmet], bArms = bBare[Piece_Arms], bSh = bBare[Piece_Shoulders];
+	const struct { const TCHAR* Slot; bool bOn; } Regions[] = {
+		{ TEXT("Bare_Helmet"), bHelm },
+		{ TEXT("Bare_Neck"), bHelm || bChest },
+		{ TEXT("Bare_Chest"), bChest },
+		{ TEXT("Bare_Collar"), bChest || bSh },
+		{ TEXT("Bare_UpperArm"), bArms || bSh || bChest },
+		{ TEXT("Bare_Gauntlets"), bArms },
+		{ TEXT("Bare_Legs"), bBare[Piece_Legs] },
+		{ TEXT("Bare_Waist"), bChest || bBare[Piece_Legs] } };
 	bool bAny = false;
-	for (int32 p = 0; p < Piece_Count; ++p)
+	for (const auto& Rg : Regions)
 	{
-		if (!BareSlots[p]) continue;
-		bAny |= bBare[p];
-		const int32 Mat = BareComp->GetMaterialIndex(FName(BareSlots[p]));
+		bAny |= Rg.bOn;
+		const int32 Mat = BareComp->GetMaterialIndex(FName(Rg.Slot));
+		if (Mat == INDEX_NONE) { UE_LOG(LogTemp, Warning, TEXT("JEEBANIM bare slot %s missing"), Rg.Slot); continue; }   // (a section nobody hides stays visible: mail through the armour)
 		for (int32 i = 0; i < Secs.Num(); ++i)
-			if (Secs[i].MaterialIndex == Mat) BareComp->ShowMaterialSection(Mat, i, bBare[p], 0);
+			if (Secs[i].MaterialIndex == Mat) BareComp->ShowMaterialSection(Mat, i, Rg.bOn, 0);
 	}
 	BareComp->SetVisibility(bAny);
 }

@@ -54,7 +54,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	};
 
 	// ----- The pack: 16 slots -----
-	NorseTitle(TEXT("PACK"), PX + 30.f, PY + 64.f, 1.2f);
+	WindowTitle(TEXT("PACK"), PX + 30.f, PY + 64.f, 1.2f);
 	const float SS = 84.f, Gap = 8.f;
 	const float GX = PX + 30.f, GY = PY + 92.f;
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -98,10 +98,10 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 	}
 
 	// ----- Worn gear -----
-	NorseTitle(TEXT("WORN"), EX, PY + 170.f, 1.2f);
+	WindowTitle(TEXT("WORN"), EX, PY + 170.f, 1.2f);
 	struct FWornSlot { int32 Kind; bool bSecond; const TCHAR* Label; };
 	static const FWornSlot Worn[10] = {
-		{ K_Shield, false, TEXT("Shield") }, { K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gloves, false, TEXT("Gloves") },
+		{ K_Shield, false, TEXT("Shield") }, { K_Helmet, false, TEXT("Helmet") }, { K_Chest, false, TEXT("Chest") }, { K_Shoulders, false, TEXT("Shoulders") }, { K_Gauntlets, false, TEXT("Gauntlets") },
 		{ K_Boots, false, TEXT("Boots") }, { K_Cape, false, TEXT("Cape") }, { K_Ring, false, TEXT("Misc") }, { K_Ring, true, TEXT("Misc") }, { K_Amulet, false, TEXT("Misc") },
 	};
 	for (int32 w = 0; w < 10; ++w)
@@ -263,12 +263,12 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 
 	// ================= Armor (just above the inventory) =================
 	{
-		// Laid out like the knight himself: helmet on top; gloves, chest and shoulders across the middle; boots below,
+		// Laid out like the knight himself: helmet on top; gauntlets, chest and shoulders across the middle; boots below,
 		// with the cape beside them (the shield lives in the slot at the end of the weapon bar). The three miscellaneous slots run down the right edge.
 		struct FWornSlot { int32 Kind; bool bSecond; int32 Col, Row; };
 		static const FWornSlot Worn[9] = {
 			{ K_Helmet, false, 1, 0 },
-			{ K_Gloves, false, 0, 1 }, { K_Chest, false, 1, 1 }, { K_Shoulders, false, 2, 1 },
+			{ K_Gauntlets, false, 0, 1 }, { K_Chest, false, 1, 1 }, { K_Shoulders, false, 2, 1 },
 			{ K_Boots, false, 1, 2 }, { K_Cape, false, 2, 2 },
 			{ K_Ring, false, 3, 0 }, { K_Ring, true, 3, 1 }, { K_Amulet, false, 3, 2 },
 		};
@@ -291,7 +291,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			ItemBadges(Id, X, Y, WS);
 			if (bOver) ItemTip(Id);
 		}
-		// The armour's weight, in the empty corner under the gloves: kg, and how much slower it makes him (JeebItems::WeightSlow)
+		// The armour's weight, in the empty corner under the gauntlets: kg, and how much slower it makes him (JeebItems::WeightSlow)
 		{
 			const float X = GX - 2.f, Y = GY + 2 * RowH;
 			const float Kg = TotalWeight(Skills);
@@ -732,7 +732,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 	const float LX = IX - PW - 12.f, LY = IY + (Pad + GridH + Pad) - LH;
 	Panel(LX, LY, PW, LH, 1.f, false);
 	AddRect(LX, LY, PW, LH);
-	NorseTitle(TEXT("Sack"), LX + Pad + 2.f, LY + Pad + 2.f, 1.15f);
+	WindowTitle(TEXT("Sack"), LX + Pad + 2.f, LY + Pad + 2.f, 1.15f);
 	if (Btn(LX + PW - Pad - 96.f, LY + Pad - 2.f, 96.f, 26.f, TEXT("Take all"), true, false, 0.9f)) { Knight->Inv(EInvOp::LootTakeAll, 0, 0, 0, Sack); return; }
 	{
 		const float GX = LX + Pad, GY = LY + Pad + TitleH;
@@ -750,7 +750,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 	// ---- Its armour, laid out like the knight, beside your Armor window ----
 	struct FWornSlot { int32 Kind; int32 Col, Row; };
 	static const FWornSlot Layout[10] = {
-		{ K_Helmet, 1, 0 }, { K_Gloves, 0, 1 }, { K_Chest, 1, 1 }, { K_Shoulders, 2, 1 },
+		{ K_Helmet, 1, 0 }, { K_Gauntlets, 0, 1 }, { K_Chest, 1, 1 }, { K_Shoulders, 2, 1 },
 		{ K_Shield, 0, 2 }, { K_Boots, 1, 2 }, { K_Cape, 2, 2 }, { K_Ring, 3, 0 }, { K_Ring, 3, 1 }, { K_Ring, 3, 2 },
 	};
 	const float WS = 50.f, WG = (GridW - 4 * WS) / 3.f, RowH = WS + 8.f;

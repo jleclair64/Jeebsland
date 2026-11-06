@@ -36,7 +36,7 @@ namespace JeebItems
 	{
 		K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Rod,   // the weapon bar
 		K_Shield,
-		K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots,
+		K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots,
 		K_Cape,
 		K_Ring, K_Amulet,
 		K_Crest,          // a brush along the helm's crest: worn in a miscellaneous slot like a ring or amulet
@@ -380,7 +380,7 @@ namespace JeebItems
 	}
 	// ---------------------------------------------------------------- armour by body part (owner, 2026-11-02)
 	// A blow that lands on the body goes through the piece covering where it hit (JeebHit::EZone): helmet the head, chestplate
-	// the body, shoulders the upper arms, gloves the forearms and hands, boots the legs. That piece's tier says how much of the
+	// the body, shoulders the upper arms, gauntlets the forearms and hands, boots the legs. That piece's tier says how much of the
 	// blow gets through (Tiers.csv ArmourTakes: Tin 80%, down to 50% for a legendary). Rings and amulets with a defence bonus
 	// cut the part that is stopped further, but never below MinTake: even the best armour lets half of a blow through.
 	// The damage number shows what got through.
@@ -391,7 +391,7 @@ namespace JeebItems
 		{
 		case JeebHit::Z_Head:     return K_Helmet;
 		case JeebHit::Z_UpperArm: return K_Shoulders;
-		case JeebHit::Z_Forearm:  return K_Gloves;
+		case JeebHit::Z_Forearm:  return K_Gauntlets;
 		case JeebHit::Z_Leg:      return K_Boots;
 		default:                  return K_Chest;
 		}

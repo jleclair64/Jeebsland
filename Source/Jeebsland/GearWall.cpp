@@ -227,7 +227,7 @@ void AGearWall::AddMannequin(int32 Style, int32 Tier, const FVector& Local)
 		{ JeebItems::K_Helmet, Head, FVector(0.f, 0.f, 12.f) },
 		{ JeebItems::K_Shoulders, LArm, FVector(0.f, 0.f, 4.f) },
 		{ JeebItems::K_Chest, Spine1, FVector::ZeroVector },
-		{ JeebItems::K_Gloves, RHand, FVector::ZeroVector },
+		{ JeebItems::K_Gauntlets, RHand, FVector::ZeroVector },
 		{ JeebItems::K_Boots, LFoot, FVector::ZeroVector } };
 	for (const auto& S : Spots) if (JeebItems::StyleHasPiece(S.Kind, Style))   // (no peg for a piece the style does not have)
 	{

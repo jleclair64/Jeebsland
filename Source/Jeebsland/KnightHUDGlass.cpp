@@ -357,7 +357,7 @@ void AKnightHUD::ItemTip(int32 Id)
 	else if (IsArmorKind(K))
 	{
 		L.Add(FString::Printf(TEXT("Stops %d%% of blows to the %s"), ArmourProtect(FullVariant(Id)),
-			K == K_Helmet ? TEXT("head") : K == K_Chest ? TEXT("body") : K == K_Shoulders ? TEXT("upper arms") : K == K_Gloves ? TEXT("forearms") : TEXT("legs")));
+			K == K_Helmet ? TEXT("head") : K == K_Chest ? TEXT("body") : K == K_Shoulders ? TEXT("upper arms") : K == K_Gauntlets ? TEXT("forearms") : TEXT("legs")));
 		L.Add(FString::Printf(TEXT("Weighs %s (heavy armour slows you)"), *WeightText(PieceWeight(K, FullVariant(Id)))));
 		L.Add(ArmourStyleRow(StyleOf(Id)).Note);
 		if (K == K_Boots) L.Add(FString::Printf(TEXT("Stamina x%.2f"), BootStaminaMult(V)));

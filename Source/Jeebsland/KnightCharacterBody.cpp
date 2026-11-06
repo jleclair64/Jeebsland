@@ -304,7 +304,7 @@ namespace
 		case KnightDesign::SlotShoulders: return JeebItems::K_Shoulders;
 		case KnightDesign::SlotBoots:     return JeebItems::K_Boots;
 		case KnightDesign::SlotCape:      return JeebItems::K_Cape;
-		case KnightDesign::SlotGloves:    return JeebItems::K_Gloves;
+		case KnightDesign::SlotGauntlets:    return JeebItems::K_Gauntlets;
 		default:                          return JeebItems::K_Shield;
 		}
 	}
@@ -336,7 +336,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
 	// The suit: each slot is one piece of it, tinted for the tier, gone when the slot is empty. Light, Classic and Heavy are the same model, they differ in the numbers (ArmourStyles.csv).
 	const int32 Piece = Slot == KnightDesign::SlotHelmet ? JeebAnim::Piece_Helmet : Slot == KnightDesign::SlotBody ? JeebAnim::Piece_Chest : Slot == KnightDesign::SlotShoulders ? JeebAnim::Piece_Shoulders
-		: Slot == KnightDesign::SlotGloves ? JeebAnim::Piece_Arms : Slot == KnightDesign::SlotBoots ? JeebAnim::Piece_Legs : -1;
+		: Slot == KnightDesign::SlotGauntlets ? JeebAnim::Piece_Arms : Slot == KnightDesign::SlotBoots ? JeebAnim::Piece_Legs : -1;
 	if (Piece >= 0) { if (Anim) Anim->Wear(Piece, bWorn ? Var : -1); return; }
 	if (Slot == KnightDesign::SlotCape)
 	{
@@ -364,7 +364,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 
 void AKnightCharacter::RefreshEquipment()
 {
-	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGloves, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
+	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGauntlets, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
 	RebuildHeld();
 }
 
@@ -375,7 +375,7 @@ static FTransform FistPlace()
 	const FQuat Q = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(E.Z)) * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(E.Y)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(E.X));
 	return FTransform(Q, KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR));
 }
-FTransform KnightFistPlace() { return FistPlace(); }
+
 
 void AKnightCharacter::RebuildHeld()
 {

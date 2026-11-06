@@ -74,11 +74,13 @@ private:
 	void SetTip(const TArray<FString>& Lines) { TipLines = Lines; }
 	void ItemTip(int32 Id);
 	void DrawTip();
-	void NorseText(const FString& Text, float Y, float H, float Alpha) { NorseTextAt(Text, -1.f, Y, H, Alpha); }
-	// The same Norse lettering at X (X < 0 centres it across the screen); returns its width. Used for every window title.
-	float NorseTextAt(const FString& Text, float X, float Y, float H, float Alpha = 1.f);
-	// A window title in the Norse hand, sized to stand in for HDText at Scale with the medium font (top-left at X, Y)
-	float NorseTitle(const FString& Text, float X, float Y, float Scale) { return NorseTextAt(Text, X, Y + 3.f * Scale, 12.f * Scale); }   // place names, lettered in a Norse hand (gold, rune-cut strokes), centred
+	// Place names and the game's name (owner, 2026-11-06, after Skyrim's): the game's own font in widely spaced capitals, warm ivory with a soft shadow, a thin fading rule either side. Centred; its capitals' top at Y, H tall.
+	void TitleBanner(const FString& Text, float Y, float H, float Alpha);
+	// The same lettering at X (X < 0 centres it across the screen); returns its width.
+	float TitleTextAt(const FString& Text, float X, float Y, float H, float Alpha = 1.f);
+	// A window title in that lettering, sized to stand in for HDText at Scale with the medium font (top-left at X, Y)
+	float WindowTitle(const FString& Text, float X, float Y, float Scale) { return TitleTextAt(Text, X, Y + 3.f * Scale, 12.f * Scale); }
+	UPROPERTY() UFont* TitleFonts[3] = {};   // rasters big enough for titles (HDFonts stop at 40)
 	void DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha);   // a tooltip-style panel centred over a point (dropped things)
 	static FLinearColor Lift(const FLinearColor& C, float F);
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light

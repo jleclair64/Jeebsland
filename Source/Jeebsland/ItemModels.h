@@ -254,7 +254,7 @@ namespace JeebItemModel
 		case K_Helmet:    FromKnight(Out, SlotHelmet, V, P_Head); break;
 		case K_Chest:     FromKnight(Out, SlotBody, V, P_Upper); break;
 		case K_Shoulders: FromKnight(Out, SlotShoulders, V); break;
-		case K_Gloves:    FromKnight(Out, SlotGloves, V, P_ElbowR); FromKnight(Out, SlotGloves, V, P_ElbowL); Turn(Out, V3(0, 0, 0)); break;
+		case K_Gauntlets:    FromKnight(Out, SlotGauntlets, V, P_ElbowR); FromKnight(Out, SlotGauntlets, V, P_ElbowL); Turn(Out, V3(0, 0, 0)); break;
 		case K_Boots:     FromKnight(Out, SlotBoots, V, P_AnkleR); FromKnight(Out, SlotBoots, V, P_AnkleL); break;
 		case K_Ring:      FromKnight(Out, SlotRingR, 0); Scale(Out, 2.5); break;    // bigger than life, so it can be seen in the grass
 		case K_Amulet:    FromKnight(Out, SlotAmulet, 0); Turn(Out, V3(0, -80, 0)); Scale(Out, 1.6); break;

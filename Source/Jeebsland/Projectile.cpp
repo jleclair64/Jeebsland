@@ -370,11 +370,33 @@ void AProjectile::Burn(AActor* Target)
 
 // (players' machines) A thin white streak behind a flying arrow, like the sword's: the tail's last moments, turned to face the
 // camera, thinning and fading out behind it. It fades away once the arrow lands.
+// It starts a few feet out in front of the knight and comes in softly over a foot and a half (owner, 2026-11-06). A fast arrow goes 90 cm in a frame, so the
+// soft part gets points of its own along the way; nothing is drawn before it. (The tail leaves from about 60 cm behind his chest.)
 void AProjectile::TickTrail()
 {
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (bFlying && !IsHidden()) TrailPts.Add(TPair<FVector, float>(GetActorLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X, Now));
-	TrailPts.RemoveAll([&](const TPair<FVector, float>& P) { return Now - P.Value > TrailLife; });
+	if (bFlying && !IsHidden())
+	{
+		static constexpr float TrailSkip = 220.f, TrailRamp = 45.f;
+		const FVector Tail = GetActorLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X;
+		if (TrailFlown < 0.f) { TrailFlown = 0.f; TrailLast = Tail; TrailLastT = Now; }
+		const float Step = FVector::Dist(Tail, TrailLast), From = TrailFlown, To = From + Step;
+		auto AddAt = [&](float D)
+		{
+			const float A = Step > 0.01f ? (D - From) / Step : 1.f;
+			TrailPts.Add({ FMath::Lerp(TrailLast, Tail, A), FMath::Lerp(TrailLastT, Now, A), FMath::SmoothStep(TrailSkip, TrailSkip + TrailRamp, D) });
+		};
+		for (int32 i = 0; i <= 5; ++i)
+		{
+			const float D = TrailSkip + TrailRamp * i / 5.f;
+			if (D > From && D <= To) AddAt(D);
+		}
+		if (To > TrailSkip + TrailRamp) AddAt(To);
+		TrailFlown = To;
+		TrailLast = Tail;
+		TrailLastT = Now;
+	}
+	TrailPts.RemoveAll([&](const FTrailPt& P) { return Now - P.T > TrailLife; });
 	if (!Trail)
 	{
 		if (TrailPts.Num() < 2) return;
@@ -402,13 +424,13 @@ void AProjectile::TickTrail()
 	const int32 N = TrailPts.Num();
 	for (int32 i = 0; i < N; ++i)
 	{
-		const FVector P = TrailPts[i].Key;
-		const FVector Along = (TrailPts[FMath::Min(i + 1, N - 1)].Key - TrailPts[FMath::Max(i - 1, 0)].Key).GetSafeNormal();
+		const FVector P = TrailPts[i].P;
+		const FVector Along = (TrailPts[FMath::Min(i + 1, N - 1)].P - TrailPts[FMath::Max(i - 1, 0)].P).GetSafeNormal();
 		FVector Side = FVector::CrossProduct(Along, (Cam - P).GetSafeNormal()).GetSafeNormal();
 		if (Side.IsNearlyZero()) Side = FVector::UpVector;
-		const float Age = FMath::Clamp((Now - TrailPts[i].Value) / TrailLife, 0.f, 1.f);
-		const float Half = TrailWidth * (1.f - 0.7f * Age);
-		const float Alpha = FMath::Pow(1.f - Age, 1.2f);
+		const float Age = FMath::Clamp((Now - TrailPts[i].T) / TrailLife, 0.f, 1.f);
+		const float Half = TrailWidth * (1.f - 0.7f * Age) * FMath::Lerp(0.35f, 1.f, TrailPts[i].W);
+		const float Alpha = FMath::Pow(1.f - Age, 1.2f) * TrailPts[i].W;
 		V.Add(P - Side * Half); UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 		V.Add(P + Side * Half); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 	}

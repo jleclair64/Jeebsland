@@ -183,7 +183,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Tab"),            TEXT("Inventory: click gear to wear or hold it, click worn gear to take it off") },
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
-			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (chain), hold to charge a smash; sprinting ahead: a dash lunge. Bow: hold to draw, let go to shoot") },
+			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (chain), hold to charge a smash; sprinting ahead: a dash lunge. Bow: with the right button held, click to shoot") },
 			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks anyone down (but loses to a sword swing)") },
 			{ TEXT("Wheel down"),     TEXT("Low sweep (sword): hits a knight on the ground and launches him (a kick that lands goes straight into it)") },
 			{ TEXT("F"),              TEXT("Pick the arrows your bow shoots (the arrow slot, right of the shield slot)") },
@@ -223,7 +223,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 		{ TEXT("Broadsword"), K_Broadsword }, { TEXT("Battle Axe"), K_BattleAxe }, { TEXT("Katana"), K_Katana },
 		{ TEXT("Wand"), K_Wand }, { TEXT("Wizard Staff"), K_Staff }, { TEXT("Bow"), K_Bow }, { TEXT("Longbow"), K_Longbow }, { TEXT("Crossbow"), K_Crossbow }, { TEXT("Arrows"), -2 }, { TEXT("Fishing Pole"), K_Rod },
 		{ TEXT("Shield"), K_Shield }, { TEXT("Helmet"), K_Helmet }, { TEXT("Chestplate"), K_Chest }, { TEXT("Shoulders"), K_Shoulders },
-		{ TEXT("Gloves"), K_Gloves }, { TEXT("Boots"), K_Boots }, { TEXT("Cape"), K_Cape }, { TEXT("Rings"), K_Ring }, { TEXT("Amulets"), K_Amulet },
+		{ TEXT("Gauntlets"), K_Gauntlets }, { TEXT("Boots"), K_Boots }, { TEXT("Cape"), K_Cape }, { TEXT("Rings"), K_Ring }, { TEXT("Amulets"), K_Amulet },
 	};
 	const int32 NumEntries = UE_ARRAY_COUNT(Entries);
 	DictEntry = FMath::Clamp(DictEntry, 0, NumEntries - 1);

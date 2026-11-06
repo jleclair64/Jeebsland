@@ -127,12 +127,18 @@ void AKnightHUD::DrawHUD()
 		const float Alpha = FMath::Clamp(FMath::Min(T / 1.2f, (7.f - T) / 1.5f), 0.f, 1.f);
 		if (Alpha > 0.f)
 		{
-			NorseText(TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
+			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
 		}
 	}
 
 	// "BLACKROCK" fades in for a few seconds each time you walk in through the walls
 	{
+		static const bool bShotBanner = FParse::Param(FCommandLine::Get(), TEXT("ShotBanner"));   // (test pictures: the game's and a town's title, as the start screen and the walls show them)
+		if (bShotBanner)
+		{
+			TitleBanner(TEXT("JEEBSLAND"), Canvas->ClipY * 0.08f, Canvas->ClipY * 0.085f, 1.f);
+			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.24f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), 1.f);
+		}
 		const bool bIn = JeebTerrain::RectSD(FVector2D(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y), JeebTerrain::VillageCenter(), FVector2D(JeebTerrain::VillageHalf(), JeebTerrain::VillageHalf())) < 0.f;
 		const float T = GetWorld()->GetTimeSeconds();
 		if (bIn && !bInTown && T > 8.f) TownBannerT = T;
@@ -141,7 +147,7 @@ void AKnightHUD::DrawHUD()
 		if (TownBannerT > 0.f && Age < 4.5f)
 		{
 			const float A = FMath::Clamp(FMath::Min(Age / 0.8f, (4.5f - Age) / 1.2f), 0.f, 1.f);
-			NorseText(TEXT("BLACKROCK"), Canvas->ClipY * 0.15f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), A);
+			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.15f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), A);
 		}
 	}
 
@@ -315,7 +321,7 @@ void AKnightHUD::DrawSkills(const USkillComponent* Skills)
 	const float Y = Canvas->ClipY - H - 24.f;
 
 	Panel(X, Y, W, H);
-	NorseTitle(TEXT("SKILLS"), X + 16.f, Y + 8.f, 1.3f);
+	WindowTitle(TEXT("SKILLS"), X + 16.f, Y + 8.f, 1.3f);
 
 	auto SkillRow = [&](float RowY, const TCHAR* Name, ESkillType Skill, const FLinearColor& BarColor)
 	{
@@ -526,9 +532,9 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 // fills, with a dot where the arrow goes
 void AKnightHUD::DrawReticle(AKnightCharacter* Knight)
 {
-	if (!Knight->IsDrawingBow() || Knight->BowAimAmount() < 0.3f) return;
+	if (!Knight->IsAimingBow() || Knight->BowAimAmount() < 0.3f) return;
 	const float Cx = Canvas->ClipX * 0.5f, Cy = Canvas->ClipY * 0.5f;
-	const float F = Knight->BowDrawFrac();
+	const float F = Knight->IsDrawingBow() ? Knight->BowDrawFrac() : 0.f;   // (between shots the ring is wide open)
 	const float A = FMath::Clamp((Knight->BowAimAmount() - 0.3f) / 0.5f, 0.f, 1.f);
 	const FLinearColor Col = F >= 1.f ? FLinearColor(1.f, 0.85f, 0.4f, 0.9f * A) : FLinearColor(1.f, 1.f, 1.f, 0.8f * A);
 	const float R = FMath::Lerp(30.f, 11.f, F);

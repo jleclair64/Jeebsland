@@ -21,9 +21,10 @@
 #include "Engine/World.h"
 
 // ---------------- The bow (2026-10-31, Breath of the Wild style) ----------------
-// Press: the string is drawn (StartDraw); the draw fills over BowDrawTime and holds full for BowHoldMax, then the arrow goes by
-// itself. Let go: the arrow flies (ReleaseDraw) toward what is under the reticle, faster and harder the fuller the draw, and
-// the bow comes down after BowRecover. The player's machine decides; the server checks against its own timer and fires.
+// The right button held (owner, 2026-11-06): the string is drawn (StartDraw) and the camera closes in; the draw fills over BowDrawTime and stays
+// full for as long as it is held. Left click: the arrow flies (ReleaseDraw) toward what is under the reticle, faster and harder the fuller the draw, and
+// after BowRecover he draws again if the button is still down. Letting go of it lets the string down without shooting.
+// The player's machine decides; the server checks against its own timer and fires.
 
 int32 AKnightCharacter::ArrowSlotId() const
 {
@@ -94,7 +95,8 @@ FVector AKnightCharacter::CheckShotStart(const FVector& Asked) const
 
 bool AKnightCharacter::ShotSideOn() const
 {
-	return bShotFace && GetController() && FMath::Abs(FMath::FindDeltaAngleDegrees(ShotFaceYaw, GetController()->GetControlRotation().Yaw)) > 20.f;
+	static const bool bTurnTest = FCString::Strifind(FCommandLine::Get(), TEXT("ShotTurn=")) != nullptr;   // (a camera swinging round on purpose: he is to follow it)
+	return bShotFace && !bTurnTest && GetController() && FMath::Abs(FMath::FindDeltaAngleDegrees(ShotFaceYaw, GetController()->GetControlRotation().Yaw)) > 20.f;
 }
 
 FVector AKnightCharacter::BowAimDir(FVector* OutTarget) const
@@ -147,6 +149,20 @@ float AKnightCharacter::BowWalkShare() const
 	return K == JeebItems::K_Longbow ? JeebTune::V().LongWalk : 0.5f;
 }
 
+void AKnightCharacter::RightDown()
+{
+	bAimHeld = true;
+	StartBlock();
+	if (JeebItems::IsShooter(SelectedKind()) && !IsUIOpen() && !bPanelCursor) StartDraw();
+}
+
+void AKnightCharacter::RightUp()
+{
+	bAimHeld = false;
+	StopBlock();
+	if (Bow == EBow::Drawing) CancelDraw();
+}
+
 void AKnightCharacter::StartDraw()
 {
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Iron)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
@@ -190,7 +206,7 @@ void AKnightCharacter::CancelDraw()
 
 void AKnightCharacter::ServerBowDraw_Implementation()
 {
-	if (Bow == EBow::Recover) SetBow(EBow::None);   // (the player's machine may be a moment ahead of us)
+	if (Bow == EBow::Recover && BowT >= BowRecover * 0.5f) SetBow(EBow::None);   // (the player's machine may be a moment ahead of us, but only that: with the button held it draws again as soon as it can)
 	if (Bow == EBow::Reload && CrossReloadLeft < 0.3f) { CrossReloadLeft = 0.f; SetBow(EBow::None); }
 	StartDraw();
 }
@@ -287,24 +303,32 @@ void AKnightCharacter::TickBow(float Dt)
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)
 	if (Bow == EBow::Drawing)
 	{
-		BowCharge = FMath::Min(1.f, BowT / DrawTimeNow());
-		if (bCross) { if (bCrossQueued && IsLocallyControlled() && BowT >= JeebTune::V().CrossRaise) ReleaseDraw(); }   // (a crossbow stays up for as long as you like)
-		else if (IsLocallyControlled() && BowT >= DrawTimeNow() + BowHoldMax) ReleaseDraw();   // held too long: it goes by itself
-		else if (HasAuthority() && !IsLocallyControlled() && BowT >= DrawTimeNow() + BowHoldMax + 1.5f) CancelDraw();   // (the player's machine never said)
+		BowCharge = FMath::Min(1.f, BowT / FMath::Max(DrawTimeNow(), 0.01f));   // (the crossbow has no draw: it is ready at once)
+		if (bCross && bCrossQueued && IsLocallyControlled() && BowT >= JeebTune::V().CrossRaise) ReleaseDraw();
 	}
 	else if (Bow == EBow::Recover && BowT >= BowRecover) SetBow(EBow::None);
+	// The button still down after a shot, a roll or a weapon swap: straight back to drawing
+	if (IsLocallyControlled() && bAimHeld && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
 
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		const bool bAimCam = Bow == EBow::Drawing;   // (it pulls back out as soon as the arrow is away: owner, 2026-11-01)
+		const bool bAimCam = Bow == EBow::Drawing || (bAimHeld && bBowIn && !bTaken);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{
 			const float A = BowCamAlpha * BowCamAlpha * (3.f - 2.f * BowCamAlpha);
-			Boom->CameraLagSpeed = FMath::Lerp(8.f, 80.f, A);   // aiming: the camera keeps up with him (its lag made arrows seem to curve as he moved)
+			// Aiming: the camera keeps up with him (its lag made arrows seem to curve as he moved). The engine's lag only steps by a frame's share, and around a lag speed of 80 that share
+			// swings with the frame time, so at jump speed he shook a few cm on screen from frame to frame: past that speed there is simply no lag sideways.
+			Boom->CameraLagSpeed = FMath::Lerp(8.f, 300.f, A * A);
 			Boom->TargetArmLength = FMath::Lerp(540.f, BowCamLength, A);
 			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
+			// A jump leaves the ground at full speed, and a camera nailed to him whips the whole world up and down with it: its height follows softly instead, the same whatever the frame rate.
+			const float Z = GetActorLocation().Z;
+			if (!bAimCamZSet) { AimCamZ = Z; bAimCamZSet = true; }
+			AimCamZ = FMath::Lerp(Z, AimCamZ, FMath::Exp(-AimCamFollow * Dt));
+			const float Off = AimCamMax * FMath::Tanh((AimCamZ - Z) / AimCamMax);
+			Boom->TargetOffset = FVector(0.f, 0.f, Off * A);
 		}
 	}
 }

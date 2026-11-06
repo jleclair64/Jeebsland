@@ -497,9 +497,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						S->Worn[Kd] = JeebItems::ArmourId(Kd, bMix ? (Kd - JeebItems::K_Helmet) % JeebItems::NumArmourStyles : ShotStyle, FMath::Clamp(ShotWear, 0, JeebItems::NumTiers - 1));
 				if (S && FParse::Param(FCommandLine::Get(), TEXT("ShotBare")))
 					for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = 0;
-				int32 ShotOff = -1;   // (-ShotOff=<n> takes one piece off, counting from the helmet: 0 helmet, 1 chest, 2 shoulders, 3 gloves, 4 boots; to see a cut edge)
-				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotOff="), ShotOff) && ShotOff >= 0 && JeebItems::K_Helmet + ShotOff <= JeebItems::K_Boots)
-					S->Worn[JeebItems::K_Helmet + ShotOff] = 0;
+				FString ShotOff;   // (-ShotOff=<digits> takes pieces off, counting from the helmet: 0 helmet, 1 chest, 2 shoulders, 3 gauntlets, 4 boots; -ShotOff=12 takes two. To see a cut edge or a gap)
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotOff="), ShotOff))
+					for (const TCHAR C : ShotOff)
+						if (C >= TEXT('0') && JeebItems::K_Helmet + (C - TEXT('0')) <= JeebItems::K_Boots) S->Worn[JeebItems::K_Helmet + (C - TEXT('0'))] = 0;
+				int32 ShotShield = -1;   // (-ShotShield=<0 kite, 1 round, 2 tower>)
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotShield="), ShotShield) && ShotShield >= 0) S->Worn[JeebItems::K_Shield] = JeebItems::ShieldId(ShotShield, FMath::Max(ShotWear, 0));
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));

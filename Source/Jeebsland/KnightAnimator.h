@@ -85,6 +85,7 @@ namespace JeebAnim
 		FTransform QuiverOnHips = FTransform::Identity;
 		FTransform BeltFlaskOnHips = FTransform::Identity;
 		FTransform CrossInHand = FTransform::Identity;
+		FTransform DrinkInHand = FTransform::Identity;
 		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
 
 		const FClip* Find(const TCHAR* Name) const { const FClip* const* F = Clips.Find(Name); return F ? *F : nullptr; }
@@ -181,6 +182,8 @@ public:
 	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
 	FTransform BeltFlaskWorld() const { return L.BeltFlaskOnHips * BoneWorld(JeebAnim::Hips); }
 	FTransform CrossWorld() const { return L.CrossInHand * BoneWorld(JeebAnim::RHand); }
+	FTransform DrinkWorld() const { return L.DrinkInHand * BoneWorld(JeebAnim::RHand); }   // the open hand and its bottle
+	int32 WornTier(int32 Piece) const { return WornTiers[Piece]; }   // (-1: nothing on)
 	float Phase01() const { return Phase; }   // where the stride is: 0 the left foot under him, 0.5 the right
 
 	// Combat: his hurt boxes as posed now, his helm's top, his raised shield's band, the kicking leg
@@ -233,6 +236,7 @@ private:
 	UPoseableMeshComponent* Comp = nullptr;
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};
+	int32 WornTiers[JeebAnim::Piece_Count] = { -1, -1, -1, -1, -1 };
 	void ShowBare(int32 Piece, bool bShow);
 	int32 PieceMat[JeebAnim::Piece_Count];
 	UMaterialInstanceDynamic* PieceMid[JeebAnim::Piece_Count];
@@ -273,7 +277,8 @@ private:
 	float LandT = 10.f;
 	float LandFor = 0.f;
 	float AirT = 0.f;
-	float AirLegs = 1.f;     // how fast the stride goes: a third of its pace in the air
+	float ShakePhase = 0.f;  // the charged smash's tremble
+	float AirLegs = 1.f;     // how fast the stride goes: half its pace in the air
 	float AirShare = 0.f;    // how far the knees have come up in the air
 	float FallShare = 0.f;   // how far into the falling pose (long falls)
 	float PeakFall = 0.f;

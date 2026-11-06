@@ -83,7 +83,10 @@ private:
 	UPROPERTY() UStaticMeshComponent* Fletch = nullptr;
 	UPROPERTY() UPointLightComponent* Glow = nullptr;   // (fire arrows, players' machines only)
 	UPROPERTY() class UProceduralMeshComponent* Trail = nullptr;   // the white streak behind it (players' machines only)
-	TArray<TPair<FVector, float>> TrailPts;   // where its tail was, and when
+	struct FTrailPt { FVector P; float T; float W; };   // where its tail was, when, and how much of the streak shows there (it starts softly, TrailSkip out)
+	TArray<FTrailPt> TrailPts;
+	FVector TrailLast = FVector::ZeroVector;   // where the tail was last frame, and how far it has come
+	float TrailLastT = 0.f, TrailFlown = -1.f;
 	void TickTrail();
 	UPROPERTY(Replicated) AKnightCharacter* Shooter = nullptr;
 	UPROPERTY(ReplicatedUsing = OnRep_Launch) FProjLaunch L;

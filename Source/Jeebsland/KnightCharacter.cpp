@@ -388,8 +388,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(SettingsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSettingsKey);
 		EIC->BindAction(CrouchAction, ETriggerEvent::Started, this, &AKnightCharacter::StartCrouch);
 		EIC->BindAction(CrouchAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopCrouch);
-		EIC->BindAction(BlockAction, ETriggerEvent::Started, this, &AKnightCharacter::StartBlock);
-		EIC->BindAction(BlockAction, ETriggerEvent::Completed, this, &AKnightCharacter::StopBlock);
+		EIC->BindAction(BlockAction, ETriggerEvent::Started, this, &AKnightCharacter::RightDown);
+		EIC->BindAction(BlockAction, ETriggerEvent::Completed, this, &AKnightCharacter::RightUp);
 		EIC->BindAction(SlideAction, ETriggerEvent::Started, this, &AKnightCharacter::StartSlide);
 		EIC->BindAction(RollAction, ETriggerEvent::Started, this, &AKnightCharacter::StartRoll);
 		EIC->BindAction(StrafeAction, ETriggerEvent::Started, this, &AKnightCharacter::ToggleStrafe);

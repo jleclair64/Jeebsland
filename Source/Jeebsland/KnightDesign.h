@@ -11,7 +11,7 @@
 // The style (owner's ChatGPT concept sheet, 2026-10-29): a stocky, cartoony knight in plain bevelled plate over dark padded
 // cloth. A round armet with a pointed visor (one eye slit, breathing slits, round ear rosettes), a tall collar, a broad
 // breastplate with a raised V at the neck, a leather belt with a round buckle, a pointed plate over the front, big
-// faceted pauldrons, big vambraces, dark gloves, large knee cops, broad greaves and sabatons. No gold trim: the plate
+// faceted pauldrons, big vambraces, dark gauntlets, large knee cops, broad greaves and sabatons. No gold trim: the plate
 // takes the tier colour. Each limb piece hangs off its own joint (shoulder, elbow, hip, knee) so it bends cleanly.
 
 enum class EArmorRole : uint8 { Plate, Under, Trim, Cloth, Accent, Leather, BootBody };
@@ -26,7 +26,7 @@ namespace KnightDesign
 		P_WristR,   // (2026-10-31) the sword hand's wrist: the right fist and the held weapon turn here (animation clips drive it)
 		P_Count
 	};
-	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGloves = 5, SlotShield = 6, SlotBrush = 7, SlotRingR = 8, SlotRingL = 9, SlotAmulet = 10, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
+	enum ESlot : int32 { SlotHelmet = 0, SlotBody = 1, SlotShoulders = 2, SlotBoots = 3, SlotCape = 4, SlotGauntlets = 5, SlotShield = 6, SlotBrush = 7, SlotRingR = 8, SlotRingL = 9, SlotAmulet = 10, SlotNone = -1 };   // SlotBrush: the Red Helm Brush (worn in a misc slot)
 	constexpr int32 NumSlots = 11;
 
 	// Where each pivot sits (capsule space). The animation turns parts about these points.
@@ -446,7 +446,7 @@ namespace KnightDesign
 
 		// =========================================================================================
 		// ARMS: dark cloth sleeves, an angular elbow cop with a fan on the outside, big flaring vambraces with a raised band
-		// at the top, a wide cuff, and dark gloved fists with a steel plate over the knuckles and the back of the hand
+		// at the top, a wide cuff, and dark gauntleted fists with a steel plate over the knuckles and the back of the hand
 		// =========================================================================================
 		for (int32 sd = -1; sd <= 1; sd += 2)
 		{
@@ -470,20 +470,20 @@ namespace KnightDesign
 				Lathe(D.Mesh, Prof({ 8.2, 0.6, 9.3, 0.6, 9.5, -1.8, 8.5, -1.8 }), 8, 1.0, 1.0, ForeX, true, true);                         // its raised top band
 			}
 			{
-				FDef& D = Add(Elb, SlotGloves, EArmorRole::Plate);
+				FDef& D = Add(Elb, SlotGauntlets, EArmorRole::Plate);
 				Lathe(D.Mesh, Prof({ 9.2, -11.6, 10.4, -11.6, 11.0, -15.6, 9.6, -15.6 }), 8, 1.0, 1.0, ForeX, true, true);   // the cuff
 				RBox(D.Mesh, 1.3, 5.2, 1.9, 0.3, Xf(F + V3(5.0, 0, 2.6)));          // knuckle plate
 				RBox(D.Mesh, 4.4, 1.2, 4.2, 0.35, Xf(F + V3(0.5, sd * 4.7, 0.8)));   // plate over the back of the hand
 			}
 			{
-				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under);   // the dark gloved fist and thumb
+				FDef& D = Add(Elb, SlotGauntlets, EArmorRole::Under);   // the dark gauntleted fist and thumb
 				D.bFixedColor = true; D.Fixed = FLinearColor(0.05f, 0.05f, 0.055f);
 				RBox(D.Mesh, 5.6, 4.7, 5.8, 0.4, Xf(F));
 				RBox(D.Mesh, 2.5, 1.9, 3.3, 0.5, Xf(F + V3(3.5, -sd * 4.7, 1.0)));
 				for (int32 j = -1; j <= 2; ++j) RBox(D.Mesh, 1.0, 1.15, 1.2, 0.6, Xf(F + V3(5.5, (j - 0.5) * 2.3, -1.8)));   // finger knuckles
 			}
 			{
-				FDef& D = Add(Elb, SlotGloves, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);   // bare hand
+				FDef& D = Add(Elb, SlotGauntlets, EArmorRole::Under); D.bBare = true; D.Fixed = FLinearColor(0.80f, 0.58f, 0.42f);   // bare hand
 				Blob(D.Mesh, 5.0, 4.4, 5.4, Xf(F));
 			}
 		}

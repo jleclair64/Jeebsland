@@ -516,7 +516,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
-	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
+	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
 	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
 	{
 		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)
@@ -528,8 +528,18 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0) | (bSwinging ? 32 : 0) | (bSideways ? 64 : 0);
 	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
-	if (bFaceCam && GetController() && !MoveLocked() && !ShotSideOn())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
-		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, GetController()->GetControlRotation().Yaw, 0.f), Dt, 640.f));
+	if (bFaceCam && GetController() && !TurnLocked() && !ShotSideOn())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
+	{
+		const FRotator Goal(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		FRotator Now = FMath::RInterpConstantTo(GetActorRotation(), Goal, Dt, 640.f);
+		if (bAttacking)   // (in a swing the body settles onto the camera's heading over the last 20 degrees or so, instead of stopping dead in a frame)
+		{
+			const float Gap = FRotator::NormalizeAxis(Goal.Yaw - GetActorRotation().Yaw);
+			const float Eased = Gap * (1.f - FMath::Exp(-30.f * Dt));
+			Now.Yaw = GetActorRotation().Yaw + FMath::Clamp(Eased, -640.f * Dt, 640.f * Dt);
+		}
+		SetActorRotation(Now);
+	}
 	const float StanceFactor = 1.f;
 	const float ShieldMove = (Skills && Skills->Worn[JeebItems::K_Shield]) ? FMath::Min(1.f, JeebItems::ShieldMoveMul(JeebItems::StyleOf(Skills->Worn[JeebItems::K_Shield]))) : 1.f;   // tower: slower; nothing beats a walk
 	// Strafe mode works like Fortnite: you can only sprint while heading roughly forward (within about 45 degrees of where
@@ -578,7 +588,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
 	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
-	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Reload)) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
+	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Recover || Bow == EBow::Reload)) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
 	else if (!bSpecial && !bMounted && bDrinking) Move->MaxWalkSpeed = JeebTune::V().DrinkWalk * WalkSpeed * Burden * AirSpeedMul;   // drinking: a slow walk
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk

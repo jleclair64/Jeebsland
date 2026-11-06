@@ -42,6 +42,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Check a new prop's lighting in the game before tuning its colour. Models imported with their own normals keep the old direction when a script turns the vertices, so they read dark and flat from every side; the bows and the potion did, and the wood was brightened to make up for it (2026-11-06). Turn the normals with the mesh.
 - A held or hung item is judged from every side and against the body: the first belt flask hung 25 cm under the belt and looked like it was floating, and a dark ball in the hand hid that its liquid colour never showed.
 - Don't judge a held item or a blade's clearance from tiny sheets: crop so the knight fills at least half the frame. Test films read the local save, so always pass `-ShotKind=`; a dark suit from the save can also hide a problem.
+- Anything built in code to stand in for part of a skinned armour piece (a hand, a plate) must match the piece beside it: its colour on a plain material has to be darkened to match the suit's painted texture, in more than one tier, and it must be as wide as its neighbour. Check the join from at least two sides.
 
 ## Moves and movement (motion-reviewer)
 - When a blend is lengthened, re-measure every contact number in the move: hips arriving late lift the blade. Judge a blend by its first frame's share, not its stated length. Anything raising a foot must ease in.
@@ -89,10 +90,12 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Check each walking clip against the stance it blends from: CrouchWalk stands 36 cm taller than CrouchIdle, so he rose the moment he moved. Mixing the idle's legs back in keeps him low.
 - Items fixed rigidly to a limb (the shield on the forearm) must be checked at the clip's extremes: rolls turn the shield edge-on and stick it out.
 - Performance, for when the animator goes live for every knight: clips and name tables must be one shared copy loaded once, with names turned into indices at load; each knight then keeps only its poses and timers. The hand twist and hip offsets baked at load must run once only. Add update-rate-by-distance, and LODs for the suit.
+- A turn allowed during a move must settle onto its heading, not run at a constant speed and stop dead in a frame; check the frame where it arrives. When a film is meant to judge a body part (the legs in the air, a camera), frame the shot so that part is whole and in the middle, or the check is wasted.
 
 ## Online (online-reviewer)
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
 - Anything that changes game state is decided on the server; the client only asks.
+- A server-side rate limit comes from the same tuning number as the action's length (or a share of it), never a fixed number: a quicker move can fall under a fixed limit, and the server then drops the follow-up without telling the client.
 - Anything decided inside the engine's movement prediction (CheckJumpInput and the like) must be reproducible from what `FSavedMove_Character` records, and the live move is recorded AFTER CheckJumpInput: keep per-move state alive until the move is done (clear it in ClearJumpInput), and plan how server and client both learn every choice. (2026-11-02, the jump squat.)
 - A prediction rule that runs on replayed moves may only read what the saved move restores for the START of that move (bPressedJump, JumpKeyHoldTime); derived counters like JumpCurrentCount are one move behind in a replay.
 - Speeds the client predicts must come from state the owner's machine also has (owner-replicated `Worn`, shared CSVs and Tuning.ini), or every step gets corrected.
@@ -116,6 +119,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).
 - Code compiles for Shipping (no editor-only fields).
 - List the test switches that are on before every package.
+- A show-or-hide that looks a section or slot up by name logs and skips when the name is not found, because a missed name silently leaves it visible. Command-line test hooks that move gear or hit boxes are off in Shipping (`!UE_BUILD_SHIPPING`).
 
 ## Code pitfalls
 - `FMath::SmoothStep(A, B, X)` needs A < B; use `JeebWorld::Smooth` for ramps that go down.

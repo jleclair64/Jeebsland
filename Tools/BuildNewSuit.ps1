@@ -12,7 +12,7 @@ $pieces = @(
     @{ Name = 'chest';     Glb = '*chestplate*'; Args = @('back', 'fit=0.386,0,0.008,1.111,0.377,-0.225,0.5,0.39,0.31', 'slot=Chest') },
     @{ Name = 'legs';      Glb = '*leg_boots*';  Args = @('back', 'fit=legs', 'slot=Legs') },
     @{ Name = 'helmet';    Glb = '*helmet*';     Args = @('back', 'cut=helmetloop', 'fit=0.18,0,-0.005,1.679', 'slot=Helm') },
-    @{ Name = 'gauntlets'; Glb = '*arm_harnes*'; Args = @('all', 'above=-0.3', 'fit=arm', 'slot=Gloves') },
+    @{ Name = 'gauntlets'; Glb = '*arm_harnes*'; Args = @('all', 'above=-0.3', 'fit=arm', 'slot=Gauntlets') },
     @{ Name = 'shoulders'; Glb = '*pauldrons*';  Args = @('all', 'dome=0.7,0.2,0.29,0.085,0.35,0.1', 'place=0.35,0.183,0,0,0,0,-1,0,0,-1,0.113,0.05,1.426,1,1.4,0.95,0.19,-0.15', 'slot=Shoulders') }
 )
 foreach ($p in $pieces) {

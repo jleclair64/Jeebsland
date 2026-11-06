@@ -429,7 +429,9 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && !FightsLikeSword(SelectedKind())) return;   // (the low sweep and the dash attack are sword moves)
 	const double Now = FPlatformTime::Seconds();
 	const bool bCombo = Style == static_cast<uint8>(EAtkStyle::Sweep) && IsKicking() && bKickLanded && StunLeft <= 0.f;   // (a landed kick cut short by the sweep)
-	if (!bCombo && Now - LastServerAttack < 0.25) return;   // no weapon swings faster than this
+	const int32 Held = SelectedKind();
+	const float Fastest = FMath::Min(0.25f, 0.8f * (Held >= 0 ? JeebItems::WeaponBase(Held).Cooldown : 0.5f) * JeebTune::V().Jab1Share);   // (a little under the quickest swing this weapon has, the katana's first: a fixed limit dropped its second one)
+	if (!bCombo && Now - LastServerAttack < Fastest) return;   // no weapon swings faster than this
 	if (!bCombo && SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
@@ -542,7 +544,7 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	if (bSitting) StandUp();
 	EndGathering();
 	CloseLoot();
-	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bRolling = false; bSliding = false;
+	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false; bRolling = false; bSliding = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	CrossReloadLeft = 0.f; bCrossQueued = false;
 	if (Bow != EBow::None) SetBow(EBow::None);

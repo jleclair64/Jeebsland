@@ -39,7 +39,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	NorseTitle(TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
+	WindowTitle(TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
@@ -50,7 +50,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseShop(); return; }
 
 	// ----- Sell (left) -----
-	NorseTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
+	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
 		static const EItemType Sellable[15] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
 			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
@@ -191,7 +191,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	NorseTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
+	WindowTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
 	// Materials you carry (every ore and gem a knight smiths with), and your smithing level
@@ -210,7 +210,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
 	// Kind list (two columns)
-	static const int32 Kinds[20] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, -1 };
+	static const int32 Kinds[20] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, -1 };
 	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 19);
 	for (int32 i = 0; i < 20; ++i)
 	{
@@ -314,7 +314,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	const float PW = 1090.f, PH = 640.f;
 	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
 	Panel(PX, PY, PW, PH);
-	NorseTitle(TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
+	WindowTitle(TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver)

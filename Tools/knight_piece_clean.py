@@ -33,7 +33,7 @@ ALLOWED = {
     "Helm": ["Head", "Neck"],
     "Chest": ["Hips", "Spine", "Spine1", "Spine2", "Neck", "LeftShoulder", "RightShoulder", "LeftUpLeg", "RightUpLeg"],
     "Shoulders": ["Spine2", "LeftShoulder", "RightShoulder", "LeftArm", "RightArm"],
-    "Gloves": ["LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "LeftArm", "RightArm"],
+    "Gauntlets": ["LeftForeArm", "RightForeArm", "LeftHand", "RightHand", "LeftArm", "RightArm"],
     "Legs": ["Hips", "LeftUpLeg", "RightUpLeg", "LeftLeg", "RightLeg", "LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"],
 }
 

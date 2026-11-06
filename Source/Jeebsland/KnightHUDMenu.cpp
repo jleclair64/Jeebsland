@@ -170,7 +170,7 @@ void AKnightHUD::DrawStartScreen()
 
 	const float CX = Canvas->ClipX, CY = Canvas->ClipY;
 	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.25f), 0.f, 0.f, CX, CY);
-	NorseText(TEXT("JEEBSLAND"), CY * 0.08f, CY * 0.085f, 1.f);
+	TitleBanner(TEXT("JEEBSLAND"), CY * 0.08f, CY * 0.085f, 1.f);
 
 	const float PW = 470.f, Gap = 30.f, PH = 520.f;
 	const float LX = CX * 0.5f - PW - Gap * 0.5f, RX = CX * 0.5f + Gap * 0.5f, PY = CY * 0.25f;
@@ -195,7 +195,7 @@ void AKnightHUD::DrawStartScreen()
 	// ---- Right: which world ----
 	Panel(RX, PY, PW, PH);
 	{
-		NorseTitle(TEXT("Choose a world"), RX + 26.f, PY + 26.f, 1.35f);
+		WindowTitle(TEXT("Choose a world"), RX + 26.f, PY + 26.f, 1.35f);
 		float Y = PY + 74.f;
 		for (int32 i = 0; i < GI->Worlds.Num(); ++i)
 		{

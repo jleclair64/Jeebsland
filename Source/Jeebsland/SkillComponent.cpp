@@ -569,7 +569,7 @@ void USkillComponent::FillPracticePack()
 	FRandomStream R(5150);
 	using namespace JeebItems;
 	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow,
-		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Ring, K_Amulet };
+		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, K_Ring, K_Amulet };
 	// (the starting kit's tools are in the pack since 2026-11-03: kept, and put back after the fixed slots below)
 	TArray<int32> KeepGear;
 	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; }

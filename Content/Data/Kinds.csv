@@ -12,15 +12,15 @@ BattleAxe,Battle Axe,17,25,250,1.05,0,0,100,9,2,yes,"The biggest hitter and the 
 Katana,Katana,6,9,225,0.38,0,0,110,6,2,yes,"A pair of light curved blades, one in each hand. Very fast, modest hits. No shield."
 Wand,Wand,7,11,1800,0.55,0,0,80,3,1,no,Fires small magic bolts at range. Light and quick.
 Staff,Wizard Staff,11,17,2200,1.00,0,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."
-Bow,Bow,5,7,4000,0.80,0,0,60,4,1,yes,"Fires arrows from a distance: hold the attack button to draw (the longer the draw, the further and harder the shot), let go to shoot. Arrows run out: buy them at the store or smith them, or pick up the ones you shot (E). Better arrows hit harder. Needs both hands: no shield."
-Longbow,Longbow,7,9,5000,0.80,0,0,90,5,2,yes,"A tall bow. It draws slower than a bow and you walk slower drawing it, but its arrows go further and hit harder. Hold the attack button to draw, let go to shoot."
-Crossbow,Crossbow,11,13,6000,0.80,0,0,120,6,3,yes,"The hardest hit and the longest shot, and its arrows bite deep into a raised shield. Every shot is at full power, and it stays ready for as long as you hold it up. But it takes a couple of seconds to load again after each shot."
+Bow,Bow,5,7,4000,0.80,0,0,60,4,1,yes,"Fires arrows from a distance: hold the right mouse button to draw (the longer the draw, the further and harder the shot), click the left button to shoot. Arrows run out: buy them at the store or smith them, or pick up the ones you shot (E). Better arrows hit harder. Needs both hands: no shield."
+Longbow,Longbow,7,9,5000,0.80,0,0,90,5,2,yes,"A tall bow. It draws slower than a bow and you walk slower drawing it, but its arrows go further and hit harder. Hold the right mouse button to draw, click the left button to shoot."
+Crossbow,Crossbow,11,13,6000,0.80,0,0,120,6,3,yes,"The hardest hit and the longest shot, and its arrows bite deep into a raised shield. Hold the right mouse button to aim and click the left to shoot: every shot is at full power, and it stays ready for as long as you hold it up. But it takes a couple of seconds to load again after each shot."
 Rod,Fishing Pole,2,3,200,0.80,0,0,30,3,0,no,A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.
 Shield,Shield,1,2,200,1,8,0,50,6,0,no,"Hold right-click to block blows from the front. A raised shield takes every blow on it out of your guard (its size grows with your Defence level; better shields lose less of it per blow). The blow that empties the guard breaks it: the shield drops until the guard recovers (10 s after the last blow, then 10 s to refill). Not usable with two-handed weapons."
 Helmet,Helmet,1,2,200,1,3,3,40,5,0,no,Protects the head: blows to the head go through it. Arrows to the head do 1.5x damage.
 Chest,Chestplate,1,2,200,1,7,8,90,10,2,no,Protects the chest and belly: blows to the body go through it.
 Shoulders,Shoulders,1,2,200,1,4,4,55,6,1,no,Layered pauldrons: blows to the upper arms go through them.
-Gloves,Gloves,1,2,200,1,2,2,30,3,0,no,Armoured gauntlets: blows to the forearms and hands go through them.
+Gauntlets,Gauntlets,1,2,200,1,2,2,30,3,0,no,Armoured gauntlets: blows to the forearms and hands go through them.
 Boots,Boots,1,2,200,1,3,4,45,5,0,no,"Armoured boots: blows to the legs go through them. Better boots also give you more stamina: it lasts longer and returns faster."
 Cape,Cape,1,2,200,1,0,0,0,0,0,no,"A cloak worn over the armour, in the colour of its tier. It is just for looks: it stops nothing and weighs nothing. Capes can be taken off, swapped, bought, sold and dropped like any other gear."
 Ring,Ring,1,2,200,1,0,0,0,0,0,no,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."

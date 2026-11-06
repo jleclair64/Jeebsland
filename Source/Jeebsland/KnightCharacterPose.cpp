@@ -177,6 +177,7 @@ void AKnightCharacter::PlaceGear()
 	}
 	if (BowHold) BowHold->SetWorldTransform(SelectedKind() == JeebItems::K_Crossbow ? Anim->CrossWorld() : Anim->BowWorld(BowAimAlpha));
 	if (IsNetMode(NM_DedicatedServer)) return;
+	if (DrinkGroup && bDrinking) DrinkGroup->SetWorldTransform(Anim->DrinkWorld());
 	UpdateBowBits();
 	UpdateQuiver();
 	UpdateBeltFlask();
@@ -190,6 +191,17 @@ void AKnightCharacter::PlaceGear()
 void AKnightCharacter::TickSuitTests(float Dt)
 {
 	if (!IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
+	{
+		static float TurnRate = 0.f;   // (-ShotTurn=200: the camera swings round at that many degrees a second, to check what he does in a move; log JEEBTURN)
+		static const bool bTurnTest = FParse::Value(FCommandLine::Get(), TEXT("ShotTurn="), TurnRate);
+		if (bTurnTest && bShotFace && GetController())
+		{
+			FRotator R = GetController()->GetControlRotation();
+			R.Yaw += TurnRate * Dt;
+			GetController()->SetControlRotation(R);
+			UE_LOG(LogTemp, Log, TEXT("JEEBTURN attacking %d style %d yaw %.1f camera %.1f"), bAttacking ? 1 : 0, int32(AtkStyle), GetActorRotation().Yaw, R.Yaw);
+		}
+	}
 	static FString Walk;
 	static FString Do;
 	static bool bRead = false;

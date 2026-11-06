@@ -184,6 +184,10 @@ public:
 	uint8 DrinkType = 0;
 	bool CanDrinkNow() const;
 	void TickDrink(float Dt);
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> DrinkGroup;         // the open hand round the bottle (the skeleton has no fingers: the fist folds away while he drinks)
+	UPROPERTY(Transient) TObjectPtr<UProceduralMeshComponent> DrinkHand;
+	float AimCamZ = 0.f; bool bAimCamZSet = false;                       // where the aiming camera's height has got to (TickBow)
+	static constexpr float AimCamFollow = 10.f, AimCamMax = 30.f;        // how quickly it follows a jump, and the most it trails by (cm)
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BottleMesh;    // the potion in his hand while he drinks
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BeltFlask;     // and on his belt while the potion slot is filled (owner 2026-11-05)
 	void UpdateBeltFlask();
@@ -247,12 +251,13 @@ public:
 	void GetShieldParts(TArray<UPrimitiveComponent*>& Out) const;
 
 	// ---------------- The bow (2026-10-31, Breath of the Wild style; KnightCharacterBow.cpp) ----------------
-	// Hold the attack button to draw: the knight turns side-on, the bow up in his left fist, the string pulled back to his face,
+	// Hold the right button to draw (owner, 2026-11-06): the knight turns side-on, the bow up in his left fist, the string pulled back to his face,
 	// walking at half speed while the camera closes in over his right shoulder and a reticle shows where the arrow goes. The
-	// draw fills in BowDrawTime, stays full for BowHoldMax (trembling), then looses by itself; let go any time to shoot. The
+	// draw fills in BowDrawTime and stays full for as long as it is held; left click shoots, and letting go of the right button lets the string down. The
 	// fuller the draw, the faster (so further) and harder the arrow flies. Switching weapons, rolling, a kick, being hit or
 	// knocked down lets the string down without shooting. The arrow slot (next to the shield slot) picks the arrows (F).
 	bool IsDrawingBow() const { return Bow == EBow::Drawing; }
+	bool IsAimingBow() const { return Bow == EBow::Drawing || (bAimHeld && JeebItems::IsShooter(SelectedKind())); }   // (the reticle stays up between shots while the button is held)
 	float BowDrawFrac() const { return BowCharge; }
 	float BowAimAmount() const { return BowAimAlpha; }
 	int32 ArrowSlotId() const;   // the arrows the next shot uses (0: none left)
@@ -399,7 +404,8 @@ protected:
 	void TickKnock(float Dt);
 	UFUNCTION(Server, Reliable) void ServerGetUp(uint8 Opt);
 	UFUNCTION(NetMulticast, Reliable) void MulticastKnock(bool bDown, uint8 Opt);
-	bool MoveLocked() const;          // a smash attack's swipe and end lag, a rebound, a kick, lying knocked down: no moving or turning
+	bool MoveLocked() const;          // a smash attack's swipe and end lag, a rebound, a kick, a sweep, lying knocked down: no moving
+	bool TurnLocked() const;          // ... and no turning either (the smash's swipe and end lag, lying down, hitstun, the dash)
 	void AttackLands();         // the moment a swing, thrust or cast lands
 	void TryStartClimb();       // walking into a ladder
 	void UpdateClimb(float Dt);
@@ -733,7 +739,9 @@ private:
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
 	static inline const float& BowDrawTime = JeebTune::Storage().BowDrawTime;   // (like the smash attack's charge)
-	static inline const float& BowHoldMax = JeebTune::Storage().BowHoldMax;
+	bool bAimHeld = false;         // the right button is down (the player's own machine): with a bow in hand he aims, and draws again after each shot
+	void RightDown();              // the right button: guard with a shield, aim with a bow
+	void RightUp();
 	static inline const float& BowRecover = JeebTune::Storage().BowRecover;
 	// By the draw (none, half, full; straight lines between): a level shot lands about 3 m out barely drawn, 12 m half drawn,
 	// 44 m full (owner, 2026-10-31: 10 ft, 40 ft, as before); the speed and how fast it drops together set that
