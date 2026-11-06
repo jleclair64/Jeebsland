@@ -124,6 +124,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	{
 		// (nobody is looking at the server's knights: a pose ten times a second serves their hurt boxes, every frame only while a blade is out.
 		// Other players' knights off screen likewise. The gear follows the capsule in between.)
+		Anim->MoveTo(GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), GetActorRotation().Yaw);   // (the boxes stay on him between poses)
 		AnimAccum += Dt;
 		float Every = 0.f;
 		if (IsNetMode(NM_DedicatedServer)) Every = bAttacking ? 0.f : 0.1f;

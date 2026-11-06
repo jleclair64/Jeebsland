@@ -159,6 +159,8 @@ public:
 	// The mesh, on players' machines only: its bones follow Update. Null if the suit is missing.
 	UPoseableMeshComponent* MakeMesh(AActor* Owner, USceneComponent* Parent);
 	UPoseableMeshComponent* Mesh() const { return Comp; }
+	// Where he is now, between poses: when poses are throttled, the hurt and shield boxes read the last pose at his current place
+	void MoveTo(const FVector& Feet, float ActorYaw);
 
 	// A worn piece: Tier < 0 takes it off (the slot's plates vanish), else tinted for that tier
 	void Wear(int32 Piece, int32 Tier);
@@ -276,5 +278,6 @@ private:
 	float CombatT = 0.f;         // seconds left on guard after a fight
 	bool bOnGuard = false;
 	float PlayUpper = 1.f, PlayLower = 1.f;   // the next PlayAt's weights
+	float PlayKeepOffArm = 0.f;   // the next PlayAt leaves this share of the left arm as it was (clips made for an empty off hand fling it, and he has a shield on it)
 	FVector LogPrevL = FVector::ZeroVector, LogPrevR = FVector::ZeroVector;
 };

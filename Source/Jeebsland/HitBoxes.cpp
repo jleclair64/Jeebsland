@@ -18,7 +18,8 @@ namespace JeebHit
 	void HurtOf(const UHealthComponent* H, TArray<FCapsule>& Out)
 	{
 		if (!H) return;
-		if (H->GatherHurt) { H->GatherHurt(Out); return; }
+		const int32 Before = Out.Num();
+		if (H->GatherHurt) { H->GatherHurt(Out); if (Out.Num() > Before) return; }   // (none: the plain capsule below, so nothing is ever unhittable)
 		const FVector C = H->HitCentre();
 		FCapsule Cap; Cap.A = C - FVector(0, 0, 50); Cap.B = C + FVector(0, 0, 50); Cap.R = 35.f;
 		Out.Add(Cap);

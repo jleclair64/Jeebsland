@@ -571,6 +571,8 @@ private:
 	bool bCapeInit = false;
 	FVector CapeRootPrev = FVector::ZeroVector; bool bCapeRootSet = false;
 	float CapeYawPrev = 0.f;   // the chest's heading last frame (the cloth is carried round when he turns)
+	FVector CapeRelPrev = FVector::ZeroVector;   // the chest against his capsule last frame (the pose's own moves carry the cloth; only travelling trails it)
+	float CapeActorYawPrev = 0.f;   // his own heading last frame (a sudden turn of his whole body starts the cloth again)
 	TArray<FVector> CapeNrmPrev;
 	bool bCapeMeshMade = false;
 	float CapeAccum = 0.f;

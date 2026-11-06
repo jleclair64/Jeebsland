@@ -114,6 +114,9 @@ void AKnightCharacter::TickCape(float Dt)
 	// A sudden jump (appearing in the world, waking up after a fall, any teleport) starts the cloth again hanging straight,
 	// instead of it being yanked across the gap and flipping over his head
 	if (bCapeInit && bCapeRootSet && FVector::Dist(UpperPivot->GetComponentLocation(), CapeRootPrev) > 80.f) bCapeInit = false;
+	// (the same for being set facing another way in one frame: no real turn is that fast, and the cloth would crumple into a rag)
+	if (bCapeInit && FMath::Abs(FMath::FindDeltaAngleDegrees(CapeActorYawPrev, float(GetActorRotation().Yaw))) > 50.f) bCapeInit = false;
+	CapeActorYawPrev = GetActorRotation().Yaw;
 
 	if (!bCapeInit || CapeP.Num() != N)
 	{
@@ -146,16 +149,24 @@ void AKnightCharacter::TickCape(float Dt)
 		const FVector Root = UpperPivot->GetComponentLocation();
 		if (bCapeRootSet)
 		{
-			const FVector Carry(0.f, 0.f, (Root.Z - CapeRootPrev.Z) * 0.8f);   // up and down only: running still trails it behind
+			// (up and down, and along the ground only what the pose does: running still trails it behind, but lunging, leaning or dropping into a move no longer flings it)
+			const FVector RelMove = Root - GetActorLocation() - CapeRelPrev;
+			const FVector Carry(RelMove.X * 0.8f, RelMove.Y * 0.8f, (Root.Z - CapeRootPrev.Z) * 0.8f);
 			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] += Carry; CapePrev[k] += Carry; }
 			// (2026-10-30) Turning, and the chest turning into a sword swing, carry most of the cloth round with him, so a quick
 			// turn no longer leaves it behind to be flung out to the side like a board
-			const float Yaw = Up.Rotator().Yaw;
-			const FQuat Turn(FVector::UpVector, FMath::DegreesToRadians(0.85f * FMath::FindDeltaAngleDegrees(CapeYawPrev, Yaw)));
+			// (the chest's heading means little when he leans far over, and flips right round when it passes the vertical: climbing, sitting, lying down.
+			// It counts for less the steeper he is, and a frame never carries the cloth far.)
+			const FVector ChestFwd = Up.GetUnitAxis(EAxis::X);
+			const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(ChestFwd.Y, ChestFwd.X));
+			const float Flat = FMath::Clamp((FVector2D(ChestFwd.X, ChestFwd.Y).Size() - 0.3f) / 0.4f, 0.f, 1.f);
+			const float TurnBy = FMath::Clamp(FMath::FindDeltaAngleDegrees(CapeYawPrev, Yaw) * Flat, -25.f, 25.f);
+			const FQuat Turn(FVector::UpVector, FMath::DegreesToRadians(0.85f * TurnBy));
 			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] = Root + Turn.RotateVector(CapeP[k] - Root); CapePrev[k] = Root + Turn.RotateVector(CapePrev[k] - Root); }
 		}
 		CapeRootPrev = Root; bCapeRootSet = true;
-		CapeYawPrev = Up.Rotator().Yaw;
+		CapeRelPrev = Root - GetActorLocation();
+		CapeYawPrev = FMath::RadiansToDegrees(FMath::Atan2(Up.GetUnitAxis(EAxis::X).Y, Up.GetUnitAxis(EAxis::X).X));
 	}
 	auto Link = [&](int32 a, int32 b, float Rest, float Stiff)
 	{
@@ -216,9 +227,12 @@ void AKnightCharacter::TickCape(float Dt)
 				if (bStowed && L.Z > CapeStowZ) Lim = CapeBackX - 10.5f;   // and over the shield when it is on the back
 				// and never far out to the side: at most a hand's width past the cloth's own edge (it hung out like a board)
 				const float Edge = 0.5f * FMath::Lerp(WTop, WBot, float(k / CapeNX) / (CapeNY - 1)) + 12.f;
-				const bool bFix = L.X > Lim || FMath::Abs(L.Y) > Edge;
+				// and it never stands up past his shoulders, however he moves: at most about 70 degrees out from hanging down his back
+				const float MaxUp = CapePinZ - 0.35f * float(k / CapeNX) * DV;
+				const bool bFix = L.X > Lim || FMath::Abs(L.Y) > Edge || L.Z > MaxUp;
 				L.X = FMath::Min(L.X, Lim);
 				L.Y = FMath::Clamp(L.Y, -Edge, Edge);
+				L.Z = FMath::Min(L.Z, MaxUp);
 				if (bFix) CapeP[k] = Up.TransformPosition(L);
 			}
 		}

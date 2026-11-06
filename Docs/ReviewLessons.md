@@ -36,6 +36,12 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Judge armour in motion at full render scale or in Blender. The upscaler frays fast-moving edges at 60% and it reads as torn plate; test before believing either explanation (run the same frames at both scales).
 
 ## Moves and movement (motion-reviewer)
+- Check every new clip's facing against the stance before wiring it in: Mixamo's ladder climber faces the opposite way from the rest. A knight's chest heading in the log (or the first frame showing his back) gives it away.
+- Never read a tilted bone's heading through `Rotator().Yaw`: it flips 180 degrees past vertical. Anything carried by a heading (the cape) must fade it out as the bone tips up.
+- A move's recovery must carry the hand and blade along one arc into the guard, and the clip must end early enough that the blend out (0.3 s or more) does the settling. Judge the last quarter of every attack sheet for the blade changing height more than once, or going out of sight.
+- Tool and bow clips were made for an empty off hand, so every off-hand item (shield, cape) must be re-checked, or stowed or pinned, for each new clip family. Run the shield and cape clearance check on every clip the moment it is wired in, not only the combat ones.
+- Pieces that follow cloth or physics (the cape) must start hanging cleanly whenever he appears or is set facing another way, be carried by the pose's own moves (only travel may trail them), and be limited in how far they can stand out. Check the first 8 frames of every state and every fast change for floating or ragged leftovers.
+- A held weapon's grip is measured on Mixamo's own armed characters (their Paladin, W and Prop files), never inferred from the empty hand; a clip's hit timing and hand path are read from its log (`-SuitLogClips`, JEEBPATH) before its CSV row is written. A row with blank cut points just holds the first frame.
 - Moves come from reference key poses (the owner's clips), never guessed.
 - Judge walking from frames well into the walk (about 12 to 28), not the first frames.
 - Measure first with log lines (JEEBJUMP, JEEBDASH, JEEBSWEEP, JEEBWEIGHT); a wrong number should cost a rebuild, not a review round.
@@ -75,6 +81,10 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Speeds the client predicts must come from state the owner's machine also has (owner-replicated `Worn`, shared CSVs and Tuning.ini), or every step gets corrected.
 - Test-only code lives inside `-JeebShot` (`bShotMode`) branches.
 - Servers and players must run the same Tuning.ini and CSVs: repackage after changing movement numbers.
+
+- Anything the server reads for hit detection (hurt boxes, shield boxes) must be evaluated at the capsule's current position, not where the last throttled pose left it: keep the pose local and apply his current place when it is read.
+- Every server RPC that starts a move checks the held item server-side for that specific style. When a gate is added for one style, audit the whole switch for the others.
+- Anything the server must run (clip data, a skeleton) has to be baked to a file the server loads itself and tested on a cooked server: editor `-server` keeps data that a packaged server strips. Pose timers that other machines compute locally need a start time sent reliably.
 
 ## Packaged game (package-reviewer)
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).

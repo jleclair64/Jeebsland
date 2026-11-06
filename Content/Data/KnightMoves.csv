@@ -3,11 +3,11 @@ Jab1,SlashIn,0.1,0.3,0.7,0.85,1,0.06,0,0.45
 Jab2,SlashIn,0.95,1.08,1.35,1.5,1,0.07,0,0.45
 Smash,SlashDown,0.1,0.42,0.78,1.5,1,0.18,0.6
 Kick,KickSparta,0.25,0.42,0.72,0.98,2,0.08,0.5
-Sweep,SlashCrouch,0.27,0.45,0.75,1.15,2,0.06,0
+Sweep,SlashCrouch,0.27,0.45,0.75,0.9,2,0.06,0
 Dash,ThrustSlash,0.5,0.7,0.95,1.2,2,0.06,1
 Rebound,HitBlocked,0.0,0,0,0.6,1,0.1,0
 Roll,StandRoll,0.75,0,0,2.2,2,0.12,1
-FallPushed,FallDown,0.2,1.2,0,2.25,2,0.07,0
+FallPushed,FallDown,0.2,1.5,0,2.25,2,0.1,0
 FallDropped,SweepFall,0.75,0.85,0,2.0,2,0.08,0
 Rise,GetUpBack,2.7,0,1.3,5.6,2,0.45,0
 JumpStand,JumpUp2,0.88,1.1,1.38,0.35,2,0.08,0
@@ -23,9 +23,9 @@ HitLeft,HitSmallL,0.05,1.4,0,1.2,2,0.03,0
 BowDraw,BowDraw,0.3,0,0,1.0,0,0.1,0
 BowRecoil,BowRecoil,0.0,0,0,0.6,0,0.05,0
 Block,ChestBlock,0.0,1.1,0.45,0,1,0.12,0
-Climb,ClimbLadder,0.0,0,0,0.77,2,0.15,0
+Climb,ClimbLadder,0.0,0,0,0.77,2,0.25,0
 Sit,SitChair,0.5,0.5,0,1.0,2,0.25,0
 Slide,RunSlide,0.1,0.5,0,1.53,2,0.12,1
-Chop,AxeHorizontal,0.0,0.5,1.0,2.4,0,0.12,0
-Mine,AxeDown,0.0,0.6,1.0,2.27,0,0.12,0
+Chop,AxeHorizontal,0.0,0.5,1.0,2.4,0,0.12,0,0.75
+Mine,AxeDown,0.0,0.6,1.0,2.27,0,0.12,0,0.65
 FishCast,FishCast,0.5,0,0,3.0,0,0.2,0

@@ -545,6 +545,7 @@ void AFoeKnight::TickBody(float Dt)
 	BlockAlpha = FMath::FInterpTo(BlockAlpha, BlockT > 0.f ? 1.f : 0.f, Dt, 12.f);
 	HitFlash = FMath::Max(0.f, HitFlash - Dt);
 	if (!Anim || !Anim->IsReady()) return;
+	Anim->MoveTo(GetActorLocation() - FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight()), GetActorRotation().Yaw);   // (the boxes stay on him between poses)
 	// (nobody is looking at the server's copy: ten poses a second serve his hurt boxes. On players' machines, slower while off screen. His gear follows the capsule in between.)
 	AnimAccum += Dt;
 	const bool bSeen = Anim->Mesh() && Anim->Mesh()->WasRecentlyRendered(0.25f);

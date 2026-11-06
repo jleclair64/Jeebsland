@@ -430,11 +430,10 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	if (!bCombo && SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
-	if (S == EAtkStyle::Cast && SelectedKind() == K_Bow) return;   // (the bow shoots through ServerBowShoot)
+	if (S == EAtkStyle::Thrust) return;   // (the spear's charged thrust and its lunge are gone: Docs/ToRecreate.md)
+	if (S == EAtkStyle::Cast && SelectedKind() != K_Wand && SelectedKind() != K_Staff) return;   // (only these cast; the bow shoots through ServerBowShoot)
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	StartAttack(S, Dir < 0 ? -1 : 1, C);
-	if (S == EAtkStyle::Thrust && !GetCharacterMovement()->IsFalling())
-		LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (200.f + 700.f * C), true, false);   // the spear lunge, as on the player's machine
 }
 
 void AKnightCharacter::MulticastAttack_Implementation(uint8 Style, int8 Dir, float Charge)

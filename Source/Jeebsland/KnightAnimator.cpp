@@ -653,7 +653,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	Overlays(Dt, In, Base);
 	float BlendFor = bMoving ? 0.26f : 0.28f;   // (he sets off at once, but the lean and stride build; a stop settles)
 	const int32 Act = ChooseAction(Dt, In, Base, BlendFor);
-	if (Act == 0 && StateKey >= 10) BlendFor = StateKey >= 30 && StateKey < 40 ? 0.36f : 0.3f;   // (out of any move, back to walking or standing: the body eases up out of it, never pops)
+	if (Act == 0 && StateKey >= 10) BlendFor = StateKey == 34 ? 0.45f : StateKey >= 30 && StateKey < 40 ? 0.36f : 0.3f;   // (out of any move, back to walking or standing: the body eases up out of it, never pops)
 	if (Act == 0 && !bMoving && StateKey == 2 && !bOnGuard) BlendFor = 0.55f;   // (easing back to rest takes its time)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
 
@@ -667,7 +667,8 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	if (Key != StateKey)
 	{
 		// (between his own walk and the sword-and-shield clips the hand turns furthest of all, and the blade shows it: never a whirl)
-		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? 0.34f : 0.16f);
+		// (out of the low sweep the blade rises from the floor to the guard: one slow arc, never three heights in a few frames)
+		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? (StateKey == 34 || (bMoving && StateKey >= 30 && StateKey < 40) ? 0.48f : 0.34f) : 0.16f);
 		StateKey = Key;
 	}
 	// (the bow's phases are layers, not states: drawing, loosing and lowering still flow into each other)
@@ -907,7 +908,12 @@ bool FKnightAnimator::PlayAt(const TCHAR* MoveName, float T, float Speed, FPose&
 	FQuat Keep[3];
 	const float KeepW = M->SpineKeep > 0.f ? FMath::Lerp(M->SpineKeep, 0.7f, FMath::Clamp(Speed / 300.f, 0.f, 1.f)) : 0.f;
 	if (KeepW > 0.f) { Keep[0] = InOut.Rot[Bone[Spine]]; Keep[1] = InOut.Rot[Bone[Spine1]]; Keep[2] = InOut.Rot[Bone[Spine2]]; }
+	const int32 OffArm[4] = { LShoulder, LArm, LFore, LHand };
+	FQuat OffKeep[4];
+	if (PlayKeepOffArm > 0.f) for (int32 i = 0; i < 4; ++i) OffKeep[i] = InOut.Rot[Bone[OffArm[i]]];
 	Overlay(InOut, Over, PlayUpper, Lower * PlayLower);
+	if (PlayKeepOffArm > 0.f) for (int32 i = 0; i < 4; ++i) InOut.Rot[Bone[OffArm[i]]] = Nlerp(InOut.Rot[Bone[OffArm[i]]], OffKeep[i], PlayKeepOffArm);
+	PlayKeepOffArm = 0.f;
 	if (KeepW > 0.f)
 	{
 		InOut.Rot[Bone[Spine]] = Nlerp(InOut.Rot[Bone[Spine]], Keep[0], KeepW);
@@ -1030,6 +1036,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			const float T = FMath::Lerp(M->ClipStart, M->ClipEnd, FMath::Clamp(ActionT / Show, 0.f, 1.f));
 			// (his boots sink through this clip's floor while he gathers himself: up on them, then out by the time he stands)
 			PlayLift = FMath::Lerp(3.f, 9.f, FMath::SmoothStep(3.f, 4.f, T)) * (1.f - FMath::SmoothStep(4.8f, 5.6f, T));
+			PlayKeepOffArm = 0.65f;   // (the clip pushes off an empty left hand; the shield on it would stand out to the side)
 			PlayAt(TEXT("Rise"), T, 1000.f, B, &OutBlend);
 			RiseLeft = Show - ActionT;
 		}
@@ -1149,6 +1156,9 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			const float U = FMath::Fmod(FMath::Abs(In.ClimbPhase) / (2.f * PI), 1.f);
 			PlayAt(TEXT("Climb"), FMath::Lerp(M->ClipStart, M->ClipEnd, U), 1000.f, B, &OutBlend);
 			B.Hip.Z -= 68.f;   // (the clip climbs on the spot well above its own floor: his hips where they are standing)
+			// (Mixamo's climber faces the other way from every other clip: he has to face the ladder)
+			TurnInMesh(B, Hips, FQuat(FVector::UpVector, PI));
+			B.Hip.X = -B.Hip.X; B.Hip.Y = -B.Hip.Y;
 		}
 		break;
 	case 71:   // sitting: down into the seat over ClipStart..ClipHit, then held
@@ -1162,14 +1172,24 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 73: case 74:   // a tool at work: its wind-up over the first 55% of each swing, the blow by 70%, then a pause on it (the game's own swing timing)
 	{
 		const TCHAR* Nm = Key == 73 ? TEXT("Chop") : TEXT("Mine");
+		PlayKeepOffArm = 1.f;
 		if (const FMove* M = Moves.Find(Nm)) PlayAt(Nm, MoveClipTime(*M, In.SwingU, 0.55f, 0.7f), Speed, B, &OutBlend);
+		PlayKeepOffArm = 0.f;
 		break;
 	}
 	case 75:   // fishing: the cast, then waiting
 		if (const FMove* M = Moves.Find(TEXT("FishCast")))
 		{
-			if (ActionT < M->ClipEnd - M->ClipStart) PlayAt(TEXT("FishCast"), M->ClipStart + ActionT, 1000.f, B, &OutBlend);
-			else if (const FClip* C = Get(TEXT("FishIdle"))) { Sample(*C, Time, Over, true); Overlay(B, Over, 1.f, 1.f); }
+			if (ActionT < M->ClipEnd - M->ClipStart) { PlayKeepOffArm = 1.f; PlayAt(TEXT("FishCast"), M->ClipStart + ActionT, 1000.f, B, &OutBlend); }
+			else if (const FClip* C = Get(TEXT("FishIdle")))
+			{
+				const int32 OffArm[4] = { LShoulder, LArm, LFore, LHand };
+				FQuat OffKeep[4];
+				for (int32 i = 0; i < 4; ++i) OffKeep[i] = B.Rot[Bone[OffArm[i]]];
+				Sample(*C, Time, Over, true);
+				Overlay(B, Over, 1.f, 1.f);
+				for (int32 i = 0; i < 4; ++i) B.Rot[Bone[OffArm[i]]] = OffKeep[i];
+			}
 		}
 		break;
 	default:   // 60-62: flinching
@@ -1415,6 +1435,11 @@ void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 			if (Secs[i].MaterialIndex == Mat) BareComp->ShowMaterialSection(Mat, i, bBare[p], 0);
 	}
 	BareComp->SetVisibility(bAny);
+}
+
+void FKnightAnimator::MoveTo(const FVector& Feet, float ActorYaw)
+{
+	ToWorld = FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
 }
 
 FTransform FKnightAnimator::BoneWorld(int32 B) const
