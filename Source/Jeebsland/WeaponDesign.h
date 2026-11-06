@@ -47,6 +47,19 @@ namespace WeaponDesign
 	constexpr float BowBrace = 14.f;
 
 	// How far the elbow is bent when the weapon is just held (long weapons are carried pointing forward)
+	// How far a held weapon reaches from its grip (cm), for its hit boxes and for keeping its point off the floor
+	inline float BladeReach(int32 Kind)
+	{
+		switch (Kind)
+		{
+		case JeebItems::K_Sword: return 79.5f;
+		case JeebItems::K_Broadsword: return 112.f;
+		case JeebItems::K_Katana: return 101.f;
+		case JeebItems::K_Spear: return 155.f;
+		default: return 70.f;
+		}
+	}
+
 	inline float IdleElbow(int32 Kind)
 	{
 		switch (Kind)

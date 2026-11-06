@@ -165,7 +165,8 @@ private:
 	// gear
 	FVector BladeInHand = FVector::ForwardVector;
 	FTransform RightGrip = FTransform::Identity;    // the old wrist's frame, in the new right hand's
-	FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity;   // the shield in the new left forearm's frame
+	FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity, ShieldAtBlock = FTransform::Identity;   // the shield in the new left forearm's frame: hanging, strapped on a raised forearm, held up to guard
+	float ShieldFrontInGuard = 60.f;
 	FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the new left hand's frame
 	FTransform QuiverOnHips = FTransform::Identity;
 	bool bGearReady = false;

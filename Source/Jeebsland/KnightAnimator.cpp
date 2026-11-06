@@ -3,6 +3,7 @@
 #include "KnightDesign.h"
 #include "KnightModel.h"
 #include "KnightShieldRest.h"
+#include "WeaponDesign.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -37,7 +38,9 @@ namespace
 		TEXT("HitHead"), TEXT("HitBody"), TEXT("HitBlocked"), TEXT("HitLargeF"), TEXT("HitSmallL"), TEXT("HitSmallR"), TEXT("HitSmallB"),
 		TEXT("SweepFall"), TEXT("GetUpBack"), TEXT("FallDown"),
 		TEXT("BlockIdle"), TEXT("CrouchIdle"), TEXT("CrouchWalk"),
-		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"), TEXT("BowWalk"), TEXT("BowRun") };
+		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"), TEXT("BowWalk"), TEXT("BowRun"),
+		TEXT("WeightedRun"), TEXT("JumpUp2"), TEXT("ForwardJump"), TEXT("ChestBlock"),
+		TEXT("AxeDown"), TEXT("AxeHorizontal"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("RunSlide") };
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -388,8 +391,8 @@ void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
 	const float URun = FMath::SmoothStep(230.f, 400.f, SmSpeed);
 	const float USprint = WD[0] > 0.7f ? FMath::SmoothStep(560.f, 700.f, SmSpeed) : 0.f;
 
-	// (ahead he walks and runs upright, as the owner saw and liked; the sword-and-shield clips only for going sideways and backing up: their forward run leans far over)
-	const TCHAR* Names[9] = { TEXT("Walking"), TEXT("WalkR_SS"), TEXT("WalkBack_SS"), TEXT("WalkL_SS"), TEXT("Running"), TEXT("RunR_SS"), TEXT("RunBack_SS"), TEXT("RunL_SS"), TEXT("Sprint") };
+	// (ahead he walks upright and runs on WeightedRun: arms bent in at the ribs, feet close but not in one line, owner 2026-11-05; the sword-and-shield clips only for going sideways and backing up)
+	const TCHAR* Names[9] = { TEXT("Walking"), TEXT("WalkR_SS"), TEXT("WalkBack_SS"), TEXT("WalkL_SS"), TEXT("WeightedRun"), TEXT("RunR_SS"), TEXT("RunBack_SS"), TEXT("RunL_SS"), TEXT("Sprint") };
 	float W[9];
 	for (int32 i = 0; i < 4; ++i) { W[i] = WD[i] * (1.f - URun) * (1.f - USprint); W[i + 4] = WD[i] * URun * (1.f - USprint); }
 	W[8] = USprint;
@@ -428,6 +431,20 @@ void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
 		}
 		LocoHand = Out.Rot[HandB];
 		bLocoHand = true;
+	}
+	// Running, the clip's fist pumps the blade from level to straight up in front of his face: the wrist keeps it steady, out in front and a little up, and only part of the swing shows
+	if (!bBow && Kind != 0)
+	{
+		const float Steady = 0.8f * FMath::Max(URun, USprint);
+		if (Steady > 0.01f)
+		{
+			FQuat HandRot;
+			BonePos(Out, RHand, &HandRot);
+			const FVector Dir = HandRot.RotateVector(BladeInHand).GetSafeNormal();
+			static const FVector Want = FVector(-0.2f, 0.92f, 0.34f).GetSafeNormal();   // (in the mesh's frame: -X his right, +Y ahead, +Z up)
+			const FQuat Turn = FQuat::FindBetweenNormals(Dir, Want);
+			TurnInMesh(Out, RHand, Nlerp(FQuat::Identity, Turn, Steady));
+		}
 	}
 	// with the bow in hand: its own carry, in step
 	if (bBow)
@@ -504,7 +521,8 @@ void FKnightAnimator::Inertialize(const FPose& Target, FPose& Out, float Dt)
 void FKnightAnimator::KeepTipUp(FPose& P, AKnightCharacter* Me) const
 {
 	if (Me->SelectedKind() == JeebItems::K_Bow) return;
-	constexpr float Reach = 95.f, Clear = 5.f;   // (about the sword's length from the wrist)
+	constexpr float Clear = 6.f;
+	const float Reach = 9.f + WeaponDesign::BladeReach(Me->SelectedKind());   // (from the hand to the point)
 	FQuat HandRot;
 	const FVector HandAt = BonePos(P, JeebAnim::RHand, &HandRot);
 	const FVector Dir = HandRot.RotateVector(BladeInHand).GetSafeNormal();
@@ -593,8 +611,9 @@ void FKnightAnimator::Update(float Dt, AKnightCharacter* Me)
 		const float SlideR = FR.Z < 14.f ? FVector2D((FR - PrevR) / FMath::Max(Dt, 0.001f) + VWorld).Size() : -1.f;
 		PrevL = FL; PrevR = FR;
 		FQuat HandRot; const FVector HandAt = BonePos(Final, RHand, &HandRot);
-		const float TipZ = HandAt.Z + HandRot.RotateVector(BladeInHand).Z * 95.f;   // (about the sword's length: over the floor)
-		UE_LOG(LogTemp, Log, TEXT("JEEBANIM t %.3f key %d speed %.0f phase %.2f worst %.1f deg %s feet %.1f %.1f hip %.1f slide %.0f %.0f tip %.0f"), Time, StateKey, Sp, Phase, Worst, *Comp->GetBoneName(WorstB).ToString(), FL.Z, FR.Z, Final.Hip.Z, SlideL, SlideR, TipZ);
+		const FVector TipAt = HandAt + HandRot.RotateVector(BladeInHand) * (9.f + WeaponDesign::BladeReach(Me->SelectedKind()));
+		const float TipZ = TipAt.Z;
+		UE_LOG(LogTemp, Log, TEXT("JEEBANIM t %.3f key %d speed %.0f phase %.2f worst %.1f deg %s feet %.1f %.1f hip %.1f slide %.0f %.0f tip %.0f hand %.0f,%.0f,%.0f tipat %.0f,%.0f,%.0f"), Time, StateKey, Sp, Phase, Worst, *Comp->GetBoneName(WorstB).ToString(), FL.Z, FR.Z, Final.Hip.Z, SlideL, SlideR, TipZ, HandAt.Y, -HandAt.X, HandAt.Z, TipAt.Y, -TipAt.X, TipAt.Z);
 	}
 }
 
@@ -674,11 +693,19 @@ void FKnightAnimator::Overlays(float Dt, AKnightCharacter* Me, FPose& B)
 		}
 	}
 	if (Me->BlockAlpha > 0.01f)
-		if (const FClip* C = Get(TEXT("BlockIdle")))
-		{
-			Sample(*C, Time, Over, true);
-			Overlay(B, Over, Me->BlockAlpha, Me->BlockAlpha * (1.f - MoveW) * (1.f - Me->CrouchAlpha));
-		}
+		if (const FMove* M = Moves.Find(TEXT("Block")))
+			if (const FClip* C = Get(*M->Clip))
+			{
+				// (owner 2026-11-05: the shield close in front of his chest. ClipStart..ClipHit is the stretch that loops, ClipFollow how slowly: a guard, not a boxer's bounce.)
+				Sample(*C, M->ClipStart + FMath::Fmod(Time * M->ClipFollow, FMath::Max(M->ClipHit - M->ClipStart, 0.1f)), Over, false);
+				// (ChestBlock's right fist sits at his collar, which would lay the blade across his neck: that arm keeps the on-guard stance, sword out to the front)
+				if (const FClip* G = Get(TEXT("Idle_SS")))
+				{
+					Sample(*G, Time, Scratch, true);
+					for (const int32 i : { RShoulder, RArm, RFore, RHand }) Over.Rot[Bone[i]] = Scratch.Rot[Bone[i]];
+				}
+				Overlay(B, Over, Me->BlockAlpha, Me->BlockAlpha * (1.f - MoveW) * (1.f - Me->CrouchAlpha));
+			}
 	if (Me->BowAimAlpha > 0.01f)
 	{
 		const float W = Me->BowAimAlpha;
@@ -763,7 +790,7 @@ bool FKnightAnimator::PlayAt(const TCHAR* MoveName, float T, float Speed, FPose&
 		Over.Hip.Y = FMath::Lerp(Over.Hip.Y, H0.Y, M->HipLock);
 	}
 	// LegsFull: 2 = always the whole body; 1 = the legs too while he stands, his own walk while he moves; 0 = chest and arms only
-	const float Lower = M->LegsFull >= 2.f ? 1.f : M->LegsFull <= 0.f ? 0.f : 1.f - FMath::Clamp(Speed / 120.f, 0.f, 1.f);
+	const float Lower = M->LegsFull >= 2.f ? 1.f : M->LegsFull <= 0.f ? 0.f : 1.f - FMath::Clamp((FMath::Min(Speed, SmSpeed) - 40.f) / 140.f, 0.f, 1.f);
 	// (SpineKeep: the chest stays partly with what he was doing, so a clip's big wind-round doesn't turn his back on what he hits)
 	FQuat Keep[3];
 	const float KeepW = M->SpineKeep > 0.f ? FMath::Lerp(M->SpineKeep, 0.7f, FMath::Clamp(Speed / 300.f, 0.f, 1.f)) : 0.f;
@@ -917,9 +944,9 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 			float T = M->ClipHit;
 			if (Me->Smash == ESm::Charging)
 			{
-				// the wind-up, then a held tremble that grows with the charge: never a frozen frame
+				// the wind-up, then held (owner: the old tremble was too much; only a fine shake of the forearm is left, below)
 				const float W = FMath::Clamp(ActionT / 0.3f, 0.f, 1.f);
-				T = FMath::Lerp(M->ClipStart, M->ClipHit, FMath::InterpEaseOut(0.f, 1.f, W, 2.f)) + (W >= 1.f ? FMath::Sin(Time * (9.f + 10.f * Me->SmashCharge)) * (0.012f + 0.02f * Me->SmashCharge) : 0.f);
+				T = FMath::Lerp(M->ClipStart, M->ClipHit, FMath::InterpEaseOut(0.f, 1.f, W, 2.f));
 			}
 			else if (Me->Smash == ESm::Swing)
 				T = FMath::Lerp(M->ClipHit, M->ClipFollow, FMath::Clamp((Me->AttackT - AKnightCharacter::SmashApexT * D) / ((AKnightCharacter::SmashPauseT - AKnightCharacter::SmashApexT) * D), 0.f, 1.f));
@@ -928,6 +955,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 				T = FMath::Lerp(M->ClipFollow, M->ClipEnd, FMath::Sin(FMath::Clamp((Me->SmashT + Me->AttackT - AKnightCharacter::SmashPauseT * D) / FMath::Max(Tn.SmashEndPause + (1.f - AKnightCharacter::SmashPauseT) * D, 0.05f), 0.f, 1.f) * HALF_PI));
 			PlayAt(TEXT("Smash"), T, Speed, B, &OutBlend);
 			if (Key == 37) OutBlend = 0.05f;   // (from the held wind-up straight into the swing)
+			else TurnInMesh(B, RFore, FQuat(FVector::UpVector, FMath::DegreesToRadians(FMath::Sin(Time * 13.f) * 0.5f * Me->SmashCharge)));   // (a fine shake as the charge fills: at most a centimetre at the tip)
 		}
 		break;
 	}
@@ -957,9 +985,17 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 		break;
 	case 40:
 	{
+		// The pose goes by his speed up and down, not by a clock (owner 2026-11-05: straight legs, an honest arc): ClipStart at the takeoff, ClipHit at the top, ClipFollow coming
+		// down as fast as he went up. A hop passes through the same poses as a full jump, only for less time. ClipEnd: how much of the clip's arms he takes (they would throw the shield over his head).
 		const TCHAR* Nm = bJumpRunning ? TEXT("JumpRun") : TEXT("JumpStand");
 		if (const FMove* M = Moves.Find(Nm))
-			PlayAt(Nm, FMath::Min(M->ClipStart + ActionT * FMath::Max(M->ClipHit, 0.1f), M->ClipEnd), 1000.f, B, &OutBlend);   // (ClipHit: its speed)
+		{
+			const float V0 = FMath::Max(float(Me->GetCharacterMovement()->JumpZVelocity), 100.f);
+			const float S = FMath::Clamp(float(V.Z) / V0, -1.f, 1.f);
+			const float T = S > 0.f ? FMath::Lerp(M->ClipHit, M->ClipStart, S) : FMath::Lerp(M->ClipHit, M->ClipFollow, -S);
+			PlayUpper = M->ClipEnd;
+			PlayAt(Nm, T, 1000.f, B, &OutBlend);
+		}
 		break;
 	}
 	case 41:
@@ -1024,21 +1060,33 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 		const FVector Fist = Hand.GetLocation() + NewF * Along.X + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		const FQuat Rot = Turn.Quaternion() * Q;
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();
-		// The fist as Meshy made it is turned about the wrist against the Mixamo hand the clips were made on (his arms are his own: 'a pair of bent
-		// arms as Meshy made them'). In the sword clips the hand holds its sword past the thumb, so here the hand is turned about its own length
-		// to put the fist's grip where theirs is, found by measuring eight swings: which way out of the hand fits the way the hand travels out from the chest (19 degrees from this, averaged over forehands and backhands). Not in his rest pose,
-		// walk and run: those were made on his own skeleton.
+		// The real grip, measured on Mixamo's own Paladin W/Prop, who holds a sword on these clips (2026-11-05, Tools/knight_ref_grip.py).
+		// In his T-pose the blade leaves the fist forward, 14 degrees out and a little down; carried through the same line-up the clips use (knight_clip_retarget.py), that is
+		// SwordInBind on our knight's bind pose. So in every sword clip the hand turns just far enough to bring the fist's own hole onto that line, and the blade then follows the
+		// Paladin's exactly. (His rest pose, walk and run were made on his own skeleton: those keep the fist as it is.)
 		BladeInHand = RightGrip.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal();
-		float TwistDeg = 126.f;
-		FParse::Value(FCommandLine::Get(), TEXT("SuitTwist="), TwistDeg);
-		const FQuat Twist(FVector::YAxisVector, FMath::DegreesToRadians(TwistDeg));
+		static const FVector SwordInBind = FVector(-0.2543f, 0.9586f, 0.1285f).GetSafeNormal();
+		FQuat HandBind;
+		BonePos(P, RHand, &HandBind);
+		const FVector TrueInHand = HandBind.Inverse().RotateVector(SwordInBind);
+		const FQuat Fit = FQuat::FindBetweenNormals(BladeInHand, TrueInHand);
+		UE_LOG(LogTemp, Log, TEXT("JEEBANIM grip: the fist's hole against the real sword %.1f deg"), FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(float(FVector::DotProduct(BladeInHand, TrueInHand)), -1.f, 1.f))));
 		const int32 NB = Parents.Num(), HandB = Bone[RHand];
 		for (TPair<FString, FClip*>& It : Clips)
 		{
 			if (It.Key == TEXT("Rest") || It.Key == TEXT("Walking") || It.Key == TEXT("Running")) continue;
 			FClip& C = *It.Value;
-			for (int32 f = 0; f < C.NumFrames; ++f) C.Rot[f * NB + HandB] = (C.Rot[f * NB + HandB] * Twist).GetNormalized();
+			for (int32 f = 0; f < C.NumFrames; ++f) C.Rot[f * NB + HandB] = (C.Rot[f * NB + HandB] * Fit).GetNormalized();
 		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("SuitLogClips")))
+			if (const FClip* C = Get(TEXT("BlockIdle")))
+			{
+				FPose GuardP; GuardP.Rot = RefRot;
+				Sample(*C, 9.f / 30.f, GuardP, false);
+				FQuat H; const FVector At = BonePos(GuardP, RHand, &H);
+				const FVector D = H.RotateVector(BladeInHand);
+				UE_LOG(LogTemp, Log, TEXT("JEEBANIM grip check, guard pose: hand %s blade dir %s (the Paladin's: x -0.82, y 0.38, z -0.42)"), *At.ToString(), *D.ToString());
+			}
 	}
 	// The shield: at rest on the outside of the forearm as the old rest pose had it; raised, facing straight ahead in front of the forearm at the guard pose
 	{
@@ -1053,16 +1101,31 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 			const FVector At = Mid + Face * 11.f;
 			ShieldAtRest = FTransform(Q, At - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
-		const FClip* GuardC = Get(TEXT("BlockIdle"));
-		if (GuardC) Sample(*GuardC, 0.f, P, true);
+		// Raised or in a sword clip: strapped as the Paladin's is (on the back of his forearm, thumb side up), carried through the same line-up
 		{
+			P.Rot = RefRot;
+			P.Hip = RefPos[Bone[Hips]];
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
-			const FVector Mid = FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.55f);
-			const FQuat Q = FRotator(0.f, -18.f, 0.f).Quaternion();   // (a little turned to his left: it covers the side he leads with)
-			const FVector Face = Q.RotateVector(FVector::ForwardVector);
-			const FVector At = Mid + Face * 11.f;
-			ShieldAtGuard = FTransform(Q, At - Q.RotateVector(Strap)) * Fore.Inverse();
+			const FVector Mid = FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.62f);
+			const FRotator ToGame(0.f, MeshYawDeg, 0.f);
+			const FVector Face = ToGame.RotateVector(FVector(0.9427f, -0.2249f, 0.2466f)).GetSafeNormal();
+			const FVector Up = ToGame.RotateVector(FVector(0.1142f, 0.9116f, 0.3949f)).GetSafeNormal();
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
+			ShieldAtGuard = FTransform(Q, Mid + Face * 9.f - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
+			// Held up to guard (the Block row of KnightMoves.csv): facing the front, turned a little to his left, tilted back a touch, on the forearm in front of his chest
+			if (const FMove* M = Moves.Find(TEXT("Block")))
+				if (const FClip* C = Get(*M->Clip))
+				{
+					Sample(*C, M->ClipStart, P, false);
+					const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
+					const FVector Mid = FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.5f);
+					const FVector Face = FRotator(6.f, -18.f, 0.f).Vector();
+					const FQuat Q = FRotationMatrix::MakeFromXZ(Face, FVector::UpVector).ToQuat();
+					ShieldAtBlock = FTransform(Q, Mid + Face * 10.f - Q.RotateVector(Strap)) * Fore.Inverse();
+					ShieldFrontInGuard = FVector::DotProduct(Mid + Face * 10.f, FVector::ForwardVector);
+					UE_LOG(LogTemp, Log, TEXT("JEEBANIM shield at the guard: %s"), *(Mid + Face * 10.f).ToString());
+				}
 	}
 	// The bow: at rest as the old rest pose had it, in the left fist; aiming upright with the string toward the drawing hand. X is along the limbs, Z toward the string.
 	{
@@ -1129,7 +1192,11 @@ void FKnightAnimator::PlaceGear(AKnightCharacter* Me)
 	if (!Me->bStowed)
 	{
 		FTransform Strap;
-		Strap.Blend(ShieldAtRest, ShieldAtGuard, Me->BlockAlpha);
+		// (at his side with the forearm hanging it hangs too, tip down; once the forearm comes up, as in every sword clip, it sits as strapped)
+		const FVector ForeDir = (BonePos(Final, LHand) - BonePos(Final, LFore)).GetSafeNormal();
+		const float Up = 1.f - FMath::SmoothStep(0.45f, 0.85f, float(-ForeDir.Z));
+		Strap.Blend(ShieldAtRest, ShieldAtGuard, Up);
+		if (Me->BlockAlpha > 0.f) { const FTransform Open = Strap; Strap.Blend(Open, ShieldAtBlock, Me->BlockAlpha); }
 		const FTransform At = Strap * InWorld(LFore);
 		for (FArmorPart& P : Me->ArmorParts)
 			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At);

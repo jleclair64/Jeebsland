@@ -241,52 +241,50 @@ void AKnightCharacter::Jump()
 	Super::Jump();
 }
 
-// The jump grows with the hold (owner, 2026-11-02): Space leaves the ground at once at the short hop's speed (HopSpeed). Let go
-// within HopHold (Tuning.ini): the 25 cm hop. Held on, each move adds height in step with the hold, up to the full jump at
-// FullJumpHold (it is JumpMaxHoldTime: Unreal lets go for us then, in ClearJumpInput); letting go in between keeps the height
-// reached so far. The height is exact: in flight the top of his arc is h + v*v/2g, so raising the top by dH takes v*v + 2g*dH.
-// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime, JumpCurrentCount) and each move's
-// time, here, which the player's machine, the server and correction replays all run (the live move is recorded AFTER this
-// function and the hold time is cleared in ClearJumpInput, after it). p.ResetJumpStateDuringResimIfNotFalling=0
-// (DefaultEngine.ini) so replays get each move's own jump state back.
+// The jump (rebuilt 2026-11-05, owner: it floated on the way up): one push at takeoff, the full jump's speed, then only gravity, so
+// the arc is a plain ballistic one. Letting go of Space early cuts the rise short: within HopHold (Tuning.ini) he tops out at the
+// short hop, at FullJumpHold or later at the full jump, in between in between. The cut happens once, in the move where the key is
+// seen released, and only ever takes speed away. The height is exact: a top at H above the takeoff, having already climbed C, needs
+// v*v = 2g(H - C), and C comes from the takeoff speed and the time held, so nothing has to be tracked.
+// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime) and each move's time, here, which the
+// player's machine, the server and correction replays all run (the live move is recorded AFTER this function and the hold time is
+// cleared in ClearJumpInput, after it). p.ResetJumpStateDuringResimIfNotFalling=0 (DefaultEngine.ini) so replays get each move's own
+// jump state back.
 void AKnightCharacter::CheckJumpInput(float DeltaTime)
 {
 	JumpCurrentCountPreJump = JumpCurrentCount;   // (the saved move records this one)
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	if (!M) return;
-	// Raise the top of the arc for the part of this move's hold that falls between HopHold and FullJumpHold
-	auto Grow = [&](float From, float Dt)
-	{
-		const float H0 = FMath::Min(JeebTune::V().HopHold, JumpMaxHoldTime - 0.01f), H1 = JumpMaxHoldTime;
-		const float Share = (FMath::Clamp(From + Dt, H0, H1) - FMath::Clamp(From, H0, H1)) / (H1 - H0);
-		if (Share <= 0.f) return;
-		const float G = -M->GetGravityZ();
-		const float Extra = (FullJumpSpeed * FullJumpSpeed - HopSpeed * HopSpeed) / (2.f * G);   // full height minus the hop's
-		M->Velocity.Z = FMath::Sqrt(M->Velocity.Z * M->Velocity.Z + 2.f * G * Extra * Share);
-	};
 	if (M->IsFalling())
 	{
 		if (bPressedJump && JumpKeyHoldTime <= 0.f) bPressedJump = false;   // a new press in the air: no jumping there
-		else if (bPressedJump && !bKnockedDown) Grow(JumpKeyHoldTime, DeltaTime);   // still holding (not JumpCurrentCount: a replay's is one move behind)
-		else if (!bPressedJump) JumpKeyHoldTime = 0.f;   // let go: the height so far stays
+		else if (!bPressedJump)
+		{
+			if (JumpKeyHoldTime > 0.f && M->Velocity.Z > 0.f)   // just let go: the rise is cut to the height this hold earns
+			{
+				const float G = -M->GetGravityZ();
+				const float H0 = FMath::Min(JeebTune::V().HopHold, JumpMaxHoldTime - 0.01f), H1 = JumpMaxHoldTime;
+				const float Hop = HopSpeed * HopSpeed / (2.f * G), Full = FullJumpSpeed * FullJumpSpeed / (2.f * G);
+				const float Top = FMath::Lerp(Hop, Full, FMath::Clamp((JumpKeyHoldTime - H0) / FMath::Max(H1 - H0, 0.001f), 0.f, 1.f));
+				const float Climbed = FullJumpSpeed * JumpKeyHoldTime - 0.5f * G * JumpKeyHoldTime * JumpKeyHoldTime;
+				const float Want = FMath::Sqrt(FMath::Max(0.f, 2.f * G * (Top - Climbed)));
+				M->Velocity.Z = FMath::Min(float(M->Velocity.Z), Want);
+			}
+			JumpKeyHoldTime = 0.f;
+		}
 		return;
 	}
 	if (!bPressedJump || JumpKeyHoldTime > 0.f) return;   // nothing new
-	// Space just went down: leave the ground at the hop's speed, unless something stops him
+	// Space just went down: leave the ground, unless something stops him
 	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
 	{
 		bPressedJump = false;
 		return;
 	}
-	const float Was = M->JumpZVelocity;
-	M->JumpZVelocity = HopSpeed;
-	const bool bDid = M->DoJump(bClientUpdating, DeltaTime);
-	M->JumpZVelocity = Was;
-	if (bDid)
+	if (M->DoJump(bClientUpdating, DeltaTime))
 	{
 		JumpCurrentCount++;
 		OnJumped();
-		Grow(0.f, DeltaTime);   // (this move's hold counts too)
 	}
 	else bPressedJump = false;
 }
