@@ -56,6 +56,10 @@ namespace WeaponDesign
 		case JeebItems::K_Broadsword: return 112.f;
 		case JeebItems::K_Katana: return 101.f;
 		case JeebItems::K_Spear: return 155.f;
+		case JeebItems::K_BattleAxe: return 103.f;
+		case JeebItems::K_Axe: case JeebItems::K_Pickaxe: return 71.f;
+		case JeebItems::K_Staff: return 113.f;
+		case JeebItems::K_Wand: return 43.f;
 		default: return 70.f;
 		}
 	}

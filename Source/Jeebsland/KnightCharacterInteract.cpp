@@ -70,12 +70,7 @@ void AKnightCharacter::Interact()
 	{
 		const int32 K = SelectedKind();
 		const float Now = GetWorld()->GetTimeSeconds();
-		if (K == JeebItems::K_Spear)
-		{
-			bCharging = true;       // hold to charge, let go to thrust
-			ChargeT = 0.f;
-		}
-		else if (K == JeebItems::K_Bow)
+		if (K == JeebItems::K_Bow)
 		{
 			StartDraw();   // hold to draw, let go to shoot (KnightCharacterBow.cpp)
 		}
@@ -83,12 +78,12 @@ void AKnightCharacter::Interact()
 		{
 			StartAttack(EAtkStyle::Cast, 1, 0.f);
 		}
-		else if (K == JeebItems::K_Sword && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkSpeed * 1.15f
+		else if (JeebItems::FightsLikeSword(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkSpeed * 1.15f
 			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
 		{
 			StartAttack(EAtkStyle::Dash, 1, 0.f);   // sprinting forward: the dash attack, a lunge
 		}
-		else if (K == JeebItems::K_Sword)
+		else if (JeebItems::FightsLikeSword(K))
 		{
 			// The sword's jab: one swing per click (a click during a swing is remembered, see TickAttack); a click just after
 			// a swing has ended still carries on, forehand and backhand in turn

@@ -34,18 +34,6 @@ namespace JeebHit
 	float SegmentDistance(const FVector& P0, const FVector& P1, const FVector& Q0, const FVector& Q1);
 	inline bool Touch(const FCapsule& X, const FCapsule& Y) { return SegmentDistance(X.A, X.B, Y.A, Y.B) <= X.R + Y.R; }
 
-	// A knight's hurt boxes (the player's and the pen knight's share the skeleton, KnightDesign.h)
-	struct FKnightJoints
-	{
-		const USceneComponent* Upper = nullptr; const USceneComponent* Head = nullptr;
-		const USceneComponent* ArmL = nullptr; const USceneComponent* ArmR = nullptr;
-		const USceneComponent* ElbowL = nullptr; const USceneComponent* ElbowR = nullptr; const USceneComponent* WristR = nullptr;
-		const USceneComponent* HipL = nullptr; const USceneComponent* HipR = nullptr;
-		const USceneComponent* KneeL = nullptr; const USceneComponent* KneeR = nullptr;
-		const USceneComponent* AnkleL = nullptr; const USceneComponent* AnkleR = nullptr;
-	};
-	void KnightHurt(const FKnightJoints& J, TArray<FCapsule>& Out);
-
 	// Anything with health: its own hurt boxes (UHealthComponent::GatherHurt), or an upright capsule round its hit centre
 	void HurtOf(const UHealthComponent* H, TArray<FCapsule>& Out);
 
@@ -81,7 +69,6 @@ namespace JeebHit
 		if (TopZ > Centre.Z) W.ZHigh = TopZ - float(Centre.Z);
 		return W;
 	}
-	float HelmTop(const USceneComponent* Head);   // the top of a knight's helm hurt box (world height), as posed now (crouching lowers it)
 	bool TouchWedge(const FCapsule& Hit, const FShieldWedge& W);
 	// How far along a hit box's sweep this frame (0 = where it was last frame, 1 = where it is now) it first touches the wedge,
 	// or any of the hurt boxes; above 1: it doesn't. Whichever comes first is what the blow meets (a blade that reaches the

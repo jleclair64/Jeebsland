@@ -4,7 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "KnightMesh.h"
 #include "HitBoxes.h"
-namespace KnightModel { struct FSkin; }
+class FKnightAnimator;
 #include "FoeKnight.generated.h"
 
 class UCapsuleComponent;
@@ -14,7 +14,7 @@ class UHealthComponent;
 // A sparring knight in iron, with a sword and a kite shield, who guards the old pig pen. Moderate-to-easy: he telegraphs
 // every swing (the sword goes up high for a moment before it comes down), raises his shield now and then after being hit,
 // and never leaves the pen. Beaten, he drops a little purse and is back on his feet 20 seconds later.
-// He is built from the same body shapes as the player's knight (KnightDesign.h / WeaponDesign.h).
+// He is the same knight as the player's (FKnightAnimator, in iron), with the same clips; shield and sword from KnightDesign.h / WeaponDesign.h.
 // Online he is the server's: it runs his fighting (against the nearest player) and sends every player where he is, what he
 // is doing (RepAct, bRepBlock) and whether he is down; their machines only animate him.
 UCLASS()
@@ -56,25 +56,12 @@ protected:
 
 private:
 	UPROPERTY() UCapsuleComponent* Capsule = nullptr;
-	UPROPERTY() USceneComponent* BodyRoot = nullptr;
-	UPROPERTY() USceneComponent* UpperPivot = nullptr;
-	UPROPERTY() USceneComponent* HeadPivot = nullptr;
-	UPROPERTY() USceneComponent* PlumePivot = nullptr;
-	UPROPERTY() USceneComponent* ArmL = nullptr;
-	UPROPERTY() USceneComponent* ArmR = nullptr;
-	UPROPERTY() USceneComponent* ElbowL = nullptr;
-	UPROPERTY() USceneComponent* ElbowR = nullptr;
-	UPROPERTY() USceneComponent* WristR = nullptr;   // (the model's right fist hangs off it; it never turns on the pen knight)
-	UPROPERTY() USceneComponent* HipL = nullptr;
-	UPROPERTY() USceneComponent* HipR = nullptr;
-	UPROPERTY() USceneComponent* KneeL = nullptr;
-	UPROPERTY() USceneComponent* KneeR = nullptr;
-	UPROPERTY() USceneComponent* AnkleL = nullptr;   // the feet turn here to stay flat on the ground
-	UPROPERTY() USceneComponent* AnkleR = nullptr;
-	UPROPERTY() USceneComponent* CapeUpper = nullptr;
-	UPROPERTY() USceneComponent* CapeLower = nullptr;
+	UPROPERTY() USceneComponent* WristR = nullptr;   // the sword's joint in his right hand, placed by the pose
 	UPROPERTY() TArray<UProceduralMeshComponent*> Meshes;
-	TSharedPtr<KnightModel::FSkin> Skin;   // the skinned knight, as the player's (KnightModel.h; null with the cut pieces)
+	TSharedPtr<FKnightAnimator> Anim;   // his body, on every machine: the hit boxes and hurt boxes read its pose
+	float AnimAccum = 0.f;
+	FVector SmVel = FVector::ZeroVector;
+	void TickBody(float Dt);        // his pose, after whatever he did this frame
 	UPROPERTY() TArray<UProceduralMeshComponent*> ShieldMeshes;   // his shield's parts
 	UPROPERTY() UHealthComponent* Hp = nullptr;
 
@@ -111,10 +98,9 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_Knock) uint8 RepKnock = 0;
 	UFUNCTION() void OnRep_Knock();
 	void KnockDown(AActor* From, bool bDrop = false);   // (bDrop: the low sweep, straight down where he stands, his guard untouched)
-	void TickKnock(float Dt);      // the knockdown's timeline and pose (after the rest of the pose)
+	void TickKnock(float Dt);      // the knockdown's timeline
 	float DeathT = 0.f;           // 0 = alive; counts up while falling, then waits for the respawn
 	float RespawnT = 0.f;
-	float GaitPhase = 0.f, MoveBlend = 0.f;
 	bool bStruck = false;
 	FRandomStream Rand;
 	FVector LastLoc = FVector::ZeroVector;   // (his steps are worked out from how far he moved since the last frame)

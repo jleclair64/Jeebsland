@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "KnightAnimator.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Messages.h"
@@ -79,22 +80,11 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 160.f, true, false);   // a small step in as the knee comes up
 	}
-	if ((Style == EAtkStyle::Slash || Style == EAtkStyle::Sweep || Style == EAtkStyle::Dash) && K == JeebItems::K_Sword)
+	if ((Style == EAtkStyle::Slash || Style == EAtkStyle::Sweep || Style == EAtkStyle::Dash) && JeebItems::FightsLikeSword(K))
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward (the low sweep and the dash attack:
 		// one each, keyed the same way)
 		AttackDur = (Style == EAtkStyle::Sweep ? SweepDur : Style == EAtkStyle::Dash ? 0.3f + DashLag() : Cd * (Dir == JabSecond ? 0.72f : 0.8f)) / SwingSpeedScale();   // (testing: DefaultGame.ini SwingSpeed slows it)
-		SwingFrom[0] = ArmPitch; SwingFrom[1] = ArmYaw; SwingFrom[2] = ArmRollR; SwingFrom[3] = ElbowRCur; SwingFrom[4] = ForearmNow; SwingFrom[5] = SwingTwistNow; SwingFrom[6] = BladeYawNow; SwingFrom[7] = BladePitchNow;   // (the key poses start from here)
-		if (BladeAlpha <= 0.5f && WristR)   // (from rest the wrist is not steering the blade: start from where the blade really points)
-		{
-			const FVector Bl = GetActorTransform().InverseTransformVector(WristR->GetComponentTransform().TransformVector(KnightDesign::BladeDir(1))).GetSafeNormal();
-			SwingFrom[6] = FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X));
-			SwingFrom[7] = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(Bl.Z, -1.f, 1.f)));
-		}
-		// Mid-combo the hand turns over from the last hit's grip (PoseArms blends from it). The two hits lead with opposite
-		// edges, so the same grip is the old cant plus half a turn
-		const float NewSign = (Dir == JabSecond) ? -1.f : 1.f;
-		CantFrom = (BladeAlpha > 0.5f) ? BladeCantNow + (NewSign != BladeLeadSign ? 180.f : 0.f) : -999.f;
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * (Style == EAtkStyle::Sweep ? 120.f : Style == EAtkStyle::Dash ? DashLunge : 210.f), true, false);   // (the player's machine and the server step together; the dash lunges on)
 	}
@@ -142,6 +132,10 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	SetActorRotation(FRotator(0.f, FaceYaw, 0.f));
 	for (int32 h = 0; h < 5; ++h)   // a sword in hand
 		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
+	{
+		int32 ShotKind = -1;   // (-ShotKind=<number>: that weapon in the first bar slot instead)
+		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, 0); SelectHotbar(0); RebuildHeld(); }
+	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("kick")) StartAttack(EAtkStyle::Kick, 1, 0.f);                             // the kick (wheel up)
@@ -184,24 +178,6 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	}
 }
 
-// Test pictures: where the sword's tip is and which way its cutting edge faces, frame by frame, in the knight's own frame
-// (forward, right, up; cm from his centre), from the real joints and the real weapon placement (RebuildHeld)
-void AKnightCharacter::LogSwordTip()
-{
-	if (!WristR) return;
-	const FVector Blade = KnightDesign::BladeDir(1);
-	const FVector TipCapsule = KnightDesign::GripPos(false) + Blade * 79.5f;    // (WeaponDesign: the sword's tip, 79.5 cm out)
-	const FVector EdgeCapsule = KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(Blade));   // (the guard and the edges)
-	const FTransform W = WristR->GetComponentTransform();
-	const FTransform A = GetActorTransform();
-	const FVector Tip = A.InverseTransformPosition(W.TransformPosition(TipCapsule - KnightDesign::PivotPos(KnightDesign::P_WristR)));
-	const FVector Edge = A.InverseTransformVector(W.TransformVector(EdgeCapsule)).GetSafeNormal();
-	const FVector Fa = A.InverseTransformVector(ElbowR->GetComponentTransform().TransformVector(KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR))).GetSafeNormal();
-	const FVector Bl = A.InverseTransformVector(W.TransformVector(Blade)).GetSafeNormal();
-	UE_LOG(LogTemp, Log, TEXT("JEEBTIP %d %.3f tip %.0f %.0f %.0f edge %.2f %.2f %.2f | wrist bend %.0f twist %.0f | forearm heading %.0f tilt %.0f | blade heading %.0f tilt %.0f"), AttackDir, AttackT / FMath::Max(AttackDur, 0.01f), Tip.X, Tip.Y, Tip.Z, Edge.X, Edge.Y, Edge.Z, WristBendNow, ForearmTwistNow,
-		FMath::RadiansToDegrees(FMath::Atan2(Fa.Y, Fa.X)), FMath::RadiansToDegrees(FMath::Asin(Fa.Z)), FMath::RadiansToDegrees(FMath::Atan2(Bl.Y, Bl.X)), FMath::RadiansToDegrees(FMath::Asin(Bl.Z)));
-}
-
 void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes, uint8 Zone, bool bHeadshot)
 {
 	if (!Target || !Target->IsAlive()) return;
@@ -240,7 +216,7 @@ void AKnightCharacter::AttackLands()
 	if (AtkStyle == EAtkStyle::Kick || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) return;   // (the kick, the sweep and the dash land through their hit boxes: TickHitboxes)
 	const bool bThrust = (AtkStyle == EAtkStyle::Thrust);
 	// The sword's jab hits softer than a full swing (it is much quicker, and it loops)
-	const bool bJab = (AtkStyle == EAtkStyle::Slash && K == JeebItems::K_Sword);
+	const bool bJab = (AtkStyle == EAtkStyle::Slash && JeebItems::FightsLikeSword(K));
 	if (bJab) return;   // (the sword's jab lands through its hit boxes: TickHitboxes)
 	const float JabMul = 1.f;
 	const float Range = ((K >= 0) ? JeebItems::WeaponBase(K).Range : 200.f) + (bThrust ? 140.f * AtkCharge : 0.f);
@@ -452,7 +428,7 @@ void AKnightCharacter::TickAttack(float Dt)
 		// A sword hit keeps facing the way it started (as in Smash): sliding along a wall or being steered never turns him
 		// mid-swing. Not in strafe mode or the shield stance: there he keeps turning with the camera, swing or not.
 		// Charging a smash he turns as he walks; the swipe goes the way he faces when it is let go.
-		if (AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword && ((!bStrafeMode && !bBlockHeld) || SmashLocked()))
+		if (AtkStyle == EAtkStyle::Slash && JeebItems::FightsLikeSword(SelectedKind()) && ((!bStrafeMode && !bBlockHeld) || SmashLocked()))
 		{
 			if (Smash == ESmash::Charging) AttackYaw = GetActorRotation().Yaw;
 			else SetActorRotation(FRotator(0.f, AttackYaw, 0.f));
@@ -491,13 +467,13 @@ void AKnightCharacter::TickAttack(float Dt)
 				{
 					// Smash's buffer: a press in the last moments of the end lag comes out as soon as it is over (hit 1; still held,
 					// it can be another smash). Earlier presses are lost, so the end lag can't be skipped.
-					if (Now - QueuedClick <= 0.17f && SelectedKind() == JeebItems::K_Sword)
+					if (Now - QueuedClick <= 0.17f && JeebItems::FightsLikeSword(SelectedKind()))
 					{
 						StartAttack(EAtkStyle::Slash, JabFirst, 0.f);
 						if (bAttackDown && IsLocallyControlled()) SetSmash(ESmash::Deciding);
 					}
 				}
-				else if (SelectedKind() == JeebItems::K_Sword)
+				else if (JeebItems::FightsLikeSword(SelectedKind()))
 				{
 					// (one buffered press per swing, Smash style; the two hits alternate for as long as you keep clicking)
 					const int32 Next = (AttackDir == JabFirst) ? JabSecond : JabFirst;
@@ -545,7 +521,7 @@ void AKnightCharacter::SetSmash(ESmash P, float Charge, bool bTell)
 
 bool AKnightCharacter::SmashInputOk(ESmash P) const
 {
-	const bool bHit1 = bAttacking && AtkStyle == EAtkStyle::Slash && AttackDir == JabFirst && SelectedKind() == JeebItems::K_Sword && !bSmashSwing;
+	const bool bHit1 = bAttacking && AtkStyle == EAtkStyle::Slash && AttackDir == JabFirst && JeebItems::FightsLikeSword(SelectedKind()) && !bSmashSwing;
 	switch (P)
 	{
 	case ESmash::Deciding: return bHit1 && Smash == ESmash::None && AttackT <= SmashApexT * AttackDur + 0.01f;   // (not once the cut is under way)
@@ -602,7 +578,7 @@ void AKnightCharacter::StartSweep()
 		if (IsKicking()) QueuedSweep = GetWorld()->GetTimeSeconds();
 		return;
 	}
-	if (Smash != ESmash::None || ActiveNode.IsValid() || GetCharacterMovement()->IsFalling() || SelectedKind() != JeebItems::K_Sword) return;
+	if (Smash != ESmash::None || ActiveNode.IsValid() || GetCharacterMovement()->IsFalling() || !JeebItems::FightsLikeSword(SelectedKind())) return;
 	StartAttack(EAtkStyle::Sweep, 1, 0.f);
 }
 
@@ -631,7 +607,7 @@ void AKnightCharacter::ApplyKickLanded()
 // The dash attack's end lag: a smash attack's (the pause at the end of the swipe, then the rest of hit 1's recovery)
 float AKnightCharacter::DashLag() const
 {
-	const float Hit1 = JeebItems::WeaponBase(JeebItems::K_Sword).Cooldown * 0.8f / SwingSpeedScale();
+	const float Hit1 = JeebItems::WeaponBase(JeebItems::FightsLikeSword(SelectedKind()) ? SelectedKind() : JeebItems::K_Sword).Cooldown * 0.8f / SwingSpeedScale();
 	return SmashEndPause + (1.f - SmashPauseT) * Hit1;
 }
 
@@ -648,7 +624,7 @@ bool AKnightCharacter::MoveLocked() const
 
 bool AKnightCharacter::BladeComing() const
 {
-	if (!bAttacking || SelectedKind() != JeebItems::K_Sword || Smash == ESmash::Rebound) return false;
+	if (!bAttacking || !JeebItems::FightsLikeSword(SelectedKind()) || Smash == ESmash::Rebound) return false;
 	const float T = AttackT / FMath::Max(AttackDur, 0.01f);
 	if (AtkStyle == EAtkStyle::Sweep) return T <= SweepActiveTo;
 	if (AtkStyle == EAtkStyle::Dash) return AttackT <= DashActiveTo;
@@ -823,7 +799,7 @@ void AKnightCharacter::TickSmash(float Dt)
 {
 	if (Smash == ESmash::None) return;
 	const bool bSweepRebound = AtkStyle == EAtkStyle::Sweep && Smash == ESmash::Rebound;   // (a sweep bounces off a shield too)
-	if (!bAttacking || (AtkStyle != EAtkStyle::Slash && !bSweepRebound) || (AttackDir != JabFirst && Smash != ESmash::Rebound) || SelectedKind() != JeebItems::K_Sword)
+	if (!bAttacking || (AtkStyle != EAtkStyle::Slash && !bSweepRebound) || (AttackDir != JabFirst && Smash != ESmash::Rebound) || !JeebItems::FightsLikeSword(SelectedKind()))
 	{
 		Smash = ESmash::None; bSmashSwing = false;   // (cut short: a weapon change, a death, a ladder ...)
 		return;
@@ -863,7 +839,7 @@ void AKnightCharacter::MulticastRebound_Implementation(float Dur)
 
 void AKnightCharacter::BeginRebound(float Dur)
 {
-	if (SelectedKind() != JeebItems::K_Sword) return;
+	if (!JeebItems::FightsLikeSword(SelectedKind())) return;
 	if (!bAttacking)   // (online: the swing had already finished on the player's machine)
 	{
 		bAttacking = true; AtkStyle = EAtkStyle::Slash; bAttackHit = true;
@@ -883,24 +859,33 @@ void AKnightCharacter::BeginRebound(float Dur)
 bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
 {
 	if (!bBlocking || !ShieldActive() || Health <= 0.f) return false;
-	Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
+	if (!Anim || !Anim->IsReady()) return false;
+	Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
 	return true;
 }
 
 // ---------------- Hit boxes and hurt boxes (Smash style, HitBoxes.h) ----------------
-// The sword's jab: three spheres along the blade (tip first: the lowest ID wins when two touch the same target), live only in
-// each hit's active frames: the whole swing, from the blade coming forward to the end of the follow-through (owner,
-// 2026-10-31). Each is swept from where it was the frame before. The server lands the blows (every machine poses the knight
-// the same way, so the boxes match what everyone sees).
-static const JeebHit::FHitSphere SwordJabBoxes[] = { { 0, 68.f, 9.f, 1.f }, { 1, 46.f, 9.f, 1.f }, { 2, 24.f, 9.f, 1.f } };
+// A blade's hit boxes: spheres along it, every BladeBoxStep cm from the tip down to the fist, the tip first (the lowest ID wins when two touch the same target), live only
+// in each hit's active frames and swept from where each was the frame before. The server lands the blows from the pose, which every machine makes the same way.
+// How far they reach comes from what is in the hand (WeaponDesign::BladeReach).
+static constexpr int32 MaxBladeBoxes = 8;
+static constexpr float BladeBoxStep = 22.f;
+static constexpr float JabTipR = 10.f, SmashTipR = 13.f;   // (a jab's reach just past the point; a smash and a sweep a little more)
+static int32 BladeBoxes(int32 Kind, float TipR, JeebHit::FHitSphere* Out)
+{
+	const float Reach = WeaponDesign::BladeReach(Kind);
+	int32 N = 0;
+	for (float A = Reach - 0.5f * TipR; A > 12.f && N < MaxBladeBoxes; A -= BladeBoxStep)
+	{
+		Out[N] = { N, A, N == 0 ? TipR : TipR - 1.f, 1.f };
+		++N;
+	}
+	return N;
+}
 static const float& SwordJabDamage = JeebTune::Storage().SwordJabDamage;   // (the jab hits softer than a full swing: it is much quicker, and it loops)
-// The smash attack: hit 1's swipe with bigger boxes reaching a little past the tip. Uncharged it hits like a full sword swing;
-// a full charge hits 2.5 times as hard (in between by how long it was charged).
-static const JeebHit::FHitSphere SwordSmashBoxes[] = { { 0, 72.f, 12.f, 1.f }, { 1, 48.f, 11.f, 1.f }, { 2, 24.f, 10.f, 1.f } };
+// The smash attack: hit 1's swipe with bigger boxes. Uncharged it hits like a full sword swing; a full charge hits 2.5 times as hard (in between by how long it was charged).
 static const float& SwordSmashDamage = JeebTune::Storage().SwordSmashDamage;
 static const float& SwordSmashFullMul = JeebTune::Storage().SwordSmashFullMul;
-// The low sweep: a little bigger at the tip (it has to find a knight lying on the ground)
-static const JeebHit::FHitSphere SweepBoxes[] = { { 0, 72.f, 12.f, 1.f }, { 1, 48.f, 11.f, 1.f }, { 2, 24.f, 10.f, 0.9f } };
 // The jab's hit frames (fractions of the swing): hit 1 from the blade swinging out on his right to the end of its follow-through
 // low on his left; hit 2 the same, the other way
 static const float& Jab1From = JeebTune::Storage().Jab1From;
@@ -914,23 +899,25 @@ static const float& PushJab2 = JeebTune::Storage().PushJab2;
 static const float& PushSmash = JeebTune::Storage().PushSmash;
 static const float& PushSmashFull = JeebTune::Storage().PushSmashFull;
 
-// The kick: three spheres on the kicking (right) leg, the foot first. Kick beats shield: it goes straight through a raised
-// shield (its wedge counts as a touch too) and knocks anyone it hits down, shield or not. Attack beats kick: a kick into a
-// knight whose sword is coming loses, and the kicker falls instead.
-static const JeebHit::FHitSphere KickBoxes[] = { { 0, 0.f, 13.f, 1.f }, { 1, 0.f, 12.f, 0.9f }, { 2, 0.f, 10.f, 0.8f } };   // in front of the sole, the foot, the knee (Along unused)
+// The kick: four spheres on the kicking (right) leg: the toes, the foot, the shin, the knee. Kick beats shield: it goes straight through a raised shield (its wedge counts as a
+// touch too) and knocks anyone it hits down, shield or not. Attack beats kick: a kick into a knight whose sword is coming loses, and the kicker falls instead.
+static const JeebHit::FHitSphere KickBoxes[] = { { 0, 0.f, 10.f, 1.f }, { 1, 0.f, 13.f, 1.f }, { 2, 0.f, 11.f, 0.9f }, { 3, 0.f, 11.f, 0.8f } };   // (Along unused)
 
 void AKnightCharacter::TickHitboxes(float Dt)
 {
 	HitLive.Reset();
-	const bool bSword = bAttacking && (AtkStyle == EAtkStyle::Slash || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) && SelectedKind() == JeebItems::K_Sword && WristR;
+	const int32 HeldKind = SelectedKind();
+	const bool bSword = bAttacking && (AtkStyle == EAtkStyle::Slash || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) && JeebItems::FightsLikeSword(HeldKind) && WristR;
 	const bool bSweep = bSword && AtkStyle == EAtkStyle::Sweep;
 	const bool bDash = bSword && AtkStyle == EAtkStyle::Dash;   // (hits like a smash attack charged DashCharge)
-	const bool bKick = bAttacking && AtkStyle == EAtkStyle::Kick && AnkleR && KneeR;
+	const bool bKick = bAttacking && AtkStyle == EAtkStyle::Kick && Anim && Anim->IsReady();
 	const float T = (bSword || bKick) ? AttackT / FMath::Max(AttackDur, 0.01f) : 0.f;
 	const float From = bKick ? KickActiveFrom : bSweep ? SweepActiveFrom : bDash ? DashActiveFrom / FMath::Max(AttackDur, 0.01f) : (AttackDir == JabSecond) ? Jab2From : Jab1From;
 	const float To = bKick ? KickActiveTo : bSweep ? SweepActiveTo : bDash ? DashActiveTo / FMath::Max(AttackDur, 0.01f) : (AttackDir == JabSecond) ? Jab2To : Jab1To;
-	const JeebHit::FHitSphere* Boxes = bKick ? KickBoxes : bSweep ? SweepBoxes : (bSmashSwing || bDash) ? SwordSmashBoxes : SwordJabBoxes;
-	const int32 NumBoxes = bKick ? UE_ARRAY_COUNT(KickBoxes) : bSweep ? UE_ARRAY_COUNT(SweepBoxes) : (bSmashSwing || bDash) ? UE_ARRAY_COUNT(SwordSmashBoxes) : UE_ARRAY_COUNT(SwordJabBoxes);
+	JeebHit::FHitSphere BladeSet[MaxBladeBoxes];
+	const int32 NumBlade = bSword ? BladeBoxes(HeldKind, (bSweep || bDash || bSmashSwing) ? SmashTipR : JabTipR, BladeSet) : 0;
+	const JeebHit::FHitSphere* Boxes = bKick ? KickBoxes : BladeSet;
+	const int32 NumBoxes = bKick ? UE_ARRAY_COUNT(KickBoxes) : NumBlade;
 	const float Power = bKick ? KickDamage : bSweep ? SweepDamage : bDash ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, DashCharge) : bSmashSwing ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, SmashCharge) : SwordJabDamage;
 	// what a clean sword hit does to whoever it lands on
 	JeebHit::FReact React;
@@ -949,11 +936,9 @@ void AKnightCharacter::TickHitboxes(float Dt)
 			if (!bKick) Now = W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * S.Along - KnightDesign::PivotPos(KnightDesign::P_WristR));
 			else
 			{
-				// a little out in front of the sole (the way the shin points: at full stretch, straight at the target), then the
-				// foot itself, then the knee
-				const FVector Shin = (AnkleR->GetComponentLocation() - KneeR->GetComponentLocation()).GetSafeNormal();
-				const FVector Foot = AnkleR->GetComponentLocation() + AnkleR->GetForwardVector() * 6.f;   // (the middle of the foot)
-				Now = (i == 0) ? Foot + Shin * 24.f : (i == 1) ? Foot + Shin * 8.f : KneeR->GetComponentLocation();
+				using namespace JeebAnim;
+				const FVector Foot = Anim->BoneAt(RFoot), Toe = Anim->BoneAt(RToe), Knee = Anim->BoneAt(RLeg);
+				Now = (i == 0) ? Toe + (Toe - Foot).GetSafeNormal() * 5.f : (i == 1) ? (Foot + Toe) * 0.5f : (i == 2) ? (Foot + Knee) * 0.5f : Knee;
 			}
 			JeebHit::FCapsule C;
 			C.A = bHitPrevValid ? HitPrev[i] : Now; C.B = Now; C.R = S.Radius;
@@ -967,7 +952,8 @@ void AKnightCharacter::TickHitboxes(float Dt)
 		{
 			const int32 Id = Skills->SelectedItem();
 			const int32 Tier = (!bKick && JeebItems::IsGear(Id)) ? JeebItems::VariantOf(Id) : 0;   // (a kick is a kick, whatever you hold)
-			const ESkillType Sk = JeebItems::CombatSkillFor(JeebItems::K_Sword);
+			const int32 DmgKind = bKick ? JeebItems::K_Sword : HeldKind;   // (a kick is a kick, whatever you hold)
+			const ESkillType Sk = JeebItems::CombatSkillFor(DmgKind);
 			TArray<JeebHit::FCapsule> Hurt;
 			// What a hit box meets first along its sweep this frame: the shield's wedge or the body. The body first (from the side
 			// or behind) is a clean hit; the wedge first is a block (at the same moment, the shield: Smash checks shields first).
@@ -1002,7 +988,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield, Zone)) continue;
 				HitThisSwing.Add(H);
 				bool bCrit = false;
-				const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
+				const int32 Dmg = JeebItems::RollDamage(Skills, DmgKind, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
 				if (bKick)
 				{
 					if (H->IsSwinging && H->IsSwinging()) { KnockDownBy(H->GetOwner()); bOver = true; break; }   // attack beats kick: the kicker falls
@@ -1037,7 +1023,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 					if (!Meet(Hurt, bShieldUp ? &Shield : nullptr, Hit, bOnShield, Zone)) continue;
 					KickedKnights.Add(K);
 					bool bCrit = false;
-					const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Sword, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
+					const int32 Dmg = JeebItems::RollDamage(Skills, DmgKind, Tier, 0, bCrit, Power * Boxes[Hit].DamageMul);
 					if (bKick)
 					{
 						if (K->BladeComing()) { KnockDownBy(K); break; }   // attack beats kick
@@ -1053,34 +1039,12 @@ void AKnightCharacter::TickHitboxes(float Dt)
 		}
 	}
 	else bHitPrevValid = false;
-	if (bShotFace)   // test pictures: the raised shield's extent and the kicking leg's joints, in the knight's frame (log: JEEBGEO)
-	{
-		const FTransform A = GetActorTransform();
-		auto L = [&](const USceneComponent* C) { return C ? A.InverseTransformPosition(C->GetComponentLocation()) : FVector::ZeroVector; };
-		if (BlockAlpha > 0.95f)
-		{
-			FBox B(ForceInit);
-			for (const FArmorPart& P : ArmorParts)
-				if (P.Slot == KnightDesign::SlotShield && P.Comp && P.Comp->IsVisible())
-				{
-					const FBox W = P.Comp->Bounds.GetBox();
-					for (int32 k = 0; k < 8; ++k) B += A.InverseTransformPosition(FVector(k & 1 ? W.Max.X : W.Min.X, k & 2 ? W.Max.Y : W.Min.Y, k & 4 ? W.Max.Z : W.Min.Z));
-				}
-			UE_LOG(LogTemp, Log, TEXT("JEEBGEO shield min %s max %s"), *B.Min.ToCompactString(), *B.Max.ToCompactString());
-		}
-		if (bAttacking && AtkStyle == EAtkStyle::Kick)
-			UE_LOG(LogTemp, Log, TEXT("JEEBGEO kick T %.2f hip %s knee %s ankle %s toe %s"), AttackT / FMath::Max(AttackDur, 0.01f), *L(HipR).ToCompactString(), *L(KneeR).ToCompactString(), *L(AnkleR).ToCompactString(),
-				*A.InverseTransformPosition(AnkleR->GetComponentTransform().TransformPosition(FVector(25.f, 13.f, -90.f) - KnightDesign::PivotPos(KnightDesign::P_AnkleR))).ToCompactString());
-	}
 	DrawBoxes();
 }
 
 void AKnightCharacter::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
 {
-	JeebHit::FKnightJoints J;
-	J.Upper = UpperPivot; J.Head = HeadPivot; J.ArmL = ArmPivotL; J.ArmR = ArmPivot; J.ElbowL = ElbowL; J.ElbowR = ElbowR; J.WristR = WristR;
-	J.HipL = HipL; J.HipR = HipR; J.KneeL = KneeL; J.KneeR = KneeR; J.AnkleL = AnkleL; J.AnkleR = AnkleR;
-	JeebHit::KnightHurt(J, Out);
+	if (Anim && Anim->IsReady()) Anim->GatherHurt(Out);
 }
 
 // The view (H turns it on and off; MoveLab starts with it on): every hurt box yellow and every live hit box red, see-through and

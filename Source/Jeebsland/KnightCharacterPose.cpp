@@ -1,240 +1,114 @@
 ﻿#include "KnightCharacter.h"
-#include "KnightModel.h"
+#include "KnightAnimator.h"
+#include "SkillComponent.h"
+#include "Inventory.h"
+#include "Components/CapsuleComponent.h"
+#include "Components/PoseableMeshComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "ProceduralMeshComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
-#include "KnightShieldRest.h"
-#include "JeebSave.h"
-#include "Net/UnrealNetwork.h"
-#include "Messages.h"
-#include "Components/StaticMeshComponent.h"
-#include "Materials/MaterialInstanceDynamic.h"
-#include "UObject/ConstructorHelpers.h"
-#include "GameFramework/PlayerController.h"
-#include "Camera/PlayerCameraManager.h"
-#include "Engine/LocalPlayer.h"
-#include "EnhancedInputSubsystems.h"
-#include "InputMappingContext.h"
-#include "InputAction.h"
-#include "InputModifiers.h"
-#include "EnhancedInputComponent.h"
-#include "SkillComponent.h"
-#include "ResourceNode.h"
-#include "EngineUtils.h"
-#include "Engine/Engine.h"
-#include "GameFramework/CharacterMovementComponent.h"
-#include "GameFramework/SpringArmComponent.h"
-#include "Components/InstancedStaticMeshComponent.h"
-#include "Terrain.h"
-#include "GrassField.h"
-#include "Canopy.h"
-#include "Pig.h"
-#include "Inventory.h"
-#include "Npc.h"
-#include "Horse.h"
-#include "Cottage.h"
-#include "Loot.h"
-#include "Pond.h"
-#include "HealthComponent.h"
-#include "Projectile.h"
-#include "Combat.h"
-#include "WeaponDesign.h"
-#include "ProceduralMeshComponent.h"
-#include "Misc/ConfigCacheIni.h"
 
-// The knight's pose, every frame (the last big part of Tick): no game rules here, only where each joint points.
-//   PosePrep   landing squash, the eased blends (walk/run, air, crouch, shield ...), the stride cycle, how strong each motion is
-//   PoseLegs   hips, knees and ankles
-//   PoseBody   the body's rise and fall, the chest, the pelvis and the head
-//   PoseCape   cape and plume
-//   PoseArms   both arms: swinging, the shield, attacks, fishing, gathering
-// The values one step works out for the next ones travel in FKnightPose.
-struct FKnightPose
+// The knight's pose, every frame (the last big part of Tick): no game rules here. The eased blends a few things read, what he is
+// doing as the animator sees it, then FKnightAnimator makes the pose (it picks and blends the clips) and his gear goes where the pose puts it.
+// It runs on every machine, the server too: hit boxes and hurt boxes are read from this pose.
+
+// What he is doing, from what every machine knows: replicated state and each machine's own timers, never a held key or the camera
+void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 {
-	float Dt = 0.f, Speed = 0.f;
-	FVector Vel = FVector::ZeroVector;
-	bool bFalling = false, bFaceCam = false;
-	// from PosePrep
-	float Squash = 0.f, CS = 0.f, Air = 0.f, Ground = 0.f, Duck = 0.f, DuckC = 0.f, DuckHip = 0.f, DuckKnee = 0.f, DuckLean = 0.f, Stream = 0.f;
-	float GContact = 0.f, GAf = 0.f, GAb = 0.f, LegReach = 0.f, Hz = 0.f, UR = 0.f, WR = 0.f, WL = 0.f, S = 0.f, C = 0.f;
-	float GHipR = 0.f, GKneeR = 0.f, GFollowR = 0.f, GToeR = 0.f, GHipL = 0.f, GKneeL = 0.f, GFollowL = 0.f, GToeL = 0.f;
-	float ArmAmp = 0.f, ElbowBase = 0.f, ElbowSwing = 0.f, Lean = 0.f, Twist = 0.f, F01 = 0.f, Asym = 0.f;
-	// from PoseLegs
-	float HipRf = 0.f, HipLf = 0.f, KneeRf = 0.f, KneeLf = 0.f, IdleAmt = 0.f, BreathS = 0.f;
-	// from PoseBody
-	float TurnRoll = 0.f;
-};
+	using JeebAnim::EMove;
+	const UCharacterMovementComponent* M = GetCharacterMovement();
+	In.Vel = GetVelocity();
+	In.Rot = GetActorRotation();
+	In.bFalling = M->IsFalling();
+	In.JumpZ = M->JumpZVelocity;
+	In.StunLeft = StunLeft;
+	In.bKnockedDown = bKnockedDown;
+	In.KnockPhase = KnockPhase;
+	In.bRolling = bRolling;
+	In.RollU = RollT / FMath::Max(RollDur, 0.01f);
+	In.RollYaw = FMath::FindDeltaAngleDegrees(In.Rot.Yaw, RollDir.Rotation().Yaw);
+	In.LegYaw = LegYaw;
+	In.CrouchAlpha = CrouchAlpha;
+	In.BlockAlpha = BlockAlpha;
+	In.BowAimAlpha = BowAimAlpha;
+	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : 0;
+	In.BowT = BowT;
+	In.Kind = SelectedKind();
+	In.AimPitch = FMath::UnwindDegrees(GetBaseAimRotation().Pitch);
+	In.bClimbing = bClimbing;
+	In.ClimbPhase = ClimbPhase;
+	In.bSitting = bSitting;
+	In.bSliding = bSliding;
+	In.bFishing = bFishing;
+	In.bSwinging = bSwinging;
+	In.bSideways = bSideways;
+	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
+	In.bShotLog = bShotFace;
+	if (bAttacking)
+	{
+		const float D = FMath::Max(AttackDur, 0.01f);
+		In.MoveU = AttackT / D;
+		In.SmashCharge = SmashCharge;
+		In.DashFrom = DashActiveFrom / D;
+		In.DashTo = DashActiveTo / D;
+		In.ReboundU = SmashT / FMath::Max(ReboundDur, 0.05f);
+		if (Smash == ESmash::Rebound) In.Move = EMove::Rebound;
+		else if (AtkStyle == EAtkStyle::Kick) In.Move = EMove::Kick;
+		else if (AtkStyle == EAtkStyle::Sweep) In.Move = EMove::Sweep;
+		else if (AtkStyle == EAtkStyle::Dash) In.Move = EMove::Dash;
+		else if (AtkStyle == EAtkStyle::Thrust) In.Move = EMove::Thrust;
+		else if (AtkStyle == EAtkStyle::Cast) In.Move = EMove::Cast;
+		else if (Smash == ESmash::Charging) In.Move = EMove::SmashCharge;
+		else if (Smash == ESmash::Swing)
+		{
+			In.Move = EMove::SmashSwing;
+			In.SmashSwingU = FMath::Clamp((AttackT - SmashApexT * D) / ((SmashPauseT - SmashApexT) * D), 0.f, 1.f);
+		}
+		else if (Smash == ESmash::EndLag)
+		{
+			In.Move = EMove::SmashEnd;
+			In.SmashEndU = FMath::Clamp((SmashT + AttackT - SmashPauseT * D) / FMath::Max(JeebTune::V().SmashEndPause + (1.f - SmashPauseT) * D, 0.01f), 0.f, 1.f);
+		}
+		else In.Move = AttackDir == JabSecond ? EMove::Jab2 : EMove::Jab1;
+	}
+}
 
 void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool bFalling, bool bFaceCam, float& OutS, float& OutC)
 {
-	FKnightPose P;
-	P.Dt = Dt; P.Vel = Vel; P.Speed = Speed; P.bFalling = bFalling; P.bFaceCam = bFaceCam;
-	PosePrep(P);
-	PoseLegs(P);
-	PoseBody(P);
-	PoseKick(P);
-	PoseCape(P);
-	PoseArms(P);
-	if (Skin) KnightModel::UpdateSkin(*Skin);   // (the skinned knight's bones follow the joints just posed)
-	OutS = P.S; OutC = P.C;
-}
-
-void AKnightCharacter::PosePrep(FKnightPose& P)
-{
-	const float Dt = P.Dt, Speed = P.Speed;
-	const FVector Vel = P.Vel;
-	const bool bFalling = P.bFalling;
-
-	// ---------- Landing detection ----------
+	// Landing: the dust reads how hard
 	if (bFalling)
 	{
 		if (!bWasFalling) LastFallVz = 0.f;
-		LastFallVz = FMath::Min(LastFallVz, Vel.Z);
+		LastFallVz = FMath::Min(LastFallVz, float(Vel.Z));
 	}
 	else if (bWasFalling)
 	{
-		LandImpact = FMath::Clamp(-LastFallVz / 900.f, 0.3f, 1.f); // harder landings squash more
+		LandImpact = FMath::Clamp(-LastFallVz / 900.f, 0.3f, 1.f);
 		LandTimer = LandDuration;
 	}
 	bWasFalling = bFalling;
 	LandTimer = FMath::Max(0.f, LandTimer - Dt);
-	const float Squash = LandImpact * (LandTimer / LandDuration);
 
-	// ---------- Blends (everything eases in and out) ----------
+	// The blends (everything eases in and out)
 	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
-	RunAlpha  = FMath::FInterpTo(RunAlpha, FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f), Dt, 6.f); // 0 = walk, 1 = full sprint
-	AirAlpha  = FMath::FInterpTo(AirAlpha, bFalling ? 1.f : 0.f, Dt, 14.f);
+	RunAlpha = FMath::FInterpTo(RunAlpha, FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f), Dt, 6.f);
+	AirAlpha = FMath::FInterpTo(AirAlpha, bFalling ? 1.f : 0.f, Dt, 14.f);
 	const bool bSweepSquat = bAttacking && AtkStyle == EAtkStyle::Sweep && AttackT < 0.76f * AttackDur;   // (the low sweep drops him into the squat, quickly)
 	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, (bCrouched || bSweepSquat) ? 1.f : 0.f, Dt, bSweepSquat ? 22.f : 10.f);
-	BlockAlpha  = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
-	SlideAlpha  = FMath::FInterpTo(SlideAlpha, bSliding ? 1.f : 0.f, Dt, 12.f);
-	SitAlpha    = FMath::FInterpTo(SitAlpha, bSitting ? 1.f : 0.f, Dt, 8.f);
-	MountAlpha  = FMath::FInterpTo(MountAlpha, bMounted ? 1.f : 0.f, Dt, 8.f);
-	TuckAlpha   = FMath::FInterpTo(TuckAlpha, bRolling ? 1.f : 0.f, Dt, 18.f);
-	ClimbAlpha  = FMath::FInterpTo(ClimbAlpha, bClimbing ? 1.f : 0.f, Dt, 12.f);
-	const float CS = FMath::Sin(ClimbPhase);
-	const float Air = AirAlpha;
-	const float Ground = 1.f - Air;
-	// A sword jab moves the whole body: he sinks into his knees and leans into each cut, most as the blade comes through
-	{
-		const bool bJab = bAttacking && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword;
-		const float JT = AttackT / FMath::Max(AttackDur, 0.01f);
-		const float Want = bJab ? (0.55f + 0.45f * FMath::SmoothStep(0.25f, 0.55f, JT)) : 0.f;
-		JabBodyNow = FMath::FInterpTo(JabBodyNow, Want, Dt, 10.f);
-	}
-	const float DuckJ = JabBodyNow * Ground;
-	const float Duck = FMath::Max(FMath::Max(CrouchAlpha, BlockAlpha) * Ground, FMath::Min(DuckJ, 1.f)); // how low the knight is sitting
-	// Crouching (Ctrl) is a deep squat, thighs about level and knees well forward like a person squatting low; the shield
-	// guard keeps its own shallower crouch. Both can be on at once (the deeper legs win; the shield arm still comes up).
-	const float DuckC = CrouchAlpha * Ground, DuckB = BlockAlpha * Ground;
-	const float DuckHip = FMath::Max(FMath::Max(55.f * DuckB, 100.f * DuckC), 42.f * DuckJ);
-	const float DuckKnee = FMath::Min(FMath::Min(-95.f * DuckB, -140.f * DuckC), -78.f * DuckJ);
-	const float DuckLean = FMath::Max(FMath::Max(14.f * DuckB, 24.f * DuckC), 15.f * DuckJ);   // a person squatting low leans forward to keep balance
-	const float Stream = RunAlpha * MoveBlend; // how hard the wind pushes the cape and plume
+	BlockAlpha = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
+	if (bSwinging) SwingTime += Dt;
+	const bool bBowIn = SelectedKind() == JeebItems::K_Bow && !bStowed && BowHold;
+	BowAimAlpha = FMath::FInterpTo(BowAimAlpha, (bBowIn && Bow != EBow::None) ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 12.f : 8.f);
+	if (!BowHold) BowAimAlpha = 0.f;   // (the bow was put away mid-draw: R, a drop, death)
 
-	// ---------- Gait: a real stride (rewritten 2026-10-30) ----------
-	// Each leg runs its own cycle U (0 to 1; the left half a cycle behind the right) in two parts, like a person:
-	//  CONTACT: the foot is planted while the hip sweeps from reaching forward (Af) to trailing behind (Ab). The hip moves at
-	//    exactly the body's speed, so a planted foot never slides; the standing knee gives a little mid-step.
-	//  SWING: the foot lifts, the knee folds (most early in the swing), and the leg swings forward to land nearly straight.
-	// Walking has a long contact (both feet down for a moment) and small swings; jogging (the normal speed) and sprinting
-	// have a short contact and a moment in the air. The clock runs on the ground covered, not on time.
-	const float JogT = FMath::Clamp((Speed - 150.f) / (WalkSpeed - 150.f), 0.f, 1.f);   // walk ... jog (WalkSpeed, the normal speed)
-	const float SprT = FMath::Clamp((Speed - WalkSpeed) / (SprintSpeed - WalkSpeed), 0.f, 1.f);   // jog ... sprint
-	auto G3 = [&](float W, float J, float Sp) { return SprT > 0.f ? FMath::Lerp(J, Sp, SprT) : FMath::Lerp(W, J, JogT); };
-	const float StepScale   = 1.f - 0.35f * CrouchAlpha;   // smaller steps when crouched
-	const float GContact    = G3(0.60f, 0.26f, 0.21f);     // share of the cycle each foot is planted (short when running: a long float between footfalls, like BotW)
-	const float GAf         = G3(32.f, 40.f, 52.f) * StepScale;   // hip reaching forward at the start of contact
-	const float GAb         = G3(22.f, 32.f, 40.f) * StepScale;   // hip trailing behind at toe-off
-	const float GStanceKnee = G3(8.f, 26.f, 32.f);         // how much the standing knee gives
-	const float GSwingKnee  = G3(42.f, 50.f, 95.f) * StepScale;   // how far the swinging knee folds (normal speed: about half the sprint, the heels stay low)
-	const float LegReach    = float(KnightDesign::ThighLen() + KnightDesign::ShinLen());
-	const float SinAf = FMath::Sin(FMath::DegreesToRadians(GAf)), SinAb = FMath::Sin(FMath::DegreesToRadians(GAb));
-	const float Sweep = LegReach * (SinAf + SinAb);        // ground a planted foot covers
-	const float Hz = FMath::Clamp(GContact * Speed / FMath::Max(Sweep, 1.f), 0.5f, 3.4f);
-	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * Hz * Dt, 2.f * PI);
-	IdleTime += Dt;
-	FlutterTime += Dt * (1.f + 1.5f * Stream);
-	// Every hand-over flows (2026-10-30, it looked rigid where one foot takes over from the other): the swing starts with
-	// the leg still moving back and ends with it already drawing back to land (part of the planted sweep's speed carried
-	// through), the standing knee eases in and out of its give, the foot rolls from heel-up straight into its swing, and
-	// each foot's hold on the body (Weight) fades in and out instead of switching.
-	const float SweepRate = FMath::RadiansToDegrees(SinAf + SinAb) * (1.f - GContact) / FMath::Max(GContact, 0.05f);   // planted hip speed, per unit of swing
-	const float CarryEnd = -0.3f * SweepRate / FMath::Cos(FMath::DegreesToRadians(GAb));
-	const float CarryStart = -0.3f * SweepRate / FMath::Cos(FMath::DegreesToRadians(GAf));
-	auto LegCycle = [&](float U, float& Hip, float& Knee, float& Weight, float& Follow, float& ToeOff)
-	{
-		if (U < GContact)
-		{
-			const float T = U / GContact;
-			Hip = FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(SinAf - (SinAf + SinAb) * T, -1.f, 1.f)));
-			Knee = -4.f - GStanceKnee * FMath::Square(FMath::Sin(PI * T));
-			Weight = FMath::SmoothStep(0.f, 0.18f, T) * (1.f - FMath::SmoothStep(0.82f, 1.f, T));
-			Follow = 0.f; ToeOff = FMath::SmoothStep(0.65f, 1.f, T);
-		}
-		else
-		{
-			const float T = (U - GContact) / (1.f - GContact);
-			const float T2 = T * T, T3 = T2 * T;   // Hermite: from trailing (-Ab) to reaching (+Af), carrying the sweep's speed
-			Hip = (2.f * T3 - 3.f * T2 + 1.f) * -GAb + (T3 - 2.f * T2 + T) * CarryEnd + (-2.f * T3 + 3.f * T2) * GAf + (T3 - T2) * CarryStart;
-			Knee = -4.f - GSwingKnee * FMath::Square(FMath::Sin(PI * FMath::Pow(T, 0.75f)));
-			Weight = 0.f;
-			const float Roll = FMath::SmoothStep(0.f, 0.3f, T);   // heel-up push-off rolling into the trailing swing foot
-			Follow = Roll * (1.f - FMath::SmoothStep(0.5f, 0.95f, T)); ToeOff = 1.f - Roll;
-		}
-	};
-	const float UR = GaitPhase / (2.f * PI), UL = FMath::Fmod(UR + 0.5f, 1.f);
-	float GHipR, GKneeR, GFollowR, GToeR, GHipL, GKneeL, GFollowL, GToeL, WR, WL;
-	LegCycle(UR, GHipR, GKneeR, WR, GFollowR, GToeR);
-	LegCycle(UL, GHipL, GKneeL, WL, GFollowL, GToeL);
-	{
-		const float Still = 1.f - FMath::SmoothStep(0.15f, 0.45f, MoveBlend);   // standing: both feet hold him
-		WR = FMath::Lerp(WR, 1.f, Still); WL = FMath::Lerp(WL, 1.f, Still);
-	}
-	const float S = FMath::Clamp(GHipR / FMath::Max(GAf, 1.f), -1.f, 1.f);   // right leg forward when positive (for the arms and hips)
-	const float C = FMath::Cos(GaitPhase);
-
-	// ---------- Strength of each motion ----------
-	const float ArmAmp     = FMath::Lerp(22.f, 55.f, RunAlpha) * MoveBlend;
-	const float ElbowBase  = FMath::Lerp(12.f, 70.f, RunAlpha) * MoveBlend;
-	const float ElbowSwing = FMath::Lerp(8.f, 25.f, RunAlpha) * MoveBlend;
-	const float Lean       = FMath::Lerp(3.f, 20.f, RunAlpha) * MoveBlend;
-	const float Twist      = FMath::Lerp(5.f, 12.f, RunAlpha) * MoveBlend;
-
-	// ---------- Jump pose: where are we in the arc? 0 = rising fast ... 1 = falling fast ----------
-	const float F01 = FMath::Clamp(0.5f - Vel.Z / 1000.f, 0.f, 1.f);
-	const float Asym = FMath::Clamp(Speed / 250.f, 0.f, 1.f); // running leap (one knee up) vs standing jump (both tucked)
-
-	P.Squash = Squash; P.CS = CS; P.Air = Air; P.Ground = Ground; P.Duck = Duck; P.DuckC = DuckC; P.DuckHip = DuckHip; P.DuckKnee = DuckKnee; P.DuckLean = DuckLean; P.Stream = Stream;
-	P.GContact = GContact; P.GAf = GAf; P.GAb = GAb; P.LegReach = LegReach; P.Hz = Hz; P.UR = UR; P.WR = WR; P.WL = WL; P.S = S; P.C = C;
-	P.GHipR = GHipR; P.GKneeR = GKneeR; P.GFollowR = GFollowR; P.GToeR = GToeR; P.GHipL = GHipL; P.GKneeL = GKneeL; P.GFollowL = GFollowL; P.GToeL = GToeL;
-	P.ArmAmp = ArmAmp; P.ElbowBase = ElbowBase; P.ElbowSwing = ElbowSwing; P.Lean = Lean; P.Twist = Twist; P.F01 = F01; P.Asym = Asym;
-}
-
-void AKnightCharacter::PoseLegs(FKnightPose& P)
-{
-	const float Dt = P.Dt;
-	const FVector Vel = P.Vel;
-	const bool bFaceCam = P.bFaceCam;
-	const float Ground = P.Ground, S = P.S, Asym = P.Asym, F01 = P.F01, Air = P.Air, Squash = P.Squash, DuckHip = P.DuckHip, DuckKnee = P.DuckKnee, Duck = P.Duck, CS = P.CS;
-	const float GHipR = P.GHipR, GHipL = P.GHipL, GKneeR = P.GKneeR, GKneeL = P.GKneeL, GFollowR = P.GFollowR, GToeR = P.GToeR, GFollowL = P.GFollowL, GToeL = P.GToeL;
-
-	// ---------- Legs ----------
-	// On the ground: legs swing opposite each other; the knee bends most as a leg passes under the body
-	// (smooth everywhere: no sharp corners in the curve, so no jerks)
-	// Shield-up stance: the legs step the way you are actually moving. Backing up runs the stride in reverse; a sidestep
-	// swings the legs out to the side instead (the leading leg reaches out, the other closes up after it).
+	// Facing the camera (strafe mode, shield stance), Fortnite style: the hips and legs turn up to 45 degrees toward the way he goes
 	{
 		const FVector LV = GetActorRotation().UnrotateVector(FVector(Vel.X, Vel.Y, 0.f));
 		float Fw = 1.f, Sd = 0.f;
 		if ((bBlockHeld || bStrafeMode) && !bMounted && LV.Size() > 30.f) { Fw = LV.X / LV.Size(); Sd = LV.Y / LV.Size(); }
 		StepFw = FMath::FInterpTo(StepFw, Fw, Dt, 8.f);
 		StepSd = FMath::FInterpTo(StepSd, Sd, Dt, 8.f);
-	}
-	// Facing the camera (strafe mode, shield stance), like Fortnite: the shoulders and back stay square to the camera while the
-	// hips and legs turn up to 45 degrees toward the way you are going (backing up, toward the way straight behind) and run
-	// that way; whatever is left over (moving straight sideways) is a sidestep. The chest turns back by the same amount.
-	float LegFw = StepFw, LegSd = StepSd;
-	{
 		float WantYaw = 0.f;
 		if (bFaceCam && (FMath::Abs(StepFw) + FMath::Abs(StepSd)) > 0.2f)
 		{
@@ -243,670 +117,118 @@ void AKnightCharacter::PoseLegs(FKnightPose& P)
 			WantYaw = FMath::Clamp(Toward, -45.f, 45.f);
 		}
 		LegYaw = FMath::FInterpTo(LegYaw, WantYaw * MoveBlend, Dt, 8.f);
-		const float Rel = FMath::DegreesToRadians(FMath::RadiansToDegrees(FMath::Atan2(StepSd, StepFw)) - LegYaw);
-		const float Mag = FMath::Min(1.f, FMath::Sqrt(StepFw * StepFw + StepSd * StepSd));
-		if (bFaceCam) { LegFw = FMath::Cos(Rel) * Mag; LegSd = FMath::Sin(Rel) * Mag; }
 	}
-	SwingLoadNow = FMath::FInterpTo(SwingLoadNow, SwingLoadWant, Dt, 22.f);
-	const float SwingLoad = SwingLoadNow * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float HipRg = GHipR * MoveBlend * LegFw;
-	const float HipLg = GHipL * MoveBlend * LegFw;
-	const float SideAmp = 24.f * MoveBlend * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float HipRroll = SideAmp * LegSd * (0.5f + 0.5f * S);   // positive roll swings a hanging leg to the right
-	const float HipLroll = SideAmp * LegSd * (0.5f - 0.5f * S);
-	const float KneeRg = GKneeR * MoveBlend;
-	const float KneeLg = GKneeL * MoveBlend;
-	// In the air: knees tuck on the way up, legs reach forward on the way down
-	const float HipRa  = FMath::Lerp(FMath::Lerp(30.f, 60.f, Asym), FMath::Lerp(15.f, 35.f, Asym), F01);
-	const float HipLa  = FMath::Lerp(FMath::Lerp(30.f, -15.f, Asym), FMath::Lerp(15.f, 0.f, Asym), F01);
-	const float KneeRa = -FMath::Lerp(FMath::Lerp(55.f, 85.f, Asym), 25.f, F01);
-	const float KneeLa = -FMath::Lerp(FMath::Lerp(55.f, 40.f, Asym), 20.f, F01);
 
-	float HipRf  = FMath::Lerp(HipRg, HipRa, Air) + 35.f * Squash + DuckHip;
-	float HipLf  = FMath::Lerp(HipLg, HipLa, Air) + 35.f * Squash + DuckHip;
-	float KneeRf = FMath::Lerp(KneeRg, KneeRa, Air) - 70.f * Squash + DuckKnee;
-	float KneeLf = FMath::Lerp(KneeLg, KneeLa, Air) - 70.f * Squash + DuckKnee;
-	// Standing still: slow breathing (the chest rises, the knees ease a little), like the idle in Breath of the Wild
-	const float IdleAmt = (1.f - MoveBlend) * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float BreathS = FMath::Sin(IdleTime * 1.65f);   // one breath every 3.8 s
-	const float Stance = StanceHip - 1.5f * BreathS * IdleAmt;
-	// A relaxed stance: on the ground the knees are always a little bent (eased out as he crouches, which bends them anyway)
-	const float Relax = Ground * (1.f - Duck) * (1.f - MoveBlend);
-	HipRf += Stance * Relax;   HipLf += Stance * Relax;
-	KneeRf -= 2.f * Stance * Relax;   KneeLf -= 2.f * Stance * Relax;
-	// Sliding: one leg stretched out in front, the other folded under
-	HipRf = FMath::Lerp(HipRf, 78.f, SlideAlpha);   KneeRf = FMath::Lerp(KneeRf, -4.f, SlideAlpha);
-	HipLf = FMath::Lerp(HipLf, 45.f, SlideAlpha);   KneeLf = FMath::Lerp(KneeLf, -115.f, SlideAlpha);
-	// Sitting: thighs level, shins hanging down
-	HipRf = FMath::Lerp(HipRf, 90.f, SitAlpha);     KneeRf = FMath::Lerp(KneeRf, -90.f, SitAlpha);
-	HipLf = FMath::Lerp(HipLf, 90.f, SitAlpha);     KneeLf = FMath::Lerp(KneeLf, -90.f, SitAlpha);
-	// Riding: thighs forward and a little apart, shins hanging beside the horse
-	HipRf = FMath::Lerp(HipRf, 62.f, MountAlpha);   KneeRf = FMath::Lerp(KneeRf, -42.f, MountAlpha);
-	HipLf = FMath::Lerp(HipLf, 62.f, MountAlpha);   KneeLf = FMath::Lerp(KneeLf, -42.f, MountAlpha);
-	// Climbing: legs step up the rungs alternately
-	HipRf = FMath::Lerp(HipRf, 55.f + 45.f * CS, ClimbAlpha);   KneeRf = FMath::Lerp(KneeRf, -(65.f + 35.f * CS), ClimbAlpha);
-	HipLf = FMath::Lerp(HipLf, 55.f - 45.f * CS, ClimbAlpha);   KneeLf = FMath::Lerp(KneeLf, -(65.f - 35.f * CS), ClimbAlpha);
-	// Rolling: tucked into a ball
-	HipRf = FMath::Lerp(HipRf, 105.f, TuckAlpha);   KneeRf = FMath::Lerp(KneeRf, -125.f, TuckAlpha);
-	HipLf = FMath::Lerp(HipLf, 105.f, TuckAlpha);   KneeLf = FMath::Lerp(KneeLf, -125.f, TuckAlpha);
-	// Load the right side during anticipation, then pass the weight across as the blade follows through.
-	HipRf += 8.f * SwingLoad; HipLf -= 8.f * SwingLoad;
-	KneeRf -= 10.f * FMath::Abs(SwingLoad); KneeLf -= 10.f * FMath::Abs(SwingLoad);
-
-	// Standing still, a natural stance (owner, 2026-11-03): heels a little closer (each leg rolls in HeelIn degrees; a hip's
-	// roll is NEGATIVE to swing a leg out to his right, measured 2026-10-31) and the toes turned out ToeOut degrees, so the toes
-	// stay about as far apart as before. Only when idle: walking with toes out read as a waddle.
-	constexpr float HeelIn = 1.5f, ToeOut = 12.f;
-	HipR->SetRelativeRotation(FRotator(HipRf, 0.f, HipRroll + HeelIn * IdleAmt));
-	HipL->SetRelativeRotation(FRotator(HipLf, 0.f, HipLroll - HeelIn * IdleAmt));
-	KneeR->SetRelativeRotation(FRotator(KneeRf, 0.f, 0.f));
-	KneeL->SetRelativeRotation(FRotator(KneeLf, 0.f, 0.f));
-	// Feet stay flat on the ground (a running stride lets them tip a little); in the air, sitting, riding, climbing,
-	// sliding and rolling they follow the shins as before
-	const float Level = Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	// Walking feet: flat while planted, the heel rising as the foot pushes off, then following the shin (toes trailing)
-	// through the swing and levelling out again to land
-	const float Gait = MoveBlend * Level;
-	auto FootPitch = [&](float H, float K, float Follow, float Toe)
+	TickSuitTests(Dt);
+	if (Anim && Anim->IsReady())
 	{
-		return Level * FMath::Lerp(-(H + K), -8.f, Follow * Gait) - 20.f * Toe * Gait;
-	};
-	AnkleR->SetRelativeRotation(FRotator(FootPitch(HipRf, KneeRf, GFollowR, GToeR), ToeOut * IdleAmt, 0.f));
-	AnkleL->SetRelativeRotation(FRotator(FootPitch(HipLf, KneeLf, GFollowL, GToeL), -ToeOut * IdleAmt, 0.f));
-
-	P.HipRf = HipRf; P.HipLf = HipLf; P.KneeRf = KneeRf; P.KneeLf = KneeLf; P.IdleAmt = IdleAmt; P.BreathS = BreathS;
-}
-
-void AKnightCharacter::PoseBody(FKnightPose& P)
-{
-	const float Dt = P.Dt;
-	const float HipRf = P.HipRf, HipLf = P.HipLf, KneeRf = P.KneeRf, KneeLf = P.KneeLf, LegReach = P.LegReach, UR = P.UR, GContact = P.GContact, Hz = P.Hz, GAb = P.GAb, GAf = P.GAf, WR = P.WR, WL = P.WL;
-	const float Air = P.Air, Stream = P.Stream, F01 = P.F01, Lean = P.Lean, Ground = P.Ground, Squash = P.Squash, DuckLean = P.DuckLean, BreathS = P.BreathS, IdleAmt = P.IdleAmt, Twist = P.Twist, S = P.S, C = P.C, DuckC = P.DuckC;
-
-	// ---------- Body bounce ----------
-	// The hips dip as the legs spread (so planted feet stay on the ground) and rise over each step
-	// Walking: the hips dip when the legs spread. Running: the body is lowest mid-stance and floats up
-	// while the legs are spread, so there is a brief moment with both feet off the ground.
-	// The hips ride exactly as high as the planted leg holds them (its thigh and shin angles), so a planted foot stays on
-	// the ground: highest as the body passes over a straight leg, lowest as the feet spread, a little lower again as a
-	// running knee gives. Both feet down: the lower of the two. Both up (running): between the two, floating.
-	const float Thigh = float(KnightDesign::ThighLen()), Shin = float(KnightDesign::ShinLen());
-	auto LegHeight = [&](float H, float K) { return Thigh * FMath::Cos(FMath::DegreesToRadians(H)) + Shin * FMath::Cos(FMath::DegreesToRadians(H + K)) - LegReach; };
-	const float HR = LegHeight(HipRf, KneeRf), HL = LegHeight(HipLf, KneeLf);
-	// In the float between running steps the body follows a real arc: from the height at push-off to the height at landing,
-	// lifted by how long it is in the air
-	float FlightZ = 0.f;
-	{
-		const float Half = FMath::Fmod(UR, 0.5f);
-		const float F = FMath::Clamp((Half - GContact) / FMath::Max(0.5f - GContact, 0.01f), 0.f, 1.f);
-		const float TAir = FMath::Max(0.5f - GContact, 0.f) / FMath::Max(Hz, 0.1f);
-		const float Arc = 0.5f * 980.f * GetCharacterMovement()->GravityScale * FMath::Square(0.5f * TAir);
-		FlightZ = FMath::Lerp(LegHeight(-GAb, -4.f), LegHeight(GAf, -4.f), F) + 4.f * Arc * F * (1.f - F);
-	}
-	const float WAir = FMath::Max(0.f, 1.f - WR - WL);   // neither foot holding him: the float
-	const float GroundZ = (WR * HR + WL * HL + WAir * FlightZ) / FMath::Max(WR + WL + WAir, 0.01f);
-	float BodyZ = FMath::Lerp(GroundZ, 0.f, Air);
-	BodyZ = FMath::Lerp(BodyZ, -42.f, SlideAlpha);
-	BodyZ = FMath::Lerp(BodyZ, 0.f, SitAlpha);
-	BodyZ = FMath::Lerp(BodyZ, 98.f, MountAlpha);                  // up onto the saddle
-	BodyZ = FMath::Lerp(BodyZ, -45.f, TuckAlpha);
-	SmoothBodyZ = FMath::FInterpTo(SmoothBodyZ, BodyZ, Dt, 14.f); // soften any remaining steps
-	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, SmoothBodyZ));
-
-	// ---------- Chest: lean into the run, twist against the hips, lean into turns ----------
-	const float NewYaw = GetActorRotation().Yaw;
-	const float TurnRate = FMath::Clamp(FMath::FindDeltaAngleDegrees(PrevYaw, NewYaw) / Dt, -720.f, 720.f);
-	PrevYaw = NewYaw;
-	YawRate = FMath::FInterpTo(YawRate, TurnRate, Dt, 8.f);
-	const float TurnRoll = FMath::Clamp(YawRate * 0.025f, -12.f, 12.f) * Stream;
-
-	const float AirLean = FMath::Lerp(4.f, -10.f, F01); // slight arch back while rising, forward while falling
-	// at ease the chest leans a little forward (not standing against a wall) and lifts with each breath
-	float UpperPitch = FMath::Lerp(-Lean - RestLean * Ground, AirLean, Air) - 12.f * Squash - DuckLean - 10.f * BlockAlpha * Ground + 0.9f * BreathS * IdleAmt;   // behind the shield he hunches over it
-	UpperPitch = FMath::Lerp(UpperPitch, 28.f, SlideAlpha);  // lean back into the slide
-	UpperPitch = FMath::Lerp(UpperPitch, 0.f, SitAlpha);
-	UpperPitch = FMath::Lerp(UpperPitch, -6.f * RunAlpha, MountAlpha);   // a little forward in a gallop
-	UpperPitch = FMath::Lerp(UpperPitch, -45.f, TuckAlpha);
-	SwingLeanNow = FMath::FInterpTo(SwingLeanNow, SwingLeanWant, Dt, 20.f);
-	UpperPitch += SwingLeanNow * Ground * (1.f - SlideAlpha) * (1.f - SitAlpha) * (1.f - MountAlpha) * (1.f - ClimbAlpha) * (1.f - TuckAlpha);
-	const float Sway = 0.9f * FMath::Sin(IdleTime * 0.62f) * IdleAmt;   // a slow shift of weight from side to side while standing
-	// a sword swing turns the chest with the arm (a third of the arm's sweep), so the body puts weight behind it
-	SwingTwistNow = FMath::FInterpTo(SwingTwistNow, SwingBodyWant, Dt, 22.f);   // (the jab's key poses set it: PoseArms)
-	UpperPivot->SetRelativeRotation(FRotator(UpperPitch, Twist * S * Ground - LegYaw + SwingTwistNow, TurnRoll + Sway));   // (turned back against the hips' LegYaw: the chest stays square to the camera)
-
-	// Chest bob: the upper body sinks as each foot takes weight and springs back up between steps.
-	// (Only the chest moves, so the feet never sink into the ground.) In the air it stretches on the way up.
-	const float BobAmp = FMath::Lerp(0.8f, 3.f, RunAlpha) * MoveBlend;   // (the hips carry the real rise and fall now)
-	const float ChestTarget = (Ground * (-BobAmp * (1.f - S * S)) + Air * FMath::Lerp(5.f, -4.f, F01)) * (1.f - FMath::Max(SlideAlpha, SitAlpha)) + 0.6f * BreathS * IdleAmt;   // the chest rises as he breathes in
-	SmoothChestZ = FMath::FInterpTo(SmoothChestZ, ChestTarget, Dt, 30.f);
-	UpperPivot->SetRelativeLocation(UpperBase + FVector(0.f, 0.f, SmoothChestZ));
-
-	// Pelvis sways with the steps: a little roll as weight shifts, and hips turning against the shoulders
-	float FlipPitch = 0.f;
-	if (bRolling)
-	{
-		const float K = FMath::Clamp(RollT / RollDur, 0.f, 1.f);
-		FlipPitch = -360.f * (K * K * (3.f - 2.f * K)); // one forward somersault
-	}
-	// (a sword swing turns the hips too, a little behind the chest: SwingTwistNow, worked out above)
-	BodyRoot->SetRelativeRotation(FRotator(FlipPitch, -0.5f * Twist * S * Ground + LegYaw + 0.55f * SwingTwistNow, 2.5f * MoveBlend * C * Ground));
-
-	// The head counter-steers so the knight keeps looking ahead, with a small nod on each step
-	const float Nod = 1.2f * FMath::Sin(2.f * GaitPhase) * MoveBlend * Ground;
-	// (crouched, the head also takes back the rest of the squat's lean, so the helm looks the same way as when standing)
-	HeadPivot->SetRelativeRotation(FRotator(-0.6f * UpperPitch + Nod - 7.f * Ground - 12.f * BlockAlpha * Ground + 0.4f * 24.f * DuckC * (1.f - BlockAlpha), -0.7f * Twist * S * Ground - 1.25f * SwingTwistNow, -0.5f * TurnRoll - 0.7f * Sway));   // (the head keeps looking ahead through a swing)
-
-	P.TurnRoll = TurnRoll;
-}
-
-// The kick (wheel up) and lying knocked down, laid over the legs and body (the arms' guard is in PoseArms).
-// The kick is Ken's forward smash kick with the right leg (owner, 2026-10-31): the knee comes up and across, the whole body
-// turns to his left until his right side faces the target, the chest leans back away from it, the head turns to watch, and
-// the leg drives out straight at hip height with the sole leading; then it folds back and sets down (the end lag).
-float AKnightCharacter::KickGuard() const
-{
-	if (!bAttacking || AtkStyle != EAtkStyle::Kick) return 0.f;
-	const float T = AttackT / FMath::Max(AttackDur, 0.01f);
-	return FMath::SmoothStep(0.f, 0.15f, T) * (1.f - FMath::SmoothStep(0.8f, 1.f, T));
-}
-
-void AKnightCharacter::PoseKick(FKnightPose& P)
-{
-	auto Add = [](USceneComponent* C, float Pitch, float Yaw, float Roll)
-	{
-		FRotator R = C->GetRelativeRotation();
-		R.Pitch += Pitch; R.Yaw += Yaw; R.Roll += Roll;
-		C->SetRelativeRotation(R);
-	};
-	// A landed kick cut short by the low sweep: its pose eases out over about 0.1 s from where the leg was
-	KickFade = FMath::Max(0.f, KickFade - P.Dt / 0.1f);
-	const bool bKickNow = bAttacking && AtkStyle == EAtkStyle::Kick;
-	if (bKickNow || KickFade > 0.f)
-	{
-		// (fraction of the kick; right hip pitch and roll, right knee, the hips' turn, the chest's lean and turn, the head's turn)
-		struct FKey { float T, HipP, HipRoll, Knee, BodyYaw, ChestRoll, ChestYaw, HeadYaw; };
-		// (the leg's angles are the pose itself, taking over from the stance; the turns and leans are added to the body's.
-		//  Measured from above, 2026-10-31: at full stretch the hips are turned a full quarter to his left so the straight leg
-		//  points at the target, the sole leading and the toes pointing to his old left)
-		static const FKey Keys[] = {
-			{ 0.00f,  0.f,  0.f,    0.f,   0.f,  0.f,  0.f,  0.f },
-			{ 0.12f, 55.f, 35.f, -105.f, -50.f,  8.f, 10.f, 30.f },   // chamber: the knee up and across, turning
-			{ 0.22f, 10.f, 92.f,   -2.f, -90.f, 26.f, 18.f, 62.f },   // the foot out, side-on, leaning back
-			{ 0.50f, 10.f, 95.f,   -2.f, -90.f, 28.f, 18.f, 62.f },   // held out
-			{ 0.66f, 45.f, 45.f,  -95.f, -60.f, 12.f, 12.f, 45.f },   // folded back
-			{ 0.85f, 12.f,  5.f,  -24.f, -15.f,  2.f,  4.f, 12.f },   // set down, turning back
-			{ 1.00f, 12.f,  0.f,  -24.f,   0.f,  0.f,  0.f,  0.f } };
-		const float T = bKickNow ? FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f) : KickFadeT;
-		const float Fade = bKickNow ? 1.f : FMath::SmoothStep(0.f, 1.f, KickFade);
-		int32 i = 0;
-		while (i + 2 < (int32)UE_ARRAY_COUNT(Keys) && T > Keys[i + 1].T) ++i;
-		const FKey& A = Keys[i];
-		const FKey& B = Keys[i + 1];
-		const float U = FMath::SmoothStep(0.f, 1.f, (T - A.T) / (B.T - A.T));
-		auto L = [&](float FKey::* M) { return FMath::Lerp(A.*M, B.*M, U); };
-		const float W = Fade * FMath::SmoothStep(0.f, 0.08f, T) * (1.f - FMath::SmoothStep(0.85f, 1.f, T));   // how far the kicking leg's own pose has taken over
-		FRotator Hr = HipR->GetRelativeRotation();
-		Hr.Pitch = FMath::Lerp(Hr.Pitch, L(&FKey::HipP), W); Hr.Yaw = FMath::Lerp(Hr.Yaw, 0.f, W);
-		Hr.Roll = FMath::Lerp(Hr.Roll, -L(&FKey::HipRoll), W);   // (a hip's roll is negative out to his right: measured from above)
-		HipR->SetRelativeRotation(Hr);
-		FRotator Kr = KneeR->GetRelativeRotation();
-		Kr.Pitch = FMath::Lerp(Kr.Pitch, L(&FKey::Knee), W);
-		KneeR->SetRelativeRotation(Kr);
-		Add(BodyRoot, 0.f, Fade * L(&FKey::BodyYaw), 0.f);
-		Add(UpperPivot, 0.f, Fade * L(&FKey::ChestYaw), -Fade * L(&FKey::ChestRoll));   // (roll + tips the top to his right: negative leans him away to his left)
-		Add(HeadPivot, 0.f, Fade * L(&FKey::HeadYaw), 0.6f * Fade * L(&FKey::ChestRoll));   // (the head stays nearly level)
-		FRotator Ar = AnkleR->GetRelativeRotation();   // the kicking foot flexed, square to the shin, so the sole leads
-		Ar.Pitch = FMath::Lerp(Ar.Pitch, 0.f, W);
-		AnkleR->SetRelativeRotation(Ar);
-	}
-	// The dash attack: a fencer's lunge, the right foot thrust ahead with its knee bent, the left leg stretched out behind, the
-	// hips turned a little to his left behind the stab and sunk so both feet stay down (feet kept flat at the ankles)
-	if (IsDashing())
-	{
-		const float U = DashU();
-		const float W = FMath::SmoothStep(0.02f, 0.2f, U) * (1.f - FMath::SmoothStep(0.6f, 1.f, U));
-		auto Leg = [&](USceneComponent* Hip, USceneComponent* Knee, USceneComponent* Ankle, float HipP, float KneeP)
+		// (nobody is looking at the server's knights: a pose ten times a second serves their hurt boxes, every frame only while a blade is out.
+		// Other players' knights off screen likewise. The gear follows the capsule in between.)
+		AnimAccum += Dt;
+		float Every = 0.f;
+		if (IsNetMode(NM_DedicatedServer)) Every = bAttacking ? 0.f : 0.1f;
+		else if (!IsLocallyControlled() && Anim->Mesh() && !Anim->Mesh()->WasRecentlyRendered(0.25f)) Every = 0.2f;
+		if (AnimAccum >= Every)
 		{
-			FRotator H = Hip->GetRelativeRotation(); H.Pitch = FMath::Lerp(H.Pitch, HipP, W); H.Roll = FMath::Lerp(H.Roll, 0.f, W); Hip->SetRelativeRotation(H);
-			FRotator K = Knee->GetRelativeRotation(); K.Pitch = FMath::Lerp(K.Pitch, KneeP, W); Knee->SetRelativeRotation(K);
-			FRotator A = Ankle->GetRelativeRotation(); A.Pitch = FMath::Lerp(A.Pitch, -(HipP + KneeP), W); Ankle->SetRelativeRotation(A);
-		};
-		Leg(HipR, KneeR, AnkleR, 50.f, -55.f);
-		Leg(HipL, KneeL, AnkleL, -25.f, -8.f);
-		Add(BodyRoot, 0.f, -18.f * W, 0.f);
-		BodyRoot->SetRelativeLocation(BodyRoot->GetRelativeLocation() + FVector(0.f, 0.f, -8.f * W));
-	}
-	// Knocked down: flat on his back, legs nearly straight (eased in as he falls, out as he gets up)
-	if (KnockAlpha > 0.001f)
-	{
-		const float A = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);
-		auto Toward = [&](USceneComponent* C, float Pitch, float Roll)
-		{
-			FRotator R = C->GetRelativeRotation();
-			R.Pitch = FMath::Lerp(R.Pitch, Pitch, A); R.Roll = FMath::Lerp(R.Roll, Roll, A);
-			C->SetRelativeRotation(R);
-		};
-		Toward(HipR, 8.f, -6.f);  Toward(HipL, 14.f, 6.f);   // (legs a little apart)
-		Toward(KneeR, -12.f, 0.f); Toward(KneeL, -24.f, 0.f);
-		Toward(AnkleR, 20.f, 0.f); Toward(AnkleL, 20.f, 0.f);
-		Add(BodyRoot, 80.f * A, 0.f, 0.f);   // (pitch up: the top tips back)
-		BodyRoot->SetRelativeLocation(BodyRoot->GetRelativeLocation() + FVector(0.f, 0.f, -78.f * A));   // down to the ground
-		Add(UpperPivot, 6.f * A, 0.f, 0.f);
-		Add(HeadPivot, -28.f * A, 0.f, 0.f);   // (chin tucked: looking down his body)
-	}
-}
-
-void AKnightCharacter::PoseCape(FKnightPose& P)
-{
-	const float Dt = P.Dt, Stream = P.Stream, F01 = P.F01, Air = P.Air, TurnRoll = P.TurnRoll;
-
-	// ---------- Cape and plume ----------
-	const float FlapAmp = 3.f + 9.f * Stream;
-	const float CapeUpperG = FMath::Lerp(-4.f, -28.f, Stream) + FlapAmp * FMath::Sin(FlutterTime * 3.1f);
-	const float CapeLowerG = FMath::Lerp(-6.f, -38.f, Stream) + FlapAmp * 1.6f * FMath::Sin(FlutterTime * 5.3f + 1.2f);
-	const float CapeUpperA = FMath::Lerp(-5.f, -40.f, F01);  // streams down while rising, flies up while falling
-	const float CapeLowerA = FMath::Lerp(-8.f, -65.f, F01);
-	CapeUpper->SetRelativeRotation(FRotator(
-		FMath::Lerp(CapeUpperG, CapeUpperA, Air), 0.f,
-		(2.f + 5.f * Stream) * FMath::Sin(FlutterTime * 2.3f) - 0.5f * TurnRoll));
-	CapeLower->SetRelativeRotation(FRotator(
-		FMath::Lerp(CapeLowerG, CapeLowerA, Air), 0.f,
-		(3.f + 9.f * Stream) * FMath::Sin(FlutterTime * 3.7f + 0.8f) - 0.8f * TurnRoll));
-
-	const float PlumeG = FMath::Lerp(0.f, 20.f, Stream) + (3.f + 5.f * Stream) * FMath::Sin(FlutterTime * 4.1f + 0.5f);
-	const float PlumeA = FMath::Lerp(20.f, -15.f, F01);
-	PlumePivot->SetRelativeRotation(FRotator(FMath::Lerp(PlumeG, PlumeA, Air), 0.f, 4.f * Stream * FMath::Sin(FlutterTime * 3.3f)));
-	TickCape(Dt);
-}
-
-void AKnightCharacter::PoseArms(FKnightPose& P)
-{
-	const float Dt = P.Dt, F01 = P.F01, Air = P.Air, ArmAmp = P.ArmAmp, S = P.S, Squash = P.Squash, Ground = P.Ground, BreathS = P.BreathS, IdleAmt = P.IdleAmt, ElbowBase = P.ElbowBase, ElbowSwing = P.ElbowSwing, CS = P.CS;
-
-	// ---------- Arms ----------
-	const float ArmSway = 1.5f * FMath::Sin(IdleTime * 1.7f) * (1.f - MoveBlend);
-	const float ArmAirPitch = FMath::Lerp(100.f, 25.f, F01);   // arms thrown up on the way up, then out
-	const float ArmAirSpread = FMath::Lerp(20.f, 50.f, F01);
-
-	// Left arm (shield): swings opposite the left leg; raised in front of the chest when blocking
-	ShieldHoldA = FMath::FInterpTo(ShieldHoldA, (ShieldActive() && !bStowed) ? 1.f : 0.f, Dt, 8.f);   // no shield: the left arm hangs normally
-	float PitchL = FMath::Lerp(0.6f * ArmAmp * S + ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
-	// at rest the arms hang closer to the hips (owner, 2026-11-03): the model's arms stand out from its A-pose
-	constexpr float ArmRestIn = 7.f;
-	float RollL = Air * ArmAirSpread * 0.7f + 1.2f * BreathS * IdleAmt - ArmRestIn * Ground;
-	float ElbowLdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(S, 0.f), 15.f, Air) + ShieldRest().ElbowPitch * Ground * ShieldHoldA;   // at rest the left hand rests on the inside of the shield (when there is one)
-	PitchL = FMath::Lerp(PitchL, 38.f, BlockAlpha);
-	ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, BlockAlpha);
-	PitchL = FMath::Lerp(PitchL, -40.f, SlideAlpha);   RollL = FMath::Lerp(RollL, 30.f, SlideAlpha);
-	PitchL = FMath::Lerp(PitchL, 32.f, SitAlpha);      ElbowLdeg = FMath::Lerp(ElbowLdeg, 70.f, SitAlpha);
-	PitchL = FMath::Lerp(PitchL, 38.f, MountAlpha);    ElbowLdeg = FMath::Lerp(ElbowLdeg, 55.f, MountAlpha);    // holding the reins
-	PitchL = FMath::Lerp(PitchL, 85.f, TuckAlpha);     ElbowLdeg = FMath::Lerp(ElbowLdeg, 100.f, TuckAlpha);
-	PitchL = FMath::Lerp(PitchL, 140.f + 35.f * CS, ClimbAlpha);  ElbowLdeg = FMath::Lerp(ElbowLdeg, 25.f, ClimbAlpha);
-	if (bAttacking && !bSwinging && AtkStyle == EAtkStyle::Slash && SelectedKind() == JeebItems::K_Sword)
-	{
-		const float T = FMath::Clamp(AttackT / FMath::Max(AttackDur, 0.01f), 0.f, 1.f);
-		const float Counter = FMath::Sin(PI * FMath::Clamp(T / 0.78f, 0.f, 1.f));
-		const float CounterSign = (AttackDir == JabSecond) ? -1.f : 1.f;
-		PitchL -= 12.f * Counter * CounterSign; RollL -= 16.f * Counter * CounterSign; ElbowLdeg += 18.f * Counter;
-	}
-	{
-		const float G = KickGuard();   // kicking: both fists up in a guard
-		PitchL = FMath::Lerp(PitchL, 40.f, G); ElbowLdeg = FMath::Lerp(ElbowLdeg, 85.f, G); RollL = FMath::Lerp(RollL, 6.f, G);
-		const float K = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);   // knocked down: the arms flung out
-		PitchL = FMath::Lerp(PitchL, 15.f, K); RollL = FMath::Lerp(RollL, 55.f, K); ElbowLdeg = FMath::Lerp(ElbowLdeg, 20.f, K);
-	}
-	ArmPivotL->SetRelativeLocation(LeftBase + BlockAlpha * FVector(22.f, 30.f, 10.f)); // shield comes across in front of the body
-	ArmPivotL->SetRelativeRotation(FRotator(PitchL, 0.f, RollL));
-	ElbowL->SetRelativeRotation(FRotator(ElbowLdeg, ShieldRest().ElbowYaw * Ground * (1.f - BlockAlpha) * ShieldHoldA, ShieldRest().ElbowRoll * Ground * (1.f - BlockAlpha) * ShieldHoldA));   // the forearm flat behind the shield
-	HoldShield();
-
-	// Right arm (sword): swings opposite the right leg, unless it is busy mining or chopping
-	float TargetPitch = FMath::Lerp(-0.22f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;   // arms hang a touch forward (relaxed shoulders)
-	float TargetYaw = 0.f;
-	float RollR = ArmRestIn * Ground - Air * ArmAirSpread - 1.2f * BreathS * IdleAmt - (EaseKind == JeebItems::K_Staff ? 14.f * EaseAlpha : 0.f);   // the arms ease out a little with each breath (and out to the side to hold a staff)
-	float ElbowRdeg = FMath::Lerp(HeldElbow + 0.25f * ElbowBase, 40.f, Air);
-	if (EaseKind == JeebItems::K_Bow && !bStowed)   // the bow in his left hand: the empty right arm hangs and swings like the left one, not as if holding something (owner, 2026-11-01)
-	{
-		TargetPitch = FMath::Lerp(-0.6f * ArmAmp * S - ArmSway, ArmAirPitch, Air) + 25.f * Squash + 4.f * Ground;
-		ElbowRdeg = FMath::Lerp(ElbowBase + ElbowSwing * FMath::Max(-S, 0.f), 15.f, Air);
-	}
-	float ArmSpeed = 25.f;
-
-	TargetPitch = FMath::Lerp(TargetPitch, -35.f, SlideAlpha);   RollR = FMath::Lerp(RollR, -30.f, SlideAlpha);
-	TargetPitch = FMath::Lerp(TargetPitch, 32.f, SitAlpha);      ElbowRdeg = FMath::Lerp(ElbowRdeg, 70.f, SitAlpha);
-	TargetPitch = FMath::Lerp(TargetPitch, 38.f, MountAlpha);    ElbowRdeg = FMath::Lerp(ElbowRdeg, 55.f, MountAlpha);
-	TargetPitch = FMath::Lerp(TargetPitch, 85.f, TuckAlpha);     ElbowRdeg = FMath::Lerp(ElbowRdeg, 100.f, TuckAlpha);
-	TargetPitch = FMath::Lerp(TargetPitch, 140.f - 35.f * CS, ClimbAlpha);  ElbowRdeg = FMath::Lerp(ElbowRdeg, 25.f, ClimbAlpha);
-
-	if (bCharging && !bAttacking && !bSwinging)
-	{
-		// Spear drawn back, the stronger the pull the further back
-		const float K = FMath::Clamp(ChargeT / 1.0f, 0.f, 1.f);
-		TargetPitch = FMath::Lerp(70.f, 45.f, K);
-		TargetYaw = FMath::Lerp(0.f, 18.f, K);
-		ElbowRdeg = FMath::Lerp(60.f, 110.f, K);
-		RollR = 0.f;
-		ArmSpeed = 20.f;
-	}
-
-	if (bAttacking && !bSwinging)
-	{
-		const float T = AttackT / AttackDur;
-		if (AtkStyle == EAtkStyle::Thrust)
-		{
-			// Pull back, then drive the arm straight out
-			if (T < 0.35f)
+			JeebAnim::FInput In;
+			FillAnimInput(In);
+			if (bShotFace && !ShotGallery.IsSet()) ShotGallery = FParse::Param(FCommandLine::Get(), TEXT("SuitGallery"));
+			if (ShotGallery.Get(false))
 			{
-				const float A = T / 0.35f;
-				TargetPitch = FMath::Lerp(55.f, 45.f, A);  TargetYaw = FMath::Lerp(10.f, 18.f, A);  ElbowRdeg = FMath::Lerp(90.f, 115.f, A);
+				SetActorHiddenInGame(true);
+				Anim->TickGallery(this, GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()));
 			}
 			else
 			{
-				const float A = FMath::Clamp((T - 0.35f) / 0.25f, 0.f, 1.f);
-				TargetPitch = FMath::Lerp(45.f, 88.f, A);  TargetYaw = FMath::Lerp(18.f, 0.f, A);  ElbowRdeg = FMath::Lerp(115.f, 4.f, A);
+				const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+				Anim->Update(AnimAccum, In, Feet, GetActorRotation().Yaw);
+				PlaceGear();
 			}
+			AnimAccum = 0.f;
 		}
-		else if (AtkStyle == EAtkStyle::Cast)
+		// (the dust's footfalls: on the stride's two marks)
+		const float P = 2.f * PI * (Anim->Phase01() - 0.15f);
+		OutS = FMath::Sin(P);
+		OutC = FMath::Cos(P);
+	}
+	if (!IsNetMode(NM_DedicatedServer)) TickCape(Dt);
+}
+
+// Everything he carries goes where the pose puts it. WristR is the weapon's joint (the blade, its trail and its hit boxes), ElbowL the left hand's,
+// UpperPivot the chest: the cape and whatever is on his back
+void AKnightCharacter::PlaceGear()
+{
+	if (WristR) WristR->SetWorldTransform(Anim->RightGripWorld());
+	if (ElbowL) ElbowL->SetWorldTransform(Anim->LeftGripWorld());
+	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
+	if (!bStowed)
+	{
+		const FTransform At = Anim->ShieldWorld(BlockAlpha);
+		for (FArmorPart& P : ArmorParts)
+			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At);
+	}
+	if (BowHold) BowHold->SetWorldTransform(Anim->BowWorld(BowAimAlpha));
+	if (IsNetMode(NM_DedicatedServer)) return;
+	UpdateBowBits();
+	UpdateQuiver();
+	if (QuiverParts.Num() > 0 && QuiverParts[0])
+		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());
+}
+
+// ---------------- Test pictures ----------------
+// -SuitWalk=<direction>_<share>_<from>_<for>: walks that way (0 = where he faces, 90 = his right), at that share of his top speed, starting <from> seconds in and
+// lasting <for>. -SuitSprint sprints. -SuitDo=roll<deg>, stun<hundredths>, knock, drop, crouch: done to him once the pictures have started.
+void AKnightCharacter::TickSuitTests(float Dt)
+{
+	if (!IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
+	static FString Walk;
+	static FString Do;
+	static bool bRead = false;
+	if (!bRead)
+	{
+		FParse::Value(FCommandLine::Get(), TEXT("SuitWalk="), Walk);
+		FParse::Value(FCommandLine::Get(), TEXT("SuitDo="), Do);
+		bRead = true;
+	}
+	if (!Walk.IsEmpty())
+	{
+		TArray<FString> P;
+		if (Walk.ParseIntoArray(P, TEXT("_")) == 4)
 		{
-			// Raise the arm and point
-			const float A = FMath::Clamp(T / 0.3f, 0.f, 1.f);
-			const float E = A * A * (3.f - 2.f * A);
-			TargetPitch = FMath::Lerp(20.f, 92.f, E);  TargetYaw = 0.f;  ElbowRdeg = FMath::Lerp(50.f, 8.f, E);
-		}
-		else if (AtkStyle == EAtkStyle::Kick)
-		{
-			// Kicking: the sword fist up by the chin in a guard
-			const float G = KickGuard();
-			TargetPitch = FMath::Lerp(TargetPitch, 40.f, G); TargetYaw = FMath::Lerp(0.f, -15.f, G); ElbowRdeg = FMath::Lerp(ElbowRdeg, 100.f, G);
-		}
-		else if (AttackDir > 0)
-		{
-						// First swing, right to left: the arm comes up to shoulder height and swings out to the right,
-			// then the whole arm sweeps flat across the body
-			if (T < 0.35f)
+			SuitTestT += Dt;
+			const float From = FCString::Atof(*P[2]), For = FCString::Atof(*P[3]);
+			if (SuitTestT < From || SuitTestT > From + For) { if (bSprinting) StopSprint(); }
+			else
 			{
-				const float A = T / 0.35f;
-				const float E = A * A * (3.f - 2.f * A);
-				TargetPitch = FMath::Lerp(10.f, 78.f, E);
-				TargetYaw = FMath::Lerp(0.f, 80.f, E);
-				ElbowRdeg = FMath::Lerp(ElbowRdeg, 65.f, E);
+				if (FParse::Param(FCommandLine::Get(), TEXT("SuitSprint")) && !bSprinting) StartSprint();
+				AddMovementInput(FRotator(0.f, GetActorRotation().Yaw + FCString::Atof(*P[0]), 0.f).Vector(), FCString::Atof(*P[1]));
 			}
-			else if (T < 0.55f)
-			{
-				const float A = (T - 0.35f) / 0.2f;
-				TargetPitch = FMath::Lerp(78.f, 84.f, A);
-				TargetYaw = FMath::Lerp(80.f, -70.f, A * A);
-				ElbowRdeg = FMath::Lerp(65.f, 5.f, A);
-			}
-			else { TargetPitch = 84.f; TargetYaw = -70.f; ElbowRdeg = 5.f; }
 		}
-		else
-		{
-						// Follow-up, left to right: starts where the first one ended, draws back across the body, whips flat back out
-			if (T < 0.35f)
-			{
-				const float A = T / 0.35f;
-				const float E = A * A * (3.f - 2.f * A);
-				TargetPitch = FMath::Lerp(84.f, 80.f, E);
-				TargetYaw = FMath::Lerp(-70.f, -88.f, E);
-				ElbowRdeg = FMath::Lerp(5.f, 70.f, E);
-			}
-			else if (T < 0.55f)
-			{
-				const float A = (T - 0.35f) / 0.2f;
-				TargetPitch = FMath::Lerp(80.f, 84.f, A);
-				TargetYaw = FMath::Lerp(-88.f, 75.f, A * A);
-				ElbowRdeg = FMath::Lerp(70.f, 5.f, A);
-			}
-			else { TargetPitch = 84.f; TargetYaw = 75.f; ElbowRdeg = 5.f; }
-		}
-		RollR = 0.f;
-		ArmSpeed = 38.f;
 	}
-
-	// The sword's jab: two horizontal SLASHES that loop for as long as you click (owner, 2026-10-31: a genuine sweep, the tip
-	// travelling a wide arc from one side of the knight to the other, edge first; not a thrust). Each hit is a few key poses:
-	//   the arm: shoulder pitch, sweep yaw, raise roll (raised out to the side), elbow bend, and the chest's turn (Body; PoseBody
-	//     turns the hips with it), which carry the hand round;
-	//   the BLADE: its heading round the knight (BladeYaw: 0 straight ahead, +90 his right, -90 his left) and tilt (BladePitch).
-	//     The wrist turns the hand so the blade points that way, lying flat with its edge leading the way it travels (worked out
-	//     in closed form below, from the real forearm). Sweeping the heading from one side to the other makes the tip sweep.
-	// Each hit starts from wherever the arm and blade are (SwingFrom), so 1-2-1-2 flows. Measured with -ShotMove=jab2 (JEEBTIP).
-	//   1 forehand: coiled right, the blade pointing back over his right side; a sweep across the front, straight ahead at the
-	//     impact, round to his left; follow-through, then easing down
-	//   2 backhand: from his left, the same sweep back the other way, ending where hit 1 winds up
-	// The knees and lean are in PosePrep (JabBodyNow).
-	float ForearmTarget = 0.f;
-	SwingBodyWant = 0.f;
-	SwingLeanWant = 0.f;
-	SwingLoadWant = 0.f;
-	bool bBladeLead = false;   // a sword slash is on: the wrist sets the blade's heading
-	const bool bSweepNow = bAttacking && AtkStyle == EAtkStyle::Sweep;
-	const bool bDashNow = bAttacking && AtkStyle == EAtkStyle::Dash;
-	if (bAttacking && !bSwinging && (AtkStyle == EAtkStyle::Slash || bSweepNow || bDashNow) && SelectedKind() == JeebItems::K_Sword)
+	if (Do.IsEmpty() || bSuitTestActed || !bShotFace) return;
+	bSuitTestActed = true;
+	if (Do.StartsWith(TEXT("roll")))
 	{
-		struct FKey { float T, Pitch, Yaw, Roll, Elbow, Body, BladeYaw, BladePitch; bool bAccel; };   // bAccel: the blend into this key speeds up (a strike)
-		static const FKey Hit1[] = {
-			{ 0.00f, 0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
-			{ 0.14f, 20.f,   12.f,  -80.f, 55.f,  16.f,  122.f,  12.f, false },   // draw the hand back out to his right, chest and hips coiling with it
-			{ 0.25f, 28.f,   18.f,  -92.f, 70.f,  28.f,  138.f,  16.f, false },   // pull-back apex: hand at shoulder height on his right, blade trailing back
-			{ 0.33f, 46.f,    6.f,  -74.f, 50.f,  14.f,   88.f,  10.f, false },   // the elbow leads forward, the blade swings out to his right
-			{ 0.38f, 66.f,   -4.f,  -40.f, 22.f,  -4.f,   42.f,   4.f, false },   // shoulder drives across the front as the elbow opens
-			{ 0.43f, 82.f,   -8.f,   -8.f,  0.f, -22.f,    0.f,   0.f, true  },   // impact: arm fully reaches, blade points straight ahead from the belt
-			{ 0.62f, 58.f,  -35.f,  -18.f, 10.f, -38.f,  -32.f,  -8.f, false },   // carry the extended arm through the front before recovery
-			{ 0.82f,-18.f,  -72.f,  -56.f, 26.f, -24.f,  -70.f, -22.f, false },   // recover low without stopping the body's turn
-			{ 0.92f,-14.f,  -48.f,  -62.f, 44.f, -24.f, -112.f, -38.f, false },   // settle the sword toward the left hip for the next stroke
-			{ 1.00f,-12.f,  -38.f,  -62.f, 48.f, -25.f, -138.f, -42.f, false } }; // low, palm-down handoff into hit 2
-				static const FKey Hit2[] = {
-			{ 0.00f,-12.f,  -38.f,  -62.f, 48.f, -25.f, -138.f, -42.f, false },   // continuous from hit 1: hand low at left hip, palm toward the ground
-			{ 0.28f, -4.f,  -78.f,  -72.f, 70.f, -50.f, -145.f, -30.f, false },   // elbow stays forward as the blade loads back behind the left leg
-			{ 0.50f, 0.f,  -85.f,  -82.f, 20.f,  14.f,    0.f,  -3.f, true  },   // the impact: hips and chest turn through the front
-			{ 0.72f, 0.f,    0.f,  -95.f, 30.f,  42.f,  110.f,   5.f, false },   // follow-through carries the whole torso round to his right
-			{ 1.00f, 0.f,  -10.f, -100.f, 40.f,  34.f,  120.f,   5.f, false } }; // ending near where hit 1 winds up
-		// The low sweep (wheel down), Link's down tilt: down in the squat, the blade drawn back low on his right, then swept flat
-		// along the ground across his front to his left (the same grip and leading edge as hit 1)
-		static const FKey Sweep[] = {
-			{ 0.00f,  0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
-			{ 0.15f, 10.f,   30.f,  -70.f, 45.f,  24.f,  125.f, -12.f, false },   // dropping into the squat, the blade drawn back low on his right
-			{ 0.245f, 22.f,  22.f,  -55.f, 30.f,  16.f,   80.f, -10.f, false },   // the blade swings out low on his right
-			{ 0.34f, 30.f,   -6.f,  -12.f,  4.f, -18.f,    0.f,  -3.f, true  },   // impact: the arm reaches low and forward, the blade flat along the ground (tip about 15 cm up)
-			{ 0.55f, 24.f,  -40.f,  -16.f,  8.f, -36.f,  -70.f,  -3.f, false },   // through to his left, still low
-			{ 0.76f,  8.f,  -40.f,  -45.f, 30.f, -22.f, -110.f, -30.f, false },   // recover, rising out of the squat
-			{ 1.00f, -8.f,  -30.f,  -60.f, 42.f, -12.f, -130.f, -40.f, false } };
-		// The dash attack (sprint + click): a lunge, the hand drawn back by his ribs and the blade poked straight out at full reach
-		// like a spear, level at chest height, the right shoulder already forward (keyed by DashU: the thrust is out about 0.16 s
-		// in, held to 0.3 s, then the end lag). A poke, not a cut (owner, 2026-10-31): from the draw-back to the stab the chest,
-		// the arm's sideways angle and the blade's heading stay put, so only the shoulder and elbow drive the blade forward.
-		static const FKey Dash[] = {
-			{ 0.00f,  0.f,    0.f,  -60.f, 25.f,   0.f,  120.f,   5.f, false },   // begins from the live ready pose
-			{ 0.13f, 30.f,   -4.f,  -10.f,105.f, -28.f,    0.f,   6.f, false },   // drawn back: the fist by his right ribs, the blade already pointing ahead
-			{ 0.24f, 88.f,   -4.f,   -2.f,  0.f, -30.f,    0.f,  -2.f, true  },   // the stab: arm straight out ahead, the blade in line with it
-			{ 0.45f, 86.f,   -4.f,   -4.f,  2.f, -28.f,    0.f,  -3.f, false },   // held out as the lunge slides on
-			{ 0.75f, 40.f,    5.f,  -45.f, 40.f, -12.f,   40.f, -20.f, false },   // drawing back in
-			{ 1.00f,-10.f,  -25.f,  -60.f, 42.f,  -8.f, -110.f, -38.f, false } };
-		const FKey* Keys = bDashNow ? Dash : bSweepNow ? Sweep : AttackDir == JabSecond ? Hit2 : Hit1;
-		const int32 Num = bDashNow ? UE_ARRAY_COUNT(Dash) : bSweepNow ? UE_ARRAY_COUNT(Sweep) : AttackDir == JabSecond ? UE_ARRAY_COUNT(Hit2) : UE_ARRAY_COUNT(Hit1);
-		const float T = bDashNow ? DashU() : FMath::Clamp(AttackT / AttackDur, 0.f, 1.f);
-		if (bDashNow) SwingLeanWant = -18.f * FMath::SmoothStep(0.06f, 0.24f, T) * (1.f - FMath::SmoothStep(0.5f, 1.f, T));   // leaning into the lunge
-		else if (AttackDir != JabSecond)
-		{
-			const float Windup = FMath::SmoothStep(0.04f, 0.22f, T);
-			const float Release = FMath::SmoothStep(0.28f, 0.44f, T);
-			const float Follow = FMath::SmoothStep(0.43f, 0.64f, T);
-			const float Recover = FMath::SmoothStep(0.78f, 1.00f, T);
-			SwingLeanWant = 7.f * Windup - 17.f * Release - 5.f * Follow + 15.f * Recover;
-			SwingLoadWant = Windup * (1.f - 2.f * FMath::SmoothStep(0.30f, 0.62f, T)) * (1.f - Recover);
-		}
-		else
-		{
-			const float Windup = FMath::SmoothStep(0.04f, 0.28f, T);
-			const float Release = FMath::SmoothStep(0.28f, 0.50f, T);
-			const float Follow = FMath::SmoothStep(0.50f, 0.72f, T);
-			const float Recover = FMath::SmoothStep(0.78f, 1.00f, T);
-			// The backhand coils left, then transfers the brace through the hips as the chest and blade turn right.
-			SwingLeanWant = 8.f * Windup - 18.f * Release - 4.f * Follow + 14.f * Recover;
-			SwingLoadWant = -Windup * (1.f - 2.f * FMath::SmoothStep(0.30f, 0.62f, T)) * (1.f - Recover);
-		}
-		int32 i = 0;
-		while (i + 2 < Num && T > Keys[i + 1].T) ++i;
-		FKey K0 = Keys[i];
-		const FKey& K1 = Keys[i + 1];
-		if (i == 0)   // the start pose is wherever the arm (and, mid-combo, the blade) was when the swing began
-		{
-			K0.Pitch = SwingFrom[0]; K0.Yaw = SwingFrom[1]; K0.Roll = SwingFrom[2]; K0.Elbow = SwingFrom[3]; K0.Body = SwingFrom[5];
-			K0.BladeYaw = SwingFrom[6]; K0.BladePitch = SwingFrom[7];
-		}
-		const float A = FMath::Clamp((T - K0.T) / FMath::Max(K1.T - K0.T, 0.001f), 0.f, 1.f);
-		const float E = K1.bAccel ? A * A : A * A * (3.f - 2.f * A);
-		TargetPitch = FMath::Lerp(K0.Pitch, K1.Pitch, E);
-		TargetYaw = FMath::Lerp(K0.Yaw, K1.Yaw, E);
-		RollR = FMath::Lerp(K0.Roll, K1.Roll, E);
-		ElbowRdeg = FMath::Lerp(K0.Elbow, K1.Elbow, E);
-		SwingBodyWant = FMath::Lerp(K0.Body, K1.Body, E);
-		BladeYawNow = FMath::Lerp(K0.BladeYaw, K1.BladeYaw, E);
-		BladePitchNow = FMath::Lerp(K0.BladePitch, K1.BladePitch, E);
-		// The smash attack's charge (TickSmash): hit 1 waits at its pull-back and coils a little further as the charge builds (it
-		// eases back out into the swipe), with Smash's tremble: a small shake that grows with the charge and stays once it is full
-		SmashCoilNow = FMath::FInterpTo(SmashCoilNow, Smash == ESmash::Charging ? SmashCharge : 0.f, Dt, Smash == ESmash::Charging ? 6.f : 18.f);
-		SwingBodyWant += 12.f * SmashCoilNow; TargetYaw += 8.f * SmashCoilNow; BladeYawNow += 12.f * SmashCoilNow; SwingLeanWant += 4.f * SmashCoilNow;
-		if (Smash == ESmash::Charging)
-		{
-			const float Shake = 0.6f + 0.8f * SmashCharge + (SmashCharge >= 1.f ? 0.5f : 0.f);   // degrees
-			const float Ph = 2.f * PI * GetWorld()->GetTimeSeconds();
-			TargetPitch += Shake * FMath::Sin(Ph * 17.f);
-			TargetYaw += Shake * FMath::Sin(Ph * 13.f + 1.3f);
-			BladeYawNow += 1.2f * Shake * FMath::Sin(Ph * 19.f + 0.7f);
-			BladePitchNow += Shake * FMath::Sin(Ph * 15.f + 2.1f);
-		}
-		// Bounced off a shield (StartRebound): the chest rocks back and the sword arm judders, settling over the stuck time
-		if (Smash == ESmash::Rebound)
-		{
-			const float K = 1.f - FMath::SmoothStep(0.f, FMath::Max(ReboundDur, 0.01f), SmashT);
-			const float Ph = 2.f * PI * GetWorld()->GetTimeSeconds();
-			SwingLeanWant += 12.f * K;
-			TargetPitch += 3.f * K * FMath::Sin(Ph * 11.f);
-			BladePitchNow += 4.f * K * FMath::Sin(Ph * 13.f + 0.9f);
-		}
-		// The second stroke remains as before; the first stroke's body and load curves are keyed separately above.
-		// Which way the leading edge faces (the sword has two edges; this picks the one the knuckles' side of the grip leads with,
-		// so the wrist stays natural): the forehand travels to his left, the backhand to his right
-		BladeLeadSign = (AttackDir == JabSecond) ? -1.f : 1.f;
-		// The edge is tilted about the blade's length so the wrist stays natural: hit 1 keeps one grip through the pull-back and
-		// the cut (measured: the wrist never bends past about 85 degrees); hit 2 rolls into its cutting grip. Mid-combo the hand
-		// first turns over from the last hit's grip during the wind-up (CantFrom, the short way round), so nothing pops
-		const float OwnCant = (AttackDir == JabSecond) ? FMath::Lerp(-30.f, 45.f, FMath::SmoothStep(0.30f, 0.43f, T)) : -45.f;
-		BladeCantNow = OwnCant;
-		if (CantFrom > -900.f)
-		{
-			float From = OwnCant + FMath::FindDeltaAngleDegrees(OwnCant, CantFrom);
-			if (AttackDir == JabSecond && From > OwnCant) From -= 360.f;
-			BladeCantNow = FMath::Lerp(From, OwnCant, FMath::SmoothStep(0.f, AttackDir == JabSecond ? 0.30f : 0.25f, T));
-		}
-		bBladeLead = true;
-		ArmSpeed = 40.f;   // (follows the key poses tightly)
+		// (StartRoll refuses during test pictures, against stray keys: this is its body)
+		RollDir = FRotator(0.f, GetActorRotation().Yaw + FCString::Atof(*Do.Mid(4)), 0.f).Vector();
+		RollT = 0.f;
+		bSavedOrient = GetCharacterMovement()->bOrientRotationToMovement;
+		GetCharacterMovement()->bOrientRotationToMovement = false;
+		bRolling = true;
 	}
-
-	if (bFishing)
+	else if (Do == TEXT("crouch")) bCrouched = true;
+	else if (Do.StartsWith(TEXT("stun"))) ApplyReact(FCString::Atoi(*Do.Mid(4)) / 100.f, -GetActorForwardVector() * 300.f, false);
+	else if (Do == TEXT("knock"))
 	{
-		// Pole held out over the water, with a slow bob
-		TargetPitch = 66.f + 3.f * FMath::Sin(IdleTime * 2.f);
-		TargetYaw = 0.f;
-		RollR = 0.f;
-		ElbowRdeg = 22.f;
-		ArmSpeed = 14.f;
+		LaunchCharacter(-GetActorForwardVector() * 300.f, true, false);
+		GetCharacterMovement()->Velocity = -GetActorForwardVector() * 300.f;
+		MulticastKnock_Implementation(true, 0);
 	}
-
-	if (bSwinging)
-	{
-		SwingTime += Dt;
-		const float T = FMath::Fmod(SwingTime, SwingPeriod) / SwingPeriod;
-
-		if (T < 0.55f)
-		{
-			// Wind up: raise the arm smoothly
-			const float A = T / 0.55f;
-			TargetPitch = FMath::Lerp(StrikeAngle, WindupAngle, A * A * (3.f - 2.f * A));
-		}
-		else if (T < 0.7f)
-		{
-			// Strike: fast swing down
-			const float A = (T - 0.55f) / 0.15f;
-			TargetPitch = FMath::Lerp(WindupAngle, StrikeAngle, A * A);
-		}
-		else
-		{
-			// Brief pause on impact
-			TargetPitch = StrikeAngle;
-		}
-		if (bSideways)
-		{
-			// The swing value drives a horizontal sweep, with the arm held out in front
-			TargetYaw = TargetPitch;
-			TargetPitch = 80.f;
-		}
-		RollR = 0.f;
-		ElbowRdeg = 0.f;
-		ArmSpeed = 30.f;
-	}
-
-	{
-		const float K = KnockAlpha * KnockAlpha * (3.f - 2.f * KnockAlpha);   // knocked down: the arms flung out
-		TargetPitch = FMath::Lerp(TargetPitch, 15.f, K); TargetYaw = FMath::Lerp(TargetYaw, 0.f, K); RollR = FMath::Lerp(RollR, -55.f, K); ElbowRdeg = FMath::Lerp(ElbowRdeg, 20.f, K);
-	}
-	ArmPitch = FMath::FInterpTo(ArmPitch, TargetPitch, Dt, ArmSpeed);
-	ArmYaw = FMath::FInterpTo(ArmYaw, TargetYaw, Dt, ArmSpeed);
-	ArmRollR = FMath::FInterpTo(ArmRollR, RollR, Dt, ArmSpeed);   // (eased like the pitch and yaw: the jab raises the arm out to the side)
-	ArmPivot->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, ArmRollR));
-	ElbowRCur = FMath::FInterpTo(ElbowRCur, ElbowRdeg, Dt, 18.f);
-	// The forearm turns about its own length (fist and all, so the grip stays in the fingers): the jab's backhand turns it over.
-	// Always the short way round, so 360 is the same as 0.
-	ForearmNow += FMath::FindDeltaAngleDegrees(ForearmNow, ForearmTarget) * FMath::Clamp(Dt * 22.f, 0.f, 1.f);
-	ForearmNow = FRotator::NormalizeAxis(ForearmNow);
-	{
-		static const FVector ForearmAxis = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
-		ElbowR->SetRelativeRotation(FQuat(FRotator(ElbowRCur, 0.f, 0.f)) * FQuat(ForearmAxis, FMath::DegreesToRadians(ForearmNow)));
-	}
-	// The sword hand turns at the wrist (2026-10-31). During a sword slash it points the blade along the keyed heading, lying
-	// flat with its cutting edge leading the way it travels. Closed form: the hand's turn W must carry the blade's rest
-	// direction and edge (as RebuildHeld places them) onto the wanted ones; the wrist's own turn is W seen from the forearm.
-	// It fades in and out (BladeAlpha), so outside a slash the wrist rests straight.
-	BladeAlpha = FMath::FInterpTo(BladeAlpha, bBladeLead ? 1.f : 0.f, Dt, 14.f);
-	if (WristR)
-	{
-		FQuat Local = FQuat::Identity;
-		if (BladeAlpha > 0.001f)
-		{
-			static const FVector B0 = KnightDesign::BladeDir(1);
-			static const FVector E0 = (KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(B0)) - B0 * FVector::DotProduct(KM::RotateEuler(FVector(0.0, 1.0, 0.0), KM::DownTo(B0)), B0)).GetSafeNormal();
-			const float Yr = FMath::DegreesToRadians(BladeYawNow), Pr = FMath::DegreesToRadians(BladePitchNow);
-			const FVector D(FMath::Cos(Pr) * FMath::Cos(Yr), FMath::Cos(Pr) * FMath::Sin(Yr), FMath::Sin(Pr));   // in the knight's frame
-			FVector Ed = FVector(-D.Y, D.X, 0.f) * BladeLeadSign;                                                  // level, square to the blade: the way it travels
-			Ed = (Ed - D * FVector::DotProduct(Ed, D)).GetSafeNormal();
-			// canted about the blade's own length (a real cut leads with the edge a little tilted; it keeps the wrist natural)
-			static float CantTest = -999.f, CantTest2 = -999.f;
-			if (CantTest < -998.f) { CantTest = CantTest2 = -500.f; FParse::Value(FCommandLine::Get(), TEXT("JeebBladeCant="), CantTest); FParse::Value(FCommandLine::Get(), TEXT("JeebBladeCant2="), CantTest2); }   // (test pictures: try a cant for hit 1 / hit 2)
-			const float CantT = (BladeLeadSign < 0.f) ? CantTest2 : CantTest;
-			const float Cant = FMath::DegreesToRadians(CantT > -400.f ? CantT : BladeCantNow);
-			Ed = (Ed * FMath::Cos(Cant) + (D ^ Ed) * FMath::Sin(Cant)).GetSafeNormal();
-			const FQuat Actor = GetActorQuat();
-			const FQuat Want = FQuat(FMatrix(Actor.RotateVector(D), Actor.RotateVector(Ed), Actor.RotateVector(D ^ Ed), FVector::ZeroVector));
-			const FQuat Rest = FQuat(FMatrix(B0, E0, B0 ^ E0, FVector::ZeroVector));
-			const FQuat HandWorld = Want * Rest.Inverse();
-			Local = ElbowR->GetComponentQuat().Inverse() * HandWorld;
-			// The part of that turn that is a twist along the forearm belongs to the forearm (a real arm turns there), so the
-			// wrist itself only bends: the forearm takes the twist, and the wrist what is left
-			static const FVector ForearmAxisW = (KnightDesign::WristPos(1) - KnightDesign::PivotPos(KnightDesign::P_ElbowR)).GetSafeNormal();
-			FQuat Swing, Twist;
-			Local.ToSwingTwist(ForearmAxisW, Swing, Twist);
-			Twist = FQuat::Slerp(FQuat::Identity, Twist, BladeAlpha);
-			ElbowR->SetRelativeRotation(ElbowR->GetRelativeRotation().Quaternion() * Twist);
-			Local = Twist.Inverse() * Local;
-			Local = FQuat::Slerp(FQuat::Identity, Local, BladeAlpha);
-			ForearmTwistNow = FMath::RadiansToDegrees(Twist.GetTwistAngle(ForearmAxisW));
-		}
-		WristR->SetRelativeRotation(Local);
-		WristBendNow = FMath::RadiansToDegrees(Local.GetAngle());
-	}
-	PoseBow(Dt);   // (the bow: KnightCharacterBow.cpp)
-	HoldWeaponAtEase(Dt, bAttacking || bCharging || bSwinging || bFishing || Air > 0.5f || FMath::Max(FMath::Max(SitAlpha, MountAlpha), FMath::Max(ClimbAlpha, FMath::Max(TuckAlpha, SlideAlpha))) > 0.5f);
+	else if (Do == TEXT("drop")) MulticastKnock_Implementation(true, 1);
+	else if (Do == TEXT("chop")) { bSwinging = true; bSideways = true; SwingPeriod = 1.25f; }
+	else if (Do == TEXT("mine")) { bSwinging = true; bSideways = false; SwingPeriod = 1.f; }
+	else if (Do == TEXT("fish")) bFishing = true;
+	else if (Do == TEXT("sit")) bSitting = true;
+	else if (Do == TEXT("slide")) bSliding = true;
+	else if (Do == TEXT("climb")) bClimbing = true;
 }

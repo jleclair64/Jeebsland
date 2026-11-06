@@ -16,7 +16,7 @@
 #include "Components/SkinnedMeshComponent.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshLODRenderData.h"
-#include "KnightModel.h"
+#include "KnightShieldRest.h"
 #include "Engine/World.h"
 
 // ---------------- The bow (2026-10-31, Breath of the Wild style) ----------------
@@ -257,7 +257,6 @@ void AKnightCharacter::TickBow(float Dt)
 			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
 		}
 	}
-	if (!IsNetMode(NM_DedicatedServer)) { UpdateBowBits(); UpdateQuiver(); }
 }
 
 // The bow's pose numbers. Test pictures can try others without a rebuild:
@@ -286,7 +285,7 @@ static const FBowTune& BowTune()
 // At ease (owner's drawing, 2026-11-01): the limbs run forward and back through the fist (the front one tipped up RestTip),
 // the bow's curve below and the string above it, the string's side tipped RestTilt in from straight up so the string runs
 // between the elbow and his body, not outside the arm.
-FQuat AKnightCharacter::BowRestQuat() const
+FQuat KnightBowRestQuat()
 {
 	using namespace KnightDesign;
 	const FVector A0 = (GripPos(true) - PivotPos(P_ArmL)).GetSafeNormal();   // (the straight arm hanging, shoulder to fist)
@@ -301,104 +300,6 @@ FQuat AKnightCharacter::BowRestQuat() const
 	FVector Z = -A0 * FMath::Cos(Tilt) + In * FMath::Sin(Tilt);                         // the string's side: up the forearm, tipped in
 	Z = (Z - X * FVector::DotProduct(Z, X)).GetSafeNormal();
 	return FQuat(FMatrix(X, FVector::CrossProduct(Z, X), Z, FVector::ZeroVector));
-}
-
-// ---------------- The pose (called at the end of PoseArms) ----------------
-// A straight left arm points the bow at the target, the fist turned so the bow stands up (rows of the arm's turn worked out
-// in closed form from where it rests); the right hand draws the string back toward his face (a two-bone reach, the elbow out
-// to the right and back); the chest turns side-on and the head looks back round at the target.
-void AKnightCharacter::PoseBow(float Dt)
-{
-	const bool bBowIn = SelectedKind() == JeebItems::K_Bow && !bStowed && BowHold;
-	BowAimAlpha = FMath::FInterpTo(BowAimAlpha, (bBowIn && Bow != EBow::None) ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 12.f : 8.f);
-	BowEaseAlpha = FMath::FInterpTo(BowEaseAlpha, bBowIn ? 1.f : 0.f, Dt, 10.f);
-	if (!BowHold) { BowAimAlpha = 0.f; return; }   // (the bow was put away mid-draw: R, a drop, death)
-	if (!ArmPivotL || !ElbowL || !ArmPivot || !ElbowR || !UpperPivot) return;
-	using namespace KnightDesign;
-	const float A = BowAimAlpha * BowAimAlpha * (3.f - 2.f * BowAimAlpha);
-	auto Frame = [](const FVector& X, const FVector& Y) { return FQuat(FMatrix(X, Y, FVector::CrossProduct(X, Y), FVector::ZeroVector)); };
-	auto Perp = [](const FVector& V, const FVector& To) { return (V - To * FVector::DotProduct(V, To)).GetSafeNormal(); };
-
-	// at ease the bow keeps most of its line while the arm swings (as if the wrist eased it), so it never stands up on end or
-	// swings across the arm as he walks (2026-11-01)
-	FQuat RestRel = BowHoldRest;
-	if (BodyRoot && BowHold)
-	{
-		const FQuat Fore = ElbowL->GetComponentQuat();
-		RestRel = Fore.Inverse() * FQuat::Slerp(Fore * BowHoldRest, BodyRoot->GetComponentQuat() * BowHoldRest, 0.6f);
-	}
-	if (A <= 0.001f) { if (BowHold) BowHold->SetRelativeRotation(RestRel); return; }
-
-	const FVector Aim = BowAimDir();
-	const FVector Up = FVector::UpVector;
-	const FQuat Chest = UpperPivot->GetComponentQuat();
-
-	// The arrow runs from the bow back to the anchor, beside his right cheek, so the string hand stays clear of his body and helm
-	// (an archer's draw: the bow arm reaches out across, the arrow passes beside the face)
-	FVector Right = FVector::CrossProduct(Up, Aim).GetSafeNormal();
-	if (Right.IsNearlyZero()) Right = GetActorRightVector();
-	const FVector UpA = FVector::CrossProduct(Aim, Right);
-	const FVector Anchor = HeadPivot ? HeadPivot->GetComponentLocation() + UpA * BowTune().Up + Right * BowTune().Side : ArrowStart();
-	// Left arm: straight, the fist on the arrow's line where the arm just reaches it, the bow upright
-	FVector GripWant;
-	{
-		static const FVector A0 = (GripPos(true) - PivotPos(P_ArmL)).GetSafeNormal();
-		static const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
-		static const float Reach = (GripPos(true) - PivotPos(P_ArmL)).Size();
-		const FVector S = ArmPivotL->GetComponentLocation();
-		const FVector D = Anchor - UpA * BowTune().Rest - S;   // (|D + Aim*L| = Reach, the far answer; the fist just under the arrow's line)
-		const float B = FVector::DotProduct(D, Aim);
-		const float L = -B + FMath::Sqrt(FMath::Max(B * B - D.SizeSquared() + Reach * Reach, 0.f));
-		GripWant = Anchor - UpA * BowTune().Rest + Aim * FMath::Max(L, 30.f);
-		const FVector ArmDir = (GripWant - S).GetSafeNormal();
-		FVector Bw = Perp(Up, ArmDir);   // (the fist's grip, and the bow in it, then runs up and down, the thumb on top)
-		if (Bw.IsNearlyZero()) Bw = GetActorRightVector();
-		const FQuat Want = Chest.Inverse() * Frame(ArmDir, Bw) * Frame(A0, B0).Inverse();
-		ArmPivotL->SetRelativeRotation(FQuat::Slerp(ArmPivotL->GetRelativeRotation().Quaternion(), Want, A));
-		ElbowL->SetRelativeRotation(FQuat::Slerp(ElbowL->GetRelativeRotation().Quaternion(), FQuat(FRotator(3.f, 0.f, 0.f)), A));
-		// the bow turns in the fist to stand upright, its string straight back toward him along the arrow (in front of his face,
-		// not leaning across toward his helm: owner, 2026-11-01)
-		const FVector BX = Perp(Up, Aim), BZ = -Aim;
-		const FQuat BowWorld(FMatrix(BX, FVector::CrossProduct(BZ, BX), BZ, FVector::ZeroVector));
-		BowHold->SetRelativeRotation(FQuat::Slerp(RestRel, ElbowL->GetComponentQuat().Inverse() * BowWorld, A));
-	}
-	// Right arm: the fist on the string, drawn back from where the arrow rests on the bow toward his face as the draw fills
-	{
-		const FVector Grip = BowHold->GetComponentTransform().TransformPosition(FVector(BowTune().Rest, 0.f, 0.f));
-		const FVector StringRest = BowHold->GetComponentTransform().TransformPosition(FVector(BowTune().Rest, 0.f, WeaponDesign::BowBrace));
-		const float Draw = (Bow == EBow::Drawing) ? BowCharge : (Bow == EBow::Recover ? 0.f : BowCharge);
-		const FVector Back = Anchor - Grip;   // (from the bow to the anchor: full draw puts the fist there)
-		const float Pull = FMath::Lerp(FMath::Min(32.f, Back.Size()), Back.Size(), FMath::Sqrt(FMath::Clamp(Draw, 0.f, 1.f)));
-		FVector Hand = Grip + Back.GetSafeNormal() * Pull;
-		if (Bow == EBow::Recover) Hand = FMath::Lerp(Anchor, StringRest, FMath::Clamp(BowT / BowRecover, 0.f, 1.f));   // (the string snaps forward; the hand follows)
-		static const float Lu = (PivotPos(P_ElbowR) - PivotPos(P_ArmR)).Size();
-		static const float Lf = (GripPos(false) - PivotPos(P_ElbowR)).Size();
-		const FVector S = ArmPivot->GetComponentLocation();
-		const FVector D = Hand - S;
-		const float Dist = FMath::Clamp(D.Size(), 6.f, Lu + Lf - 0.5f);
-		const FVector N = D.GetSafeNormal();
-		const FVector Pole = Perp(-Aim + Up * 0.15f + Right * 0.2f, N);   // (the drawing elbow behind the hand, in line with the arrow, as an archer's: owner, 2026-11-01)
-		const float CosA = FMath::Clamp((Lu * Lu + Dist * Dist - Lf * Lf) / (2.f * Lu * Dist), -1.f, 1.f);
-		const FVector Au = (N * CosA + Pole * FMath::Sqrt(1.f - CosA * CosA)).GetSafeNormal();
-		const FVector Elbow = S + Au * Lu;
-		const FVector F = (S + N * Dist - Elbow).GetSafeNormal();
-		FVector Bend = Perp(F, Au);
-		if (Bend.IsNearlyZero()) Bend = Perp(Aim, Au);
-		static const FVector A0 = (PivotPos(P_ElbowR) - PivotPos(P_ArmR)).GetSafeNormal();
-		static const FVector B0 = (FVector::ForwardVector - A0 * FVector::DotProduct(FVector::ForwardVector, A0)).GetSafeNormal();
-		const FQuat World = Frame(Au, Bend) * Frame(A0, B0).Inverse();
-		ArmPivot->SetRelativeRotation(FQuat::Slerp(ArmPivot->GetRelativeRotation().Quaternion(), Chest.Inverse() * World, A));
-		// the elbow: a bend about its own pitch axis that carries the resting forearm onto F
-		static const FVector F0 = (GripPos(false) - PivotPos(P_ElbowR)).GetSafeNormal();
-		const FVector Fl = World.Inverse().RotateVector(F);
-		auto Phi = [](const FVector& V) { return FMath::RadiansToDegrees(FMath::Atan2(V.X, -V.Z)); };   // (0 hanging, + forward)
-		const float Bendp = Phi(Fl) - Phi(F0);
-		ElbowR->SetRelativeRotation(FQuat::Slerp(ElbowR->GetRelativeRotation().Quaternion(), FQuat(FRotator(Bendp, 0.f, 0.f)), A));
-		if (WristR) WristR->SetRelativeRotation(FQuat::Slerp(WristR->GetRelativeRotation().Quaternion(), FQuat::Identity, A));
-	}
-	// side-on: the chest turned to his right (PoseBody turns it, next frame; the head already turns back against it to look
-	// along the arrow)
-	SwingBodyWant += BowTune().Chest * A;   // (more side-on: the bow arm out in front, the string before his face)
 }
 
 // ---------------- The drawn string, the nocked arrow and the quiver ----------------
@@ -463,7 +364,7 @@ void AKnightCharacter::UpdateBowBits()
 // tipped forward with fletched arrows showing, while the bow is his weapon
 void AKnightCharacter::UpdateQuiver()
 {
-	const bool bShow = SelectedKind() == JeebItems::K_Bow && BodyRoot;
+	const bool bShow = SelectedKind() == JeebItems::K_Bow;
 	if (!bShow) { for (UStaticMeshComponent* C : QuiverParts) if (C) C->SetVisibility(false); return; }
 	if (QuiverParts.Num() == 0)
 	{
@@ -471,14 +372,7 @@ void AKnightCharacter::UpdateQuiver()
 		// archers wear it (2026-11-01: the arm used to pass through it at the side); pitch -: the mouth leans forward; roll -:
 		// the bottom swings out from the leg)
 		USceneComponent* Q = NewObject<USceneComponent>(this);
-		Q->SetupAttachment(BodyRoot);
-		FVector QAt(-26.f, 28.f, -29.f); FRotator QTurn(-5.f, 0.f, -6.f);   // (found by -QuiverSearch: clear of the armour, arms, legs and cape standing, walking and aiming; hangs nearly straight)
-		{
-			FString S; TArray<FString> P;   // (test pictures: -QuiverTune=X_Y_Z_Pitch_Roll tries another spot without a rebuild)
-			if (FParse::Value(FCommandLine::Get(), TEXT("QuiverTune="), S) && S.ParseIntoArray(P, TEXT("_")) == 5)
-			{ QAt = FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2])); QTurn = FRotator(FCString::Atof(*P[3]), 0.f, FCString::Atof(*P[4])); }
-		}
-		Q->SetRelativeLocationAndRotation(QAt, QTurn);
+		Q->SetupAttachment(GetRootComponent());
 		Q->RegisterComponent();
 		auto Bit = [&](const TCHAR* MeshPath, const FLinearColor& Col, const FVector& At, const FRotator& Rot, const FVector& Scale)
 		{
@@ -503,176 +397,4 @@ void AKnightCharacter::UpdateQuiver()
 	// the arrows in it only while he has some (the tube, rim and bottom are the first three parts)
 	const bool bArrows = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() != 0 : LookArrows != 0;
 	for (int32 i = 0; i < QuiverParts.Num(); ++i) if (QuiverParts[i]) QuiverParts[i]->SetVisibility(i < 3 || bArrows);
-}
-
-// ---------------- Test pictures: measured clipping (log JEEBCLEAR) ----------------
-// Every test picture also logs where the bow, its string, the nocked arrow and the quiver go INTO his own armour or cape
-// (segment against the model's triangles), so clipping is measured instead of guessed from pictures. The bow's middle
-// 6 cm either side of the grip is left out: it runs through the fist on purpose.
-void AKnightCharacter::LogClearance(int32 Frame)
-{
-	if (!BowHold || SelectedKind() != JeebItems::K_Bow) return;
-	struct FTri { FVector A, B, C; FName Part; };
-	TArray<FTri> Tris;
-	auto AddMesh = [&](UProceduralMeshComponent* M)
-	{
-		if (!M || !M->IsVisible()) return;
-		const FTransform X = M->GetComponentTransform();
-		const FName Part = M->GetAttachParent() ? M->GetAttachParent()->GetFName() : M->GetFName();
-		for (int32 s = 0; s < M->GetNumSections(); ++s)
-			if (const FProcMeshSection* S = M->GetProcMeshSection(s))
-				for (int32 t = 0; t + 2 < S->ProcIndexBuffer.Num(); t += 6)   // (each triangle is stored twice, once per winding)
-					Tris.Add({ X.TransformPosition(S->ProcVertexBuffer[S->ProcIndexBuffer[t]].Position), X.TransformPosition(S->ProcVertexBuffer[S->ProcIndexBuffer[t + 1]].Position),
-						X.TransformPosition(S->ProcVertexBuffer[S->ProcIndexBuffer[t + 2]].Position), Part });
-	};
-	for (const FArmorPart& P : ArmorParts) AddMesh(Cast<UProceduralMeshComponent>(P.Comp));
-	// the skinned knight: its triangles as bent this frame, each named after the bone its first corner follows most
-	if (USkinnedMeshComponent* Sk = Skin ? Cast<USkinnedMeshComponent>(ArmorParts.Num() ? ArmorParts[0].Comp : nullptr) : nullptr)
-		if (FSkeletalMeshRenderData* RD = Sk->GetSkeletalMeshRenderData())
-			if (RD->LODRenderData.Num() > 0 && RD->LODRenderData[0].StaticVertexBuffers.PositionVertexBuffer.GetAllowCPUAccess())
-			{
-				const FSkeletalMeshLODRenderData& Lod = RD->LODRenderData[0];
-				TArray<FMatrix44f> RefToLocal;
-				Sk->CacheRefToLocalMatrices(RefToLocal);
-				TArray<FVector3f> Pos;
-				USkinnedMeshComponent::ComputeSkinnedPositions(Sk, Pos, RefToLocal, Lod, Lod.SkinWeightVertexBuffer);
-				const FTransform X = Sk->GetComponentTransform();
-				const FRawStaticIndexBuffer16or32Interface* Ib = Lod.MultiSizeIndexContainer.GetIndexBuffer();
-				for (const FSkelMeshRenderSection& Sec : Lod.RenderSections)
-					for (uint32 t = 0; t < Sec.NumTriangles; ++t)
-					{
-						const uint32 I0 = Ib->Get(Sec.BaseIndex + t * 3), I1 = Ib->Get(Sec.BaseIndex + t * 3 + 1), I2 = Ib->Get(Sec.BaseIndex + t * 3 + 2);
-						const int32 Local = Lod.SkinWeightVertexBuffer.GetBoneIndex(I0, 0);
-						const FName Part = Sec.BoneMap.IsValidIndex(Local) ? Sk->GetBoneName(Sec.BoneMap[Local]) : NAME_None;
-						Tris.Add({ X.TransformPosition(FVector(Pos[I0])), X.TransformPosition(FVector(Pos[I1])), X.TransformPosition(FVector(Pos[I2])), Part });
-					}
-			}
-	AddMesh(CapeCloth);
-	// the left fist's top along the bow (where the arrow should rest): the glove's furthest point up the bow, close to its line
-	float FistTop = -1000.f;
-	{
-		const FTransform Bi = BowHold->GetComponentTransform();
-		for (const FTri& T : Tris)
-			if (T.Part == ElbowL->GetFName())
-				for (const FVector& W : { T.A, T.B, T.C })
-				{
-					const FVector L = Bi.InverseTransformPosition(W);
-					if (FMath::Square(L.Y) + FMath::Square(L.Z) < 25.f && FMath::Abs(L.X) < 20.f) FistTop = FMath::Max(FistTop, L.X);
-				}
-	}
-
-	// a segment against every triangle: each crossing as "item at <cm along it> into <part>"
-	TMap<FString, FString> Hits;
-	auto Test = [&](const FString& Item, const FVector& P, const FVector& Q, float From)
-	{
-		const FVector D = Q - P;
-		for (const FTri& T : Tris)
-		{
-			const FVector E1 = T.B - T.A, E2 = T.C - T.A, H = FVector::CrossProduct(D, E2);
-			const float Det = FVector::DotProduct(E1, H);
-			if (FMath::Abs(Det) < 1e-6f) continue;
-			const FVector S = P - T.A;
-			const float U = FVector::DotProduct(S, H) / Det;
-			if (U < 0.f || U > 1.f) continue;
-			const FVector Qv = FVector::CrossProduct(S, E1);
-			const float V = FVector::DotProduct(D, Qv) / Det;
-			if (V < 0.f || U + V > 1.f) continue;
-			const float W = FVector::DotProduct(E2, Qv) / Det;
-			if (W < 0.f || W > 1.f) continue;
-			FString& L = Hits.FindOrAdd(Item + TEXT(" -> ") + T.Part.ToString());
-			L += FString::Printf(TEXT(" %.0f"), From + W * D.Size());
-		}
-	};
-	const FTransform B = BowHold->GetComponentTransform();
-	// the bow's limbs (as WeaponDesign builds them: the belly curves toward the string side), outside the fist
-	for (float X = -48.f; X < 48.f; X += 4.f)
-	{
-		if (X + 4.f > -6.f && X < 6.f) continue;
-		auto Pt = [&](float x) { return B.TransformPosition(FVector(x, 0.f, WeaponDesign::BowBrace * x * x / (48.f * 48.f))); };
-		Test(X < 0.f ? TEXT("bow back/low limb") : TEXT("bow front/top limb"), Pt(X), Pt(X + 4.f), FMath::Abs(X));
-	}
-	// the string (straight at rest; to the nock while drawn) and the nocked arrow, from the rods UpdateBowBits places
-	auto RodEnds = [](UStaticMeshComponent* C, FVector& P, FVector& Q)
-	{
-		const FVector Mid = C->GetComponentLocation(), Ax = C->GetComponentQuat().GetAxisZ() * C->GetComponentScale().Z * 50.f;
-		P = Mid - Ax; Q = Mid + Ax;
-	};
-	if (BowBits.Num() >= 3 && BowBits[0] && BowBits[0]->IsVisible())
-	{
-		FVector P, Q;
-		RodEnds(BowBits[0], P, Q); Test(TEXT("string upper"), P, Q, 0.f);
-		RodEnds(BowBits[1], P, Q); Test(TEXT("string lower"), P, Q, 0.f);
-		if (BowBits[2]->IsVisible()) { RodEnds(BowBits[2], P, Q); Test(TEXT("arrow"), P, Q, 0.f); }
-	}
-	else Test(TEXT("string"), B.TransformPosition(FVector(-48.f, 0.f, WeaponDesign::BowBrace)), B.TransformPosition(FVector(48.f, 0.f, WeaponDesign::BowBrace)), 0.f);
-	// the quiver: its tube's four sides and middle, bottom to rim
-	if (QuiverParts.Num() > 0 && QuiverParts[0] && QuiverParts[0]->IsVisible())
-	{
-		const FTransform Qt = QuiverParts[0]->GetAttachParent()->GetComponentTransform();
-		for (int32 k = 0; k < 5; ++k)
-		{
-			const FVector Off = k == 4 ? FVector::ZeroVector : FVector(FMath::Cos(k * UE_HALF_PI), FMath::Sin(k * UE_HALF_PI), 0.f) * 6.5f;
-			Test(FString::Printf(TEXT("quiver side %d"), k), Qt.TransformPosition(Off + FVector(0.f, 0.f, -22.f)), Qt.TransformPosition(Off + FVector(0.f, 0.f, 34.f)), 0.f);
-		}
-	}
-	// -QuiverSearch: try a grid of spots for the quiver on every picture of the move; at the end log the spots it never touched
-	// anything from, the snuggest first (the gap: how far the tube's side stands off the nearest armour, worst frame)
-	static const bool bSearch = FParse::Param(FCommandLine::Get(), TEXT("QuiverSearch"));
-	if (bSearch && BodyRoot)
-	{
-		struct FCand { FVector At; FRotator Turn; int32 Hits = 0; float Gap = 0.f; };
-		static TArray<FCand> Cands;
-		if (Cands.Num() == 0)
-			for (float x = -30.f; x <= -10.f; x += 4.f) for (float y = 16.f; y <= 34.f; y += 3.f) for (float z = -44.f; z <= -24.f; z += 5.f)
-				for (float p = -40.f; p <= -5.f; p += 7.f) for (float r = -24.f; r <= 0.f; r += 6.f)
-					Cands.Add({ FVector(x, y, z), FRotator(p, 0.f, r) });
-		const FTransform Root = BodyRoot->GetComponentTransform();
-		const FVector Mid = Root.TransformPosition(FVector(-20.f, 25.f, -34.f));
-		TArray<const FTri*> Near;
-		for (const FTri& T : Tris) if (FVector::DistSquared(T.A, Mid) < FMath::Square(75.f)) Near.Add(&T);
-		auto Crosses = [&](const FVector& P, const FVector& Q)
-		{
-			const FVector D = Q - P;
-			for (const FTri* T : Near)
-			{
-				const FVector E1 = T->B - T->A, E2 = T->C - T->A, H = FVector::CrossProduct(D, E2);
-				const float Det = FVector::DotProduct(E1, H);
-				if (FMath::Abs(Det) < 1e-6f) continue;
-				const FVector S = P - T->A;
-				const float U = FVector::DotProduct(S, H) / Det;
-				if (U < 0.f || U > 1.f) continue;
-				const FVector Qv = FVector::CrossProduct(S, E1);
-				const float V = FVector::DotProduct(D, Qv) / Det;
-				if (V < 0.f || U + V > 1.f) continue;
-				const float W = FVector::DotProduct(E2, Qv) / Det;
-				if (W >= 0.f && W <= 1.f) return true;
-			}
-			return false;
-		};
-		for (FCand& C : Cands)
-		{
-			const FTransform Qt = FTransform(C.Turn, C.At) * Root;
-			const FVector Bot = Qt.TransformPosition(FVector(0.f, 0.f, -22.f)), Top = Qt.TransformPosition(FVector(0.f, 0.f, 34.f));
-			if (C.Hits == 0)
-				for (int32 k = 0; k < 5 && C.Hits == 0; ++k)
-				{
-					const FVector Off = k == 4 ? FVector::ZeroVector : FVector(FMath::Cos(k * UE_HALF_PI), FMath::Sin(k * UE_HALF_PI), 0.f) * 6.5f;
-					if (Crosses(Qt.TransformPosition(Off + FVector(0.f, 0.f, -22.f)), Qt.TransformPosition(Off + FVector(0.f, 0.f, 34.f)))) C.Hits++;
-				}
-			float Best = 1e9f;
-			for (const FTri* T : Near) Best = FMath::Min(Best, FMath::PointDistToSegment(T->A, Bot, Top));
-			C.Gap = FMath::Max(C.Gap, Best - 6.5f);
-		}
-		if (Frame == 38)
-		{
-			TArray<FCand> Ok = Cands.FilterByPredicate([](const FCand& C) { return C.Hits == 0; });
-			Ok.Sort([](const FCand& A, const FCand& B) { return A.Gap < B.Gap; });
-			UE_LOG(LogTemp, Log, TEXT("JEEBQUIVER %d of %d spots clear"), Ok.Num(), Cands.Num());
-			for (int32 i = 0; i < FMath::Min(Ok.Num(), 600); ++i)
-				UE_LOG(LogTemp, Log, TEXT("JEEBQUIVER gap %.1f  %.0f_%.0f_%.0f_%.0f_%.0f"), Ok[i].Gap, Ok[i].At.X, Ok[i].At.Y, Ok[i].At.Z, Ok[i].Turn.Pitch, Ok[i].Turn.Roll);
-		}
-	}
-	FString Out;
-	for (const TPair<FString, FString>& H : Hits) Out += FString::Printf(TEXT(" | %s at cm%s"), *H.Key, *H.Value);
-	UE_LOG(LogTemp, Log, TEXT("JEEBCLEAR %d fisttop %.1f%s"), Frame, FistTop, Out.IsEmpty() ? TEXT(" clear") : *Out);
 }

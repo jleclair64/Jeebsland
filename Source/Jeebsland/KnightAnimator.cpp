@@ -1,7 +1,7 @@
 #include "KnightAnimator.h"
-#include "KnightCharacter.h"
+#include "HitBoxes.h"
+#include "Inventory.h"
 #include "KnightDesign.h"
-#include "KnightModel.h"
 #include "KnightShieldRest.h"
 #include "WeaponDesign.h"
 #include "HAL/FileManager.h"
@@ -9,17 +9,18 @@
 #include "Misc/Paths.h"
 #include "Misc/Parse.h"
 #include "Misc/CommandLine.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/MemoryReader.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimationAsset.h"
 #include "Animation/Skeleton.h"
-#include "Components/CapsuleComponent.h"
 #include "Components/PoseableMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
-#include "Engine/Font.h"
-#include "GameFramework/PlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Rendering/SkeletalMeshRenderData.h"
 #include "JeebTuning.h"
 #include "Engine/SkeletalMesh.h"
-#include "GameFramework/CharacterMovementComponent.h"
 
 using namespace JeebAnim;
 
@@ -33,11 +34,11 @@ namespace
 	// Every clip the animator uses, besides his rest pose, walk and run in /Game/NewSuit; a missing one is left out (Art/Knight Chainmail/Clips: Tools/ImportKnightClips.ps1).
 	const TCHAR* const ClipNames[] = {
 		TEXT("Idle"), TEXT("Idle_SS"), TEXT("WalkBack_SS"), TEXT("WalkL_SS"), TEXT("WalkR_SS"), TEXT("RunBack_SS"), TEXT("RunL_SS"), TEXT("RunR_SS"), TEXT("Sprint"),
-		TEXT("Jump_SS"), TEXT("RunJump_SS"), TEXT("FallIdle"), TEXT("FallLand"), TEXT("HardLand"), TEXT("StandRoll"),
+		TEXT("FallIdle"), TEXT("FallLand"), TEXT("HardLand"), TEXT("StandRoll"),
 		TEXT("SlashIn"), TEXT("SlashDown"), TEXT("SlashCrouch"), TEXT("ThrustSlash"), TEXT("KickSparta"),
 		TEXT("HitHead"), TEXT("HitBody"), TEXT("HitBlocked"), TEXT("HitLargeF"), TEXT("HitSmallL"), TEXT("HitSmallR"), TEXT("HitSmallB"),
 		TEXT("SweepFall"), TEXT("GetUpBack"), TEXT("FallDown"),
-		TEXT("BlockIdle"), TEXT("CrouchIdle"), TEXT("CrouchWalk"),
+		TEXT("CrouchIdle"), TEXT("CrouchWalk"),
 		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"), TEXT("BowWalk"), TEXT("BowRun"),
 		TEXT("WeightedRun"), TEXT("JumpUp2"), TEXT("ForwardJump"), TEXT("ChestBlock"),
 		TEXT("AxeDown"), TEXT("AxeHorizontal"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("RunSlide") };
@@ -68,49 +69,99 @@ namespace
 
 // ---------------- Clips ----------------
 
-bool FKnightAnimator::Init(UPoseableMeshComponent* InComp, USkeletalMesh* Mesh)
+namespace
 {
-	Comp = InComp;
-	if (!Comp || !Mesh) return false;
-	const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
-	const int32 N = Ref.GetNum();
-	Parents.SetNum(N); RefPos.SetNum(N); RefRot.SetNum(N); UpperMask.Init(0, N);
-	for (int32 b = 0; b < N; ++b)
+	FString BakedPath() { return FPaths::ProjectContentDir() / TEXT("Data/KnightClips.bin"); }
+	constexpr int32 BakedVersion = 1;
+	const TCHAR* const SuitMeshPath = TEXT("/Game/NewSuit/SK_NewSuit.SK_NewSuit");
+}
+
+const FClipLib& FClipLib::Get()
+{
+	static const FClipLib Lib;
+	return Lib;
+}
+
+FClipLib::FClipLib()
+{
+	const double LoadFrom = FPlatformTime::Seconds();
+	bool bLoaded = false;
+#if WITH_EDITOR
+	// (the editor keeps the file up to date: new clips imported since it was written, or none yet)
+	if (!BakeIsStale()) bLoaded = LoadBaked();
+	if (!bLoaded && BakeFromAssets()) { SaveBaked(); bLoaded = true; }
+	if (!bLoaded) bLoaded = LoadBaked();
+#else
+	bLoaded = LoadBaked();
+#endif
+	if (!bLoaded) { UE_LOG(LogTemp, Error, TEXT("JEEBANIM no clips: Content/Data/KnightClips.bin is missing")); return; }
+	Finalize();
+	bReady = Clips.Contains(TEXT("Rest"));
+	UE_LOG(LogTemp, Log, TEXT("JEEBANIM %d clips, %d bones, %d moves, %.0f ms to load"), Clips.Num(), Parents.Num(), Moves.Num(), (FPlatformTime::Seconds() - LoadFrom) * 1000.0);
+}
+
+// The skeleton and every clip as plain numbers: no engine assets, so a cooked server (which strips animations) can read it as well
+bool FClipLib::LoadBaked()
+{
+	TArray<uint8> Bytes;
+	if (!FFileHelper::LoadFileToArray(Bytes, *BakedPath(), FILEREAD_Silent)) return false;
+	FMemoryReader Ar(Bytes, true);
+	int32 Version = 0;
+	Ar << Version;
+	if (Version != BakedVersion) return false;
+	Ar << BoneName << Parents << RefPos << RefRot;
+	int32 NumClips = 0;
+	Ar << NumClips;
+	const int32 N = Parents.Num();
+	for (int32 c = 0; c < NumClips; ++c)
 	{
-		Parents[b] = Ref.GetParentIndex(b);
-		RefPos[b] = Ref.GetRefBonePose()[b].GetLocation();
-		RefRot[b] = Ref.GetRefBonePose()[b].GetRotation();
+		TUniquePtr<FClip> C = MakeUnique<FClip>();
+		Ar << C->Name << C->NumFrames << C->Len << C->Rot << C->HipPos;
+		if (Ar.IsError() || C->Rot.Num() != C->NumFrames * N) return false;
+		FClip* Raw = C.Get();
+		ClipStore.Add(MoveTemp(C));
+		Clips.Add(Raw->Name, Raw);
 	}
+	return !Ar.IsError() && N > 0;
+}
+
+void FClipLib::Finalize()
+{
+	const int32 N = Parents.Num();
+	UpperMask.Init(0, N);
 	for (int32 i = 0; i < B_Count; ++i)
 	{
 		Bone[i] = INDEX_NONE;
 		for (int32 b = 0; b < N; ++b)
 		{
-			const FString Nm = Ref.GetBoneName(b).ToString();
+			const FString& Nm = BoneName[b];
 			if (Nm == BoneNames[i] || Nm.EndsWith(FString(TEXT(":")) + BoneNames[i])) { Bone[i] = b; break; }
 		}
-		if (Bone[i] == INDEX_NONE) { UE_LOG(LogTemp, Warning, TEXT("JEEBANIM no bone %s"), BoneNames[i]); return false; }
+		if (Bone[i] == INDEX_NONE) { UE_LOG(LogTemp, Error, TEXT("JEEBANIM no bone %s"), BoneNames[i]); return; }
 	}
 	for (int32 i = Spine; i <= RHand; ++i) UpperMask[Bone[i]] = 1;
-	for (FPose* P : { &Scratch, &ScratchSum, &Base, &Over, &Final, &PrevFinal }) { P->Rot = RefRot; P->Hip = RefPos[Bone[Hips]]; }
-	OffRot.Init(FVector::ZeroVector, N);
-	OffRotV.Init(FVector::ZeroVector, N);
-
-	const double LoadFrom = FPlatformTime::Seconds();
-	for (const TCHAR* Nm : ClipNames) LoadClip(Nm);
-	LoadClip(TEXT("Rest"), TEXT("/Game/NewSuit/A_"));
-	LoadClip(TEXT("Walking"), TEXT("/Game/NewSuit/A_"));
-	LoadClip(TEXT("Running"), TEXT("/Game/NewSuit/A_"));
-	// (his own walk and run ride high against the rest pose: this puts their planted foot on the floor)
+	// (his own walk rides high against the rest pose: this puts its planted foot on the floor)
 	if (FClip* const* W = Clips.Find(TEXT("Walking"))) for (FVector& H : (*W)->HipPos) H.Z -= 3.9f;
-	if (FClip* const* R = Clips.Find(TEXT("Running"))) for (FVector& H : (*R)->HipPos) H.Z -= 2.9f;
+	for (TUniquePtr<FClip>& C : ClipStore) Measure(*C);
 	LoadMoves();
+	SolveGear();
 	// Test pictures (-SuitLogClips): where the hand and foot go through each move's clip, the way to read off KnightMoves.csv's numbers
 	if (FParse::Param(FCommandLine::Get(), TEXT("SuitLogClips")))
+	{
+		FPose P; P.Rot = RefRot; P.Hip = RefPos[Bone[Hips]];
+		FString Rest = TEXT("JEEBSKEL bones at the bind pose, fwd,right,up:");
+		for (int32 i = 0; i < B_Count; ++i) { const FVector X = BindInGame(P, i).GetLocation(); Rest += FString::Printf(TEXT(" %s %.0f,%.0f,%.0f"), BoneNames[i], X.X, X.Y, X.Z); }
+		UE_LOG(LogTemp, Log, TEXT("%s"), *Rest);
+		if (const FClip* RC = Find(TEXT("Rest")))
+		{
+			Sample(*RC, 0.f, P, false);
+			Rest = TEXT("JEEBSKEL bones at rest, fwd,right,up:");
+			for (int32 i = 0; i < B_Count; ++i) { const FVector X = BindInGame(P, i).GetLocation(); Rest += FString::Printf(TEXT(" %s %.0f,%.0f,%.0f"), BoneNames[i], X.X, X.Y, X.Z); }
+			UE_LOG(LogTemp, Log, TEXT("%s"), *Rest);
+		}
 		for (const TPair<FString, FMove>& It : Moves)
-			if (const FClip* C = Get(*It.Value.Clip))
+			if (const FClip* C = Find(*It.Value.Clip))
 			{
-				FPose P; P.Rot = RefRot;
 				FString Line = FString::Printf(TEXT("JEEBPATH %s %s (%.2f s; time: hand fwd,right,up / foot R up,fwd / hip up,fwd):"), *It.Key, *It.Value.Clip, C->Len);
 				for (float T = 0.f; T <= C->Len + 0.001f; T += 0.1f)
 				{
@@ -120,11 +171,45 @@ bool FKnightAnimator::Init(UPoseableMeshComponent* InComp, USkeletalMesh* Mesh)
 				}
 				UE_LOG(LogTemp, Log, TEXT("%s"), *Line);
 			}
-	UE_LOG(LogTemp, Log, TEXT("JEEBANIM %d clips, %d bones, %d moves, %.0f ms to load"), Clips.Num(), N, Moves.Num(), (FPlatformTime::Seconds() - LoadFrom) * 1000.0);
+	}
+}
+
+#if WITH_EDITOR
+bool FClipLib::BakeIsStale() const
+{
+	const FDateTime Baked = IFileManager::Get().GetTimeStamp(*BakedPath());
+	if (Baked == FDateTime::MinValue()) return true;
+	TArray<FString> Files;
+	IFileManager::Get().FindFiles(Files, *(FPaths::ProjectContentDir() / TEXT("NewSuit/Clips/*.uasset")), true, false);
+	for (const FString& F : Files)
+		if (IFileManager::Get().GetTimeStamp(*(FPaths::ProjectContentDir() / TEXT("NewSuit/Clips") / F)) > Baked) return true;
+	return IFileManager::Get().GetTimeStamp(*(FPaths::ProjectContentDir() / TEXT("NewSuit/SK_NewSuit.uasset"))) > Baked;
+}
+
+bool FClipLib::BakeFromAssets()
+{
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, SuitMeshPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!Mesh) return false;
+	const FReferenceSkeleton& Ref = Mesh->GetRefSkeleton();
+	const int32 N = Ref.GetNum();
+	BoneName.SetNum(N); Parents.SetNum(N); RefPos.SetNum(N); RefRot.SetNum(N);
+	TArray<FName> Names;
+	Names.SetNum(N);
+	for (int32 b = 0; b < N; ++b)
+	{
+		Names[b] = Ref.GetBoneName(b);
+		BoneName[b] = Names[b].ToString();
+		Parents[b] = Ref.GetParentIndex(b);
+		RefPos[b] = Ref.GetRefBonePose()[b].GetLocation();
+		RefRot[b] = Ref.GetRefBonePose()[b].GetRotation();
+	}
+	for (const TCHAR* Nm : ClipNames) LoadClipAsset(Nm, TEXT("/Game/NewSuit/Clips/A_"), Names);
+	LoadClipAsset(TEXT("Rest"), TEXT("/Game/NewSuit/A_"), Names);
+	LoadClipAsset(TEXT("Walking"), TEXT("/Game/NewSuit/A_"), Names);
 	return Clips.Contains(TEXT("Rest"));
 }
 
-const FClip* FKnightAnimator::LoadClip(const FString& Name, const TCHAR* Folder)
+const FClip* FClipLib::LoadClipAsset(const FString& Name, const TCHAR* Folder, const TArray<FName>& Names)
 {
 	const FString Path = FString(Folder) + Name + TEXT(".A_") + Name;
 	UAnimSequence* Seq = LoadObject<UAnimSequence>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet);
@@ -139,7 +224,12 @@ const FClip* FKnightAnimator::LoadClip(const FString& Name, const TCHAR* Folder)
 	const FReferenceSkeleton& SkelRef = Seq->GetSkeleton()->GetReferenceSkeleton();
 	TArray<int32> Track;
 	Track.SetNum(N);
-	for (int32 b = 0; b < N; ++b) Track[b] = SkelRef.FindBoneIndex(Comp->GetBoneName(b));
+	int32 HipB = INDEX_NONE;
+	for (int32 b = 0; b < N; ++b)
+	{
+		Track[b] = SkelRef.FindBoneIndex(Names[b]);
+		if (BoneName[b] == BoneNames[Hips] || BoneName[b].EndsWith(FString(TEXT(":")) + BoneNames[Hips])) HipB = b;
+	}
 	for (int32 f = 0; f < C->NumFrames; ++f)
 	{
 		const double T = C->Len * f / (C->NumFrames - 1);
@@ -150,19 +240,38 @@ const FClip* FKnightAnimator::LoadClip(const FString& Name, const TCHAR* Folder)
 			if (Track[b] != INDEX_NONE) Seq->GetBoneTransform(X, FSkeletonPoseBoneIndex(Track[b]), Ctx, false);
 			else { X.SetRotation(RefRot[b]); X.SetLocation(RefPos[b]); }
 			C->Rot[f * N + b] = X.GetRotation();
-			if (b == Bone[Hips]) C->HipPos[f] = X.GetLocation();
+			if (b == HipB) C->HipPos[f] = X.GetLocation();
 		}
 	}
-	Measure(*C);
 	FClip* Raw = C.Get();
 	ClipStore.Add(MoveTemp(C));
 	Clips.Add(Name, Raw);
 	return Raw;
 }
 
+void FClipLib::SaveBaked() const
+{
+	TArray<uint8> Bytes;
+	FMemoryWriter Ar(Bytes, true);
+	int32 Version = BakedVersion;
+	Ar << Version;
+	FClipLib& Me = const_cast<FClipLib&>(*this);   // (the writer's << takes references; nothing is changed)
+	Ar << Me.BoneName << Me.Parents << Me.RefPos << Me.RefRot;
+	// (in a fixed order, so the same clips always make the same file)
+	TArray<FClip*> Order;
+	for (const TUniquePtr<FClip>& C : ClipStore) Order.Add(C.Get());
+	Order.Sort([](const FClip& A, const FClip& B) { return A.Name < B.Name; });
+	int32 NumClips = Order.Num();
+	Ar << NumClips;
+	for (FClip* C : Order) Ar << C->Name << C->NumFrames << C->Len << C->Rot << C->HipPos;
+	FFileHelper::SaveArrayToFile(Bytes, *BakedPath());
+	UE_LOG(LogTemp, Log, TEXT("JEEBANIM baked %d clips to KnightClips.bin (%d KB)"), NumClips, Bytes.Num() / 1024);
+}
+#endif
+
 // How fast the planted foot moves, and when each foot is under him. All clips are in place, so a planted foot slides back under
 // the body at exactly the speed the body should cover the ground.
-void FKnightAnimator::Measure(FClip& C)
+void FClipLib::Measure(FClip& C)
 {
 	const int32 N = Parents.Num();
 	FPose P;
@@ -193,7 +302,7 @@ void FKnightAnimator::Measure(FClip& C)
 }
 
 // Content/Data/KnightMoves.csv: Move,Clip,ClipStart,ClipHit,ClipFollow,ClipEnd,LegsFull,Blend,HipLock,SpineKeep
-void FKnightAnimator::LoadMoves()
+void FClipLib::LoadMoves()
 {
 	Moves.Reset();
 	TArray<FString> Lines;
@@ -215,7 +324,7 @@ void FKnightAnimator::LoadMoves()
 
 // ---------------- Sampling and blending ----------------
 
-void FKnightAnimator::Sample(const FClip& C, float T, FPose& Out, bool bLoop) const
+void FClipLib::Sample(const FClip& C, float T, FPose& Out, bool bLoop) const
 {
 	const int32 N = Parents.Num();
 	float U = bLoop ? FMath::Fmod(T, C.Len) : FMath::Clamp(T, 0.f, C.Len);
@@ -229,14 +338,14 @@ void FKnightAnimator::Sample(const FClip& C, float T, FPose& Out, bool bLoop) co
 	Out.Hip = FMath::Lerp(C.HipPos[F0], C.HipPos[F1], W);
 }
 
-float FKnightAnimator::PhaseTime(const FClip& C, float P) const
+float FClipLib::PhaseTime(const FClip& C, float P) const
 {
 	const float GapLR = FMath::Fmod(C.MarkR - C.MarkL + C.Len, C.Len);
 	const float GapRL = C.Len - GapLR;
 	return P < 0.5f ? C.MarkL + P * 2.f * GapLR : C.MarkR + (P - 0.5f) * 2.f * GapRL;
 }
 
-void FKnightAnimator::Accum(const FPose& P, float W, FPose& Sum, float& SumW) const
+void FClipLib::Accum(const FPose& P, float W, FPose& Sum, float& SumW) const
 {
 	if (W <= 0.f) return;
 	const int32 N = Parents.Num();
@@ -258,14 +367,14 @@ void FKnightAnimator::Accum(const FPose& P, float W, FPose& Sum, float& SumW) co
 	SumW += W;
 }
 
-void FKnightAnimator::Finish(FPose& Sum, float SumW) const
+void FClipLib::Finish(FPose& Sum, float SumW) const
 {
 	for (FQuat& Q : Sum.Rot) Q.Normalize();
 	if (SumW > 0.f) Sum.Hip /= SumW;
 }
 
 // The turn of a bone's parent in the mesh's own space
-FQuat FKnightAnimator::ParentRot(const FPose& P, int32 B) const
+FQuat FClipLib::ParentRot(const FPose& P, int32 B) const
 {
 	FQuat Q = FQuat::Identity;
 	for (int32 p = Parents[Bone[B]]; p != INDEX_NONE; p = Parents[p]) Q = P.Rot[p] * Q;
@@ -273,13 +382,13 @@ FQuat FKnightAnimator::ParentRot(const FPose& P, int32 B) const
 }
 
 // Turns one bone by Q as seen in the mesh's space (up is up, whatever the bones above it are doing)
-void FKnightAnimator::TurnInMesh(FPose& P, int32 B, const FQuat& Q) const
+void FClipLib::TurnInMesh(FPose& P, int32 B, const FQuat& Q) const
 {
 	const FQuat Pa = ParentRot(P, B);
 	P.Rot[Bone[B]] = (Pa.Inverse() * Q * Pa * P.Rot[Bone[B]]).GetNormalized();
 }
 
-FVector FKnightAnimator::BonePos(const FPose& P, int32 B, FQuat* OutRot) const
+FVector FClipLib::BonePos(const FPose& P, int32 B, FQuat* OutRot) const
 {
 	const int32 Start = Bone[B];
 	FVector Pos = FVector::ZeroVector;
@@ -296,7 +405,7 @@ FVector FKnightAnimator::BonePos(const FPose& P, int32 B, FQuat* OutRot) const
 
 // Puts Over on Base: Upper for the bones above the waist, Lower for the hips and legs. The waist is kept in the mesh's frame: when the
 // legs stay with Base, the chest still faces the way Over's chest faces, not the way Base's hips happen to swing.
-void FKnightAnimator::Overlay(FPose& B, const FPose& O, float Upper, float Lower) const
+void FClipLib::Overlay(FPose& B, const FPose& O, float Upper, float Lower) const
 {
 	const int32 N = Parents.Num();
 	const int32 HipB = Bone[Hips], SpineB = Bone[Spine];
@@ -318,9 +427,9 @@ void FKnightAnimator::Overlay(FPose& B, const FPose& O, float Upper, float Lower
 // ---------------- Locomotion ----------------
 // One phase for every direction and speed: 0 = the left foot under him, 0.5 = the right. It moves by distance covered, so
 // whatever the mix of clips, the planted foot keeps pace with the ground. Standing is its own pose; starts and stops are inertial blends.
-void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
+void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 {
-	const FVector V = Me->GetVelocity();
+	const FVector V = In.Vel;
 	const float Speed = FVector2D(V.X, V.Y).Size();
 	SmSpeed = FMath::FInterpTo(SmSpeed, Speed, Dt, 9.f);
 	const bool bMoveNow = Speed > (bMoving ? 12.f : 25.f);
@@ -334,13 +443,13 @@ void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
 			bPhaseLeft = !bPhaseLeft;
 			if (SmSpeed < 150.f) SmSpeed = FMath::Min(Speed, 230.f);
 			// (from standing he sets off straight in the way he means to go, not swinging round through the other ways from where he last went)
-			const FVector Lv = Me->GetActorRotation().UnrotateVector(FVector(V.X, V.Y, 0.f));
+			const FVector Lv = In.Rot.UnrotateVector(FVector(V.X, V.Y, 0.f));
 			if (Speed > 1.f) { DirF = Lv.X / Speed; DirR = Lv.Y / Speed; }
 			bLocoHand = false;
 		}
 	}
 	// the arms: what he holds
-	const int32 Kind = Me->SelectedKind();
+	const int32 Kind = In.Kind;
 	const bool bBow = Kind == JeebItems::K_Bow;
 	float SumW = 0.f;
 	if (!bMoving)
@@ -374,14 +483,14 @@ void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
 		return;
 	}
 	// the way he is going, in his own frame (strafe mode: he faces the camera; hips and legs turn up to 45 degrees toward the way he goes, as the old pose does)
-	const FVector LV = Me->GetActorRotation().UnrotateVector(FVector(V.X, V.Y, 0.f));
+	const FVector LV = In.Rot.UnrotateVector(FVector(V.X, V.Y, 0.f));
 	if (Speed > 1.f)
 	{
 		const float Rate = 11.f;
 		DirF = FMath::FInterpTo(DirF, LV.X / Speed, Dt, Rate);
 		DirR = FMath::FInterpTo(DirR, LV.Y / Speed, Dt, Rate);
 	}
-	const float LegYaw = Me->LegYaw;
+	const float LegYaw = In.LegYaw;
 	const float Ang = FMath::RadiansToDegrees(FMath::Atan2(DirR, DirF)) - LegYaw;
 	const float CosA = FMath::Cos(FMath::DegreesToRadians(Ang)), SinA = FMath::Sin(FMath::DegreesToRadians(Ang));
 	float WD[4] = { FMath::Max(CosA, 0.f), FMath::Max(SinA, 0.f), FMath::Max(-CosA, 0.f), FMath::Max(-SinA, 0.f) };   // ahead, right, back, left
@@ -433,14 +542,14 @@ void FKnightAnimator::Locomotion(float Dt, AKnightCharacter* Me, FPose& Out)
 		bLocoHand = true;
 	}
 	// Running, the clip's fist pumps the blade from level to straight up in front of his face: the wrist keeps it steady, out in front and a little up, and only part of the swing shows
-	if (!bBow && Kind != 0)
+	if (!bBow && Kind >= 0)
 	{
 		const float Steady = 0.8f * FMath::Max(URun, USprint);
 		if (Steady > 0.01f)
 		{
 			FQuat HandRot;
 			BonePos(Out, RHand, &HandRot);
-			const FVector Dir = HandRot.RotateVector(BladeInHand).GetSafeNormal();
+			const FVector Dir = HandRot.RotateVector(L.BladeInHand).GetSafeNormal();
 			static const FVector Want = FVector(-0.2f, 0.92f, 0.34f).GetSafeNormal();   // (in the mesh's frame: -X his right, +Y ahead, +Z up)
 			const FQuat Turn = FQuat::FindBetweenNormals(Dir, Want);
 			TurnInMesh(Out, RHand, Nlerp(FQuat::Identity, Turn, Steady));
@@ -503,29 +612,29 @@ void FKnightAnimator::Inertialize(const FPose& Target, FPose& Out, float Dt)
 		return;
 	}
 	BlendT += Dt;
-	const float L = BlendLambda, T = BlendT;
-	const float E = FMath::Exp(-L * T);
+	const float Lam = BlendLambda, T = BlendT;
+	const float E = FMath::Exp(-Lam * T);
 	if (BlendLambdaHand * T > 8.f) bBlending = false;
 	for (int32 b = 0; b < N; ++b)
 	{
 		// (the sword hand turns further than anything else between his own walk and the sword clips, and the blade makes it show: it takes a little longer)
-		const float LH = b == Bone[RHand] ? BlendLambdaHand : L;
+		const float LH = b == Bone[RHand] ? BlendLambdaHand : Lam;
 		const FVector Y = (OffRot[b] + (OffRotV[b] + OffRot[b] * LH) * T) * FMath::Exp(-LH * T);
 		Out.Rot[b] = (FromRotVec(Y) * Target.Rot[b]).GetNormalized();
 	}
-	Out.Hip = Target.Hip + (OffHip + (OffHipV + OffHip * L) * T) * E;
+	Out.Hip = Target.Hip + (OffHip + (OffHipV + OffHip * Lam) * T) * E;
 }
 
 // A low pose can put the point of the sword through the floor: the wrist lifts it just clear, keeping the way it points. Only as much as it takes, and it
 // comes and goes with the pose, so it can't be seen happening.
-void FKnightAnimator::KeepTipUp(FPose& P, AKnightCharacter* Me) const
+void FKnightAnimator::KeepTipUp(FPose& P, const FInput& In) const
 {
-	if (Me->SelectedKind() == JeebItems::K_Bow) return;
+	if (In.Kind == JeebItems::K_Bow) return;
 	constexpr float Clear = 6.f;
-	const float Reach = 9.f + WeaponDesign::BladeReach(Me->SelectedKind());   // (from the hand to the point)
+	const float Reach = 9.f + WeaponDesign::BladeReach(In.Kind);   // (from the hand to the point)
 	FQuat HandRot;
 	const FVector HandAt = BonePos(P, JeebAnim::RHand, &HandRot);
-	const FVector Dir = HandRot.RotateVector(BladeInHand).GetSafeNormal();
+	const FVector Dir = HandRot.RotateVector(L.BladeInHand).GetSafeNormal();
 	const float WantZ = FMath::Clamp((Clear - float(HandAt.Z)) / Reach, -1.f, 0.9f);
 	if (Dir.Z >= WantZ) return;
 	const FVector Flat = FVector(Dir.X, Dir.Y, 0.f).GetSafeNormal();
@@ -536,14 +645,14 @@ void FKnightAnimator::KeepTipUp(FPose& P, AKnightCharacter* Me) const
 
 // ---------------- The frame ----------------
 
-void FKnightAnimator::Update(float Dt, AKnightCharacter* Me)
+void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, float ActorYaw)
 {
-	if (!Comp || !Me) return;
+	if (!L.bReady) return;
 	Time += Dt;
-	Locomotion(Dt, Me, Base);
-	Overlays(Dt, Me, Base);
+	Locomotion(Dt, In, Base);
+	Overlays(Dt, In, Base);
 	float BlendFor = bMoving ? 0.26f : 0.28f;   // (he sets off at once, but the lean and stride build; a stop settles)
-	const int32 Act = ChooseAction(Dt, Me, Base, BlendFor);
+	const int32 Act = ChooseAction(Dt, In, Base, BlendFor);
 	if (Act == 0 && StateKey >= 10) BlendFor = StateKey >= 30 && StateKey < 40 ? 0.36f : 0.3f;   // (out of any move, back to walking or standing: the body eases up out of it, never pops)
 	if (Act == 0 && !bMoving && StateKey == 2 && !bOnGuard) BlendFor = 0.55f;   // (easing back to rest takes its time)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
@@ -562,7 +671,7 @@ void FKnightAnimator::Update(float Dt, AKnightCharacter* Me)
 		StateKey = Key;
 	}
 	// (the bow's phases are layers, not states: drawing, loosing and lowering still flow into each other)
-	const int32 BowKey = int32(Me->Bow);
+	const int32 BowKey = In.BowMode;
 	if (BowKey != LastBowKey && Key == StateKey) StartBlend(Base, 0.16f, 0.2f);
 	LastBowKey = BowKey;
 	PrevFinal = Final;
@@ -570,31 +679,37 @@ void FKnightAnimator::Update(float Dt, AKnightCharacter* Me)
 	Inertialize(Base, Final, Dt);
 	// (a part-way landing or a chest-only move can leave a boot sunk: the hips rise just enough. Floor clips lie lower.)
 	{
-		const float Sole = (StateKey == 10 || StateKey == 11 || StateKey == 20) ? 1.f : 7.f;
+		const float Sole = (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
 		const float Low = FMath::Min(float(BonePos(Final, LFoot).Z), float(BonePos(Final, RFoot).Z));
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
-	KeepTipUp(Final, Me);
+	KeepTipUp(Final, In);
 	bHavePrev = true;
 
-	// Into the mesh
-	TArray<FTransform>& Bones = Comp->BoneSpaceTransforms;
+	ToWorld = FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
 	const int32 N = Parents.Num();
-	if (Bones.Num() == N)
+
+	// Into the mesh (when it can be seen: the pose above is what the game reads)
+	if (Comp)
 	{
-		const int32 HipB = Bone[Hips];
-		for (int32 b = 0; b < N; ++b)
+		Comp->SetWorldLocationAndRotation(Feet, FRotator(0.f, ActorYaw + YawNow + MeshYawDeg, 0.f));
+		TArray<FTransform>& Bones = Comp->BoneSpaceTransforms;
+		if (Bones.Num() == N && (Comp->WasRecentlyRendered(0.25f) || In.bShotLog))
 		{
-			Bones[b].SetRotation(Final.Rot[b]);
-			Bones[b].SetTranslation(b == HipB ? Final.Hip : RefPos[b]);
-			Bones[b].SetScale3D(FVector::OneVector);
+			const int32 HipB = Bone[Hips];
+			for (int32 b = 0; b < N; ++b)
+			{
+				Bones[b].SetRotation(Final.Rot[b]);
+				Bones[b].SetTranslation(b == HipB ? Final.Hip : RefPos[b]);
+				Bones[b].SetScale3D(FVector::OneVector);
+			}
+			Comp->MarkRefreshTransformDirty();
+			Comp->RefreshBoneTransforms();
 		}
-		Comp->MarkRefreshTransformDirty();
-		Comp->RefreshBoneTransforms();
 	}
 
 	// A check for the logs (test pictures only): the biggest jump of any bone between two frames: pops show here before they show in a picture
-	if (Me->bShotFace && bHavePrev)
+	if (In.bShotLog && bHavePrev)
 	{
 		float Worst = 0.f; int32 WorstB = 0;
 		for (int32 b = 0; b < N; ++b)
@@ -602,31 +717,30 @@ void FKnightAnimator::Update(float Dt, AKnightCharacter* Me)
 			const float A = FMath::RadiansToDegrees(ToRotVec(Final.Rot[b] * PrevFinal.Rot[b].Inverse()).Size());
 			if (A > Worst) { Worst = A; WorstB = b; }
 		}
-		const float Sp = FVector2D(Me->GetVelocity().X, Me->GetVelocity().Y).Size();
+		const float Sp = FVector2D(In.Vel.X, In.Vel.Y).Size();
 		const FVector FL = BonePos(Final, LFoot), FR = BonePos(Final, RFoot);
 		// how far a foot on the ground slides on the floor since the last frame (cm/s): body speed against its speed under the body
-		static FVector PrevL = FVector::ZeroVector, PrevR = FVector::ZeroVector;
-		const FVector VWorld = FRotator(0.f, -Me->GetActorRotation().Yaw - MeshYawDeg, 0.f).RotateVector(FVector(Me->GetVelocity().X, Me->GetVelocity().Y, 0.f));
+		FVector& PrevL = LogPrevL; FVector& PrevR = LogPrevR;
+		const FVector VWorld = FRotator(0.f, -In.Rot.Yaw - MeshYawDeg, 0.f).RotateVector(FVector(In.Vel.X, In.Vel.Y, 0.f));
 		const float SlideL = FL.Z < 14.f ? FVector2D((FL - PrevL) / FMath::Max(Dt, 0.001f) + VWorld).Size() : -1.f;
 		const float SlideR = FR.Z < 14.f ? FVector2D((FR - PrevR) / FMath::Max(Dt, 0.001f) + VWorld).Size() : -1.f;
 		PrevL = FL; PrevR = FR;
 		FQuat HandRot; const FVector HandAt = BonePos(Final, RHand, &HandRot);
-		const FVector TipAt = HandAt + HandRot.RotateVector(BladeInHand) * (9.f + WeaponDesign::BladeReach(Me->SelectedKind()));
+		const FVector TipAt = HandAt + HandRot.RotateVector(L.BladeInHand) * (9.f + WeaponDesign::BladeReach(In.Kind));
 		const float TipZ = TipAt.Z;
-		UE_LOG(LogTemp, Log, TEXT("JEEBANIM t %.3f key %d speed %.0f phase %.2f worst %.1f deg %s feet %.1f %.1f hip %.1f slide %.0f %.0f tip %.0f hand %.0f,%.0f,%.0f tipat %.0f,%.0f,%.0f"), Time, StateKey, Sp, Phase, Worst, *Comp->GetBoneName(WorstB).ToString(), FL.Z, FR.Z, Final.Hip.Z, SlideL, SlideR, TipZ, HandAt.Y, -HandAt.X, HandAt.Z, TipAt.Y, -TipAt.X, TipAt.Z);
+		UE_LOG(LogTemp, Log, TEXT("JEEBANIM t %.3f key %d speed %.0f phase %.2f worst %.1f deg %s feet %.1f %.1f hip %.1f slide %.0f %.0f tip %.0f hand %.0f,%.0f,%.0f tipat %.0f,%.0f,%.0f"), Time, StateKey, Sp, Phase, Worst, *L.BoneName[WorstB], FL.Z, FR.Z, Final.Hip.Z, SlideL, SlideR, TipZ, HandAt.Y, -HandAt.X, HandAt.Z, TipAt.Y, -TipAt.X, TipAt.Z);
 	}
 }
 
 // Test pictures (-SuitGallery): every picture is one clip shown as eight frozen knights in a row, across its length, with its name above
-void FKnightAnimator::TickGallery(AKnightCharacter* Me)
+void FKnightAnimator::TickGallery(AActor* Owner, const FVector& Floor)
 {
-	AActor* Owner = Comp->GetOwner();
-	Me->SetActorHiddenInGame(true);
+	if (!Comp) return;
 	Comp->SetVisibility(false);
-	const FVector Floor = Me->GetActorLocation() - FVector(0.f, 0.f, Me->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 	if (GalleryComps.Num() == 0)
 	{
-		ClipStore.Sort([](const TUniquePtr<FClip>& A, const TUniquePtr<FClip>& B) { return A->Name < B->Name; });
+		for (const TUniquePtr<FClip>& C : L.ClipStore) GalleryOrder.Add(C.Get());
+		GalleryOrder.Sort([](const FClip& A, const FClip& B) { return A.Name < B.Name; });
 		for (int32 i = 0; i < 8; ++i)
 		{
 			UPoseableMeshComponent* C = NewObject<UPoseableMeshComponent>(Owner);
@@ -648,8 +762,8 @@ void FKnightAnimator::TickGallery(AKnightCharacter* Me)
 	int32 First = 0;
 	FParse::Value(FCommandLine::Get(), TEXT("SuitGalleryFrom="), First);
 	const int32 Shown = First + GalleryTick++ / 2;
-	if (!ClipStore.IsValidIndex(Shown)) return;
-	const FClip& Cl = *ClipStore[Shown];
+	if (!GalleryOrder.IsValidIndex(Shown)) return;
+	const FClip& Cl = *GalleryOrder[Shown];
 	GalleryLabel->SetWorldLocationAndRotation(Floor + FVector(0.f, 0.f, 215.f), FRotator(0.f, 180.f, 0.f));
 	GalleryLabel->SetText(FText::FromString(FString::Printf(TEXT("%s  %.2f s  (0 .. 7/8)"), *Cl.Name, Cl.Len)));
 	FPose P;
@@ -671,28 +785,28 @@ void FKnightAnimator::TickGallery(AKnightCharacter* Me)
 }
 
 // ---------------- Layers over the walk: crouching, the raised shield, aiming ----------------
-void FKnightAnimator::Overlays(float Dt, AKnightCharacter* Me, FPose& B)
+void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 {
-	const FVector V = Me->GetVelocity();
+	const FVector V = In.Vel;
 	const float Speed = FVector2D(V.X, V.Y).Size();
 	const float MoveW = FMath::Clamp(Speed / 150.f, 0.f, 1.f);
-	if (Me->CrouchAlpha > 0.01f)
+	if (In.CrouchAlpha > 0.01f)
 	{
 		const FClip* C = bMoving ? Get(TEXT("CrouchWalk")) : Get(TEXT("CrouchIdle"));
 		if (C)
 		{
 			Sample(*C, bMoving ? PhaseTime(*C, Phase) : Time, Over, true);
-			Overlay(B, Over, Me->CrouchAlpha * 0.75f, Me->CrouchAlpha);
+			Overlay(B, Over, In.CrouchAlpha * 0.75f, In.CrouchAlpha);
 			// (the walking clip stands much taller than the crouch: mixing the crouch's legs back in keeps him low, with a shorter stride that suits the slow speed)
 			if (bMoving)
 				if (const FClip* Low = Get(TEXT("CrouchIdle")))
 				{
 					Sample(*Low, Time, Over, true);
-					Overlay(B, Over, 0.f, Me->CrouchAlpha * 0.55f);
+					Overlay(B, Over, 0.f, In.CrouchAlpha * 0.55f);
 				}
 		}
 	}
-	if (Me->BlockAlpha > 0.01f)
+	if (In.BlockAlpha > 0.01f)
 		if (const FMove* M = Moves.Find(TEXT("Block")))
 			if (const FClip* C = Get(*M->Clip))
 			{
@@ -704,25 +818,25 @@ void FKnightAnimator::Overlays(float Dt, AKnightCharacter* Me, FPose& B)
 					Sample(*G, Time, Scratch, true);
 					for (const int32 i : { RShoulder, RArm, RFore, RHand }) Over.Rot[Bone[i]] = Scratch.Rot[Bone[i]];
 				}
-				Overlay(B, Over, Me->BlockAlpha, Me->BlockAlpha * (1.f - MoveW) * (1.f - Me->CrouchAlpha));
+				Overlay(B, Over, In.BlockAlpha, In.BlockAlpha * (1.f - MoveW) * (1.f - In.CrouchAlpha));
 			}
-	if (Me->BowAimAlpha > 0.01f)
+	if (In.BowAimAlpha > 0.01f)
 	{
-		const float W = Me->BowAimAlpha;
+		const float W = In.BowAimAlpha;
 		const FClip* Upper = nullptr; float T = Time; bool bLoop = true;
-		if (Me->Bow == AKnightCharacter::EBow::Drawing)
+		if (In.BowMode == 1)
 		{
 			const FClip* D = Get(TEXT("BowDraw"));
 			const FMove* M = Moves.Find(TEXT("BowDraw"));
-			const float U = Me->BowT / FMath::Max(JeebTune::V().BowDrawTime, 0.1f);
+			const float U = In.BowT / FMath::Max(JeebTune::V().BowDrawTime, 0.1f);
 			if (D && M && U < 1.f) { Upper = D; T = FMath::Lerp(M->ClipStart, M->ClipEnd, U); bLoop = false; }
 			else Upper = Get(TEXT("AimIdle"));
 		}
-		else if (Me->Bow == AKnightCharacter::EBow::Recover)
+		else if (In.BowMode == 2)
 		{
 			const FMove* M = Moves.Find(TEXT("BowRecoil"));
 			Upper = Get(TEXT("BowRecoil")); bLoop = false;
-			if (M) T = M->ClipStart + Me->BowT * 1.2f;
+			if (M) T = M->ClipStart + In.BowT * 1.2f;
 		}
 		else
 		{
@@ -739,7 +853,7 @@ void FKnightAnimator::Overlays(float Dt, AKnightCharacter* Me, FPose& B)
 		// moving, the legs walk his aiming stance's way, in step
 		if (bMoving && MoveW > 0.01f)
 		{
-			const FVector LV = Me->GetActorRotation().UnrotateVector(FVector(V.X, V.Y, 0.f));
+			const FVector LV = In.Rot.UnrotateVector(FVector(V.X, V.Y, 0.f));
 			const float CosA = LV.X / FMath::Max(Speed, 1.f), SinA = LV.Y / FMath::Max(Speed, 1.f);
 			const float WD[4] = { FMath::Max(CosA, 0.f), FMath::Max(SinA, 0.f), FMath::Max(-CosA, 0.f), FMath::Max(-SinA, 0.f) };
 			const TCHAR* Nm[4] = { TEXT("AimWalkF"), TEXT("AimWalkR"), TEXT("AimWalkB"), TEXT("AimWalkL") };
@@ -751,10 +865,8 @@ void FKnightAnimator::Overlays(float Dt, AKnightCharacter* Me, FPose& B)
 			if (Sum > 0.f) { Finish(Tmp, Sum); Overlay(B, Tmp, 0.f, W * MoveW); }
 		}
 		// the whole chest follows the camera up and down, so the bow's line stays on what he aims at
-		if (APlayerController* PC = Cast<APlayerController>(Me->GetController()))
 		{
-			const float Pitch = FMath::UnwindDegrees(PC->GetControlRotation().Pitch);
-			const FQuat Q(FVector::XAxisVector, FMath::DegreesToRadians(Pitch * 0.5f * W));
+			const FQuat Q(FVector::XAxisVector, FMath::DegreesToRadians(In.AimPitch * 0.5f * W));
 			TurnInMesh(B, Spine1, Q);
 			TurnInMesh(B, Spine2, Q);
 		}
@@ -807,13 +919,11 @@ bool FKnightAnimator::PlayAt(const TCHAR* MoveName, float T, float Speed, FPose&
 	return true;
 }
 
-int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, float& OutBlend)
+int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend)
 {
-	using EStyle = AKnightCharacter::EAtkStyle;
-	using ESm = AKnightCharacter::ESmash;
-	const FVector V = Me->GetVelocity();
+	const FVector V = In.Vel;
 	const float Speed = FVector2D(V.X, V.Y).Size();
-	const bool bAir = Me->GetCharacterMovement()->IsFalling();
+	const bool bAir = In.bFalling;
 
 	// landing and being hit are moments, not states: catch them here
 	if (bAir) { AirT += Dt; PeakFall = FMath::Max(PeakFall, float(-V.Z)); bWasAir = true; }
@@ -827,39 +937,50 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 		}
 		AirT = 0.f;
 	}
-	if (Me->StunLeft > PrevStun + 0.01f)
+	if (In.StunLeft > PrevStun + 0.01f)
 	{
 		++HitSerial;
 		// which way the blow pushed him picks the flinch
-		const FVector LV = Me->GetActorRotation().UnrotateVector(V);
+		const FVector LV = In.Rot.UnrotateVector(V);
 		const bool bPushed = FVector2D(LV.X, LV.Y).Size() > 60.f;
-		HitPick = Me->StunLeft >= 0.5f ? 0 : (!bPushed || LV.X < -FMath::Abs(LV.Y)) ? 1 + (HitSerial % 2) : LV.X > FMath::Abs(LV.Y) ? 3 : LV.Y > 0.f ? 4 : 5;
+		HitPick = In.StunLeft >= 0.5f ? 0 : (!bPushed || LV.X < -FMath::Abs(LV.Y)) ? 1 + (HitSerial % 2) : LV.X > FMath::Abs(LV.Y) ? 3 : LV.Y > 0.f ? 4 : 5;
 	}
-	PrevStun = Me->StunLeft;
-	if (Me->bKnockedDown && !bWasDown) { bFallPushed = Speed > 100.f; }
-	bWasDown = Me->bKnockedDown;
-	if (Me->bKnockedDown && Me->KnockPhase == 1 && RiseLeft <= 0.f) RiseLeft = 1.f;   // (the rising plays on a little past the locked part, unless he moves off)
+	PrevStun = In.StunLeft;
+	if (In.bKnockedDown && !bWasDown) { bFallPushed = Speed > 100.f; }
+	bWasDown = In.bKnockedDown;
+	if (In.bKnockedDown && In.KnockPhase == 1 && RiseLeft <= 0.f) RiseLeft = 1.f;   // (the rising plays on a little past the locked part, unless he moves off)
 
 	// Which state
 	int32 Key = 0;
-	if (Me->bKnockedDown) Key = Me->KnockPhase == 1 ? 11 : 10;
-	else if (Me->bRolling) Key = 20;
-	else if (Me->bAttacking)
+	if (In.bKnockedDown) Key = In.KnockPhase == 1 ? 11 : 10;
+	else if (In.bRolling) Key = 20;
+	else if (In.Move != EMove::None)
 	{
-		if (Me->Smash == ESm::Rebound) Key = 36;
-		else if (Me->AtkStyle == EStyle::Kick) Key = 33;
-		else if (Me->AtkStyle == EStyle::Sweep) Key = 34;
-		else if (Me->AtkStyle == EStyle::Dash) Key = 35;
-		else if (Me->Smash == ESm::Charging) Key = 32;
-		else if (Me->Smash == ESm::Swing || Me->Smash == ESm::EndLag) Key = 37;
-		else Key = Me->AttackDir == AKnightCharacter::JabSecond ? 31 : 30;
+		switch (In.Move)
+		{
+		case EMove::Rebound: Key = 36; break;
+		case EMove::Kick: Key = 33; break;
+		case EMove::Sweep: Key = 34; break;
+		case EMove::Dash: Key = 35; break;
+		case EMove::SmashCharge: Key = 32; break;
+		case EMove::SmashSwing: case EMove::SmashEnd: Key = 37; break;
+		case EMove::Jab2: Key = 31; break;
+		case EMove::Thrust: Key = 38; break;
+		case EMove::Cast: Key = 39; break;
+		default: Key = 30; break;
+		}
 	}
-	else if (Me->StunLeft > 0.f) Key = 60 + HitSerial % 3;
+	else if (In.StunLeft > 0.f) Key = 60 + HitSerial % 3;
 	else if (RiseLeft > 0.f && !bMoving) Key = 11;
+	else if (In.bClimbing) Key = 70;
+	else if (In.bSitting) Key = 71;
+	else if (In.bSliding) Key = 72;
+	else if (In.bSwinging) Key = In.bSideways ? 73 : 74;
+	else if (In.bFishing) Key = 75;
 	else if (bAir) Key = AirT > 0.8f ? 41 : 40;
 	else if (LandT < LandFor && !bMoving) Key = bLandHard ? 51 : 50;
 	if (Key != 11) RiseLeft = 0.f;
-	if ((Key >= 30 && Key < 40) || Key >= 60 || Key == 10 || Key == 11) CombatT = 4.f; else CombatT = FMath::Max(CombatT - Dt, 0.f);
+	if ((Key >= 30 && Key < 40) || (Key >= 60 && Key < 70) || Key == 10 || Key == 11) CombatT = 4.f; else CombatT = FMath::Max(CombatT - Dt, 0.f);
 
 	ActionT = Key == LastActionKey ? ActionT + Dt : 0.f;
 	if (Key != LastActionKey && Key == 40) bJumpRunning = Speed > 300.f;
@@ -870,7 +991,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 	bRollBack = false;
 	if (Key == 20)
 	{
-		float A = FMath::FindDeltaAngleDegrees(Me->GetActorRotation().Yaw, Me->RollDir.Rotation().Yaw);
+		float A = In.RollYaw;
 		if (FMath::Abs(A) > 135.f) { bRollBack = true; A = FMath::UnwindDegrees(A + 180.f); }
 		YawWant = A;
 	}
@@ -918,7 +1039,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 	{
 		if (const FMove* M = Moves.Find(TEXT("Roll")))
 		{
-			const float U = FMath::Clamp(Me->RollT / FMath::Max(Me->RollDur, 0.01f), 0.f, 1.f);
+			const float U = FMath::Clamp(In.RollU, 0.f, 1.f);
 			// (backward: the clip run in reverse, from the crouch where it comes up, right over his shoulders to his hands on the floor. He pushes up from there
 			// in the blend out, because the clip's own start is a lean forward.)
 			if (bRollBack) PlayUpper = PlayLower = 1.f - 0.5f * FMath::SmoothStep(0.75f, 1.f, U);
@@ -931,7 +1052,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 		const bool b2 = Key == 31;
 		if (const FMove* M = Moves.Find(b2 ? TEXT("Jab2") : TEXT("Jab1")))
 		{
-			const float U = Me->AttackT / FMath::Max(Me->AttackDur, 0.01f);
+			const float U = In.MoveU;
 			PlayAt(b2 ? TEXT("Jab2") : TEXT("Jab1"), MoveClipTime(*M, U, b2 ? Tn.Jab2From : Tn.Jab1From, b2 ? Tn.Jab2To : Tn.Jab1To), Speed, B, &OutBlend);
 		}
 		break;
@@ -940,48 +1061,45 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 	{
 		if (const FMove* M = Moves.Find(TEXT("Smash")))
 		{
-			const float D = FMath::Max(Me->AttackDur, 0.01f);
 			float T = M->ClipHit;
-			if (Me->Smash == ESm::Charging)
+			if (In.Move == EMove::SmashCharge)
 			{
 				// the wind-up, then held (owner: the old tremble was too much; only a fine shake of the forearm is left, below)
 				const float W = FMath::Clamp(ActionT / 0.3f, 0.f, 1.f);
 				T = FMath::Lerp(M->ClipStart, M->ClipHit, FMath::InterpEaseOut(0.f, 1.f, W, 2.f));
 			}
-			else if (Me->Smash == ESm::Swing)
-				T = FMath::Lerp(M->ClipHit, M->ClipFollow, FMath::Clamp((Me->AttackT - AKnightCharacter::SmashApexT * D) / ((AKnightCharacter::SmashPauseT - AKnightCharacter::SmashApexT) * D), 0.f, 1.f));
+			else if (In.Move == EMove::SmashSwing)
+				T = FMath::Lerp(M->ClipHit, M->ClipFollow, In.SmashSwingU);
 			else
 				// (the clip loops, so it reaches its end still at full speed: he slows into the stance instead of stopping dead)
-				T = FMath::Lerp(M->ClipFollow, M->ClipEnd, FMath::Sin(FMath::Clamp((Me->SmashT + Me->AttackT - AKnightCharacter::SmashPauseT * D) / FMath::Max(Tn.SmashEndPause + (1.f - AKnightCharacter::SmashPauseT) * D, 0.05f), 0.f, 1.f) * HALF_PI));
+				T = FMath::Lerp(M->ClipFollow, M->ClipEnd, FMath::Sin(In.SmashEndU * HALF_PI));
 			PlayAt(TEXT("Smash"), T, Speed, B, &OutBlend);
 			if (Key == 37) OutBlend = 0.05f;   // (from the held wind-up straight into the swing)
-			else TurnInMesh(B, RFore, FQuat(FVector::UpVector, FMath::DegreesToRadians(FMath::Sin(Time * 13.f) * 0.5f * Me->SmashCharge)));   // (a fine shake as the charge fills: at most a centimetre at the tip)
+			else TurnInMesh(B, RFore, FQuat(FVector::UpVector, FMath::DegreesToRadians(FMath::Sin(Time * 13.f) * 0.5f * In.SmashCharge)));   // (a fine shake as the charge fills: at most a centimetre at the tip)
 		}
 		break;
 	}
 	case 33:
 		if (const FMove* M = Moves.Find(TEXT("Kick")))
-			PlayAt(TEXT("Kick"), MoveClipTime(*M, Me->AttackT / FMath::Max(Me->AttackDur, 0.01f), Tn.KickActiveFrom, Tn.KickActiveTo), 1000.f, B, &OutBlend);
+			PlayAt(TEXT("Kick"), MoveClipTime(*M, In.MoveU, Tn.KickActiveFrom, Tn.KickActiveTo), 1000.f, B, &OutBlend);
 		break;
 	case 34:
 		if (const FMove* M = Moves.Find(TEXT("Sweep")))
 		{
-			const float U = Me->AttackT / FMath::Max(Me->AttackDur, 0.01f);
-			PlayAt(TEXT("Sweep"), MoveClipTime(*M, U, Tn.SweepActiveFrom, Tn.SweepActiveTo), 1000.f, B, &OutBlend);
+			PlayAt(TEXT("Sweep"), MoveClipTime(*M, In.MoveU, Tn.SweepActiveFrom, Tn.SweepActiveTo), 1000.f, B, &OutBlend);
 		}
 		break;
 	case 35:
 		if (const FMove* M = Moves.Find(TEXT("Dash")))
 		{
-			const float D = FMath::Max(Me->AttackDur, 0.01f);
-			// (the end lag: he draws himself back up out of the lunge, not all at once at the end)
-			PlayUpper = PlayLower = 1.f - FMath::SmoothStep(0.5f, 1.f, Me->AttackT / D);
-			PlayAt(TEXT("Dash"), MoveClipTime(*M, Me->AttackT / D, Tn.DashActiveFrom / D, Tn.DashActiveTo / D), 1000.f, B, &OutBlend);
+			// (the end lag: he draws himself back up out of the lunge, not all at once at the end. DashFrom/DashTo: its hit frames as shares of the move)
+			PlayUpper = PlayLower = 1.f - FMath::SmoothStep(0.5f, 1.f, In.MoveU);
+			PlayAt(TEXT("Dash"), MoveClipTime(*M, In.MoveU, In.DashFrom, In.DashTo), 1000.f, B, &OutBlend);
 		}
 		break;
 	case 36:
 		if (const FMove* M = Moves.Find(TEXT("Rebound")))
-			PlayAt(TEXT("Rebound"), FMath::Lerp(M->ClipStart, M->ClipEnd, FMath::Clamp(Me->SmashT / FMath::Max(Me->ReboundDur, 0.05f), 0.f, 1.f)), Speed, B, &OutBlend);
+			PlayAt(TEXT("Rebound"), FMath::Lerp(M->ClipStart, M->ClipEnd, FMath::Clamp(In.ReboundU, 0.f, 1.f)), Speed, B, &OutBlend);
 		break;
 	case 40:
 	{
@@ -990,7 +1108,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 		const TCHAR* Nm = bJumpRunning ? TEXT("JumpRun") : TEXT("JumpStand");
 		if (const FMove* M = Moves.Find(Nm))
 		{
-			const float V0 = FMath::Max(float(Me->GetCharacterMovement()->JumpZVelocity), 100.f);
+			const float V0 = FMath::Max(In.JumpZ, 100.f);
 			const float S = FMath::Clamp(float(V.Z) / V0, -1.f, 1.f);
 			const float T = S > 0.f ? FMath::Lerp(M->ClipHit, M->ClipStart, S) : FMath::Lerp(M->ClipHit, M->ClipFollow, -S);
 			PlayUpper = M->ClipEnd;
@@ -1017,6 +1135,43 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 		}
 		break;
 	}
+	case 38: case 39:   // the spear's thrust and a wand's or staff's cast: the sword's lunge with the arms only
+		if (const FMove* M = Moves.Find(TEXT("Dash")))
+		{
+			PlayLower = 0.f;
+			PlayUpper = 1.f - FMath::SmoothStep(0.6f, 1.f, In.MoveU);
+			PlayAt(TEXT("Dash"), MoveClipTime(*M, In.MoveU, 0.35f, 0.6f), Speed, B, &OutBlend);
+		}
+		break;
+	case 70:   // up a ladder: hand over hand with how far he has climbed
+		if (const FMove* M = Moves.Find(TEXT("Climb")))
+		{
+			const float U = FMath::Fmod(FMath::Abs(In.ClimbPhase) / (2.f * PI), 1.f);
+			PlayAt(TEXT("Climb"), FMath::Lerp(M->ClipStart, M->ClipEnd, U), 1000.f, B, &OutBlend);
+			B.Hip.Z -= 68.f;   // (the clip climbs on the spot well above its own floor: his hips where they are standing)
+		}
+		break;
+	case 71:   // sitting: down into the seat over ClipStart..ClipHit, then held
+		if (const FMove* M = Moves.Find(TEXT("Sit")))
+			PlayAt(TEXT("Sit"), FMath::Min(M->ClipStart + ActionT, M->ClipHit), 1000.f, B, &OutBlend);
+		break;
+	case 72:   // sliding: into the slide over ClipStart..ClipHit, then held
+		if (const FMove* M = Moves.Find(TEXT("Slide")))
+			PlayAt(TEXT("Slide"), FMath::Min(M->ClipStart + ActionT, M->ClipHit), 1000.f, B, &OutBlend);
+		break;
+	case 73: case 74:   // a tool at work: its wind-up over the first 55% of each swing, the blow by 70%, then a pause on it (the game's own swing timing)
+	{
+		const TCHAR* Nm = Key == 73 ? TEXT("Chop") : TEXT("Mine");
+		if (const FMove* M = Moves.Find(Nm)) PlayAt(Nm, MoveClipTime(*M, In.SwingU, 0.55f, 0.7f), Speed, B, &OutBlend);
+		break;
+	}
+	case 75:   // fishing: the cast, then waiting
+		if (const FMove* M = Moves.Find(TEXT("FishCast")))
+		{
+			if (ActionT < M->ClipEnd - M->ClipStart) PlayAt(TEXT("FishCast"), M->ClipStart + ActionT, 1000.f, B, &OutBlend);
+			else if (const FClip* C = Get(TEXT("FishIdle"))) { Sample(*C, Time, Over, true); Overlay(B, Over, 1.f, 1.f); }
+		}
+		break;
 	default:   // 60-62: flinching
 	{
 		static const TCHAR* const Flinch[6] = { TEXT("HitLarge"), TEXT("HitBody"), TEXT("HitHead"), TEXT("HitBack"), TEXT("HitRight"), TEXT("HitLeft") };
@@ -1029,19 +1184,18 @@ int32 FKnightAnimator::ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, fl
 	return Key;
 }
 
-// ---------------- Gear on the new bones ----------------
+// ---------------- Gear on the bones ----------------
 
 // Where bone B sits in the game's frame (forward +X, right +Y, up +Z; origin between his feet), for pose P
-FTransform FKnightAnimator::BindInGame(const FPose& P, int32 B) const
+FTransform FClipLib::BindInGame(const FPose& P, int32 B) const
 {
 	FQuat R;
 	const FVector Pos = BonePos(P, B, &R);
 	return FTransform(R, Pos) * FTransform(FRotator(0.f, MeshYawDeg, 0.f));
 }
 
-void FKnightAnimator::SolveGear(AKnightCharacter* Me)
+void FClipLib::SolveGear()
 {
-	bGearReady = true;
 	FPose P;
 	P.Rot = RefRot;
 	P.Hip = RefPos[Bone[Hips]];
@@ -1074,24 +1228,24 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 		const int32 NB = Parents.Num(), HandB = Bone[RHand];
 		for (TPair<FString, FClip*>& It : Clips)
 		{
-			if (It.Key == TEXT("Rest") || It.Key == TEXT("Walking") || It.Key == TEXT("Running")) continue;
+			if (It.Key == TEXT("Rest") || It.Key == TEXT("Walking")) continue;
 			FClip& C = *It.Value;
 			for (int32 f = 0; f < C.NumFrames; ++f) C.Rot[f * NB + HandB] = (C.Rot[f * NB + HandB] * Fit).GetNormalized();
 		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("SuitLogClips")))
-			if (const FClip* C = Get(TEXT("BlockIdle")))
-			{
-				FPose GuardP; GuardP.Rot = RefRot;
-				Sample(*C, 9.f / 30.f, GuardP, false);
-				FQuat H; const FVector At = BonePos(GuardP, RHand, &H);
-				const FVector D = H.RotateVector(BladeInHand);
-				UE_LOG(LogTemp, Log, TEXT("JEEBANIM grip check, guard pose: hand %s blade dir %s (the Paladin's: x -0.82, y 0.38, z -0.42)"), *At.ToString(), *D.ToString());
-			}
+	}
+	// The left hand's joint, the same way, for a second blade (the katana's): the blade leaves the fist forward as the forearm lies at rest
+	{
+		const FTransform Hand = BindInGame(P, LHand), Fore = BindInGame(P, LFore);
+		const FVector NewF = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
+		const FVector OldF = (KnightDesign::WristPos(-1) - KnightDesign::PivotPos(KnightDesign::P_ElbowL)).GetSafeNormal();
+		const FQuat Q = FQuat::FindBetweenNormals(OldF, NewF);
+		const FVector G = KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL);
+		LeftGrip = FTransform(Q, Hand.GetLocation() + NewF * 7.f - Q.RotateVector(G)) * Hand.Inverse();
 	}
 	// The shield: at rest on the outside of the forearm as the old rest pose had it; raised, facing straight ahead in front of the forearm at the guard pose
 	{
 		const FVector Strap(14.f, -41.f, -8.f);
-		const FClip* RestC = Get(TEXT("Rest"));
+		const FClip* RestC = Find(TEXT("Rest"));
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
@@ -1115,7 +1269,7 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing the front, turned a little to his left, tilted back a touch, on the forearm in front of his chest
 			if (const FMove* M = Moves.Find(TEXT("Block")))
-				if (const FClip* C = Get(*M->Clip))
+				if (const FClip* C = Find(*M->Clip))
 				{
 					Sample(*C, M->ClipStart, P, false);
 					const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
@@ -1123,20 +1277,19 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 					const FVector Face = FRotator(6.f, -18.f, 0.f).Vector();
 					const FQuat Q = FRotationMatrix::MakeFromXZ(Face, FVector::UpVector).ToQuat();
 					ShieldAtBlock = FTransform(Q, Mid + Face * 10.f - Q.RotateVector(Strap)) * Fore.Inverse();
-					ShieldFrontInGuard = FVector::DotProduct(Mid + Face * 10.f, FVector::ForwardVector);
-					UE_LOG(LogTemp, Log, TEXT("JEEBANIM shield at the guard: %s"), *(Mid + Face * 10.f).ToString());
+					ShieldInGuard = Mid + Face * 10.f;
 				}
 	}
 	// The bow: at rest as the old rest pose had it, in the left fist; aiming upright with the string toward the drawing hand. X is along the limbs, Z toward the string.
 	{
-		const FClip* RestC = Get(TEXT("Rest"));
+		const FClip* RestC = Find(TEXT("Rest"));
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
 			const FTransform Hand = BindInGame(P, LHand), Fore = BindInGame(P, LFore);
 			const FVector Dir = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			BowAtRest = FTransform(FQuat(Me->BowRestQuat()), Hand.GetLocation() + Dir * 7.f) * Hand.Inverse();
+			BowAtRest = FTransform(KnightBowRestQuat(), Hand.GetLocation() + Dir * 7.f) * Hand.Inverse();
 		}
-		const FClip* AimC = Get(TEXT("AimIdle"));
+		const FClip* AimC = Find(TEXT("AimIdle"));
 		if (AimC) Sample(*AimC, AimC->Len * 0.5f, P, true);
 		{
 			const FTransform Hand = BindInGame(P, LHand), Fore = BindInGame(P, LFore), Other = BindInGame(P, RHand);
@@ -1154,90 +1307,191 @@ void FKnightAnimator::SolveGear(AKnightCharacter* Me)
 	{
 		const FTransform Hip = BindInGame(P, Hips);
 		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		const float Half = Me->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-		QuiverOnHips = FTransform(FRotator(-5.f, 0.f, -6.f), FVector(-22.f, 24.f, -29.f) + Old + FVector(0.f, 0.f, Half)) * Hip.Inverse();
+		QuiverOnHips = FTransform(FRotator(-5.f, 0.f, -6.f), FVector(-22.f, 24.f, -29.f) + Old + FVector(0.f, 0.f, 96.f)) * Hip.Inverse();
 	}
+	// The chest at rest: the frame the cape is pinned in, and gear goes on his back in
+	if (const FClip* RestC = Find(TEXT("Rest"))) Sample(*RestC, 0.f, P, false);
+	ChestRest = BindInGame(P, Spine2).GetRotation();
 }
 
-void FKnightAnimator::HideOldBody(AKnightCharacter* Me, bool bHide)
+FKnightAnimator::FKnightAnimator()
+	: L(FClipLib::Get()), Bone(L.Bone), Parents(L.Parents), RefPos(L.RefPos), RefRot(L.RefRot), Moves(L.Moves)
 {
-	if (Me->Skin.IsValid())
-		for (int32 s = 0; s < KnightModel::Set_Count; ++s)
-			if (USkinnedMeshComponent* C = Me->Skin->Sets[s]) C->SetVisibility(!bHide);
-	if (bHide)
-	{
-		for (FArmorPart& P : Me->ArmorParts)
-			if (P.Comp && P.Slot != KnightDesign::SlotShield) P.Comp->SetVisibility(false);
-		if (Me->CapeCloth) Me->CapeCloth->SetVisibility(false);
-	}
-	else Me->RefreshEquipment();
+	for (int32 i = 0; i < Piece_Count; ++i) { PieceMat[i] = INDEX_NONE; PieceMid[i] = nullptr; }
+	if (!L.bReady) return;
+	const int32 N = Parents.Num();
+	for (FPose* P : { &Scratch, &ScratchSum, &Base, &Over, &Final, &PrevFinal }) { P->Rot = RefRot; P->Hip = RefPos[Bone[Hips]]; }
+	if (const FClip* C = Get(TEXT("Rest"))) { Sample(*C, 0.f, Final, false); PrevFinal = Final; }
+	OffRot.Init(FVector::ZeroVector, N);
+	OffRotV.Init(FVector::ZeroVector, N);
 }
 
-void FKnightAnimator::PlaceGear(AKnightCharacter* Me)
+UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent* Parent)
 {
-	if (!Comp || !Me) return;
-	if (!bGearReady) SolveGear(Me);
-	HideOldBody(Me, true);
-	const FTransform Mesh = Comp->GetComponentTransform();
-	const FTransform GameToWorld = FTransform(FRotator(0.f, -MeshYawDeg, 0.f)) * Mesh;   // (the game's frame in the world: mesh space with the yaw taken back out)
-	auto InWorld = [&](int32 B) { return BindInGame(Final, B) * GameToWorld; };
+	if (!L.bReady || !Owner) return nullptr;
+	USkeletalMesh* Asset = LoadObject<USkeletalMesh>(nullptr, SuitMeshPath);
+	if (!Asset) { UE_LOG(LogTemp, Error, TEXT("JEEBANIM no suit mesh")); return nullptr; }
+	Comp = NewObject<UPoseableMeshComponent>(Owner);
+	Comp->SetupAttachment(Parent);
+	Comp->SetUsingAbsoluteLocation(true);
+	Comp->SetUsingAbsoluteRotation(true);
+	Comp->SetSkinnedAssetAndUpdate(Asset);
+	Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Comp->SetBoundsScale(2.5f);   // (a roll or a kick reaches well past the standing bounds)
+	Comp->RegisterComponent();
+	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
+	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
+	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
+	for (int32 m = 0; m < Slots.Num(); ++m)
+		for (int32 i = 0; i < Piece_Count; ++i)
+			if (Slots[m].MaterialSlotName.ToString().Contains(SlotNames[i])) PieceMat[i] = m;
+	return Comp;
+}
 
-	// The right hand: the old wrist joint follows it, so the weapon, its trail and its hit boxes all come along
-	if (Me->WristR)
-	{
-		if (!bWristSaved) { WristRel = Me->WristR->GetRelativeLocation(); WristRelRot = Me->WristR->GetRelativeRotation().Quaternion(); bWristSaved = true; }
-		Me->WristR->SetWorldTransform(RightGrip * InWorld(RHand));
-	}
-	// The shield, strapped to the forearm: rest to guard by how far it is raised
-	if (!Me->bStowed)
-	{
-		FTransform Strap;
-		// (at his side with the forearm hanging it hangs too, tip down; once the forearm comes up, as in every sword clip, it sits as strapped)
-		const FVector ForeDir = (BonePos(Final, LHand) - BonePos(Final, LFore)).GetSafeNormal();
-		const float Up = 1.f - FMath::SmoothStep(0.45f, 0.85f, float(-ForeDir.Z));
-		Strap.Blend(ShieldAtRest, ShieldAtGuard, Up);
-		if (Me->BlockAlpha > 0.f) { const FTransform Open = Strap; Strap.Blend(Open, ShieldAtBlock, Me->BlockAlpha); }
-		const FTransform At = Strap * InWorld(LFore);
-		for (FArmorPart& P : Me->ArmorParts)
-			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At);
-	}
-	// The kicking leg's old joints follow the new leg: the kick's hit boxes read them
-	if (Me->KneeR && Me->AnkleR)
-	{
-		if (!bLegSaved) { KneeRel = Me->KneeR->GetRelativeLocation(); AnkleRel = Me->AnkleR->GetRelativeLocation(); bLegSaved = true; }
-		Me->KneeR->SetWorldLocation(InWorld(RLeg).GetLocation());
-		Me->AnkleR->SetWorldLocation(InWorld(RFoot).GetLocation());
-		Me->AnkleR->SetWorldRotation(FRotator(0.f, Comp->GetComponentRotation().Yaw - MeshYawDeg, 0.f));
-	}
-	// The bow in the left fist
-	if (Me->BowHold)
-	{
-		FTransform Hold;
-		Hold.Blend(BowAtRest, BowAtAim, Me->BowAimAlpha);
-		Me->BowHold->SetWorldTransform(Hold * InWorld(LHand));
-	}
-	Me->UpdateBowBits();
-	// The quiver on the hips
-	if (Me->QuiverParts.Num() > 0 && Me->QuiverParts[0])
-		if (USceneComponent* Q = Me->QuiverParts[0]->GetAttachParent())
+void FKnightAnimator::Wear(int32 Piece, int32 Tier)
+{
+	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
+	const int32 Mat = PieceMat[Piece];
+	if (const FSkeletalMeshRenderData* R = Comp->GetSkinnedAsset() ? Comp->GetSkinnedAsset()->GetResourceForRendering() : nullptr)
+		if (R->LODRenderData.Num() > 0)
 		{
-			if (!bQuiverSaved) { QuiverRel = Q->GetRelativeTransform(); bQuiverSaved = true; }
-			Q->SetWorldTransform(QuiverOnHips * InWorld(Hips));
+			const TArray<FSkelMeshRenderSection>& Secs = R->LODRenderData[0].RenderSections;
+			for (int32 i = 0; i < Secs.Num(); ++i)
+				if (Secs[i].MaterialIndex == Mat) Comp->ShowMaterialSection(Mat, i, Tier >= 0, 0);
 		}
+	ShowBare(Piece, Tier < 0);
+	if (Tier < 0) return;
+	if (!PieceMid[Piece]) PieceMid[Piece] = Comp->CreateDynamicMaterialInstance(Mat, Comp->GetMaterial(Mat));
+	if (UMaterialInstanceDynamic* M = PieceMid[Piece])
+	{
+		// The tier's colour and shine (Tiers.csv). Meshy painted this steel dark, so it is greyed and lifted before the tint. MetalShare: at Tiers.csv's full metal it mirrors the dark surroundings and looks nearly black.
+		const FLinearColor Steel(0.90f, 0.97f, 1.0f), C = JeebItems::Palette(Tier, 0);
+		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FMath::Min(C.R / Steel.R, 2.f), FMath::Min(C.G / Steel.G, 2.f), FMath::Min(C.B / Steel.B, 2.f), 1.f));
+		M->SetScalarParameterValue(TEXT("MetalScale"), JeebItems::TierMetal(Tier) * 0.75f);
+		M->SetScalarParameterValue(TEXT("TierRough"), JeebItems::TierRough(Tier));
+		M->SetScalarParameterValue(TEXT("RoughMix"), 0.85f);
+		M->SetScalarParameterValue(TEXT("Desat"), 1.f);
+		M->SetScalarParameterValue(TEXT("DesatGain"), 2.3f);
+	}
 }
 
-void FKnightAnimator::ReleaseGear(AKnightCharacter* Me)
+// An empty slot shows the mail body underneath. It is a whole mesh of its own, since the suit has no mail under its plate (it never shows through); it is drawn only while some slot is empty.
+void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 {
-	if (!Me) return;
-	HideOldBody(Me, false);
-	if (Me->WristR && bWristSaved) { Me->WristR->SetRelativeLocationAndRotation(WristRel, WristRelRot); bWristSaved = false; }
-	if (bLegSaved && Me->KneeR && Me->AnkleR) { Me->KneeR->SetRelativeLocation(KneeRel); Me->AnkleR->SetRelativeLocation(AnkleRel); }
-	bLegSaved = false;
-	YawNow = 0.f;
-	if (bQuiverSaved && Me->QuiverParts.Num() > 0 && Me->QuiverParts[0])
-		if (USceneComponent* Q = Me->QuiverParts[0]->GetAttachParent()) Q->SetRelativeTransform(QuiverRel);
-	bQuiverSaved = false;
-	StateKey = -1;
-	bHavePrev = false;
-	bBlending = false;
+	static const TCHAR* const BareSlots[Piece_Count] = { TEXT("Bare_Chest"), TEXT("Bare_Legs"), TEXT("Bare_Helmet"), TEXT("Bare_Gauntlets"), nullptr };   // (nothing under the shoulder plates but the arm and chest)
+	if (!BareSlots[Piece] || bBare[Piece] == bShow) return;
+	bBare[Piece] = bShow;
+	if (!BareComp)
+	{
+		if (!bShow) return;
+		USkeletalMesh* Asset = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/NewSuit/SK_NewSuitBare.SK_NewSuitBare"));
+		if (!Asset) { UE_LOG(LogTemp, Warning, TEXT("JEEBANIM no bare mesh")); return; }
+		BareComp = NewObject<USkeletalMeshComponent>(Comp->GetOwner());
+		BareComp->SetupAttachment(Comp);
+		BareComp->SetSkinnedAssetAndUpdate(Asset);
+		BareComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		BareComp->SetBoundsScale(2.5f);
+		BareComp->RegisterComponent();
+		BareComp->SetLeaderPoseComponent(Comp);
+		// (Meshy painted the mail nearly black, like the plate: greyed and lifted the same way)
+		if (UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(BareComp->GetMaterial(0), BareComp))
+		{
+			M->SetScalarParameterValue(TEXT("Desat"), 1.f);
+			M->SetScalarParameterValue(TEXT("DesatGain"), 2.3f);
+			M->SetScalarParameterValue(TEXT("MetalScale"), 0.5f);
+			for (int32 m = 0; m < BareComp->GetNumMaterials(); ++m) BareComp->SetMaterial(m, M);
+		}
+	}
+	const FSkeletalMeshRenderData* R = BareComp->GetSkinnedAsset()->GetResourceForRendering();
+	if (!R || R->LODRenderData.Num() == 0) return;
+	const TArray<FSkelMeshRenderSection>& Secs = R->LODRenderData[0].RenderSections;
+	bool bAny = false;
+	for (int32 p = 0; p < Piece_Count; ++p)
+	{
+		if (!BareSlots[p]) continue;
+		bAny |= bBare[p];
+		const int32 Mat = BareComp->GetMaterialIndex(FName(BareSlots[p]));
+		for (int32 i = 0; i < Secs.Num(); ++i)
+			if (Secs[i].MaterialIndex == Mat) BareComp->ShowMaterialSection(Mat, i, bBare[p], 0);
+	}
+	BareComp->SetVisibility(bAny);
+}
+
+FTransform FKnightAnimator::BoneWorld(int32 B) const
+{
+	return L.BindInGame(Final, B) * ToWorld;
+}
+
+FTransform FKnightAnimator::ChestWorld() const
+{
+	const FTransform Chest = L.BindInGame(Final, Spine2);
+	return FTransform(Chest.GetRotation() * L.ChestRest.Inverse(), Chest.GetLocation()) * ToWorld;
+}
+
+FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
+{
+	// (at his side with the forearm hanging it hangs too, tip down; once the forearm comes up, as in every sword clip, it sits as strapped)
+	const FVector ForeDir = (BonePos(Final, LHand) - BonePos(Final, LFore)).GetSafeNormal();
+	const float Up = 1.f - FMath::SmoothStep(0.45f, 0.85f, float(-ForeDir.Z));
+	FTransform Strap;
+	Strap.Blend(L.ShieldAtRest, L.ShieldAtGuard, Up);
+	if (BlockAlpha > 0.f) { const FTransform Open = Strap; Strap.Blend(Open, L.ShieldAtBlock, BlockAlpha); }
+	return Strap * BoneWorld(LFore);
+}
+
+FTransform FKnightAnimator::BowWorld(float AimAlpha) const
+{
+	FTransform Hold;
+	Hold.Blend(L.BowAtRest, L.BowAtAim, AimAlpha);
+	return Hold * BoneWorld(LHand);
+}
+
+// ---------------- Hurt boxes: capsules on the bones, the size of the plates on them (owner, 2026-11-05: fat old ones did not match) ----------------
+namespace
+{
+	constexpr float HelmFrom = 8.f, HelmTo = 18.f, HelmR = 13.f;     // along the head from the head bone; the helm's top is HelmTo + HelmR above it
+	constexpr float TorsoR = 17.f, UpperArmR = 8.f, ForearmR = 7.f, ThighR = 10.f, ShinR = 8.f, FootR = 7.f;
+}
+
+void FKnightAnimator::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
+{
+	using namespace JeebHit;
+	uint8 Zone = Z_None;
+	auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R; C.Zone = Zone; Out.Add(C); };
+	const FVector Hd = BoneAt(Head), Nk = BoneAt(Neck);
+	const FVector HeadUp = (Hd - Nk).GetSafeNormal();
+	Zone = Z_Head;
+	Add(Hd + HeadUp * HelmFrom, Hd + HeadUp * HelmTo, HelmR);
+	Zone = Z_Torso;
+	Add(BoneAt(Hips) + FVector(0.f, 0.f, -2.f), BoneAt(Spine2) + (Nk - BoneAt(Spine2)) * 0.5f, TorsoR);
+	const int32 Sides[2][7] = { { LArm, LFore, LHand, LUp, LLeg, LFoot, LToe }, { RArm, RFore, RHand, RUp, RLeg, RFoot, RToe } };
+	for (const auto& S : Sides)
+	{
+		const FVector Sh = BoneAt(S[0]), El = BoneAt(S[1]), Wr = BoneAt(S[2]), Hp = BoneAt(S[3]), Kn = BoneAt(S[4]), An = BoneAt(S[5]), To = BoneAt(S[6]);
+		Zone = Z_UpperArm;
+		Add(Sh, El, UpperArmR);
+		Zone = Z_Forearm;
+		Add(El, Wr + (Wr - El).GetSafeNormal() * 9.f, ForearmR);   // (to the knuckles)
+		Zone = Z_Leg;
+		Add(Hp, Kn, ThighR);
+		Add(Kn, An, ShinR);
+		Add(An, To + (To - An).GetSafeNormal() * 6.f, FootR);
+	}
+}
+
+float FKnightAnimator::HelmTopZ() const
+{
+	const FVector Hd = BoneAt(Head);
+	return float(Hd.Z) + FMath::Max(0.f, float((Hd - BoneAt(Neck)).GetSafeNormal().Z)) * HelmTo + HelmR;
+}
+
+// His raised shield as hit boxes see it: the same band as ever, moved so that its middle lies where the raised shield really is (owner, 2026-11-05)
+JeebHit::FShieldWedge FKnightAnimator::ShieldWedge(const FVector& Centre, const FVector& Forward) const
+{
+	JeebHit::FShieldWedge W = JeebHit::KnightShield(Centre, Forward, HelmTopZ());
+	const float Mid = 0.5f * (W.Inner + W.Radius);
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, W.Fwd);
+	constexpr float SideShare = 0.5f;   // (half way over to the shield's side: the far edge of the band still covers his sword arm)
+	W.Apex = Centre + W.Fwd * (L.ShieldInGuard.X - Mid) + Right * (L.ShieldInGuard.Y * SideShare);
+	return W;
 }

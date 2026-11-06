@@ -90,38 +90,13 @@ AKnightCharacter::AKnightCharacter()
 		}
 	}
 
-	// Every body part hangs off a pivot so it can be animated. Positions below are given relative to the
-	// capsule center (feet at Z = -96, forward = +X, right = +Y); the helpers convert them to pivot space.
-	TMap<USceneComponent*, FVector> PivotPos;
-
-	auto MakePivot = [&](const TCHAR* Name, USceneComponent* Parent, FVector CapsulePos) -> USceneComponent*
-	{
-		USceneComponent* P = CreateDefaultSubobject<USceneComponent>(Name);
-		P->SetupAttachment(Parent ? Parent : RootComponent.Get());
-		P->SetRelativeLocation(CapsulePos - (Parent ? PivotPos.FindChecked(Parent) : FVector::ZeroVector));
-		PivotPos.Add(P, CapsulePos);
-		return P;
-	};
-
-	// ---- Pivots (the skeleton) ----
-	BodyRoot   = MakePivot(TEXT("BodyRoot"),   nullptr,   FVector(0, 0, 0));       // bounces up and down
-	HipL       = MakePivot(TEXT("HipL"),       BodyRoot,  KnightDesign::PivotPos(KnightDesign::P_HipL));
-	HipR       = MakePivot(TEXT("HipR"),       BodyRoot,  KnightDesign::PivotPos(KnightDesign::P_HipR));
-	KneeL      = MakePivot(TEXT("KneeL"),      HipL,      KnightDesign::PivotPos(KnightDesign::P_KneeL));
-	KneeR      = MakePivot(TEXT("KneeR"),      HipR,      KnightDesign::PivotPos(KnightDesign::P_KneeR));
-	AnkleL     = MakePivot(TEXT("AnkleL"),     KneeL,     KnightDesign::PivotPos(KnightDesign::P_AnkleL));
-	AnkleR     = MakePivot(TEXT("AnkleR"),     KneeR,     KnightDesign::PivotPos(KnightDesign::P_AnkleR));
-	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,  FVector(0, 0, -41.f));     // chest: leans and twists
-	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
-	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot, FVector(-2, 0, 71.f));
-	// (the helm is modelled at its full size: no head scaling)
-	CapeUpper  = MakePivot(TEXT("CapeUpper"),  UpperPivot, FVector(-26, 0, 13.f));
-	CapeLower  = MakePivot(TEXT("CapeLower"),  CapeUpper, FVector(-26, 0, -19.f));
-	ArmPivot   = MakePivot(TEXT("ArmPivotR"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmR));     // right shoulder (sword arm)
-	ArmPivotL  = MakePivot(TEXT("ArmPivotL"),  UpperPivot, KnightDesign::PivotPos(KnightDesign::P_ArmL));    // left shoulder (shield arm)
-	ElbowR     = MakePivot(TEXT("ElbowR"),     ArmPivot,  KnightDesign::PivotPos(KnightDesign::P_ElbowR));
-	ElbowL     = MakePivot(TEXT("ElbowL"),     ArmPivotL, KnightDesign::PivotPos(KnightDesign::P_ElbowL));
-	WristR     = MakePivot(TEXT("WristR"),     ElbowR,    KnightDesign::PivotPos(KnightDesign::P_WristR));   // (2026-10-31) the sword hand
+	// Where the pose puts his gear (PlaceGear): empty joints on the capsule
+	UpperPivot = CreateDefaultSubobject<USceneComponent>(TEXT("UpperPivot"));
+	UpperPivot->SetupAttachment(RootComponent.Get());
+	WristR = CreateDefaultSubobject<USceneComponent>(TEXT("WristR"));
+	WristR->SetupAttachment(RootComponent.Get());
+	ElbowL = CreateDefaultSubobject<USceneComponent>(TEXT("ElbowL"));
+	ElbowL->SetupAttachment(RootComponent.Get());
 }
 
 void AKnightCharacter::BeginPlay()
@@ -161,8 +136,6 @@ void AKnightCharacter::BeginPlay()
 	GraphicsLevel = 1;        // graphics start on Low every time
 	RenderScale = 0.6f;       // and a low render resolution
 	ApplyGraphics();
-	UpperBase = UpperPivot->GetRelativeLocation();
-	LeftBase = ArmPivotL->GetRelativeLocation();
 
 	Dust.SetNum(16);
 	{
@@ -477,7 +450,6 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);
-	if (bShotFace && bAttacking) LogSwordTip();   // (test pictures only: the sword tip's path, for checking a move)
 	TickHitboxes(Dt);   // (after the pose: the hit boxes and hurt boxes follow the joints as posed this frame)
 	TickDust(Dt, bFalling, bSpecial, S, C);
 	TickSwordTrail(Dt);

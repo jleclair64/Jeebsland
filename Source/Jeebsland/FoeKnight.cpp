@@ -8,7 +8,8 @@
 #include "Terrain.h"
 #include "Messages.h"
 #include "ProceduralMeshComponent.h"
-#include "KnightModel.h"
+#include "KnightAnimator.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
@@ -31,35 +32,8 @@ AFoeKnight::AFoeKnight()
 	Capsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	SetRootComponent(Capsule);
 
-	// The same skeleton as the player's knight (positions relative to the capsule centre)
-	TMap<USceneComponent*, FVector> Placed;
-	auto MakePivot = [&](const TCHAR* Name, USceneComponent* Parent, FVector CapsulePos) -> USceneComponent*
-	{
-		USceneComponent* P = CreateDefaultSubobject<USceneComponent>(Name);
-		P->SetupAttachment(Parent ? Parent : RootComponent.Get());
-		P->SetRelativeLocation(CapsulePos - (Parent ? Placed.FindChecked(Parent) : FVector::ZeroVector));
-		Placed.Add(P, CapsulePos);
-		return P;
-	};
-	using namespace KnightDesign;
-	BodyRoot   = MakePivot(TEXT("BodyRoot"),   nullptr,    FVector(0, 0, 0));
-	HipL       = MakePivot(TEXT("HipL"),       BodyRoot,   PivotPos(P_HipL));
-	HipR       = MakePivot(TEXT("HipR"),       BodyRoot,   PivotPos(P_HipR));
-	KneeL      = MakePivot(TEXT("KneeL"),      HipL,       PivotPos(P_KneeL));
-	KneeR      = MakePivot(TEXT("KneeR"),      HipR,       PivotPos(P_KneeR));
-	AnkleL     = MakePivot(TEXT("AnkleL"),     KneeL,      PivotPos(P_AnkleL));
-	AnkleR     = MakePivot(TEXT("AnkleR"),     KneeR,      PivotPos(P_AnkleR));
-	UpperPivot = MakePivot(TEXT("UpperPivot"), BodyRoot,   FVector(0, 0, -41.f));
-	HeadPivot  = MakePivot(TEXT("HeadPivot"),  UpperPivot, FVector(0, 0, 23.f));
-	PlumePivot = MakePivot(TEXT("PlumePivot"), HeadPivot,  FVector(-2, 0, 71.f));
-	// (the helm is modelled at its full size: no head scaling)
-	CapeUpper  = MakePivot(TEXT("CapeUpper"),  UpperPivot, FVector(-26, 0, 13.f));
-	CapeLower  = MakePivot(TEXT("CapeLower"),  CapeUpper,  FVector(-26, 0, -19.f));
-	ArmR       = MakePivot(TEXT("ArmR"),       UpperPivot, PivotPos(P_ArmR));
-	ArmL       = MakePivot(TEXT("ArmL"),       UpperPivot, PivotPos(P_ArmL));
-	ElbowR     = MakePivot(TEXT("ElbowR"),     ArmR,       PivotPos(P_ElbowR));
-	WristR     = MakePivot(TEXT("WristR"),     ElbowR,     PivotPos(P_WristR));
-	ElbowL     = MakePivot(TEXT("ElbowL"),     ArmL,       PivotPos(P_ElbowL));
+	WristR = CreateDefaultSubobject<USceneComponent>(TEXT("WristR"));
+	WristR->SetupAttachment(Capsule);
 
 	Hp = CreateDefaultSubobject<UHealthComponent>(TEXT("Hp"));
 	Hp->Max = Hp->Cur = MaxHp;
@@ -114,53 +88,22 @@ void AFoeKnight::BeginPlay()
 {
 	Super::BeginPlay();
 	using namespace KnightDesign;
-	USceneComponent* Pivots[P_Count] = {};
-	Pivots[P_Body] = BodyRoot;   Pivots[P_Upper] = UpperPivot; Pivots[P_Head] = HeadPivot; Pivots[P_Plume] = PlumePivot;
-	Pivots[P_CapeU] = CapeUpper; Pivots[P_CapeL] = CapeLower;  Pivots[P_ArmL] = ArmL;      Pivots[P_ArmR] = ArmR;
-	Pivots[P_ElbowL] = ElbowL;   Pivots[P_ElbowR] = ElbowR;    Pivots[P_HipL] = HipL;      Pivots[P_HipR] = HipR;
-	Pivots[P_KneeL] = KneeL;     Pivots[P_KneeR] = KneeR;
-	Pivots[P_AnkleL] = AnkleL;   Pivots[P_AnkleR] = AnkleR;   Pivots[P_WristR] = WristR;
-
-	// A full suit of iron (dark grey plate, red accents), shield included; no bare skin
+	// The same knight as the player's, in his tier
+	Anim = MakeShared<FKnightAnimator>();
+	if (!IsNetMode(NM_DedicatedServer) && Anim->MakeMesh(this, GetRootComponent()))
+		for (int32 p = 0; p < JeebAnim::Piece_Count; ++p) Anim->Wear(p, Tier);
+	// He carries the kite shield (arrows stick in its parts, so the server has them too)
 	TArray<FDef> Defs;
 	Build(Defs);
-	// the armour from the Meshy model when it is there (the same as the player's), tinted for his tier: the skinned knight
-	// bending at every joint, else the model cut into pieces on the joints
-	Skin = MakeShared<KnightModel::FSkin>();
-	UPoseableMeshComponent* SkinComp = IsNetMode(NM_DedicatedServer) ? nullptr : KnightModel::MakeSkin(*Skin, this, GetRootComponent(), Pivots);
-	if (SkinComp)
-		for (int32 Slot : { SlotHelmet, SlotBody, SlotShoulders, SlotBoots, SlotGloves })
-			KnightModel::Wear(*Skin, Slot, JeebItems::ArmourId(JeebItems::K_Helmet, JeebItems::AS_Heavy, Tier));   // (heavy, the original knight, in his tier; only the style and tier matter to the look)
-	else Skin.Reset();
-	static const TArray<KnightModel::FPart> NoPieces;
-	const TArray<KnightModel::FPart>& Model = SkinComp ? NoPieces : KnightModel::Parts();
-	const bool bModelArmour = SkinComp || Model.Num() > 0;
-	for (const KnightModel::FPart& MP : Model)
-	{
-		if (!Pivots[MP.Pivot]) continue;
-		UProceduralMeshComponent* C = KnightModel::MakeComp(this, Pivots[MP.Pivot], MP);
-		Meshes.Add(C);
-		KnightModel::Paint(C, Tier);
-	}
-	if (Model.Num() > 0)   // the dark body inside the armour
-	{
-		TArray<FDef> Cores;
-		KnightModel::AddCores(Cores);
-		for (const FDef& D : Cores)
-			if (Pivots[D.Pivot]) Paint(MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh), D.Fixed, false);
-	}
 	for (const FDef& D : Defs)
 	{
-		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot] || D.bBare || D.Style != 0 || D.Slot >= SlotBrush) continue;   // (he carries the kite shield, and no brush)
-		if (bModelArmour && KnightModel::IsModelSlot(D.Slot)) continue;
-		if (Tier < D.MinTier || Tier > D.MaxTier) continue;
-		UProceduralMeshComponent* C = MakePart(Pivots[D.Pivot], D.Pivot, D.Mesh);
-		if (D.Slot == SlotShield) ShieldMeshes.Add(C);   // (arrows stick in these)
+		if (D.Slot != SlotShield || D.Mesh.V.Num() == 0 || D.bBare || D.Style != 0 || Tier < D.MinTier || Tier > D.MaxTier) continue;
+		UProceduralMeshComponent* C = MakePart(GetRootComponent(), D.Pivot, D.Mesh);
+		ShieldMeshes.Add(C);
 		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
 		if (D.bFixedColor) Col = D.Fixed;
-		const bool bMetal = JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody);
-		Paint(C, Col, bMetal);
+		Paint(C, Col, JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody));
 	}
 	// His sword, in the right hand, held the way the player holds one
 	{
@@ -169,7 +112,7 @@ void AFoeKnight::BeginPlay()
 		for (const WeaponDesign::FWPart& WP : Parts)
 		{
 			if (WP.Mesh.V.Num() == 0) continue;
-			UProceduralMeshComponent* C = MakePart(ElbowR, P_ElbowR, WP.Mesh);
+			UProceduralMeshComponent* C = MakePart(WristR, P_WristR, WP.Mesh);
 			const bool bMetal = JeebItems::TierIsMetal(Tier) && !WP.bFixed && (WP.Role == 0 || WP.Role == 2);
 			Paint(C, WP.bFixed ? WP.Fixed : JeebItems::Palette(Tier, WP.Role), bMetal);
 		}
@@ -177,14 +120,8 @@ void AFoeKnight::BeginPlay()
 
 	Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
 	Hp->OnHitSeen = [this]() { HitFlash = 0.35f; };
-	// His hurt boxes follow his joints (HitBoxes.h)
-	Hp->GatherHurt = [this](TArray<JeebHit::FCapsule>& Out)
-	{
-		JeebHit::FKnightJoints J;
-		J.Upper = UpperPivot; J.Head = HeadPivot; J.ArmL = ArmL; J.ArmR = ArmR; J.ElbowL = ElbowL; J.ElbowR = ElbowR; J.WristR = WristR;
-		J.HipL = HipL; J.HipR = HipR; J.KneeL = KneeL; J.KneeR = KneeR; J.AnkleL = AnkleL; J.AnkleR = AnkleR;
-		JeebHit::KnightHurt(J, Out);
-	};
+	// His hurt boxes follow his bones (HitBoxes.h)
+	Hp->GatherHurt = [this](TArray<JeebHit::FCapsule>& Out) { if (Anim && Anim->IsReady()) Anim->GatherHurt(Out); };
 	// Blows that don't come through hit boxes (arrows, other weapons' swings): his raised shield, facing the blow (its 90-degree
 	// wedge), takes the whole of it
 	Hp->ModifyDamage = [this](int32 Amount, AActor* From) -> int32
@@ -199,7 +136,8 @@ void AFoeKnight::BeginPlay()
 	Hp->GatherShield = [this](JeebHit::FShieldWedge& Out)
 	{
 		if (BlockAlpha < 0.6f || DeathT > 0.f || bGuardBroken || KnockT >= 0.f) return false;
-		Out = JeebHit::KnightShield(GetActorLocation(), GetActorForwardVector(), JeebHit::HelmTop(HeadPivot));   // (up to the top of his helm)
+		if (!Anim || !Anim->IsReady()) return false;
+		Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
 		return true;
 	};
 	GuardMax = GuardPool = JeebItems::GuardForLevel(GuardLevel);   // (his guard: a Defence level 10 knight's; he carries an iron kite shield)
@@ -325,12 +263,8 @@ void AFoeKnight::TickKnock(float Dt)
 	KnockT += Dt;
 	if (HasAuthority() ? bAir : GetActorLocation().Z > GroundZ + 8.f) KnockT = FMath::Min(KnockT, KnockFall);   // (launched: lying back in the air; the rest waits until he lands)
 	const float RollEnd = KnockLie + (KnockOpt ? KnockRoll : 0.f), End = RollEnd + KnockRise;
-	// how far down (1 lying)
-	const float Down = (KnockT < KnockFall) ? FMath::SmoothStep(0.f, 1.f, KnockT / KnockFall) : (KnockT < RollEnd ? 1.f : 1.f - FMath::SmoothStep(0.f, 1.f, (KnockT - RollEnd) / KnockRise));
 	// rolling over sideways along the ground (his length lies along his facing), to his left or right
 	const float Side = (KnockOpt == 1) ? -1.f : 1.f;
-	float RollK = 0.f;
-	if (KnockOpt && KnockT > KnockLie) RollK = FMath::SmoothStep(0.f, 1.f, FMath::Min(1.f, (KnockT - KnockLie) / KnockRoll));
 	if (KnockOpt && HasAuthority() && Before < RollEnd && Before >= KnockLie)
 	{
 		const float K0 = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((Before - KnockLie) / KnockRoll, 0.f, 1.f));
@@ -339,24 +273,7 @@ void AFoeKnight::TickKnock(float Dt)
 		if (bStill) SetActorLocation(GetActorLocation() + By, true);
 		else MoveTowards(FVector2D(GetActorLocation() + By), 1.0e5f, 1.f);
 	}
-	if (KnockT >= End)
-	{
-		KnockT = -1.f;
-		BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
-		BodyRoot->SetRelativeLocation(FVector::ZeroVector);
-		return;
-	}
-	// the pose: flat on his back (the top tipped back), legs out straight, arms flung wide
-	const FQuat Lie = FQuat(FVector::ForwardVector, -Side * 2.f * PI * RollK) * FQuat(FRotator(80.f * Down, 0.f, 0.f));
-	BodyRoot->SetRelativeRotation(Lie);
-	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -78.f * Down));
-	auto Toward = [Down](USceneComponent* C, const FRotator& R) { C->SetRelativeRotation(FMath::Lerp(C->GetRelativeRotation(), R, Down)); };
-	Toward(HipR, FRotator(8.f, 0.f, -6.f));   Toward(HipL, FRotator(14.f, 0.f, 6.f));
-	Toward(KneeR, FRotator(-12.f, 0.f, 0.f)); Toward(KneeL, FRotator(-24.f, 0.f, 0.f));
-	Toward(AnkleR, FRotator(20.f, 0.f, 0.f)); Toward(AnkleL, FRotator(20.f, 0.f, 0.f));
-	Toward(ArmR, FRotator(15.f, 0.f, -55.f)); Toward(ArmL, FRotator(15.f, 0.f, 55.f));
-	Toward(ElbowR, FRotator(20.f, 0.f, 0.f)); Toward(ElbowL, FRotator(20.f, 0.f, 0.f));
-	Toward(HeadPivot, FRotator(-28.f, 0.f, 0.f));
+	if (KnockT >= End) KnockT = -1.f;
 }
 
 void AFoeKnight::OnRep_Act()
@@ -378,8 +295,6 @@ void AFoeKnight::OnRep_Down()
 	// back on his feet
 	DeathT = 0.f;
 	HitFlash = 0.f;
-	BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
-	BodyRoot->SetRelativeLocation(FVector::ZeroVector);
 	Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
 
@@ -428,8 +343,6 @@ void AFoeKnight::Rise()
 	AttackCool = 2.f;
 	const FVector2D P = PenCenter;
 	SetActorLocation(FVector(P.X, P.Y, FloorZ(P.X, P.Y)));
-	BodyRoot->SetRelativeRotation(FRotator::ZeroRotator);
-	BodyRoot->SetRelativeLocation(FVector::ZeroVector);
 	SetActorHiddenInGame(false);
 	Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 }
@@ -470,27 +383,20 @@ void AFoeKnight::OnHurt(AActor* From)
 void AFoeKnight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	ON_SCOPE_EXIT { if (Skin) KnightModel::UpdateSkin(*Skin); };   // (once the pose is done, whichever way Tick ends)
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
+	ON_SCOPE_EXIT { TickBody(Dt); };   // (his pose, whichever way Tick ends)
 	const float Now = GetWorld()->GetTimeSeconds();
 
 	// ---- Beaten: topple, lie still, vanish, then stand up again in the middle of the pen ----
 	if (DeathT > 0.f)
 	{
-		if (DeathT < 1.f)
-		{
-			DeathT = FMath::Min(1.f, DeathT + Dt * 1.6f);
-			const float K = DeathT * DeathT;
-			BodyRoot->SetRelativeRotation(FRotator(-80.f * K, 0.f, 0.f));
-			BodyRoot->SetRelativeLocation(FVector(-30.f * K, 0.f, -60.f * K));
-		}
+		if (DeathT < 1.f) DeathT = FMath::Min(1.f, DeathT + Dt * 1.6f);
 		if (HasAuthority())
 		{
 			RespawnT -= Dt;
 			if (RespawnT < 14.f) SetActorHiddenInGame(true);
 			if (RespawnT <= 0.f) Rise();
 		}
-		LastLoc = GetActorLocation();
 		return;
 	}
 
@@ -627,49 +533,45 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	bRepBlock = BlockT > 0.f;
 	}
 
-	// ---- Animation ----
+	TickKnock(Dt);
+}
+
+// His body: the same animator as the player's, told what he is doing. (Everything here is known on every machine: RepAct, bRepBlock, RepKnock and where he is.)
+void AFoeKnight::TickBody(float Dt)
+{
 	const FVector Moved = GetActorLocation() - LastLoc;
 	LastLoc = GetActorLocation();
-	const float Speed = FVector2D(Moved.X, Moved.Y).Size() / FMath::Max(Dt, 1e-4f);
-	MoveBlend = FMath::FInterpTo(MoveBlend, FMath::Clamp(Speed / 150.f, 0.f, 1.f), Dt, 10.f);
-	GaitPhase = FMath::Fmod(GaitPhase + 2.f * PI * 1.4f * Dt, 2.f * PI);
+	SmVel = FMath::VInterpTo(SmVel, (Moved / FMath::Max(Dt, 1e-4f)).GetClampedToMaxSize(900.f), Dt, 14.f);
 	BlockAlpha = FMath::FInterpTo(BlockAlpha, BlockT > 0.f ? 1.f : 0.f, Dt, 12.f);
 	HitFlash = FMath::Max(0.f, HitFlash - Dt);
-	const float S = FMath::Sin(GaitPhase), C = FMath::Cos(GaitPhase);
-
-	// legs step the way he moves (forward, back, or sideways while circling)
-	const FVector LV = GetActorRotation().UnrotateVector(FVector(Moved.X, Moved.Y, 0.f));
-	const float Fw = LV.Size() > 0.1f ? LV.X / LV.Size() : 1.f, Sd = LV.Size() > 0.1f ? LV.Y / LV.Size() : 0.f;
-	const float HipAmp = 30.f * MoveBlend, KneeAmp = 40.f * MoveBlend;
-	const float Crouch = 0.35f * BlockAlpha + (Act == EAct::Strike ? 0.3f : 0.f);
-	// a relaxed stance (knees a little bent), feet kept flat at the ankles
-	const float Stance = 12.f;
-	const float HipRp = HipAmp * S * Fw + 30.f * Crouch + Stance, HipLp = -HipAmp * S * Fw + 30.f * Crouch + Stance;
-	const float KneeRp = -KneeAmp * FMath::Pow(0.5f * (1.f + C), 2.f) - 55.f * Crouch - 2.f * Stance;
-	const float KneeLp = -KneeAmp * FMath::Pow(0.5f * (1.f - C), 2.f) - 55.f * Crouch - 2.f * Stance;
-	HipR->SetRelativeRotation(FRotator(HipRp, 0.f, 22.f * MoveBlend * Sd * (0.5f + 0.5f * S)));
-	HipL->SetRelativeRotation(FRotator(HipLp, 0.f, 22.f * MoveBlend * Sd * (0.5f - 0.5f * S)));
-	KneeR->SetRelativeRotation(FRotator(KneeRp, 0.f, 0.f));
-	KneeL->SetRelativeRotation(FRotator(KneeLp, 0.f, 0.f));
-	AnkleR->SetRelativeRotation(FRotator(-(HipRp + KneeRp), 0.f, 0.f));
-	AnkleL->SetRelativeRotation(FRotator(-(HipLp + KneeLp), 0.f, 0.f));
-	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -3.f * MoveBlend * FMath::Abs(S) - 10.f * Crouch - 1.f));
-
-	// sword arm: hangs ready; on a windup it rises high overhead (the tell), then cuts down hard and follows through
-	float ArmPitch = 20.f, ArmYaw = 0.f, Elbow = -25.f;
-	if (Act == EAct::Windup) { const float K = FMath::SmoothStep(0.f, 0.35f, ActT); ArmPitch = FMath::Lerp(20.f, 165.f, K); Elbow = FMath::Lerp(-25.f, -60.f, K); ArmYaw = -15.f * K; }
-	else if (Act == EAct::Strike) { const float K = FMath::Clamp(ActT / 0.16f, 0.f, 1.f); ArmPitch = FMath::Lerp(165.f, 5.f, K * K); Elbow = FMath::Lerp(-60.f, -5.f, K); ArmYaw = FMath::Lerp(-15.f, 20.f, K); }
-	else if (Act == EAct::Recover) { const float K = FMath::Clamp(ActT / 0.55f, 0.f, 1.f); ArmPitch = FMath::Lerp(5.f, 20.f, K); Elbow = FMath::Lerp(-5.f, -25.f, K); ArmYaw = FMath::Lerp(20.f, 0.f, K); }
-	ArmR->SetRelativeRotation(FRotator(ArmPitch, ArmYaw, 0.f));
-	ElbowR->SetRelativeRotation(FRotator(-Elbow, 0.f, 0.f));
-	// shield arm: across the body when guarding
-	ArmL->SetRelativeRotation(FRotator(FMath::Lerp(10.f, 60.f, BlockAlpha), FMath::Lerp(0.f, 32.f, BlockAlpha), 0.f));
-	ElbowL->SetRelativeRotation(FRotator(FMath::Lerp(25.f, 55.f, BlockAlpha), 0.f, 0.f));
-	// chest: leans into the cut, rocks back when hit
-	const float Flinch = HitFlash / 0.35f;
-	UpperPivot->SetRelativeRotation(FRotator((Act == EAct::Strike ? -10.f : (Act == EAct::Windup ? 6.f : 0.f)) + 12.f * Flinch * FMath::Sin(Flinch * 9.f), 0.f, 0.f));
-	HeadPivot->SetRelativeRotation(FRotator(0.f, 0.f, 2.f * FMath::Sin(Now * 1.3f)));
-	TickKnock(Dt);   // (knocked down: over all of that)
+	if (!Anim || !Anim->IsReady()) return;
+	// (nobody is looking at the server's copy: ten poses a second serve his hurt boxes. On players' machines, slower while off screen. His gear follows the capsule in between.)
+	AnimAccum += Dt;
+	const bool bSeen = Anim->Mesh() && Anim->Mesh()->WasRecentlyRendered(0.25f);
+	if (AnimAccum < (IsNetMode(NM_DedicatedServer) ? 0.1f : bSeen ? 0.f : 0.2f)) return;
+	JeebAnim::FInput In;
+	using JeebAnim::EMove;
+	In.Vel = SmVel;
+	In.Rot = GetActorRotation();
+	In.BlockAlpha = BlockAlpha;
+	In.Kind = JeebItems::K_Sword;
+	In.StunLeft = Act == EAct::Stun ? FMath::Max(StunDur - ActT, 0.05f) : HitFlash;
+	if (DeathT > 0.f) In.bKnockedDown = true;
+	else if (KnockT >= 0.f)
+	{
+		const float RollEnd = KnockLie + (KnockOpt ? KnockRoll : 0.f);
+		if (KnockOpt == 0) { In.bKnockedDown = true; In.KnockPhase = KnockT >= RollEnd ? 1 : 0; }
+		else if (KnockT < KnockLie) In.bKnockedDown = true;
+		else if (KnockT < RollEnd) { In.bRolling = true; In.RollU = (KnockT - KnockLie) / KnockRoll; In.RollYaw = KnockOpt == 1 ? -90.f : 90.f; }
+	}
+	else if (Act == EAct::Windup) { In.Move = EMove::SmashCharge; In.SmashCharge = FMath::Clamp(ActT / 0.65f, 0.f, 1.f); }
+	else if (Act == EAct::Strike) { In.Move = EMove::SmashSwing; In.SmashSwingU = FMath::Clamp(ActT / 0.2f, 0.f, 1.f); }
+	else if (Act == EAct::Recover) { In.Move = EMove::SmashEnd; In.SmashEndU = FMath::Clamp(ActT / 0.55f, 0.f, 1.f); }
+	Anim->Update(AnimAccum, In, GetActorLocation() - FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight()), In.Rot.Yaw);
+	AnimAccum = 0.f;
+	WristR->SetWorldTransform(Anim->RightGripWorld());
+	const FTransform At = Anim->ShieldWorld(BlockAlpha);
+	for (UProceduralMeshComponent* C : ShieldMeshes) if (C) C->SetWorldTransform(At);
 }
 
 float AFoeKnight::FloorZ(float X, float Y) const

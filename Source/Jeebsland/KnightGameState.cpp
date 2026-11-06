@@ -2,7 +2,6 @@
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
 #include "GearWall.h"
-#include "NewSuitTest.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "Meadow.h"
@@ -356,22 +355,6 @@ void AKnightGameState::BuildMoveLab()
 	}
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
-	// The new armour suit to look at (2026-11-05): standing, walking and running in a row left of the sparring knight, facing the
-	// start, plus one for the player (N puts it on). Only something to look at, so each machine makes its own.
-	if (World->GetNetMode() != NM_DedicatedServer)
-	{
-		const int32 Row[] = { ANewSuitTest::Show_Stand, ANewSuitTest::Show_Walk, ANewSuitTest::Show_Run, ANewSuitTest::Show_Player };
-		for (int32 i = 0; i < 4; ++i)
-		{
-			const float Drop = Row[i] == ANewSuitTest::Show_Walk ? 3.9f : Row[i] == ANewSuitTest::Show_Run ? 2.9f : 0.f;   // (see NewSuitTest.cpp)
-			const FTransform Xf(FRotator(0.f, 90.f, 0.f), FVector(300.f, -170.f - i * 170.f, Z - Drop));   // (his front is his +Y: 90 turns him toward the start)
-			if (ANewSuitTest* S = World->SpawnActorDeferred<ANewSuitTest>(ANewSuitTest::StaticClass(), Xf))
-			{
-				S->Show = Row[i];
-				S->FinishSpawning(Xf);
-			}
-		}
-	}
 	SetupShotMode();
 }
 
@@ -471,7 +454,6 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				ShotMoveClock += DeltaSeconds;
 				static float ShotSeconds = 2.6f;   // (-ShotSeconds=6: a longer series, for a chain of moves)
 				static const bool bReadSeconds = FParse::Value(FCommandLine::Get(), TEXT("ShotSeconds="), ShotSeconds);
-				if (ShotMoveClock < ShotSeconds && (ShotFrame % 2) == 0 && K) K->LogClearance(ShotFrame / 2);
 				if (ShotMoveClock < ShotSeconds && (ShotFrame++ % 2) == 0)
 					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%03d.png"), *ShotName, ShotFrame / 2), false, false);
 				if (ShotMoveClock > ShotSeconds + 0.2f && PC) PC->ConsoleCommand(TEXT("quit"));
@@ -507,14 +489,6 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		if (bShotDressed && ShotClock > 8.f && ShotClock < 8.1f)
 			if (ACharacter* C = Cast<ACharacter>(PC ? PC->GetPawn() : nullptr))
 				UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT MaxWalkSpeed=%.1f"), C->GetCharacterMovement()->MaxWalkSpeed);
-		if (ShotClock > 8.f && ShotClock < 8.1f)   // (test pictures: JEEBFEET = how far each knight's left ankle bone sits above the floor)
-			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-				for (UActorComponent* Ac : It->GetComponents())
-					if (USkinnedMeshComponent* Sm = Cast<USkinnedMeshComponent>(Ac); Sm && Sm->IsVisible() && Sm->GetBoneIndex(TEXT("AnkleL")) != INDEX_NONE)
-					{
-						const FVector L = Sm->GetBoneLocation(TEXT("AnkleL"));
-						UE_LOG(LogTemp, Display, TEXT("JEEBFEET %s %s ankle %.1f above the MoveLab floor (standing: about 14)"), *It->GetName(), *Sm->GetName(), L.Z - JeebTerrain::HeightAt(0.f, 0.f));
-					}
 		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;

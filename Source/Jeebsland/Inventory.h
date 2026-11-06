@@ -105,6 +105,8 @@ namespace JeebItems
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
 	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
+	// Everything with a blade or a point plays the sword's moves (owner, 2026-11-05: until they have their own), each with hit boxes as long as it reaches
+	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear; }
 	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
 	inline int32 BarSlotFor(int32 K) { return K == K_Bow ? 1 : 0; }
 	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }

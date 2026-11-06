@@ -1,7 +1,7 @@
 Name,StopMul,WeightMul,PriceMul,Note
 # Armour styles (2026-11-03). Every armour piece (helmet, chestplate, shoulders, gloves, boots) comes in each style at every tier; the tier is only its colour. Each style has its own model, so keep these three rows in this order (classic, light, heavy); every column can be changed.
 # StopMul: how much of a blow the piece stops, x this (the tier's stop in Tiers.csv ArmourTakes; 0.75 = three quarters as much). WeightMul: its weight x this (Kinds.csv Weight x Tiers.csv WeightMult). PriceMul: store and selling price x this.
-# The models: Classic = the gold-trimmed plate, Light = the crusader tunic, Heavy = the big original knight. Name is what goes in front of the kind ("Iron Light Helmet"); the classic piece is just "Iron Helmet".
+# All three look the same for now: one knight model, different numbers (Docs/ToRecreate.md has their old looks). Name is what goes in front of the kind ("Iron Light Helmet"); the classic piece is just "Iron Helmet".
 Classic,1,1,1,"Classic plate: the all-rounder"
-Light,0.75,0.55,0.8,"Light: a tunic and mail. Stops a quarter less, but weighs about half as much"
+Light,0.75,0.55,0.8,"Light: stops a quarter less, but weighs about half as much"
 Heavy,1.2,1.45,1.3,"Heavy plate: stops a fifth more, but weighs half as much again"

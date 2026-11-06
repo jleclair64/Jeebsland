@@ -213,11 +213,12 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 	const float Life = 0.09f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
 	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
 	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
-	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && SelectedKind() == JeebItems::K_Sword && WristR)
+	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR)
 	{
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
-		FVector Tip = Along(79.5f), In = Along(67.f);   // a thin band at the tip (the sword's tip is 79.5 cm from the grip)
+		const float Reach = WeaponDesign::BladeReach(SelectedKind());
+		FVector Tip = Along(Reach), In = Along(Reach - 12.5f);   // a thin band at the tip
 		if (bDash) { const FVector Mid = Tip; In = Mid + FVector(0.f, 0.f, 5.f); Tip = Mid - FVector(0.f, 0.f, 5.f); }   // (a stab runs along the blade: a streak behind the point instead)
 		// Only the cut itself leaves a trail (the hit boxes' active part). Begin hit 1 once the blade is already moving across the
 		// front of the body.

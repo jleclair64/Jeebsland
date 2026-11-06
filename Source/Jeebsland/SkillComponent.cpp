@@ -66,7 +66,7 @@ void USkillComponent::ResetToStartingKit()
 	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
-		Worn[K] = JeebItems::StyleHasPiece(K, JeebItems::AS_Light) ? JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin) : 0;
+		Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // (ArmourId gives the classic shoulders: Light has none of its own)
 	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, JeebItems::T_Tin);   // (a plain tin cape; capes are ordinary items since 2026-11-03)
 }
 

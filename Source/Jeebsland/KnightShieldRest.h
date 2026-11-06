@@ -11,3 +11,4 @@ struct FShieldRest
 };
 
 const FShieldRest& ShieldRest();
+FQuat KnightBowRestQuat();   // the bow's turn in the fist at ease (KnightCharacterBow.cpp)

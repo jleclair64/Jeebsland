@@ -1,7 +1,8 @@
 #include "GearWall.h"
 #include "Inventory.h"
 #include "ItemModels.h"
-#include "KnightModel.h"
+#include "KnightAnimator.h"
+#include "Components/PoseableMeshComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -200,39 +201,39 @@ int32 AGearWall::PegAt(const FVector& From, const FVector& Dir, const FVector& N
 	return Best;
 }
 
-// A small knight on the board wearing one style's whole suit at one tier: the style's own skinned model (KnightModel.h),
-// standing in its rest pose, tinted like a worn suit. Each of the five pieces is a peg where it sits on him.
+// A knight on the board wearing a whole suit of one style at one tier, standing in his rest pose, tinted like a worn suit. Each of the five pieces is a peg where it sits on him.
+// (The styles are the same model: they differ in the numbers, ArmourStyles.csv.)
 void AGearWall::AddMannequin(int32 Style, int32 Tier, const FVector& Local)
 {
-	using namespace KnightDesign;
-	const struct { int32 Kind; FVector At; } Spots[5] = {
-		{ JeebItems::K_Helmet, PivotPos(P_Head) + FVector(0.f, 0.f, 12.f) },
-		{ JeebItems::K_Shoulders, PivotPos(P_ArmL) + FVector(0.f, 0.f, 4.f) },
-		{ JeebItems::K_Chest, PivotPos(P_Upper) + FVector(0.f, 0.f, -12.f) },
-		{ JeebItems::K_Gloves, PivotPos(P_ElbowR) + FVector(0.f, 0.f, -28.f) },
-		{ JeebItems::K_Boots, PivotPos(P_AnkleL) + FVector(0.f, 0.f, -4.f) } };
+	using namespace JeebAnim;
+	const FClipLib& L = FClipLib::Get();
+	const FVector Feet = Local - FVector(0.f, 0.f, DollZ - 1.f);
+	const FClip* RestClip = L.Find(TEXT("Rest"));
+	if (!RestClip) return;
+	FPose Rest;
+	Rest.Rot.SetNum(L.Parents.Num());
+	L.Sample(*RestClip, 0.f, Rest, false);
+	const struct { int32 Kind; int32 Bone; FVector Off; } Spots[5] = {
+		{ JeebItems::K_Helmet, Head, FVector(0.f, 0.f, 12.f) },
+		{ JeebItems::K_Shoulders, LArm, FVector(0.f, 0.f, 4.f) },
+		{ JeebItems::K_Chest, Spine1, FVector::ZeroVector },
+		{ JeebItems::K_Gloves, RHand, FVector::ZeroVector },
+		{ JeebItems::K_Boots, LFoot, FVector::ZeroVector } };
 	for (const auto& S : Spots) if (JeebItems::StyleHasPiece(S.Kind, Style))   // (no peg for a piece the style does not have)
 	{
 		FPeg P;
 		P.Id = JeebItems::ArmourId(S.Kind, Style, Tier);
-		P.Pos = GetActorTransform().TransformPosition(Local + S.At * DollScale + FVector(12.f, 0.f, 0.f));
+		P.Pos = GetActorTransform().TransformPosition(Feet + L.BindInGame(Rest, S.Bone).GetLocation() + S.Off + FVector(12.f, 0.f, 0.f));
 		Pegs.Add(P);
 	}
 	if (GetNetMode() == NM_DedicatedServer) return;
-	USkeletalMesh* M = LoadObject<USkeletalMesh>(nullptr, KnightModel::SetMeshPath(Style));
-	if (!M) return;
-	USkeletalMeshComponent* C = NewObject<USkeletalMeshComponent>(this);
-	C->SetupAttachment(Root);
-	C->SetRelativeLocation(Local);
-	C->SetRelativeScale3D(FVector(DollScale));
-	C->SetSkinnedAssetAndUpdate(M);
-	C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	C->RegisterComponent();
-	UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, KnightModel::SetMaterialPath(Style));
-	for (int32 m = 0; m < C->GetNumMaterials(); ++m)
-		if (UMaterialInstanceDynamic* D = C->CreateDynamicMaterialInstance(m, Mi ? Mi : C->GetMaterial(m)))
-		{
-			D->SetVectorParameterValue(TEXT("Tint"), KnightModel::TierTint(Tier));
-			if (Style == KnightModel::Set_Classic) D->SetScalarParameterValue(TEXT("DesatGain"), KnightModel::ClassicGreyGain);
-		}
+	FKnightAnimator Statue;
+	if (UPoseableMeshComponent* C = Statue.MakeMesh(this, Root))
+	{
+		C->SetCastShadow(false);
+		for (int32 p = 0; p < Piece_Count; ++p) Statue.Wear(p, Tier);
+		FInput In;
+		In.bShotLog = true;   // (write the pose now, seen or not)
+		Statue.Update(0.016f, In, GetActorTransform().TransformPosition(Feet), GetActorRotation().Yaw);
+	}
 }

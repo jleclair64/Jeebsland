@@ -7,7 +7,8 @@
 #include "Inventory.h"
 #include "HitBoxes.h"
 #include "JeebTuning.h"
-namespace KnightModel { struct FSkin; }
+namespace JeebAnim { struct FInput; }
+class FKnightAnimator;
 #include "KnightCharacter.generated.h"
 
 class UStaticMeshComponent;
@@ -24,8 +25,8 @@ class UHealthComponent;
 class ACottage;
 class ALootDrop;
 
-// The knight is built from slots (helmet, body, shoulders, boots, cape, gloves, shield); what is worn in a slot sets its
-// tier colours and extra parts. The shapes themselves are modelled in KnightDesign.h; weapons in WeaponDesign.h.
+// One part he carries that is modelled in code (his shield's pieces): KnightDesign.h; weapons in WeaponDesign.h. His body and armour are one
+// skinned suit (FKnightAnimator).
 struct FArmorPart
 {
 	UPrimitiveComponent* Comp = nullptr;
@@ -38,8 +39,6 @@ struct FArmorPart
 	bool bFixedColor = false;        // always its Fixed colour, matte (black eye openings, the red brush)
 	int32 Style = 0;                 // shields: which shield style the piece belongs to
 	float Shade = 1.f;
-	bool bModel = false;             // a piece of the Meshy model (KnightModel.h): painted by M_Knight, tinted for the tier
-	int32 Mat = 0;                   // which of its component's materials (the skinned knight: one per armour set)
 };
 
 // Everything a player can do to their pack, gear and money. ONLINE the player's machine only asks (AKnightCharacter::Inv sends a
@@ -87,9 +86,6 @@ UCLASS()
 class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
-
-	friend class FKnightAnimator;   // the new suit's animator (MoveLab only) reads what he is doing and moves his gear to its hands
-	friend class ANewSuitTest;
 
 public:
 	AKnightCharacter();
@@ -186,7 +182,6 @@ public:
 	void SelectHotbar(int32 H);
 	// Test pictures (-JeebShot -ShotMove=...): the knight faces FaceYaw (not the camera) and does the move with a sword
 	void ShotPlayMove(const FString& Move, float FaceYaw);
-	void LogClearance(int32 Frame);   // test pictures: what the bow, string, arrow and quiver pass through on his own body (log JEEBCLEAR)
 	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
@@ -284,7 +279,7 @@ protected:
 	// Online combat and moves (KnightCharacterNet.cpp). The server decides every hit; swings, guarding, crouching, rolls and
 	// slides are copied to the server (so it moves the knight the same way) and shown to everyone else.
 	UFUNCTION(Server, Reliable) void ServerAttack(uint8 Style, int8 Dir, float Charge);
-	UFUNCTION(NetMulticast, Unreliable) void MulticastAttack(uint8 Style, int8 Dir, float Charge);
+	UFUNCTION(NetMulticast, Reliable) void MulticastAttack(uint8 Style, int8 Dir, float Charge);
 	UFUNCTION(Server, Reliable) void ServerState(uint8 Flags);   // 1 sprinting, 2 crouching, 4 shield button held
 	UFUNCTION(Server, Reliable) void ServerRoll(FVector_NetQuantizeNormal Dir);
 	UFUNCTION(Server, Reliable) void ServerSlide(FVector_NetQuantizeNormal Dir, float Speed);
@@ -424,8 +419,15 @@ protected:
 	void NextWeapon() { CycleHotbar(1); }   // R: the next weapon on the bar, left to right (round to the first again)
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
-	void BuildKnight();   // creates every armour part from KnightDesign.h
-	TSharedPtr<KnightModel::FSkin> Skin;   // the skinned knight and the joints its bones follow (KnightModel.h; null with the cut pieces)
+	void BuildKnight();   // his body (FKnightAnimator) and the shield's parts
+	TSharedPtr<FKnightAnimator> Anim;   // his body: on every machine, since the hit boxes and hurt boxes are read from its pose
+	float AnimAccum = 0.f;
+	TOptional<bool> ShotGallery;
+	float SuitTestT = 0.f;
+	bool bSuitTestActed = false;
+	void FillAnimInput(JeebAnim::FInput& In) const;
+	void PlaceGear();
+	void TickSuitTests(float Dt);   // test pictures (-SuitWalk, -SuitDo)
 	void RebuildHeld();   // the weapon(s) in your hands
 	UProceduralMeshComponent* MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);
 	void ApplyPartMaterial(FArmorPart& P, const FLinearColor& Color, bool bMetal, float Rough = 0.28f);
@@ -456,20 +458,10 @@ private:
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
-	float HeldElbow = 25.f;                    // how far the sword arm is bent while holding the weapon
 	bool bShieldShown = false;
 	// Shield and weapon go on the back (shield over the sword, both under the cape) while climbing, riding or sitting
 	bool bStowed = false;
 	void PlaceShield(bool bOnBack);
-	// The shield is strapped along the left forearm (at the elbow and the hand) and hangs at the side; raising it blends to
-	// the guard. Called every frame after the arms are posed.
-	void HoldShield();
-	// A sword held at ease: the blade turned in the hand so its tip rests in front, between the feet. Blends out for attacks.
-	TArray<UProceduralMeshComponent*> EaseComps;
-	float EaseAlpha = 0.f;
-	int32 EaseKind = -1;
-	float ShieldHoldA = 1.f;
-	void HoldWeaponAtEase(float Dt, bool bBusy);
 	// Stepping in the shield-up stance: the way the legs step (forward/back, and sideways), eased
 	float StepFw = 1.f, StepSd = 0.f;
 	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
@@ -518,13 +510,6 @@ private:
 	void TickGear(float Dt);
 	bool TickGroundSpeed(float Dt, float Speed, bool bFalling, bool bSpecial, float SpecialSpeed, bool bWantSprint);
 	void TickPose(float Dt, const FVector& Vel, float Speed, bool bFalling, bool bFaceCam, float& OutS, float& OutC);
-	void PosePrep(struct FKnightPose& P);
-	void PoseLegs(struct FKnightPose& P);
-	void PoseBody(struct FKnightPose& P);
-	void PoseCape(struct FKnightPose& P);
-	void PoseArms(struct FKnightPose& P);
-	void PoseKick(struct FKnightPose& P);   // the kick and lying knocked down, over the legs and body
-	float KickGuard() const;                // 0 - 1: how far the fists are up in the kick's guard
 	void TickDust(float Dt, bool bFalling, bool bSpecial, float S, float C);
 	TWeakObjectPtr<class ALootDrop> LootTarget;
 	UPROPERTY() UInputAction* PotionAction = nullptr;
@@ -548,7 +533,6 @@ private:
 	EInteract FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const;
 	TWeakObjectPtr<AHorse> MyHorse;
 	bool bMounted = false;
-	float MountAlpha = 0.f;
 	float HorseEnergy = 100.f;
 	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
 	float HorseSpeedNow = 0.f;   // the horse's current top speed while ridden (ramps up when sprinting)
@@ -574,31 +558,15 @@ private:
 	static inline const float& SprintSpeed = JeebTune::Storage().SprintSpeed;
 
 
-	// The skeleton: every body part hangs off one of these pivots
-	UPROPERTY() USceneComponent* BodyRoot = nullptr;    // bounces
-	UPROPERTY() USceneComponent* UpperPivot = nullptr;  // chest: leans and twists
-	UPROPERTY() USceneComponent* HeadPivot = nullptr;
-	UPROPERTY() USceneComponent* PlumePivot = nullptr;
-	UPROPERTY() USceneComponent* CapeUpper = nullptr;
-	UPROPERTY() USceneComponent* CapeLower = nullptr;
-	UPROPERTY() USceneComponent* HipL = nullptr;
-	UPROPERTY() USceneComponent* HipR = nullptr;
-	UPROPERTY() USceneComponent* KneeL = nullptr;
-	UPROPERTY() USceneComponent* KneeR = nullptr;
-	UPROPERTY() USceneComponent* AnkleL = nullptr;   // the feet turn here to stay flat on the ground
-	UPROPERTY() USceneComponent* AnkleR = nullptr;
-	UPROPERTY() USceneComponent* ArmPivot = nullptr;    // right shoulder (sword arm); mining and chopping drive this
-	UPROPERTY() USceneComponent* ArmPivotL = nullptr;   // left shoulder (shield arm)
-	UPROPERTY() USceneComponent* ElbowR = nullptr;
-	UPROPERTY() USceneComponent* WristR = nullptr;   // the sword hand turns here (the held weapon hangs off it)
-	UPROPERTY() USceneComponent* ElbowL = nullptr;
+	// Where the pose puts his gear (KnightCharacterPose.cpp, PlaceGear): empty joints, placed in the world every frame
+	UPROPERTY() USceneComponent* UpperPivot = nullptr;  // the chest: its axes are the actor's when he stands at rest (the cape; what is on his back)
+	UPROPERTY() USceneComponent* WristR = nullptr;      // the weapon's joint in the right hand
+	UPROPERTY() USceneComponent* ElbowL = nullptr;      // the left hand's joint (a second blade)
 
 	// The cape: a small cloth simulation (a grid of points pinned across the shoulders), redrawn every frame
 	UPROPERTY() UProceduralMeshComponent* CapeCloth = nullptr;
 	UPROPERTY() class UMaterialInstanceDynamic* CapeMid = nullptr;
 	static constexpr int32 CapeNX = 7, CapeNY = 10;
-	static constexpr float StanceHip = 12.f;   // relaxed stance: the thighs lean this far forward and the knees bend twice as much
-	static constexpr float RestLean = 0.f;    // at ease the chest leans this far forward
 	TArray<FVector> CapeP, CapePrev;
 	bool bCapeInit = false;
 	FVector CapeRootPrev = FVector::ZeroVector; bool bCapeRootSet = false;
@@ -611,7 +579,6 @@ private:
 	FVector CapePin(int32 i) const;
 
 	// Animation state
-	float GaitPhase = 0.f;
 	float MoveBlend = 0.f;   // 0 = standing, 1 = moving
 	float RunAlpha = 0.f;    // 0 = walking, 1 = full sprint
 	float AirAlpha = 0.f;    // 0 = on the ground, 1 = in the air
@@ -619,15 +586,10 @@ private:
 	float LandImpact = 0.f;
 	float LandDuration = 0.35f;
 	float LastFallVz = 0.f;
-	float FlutterTime = 0.f;
-	float IdleTime = 0.f;
 	float PrevYaw = 0.f;
 	float YawRate = 0.f;
-	float SmoothBodyZ = 0.f;
-	float SmoothChestZ = 0.f;
 	float AirSpeedMul = 1.f;
 	bool bSprinting = false;
-	FVector UpperBase = FVector::ZeroVector;
 	bool bWasFalling = false;
 
 	// Moves and stances
@@ -646,12 +608,12 @@ private:
 	bool bClimbing = false;
 	bool bAttackHit = true;
 	bool bClimbIgnoreUp = false;
-	float ClimbAlpha = 0.f, ClimbPhase = 0.f;
+	float ClimbPhase = 0.f;
 	FVector2D ClimbPos = FVector2D::ZeroVector, ClimbOut = FVector2D(1.f, 0.f);
 		float ClimbGround = 0.f, ClimbDeckTop = 0.f;
 	float ClimbT = 0.f;
 	bool bSavedOrient = true;
-	float CrouchAlpha = 0.f, BlockAlpha = 0.f, SlideAlpha = 0.f, SitAlpha = 0.f, TuckAlpha = 0.f;
+	float CrouchAlpha = 0.f, BlockAlpha = 0.f;
 	float Stamina = 10000.f, MaxStamina = 10000.f, StaminaDelay = 0.f;
 	float SlideT = 0.f, SlideSpeed = 0.f, SlideCooldown = 0.f;
 	FVector SlideDir = FVector::ForwardVector;
@@ -663,19 +625,15 @@ private:
 	int32 AttackDir = 1;            // +1 right-to-left, -1 left-to-right (the follow-up swing); (the sword's jab uses the same two)
 	static constexpr int32 JabFirst = 1, JabSecond = -1;   // the sword's two-hit jab (forehand, backhand; they loop)
 	float SwingTwistNow = 0.f;      // the chest turning into a sword swing
-	float SwingBodyWant = 0.f;      // the chest turn the jab's key poses ask for
 	float SwingLeanWant = 0.f, SwingLeanNow = 0.f;  // the chest loads back, then leans into the sword cut
 	float SwingLoadWant = 0.f, SwingLoadNow = 0.f;  // weight shifts from the rear-side leg through the follow-through
-	float SwingFrom[8] = {};        // where the arm was when a sword swing began (pitch, yaw, roll, elbow, forearm, chest turn, blade heading, blade tilt)
 	float BladeYawNow = 0.f, BladePitchNow = 0.f, BladeLeadSign = -1.f;   // a sword slash: where the blade points (knight's frame, degrees) and which way it travels
 	float BladeCantNow = 0.f;       // the blade's cant about its own length (degrees; 0 = edge level)
-	float CantFrom = 0.f;           // the cant a sword swing starts from (the previous hit's, seen with this hit's leading edge), or below -900: none
 	float BladeAlpha = 0.f;         // how much the wrist is steering the blade (fades in and out of a slash)
 	float WristBendNow = 0.f, ForearmTwistNow = 0.f;   // how far the wrist is bent and the forearm twisted for the blade (degrees; for checking a move)
-	void LogSwordTip();             // test pictures: the sword tip and edge, frame by frame, in the knight's frame (log: JEEBTIP)
 	// Smash-style hit boxes and hurt boxes (HitBoxes.h; KnightCharacterCombat.cpp, TickHitboxes)
 	TArray<JeebHit::FCapsule> HitLive;                         // the sword's hit boxes this frame (swept from the last frame); empty outside the active frames
-	FVector HitPrev[4]; bool bHitPrevValid = false;            // where each hit box was the frame before
+	FVector HitPrev[10]; bool bHitPrevValid = false;            // where each hit box was the frame before
 	TArray<TWeakObjectPtr<class UHealthComponent>> HitThisSwing;   // a move hits each target once
 	UPROPERTY() class UProceduralMeshComponent* BoxView = nullptr;   // the boxes, drawn see-through (M_HitBox)
 	void TickHitboxes(float Dt);
@@ -731,7 +689,7 @@ private:
 	void TickSmash(float Dt);
 	float SmashTimeLeft() const;   // how long until the smash's end lag is over
 	UFUNCTION(Server, Reliable) void ServerSmash(uint8 Phase, float Charge);
-	UFUNCTION(NetMulticast, Unreliable) void MulticastSmash(uint8 Phase, float Charge);
+	UFUNCTION(NetMulticast, Reliable) void MulticastSmash(uint8 Phase, float Charge);
 	bool SmashLocked() const { return Smash == ESmash::Swing || Smash == ESmash::EndLag || Smash == ESmash::Rebound; }   // no moving
 	float AtkCharge = 0.f;
 	float LastSwingEnd = -10.f, QueuedClick = -10.f;
@@ -746,7 +704,6 @@ private:
 	float BowT = 0.f;              // time in this phase
 	float BowCharge = 0.f;         // 0 - 1: how far drawn
 	float BowAimAlpha = 0.f;       // the aiming pose and camera, eased in and out
-	float BowEaseAlpha = 0.f;      // the bow in his hand (the left forearm turns so it lies forward and back at his side)
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
 	static inline const float& BowDrawTime = JeebTune::Storage().BowDrawTime;   // (like the smash attack's charge)
@@ -774,7 +731,6 @@ private:
 	void CancelDraw();
 	void SetBow(EBow P);
 	void TickBow(float Dt);
-	void PoseBow(float Dt);        // (end of PoseArms) the aiming arms, the side-on chest and the turned head
 	FVector ArrowStart() const;    // where arrows leave from (the same on every machine)
 	FVector BowAimDir(FVector* OutTarget = nullptr) const;     // the player's machine: from ShotStart through what is under the reticle; elsewhere where he looks
 	FVector ShotStart() const;     // the player's machine: where the arrow really flies from, on the reticle's line abreast of the bow (else ArrowStart)
@@ -786,8 +742,6 @@ private:
 	UFUNCTION(NetMulticast, Reliable) void MulticastBow(uint8 Phase);
 	UPROPERTY() USceneComponent* BowHold = nullptr;              // the bow in the left fist, built at its grip (RebuildHeld)
 	int32 LookArrows = 0;                                        // other players' knights: the arrows they have (RepLook), for their quivers
-	FQuat BowRestQuat() const;                                  // the bow's turn in the fist at ease (KnightCharacterBow.cpp)
-	FQuat BowHoldRest = FQuat::Identity;                        // how it sits in the fist at ease (PoseBow turns it upright to aim)
 	UPROPERTY() UProceduralMeshComponent* BowString = nullptr;   // its straight string, hidden while drawn (BowBits take over)
 	UPROPERTY() TArray<UStaticMeshComponent*> BowBits;           // the drawn string's two halves, the nocked arrow and its head
 	UPROPERTY() TArray<UStaticMeshComponent*> QuiverParts;       // the quiver of arrows on his back while the bow is in hand
@@ -800,7 +754,6 @@ private:
 	FVector SpawnLoc = FVector::ZeroVector;
 	float PrevC = 1.f;
 	float SlideDustTimer = 0.f;
-	FVector LeftBase = FVector::ZeroVector;
 	FVector SeatForward = FVector::ForwardVector;
 
 	// Dust puffs kicked up by feet, landings, rolls and slides
@@ -823,7 +776,6 @@ private:
 	float SwingPeriod = 1.f;
 	float WindupAngle = 150.f;
 	float StrikeAngle = 30.f;
-	float ArmPitch = 0.f;
 	float ArmYaw = 0.f;
 	bool bSideways = false; // woodcutting sweeps the arm sideways instead of overhead
 

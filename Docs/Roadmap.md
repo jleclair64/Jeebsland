@@ -143,7 +143,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 12. **Trolls, then wizards,** and the remaining towns.
 13. Message board (once there is a rented server); key rebinding screen.
 14. **Groundwork (agreed 2026-10-30):** items as data (DONE 2026-10-30: Content/Data CSVs, Docs/EditingItems.md); splitting the knight's Tick (DONE 2026-10-30). Later, once online play is working with friends: a server stress test with fake players, then accounts in a database and encrypted logins (before public hosting). Quests, NPCs and villagers should be data from the start, the same way.
-15. **Animation (owner, 2026-10-30):** the knight keeps its code-driven pose; bosses and NPCs get standard skinned models with animation clips.
+15. **Animation (owner, 2026-11-05, replacing the 2026-10-30 rule):** the knight plays animation clips (`FKnightAnimator`); bosses and NPCs get skinned models with clips too. Things that went with the old knight and need remaking: `Docs/ToRecreate.md`.
 16. **(REPLACED 2026-11-03: capes are ordinary items now.) Cape = PvP rank on the tier ladder (owner, 2026-10-30):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
 
 ## Sound (added 2026-11-02, later)

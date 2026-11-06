@@ -15,38 +15,6 @@ namespace JeebHit
 		return FVector::Dist(A, B);
 	}
 
-	void KnightHurt(const FKnightJoints& J, TArray<FCapsule>& Out)
-	{
-		using namespace KnightDesign;
-		// a point given in capsule space (where the body is modelled), carried by the joint it hangs off
-		auto At = [](const USceneComponent* C, int32 Pivot, const FVector& P) { return C->GetComponentTransform().TransformPosition(P - PivotPos(Pivot)); };
-		uint8 Zone = Z_None;
-		auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R; C.Zone = Zone; Out.Add(C); };
-		Zone = Z_Head;
-		if (J.Head)  Add(At(J.Head, P_Head, FVector(3, 0, 36)), At(J.Head, P_Head, FVector(3, 0, 50)), 17.f);      // the helm
-		Zone = Z_Torso;
-		if (J.Upper) Add(At(J.Upper, P_Upper, FVector(0, 0, -34)), At(J.Upper, P_Upper, FVector(0, 0, 4)), 22.f); // chest down to the hips
-		for (int32 sd = -1; sd <= 1; sd += 2)
-		{
-			const USceneComponent* Arm = sd < 0 ? J.ArmL : J.ArmR;
-			const USceneComponent* Elb = sd < 0 ? J.ElbowL : J.ElbowR;
-			const USceneComponent* Hip = sd < 0 ? J.HipL : J.HipR;
-			const USceneComponent* Knee = sd < 0 ? J.KneeL : J.KneeR;
-			const USceneComponent* Ankle = sd < 0 ? J.AnkleL : J.AnkleR;
-			Zone = Z_UpperArm;
-			if (Arm && Elb) Add(Arm->GetComponentLocation(), Elb->GetComponentLocation(), 9.f);                     // upper arm
-			Zone = Z_Forearm;
-			if (Elb)                                                                                                // forearm to the fist
-			{
-				const FVector Fist = (sd > 0 && J.WristR) ? At(J.WristR, P_WristR, FistPos(1)) : At(Elb, sd < 0 ? P_ElbowL : P_ElbowR, FistPos(sd));
-				Add(Elb->GetComponentLocation(), Fist, 8.f);
-			}
-			Zone = Z_Leg;
-			if (Hip && Knee) Add(Hip->GetComponentLocation(), Knee->GetComponentLocation(), 10.f);                  // thigh
-			if (Knee && Ankle) Add(Knee->GetComponentLocation(), At(Ankle, sd < 0 ? P_AnkleL : P_AnkleR, FVector(2, sd * 13, -90)), 8.f);   // shin, down to the sole
-		}
-	}
-
 	void HurtOf(const UHealthComponent* H, TArray<FCapsule>& Out)
 	{
 		if (!H) return;
@@ -108,13 +76,6 @@ namespace JeebHit
 				I.Add(A0); I.Add(B0); I.Add(A1);
 				I.Add(A1); I.Add(B0); I.Add(B1);
 			}
-	}
-
-	float HelmTop(const USceneComponent* Head)
-	{
-		using namespace KnightDesign;
-		if (!Head) return -1.0e9f;
-		return float(Head->GetComponentTransform().TransformPosition(FVector(3, 0, 50) - PivotPos(P_Head)).Z) + 17.f;   // (the helm capsule's top: KnightHurt)
 	}
 
 	// The top's height over a flat point (relative to the apex): seen from the front an arch, the helm's top in the middle,

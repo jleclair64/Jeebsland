@@ -23,3 +23,9 @@ HitLeft,HitSmallL,0.05,1.4,0,1.2,2,0.03,0
 BowDraw,BowDraw,0.3,0,0,1.0,0,0.1,0
 BowRecoil,BowRecoil,0.0,0,0,0.6,0,0.05,0
 Block,ChestBlock,0.0,1.1,0.45,0,1,0.12,0
+Climb,ClimbLadder,0.0,0,0,0.77,2,0.15,0
+Sit,SitChair,0.5,0.5,0,1.0,2,0.25,0
+Slide,RunSlide,0.1,0.5,0,1.53,2,0.12,1
+Chop,AxeHorizontal,0.0,0.5,1.0,2.4,0,0.12,0
+Mine,AxeDown,0.0,0.6,1.0,2.27,0,0.12,0
+FishCast,FishCast,0.5,0,0,3.0,0,0.2,0

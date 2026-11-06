@@ -2,22 +2,26 @@
 
 #include "CoreMinimal.h"
 
-class AKnightCharacter;
+class AActor;
+class USceneComponent;
 class UPoseableMeshComponent;
-class USkeletalMesh;
-class UAnimSequence;
+class UMaterialInstanceDynamic;
+namespace JeebHit { struct FCapsule; struct FShieldWedge; }
 
-// The new suit's animator (2026-11-05, MoveLab only). Code, not an Anim Blueprint: every frame it looks at what the knight is doing
-// (the same state the old key poses read), picks clips from Mixamo (Tools/knight_clip_retarget.py put them on his skeleton), blends
-// them, and writes the bones to a poseable mesh. Nothing here changes the game: the server and every rule still run off the old
-// joints; this is what the player sees when the suit is on.
+// The knight's body (2026-11-05: the only knight in the game). Code, not an Anim Blueprint: every frame it looks at what the knight is
+// doing (FInput, filled in by whoever owns him: the player's knight or the pen knight), picks clips from Mixamo (Tools/knight_clip_retarget.py
+// put them on his skeleton) and blends them. It runs on every machine, the server too, because the hit boxes and hurt boxes are read from
+// the pose it makes. Only players' machines also write it to a mesh (MakeMesh).
 //
 // How it keeps things from looking choppy:
 //   - Walking, running and sprinting in every direction share one phase, timed by distance so the planted foot doesn't slide.
 //   - Every switch (run to swing, swing to roll, roll to fall ...) is an inertial blend: the new pose starts at once, and the
 //     difference from the old pose, with the speed it was moving at, dies away on a spring (Gears of War's trick).
 //   - Moves are time-warped clips: each move's clip times are tied to the game's own timing (wind-up, hit frames, recovery) in
-//     Content/Data/KnightMoves.csv, read when the suit is first put on.
+//     Content/Data/KnightMoves.csv.
+//
+// The clips and the skeleton come from Content/Data/KnightClips.bin (FClipLib), a plain file baked from the imported assets, because a cooked
+// server has no animation data of its own. The editor rewrites it by itself whenever the imported clips are newer than it.
 namespace JeebAnim
 {
 	enum EBone : int32 { Hips, Spine, Spine1, Spine2, Neck, Head, LShoulder, LArm, LFore, LHand, RShoulder, RArm, RFore, RHand, LUp, LLeg, LFoot, LToe, RUp, RLeg, RFoot, RToe, B_Count };
@@ -50,24 +54,138 @@ namespace JeebAnim
 		float HipLock = 0.f;         // 1 = none of the clip's forward travel: the capsule does the travelling
 		float SpineKeep = 0.f;       // how much of the chest's turn stays with what he was doing: tames a clip's big wind-round
 	};
+
+	// The armour pieces: each is one material slot of the suit, shown and tinted by itself
+	enum EPiece : int32 { Piece_Chest, Piece_Legs, Piece_Helmet, Piece_Arms, Piece_Shoulders, Piece_Count };
+
+	// The skeleton, the clips and where gear sits on them: the same for every knight, made once
+	struct FClipLib
+	{
+		static const FClipLib& Get();
+		FClipLib();
+
+		bool bReady = false;
+		int32 Bone[B_Count];
+		TArray<FString> BoneName;
+		TArray<int32> Parents;
+		TArray<FVector> RefPos;
+		TArray<FQuat> RefRot;
+		TArray<int32> UpperMask;   // per bone: 1 above the waist
+		TMap<FString, FClip*> Clips;
+		TArray<TUniquePtr<FClip>> ClipStore;
+		TMap<FString, FMove> Moves;
+
+		// gear
+		FVector BladeInHand = FVector::ForwardVector;
+		FTransform RightGrip = FTransform::Identity;    // the weapon joint (KnightDesign's wrist frame) in the right hand's frame
+		FTransform LeftGrip = FTransform::Identity;     // ... and the left hand's (KnightDesign's left elbow frame): a second blade
+		FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity, ShieldAtBlock = FTransform::Identity;   // the shield in the left forearm's frame: hanging, strapped on a raised forearm, held up to guard
+		FVector ShieldInGuard = FVector(45.f, -26.f, 112.f);   // where the raised shield's face is, from between his feet (game frame)
+		FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the left hand's frame
+		FTransform QuiverOnHips = FTransform::Identity;
+		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
+
+		const FClip* Find(const TCHAR* Name) const { const FClip* const* F = Clips.Find(Name); return F ? *F : nullptr; }
+
+		// sampling and blending
+		void Sample(const FClip& C, float T, FPose& Out, bool bLoop) const;
+		float PhaseTime(const FClip& C, float P) const;
+		void Accum(const FPose& P, float W, FPose& Sum, float& SumW) const;
+		void Finish(FPose& Sum, float SumW) const;
+		FQuat ParentRot(const FPose& P, int32 B) const;
+		void TurnInMesh(FPose& P, int32 B, const FQuat& Q) const;
+		FVector BonePos(const FPose& P, int32 B, FQuat* OutRot = nullptr) const;
+		void Overlay(FPose& Base, const FPose& Over, float Upper, float Lower) const;
+		FTransform BindInGame(const FPose& P, int32 B) const;   // where bone B sits in the game's frame (forward +X, right +Y, up +Z; origin between his feet)
+
+	private:
+		bool LoadBaked();
+		void Finalize();
+		void Measure(FClip& C);
+		void LoadMoves();
+		void SolveGear();
+#if WITH_EDITOR
+		bool BakeFromAssets();
+		const FClip* LoadClipAsset(const FString& Name, const TCHAR* Folder, const TArray<FName>& Names);
+		void SaveBaked() const;
+		bool BakeIsStale() const;
+#endif
+	};
+
+	// What he is swinging, as the animator sees it
+	enum class EMove : uint8 { None, Jab1, Jab2, SmashCharge, SmashSwing, SmashEnd, Kick, Sweep, Dash, Rebound, Thrust, Cast };
+
+	// What the knight is doing this frame. Everything here must be known on every machine (the server and other players' too): worked
+	// out from replicated state and each machine's own timers, never from the camera or a held key.
+	struct FInput
+	{
+		FVector Vel = FVector::ZeroVector;
+		FRotator Rot = FRotator::ZeroRotator;
+		bool bFalling = false;
+		float JumpZ = 500.f;
+		float StunLeft = 0.f;
+		bool bKnockedDown = false;
+		int32 KnockPhase = 0;       // 0 lying, 1 getting up
+		bool bRolling = false;
+		float RollU = 0.f;          // 0..1 through the roll
+		float RollYaw = 0.f;        // the way he rolls, from the way he faces (degrees)
+		EMove Move = EMove::None;
+		float MoveU = 0.f;          // 0..1 through the swing
+		float SmashCharge = 0.f;
+		float SmashSwingU = 0.f, SmashEndU = 0.f;
+		float DashFrom = 0.3f, DashTo = 0.6f;   // the dash's hit frames as shares of the move
+		float ReboundU = 0.f;
+		float LegYaw = 0.f;
+		float CrouchAlpha = 0.f, BlockAlpha = 0.f, BowAimAlpha = 0.f;
+		int32 BowMode = 0;          // 0 lowering, 1 drawing, 2 just loosed
+		float BowT = 0.f;
+		int32 Kind = -1;            // what is in his hand (JeebItems kind)
+		float AimPitch = 0.f;
+		bool bClimbing = false; float ClimbPhase = 0.f;
+		bool bSitting = false;
+		bool bSliding = false;
+		bool bFishing = false;
+		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
+		bool bShotLog = false;      // test pictures: log JEEBANIM
+	};
 }
 
 class FKnightAnimator
 {
 public:
-	bool Init(UPoseableMeshComponent* InComp, USkeletalMesh* Mesh);
-	void Update(float Dt, AKnightCharacter* Me);
-	void PlaceGear(AKnightCharacter* Me);   // sword, shield, bow and quiver onto this frame's bones (after Update)
-	void ReleaseGear(AKnightCharacter* Me); // the suit is off: the joints are the old pose's again
+	FKnightAnimator();
+	bool IsReady() const { return L.bReady; }
 
-	// The body's extra turn away from the capsule (rolls go the way he is rolling): degrees of yaw
-	float BodyYaw() const { return YawNow; }
-	float FloorOffset() const { return 0.f; }
+	// The mesh, on players' machines only: its bones follow Update. Null if the suit is missing.
+	UPoseableMeshComponent* MakeMesh(AActor* Owner, USceneComponent* Parent);
+	UPoseableMeshComponent* Mesh() const { return Comp; }
 
-	void TickGallery(AKnightCharacter* Me);   // test pictures (-SuitGallery)
+	// A worn piece: Tier < 0 takes it off (the slot's plates vanish), else tinted for that tier
+	void Wear(int32 Piece, int32 Tier);
+
+	void Update(float Dt, const JeebAnim::FInput& In, const FVector& Feet, float ActorYaw);
+
+	// This frame's pose, in the world
+	FTransform BoneWorld(int32 B) const;
+	FVector BoneAt(int32 B) const { return BoneWorld(B).GetLocation(); }
+	FTransform RightGripWorld() const { return L.RightGrip * BoneWorld(JeebAnim::RHand); }
+	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
+	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
+	FTransform ShieldWorld(float BlockAlpha) const;
+	FTransform BowWorld(float AimAlpha) const;
+	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
+	float Phase01() const { return Phase; }   // where the stride is: 0 the left foot under him, 0.5 the right
+
+	// Combat: his hurt boxes as posed now, his helm's top, his raised shield's band, the kicking leg
+	void GatherHurt(TArray<JeebHit::FCapsule>& Out) const;
+	float HelmTopZ() const;
+	JeebHit::FShieldWedge ShieldWedge(const FVector& Centre, const FVector& Forward) const;
+
+	void TickGallery(AActor* Owner, const FVector& Floor);   // test pictures (-SuitGallery)
 	TArray<UPoseableMeshComponent*> GalleryComps;
 	class UTextRenderComponent* GalleryLabel = nullptr;
 	int32 GalleryTick = 0;
+	TArray<const JeebAnim::FClip*> GalleryOrder;
 
 	// Test pictures: hold a named clip instead of what the knight is doing (-SuitClip=Name)
 	FString ForcedClip;
@@ -76,42 +194,41 @@ public:
 private:
 	using FPose = JeebAnim::FPose;
 	using FClip = JeebAnim::FClip;
+	using FInput = JeebAnim::FInput;
 
-	// clips
-	const FClip* LoadClip(const FString& Name, const TCHAR* Folder = TEXT("/Game/NewSuit/Clips/A_"));
-	void Measure(FClip& C);
-	const FClip* Get(const TCHAR* Name) const { const FClip* const* F = Clips.Find(Name); return F ? *F : nullptr; }
-	void LoadMoves();
-
-	// sampling and blending
-	void Sample(const FClip& C, float T, FPose& Out, bool bLoop) const;
-	float PhaseTime(const FClip& C, float P) const;
-	void Accum(const FPose& P, float W, FPose& Sum, float& SumW) const;
-	void Finish(FPose& Sum, float SumW) const;
-	FQuat ParentRot(const FPose& P, int32 Bone) const;
-	void TurnInMesh(FPose& P, int32 Bone, const FQuat& Q) const;
-	FVector BonePos(const FPose& P, int32 Bone, FQuat* OutRot = nullptr) const;
-	void Overlay(FPose& Base, const FPose& Over, float Upper, float Lower) const;
+	const JeebAnim::FClipLib& L;
+	// (short names for the library's data and sampling: the same for every knight)
+	const int32* Bone;
+	const TArray<int32>& Parents;
+	const TArray<FVector>& RefPos;
+	const TArray<FQuat>& RefRot;
+	const TMap<FString, JeebAnim::FMove>& Moves;
+	const FClip* Get(const TCHAR* Name) const { return L.Find(Name); }
+	void Sample(const FClip& C, float T, FPose& Out, bool bLoop) const { L.Sample(C, T, Out, bLoop); }
+	float PhaseTime(const FClip& C, float P) const { return L.PhaseTime(C, P); }
+	void Accum(const FPose& P, float W, FPose& Sum, float& SumW) const { L.Accum(P, W, Sum, SumW); }
+	void Finish(FPose& Sum, float SumW) const { L.Finish(Sum, SumW); }
+	void TurnInMesh(FPose& P, int32 B, const FQuat& Q) const { L.TurnInMesh(P, B, Q); }
+	FVector BonePos(const FPose& P, int32 B, FQuat* OutRot = nullptr) const { return L.BonePos(P, B, OutRot); }
+	void Overlay(FPose& Into, const FPose& O, float Upper, float Lower) const { L.Overlay(Into, O, Upper, Lower); }
 
 	// the layers
-	void Locomotion(float Dt, AKnightCharacter* Me, FPose& Out);
-	void Overlays(float Dt, AKnightCharacter* Me, FPose& B);
+	void Locomotion(float Dt, const FInput& In, FPose& Out);
+	void Overlays(float Dt, const FInput& In, FPose& B);
 	void Inertialize(const FPose& Target, FPose& Out, float Dt);
 	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f);
-	void KeepTipUp(FPose& P, AKnightCharacter* Me) const;
-	int32 ChooseAction(float Dt, AKnightCharacter* Me, FPose& B, float& OutBlend);
+	void KeepTipUp(FPose& P, const FInput& In) const;
+	int32 ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend);
 	float MoveClipTime(const JeebAnim::FMove& M, float U, float UHit, float UFollow) const;
 	bool PlayAt(const TCHAR* MoveName, float T, float Speed, FPose& InOut, float* OutBlend);
 
 	UPoseableMeshComponent* Comp = nullptr;
-	int32 Bone[JeebAnim::B_Count];
-	TArray<int32> Parents;
-	TArray<FVector> RefPos;
-	TArray<FQuat> RefRot;
-	TArray<int32> UpperMask;   // per bone: 1 above the waist
-	TMap<FString, FClip*> Clips;
-	TArray<TUniquePtr<FClip>> ClipStore;
-	TMap<FString, JeebAnim::FMove> Moves;
+	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
+	bool bBare[JeebAnim::Piece_Count] = {};
+	void ShowBare(int32 Piece, bool bShow);
+	int32 PieceMat[JeebAnim::Piece_Count];
+	UMaterialInstanceDynamic* PieceMid[JeebAnim::Piece_Count];
+	FTransform ToWorld = FTransform::Identity;      // the game's frame in the world (feet, facing)
 
 	FPose Scratch, ScratchSum, Base, Over, Final, PrevFinal;
 	bool bHavePrev = false;
@@ -159,24 +276,5 @@ private:
 	float CombatT = 0.f;         // seconds left on guard after a fight
 	bool bOnGuard = false;
 	float PlayUpper = 1.f, PlayLower = 1.f;   // the next PlayAt's weights
-	bool bLegSaved = false;
-	FVector KneeRel = FVector::ZeroVector, AnkleRel = FVector::ZeroVector;
-
-	// gear
-	FVector BladeInHand = FVector::ForwardVector;
-	FTransform RightGrip = FTransform::Identity;    // the old wrist's frame, in the new right hand's
-	FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity, ShieldAtBlock = FTransform::Identity;   // the shield in the new left forearm's frame: hanging, strapped on a raised forearm, held up to guard
-	float ShieldFrontInGuard = 60.f;
-	FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the new left hand's frame
-	FTransform QuiverOnHips = FTransform::Identity;
-	bool bGearReady = false;
-	bool bQuiverSaved = false;
-	FTransform QuiverRel = FTransform::Identity;
-	FVector WristRel = FVector::ZeroVector;
-	FQuat WristRelRot = FQuat::Identity;
-	bool bWristSaved = false;
-	void SolveGear(AKnightCharacter* Me);
-	FTransform BindInGame(const FPose& P, int32 B) const;
-	void HideOldBody(AKnightCharacter* Me, bool bHide);
-	float LogT = 0.f;
+	FVector LogPrevL = FVector::ZeroVector, LogPrevR = FVector::ZeroVector;
 };

@@ -34,72 +34,28 @@
 #include "Combat.h"
 #include "WeaponDesign.h"
 #include "ProceduralMeshComponent.h"
-#include "KnightModel.h"
+#include "KnightAnimator.h"
 #include "Misc/ConfigCacheIni.h"
+
+// Where things sit on his back, in the chest bone's frame (UpperPivot: X forward, Y his right, Z up; measured on film)
+static constexpr float CapePinX = -19.f, CapePinZ = 12.f;   // the cape's top row
+static constexpr float CapeBackX = -24.f, CapeStowZ = -30.f;   // the cape never comes nearer than this; above CapeStowZ it clears the shield on his back
+static constexpr float StowBackX = -27.f, StowZ = 8.f;      // a stowed weapon
+static constexpr float ShieldBackX = -14.f, ShieldBackZ = -4.f;   // a stowed shield
 
 // ---------------- The knight's body parts ----------------
 void AKnightCharacter::BuildKnight()
 {
-	USceneComponent* Pivots[KnightDesign::P_Count] = {};
-	Pivots[KnightDesign::P_Body] = BodyRoot;     Pivots[KnightDesign::P_Upper] = UpperPivot;  Pivots[KnightDesign::P_Head] = HeadPivot;
-	Pivots[KnightDesign::P_Plume] = PlumePivot;  Pivots[KnightDesign::P_CapeU] = CapeUpper;   Pivots[KnightDesign::P_CapeL] = CapeLower;
-	Pivots[KnightDesign::P_ArmL] = ArmPivotL;    Pivots[KnightDesign::P_ArmR] = ArmPivot;     Pivots[KnightDesign::P_ElbowL] = ElbowL;
-	Pivots[KnightDesign::P_ElbowR] = ElbowR;     Pivots[KnightDesign::P_HipL] = HipL;         Pivots[KnightDesign::P_HipR] = HipR;
-	Pivots[KnightDesign::P_KneeL] = KneeL;       Pivots[KnightDesign::P_KneeR] = KneeR;
-	Pivots[KnightDesign::P_AnkleL] = AnkleL;     Pivots[KnightDesign::P_AnkleR] = AnkleR;     Pivots[KnightDesign::P_WristR] = WristR;
-
+	Anim = MakeShared<FKnightAnimator>();
+	if (!IsNetMode(NM_DedicatedServer)) Anim->MakeMesh(this, GetRootComponent());
+	// The only parts still modelled in code: the shield (arrows stick in its parts, so the server has them too). The pose places them.
 	TArray<KnightDesign::FDef> Defs;
 	KnightDesign::Build(Defs);
-
-	// The armour itself comes from the Meshy model when it is there; the code-built pieces for those slots are left out.
-	// Best: the skinned knight, one mesh bending at every joint (2026-11-01, KnightModel::MakeSkin); else the model cut into
-	// rigid pieces on the joints, with a dark body inside to fill the gaps they open
-	Skin = MakeShared<KnightModel::FSkin>();
-	UPoseableMeshComponent* SkinComp = IsNetMode(NM_DedicatedServer) ? nullptr : KnightModel::MakeSkin(*Skin, this, RootComponent, Pivots);
-	if (SkinComp)
-		for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGloves })
-		{
-			FArmorPart P;
-			P.Comp = SkinComp;
-			P.Slot = Slot;
-			P.bModel = true;
-			P.Mat = SkinComp->GetMaterialIndex(FName(KnightModel::SlotMaterial(Slot)));
-			ArmorParts.Add(P);
-		}
-	else Skin.Reset();
-	static const TArray<KnightModel::FPart> NoPieces;
-	const TArray<KnightModel::FPart>& Model = SkinComp ? NoPieces : KnightModel::Parts();
-	const bool bModelArmour = SkinComp || Model.Num() > 0;
-	if (Model.Num() > 0)
-	{
-		TArray<KnightDesign::FDef> Cores;
-		KnightModel::AddCores(Cores);
-		for (const KnightDesign::FDef& D : Cores)
-		{
-			if (!Pivots[D.Pivot]) continue;
-			FArmorPart P;
-			P.Comp = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
-			P.Slot = D.Slot; P.Role = D.Role; P.Fixed = D.Fixed; P.bFixedColor = true;
-			ArmorParts.Add(P);
-		}
-	}
-	for (const KnightModel::FPart& MP : Model)
-	{
-		if (!Pivots[MP.Pivot]) continue;
-		FArmorPart P;
-		P.Comp = KnightModel::MakeComp(this, Pivots[MP.Pivot], MP);
-		P.Slot = MP.Slot;
-		P.bModel = true;
-		ArmorParts.Add(P);
-	}
 	for (const KnightDesign::FDef& D : Defs)
 	{
-		if (D.Mesh.V.Num() == 0 || !Pivots[D.Pivot]) continue;
-		if (bModelArmour && KnightModel::IsModelSlot(D.Slot)) continue;
-		UProceduralMeshComponent* C = MakeMeshComp(Pivots[D.Pivot], D.Pivot, D.Mesh);
-
+		if (D.Slot != KnightDesign::SlotShield || D.Mesh.V.Num() == 0) continue;
 		FArmorPart P;
-		P.Comp = C;
+		P.Comp = MakeMeshComp(GetRootComponent(), D.Pivot, D.Mesh);
 		P.Slot = D.Slot; P.Role = D.Role; P.MinTier = D.MinTier; P.MaxTier = D.MaxTier;
 		P.Fixed = D.Fixed; P.bFixedMetal = D.bFixedMetal; P.Shade = D.Shade; P.bBare = D.bBare;
 		P.Style = D.Style; P.bFixedColor = D.bFixedColor;
@@ -140,8 +96,8 @@ UProceduralMeshComponent* AKnightCharacter::MakeMeshComp(USceneComponent* Attach
 FVector AKnightCharacter::CapePin(int32 i) const
 {
 	const float Y = FMath::Lerp(-16.f, 16.f, float(i) / (CapeNX - 1));
-	// across the tops of the shoulders (the upper body is modelled in body space, 41 cm above the chest pivot)
-	return UpperPivot->GetComponentTransform().TransformPosition(FVector(-25.5f + 0.012f * Y * Y, Y, 66.f));   // (5 cm higher, 2026-10-30)
+	// across the tops of the shoulders, behind the collar (UpperPivot: the chest bone)
+	return UpperPivot->GetComponentTransform().TransformPosition(FVector(CapePinX + 0.012f * Y * Y, Y, CapePinZ));
 }
 
 // A little cloth simulation (Verlet points held together by distance links): pinned at the shoulders, pulled down by
@@ -256,8 +212,8 @@ void AKnightCharacter::TickCape(float Dt)
 			for (int32 k = CapeNX; k < N; ++k)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
-				float Lim = -27.5f;   // the back of the armour (it stands out to about -23.6 at the shoulder blades), plus the cloth's 3 cm thickness
-				if (bStowed && L.Z > -9.f) Lim = -38.f;   // and over the shield when it is on the back
+				float Lim = CapeBackX;   // the back of the armour, plus the cloth's 3 cm thickness
+				if (bStowed && L.Z > CapeStowZ) Lim = CapeBackX - 10.5f;   // and over the shield when it is on the back
 				// and never far out to the side: at most a hand's width past the cloth's own edge (it hung out like a board)
 				const float Edge = 0.5f * FMath::Lerp(WTop, WBot, float(k / CapeNX) / (CapeNY - 1)) + 12.f;
 				const bool bFix = L.X > Lim || FMath::Abs(L.Y) > Edge;
@@ -334,9 +290,6 @@ namespace
 		case KnightDesign::SlotBoots:     return JeebItems::K_Boots;
 		case KnightDesign::SlotCape:      return JeebItems::K_Cape;
 		case KnightDesign::SlotGloves:    return JeebItems::K_Gloves;
-		case KnightDesign::SlotBrush:     return JeebItems::K_Crest;
-		case KnightDesign::SlotRingR: case KnightDesign::SlotRingL: return JeebItems::K_Ring;
-		case KnightDesign::SlotAmulet:    return JeebItems::K_Amulet;
 		default:                          return JeebItems::K_Shield;
 		}
 	}
@@ -363,55 +316,28 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 {
 	if (!Skills) return;
 	const int32 Kind = KindForSlot(Slot);
-	int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
-	if (Slot == KnightDesign::SlotBrush)   // the brush is worn in one of the three miscellaneous slots
-	{
-		Id = 0;
-		for (int32 M : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
-			if (JeebItems::IsGear(M) && JeebItems::KindOf(M) == JeebItems::K_Crest) Id = M;
-	}
-	if (Slot == KnightDesign::SlotRingR || Slot == KnightDesign::SlotRingL || Slot == KnightDesign::SlotAmulet)   // jewellery in the miscellaneous slots
-	{
-		Id = 0;
-		int32 Rings = 0;
-		for (int32 M : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
-		{
-			if (!JeebItems::IsGear(M)) continue;
-			const int32 MK = JeebItems::KindOf(M);
-			if (MK == JeebItems::K_Amulet && Slot == KnightDesign::SlotAmulet) Id = M;
-			if (MK == JeebItems::K_Ring) { ++Rings; if ((Rings == 1 && Slot == KnightDesign::SlotRingR) || (Rings == 2 && Slot == KnightDesign::SlotRingL)) Id = M; }
-		}
-	}
+	const int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
 	const bool bWorn = Id != 0;
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
+	// The suit: each slot is one piece of it, tinted for the tier, gone when the slot is empty. Light, Classic and Heavy are the same model, they differ in the numbers (ArmourStyles.csv).
+	const int32 Piece = Slot == KnightDesign::SlotHelmet ? JeebAnim::Piece_Helmet : Slot == KnightDesign::SlotBody ? JeebAnim::Piece_Chest : Slot == KnightDesign::SlotShoulders ? JeebAnim::Piece_Shoulders
+		: Slot == KnightDesign::SlotGloves ? JeebAnim::Piece_Arms : Slot == KnightDesign::SlotBoots ? JeebAnim::Piece_Legs : -1;
+	if (Piece >= 0) { if (Anim) Anim->Wear(Piece, bWorn ? Var : -1); return; }
+	if (Slot == KnightDesign::SlotCape)
+	{
+		if (CapeCloth) CapeCloth->SetVisibility(bWorn);
+		if (CapeMid && bWorn) CapeMid->SetVectorParameterValue(TEXT("Color"), JeebItems::CapeColor(Var));
+		return;
+	}
 	for (FArmorPart& P : ArmorParts)
 	{
 		if (P.Slot != Slot) continue;
-		// the skinned knight: the slot shows its piece in its style and tier, or only the chain mail when bare (2026-11-03)
-		if (P.bModel && Skin && Skin->Comp) { KnightModel::Wear(*Skin, Slot, bWorn ? Id : 0); continue; }
-
-		// Underclothes, belt and boots are always there; everything else shows only while worn
-		bool bAlways = false;
-		if (Slot == KnightDesign::SlotBody) bAlways = (P.Role == EArmorRole::Under || P.Role == EArmorRole::Leather);
-		if (Slot == KnightDesign::SlotBoots) bAlways = (P.Role == EArmorRole::BootBody || P.Role == EArmorRole::Under);
-		bool bVisible;
-		if (P.bBare) bVisible = !bWorn;
-		else if (bAlways) bVisible = true;
-		else bVisible = bWorn && (Slot == KnightDesign::SlotCape || (Var >= P.MinTier && Var <= P.MaxTier));
-		if (Slot == KnightDesign::SlotShield && bWorn && P.Style != JeebItems::StyleOf(Id)) bVisible = false;   // only the worn shield style
+		const bool bVisible = bWorn && Var >= P.MinTier && Var <= P.MaxTier && P.Style == JeebItems::StyleOf(Id);   // only the worn shield style
 		P.Comp->SetVisibility(bVisible);
 		if (!bVisible) continue;
-		if (P.bModel) { KnightModel::Paint(P.Comp, Var, P.Mat); continue; }   // (the cut pieces of the old rigid knight, when no skinned model is there)
-
-		FLinearColor Color;
+		FLinearColor Color = P.Fixed;
 		bool bMetal = false;
-		if (P.bBare || P.bFixedColor) Color = P.Fixed;
-		else if (Slot == KnightDesign::SlotCape)
-		{
-			Color = JeebItems::CapeColor(Var);
-			Color.R *= P.Shade; Color.G *= P.Shade; Color.B *= P.Shade;
-		}
-		else
+		if (!P.bFixedColor)
 		{
 			Color = JeebItems::Palette(Var, static_cast<int32>(P.Role));
 			Color.R *= P.Shade; Color.G *= P.Shade; Color.B *= P.Shade;
@@ -419,16 +345,11 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		}
 		ApplyPartMaterial(P, Color, bMetal, JeebItems::TierRough(Var));
 	}
-	if (Slot == KnightDesign::SlotCape && CapeCloth)
-	{
-		CapeCloth->SetVisibility(bWorn);
-		if (CapeMid && bWorn) CapeMid->SetVectorParameterValue(TEXT("Color"), JeebItems::CapeColor(Var));
-	}
 }
 
 void AKnightCharacter::RefreshEquipment()
 {
-	for (int32 Slot = 0; Slot < KnightDesign::NumSlots; ++Slot) ApplyArmorSlot(Slot);
+	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGloves, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
 	RebuildHeld();
 }
 
@@ -439,16 +360,13 @@ void AKnightCharacter::RebuildHeld()
 		if (C) C->DestroyComponent();
 	}
 	HeldComps.Reset();
-	EaseComps.Reset();
 	if (BowHold) { BowHold->DestroyComponent(); BowHold = nullptr; }
 	BowString = nullptr;
-	HeldElbow = 25.f;
 	if (!Skills) return;
 	const int32 Id = Skills->SelectedItem();
 	if (!JeebItems::IsGear(Id)) return;
 	const int32 K = JeebItems::KindOf(Id), T = JeebItems::VariantOf(Id);
 	if (!JeebItems::IsWeaponKind(K)) return;
-	HeldElbow = WeaponDesign::IdleElbow(K);
 
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
@@ -491,41 +409,24 @@ void AKnightCharacter::RebuildHeld()
 		Make(UpperPivot, KnightDesign::P_Upper, KM::Xf(FVector::ZeroVector));
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
-			HeldComps[i]->SetRelativeLocationAndRotation(FVector(-27.5f, 14.f, 41.f + 16.f), Q);   // (clear of the Meshy model's back)   // chest pivot sits 41 below the body's centre
+			HeldComps[i]->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q);   // (clear of the model's back)
 		return;
 	}
-	// The bow is held in the LEFT fist (2026-10-31, as Link holds his), built at its own grip on BowHold, which sits in the fist:
-	// at ease it lies forward and back through the fist, the bow below and its string above, tipped in so the string runs between
-	// the elbow and his body (owner's drawing, 2026-11-01; BowRestQuat).
-	// PoseBow turns it upright in the fist with the string toward him to aim.
-	if (K == JeebItems::K_Bow && ElbowL)
+	// The bow is held in the LEFT fist, built at its own grip on BowHold, which the pose places in the fist: at ease lying forward and back through it,
+	// aiming upright (FClipLib::SolveGear).
+	if (K == JeebItems::K_Bow)
 	{
 		BowHold = NewObject<USceneComponent>(this);
-		BowHold->SetupAttachment(ElbowL);
-		BowHold->SetRelativeLocation(KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
-		BowHoldRest = BowRestQuat();
-		BowHold->SetRelativeRotation(BowHoldRest);
+		BowHold->SetupAttachment(GetRootComponent());
 		BowHold->RegisterComponent();
 		const int32 First = HeldComps.Num();
 		Make(BowHold, KnightDesign::P_ElbowL, KM::Xf(FVector::ZeroVector));
 		for (int32 i = First; i < HeldComps.Num(); ++i) HeldComps[i]->SetRelativeLocation(FVector::ZeroVector);   // (built at the grip)
 		if (HeldComps.Num() > First) BowString = HeldComps.Last();   // (WeaponDesign builds the string last)
-		EaseKind = K;
 		return;
 	}
-	// Blades are held the way a hand really grips a sword: the grip runs across the closed fist (the Meshy model's fists close
-	// side to side, knuckles forward), so the blade leaves from the thumb side, forward and in, with the pommel showing on the
-	// little-finger side. Other things (tools, bows, spears, staffs) keep the old hold, pointing down and forward.
-	const bool bBlade = K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana;
-	const KM::FXf Tilt = bBlade ? KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1)))
-	                            : KM::Xf(KnightDesign::GripPos(false), FVector(0, (K == JeebItems::K_Bow) ? -28.0 : -20.0, 0));
-	{
-		const int32 First = HeldComps.Num();
-		Make(WristR, KnightDesign::P_WristR, Tilt);   // (held in the fist, which turns at the wrist)
-		EaseKind = K;
-		if (K == JeebItems::K_Sword || K == JeebItems::K_Broadsword || K == JeebItems::K_Katana || K == JeebItems::K_Staff)   // held at ease
-			for (int32 i = First; i < HeldComps.Num(); ++i) EaseComps.Add(HeldComps[i]);
-	}
+	// Everything else lies through the fist the way a sword does, the grip across it and the working end out past the thumb
+	Make(WristR, KnightDesign::P_WristR, KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1))));
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), KM::DownTo(KnightDesign::BladeDir(-1))));
 }
 
@@ -539,11 +440,11 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		if (bOnBack)
 		{
 			P.Comp->AttachToComponent(UpperPivot, FAttachmentTransformRules::KeepRelativeTransform);
-			P.Comp->SetRelativeLocationAndRotation(FVector(-14.f, -41.f, 41.f), FRotator(0.f, 180.f, 0.f));
+			P.Comp->SetRelativeLocationAndRotation(FVector(ShieldBackX, -41.f, ShieldBackZ), FRotator(0.f, 180.f, 0.f));
 		}
 		else
 		{
-			P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);   // HoldShield poses it
+			P.Comp->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);   // (PlaceGear places it)
 		}
 	}
 }
@@ -594,47 +495,3 @@ const FShieldRest& ShieldRest()
 	}();
 	return R;
 }
-
-void AKnightCharacter::HoldShield()
-{
-	if (bStowed || !ElbowL || !ArmPivotL) return;
-	// Raised: where the guard always put it (in front of the arm, turning with the shoulder); at rest: as worked out above
-	const FTransform Guard(-KnightDesign::PivotPos(KnightDesign::P_ArmL));
-	FTransform Now;
-	Now.Blend(ShieldRest().InArm, Guard, BlockAlpha);
-	for (FArmorPart& P : ArmorParts)
-	{
-		if (P.Slot != KnightDesign::SlotShield || !P.Comp) continue;
-		if (P.Comp->GetAttachParent() != ArmPivotL) P.Comp->AttachToComponent(ArmPivotL, FAttachmentTransformRules::KeepRelativeTransform);
-		P.Comp->SetRelativeTransform(Now);
-	}
-}
-
-void AKnightCharacter::HoldWeaponAtEase(float Dt, bool bBusy)
-{
-	EaseAlpha = FMath::FInterpTo(EaseAlpha, (bBusy || bStowed || EaseComps.Num() == 0) ? 0.f : 1.f, Dt, 9.f);
-	if (EaseComps.Num() == 0) return;
-	// The blade leaves the hand pointing down and forward (built that way); at ease it turns in so the tip rests in front
-	// of the knight, between his feet (worked out for the arm's relaxed bend)
-	static const FQuat SwordQ = []()
-	{
-		// (since 2026-10-30 a blade stays exactly as gripped: turning it in the hand pulled the grip out of the fist)
-		return FQuat::Identity;
-	}();
-	// The wizard staff stands upright, held round the middle of its shaft with the arm a little out, its foot on the ground
-	// (worked out for the staff's relaxed elbow bend, see WeaponDesign::IdleElbow)
-	static const FVector StaffHead = KM::RotateEuler(FVector(0, 0, -1), FVector(0, -20, 0)).GetSafeNormal();
-	static const FQuat StaffQ = []()
-	{
-		const float Bend = WeaponDesign::IdleElbow(JeebItems::K_Staff) + 4.f;   // the elbow, plus the arms' relaxed lean
-		const FVector Up(FMath::Sin(FMath::DegreesToRadians(Bend)), 0.0, FMath::Cos(FMath::DegreesToRadians(Bend)));   // world up, in the forearm's frame
-		return FQuat::FindBetweenNormals(StaffHead, Up);
-	}();
-	const bool bStaff = EaseKind == JeebItems::K_Staff;
-	const FQuat Q = FQuat::Slerp(FQuat::Identity, bStaff ? StaffQ : SwordQ, EaseAlpha);
-	const FVector Slide = bStaff ? -StaffHead * (40.f * EaseAlpha) : FVector::ZeroVector;   // slid down through the hand to grip the middle
-	const FVector G = KnightDesign::GripPos(false), PE = KnightDesign::PivotPos(KnightDesign::P_WristR);   // (the blade hangs off the wrist)
-	for (UProceduralMeshComponent* C : EaseComps)
-		if (C) C->SetRelativeLocationAndRotation(G - PE - Q.RotateVector(G) + Q.RotateVector(Slide), Q);
-}
-
