@@ -309,7 +309,7 @@ Remote: private GitHub repo https://github.com/jleclair64/Jeebsland (set up 2026
 
 The owner has a paid Meshy account. Reach Meshy through its API, not its website.
 - Connector: `.mcp.json` runs Meshy's official MCP server (`@meshy-ai/meshy-mcp-server` through `cmd /c npx`, Node.js is installed) and takes the key from the `MESHY_API_KEY` Windows user environment variable. The key is in no file in this repo; never ask for it in chat, print it or write it to a file. To replace it, have the owner create one at https://www.meshy.ai/settings/api and save it themselves.
-- The connector's tools only load when the Claude app starts, so a session opened before the key was saved won't have them. The key itself was tested against the API (balance check, 2026-11-05), but the connector had not run yet; try it on first use and correct this line.
+- The connector's tools only load when the Claude app starts, so a session opened before the key was saved won't have them. The connector works (`mcp__meshy__*`, load with ToolSearch; free balance check passed 2026-11-05 after an app restart). Its own guide says to confirm every cost first; the owner's credit rule below replaces that.
 - No tools, or the app hasn't restarted: read the key with `[Environment]::GetEnvironmentVariable('MESHY_API_KEY','User')` and call `https://api.meshy.ai` directly with `Authorization: Bearer <key>`. `GET /openapi/v1/balance` is a free check. A 401 reads `Invalid API key`, the placeholder or a bad key being the usual cause.
 - Credits (owner, 2026-11-05): spend them whenever a task calls for it, without asking, but be smart about it. Look up what a job costs first (https://docs.meshy.ai/en/api/pricing), use the cheapest option that gives a good result, try a cheap preview or a single piece before a batch, and reuse what already exists. Don't keep retrying a failing job or regenerating on a whim. Say in the report what was spent. Checking the balance is free.
 - NEVER reload the account: no buying credits, no upgrading the plan, no changing billing. Only the owner does that.
@@ -317,15 +317,17 @@ The owner has a paid Meshy account. Reach Meshy through its API, not its website
 - Finished pieces follow "The suit's model" above: into `Art/`, then the usual build and import tools. The owner has been making each piece themselves; the API adds a way to do it, it doesn't replace their say on what gets made.
 - Check the licence of models made on the paid plan before changing the Credit note below; that note describes the free-tier pieces.
 
-## Mixamo: use the built-in browser (2026-11-05)
+## Mixamo: use Claude in Chrome (2026-11-05)
 
-Mixamo has no official API, so there is no connector or key. The owner's Adobe sign-in is saved in the Claude app's built-in browser (`mcp__Claude_Browser__*`), which every session shares, so open https://www.mixamo.com there with `preview_start`; their name shows at the top right when signed in. Claude in Chrome is the fallback only if the owner agrees.
-- The sign-in can expire. Then ask the owner to sign in again in the browser pane; never type their password. It only works while the Claude app is open on this PC.
+Mixamo has no official API, so there is no connector or key. Use Claude in Chrome (`mcp__claude-in-chrome__*`, owner's choice), where downloads save straight to Downloads with no dialog (tested 2026-11-05). The owner is logged in there; their name shows at the top right. Open your own new tab and close it when done. `navigate` works with URLs like `https://www.mixamo.com/#/?page=1&query=breathing%20idle&type=Motion%2CMotionPack`.
+- If `list_connected_browsers` is empty, ask the owner to open Chrome with the Claude extension. It only works while Chrome is running on this PC.
+- The login can expire. Then ask the owner to log in again in Chrome; they use "Continue with Facebook". Never type their password, and never act on their Facebook account.
+- Fallback only: the app's built-in browser is logged in too, but every download there opens a Windows Save dialog that only the owner can click (see below).
 - Don't use unofficial Mixamo download scripts or `mixamo-mcp`: they rely on undocumented web behaviour, and it is unconfirmed that Adobe's terms allow them.
 - Mixamo opens on whichever character was last chosen, but our clips are downloaded on its stock Y Bot (see "Adding a clip" under "Animation direction"). Check that the viewer's title says "... ON Y BOT" before downloading.
-- Download settings (tested 2026-11-05 with Breathing Idle; `Tools/knight_clip_retarget.py` took it fine): FBX Binary, Without Skin (the dialog defaults to With Skin), 30 fps, keyframe reduction none. The file lands in `%USERPROFILE%\Downloads` under the clip's name. Rename it and move it to `Art/Knight Chainmail/Clips` only when it is really being added, because the importer reads every `.fbx` in that folder. Then follow the normal "Adding a clip" steps.
-- Mixamo clips cost nothing, so sessions can download what a task needs.
-- The pane refuses `navigate` while a page-opened pop-up is open in any tab (sign-in windows, for example). Don't close a pop-up you didn't open; Mixamo's own links, search box and clicks still work without it.
+- Download settings (tested 2026-11-05 with Breathing Idle; `Tools/knight_clip_retarget.py` took it fine): FBX Binary, Without Skin (the dialog defaults to With Skin), 30 fps, keyframe reduction none. In Chrome the file lands in `%USERPROFILE%\Downloads` under the clip's name, with `(1)` added if that name is taken, so look for the newest file. This relies on Chrome's "Ask where to save each file" staying off. Rename it and move it to `Art/Knight Chainmail/Clips` only when it is really being added, because the importer reads every `.fbx` in that folder. Then follow the normal "Adding a clip" steps.
+- Mixamo clips cost nothing, so sessions can download what a task needs without asking.
+- In the built-in browser, the file stays a `.tmp` until the owner clicks Save, and the app has no setting to skip that dialog. The pane also refuses `navigate` while a page-opened pop-up is open in any tab; don't close a pop-up you didn't open.
 
 ## Credit
 

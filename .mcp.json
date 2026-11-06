@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "meshy": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@meshy-ai/meshy-mcp-server"],
+      "env": {
+        "MESHY_API_KEY": "${MESHY_API_KEY}"
+      }
+    }
+  }
+}
