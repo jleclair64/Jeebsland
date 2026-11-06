@@ -176,7 +176,7 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	{
 		const int32 T = ArrowTier(Id);
 		const bool bFire = IsFireArrow(Id);   // (fire arrows: a flame-orange head and red fletching)
-		const FLinearColor Head = bFire ? FLinearColor(1.f, 0.45f, 0.08f) : Lift(Palette(T, 0), 1.3f), Shaft(0.50f, 0.34f, 0.17f), Fl = bFire ? FLinearColor(0.85f, 0.18f, 0.08f) : FLinearColor(0.92f, 0.92f, 0.88f);
+		const FLinearColor Head = bFire ? FLinearColor(1.f, 0.45f, 0.08f) : Lift(Palette(T, 0), 1.3f), Shaft(0.50f, 0.34f, 0.17f), Fl = ArrowFeatherColor(Id);
 		for (int32 k = 0; k < 3; ++k)
 		{
 			const float Ox = (k - 1) * 11.f;
@@ -308,6 +308,17 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Poly({ P(44, 2), P(54, 16), P(57, 32), P(54, 48), P(44, 62), P(40, 59), P(49, 47), P(52, 32), P(49, 17), P(40, 5) }, Pl);
 			Quad(40.5f, 4, 42.5f, 60, Edge);
 			Quad(38, 28, 47, 36, Lt);
+			break;
+		case K_Longbow:   // (taller and straighter than the bow, with a leather grip)
+			Poly({ P(36, 0), P(44, 16), P(46, 32), P(44, 48), P(36, 64), P(32, 62), P(39, 47), P(41, 32), P(39, 17), P(32, 2) }, Pl);
+			Quad(33.f, 2, 34.5f, 62, Edge);
+			Quad(37, 27, 48, 37, Wd);
+			break;
+		case K_Crossbow:   // (a stock, a curved prod across its front, a string back to the middle)
+			Quad(27, 18, 37, 62, Wd);
+			Poly({ P(6, 26), P(14, 15), P(32, 9), P(50, 15), P(58, 26), P(52, 28), P(46, 21), P(32, 16), P(18, 21), P(12, 28) }, Pl);
+			Poly({ P(8, 26), P(32, 36), P(56, 26), P(56, 28), P(32, 38), P(8, 28) }, Edge);
+			Quad(28, 8, 36, 14, Lt);
 			break;
 		case K_Rod:
 			Poly({ P(8, 58), P(12, 62), P(56, 8), P(52, 4) }, Wd);

@@ -393,7 +393,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 	const FVector2D M(UIMouseX, UIMouseY);
 	auto OverCell = [&](float X, float Y, float S) { return M.X >= X && M.X <= X + S && M.Y >= Y && M.Y <= Y + S; };
 	auto OverWindows = [&]() { for (int32 r = 0; r < RectCount; ++r) if (M.X >= RectX[r] - 6.f && M.X <= RectX[r] + RectW[r] + 6.f && M.Y >= RectY[r] - 6.f && M.Y <= RectY[r] + RectH[r] + 6.f) return true; return false; };
-	auto OverBar = [&]() { return bHotCells && M.X >= HotCellX[0] - 12.f && M.X <= HotCellX[4] + HotCellS + 200.f && M.Y >= HotCellY[0] - 24.f && M.Y <= HotCellY[0] + HotCellS + 20.f; };
+	auto OverBar = [&]() { return bHotCells && M.X >= BarCellX[0] - 12.f && M.X <= BarCellX[4] + HotCellS + 12.f && M.Y >= BarCellY - 24.f && M.Y <= BarCellY + HotCellS + 20.f; };
 
 	// right-click a stack (or the ingots) for "drop how many?"
 	if (bUIRightClick && DragKind == 0)
@@ -427,6 +427,9 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				if (Idx < 0 ? Sack->GetIngots() > 0 : (Sack->GetItems().IsValidIndex(Idx) && Sack->GetItems()[Idx].Id != 0)) { DragKind = 5; DragIdx = Idx; DragId = Idx < 0 ? 0 : Sack->GetItems()[Idx].Id; }
 			}
 		if (DragKind == 0 && bPotionCell && Sk->PotionSlot.Id != 0 && OverCell(PotionCellX, PotionCellY, HotCellS)) { DragKind = 6; DragIdx = 0; DragId = Sk->PotionSlot.Id; }
+		if (DragKind == 0 && bHotCells)   // a slot with nothing to pick up (the shield and arrow slots always, the others when empty): its list
+			for (int32 p = 0; p < 5; ++p)
+				if (OverCell(BarCellX[p], BarCellY, HotCellS)) { SwapSlot = p; return; }
 		if (DragKind != 0) { DragStart = M; bDragging = false; }
 		else if (!OverWindows() && !OverBar()) Knight->SetPanelCursor(false);   // a click on nothing: leave pointer mode
 	}
@@ -441,8 +444,8 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			if (DragKind == 1 && IsGear(DragId)) Knight->EquipFromInventory(DragIdx);   // a plain click: hold or wear it
 			else if (DragKind == 4) Knight->UnequipWorn(WornKind[DragIdx], WornSecond[DragIdx]);   // a plain click on a worn piece takes it off
 			else if (DragKind == 5 && Knight->GetLootTarget()) Knight->Inv(EInvOp::LootTakeOne, DragIdx, 0, 0, Knight->GetLootTarget());   // a click takes it
-			else if (DragKind == 2) Knight->SelectHotbar(DragIdx);   // a click on a weapon bar slot takes that weapon in hand
-			else if (DragKind == 6) Knight->DrinkPotion();   // a click on the potion slot drinks
+			else if (DragKind == 2) SwapSlot = DragIdx == 0 ? 0 : 2;   // a click on a weapon bar slot lists what could go there (1, 2 and R take it in hand)
+			else if (DragKind == 6) SwapSlot = 4;                      // and on the potion slot (Q drinks)
 			else if (DragKind == 7) Knight->UnequipWorn(K_Shield);   // a click on the shield slot puts the shield away
 		}
 		else
@@ -515,6 +518,107 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			else if (DragKind == 6 && ToInv >= 0) Knight->Inv(EInvOp::SwapInvPotion, ToInv);   // the potion slot back into the pack
 		}
 		DragKind = 0; bDragging = false; DragIdx = -1;
+	}
+}
+
+// The swap popup: just above the slot clicked on the bottom bar, what in your pack could go in it. A click on one puts it there and what was
+// there goes back to the pack (the same requests dragging makes, so the server still decides). A click anywhere else, or putting the cursor away, closes it.
+void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
+{
+	static const int32 TestSlot = []() { int32 V = -1; if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot"))) FParse::Value(FCommandLine::Get(), TEXT("ShotSwap="), V); return V; }();   // (test pictures, with -ShotPanel)
+	if (TestSlot >= 0 && SwapSlot < 0 && Knight->IsPanelCursor()) SwapSlot = TestSlot;
+	if (SwapSlot < 0) return;
+	USkillComponent* Sk = Knight->GetSkills();
+	if (!Sk || !Knight->IsPanelCursor() || Knight->IsUIOpen() || !bHotCells || SwapSlot >= 5) { SwapSlot = -1; return; }
+
+	struct FEntry { int32 Id; int32 Count; int32 Pack; };   // Pack: the pack slot, or -1 for arrows, or -2 for "take it off"
+	TArray<FEntry> List;
+	const int32 Kind = SwapSlot == 1 ? int32(K_Shield) : -1;
+	if (SwapSlot == 3)
+	{
+		for (int32 i = 0; i < NumArrowKinds(); ++i)
+		{
+			const int32 Id = ArrowKindId(i), N = Sk->CountItem(Id);
+			if (N > 0 && Id != Knight->ArrowSlotId()) List.Add({ Id, N, -1 });
+		}
+	}
+	else
+	{
+		for (int32 i = 0; i < Sk->Slots.Num(); ++i)
+		{
+			const FInvSlot& S = Sk->Slots[i];
+			if (S.Id == 0) continue;
+			const bool bFits = SwapSlot == 4 ? IsPotion(S.Id)
+				: !IsGear(S.Id) ? false
+				: SwapSlot == 1 ? KindOf(S.Id) == Kind
+				: IsWeaponKind(KindOf(S.Id)) && BarSlotFor(KindOf(S.Id)) == (SwapSlot == 2 ? 1 : 0);
+			if (bFits) List.Add({ S.Id, S.Count, i });
+		}
+		if (SwapSlot == 1 && Sk->Worn[K_Shield] != 0) List.Add({ 0, 0, -2 });
+	}
+
+	UFont* Font = GEngine->GetMediumFont();
+	static const TCHAR* const Titles[5] = { TEXT("Swap your weapon"), TEXT("Swap your shield"), TEXT("Swap your bow"), TEXT("Pick your arrows"), TEXT("Swap your potion") };
+	static const TCHAR* const None[5] = { TEXT("No other weapons in your pack"), TEXT("No other shields in your pack"), TEXT("No other bows in your pack"), TEXT("No other arrows"), TEXT("No other potions in your pack") };
+	const FString Title = List.Num() > 0 ? Titles[SwapSlot] : None[SwapSlot];
+	float TW = 0.f, TH = 0.f;
+	HDTextSize(Title, TW, TH, Font, 0.85f);
+	const float S = 54.f, Gap = 6.f, Pad = 10.f;
+	const int32 Cols = FMath::Clamp(List.Num(), 1, 6), Rows = FMath::Max(1, (List.Num() + Cols - 1) / Cols);
+	const float GridW = Cols * S + (Cols - 1) * Gap, GridH = List.Num() > 0 ? Rows * S + (Rows - 1) * Gap : 0.f;
+	const float W = FMath::Max(GridW, TW) + 2.f * Pad, H = TH + 6.f + GridH + 2.f * Pad;
+	const float X = FMath::Clamp(BarCellX[SwapSlot] + HotCellS * 0.5f - W * 0.5f, 8.f, Canvas->ClipX - W - 8.f);
+	const float Y = BarCellY - 24.f - H;   // (clear of the slot in hand, which stands higher than the others)
+	Panel(X, Y, W, H);
+	HDText(Title, FLinearColor(0.92f, 0.92f, 0.92f), X + Pad, Y + Pad - 2.f, Font, 0.85f);
+
+	int32 Hit = -1;
+	const float GridX = X + (W - GridW) * 0.5f, GridY = Y + Pad + TH + 6.f;
+	for (int32 i = 0; i < List.Num(); ++i)
+	{
+		const FEntry& E = List[i];
+		const float Cx = GridX + (i % Cols) * (S + Gap), Cy = GridY + (i / Cols) * (S + Gap);
+		const bool bOver = Over(Cx, Cy, S, S);
+		if (bOver) Hit = i;
+		Tile(Cx, Cy, S, S, FLinearColor(0.05f, 0.07f, 0.12f), bOver ? 0.55f : 0.35f, true);
+		if (bOver) Outline(Cx - 1.f, Cy - 1.f, S + 2.f, S + 2.f, 12.f, FLinearColor(1.f, 0.8f, 0.3f, 1.f));
+		if (E.Pack == -2)
+		{
+			float OW = 0.f, OH = 0.f;
+			HDTextSize(TEXT("Off"), OW, OH, Font, 0.85f);
+			HDText(TEXT("Off"), FLinearColor(0.8f, 0.8f, 0.82f), Cx + (S - OW) * 0.5f, Cy + (S - OH) * 0.5f, Font, 0.85f);
+			if (bOver) SetTip({ TEXT("Take your shield off"), TEXT("It goes back in your pack") });
+			continue;
+		}
+		DrawIcon(E.Id, Cx + 2.f, Cy + 2.f, S - 4.f);
+		if (E.Count > 1)
+		{
+			const FString Txt = FString::FromInt(E.Count);
+			float NW = 0.f, NH = 0.f;
+			HDTextSize(Txt, NW, NH, Font, 0.85f);
+			HDText(Txt, FLinearColor::White, Cx + S - NW - 4.f, Cy + S - NH - 2.f, Font, 0.85f);
+		}
+		if (IsGear(E.Id) && !CanEquip(Sk, E.Id)) FillRR(Cx, Cy, S, S, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.55f); });   // (too high a level for you: the tip says why)
+		if (bOver) ItemTip(E.Id);
+	}
+
+	if (!bUIClick) return;
+	if (Hit >= 0)
+	{
+		const FEntry& E = List[Hit];
+		if (E.Pack == -1) Knight->PickArrows(E.Id);
+		else if (E.Pack == -2) Knight->UnequipWorn(K_Shield);
+		else if (SwapSlot == 4) Knight->Inv(EInvOp::SwapInvPotion, E.Pack);
+		else if (SwapSlot == 1) Knight->Inv(EInvOp::SwapInvWorn, E.Pack, K_Shield, 0);
+		else Knight->Inv(EInvOp::SwapInvHot, E.Pack, SwapSlot == 2 ? 1 : 0);
+		SwapSlot = -1;
+		bUIClick = false;
+	}
+	else if (Over(X, Y, W, H)) bUIClick = false;   // (on the panel, between things: nothing)
+	else
+	{
+		if (Over(BarCellX[SwapSlot], BarCellY, HotCellS, HotCellS)) bUIClick = false;   // (the same slot again closes it)
+		SwapSlot = -1;   // (anywhere else closes it too, and goes on to do what it does: another slot opens its own)
 	}
 }
 

@@ -40,7 +40,7 @@ void AKnightCharacter::Interact()
 {
 	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
-	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f) return; // (nor in hitstun) clicks belong to the open screen (or the side panel); no attacks mid-move
+	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)
 
@@ -70,7 +70,7 @@ void AKnightCharacter::Interact()
 	{
 		const int32 K = SelectedKind();
 		const float Now = GetWorld()->GetTimeSeconds();
-		if (K == JeebItems::K_Bow)
+		if (JeebItems::IsShooter(K))
 		{
 			StartDraw();   // hold to draw, let go to shoot (KnightCharacterBow.cpp)
 		}
@@ -458,6 +458,11 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 {
 	ActiveNode = Node;
 	GatherStart = GetActorLocation();
+	if (Skill != ESkillType::Fishing)   // (square on to it, so that the swing lands on it)
+	{
+		const FVector ToNode = Node->GetActorLocation() - GetActorLocation();
+		SetActorRotation(FRotator(0.f, FVector(ToNode.X, ToNode.Y, 0.f).Rotation().Yaw, 0.f));
+	}
 	// online: the server runs the gathering; the player's machine plays the animation
 	if (HasAuthority() && GetNetMode() != NM_Standalone && !IsLocallyControlled()) ClientGather(Node->GetActorLocation(), static_cast<uint8>(Skill), true);
 	if (Skill == ESkillType::Fishing)

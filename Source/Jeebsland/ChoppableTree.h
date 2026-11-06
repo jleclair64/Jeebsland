@@ -33,6 +33,7 @@ public:
 
 	ETreeKind GetKind() const { return Kind; }
 	float GetTreeHeight() const { return TreeHeight; }
+	virtual float ReachRadius() const override { return TrunkRadius + 135.f; }   // (close enough for the swing to land on the trunk)
 
 	TArray<FTreePart> Parts;
 
@@ -40,6 +41,7 @@ protected:
 	virtual void OnChargesChanged(int32 Remaining, int32 Max) override;
 
 private:
+	float TrunkRadius = 25.f;
 	UPROPERTY() USceneComponent* TreeRoot = nullptr;
 	UPROPERTY() UCapsuleComponent* Capsule = nullptr;
 

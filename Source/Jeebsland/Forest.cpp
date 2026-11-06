@@ -840,6 +840,7 @@ void AForest::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("M_BarkTint is missing: run MakeGrassCards.bat once. Trunks and branches keep their old shapes."));
 	}
 
+	if (bNoWoods) return;
 	FRandomStream R(777); // fixed seed = the same woods every run
 	const FVector Cottage = JeebTerrain::CottagePos();
 	int32 Planted = 0;

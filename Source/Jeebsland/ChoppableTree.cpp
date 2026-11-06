@@ -30,6 +30,7 @@ void AChoppableTree::Setup(ETreeKind InKind, float Radius, float Height)
 {
 	Kind = InKind;
 	TreeHeight = Height;
+	TrunkRadius = Radius;
 
 	const float HalfHeight = FMath::Max(FMath::Min(Height * 0.5f, 300.f), Radius + 1.f);
 	Capsule->SetCapsuleSize(Radius, HalfHeight);

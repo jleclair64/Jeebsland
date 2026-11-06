@@ -282,18 +282,18 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	case EInvOp::Drink:
 	{
 		FInvSlot& P = Sk->PotionSlot;
-		if (P.Id == 0 || !IsPotion(P.Id) || P.Count <= 0) { Sk->Say(2.f, Warn, TEXT("No potion in the potion slot.")); break; }
+		if (P.Id == 0 || !IsPotion(P.Id) || P.Count <= 0) { Sk->Say(2.f, Warn, TEXT("No potion in the potion slot.")); ClientDrinkRefused(); break; }
 		const int32 T = PotionType(P.Id);
 		const float Left = GetPotionCooldownLeft(T);
 		if (Left > 0.f)
 		{
 			Sk->Say(2.f, Warn, FString::Printf(TEXT("%s is not ready yet (%d s)."), PotionName(T), FMath::CeilToInt(Left)));
+			ClientDrinkRefused();
 			break;
 		}
-		ApplyPotion(T);
-		if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDrank(static_cast<uint8>(T));   // the player's machine runs the effect too (speed, the bigger bar)
-		if (--P.Count <= 0) P = FInvSlot();
-		Sk->Say(2.5f, FColor(170, 255, 170), FString::Printf(TEXT("You drink a %s."), PotionName(T)));
+		// (it takes time now: TickDrink uses it up at the end, if he gets that far)
+		if (CanDrinkNow()) MulticastDrink(static_cast<uint8>(T), true);
+		else ClientDrinkRefused();
 		break;
 	}
 
@@ -306,6 +306,9 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		else Skills->Say(2.f, FColor::Orange, TEXT("Your pack is full."));
 		break;
 	}
+	case EInvOp::ChooseArrows:
+		if (A == 0 || (IsArrow(A) && Sk->CountItem(A) > 0)) ArrowPick = A;
+		break;
 	case EInvOp::TakeFromWall:
 	{
 #if !UE_BUILD_SHIPPING
@@ -422,7 +425,7 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
-	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown) return;
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown || bDrinking) return;
 	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && !FightsLikeSword(SelectedKind())) return;   // (the low sweep and the dash attack are sword moves)
 	const double Now = FPlatformTime::Seconds();
 	const bool bCombo = Style == static_cast<uint8>(EAtkStyle::Sweep) && IsKicking() && bKickLanded && StunLeft <= 0.f;   // (a landed kick cut short by the sweep)
@@ -432,6 +435,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
 	if (S == EAtkStyle::Thrust) return;   // (the spear's charged thrust and its lunge are gone: Docs/ToRecreate.md)
 	if (S == EAtkStyle::Cast && SelectedKind() != K_Wand && SelectedKind() != K_Staff) return;   // (only these cast; the bow shoots through ServerBowShoot)
+	if (S == EAtkStyle::Slash && IsShooter(SelectedKind())) return;   // (a bow is never swung: no arrow, no reload and a shot's reach)
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	StartAttack(S, Dir < 0 ? -1 : 1, C);
 }
@@ -522,6 +526,12 @@ void AKnightCharacter::OnRep_MoveFlags()
 	if (bRoll && !bRolling) { bRolling = true; RollT = 0.f; RollDir = GetActorForwardVector().GetSafeNormal2D(); }
 	if (bSlide && !bSliding) { bSliding = true; SlideT = 0.f; SlideSpeed = 800.f; SlideDir = GetActorForwardVector().GetSafeNormal2D(); }
 	else if (!bSlide) bSliding = false;
+	// (a tool at work: others see the swing, and the shield on his back)
+	const bool bTool = (RepMoveFlags & 32) != 0;
+	if (bTool && !bSwinging) SwingTime = 0.f;
+	bSwinging = bTool;
+	bSideways = (RepMoveFlags & 64) != 0;
+	SwingPeriod = bSideways ? 1.25f : 1.f;
 }
 
 // The server says we fell: wake up in Blackrock here too
@@ -534,6 +544,8 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	CloseLoot();
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bRolling = false; bSliding = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
+	CrossReloadLeft = 0.f; bCrossQueued = false;
+	if (Bow != EBow::None) SetBow(EBow::None);
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	SetActorLocation(Wake);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));

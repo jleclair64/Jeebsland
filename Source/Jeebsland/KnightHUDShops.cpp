@@ -210,13 +210,13 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
 	// Kind list (two columns)
-	static const int32 Kinds[18] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, -1 };
-	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 17);
-	for (int32 i = 0; i < 18; ++i)
+	static const int32 Kinds[20] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, -1 };
+	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 19);
+	for (int32 i = 0; i < 20; ++i)
 	{
-		const float X = PX + 30.f + (i / 9) * 160.f, Y = PY + 118.f + (i % 9) * 44.f;
+		const float X = PX + 30.f + (i / 10) * 160.f, Y = PY + 118.f + (i % 10) * 40.f;
 		const FString Nm = Kinds[i] < 0 ? FString(TEXT("Arrows")) : FString(KindName(Kinds[i]));
-		if (Btn(X, Y, 150.f, 38.f, Nm, true, SmithKindIdx == i, 1.0f)) SmithKindIdx = i;
+		if (Btn(X, Y, 150.f, 35.f, Nm, true, SmithKindIdx == i, 1.0f)) SmithKindIdx = i;
 	}
 	const int32 Kind = Kinds[SmithKindIdx];
 	const bool bArrows = Kind < 0;

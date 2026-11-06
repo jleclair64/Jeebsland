@@ -143,20 +143,7 @@ namespace WeaponDesign
 		}
 		case K_Pickaxe:
 		{
-			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 10, 2.1, 9.5, 2.3, 0, 2.3, -60, 2.0, -70, 0, -71 }), 12, 1.0, 1.0, Pl);
-			{ FMD& M = Add(Trim);
-			  RBox(M, 3.0, 5.0, 3.2, 0.6, At(0, 0, -66)); }
-			{ // curved pick head, tips swept forward
-				TArray<FVector> Path; TArray<FVector2D> AB;
-				for (int32 i = -6; i <= 6; ++i)
-				{
-					const double Y = i * 3.6;
-					Path.Add(V3(0, Y, -66.0 - 0.020 * Y * Y));
-					AB.Add(FVector2D(2.2 * (1.0 - 0.7 * FMath::Abs(i) / 6.0) + 0.35, 2.4 * (1.0 - 0.8 * FMath::Abs(i) / 6.0) + 0.3));
-				}
-				Sweep(Add(Plate), Path, AB, V3(1, 0, 0), 8, 0.8, Pl);
-			}
-			break;
+			break;   // (a model now: JeebProps)
 		}
 		case K_Spear:
 		{
@@ -205,6 +192,13 @@ namespace WeaponDesign
 			{ TArray<FVector> SP; TArray<FVector2D> SA; // string
 			  for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-48.0 + 48.0 * i, 0, BowBrace)); SA.Add(FVector2D(0.28, 0.28)); }
 			  Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl); }
+			break;
+		}
+		case K_Longbow:   // (the stave is a model, JeebProps; only its string is built here, last, as the bow's is)
+		{
+			TArray<FVector> SP; TArray<FVector2D> SA;
+			for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-76.0 + 76.0 * i, 0, 16.0)); SA.Add(FVector2D(0.3, 0.3)); }
+			Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl);
 			break;
 		}
 		case K_Rod:

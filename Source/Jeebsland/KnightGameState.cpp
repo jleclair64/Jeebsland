@@ -353,6 +353,24 @@ void AKnightGameState::BuildMoveLab()
 			D->FinishSpawning(Xf);
 		}
 	}
+	// A tree and a rock to work on, ahead of the start to either side (every machine builds its own, as in the real world)
+	{
+		FActorSpawnParameters SP;
+		SP.bDeferConstruction = true;
+		if (AForest* LabWoods = World->SpawnActor<AForest>(AForest::StaticClass(), FTransform::Identity, SP))
+		{
+			LabWoods->bNoWoods = true;
+			LabWoods->FinishSpawning(FTransform::Identity);
+			FRandomStream TreeRand(99);
+			LabWoods->AddTree(ETreeKind::Oak, FVector(150.f, -800.f, Z - 20.f), 1.f, TreeRand);
+		}
+		const FTransform RockAt(FRotator(0.f, 40.f, 0.f), FVector(150.f, 800.f, Z - 8.f));
+		if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), RockAt))
+		{
+			Rock->SetOre(EItemType::TinOre);
+			Rock->FinishSpawning(RockAt);
+		}
+	}
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();

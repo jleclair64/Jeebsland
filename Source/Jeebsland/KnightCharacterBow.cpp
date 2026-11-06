@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "JeebProps.h"
 #include "KnightDesign.h"
 #include "WeaponDesign.h"
 #include "Messages.h"
@@ -43,8 +44,14 @@ void AKnightCharacter::CycleArrows()
 	for (int32 s = 1; s <= N; ++s)
 	{
 		const int32 Id = JeebItems::ArrowKindId((At + s) % N);
-		if (Skills->CountItem(Id) > 0) { ArrowPick = Id; return; }
+		if (Skills->CountItem(Id) > 0) { PickArrows(Id); return; }
 	}
+}
+
+void AKnightCharacter::PickArrows(int32 Id)
+{
+	ArrowPick = Id;
+	if (!HasAuthority()) Inv(EInvOp::ChooseArrows, Id);
 }
 
 void AKnightCharacter::GetShieldParts(TArray<UPrimitiveComponent*>& Out) const
@@ -124,14 +131,30 @@ void AKnightCharacter::SetBow(EBow P)
 	BowT = 0.f;
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW phase %d at %.2f"), int32(P), GetWorld()->GetTimeSeconds());
 	if (P == EBow::Drawing) BowCharge = 0.f;
+	bCrossQueued = false;
+}
+
+float AKnightCharacter::DrawTimeNow() const
+{
+	const int32 K = SelectedKind();
+	return K == JeebItems::K_Crossbow ? JeebTune::V().CrossRaise : K == JeebItems::K_Longbow ? JeebTune::V().LongDrawTime : BowDrawTime;
+}
+
+float AKnightCharacter::BowWalkShare() const
+{
+	const int32 K = SelectedKind();
+	if (K == JeebItems::K_Crossbow) return Bow == EBow::Reload ? JeebTune::V().CrossReloadWalk : JeebTune::V().CrossAimWalk;
+	return K == JeebItems::K_Longbow ? JeebTune::V().LongWalk : 0.5f;
 }
 
 void AKnightCharacter::StartDraw()
 {
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Iron)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
-	if (!Skills || SelectedKind() != JeebItems::K_Bow || Bow != EBow::None) return;
-	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted) return;
+	if (!Skills || !JeebItems::IsShooter(SelectedKind()) || Bow != EBow::None) return;
+	if (SelectedKind() == JeebItems::K_Crossbow && CrossReloadLeft > 0.f) return;   // (not loaded yet)
+	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted || bDrinking) return;
 	if (ArrowSlotId() == 0) { if (IsLocallyControlled()) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
+	BowKindDrawn = SelectedKind();
 	SetBow(EBow::Drawing);
 	if (GetNetMode() == NM_Standalone) return;
 	if (!HasAuthority()) ServerBowDraw();
@@ -141,13 +164,16 @@ void AKnightCharacter::StartDraw()
 void AKnightCharacter::ReleaseDraw()
 {
 	if (Bow != EBow::Drawing) return;
+	const bool bCross = SelectedKind() == JeebItems::K_Crossbow;
+	if (bCross && BowT < JeebTune::V().CrossRaise) { bCrossQueued = true; return; }   // (no half shots: it goes as soon as it is up)
 	FVector Target = FVector::ZeroVector;
 	const FVector Dir = BowAimDir(&Target);
 	const FVector From = ShotStart();
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBAIM start %s dir %s target %s speed %s"), *From.ToCompactString(), *Dir.ToCompactString(), *Target.ToCompactString(), *GetVelocity().ToCompactString());
 	const float C = BowCharge;
 	const int32 Id = ArrowSlotId();
-	SetBow(EBow::Recover);
+	if (bCross) CrossReloadLeft = JeebTune::V().CrossReload;
+	SetBow(bCross ? EBow::Reload : EBow::Recover);
 	if (HasAuthority()) { FireArrow(Dir, C, Id, From); if (GetNetMode() != NM_Standalone) MulticastBow(2); }
 	else ServerBowShoot(Dir, C, Id, From);
 }
@@ -155,26 +181,30 @@ void AKnightCharacter::ReleaseDraw()
 void AKnightCharacter::CancelDraw()
 {
 	if (Bow == EBow::None) return;
-	const bool bWasDrawing = Bow == EBow::Drawing;
+	const bool bWasDrawing = Bow == EBow::Drawing, bWasLoading = Bow == EBow::Reload;
 	SetBow(EBow::None);
-	if (!bWasDrawing || GetNetMode() == NM_Standalone) return;
-	if (IsLocallyControlled() && !HasAuthority()) ServerBowCancel();
+	if ((!bWasDrawing && !bWasLoading) || GetNetMode() == NM_Standalone) return;
+	if (IsLocallyControlled() && !HasAuthority()) { if (bWasDrawing) ServerBowCancel(); }
 	else if (HasAuthority()) MulticastBow(0);
 }
 
 void AKnightCharacter::ServerBowDraw_Implementation()
 {
 	if (Bow == EBow::Recover) SetBow(EBow::None);   // (the player's machine may be a moment ahead of us)
+	if (Bow == EBow::Reload && CrossReloadLeft < 0.3f) { CrossReloadLeft = 0.f; SetBow(EBow::None); }
 	StartDraw();
 }
 
 void AKnightCharacter::ServerBowShoot_Implementation(FVector_NetQuantizeNormal Dir, float Charge, int32 ArrowId, FVector_NetQuantize10 From)
 {
-	if (Bow != EBow::Drawing || SelectedKind() != JeebItems::K_Bow) return;
-	const float C = FMath::Clamp(FMath::Min(Charge, BowT / BowDrawTime + 0.15f), 0.f, 1.f);   // (never more draw than we have seen)
+	if (Bow != EBow::Drawing || !JeebItems::IsShooter(SelectedKind())) return;
+	const bool bCross = SelectedKind() == JeebItems::K_Crossbow;
+	if (bCross && (BowT < JeebTune::V().CrossRaise - 0.15f || CrossReloadLeft > 0.3f)) { CancelDraw(); return; }   // (never before it can be up, nor before it is loaded)
+	const float C = bCross ? 1.f : FMath::Clamp(FMath::Min(Charge, BowT / DrawTimeNow() + 0.15f), 0.f, 1.f);   // (never more draw than we have seen)
 	FVector D = FVector(Dir).GetSafeNormal();
 	if (FVector::DotProduct(D, GetActorForwardVector()) < 0.2f) D = GetBaseAimRotation().Vector();   // (only ahead of him)
-	SetBow(EBow::Recover);
+	if (bCross) CrossReloadLeft = JeebTune::V().CrossReload;
+	SetBow(bCross ? EBow::Reload : EBow::Recover);
 	FireArrow(D, C, ArrowId, CheckShotStart(From));
 	MulticastBow(2);
 }
@@ -186,7 +216,9 @@ void AKnightCharacter::ServerBowCancel_Implementation()
 
 void AKnightCharacter::MulticastBow_Implementation(uint8 Phase)
 {
-	if (HasAuthority() || IsLocallyControlled() || Phase > 2) return;   // (they already know)
+	if (HasAuthority() || IsLocallyControlled() || Phase > 3) return;   // (they already know)
+	if (SelectedKind() == JeebItems::K_Crossbow && Phase == 2) { CrossReloadLeft = JeebTune::V().CrossReload; SetBow(EBow::Reload); return; }
+	if (Phase == 3 && CrossReloadLeft <= 0.f) CrossReloadLeft = JeebTune::V().CrossReload * 0.5f;   // (joining part way through someone else's)
 	SetBow(static_cast<EBow>(Phase));
 }
 
@@ -210,25 +242,42 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	const int32 BowTier = JeebItems::IsGear(BowId) ? JeebItems::VariantOf(BowId) : 0;
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	bool bCrit = false;
-	const int32 Dmg = JeebItems::RollDamage(Skills, JeebItems::K_Bow, BowTier, JeebItems::ArrowTier(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, FMath::Pow(C, 1.5f)));
+	const int32 Kind = JeebItems::IsShooter(SelectedKind()) ? SelectedKind() : int32(JeebItems::K_Bow);
+	const bool bCross = Kind == JeebItems::K_Crossbow;
+	const float SpeedMul = Kind == JeebItems::K_Longbow ? JeebTune::V().LongSpeed / FMath::Max(float(BowSpeedMax), 1.f) : 1.f;
+	const int32 Dmg = JeebItems::RollDamage(Skills, Kind, BowTier, JeebItems::ArrowTier(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, FMath::Pow(C, 1.5f)));
 	auto ByDraw = [C](float Min, float Mid, float Max) { return C < 0.5f ? FMath::Lerp(Min, Mid, C * 2.f) : FMath::Lerp(Mid, Max, C * 2.f - 1.f); };
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), From, Dir.Rotation(), SP))
 	{
 		const bool bFull = C >= 1.f;
-		P->Launch(this, Dir, ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax), 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id,
-			bFull ? BowSagFull : ByDraw(BowSagMin, BowSagMid, BowSagMax), bFull ? BowStraight : 0.f);
+		P->Launch(this, Dir, bCross ? JeebTune::V().CrossSpeed : ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax) * SpeedMul, 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id,
+			bCross ? JeebTune::V().CrossSag : bFull ? BowSagFull : ByDraw(BowSagMin, BowSagMid, BowSagMax), bFull ? BowStraight : 0.f);
+		if (bCross) P->GuardMul = JeebTune::V().CrossGuardMul;
 	}
 }
 
 void AKnightCharacter::TickBow(float Dt)
 {
-	const bool bBowIn = SelectedKind() == JeebItems::K_Bow;
+	const bool bBowIn = JeebItems::IsShooter(SelectedKind());
+	const bool bCross = SelectedKind() == JeebItems::K_Crossbow;
+	const bool bOtherBow = Bow == EBow::Drawing && SelectedKind() != BowKindDrawn && (HasAuthority() || IsLocallyControlled());   // (a draw never carries over to another bow)
+	const bool bTaken = !bBowIn || bOtherBow || bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted || Health <= 0.f || bDrinking;
 	// let down without shooting: another weapon, a roll, a kick or a swing, hitstun, knocked down, climbing, sitting ...
-	if (Bow != EBow::None && (!bBowIn || bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted || Health <= 0.f
-		|| (IsLocallyControlled() && IsUIOpen())))
+	if (Bow != EBow::None && (bTaken || (Bow != EBow::Reload && IsLocallyControlled() && IsUIOpen())))
 		CancelDraw();
+	// the crossbow's loading: whatever stopped it, it carries on from where it was as soon as he is free
+	if (bCross && !bTaken && Bow == EBow::None && CrossReloadLeft > 0.f && (HasAuthority() || IsLocallyControlled()))
+	{
+		SetBow(EBow::Reload);
+		if (HasAuthority() && GetNetMode() != NM_Standalone) MulticastBow(3);
+	}
+	if (Bow == EBow::Reload)
+	{
+		CrossReloadLeft -= Dt;
+		if (CrossReloadLeft <= 0.f) { CrossReloadLeft = 0.f; SetBow(EBow::None); }
+	}
 	BowT += Dt;
 	if (HasAuthority() && Skills && UnlimitedArrows())   // (testing: topped up to a full stack of each)
 		for (const int32 Id : { JeebItems::ArrowId(JeebItems::T_Iron), JeebItems::IdFireArrow })
@@ -238,9 +287,10 @@ void AKnightCharacter::TickBow(float Dt)
 	if (ShotBowAt > 0.f && GetWorld()->GetTimeSeconds() >= ShotBowAt) { ShotBowAt = -1.f; ReleaseDraw(); }   // (test pictures)
 	if (Bow == EBow::Drawing)
 	{
-		BowCharge = FMath::Min(1.f, BowT / BowDrawTime);
-		if (IsLocallyControlled() && BowT >= BowDrawTime + BowHoldMax) ReleaseDraw();   // held too long: it goes by itself
-		else if (HasAuthority() && !IsLocallyControlled() && BowT >= BowDrawTime + BowHoldMax + 1.5f) CancelDraw();   // (the player's machine never said)
+		BowCharge = FMath::Min(1.f, BowT / DrawTimeNow());
+		if (bCross) { if (bCrossQueued && IsLocallyControlled() && BowT >= JeebTune::V().CrossRaise) ReleaseDraw(); }   // (a crossbow stays up for as long as you like)
+		else if (IsLocallyControlled() && BowT >= DrawTimeNow() + BowHoldMax) ReleaseDraw();   // held too long: it goes by itself
+		else if (HasAuthority() && !IsLocallyControlled() && BowT >= DrawTimeNow() + BowHoldMax + 1.5f) CancelDraw();   // (the player's machine never said)
 	}
 	else if (Bow == EBow::Recover && BowT >= BowRecover) SetBow(EBow::None);
 
@@ -326,7 +376,8 @@ static void Rod(UStaticMeshComponent* C, const FVector& P, const FVector& Q, flo
 
 void AKnightCharacter::UpdateBowBits()
 {
-	const bool bShow = BowHold && BowAimAlpha > 0.02f && !bStowed;
+	const bool bCross = SelectedKind() == JeebItems::K_Crossbow;
+	const bool bShow = BowHold && (bCross || BowAimAlpha > 0.02f) && !bStowed && !(bCross && bDrinking);   // (with the crossbow put away for a drink, its string and bolt go too)
 	if (BowString) BowString->SetVisibility(!bShow);
 	if (!bShow) { for (UStaticMeshComponent* C : BowBits) if (C) C->SetVisibility(false); return; }
 	if (BowBits.Num() == 0)
@@ -335,36 +386,66 @@ void AKnightCharacter::UpdateBowBits()
 		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), FLinearColor(0.9f, 0.88f, 0.78f)));   // lower half
 		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), FLinearColor(0.5f, 0.34f, 0.17f)));   // the nocked arrow
 		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cone.Cone"), FLinearColor(0.6f, 0.6f, 0.7f)));             // its head
+		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cube.Cube"), FLinearColor(0.9f, 0.9f, 0.9f)));             // its feathers
+		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cube.Cube"), FLinearColor(0.9f, 0.9f, 0.9f)));             // (across the first)
 		for (UStaticMeshComponent* C : BowBits) { C->SetUsingAbsoluteLocation(true); C->SetUsingAbsoluteRotation(true); C->SetUsingAbsoluteScale(true); }
 	}
 	const FTransform B = BowHold->GetComponentTransform();
-	const FVector TipA = B.TransformPosition(FVector(-48.f, 0.f, WeaponDesign::BowBrace)), TipB = B.TransformPosition(FVector(48.f, 0.f, WeaponDesign::BowBrace));
-	const FVector Rest = B.TransformPosition(FVector(BowTune().Rest, 0.f, WeaponDesign::BowBrace));   // (the nocking point: level with the arrow rest, just above the fist)
+	const int32 ShowId = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() : LookArrows;
+	// An arrow laid from Nock to Tip, its feathers at the nock
+	auto LayArrow = [&](const FVector& Nock, const FVector& Along, float Long, bool bShown)
+	{
+		for (int32 i = 2; i < 6; ++i) BowBits[i]->SetVisibility(bShown);
+		if (!bShown) return;
+		const FVector Tip = Nock + Along * Long;
+		Rod(BowBits[2], Nock, Tip, 0.6f);
+		BowBits[3]->SetWorldLocationAndRotation(Tip + Along * 2.f, FRotationMatrix::MakeFromZ(Along).Rotator());
+		BowBits[3]->SetWorldScale3D(FVector(0.028f, 0.028f, 0.065f));
+		if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[3]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), JeebItems::ArrowTipColor(ShowId));
+		const FRotator Fl = FRotationMatrix::MakeFromX(Along).Rotator();
+		for (int32 i = 4; i < 6; ++i)
+		{
+			BowBits[i]->SetWorldLocationAndRotation(Nock + Along * 6.f, (Fl.Quaternion() * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(i == 4 ? 0.f : 90.f))).Rotator());
+			BowBits[i]->SetWorldScale3D(FVector(0.1f, 0.004f, 0.045f));
+			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), JeebItems::ArrowFeatherColor(ShowId));
+		}
+	};
+	if (bCross)
+	{
+		// (the model has no string of its own: from one end of the prod back to the nut, drawn up as it loads, with the arrow lying on the stock once it is loaded)
+		if (!bBitsCross)
+		{
+			bBitsCross = true;
+			for (int32 i = 0; i < 2; ++i) if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.09f, 0.075f, 0.055f));   // (a dark cord: as long as the prod is wide, a pale one draws the eye across his face)
+		}
+		const FVector PA = B.TransformPosition(FVector(JeebProps::CrossTipX, -JeebProps::CrossTipY, JeebProps::CrossZ)), PB = B.TransformPosition(FVector(JeebProps::CrossTipX, JeebProps::CrossTipY, JeebProps::CrossZ));
+		const float Load = CrossReloadLeft > 0.f ? FMath::Clamp(1.f - CrossReloadLeft / JeebTune::V().CrossReload, 0.f, 1.f) : 1.f;
+		const FVector Nock = B.TransformPosition(FVector(FMath::Lerp(JeebProps::CrossTipX, JeebProps::CrossNutX, FMath::SmoothStep(0.25f, 0.8f, Load)), 0.f, JeebProps::CrossZ));
+		for (int32 i = 0; i < 2; ++i) { BowBits[i]->SetVisibility(true); Rod(BowBits[i], i == 0 ? PA : PB, Nock, 0.35f); }
+		LayArrow(Nock, B.TransformVectorNoScale(FVector::ForwardVector), JeebProps::CrossBoltLen, CrossReloadLeft <= 0.f && ShowId != 0);
+		return;
+	}
+	if (bBitsCross)
+	{
+		bBitsCross = false;
+		for (int32 i = 0; i < 2; ++i) if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.9f, 0.88f, 0.78f));
+	}
+	const float TipX = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongTipX : 48.f, Brace = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongBrace : float(WeaponDesign::BowBrace);
+	const FVector TipA = B.TransformPosition(FVector(-TipX, 0.f, Brace)), TipB = B.TransformPosition(FVector(TipX, 0.f, Brace));
+	const FVector Rest = B.TransformPosition(FVector(BowTune().Rest, 0.f, Brace));   // (the nocking point: level with the arrow rest, just above the fist)
 	// the nock: in the drawing fist while drawn, back on the bow as it is let go
 	FVector Nock = Rest;
 	if (WristR) Nock = FMath::Lerp(Rest, WristR->GetComponentTransform().TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR)), FMath::Clamp(BowAimAlpha * 1.4f - 0.2f, 0.f, 1.f));
 	if (Bow == EBow::Recover) Nock = FMath::Lerp(Nock, Rest, FMath::Clamp(BowT / 0.06f, 0.f, 1.f));
 	for (int32 i = 0; i < 2; ++i) { BowBits[i]->SetVisibility(true); Rod(BowBits[i], i == 0 ? TipA : TipB, Nock, 0.3f); }
-	const bool bArrow = Bow == EBow::Drawing && ArrowSlotId() != 0;
-	BowBits[2]->SetVisibility(bArrow);
-	BowBits[3]->SetVisibility(bArrow);
-	if (bArrow)
-	{
-		const FVector Along = (B.TransformPosition(FVector(BowTune().Rest, 0.f, 0.f)) - Nock).GetSafeNormal();   // (over the top of the fist)
-		const FVector Tip = Nock + Along * 74.f;
-		Rod(BowBits[2], Nock, Tip, 0.6f);
-		BowBits[3]->SetWorldLocationAndRotation(Tip + Along * 2.f, FRotationMatrix::MakeFromZ(Along).Rotator());
-		BowBits[3]->SetWorldScale3D(FVector(0.028f, 0.028f, 0.065f));
-		if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[3]->GetMaterial(0)))
-			M->SetVectorParameterValue(TEXT("Color"), JeebItems::IsFireArrow(ArrowSlotId()) ? FLinearColor(4.f, 1.4f, 0.25f) : FLinearColor(0.6f, 0.6f, 0.7f));
-	}
+	LayArrow(Nock, (B.TransformPosition(FVector(BowTune().Rest, 0.f, 0.f)) - Nock).GetSafeNormal(), 74.f, Bow == EBow::Drawing && ShowId != 0);   // (over the top of the fist)
 }
 
 // The quiver: a leather tube hung on his right hip like a sword's sheath (clear of the cape; owner, 2026-10-31), its mouth
 // tipped forward with fletched arrows showing, while the bow is his weapon
 void AKnightCharacter::UpdateQuiver()
 {
-	const bool bShow = SelectedKind() == JeebItems::K_Bow;
+	const bool bShow = JeebItems::IsShooter(SelectedKind());
 	if (!bShow) { for (UStaticMeshComponent* C : QuiverParts) if (C) C->SetVisibility(false); return; }
 	if (QuiverParts.Num() == 0)
 	{
@@ -397,4 +478,13 @@ void AKnightCharacter::UpdateQuiver()
 	// the arrows in it only while he has some (the tube, rim and bottom are the first three parts)
 	const bool bArrows = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() != 0 : LookArrows != 0;
 	for (int32 i = 0; i < QuiverParts.Num(); ++i) if (QuiverParts[i]) QuiverParts[i]->SetVisibility(i < 3 || bArrows);
+	// (the feathers are those of the arrows he is about to shoot, owner 2026-11-05: emerald arrows have green ones)
+	const int32 Id = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() : LookArrows;
+	if (Id != QuiverArrowId && Id != 0)
+	{
+		QuiverArrowId = Id;
+		for (int32 i = 4; i < QuiverParts.Num(); i += 2)
+			if (QuiverParts[i])
+				if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(QuiverParts[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), JeebItems::ArrowFeatherColor(Id));
+	}
 }

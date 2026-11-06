@@ -34,6 +34,22 @@ void UJeebSave::Migrate()
 		if (IsGear(Id) && IsArmorKind(KindOf(Id)) && !StyleHasPiece(KindOf(Id), StyleOf(Id))) Id = ArmourId(KindOf(Id), AS_Classic, VariantOf(Id));
 	};
 	for (TArray<int32>* A : { &SlotIds, &BankIds, &Hotbar, &Worn }) for (int32& Id : *A) FixPiece(Id);
+	if (SaveVersion == 11)
+	{
+		// Once (owner, 2026-11-05): characters made while Light had no shoulders get a pair on, and the cape comes off into the pack, or the bank if that is full
+		if (Worn.IsValidIndex(K_Shoulders) && Worn[K_Shoulders] == 0) Worn[K_Shoulders] = ArmourId(K_Shoulders, AS_Classic, T_Tin);
+		if (Worn.IsValidIndex(K_Cape) && Worn[K_Cape] != 0)
+		{
+			auto Into = [this](TArray<int32>& Ids, TArray<int32>& Counts, int32 Size)
+			{
+				Ids.SetNum(Size); Counts.SetNum(Size);
+				for (int32 i = 0; i < Size; ++i)
+					if (Ids[i] == 0) { Ids[i] = Worn[K_Cape]; Counts[i] = 1; return true; }
+				return false;
+			};
+			if (Into(SlotIds, SlotCounts, NumSlots) || Into(BankIds, BankCounts, USkillComponent::NumBankSlots)) Worn[K_Cape] = 0;
+		}
+	}
 	SaveVersion = CurrentVersion;
 }
 
@@ -73,7 +89,7 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 bool UJeebSave::ApplyTo(USkillComponent* Skills)
 {
 	if (!Skills) return false;
-	if (SaveVersion != CurrentVersion)   // a newer game's, or from before the six tiers (its item numbers mean other things): never read it
+	if (SaveVersion != CurrentVersion && SaveVersion != 11)   // a newer game's, or from before the six tiers (its item numbers mean other things): never read it
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Jeebsland save: refused a file of version %d (this game reads %d); the character starts fresh."), SaveVersion, CurrentVersion);
 		return false;

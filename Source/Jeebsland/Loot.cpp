@@ -10,6 +10,7 @@
 #include "Engine/StaticMesh.h"
 #include "ProceduralMeshComponent.h"
 #include "ItemModels.h"
+#include "JeebProps.h"
 #include "Net/UnrealNetwork.h"
 
 ALootDrop::ALootDrop()
@@ -291,6 +292,22 @@ void ALootDrop::BuildItemLook()
 		if (JeebItems::StackSize(First->Id) > 1) Copies = FMath::Clamp(First->Count, 1, 4);
 	}
 	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
+	// (a model from /Game/Props: it floats the same way)
+	if (First && JeebItems::IsGear(First->Id))
+		if (UStaticMesh* Prop = JeebProps::MeshFor(JeebItems::KindOf(First->Id)))
+		{
+			const FBox PB = Prop->GetBoundingBox();
+			const float PGrow = FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
+			Hover = NewObject<USceneComponent>(this);
+			Hover->SetupAttachment(Origin);
+			Hover->RegisterComponent();
+			Hover->SetRelativeScale3D(FVector(PGrow));
+			HoverZ = 30.f + 0.5f * (float)PB.GetSize().Z * PGrow;
+			Hover->SetRelativeLocation(FVector(0.f, 0.f, HoverZ));
+			ItemTop = HoverZ + 0.5f * (float)PB.GetSize().Z * PGrow + 16.f;
+			if (UStaticMeshComponent* S = JeebProps::Make(this, Hover, JeebItems::KindOf(First->Id), JeebItems::VariantOf(First->Id))) S->SetRelativeLocation(-PB.GetCenter());
+			return;
+		}
 	if (Parts.Num() == 0) { Body->SetVisibility(true); return; }   // nothing to show: keep the plain parcel
 
 	// it floats: small things are shown bigger (at least about 22 cm across) so they read from a distance and above tall grass

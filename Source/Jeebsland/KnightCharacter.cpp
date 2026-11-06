@@ -219,11 +219,12 @@ void AKnightCharacter::SendLook()
 {
 	if (!Skills || !HasAuthority() || GetNetMode() == NM_Standalone) return;
 	TArray<int32> Look;
-	Look.Reserve(USkillComponent::NumWornKinds + 3);
+	Look.Reserve(USkillComponent::NumWornKinds + 4);
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Look.Add(Skills->Worn[i]);
 	Look.Add(Skills->RingB);
 	Look.Add(Skills->SelectedItem());
 	Look.Add(ArrowSlotId());   // (arrows show in the quiver only while he has some)
+	Look.Add(Skills->PotionSlot.Id);   // (the flask on his belt)
 	if (Look != RepLook) RepLook = Look;
 }
 
@@ -234,12 +235,13 @@ void AKnightCharacter::OnRep_Look()
 
 void AKnightCharacter::ApplyLook(const TArray<int32>& Look)
 {
-	if (!Skills || Look.Num() != USkillComponent::NumWornKinds + 3) return;
+	if (!Skills || Look.Num() != USkillComponent::NumWornKinds + 4) return;
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = Look[i];
 	Skills->RingB = Look[USkillComponent::NumWornKinds];
 	Skills->Selected = 0;
 	Skills->Hotbar[0] = Look[USkillComponent::NumWornKinds + 1];
 	LookArrows = Look[USkillComponent::NumWornKinds + 2];
+	LookPotion = Look[USkillComponent::NumWornKinds + 3];
 	// The look can arrive before the body is built; BeginPlay dresses it then
 	if (HasActorBegunPlay()) RefreshEquipment();
 }
@@ -446,6 +448,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickKnock(Dt);
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
+	TickDrink(Dt);
 	TickGear(Dt);
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)

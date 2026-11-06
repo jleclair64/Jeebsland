@@ -1,4 +1,7 @@
 ﻿#include "KnightCharacter.h"
+#include "ChoppableTree.h"
+#include "MiningRock.h"
+#include "EngineUtils.h"
 #include "KnightAnimator.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
@@ -21,7 +24,6 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.Vel = GetVelocity();
 	In.Rot = GetActorRotation();
 	In.bFalling = M->IsFalling();
-	In.JumpZ = M->JumpZVelocity;
 	In.StunLeft = StunLeft;
 	In.bKnockedDown = bKnockedDown;
 	In.KnockPhase = KnockPhase;
@@ -32,8 +34,9 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.CrouchAlpha = CrouchAlpha;
 	In.BlockAlpha = BlockAlpha;
 	In.BowAimAlpha = BowAimAlpha;
-	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : 0;
-	In.BowT = BowT;
+	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : Bow == EBow::Reload ? 3 : 0;
+	In.BowT = Bow == EBow::Reload ? JeebTune::V().CrossReload - CrossReloadLeft : BowT;
+	In.BowDrawFor = DrawTimeNow();
 	In.Kind = SelectedKind();
 	In.AimPitch = FMath::UnwindDegrees(GetBaseAimRotation().Pitch);
 	In.bClimbing = bClimbing;
@@ -41,6 +44,8 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bSitting = bSitting;
 	In.bSliding = bSliding;
 	In.bFishing = bFishing;
+	In.bDrinking = bDrinking;
+	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
 	In.bSwinging = bSwinging;
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
@@ -98,7 +103,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, (bCrouched || bSweepSquat) ? 1.f : 0.f, Dt, bSweepSquat ? 22.f : 10.f);
 	BlockAlpha = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
 	if (bSwinging) SwingTime += Dt;
-	const bool bBowIn = SelectedKind() == JeebItems::K_Bow && !bStowed && BowHold;
+	const bool bBowIn = JeebItems::IsShooter(SelectedKind()) && !bStowed && BowHold;
 	BowAimAlpha = FMath::FInterpTo(BowAimAlpha, (bBowIn && Bow != EBow::None) ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 12.f : 8.f);
 	if (!BowHold) BowAimAlpha = 0.f;   // (the bow was put away mid-draw: R, a drop, death)
 
@@ -162,16 +167,19 @@ void AKnightCharacter::PlaceGear()
 	if (WristR) WristR->SetWorldTransform(Anim->RightGripWorld());
 	if (ElbowL) ElbowL->SetWorldTransform(Anim->LeftGripWorld());
 	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
-	if (!bStowed)
+	const bool bWantBack = bStowed || (bSwinging && !bBlocking);   // (both hands on a tool: the shield goes on his back, unless he raises it)
+	if (bWantBack != bShieldBack) { bShieldBack = bWantBack; PlaceShield(bShieldBack); }
+	if (!bShieldBack)
 	{
 		const FTransform At = Anim->ShieldWorld(BlockAlpha);
 		for (FArmorPart& P : ArmorParts)
 			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At);
 	}
-	if (BowHold) BowHold->SetWorldTransform(Anim->BowWorld(BowAimAlpha));
+	if (BowHold) BowHold->SetWorldTransform(SelectedKind() == JeebItems::K_Crossbow ? Anim->CrossWorld() : Anim->BowWorld(BowAimAlpha));
 	if (IsNetMode(NM_DedicatedServer)) return;
 	UpdateBowBits();
 	UpdateQuiver();
+	UpdateBeltFlask();
 	if (QuiverParts.Num() > 0 && QuiverParts[0])
 		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());
 }
@@ -207,6 +215,19 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		}
 	}
 	if (Do.IsEmpty() || bSuitTestActed || !bShotFace) return;
+	if (Do.StartsWith(TEXT("hopat")))   // (hopat60: a hop 0.6 s into whatever else the test is doing, such as drawing the bow)
+	{
+		static float Waited = 0.f;
+		Waited += Dt;
+		if (Waited < FCString::Atoi(*Do.Mid(5)) / 100.f) return;
+		bSuitTestActed = true;
+		Jump();
+		ShotJumpFrom = GetActorLocation().Z;
+		ShotJumpT = GetWorld()->GetTimeSeconds();
+		FTimerHandle T;
+		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StopJumping(); }), 0.2f, false);
+		return;
+	}
 	bSuitTestActed = true;
 	if (Do.StartsWith(TEXT("roll")))
 	{
@@ -226,10 +247,32 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		MulticastKnock_Implementation(true, 0);
 	}
 	else if (Do == TEXT("drop")) MulticastKnock_Implementation(true, 1);
+	else if (Do == TEXT("chopnode") || Do == TEXT("minenode"))   // (the real thing: right in front of the MoveLab's tree or rock, then the click)
+	{
+		const bool bTree = Do == TEXT("chopnode");
+		AActor* Best = nullptr;
+		for (TActorIterator<AResourceNode> It(GetWorld()); It; ++It)
+			if ((bTree ? It->IsA<AChoppableTree>() : It->IsA<AMiningRock>()) && (!Best || FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < FVector::Dist2D(Best->GetActorLocation(), GetActorLocation()))) Best = *It;
+		if (Best)
+		{
+			const FVector Dir = FRotator(0.f, ShotFaceYaw, 0.f).Vector();
+			FVector At = Best->GetActorLocation() - Dir * (bTree ? 125.f : 130.f);
+			At.Z = GetActorLocation().Z;
+			SetActorLocation(At);
+			SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));
+			Interact();
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER %s node %s swinging %d kind %d"), *Do, Best ? *Best->GetName() : TEXT("none"), bSwinging ? 1 : 0, SelectedKind());
+	}
 	else if (Do == TEXT("chop")) { bSwinging = true; bSideways = true; SwingPeriod = 1.25f; }
 	else if (Do == TEXT("mine")) { bSwinging = true; bSideways = false; SwingPeriod = 1.f; }
 	else if (Do == TEXT("fish")) bFishing = true;
 	else if (Do == TEXT("sit")) bSitting = true;
-	else if (Do == TEXT("slide")) bSliding = true;
+	else if (Do == TEXT("slide")) BeginSlide(GetActorForwardVector(), 1000.f);
+	else if (Do == TEXT("drink"))
+	{
+		if (Skills->PotionSlot.Id == 0) { Skills->PotionSlot.Id = JeebItems::PotionId(JeebItems::P_Heal); Skills->PotionSlot.Count = 3; }
+		MulticastDrink(uint8(JeebItems::PotionType(Skills->PotionSlot.Id)), true);
+	}
 	else if (Do == TEXT("climb")) bClimbing = true;
 }

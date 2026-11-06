@@ -298,6 +298,7 @@ void AKnightHUD::DrawHUD()
 	else if (Knight->IsSmithOpen()) DrawSmithScreen(Knight);
 	else if (Knight->IsDialogueOpen()) DrawDialogue(Knight);
 
+	DrawSwapPopup(Knight);   // (before ProcessDrag: a click on it is not also a click on what is underneath)
 	if (!bDropOpen) ProcessDrag(Knight);
 	DrawDropBox(Knight);
 	DrawDragGhost();
@@ -395,6 +396,8 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f;
 	auto SlotX = [&](int32 Pos) { return X0 + Pos * Step + (Pos >= 4 ? 18.f : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
+	for (int32 p = 0; p < 5; ++p) BarCellX[p] = SlotX(p);
+	BarCellY = Y0;
 
 	for (int32 i = 0; i < NumHotbar; ++i)
 	{
@@ -454,7 +457,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 			}
 			if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(P.Id);
 		}
-		else if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Potion slot"), TEXT("Drag a potion here, then press Q to drink it") });
+		else if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) SetTip({ TEXT("Potion slot"), TEXT("Click to pick a potion from your pack, then press Q to drink it") });
 	}
 
 	// The shield slot with the defence total, right of the hand
@@ -484,12 +487,12 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
 		{
 			if (ShieldId != 0) ItemTip(ShieldId);
-			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Drag a shield here. Your armour stops %d%% of a blow on average, every bonus counted"), Def) });
+			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Click to pick a shield from your pack. Your armour stops %d%% of a blow on average, every bonus counted"), Def) });
 		}
 	}
 
-	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F (or a click on
-	// it with the cursor out) picks the next kind you carry.
+	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F picks the next kind you
+	// carry; a click with the cursor out lists them (DrawSwapPopup).
 	{
 		const float X = SlotX(3);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
@@ -512,10 +515,8 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		}
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
 		{
-			if (Id != 0) SetTip({ ItemName(Id), TEXT("The arrows your bow shoots next. F or a click picks the next kind you carry") });
+			if (Id != 0) SetTip({ ItemName(Id), TEXT("The arrows your bow shoots next. Click to pick from what you carry, or F for the next kind") });
 			else SetTip({ TEXT("Arrow slot"), TEXT("No arrows: buy them at the store or smith them, or pick up the ones you shot (E)") });
-			if (APlayerController* PC = GetOwningPlayerController())
-				if (PC->WasInputKeyJustPressed(EKeys::LeftMouseButton)) Knight->CycleArrows();
 		}
 	}
 }

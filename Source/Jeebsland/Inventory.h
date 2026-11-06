@@ -40,6 +40,7 @@ namespace JeebItems
 		K_Cape,
 		K_Ring, K_Amulet,
 		K_Crest,          // a brush along the helm's crest: worn in a miscellaneous slot like a ring or amulet
+		K_Longbow, K_Crossbow,   // (weapons, at the end so that no saved item's number moves)
 		K_Count
 	};
 
@@ -104,11 +105,13 @@ namespace JeebItems
 	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
-	inline bool IsWeaponKind(int32 K) { return K >= K_Sword && K <= K_Rod; }
+	inline bool IsWeaponKind(int32 K) { return (K >= K_Sword && K <= K_Rod) || K == K_Longbow || K == K_Crossbow; }
+	inline bool IsDrawnBow(int32 K) { return K == K_Bow || K == K_Longbow; }            // a string pulled back by hand, as far as you like
+	inline bool IsShooter(int32 K) { return IsDrawnBow(K) || K == K_Crossbow; }          // shoots arrows from the arrow slot
 	// Everything with a blade or a point plays the sword's moves (owner, 2026-11-05: until they have their own), each with hit boxes as long as it reaches
 	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear; }
 	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
-	inline int32 BarSlotFor(int32 K) { return K == K_Bow ? 1 : 0; }
+	inline int32 BarSlotFor(int32 K) { return IsShooter(K) ? 1 : 0; }
 	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }
 	inline bool IsArmorKind(int32 K) { return K >= K_Helmet && K <= K_Boots; }
 	inline bool IsAccessoryKind(int32 K) { return K == K_Ring || K == K_Amulet || K == K_Crest; }
@@ -171,6 +174,21 @@ namespace JeebItems
 	// ---------------------------------------------------------------- tier colours (Tiers.csv)
 	// Roles follow EArmorRole: Plate, Under, Trim, Cloth, Accent, Leather, BootBody.
 	inline FLinearColor Palette(int32 T, int32 Role) { return TierRow(T).Palette[FMath::Clamp(Role, 0, 6)]; }
+	// An arrow's head and feathers by its tier (owner 2026-11-05: emerald arrows have green feathers; flying, nocked, in the quiver and in the icon)
+	inline FLinearColor ArrowTipColor(int32 Id)
+	{
+		static const FLinearColor Tips[NumTiers] = {
+			FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.035f, 0.035f, 0.04f),
+			FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.7f, 1.1f, 1.5f) };   // tin ... diamond
+		return IsFireArrow(Id) ? FLinearColor(4.f, 1.4f, 0.25f) : Tips[FMath::Clamp<int32>(ArrowTier(Id), 0, NumTiers - 1)];
+	}
+	inline FLinearColor ArrowFeatherColor(int32 Id)
+	{
+		static const FLinearColor Feathers[NumTiers] = {
+			FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.05f, 0.05f, 0.055f),
+			FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.72f, 0.18f), FLinearColor(0.06f, 0.75f, 0.25f), FLinearColor(0.55f, 0.85f, 1.0f) };   // tin ... diamond
+		return IsFireArrow(Id) ? FLinearColor(0.85f, 0.18f, 0.08f) : Feathers[FMath::Clamp<int32>(ArrowTier(Id), 0, NumTiers - 1)];
+	}
 	inline FLinearColor GemColor(int32 T) { return TierRow(T).Gem; }
 	// Shine (Tiers.csv Metal, Rough; owner, 2026-11-04): tin and iron have none, the other four shine
 	inline float TierMetal(int32 T) { return TierRow(T).Metal; }
@@ -196,7 +214,7 @@ namespace JeebItems
 	inline void WeaponDamage(int32 K, int32 T, int32& OutMin, int32& OutMax, int32 ArrowTierForBow = 0)
 	{
 		const FWeaponBase B = WeaponBase(K);
-		const float Steps = (K == K_Bow) ? (TierSteps(ArrowTierForBow) + 0.5f * TierSteps(T)) : TierSteps(T);
+		const float Steps = IsShooter(K) ? (TierSteps(ArrowTierForBow) + 0.5f * TierSteps(T)) : TierSteps(T);
 		const int32 Add = FMath::RoundToInt(TierStep(K) * Steps);
 		OutMin = B.Min + Add;
 		OutMax = B.Max + Add;
@@ -204,7 +222,7 @@ namespace JeebItems
 	// Which skill a weapon trains and is boosted by
 	inline ESkillType CombatSkillFor(int32 K)
 	{
-		if (K == K_Bow) return ESkillType::Archery;
+		if (IsShooter(K)) return ESkillType::Archery;
 		if (K == K_Wand || K == K_Staff) return ESkillType::Magic;
 		return ESkillType::Attack;
 	}
@@ -300,7 +318,7 @@ namespace JeebItems
 		case K_Axe:     return ESkillType::Woodcutting;
 		case K_Pickaxe: return ESkillType::Mining;
 		case K_Rod:     return ESkillType::Fishing;
-		case K_Bow:     return ESkillType::Archery;
+		case K_Bow: case K_Longbow: case K_Crossbow: return ESkillType::Archery;
 		case K_Wand: case K_Staff: return ESkillType::Magic;
 		default:        return IsWeaponKind(Kind) ? ESkillType::Attack : ESkillType::Defense;
 		}

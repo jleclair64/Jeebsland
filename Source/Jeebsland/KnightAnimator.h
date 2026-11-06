@@ -83,6 +83,8 @@ namespace JeebAnim
 		FVector ShieldInGuard = FVector(45.f, -26.f, 112.f);   // where the raised shield's face is, from between his feet (game frame)
 		FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the left hand's frame
 		FTransform QuiverOnHips = FTransform::Identity;
+		FTransform BeltFlaskOnHips = FTransform::Identity;
+		FTransform CrossInHand = FTransform::Identity;
 		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
 
 		const FClip* Find(const TCHAR* Name) const { const FClip* const* F = Clips.Find(Name); return F ? *F : nullptr; }
@@ -122,7 +124,6 @@ namespace JeebAnim
 		FVector Vel = FVector::ZeroVector;
 		FRotator Rot = FRotator::ZeroRotator;
 		bool bFalling = false;
-		float JumpZ = 500.f;
 		float StunLeft = 0.f;
 		bool bKnockedDown = false;
 		int32 KnockPhase = 0;       // 0 lying, 1 getting up
@@ -139,12 +140,14 @@ namespace JeebAnim
 		float CrouchAlpha = 0.f, BlockAlpha = 0.f, BowAimAlpha = 0.f;
 		int32 BowMode = 0;          // 0 lowering, 1 drawing, 2 just loosed
 		float BowT = 0.f;
+		float BowDrawFor = 1.f;     // how long a full draw takes with what is in his hand
 		int32 Kind = -1;            // what is in his hand (JeebItems kind)
 		float AimPitch = 0.f;
 		bool bClimbing = false; float ClimbPhase = 0.f;
 		bool bSitting = false;
 		bool bSliding = false;
 		bool bFishing = false;
+		bool bDrinking = false; float DrinkU = 0.f;   // a potion on its way down: 0..1
 		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
 		bool bShotLog = false;      // test pictures: log JEEBANIM
 	};
@@ -176,6 +179,8 @@ public:
 	FTransform ShieldWorld(float BlockAlpha) const;
 	FTransform BowWorld(float AimAlpha) const;
 	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
+	FTransform BeltFlaskWorld() const { return L.BeltFlaskOnHips * BoneWorld(JeebAnim::Hips); }
+	FTransform CrossWorld() const { return L.CrossInHand * BoneWorld(JeebAnim::RHand); }
 	float Phase01() const { return Phase; }   // where the stride is: 0 the left foot under him, 0.5 the right
 
 	// Combat: his hurt boxes as posed now, his helm's top, his raised shield's band, the kicking leg
@@ -218,8 +223,9 @@ private:
 	void Locomotion(float Dt, const FInput& In, FPose& Out);
 	void Overlays(float Dt, const FInput& In, FPose& B);
 	void Inertialize(const FPose& Target, FPose& Out, float Dt);
-	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f);
-	void KeepTipUp(FPose& P, const FInput& In) const;
+	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f, float LegSeconds = 0.f);
+	void KeepTipUp(FPose& P, const FInput& In, float Dt);
+	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
 	int32 ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend);
 	float MoveClipTime(const JeebAnim::FMove& M, float U, float UHit, float UFollow) const;
 	bool PlayAt(const TCHAR* MoveName, float T, float Speed, FPose& InOut, float* OutBlend);
@@ -239,13 +245,17 @@ private:
 	// inertial blend
 	TArray<FVector> OffRot, OffRotV;
 	FVector OffHip = FVector::ZeroVector, OffHipV = FVector::ZeroVector;
-	float BlendT = 0.f, BlendLambda = 20.f, BlendLambdaHand = 20.f;
+	float BlendT = 0.f, BlendLambda = 20.f, BlendLambdaHand = 20.f, BlendLambdaLegs = 20.f;
+	float TipHeading = 0.f, SweepHeading = 0.f, SweepAt = -10.f;   // (which way the blade points across the floor: KeepTipUp, the low sweep)
 	bool bBlending = false;
 	int32 StateKey = -1;
 
 	// locomotion
 	float Phase = 0.f;
 	float SmSpeed = 0.f;
+	float LegsW = 1.f, LegsAt = -10.f, PlayDt = 0.f;   // (a move's legs mode changes slowly: PlayAt)
+	float FootLift[2] = { 0.f, 0.f }, LiftWindow = 0.f;
+	FVector FootPrev[2] = { FVector::ZeroVector, FVector::ZeroVector };
 	float DirF = 1.f, DirR = 0.f;
 	bool bMoving = false;
 	bool bPhaseLeft = true;
@@ -263,6 +273,9 @@ private:
 	float LandT = 10.f;
 	float LandFor = 0.f;
 	float AirT = 0.f;
+	float AirLegs = 1.f;     // how fast the stride goes: a third of its pace in the air
+	float AirShare = 0.f;    // how far the knees have come up in the air
+	float FallShare = 0.f;   // how far into the falling pose (long falls)
 	float PeakFall = 0.f;
 	bool bWasAir = false;
 	bool bLandHard = false;
@@ -273,7 +286,6 @@ private:
 	bool bWasDown = false;
 	bool bFallPushed = false;
 	float RiseLeft = 0.f;
-	bool bJumpRunning = false;
 	bool bRollBack = false;
 	float CombatT = 0.f;         // seconds left on guard after a fight
 	bool bOnGuard = false;

@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "JeebProps.h"
 #include "KnightShieldRest.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
@@ -367,6 +368,15 @@ void AKnightCharacter::RefreshEquipment()
 	RebuildHeld();
 }
 
+// Where a model built around its grip, working end along -Z, sits on WristR: exactly as the code-built weapons are placed (KM::RotateEuler's order: X, then Y, then Z)
+static FTransform FistPlace()
+{
+	const FVector E = KM::DownTo(KnightDesign::BladeDir(1));
+	const FQuat Q = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(E.Z)) * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(E.Y)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(E.X));
+	return FTransform(Q, KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR));
+}
+FTransform KnightFistPlace() { return FistPlace(); }
+
 void AKnightCharacter::RebuildHeld()
 {
 	for (UProceduralMeshComponent* C : HeldComps)
@@ -374,6 +384,8 @@ void AKnightCharacter::RebuildHeld()
 		if (C) C->DestroyComponent();
 	}
 	HeldComps.Reset();
+	for (UStaticMeshComponent* C : HeldStatics) if (C) C->DestroyComponent();
+	HeldStatics.Reset();
 	if (BowHold) { BowHold->DestroyComponent(); BowHold = nullptr; }
 	BowString = nullptr;
 	if (!Skills) return;
@@ -424,11 +436,12 @@ void AKnightCharacter::RebuildHeld()
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
 			HeldComps[i]->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q);   // (clear of the model's back)
+		if (UStaticMeshComponent* S = JeebProps::Make(this, UpperPivot, K, T)) { S->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q); HeldStatics.Add(S); }
 		return;
 	}
 	// The bow is held in the LEFT fist, built at its own grip on BowHold, which the pose places in the fist: at ease lying forward and back through it,
 	// aiming upright (FClipLib::SolveGear).
-	if (K == JeebItems::K_Bow)
+	if (JeebItems::IsShooter(K))
 	{
 		BowHold = NewObject<USceneComponent>(this);
 		BowHold->SetupAttachment(GetRootComponent());
@@ -437,11 +450,13 @@ void AKnightCharacter::RebuildHeld()
 		Make(BowHold, KnightDesign::P_ElbowL, KM::Xf(FVector::ZeroVector));
 		for (int32 i = First; i < HeldComps.Num(); ++i) HeldComps[i]->SetRelativeLocation(FVector::ZeroVector);   // (built at the grip)
 		if (HeldComps.Num() > First) BowString = HeldComps.Last();   // (WeaponDesign builds the string last)
+		if (UStaticMeshComponent* S = JeebProps::Make(this, BowHold, K, T)) HeldStatics.Add(S);
 		return;
 	}
 	// Everything else lies through the fist the way a sword does, the grip across it and the working end out past the thumb
 	Make(WristR, KnightDesign::P_WristR, KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1))));
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), KM::DownTo(KnightDesign::BladeDir(-1))));
+	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, K, T)) { S->SetRelativeTransform(FistPlace()); HeldStatics.Add(S); }
 }
 
 // The shield on the arm, or on the back: turned to face backwards, its inner face just behind the sword on the back,

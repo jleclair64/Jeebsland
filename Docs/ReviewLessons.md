@@ -13,6 +13,11 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Pictures of the Tab windows: `-JeebShot -ShotPanel` (add `-ShotWear=<tier>` for a full suit); crop the panel 2x for the reviewer.
 
 ## Poses, held and worn items (visual-reviewer)
+- A held item must show its identifying part (neck, head, tip) past the hand, from the side, in every frame of the move. If the clip's hand leaves no room, offset the hand; don't hide the part. Measure the visible part against the fist's width (about 12 cm). After clearing a clip, re-check contact from the side: the item must still visibly connect to the hand.
+- Check every worn item against the arm in every clip, and show what holds it on: a strap, a loop, a hook. Nothing floats beside the body.
+- Check a bottle's every face in the hand, base included, and let the part that matters (the neck at the mouth) show past the fist.
+- Keep the forward hand behind a crossbow's prod. A stand-in clip made for another object: check it against the held item's real shape.
+- Size wall rows to an item's widest span, not its length. Check the raised shield's front for fingers.
 - Measure clipping with `JEEBCLEAR` and sweep numbers until clear before taking pictures; never guess.
 - Arms hang close to his sides at rest; make room by placing the item, not by moving the arm.
 - Swords are really gripped: through the curl of the fingers, blade out past the thumb.
@@ -34,8 +39,20 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Keeping or dropping whole triangles leaves a saw-toothed edge. Where an edge can show, cut it with a plane and smooth it. Give anything tucked under a plate that plate's own weights near the rim, so the two can't part.
 - Meshy models are split along texture seams and may have inner shells: weld before asking what is connected, and remove faces that face inward before reshaping.
 - Judge armour in motion at full render scale or in Blender. The upscaler frays fast-moving edges at 60% and it reads as torn plate; test before believing either explanation (run the same frames at both scales).
+- Check a new prop's lighting in the game before tuning its colour. Models imported with their own normals keep the old direction when a script turns the vertices, so they read dark and flat from every side; the bows and the potion did, and the wood was brightened to make up for it (2026-11-06). Turn the normals with the mesh.
+- A held or hung item is judged from every side and against the body: the first belt flask hung 25 cm under the belt and looked like it was floating, and a dark ball in the hand hid that its liquid colour never showed.
+- Don't judge a held item or a blade's clearance from tiny sheets: crop so the knight fills at least half the frame. Test films read the local save, so always pass `-ShotKind=`; a dark suit from the save can also hide a problem.
 
 ## Moves and movement (motion-reviewer)
+- When a blend is lengthened, re-measure every contact number in the move: hips arriving late lift the blade. Judge a blend by its first frame's share, not its stated length. Anything raising a foot must ease in.
+- Warp each stretch of a clip under about 1.6x, its tail included. Every clip swap blends, even within one mode. Never derive a heading from a near-vertical bone. Size a foot's lift so a dragged boot clearly steps.
+- Read the foot-slide log across every key change. A move's legs mode must never change in a frame: the feet jump and the hand goes with them.
+- Recovering from a lunge, the rear foot steps or stays; it never drags. Size a get-up's blend by how far the hips travel, and keep some of the glide while rising.
+- Two-handed clips must release or stow the shield.
+- Measure the blade against his own body on every clip with a blade (JEEBSELF: body, head, tip and hand ahead); reviewers once passed a jab that stabbed himself. A clip's name doesn't say which part is the cut: read its path.
+- Check two saved frames after an attack returns to stance and size the out-blend from them. A follow-through the owner drew must finish on the side the cut ended before the hand heads to the guard.
+- Parts kept from the pose underneath (an arm masked out of a clip) must come from a fixed pose, not whatever was playing; judge held poses from behind too.
+- A clip whose feet leave the floor (the axe clip hops) reads as a jump when he should be standing: use `LegsFull` 0 for work done on the spot.
 - Check every new clip's facing against the stance before wiring it in: Mixamo's ladder climber faces the opposite way from the rest. A knight's chest heading in the log (or the first frame showing his back) gives it away.
 - Never read a tilted bone's heading through `Rotator().Yaw`: it flips 180 degrees past vertical. Anything carried by a heading (the cape) must fade it out as the bone tips up.
 - A move's recovery must carry the hand and blade along one arc into the guard, and the clip must end early enough that the blend out (0.3 s or more) does the settling. Judge the last quarter of every attack sheet for the blade changing height more than once, or going out of sight.
@@ -85,6 +102,15 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Anything the server reads for hit detection (hurt boxes, shield boxes) must be evaluated at the capsule's current position, not where the last throttled pose left it: keep the pose local and apply his current place when it is read.
 - Every server RPC that starts a move checks the held item server-side for that specific style. When a gate is added for one style, audit the whole switch for the others.
 - Anything the server must run (clip data, a skeleton) has to be baked to a file the server loads itself and tested on a cooked server: editor `-server` keeps data that a packaged server strips. Pose timers that other machines compute locally need a start time sent reliably.
+- A speed cap learned through a multicast arrives one round trip late: start the capped state on the owner's machine, the moment it asks.
+- Block an action on the client from the moment a blocking request is sent, not from when the answer arrives.
+- End every timed state explicitly in Die(), and hang cancel rules on the event (Hurt), not on a check somewhere else. A new state that blocks an action goes in that action's start function.
+- Any RPC that leads to a reliable multicast needs a rate limit. Dedicated-server guard before visibility calls in Tick.
+- After any material import, search the log for "Failed to compile Material": a broken material shows flat grey in the game without any other sign.
+- A prediction's echo guard keys on a flag set when the client predicted, never on a time window: the window swallowed the client's own later press.
+- Check state at the shot itself, and cancel a move when the held item changes (a draw carried over onto a reloading crossbow). When a new weapon kind arrives, audit every attack style in ServerAttack for it.
+- Server-only resets need a matching client reset (ClientDied). State that drives what another machine draws must be replicated (RepMoveFlags). A client's choice the server reads goes through a checked request. Local aim-facing must yield to any forced facing.
+- Shared mesh helpers return early on a dedicated server, and command-line test switches check `-JeebShot` first.
 
 ## Packaged game (package-reviewer)
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).

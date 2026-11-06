@@ -1,6 +1,7 @@
 #include "GearWall.h"
 #include "Inventory.h"
 #include "ItemModels.h"
+#include "JeebProps.h"
 #include "KnightAnimator.h"
 #include "Components/PoseableMeshComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -79,9 +80,11 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 
 	TArray<JeebItemModel::FPart> Parts;
 	JeebItemModel::Build(Id, Parts);
-	if (Parts.Num() == 0) return;
+	UStaticMesh* Prop = JeebItems::IsGear(Id) ? JeebProps::MeshFor(JeebItems::KindOf(Id)) : nullptr;   // (a model from /Game/Props)
+	if (Parts.Num() == 0 && !Prop) return;
 	FBox Bx(ForceInit);
-	for (const JeebItemModel::FPart& Pt : Parts) for (const FVector& V : Pt.Mesh.V) Bx += V;
+	if (Prop) Bx = Prop->GetBoundingBox();
+	else for (const JeebItemModel::FPart& Pt : Parts) for (const FVector& V : Pt.Mesh.V) Bx += V;
 	if (!Bx.IsValid) return;
 	const FVector Sz = Bx.GetSize();
 	const float Grow = Size / FMath::Max((float)Sz.GetMax(), 1.f);
@@ -106,7 +109,9 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	UMaterialInterface* MetalMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
 	const FVector Centre = Bx.GetCenter();
-	for (const JeebItemModel::FPart& Pt : Parts)
+	if (Prop)
+		if (UStaticMeshComponent* S = JeebProps::Make(this, Holder, JeebItems::KindOf(Id), JeebItems::VariantOf(Id))) { S->SetRelativeLocation(-Centre); S->SetCastShadow(false); }
+	if (!Prop) for (const JeebItemModel::FPart& Pt : Parts)
 	{
 		UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
 		C->SetupAttachment(Holder);
@@ -159,21 +164,26 @@ void AGearWall::Build()
 
 	// ---- weapons and arrows: across the floor, facing back toward the armour (-X); seen from the start, +Y is on the right ----
 	const FRotator Back(0.f, 180.f, 0.f);
-	const int32 NumCols = (K_Rod - K_Sword + 1) + 3;   // (then capes, arrows by tier, fire arrows)
+	const int32 CrossCol = K_Rod - K_Sword + 2;   // (a crossbow's prod is far taller than a row: they take two columns, turn about, each row's clear of the next)
+	const int32 NumCols = (K_Rod - K_Sword + 1) + 3 + 3;   // (then the longbow and crossbow (two wide), capes, arrows by tier, fire arrows)
+	auto WeaponOf = [](int32 col) { return col <= K_Rod - K_Sword ? K_Sword + col : col == K_Rod - K_Sword + 1 ? int32(K_Longbow) : int32(K_Crossbow); };
 	const float Len = NumCols * WeaponColW;
 	AddBoard(FVector(WeaponX + 6.f, 0.f, 245.f), FVector(4.f, 0.5f * Len + 110.f, 245.f), Wood);
 	AddBoard(FVector(WeaponX + 1.f, 0.f, 200.f), FVector(1.5f, 0.5f * Len + 6.f, 190.f), Rail);
 	AddSign(FVector(WeaponX, 0.f, 462.f), Back, TEXT("WEAPONS  -  look at one, E takes a copy"), 34.f);   // (its own strip above the column names)
 	for (int32 col = 0; col < NumCols; ++col)
 	{
+		if (col == CrossCol + 1) continue;
+		const bool bCrossbow = col == CrossCol;
 		const float Y = -0.5f * Len + (col + 0.5f) * WeaponColW;
 		const bool bCapes = col == NumCols - 3, bArrows = col == NumCols - 2, bFire = col == NumCols - 1;
-		const FString Head = bFire ? FString(TEXT("Fire arrows")) : bArrows ? FString(TEXT("Arrows")) : bCapes ? FString(TEXT("Capes")) : FString(KindName(K_Sword + col));
-		AddSign(FVector(WeaponX - 2.f, Y, WeaponZ0 + NT * WeaponRowH + 16.f), Back, Head, 22.f);
+		const FString Head = bFire ? FString(TEXT("Fire arrows")) : bArrows ? FString(TEXT("Arrows")) : bCapes ? FString(TEXT("Capes")) : FString(KindName(WeaponOf(col)));
+		AddSign(FVector(WeaponX - 2.f, bCrossbow ? Y + 0.5f * WeaponColW : Y, WeaponZ0 + NT * WeaponRowH + 16.f), Back, Head, 22.f);
 		for (int32 t = 0; t < NT; ++t)
 		{
 			if (bFire && t > 0) break;
-			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : bCapes ? GearId(K_Cape, t) : GearId(K_Sword + col, t);
+			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : bCapes ? GearId(K_Cape, t) : GearId(WeaponOf(col), t);
+			if (bCrossbow) { AddItem(Id, 1, FVector(WeaponX - 14.f, Y + (t % 2 ? WeaponColW : 0.f), WeaponZ0 + 10.f + t * WeaponRowH), WeaponSize * 0.75f, true); continue; }
 			AddItem(Id, (bFire || bArrows) ? ArrowCount : 1, FVector(WeaponX - 14.f, Y, WeaponZ0 + t * WeaponRowH), (bArrows || bFire) ? WeaponSize * 0.7f : bCapes ? WeaponSize * 0.4f : WeaponSize, !bCapes);
 		}
 	}

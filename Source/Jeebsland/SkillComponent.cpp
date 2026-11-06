@@ -67,7 +67,7 @@ void USkillComponent::ResetToStartingKit()
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
 		Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // (ArmourId gives the classic shoulders: Light has none of its own)
-	Worn[JeebItems::K_Cape] = JeebItems::GearId(JeebItems::K_Cape, JeebItems::T_Tin);   // (a plain tin cape; capes are ordinary items since 2026-11-03)
+	// (no cape: owner, 2026-11-05, until it looks better. Capes are still bought and worn like any item.)
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots
@@ -568,7 +568,7 @@ void USkillComponent::FillPracticePack()
 	if (!HasAuth()) return;   // only the server changes the pack
 	FRandomStream R(5150);
 	using namespace JeebItems;
-	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow,
+	static const int32 Kinds[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow,
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gloves, K_Boots, K_Ring, K_Amulet };
 	// (the starting kit's tools are in the pack since 2026-11-03: kept, and put back after the fixed slots below)
 	TArray<int32> KeepGear;

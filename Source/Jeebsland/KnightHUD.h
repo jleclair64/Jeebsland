@@ -118,6 +118,10 @@ private:
 	float WornCellX[10] = {}, WornCellY[10] = {}, WornCellS = 0.f; int32 WornKind[10] = {}; bool WornSecond[10] = {}; int32 WornCellCount = 0;   // the armour slots drawn this frame
 	float PotionCellX = 0.f, PotionCellY = 0.f; bool bPotionCell = false;   // the potion slot
 	float DefCellX = 0.f, DefCellY = 0.f; bool bDefCell = false;   // the shield slot at the end of the weapon bar
+	// The swap popup (owner, 2026-11-05): a click on a slot of the bottom bar lists what in your pack could go there, just above it
+	float BarCellX[5] = {}, BarCellY = 0.f;                        // the bar's slots: 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
+	int32 SwapSlot = -1;                                           // the slot whose list is open
+	void DrawSwapPopup(AKnightCharacter* Knight);
 	// An open sack (E on it): its windows sit to the left of yours. Cells point at entries in the sack (-1 = its ingots).
 	float LootCellX[64] = {}, LootCellY[64] = {}, LootCellS = 0.f; int32 LootCellIdx[64] = {}; int32 LootCellCount = 0;
 	float ArmorTopY = 0.f;

@@ -7,6 +7,9 @@ On 2026-11-05 the new suit became the only knight, and the old knight was remove
 - **Rings:** they were drawn on the fingers. They still give their bonus but are not drawn.
 - **Red Helm Brush (crest):** a red horsehair brush along the top of the helm, +5% speed on foot. It still gives the speed but is not drawn. The new helmet needs its own brush.
 
+## The cape
+Taken off as the default look on 2026-11-05 (owner: it should look better, and it gets in the way of testing). Capes are still ordinary items, bought and worn in any tier. When it is remade, it must also stop going through the quiver when he has the bow in hand.
+
 ## The three armour styles
 Light, Classic and Heavy are now only numbers on this one model (`Content/Data/ArmourStyles.csv`: how much each stops and weighs). Items and saves did not change. Their old looks, to remake as new models if wanted:
 - **Light:** the crusader tunic with sleeves and a light helm. It was the old `Art/Knight Tunic`.

@@ -19,6 +19,7 @@ public:
 	AMiningRock();
 	// Each rock always holds the same ore, like RuneScape's (chosen by the world builder; the same on every machine)
 	void SetOre(EItemType T) { FixedOre = T; bFixedOre = true; }
+	virtual float ReachRadius() const override { return 190.f; }   // (close enough for the swing to land on it)
 
 protected:
 	virtual void BeginPlay() override;

@@ -17,7 +17,8 @@ class UJeebSave : public USaveGame
 	GENERATED_BODY()
 
 public:
-	static constexpr int32 CurrentVersion = 11;   // 11: the six tiers; every save was reset (2026-11-04), and ApplyTo reads no other version
+	// 12 (2026-11-05): an empty shoulder slot gets tin shoulders once, a worn cape goes to the pack (Migrate). ApplyTo reads 11 and 12.
+	static constexpr int32 CurrentVersion = 12;   // 11: the six tiers, when every save was reset (2026-11-04). 12: see Migrate
 	static const FString SlotName;
 
 	// 0 = "not in the file". (Unreal leaves out a value that equals its default, so while the default was CurrentVersion no

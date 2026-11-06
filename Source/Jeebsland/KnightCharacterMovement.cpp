@@ -447,7 +447,14 @@ bool AKnightCharacter::TickRollSlide(float Dt, bool bFalling, float& OutSpecialS
 			bSliding = false;
 			SlideCooldown = 0.9f;
 			Move->bOrientRotationToMovement = bSavedOrient;
+			SlideGlide = SlideT > 3.f || AirAlpha > 0.8f ? 0.f : SlideSpeed;
 		}
+	}
+	// (he rises while the last of the slide runs out, not from a dead stop; pushing a key takes over)
+	else if (SlideGlide > 0.f)
+	{
+		SlideGlide = Move->IsMovingOnGround() && Move->GetCurrentAcceleration().IsNearlyZero() && !bRolling && !bAttacking && !bKnockedDown && StunLeft <= 0.f ? FMath::Max(0.f, SlideGlide - 650.f * Dt) : 0.f;
+		if (SlideGlide > 0.f) { Move->Velocity.X = SlideDir.X * SlideGlide; Move->Velocity.Y = SlideDir.Y * SlideGlide; }
 	}
 	OutSpecialSpeed = SpecialSpeed;
 	return bRolling || bSliding;
@@ -509,7 +516,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
-	const bool bFaceCam = (bStance || bStrafeMode || Bow == EBow::Drawing) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed
+	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
 	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
 	{
 		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)
@@ -518,7 +525,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 		StanceFwd = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X));
 		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
 	}
-	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0);
+	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0) | (bSwinging ? 32 : 0) | (bSideways ? 64 : 0);
 	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bFaceCam && GetController() && !MoveLocked() && !ShotSideOn())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
@@ -571,7 +578,8 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
 	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
-	else if (!bSpecial && !bMounted && Bow == EBow::Drawing) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
+	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Reload)) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
+	else if (!bSpecial && !bMounted && bDrinking) Move->MaxWalkSpeed = JeebTune::V().DrinkWalk * WalkSpeed * Burden * AirSpeedMul;   // drinking: a slow walk
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk
 	// to sprint) the usual acceleration keeps the sprint's ramp. Worked out from the velocity, so the server agrees.

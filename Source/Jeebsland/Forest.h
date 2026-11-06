@@ -21,6 +21,7 @@ public:
 
 	// Plants one tree (random shape comes from R). Used by the woods and by the game mode.
 	AChoppableTree* AddTree(ETreeKind Kind, const FVector& Pos, float Scale, FRandomStream& R);
+	bool bNoWoods = false;   // (MoveLab: only what AddTree is asked for; set before it begins play)
 
 protected:
 	virtual void BeginPlay() override;

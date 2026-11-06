@@ -1,4 +1,9 @@
 #include "KnightCharacter.h"
+#include "JeebProps.h"
+#if WITH_EDITOR
+#include "ShaderCompiler.h"
+#endif
+FTransform KnightFistPlace();
 #include "KnightAnimator.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -64,6 +69,7 @@ float AKnightCharacter::GetStaminaMult() const
 
 void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 {
+	if (bDrinking) return;   // (the bottle is in that hand)
 	const int32 K = SelectedKind();
 	const float Cd = (K >= 0) ? JeebItems::WeaponBase(K).Cooldown : 0.5f;
 	if (bAttacking && AtkStyle == EAtkStyle::Kick && Style == EAtkStyle::Sweep) { KickFade = 1.f; KickFadeT = AttackT / FMath::Max(AttackDur, 0.01f); }   // (a landed kick cut short by the sweep: the leg eases out from there)
@@ -127,6 +133,10 @@ float AKnightCharacter::SwingSpeedScale()
 void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 {
 	if (!Skills) return;
+#if WITH_EDITOR
+	// (a new material still compiling shows as plain grey, and a short test run ends before it is done: test pictures wait for it)
+	if (GShaderCompilingManager) GShaderCompilingManager->FinishAllCompilation();
+#endif
 	bShotFace = true;
 	ShotFaceYaw = FaceYaw;
 	SetActorRotation(FRotator(0.f, FaceYaw, 0.f));
@@ -142,16 +152,21 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down)
 	if (Move == TEXT("dash")) StartAttack(EAtkStyle::Dash, 1, 0.f);                              // the dash attack (sprint + click): the lunge
 	if (Move == TEXT("kickcombo")) { StartAttack(EAtkStyle::Kick, 1, 0.f); QueuedSweep = GetWorld()->GetTimeSeconds() + 0.1f; }   // a kick with the wheel-down buffered: the sweep cuts in when it lands
+	int32 TestBow = JeebItems::K_Bow;   // (-ShotBowKind=21 longbow, 22 crossbow)
+	FParse::Value(FCommandLine::Get(), TEXT("ShotBowKind="), TestBow);
+	int32 TestArrowTier = -1;   // (-ShotArrow=4: he carries that tier's arrows, for the quiver and the feathers)
+	if (FParse::Value(FCommandLine::Get(), TEXT("ShotArrow="), TestArrowTier) && Skills->AddInvItem(JeebItems::ArrowId(TestArrowTier), 10)) ArrowPick = JeebItems::ArrowId(TestArrowTier);
+	if (Move.StartsWith(TEXT("bow")) && TestBow != JeebItems::K_Bow) Skills->Hotbar[1] = JeebItems::GearId(TestBow, 0);
 	if (Move == TEXT("bowidle") || Move == TEXT("bowwalk"))   // the bow in hand, not drawn: standing, or walking ahead
 	{
 		for (int32 h = 0; h < 5; ++h)
-			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Bow) { SelectHotbar(h); break; }
+			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == TestBow) { SelectHotbar(h); break; }
 		bShotWalk = Move == TEXT("bowwalk");
 	}
 	else if (Move.StartsWith(TEXT("bow")))   // the bow: bow = a full draw that goes by itself, bow60 = let go after 0.6 s
 	{
 		for (int32 h = 0; h < 5; ++h)
-			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Bow) { SelectHotbar(h); break; }
+			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == TestBow) { SelectHotbar(h); break; }
 		if (ArrowSlotId() == 0 && !Skills->AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), 10) && Skills->Slots.Num() > 0)   // (test pictures are never saved)
 		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::T_Iron); Skills->Slots.Last().Count = 10; }
 		FParse::Value(FCommandLine::Get(), TEXT("ShotStrafe="), ShotStrafe);
@@ -292,6 +307,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 	// Defence trains only from blows you block with a raised shield, facing the attacker.
 	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
 	if (!bEnvironmental && ShieldStop > 0) Skills->AddXP(ESkillType::Defense, 2 + ShieldStop / 2);
+	if (bDrinking && !bEnvironmental) MulticastDrink(DrinkType, false);   // (any blow stops a drink, stun or not: he keeps the potion)
 	if (Health <= 0.f) { Die(); return; }   // any death: the sack, and a fresh start in Blackrock
 	// Attack beats kick (owner, 2026-10-31): a blow that lands while you are kicking throws you to the ground
 	if (!bEnvironmental && ShieldStop == 0 && IsKicking()) KnockDownBy(From);
@@ -300,7 +316,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 void AKnightCharacter::StartBlock()
 {
 	bBlockHeld = true;
-	if (bSitting || bRolling || bClimbing || IsUIOpen() || !ShieldActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
+	if (bSitting || bRolling || bClimbing || bDrinking || IsUIOpen() || !ShieldActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
 	bBlocking = true;
 }
 
@@ -328,6 +344,8 @@ void AKnightCharacter::Die()
 	if (bSitting) StandUp();
 	if (bKnockedDown) MulticastKnock(false, 0);   // (he wakes standing)
 	bKnockedDown = false; KnockPhase = 0;
+	if (bDrinking) MulticastDrink(DrinkType, false);   // (Health is refilled below in this same call, so TickDrink would never see the death)
+	CrossReloadLeft = 0.f;
 	const FVector Fell = GetActorLocation();
 	TArray<FInvSlot> Items;
 	TArray<uint8> Where;
@@ -390,11 +408,136 @@ void AKnightCharacter::UpdateRadar()
 	else if (RadarDots.Num() > 0) RadarDots.Reset();   // over: clear the dots once
 }
 
-// The server checks the cooldown, takes the potion and runs its effect (DoInv, EInvOp::Drink)
+// The server checks the cooldown and starts the drinking (DoInv, EInvOp::Drink); the potion goes and works at the end of it (TickDrink)
 void AKnightCharacter::DrinkPotion()
 {
-	if (!Skills || IsUIOpen()) return;
+	if (!Skills || IsUIOpen() || !CanDrinkNow()) return;
+	if (!HasAuthority())
+	{
+		const FInvSlot& P = Skills->PotionSlot;
+		bDrinkPredicted = false;
+		if (P.Id != 0 && JeebItems::IsPotion(P.Id) && P.Count > 0 && GetPotionCooldownLeft(JeebItems::PotionType(P.Id)) <= 0.f)
+			{
+				MulticastDrink_Implementation(static_cast<uint8>(JeebItems::PotionType(P.Id)), true);
+				bDrinkPredicted = true;
+			}
+	}
 	Inv(EInvOp::Drink);
+}
+
+void AKnightCharacter::ClientDrinkRefused_Implementation()
+{
+	bDrinkPredicted = false;
+	if (bDrinking) MulticastDrink_Implementation(DrinkType, false);
+}
+
+bool AKnightCharacter::CanDrinkNow() const
+{
+	return !bDrinking && Health > 0.f && !bAttacking && !bKnockedDown && StunLeft <= 0.f && !bRolling && !bSliding && !bClimbing && !bSitting && !bMounted && Bow == EBow::None
+		&& !ActiveNode.IsValid() && GetWorld()->GetTimeSeconds() - LastDrinkStart >= 0.5f;   // (not over and over: each start is a message to everyone in range)
+}
+
+// Everyone sees it: the weapon goes away and a bottle in the potion's colour comes into the right hand (the bow's hand is the left, so it stays).
+void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
+{
+	// (the player's own machine started it the moment he pressed the key: the server's echo of that start must not start the clock again, or restart one he has already cut short)
+	if (bStart && bDrinkPredicted && !HasAuthority() && IsLocallyControlled()) { bDrinkPredicted = false; return; }
+	if (bStart) LastDrinkStart = GetWorld()->GetTimeSeconds();
+	bDrinking = bStart;
+	DrinkT = 0.f;
+	DrinkType = Type;
+	if (GetNetMode() == NM_DedicatedServer) return;
+	if (bStart && !BottleMesh && WristR)
+		if (UStaticMesh* Flask = JeebProps::PotionMesh())   // (through the fist as a sword's grip lies, the neck out past the thumb)
+		{
+			BottleMesh = NewObject<UStaticMeshComponent>(this);
+			BottleMesh->SetupAttachment(WristR);
+			BottleMesh->SetStaticMesh(Flask);
+			BottleMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, 8.4f), FVector(0.9f)) * KnightFistPlace());   // (held by its long neck and upended to the mouth: the fist at the cork end, the neck showing between it and the body)
+			BottleMesh->RegisterComponent();
+		}
+	if (BottleMesh)
+	{
+		if (bStart) JeebProps::Tint(BottleMesh, JeebItems::PotionRow(FMath::Clamp<int32>(Type, 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
+		BottleMesh->SetVisibility(bStart);
+	}
+	if (!JeebItems::IsDrawnBow(SelectedKind()))
+	{
+		for (UProceduralMeshComponent* C : HeldComps) if (C) C->SetVisibility(!bStart);
+		for (UStaticMeshComponent* C : HeldStatics) if (C) C->SetVisibility(!bStart);
+	}
+}
+
+// (owner 2026-11-05) A small flask on the back left of his belt, the other side from the quiver, in the potion's colour, while the potion slot holds something
+void AKnightCharacter::UpdateBeltFlask()
+{
+	const int32 Id = (IsLocallyControlled() || GetNetMode() == NM_Standalone) ? (Skills ? Skills->PotionSlot.Id : 0) : LookPotion;
+	const bool bShow = !bStowed && !bDrinking && Id != 0 && JeebItems::IsPotion(Id);
+	if (!BeltFlask && bShow)
+		if (UStaticMesh* Flask = JeebProps::PotionMesh())
+		{
+			BeltFlask = NewObject<UStaticMeshComponent>(this);
+			BeltFlask->SetupAttachment(GetRootComponent());
+			BeltFlask->SetStaticMesh(Flask);
+			BeltFlask->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			BeltFlask->RegisterComponent();
+			// (what holds it there: a leather collar round the neck and a strap up to the belt. In the flask's frame: -Z towards the cork, +X and -Y towards his middle.)
+			UMaterialInterface* Col = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+			auto Leather = [&](const TCHAR* Shape, const FTransform& At)
+			{
+				UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+				C->SetupAttachment(BeltFlask);
+				C->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, Shape));
+				C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				C->SetCastShadow(false);
+				C->SetRelativeTransform(At);
+				C->RegisterComponent();
+				if (Col) if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Col)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.11f, 0.055f, 0.03f));
+			};
+			Leather(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), FTransform(FQuat::Identity, FVector(0.f, 0.f, -1.5f), FVector(0.052f, 0.052f, 0.022f)));
+			const FVector From(1.6f, -1.6f, -1.5f), To(6.5f, -6.5f, -9.f);
+			Leather(TEXT("/Engine/BasicShapes/Cube.Cube"), FTransform(FRotationMatrix::MakeFromZX((To - From).GetSafeNormal(), FVector(1.f, 1.f, 0.f)).ToQuat(), (From + To) * 0.5f, FVector(0.012f, 0.03f, float((To - From).Size()) / 100.f)));
+		}
+	if (!BeltFlask) return;
+	BeltFlask->SetVisibility(bShow, true);
+	if (!bShow) return;
+	if (Id != BeltFlaskId)
+	{
+		BeltFlaskId = Id;
+		JeebProps::Tint(BeltFlask, JeebItems::PotionRow(FMath::Clamp<int32>(JeebItems::PotionType(Id), 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
+	}
+	if (Anim) BeltFlask->SetWorldTransform(Anim->BeltFlaskWorld());
+}
+
+void AKnightCharacter::TickDrink(float Dt)
+{
+	if (!bDrinking) return;
+	DrinkT += Dt;
+	const float Takes = JeebTune::V().DrinkTime;
+	if (!IsNetMode(NM_DedicatedServer) && !JeebItems::IsDrawnBow(SelectedKind()))   // (a weapon changed meanwhile is rebuilt showing)
+	{
+		for (UProceduralMeshComponent* C : HeldComps) if (C) C->SetVisibility(false);
+		for (UStaticMeshComponent* C : HeldStatics) if (C) C->SetVisibility(false);
+	}
+	// A roll or anything else that takes over stops it: he keeps the potion (blows and deaths stop it in Hurt and Die)
+	const bool bStop = bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bMounted || Bow != EBow::None;
+	if (!HasAuthority())
+	{
+		// (the player's own machine keeps its own clock, so its speed cap ends with the server's; others wait for the server, and never stay stuck holding a bottle)
+		if (IsLocallyControlled() ? (bStop || DrinkT >= Takes) : DrinkT > Takes + 3.f) MulticastDrink_Implementation(DrinkType, false);
+		return;
+	}
+	const int32 T = DrinkType;
+	FInvSlot* P = Skills ? &Skills->PotionSlot : nullptr;
+	const bool bHasIt = P && P->Id != 0 && JeebItems::IsPotion(P->Id) && JeebItems::PotionType(P->Id) == T && P->Count > 0;   // (it may have been moved out of the slot meanwhile)
+	if (bStop || !bHasIt) { MulticastDrink(DrinkType, false); return; }
+	if (DrinkT < Takes) return;
+	ApplyPotion(T);
+	if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDrank(static_cast<uint8>(T));   // the player's machine runs the effect too (speed, the bigger bar)
+	if (--P->Count <= 0) *P = FInvSlot();
+	Skills->Say(2.5f, FColor(170, 255, 170), FString::Printf(TEXT("You drink a %s."), JeebItems::PotionName(T)));
+	MulticastDrink(DrinkType, false);
 }
 
 // ---------------- Tick steps (see AKnightCharacter::Tick) ----------------
@@ -1134,7 +1277,6 @@ void AKnightCharacter::TickGear(float Dt)
 		if (bWantStow != bStowed)
 		{
 			bStowed = bWantStow;
-			PlaceShield(bStowed);
 			RebuildHeld();
 			if (bStowed) bBlocking = false;
 		}
@@ -1185,6 +1327,6 @@ void AKnightCharacter::TickGear(float Dt)
 	}
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
-	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
+	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f || bDrinking) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
 	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 }

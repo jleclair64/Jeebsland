@@ -78,6 +78,7 @@ enum class EInvOp : uint8
 	ToggleDoor,     // At: the cottage (open or shut its door)
 	PickArrow,      // Target: an arrow lying in the world (E)
 	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
+	ChooseArrows,   // A: the arrow id to shoot next
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -173,6 +174,21 @@ public:
 	UFUNCTION(Client, Reliable) void ClientShopNote(const FString& Text, float Seconds);
 	UFUNCTION(Client, Reliable) void ClientGather(FVector_NetQuantize At, uint8 Skill, bool bStart);
 	UFUNCTION(Client, Reliable) void ClientDrank(uint8 Type);
+	// Drinking takes time (owner, 2026-11-05): the server starts it and ends it, every machine plays it. The potion is used and works only at the end.
+	UFUNCTION(NetMulticast, Reliable) void MulticastDrink(uint8 Type, bool bStart);
+	bool bDrinking = false;
+	float DrinkT = 0.f;
+	double LastDrinkStart = -100.0;
+	bool bDrinkPredicted = false;   // the player's machine has started a drink itself and is waiting for the server's echo of it
+	UFUNCTION(Client, Reliable) void ClientDrinkRefused();
+	uint8 DrinkType = 0;
+	bool CanDrinkNow() const;
+	void TickDrink(float Dt);
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BottleMesh;    // the potion in his hand while he drinks
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BeltFlask;     // and on his belt while the potion slot is filled (owner 2026-11-05)
+	void UpdateBeltFlask();
+	int32 LookPotion = 0;                                                // other players' knights: what is in their potion slot (RepLook)
+	int32 BeltFlaskId = -1;
 	UFUNCTION(Client, Reliable) void ClientUnlockHut(FVector_NetQuantize At);
 	void ShopNote(const FString& Text, float Seconds = 3.f);   // shown at the bottom of the shop or smithy screen
 
@@ -241,6 +257,7 @@ public:
 	float BowAimAmount() const { return BowAimAlpha; }
 	int32 ArrowSlotId() const;   // the arrows the next shot uses (0: none left)
 	void CycleArrows();          // F: the next kind of arrows you carry
+	void PickArrows(int32 Id);   // (the swap popup on the bar, and F: the server is told, since others see what is in his quiver)
 
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)
@@ -458,6 +475,8 @@ private:
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
+	UPROPERTY() TArray<UStaticMeshComponent*> HeldStatics;       // the parts of it that are models from /Game/Props
+	bool bShieldBack = false;                                    // the shield is on his back (stowed, or both hands on a tool)
 	bool bShieldShown = false;
 	// Shield and weapon go on the back (shield over the sword, both under the cape) while climbing, riding or sitting
 	bool bStowed = false;
@@ -478,7 +497,7 @@ private:
 	UPROPERTY() class UProceduralMeshComponent* SwordTrail = nullptr;
 	struct FTrailSample { FVector In, Out; float Time = 0.f, Strength = 0.f; };
 	TArray<FTrailSample> TrailSamples;
-	FVector TrailPrevTip = FVector::ZeroVector; bool bTrailPrev = false;
+	FVector TrailPrevTip = FVector::ZeroVector; bool bTrailPrev = false; float TrailPeak = 0.f; bool bTrailDone = false;
 	void TickSwordTrail(float Dt);
 	UPROPERTY() UInstancedStaticMeshComponent* ClodISM = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* BladeISM = nullptr;
@@ -617,7 +636,7 @@ private:
 	bool bSavedOrient = true;
 	float CrouchAlpha = 0.f, BlockAlpha = 0.f;
 	float Stamina = 10000.f, MaxStamina = 10000.f, StaminaDelay = 0.f;
-	float SlideT = 0.f, SlideSpeed = 0.f, SlideCooldown = 0.f;
+	float SlideT = 0.f, SlideSpeed = 0.f, SlideCooldown = 0.f, SlideGlide = 0.f;
 	FVector SlideDir = FVector::ForwardVector;
 	float RollT = 0.f, RollDur = 0.6f, RollCooldown = 0.f;
 	FVector RollDir = FVector::ForwardVector;
@@ -701,7 +720,12 @@ private:
 	// The bow (see IsDrawingBow above). The player's machine decides the draw and the shot from the button and tells the server,
 	// which checks them (it keeps its own draw timer: never more charge than it has seen) and fires the arrow; everyone else is
 	// shown the draw.
-	enum class EBow : uint8 { None, Drawing, Recover };
+	enum class EBow : uint8 { None, Drawing, Recover, Reload };
+	float CrossReloadLeft = 0.f;                                 // the crossbow: seconds of loading still to do (paused while something else is going on)
+	bool bCrossQueued = false;                                   // the crossbow: a click before it was up shoots as soon as it is
+	int32 BowKindDrawn = 0;                                      // which bow the draw began with (changing it lets the draw down)
+	float DrawTimeNow() const;                                   // how long a full draw takes with what is in his hand
+	float BowWalkShare() const;                                  // x walking speed with it, in the state it is in
 	EBow Bow = EBow::None;
 	float BowT = 0.f;              // time in this phase
 	float BowCharge = 0.f;         // 0 - 1: how far drawn
@@ -746,7 +770,9 @@ private:
 	int32 LookArrows = 0;                                        // other players' knights: the arrows they have (RepLook), for their quivers
 	UPROPERTY() UProceduralMeshComponent* BowString = nullptr;   // its straight string, hidden while drawn (BowBits take over)
 	UPROPERTY() TArray<UStaticMeshComponent*> BowBits;           // the drawn string's two halves, the nocked arrow and its head
+	bool bBitsCross = false;                                     // (the string is painted for the crossbow)
 	UPROPERTY() TArray<UStaticMeshComponent*> QuiverParts;       // the quiver of arrows on his back while the bow is in hand
+	int32 QuiverArrowId = -1;                                    // which arrows its feathers are coloured for
 	void UpdateBowBits();
 	void UpdateQuiver();
 	// (online: the server's numbers, sent to everyone)

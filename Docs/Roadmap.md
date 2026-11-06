@@ -146,5 +146,7 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 15. **Animation (owner, 2026-11-05, replacing the 2026-10-30 rule):** the knight plays animation clips (`FKnightAnimator`); bosses and NPCs get skinned models with clips too. Things that went with the old knight and need remaking: `Docs/ToRecreate.md`.
 16. **(REPLACED 2026-11-03: capes are ordinary items now.) Cape = PvP rank on the tier ladder (owner, 2026-10-30):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
 
+17. **New weapons from Meshy (owner, 2026-11-05):** remake the code-built weapons (sword, axe, spear, broadsword, battle axe, katana, wand, staff, bow, fishing rod) as Meshy models, and shields too if wanted. Follow `Docs/ItemStyleGuide.md` for the look and the process. The pickaxe, longbow, crossbow and potion are done.
+
 ## Sound (added 2026-11-02, later)
 - The game has no sound yet. When it gets some: a sharp "tink" on headshots, footsteps, sword hits and blocks, the bow, ambient wind and birds, music.

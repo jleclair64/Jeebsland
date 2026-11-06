@@ -344,7 +344,7 @@ void AKnightHUD::ItemTip(int32 Id)
 	if (IsWeaponKind(K))
 	{
 		int32 A, B; WeaponDamage(K, V, A, B, V);
-		L.Add(FString::Printf(TEXT("Damage %d-%d%s"), A, B, K == K_Bow ? TEXT(" with same-tier arrows") : TEXT("")));
+		L.Add(FString::Printf(TEXT("Damage %d-%d%s"), A, B, IsShooter(K) ? TEXT(" with same-tier arrows") : TEXT("")));
 		if (K == K_Pickaxe || K == K_Axe || K == K_Rod) L.Add(FString::Printf(TEXT("Gathers %d%% quicker than tin"), FMath::RoundToInt((1.f - ToolTimeMult(V)) * 100.f)));
 		if (!AllowsShield(K)) L.Add(TEXT("Two-handed: cannot be used with a shield"));
 	}

@@ -210,10 +210,10 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.92f, 0.95f, 1.0f) * ADayNight::TrailLight);
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
-	const float Life = 0.09f / Slow;   // how long a bit of the trail lasts (longer in slow motion)
+	const float Life = (bTrailDone ? 0.06f : 0.09f) / Slow;   // how long a bit of the trail lasts (longer in slow motion, shorter once the cut is over)
 	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
 	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
-	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR)
+	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR && Smash != ESmash::Rebound)
 	{
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
@@ -231,11 +231,18 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		if (Window > 0.001f)
 		{
 			// A fresh cut gets a fresh curve; never spline-connect the end of one swing to the start of the next.
-			if (!bTrailPrev) TrailSamples.Reset();
+			if (!bTrailPrev) { TrailSamples.Reset(); TrailPeak = 0.f; bTrailDone = false; }
 			const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
 			TrailPrevTip = Tip; bTrailPrev = true;
-			FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 250.f) / 500.f, 0.f, 1.f);
-			TrailSamples.Add(S);
+			// (owner 2026-11-05: it lasted past the swing. Whatever the clip does, the streak is over for good once the blade has dropped well below this cut's top speed.)
+			TrailPeak = FMath::Max(TrailPeak, Speed);
+			if (TrailPeak > 600.f && Speed < TrailPeak * 0.45f) bTrailDone = true;
+			if (!bTrailDone)
+			{
+				FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 300.f) / 500.f, 0.f, 1.f);
+				TrailSamples.Add(S);
+			}
+			if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBTRAIL t %.3f u %.2f win %.2f speed %.0f peak %.0f done %d"), Now, T, Window, Speed, TrailPeak, bTrailDone ? 1 : 0);
 		}
 		else bTrailPrev = false;
 	}

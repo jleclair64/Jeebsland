@@ -102,6 +102,9 @@ private:
 	FVector Velocity = FVector::ZeroVector;
 	float Travelled = 0.f;
 	int32 Damage = 1;
+public:
+	float GuardMul = 1.f;   // x what it takes out of a raised shield's guard (server)
+private:
 	bool bCrit = false;
 	ESkillType Skill = ESkillType::Archery;
 	UPROPERTY() UStaticMesh* BallMesh = nullptr;

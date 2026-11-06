@@ -120,13 +120,10 @@ void AProjectile::ApplyLaunch()
 		Paint(Head, L.bPurple ? FLinearColor(2.6f, 0.5f, 3.f) : FLinearColor(0.6f, 1.5f, 3.2f));
 		return;
 	}
-	static const FLinearColor Tips[JeebItems::NumTiers] = {
-		FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.035f, 0.035f, 0.04f),
-		FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.7f, 1.1f, 1.5f) };   // tin ... diamond
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);
 	Paint(Body, FLinearColor(0.5f, 0.34f, 0.17f));
-	Paint(Head, bFire ? FLinearColor(4.f, 1.4f, 0.25f) : Tips[FMath::Clamp<int32>(L.Tier, 0, JeebItems::NumTiers - 1)]);   // (fire: a glowing head)
-	Paint(Fletch, bFire ? FLinearColor(0.85f, 0.18f, 0.08f) : FLinearColor(0.92f, 0.92f, 0.88f));
+	Paint(Head, JeebItems::ArrowTipColor(L.ArrowId));   // (fire: a glowing head)
+	Paint(Fletch, JeebItems::ArrowFeatherColor(L.ArrowId));
 	if (bFire)
 	{
 		Glow = NewObject<UPointLightComponent>(this);
@@ -209,7 +206,8 @@ void AProjectile::Tick(float DeltaSeconds)
 					{ HitT = Time; HitPart = i; HitAt = Xf.TransformPosition(HitL); }
 				}
 				if (!bAuth) { if (HitPart >= 0) { SetActorLocation(HitAt); Wait(); return; } bSpent = true; Wait(); return; }
-				if (BestK) BestK->Hurt(Damage, Shooter); else if (BestH->ShieldBlock) BestH->ShieldBlock(Damage, Shooter); else if (Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
+				const int32 OnGuard = FMath::RoundToInt(Damage * GuardMul);
+				if (BestK) BestK->Hurt(OnGuard, Shooter); else if (BestH->ShieldBlock) BestH->ShieldBlock(OnGuard, Shooter); else if (Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
 				if (HitPart >= 0) StickAt(HitAt, Target, Parts[HitPart], FName(TEXT("Shield")), static_cast<uint8>(HitPart), false);
 				else Deflect(At, (At - BestWedge.Apex).GetSafeNormal2D());
 				return;
