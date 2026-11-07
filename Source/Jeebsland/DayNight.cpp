@@ -91,7 +91,7 @@ void ADayNight::BeginPlay()
 void ADayNight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	Clock += DeltaSeconds;
+	Clock += DeltaSeconds * ClockSpeed;
 	TickClouds(DeltaSeconds);
 	Phase = FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
 

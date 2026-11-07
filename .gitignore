@@ -21,3 +21,7 @@ build_log.txt
 Packaged/
 Build/
 *.blend1
+
+# The 2.4 million triangle test house: too big for GitHub's file limit. Remake it from its Meshy task (Docs/Roadmap.md) if needed.
+Art/Buildings/*Detailed*
+Content/Buildings/*Detailed*

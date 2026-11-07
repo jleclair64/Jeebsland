@@ -195,16 +195,17 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 	}
 
 	auto ToScreen = [&](const FVector2D& P) { return FVector2D(X + (P.Y - MapMin.Y) / MapSize * S, Y + (1.f - (P.X - MapMin.X) / MapSize) * S); };
-	auto Label = [&](const FString& T, const FVector2D& P, float Scale)
+	auto Label = [&](const FString& T, const FVector2D& P, float Scale, float Side = 0.f)
 	{
 		if (Knight->GetSkills() && !Knight->GetSkills()->IsExplored(P.X, P.Y)) return;   // no names under the fog
 		const FVector2D At = ToScreen(P);
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(T, TW, TH, Font, Scale);
-		HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.6f), At.X - TW * 0.5f + 1.5f, At.Y - TH * 0.5f + 1.5f, Font, Scale);
-		HDText(T, FLinearColor(1.f, 0.93f, 0.75f), At.X - TW * 0.5f, At.Y - TH * 0.5f, Font, Scale);
+		const float TextX = At.X - TW * 0.5f + Side * TW * 0.5f;
+		HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.6f), TextX + 1.5f, At.Y - TH * 0.5f + 1.5f, Font, Scale);
+		HDText(T, FLinearColor(1.f, 0.93f, 0.75f), TextX, At.Y - TH * 0.5f, Font, Scale);
 	};
-	for (const JeebWorld::FTown& T : JeebWorld::Towns()) Label(T.Name, T.Pos, 1.1f);   // every town, once you have seen it
+	for (const JeebWorld::FTown& T : JeebWorld::Towns()) Label(T.Name, T.Pos, 1.1f, T.LabelSide);   // every town, once you have seen it (Blackrock and Oak Hill stand close: their names sit outward)
 	HDText(TEXT("N"), FLinearColor(1.f, 0.93f, 0.75f), X + S - 26.f, Y + 8.f, Font, 1.2f);
 
 	// You: an arrow pointing the way you face (only you: never other players)

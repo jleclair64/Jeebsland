@@ -37,6 +37,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/BoxComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/DirectionalLightComponent.h"
@@ -117,7 +119,8 @@ void AKnightGameState::BuildWorld()
 	// training dummies, so Play starts in seconds. The knight is the same knight as in the game: nothing to carry over.
 	if (World->GetMapName().Contains(TEXT("MoveLab")))
 	{
-		World->SpawnActor<ADayNight>(FVector::ZeroVector, FRotator::ZeroRotator);   // (the sun and its light, as in the game)
+		// (the sun and its light, as in the game, but three times as fast so the light can be judged quickly: owner, 2026-11-06)
+		if (ADayNight* LabSun = World->SpawnActor<ADayNight>(FVector::ZeroVector, FRotator::ZeroRotator)) LabSun->ClockSpeed = 3.f;
 		BuildMoveLab();
 		if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
 		return;
@@ -419,6 +422,49 @@ void AKnightGameState::BuildMoveLab()
 		}
 		World->SpawnActor<AFishingSpot>(FVector(PX, PY, Z + 5.f), FRotator::ZeroRotator, FP);
 	}
+	// Oak Hill's test house in three versions, side by side on a patch of grass past the floor's +Y edge (to the right of the start, clear of the gear wall's
+	// boards), doors toward the floor (owner, 2026-11-06: to compare them in the game; Tools\BuildBuildings.ps1). The models are 12 m long and drawn 1.2 times
+	// that (14.4 m), so the door clears the knight (owner: at 12 m it looked short for him); a box stands in for the walls and a sign says which is which.
+	{
+		const float HouseScale = 1.2f;
+		Box(FVector(0.f, 2900.f, -50.f), FVector(5000.f, 1800.f, 100.f), FLinearColor(0.20f, 0.30f, 0.14f), true);
+		struct FHouse { const TCHAR* Name; const TCHAR* Sign; float X; };
+		const FHouse Houses[] = {
+			{ TEXT("OakHillHouse_Standard"), TEXT("STANDARD: 14,000 triangles"), -1700.f },
+			{ TEXT("OakHillHouse_300k"), TEXT("REDUCED: 300,000, Nanite"), 0.f },
+			{ TEXT("OakHillHouse_Detailed"), TEXT("DETAILED: 2.4 million, Nanite"), 1700.f },
+		};
+		for (const FHouse& H : Houses)
+		{
+			UStaticMesh* HouseMesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/Buildings/SM_%s.SM_%s"), H.Name, H.Name));
+			if (!HouseMesh) continue;
+			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Floor);
+			M->SetStaticMesh(HouseMesh);
+			M->SetupAttachment(Root);
+			M->SetRelativeLocation(FVector(H.X, 2700.f, 0.f));
+			M->SetRelativeRotation(FRotator(0.f, 180.f, 0.f));   // (the model's door side, its +Y, toward the floor)
+			M->SetRelativeScale3D(FVector(HouseScale));          // (the wall box below follows)
+			M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M->RegisterComponent();
+			UBoxComponent* Walls = NewObject<UBoxComponent>(Floor);
+			Walls->SetupAttachment(M);
+			Walls->SetRelativeLocation(FVector(-17.f, -53.f, 200.f));
+			Walls->SetBoxExtent(FVector(580.f, 346.f, 200.f));
+			Walls->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			Walls->SetCollisionResponseToAllChannels(ECR_Block);
+			Walls->RegisterComponent();
+			UTextRenderComponent* Sign = NewObject<UTextRenderComponent>(Floor);
+			Sign->SetupAttachment(Root);
+			Sign->SetRelativeLocation(FVector(H.X, 2130.f, 1100.f));
+			Sign->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+			Sign->SetHorizontalAlignment(EHTA_Center);
+			Sign->SetWorldSize(70.f);
+			Sign->SetTextRenderColor(FColor::White);
+			Sign->SetText(FText::FromString(H.Sign));
+			Sign->SetCastShadow(false);
+			Sign->RegisterComponent();
+		}
+	}
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();
@@ -510,6 +556,16 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		ShotClock += DeltaSeconds;
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC) PC->SetControlRotation(ShotRot);
+		// (test pictures, where -ShotPos doesn't move him: -ShotAt=X,Y stands him there once the world has settled, on the ground, or on the floor's height in MoveLab)
+		static bool bShotAtDone = false;
+		FString ShotAt, ShotAtX, ShotAtY;
+		if (!bShotAtDone && ShotClock > 2.f && FParse::Value(FCommandLine::Get(), TEXT("ShotAt="), ShotAt, false) && ShotAt.Split(TEXT(","), &ShotAtX, &ShotAtY))
+		{
+			bShotAtDone = true;
+			const float AtX = FCString::Atof(*ShotAtX), AtY = FCString::Atof(*ShotAtY);
+			const bool bLab = GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
+			if (APawn* P = PC ? PC->GetPawn() : nullptr) P->SetActorLocation(FVector(AtX, AtY, (bLab ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(AtX, AtY)) + 100.f));
+		}
 		if (!ShotMove.IsEmpty())
 		{
 			// A move, picture by picture
@@ -564,7 +620,11 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotClock > 11.f && PC) PC->ConsoleCommand(TEXT("quit"));
+		if (ShotClock > 11.f && PC)
+		{
+			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
+			PC->ConsoleCommand(TEXT("quit"));
+		}
 	}
 
 	if (!FogActor.IsValid()) return;

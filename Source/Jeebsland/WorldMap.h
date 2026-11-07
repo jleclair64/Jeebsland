@@ -30,12 +30,12 @@ namespace JeebWorld
 	constexpr float RiverLevel = SeaLevel + 40.f; // the rivers' surface (a touch above the sea, so they run into it)
 
 	// ------------------------------------------------------------------ places (sketch pixels)
-	struct FTown { const TCHAR* Name; FVector2D Pos; float Flat, Fade; };
+	struct FTown { const TCHAR* Name; FVector2D Pos; float Flat, Fade; float LabelSide = 0.f; };   // (LabelSide: where the world map's name sits, -1 left of the spot, 0 on it, 1 right)
 	inline const TArray<FTown>& Towns()
 	{
 		static const TArray<FTown> T = {
-			{ TEXT("Blackrock"),     FromSketch(400.f, 870.f),  0.f,    0.f },      // the existing village (its own ground)
-			{ TEXT("Oak Hill"),      FromSketch(620.f, 875.f),  3500.f, 6500.f },
+			{ TEXT("Blackrock"),     FromSketch(400.f, 870.f),  0.f,    0.f, -1.f },      // the existing village (its own ground)
+			{ TEXT("Oak Hill"),      FromSketch(543.f, 875.f),  3500.f, 6500.f, 1.f },   // moved 100 m west (owner, 2026-11-06): its west edge is the river, its forts and bridge face Blackrock (Docs/OakHillSketch.webp)
 			{ TEXT("Silver Point"),  FromSketch(835.f, 455.f),  3800.f, 8000.f },   // a level shelf among the northern peaks
 			{ TEXT("Anchorage"),     FromSketch(1110.f, 995.f), 3200.f, 6000.f },
 			{ TEXT("Birch Grove"),   FromSketch(760.f, 1280.f), 5000.f, 8000.f },   // the big walled troll town (in PvP 2)

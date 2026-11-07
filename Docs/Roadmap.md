@@ -3,7 +3,7 @@
 Rewritten 2026-10-29. The design plan from every chat so far. **Story mode is SHELVED**: the full old version (main story, 14 chapters, pocket maps, cape-per-chapter) is saved in `Docs/Shelved/Roadmap_2026-10-13_with_story.md` in case it comes back. Do not build anything from that file without asking.
 
 Inspirations: RuneScape (the grind, quests, chat, skills), Super Smash Bros (combat), Skyrim, Zelda, Lord of the Rings, Red Rising, Hunger Games.
-Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/MapSketch.jpg` (note: Oak Hill has since moved, see Map).
+Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/MapSketch.jpg` (note: Oak Hill has since moved, see Map). What the land on it should look like: `Docs/TerrainSketch.webp` (see "Terrain by region").
 
 ## The direction (2026-10-29)
 - **Online, RuneScape-style grind game.** No story mode. The heart of the game is a WEALTH OF SIDE QUESTS plus skills that take real time to level. The player should always have a next goal (a quest, a level, a tier of gear).
@@ -21,15 +21,47 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 - World edge: a low mountain range acting as a wall for now.
 
 ## Map
-- Mountains north and northeast; ocean along the east edge; woods south and west; rock country southwest; plains middle south; tropics southeast (islands as backdrop).
+- Mountains north, snowy at the far north; high grasslands northeast; ocean along the east edge; forest through the middle, west, south and southwest; desert middle south; tropics southeast (islands as backdrop).
 - **River:** starts in the northern mountains, runs south between Blackrock and Oak Hill, forks just south of them: the east branch runs through woods to Anchorage; the south branch swings southwest past Steele Creek, then east along the south to the coast near Palmer Square.
 - **Swapped sides (decided 2026-10-29):** BLACKROCK is now on the WEST side of the river, OAK HILL on the EAST side. The river still divides the two warring towns, and the big bridge between them is the front line. (The sketch shows the old sides. There is NO river in the game yet, only the pond and the castle moat: the river, with Blackrock west of it, is built in the Oak Hill step, and the stone bridges come with it.)
 - **Stone bridges over the rivers (2026-10-29) [S-M]:** arched stone bridges wherever roads cross water, built in code like the rest of the world. One big bridge on the Blackrock to Oak Hill road is the contested crossing of the war.
 - **War:** Blackrock and Oak Hill are at war; small scripted NPC skirmishes at set spots (bridge, road), not a roaming army.
 - **Two PvP areas ("wild west"):** players kill and loot each other (death sack); the richest bosses and quests live here; no health regen; no fast travel.
-  - PvP 1: the northeast mountains, east of Silver Point and north of the Anchorage road, to the coast.
-  - PvP 2: the middle-south plains, with Birch Grove inside it: a huge walled troll town under siege; inside the walls is safe (Bank, Store, Smith), outside is PvP. Fast travel into Birch Grove is allowed.
+  - PvP 1: the northeast high grasslands, with the abandoned castle inside it, east of Silver Point and north of the Anchorage road, to the coast.
+  - PvP 2: the middle-south forest and desert (owner, 2026-11-06; was plains), with Birch Grove inside it: a huge walled troll town under siege; inside the walls is safe (Bank, Store, Smith), outside is PvP. Fast travel into Birch Grove is allowed.
 - **Fog of war on the map (2026-10-29) [M]:** the world map (and minimap) is fogged over where the character has not been yet. Each character remembers the ground it has uncovered (a coarse grid, saved on the server with the character); the fog clears in a soft circle as you walk.
+
+### Terrain by region (owner, 2026-11-06; an idea, not built)
+`Docs/MapSketch.jpg` stays the map: the river, coast, towns and PvP areas come from it. `Docs/TerrainSketch.webp` is a rough redraw of that map to show what the land should look like, so its positions are approximate. Where the two differ on layout, the first map wins.
+- **Far north:** snowy mountains, with ordinary mountains around them (northwest, and east of the river around Silver Point).
+- **Head of the river:** a waterfall and caves.
+- **Northeast:** Scottish-style high grasslands with an abandoned castle, between the mountains and the coast; cliffs along the coast.
+- **Upper river:** forest on both banks, around Blackrock and Oak Hill.
+- **East branch:** forest along it, ending in a fjord (Anchorage's).
+- **Lake (new, not on the first map):** on the south branch just below the fork; the river runs in from the north and out to the south.
+- **East of the lake:** forest, then desert to the south of it, with sand dunes on the coast south of the fjord.
+- **Inside the river's southwest loop:** forest, around Steele Creek (owner, 2026-11-06). The sketch's volcano and rocky land are set aside so the world doesn't feel scrunched, and can be added when it expands. The land the game has today is still rocky here (`WorldMap.h`).
+- **Southeast, where the river reaches the coast:** tropical (Palmer Square).
+- The woods south of the river, the ocean and the islands aren't on this sketch; they stay as on the first map.
+
+Left for now (owner, 2026-11-06):
+- Room: the world is about 2.3 x 1.7 km, about 8 minutes' walk north to south, so regions get roughly 500 m each. It may be too much in too little space; keep regions few for now, so the world can expand later and take new ones.
+
+Mountain heights and slopes (owner, 2026-11-06; decided, not built):
+- **Height:** the snowy mountains in the far north reach 80 m; all other mountains reach 60 m (today every range tops out at 48 m, `MountainBase` + `MountainRise` in `WorldMap.h`).
+- **Slopes:** mountains must be easy to walk up, about 35 degrees at the steepest. The knight's limit is Unreal's default of about 45 degrees (our code doesn't change it), so this leaves a margin.
+- **No false slopes:** a mountainside must never look walkable and then stop him. Ground is either 35 degrees or less, or a sheer cliff that is clearly a different thing, with nothing in between. Once climbing exists (see below), going past the walking limit starts a climb or a slide, never a dead stop.
+- **When building:** taller mountains at this slope need more width (an 80 m peak needs at least 115 m from foot to top, more with a rounded shape, and today's ramp is about 140 m with no limit on slope), and the ridge pattern adds its own steepness, so measure slopes across the whole world rather than trusting the numbers. The peaks in `WorldMap.h` across PvP 1 and south of Anchorage come out or drop, for the grasslands and sand dunes. Silver Point's shelf rises with the mountains around it.
+
+Mountain shape and climbing (owner approved this plan, 2026-11-06: something similar to Breath of the Wild; not built. Build order: mountains, then climbing, then steep faces):
+- **Mountains run together:** they bump into and merge with each other, not evenly spaced. Shared slopes also use less land than separate peaks, which helps a small world.
+- **Triangles in three sizes (Nintendo's own rule, from their CEDEC 2017 talk):** large as landmarks seen from far off, medium to hide routes and places, small to set the pace of a walk. Nintendo's numbers aren't public and its map is far bigger than ours, so these are suggestions to try: large is the 60 to 80 m mountains, medium about 15 to 35 m foothills, small about 3 to 8 m knolls and rocks.
+- **Over or around:** a mountain offers a choice of climbing it or going round it, with something different to find behind it. Its shape draws the eye to its tip, a natural spot for a reward.
+- **Gradual reveal:** as you approach, what's behind a slope comes into view a bit at a time. Only a few things catch the eye at once. Trees and other blocky shapes hide things completely; slopes reveal them slowly.
+- **Low routes:** main roads follow rivers or cut through passes. Important places sit in low ground, hollows and mountainsides, not on peaks; Silver Point's shelf already fits this.
+- **Climbing:** too steep to walk means he climbs going up and slides going down. A climb is direct but slow, costs stamina and gives a poorer view, and hidden ledges to rest on turn a tall climb into a small puzzle. Every mountain keeps a walkable way up.
+- **When building:** today each peak has the same width and a height set by noise, so peaks can't yet be shaped individually: each needs its own height and width. Steep faces wait until climbing exists; until then only the coast cliffs are steeper than 35 degrees. Climbing needs the stamina bar shown (hidden on purpose today), new clips, and a server check on position, since today's ladder climb trusts the client's position.
+- Use the principles only; the world stays our own map. Sources are mostly summaries of Nintendo's talk and fan analysis: [Gigazine](https://gigazine.net/gsc_news/en/20171004-breath-of-the-wild-design-secret), [80 Level](https://80.lv/articles/the-design-secrets-of-breath-of-the-wild/), [Game Developer](https://gamedeveloper.com/design/breath-of-the-wild-open-world-analysis-gravity-to-go-forward), [GamesRadar](https://gamesradar.com/the-legend-of-zelda-breath-of-the-wilds-climbing-is-the-secret-ingredient-that-finally-adds-real-adventure-to-open-world-gaming).
 
 ## Towns
 | Town | Place | Role | Trial | Knights / Wizards / Trolls |
@@ -37,12 +69,26 @@ Cost tags: [S] small, [M] moderate, [L] big new system. Hand-drawn map: `Docs/Ma
 | Blackrock | centre, WEST of the river | rich, cold walled town; open and friendly to players; the current start | The Ladder: ranked arena (PvE first, PvP later) | 70 / 15 / 15 |
 | Oak Hill | EAST of the river (moved 2026-10-29) | poor, kind forest town at war with Blackrock; the knights' home and respawn town; has the Boxing Ring | The Hunt: timed last-one-standing zone | 70 / 15 / 15 |
 | Silver Point | northern mountains | wizard school; wizards' home and respawn | The Examination: puzzle or spell test | 15 / 80 / 5 |
-| Birch Grove | central plains, inside PvP 2 | troll town under siege; trolls' home and respawn | to be decided | 5 / 5 / 90 |
+| Birch Grove | middle south, forest and desert, inside PvP 2 | troll town under siege; trolls' home and respawn | to be decided | 5 / 5 / 90 |
 | Anchorage | east coast fjord | banking and trading hub, best stores | The Regatta or a Cliff Run | 50 / 25 / 25 |
-| Steele Creek | southwest rocks | best ore, smithing town | The Wade: hazard endurance course | 40 / 20 / 40 |
+| Steele Creek | southwest forest | best ore, smithing town | The Wade: hazard endurance course | 40 / 20 / 40 |
 | Palmer Square | southeast tropics | best potions | to be decided | 25 / 50 / 25 |
 - Every town has one optional **Trial** (prestige); that town's side quests lead up to it.
-- Build order for towns: Oak Hill and Blackrock > Steele Creek > Silver Point > Birch Grove > Anchorage > Palmer Square.
+- Build order for towns: Oak Hill first (owner, 2026-11-06) > Steele Creek > Silver Point > Birch Grove > Anchorage > Palmer Square.
+- **Blackrock is not the standard (owner, 2026-11-06):** today's code-built town doesn't look the way the rest of the game should, so don't copy it for new towns. It gets redone later; when is still to be decided.
+- **Oak Hill layout (owner's sketch, 2026-11-06, `Docs/OakHillSketch.webp`; not built; north is up):**
+  - **Centre:** a big oak tree in a round plaza, with a road running round it. The town's landmark.
+  - **Round the plaza:** Smith northwest, Bank northeast, Store southeast, Potion Shop southwest, one house to the west. The Town Hall, the biggest building, stands to the east, with a road running from the plaza to its door. (The sketch says "Main Townhouse"; the owner means town hall.)
+  - **South:** the PvP Boxing Ring, at the end of a short road from the plaza.
+  - **West, the front toward Blackrock (owner, 2026-11-06):** the river runs along the town's west edge, north to south. A straight road goes from the plaza to the bridge. Two long forts stand on the town's bank, one on each side of the bridge, with a round watchtower to the northwest beyond the north fort. They all face Blackrock across the river.
+  - **North:** the Castle Ruins, a large old building on the north side of the road that curves across the top of town, with one house beyond them to the northwest. The castle and its ruin are not designed yet.
+  - **Other roads:** one leaves the plaza to the north; one curves across the north of town, west to east, with a branch leaving to the northeast past the ruins; one runs north to south behind the Bank and between it and the Town Hall, on to the southeast; two more run from south of the plaza to the southwest and southeast edges.
+  - **Houses:** 17 scattered along those roads, not in rows: 8 to the north, 1 by the plaza, 4 to the southwest, 4 to the southeast.
+  - **Ground (owner, 2026-11-06):** not flat, but not too hilly either: some hills in the town, like Hogsmeade in Hogwarts Legacy or the main town in Skyrim. Streets rise and fall and buildings sit at different heights. Today's town code does the opposite, levelling a disc of ground (`Towns()` and `LandHeight` in `WorldMap.h`), so Oak Hill needs its own gentle shape. Suggested, to be judged: the plaza and oak on a low rise, which also suits the name, and houses on stone footings that go deeper on the downhill side.
+  - **Size:** at 14.4 m a house (scaled up 1.2 times so the door fits the knight), the sketch is about 120 x 175 m, but the shaped ground is only 70 m across today, so it has to grow.
+  - **Where it stands (owner, 2026-11-06):** moved about 100 m west so its west edge is the river. Its centre is about 60 m from the river and 185 m from Blackrock, so the two towns can see each other across the water. For the build: the town's west part (the forts, bridge and watchtower) now falls on the original square, which reaches 160 m from the start and has its own ground, forest and seam, so clearing and reshaping that strip is part of the job.
+- **Oak Hill test house (2026-11-06; three versions stand in MoveLab for the owner to compare, drawn 1.2x so the door fits the knight; take them out of `/Game` before the next package, since everything there gets cooked; the Detailed one's files are too big for GitHub and live only on this PC):** humble timber and plaster cottage with thatch, flower boxes and candle lanterns. Meshy tasks: picture `01a1b42b-323d-727d-a369-1c695057b715`, standard model (14k triangles) `01a1b42f-9524-75c3-ae8a-996cdf4c6452`, detailed model (2.4M triangles, 80 MB) `01a1b42f-98f9-71ff-8556-e88353a2170c`. The detailed one is much better, with cleaner flowers, door and walls; the standard one has brown gable walls and smeared flowers. Plainly reducing the detailed one holds up at 300k triangles (20 MB, slightly wobblier edges), but 100k frays lines and 30k breaks them. To judge in the game: looks in sun and shade, and frame rate with many copies, with and without Nanite (our shadows are not virtual shadows).
+- **Lesson for building pictures:** don't use `remove_background` with a white backdrop, because it also removes cream plaster. Use a plain blue-grey backdrop with removal off.
 
 ## Side quests and the grind (the new focus) [L, in parts]
 - RuneScape-style: many quests, each a small self-contained story with its own NPC; the player is a helper, not a chosen hero.

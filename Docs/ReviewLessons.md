@@ -129,6 +129,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Shared mesh helpers return early on a dedicated server, and command-line test switches check `-JeebShot` first.
 - Never merge per-map data into a function-level static that is built once (it outlives the map, and a later Play or travel keeps it): read the per-map list on its own each call, or clear the cache when the world is rebuilt.
 
+## Frame rate (performance-reviewer)
+- Before reading a benchmark, take one still and confirm the thing being measured is in frame, and set up the baseline so a fixed cost (such as resolution) can't hide what one object costs. Give the run a limit: a test row of three models needs a few runs, not fifteen minutes.
+
 ## Packaged game (package-reviewer)
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).
 - Code compiles for Shipping (no editor-only fields).
