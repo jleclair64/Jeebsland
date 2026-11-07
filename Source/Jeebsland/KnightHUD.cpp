@@ -398,9 +398,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	// (2026-11-03) left to right: the hand (sword or whatever weapon or tool is equipped), the shield, the bow, the arrows, then
 	// the potion. R swaps the hand and the bow.
 	const float SS = 46.f, Step = SS + 12.f;   // small slots, low on the screen
-	const float TotalW = 4.f * Step + 18.f + SS;
+	const float BarGap = 18.f;   // (owner 2026-11-06: the same gap before the bow as before the potion; every other place reads BarCellX)
+	const float TotalW = 4.f * Step + 2.f * BarGap + SS;
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f;
-	auto SlotX = [&](int32 Pos) { return X0 + Pos * Step + (Pos >= 4 ? 18.f : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
+	auto SlotX = [&](int32 Pos) { return X0 + Pos * Step + (Pos >= 2 ? BarGap : 0.f) + (Pos >= 4 ? BarGap : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 	for (int32 p = 0; p < 5; ++p) BarCellX[p] = SlotX(p);
 	BarCellY = Y0;

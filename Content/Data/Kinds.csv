@@ -4,8 +4,8 @@ Key,Name,DamageMin,DamageMax,Range,Cooldown,Defence,Weight,BuyPrice,Mass,SmithEx
 # Defence: a TIN armour piece's or shield's defence (x the tier's DefenceMult). Weight: an armour piece's weight in kg before its material (x the tier's WeightMult); a heavy suit slows the knight (Tuning.ini [Weight]). BuyPrice: a BRONZE piece's store price (x the tier's PriceMult; capes use it as is).
 # Mass: how much material smithing it takes. SmithExtraLevel: added to the tier's Smithing level (not for tin). TwoHanded: yes = no shield with it.
 Sword,Sword,8,12,230,0.55,0,0,40,4,0,no,"The all-rounder: quick, reliable hits. Swing right to left, then back left to right for a fast combo. A shield can be carried with it."
-Axe,Axe,9,13,220,0.70,0,0,45,5,0,no,"Hits harder than a sword and chops trees faster. Equip it (or let it auto-select) to chop. A shield can be carried with it."
-Pickaxe,Pickaxe,6,9,210,0.75,0,0,35,4,0,no,A mining tool first and a weapon only in a pinch. Better pickaxes mine faster and unlock harder ore.
+Axe,Axe,9,13,220,0.55,0,0,45,5,0,no,"Hits harder than a sword and chops trees faster. Fights just as a sword does, swings, charge, low sweep and dash, away from a tree. A shield can be carried with it."
+Pickaxe,Pickaxe,6,9,210,0.55,0,0,35,4,0,no,"A mining tool first and a weapon only in a pinch, though it fights as a sword does away from a rock. Better pickaxes mine faster and unlock harder ore."
 Spear,Spear,6,9,380,0.65,0,0,40,4,0,no,Long reach. Hold the attack button to charge a lunge. A shield can be carried with it.
 Broadsword,Broadsword,15,22,260,0.95,0,0,90,8,2,yes,"A heavy two-handed blade: slow swings, big damage. Cannot be used with a shield."
 BattleAxe,Battle Axe,17,25,250,1.05,0,0,100,9,2,yes,"The biggest hitter and the slowest. Two-handed, no shield."
@@ -14,7 +14,7 @@ Wand,Wand,7,11,1800,0.55,0,0,80,3,1,no,Fires small magic bolts at range. Light a
 Staff,Wizard Staff,11,17,2200,1.00,0,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."
 Bow,Bow,5,7,4000,0.80,0,0,60,4,1,yes,"Fires arrows from a distance: hold the left or right mouse button to draw (the longer the draw, the further and harder the shot) and let go to shoot. Arrows run out: buy them at the store or smith them, or pick up the ones you shot (E). Better arrows hit harder. Needs both hands: no shield."
 Longbow,Longbow,7,9,5000,0.80,0,0,90,5,2,yes,"A tall bow. It draws slower than a bow and you walk slower drawing it, but its arrows go further and hit harder. Hold the left or right mouse button to draw and let go to shoot."
-Crossbow,Crossbow,11,13,6000,0.80,0,0,120,6,3,yes,"The hardest hit and the longest shot, and its arrows bite deep into a raised shield. Hold the right mouse button to aim and click the left to shoot: every shot is at full power, and it stays ready for as long as you hold it up. But it takes a couple of seconds to load again after each shot."
+Crossbow,Crossbow,11,13,6000,0.80,0,0,120,6,3,yes,"The hardest hit and the longest shot, and its arrows bite deep into a raised shield. Hold the left mouse button to bring it up and let go to shoot: every shot is at full power, at once, and it stays ready for as long as you hold it up. But it takes a couple of seconds to load again after each shot."
 Rod,Fishing Pole,2,3,200,0.80,0,0,30,3,0,no,A fishing pole. Equip it and click towards the pond. Better poles bite faster and reach rarer fish.
 Shield,Shield,1,2,200,1,8,0,50,6,0,no,"Hold right-click to block blows from the front. A shield has health: holding it up costs 25 a second and a blow on it costs its damage, so it never hurts you. When it runs out it breaks and drops until it has healed to full. Better shields have more health; a higher Defence level heals it faster."
 Helmet,Helmet,1,2,200,1,3,3,40,5,0,no,Protects the head: blows to the head go through it. Arrows to the head do 1.5x damage.

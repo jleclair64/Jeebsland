@@ -90,10 +90,10 @@ namespace JeebAnim
 		FQuat ShieldArm[4];                             // the left arm's pose holding a shield (LShoulder, LArm, LFore, LHand)
 		FVector MouthInHead = FVector::ZeroVector;      // his visor's mouth, in the head bone's frame
 		// Where a tool's head is at its clip's blow, from between his feet in his own frame (forward, right, up)
-		FVector ToolContact(bool bChop, int32 Kind, float ClipT = -1.f) const;
-		// A chopping or mining clip holds a long two-handed weapon: the tool runs from the left fist through the right, its edge leading. Turns the hands so, by W.
-		void ToolPose(FPose& P, float W) const;
-		FVector ToolStrike(const FTransform& Grip) const;   // the middle of the tool's edge, given where WristR is
+		FVector ToolContact(bool bChop, int32 Kind, float Share = 1.f) const;   // (Share: how far through the blow, 0 tool up, 1 the end of it)
+		// A chopping or mining clip holds a long two-handed weapon: the tool runs from the left fist through the right. Turns the hands so, by W, and returns how far the tool rolls in the fist so that its edge leads.
+		float ToolPose(FPose& P, float W, int32 Kind) const;
+		FVector ToolStrike(const FTransform& Grip, int32 Kind) const;   // the working point of the tool's edge, given where WristR is
 		FVector ToolEdgeInHand = FVector::ZeroVector;       // the way a tool's edge points, in the hand bone's frame
 		FQuat ToolEdgeTurn = FQuat::Identity;
 
@@ -161,7 +161,6 @@ namespace JeebAnim
 		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
 		bool bShotLog = false;      // test pictures: log JEEBANIM
 		bool bShieldArm = false;    // a shield on his left arm, not on his back: the forearm holds it out in front
-		int32 SwingSet = 0;         // which rows of KnightMoves.csv the sword's two swings play
 	};
 }
 
@@ -196,6 +195,7 @@ public:
 	FTransform DrinkWorld() const;     // the open hand and its bottle, the cork aimed at his mouth
 	FVector MouthWorld() const { return BoneWorld(JeebAnim::Head).TransformPosition(L.MouthInHead); }
 	FVector ToolHeadWorld(int32 Kind) const;   // where the head of the tool in his hand is
+	void ToolHands(float& OutOffHaft, float& OutFromButt) const;   // (test log) how far the left fist is from the haft, and how far up the haft from its butt
 	int32 WornTier(int32 Piece) const { return WornTiers[Piece]; }   // (-1: nothing on)
 	float Phase01() const { return Phase; }   // where the stride is: 0 the left foot under him, 0.5 the right
 
@@ -241,6 +241,7 @@ private:
 	void Inertialize(const FPose& Target, FPose& Out, float Dt);
 	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f, float LegSeconds = 0.f);
 	void KeepTipUp(FPose& P, const FInput& In, float Dt);
+	void ToolHeadClear(FPose& P, const FInput& In) const;
 	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
 	void ExtendArm(FPose& P, float Deg, float W) const;
 	void TwoHandTool(FPose& P, const FInput& In, float Dt);
@@ -249,6 +250,7 @@ private:
 	bool PlayAt(const TCHAR* MoveName, float T, float Speed, FPose& InOut, float* OutBlend);
 
 	UPoseableMeshComponent* Comp = nullptr;
+	class USkeletalMeshComponent* UnderComp = nullptr;  // the mail always under the armour, so plate never looks hollow: follows Comp's bones
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};
 	int32 WornTiers[JeebAnim::Piece_Count] = { -1, -1, -1, -1, -1 };
@@ -295,6 +297,8 @@ private:
 	float ShakePhase = 0.f;  // the charged smash's tremble
 	float ShieldArmW = 0.f;  // how far the left arm is in its shield pose
 	float TwoHandW = 0.f;    // how far the left hand is on the tool's haft
+	float ToolRoll = 0.f;    // how far the tool has rolled in the fist about its haft (radians)
+	int32 ToolKind = 0;      // the tool being worked with
 	float AirLegs = 1.f;     // how fast the stride goes: half its pace in the air
 	float AirShare = 0.f;    // how far the knees have come up in the air
 	float FallShare = 0.f;   // how far into the falling pose (long falls)

@@ -177,6 +177,28 @@ void AMiningRock::BeginPlay()
 	UpdateVisuals(MaxCharges, MaxCharges);
 }
 
+float AMiningRock::SurfaceAlong(const FVector& From, float Z) const
+{
+	// The stone itself, lumps and all, and the ore that sits on it (which has no collision of its own), on a level line toward its middle
+	const FVector Mid = GetActorLocation() + FVector(0.f, 0.f, Z);
+	const FVector Start = Mid + From * 400.f;
+	float Far = 0.f;
+	FHitResult Hit;
+	FCollisionQueryParams Q;
+	Q.bTraceComplex = true;
+	if (Main && Main->LineTraceComponent(Hit, Start, Mid, Q)) Far = float(FVector::Dist(Hit.Location, Mid));
+	if (!bDiamond)
+		for (const UProceduralMeshComponent* L : Ore)
+		{
+			if (!L || !L->IsVisible()) continue;
+			const float R = 17.f * float(L->GetComponentScale().X);   // (a lump's size: BeginPlay)
+			const FVector C = L->GetComponentLocation() - Mid;
+			const FVector Across = C - From * FVector::DotProduct(C, From);
+			if (Across.SizeSquared() < R * R) Far = FMath::Max(Far, float(FVector::DotProduct(C, From)) + FMath::Sqrt(R * R - float(Across.SizeSquared())));
+		}
+	return Far > 0.f ? Far : SurfaceRadius(Z);
+}
+
 void AMiningRock::RollOre()
 {
 	// Which ore the rock holds (six kinds since 2026-11-04). Normally fixed by the world builder (SetOre), the same

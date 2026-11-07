@@ -6,6 +6,16 @@
 #include "TimerManager.h"
 #include "KnightGameState.h"
 #include "Engine/World.h"
+#include "Misc/ConfigCacheIni.h"
+
+// TEMPORARY (testing, owner 2026-11-06): [Jeebsland.Testing] UnlimitedNodes=True in DefaultGame.ini. Trees, rocks and every other
+// resource node still give their yield and XP but never lose a charge, so they never empty, vanish or need to respawn. The server
+// does the gathering (FinishGathering runs from its timer), so it decides. Turn it off before real play; remove with the switch.
+static bool UnlimitedNodes()
+{
+	static const bool b = []() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("UnlimitedNodes"), v, GGameIni); return v; }();
+	return b;
+}
 
 AResourceNode::AResourceNode()
 {
@@ -124,8 +134,11 @@ void AResourceNode::FinishGathering()
 		Skills->AddXP(Skill, XP);
 	}
 
-	--Charges;
-	ChargesChanged();
+	if (!UnlimitedNodes())   // (TEMPORARY, testing: a node that is never used up)
+	{
+		--Charges;
+		ChargesChanged();
+	}
 
 	{
 		FString Msg = SuccessText;

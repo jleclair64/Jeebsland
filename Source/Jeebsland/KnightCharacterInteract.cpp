@@ -43,11 +43,10 @@ void AKnightCharacter::Interact()
 	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
-	// Shooters (owner 2026-11-06). The crossbow: the right button brings it up, this shoots. A bow: either button draws while it is held, and letting go of the last one shoots (InteractReleased, RightUp).
+	// Shooters (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
 	if (JeebItems::IsShooter(SelectedKind()))
 	{
-		if (SelectedKind() == JeebItems::K_Crossbow) { if (Bow == EBow::Drawing) ReleaseDraw(); }
-		else if (Bow == EBow::None) StartDraw();
+		if (Bow == EBow::None) StartDraw();
 		return;
 	}
 	if (Bow == EBow::Drawing) return;
@@ -114,7 +113,7 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
-	if (Bow == EBow::Drawing && SelectedKind() != JeebItems::K_Crossbow && !bAimHeld)
+	if (Bow == EBow::Drawing && !bAimHeld)
 	{
 		if (IsUIOpen() || bPanelCursor) CancelDraw(); else ReleaseDraw();
 		return;
@@ -406,16 +405,6 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 	Inv(EInvOp::PickLock, 0, 0, 0, nullptr, Hut->GetActorLocation());
 }
 
-void AKnightCharacter::CycleSwingSet()
-{
-	if (IsUIOpen()) return;
-	const uint8 Next = (SwingSet + 1) % 3;
-	static const TCHAR* const Names[3] = { TEXT("A: the first look"), TEXT("B: high diagonal cuts, a step in on the second"), TEXT("C: a wide whip across, a flat cut back") };
-	SwingSet = Next;
-	Inv(EInvOp::SwingSet, Next);
-	JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("Sword swings %s"), Names[Next]));
-}
-
 void AKnightCharacter::CallHorse()
 {
 	if (IsUIOpen() || bMounted) return;
@@ -492,9 +481,21 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 		F.Z = 0.f;
 		F = F.GetSafeNormal();
 		const FVector R = FVector::CrossProduct(FVector::UpVector, F);
-		const FVector Head = JeebAnim::FClipLib::Get().ToolContact(Skill != ESkillType::Mining, Skill != ESkillType::Mining ? JeebItems::K_Axe : JeebItems::K_Pickaxe);
+		const bool bChop = Skill != ESkillType::Mining;
+		const int32 ToolK = bChop ? JeebItems::K_Axe : JeebItems::K_Pickaxe;
 		const float FeetZ = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-		GatherSpot = Node->GetActorLocation() - F * (Node->SurfaceRadius(FeetZ + Head.Z - Node->GetActorLocation().Z) + Head.X) - R * Head.Y;
+		const JeebAnim::FClipLib& Lib = JeebAnim::FClipLib::Get();
+		// (owner 2026-11-06: the steel stops at the rock, it doesn't go through. He stands as far off as the steel's furthest reach at any point of the blow's second half needs, on the node's real surface at that height.)
+		float Off = 0.f;
+		for (int32 i = 0; i <= 8; ++i)
+		{
+			const FVector At = Lib.ToolContact(bChop, ToolK, 0.5f + 0.5f * float(i) / 8.f);
+			const float Surf = Node->SurfaceAlong(-F, FeetZ + float(At.Z) - float(Node->GetActorLocation().Z));
+			Off = FMath::Max(Off, Surf + float(At.X));
+			if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBREACH share %.2f tip forward %.1f up %.1f side %.1f, surface there %.1f"), 0.5f + 0.5f * float(i) / 8.f, At.X, At.Z, At.Y, Surf);
+		}
+		const FVector Head = Lib.ToolContact(bChop, ToolK);
+		GatherSpot = Node->GetActorLocation() - F * Off - R * Head.Y;
 		GatherSpot.Z = GetActorLocation().Z;
 		GatherYaw = F.Rotation().Yaw;
 		GatherWalkLeft = IsLocallyControlled() ? 1.f : 1.5f;   // (the server's runs longer: his own machine starts half a round trip later)

@@ -48,7 +48,6 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
 	In.bSwinging = bSwinging && GatherWalkLeft <= 0.f && In.Vel.Size2D() < 50.f;   // (walking into place or off with the tool: he walks, then swings. Other machines go by his speed.)
 	In.bShieldArm = ShieldActive() && !bShieldBack && !bStowed;
-	In.SwingSet = SwingSet;
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
 	In.bShotLog = bShotFace;
@@ -187,8 +186,13 @@ void AKnightCharacter::PlaceGear()
 	if (bShotFace && bSwinging && ActiveNode.IsValid())
 	{
 		const FVector Head = Anim->ToolHeadWorld(SelectedKind());
+		{
+			float OffHaft = 0.f, FromButt = 0.f;
+			Anim->ToolHands(OffHaft, FromButt);
+			UE_LOG(LogTemp, Log, TEXT("JEEBHANDS u %.2f left fist off the haft %.1f cm, %.1f cm up from the butt"), FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f), OffHaft, FromButt);
+		}
 		const float Feet = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-		UE_LOG(LogTemp, Log, TEXT("JEEBCONTACT swingT %.2f u %.2f head off the surface %.1f cm, head height %.0f, surface radius %.0f, from spot %.1f, kind %d"), SwingTime, FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f), FVector::Dist2D(Head, ActiveNode->GetActorLocation()) - ActiveNode->SurfaceRadius(Head.Z - ActiveNode->GetActorLocation().Z), Head.Z - Feet, ActiveNode->SurfaceRadius(Head.Z - ActiveNode->GetActorLocation().Z), FVector::Dist2D(GatherSpot, GetActorLocation()), SelectedKind());
+		UE_LOG(LogTemp, Log, TEXT("JEEBCONTACT swingT %.2f u %.2f head off the surface %.1f cm, head height %.0f, surface %.0f, from spot %.1f, kind %d"), SwingTime, FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f), FVector::Dist2D(Head, ActiveNode->GetActorLocation()) - ActiveNode->SurfaceAlong(-GetActorForwardVector(), Head.Z - ActiveNode->GetActorLocation().Z), Head.Z - Feet, ActiveNode->SurfaceAlong(-GetActorForwardVector(), Head.Z - ActiveNode->GetActorLocation().Z), FVector::Dist2D(GatherSpot, GetActorLocation()), SelectedKind());
 	}
 	UpdateBowBits();
 	UpdateQuiver();
@@ -204,10 +208,6 @@ void AKnightCharacter::TickSuitTests(float Dt)
 {
 	if (!IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
 	{
-		int32 ShotSwing = 0;   // (-ShotSwing=<0..3>: which look the sword's swings have)
-		if (bShotFace && FParse::Value(FCommandLine::Get(), TEXT("ShotSwing="), ShotSwing)) SwingSet = uint8(FMath::Clamp(ShotSwing, 0, 2));
-	}
-	{
 		static float TurnRate = 0.f;   // (-ShotTurn=200: the camera swings round at that many degrees a second, to check what he does in a move; log JEEBTURN)
 		static const bool bTurnTest = FParse::Value(FCommandLine::Get(), TEXT("ShotTurn="), TurnRate);
 		if (bTurnTest && bShotFace && GetController())
@@ -219,6 +219,15 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		}
 	}
 	static FString Walk;
+	{
+		static bool bLabAt = false;   // (-LabAt=<x>_<y>: starts him there, for a look at what stands elsewhere in MoveLab)
+		if (bShotFace && !bLabAt)
+		{
+			bLabAt = true;
+			FString S; TArray<FString> Pr;
+			if (FParse::Value(FCommandLine::Get(), TEXT("LabAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 2) SetActorLocation(FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), GetActorLocation().Z));
+		}
+	}
 	static FString Do;
 	static bool bRead = false;
 	if (!bRead)
@@ -294,6 +303,12 @@ void AKnightCharacter::TickSuitTests(float Dt)
 			Interact();
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER %s node %s swinging %d kind %d"), *Do, Best ? *Best->GetName() : TEXT("none"), bSwinging ? 1 : 0, SelectedKind());
+	}
+	else if (Do == TEXT("fishnode"))   // (the real thing, at MoveLab's pond)
+	{
+		SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));
+		Interact();
+		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER fishnode node %s fishing %d kind %d"), ActiveNode.IsValid() ? *ActiveNode->GetName() : TEXT("none"), bFishing ? 1 : 0, SelectedKind());
 	}
 	else if (Do == TEXT("chop")) { bSwinging = true; bSideways = true; SwingPeriod = 1.25f; }
 	else if (Do == TEXT("mine")) { bSwinging = true; bSideways = false; SwingPeriod = 1.f; }

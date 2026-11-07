@@ -109,7 +109,7 @@ namespace JeebItems
 	inline bool IsDrawnBow(int32 K) { return K == K_Bow || K == K_Longbow; }            // a string pulled back by hand, as far as you like
 	inline bool IsShooter(int32 K) { return IsDrawnBow(K) || K == K_Crossbow; }          // shoots arrows from the arrow slot
 	// Everything with a blade or a point plays the sword's moves (owner, 2026-11-05: until they have their own), each with hit boxes as long as it reaches
-	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear; }
+	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear || K == K_Axe || K == K_Pickaxe; }
 	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
 	inline int32 BarSlotFor(int32 K) { return IsShooter(K) ? 1 : 0; }
 	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }
@@ -162,6 +162,7 @@ namespace JeebItems
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
+		if (IsMaterial(Id) && Tables().Materials.IsValidIndex(Id - 1)) return MaterialName(MaterialType(Id));   // (the wall's prompt names ores and fish too)
 		if (!IsGear(Id)) return FString();
 		const int32 K = KindOf(Id), V = VariantOf(Id);
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), TierName(V));

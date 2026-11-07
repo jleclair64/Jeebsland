@@ -97,7 +97,9 @@ namespace JeebTerrain
 	}
 
 	// Ladders up to the walkway. Pos is the ladder itself; Out points away from the wall (the side you climb from).
-	struct FLadder { FVector2D Pos; FVector2D Out; float Top = -1.f; float Bottom = -1.f; };   // Bottom > 0: the ladder starts from a deck at this height, not the ground   // Top < 0: the village walkway; otherwise the height of the deck
+	struct FLadder { FVector2D Pos; FVector2D Out; float Top = -1.f; float Bottom = -1.f; bool bAbsolute = false; };   // Bottom > 0: the ladder starts from a deck at this height, not the ground   // Top < 0: the village walkway; otherwise the height of the deck   // bAbsolute: Top and Bottom are exact heights whatever their sign (MoveLab's ladder)
+	// Ladders added at run time (MoveLab builds one on its flat floor): climbed like the others, never part of the real world. Emptied when a world builds.
+	inline TArray<FLadder>& ExtraLadders() { static TArray<FLadder> All; return All; }
 	inline const TArray<FLadder>& Ladders()
 	{
 		static const TArray<FLadder> All = []()

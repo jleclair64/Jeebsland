@@ -30,6 +30,8 @@ public:
 	virtual float MinFacing() const { return 0.5f; }
 	// How far from its middle the surface is, this high above its foot: where a tool's swing meets it
 	virtual float SurfaceRadius(float Z) const { return 30.f; }
+	// How far from its middle its surface is at height Z above its foot, looking from outside along From (a flat direction). A lumpy node measures itself.
+	virtual float SurfaceAlong(const FVector& From, float Z) const { return SurfaceRadius(Z); }
 	virtual FString PromptText() const { return FString(); }
 
 protected:

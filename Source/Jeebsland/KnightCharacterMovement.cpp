@@ -79,14 +79,15 @@ void AKnightCharacter::TryStartClimb()
 		AllLadders.Append(JeebTerrain::FortLadders());   // rope ladders up to the redwood forts
 		AllLadders.Append(JeebTerrain::CastleLadders());   // and up the castle wall
 	}
-	for (const JeebTerrain::FLadder& L : AllLadders)
+	for (int32 Pass = 0; Pass < 2; ++Pass)   // (the world's ladders, kept for good; then this map's own, MoveLab's, read fresh so they never outlive it)
+	for (const JeebTerrain::FLadder& L : Pass == 0 ? AllLadders : JeebTerrain::ExtraLadders())
 	{
-		const float DeckTop = (L.Top > 0.f) ? L.Top : VillageDeckTop;
+		const float DeckTop = (L.Top > 0.f || L.bAbsolute) ? L.Top : VillageDeckTop;
 		const FVector2D Rel = P2 - L.Pos;
 		const FVector2D Side(-L.Out.Y, L.Out.X);
 		if (FMath::Abs(FVector2D::DotProduct(Rel, Side)) > 70.f) continue;
 		const float Along = FVector2D::DotProduct(Rel, L.Out);
-				const float Ground = (L.Bottom > 0.f) ? L.Bottom : JeebTerrain::HeightAt(L.Pos.X, L.Pos.Y);
+				const float Ground = (L.Bottom > 0.f || L.bAbsolute) ? L.Bottom : JeebTerrain::HeightAt(L.Pos.X, L.Pos.Y);
 		const bool bAtBottom = !Move->IsFalling() && FeetZ < Ground + 60.f && Along > 0.f && Along < 150.f;
 		const bool bOnDeck = !Move->IsFalling() && FeetZ > DeckTop - 40.f && Along < 0.f && Along > -150.f;
 		int32 Dir = 0;
@@ -116,7 +117,8 @@ void AKnightCharacter::TryStartClimb()
 void AKnightCharacter::UpdateClimb(float Dt)
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	const bool bUp = PC && (PC->IsInputKeyDown(EKeys::W) || PC->IsInputKeyDown(EKeys::Up));
+	static const bool bTestUp = FParse::Param(FCommandLine::Get(), TEXT("SuitClimbUp"));   // (test pictures: keeps climbing)
+	const bool bUp = (bShotFace && bTestUp) || (PC && (PC->IsInputKeyDown(EKeys::W) || PC->IsInputKeyDown(EKeys::Up)));
 	const bool bDown = PC && (PC->IsInputKeyDown(EKeys::S) || PC->IsInputKeyDown(EKeys::Down));
 	if (!bUp) bClimbIgnoreUp = false;
 	const float Dir = (bUp && !bClimbIgnoreUp) ? 1.f : (bDown ? -1.f : 0.f);
@@ -154,9 +156,9 @@ void AKnightCharacter::ExitClimb(bool bAtTop, bool bAtBottom)
 	}
 	else if (bAtBottom)
 	{
-				const bool bFromDeck = ClimbGround > JeebTerrain::HeightAt(ClimbPos.X, ClimbPos.Y) + 40.f;   // a ladder between two terraces
+				const bool bFromDeck = FMath::Abs(ClimbGround - JeebTerrain::HeightAt(ClimbPos.X, ClimbPos.Y)) > 40.f;   // a ladder between two terraces
 		const FVector2D P = ClimbPos + ClimbOut * (bFromDeck ? 60.f : 115.f);
-		SetActorLocation(FVector(P.X, P.Y, (bFromDeck ? ClimbGround : JeebTerrain::HeightAt(P.X, P.Y)) + 95.f), false);
+		SetActorLocation(FVector(P.X, P.Y, (bFromDeck ? ClimbGround : FMath::Max(JeebTerrain::HeightAt(P.X, P.Y), ClimbGround)) + 95.f), false);
 	}
 	Move->SetMovementMode(MOVE_Falling);
 	if (!bAtTop && !bAtBottom)

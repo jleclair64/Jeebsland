@@ -84,6 +84,7 @@ void AKnightGameState::BuildWorld()
 	}
 
 	UWorld* World = GetWorld();
+	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 
 	// Cosy autumn evening: low golden sun, cool dusky shadows, soft haze
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
@@ -371,7 +372,54 @@ void AKnightGameState::BuildMoveLab()
 			Rock->FinishSpawning(RockAt);
 		}
 	}
-	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon
+	// A ladder up a tower, and a pond to fish in (owner, 2026-11-06, for testing climbing and fishing). Both sit east of the gear
+	// wall's far board, out past its ends (north +Y for the tower, south -Y for the pond), well clear of the X = 0 line the films run along.
+	// They use the real mechanics: the climb code looks the ladder up in JeebTerrain::ExtraLadders (exact heights, since this floor is
+	// not the open world's ground) and the pond is made of real AFishingSpot nodes, like the village pond.
+	{
+		const float TX = 1000.f, TY = 1650.f, TowerH = 360.f;   // the tower: 3 x 3 m, its deck TowerH up
+		Box(FVector(TX, TY, TowerH * 0.5f), FVector(300.f, 300.f, TowerH), FLinearColor(0.45f, 0.42f, 0.38f), true);
+		Box(FVector(TX, TY, TowerH + 4.f), FVector(316.f, 316.f, 8.f), FLinearColor(0.36f, 0.22f, 0.10f), true);   // a wooden deck cap
+		const float LX = TX - 150.f - 5.f;   // the ladder stands against the tower's -X face (facing the start side), Out = -X
+		for (int32 sd = -1; sd <= 1; sd += 2) Box(FVector(LX, TY + sd * 28.f, (TowerH + 30.f) * 0.5f), FVector(6.f, 6.f, TowerH + 30.f), FLinearColor(0.30f, 0.18f, 0.08f), false);
+		for (float Rz = 30.f; Rz < TowerH + 10.f; Rz += 38.f) Box(FVector(LX, TY, Rz), FVector(6.f, 56.f, 5.f), FLinearColor(0.30f, 0.18f, 0.08f), false);
+		JeebTerrain::FLadder L;
+		L.Pos = FVector2D(LX, TY);
+		L.Out = FVector2D(-1.f, 0.f);
+		L.Top = Z + TowerH + 8.f;   // (the cap's top)
+		L.Bottom = Z;
+		L.bAbsolute = true;
+		JeebTerrain::ExtraLadders().Add(L);
+
+		// The pond: a stone rim and a disc of water on the floor (nothing to bump into), with fishing spots on it
+		UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+		const float PX = 1000.f, PY = -1600.f, PondR = 330.f;
+		auto Disc = [&](float Radius, float Thick, float Zc, const FLinearColor& Col)
+		{
+			if (!Cyl) return;
+			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Floor);
+			M->SetStaticMesh(Cyl);
+			M->SetupAttachment(Root);
+			M->SetRelativeLocation(FVector(PX, PY, Zc));
+			M->SetRelativeScale3D(FVector(2.f * Radius / 100.f, 2.f * Radius / 100.f, Thick / 100.f));
+			M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			M->SetCastShadow(false);
+			M->RegisterComponent();
+			if (Base)
+				if (UMaterialInstanceDynamic* Mi = M->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), Col);
+		};
+		Disc(PondR + 30.f, 2.f, 1.f, FLinearColor(0.40f, 0.38f, 0.34f));
+		Disc(PondR, 3.f, 3.f, FLinearColor(0.06f, 0.24f, 0.36f));
+		FActorSpawnParameters FP;
+		FP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		for (int32 k = 0; k < 4; ++k)
+		{
+			const float A = FMath::DegreesToRadians(45.f + 90.f * k);
+			World->SpawnActor<AFishingSpot>(FVector(PX + 200.f * FMath::Cos(A), PY + 200.f * FMath::Sin(A), Z + 5.f), FRotator::ZeroRotator, FP);
+		}
+		World->SpawnActor<AFishingSpot>(FVector(PX, PY, Z + 5.f), FRotator::ZeroRotator, FP);
+	}
+	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();
 }

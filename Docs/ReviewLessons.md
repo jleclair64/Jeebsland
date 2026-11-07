@@ -47,6 +47,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Judge a grip from a close side crop where the fist and handle are separate in silhouette; a foreshortened or dark-on-dark view can't pass or fail it. Check an orientation request in two perpendicular views, and quote the owner's words in the brief: "lines up with the near-vertical line" was once briefed as hanging straight down.
 - Anything on his back follows the chest bone, so cloth that also follows it goes on past his waist like a board when he bends over: below the waist it has to hang. Check every swing frame from the side and from behind.
 - Anything built in code to stand in for part of a skinned armour piece (a hand, a plate) must match the piece beside it: its colour on a plain material has to be darkened to match the suit's painted texture, in more than one tier, and it must be as wide as its neighbour. Check the join from at least two sides.
+- Work out which way the owner's marked-up picture looks before reading it: a line drawn on a picture from above is a shield standing upright seen edge-on, not a shield tilted. Film from their angle, brief the reviewer on it, and judge a piece fixed to the arm by the angle of its plane to the forearm in that view.
+- A tool or axe has a wide head where a sword has a thin point, and the sword's clips bring that end up by his cheek: check the helm's clearance in the guard and the recovery from a crop where the knight fills half the frame.
 
 ## Moves and movement (motion-reviewer)
 - When a blend is lengthened, re-measure every contact number in the move: hips arriving late lift the blade. Judge a blend by its first frame's share, not its stated length. Anything raising a foot must ease in.
@@ -99,6 +101,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Items fixed rigidly to a limb (the shield on the forearm) must be checked at the clip's extremes: rolls turn the shield edge-on and stick it out.
 - Performance, for when the animator goes live for every knight: clips and name tables must be one shared copy loaded once, with names turned into indices at load; each knight then keeps only its poses and timers. The hand twist and hip offsets baked at load must run once only. Add update-rate-by-distance, and LODs for the suit.
 - A turn allowed during a move must settle onto its heading, not run at a constant speed and stop dead in a frame; check the frame where it arrives. When a film is meant to judge a body part (the legs in the air, a camera), frame the shot so that part is whole and in the middle, or the check is wasted.
+- When the owner asks for more of something (a lean), put the old and new side frames next to each other, the same camera, and hand over both. A film meant to judge a charge must include the charge: check the frame numbers against the log's phases first.
 
 ## Online (online-reviewer)
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
@@ -124,12 +127,14 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - A testing switch that changes server-evaluated geometry (hit boxes, ranges) is gated behind a test flag or chosen by the server before shipping.
 - Server-only resets need a matching client reset (ClientDied). State that drives what another machine draws must be replicated (RepMoveFlags). A client's choice the server reads goes through a checked request. Local aim-facing must yield to any forced facing.
 - Shared mesh helpers return early on a dedicated server, and command-line test switches check `-JeebShot` first.
+- Never merge per-map data into a function-level static that is built once (it outlives the map, and a later Play or travel keeps it): read the per-map list on its own each call, or clear the cache when the world is rebuilt.
 
 ## Packaged game (package-reviewer)
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).
 - Code compiles for Shipping (no editor-only fields).
 - List the test switches that are on before every package.
 - A show-or-hide that looks a section or slot up by name logs and skips when the name is not found, because a missed name silently leaves it visible. Command-line test hooks that move gear or hit boxes are off in Shipping (`!UE_BUILD_SHIPPING`).
+- A new switch in `[Jeebsland.Testing]` goes in CLAUDE.md's TEMPORARY list in the same change, since that section ships in a package.
 
 ## Code pitfalls
 - `FMath::SmoothStep(A, B, X)` needs A < B; use `JeebWorld::Smooth` for ramps that go down.

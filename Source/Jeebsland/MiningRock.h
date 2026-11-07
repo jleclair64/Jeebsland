@@ -25,6 +25,7 @@ public:
 		const float Sc = GetActorScale3D().X, Up = FMath::Clamp((Z / FMath::Max(Sc, 0.1f) - 31.f) / 46.f, -1.f, 1.f);
 		return FMath::Max(59.f * Sc * FMath::Sqrt(1.f - Up * Up), 22.f * Sc);
 	}
+	virtual float SurfaceAlong(const FVector& From, float Z) const override;
 
 protected:
 	virtual void BeginPlay() override;

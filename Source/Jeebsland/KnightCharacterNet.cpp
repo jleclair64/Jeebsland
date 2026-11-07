@@ -391,7 +391,6 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		break;
 	}
 
-	case EInvOp::SwingSet: SwingSet = uint8(FMath::Clamp(A, 0, 2)); break;
 
 	// ---- gathering: the server runs it; the player's machine is told to play the animation (ClientGather) ----
 	case EInvOp::Gather:

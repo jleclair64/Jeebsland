@@ -41,7 +41,7 @@ namespace
 		TEXT("CrouchIdle"), TEXT("CrouchWalk"),
 		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"),
 		TEXT("WeightedRun"), TEXT("ChestBlock"), TEXT("Drink"),
-		TEXT("HeavySwing"), TEXT("SlashInward"), TEXT("SlashCombo"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold") };
+		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold") };
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -645,6 +645,23 @@ void FKnightAnimator::KeepTipUp(FPose& P, const FInput& In, float Dt)
 	TurnInMesh(P, JeebAnim::RHand, FQuat::FindBetweenNormals(Dir, NewDir));
 }
 
+// A tool or battle axe has a wide head at the end of its haft where a sword has only a thin point: in the guard and on the way back to it, the sword's clips bring that end up by his cheek.
+// The wrist turns just enough to keep the head off the helm, more the closer it would have come, so it never jumps. Chopping and mining have their own hands (TwoHandTool).
+void FKnightAnimator::ToolHeadClear(FPose& P, const FInput& In) const
+{
+	if ((In.Kind != JeebItems::K_Axe && In.Kind != JeebItems::K_Pickaxe && In.Kind != JeebItems::K_BattleAxe) || TwoHandW > 0.f) return;
+	constexpr float Need = 34.f;   // (from the helm's middle to the head's: the helm's 14 and the head's 17, and a little air)
+	FQuat HandRot;
+	const FVector HandAt = BonePos(P, JeebAnim::RHand, &HandRot);
+	const FVector Dir = HandRot.RotateVector(L.BladeInHand).GetSafeNormal();
+	const FVector Helm = BonePos(P, JeebAnim::Head) + FVector(0.f, 0.f, 10.f);
+	const FVector ToolHead = HandAt + Dir * (WeaponDesign::BladeReach(In.Kind) + 1.f);
+	const FVector Away = ToolHead - Helm;
+	const float Off = Away.Size();
+	if (Off >= Need || Off < 1.f) return;
+	TurnInMesh(P, JeebAnim::RHand, FQuat::FindBetweenNormals(Dir, (Helm + Away / Off * Need - HandAt).GetSafeNormal()));
+}
+
 // ---------------- The frame ----------------
 
 void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, float ActorYaw)
@@ -689,6 +706,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	}
 	LiftDraggedFeet(Final, In, Dt);
 	KeepTipUp(Final, In, Dt);
+	ToolHeadClear(Final, In);
 	TwoHandTool(Final, In, Dt);
 	bHavePrev = true;
 
@@ -958,12 +976,12 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 			const float Turn = FMath::DegreesToRadians(15.f * Stride * Run);   // (his right foot ahead, his right shoulder back)
 			for (const int32 S : { Spine, Spine1, Spine2 }) TurnInMesh(B, S, FQuat(FVector::ZAxisVector, Turn / 3.f));
 			TurnInMesh(B, Spine1, FQuat(FVector::YAxisVector, FMath::DegreesToRadians(-3.f * FMath::Sin(2.f * PI * (Phase - 0.125f)) * Run)));
-			TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians((6.f - 1.5f * Step) * Run)));   // (the run's own lean is a lot with a weapon carried low: up a little, with a bob on each step)
+			TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-(26.f + 1.5f * Step) * Run)));   // (owner 2026-11-06: leaning into the run, more than the clip's own lean, with a bob on each step)
 			const FQuat Pump(FVector::XAxisVector, FMath::DegreesToRadians(6.f * Step * Run));
 			TurnInMesh(B, RFore, Pump);
 			TurnInMesh(B, LFore, Pump);
 			TurnInMesh(B, Head, FQuat(FVector::ZAxisVector, -Turn * 0.7f));
-			TurnInMesh(B, Head, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(2.f * Run)));
+			TurnInMesh(B, Head, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(14.f * Run)));   // (still looking where he is going)
 		}
 	}
 }
@@ -1043,57 +1061,86 @@ void FKnightAnimator::ExtendArm(FPose& P, float Deg, float W) const
 	TurnInMesh(P, RHand, HandRot * Turned.Inverse());
 }
 
-// Both hands on a chopping or mining tool (owner 2026-11-06). These clips are made for a long two-handed weapon, the hands about 28 cm apart all the way through, so the arms need nothing:
-// the tool just lies along the line from the left fist through the right, its edge leading in the plane of the swing, and slides back through the right fist (ToolSlide) so that its butt is in the left.
-static constexpr float ToolSlide = 18.f;
+// Both hands on a chopping or mining tool (owner 2026-11-06). These clips are made for a long two-handed weapon, so the arms need nothing: the haft lies on the line through the two fists' real grip
+// points (measured, not guessed: a fist's grip point moves as the wrist turns, so this goes round a few times), each hand turning only the shortest way onto it. The tool then rolls in the fist about
+// its own haft until its edge leads, and the hand has no part in that: turning the hand as well broke the wrist back into the forearm. And it slides back through the right fist until its butt is past
+// the left: HeavySwing's hands are up to 34 cm apart, and an axe has 16 cm behind the grip.
+static float ToolSlide(int32 Kind) { return Kind == JeebItems::K_Axe ? 30.f : 18.f; }
+static float ToolEdgeSign(int32 Kind) { return Kind == JeebItems::K_Axe ? -1.f : 1.f; }   // (the axe's head is built on the -X side of its haft, so that it faces forward as he carries it)
 
-void FClipLib::ToolPose(FPose& P, float W) const
+static FVector GripInRightHand(const FTransform& RightGrip) { return RightGrip.TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR)); }
+static FVector GripInLeftHand(const FTransform& LeftGrip) { return LeftGrip.TransformPosition(KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL)); }
+
+float FClipLib::ToolPose(FPose& P, float W, int32 Kind) const
 {
+	const FVector RG = GripInRightHand(RightGrip), LG = GripInLeftHand(LeftGrip);
+	const FVector LeftHole = LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1)).GetSafeNormal();
+	const FQuat R0 = P.Rot[Bone[RHand]], L0 = P.Rot[Bone[LHand]];
+	FVector Dir = FVector::ZeroVector;
 	FQuat HR, LR;
-	const FVector R = BonePos(P, RHand, &HR), Lf = BonePos(P, LHand, &LR);
-	const FVector RF = R + (R - BonePos(P, RFore)).GetSafeNormal() * 7.f, LF = Lf + (Lf - BonePos(P, LFore)).GetSafeNormal() * 7.f;
-	const FVector Dir = (RF - LF).GetSafeNormal();
-	if (Dir.IsNearlyZero()) return;
-	const FQuat Align = FQuat::FindBetweenNormals(HR.RotateVector(BladeInHand).GetSafeNormal(), Dir);
-	// (the edge: square to his right, so it leads in a swing up and down in front of him. Where the tool lies nearly along his right that means nothing, and it keeps the clip's own twist.)
+	for (int32 i = 0; i < 3; ++i)
+	{
+		const FVector A = BonePos(P, RHand, &HR), B = BonePos(P, LHand, &LR);
+		Dir = (A + HR.RotateVector(RG) - B - LR.RotateVector(LG)).GetSafeNormal();
+		if (Dir.IsNearlyZero()) return 0.f;
+		TurnInMesh(P, RHand, FQuat::FindBetweenNormals(HR.RotateVector(BladeInHand).GetSafeNormal(), Dir));
+		TurnInMesh(P, LHand, FQuat::FindBetweenNormals(LR.RotateVector(LeftHole).GetSafeNormal(), Dir));
+	}
+	// (the edge: square to his right, so it leads in a swing up and down in front of him. Where the tool lies nearly along his right that means nothing, and it keeps the roll it has.)
+	BonePos(P, RHand, &HR);
 	const FVector Cross = FVector::CrossProduct(FVector(-1.f, 0.f, 0.f), Dir);
 	const float Sure = FMath::SmoothStep(0.2f, 0.5f, float(Cross.Size()));
 	const FVector Want = Cross.GetSafeNormal();
-	FVector Now = (Align * HR).RotateVector(ToolEdgeInHand);
+	FVector Now = HR.RotateVector(ToolEdgeInHand) * ToolEdgeSign(Kind);
 	Now = (Now - Dir * FVector::DotProduct(Now, Dir)).GetSafeNormal();
-	const float Twist = FMath::Atan2(float(FVector::DotProduct(FVector::CrossProduct(Now, Want), Dir)), float(FVector::DotProduct(Now, Want))) * Sure;
-	TurnInMesh(P, RHand, FQuat::Slerp(FQuat::Identity, FQuat(Dir, Twist) * Align, W));
-	const FVector Hole = LR.RotateVector(LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1))).GetSafeNormal();
-	TurnInMesh(P, LHand, FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(Hole, Dir), W));
+	const float Roll = FMath::Atan2(float(FVector::DotProduct(FVector::CrossProduct(Now, Want), Dir)), float(FVector::DotProduct(Now, Want))) * Sure;
+	P.Rot[Bone[RHand]] = Nlerp(R0, P.Rot[Bone[RHand]], W);
+	P.Rot[Bone[LHand]] = Nlerp(L0, P.Rot[Bone[LHand]], W);
+	return Roll * W;
 }
 
-FVector FClipLib::ToolStrike(const FTransform& Grip) const
+FVector FClipLib::ToolStrike(const FTransform& Grip, int32 Kind) const
 {
-	constexpr float HeadAlong = 64.f, EdgeOut = 15.f;   // (from the grip, as WeaponDesign builds the axe; the pickaxe model's point is about the same)
+	// (from the grip. The axe as WeaponDesign builds it; the pickaxe's point measured on its model, Tools/prop_clean.py's Pickaxe.fbx: 68.5 down the haft, 24.7 out)
+	const float HeadAlong = Kind == JeebItems::K_Pickaxe ? 68.5f : 64.f, EdgeOut = Kind == JeebItems::K_Pickaxe ? 24.7f : 17.f;
 	return Grip.TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR))
 		+ Grip.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal() * HeadAlong
-		+ Grip.TransformVectorNoScale(ToolEdgeTurn.RotateVector(FVector::ForwardVector)).GetSafeNormal() * EdgeOut;
+		+ Grip.TransformVectorNoScale(ToolEdgeTurn.RotateVector(FVector::ForwardVector)).GetSafeNormal() * EdgeOut * ToolEdgeSign(Kind);
+}
+
+// The tool's roll about its haft and its slide along it, applied to where the fist has it
+static void PlaceToolInFist(FTransform& G, float Roll, float Slide)
+{
+	const FVector Along = G.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal();
+	const FVector Pivot = G.TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR));
+	const FQuat Q(Along, Roll);
+	G.SetLocation(Pivot + Q.RotateVector(G.GetLocation() - Pivot) - Along * Slide);
+	G.SetRotation((Q * G.GetRotation()).GetNormalized());
 }
 
 FTransform FKnightAnimator::RightGripWorld() const
 {
 	FTransform G = L.RightGrip * BoneWorld(JeebAnim::RHand);
-	if (TwoHandW > 0.005f) G.AddToTranslation(G.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal() * -ToolSlide * TwoHandW);
+	if (TwoHandW > 0.005f) PlaceToolInFist(G, ToolRoll, ToolSlide(ToolKind) * FMath::SmoothStep(0.f, 1.f, TwoHandW));
 	return G;
+}
+
+void FKnightAnimator::ToolHands(float& OutOffHaft, float& OutFromButt) const
+{
+	const FTransform Fist = L.RightGrip * BoneWorld(JeebAnim::RHand);
+	const FVector Along = Fist.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal();
+	const FVector Rg = BoneWorld(JeebAnim::RHand).TransformPosition(GripInRightHand(L.RightGrip)), Lg = BoneWorld(JeebAnim::LHand).TransformPosition(GripInLeftHand(L.LeftGrip));
+	const float Back = float(FVector::DotProduct(Rg - Lg, Along));
+	OutOffHaft = float(FVector::Dist(Lg + Along * Back, Rg));
+	OutFromButt = 16.f + ToolSlide(ToolKind) - Back;   // (an axe has 16 cm of haft behind its grip)
 }
 
 void FKnightAnimator::TwoHandTool(FPose& P, const FInput& In, float Dt)
 {
 	const bool bOn = StateKey == 73 || StateKey == 74;
 	TwoHandW = FMath::FInterpConstantTo(TwoHandW, bOn ? 1.f : 0.f, Dt, 3.3f);   // (about 0.3 s, eased: the tool turns from how he carries it into both hands without a jump)
-	if (TwoHandW >= 0.005f) L.ToolPose(P, FMath::SmoothStep(0.f, 1.f, TwoHandW));
-}
-
-// The rows of KnightMoves.csv the sword's two swings play (T cycles them for testing). Always right to left, then left to right.
-static const TCHAR* SwingRow(bool bSecond, int32 Set)
-{
-	static const TCHAR* const Rows[3][2] = { { TEXT("Jab1"), TEXT("Jab2") }, { TEXT("Jab1B"), TEXT("Jab2B") }, { TEXT("Jab1C"), TEXT("Jab2C") } };
-	return Rows[FMath::Clamp(Set, 0, 2)][bSecond ? 1 : 0];
+	if (bOn) ToolKind = In.Kind;
+	ToolRoll = TwoHandW >= 0.005f ? L.ToolPose(P, FMath::SmoothStep(0.f, 1.f, TwoHandW), ToolKind) : 0.f;
 }
 
 // How far the arm reaches out through a swing: U through it, From..To its hit frames
@@ -1279,7 +1326,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 30: case 31:
 	{
 		const bool b2 = Key == 31;
-		const TCHAR* Nm = SwingRow(b2, In.SwingSet);
+		const TCHAR* Nm = b2 ? TEXT("Jab2") : TEXT("Jab1");
 		if (const FMove* M = Moves.Find(Nm))
 		{
 			const float U = In.MoveU;
@@ -1299,11 +1346,10 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 				// (owner 2026-11-06) It starts exactly at the first swing's pull-back, where the button caught it, and creeps back into the big wind-up over the whole charge. The shake is in the
 				// hand and a little of the forearm, across the blade, so the shoulders stay still.
 				const float C = FMath::Clamp(In.SmashCharge, 0.f, 1.f), Creep = C * C * (3.f - 2.f * C);
-				const TCHAR* First = SwingRow(false, In.SwingSet);
-				if (const FMove* J = Moves.Find(First))
+				if (const FMove* J = Moves.Find(TEXT("JabCharge")))   // (its own clip's pull-back, the one the owner liked: the first swing itself is another clip)
 				{
 					PlayKeepOffArm = 0.6f;
-					PlayAt(First, MoveClipTime(*J, In.MoveU, Tn.Jab1From, Tn.Jab1To), Speed, B, nullptr);
+					PlayAt(TEXT("JabCharge"), MoveClipTime(*J, In.MoveU, Tn.Jab1From, Tn.Jab1To), Speed, B, nullptr);
 					ExtendArm(B, Jab1Reach, SwingReach(In.MoveU, Tn.Jab1From, Tn.Jab1To) * (1.f - Creep));
 				}
 				PlayKeepOffArm = 0.7f;
@@ -1588,16 +1634,16 @@ void FClipLib::SolveGear()
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
 			ShieldAtRest = FTransform(Q, Mid + Face * Out - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
-		// Held out (owner 2026-11-06, with pictures of a viking and a templar): the upper arm hangs, a little out and forward; the forearm lies nearly level, forward and out to his left, thumb up,
-		// and the shield stands square on its end with the fist behind its middle. These bones' turns are the pose every frame takes (ShieldArm); the same strap serves any clip with the forearm up.
+		// Held out (owner 2026-11-06, with a drawing over a picture): the elbow well out to his left, the forearm level and running forward and in across him, thumb up, and the shield flush along the
+		// outside of the forearm, parallel to it and centred on it. These bones' turns are the pose every frame takes (ShieldArm); the same strap serves any clip with the forearm up.
 		{
 			if (RestC) Sample(*RestC, 0.f, P, false);
 			auto ToMesh = [](const FVector& G) { return FVector(-G.Y, G.X, G.Z); };   // (game frame to mesh frame)
-			FVector ArmGame(0.16f, -0.30f, -0.94f), ForeGame(0.80f, -0.60f, 0.06f);
-			float OutFromHand = 11.f;
+			FVector ArmGame(0.30f, -0.65f, -0.68f), ForeGame(0.75f, 0.66f, 0.06f);
+			float OutFromFore = 8.f;
 			FString S; TArray<FString> Pr;   // (test pictures: -ShieldArmTune=ArmX_ArmY_ForeX_ForeY_ForeZ_Out)
 			if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("ShieldArmTune="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
-			{ ArmGame = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), -0.94f); ForeGame = FVector(FCString::Atof(*Pr[2]), FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4])); OutFromHand = FCString::Atof(*Pr[5]); }
+			{ ArmGame = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), -0.68f); ForeGame = FVector(FCString::Atof(*Pr[2]), FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4])); OutFromFore = FCString::Atof(*Pr[5]); }
 			const FVector ArmDir = ToMesh(ArmGame.GetSafeNormal()), ForeDir = ToMesh(ForeGame.GetSafeNormal());
 			TurnInMesh(P, LArm, FQuat::FindBetweenNormals((BonePos(P, LFore) - BonePos(P, LArm)).GetSafeNormal(), ArmDir));
 			TurnInMesh(P, LFore, FQuat::FindBetweenNormals((BonePos(P, LHand) - BonePos(P, LFore)).GetSafeNormal(), ForeDir));
@@ -1611,10 +1657,10 @@ void FClipLib::SolveGear()
 			const int32 Arm[4] = { LShoulder, LArm, LFore, LHand };
 			for (int32 i = 0; i < 4; ++i) ShieldArm[i] = P.Rot[Bone[Arm[i]]];
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
-			const FVector Face = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			const FVector Up = (FVector::UpVector - Face * FVector::DotProduct(FVector::UpVector, Face)).GetSafeNormal();
-			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
-			ShieldAtGuard = FTransform(Q, Hand.GetLocation() + Face * OutFromHand - Q.RotateVector(Strap)) * Fore.Inverse();
+			const FVector Along = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
+			const FVector Face = FVector::CrossProduct(Along, FVector::UpVector).GetSafeNormal();   // (level, square to the forearm, on its outer side: forward and to his left)
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, FVector::UpVector).ToQuat();
+			ShieldAtGuard = FTransform(Q, FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.5f) + Face * OutFromFore - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing straight ahead, tilted back a touch, in the middle of his chest
 			if (const FMove* M = Moves.Find(TEXT("Block")))
@@ -1718,6 +1764,26 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 	for (int32 m = 0; m < Slots.Num(); ++m)
 		for (int32 i = 0; i < Piece_Count; ++i)
 			if (Slots[m].MaterialSlotName.ToString().Contains(SlotNames[i])) PieceMat[i] = m;
+	// His mail, always there under the plate (owner 2026-11-06: an arm seen from below or a helmet seen through its visor looked hollow). Tools/knight_under_export.py keeps it from ever showing through:
+	// its bone weights are the nearest plate's, and its material moves it a few centimetres away from the camera as it draws.
+	if (USkeletalMesh* Under = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/NewSuit/SK_NewSuitUnder.SK_NewSuitUnder")))
+	{
+		UnderComp = NewObject<USkeletalMeshComponent>(Owner);
+		UnderComp->SetupAttachment(Comp);
+		UnderComp->SetSkinnedAssetAndUpdate(Under);
+		UnderComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		UnderComp->SetCastShadow(false);
+		UnderComp->SetBoundsScale(2.5f);
+		UnderComp->RegisterComponent();
+		UnderComp->SetLeaderPoseComponent(Comp);
+		if (!UE_BUILD_SHIPPING && FParse::Param(FCommandLine::Get(), TEXT("ShotUnderRed")))   // (test pictures: anything red coming through a plate is wrong)
+			if (UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(UnderComp->GetMaterial(0), UnderComp))
+			{
+				M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(3.f, 0.f, 0.f));
+				UnderComp->SetMaterial(0, M);
+			}
+	}
+	else UE_LOG(LogTemp, Warning, TEXT("JEEBANIM no under mesh"));
 	return Comp;
 }
 
@@ -1834,20 +1900,20 @@ FTransform FKnightAnimator::DrinkWorld() const
 	return G;
 }
 
-FVector FKnightAnimator::ToolHeadWorld(int32 Kind) const { return L.ToolStrike(RightGripWorld()); }
+FVector FKnightAnimator::ToolHeadWorld(int32 Kind) const { return L.ToolStrike(RightGripWorld(), Kind); }
 
-FVector FClipLib::ToolContact(bool bChop, int32 Kind, float ClipT) const
+FVector FClipLib::ToolContact(bool bChop, int32 Kind, float Share) const
 {
 	const FMove* M = Moves.Find(bChop ? TEXT("Chop") : TEXT("Mine"));
 	const FClip* C = M ? Find(*M->Clip) : nullptr;
 	if (!C) return FVector(100.f, 0.f, 100.f);
 	FPose P;
 	P.Rot = RefRot;
-	Sample(*C, ClipT >= 0.f ? ClipT : M->ClipFollow, P, false);
-	ToolPose(P, 1.f);
+	Sample(*C, FMath::Lerp(M->ClipStart, M->ClipFollow, Share), P, false);
+	const float Roll = ToolPose(P, 1.f, Kind);
 	FTransform G = RightGrip * BindInGame(P, RHand);
-	G.AddToTranslation(G.TransformVectorNoScale(KnightDesign::BladeDir(1)).GetSafeNormal() * -ToolSlide);
-	return ToolStrike(G);
+	PlaceToolInFist(G, Roll, ToolSlide(Kind));
+	return ToolStrike(G, Kind);
 }
 
 FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const

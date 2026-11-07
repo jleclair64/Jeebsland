@@ -189,6 +189,56 @@ void AGearWall::Build()
 	}
 	for (int32 t = 0; t < NT; ++t)   // tier names down the left edge
 		AddSign(FVector(WeaponX - 2.f, -0.5f * Len - 70.f, WeaponZ0 + t * WeaponRowH), Back, TierName(t), 26.f);
+
+	// ---- everything else (owner, 2026-11-06, for testing): the BACK of the weapon board, facing away from the start (+X). Potions,
+	// rings, amulets and the helm brush, then the things you gather. A band per two groups, each group under its own header, each
+	// item with its name under it (rows run left to right, seen from +X, with falling Y). Each peg gives a full stack. ----
+	{
+		constexpr float FaceX = WeaponX + 30.f, BandPitch = 115.f, TopHeaderZ = 450.f, Spacing = 125.f, GroupGap = 70.f, ItemSize = 50.f;
+		AddBoard(FVector(WeaponX + 16.f, 0.f, 275.f), FVector(4.f, 720.f, 275.f), Wood);
+		AddSign(FVector(WeaponX + 22.f, 0.f, 505.f), FRotator::ZeroRotator, TEXT("EVERYTHING ELSE  -  look at one, E takes a copy"), 32.f);   // (its own strip above the first band)
+		struct FItem { int32 Id; bool bLay; };
+		struct FGroup { FString Head; TArray<FItem> Items; };
+		auto Many = [](int32 Kind, int32 Num) { TArray<FItem> A; for (int32 i = 0; i < Num; ++i) A.Add({ GearId(Kind, i), true }); return A; };
+		auto Mats = [](std::initializer_list<EItemType> L, bool bLay) { TArray<FItem> A; for (EItemType T : L) A.Add({ MaterialId(T), bLay }); return A; };
+		TArray<FItem> Potions;
+		for (int32 p = 0; p < NumPotions(); ++p) Potions.Add({ PotionId(p), false });
+		TArray<FItem> Charms = Many(K_Amulet, NumAmulets());
+		Charms.Add({ GearId(K_Crest, 0), true });
+		// (copper ore, coal and onyx are retired and raw pork has no source: left off)
+		const TArray<TArray<FGroup>> Bands = {
+			{ { TEXT("Potions"), Potions }, { TEXT("Rings"), Many(K_Ring, NumRings()) } },
+			{ { TEXT("Amulets and helm brush"), Charms }, { TEXT("Logs"), Mats({ EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs }, true) } },
+			{ { TEXT("Ores"), Mats({ EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre }, false) }, { TEXT("Gems"), Mats({ EItemType::Diamond, EItemType::Emerald }, false) } },
+			{ { TEXT("Fish"), Mats({ EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp }, true) }, { TEXT("Animal drops"), Mats({ EItemType::Hide, EItemType::Bones }, true) } } };
+		for (int32 b = 0; b < Bands.Num(); ++b)
+		{
+			const float HeaderZ = TopHeaderZ - b * BandPitch;
+			float Total = GroupGap * (Bands[b].Num() - 1);
+			for (const FGroup& G : Bands[b]) Total += G.Items.Num() * Spacing;
+			float Y = 0.5f * Total;   // (the band's left edge as seen from +X)
+			for (const FGroup& G : Bands[b])
+			{
+				const float W = G.Items.Num() * Spacing;
+				AddSign(FVector(WeaponX + 22.f, Y - 0.5f * W, HeaderZ), FRotator::ZeroRotator, G.Head, 22.f);
+				for (int32 i = 0; i < G.Items.Num(); ++i)
+				{
+					const int32 Id = G.Items[i].Id;
+					const float CY = Y - (i + 0.5f) * Spacing;
+					AddItem(Id, FMath::Max(1, StackSize(Id)), FVector(FaceX, CY, HeaderZ - 42.f), ItemSize, G.Items[i].bLay);
+					FString Nm = IsMaterial(Id) ? FString(MaterialName(MaterialType(Id))) : ItemName(Id);
+					if (Nm.Len() > 11)   // (two short lines, so a name never runs into its neighbour)
+					{
+						int32 Cut = INDEX_NONE;
+						for (int32 c = 0; c < Nm.Len(); ++c) if (Nm[c] == TEXT(' ') && (Cut == INDEX_NONE || FMath::Abs(c - Nm.Len() / 2) < FMath::Abs(Cut - Nm.Len() / 2))) Cut = c;
+						if (Cut != INDEX_NONE) Nm = Nm.Left(Cut) + TEXT("\n") + Nm.Mid(Cut + 1);
+					}
+					AddSign(FVector(WeaponX + 22.f, CY, HeaderZ - 82.f), FRotator::ZeroRotator, Nm, 13.f);
+				}
+				Y -= W + GroupGap;
+			}
+		}
+	}
 }
 
 int32 AGearWall::PegAt(const FVector& From, const FVector& Dir, const FVector& Near, float MaxDist) const

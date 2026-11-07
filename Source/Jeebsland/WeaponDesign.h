@@ -119,12 +119,12 @@ namespace WeaponDesign
 		}
 		case K_Axe:
 		{
-			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 10, 2.1, 9.5, 2.3, 0, 2.3, -60, 2.0, -70, 0, -71 }), 12, 1.0, 1.0, Pl);
+			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 16, 2.1, 15.5, 2.3, 0, 2.3, -60, 2.0, -70, 0, -71 }), 12, 1.0, 1.0, Pl);   // (16 behind the grip: room for the left fist in a two-handed chop)
 			{ FMD& M = Add(Trim);
-			  RBox(M, 3.6, 2.4, 6.0, 0.6, At(-1, 0, -62)); }                // socket on the haft
-			{ FMD& M = Add(Plate);
-			  RBox(M, 7.5, 1.5, 9.0, 0.7, At(7.0, 0, -64));                    // head
-			  Ellipsoid(M, 3.0, 1.0, 13.0, 1.0, 1.0, 14, 10, At(14.0, 0, -64)); } // curved cutting edge
+			  RBox(M, 3.6, 2.4, 6.0, 0.6, At(1, 0, -62)); }                 // socket on the haft
+			{ FMD& M = Add(Plate);                                              // (the -X side: forward as he carries it, owner 2026-11-06)
+			  RBox(M, 7.5, 1.5, 9.0, 0.7, At(-7.0, 0, -64));                   // head
+			  Ellipsoid(M, 3.0, 1.0, 13.0, 1.0, 1.0, 14, 10, At(-14.0, 0, -64)); } // curved cutting edge
 			break;
 		}
 		case K_BattleAxe:

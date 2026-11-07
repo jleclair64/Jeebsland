@@ -73,7 +73,6 @@ enum class EInvOp : uint8
 	HutLoot,        // At: the cottage
 	PickLock,       // At: the cottage
 	Gather,         // At: the rock, tree or fishing spot
-	SwingSet,       // A: which look the sword's swings have (testing)
 	Lore,           // A lore entry (heard from a villager)
 	BankDepositHot, // A bar slot: that weapon into the bank
 	ToggleDoor,     // At: the cottage (open or shut its door)
@@ -427,8 +426,6 @@ protected:
 	void OnInteractKey();       // E: sit, trade, talk, mount, open doors ...
 	void UseDoor(ACottage* Hut);   // open, close, or try to pick the lock
 	void CallHorse();           // (T, when the horse is back)
-	void CycleSwingSet();       // T, for testing: the next look for the sword's two swings
-	UPROPERTY(Replicated) uint8 SwingSet = 0;   // which rows of KnightMoves.csv they play (every machine must agree: the server's pose places the hit boxes)
 	void Mount(AHorse* H);
 	void Dismount();
 	void SitOnSeat(int32 SeatIdx);
