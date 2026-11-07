@@ -151,6 +151,7 @@ float AKnightCharacter::BowWalkShare() const
 
 void AKnightCharacter::RightDown()
 {
+	if (IsUIOpen() || bPanelCursor) return;   // (owner 2026-11-06: with the cursor out, a click on the HUD never aims, draws or blocks)
 	bAimHeld = true;
 	StartBlock();
 	if (JeebItems::IsShooter(SelectedKind()) && !IsUIOpen() && !bPanelCursor) StartDraw();
@@ -311,13 +312,20 @@ void AKnightCharacter::TickBow(float Dt)
 		if (bCross && bCrossQueued && IsLocallyControlled() && BowT >= JeebTune::V().CrossRaise) ReleaseDraw();
 	}
 	else if (Bow == EBow::Recover && BowT >= BowRecover) SetBow(EBow::None);
+	// Cursor out (Tab) or a screen open: a draw in progress is cancelled without shooting (the arrow is kept), and both buttons are forgotten so nothing sticks or fires when it goes away again
+	if (IsLocallyControlled() && (IsUIOpen() || bPanelCursor))
+	{
+		if (Bow == EBow::Drawing) CancelDraw();
+		if (Smash == ESmash::Deciding || Smash == ESmash::Charging) SetSmash(ESmash::None);
+		bAttackDown = false; bAimHeld = false;
+	}
 	// The button still down after a shot, a roll or a weapon swap: straight back to drawing
 	if (IsLocallyControlled() && (bAimHeld || bAttackDown) && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
 
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		const bool bAimCam = Bow == EBow::Drawing || ((bAimHeld || bAttackDown) && bBowIn && !bTaken);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
+		const bool bAimCam = Bow == EBow::Drawing || ((bAimHeld || bAttackDown) && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{

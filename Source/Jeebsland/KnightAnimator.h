@@ -93,6 +93,8 @@ namespace JeebAnim
 		FVector ToolContact(bool bChop, int32 Kind, float Share = 1.f) const;   // (Share: how far through the blow, 0 tool up, 1 the end of it)
 		// A chopping or mining clip holds a long two-handed weapon: the tool runs from the left fist through the right. Turns the hands so, by W, and returns how far the tool rolls in the fist so that its edge leads.
 		float ToolPose(FPose& P, float W, int32 Kind) const;
+		void ReachTo(FPose& P, int32 Upper, int32 Mid, int32 End, const FVector& Target, const FVector& ElbowHint) const;
+		void BothHandsOnGrip(FPose& P, float W, float Below) const;
 		FVector ToolStrike(const FTransform& Grip, int32 Kind) const;   // the working point of the tool's edge, given where WristR is
 		FVector ToolEdgeInHand = FVector::ZeroVector;       // the way a tool's edge points, in the hand bone's frame
 		FQuat ToolEdgeTurn = FQuat::Identity;
@@ -241,6 +243,8 @@ private:
 	void Inertialize(const FPose& Target, FPose& Out, float Dt);
 	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f, float LegSeconds = 0.f);
 	void KeepTipUp(FPose& P, const FInput& In, float Dt);
+	void GreatGripLine(FPose& P, const FInput& In, float Dt);
+	void LevelCut(FPose& B, int32 Kind, float W, float HandWant, float TipWant, float Dt);
 	void ToolHeadClear(FPose& P, const FInput& In) const;
 	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
 	void ExtendArm(FPose& P, float Deg, float W) const;
@@ -296,6 +300,8 @@ private:
 	float AirT = 0.f;
 	float ShakePhase = 0.f;  // the charged smash's tremble
 	float ShieldArmW = 0.f;  // how far the left arm is in its shield pose
+	float CutHeading = 0.f, CutAt = -10.f;   // (which way the blade points across the floor: LevelCut)
+	float GreatW = 0.f, GreatLineW = 0.f;   // the big sword: how far the left hand is on the grip, and how far the blade follows the line through his fists
 	float TwoHandW = 0.f;    // how far the left hand is on the tool's haft
 	float ToolRoll = 0.f;    // how far the tool has rolled in the fist about its haft (radians)
 	int32 ToolKind = 0;      // the tool being worked with

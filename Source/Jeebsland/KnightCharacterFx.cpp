@@ -224,7 +224,7 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		// front of the body.
 		const float T = AttackT / FMath::Max(AttackDur, 0.01f);
 		float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.84f;   // (owner 2026-11-06: the first one's streak runs on further round its arc)
-		if (bSweep) { From = SweepActiveFrom; To = SweepActiveTo; }
+		if (bSweep) { From = FMath::Max(SweepActiveFrom, JeebTune::V().SweepTrailFrom); To = SweepActiveTo; }   // (owner 2026-11-06: no trail while the tip skims the floor; Tuning.ini SweepTrailFrom)
 		if (bDash) { From = (DashActiveFrom - 0.06f) / FMath::Max(AttackDur, 0.01f);   // (from the thrust itself, just before it can hit)
  To = DashActiveTo / FMath::Max(AttackDur, 0.01f) + 0.08f; }
 		const float Window = FMath::SmoothStep(From, From + 0.05f, T) * (1.f - FMath::SmoothStep(To - 0.08f, To, T));

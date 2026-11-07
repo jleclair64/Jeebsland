@@ -40,7 +40,7 @@
 
 void AKnightCharacter::Interact()
 {
-	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
+	bAttackDown = !(IsUIOpen() || bPanelCursor);   // (held: the sword's smash attack, see TickSmash; a click on the HUD with the cursor out (Tab) is not a game click)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
 	// Shooters (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
@@ -173,7 +173,7 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 		Controller->GetPlayerViewPoint(From, Rot);
 		for (TActorIterator<AGearWall> It(GetWorld()); It; ++It)
 		{
-			const int32 Peg = It->PegAt(From, Rot.Vector(), GetActorLocation(), 350.f);
+			const int32 Peg = It->PegAt(From, Rot.Vector(), GetActorLocation(), 450.f);
 			if (Peg >= 0) { FoundWall = *It; FoundPeg = Peg; return EInteract::GearWall; }
 		}
 	}
@@ -471,6 +471,7 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 {
 	ActiveNode = Node;
 	GatherStart = GetActorLocation();
+	GatherKind = SelectedKind();
 	GatherWalkLeft = 0.f;
 	if (Skill != ESkillType::Fishing)   // (square on to it, so that the swing lands on it)
 	{
@@ -534,10 +535,16 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 	}
 }
 
+bool AKnightCharacter::WorkingOn(const AResourceNode* Node) const { return ActiveNode.Get() == Node; }
+
 // The walk into place: at most a moment, facing the node all the way. Nothing here is a teleport: a blocked spot just means he works from as near as he got.
 void AKnightCharacter::TickGatherWalk(float Dt)
 {
-	if (GatherWalkLeft <= 0.f) return;
+	if (GatherWalkLeft <= 0.f)
+	{
+		if (bSwinging && ActiveNode.IsValid()) SetActorRotation(FRotator(0.f, GatherYaw, 0.f));   // (at work: looking round with the camera doesn't turn him off the tree)
+		return;
+	}
 	if (!ActiveNode.IsValid()) { GatherWalkLeft = 0.f; return; }
 	GatherWalkLeft -= Dt;
 	SetActorRotation(FRotator(0.f, GatherYaw, 0.f));

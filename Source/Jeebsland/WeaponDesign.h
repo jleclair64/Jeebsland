@@ -58,6 +58,7 @@ namespace WeaponDesign
 		case JeebItems::K_Spear: return 155.f;
 		case JeebItems::K_BattleAxe: return 103.f;
 		case JeebItems::K_Axe: case JeebItems::K_Pickaxe: return 71.f;
+		case JeebItems::K_Rod: return 128.f;
 		case JeebItems::K_Staff: return 113.f;
 		case JeebItems::K_Wand: return 43.f;
 		default: return 70.f;
@@ -98,9 +99,9 @@ namespace WeaponDesign
 		}
 		case K_Broadsword:
 		{
-			Lathe(Add(Leather), KnightDesign::Prof({ 0, 16, 2.3, 15.5, 2.6, 8, 2.3, 0, 2.6, -8, 2.3, -15.5, 0, -16 }), 14, 1.0, 1.0, Pl);
+			Lathe(Add(Leather), KnightDesign::Prof({ 0, 23, 2.3, 22.5, 2.6, 14, 2.3, 7, 2.6, 0, 2.3, -8, 2.6, -13, 0, -16 }), 14, 1.0, 1.0, Pl);   // (long enough for both fists, owner 2026-11-06)
 			{ FMD& M = Add(Trim);
-			  Blob(M, 4.2, 4.2, 4.2, At(0, 0, 19));
+			  Blob(M, 4.2, 4.2, 4.2, At(0, 0, 26));
 			  RBox(M, 2.2, 15.0, 2.0, 0.5, At(0, 0, -18));
 			  Blob(M, 3.0, 3.0, 3.0, At(0, 15.5, -18)); Blob(M, 3.0, 3.0, 3.0, At(0, -15.5, -18)); }
 			BladeSolid(Add(Plate), { {-19, 7.0, 1.9, 0}, {-80, 6.3, 1.7, 0}, {-95, 4.6, 1.3, 0}, {-107, 2.0, 0.8, 0}, {-112, 0, 0, 0} }, Pl);

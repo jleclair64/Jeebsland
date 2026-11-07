@@ -61,6 +61,7 @@ private:
 	FTimerHandle RespawnTimer;
 	int32 Charges = 1;
 	float EffectiveSeconds = 2.f;
+	float WorkLeft = 0.f;   // seconds of work left in this click
 	bool bBeingGathered = false;
 
 	bool bLockedNode = false;

@@ -328,7 +328,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		{
 			if (!It->GetPegs().IsValidIndex(A)) continue;
 			const AGearWall::FPeg& P = It->GetPegs()[A];
-			if (FVector::Dist(P.Pos, GetActorLocation()) > 400.f) break;   // (the player's machine offers pegs within 350 cm; a little slack for lag)
+			if (FVector::Dist(P.Pos, GetActorLocation()) > 480.f) break;   // (the player's machine offers pegs within 450 cm; a little slack for lag)
 			LastWallTake = Now;
 			if (Sk->AddInvItem(P.Id, P.Count)) Sk->Say(1.5f, FColor::White, FString::Printf(TEXT("Took the %s."), *JeebItems::ItemName(P.Id)));
 			else Sk->Say(2.f, Warn, TEXT("Your pack is full."));
@@ -543,6 +543,7 @@ void AKnightCharacter::OnRep_MoveFlags()
 	bSwinging = bTool;
 	bSideways = (RepMoveFlags & 64) != 0;
 	SwingPeriod = bSideways ? 1.25f : 1.f;
+	bFishing = (RepMoveFlags & 128) != 0;
 }
 
 // The server says we fell: wake up in Blackrock here too

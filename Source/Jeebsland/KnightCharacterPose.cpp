@@ -168,7 +168,7 @@ void AKnightCharacter::PlaceGear()
 	if (WristR) WristR->SetWorldTransform(Anim->RightGripWorld());
 	if (ElbowL) ElbowL->SetWorldTransform(Anim->LeftGripWorld());
 	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
-	const bool bWantBack = bStowed || (bSwinging && !bBlocking);   // (both hands on a tool: the shield goes on his back, unless he raises it)
+	const bool bWantBack = bStowed || ((bSwinging || bFishing) && !bBlocking);   // (both hands on a tool, or fishing: the shield goes on his back, unless he raises it)
 	if (bWantBack != bShieldBack) { bShieldBack = bWantBack; PlaceShield(bShieldBack); }
 	if (!bShieldBack)
 	{

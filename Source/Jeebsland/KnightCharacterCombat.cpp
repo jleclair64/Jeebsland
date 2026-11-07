@@ -346,6 +346,7 @@ void AKnightCharacter::Die()
 	if (bMounted) Dismount();
 	if (bClimbing) ExitClimb(false, false);
 	if (bSitting) StandUp();
+	if (AResourceNode* Node = ActiveNode.Get()) Node->CancelGathering();
 	if (bKnockedDown) MulticastKnock(false, 0);   // (he wakes standing)
 	bKnockedDown = false; KnockPhase = 0;
 	if (bDrinking) MulticastDrink(DrinkType, false);   // (Health is refilled below in this same call, so TickDrink would never see the death)

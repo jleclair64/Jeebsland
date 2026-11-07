@@ -476,9 +476,13 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		// this is the shield slot: drag a shield here to hold it, drag it off to put it away
 		DefCellX = X; DefCellY = Y0; bDefCell = true;
 		const int32 ShieldId = Skills->Worn[K_Shield];
+		// (owner 2026-11-06: greyed out while the weapon in hand takes no shield, Kinds.csv TwoHanded. The slot still takes drags and clicks)
+		const int32 HandId = Skills->Hotbar[Skills->Selected];
+		const bool bNoShield = HandId != 0 && IsGear(HandId) && !AllowsShield(KindOf(HandId));
 		if (ShieldId != 0)
 		{
 			if (!(DragKind == 7 && bDragging)) DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
+			if (bNoShield) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.10f, 0.10f, 0.12f, 0.62f); });   // (the icon shows through at about 40%, drained of colour)
 		}
 		else
 		{
@@ -490,7 +494,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(Txt, TW, TH, Font, 1.15f);
 		Tile(X + SS - TW - 9.f, Y0 + SS - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
-		HDText(Txt, FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
+		HDText(Txt, bNoShield ? FLinearColor(0.5f, 0.5f, 0.52f, 0.4f) : FLinearColor(0.5f, 0.75f, 1.f), X + SS - TW - 5.f, Y0 + SS - TH - 3.f, Font, 1.15f);
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
 		{
 			if (ShieldId != 0) ItemTip(ShieldId);

@@ -16,11 +16,12 @@ namespace
 	// The armour board (2026-11-03, made bigger and lower at the owner's word) faces the start (+X), behind it. One block per
 	// tier, Tin to Diamond from left to right, three knights in it (Light, Classic, Heavy) standing on the floor at
 	// DollScale of life size, a peg on each piece; each knight's shield (kite, round, tower) hangs on the board above him.
-	constexpr float ColW = 115.f, TierGap = 55.f, DollScale = 1.f, DollZ = 96.f * DollScale + 4.f, ShieldZ = 262.f, ShieldSize = 50.f;
+	constexpr float ColW = 160.f, TierGap = 55.f, DollScale = 1.f, DollZ = 96.f * DollScale + 4.f, ShieldZ = 135.f, ShieldSize = 50.f, ShieldSide = 60.f;
+	// (owner, 2026-11-06: no item centre above about 2.2 m, so each shield hangs beside its knight, not above his helm)
 	const int32 ColStyle[3] = { JeebItems::AS_Light, JeebItems::AS_Classic, JeebItems::AS_Heavy };
 	// The weapon board stands across the floor, WeaponX in front of the armour board, facing it (and the start): a column
 	// per weapon kind, then arrows by tier and fire arrows; a row per tier from the floor up.
-	constexpr float WeaponX = 1300.f, WeaponColW = 135.f, WeaponRowH = 40.f, WeaponZ0 = 30.f, WeaponSize = 95.f;
+	constexpr float WeaponX = 1300.f, WeaponColW = 135.f, WeaponRowH = 38.f, WeaponZ0 = 20.f, WeaponSize = 95.f;
 	constexpr int32 ArrowCount = 20;
 }
 AGearWall::AGearWall()
@@ -146,19 +147,19 @@ void AGearWall::Build()
 	// ---- armour: seen from the start, -Y is on the right, so things run left to right with falling Y ----
 	const float TierW = 3.f * ColW + TierGap;
 	const float ArmLeft = 0.5f * NT * TierW;
-	AddBoard(FVector(-6.f, 0.f, 185.f), FVector(4.f, ArmLeft + 20.f, 185.f), Wood);
-	AddSign(FVector(0.f, 0.f, 352.f), FRotator::ZeroRotator, TEXT("ARMOUR  -  look at a piece, E takes a copy"), 30.f);
+	AddBoard(FVector(-6.f, 0.f, 150.f), FVector(4.f, ArmLeft + 20.f, 150.f), Wood);
+	AddSign(FVector(0.f, 0.f, 282.f), FRotator::ZeroRotator, TEXT("ARMOUR  -  look at a piece, E takes a copy"), 30.f);
 	for (int32 t = 0; t < NT; ++t)
 	{
 		const float TL = ArmLeft - t * TierW - 0.5f * TierGap;   // the tier block's left edge
-		AddBoard(FVector(-1.f, TL - 1.5f * ColW, 168.f), FVector(1.5f, 1.5f * ColW + 8.f, 160.f), Rail);
-		AddSign(FVector(2.f, TL - 1.5f * ColW, 312.f), FRotator::ZeroRotator, TierName(t), 34.f);
+		AddBoard(FVector(-1.f, TL - 1.5f * ColW, 140.f), FVector(1.5f, 1.5f * ColW + 8.f, 135.f), Rail);
+		AddSign(FVector(2.f, TL - 1.5f * ColW, 250.f), FRotator::ZeroRotator, TierName(t), 34.f);
 		for (int32 c = 0; c < 3; ++c)
 		{
 			const float Y = TL - (c + 0.5f) * ColW;
 			AddSign(FVector(2.f, Y, 222.f), FRotator::ZeroRotator, ArmourStyleRow(ColStyle[c]).Name, 20.f);   // (just above his helmet)
 			AddMannequin(ColStyle[c], t, FVector(45.f, Y, DollZ));
-			AddItem(ShieldId(c, t), 1, FVector(14.f, Y, ShieldZ), ShieldSize, false);
+			AddItem(ShieldId(c, t), 1, FVector(14.f, Y - ShieldSide, ShieldZ), ShieldSize, false);
 		}
 	}
 
@@ -168,9 +169,9 @@ void AGearWall::Build()
 	const int32 NumCols = (K_Rod - K_Sword + 1) + 3 + 3;   // (then the longbow and crossbow (two wide), capes, arrows by tier, fire arrows)
 	auto WeaponOf = [](int32 col) { return col <= K_Rod - K_Sword ? K_Sword + col : col == K_Rod - K_Sword + 1 ? int32(K_Longbow) : int32(K_Crossbow); };
 	const float Len = NumCols * WeaponColW;
-	AddBoard(FVector(WeaponX + 6.f, 0.f, 245.f), FVector(4.f, 0.5f * Len + 110.f, 245.f), Wood);
-	AddBoard(FVector(WeaponX + 1.f, 0.f, 200.f), FVector(1.5f, 0.5f * Len + 6.f, 190.f), Rail);
-	AddSign(FVector(WeaponX, 0.f, 462.f), Back, TEXT("WEAPONS  -  look at one, E takes a copy"), 34.f);   // (its own strip above the column names)
+	AddBoard(FVector(WeaponX + 6.f, 0.f, 165.f), FVector(4.f, 0.5f * Len + 110.f, 165.f), Wood);
+	AddBoard(FVector(WeaponX + 1.f, 0.f, 140.f), FVector(1.5f, 0.5f * Len + 6.f, 135.f), Rail);
+	AddSign(FVector(WeaponX, 0.f, 300.f), Back, TEXT("WEAPONS  -  look at one, E takes a copy"), 34.f);   // (its own strip above the column names)
 	for (int32 col = 0; col < NumCols; ++col)
 	{
 		if (col == CrossCol + 1) continue;
@@ -194,9 +195,9 @@ void AGearWall::Build()
 	// rings, amulets and the helm brush, then the things you gather. A band per two groups, each group under its own header, each
 	// item with its name under it (rows run left to right, seen from +X, with falling Y). Each peg gives a full stack. ----
 	{
-		constexpr float FaceX = WeaponX + 30.f, BandPitch = 115.f, TopHeaderZ = 450.f, Spacing = 125.f, GroupGap = 70.f, ItemSize = 50.f;
-		AddBoard(FVector(WeaponX + 16.f, 0.f, 275.f), FVector(4.f, 720.f, 275.f), Wood);
-		AddSign(FVector(WeaponX + 22.f, 0.f, 505.f), FRotator::ZeroRotator, TEXT("EVERYTHING ELSE  -  look at one, E takes a copy"), 32.f);   // (its own strip above the first band)
+		constexpr float FaceX = WeaponX + 30.f, BandPitch = 120.f, TopHeaderZ = 255.f, Spacing = 100.f, GroupGap = 70.f, ItemSize = 50.f;   // (two bands: the top item centre is 215 cm)
+		AddBoard(FVector(WeaponX + 16.f, 0.f, 165.f), FVector(4.f, 920.f, 165.f), Wood);
+		AddSign(FVector(WeaponX + 22.f, 0.f, 300.f), FRotator::ZeroRotator, TEXT("EVERYTHING ELSE  -  look at one, E takes a copy"), 32.f);   // (its own strip above the first band)
 		struct FItem { int32 Id; bool bLay; };
 		struct FGroup { FString Head; TArray<FItem> Items; };
 		auto Many = [](int32 Kind, int32 Num) { TArray<FItem> A; for (int32 i = 0; i < Num; ++i) A.Add({ GearId(Kind, i), true }); return A; };
@@ -207,10 +208,10 @@ void AGearWall::Build()
 		Charms.Add({ GearId(K_Crest, 0), true });
 		// (copper ore, coal and onyx are retired and raw pork has no source: left off)
 		const TArray<TArray<FGroup>> Bands = {
-			{ { TEXT("Potions"), Potions }, { TEXT("Rings"), Many(K_Ring, NumRings()) } },
-			{ { TEXT("Amulets and helm brush"), Charms }, { TEXT("Logs"), Mats({ EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs }, true) } },
-			{ { TEXT("Ores"), Mats({ EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre }, false) }, { TEXT("Gems"), Mats({ EItemType::Diamond, EItemType::Emerald }, false) } },
-			{ { TEXT("Fish"), Mats({ EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp }, true) }, { TEXT("Animal drops"), Mats({ EItemType::Hide, EItemType::Bones }, true) } } };
+			{ { TEXT("Potions"), Potions }, { TEXT("Rings"), Many(K_Ring, NumRings()) }, { TEXT("Amulets and helm brush"), Charms } },
+			{ { TEXT("Logs"), Mats({ EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs }, true) }, { TEXT("Ores"), Mats({ EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre }, false) },
+			  { TEXT("Gems"), Mats({ EItemType::Diamond, EItemType::Emerald }, false) }, { TEXT("Fish"), Mats({ EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp }, true) },
+			  { TEXT("Animal drops"), Mats({ EItemType::Hide, EItemType::Bones }, true) } } };
 		for (int32 b = 0; b < Bands.Num(); ++b)
 		{
 			const float HeaderZ = TopHeaderZ - b * BandPitch;
@@ -225,7 +226,7 @@ void AGearWall::Build()
 				{
 					const int32 Id = G.Items[i].Id;
 					const float CY = Y - (i + 0.5f) * Spacing;
-					AddItem(Id, FMath::Max(1, StackSize(Id)), FVector(FaceX, CY, HeaderZ - 42.f), ItemSize, G.Items[i].bLay);
+					AddItem(Id, FMath::Max(1, StackSize(Id)), FVector(FaceX, CY, HeaderZ - 40.f), ItemSize, G.Items[i].bLay);
 					FString Nm = IsMaterial(Id) ? FString(MaterialName(MaterialType(Id))) : ItemName(Id);
 					if (Nm.Len() > 11)   // (two short lines, so a name never runs into its neighbour)
 					{
@@ -233,7 +234,7 @@ void AGearWall::Build()
 						for (int32 c = 0; c < Nm.Len(); ++c) if (Nm[c] == TEXT(' ') && (Cut == INDEX_NONE || FMath::Abs(c - Nm.Len() / 2) < FMath::Abs(Cut - Nm.Len() / 2))) Cut = c;
 						if (Cut != INDEX_NONE) Nm = Nm.Left(Cut) + TEXT("\n") + Nm.Mid(Cut + 1);
 					}
-					AddSign(FVector(WeaponX + 22.f, CY, HeaderZ - 82.f), FRotator::ZeroRotator, Nm, 13.f);
+					AddSign(FVector(WeaponX + 22.f, CY, HeaderZ - 78.f), FRotator::ZeroRotator, Nm, 13.f);
 				}
 				Y -= W + GroupGap;
 			}

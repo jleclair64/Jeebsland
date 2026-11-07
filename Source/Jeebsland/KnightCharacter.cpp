@@ -517,17 +517,15 @@ void AKnightCharacter::TickHousekeeping()
 	}
 }
 
-// Working continues while you move; it only stops if you drift about a body length away
-// from where you started, or turn so you are no longer facing the tree or rock
+// Working goes on until he moves (owner 2026-11-06). The server decides; a cast of the rod lets him shift about a little. The camera can look round meanwhile: he stays square to the tree or rock (TickGatherWalk).
 void AKnightCharacter::TickGatherReach()
 {
 	if (GatherWalkLeft > 0.f) return;   // (still walking into place: he may be further off than he will work from)
 	if (AResourceNode* Node = ActiveNode.Get())
 	{
-				const bool bTooFar = FVector::Dist2D(GetActorLocation(), GatherStart) > (bFishing ? 320.f : 200.f);
-		const FVector ToNode = Node->GetActorLocation() - GetActorLocation();
-		const bool bLookedAway = !bFishing && FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), ToNode.GetSafeNormal2D()) < 0.34f; // beyond about 70 degrees
-		if (bTooFar || bLookedAway)
+		const bool bMoved = FVector::Dist2D(GetActorLocation(), GatherStart) > (bFishing ? 320.f : 35.f) || (!bFishing && GetCharacterMovement()->IsFalling());
+		// (a click now lasts about ten swings: a blow that stuns or fells him ends it, and so does the tool leaving his hand)
+		if (bMoved || StunLeft > 0.f || bKnockedDown || SelectedKind() != GatherKind)
 		{
 			Node->CancelGathering();
 		}

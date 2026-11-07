@@ -7,6 +7,7 @@
 #include "KnightGameState.h"
 #include "Engine/World.h"
 #include "Misc/ConfigCacheIni.h"
+#include "JeebTuning.h"
 
 // TEMPORARY (testing, owner 2026-11-06): [Jeebsland.Testing] UnlimitedNodes=True in DefaultGame.ini. Trees, rocks and every other
 // resource node still give their yield and XP but never lose a charge, so they never empty, vanish or need to respawn. The server
@@ -88,8 +89,11 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 	bBeingGathered = true;
 	CurrentGatherer = Gatherer;
 	if (Knight) Knight->BeginGathering(this, Skill);
+	// (owner 2026-11-06) One click is about ten swings of the axe or pick, a yield every EffectiveSeconds, unless he moves off (TickGatherReach). A cast of the rod is still one catch.
+	WorkLeft = Knight && Skill != ESkillType::Fishing ? JeebTune::V().GatherSwings * Knight->GatherSwingSeconds() : 0.f;
 	Tell(Gatherer, EffectiveSeconds, FColor::Yellow, StartText);
 	GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
+	UE_LOG(LogTemp, Log, TEXT("JEEBGATHER start: %.1f s a yield, %.1f s of work"), EffectiveSeconds, WorkLeft);
 	return true;
 }
 
@@ -111,16 +115,16 @@ void AResourceNode::FinishGathering()
 	bBeingGathered = false;
 
 	AActor* Gatherer = CurrentGatherer.Get();
-	if (AKnightCharacter* Knight = Cast<AKnightCharacter>(Gatherer))
-	{
-		Knight->EndGathering();
-	}
+	AKnightCharacter* Knight = Cast<AKnightCharacter>(Gatherer);
+	WorkLeft -= EffectiveSeconds;
 	if (!Gatherer || FVector::Dist2D(Gatherer->GetActorLocation(), GetActorLocation()) > ReachRadius() + 150.f)
 	{
+		if (Knight) Knight->EndGathering();
 		Tell(Gatherer, 2.f, FColor::Orange, TEXT("You wandered off and stopped."));
 		return;
 	}
 
+	bool bPackFull = false;
 	if (USkillComponent* Skills = Gatherer->FindComponentByClass<USkillComponent>())
 	{
 		EItemType Item = ItemType;
@@ -128,19 +132,21 @@ void AResourceNode::FinishGathering()
 		RollYield(Skills, Item, XP);
 		if (!Skills->AddItem(Item, ItemsPerGather))
 		{
+			// (owner 2026-11-07: he goes on swinging until he moves or the click's work is over. Nothing is won meanwhile, and the node keeps its charge.)
 			Tell(Gatherer, 3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
-			return;
+			bPackFull = true;
 		}
-		Skills->AddXP(Skill, XP);
+		else Skills->AddXP(Skill, XP);
 	}
 
-	if (!UnlimitedNodes())   // (TEMPORARY, testing: a node that is never used up)
+	if (!bPackFull)
 	{
-		--Charges;
-		ChargesChanged();
-	}
+		if (!UnlimitedNodes())   // (TEMPORARY, testing: a node that is never used up)
+		{
+			--Charges;
+			ChargesChanged();
+		}
 
-	{
 		FString Msg = SuccessText;
 		if (MaxCharges > 1 && Charges > 0)
 		{
@@ -149,9 +155,22 @@ void AResourceNode::FinishGathering()
 		Tell(Gatherer, 2.f, FColor::Green, Msg);
 	}
 
-	if (Charges <= 0)
+	if (!bPackFull && Charges <= 0)
 	{
 		GetWorldTimerManager().SetTimer(RespawnTimer, this, &AResourceNode::Respawn, RespawnSeconds, false);
+	}
+
+	// Still swinging: the animation never stopped, the next yield is just on its way
+	if (Knight && WorkLeft > 0.01f && Charges > 0 && Knight->WorkingOn(this))
+	{
+		bBeingGathered = true;
+		GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
+		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER yield, pack full %d, %.1f s of work left"), bPackFull ? 1 : 0, WorkLeft);
+	}
+	else if (Knight)
+	{
+		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER the work is over: %.1f s left, %d charges, working on it %d"), WorkLeft, Charges, Knight->WorkingOn(this) ? 1 : 0);
+		Knight->EndGathering();
 	}
 }
 

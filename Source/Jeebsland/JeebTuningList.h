@@ -6,7 +6,7 @@
 
 // [Movement]
 JEEB_TUNE(Movement, WalkSpeed, 500.f)
-JEEB_TUNE(Movement, SprintSpeed, 750.f)
+JEEB_TUNE(Movement, SprintSpeed, 637.5f)
 JEEB_TUNE(Movement, CrouchSpeed, 240.f)
 JEEB_TUNE(Movement, WalkAccel, 30000.f)
 JEEB_TUNE(Movement, SprintAccel, 2048.f)
@@ -56,8 +56,8 @@ JEEB_TUNE(Smash, StunSmash, 0.5f)
 JEEB_TUNE(Smash, StunSmashFull, 0.8f)
 JEEB_TUNE(Smash, PushSmash, 300.f)
 JEEB_TUNE(Smash, PushSmashFull, 700.f)
-JEEB_TUNE(Smash, ReboundJab, 0.3f)
-JEEB_TUNE(Smash, ReboundSmash, 0.6f)
+JEEB_TUNE(Smash, ReboundJab, 0.405f)
+JEEB_TUNE(Smash, ReboundSmash, 0.81f)
 
 // [Kick]
 JEEB_TUNE(Kick, KickDur, 0.65f)
@@ -70,6 +70,7 @@ JEEB_TUNE(Kick, KickLandedSpeed, 2.2f)
 JEEB_TUNE(Sweep, SweepDur, 0.55f)
 JEEB_TUNE(Sweep, SweepActiveFrom, 0.24f)
 JEEB_TUNE(Sweep, SweepActiveTo, 0.6f)
+JEEB_TUNE(Sweep, SweepTrailFrom, 0.36f)
 JEEB_TUNE(Sweep, SweepDamage, 0.8f)
 
 // [Dash]
@@ -108,5 +109,6 @@ JEEB_TUNE(Crossbow, CrossReload, 2.1f)
 JEEB_TUNE(Crossbow, CrossReloadWalk, 0.5f)
 JEEB_TUNE(Crossbow, CrossAimWalk, 0.7f)
 JEEB_TUNE(Crossbow, CrossGuardMul, 1.f)
+JEEB_TUNE(Gather, GatherSwings, 10.f)
 JEEB_TUNE(Potion, DrinkTime, 1.5f)
 JEEB_TUNE(Potion, DrinkWalk, 0.5f)

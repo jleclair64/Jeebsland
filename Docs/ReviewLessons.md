@@ -13,6 +13,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Pictures of the Tab windows: `-JeebShot -ShotPanel` (add `-ShotWear=<tier>` for a full suit); crop the panel 2x for the reviewer.
 
 ## Poses, held and worn items (visual-reviewer)
+- Pictures of a hand or grip change, or of a greyed HUD state, must be close-ups at the moment that matters (the peak of the swing, the end guard, the bar with the item disabled). A wide sheet of small frames can't prove a grip or a grey-out. Check the closing pose too: a condition on the state key that names the wrong key (the guard is key 2, not 0) is invisible in mid-swing.
 - A held item must show its identifying part (neck, head, tip) past the hand, from the side, in every frame of the move. If the clip's hand leaves no room, offset the hand; don't hide the part. Measure the visible part against the fist's width (about 12 cm). After clearing a clip, re-check contact from the side: the item must still visibly connect to the hand.
 - Check every worn item against the arm in every clip, and show what holds it on: a strap, a loop, a hook. Nothing floats beside the body.
 - Check a bottle's every face in the hand, base included, and let the part that matters (the neck at the mouth) show past the fist.
@@ -51,6 +52,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - A tool or axe has a wide head where a sword has a thin point, and the sword's clips bring that end up by his cheek: check the helm's clearance in the guard and the recovery from a crop where the knight fills half the frame.
 
 ## Moves and movement (motion-reviewer)
+- A request that depends on a line the owner drew (a flat cut's height, a trail's start) needs a sheet from the owner's own camera angle, with the trail and the cut's frames cropped large enough to see, next to the drawing.
+- When a clip switch starts a wind-up from the previous cut's end pose, log the tip and hip height across the switch frame; over 80 cm in a frame, or 70 degrees or more of bone change, needs a longer blend or a later ClipStart before the sheet is shown.
 - When a blend is lengthened, re-measure every contact number in the move: hips arriving late lift the blade. Judge a blend by its first frame's share, not its stated length. Anything raising a foot must ease in.
 - Warp each stretch of a clip under about 1.6x, its tail included. Every clip swap blends, even within one mode. Never derive a heading from a near-vertical bone. Size a foot's lift so a dragged boot clearly steps.
 - Read the foot-slide log across every key change. A move's legs mode must never change in a frame: the feet jump and the hand goes with them.
@@ -104,6 +107,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When the owner asks for more of something (a lean), put the old and new side frames next to each other, the same camera, and hand over both. A film meant to judge a charge must include the charge: check the frame numbers against the log's phases first.
 
 ## Online (online-reviewer)
+- When a client-side reach or range changes, change the server's matching check with it, with slack for lag. Better, share one constant instead of keeping two literals.
+- A state that now lasts many seconds (a repeating gather) must be ended by every event that should end it (death, stun, knockdown, the tool leaving his hand); a single movement check does not cover them.
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
 - Anything that changes game state is decided on the server; the client only asks.
 - A server-side rate limit comes from the same tuning number as the action's length (or a share of it), never a fixed number: a quicker move can fall under a fixed limit, and the server then drops the follow-up without telling the client.

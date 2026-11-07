@@ -202,6 +202,8 @@ public:
 	void SelectHotbar(int32 H);
 	// Test pictures (-JeebShot -ShotMove=...): the knight faces FaceYaw (not the camera) and does the move with a sword
 	void ShotPlayMove(const FString& Move, float FaceYaw);
+	float GatherSwingSeconds() const { return SwingPeriod; }   // one swing of the tool he is working with
+	bool WorkingOn(const AResourceNode* Node) const;
 	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
@@ -579,6 +581,7 @@ private:
 	void ApplyGraphics();
 	float LookSensitivity = 0.5f; // 1.0 = the original (fast) speed
 	FVector GatherStart = FVector::ZeroVector;
+	int32 GatherKind = -1;   // (what he works with: TickGatherReach ends the work if it leaves his hand)
 	float ElbowRCur = 0.f;
 
 	static inline const float& WalkSpeed = JeebTune::Storage().WalkSpeed;   // 5 m/s (owner, 2026-11-01; was 4)

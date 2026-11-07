@@ -527,7 +527,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 		StanceFwd = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X));
 		StanceRight = FVector::DotProduct(Acc, FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y));
 	}
-	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0) | (bSwinging ? 32 : 0) | (bSideways ? 64 : 0);
+	if (HasAuthority() && GetNetMode() != NM_Standalone) RepMoveFlags = (bCrouched ? 1 : 0) | (bBlocking ? 2 : 0) | (bRolling ? 4 : 0) | (bSliding ? 8 : 0) | (bClimbing ? 16 : 0) | (bSwinging ? 32 : 0) | (bSideways ? 64 : 0) | (bFishing ? 128 : 0);
 	if (bFaceCam && !bBackOrient) { bBackOrient = true; bBackSavedOrient = Move->bOrientRotationToMovement; Move->bOrientRotationToMovement = false; }
 	else if (!bFaceCam && bBackOrient && !bRolling && !bSliding) { bBackOrient = false; Move->bOrientRotationToMovement = bBackSavedOrient; }
 	if (bFaceCam && GetController() && !TurnLocked() && !ShotSideOn())   // turn to the camera quickly but smoothly (about 0.15 s for a quarter turn; not in a smash attack's swipe and end lag)
