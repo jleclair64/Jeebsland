@@ -140,7 +140,7 @@ void AFoeKnight::BeginPlay()
 		Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
 		return true;
 	};
-	GuardMax = GuardPool = JeebItems::GuardForLevel(GuardLevel);   // (his guard: a Defence level 10 knight's; he carries an iron kite shield)
+	GuardMax = GuardPool = JeebItems::ShieldHealth(JeebItems::ShieldId(0, Tier));   // (he carries a kite shield)
 	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
 	{
 		TakeOnShield(Amount, From);
@@ -169,7 +169,7 @@ bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
 {
 	if (bGuardBroken || Amount <= 0) return false;
 	const float Now = GetWorld()->GetTimeSeconds();
-	GuardPool -= Amount * JeebItems::ShieldDrain(JeebItems::ShieldId(0, Tier));   // (none reaches him; his iron kite shield takes part of it from the guard)
+	GuardPool -= Amount;   // (none reaches him; a blow costs the shield its damage, one for one)
 	GuardHitTime = Now;
 	if (bStill) Hp->LastHitTime = Now;   // (the still knight's guard and health come back 3 s after the last blow)
 	JeebCombat::AddNumber(GetWorld(), GetActorLocation() + FVector(0.f, 0.f, 150.f), Amount, JeebCombat::N_Blocked);
@@ -555,6 +555,7 @@ void AFoeKnight::TickBody(float Dt)
 	In.Vel = SmVel;
 	In.Rot = GetActorRotation();
 	In.BlockAlpha = BlockAlpha;
+	In.bShieldArm = true;
 	In.Kind = JeebItems::K_Sword;
 	In.StunLeft = Act == EAct::Stun ? FMath::Max(StunDur - ActT, 0.05f) : HitFlash;
 	if (DeathT > 0.f) In.bKnockedDown = true;

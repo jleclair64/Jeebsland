@@ -73,6 +73,7 @@ enum class EInvOp : uint8
 	HutLoot,        // At: the cottage
 	PickLock,       // At: the cottage
 	Gather,         // At: the rock, tree or fishing spot
+	SwingSet,       // A: which look the sword's swings have (testing)
 	Lore,           // A lore entry (heard from a villager)
 	BankDepositHot, // A bar slot: that weapon into the bank
 	ToggleDoor,     // At: the cottage (open or shut its door)
@@ -294,6 +295,8 @@ protected:
 	void SendLook();
 
 	// Requests (see Inv). DoInv runs on the server (or in single player) and checks everything before doing it.
+	FQuat CapeChestPrev = FQuat::Identity;
+	float GuardShare = 1.f;   // the share of the shield's health left, while none is worn (a change of shield carries it over)
 	UFUNCTION(Server, Reliable) void ServerInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, FVector_NetQuantize At);
 	void DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Target, const FVector& At);
 	bool NearTrader(uint8 Role) const;   // a villager of that ENpcRole is close enough to trade with
@@ -423,7 +426,9 @@ protected:
 	FVector PendingRollDir = FVector::ZeroVector;
 	void OnInteractKey();       // E: sit, trade, talk, mount, open doors ...
 	void UseDoor(ACottage* Hut);   // open, close, or try to pick the lock
-	void CallHorse();           // T
+	void CallHorse();           // (T, when the horse is back)
+	void CycleSwingSet();       // T, for testing: the next look for the sword's two swings
+	UPROPERTY(Replicated) uint8 SwingSet = 0;   // which rows of KnightMoves.csv they play (every machine must agree: the server's pose places the hit boxes)
 	void Mount(AHorse* H);
 	void Dismount();
 	void SitOnSeat(int32 SeatIdx);
@@ -528,6 +533,9 @@ private:
 	void ApplyTuning();          // (Tuning.ini numbers the engine keeps itself: the jump; again on each reload)
 	int32 TunedVersion = -1;
 	void TickGatherReach();
+	void TickGatherWalk(float Dt);
+	FVector GatherSpot = FVector::ZeroVector;   // where he stands so that the tool's blow lands on the node
+	float GatherYaw = 0.f, GatherWalkLeft = 0.f;
 	bool TickRollSlide(float Dt, bool bFalling, float& OutSpecialSpeed);
 	void TickAttack(float Dt);
 	void TickHealth(float Dt);

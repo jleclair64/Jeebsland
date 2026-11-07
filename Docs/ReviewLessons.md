@@ -42,6 +42,10 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Check a new prop's lighting in the game before tuning its colour. Models imported with their own normals keep the old direction when a script turns the vertices, so they read dark and flat from every side; the bows and the potion did, and the wood was brightened to make up for it (2026-11-06). Turn the normals with the mesh.
 - A held or hung item is judged from every side and against the body: the first belt flask hung 25 cm under the belt and looked like it was floating, and a dark ball in the hand hid that its liquid colour never showed.
 - Don't judge a held item or a blade's clearance from tiny sheets: crop so the knight fills at least half the frame. Test films read the local save, so always pass `-ShotKind=`; a dark suit from the save can also hide a problem.
+- A shield stowed on the back is checked from behind and both sides in every move that stows it, against the shoulders, head and cape. It lies flat, no higher than the shoulders and no wider than the torso, and the cape must not flare like a flag.
+- Retake any test series that comes back mis-framed before reviewing it: check one frame's framing first. Check too that the film shows what you meant: in MoveLab a run straight ahead hits the wall before the pictures start, so eight identical frames were read as a stiff run. A straight-behind film needs another way; `-ShotFacing=-60` gives a rear three-quarter view.
+- Judge a grip from a close side crop where the fist and handle are separate in silhouette; a foreshortened or dark-on-dark view can't pass or fail it. Check an orientation request in two perpendicular views, and quote the owner's words in the brief: "lines up with the near-vertical line" was once briefed as hanging straight down.
+- Anything on his back follows the chest bone, so cloth that also follows it goes on past his waist like a board when he bends over: below the waist it has to hang. Check every swing frame from the side and from behind.
 - Anything built in code to stand in for part of a skinned armour piece (a hand, a plate) must match the piece beside it: its colour on a plain material has to be darkened to match the suit's painted texture, in more than one tier, and it must be as wide as its neighbour. Check the join from at least two sides.
 
 ## Moves and movement (motion-reviewer)
@@ -60,6 +64,10 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Tool and bow clips were made for an empty off hand, so every off-hand item (shield, cape) must be re-checked, or stowed or pinned, for each new clip family. Run the shield and cape clearance check on every clip the moment it is wired in, not only the combat ones.
 - Pieces that follow cloth or physics (the cape) must start hanging cleanly whenever he appears or is set facing another way, be carried by the pose's own moves (only travel may trail them), and be limited in how far they can stand out. Check the first 8 frames of every state and every fast change for floating or ragged leftovers.
 - A held weapon's grip is measured on Mixamo's own armed characters (their Paladin, W and Prop files), never inferred from the empty hand; a clip's hit timing and hand path are read from its log (`-SuitLogClips`, JEEBPATH) before its CSV row is written. A row with blank cut points just holds the first frame.
+- A run with a held two-handed weapon is judged in a full-body frame from the side and from behind: he stays upright and the arms and chest visibly move.
+- Run JEEBSELF on every new look of a clip-driven move, not only the first. Alternate clip rows keep body and head clearance above zero in every frame, and each row's hit window contains its own peak tip speed, not at the window's edge.
+- A move that starts after walking into place starts only after its entry condition is true (speed about 0), tapers its stop over about 0.2 s, and never shows one frame of the action pose on the way. Check the worst bone change on the action's first frame: anything laid over the pose after the blend (the two-handed tool grip) needs its own eased weight, or the blend can't soften it.
+- When a clip drives a slow gait at an unusual speed, measure the planted-foot slide in the log (the aim shuffle skated at 150 cm/s; his own walk's legs at that speed fall to about 10).
 - Moves come from reference key poses (the owner's clips), never guessed.
 - Judge walking from frames well into the walk (about 12 to 28), not the first frames.
 - Measure first with log lines (JEEBJUMP, JEEBDASH, JEEBSWEEP, JEEBWEIGHT); a wrong number should cost a rebuild, not a review round.
@@ -112,6 +120,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - After any material import, search the log for "Failed to compile Material": a broken material shows flat grey in the game without any other sign.
 - A prediction's echo guard keys on a flag set when the client predicted, never on a time window: the window swallowed the client's own later press.
 - Check state at the shot itself, and cancel a move when the held item changes (a draw carried over onto a reloading crossbow). When a new weapon kind arrives, audit every attack style in ServerAttack for it.
+- When state moves to a new keyed pool (a shield's fraction of its health), define one clamp that every equip and swap path runs through, so no path can refill or bypass it.
+- A testing switch that changes server-evaluated geometry (hit boxes, ranges) is gated behind a test flag or chosen by the server before shipping.
 - Server-only resets need a matching client reset (ClientDied). State that drives what another machine draws must be replicated (RepMoveFlags). A client's choice the server reads goes through a checked request. Local aim-facing must yield to any forced facing.
 - Shared mesh helpers return early on a dedicated server, and command-line test switches check `-JeebShot` first.
 

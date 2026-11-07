@@ -207,6 +207,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, SwingSet, COND_SkipOwner);   // (the owner sets it at once)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
@@ -401,7 +402,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(DodgeFAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeFwd);
 		EIC->BindAction(DodgeBAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeBack);
 		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
-		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
+		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CycleSwingSet);   // (testing, owner 2026-11-06. T called the horse, which is out of the game for now)
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 		EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
 		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);
@@ -428,6 +429,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 
 	Super::Tick(DeltaSeconds);
 
+	TickGatherWalk(DeltaSeconds);
 	TickGatherReach();
 
 	const float Dt = FMath::Max(DeltaSeconds, 0.0001f);
@@ -520,6 +522,7 @@ void AKnightCharacter::TickHousekeeping()
 // from where you started, or turn so you are no longer facing the tree or rock
 void AKnightCharacter::TickGatherReach()
 {
+	if (GatherWalkLeft > 0.f) return;   // (still walking into place: he may be further off than he will work from)
 	if (AResourceNode* Node = ActiveNode.Get())
 	{
 				const bool bTooFar = FVector::Dist2D(GetActorLocation(), GatherStart) > (bFishing ? 320.f : 200.f);

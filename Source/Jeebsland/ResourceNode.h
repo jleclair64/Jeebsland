@@ -28,6 +28,8 @@ public:
 	// How far away (flat distance) and how squarely the player must face the node to start working on it
 	virtual float ReachRadius() const { return 300.f; }
 	virtual float MinFacing() const { return 0.5f; }
+	// How far from its middle the surface is, this high above its foot: where a tool's swing meets it
+	virtual float SurfaceRadius(float Z) const { return 30.f; }
 	virtual FString PromptText() const { return FString(); }
 
 protected:

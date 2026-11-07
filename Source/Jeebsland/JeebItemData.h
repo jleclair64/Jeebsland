@@ -44,7 +44,7 @@ namespace JeebItems
 		FLinearColor Palette[7];         // EArmorRole order: Plate, Under, Trim, Cloth, Accent, Leather, BootBody
 		FLinearColor CapeColor = FLinearColor(0.5f, 0.5f, 0.5f);   // the colour of this tier's cape
 		float ArmourTakes = 1.f;   // share of a blow that gets through an armour piece of this tier, where it covers
-		float ShieldTakes = 1.f;   // share of a blow on a raised shield of this tier that comes out of the guard
+		float ShieldHealth = 100.f;   // a kite shield of this tier's health
 		float WeightMult = 1.f;    // x an armour piece's Weight: how heavy this material is
 		float Metal = 1.f, Rough = 0.3f;   // how shiny it is: 1 metal or 0 none; how polished, 0 a mirror to 1 dull
 	};
@@ -82,7 +82,7 @@ namespace JeebItems
 		FMods Mods;
 		FLinearColor Band = FLinearColor::White, Gem = FLinearColor::White;
 	};
-	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 10.f; };
+	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 6.25f, HealMul = 1.f, Weight = 5.f; };
 	struct FArmourStyleRow { FString Name, Note; float StopMul = 1.f, WeightMul = 1.f, PriceMul = 1.f; };
 
 	struct FItemTables

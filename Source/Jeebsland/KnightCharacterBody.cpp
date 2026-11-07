@@ -40,6 +40,7 @@
 
 // Where things sit on his back, in the chest bone's frame (UpperPivot: X forward, Y his right, Z up; measured on film)
 static constexpr float CapePinX = -19.f, CapePinZ = 12.f;   // the cape's top row
+static constexpr float CapeWaist = 40.f;   // how far down the cloth his waist is
 static constexpr float CapeBackX = -24.f, CapeStowZ = -30.f;   // the cape never comes nearer than this; above CapeStowZ it clears the shield on his back
 static constexpr float StowBackX = -27.f, StowZ = 8.f;      // a stowed weapon
 static constexpr float ShieldBackX = -14.f, ShieldBackZ = -4.f;   // a stowed shield
@@ -165,6 +166,13 @@ void AKnightCharacter::TickCape(float Dt)
 			const FQuat Turn(FVector::UpVector, FMath::DegreesToRadians(0.85f * TurnBy));
 			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] = Root + Turn.RotateVector(CapeP[k] - Root); CapePrev[k] = Root + Turn.RotateVector(CapePrev[k] - Root); }
 		}
+		// (a tool's swing bends him right over and back in a moment: there the cloth goes round with the chest, or it is left standing in the air)
+		if (bSwinging && bCapeRootSet)
+		{
+			const FQuat Follow = FQuat::Slerp(FQuat::Identity, Up.GetRotation() * CapeChestPrev.Inverse(), 0.85f);
+			for (int32 k = CapeNX; k < N; ++k) { CapeP[k] = Root + Follow.RotateVector(CapeP[k] - Root); CapePrev[k] = Root + Follow.RotateVector(CapePrev[k] - Root); }
+		}
+		CapeChestPrev = Up.GetRotation();
 		CapeRootPrev = Root; bCapeRootSet = true;
 		CapeRelPrev = Root - GetActorLocation();
 		CapeYawPrev = FMath::RadiansToDegrees(FMath::Atan2(Up.GetUnitAxis(EAxis::X).Y, Up.GetUnitAxis(EAxis::X).X));
@@ -181,6 +189,8 @@ void AKnightCharacter::TickCape(float Dt)
 		else if (bPinB) CapeP[a] += Fix * 2.f;
 		else { CapeP[a] += Fix; CapeP[b] -= Fix; }
 	};
+	// (bent over a tool, the cloth below his waist hangs down instead of going straight on along the line of his back like a board)
+	const float ToolBend = bSwinging ? FMath::Clamp(-Up.GetUnitAxis(EAxis::X).Z, 0.f, 0.7f) : 0.f;
 	while (CapeAccum >= H)
 	{
 		CapeAccum -= H;
@@ -225,13 +235,17 @@ void AKnightCharacter::TickCape(float Dt)
 			{
 				FVector L = Up.InverseTransformPosition(CapeP[k]);
 				float Lim = CapeBackX;   // the back of the armour, plus the cloth's 3 cm thickness
-				if (bStowed && L.Z > CapeStowZ) Lim = CapeBackX - 10.5f;   // and over the shield when it is on the back
+				if (bStowed && L.Z > CapeStowZ) Lim = CapeBackX - 10.5f;   // and over the shield when it is on the back (at work with a tool the shield is slung over the cape instead)
 				// and never far out to the side: at most a hand's width past the cloth's own edge (it hung out like a board)
 				const float Edge = 0.5f * FMath::Lerp(WTop, WBot, float(k / CapeNX) / (CapeNY - 1)) + 12.f;
 				// and it never stands up past his shoulders, however he moves: at most about 70 degrees out from hanging down his back
 				const float MaxUp = CapePinZ - 0.35f * float(k / CapeNX) * DV;
-				const bool bFix = L.X > Lim || FMath::Abs(L.Y) > Edge || L.Z > MaxUp;
-				L.X = FMath::Min(L.X, Lim);
+				// (bent over a tool it lies along his back: there isn't time for it to fall, and it would stand out behind him like a flag)
+				const float Below = FMath::Max(float(k / CapeNX) * DV - CapeWaist, 0.f);
+				const float MinX = bSwinging ? Lim - 0.1f * FMath::Min(float(k / CapeNX) * DV, CapeWaist) + 0.8f * ToolBend * Below : -100000.f;
+				Lim += ToolBend * Below;
+				const bool bFix = L.X > Lim || L.X < MinX || FMath::Abs(L.Y) > Edge || L.Z > MaxUp;
+				L.X = FMath::Clamp(L.X, MinX, Lim);
 				L.Y = FMath::Clamp(L.Y, -Edge, Edge);
 				L.Z = FMath::Min(L.Z, MaxUp);
 				if (bFix) CapeP[k] = Up.TransformPosition(L);
@@ -456,7 +470,12 @@ void AKnightCharacter::RebuildHeld()
 	// Everything else lies through the fist the way a sword does, the grip across it and the working end out past the thumb
 	Make(WristR, KnightDesign::P_WristR, KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1))));
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), KM::DownTo(KnightDesign::BladeDir(-1))));
-	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, K, T)) { S->SetRelativeTransform(FistPlace()); HeldStatics.Add(S); }
+	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, K, T))
+	{
+		// (owner 2026-11-06: the pickaxe's head stands upright in the hand, in the plane of its swing, not flat across it. A turn about the haft.)
+		S->SetRelativeTransform(K == JeebItems::K_Pickaxe ? FTransform(FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f))) * FistPlace() : FistPlace());
+		HeldStatics.Add(S);
+	}
 }
 
 // The shield on the arm, or on the back: turned to face backwards, its inner face just behind the sword on the back,

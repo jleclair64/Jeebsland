@@ -34,6 +34,7 @@ public:
 	ETreeKind GetKind() const { return Kind; }
 	float GetTreeHeight() const { return TreeHeight; }
 	virtual float ReachRadius() const override { return TrunkRadius + 135.f; }   // (close enough for the swing to land on the trunk)
+	virtual float SurfaceRadius(float Z) const override { return TrunkRadius; }
 
 	TArray<FTreePart> Parts;
 

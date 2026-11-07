@@ -21,9 +21,9 @@
 #include "Engine/World.h"
 
 // ---------------- The bow (2026-10-31, Breath of the Wild style) ----------------
-// The right button held (owner, 2026-11-06): the string is drawn (StartDraw) and the camera closes in; the draw fills over BowDrawTime and stays
-// full for as long as it is held. Left click: the arrow flies (ReleaseDraw) toward what is under the reticle, faster and harder the fuller the draw, and
-// after BowRecover he draws again if the button is still down. Letting go of it lets the string down without shooting.
+// A bow (owner, 2026-11-06): the left or right button held draws the string (StartDraw) and the camera closes in; the draw fills over BowDrawTime and stays full for as long as it is
+// held. Letting go of the last button looses the arrow (ReleaseDraw) toward what is under the reticle, faster and harder the fuller the draw.
+// The crossbow: the right button brings it up, a left click shoots, and letting go of the right button lowers it without shooting.
 // The player's machine decides; the server checks against its own timer and fires.
 
 int32 AKnightCharacter::ArrowSlotId() const
@@ -160,7 +160,11 @@ void AKnightCharacter::RightUp()
 {
 	bAimHeld = false;
 	StopBlock();
-	if (Bow == EBow::Drawing) CancelDraw();
+	if (Bow == EBow::Drawing)
+	{
+		if (SelectedKind() == JeebItems::K_Crossbow || IsUIOpen() || bPanelCursor) CancelDraw();   // (the crossbow: lowered without shooting)
+		else if (!bAttackDown) ReleaseDraw();                                                        // (a bow: let go, it shoots; the left button still down keeps it drawn)
+	}
 }
 
 void AKnightCharacter::StartDraw()
@@ -308,7 +312,7 @@ void AKnightCharacter::TickBow(float Dt)
 	}
 	else if (Bow == EBow::Recover && BowT >= BowRecover) SetBow(EBow::None);
 	// The button still down after a shot, a roll or a weapon swap: straight back to drawing
-	if (IsLocallyControlled() && bAimHeld && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
+	if (IsLocallyControlled() && (bAimHeld || (bAttackDown && !bCross)) && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
 
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())

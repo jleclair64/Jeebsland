@@ -223,7 +223,7 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		// Only the cut itself leaves a trail (the hit boxes' active part). Begin hit 1 once the blade is already moving across the
 		// front of the body.
 		const float T = AttackT / FMath::Max(AttackDur, 0.01f);
-		float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.68f;
+		float From = (AttackDir == JabSecond) ? 0.30f : 0.32f, To = (AttackDir == JabSecond) ? 0.74f : 0.84f;   // (owner 2026-11-06: the first one's streak runs on further round its arc)
 		if (bSweep) { From = SweepActiveFrom; To = SweepActiveTo; }
 		if (bDash) { From = (DashActiveFrom - 0.06f) / FMath::Max(AttackDur, 0.01f);   // (from the thrust itself, just before it can hit)
  To = DashActiveTo / FMath::Max(AttackDur, 0.01f) + 0.08f; }
@@ -236,7 +236,7 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 			TrailPrevTip = Tip; bTrailPrev = true;
 			// (owner 2026-11-05: it lasted past the swing. Whatever the clip does, the streak is over for good once the blade has dropped well below this cut's top speed.)
 			TrailPeak = FMath::Max(TrailPeak, Speed);
-			if (TrailPeak > 600.f && Speed < TrailPeak * 0.45f) bTrailDone = true;
+			if (TrailPeak > 600.f && Speed < TrailPeak * (AttackDir == JabSecond || bSweep || bDash ? 0.45f : 0.3f)) bTrailDone = true;
 			if (!bTrailDone)
 			{
 				FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 300.f) / 500.f, 0.f, 1.f);

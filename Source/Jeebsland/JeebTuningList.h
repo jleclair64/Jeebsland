@@ -33,7 +33,7 @@ JEEB_TUNE(Bow, BowCamLength, 220.f)
 JEEB_TUNE(Bow, HeadshotMul, 1.5f)
 
 // [Jab]
-JEEB_TUNE(Jab, Jab1Share, 0.64f)
+JEEB_TUNE(Jab, Jab1Share, 0.49f)
 JEEB_TUNE(Jab, Jab2Share, 0.847f)
 JEEB_TUNE(Jab, SwordJabDamage, 0.75f)
 JEEB_TUNE(Jab, Jab1From, 0.30f)
@@ -85,15 +85,15 @@ JEEB_TUNE(Knockdown, KnockAuto, 1.5f)
 JEEB_TUNE(Knockdown, KnockRise, 0.45f)
 
 // [Guard]
-JEEB_TUNE(Guard, GuardAtLevel1, 20.f)
-JEEB_TUNE(Guard, GuardAtLevel99, 40.f)
-JEEB_TUNE(Guard, GuardDrainSeconds, 15.f)
+JEEB_TUNE(Guard, ShieldDrainPerSecond, 25.f)
+JEEB_TUNE(Guard, ShieldHealAtLevel1, 15.f)
+JEEB_TUNE(Guard, ShieldHealAtLevel99, 60.f)
 
 // [Armour]
 JEEB_TUNE(Armour, MinTake, 0.5f)
 
 // [Weight]
-JEEB_TUNE(Weight, FreeWeight, 18.f)
+JEEB_TUNE(Weight, FreeWeight, 23.f)
 JEEB_TUNE(Weight, SlowPerKg, 0.01f)
 JEEB_TUNE(Weight, MaxSlow, 0.3f)
 
@@ -107,6 +107,6 @@ JEEB_TUNE(Crossbow, CrossSag, 700.f)
 JEEB_TUNE(Crossbow, CrossReload, 2.1f)
 JEEB_TUNE(Crossbow, CrossReloadWalk, 0.5f)
 JEEB_TUNE(Crossbow, CrossAimWalk, 0.7f)
-JEEB_TUNE(Crossbow, CrossGuardMul, 1.5f)
+JEEB_TUNE(Crossbow, CrossGuardMul, 1.f)
 JEEB_TUNE(Potion, DrinkTime, 1.5f)
 JEEB_TUNE(Potion, DrinkWalk, 0.5f)

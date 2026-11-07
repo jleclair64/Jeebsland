@@ -339,7 +339,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		Total(GX + Half + 3.f, DefIcon, FString::Printf(TEXT("%d%%"), Defence), FLinearColor(0.5f, 0.75f, 1.f), FLinearColor(0.45f, 0.65f, 1.f));
 		if (Hot(GX, TY, Half, BoxH)) SetTip({ TEXT("Total offence"), FString::Printf(TEXT("Your weapon deals %d - %d, all bonuses counted"), A, B) });
 		if (Hot(GX + Half, TY, Half, BoxH)) SetTip({ TEXT("Total defence"), FString::Printf(TEXT("Your armour stops %d%% of a blow on average (each body part goes through its own piece)"), Defence),
-			Guard > 0 ? FString::Printf(TEXT("Shield strength %d, guard %d from your Defence level"), Guard, FMath::RoundToInt(Knight->GetGuardMax())) : FString(TEXT("No shield ready")),
+			Guard > 0 ? FString::Printf(TEXT("Shield health %d of %d. It heals faster the higher your Defence level"), FMath::RoundToInt(Knight->GetGuardFraction() * Knight->GetGuardMax()), Guard) : FString(TEXT("No shield ready")),
 			FString::Printf(TEXT("Armour weight %s: %d%% slower"), *WeightText(TotalWeight(Skills)), FMath::RoundToInt(WeightSlow(TotalWeight(Skills)) * 100.f)) });
 	}
 

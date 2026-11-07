@@ -87,6 +87,15 @@ namespace JeebAnim
 		FTransform CrossInHand = FTransform::Identity;
 		FTransform DrinkInHand = FTransform::Identity;
 		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
+		FQuat ShieldArm[4];                             // the left arm's pose holding a shield (LShoulder, LArm, LFore, LHand)
+		FVector MouthInHead = FVector::ZeroVector;      // his visor's mouth, in the head bone's frame
+		// Where a tool's head is at its clip's blow, from between his feet in his own frame (forward, right, up)
+		FVector ToolContact(bool bChop, int32 Kind, float ClipT = -1.f) const;
+		// A chopping or mining clip holds a long two-handed weapon: the tool runs from the left fist through the right, its edge leading. Turns the hands so, by W.
+		void ToolPose(FPose& P, float W) const;
+		FVector ToolStrike(const FTransform& Grip) const;   // the middle of the tool's edge, given where WristR is
+		FVector ToolEdgeInHand = FVector::ZeroVector;       // the way a tool's edge points, in the hand bone's frame
+		FQuat ToolEdgeTurn = FQuat::Identity;
 
 		const FClip* Find(const TCHAR* Name) const { const FClip* const* F = Clips.Find(Name); return F ? *F : nullptr; }
 
@@ -151,6 +160,8 @@ namespace JeebAnim
 		bool bDrinking = false; float DrinkU = 0.f;   // a potion on its way down: 0..1
 		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
 		bool bShotLog = false;      // test pictures: log JEEBANIM
+		bool bShieldArm = false;    // a shield on his left arm, not on his back: the forearm holds it out in front
+		int32 SwingSet = 0;         // which rows of KnightMoves.csv the sword's two swings play
 	};
 }
 
@@ -174,7 +185,7 @@ public:
 	// This frame's pose, in the world
 	FTransform BoneWorld(int32 B) const;
 	FVector BoneAt(int32 B) const { return BoneWorld(B).GetLocation(); }
-	FTransform RightGripWorld() const { return L.RightGrip * BoneWorld(JeebAnim::RHand); }
+	FTransform RightGripWorld() const;   // WristR: the weapon's joint
 	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
 	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
 	FTransform ShieldWorld(float BlockAlpha) const;
@@ -182,7 +193,9 @@ public:
 	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
 	FTransform BeltFlaskWorld() const { return L.BeltFlaskOnHips * BoneWorld(JeebAnim::Hips); }
 	FTransform CrossWorld() const { return L.CrossInHand * BoneWorld(JeebAnim::RHand); }
-	FTransform DrinkWorld() const { return L.DrinkInHand * BoneWorld(JeebAnim::RHand); }   // the open hand and its bottle
+	FTransform DrinkWorld() const;     // the open hand and its bottle, the cork aimed at his mouth
+	FVector MouthWorld() const { return BoneWorld(JeebAnim::Head).TransformPosition(L.MouthInHead); }
+	FVector ToolHeadWorld(int32 Kind) const;   // where the head of the tool in his hand is
 	int32 WornTier(int32 Piece) const { return WornTiers[Piece]; }   // (-1: nothing on)
 	float Phase01() const { return Phase; }   // where the stride is: 0 the left foot under him, 0.5 the right
 
@@ -229,6 +242,8 @@ private:
 	void StartBlend(const FPose& Target, float Seconds, float HandSeconds = 0.16f, float LegSeconds = 0.f);
 	void KeepTipUp(FPose& P, const FInput& In, float Dt);
 	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
+	void ExtendArm(FPose& P, float Deg, float W) const;
+	void TwoHandTool(FPose& P, const FInput& In, float Dt);
 	int32 ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend);
 	float MoveClipTime(const JeebAnim::FMove& M, float U, float UHit, float UFollow) const;
 	bool PlayAt(const TCHAR* MoveName, float T, float Speed, FPose& InOut, float* OutBlend);
@@ -278,6 +293,8 @@ private:
 	float LandFor = 0.f;
 	float AirT = 0.f;
 	float ShakePhase = 0.f;  // the charged smash's tremble
+	float ShieldArmW = 0.f;  // how far the left arm is in its shield pose
+	float TwoHandW = 0.f;    // how far the left hand is on the tool's haft
 	float AirLegs = 1.f;     // how fast the stride goes: half its pace in the air
 	float AirShare = 0.f;    // how far the knees have come up in the air
 	float FallShare = 0.f;   // how far into the falling pose (long falls)

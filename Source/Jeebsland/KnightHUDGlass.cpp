@@ -350,7 +350,8 @@ void AKnightHUD::ItemTip(int32 Id)
 	}
 	else if (K == K_Shield)
 	{
-		L.Add(FString::Printf(TEXT("Strength %d: each blow on it costs your guard %d%% of its damage"), ShieldGuard(Id), FMath::RoundToInt(ShieldDrain(Id) * 100.f)));
+		L.Add(FString::Printf(TEXT("Health %d: holding it up costs %d a second, a blow costs its damage"), ShieldGuard(Id), FMath::RoundToInt(JeebTune::V().ShieldDrainPerSecond)));
+		L.Add(FString::Printf(TEXT("Heals %d%% as fast as a kite shield. Weighs %s"), FMath::RoundToInt(ShieldStyleRow(StyleOf(Id)).HealMul * 100.f), *WeightText(ShieldWeight(Id))));
 		L.Add(TEXT("Your guard grows with your Defence level; the blow that empties it drops the shield until it recovers"));
 		L.Add(ShieldStyleRow(StyleOf(Id)).Note);
 	}

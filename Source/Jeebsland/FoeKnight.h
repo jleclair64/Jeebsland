@@ -45,7 +45,6 @@ public:
 	static constexpr int32 MaxHp = 90;
 	static constexpr int32 HitMin = 11, HitMax = 15;   // raw damage of his swing (your armour softens it)
 	static constexpr int32 Tier = 1;                   // iron (tier 1 since the 2026-10-30 redo)
-	static constexpr int32 GuardLevel = 10;            // the Defence level his guard is sized for (JeebItems::GuardForLevel)
 	static constexpr float GuardBack = 6.f;            // the pen knight's broken guard is whole again this long after the last blow on it
 	static constexpr float KnockFall = 0.35f, KnockLie = 1.f, KnockRoll = 0.5f, KnockRise = 0.45f, KnockRollDist = 130.f;
 	static constexpr float StrikeReach = 200.f;        // (centre to centre; was 240, longer than a player's sword reaches)

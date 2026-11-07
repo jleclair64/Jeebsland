@@ -20,6 +20,11 @@ public:
 	// Each rock always holds the same ore, like RuneScape's (chosen by the world builder; the same on every machine)
 	void SetOre(EItemType T) { FixedOre = T; bFixedOre = true; }
 	virtual float ReachRadius() const override { return 190.f; }   // (close enough for the swing to land on it)
+	virtual float SurfaceRadius(float Z) const override   // (the boulder: about 59 across, its middle 31 above its foot and 46 from there to its top; never less than a blow on its top needs)
+	{
+		const float Sc = GetActorScale3D().X, Up = FMath::Clamp((Z / FMath::Max(Sc, 0.1f) - 31.f) / 46.f, -1.f, 1.f);
+		return FMath::Max(59.f * Sc * FMath::Sqrt(1.f - Up * Up), 22.f * Sc);
+	}
 
 protected:
 	virtual void BeginPlay() override;

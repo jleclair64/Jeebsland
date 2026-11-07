@@ -472,7 +472,8 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				ShotMoveClock += DeltaSeconds;
 				static float ShotSeconds = 2.6f;   // (-ShotSeconds=6: a longer series, for a chain of moves)
 				static const bool bReadSeconds = FParse::Value(FCommandLine::Get(), TEXT("ShotSeconds="), ShotSeconds);
-				if (ShotMoveClock < ShotSeconds && (ShotFrame++ % 2) == 0)
+				static const int32 ShotEvery = []() { int32 V = 2; FParse::Value(FCommandLine::Get(), TEXT("ShotEvery="), V); return FMath::Max(V, 1); }();   // (-ShotEvery=1: every frame, for a quick move)
+				if (ShotMoveClock < ShotSeconds && (ShotFrame++ % ShotEvery) == 0)
 					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%03d.png"), *ShotName, ShotFrame / 2), false, false);
 				if (ShotMoveClock > ShotSeconds + 0.2f && PC) PC->ConsoleCommand(TEXT("quit"));
 			}

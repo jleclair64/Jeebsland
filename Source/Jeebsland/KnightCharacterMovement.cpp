@@ -588,7 +588,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
 	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
-	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Recover || Bow == EBow::Reload)) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
+	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Recover || (Bow == EBow::Reload && !bWantSprint))) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
 	else if (!bSpecial && !bMounted && bDrinking) Move->MaxWalkSpeed = JeebTune::V().DrinkWalk * WalkSpeed * Burden * AirSpeedMul;   // drinking: a slow walk
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk

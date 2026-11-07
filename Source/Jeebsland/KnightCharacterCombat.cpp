@@ -279,14 +279,13 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) >= FMath::Cos(FMath::DegreesToRadians(JeebHit::FShieldWedge().HalfAngle));
 	}
-	// The shield takes the blow (owner, 2026-10-31): a blow on a raised shield never hurts the knight; the guard takes it, as
-	// much of it as the shield lets through to the guard (JeebItems::ShieldDrain, 2026-11-02: Tin all of it, a legendary half).
-	// The blow that empties the guard breaks it: the shield drops and can't be raised until the guard is full again.
+	// The shield takes the blow (owner, 2026-10-31): a blow on a raised shield never hurts the knight; its health takes it, one for one (owner, 2026-11-06).
+	// The blow that empties it breaks it: the shield drops and can't be raised until it has healed to full.
 	int32 ShieldStop = 0;
 	if (bFront && !bGuardBroken)
 	{
 		ShieldStop = Raw;
-		GuardPool -= Raw * JeebItems::ShieldDrain(Skills->Worn[JeebItems::K_Shield]);
+		GuardPool -= Raw;
 		if (GuardPool < 1.f)
 		{
 			GuardPool = 0.f;
@@ -1388,22 +1387,28 @@ void AKnightCharacter::TickGear(float Dt)
 			NextExploreTime = GetWorld()->GetTimeSeconds() + 0.5f;
 			Skills->Explore(GetActorLocation());
 		}
-		const int32 ShieldId = (Skills && ShieldActive()) ? Skills->Worn[JeebItems::K_Shield] : 0;
-		// (the guard's size comes from the Defence level alone, owner 2026-11-02; the shield sets how much each blow costs it)
-		const float NewMax = ShieldId ? JeebItems::GuardForLevel(Skills->GetLevel(ESkillType::Defense)) : 0.f;
-		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 10.f;   // the round shield recovers sooner
+		// The shield's health (owner, 2026-11-06). GuardMax follows what is worn, whatever is in the hand. This is the one place that answers a change of shield, by whatever path it came:
+		// the share that was left carries over, so no swap ever refills it, and a broken guard stays broken.
+		const int32 ShieldId = Skills ? Skills->Worn[JeebItems::K_Shield] : 0;
+		const float NewMax = JeebItems::ShieldHealth(ShieldId);
+		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 6.25f;
 		if (!FMath::IsNearlyEqual(NewMax, GuardMax))
 		{
-			if (GuardMax > 0.f && NewMax > 0.f) GuardPool *= NewMax / GuardMax;   // (a Defence level up: the bar grows, as full as it was)
-			else { GuardPool = NewMax; bGuardBroken = false; }                    // (a shield taken up or put away)
+			if (GuardMax > 0.f) GuardShare = FMath::Clamp(GuardPool / GuardMax, 0.f, 1.f);
+			GuardPool = NewMax * GuardShare;
 			GuardMax = NewMax;
 		}
-		// Holding the shield up drains the guard slowly (Smash Bros style): a full guard lasts GuardDrainSeconds of holding,
-		// and it never refills while raised. Lowered, it recovers as before.
-		static const float& GuardDrainSeconds = JeebTune::Storage().GuardDrainSeconds;
-		if (bBlocking && GuardMax > 0.f && !bGuardBroken)
+		const float SinceHit = GetWorld()->GetTimeSeconds() - LastGuardHitTime;
+		if (GuardMax <= 0.f)
 		{
-			GuardPool -= GuardMax / GuardDrainSeconds * Dt;
+			// (no shield worn: what was left keeps healing while it is off, about as a tin kite shield would)
+			if (SinceHit > RecoverDelay) GuardShare = FMath::Min(1.f, GuardShare + 0.15f * Dt);
+			if (GuardShare >= 1.f) bGuardBroken = false;
+		}
+		else if (bBlocking && !bGuardBroken)
+		{
+			static const float& ShieldDrainPerSecond = JeebTune::Storage().ShieldDrainPerSecond;
+			GuardPool -= ShieldDrainPerSecond * Dt;
 			if (GuardPool < 1.f)
 			{
 				GuardPool = 0.f;
@@ -1412,15 +1417,16 @@ void AKnightCharacter::TickGear(float Dt)
 				if (Skills) Skills->Say(2.5f, FColor::Orange, TEXT("Guard broken! Your shield is down until it recovers."));
 			}
 		}
-		else if (GuardMax > 0.f && GuardPool < GuardMax && GetWorld()->GetTimeSeconds() - LastGuardHitTime > RecoverDelay)
+		else if (GuardPool < GuardMax && SinceHit > RecoverDelay)
 		{
-			GuardPool = FMath::Min(GuardMax, GuardPool + GuardMax * 0.1f * Dt);
+			GuardPool = FMath::Min(GuardMax, GuardPool + JeebItems::ShieldHeal(Skills->GetLevel(ESkillType::Defense), JeebItems::StyleOf(ShieldId)) * Dt);
 			if (GuardPool >= GuardMax && bGuardBroken)
 			{
 				bGuardBroken = false;
 				if (Skills) Skills->Say(2.5f, FColor(140, 200, 255), TEXT("Your shield guard is back to full."));
 			}
 		}
+		else if (GuardPool >= GuardMax) bGuardBroken = false;
 	}
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held

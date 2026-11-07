@@ -141,7 +141,7 @@ namespace JeebItems
 				for (int32 k = 0; k < 7; ++k) Row.Palette[k] = Tab.Color(r, Roles[k], Row.Palette[k]);
 				Row.CapeColor = Tab.Color(r, TEXT("CapeColor"), Row.CapeColor);
 				Row.ArmourTakes = FMath::Clamp(Tab.F(r, TEXT("ArmourTakes"), 1.f), 0.f, 1.f);
-				Row.ShieldTakes = FMath::Clamp(Tab.F(r, TEXT("ShieldTakes"), 1.f), 0.f, 2.f);
+				Row.ShieldHealth = FMath::Max(Tab.F(r, TEXT("ShieldHealth"), 100.f), 1.f);
 				Row.WeightMult = FMath::Clamp(Tab.F(r, TEXT("WeightMult"), 1.f), 0.f, 10.f);
 				Row.Metal = FMath::Clamp(Tab.F(r, TEXT("Metal"), 1.f), 0.f, 1.f);
 				Row.Rough = FMath::Clamp(Tab.F(r, TEXT("Rough"), 0.3f), 0.f, 1.f);
@@ -264,7 +264,9 @@ namespace JeebItems
 				Row.Note = Tab.S(s, TEXT("Note"));
 				Row.GuardMul = Tab.F(s, TEXT("GuardMul"), 1.f);
 				Row.MoveMul = Tab.F(s, TEXT("MoveMul"), 1.f);
-				Row.RecoverDelay = Tab.F(s, TEXT("RecoverDelay"), 10.f);
+				Row.RecoverDelay = Tab.F(s, TEXT("RecoverDelay"), 6.25f);
+				Row.HealMul = Tab.F(s, TEXT("HealMul"), 1.f);
+				Row.Weight = Tab.F(s, TEXT("Weight"), 5.f);
 			}
 		}
 

@@ -146,7 +146,15 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	case EInvOp::SwapInv:       Sk->SwapInv(A, B); break;
 	case EInvOp::SwapHot:       bGear = Sk->SwapHotbar(A, B); break;
 	case EInvOp::SwapInvWorn:   if (ArmourBusy(IsArmorKind(B))) break; bGear = Sk->SwapInvWorn(A, B, C != 0); break;
-	case EInvOp::SwapInvPotion: Sk->SwapInvPotion(A); break;
+	case EInvOp::SwapInvPotion:
+		// (owner 2026-11-06: the slot stays as it is until the potion he just drank is ready again. Only this request is refused: the death kit and loot still work.)
+		{
+			float Wait = 0.f;
+			for (int32 i = 0; i < PotionReadyAt.Num(); ++i) Wait = FMath::Max(Wait, GetPotionCooldownLeft(i));
+			if (Wait > 0.f) { Sk->Say(2.f, FColor::Orange, FString::Printf(TEXT("You can't change potions yet: %d s more."), FMath::CeilToInt(Wait))); break; }
+		}
+		Sk->SwapInvPotion(A);
+		break;
 	case EInvOp::Select:
 		if (A >= 0 && A < JeebItems::NumHotbar && A != Sk->Selected && Sk->Hotbar[A] != 0) { Sk->SetSelected(A); bAttacking = false; bCharging = false; bGear = true; }
 		break;
@@ -382,6 +390,8 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		}
 		break;
 	}
+
+	case EInvOp::SwingSet: SwingSet = uint8(FMath::Clamp(A, 0, 2)); break;
 
 	// ---- gathering: the server runs it; the player's machine is told to play the animation (ClientGather) ----
 	case EInvOp::Gather:

@@ -46,7 +46,9 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bFishing = bFishing;
 	In.bDrinking = bDrinking;
 	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
-	In.bSwinging = bSwinging;
+	In.bSwinging = bSwinging && GatherWalkLeft <= 0.f && In.Vel.Size2D() < 50.f;   // (walking into place or off with the tool: he walks, then swings. Other machines go by his speed.)
+	In.bShieldArm = ShieldActive() && !bShieldBack && !bStowed;
+	In.SwingSet = SwingSet;
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
 	In.bShotLog = bShotFace;
@@ -102,7 +104,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	const bool bSweepSquat = bAttacking && AtkStyle == EAtkStyle::Sweep && AttackT < 0.76f * AttackDur;   // (the low sweep drops him into the squat, quickly)
 	CrouchAlpha = FMath::FInterpTo(CrouchAlpha, (bCrouched || bSweepSquat) ? 1.f : 0.f, Dt, bSweepSquat ? 22.f : 10.f);
 	BlockAlpha = FMath::FInterpTo(BlockAlpha, bBlocking ? 1.f : 0.f, Dt, 14.f);
-	if (bSwinging) SwingTime += Dt;
+	if (bSwinging) SwingTime = Speed < 50.f && GatherWalkLeft <= 0.f ? SwingTime + Dt : 0.f;
 	const bool bBowIn = JeebItems::IsShooter(SelectedKind()) && !bStowed && BowHold;
 	BowAimAlpha = FMath::FInterpTo(BowAimAlpha, (bBowIn && Bow != EBow::None) ? 1.f : 0.f, Dt, Bow == EBow::Drawing ? 12.f : 8.f);
 	if (!BowHold) BowAimAlpha = 0.f;   // (the bow was put away mid-draw: R, a drop, death)
@@ -177,7 +179,17 @@ void AKnightCharacter::PlaceGear()
 	}
 	if (BowHold) BowHold->SetWorldTransform(SelectedKind() == JeebItems::K_Crossbow ? Anim->CrossWorld() : Anim->BowWorld(BowAimAlpha));
 	if (IsNetMode(NM_DedicatedServer)) return;
-	if (DrinkGroup && bDrinking) DrinkGroup->SetWorldTransform(Anim->DrinkWorld());
+	if (DrinkGroup && bDrinking)
+	{
+		DrinkGroup->SetWorldTransform(Anim->DrinkWorld());
+		if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBDRINK u %.2f mouth off the bottle's line %.1f cm, cork %.1f cm from the mouth"), DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f), FMath::PointDistToLine(Anim->MouthWorld(), -DrinkGroup->GetComponentQuat().GetAxisZ(), DrinkGroup->GetComponentLocation()), float(FVector::Dist(Anim->MouthWorld(), DrinkGroup->GetComponentLocation() - DrinkGroup->GetComponentQuat().GetAxisZ() * 15.f)));
+	}
+	if (bShotFace && bSwinging && ActiveNode.IsValid())
+	{
+		const FVector Head = Anim->ToolHeadWorld(SelectedKind());
+		const float Feet = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		UE_LOG(LogTemp, Log, TEXT("JEEBCONTACT swingT %.2f u %.2f head off the surface %.1f cm, head height %.0f, surface radius %.0f, from spot %.1f, kind %d"), SwingTime, FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f), FVector::Dist2D(Head, ActiveNode->GetActorLocation()) - ActiveNode->SurfaceRadius(Head.Z - ActiveNode->GetActorLocation().Z), Head.Z - Feet, ActiveNode->SurfaceRadius(Head.Z - ActiveNode->GetActorLocation().Z), FVector::Dist2D(GatherSpot, GetActorLocation()), SelectedKind());
+	}
 	UpdateBowBits();
 	UpdateQuiver();
 	UpdateBeltFlask();
@@ -191,6 +203,10 @@ void AKnightCharacter::PlaceGear()
 void AKnightCharacter::TickSuitTests(float Dt)
 {
 	if (!IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
+	{
+		int32 ShotSwing = 0;   // (-ShotSwing=<0..3>: which look the sword's swings have)
+		if (bShotFace && FParse::Value(FCommandLine::Get(), TEXT("ShotSwing="), ShotSwing)) SwingSet = uint8(FMath::Clamp(ShotSwing, 0, 2));
+	}
 	{
 		static float TurnRate = 0.f;   // (-ShotTurn=200: the camera swings round at that many degrees a second, to check what he does in a move; log JEEBTURN)
 		static const bool bTurnTest = FParse::Value(FCommandLine::Get(), TEXT("ShotTurn="), TurnRate);
@@ -268,7 +284,10 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		if (Best)
 		{
 			const FVector Dir = FRotator(0.f, ShotFaceYaw, 0.f).Vector();
-			FVector At = Best->GetActorLocation() - Dir * (bTree ? 125.f : 130.f);
+			float FromD = bTree ? 125.f : 130.f, FromS = 0.f;   // (-GatherFrom=<distance>_<sideways>: where he clicks from, to see him walk into place)
+			FString GF; TArray<FString> GP;
+			if (FParse::Value(FCommandLine::Get(), TEXT("GatherFrom="), GF) && GF.ParseIntoArray(GP, TEXT("_")) == 2) { FromD = FCString::Atof(*GP[0]); FromS = FCString::Atof(*GP[1]); }
+			FVector At = Best->GetActorLocation() - Dir * FromD + FVector::CrossProduct(FVector::UpVector, Dir) * FromS;
 			At.Z = GetActorLocation().Z;
 			SetActorLocation(At);
 			SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));

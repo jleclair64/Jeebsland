@@ -1,5 +1,7 @@
 #include "KnightCharacter.h"
 #include "Messages.h"
+#include "KnightAnimator.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
@@ -41,8 +43,14 @@ void AKnightCharacter::Interact()
 	bAttackDown = true;   // (held: the sword's smash attack, see TickSmash)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
-	if (Bow == EBow::Drawing) { ReleaseDraw(); return; }            // the bow: the right button draws, this shoots
-	if (IsAimingBow()) return;                                      // (aiming, between shots: a click never starts gathering)
+	// Shooters (owner 2026-11-06). The crossbow: the right button brings it up, this shoots. A bow: either button draws while it is held, and letting go of the last one shoots (InteractReleased, RightUp).
+	if (JeebItems::IsShooter(SelectedKind()))
+	{
+		if (SelectedKind() == JeebItems::K_Crossbow) { if (Bow == EBow::Drawing) ReleaseDraw(); }
+		else if (Bow == EBow::None) StartDraw();
+		return;
+	}
+	if (Bow == EBow::Drawing) return;
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)
 
@@ -106,6 +114,11 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
+	if (Bow == EBow::Drawing && SelectedKind() != JeebItems::K_Crossbow && !bAimHeld)
+	{
+		if (IsUIOpen() || bPanelCursor) CancelDraw(); else ReleaseDraw();
+		return;
+	}
 	// The sword's smash attack: let go before it starts charging and it was just hit 1; let go while charging and it swings
 	if (Smash == ESmash::Deciding) { SetSmash(ESmash::None); return; }
 	if (Smash == ESmash::Charging) { SetSmash(ESmash::Swing, SmashCharge); return; }
@@ -393,6 +406,16 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 	Inv(EInvOp::PickLock, 0, 0, 0, nullptr, Hut->GetActorLocation());
 }
 
+void AKnightCharacter::CycleSwingSet()
+{
+	if (IsUIOpen()) return;
+	const uint8 Next = (SwingSet + 1) % 3;
+	static const TCHAR* const Names[3] = { TEXT("A: the first look"), TEXT("B: high diagonal cuts, a step in on the second"), TEXT("C: a wide whip across, a flat cut back") };
+	SwingSet = Next;
+	Inv(EInvOp::SwingSet, Next);
+	JeebMsg::Post(3.f, FColor::Yellow, FString::Printf(TEXT("Sword swings %s"), Names[Next]));
+}
+
 void AKnightCharacter::CallHorse()
 {
 	if (IsUIOpen() || bMounted) return;
@@ -459,10 +482,23 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 {
 	ActiveNode = Node;
 	GatherStart = GetActorLocation();
+	GatherWalkLeft = 0.f;
 	if (Skill != ESkillType::Fishing)   // (square on to it, so that the swing lands on it)
 	{
-		const FVector ToNode = Node->GetActorLocation() - GetActorLocation();
-		SetActorRotation(FRotator(0.f, FVector(ToNode.X, ToNode.Y, 0.f).Rotation().Yaw, 0.f));
+		// Into place (owner 2026-11-06: the steel must meet the wood or stone, no chopping off to one side). The clip's blow frame says where the tool's head is from his feet, in his own frame;
+		// he stands so that this point is on the near face of the trunk or rock. Worked out alike on the server and his own machine. His own machine walks him there (ordinary movement, which
+		// the server checks); reach isn't checked until the walk is over (TickGatherWalk).
+		FVector F = Node->GetActorLocation() - GetActorLocation();
+		F.Z = 0.f;
+		F = F.GetSafeNormal();
+		const FVector R = FVector::CrossProduct(FVector::UpVector, F);
+		const FVector Head = JeebAnim::FClipLib::Get().ToolContact(Skill != ESkillType::Mining, Skill != ESkillType::Mining ? JeebItems::K_Axe : JeebItems::K_Pickaxe);
+		const float FeetZ = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		GatherSpot = Node->GetActorLocation() - F * (Node->SurfaceRadius(FeetZ + Head.Z - Node->GetActorLocation().Z) + Head.X) - R * Head.Y;
+		GatherSpot.Z = GetActorLocation().Z;
+		GatherYaw = F.Rotation().Yaw;
+		GatherWalkLeft = IsLocallyControlled() ? 1.f : 1.5f;   // (the server's runs longer: his own machine starts half a round trip later)
+		SetActorRotation(FRotator(0.f, GatherYaw, 0.f));
 	}
 	// online: the server runs the gathering; the player's machine plays the animation
 	if (HasAuthority() && GetNetMode() != NM_Standalone && !IsLocallyControlled()) ClientGather(Node->GetActorLocation(), static_cast<uint8>(Skill), true);
@@ -495,6 +531,22 @@ void AKnightCharacter::BeginGathering(AResourceNode* Node, ESkillType Skill)
 		WindupAngle = 85.f;    // arm pulled out to the right
 		StrikeAngle = -40.f;   // arm swept across the front
 	}
+}
+
+// The walk into place: at most a moment, facing the node all the way. Nothing here is a teleport: a blocked spot just means he works from as near as he got.
+void AKnightCharacter::TickGatherWalk(float Dt)
+{
+	if (GatherWalkLeft <= 0.f) return;
+	if (!ActiveNode.IsValid()) { GatherWalkLeft = 0.f; return; }
+	GatherWalkLeft -= Dt;
+	SetActorRotation(FRotator(0.f, GatherYaw, 0.f));
+	FVector To = GatherSpot - GetActorLocation();
+	To.Z = 0.f;
+	const float D = To.Size();
+	if (IsLocallyControlled() && D > 3.f)
+		AddMovementInput(To / D, FMath::Clamp(D / 70.f, 0.12f, 0.4f));   // (an easy walk, slowing into the spot, so he stops on it)
+	if ((IsLocallyControlled() && D <= 3.f) || GatherWalkLeft <= 0.f) { if (IsLocallyControlled()) GatherWalkLeft = 0.f; }
+	if (GatherWalkLeft <= 0.f) GatherStart = GetActorLocation();
 }
 
 void AKnightCharacter::EndGathering()

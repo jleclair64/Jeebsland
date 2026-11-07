@@ -1,6 +1,6 @@
-Name,GuardMul,MoveMul,RecoverDelay,Note
+Name,GuardMul,MoveMul,RecoverDelay,HealMul,Weight,Note
 # Shield styles. Each has its own model in the code, so keep these three rows in this order (kite, round, tower); every column can be changed.
-# GuardMul: a blow on this style costs the guard less (x 1 / GuardMul: tower 1.5 = two thirds, round 0.75 = a third more); the guard's size comes from the Defence level. MoveMul: speed in the shield stance x this. RecoverDelay: seconds after the last blocked blow before the guard refills.
-Kite Shield,1,1,10,Kite: the all-rounder
-Round Shield,0.75,1.15,5,"Round: blows cost its guard a third more, but it recovers twice as soon and you move 15% quicker behind it"
-Tower Shield,1.5,0.8,10,"Tower: blows cost its guard only two thirds as much, but you move 20% slower behind it"
+# GuardMul: its health x this (Tiers.csv ShieldHealth). MoveMul: speed in the shield stance x this. RecoverDelay: seconds after the last blow on it before it starts to heal. HealMul: how fast it heals x this (the speed itself comes from the Defence level: Tuning.ini [Guard]). Weight: kg, x the tier's WeightMult.
+Kite Shield,1,1,6.25,1,5,Kite: the all-rounder
+Round Shield,0.75,1.15,3.1,1.3,3.5,"Round: less health, but light, it heals sooner and faster and you move 15% quicker behind it"
+Tower Shield,1.5,0.8,6.25,0.8,9,"Tower: half as much health again, but heavy, it heals slower and you move 20% slower behind it"

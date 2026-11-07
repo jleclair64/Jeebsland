@@ -228,25 +228,19 @@ namespace JeebItems
 	}
 	// Defence points of a shield (flat damage blocked) or armour piece (adds to the total)
 	inline int32 DefenseOf(int32 K, int32 T) { return FMath::RoundToInt(KindRow(K).Defence * TierMult(T)); }
-	// Shields (owner, 2026-11-02): the guard's SIZE comes only from the Defence level (GuardForLevel); the shield decides how much
-	// of each blow on it comes out of the guard: its tier's ShieldTakes (Tin all of it, down to half for diamond), divided by
-	// its style's GuardMul (a tower loses less per blow, a round shield more). The shield's size never changes.
-	inline float ShieldDrain(int32 ShieldItemId)
+	// Shields (owner, 2026-11-06): a shield has health. Its tier's ShieldHealth x its style's GuardMul: a gold kite shield 200. Holding it up costs Tuning.ini ShieldDrainPerSecond whatever the
+	// shield, a blow on it costs its damage one for one, and it heals by the holder's Defence level (ShieldHeal). The shield's size never changes.
+	inline float ShieldHealth(int32 ShieldItemId)
 	{
-		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 1.f;
-		return TierRow(VariantOf(ShieldItemId)).ShieldTakes / FMath::Max(0.1f, ShieldGuardMul(StyleOf(ShieldItemId)));
+		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 0.f;
+		return TierRow(VariantOf(ShieldItemId)).ShieldHealth * FMath::Max(0.1f, ShieldGuardMul(StyleOf(ShieldItemId)));
 	}
-	// The number a shield shows (badges, tooltips, the store): its strength, 10 for a tin kite shield, higher the less each blow
-	// costs the guard (a gold kite shield 15, a diamond one 20)
-	inline int32 ShieldGuard(int32 ShieldItemId)
-	{
-		if (!IsGear(ShieldItemId) || KindOf(ShieldItemId) != K_Shield) return 0;
-		return FMath::RoundToInt(10.f / FMath::Max(0.05f, ShieldDrain(ShieldItemId)));
-	}
+	// The number a shield shows (badges, tooltips, the store)
+	inline int32 ShieldGuard(int32 ShieldItemId) { return FMath::RoundToInt(ShieldHealth(ShieldItemId)); }
 	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
-	// The guard bar's size from the Defence level: 20 at level 1 up to 40 at level 99
-	// (the two ends: Tuning.ini [Guard])
-	inline float GuardForLevel(int32 DefenceLevel) { return FMath::Lerp(JeebTune::V().GuardAtLevel1, JeebTune::V().GuardAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)); }
+	// Health a second it heals, lowered: by the Defence level (the two ends: Tuning.ini [Guard]) x the style's HealMul
+	inline float ShieldHeal(int32 DefenceLevel, int32 Style) { return FMath::Lerp(JeebTune::V().ShieldHealAtLevel1, JeebTune::V().ShieldHealAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)) * ShieldStyleRow(Style).HealMul; }
+	inline float ShieldWeight(int32 ShieldItemId) { return ShieldStyleRow(StyleOf(ShieldItemId)).Weight * TierRow(VariantOf(ShieldItemId)).WeightMult; }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
 	// Tools make gathering faster: 1.0 for a tin tool, down to 0.6 for a diamond one
@@ -432,12 +426,13 @@ namespace JeebItems
 	// walking, sprinting and crouching by SlowPerKg for each kg over, at most MaxSlow. Shields, weapons and the pack weigh nothing.
 	// (2026-11-03: x the armour style's WeightMul too; Variant = style x 10 + tier, as FullVariant gives it)
 	inline float PieceWeight(int32 Kind, int32 Variant) { return IsArmorKind(Kind) ? KindRow(Kind).Weight * TierRow(Variant % 10).WeightMult * ArmourStyleRow(Variant / 10).WeightMul : 0.f; }
-	inline float ItemWeight(int32 Id) { return Id >= IdGearBase ? PieceWeight(KindOf(Id), FullVariant(Id)) : 0.f; }
+	inline float ItemWeight(int32 Id) { return Id < IdGearBase ? 0.f : KindOf(Id) == K_Shield ? ShieldWeight(Id) : PieceWeight(KindOf(Id), FullVariant(Id)); }
 	inline float TotalWeight(const USkillComponent* S)
 	{
 		if (!S) return 0.f;
 		float Kg = 0.f;
 		for (int32 K = K_Helmet; K <= K_Boots; ++K) Kg += ItemWeight(S->Worn[K]);
+		Kg += ItemWeight(S->Worn[K_Shield]);
 		return Kg;
 	}
 	// The share of speed a suit this heavy takes away (0.1 = 10% slower)
