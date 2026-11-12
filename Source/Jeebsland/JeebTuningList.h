@@ -34,7 +34,9 @@ JEEB_TUNE(Bow, HeadshotMul, 1.5f)
 
 // [Jab]
 JEEB_TUNE(Jab, Jab1Share, 0.49f)
-JEEB_TUNE(Jab, Jab2Share, 0.847f)
+JEEB_TUNE(Jab, Jab2Share, 0.65f)
+JEEB_TUNE(Jab, Jab1Pause, 0.2f)
+JEEB_TUNE(Jab, Jab2Pause, 0.28f)
 JEEB_TUNE(Jab, SwordJabDamage, 0.75f)
 JEEB_TUNE(Jab, Jab1From, 0.30f)
 JEEB_TUNE(Jab, Jab1To, 0.80f)

@@ -17,6 +17,11 @@
 #  The grip's other two axes come from what is actually at the grip, not the bounding box.
 #  mask: "grey" = low-saturation pixels take the tier (metal parts), "colour" = saturated pixels take it (a potion's liquid), "far" = everything beyond 'far' of the
 #  grip along the long axis takes it (a stave but not its leather grip).
+#  More steel for the tier's colour (owner, 2026-11-11; one model for every tier). Conditions are (axis, lo, hi) on a face's centre in cm, "|Y|" the distance
+#  from the middle, "nZ" which way the face looks (-1..1):
+#  clean: the mask is decided once per face from inside it (no tinted streaks where a corner sits on the picture's grey seam), and wood faces show only wood.
+#  metal: [[conds], ...] whole parts that become steel. bands: [(axis, lo, hi[, [conds]]), ...] slices cut cleanly and raised by 'raise' cm (0.15) as steel bands
+#  and plates. plain: [[conds], ...] parts that stay wood whatever the picture painted there. Added steel takes one even colour from a calm steel spot in the picture.
 import bpy, bmesh, os, sys, math
 from mathutils import Vector, Matrix
 
@@ -30,9 +35,12 @@ os.makedirs(out, exist_ok=True)
 #  on the crossbow's hold: X toward the prod, Z up, the rear grip at the origin
 PROPS = {
     "Potion":   dict(file="Potion.glb",   axes=("X", "-Y", "-Z"), length=21.0, grip=("Z", 0.25), mask="colour", also=("Z", 13.0), neck=("Z", -1.0, 4.5)),                       # (held by the neck: the body is wider than a fist)
-    "Pickaxe":  dict(file="Pickaxe.glb",  axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), blade=("Y", "X", 3.4, 2.2, 0.35), wood=(25.0, 0.74, 0.30, 60.0)),
-    "Longbow":  dict(file="Longbow.glb",  axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="grey", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0)),
-    "Crossbow": dict(file="Crossbow.glb", axes=("-X", "-Y", "Z"), length=88.0, grip=("X", 0.36), mask="grey", wood=(25.0, 0.74, 0.28, 60.0)),
+    "Pickaxe":  dict(file="Pickaxe.glb",  axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), blade=("Y", "X", 3.4, 2.2, 0.35), wood=(25.0, 0.74, 0.30, 60.0),
+                     clean=True, bands=[("Z", -69.6, -61.0, [("|X|", 0.0, 2.8), ("|Y|", 0.0, 2.8)]), ("Z", -20.0, -18.0)], metal=[[("Z", 12.4, 99.0)]]),
+    "Longbow":  dict(file="Longbow.glb",  axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="grey", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0),
+                     clean=True, plain=[[("|X|", 15.0, 68.0)]], bands=[("|X|", 9.5, 22.0), ("|X|", 41.0, 45.0), ("|X|", 64.0, 80.0)]),
+    "Crossbow": dict(file="Crossbow.glb", axes=("-X", "-Y", "Z"), length=88.0, grip=("X", 0.36), mask="grey", wood=(25.0, 0.74, 0.28, 60.0),
+                     clean=True, metal=[[("X", 29.0, 47.0), ("|Y|", 5.0, 99.0)]], bands=[("X", -24.5, -20.5), ("X", -10.5, -6.5), ("X", 9.0, 44.5, [("|Y|", 0.0, 5.0)])]),
 }
 names = a[2:] or list(PROPS)
 IDX = {"X": 0, "Y": 1, "Z": 2}
@@ -53,6 +61,108 @@ def shrink(img, size, path, srgb=True):
     im.file_format = "PNG"
     im.save()
 
+def steel_uv(pix, W, H, normal):
+    # a calm spot of steel in the model's own picture, as bright as its steel usually is and with a flat normal: metal parts added here all take their colour from it
+    import numpy as np
+    arr = np.array(pix, dtype=np.float32).reshape(H, W, 4)[..., :3]
+    V = arr.max(axis=2); S = (V - arr.min(axis=2)) / np.maximum(V, 1e-4)
+    steel = S < 0.2
+    med = float(np.median(V[steel]))
+    k = 6
+    def box(a_):
+        c = np.cumsum(np.cumsum(np.pad(a_, ((1, 0), (1, 0))), 0), 1)
+        return (c[2 * k + 1:, 2 * k + 1:] - c[:-2 * k - 1, 2 * k + 1:] - c[2 * k + 1:, :-2 * k - 1] + c[:-2 * k - 1, :-2 * k - 1]) / float((2 * k + 1) ** 2)
+    m1 = box(V.astype(np.float64)); m2 = box((V * V).astype(np.float64)); st = box(steel.astype(np.float64))
+    var = np.maximum(m2 - m1 * m1, 0.0)
+    score = np.sqrt(var) + np.abs(m1 - med) + (st < 0.999) * 10.0
+    if normal is not None:
+        nw, nh = normal.size
+        na = np.array(normal.pixels[:], dtype=np.float32).reshape(nh, nw, 4)
+        ys = (np.arange(k, H - k) * nh // H); xs = (np.arange(k, W - k) * nw // W)
+        nn = na[ys][:, xs]
+        score = score + (np.abs(nn[..., 0] - 0.5) + np.abs(nn[..., 1] - 0.5)) * 2.0
+    y, x = np.unravel_index(int(np.argmin(score)), score.shape)
+    y += k; x += k
+    print("PROP steel spot", x, y, "value %.3f (steel median %.3f)" % (float(V[y, x]), med))
+    return ((x + 0.5) / W, (y + 0.5) / H)
+
+def add_metal(me, P, M3, pix, W, H, normal):
+    # metal: whole parts that become metal (each a list of (axis, lo, hi) its face's centre must meet; "|Y|" is the distance from the middle along Y).
+    # bands: (axis, lo, hi) slices cut cleanly into the model and raised by 'raise' cm as a metal band. Both take one even steel colour from the model's own picture.
+    # Returns the faces that take the tier's colour.
+    bm = bmesh.new(); bm.from_mesh(me)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-3)   # (Meshy splits the mesh along its picture's seams: a band must come up as one piece)
+    own = bm.loops.layers.float_vector["OwnN"]; uvl = bm.loops.layers.uv.active
+    M3T = M3.transposed()
+    def fnorm(f):
+        n_ = Vector((0.0, 0.0, 0.0))
+        for l in f.loops: n_ += (M3 @ Vector(l[own])).normalized()
+        return n_.normalized()
+    def inside(f, conds):
+        c = f.calc_center_median(); n_ = None
+        for ax, lo_, hi_ in conds:
+            if ax.strip("|").startswith("n"):   # (which way the face looks: "nZ" 0.6..1 = facing up, "|nY|" 0.6..1 = facing either side)
+                if n_ is None: n_ = fnorm(f)
+                v_ = n_[IDX[ax.strip("|")[1:]]]
+                if ax.startswith("|"): v_ = abs(v_)
+            else:
+                v_ = c[IDX[ax.strip("|")]]
+                if ax.startswith("|"): v_ = abs(v_)
+            if not (lo_ <= v_ <= hi_): return False
+        return True
+    def in_band(f, b):
+        return inside(f, [b[:3]]) and inside(f, b[3] if len(b) > 3 else [])
+    su = steel_uv(pix, W, H, normal)
+    bands = P.get("bands", [])
+    for b in bands:   # (cut along every edge of the band, so it comes up with straight clean edges; only where the band is, so the rest keeps its triangles)
+        bax, blo, bhi = b[:3]; bi = IDX[bax.strip("|")]
+        def near(f):
+            vs = [abs(v.co[bi]) if bax.startswith("|") else v.co[bi] for v in f.verts]
+            return min(vs) <= bhi + 0.01 and max(vs) >= blo - 0.01
+        for ax, lo_, hi_ in [b[:3]] + [c_ for c_ in (b[3] if len(b) > 3 else []) if not c_[0].strip("|").startswith("n")]:
+            i = IDX[ax.strip("|")]
+            ds = [d for d in (lo_, hi_) if (d > 0.0 or not ax.startswith("|")) and abs(d) < 90.0]
+            for d in (ds + [-d for d in ds] if ax.startswith("|") else ds):
+                fs = [f for f in bm.faces if near(f)]
+                es = list({e for f in fs for e in f.edges}); vs_ = list({v for f in fs for v in f.verts})
+                co = Vector((0.0, 0.0, 0.0)); co[i] = d; no = Vector((0.0, 0.0, 0.0)); no[i] = 1.0
+                bmesh.ops.bisect_plane(bm, geom=vs_ + es + fs, dist=1e-4, plane_co=co, plane_no=no)
+    metal = set()
+    for conds in P.get("metal", []):
+        metal |= {f for f in bm.faces if inside(f, conds)}
+    metal -= {f for f in metal if any(in_band(f, b) for b in bands)}
+    raised = set()
+    if bands:
+        band = [f for f in bm.faces if any(in_band(f, b) for b in bands)]
+        before = set(bm.faces) - set(band)
+        res = bmesh.ops.extrude_face_region(bm, geom=band)
+        top = {g for g in res["geom"] if isinstance(g, bmesh.types.BMFace)}
+        walls = set(bm.faces) - before - top
+        push = {}
+        for f in top:
+            for l in f.loops:
+                push.setdefault(l.vert, Vector((0.0, 0.0, 0.0)))
+                push[l.vert] += (M3 @ Vector(l[own])).normalized()
+        rz = P.get("raise", 0.15)
+        for v, d in push.items(): v.co += d.normalized() * rz
+        bm.normal_update()
+        for f in walls:
+            # (a wall faces away from the band it rims)
+            t_ = next((t for e in f.edges for t in e.link_faces if t in top), None)
+            if t_ is not None and f.normal.dot(f.calc_center_median() - t_.calc_center_median()) < 0.0:
+                f.normal_flip()
+            n_ = M3T @ f.normal.normalized()
+            for l in f.loops: l[own] = n_
+        raised = top | walls
+    for f in metal | raised:
+        for l in f.loops: l[uvl].uv = su
+    bm.faces.index_update()
+    forced = {f.index for f in metal | raised}
+    plain = {f.index for f in bm.faces if f.index not in forced and any(inside(f, conds) for conds in P.get("plain", []))}   # (parts that stay wood, whatever the picture painted there)
+    print("PROP metal faces", len(metal), "band faces", len(raised), "plain faces", len(plain))
+    bm.to_mesh(me); bm.free(); me.update()
+    return forced, plain
+
 for name in names:
     P = PROPS[name]
     f = os.path.join(src, P["file"])
@@ -64,11 +174,9 @@ for name in names:
     bpy.context.view_layer.objects.active = o; o.select_set(True)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     me = o.data
-    # (the model's own normals, by face and corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side)
-    own_normals = {}
-    for poly in me.polygons:
-        for li_ in poly.loop_indices:
-            own_normals[(poly.index, me.loops[li_].vertex_index)] = me.corner_normals[li_].vector.copy()
+    # (the model's own normals, by corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side. Kept as a corner attribute so cuts and bands carry them along)
+    own = me.attributes.new("OwnN", "FLOAT_VECTOR", "CORNER")
+    for li_ in range(len(me.loops)): own.data[li_].vector = me.corner_normals[li_].vector.copy()
     # the pictures, by what they feed
     mat = me.materials[0]
     nodes = mat.node_tree.nodes
@@ -195,25 +303,74 @@ for name in names:
         graded.update()
         base = graded
         print("PROP", name, "wood %.0f%% of the picture" % (100.0 * wood.mean()))
+    # more metal (owner, 2026-11-11: the tier's colour should stand out; the same model in every tier): whole parts made metal, and raised metal bands
+    forced = set(); plain = set()
+    if "metal" in P or "bands" in P or "plain" in P:
+        forced, plain = add_metal(me, P, M3, pix, W, H, normal)
     # the mask
     uv = me.uv_layers.active.data
     if "Mask" in me.color_attributes: me.color_attributes.remove(me.color_attributes["Mask"])
     ca = me.color_attributes.new("Mask", "BYTE_COLOR", "CORNER")
-    vm = {}
+    vm = {}; woodfaces = []
+    def is_metal(r, g_, b):
+        mx, mn = max(r, g_, b), min(r, g_, b)
+        sat = (mx - mn) / max(mx, 1e-4)
+        return sat < 0.30 or mx < 0.06   # (dark steel counts, whatever faint hue it has)
     for poly in me.polygons:
+        face_val = None
+        if P.get("clean"):
+            # (one answer per face, from inside it: a corner on the edge of a wood patch in the picture picks up the grey seam around it, which drew gold streaks along the wood)
+            uvs = [Vector(uv[li_].uv) for li_ in poly.loop_indices]
+            c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
+            pts = [c_] + [c_ + (q - c_) * 0.6 for q in uvs]
+            votes = sum(1 for q in pts if is_metal(*colour_at(q.x, q.y)))
+            face_val = 1.0 if votes * 2 > len(pts) else 0.0
+            if poly.index in plain: face_val = 0.0
         for li_ in poly.loop_indices:
             r, g_, b = colour_at(*uv[li_].uv)
             mx, mn = max(r, g_, b), min(r, g_, b)
             sat = (mx - mn) / max(mx, 1e-4)
             vi = me.loops[li_].vertex_index
-            if P["mask"] == "grey": val = 1.0 if sat < 0.30 or mx < 0.06 else 0.0   # (dark steel counts, whatever faint hue it has)
+            if face_val is not None: val = face_val
+            elif P["mask"] == "grey": val = 1.0 if is_metal(r, g_, b) else 0.0
             elif P["mask"] == "colour": val = 1.0 if sat > 0.45 and g_ < 0.35 * r else 0.0   # (the red liquid, not the tan cork)
             else: val = 0.0
             if "also" in P and me.vertices[vi].co[IDX[P["also"][0]]] > P["also"][1]: val = 1.0
             if "far" in P and abs(me.vertices[vi].co[li]) <= P["far"]: val = 0.0
             if "below" in P and me.vertices[vi].co[IDX[P["below"][0]]] >= P["below"][1]: val = 0.0
+            if poly.index in forced: val = 1.0
             ca.data[li_].color = (val, val, val, 1.0)
+        if face_val == 0.0 and poly.index not in forced:
+            woodfaces.append([tuple(uv[li_].uv) for li_ in poly.loop_indices])
     me.update()
+    # a face judged wood shows only wood: the picture's grey seams inside it (pale streaks along the stock and limbs) take the wood's colour from nearby
+    if woodfaces and "wood" in P:
+        fill = np.stack([blur(arr[..., c] * wood, rad) for c in range(3)], axis=-1) / np.maximum(wt, 1.0)[..., None]
+        far_ = wt < 1.0
+        mean_rgb = arr[..., :3][wood].mean(axis=0) if wood.any() else np.array([0.28, 0.12, 0.05])
+        fill[far_] = mean_rgb
+        in_wood = np.zeros((H, W), dtype=bool)
+        for f_uv in woodfaces:
+            q = [(u_ * W - 0.5, v_ * H - 0.5) for u_, v_ in f_uv]
+            for k_ in range(1, len(q) - 1):
+                (x0, y0), (x1, y1), (x2, y2) = q[0], q[k_], q[k_ + 1]
+                den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+                if abs(den) < 1e-9: continue
+                xa = max(0, int(math.floor(min(x0, x1, x2))) - 1); xb = min(W - 1, int(math.ceil(max(x0, x1, x2))) + 1)
+                ya = max(0, int(math.floor(min(y0, y1, y2))) - 1); yb = min(H - 1, int(math.ceil(max(y0, y1, y2))) + 1)
+                if xb < xa or yb < ya: continue
+                gx, gy = np.meshgrid(np.arange(xa, xb + 1), np.arange(ya, yb + 1))
+                l0 = ((y1 - y2) * (gx - x2) + (x2 - x1) * (gy - y2)) / den
+                l1 = ((y2 - y0) * (gx - x2) + (x0 - x2) * (gy - y2)) / den
+                l2 = 1.0 - l0 - l1
+                A2 = abs(den)
+                hs = [A2 / max(math.hypot(x1 - x2, y1 - y2), 1e-6), A2 / max(math.hypot(x2 - x0, y2 - y0), 1e-6), A2 / max(math.hypot(x0 - x1, y0 - y1), 1e-6)]
+                ok = (l0 * hs[0] >= -1.0) & (l1 * hs[1] >= -1.0) & (l2 * hs[2] >= -1.0)   # (a pixel's width past each edge)
+                in_wood[ya:yb + 1, xa:xb + 1] |= ok
+        fix = in_wood & ~wood
+        arr[..., :3][fix] = fill[fix]
+        graded.pixels.foreach_set(arr.reshape(-1)); graded.update(); base = graded
+        print("PROP", name, "wood faces %d, seam pixels evened %.1f%%" % (len(woodfaces), 100.0 * fix.mean()))
     # the pictures
     shrink(base, 1024, os.path.join(out, "T_%s_Base.png" % name))
     if normal: shrink(normal, 512, os.path.join(out, "T_%s_Normal.png" % name))
@@ -228,10 +385,10 @@ for name in names:
     bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.reverse_faces(bm, faces=bm.faces); bm.to_mesh(me); bm.free(); me.update()
     # the normals, turned the same way
     turned = [None] * len(me.loops)
-    for poly in me.polygons:
-        for li_ in poly.loop_indices:
-            n_ = M3 @ own_normals[(poly.index, me.loops[li_].vertex_index)]
-            turned[li_] = (n_.x, -n_.y, n_.z)
+    own = me.attributes["OwnN"]
+    for li_ in range(len(me.loops)):
+        n_ = (M3 @ Vector(own.data[li_].vector)).normalized()
+        turned[li_] = (n_.x, -n_.y, n_.z)
     me.normals_split_custom_set(turned)
     me.update()
     bpy.ops.export_scene.fbx(filepath=fbx, use_selection=True, object_types={"MESH"}, apply_scale_options="FBX_SCALE_NONE", global_scale=0.01, apply_unit_scale=True,

@@ -723,6 +723,7 @@ private:
 	bool SmashInputOk(ESmash P) const;   // a phase change the player's machine asked for fits what this machine is doing
 	void TickSmash(float Dt);
 	float SmashTimeLeft() const;   // how long until the smash's end lag is over
+	float JabPause() const;        // seconds he holds still after a sword's jab before the next swing can start (Tuning.ini Jab1Pause / Jab2Pause); 0 for anything else
 	UFUNCTION(Server, Reliable) void ServerSmash(uint8 Phase, float Charge);
 	UFUNCTION(NetMulticast, Reliable) void MulticastSmash(uint8 Phase, float Charge);
 	bool SmashLocked() const { return Smash == ESmash::Swing || Smash == ESmash::EndLag || Smash == ESmash::Rebound; }   // no moving

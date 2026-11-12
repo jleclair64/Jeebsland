@@ -104,6 +104,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	QueuedClick = -10.f;
 	QueuedJabs = 0;   // (a new swing starts with an empty buffer: presses made before it began are used up)
 	Smash = ESmash::None; bSmashSwing = false; SmashT = 0.f; SmashCoilNow = 0.f;   //(the caller makes hit 1 a smash; online the player's next swing ends the server's end lag)
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBJAB start dir %d at %.3f, swing %.3f s, then a pause of %.3f s"), Dir, GetWorld()->GetTimeSeconds(), AttackDur, JabPause());
 	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
 	// Face where you aim: always for shots (bow, wand, staff fly where the camera points); a melee swing or thrust only in
 	// strafe mode, otherwise it goes the way the knight already faces (owner, 2026-10-31)
@@ -190,6 +191,13 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StopJumping(); }), Hold, false);
 	}
 	if (Move == TEXT("jab2")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // hits 1 and 2
+	if (Move == TEXT("jab3"))   // hits 1, 2 and 1 again: both pauses (a press is buffered again once hit 2 is under way)
+	{
+		StartAttack(EAtkStyle::Slash, JabFirst, 0.f);
+		QueuedJabs = 1;
+		FTimerHandle T;
+		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { QueuedJabs = 1; }), AttackDur + JabPause() + 0.08f, false);
+	}
 	if (Move.StartsWith(TEXT("smash")))   // the smash attack: smash = full charge (1 s), smash40 = 0.4 s of charge (hundredths: the command line stops at a dot)
 	{
 		StartAttack(EAtkStyle::Slash, JabFirst, 0.f);
@@ -675,8 +683,11 @@ void AKnightCharacter::TickAttack(float Dt)
 			bAttackHit = true;
 			AttackLands();
 		}
-		if (AttackT >= AttackDur || (Smash == ESmash::Rebound && SmashT >= ReboundDur))
+		// (owner 2026-11-11, Ocarina of Time's pace: each jab is fast and ends in a still moment, a little longer after the second, and only then can the next one come out. A press
+		// in the swing or the pause is kept for it. The animator holds the end of the cut through it: MoveU runs past 1.)
+		if (Smash == ESmash::Rebound ? SmashT >= ReboundDur : AttackT >= AttackDur + JabPause())   // (a rebound ends on its own clock only: it may begin in the pause, already past the swing's end)
 		{
+			if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBJAB end dir %d at %.3f (swing %.3f s, pause %.3f s)"), AttackDir, GetWorld()->GetTimeSeconds(), AttackDur, FMath::Max(0.f, AttackT - AttackDur));
 			bAttacking = false;
 			// (a rebound, a kick and a sweep end like a smash attack: only a late press comes out)
 			const bool bWasSmash = bSmashSwing || Smash == ESmash::Rebound || AtkStyle == EAtkStyle::Kick || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash;
@@ -780,6 +791,13 @@ void AKnightCharacter::MulticastSmash_Implementation(uint8 Phase, float Charge)
 	if (HasAuthority() || IsLocallyControlled() || Phase > static_cast<uint8>(ESmash::EndLag)) return;   // (they already know)
 	const ESmash P = static_cast<ESmash>(Phase);
 	if (SmashInputOk(P)) SetSmash(P, Charge, false);
+}
+
+float AKnightCharacter::JabPause() const
+{
+	const int32 K = SelectedKind();
+	if (AtkStyle != EAtkStyle::Slash || bSmashSwing || Smash != ESmash::None || !JeebItems::FightsLikeSword(K)) return 0.f;
+	return JeebItems::WeaponBase(K).Cooldown * (AttackDir == JabSecond ? JeebTune::V().Jab2Pause : JeebTune::V().Jab1Pause) / SwingSpeedScale();
 }
 
 float AKnightCharacter::SmashTimeLeft() const
@@ -1080,10 +1098,10 @@ void AKnightCharacter::MulticastRebound_Implementation(float Dur)
 void AKnightCharacter::BeginRebound(float Dur)
 {
 	if (!JeebItems::FightsLikeSword(SelectedKind())) return;
-	if (!bAttacking)   // (online: the swing had already finished on the player's machine)
+	if (!bAttacking || AttackT >= AttackDur)   // (online: the swing had already finished on the player's machine, or it is in the still pause after it)
 	{
+		if (!bAttacking) AttackDir = (LastSwingDir == JabSecond) ? JabSecond : JabFirst;
 		bAttacking = true; AtkStyle = EAtkStyle::Slash; bAttackHit = true;
-		AttackDir = (LastSwingDir == JabSecond) ? JabSecond : JabFirst;
 		AttackT = 0.6f * AttackDur;
 	}
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBSMASH rebound %.2f s, swing T %.2f"), Dur, AttackT / FMath::Max(AttackDur, 0.01f));   // (test pictures)

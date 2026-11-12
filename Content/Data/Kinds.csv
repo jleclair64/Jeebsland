@@ -8,7 +8,7 @@ Axe,Axe,9,13,220,0.55,0,0,45,5,0,no,"Hits harder than a sword and chops trees fa
 Pickaxe,Pickaxe,6,9,210,0.55,0,0,35,4,0,no,"A mining tool first and a weapon only in a pinch, though it fights as a sword does away from a rock. Better pickaxes mine faster and unlock harder ore."
 Spear,Spear,6,9,380,0.65,0,0,40,4,0,no,Long reach. Hold the attack button to charge a lunge. A shield can be carried with it.
 Broadsword,Broadsword,15,22,260,0.95,0,0,90,8,2,yes,"A heavy two-handed blade: slow swings, big damage. Cannot be used with a shield."
-BattleAxe,Battle Axe,17,25,250,1.05,0,0,100,9,2,yes,"The biggest hitter and the slowest. Two-handed, no shield."
+BattleAxe,Battle Axe,17,25,250,1.05,0,0,100,9,2,no,"The biggest hitter and the slowest. One-handed, with a shield (owner 2026-11-11)."
 Katana,Katana,6,9,225,0.38,0,0,110,6,2,yes,"A pair of light curved blades, one in each hand. Very fast, modest hits. No shield."
 Wand,Wand,7,11,1800,0.55,0,0,80,3,1,no,Fires small magic bolts at range. Light and quick.
 Staff,Wizard Staff,11,17,2200,1.00,0,0,100,5,1,yes,"A wizard's staff: slow, heavy bolts from far away. Two-handed, no shield."

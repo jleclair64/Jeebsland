@@ -152,6 +152,16 @@ if FIT:
     zs = SC[seg][Lf]
     nn = np.stack([n0[:, 0] / FIT[0], n0[:, 1] / FIT[0], n0[:, 2] / zs], 1); nn /= np.maximum(np.linalg.norm(nn, axis=1), 1e-12)[:, None]
     me.update(); me.normals_split_custom_set(nn.tolist()); me.update()
+if "tilt" in opts:
+    # tilt=degrees,y,z (after the fit, the knight's own coordinates): turns the piece forward and down (positive: its front, toward -Y, goes down) about the sideways axis
+    # through the point y,z, and its normals with it. The helmet uses it to bring the visor's eye slots down to the eyes (owner, 2026-11-11).
+    TD, TY, TZ = [float(v) for v in opts["tilt"].split(",")]
+    ca, sa = math.cos(math.radians(TD)), math.sin(math.radians(TD))
+    n1 = np.array([c.vector[:] for c in me.corner_normals])
+    for v in me.vertices:
+        v.co = Vector((v.co.x, (v.co.y - TY) * ca - (v.co.z - TZ) * sa + TY, (v.co.y - TY) * sa + (v.co.z - TZ) * ca + TZ))
+    n1 = np.stack([n1[:, 0], n1[:, 1] * ca - n1[:, 2] * sa, n1[:, 1] * sa + n1[:, 2] * ca], 1); n1 /= np.maximum(np.linalg.norm(n1, axis=1), 1e-12)[:, None]
+    me.update(); me.normals_split_custom_set(n1.tolist()); me.update()
 if "place" in opts:
     # place=scale, piece pivot x y z, piece axis x y z, knight axis x y z, knight spot x y z[, stretch x y z[, trail, hinge]]: for a pair of pieces (gauntlets, shoulders),
     # given for the knight's left side (+X). The pivot goes on the spot and the piece's axis along his limb; the other side is the mirror image.

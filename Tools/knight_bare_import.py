@@ -21,7 +21,7 @@ ui.set_editor_property("import_textures", False)
 ui.set_editor_property("import_animations", False)
 ui.set_editor_property("create_physics_asset", False)
 sk = ui.get_editor_property("skeletal_mesh_import_data")
-sk.set_editor_property("import_morph_targets", False)
+sk.set_editor_property("import_morph_targets", True)   # (the fists, FistR / FistL: knight_fist.py; the under-mail has none)
 sk.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
 sk.set_editor_property("convert_scene", True)
 task = unreal.AssetImportTask()
@@ -35,6 +35,11 @@ task.options = ui
 tools.import_asset_tasks([task])
 skm = lib.load_asset(folder + "/SK_NewSuitBare")
 if skm is None: raise RuntimeError("SUITDIAG SK_NewSuitBare did not import")
+def morphs(m):
+    """The mesh's morph target names (the fists, knight_fist.py)."""
+    try: return [str(n) for n in m.get_all_morph_target_names()]
+    except Exception as e: return ["?" + str(e)]
+unreal.log("SUITDIAG bare morph targets: %s" % morphs(skm))
 mail = lib.load_asset(folder + "/MI_Suit_Mail")
 slots = []
 for m in skm.get_editor_property("materials"):

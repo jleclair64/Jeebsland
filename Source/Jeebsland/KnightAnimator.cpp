@@ -14,6 +14,7 @@
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimationAsset.h"
 #include "Animation/Skeleton.h"
+#include "AnimationRuntime.h"
 #include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -696,8 +697,10 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	{
 		// (between his own walk and the sword-and-shield clips the hand turns furthest of all, and the blade shows it: never a whirl)
 		// (out of the low sweep the blade rises from the floor to the guard: one slow arc, never three heights in a few frames)
-		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? (StateKey == 34 || (bMoving && StateKey >= 30 && StateKey < 40) ? 0.48f : 0.34f) : Key == 31 ? 0.2f : 0.16f, Key == 30 ? 0.4f : Key == 31 ? 0.3f : Key == 34 ? 0.25f : 0.f);   // (the sweep's hips must be down by the cut, or the blade rides high; the second jab's feet stand elsewhere than the first's, and they get there over its whole wind-up)
+		if (StateKey != -2) StartBlend(Base, BlendFor, Act == 0 ? (StateKey == 34 || StateKey == 31 || (bMoving && StateKey >= 30 && StateKey < 40) ? 0.48f : 0.34f) : Key == 31 ? 0.2f : 0.16f, Key == 30 ? 0.4f : Key == 31 ? 0.4f : Key == 34 ? 0.25f : 0.f);   // (the sweep's hips must be down by the cut, or the blade rides high; the second jab's feet stand elsewhere than the first's, and they get there over its whole wind-up)
 		if ((StateKey >= 30 && StateKey < 40) || StateKey == 72) LiftWindow = 0.5f;
+		// (between the two jabs the boots change stance, the second clip standing narrower than the first: the moving boot steps, lifted clear, instead of skating, LiftDraggedFeet)
+		if ((Key == 31 && StateKey == 30) || (Key == 30 && StateKey == 31)) JabStepT = 0.35f;
 		StateKey = Key;
 	}
 	// (the bow's phases are layers, not states: drawing, loosing and lowering still flow into each other)
@@ -707,6 +710,13 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	PrevFinal = Final;
 	PrevDt = Dt;
 	Inertialize(Base, Final, Dt);
+	if (In.bShotLog && (StateKey == 30 || StateKey == 31))   // (test pictures: the two swings' lunges side by side; mesh +Y ahead, -X right)
+	{
+		const FVector FL = BonePos(Final, LFoot), FR = BonePos(Final, RFoot), Kn = BonePos(Final, LLeg), Kr = BonePos(Final, RLeg), Th = BonePos(Final, LUp), Tr = BonePos(Final, RUp);
+		auto Bend = [](const FVector& H, const FVector& K, const FVector& F) { return 180.f - FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(float(FVector::DotProduct((H - K).GetSafeNormal(), (F - K).GetSafeNormal())), -1.f, 1.f))); };
+		UE_LOG(LogTemp, Log, TEXT("JEEBLUNGE t %.3f key %d u %.2f hip up %.1f ahead %.1f feet L %.0f,%.0f R %.0f,%.0f stance %.0f knees L %.0f R %.0f"), Time, StateKey, In.MoveU, float(Final.Hip.Z), float(Final.Hip.Y),
+			float(FL.Y), float(-FL.X), float(FR.Y), float(-FR.X), float(FVector2D(FL - FR).Size()), Bend(Th, Kn, FL), Bend(Tr, Kr, FR));
+	}
 	// (a part-way landing or a chest-only move can leave a boot sunk: the hips rise just enough. Floor clips lie lower.)
 	{
 		const float Sole = (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
@@ -718,7 +728,11 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	KeepTipUp(Final, In, Dt);
 	ToolHeadClear(Final, In);
 	TwoHandTool(Final, In, Dt);
+	// (the crossbow in both hands, whatever the clip: owner 2026-11-11, the idle and running clips left the left hand off the stock)
+	CrossW = FMath::FInterpConstantTo(CrossW, In.Kind == JeebItems::K_Crossbow && !In.bClimbing && !In.bSitting && !In.bDrinking ? 1.f : 0.f, Dt, 4.f);
+	if (CrossW > 0.005f) L.CrossLeftHand(Final, FMath::SmoothStep(0.f, 1.f, CrossW));
 	if (GreatW > 0.005f) L.BothHandsOnGrip(Final, FMath::SmoothStep(0.f, 1.f, GreatW), GreatLeftBelow);
+	SetFists(In, Dt);
 	bHavePrev = true;
 
 	ToWorld = FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
@@ -1082,6 +1096,47 @@ static float ToolEdgeSign(int32 Kind) { return Kind == JeebItems::K_Axe ? -1.f :
 static FVector GripInRightHand(const FTransform& RightGrip) { return RightGrip.TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR)); }
 static FVector GripInLeftHand(const FTransform& LeftGrip) { return LeftGrip.TransformPosition(KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL)); }
 
+// (2026-11-11) Where a held thing's grip runs through a closed fist, in the bind pose: the hands are bent shut round this line in the mesh (Tools/knight_fist.py; keep these
+// two numbers equal to its GRIP_ALONG and GRIP_PALM, in cm). Hand: the hand bone, Along: forearm to hand, Blade: the way a blade leaves the fist; Side +1 right, -1 left.
+static constexpr float FistAlong = 5.5f, FistPalm = 6.f;   // (FistAlong was 3: the fingers closed above the handle)
+static constexpr float BowRestDrop = 5.f;   // (cm) how far down the bow's limbs it sits in the left fist while drawn, so the arrow lies on the index knuckle
+static FVector FistHole(const FVector& Hand, const FVector& Along, const FVector& Blade, int32 Side)
+{
+	const FVector Palm = FVector::CrossProduct(Along, Blade.GetSafeNormal()).GetSafeNormal() * float(Side);   // (toward the palm: his palms face his thighs)
+	return Hand + Along * (7.f + FistAlong) + Palm * FistPalm;
+}
+
+// (2026-11-11) Each hand closes into a fist only round something: the morph targets FistR / FistL on the suit's gauntlets and the bare mail hands (Tools/knight_fist.py),
+// relaxed when the hand is empty. Built only from what every machine knows (what is in his hand, the shield on his arm, the bow's phase), so others see the same.
+void FKnightAnimator::SetFists(const FInput& In, float Dt)
+{
+	const bool bStowed = In.bClimbing || In.bSitting;   // (the weapon and shield on his back)
+	const bool bWeapon = !bStowed && JeebItems::IsWeaponKind(In.Kind);
+	// the right hand: round any weapon or tool, but a bow only while drawing its string (at rest it hangs open; the crossbow's grip is always held)
+	const float WantR = bWeapon && (!JeebItems::IsDrawnBow(In.Kind) || In.BowMode == 1) ? 1.f : 0.f;
+	// the left: round the shield's grip, the bow, the katana's second blade, or the grip, haft or stock it has moved onto (eased already)
+	const bool bLeftHolds = !bStowed && (In.bShieldArm || JeebItems::IsDrawnBow(In.Kind) || In.Kind == JeebItems::K_Katana);
+	const float WantL = FMath::Max(bLeftHolds ? 1.f : 0.f, FMath::Max3(CrossW, GreatW, TwoHandW));
+	FistW[0] = FMath::FInterpConstantTo(FistW[0], WantR, Dt, 1.f / 0.15f);   // (about 0.15 s to close or open)
+	FistW[1] = FMath::FInterpConstantTo(FistW[1], WantL, Dt, 1.f / 0.15f);
+	if (!Comp) return;
+	static const FName FistName[2] = { TEXT("FistR"), TEXT("FistL") };
+	const float W[2] = { FMath::SmoothStep(0.f, 1.f, FistW[0]), FMath::SmoothStep(0.f, 1.f, FistW[1]) };
+	// the suit (a poseable mesh runs no animation, so its morph weights are set here and go to the renderer with its bones, RefreshBoneTransforms)
+	if (const USkeletalMesh* SM = Cast<USkeletalMesh>(Comp->GetSkinnedAsset()))
+	{
+		TMap<FName, float> Curves;
+		for (int32 h = 0; h < 2; ++h) if (W[h] > 0.001f) Curves.Add(FistName[h], W[h]);
+		Comp->ActiveMorphTargets.Reset();
+		Comp->MorphTargetWeights.SetNumZeroed(SM->GetMorphTargets().Num());
+		for (float& V : Comp->MorphTargetWeights) V = 0.f;
+		if (Curves.Num()) FAnimationRuntime::AppendActiveMorphTargets(SM, Curves, Comp->ActiveMorphTargets, Comp->MorphTargetWeights);
+	}
+	// the mail body under empty slots follows Comp's bones and applies its own morph weights each tick (USkeletalMeshComponent::UpdateFollowerComponent)
+	if (BareComp)
+		for (int32 h = 0; h < 2; ++h) BareComp->SetMorphTarget(FistName[h], W[h]);
+}
+
 float FClipLib::ToolPose(FPose& P, float W, int32 Kind) const
 {
 	const FVector RG = GripInRightHand(RightGrip), LG = GripInLeftHand(LeftGrip);
@@ -1229,6 +1284,25 @@ void FClipLib::BothHandsOnGrip(FPose& P, float W, float Below) const
 	if (W < 0.999f) for (int32 i = 0; i < 6; ++i) P.Rot[Bone[Arms[i]]] = Nlerp(Was[i], P.Rot[Bone[Arms[i]]], W);
 }
 
+// The left fist onto the crossbow's stock, where the aiming clip holds it (the crossbow follows the right hand): the arm reaches with the elbow out and down, the hand turned as in that clip.
+void FClipLib::CrossLeftHand(FPose& P, float W) const
+{
+	const int32 Arms[3] = { LArm, LFore, LHand };
+	FQuat Was[3];
+	for (int32 i = 0; i < 3; ++i) Was[i] = P.Rot[Bone[Arms[i]]];
+	FQuat RQ;
+	const FVector RW = BonePos(P, RHand, &RQ);
+	const FTransform Want = LeftOnCross * CrossInHand * FTransform(RQ, RW);
+	for (int32 Pass = 0; Pass < 2; ++Pass)
+	{
+		ReachTo(P, LArm, LFore, LHand, Want.GetLocation(), FVector(0.7f, -0.2f, -1.f));
+		FQuat Turned;
+		BonePos(P, LHand, &Turned);
+		TurnInMesh(P, LHand, Want.GetRotation() * Turned.Inverse());
+	}
+	if (W < 0.999f) for (int32 i = 0; i < 3; ++i) P.Rot[Bone[Arms[i]]] = Nlerp(Was[i], P.Rot[Bone[Arms[i]]], W);
+}
+
 // When the big sword is in both hands: every attack, and on guard standing still. Walking or running, he carries it in the right. In its own swings (the two-handed clip) the blade lies on the line through his fists.
 void FKnightAnimator::GreatGripLine(FPose& P, const FInput& In, float Dt)
 {
@@ -1270,7 +1344,7 @@ void FKnightAnimator::LevelCut(FPose& B, int32 Kind, float W, float HandWant, fl
 
 // How far the arm reaches out through a swing: U through it, From..To its hit frames
 static float SwingReach(float U, float From, float To) { return FMath::SmoothStep(From * 0.3f, From + 0.1f, U) * (1.f - FMath::SmoothStep(To, 1.f, U)); }
-static constexpr float Jab1Reach = 34.f, Jab2Reach = 24.f;
+static constexpr float Jab1Reach = 34.f, Jab2Reach = 34.f;   // (owner 2026-11-11: the second reaches as far as the first; in its cut the arm is already straight, so this only acts in the wind-up)
 static constexpr float ChargeApexU = 0.25f;   // (AKnightCharacter::SmashApexT: where the first swing waits while the button decides)
 
 // A boot flat on the floor being dragged across it, in a swing's recovery or rising from a slide, lifts for those frames: a small step, not a slide
@@ -1278,6 +1352,7 @@ void FKnightAnimator::LiftDraggedFeet(FPose& P, const FInput& In, float Dt)
 {
 	const bool bOn = !In.bFalling && StateKey != 72 && ((StateKey >= 30 && StateKey < 40) || LiftWindow > 0.f);
 	LiftWindow = FMath::Max(0.f, LiftWindow - Dt);
+	JabStepT = FMath::Max(0.f, JabStepT - Dt);
 	if (!bOn && FootLift[0] <= 0.f && FootLift[1] <= 0.f) return;
 	const FVector VW = FRotator(0.f, -In.Rot.Yaw - MeshYawDeg, 0.f).RotateVector(FVector(In.Vel.X, In.Vel.Y, 0.f));
 	const int32 Foot[2] = { LFoot, RFoot }, Knee[2] = { LLeg, RLeg }, Thigh[2] = { LUp, RUp };
@@ -1287,7 +1362,7 @@ void FKnightAnimator::LiftDraggedFeet(FPose& P, const FInput& In, float Dt)
 		const FVector F = BonePos(P, Foot[i], &FootRot);
 		const float Slide = F.Z < 14.f ? FVector2D((F - FootPrev[i]) / FMath::Max(Dt, 0.001f) + VW).Size() : 0.f;
 		FootPrev[i] = F;
-		const float Want = bOn && Dt < 0.05f ? FMath::Clamp((Slide - 60.f) * 0.12f, 0.f, 9.f) : 0.f;
+		const float Want = bOn && Dt < 0.05f ? FMath::Clamp((Slide - 60.f) * 0.12f, 0.f, JabStepT > 0.f ? 15.f : 9.f) : 0.f;   // (a step between the jabs lifts higher: a real step)
 		FootLift[i] = FMath::FInterpTo(FootLift[i], Want, Dt, Want > FootLift[i] ? 12.f : 10.f);
 		if (FootLift[i] < 0.2f) { FootLift[i] = Want > 0.f ? FootLift[i] : 0.f; continue; }
 		// (the knee bends just enough, then the thigh aims the foot at the spot; the boot keeps its own angle)
@@ -1456,8 +1531,9 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 		const TCHAR* Nm = b2 ? (bGreat ? TEXT("Great_Jab2") : TEXT("Jab2")) : (bGreat ? TEXT("Great_Jab1") : TEXT("Jab1"));
 		if (const FMove* M = Moves.Find(Nm))
 		{
-			const float U = In.MoveU;
+			const float U = In.MoveU;   // (past 1: the still moment after the swing, Tuning.ini Jab1Pause / Jab2Pause)
 			const float From = b2 ? Tn.Jab2From : Tn.Jab1From, To = b2 ? Tn.Jab2To : Tn.Jab1To;
+			const float UEnd = 1.f + (b2 ? Tn.Jab2Pause : Tn.Jab1Pause) / FMath::Max(b2 ? Tn.Jab2Share : Tn.Jab1Share, 0.05f);
 			// (owner 2026-11-06) The first swing and a charge start the same way, since nobody can tell yet which it is: the blade only comes up beside him, and the deep draw is the charge's
 			// (case 32). It used to go on behind his back here and then come forward again for the charge. Let go, and it goes from there into the cut.
 			float W = 1.f;
@@ -1470,15 +1546,19 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 				}
 			PlayKeepOffArm = bGreat ? 0.f : 0.6f;   // (the shield stays mostly where it is held)
 			PlayUpper = PlayLower = W;
-			PlayAt(Nm, MoveClipTime(*M, U, From, To), Speed, B, &OutBlend);
-			if (!bGreat) ExtendArm(B, b2 ? Jab2Reach : Jab1Reach, SwingReach(U, From, To));   // (owner 2026-11-06: the arm out further in both swings)
-			if (b2 && !bGreat)
+			// (owner 2026-11-11, Ocarina of Time's pace) After the cut the follow-through slows to a stop over most of the pause and holds there, instead of running on into
+			// the recovery: a fast cut, then a still moment. The blend out (or the next swing) takes him on from that held end.
+			float ClipT = MoveClipTime(*M, U, From, To);
+			if (U > To)
 			{
-				// (owner 2026-11-07, a line drawn on a screenshot) The clip's cut dives from high on his left down to his knee and comes up again. It should be flat: from about his shoulders on the
-				// left, across in front of him, a little lower on the right. The clip still says when and which way round; this only says how high.
-				const float Share = FMath::Clamp((U - From) / FMath::Max(To - From, 0.01f), 0.f, 1.f);
-				LevelCut(B, In.Kind, FMath::SmoothStep(From - 0.16f, From, U) * (1.f - FMath::SmoothStep(To, To + 0.2f, U)), FMath::Lerp(140.f, 118.f, Share), FMath::Lerp(158.f, 122.f, Share), Dt);
+				const float S = FMath::Clamp((U - To) / FMath::Max((UEnd - To) * 0.7f, 0.01f), 0.f, 1.f);
+				ClipT = FMath::Lerp(M->ClipFollow, M->ClipEnd, 1.f - FMath::Square(1.f - S));
 			}
+			PlayAt(Nm, ClipT, Speed, B, &OutBlend);
+			if (!b2 && StateKey == 31) OutBlend = FMath::Max(OutBlend, 0.12f);   // (from the second swing's held end, high on his right, the blade has a long way round: not in one frame)
+			// (the second swing's arm stays out through its pause, held at the end of its cut)
+			const float ReachW = b2 ? FMath::SmoothStep(From * 0.3f, From + 0.1f, U) : SwingReach(U, From, To);
+			if (!bGreat) ExtendArm(B, b2 ? Jab2Reach : Jab1Reach, ReachW);   // (owner 2026-11-06: the arm out further in both swings)
 		}
 		break;
 	}
@@ -1705,8 +1785,9 @@ void FClipLib::SolveGear()
 		FString S; TArray<FString> Pr;   // (test pictures: -SuitGrip=Along_Side_Fwd_Pitch_Yaw_Roll tries another grip without a rebuild)
 		if (FParse::Value(FCommandLine::Get(), TEXT("SuitGrip="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
 		{ Along = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2])); Turn = FRotator(FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4]), FCString::Atof(*Pr[5])); }
-		const FVector Fist = Hand.GetLocation() + NewF * Along.X + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		const FQuat Rot = Turn.Quaternion() * Q;
+		// (2026-11-11) The grip sits in the hole of the closed fist: both hands are bent shut round this line in the mesh (Tools/knight_fist.py), in front of the palm at the base of the fingers
+		const FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();
 		// The real grip, measured on Mixamo's own Paladin W/Prop, who holds a sword on these clips (2026-11-05, Tools/knight_ref_grip.py).
 		// In his T-pose the blade leaves the fist forward, 14 degrees out and a little down; carried through the same line-up the clips use (knight_clip_retarget.py), that is
@@ -1759,7 +1840,8 @@ void FClipLib::SolveGear()
 		const FVector OldF = (KnightDesign::WristPos(-1) - KnightDesign::PivotPos(KnightDesign::P_ElbowL)).GetSafeNormal();
 		const FQuat Q = FQuat::FindBetweenNormals(OldF, NewF);
 		const FVector G = KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL);
-		LeftGrip = FTransform(Q, Hand.GetLocation() + NewF * 7.f - Q.RotateVector(G)) * Hand.Inverse();
+		LeftGrip = FTransform(Q, FistHole(Hand.GetLocation(), NewF, Q.RotateVector(KnightDesign::BladeDir(-1)), -1) - Q.RotateVector(G)) * Hand.Inverse();
+		UE_LOG(LogTemp, Log, TEXT("JEEBANIM fist holes in the bind pose (cm, forward right up): right %s, left %s"), *BindInGame(P, RHand).TransformPosition(GripInRightHand(RightGrip)).ToString(), *Hand.TransformPosition(GripInLeftHand(LeftGrip)).ToString());
 	}
 	// The shield: at rest on the outside of the forearm as the old rest pose had it; raised, facing straight ahead in front of the forearm at the guard pose
 	{
@@ -1830,20 +1912,21 @@ void FClipLib::SolveGear()
 		const FClip* RestC = Find(TEXT("Rest"));
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
-			const FTransform Hand = BindInGame(P, LHand), Fore = BindInGame(P, LFore);
-			const FVector Dir = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			BowAtRest = FTransform(KnightBowRestQuat(), Hand.GetLocation() + Dir * 7.f) * Hand.Inverse();
+			const FTransform Hand = BindInGame(P, LHand);
+			BowAtRest = FTransform(KnightBowRestQuat(), Hand.TransformPosition(GripInLeftHand(LeftGrip))) * Hand.Inverse();   // (in the closed fist's hole, 2026-11-11)
 		}
 		const FClip* AimC = Find(TEXT("AimIdle"));
 		if (AimC) Sample(*AimC, AimC->Len * 0.5f, P, true);
 		{
-			const FTransform Hand = BindInGame(P, LHand), Fore = BindInGame(P, LFore), Other = BindInGame(P, RHand);
-			const FVector Dir = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			const FVector At = Hand.GetLocation() + Dir * 7.f;
+			const FTransform Hand = BindInGame(P, LHand), Other = BindInGame(P, RHand);
+			const FVector At = Hand.TransformPosition(GripInLeftHand(LeftGrip));   // (in the closed fist's hole, 2026-11-11)
 			const FVector ToString = (Other.GetLocation() - At).GetSafeNormal();
 			const FVector Up = (FVector::UpVector - ToString * FVector::DotProduct(FVector::UpVector, ToString)).GetSafeNormal();
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Up, ToString).ToQuat();
-			BowAtAim = FTransform(Q, At) * Hand.Inverse();
+			BowAtAim = FTransform(Q, At - Up * BowRestDrop) * Hand.Inverse();   // (the bow sits lower in the fist so the arrow rests on it: the reviewer measured the grip wrap 5-6 cm above the fist at full draw)
+			const FVector Hole = LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1)).GetSafeNormal();
+			auto Off = [&Hole](const FTransform& Bow) { return FMath::RadiansToDegrees(FMath::Acos(FMath::Abs(FVector::DotProduct(Bow.GetRotation().RotateVector(FVector::ForwardVector), Hole)))); };
+			UE_LOG(LogTemp, Log, TEXT("JEEBANIM grip: the bow's limbs against the left fist's hole: %.0f deg at rest, %.0f deg aiming"), Off(BowAtRest), Off(BowAtAim));
 		}
 	}
 	P.Rot = RefRot;
@@ -1867,11 +1950,20 @@ void FClipLib::SolveGear()
 	if (const FClip* C = Find(TEXT("CrossAim")))
 	{
 		Sample(*C, 0.f, P, false);
-		const FTransform RH = BindInGame(P, RHand), RF = BindInGame(P, RFore), LH = BindInGame(P, LHand), LF = BindInGame(P, LFore);
-		const FVector At = RH.GetLocation() + (RH.GetLocation() - RF.GetLocation()).GetSafeNormal() * 7.f;
-		const FVector Front = LH.GetLocation() + (LH.GetLocation() - LF.GetLocation()).GetSafeNormal() * 7.f;
+		const FTransform RH = BindInGame(P, RHand), LH = BindInGame(P, LHand);
+		const FVector At = RH.TransformPosition(GripInRightHand(RightGrip));   // (both in the closed fists' holes, 2026-11-11)
+		const FVector Front = LH.TransformPosition(GripInLeftHand(LeftGrip));
 		const FVector Line = (Front - At).GetSafeNormal();
 		CrossInHand = FTransform(FRotationMatrix::MakeFromXZ(Line, FVector::UpVector).ToQuat(), At + Line * 12.f) * RH.Inverse();   // (12 cm ahead: the left fist stays behind the prod, the right on the stock's wrist)
+		// (the left fist where the aiming clip has it, turned about its hole so the stock runs through the closed fist, not across an open palm: CrossLeftHand keeps it there in every other clip)
+		FTransform LHOn = LH;
+		{
+			const FVector Hole = LH.TransformVectorNoScale(LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1))).GetSafeNormal();
+			const FQuat Turn = FQuat::FindBetweenNormals(Hole, FVector::DotProduct(Hole, Line) >= 0.f ? Line : -Line);
+			LHOn.SetRotation(Turn * LH.GetRotation());
+			LHOn.SetLocation(Front + Turn.RotateVector(LH.GetLocation() - Front));
+		}
+		LeftOnCross = LHOn * (CrossInHand * RH).Inverse();
 		P.Rot = RefRot;
 		P.Hip = RefPos[Bone[Hips]];
 	}

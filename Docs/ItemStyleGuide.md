@@ -66,6 +66,8 @@ Wording that overshot: "chunky", "thick", "exaggerated", "toy-like", "cartoon" (
 
 `M_Prop` tints what the vertex colour marks with the tier's colour, and `Tools/prop_clean.py` sets that mask. Steel takes the tier; wood and leather keep their own colours, so an emerald crossbow has green fittings on brown wood.
 
+Give every item enough steel for its tier to show at a glance (owner, 2026-11-11: "more colour so they stand out", the same model in every tier). Small fittings alone left a gold crossbow reading as brown wood. `prop_clean.py` adds it without a new model: `metal` turns whole parts to steel (the crossbow's prod), `bands` cuts clean raised steel bands and plates into the model (ferrules, sleeves, tip caps, a deck plate), `plain` keeps a part wood whatever the picture painted there, and `clean` decides the mask once per face, so the wood shows no tinted streaks. Plan the steel into the picture prompt for new items: steel caps, collars, bands and plates, about a third of what you see.
+
 ## What it costs
 
 About 4 credits a picture and 15 a model: under 25 credits for a finished item if the picture is right the first or second time.

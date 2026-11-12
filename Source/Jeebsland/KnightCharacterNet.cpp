@@ -442,6 +442,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	const float Fastest = FMath::Min(0.25f, 0.8f * (Held >= 0 ? JeebItems::WeaponBase(Held).Cooldown : 0.5f) * JeebTune::V().Jab1Share);   // (a little under the quickest swing this weapon has, the katana's first: a fixed limit dropped its second one)
 	if (!bCombo && Now - LastServerAttack < Fastest) return;   // no weapon swings faster than this
 	if (!bCombo && SmashTimeLeft() > 0.15f) return;   // nor before a smash attack's end lag, a kick, a sweep or hitstun is over (give or take the network)
+	if (!bCombo && bAttacking && AttackDur + JabPause() - AttackT > 0.15f && JabPause() > 0.f) return;   // nor before this machine's own sword jab and the still moment after it are over (Tuning.ini Jab1Pause / Jab2Pause)
 	LastServerAttack = Now;
 	const EAtkStyle S = static_cast<EAtkStyle>(Style);
 	if (S == EAtkStyle::Thrust) return;   // (the spear's charged thrust and its lunge are gone: Docs/ToRecreate.md)

@@ -85,6 +85,7 @@ namespace JeebAnim
 		FTransform QuiverOnHips = FTransform::Identity;
 		FTransform BeltFlaskOnHips = FTransform::Identity;
 		FTransform CrossInHand = FTransform::Identity;
+		FTransform LeftOnCross = FTransform::Identity;  // the left hand on the crossbow's stock, in the crossbow's frame (as the aiming clip holds it)
 		FTransform DrinkInHand = FTransform::Identity;
 		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
 		FQuat ShieldArm[4];                             // the left arm's pose holding a shield (LShoulder, LArm, LFore, LHand)
@@ -95,6 +96,7 @@ namespace JeebAnim
 		float ToolPose(FPose& P, float W, int32 Kind) const;
 		void ReachTo(FPose& P, int32 Upper, int32 Mid, int32 End, const FVector& Target, const FVector& ElbowHint) const;
 		void BothHandsOnGrip(FPose& P, float W, float Below) const;
+		void CrossLeftHand(FPose& P, float W) const;   // the left fist onto the crossbow's stock, by W (owner 2026-11-11: held in both hands always)
 		FVector ToolStrike(const FTransform& Grip, int32 Kind) const;   // the working point of the tool's edge, given where WristR is
 		FVector ToolEdgeInHand = FVector::ZeroVector;       // the way a tool's edge points, in the hand bone's frame
 		FQuat ToolEdgeTurn = FQuat::Identity;
@@ -301,8 +303,12 @@ private:
 	float ShakePhase = 0.f;  // the charged smash's tremble
 	float ShieldArmW = 0.f;  // how far the left arm is in its shield pose
 	float CutHeading = 0.f, CutAt = -10.f;   // (which way the blade points across the floor: LevelCut)
+	float JabStepT = 0.f;    // (seconds left of a stance change between the two jabs: the moving boot lifts higher, LiftDraggedFeet)
 	float GreatW = 0.f, GreatLineW = 0.f;   // the big sword: how far the left hand is on the grip, and how far the blade follows the line through his fists
 	float TwoHandW = 0.f;    // how far the left hand is on the tool's haft
+	float CrossW = 0.f;      // how far the left hand is on the crossbow's stock
+	float FistW[2] = { 0.f, 0.f };   // how far each hand (0 right, 1 left) is closed into a fist: the morph targets FistR / FistL (Tools/knight_fist.py)
+	void SetFists(const FInput& In, float Dt);
 	float ToolRoll = 0.f;    // how far the tool has rolled in the fist about its haft (radians)
 	int32 ToolKind = 0;      // the tool being worked with
 	float AirLegs = 1.f;     // how fast the stride goes: half its pace in the air

@@ -17,6 +17,13 @@ arm.name = "Armature"
 arm.data.pose_position = "REST"
 for act in list(bpy.data.actions): bpy.data.actions.remove(act)
 
+# (2026-11-11) The hands: a relaxed half curl, and shape keys FistR / FistL closing each round the grip line every weapon is held on (knight_fist.py; the
+# gauntlets get the same in knight_suit_export.py). Unreal imports them as morph targets, set per hand by FKnightAnimator.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); sys.dont_write_bytecode = True
+import knight_fist
+bpy.context.view_layer.update()
+knight_fist.make_fists(body, arm, bare=True, log=lambda s: print("BARE " + s))
+
 # (2026-11-06) The joins between pieces have regions of their own, so they can show when EITHER piece next to them is off (FKnightAnimator::ShowBare): the neck, the collar, the upper arm and the waist.
 REGIONS = ["Bare_Helmet", "Bare_Neck", "Bare_Chest", "Bare_Collar", "Bare_UpperArm", "Bare_Gauntlets", "Bare_Legs", "Bare_Waist"]
 def region(bone):

@@ -62,7 +62,7 @@ ui.set_editor_property("import_textures", False)
 ui.set_editor_property("import_animations", True)
 ui.set_editor_property("create_physics_asset", False)
 sk = ui.get_editor_property("skeletal_mesh_import_data")
-sk.set_editor_property("import_morph_targets", False)
+sk.set_editor_property("import_morph_targets", True)   # (the fists, FistR / FistL: knight_fist.py)
 sk.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
 sk.set_editor_property("convert_scene", True)
 sk.set_editor_property("use_t0_as_ref_pose", False)
@@ -83,6 +83,11 @@ task.options = ui
 tools.import_asset_tasks([task])
 skm = lib.load_asset(folder + "/SK_NewSuit")
 if skm is None: raise RuntimeError("SUITDIAG SK_NewSuit did not import")
+def morphs(m):
+    """The mesh's morph target names (the fists, knight_fist.py)."""
+    try: return [str(n) for n in m.get_all_morph_target_names()]
+    except Exception as e: return ["?" + str(e)]
+unreal.log("SUITDIAG morph targets: %s" % morphs(skm))
 # the clips came with the mesh (with one spare copy per mesh part): keep one of each, under plain names
 for clip in ("Walking", "Running", "Rest"):
     lib.rename_asset(folder + "/SK_NewSuit_Anim_Armature_" + clip, folder + "/A_" + clip)

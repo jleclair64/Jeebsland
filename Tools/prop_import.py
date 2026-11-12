@@ -71,7 +71,11 @@ def make_material(default_base, default_mr):
         mel.connect_material_expressions(a, an, l, "A"); mel.connect_material_expressions(b, bn, l, "B"); mel.connect_material_expressions(vc, "R", l, "Alpha")
         return l
     lb = lerp(base, "RGB", mul2, "", -250, -200)
-    lm = lerp(mr, "B", metal, "", -250, 100)
+    # (a mirror-shiny tint reflects the blue sky and turns gold olive: only part of the tier's shine is metal, so its own warm colour shows too; 2026-11-11)
+    share = sca("TintMetalShare", -900, 380, 0.7)
+    msh = E(m, unreal.MaterialExpressionMultiply, -600, 300)
+    mel.connect_material_expressions(metal, "", msh, "A"); mel.connect_material_expressions(share, "", msh, "B")
+    lm = lerp(mr, "B", msh, "", -250, 100)
     lr = lerp(mr, "G", rough, "", -250, 300)
     MP = unreal.MaterialProperty
     mel.connect_material_property(lb, "", MP.MP_BASE_COLOR)

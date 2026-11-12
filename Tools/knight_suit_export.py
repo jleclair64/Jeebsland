@@ -51,6 +51,13 @@ for fn, tag in PIECES:
 save_pics(body, "Mail")
 bpy.context.view_layer.update()
 
+# ---- (2026-11-11) the gauntlets get shape keys FistR / FistL closing each hand round the grip line every weapon is held on (knight_fist.py; their own half
+# closed shape is the relaxed basis), as the bare hand's do in knight_bare_export.py. Unreal imports them as morph targets, set per hand by FKnightAnimator.
+import knight_fist
+glv = next(p for p in plates if p.name == "gauntlets")
+knight_fist.make_fists(glv, arm, bare=False, log=lambda s: print("SUIT " + s))
+bpy.context.view_layer.update()
+
 # ---- the mail: only a clean sleeve in the gap between pauldron and bracer stays, plus a dark pelvis (knight_suit_mail.py)
 trees = []
 for pl in plates:
