@@ -146,6 +146,15 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 
 ## Code pitfalls
 - `FMath::SmoothStep(A, B, X)` needs A < B; use `JeebWorld::Smooth` for ramps that go down.
+- (Oak Hill plan review, 2026-11-11) When new geometry can sit above the heightmap (a bridge, a deck), every server placement that uses HeightAt (drops, sacks, arrows, respawns) switches to a collision trace in the same change.
+- When two ground meshes of different resolution meet, their shared edge vertices come from one function (the coarse mesh's own straight line between its points), so the seam has no step or gap.
+- Anything built independently on every machine from shared constants gets a checksum of its final solid data, logged on every machine (JEEBOAK hash) so a mismatch can be found.
+- A test switch that changes shared world data is read before the first use of that data, only under `-JeebShot`, never in Shipping, and turns the whole change off.
+- World-building randomness comes only from a seeded stream (never the global `FMath::FRand`), and per-spot data is indexed by the spot's loop index, not by a count of the spots that survived.
+- (Oak Hill build, 2026-11-12) Level each building pad over a blend that grows with its height step (6x the step, at least 6 m), mix overlapping pads by weight so every floor stays flat, and pull neighbouring floor levels together before blending: a fixed short blend on a slope made 36-42 degree banks between houses.
+- Keep buildings placed from a plan at least 3 m apart wall to wall, checked in code against real wall sizes and logged (closest pair), alternating with any step-back from roads; if a plot can't satisfy both, drop or move it and tell the owner.
+- Judge a town's frame cost by splitting it (buildings, grass, trees, ground) with test switches, not only against an empty patch: the empty blank-world mesh is cheaper ground than the real ground the baseline already pays for.
+- When a new ground patch meets a mesh with a different material, report the visible seam to the owner as a known issue when it is built.
 - Don't call `GetGravityZ` in a constructor (use 980 x GravityScale).
 - PowerShell: matching text in CRLF files needs `` `r`n ``, and short function names can clash with aliases (R, Rp); prefer the Edit tool for multi-line changes.
 

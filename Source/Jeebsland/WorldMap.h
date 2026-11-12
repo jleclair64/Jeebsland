@@ -35,7 +35,7 @@ namespace JeebWorld
 	{
 		static const TArray<FTown> T = {
 			{ TEXT("Blackrock"),     FromSketch(400.f, 870.f),  0.f,    0.f, -1.f },      // the existing village (its own ground)
-			{ TEXT("Oak Hill"),      FromSketch(543.f, 875.f),  3500.f, 6500.f, 1.f },   // moved 100 m west (owner, 2026-11-06): its west edge is the river, its forts and bridge face Blackrock (Docs/OakHillSketch.webp)
+			{ TEXT("Oak Hill"),      FromSketch(543.f, 875.f),  0.f,    0.f, 1.f },      // moved 100 m west (owner, 2026-11-06): its west edge is the river, its forts and bridge face Blackrock (Docs/OakHillSketch.webp). Its own hills, not a level disc: OakHill.h (2026-11-11)
 			{ TEXT("Silver Point"),  FromSketch(835.f, 455.f),  3800.f, 8000.f },   // a level shelf among the northern peaks
 			{ TEXT("Anchorage"),     FromSketch(1110.f, 995.f), 3200.f, 6000.f },
 			{ TEXT("Birch Grove"),   FromSketch(760.f, 1280.f), 5000.f, 8000.f },   // the big walled troll town (in PvP 2)
@@ -229,7 +229,7 @@ namespace JeebWorld
 	}
 	// The full world height (without the original square round the start): the land, then the sea and the coast, then the
 	// river valleys and channels
-	inline float SeaAndRivers(float X, float Y, float H)
+	inline float SeaAndRivers(float X, float Y, float H, float* OutRiverD = nullptr, float* OutRiverHalf = nullptr)
 	{
 		const FVector2D P(X, Y);
 		// The coast: the land eases down to a beach at the shoreline; past it the sea floor drops away
@@ -247,6 +247,8 @@ namespace JeebWorld
 		// The rivers: a wide valley with a level floor, and a channel down its middle
 		float Half;
 		const float Dr = RiverDistance(X, Y, Half);
+		if (OutRiverD) *OutRiverD = Dr;
+		if (OutRiverHalf) *OutRiverHalf = Half;
 		if (Dr < 6000.f)
 		{
 			const float Floor = RiverLevel + 130.f;

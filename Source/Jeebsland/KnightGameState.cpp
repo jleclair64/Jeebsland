@@ -4,6 +4,9 @@
 #include "GearWall.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
+#include "OakHillTown.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
 #include "Meadow.h"
 #include "MiningRock.h"
 #include "Inventory.h"
@@ -130,6 +133,7 @@ void AKnightGameState::BuildWorld()
 		World->SpawnActor<AGrassField>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
+	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill: its ground east of the square, and its buildings (OakHill.h)
 
 	// The cottage, with its door facing the starting point
 	const FVector CottageSpot = JeebTerrain::CottagePos();
@@ -153,7 +157,8 @@ void AKnightGameState::BuildWorld()
 	int32 NextOre = 0;
 	auto SpawnRock = [&](float X, float Y, EItemType Ore)
 	{
-		const FTransform Xf(FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 8.f));
+		// (its turn from its own spot, so every machine builds the same rock: the global random number differed per machine)
+		const FTransform Xf(FRotator(0.f, FRandomStream(FMath::RoundToInt(X) * 7919 + FMath::RoundToInt(Y) * 104729).FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 8.f));
 		if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf))
 		{
 			Rock->SetOre(Ore);
@@ -222,6 +227,7 @@ void AKnightGameState::BuildWorld()
 			const float S = TreeRand.FRandRange(0.9f, 1.3f);
 			Forest->AddTree(ETreeKind::Oak, FVector(Spot.X, Spot.Y, JeebTerrain::HeightAt(Spot.X, Spot.Y) - 20.f * S), S, TreeRand);
 		}
+		AOakHillTown::PlantTrees(Forest);   // Oak Hill's big plaza oak and the trees round the town
 	}
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
@@ -565,6 +571,24 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			const float AtX = FCString::Atof(*ShotAtX), AtY = FCString::Atof(*ShotAtY);
 			const bool bLab = GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
 			if (APawn* P = PC ? PC->GetPawn() : nullptr) P->SetActorLocation(FVector(AtX, AtY, (bLab ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(AtX, AtY)) + 100.f));
+		}
+		// (-ShotEye=X_Y_Z: a free camera there, looking along -ShotYaw / -ShotPitch, for pictures from the air: Oak Hill, 2026-11-11)
+		static bool bShotEyeDone = false;
+		FString ShotEye;
+		if (!bShotEyeDone && ShotClock > 2.f && PC && FParse::Value(FCommandLine::Get(), TEXT("ShotEye="), ShotEye, false))
+		{
+			bShotEyeDone = true;
+			TArray<FString> Parts;
+			ShotEye.ParseIntoArray(Parts, TEXT("_"));
+			if (Parts.Num() == 3)
+				if (ACameraActor* Eye = GetWorld()->SpawnActor<ACameraActor>(FVector(FCString::Atof(*Parts[0]), FCString::Atof(*Parts[1]), FCString::Atof(*Parts[2])), ShotRot))
+				{
+					float Fov = 70.f;
+					FParse::Value(FCommandLine::Get(), TEXT("ShotFov="), Fov);
+					Eye->GetCameraComponent()->SetFieldOfView(Fov);
+					Eye->GetCameraComponent()->bConstrainAspectRatio = false;
+					PC->SetViewTarget(Eye);
+				}
 		}
 		if (!ShotMove.IsEmpty())
 		{

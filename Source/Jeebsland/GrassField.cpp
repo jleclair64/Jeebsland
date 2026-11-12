@@ -97,7 +97,7 @@ void AGrassField::BuildTerrain()
 	for (const FVector& V : Verts)
 	{
 		float Worn = 0.f;
-		if (FMath::Abs(V.X) < 9800.f && FMath::Abs(V.Y) < 9800.f)
+		if ((FMath::Abs(V.X) < 9800.f && FMath::Abs(V.Y) < 9800.f) || JeebOakHill::InBox(V.X, V.Y))   // (and Oak Hill's streets, 2026-11-11)
 		{
 			const float Pc = JeebTerrain::PathClearance(V.X, V.Y);
 			Worn = 1.f - FMath::SmoothStep(-20.f, 250.f, Pc);

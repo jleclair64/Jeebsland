@@ -224,7 +224,7 @@ void AMeadow::Tick(float Dt)
 		{
 			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
 			const float D = FVector2D::Distance(Ctr, Me);
-			if (D > Reach || Ctr.Size() > FieldR) continue;
+			if (D > Reach || (Ctr.Size() > FieldR && !JeebOakHill::GrassArea(Ctr.X, Ctr.Y, CellSize * 0.75f))) continue;   // (Oak Hill grows grass too, 2026-11-11)
 			const FCell* Have = Cells.Find(FIntPoint(i, j));
 			// Pick the detail from the nearer of now and a moment ahead, and only coarsen a square once it is well behind (no flicker at the boundary)
 			const float DA = FMath::Min(D, float(FVector2D::Distance(Ctr, Ahead)));
@@ -259,7 +259,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 		const float X = (JobId.X + JobRand.FRand()) * CellSize, Y = (JobId.Y + JobRand.FRand()) * CellSize;
 		const float Sxy = JobRand.FRandRange(0.85f, 1.3f) * TierSize(JobTier);
 		const float Yaw = JobRand.FRandRange(0.f, 360.f), Sz = JobRand.FRandRange(0.75f, 1.3f);
-				if (FVector2D(X, Y).Size() <= FieldR)
+				if (FVector2D(X, Y).Size() <= FieldR || JeebOakHill::GrassArea(X, Y))
 		{
 			const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
 			if ((Pc >= -12.f || (Pc >= -40.f && JobRand.FRand() < (Pc + 40.f) / 28.f)) && !JeebTerrain::NoGroundCover(X, Y))   // a few tufts creep onto the edge of the dirt

@@ -9,7 +9,8 @@ mel = unreal.MaterialEditingLibrary
 proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 work = os.path.join(proj, "Saved", "KnightBuild", "Buildings")
 folder = "/Game/Buildings"
-NANITE = {"OakHillHouse_Detailed", "OakHillHouse_300k"}
+NANITE = {"OakHillHouse_Detailed", "OakHillHouse_300k", "OakHillCornerHouse_300k", "OakHillSmith_300k", "OakHillBank_300k", "OakHillStore_300k",
+          "OakHillPotionShop_300k", "OakHillTownHall_300k", "OakHillChurch_300k", "OakHillWell_150k"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx"))
 if not lib.does_directory_exist(folder): lib.make_directory(folder)
 
@@ -29,7 +30,9 @@ def pic(name, srgb, normal=False):
     lib.save_asset(folder + "/" + name)
     return t
 
-def make_material(default_base, default_mr, default_normal):
+GLOW_STRENGTH = 2.0   # lit windows (T_<Name>_Glow from Tools/building_glow.py): emissive = GlowTex x GlowStrength; "slightly glow" in daylight
+
+def make_material(default_base, default_mr, default_normal, default_glow):
     # (a picture slot with no default picture doesn't compile, and the game then silently draws it in plain grey: check the log for "Failed to compile Material")
     path = folder + "/M_Building"
     if lib.does_asset_exist(path): lib.delete_asset(path)
@@ -50,12 +53,21 @@ def make_material(default_base, default_mr, default_normal):
     mel.connect_material_property(mr, "B", MP.MP_METALLIC)
     mel.connect_material_property(mr, "G", MP.MP_ROUGHNESS)
     mel.connect_material_property(nrm, "RGB", MP.MP_NORMAL)
+    glow = tex("GlowTex", 1000, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, default_glow)
+    gs = E(m, unreal.MaterialExpressionScalarParameter, -700, 1300)
+    gs.set_editor_property("parameter_name", "GlowStrength")
+    gs.set_editor_property("default_value", GLOW_STRENGTH)
+    mul = E(m, unreal.MaterialExpressionMultiply, -350, 1100)
+    mel.connect_material_expressions(glow, "RGB", mul, "A")
+    mel.connect_material_expressions(gs, "", mul, "B")
+    mel.connect_material_property(mul, "", MP.MP_EMISSIVE_COLOR)
     mel.recompile_material(m)
     lib.save_asset(path)
     return m
 
 first = NAMES[0]
-parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True))
+no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows
+parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow)
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
 for n in NAMES:
     mi_path = folder + "/MI_" + n
@@ -65,6 +77,7 @@ for n in NAMES:
     mel.set_material_instance_texture_parameter_value(mi, "BaseTex", pic("T_%s_Base" % n, True))
     mel.set_material_instance_texture_parameter_value(mi, "MRTex", pic("T_%s_MR" % n, False))
     mel.set_material_instance_texture_parameter_value(mi, "NormalTex", pic("T_%s_Normal" % n, False, True))
+    mel.set_material_instance_texture_parameter_value(mi, "GlowTex", pic("T_%s_Glow" % n, True) or no_glow)
     lib.save_asset(mi_path)
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)

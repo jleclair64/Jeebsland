@@ -14,6 +14,13 @@ for the map / settings screen there. For full screen with a working Escape, pick
 it plays offline straight away. (Alt is the roll key, so Alt+Enter just rolls.) To change the editor's Stop key: Editor
 Preferences > Keyboard Shortcuts > search "Stop" > set it to Shift+Escape.
 
+## Oak Hill (2026-11-11)
+
+Field map, Play. Oak Hill is about 185 m east of the start, across the river (there is no bridge yet, so wade across where its west road stops at the bank). The world map (O) shows its name and its streets. Head for them and look for the big oak on the plaza.
+- What's there: the plaza with its big oak and the well, the smith, bank, store and potion shop round the ring road, the town hall to the east, the church on its rise to the northeast, and 17 houses (two designs). The streets follow the approved plan. The ground has its own gentle hills: the plaza is just over 6 m above the river and the castle knoll about 9 m. There's grass and there are trees.
+- Left empty on purpose, for what isn't made yet: the boxing ring (south of the plaza, levelled), the castle ruins (on the knoll to the north), the garden behind the town hall, the graveyard (southeast), both forts and the watchtower by the river, and the bridge.
+- Test pictures from the air: `-ShotEye=X_Y_Z` puts a free camera there, looking along `-ShotYaw` and `-ShotPitch` (`-ShotFov` too). Add `-ShotAt=X,Y` to stand the knight there, so the grass grows round him. `-NoOakHill` (test pictures only) leaves the town out, to compare frame rates; `-NoOakGrass`, `-NoOakMeshes` and `-NoOakTrees` leave out just that part. The plaza is at X -3550, Y 18290; a view of the whole town from the air: `-ShotEye=-9550_13290_6500 -ShotYaw=40 -ShotPitch=-37`. The log's `JEEBOAK` lines give the heights, each road's steepest grade, where each building went, and the closest two buildings.
+
 ## Chat and the radar potion (2026-10-30)
 
 - **Chat:** press **Enter**, type, Enter again to send (Escape cancels). Players within 35 m hear it and see it over your head. `/w message` tells the whole world. `/mute Name`, `/unmute Name`, `/mutelist` hide players on your machine. Bad words turn into asterisks (the server does it). Try it with "Play As Client", 2 players.

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldMap.h"
+#include "OakHill.h"
 
 // Shared description of the land, so the ground mesh, trees, rocks, huts, paths and walls all agree.
 namespace JeebTerrain
@@ -156,7 +157,8 @@ namespace JeebTerrain
 		if (FVector2D::Distance(P, CastlePos()) < CastleMoatOut + 80.f) return true;
 				if (FVector2D::Distance(P, PondCenter()) < PondWaterR) return true;
 		if (JeebWorld::InWater(X, Y)) return true;   // the river (it runs through the east side of the square)
-		
+		if (JeebOakHill::OnBuilding(X, Y)) return true;   // Oak Hill's buildings
+
 		return false;
 	}
 
@@ -251,7 +253,9 @@ namespace JeebTerrain
 		if (Cheb < 12000.f) H = HomeHeight(X, Y);
 		else if (Cheb >= GroundHalfForBlend - 400.f) H = JeebWorld::LandHeight(X, Y);
 		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
-		return JeebWorld::SeaAndRivers(X, Y, H);
+		float RiverD = 1.0e9f, RiverHalf = 600.f;
+		H = JeebWorld::SeaAndRivers(X, Y, H, &RiverD, &RiverHalf);
+		return JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf);   // Oak Hill's own hills and level plots (2026-11-11)
 	}
 
 	// The height of the ground mesh as actually drawn (GrassField: a 200 cm grid, each cell split along its B-C diagonal).
@@ -295,6 +299,9 @@ namespace JeebTerrain
 		// Half the road's width on its left and right at each point. Each side wanders on its own, and here and there
 		// the grass has crept in and the road narrows to about 60% (Width is the usual, full width).
 		TArray<float> HalfL, HalfR;
+		// Where it lies and its widest half: a point further than this from the box can skip the road (2026-11-11, PathClearance)
+		FBox2D Bounds = FBox2D(ForceInit);
+		float MaxHalf = 0.f;
 	};
 
 	// Fills HalfL / HalfR from the distance along the road (Seed makes each road different)
@@ -391,6 +398,23 @@ namespace JeebTerrain
 			}
 			// Village plaza (a wide patch of packed earth)
 			Add({ {VC.X - 330.f, VC.Y}, {VC.X + 330.f, VC.Y} }, 660.f, false);
+			// Oak Hill's streets (2026-11-11; always after every road above, so their shapes never change): already dense, 5 m wide
+			for (const JeebOakHill::FRoad& R : JeebOakHill::Roads())
+			{
+				FPathDef P;
+				P.Pts = R.Pts;
+				P.Width = JeebOakHill::RoadWidth;
+				P.bClosed = R.bClosed;
+				ShapeRoadEdges(P, D.Num());
+				D.Add(P);
+			}
+			for (FPathDef& P : D)
+			{
+				P.Bounds = FBox2D(P.Pts);
+				P.MaxHalf = P.Width * 0.5f;
+				for (float W : P.HalfL) P.MaxHalf = FMath::Max(P.MaxHalf, W);
+				for (float W : P.HalfR) P.MaxHalf = FMath::Max(P.MaxHalf, W);
+			}
 			return D;
 		}();
 		return Defs;
@@ -403,6 +427,8 @@ namespace JeebTerrain
 		float Best = 1.0e9f;
 		for (const FPathDef& Def : PathDefs())
 		{
+			// (a road whose whole box is further away than the best so far cannot be nearer: the same answer, much quicker)
+			if (Best < 1.0e8f && FMath::Sqrt(Def.Bounds.ComputeSquaredDistanceToPoint(P)) - Def.MaxHalf > Best) continue;
 			const int32 N = Def.Pts.Num();
 			const int32 Segs = Def.bClosed ? N : N - 1;
 			for (int32 i = 0; i < Segs; ++i)
@@ -429,6 +455,7 @@ namespace JeebTerrain
 		FVector2D BestPt = P;
 		for (const FPathDef& Def : PathDefs())
 		{
+			if (Best < 1.0e8f && Def.Bounds.ComputeSquaredDistanceToPoint(P) > Best * Best) continue;
 			const int32 N = Def.Pts.Num();
 			const int32 Segs = Def.bClosed ? N : N - 1;
 			for (int32 i = 0; i < Segs; ++i)
@@ -569,6 +596,7 @@ namespace JeebTerrain
 		D = FMath::Min(D, RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())));   // the whole walled village
 		D = FMath::Min(D, RectSD(P, PenCenter(), PenHalf()));
 		for (const FFort& F : Forts()) D = FMath::Min(D, float(FVector2D::Distance(P, F.Tree)) - 400.f);
+		D = FMath::Min(D, JeebOakHill::BuildingDistance(X, Y));
 		return 1.f - FMath::SmoothStep(0.f, 700.f, D);
 	}
 }
