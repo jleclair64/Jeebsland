@@ -1,4 +1,4 @@
-# Oak Hill town plan
+﻿# Oak Hill town plan
 
 **Built 2026-11-12** (Source/Jeebsland/OakHill.h, OakHillTown.cpp): the hills, roads, plots and buildings below are in the game. Differences from this plan: 16 houses (the one at sketch 315,280 is left out: the real bank and that house overlapped), buildings step back from roads and keep 3 m apart (so some sit a few metres off their sketch spot; the JEEBOAK log gives each final spot), pads are levelled and neighbouring floors pulled to similar heights, and the hills fade into the riverbanks over 10 m.
 
@@ -70,3 +70,8 @@ How it was planned: as a top-down drawing at true scale, traced from the owner's
   - The ring and the south houses are at about 4-5 m. The graveyard slopes down toward the south river.
   - The steepest street is about 5 degrees, and every street stays under 8 degrees.
   - East of the drawing, the land blends back into the ordinary lowland (`JeebWorld::LandHeight`).
+
+## Open-air market store candidates (2026-11-12)
+The owner wants the four shops redone as open-air market stalls, general store first. The first pass (three free library stalls) was rejected as too small and bare and deleted. Second pass: generated on Meshy (text to 3D, latest model, 300k triangles target, PBR texture). Full size in `Art/Buildings` (not reduced or imported), front previews in `Docs/GeneralStore/`. The old store stays untouched.
+- A `GeneralStore_A.glb`: cream canvas peaked tent on poles over a counter booth, pots, pans and tools hanging at the sides, barrels, sacks, baskets in front. Preview task 01a1d25b-4e9d-777e-a8f1-2f28246db2fb, textured task 01a1d25f-9568-77bc-85c7-f3fbc035d1c6.
+- B `GeneralStore_B.glb`: timber-framed trading post with a red and cream roof, back shelves full of goods, front counter, barrels, crates and jars. Preview task 01a1d25b-575c-77bd-855e-3fa24abe5820, textured task 01a1d25f-9e40-732b-8d8b-028ff97f9972.
