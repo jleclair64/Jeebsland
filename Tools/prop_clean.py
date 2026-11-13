@@ -33,14 +33,79 @@ os.makedirs(out, exist_ok=True)
 #  on the right fist (pickaxe, potion): the working end runs along -Z, grip at the origin (KnightDesign's Xf(GripPos, DownTo(BladeDir)))
 #  on the bow's hold (longbow): X along the limbs, Z toward the string, grip at the origin (WeaponDesign K_Bow)
 #  on the crossbow's hold: X toward the prod, Z up, the rear grip at the origin
+#
+# Added 2026-11-12 for the community-library models (Docs/MeshyCommunityLibrary.md lists their pages):
+#  reduce: triangles to keep (Blender's collapse decimation, before anything else; the library models come at 3k to 1M).
+#  bake: the reduced model is welded, gets fresh UVs and its pictures baked from the full one (a heavy reduction otherwise shatters the picture into shards).
+#  cull: before a bake, delete faces no ray from them can leave the model by (inner walls). Off unless asked: it ate a crystal face and frayed a medallion.
+#  refine: N rounds of splitting the faces the picture's metal/wood edge runs through, so a 'clean' mask follows the edge instead of making teeth (2026-11-13).
+#  cut: lambda on a face's centre in the MODEL's own frame (as Blender imports it, metres): those faces are deleted (the crossbow's bolt and string, the bows' strings, the quiver's arrows).
+#  marks: {name: (lo, hi)} boxes in the model's own frame: the middle of what is left inside each is printed in the game's frame, in cm ("PROP mark"), for the numbers in JeebProps.h.
+#  stretch: (axis, from cm, cm): everything above 'from' along this game axis moves that much further up (a longer grip, the pommel side moved, the blade kept where it was).
+#  rg: lambda (game-frame position in cm, (r, g, b) of the picture) -> (red, green) of the mask, instead of 'mask': red takes the tier's colour, green the second colour (an arrow's feathers).
+#  mask "none": nothing takes a colour (potions and amulets in their own colours).
+# The frames of the new ones:
+#  arrows: the tip at the origin, the shaft back along -X (Projectile's arrow; BowBits lay it from the nock).  ArrowBack: only the back of it, for the quiver (nock up along +Z there).
+#  quiver: standing along Z, centred on the origin (UpdateQuiver).  potions: as the old one, the cork along -Z, held at the neck.
+#  amulets: hung from the top of the bail (the origin), the face looking along +X, down -Z (UpdateAmulet, on the chest).
+def _seg_d(p, a_, b_):
+    # distance in the model's xy plane from p to the segment a_-b_
+    ax_, ay_ = b_[0] - a_[0], b_[1] - a_[1]
+    t = max(0.0, min(1.0, ((p[0] - a_[0]) * ax_ + (p[1] - a_[1]) * ay_) / (ax_ * ax_ + ay_ * ay_)))
+    return math.hypot(p[0] - a_[0] - t * ax_, p[1] - a_[1] - t * ay_)
+
+def _hue(c):
+    r, g_, b = c
+    mx, mn = max(c), min(c)
+    if mx - mn < 1e-5: return 0.0, 0.0, mx
+    if mx == r: h = (g_ - b) / (mx - mn) % 6.0
+    elif mx == g_: h = (b - r) / (mx - mn) + 2.0
+    else: h = (r - g_) / (mx - mn) + 4.0
+    return h * 60.0, (mx - mn) / mx, mx
+
+def _grey(c):
+    mx, mn = max(c), min(c)
+    return (mx - mn) / max(mx, 1e-4) < 0.30 or mx < 0.06
+
+AMULET = dict(length=6.0, grip=("Z", 1.0), mask="none", reduce=4000, bake=True)
 PROPS = {
-    "Potion":   dict(file="Potion.glb",   axes=("X", "-Y", "-Z"), length=21.0, grip=("Z", 0.25), mask="colour", also=("Z", 13.0), neck=("Z", -1.0, 4.5)),                       # (held by the neck: the body is wider than a fist)
-    "Pickaxe":  dict(file="Pickaxe.glb",  axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), blade=("Y", "X", 3.4, 2.2, 0.35), wood=(25.0, 0.74, 0.30, 60.0),
-                     clean=True, bands=[("Z", -69.6, -61.0, [("|X|", 0.0, 2.8), ("|Y|", 0.0, 2.8)]), ("Z", -20.0, -18.0)], metal=[[("Z", 12.4, 99.0)]]),
-    "Longbow":  dict(file="Longbow.glb",  axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="grey", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0),
+    "Pickaxe":  dict(file="Pickaxe2.glb", axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), wood=(25.0, 0.74, 0.30, 60.0), clean=True, reduce=6000),
+    "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=3000,
+                     cut=lambda p: p[0] > 0.136 and -0.925 < p[2] < 0.905,
+                     marks={"TipTop": ((0.10, -0.05, 0.86), (0.16, 0.05, 0.97)), "TipLow": ((0.10, -0.05, -0.98), (0.16, 0.05, -0.88))},
                      clean=True, plain=[[("|X|", 15.0, 68.0)]], bands=[("|X|", 9.5, 22.0), ("|X|", 41.0, 45.0), ("|X|", 64.0, 80.0)]),
-    "Crossbow": dict(file="Crossbow.glb", axes=("-X", "-Y", "Z"), length=88.0, grip=("X", 0.36), mask="grey", wood=(25.0, 0.74, 0.28, 60.0),
-                     clean=True, metal=[[("X", 29.0, 47.0), ("|Y|", 5.0, 99.0)]], bands=[("X", -24.5, -20.5), ("X", -10.5, -6.5), ("X", 9.0, 44.5, [("|Y|", 0.0, 5.0)])]),
+    "Crossbow": dict(file="Crossbow2.glb", axes=("-X", "-Y", "Z"), length=88.0, grip=("X", 0.36), mask="grey", wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=12000,
+                     # (the bolt lying on the stock past the nut, and the string from the prod's ends back to the nut, with its loop over the nut: the game draws both)
+                     cut=lambda p: (p[0] < -0.15 and abs(p[1]) < 0.042 and ((p[0] > -0.62 and p[2] > 0.085) or (p[0] <= -0.62 and p[2] > 0.118))) or (_seg_d(p, (-0.378, 0.792), (0.065, 0.0)) < 0.03 and (abs(p[1]) > 0.13 or p[2] > 0.135))
+                                   or (_seg_d(p, (-0.378, -0.792), (0.065, 0.0)) < 0.03 and (abs(p[1]) > 0.13 or p[2] > 0.135)) or (0.0 < p[0] < 0.13 and abs(p[1]) <= 0.03 and p[2] > 0.15),
+                     marks={"TipR": ((-0.46, 0.78, -0.3), (-0.36, 0.92, 0.3)), "TipL": ((-0.46, -0.92, -0.3), (-0.36, -0.78, 0.3)), "Nut": ((0.02, -0.03, 0.0), (0.12, 0.03, 0.3)),
+                            "Stirrup": ((-0.96, -0.1, -0.3), (-0.85, 0.1, 0.3))}),
+    "Sword":    dict(file="Sword.glb", axes=("Y", "X", "-Z"), length=92.0, grip=("Z", 0.890), mask="grey", clean=True, reduce=8000, stretch=("Z", 1.0, 6.0),
+                     marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
+    "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -47.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
+                     marks={"Edge": ((-0.32, -0.1, 0.5), (-0.27, 0.1, 0.95)), "Head": ((-0.3, -0.1, 0.9), (0.3, 0.1, 0.95))}),
+    "Bow":      dict(file="Bow.glb", axes=("Z", "-Y", "X"), length=124.0, grip=("X", 0.50), widen=("Z", 0.75), wood=(25.0, 0.74, 0.28, 30.0), clean=True, refine=2, islands=12.0,
+                     cut=lambda p: p[0] > 0.18 and abs(p[2]) < 0.738,
+                     # (the gold fittings take the tier's colour: pale yellow, not the orange wood or the dark leather)
+                     rg=lambda co, c: (1.0 if (28.0 <= _hue(c)[0] <= 65.0 and _hue(c)[2] > 0.10 and _hue(c)[1] > 0.2) else 0.0, 0.0),
+                     marks={"WrapTop": ((0.12, -0.08, 0.72), (0.23, 0.08, 0.84)), "WrapLow": ((0.12, -0.08, -0.84), (0.23, 0.08, -0.72))}),
+    "Arrow":    dict(file="Arrow.glb", axes=("Y", "Z", "X"), length=70.0, grip=("X", 1.0), wood=(25.0, 0.74, 0.28, 60.0), reduce=900, bake=True,
+                     rg=lambda co, c: (1.0 if co.x > -9.0 else 0.0, 1.0 if (co.x < -52.0 and math.hypot(co.y, co.z) > 0.9) else 0.0)),
+    "ArrowBack": dict(file="Arrow.glb", axes=("Y", "Z", "X"), length=29.5, grip=("X", 1.0), wood=(25.0, 0.74, 0.28, 60.0), reduce=900, bake=True,
+                     cut=lambda p: p[2] > -0.15,   # (the back 30 cm of it, what shows out of the quiver)
+                     rg=lambda co, c: (0.0, 1.0 if (co.x < -11.5 and math.hypot(co.y, co.z) > 0.9) else 0.0)),
+    "Quiver":   dict(file="Quiver.glb", axes=("X", "Y", "Z"), length=46.0, grip=("Z", 0.5), mask="none", reduce=8000, bake=True,
+                     cut=lambda p: p[2] > 0.47 or (p[2] > 0.30 and (p[0] / 0.175) ** 2 + (p[1] / 0.095) ** 2 < 1.0)),   # (its own arrows: the game puts its own in)
+    "PotionRed":    dict(file="PotionRed.glb",    axes=("X", "-Y", "-Z"), length=19.0, grip=("Z", 0.22), mask="none", reduce=5000, bake=True),
+    "PotionPurple": dict(file="PotionPurple.glb", axes=("X", "-Y", "-Z"), length=17.0, grip=("Z", 0.22), mask="none", reduce=5000, bake=True),
+    "PotionGreen":  dict(file="PotionGreen.glb",  axes=("X", "-Y", "-Z"), length=19.0, grip=("Z", 0.30), reduce=5000,
+                     rg=lambda co, c: (1.0 if (c[1] > 1.25 * c[0] and c[1] > 1.1 * c[2] and _hue(c)[1] > 0.25) else 0.0, 0.0)),   # (the liquid takes the potion's colour: swiftness, radar)
+    "AmuletRune":       dict(AMULET, file="AmuletRune.glb",       axes=("-Y", "X", "Z")),
+    "AmuletEmberHeart": dict(AMULET, file="AmuletEmberHeart.glb", axes=("-Y", "X", "Z")),
+    "AmuletScarab":     dict(AMULET, file="AmuletScarab.glb",     axes=("Y", "-X", "Z")),
+    "AmuletCrystal":    dict(AMULET, file="AmuletCrystal.glb",    axes=("Z", "-Y", "X")),
+    "AmuletVoidSeer":   dict(AMULET, file="AmuletVoidSeer.glb",   axes=("-Y", "X", "Z")),
+    "AmuletEmber":      dict(AMULET, file="AmuletEmber.glb",      axes=("-Y", "X", "Z")),
 }
 names = a[2:] or list(PROPS)
 IDX = {"X": 0, "Y": 1, "Z": 2}
@@ -163,6 +228,95 @@ def add_metal(me, P, M3, pix, W, H, normal):
     bm.to_mesh(me); bm.free(); me.update()
     return forced, plain
 
+
+def _tex_node(mat, sock_name):
+    pr = next(n for n in mat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+    stack = [pr.inputs[sock_name]]
+    while stack:
+        s = stack.pop()
+        for l in s.links:
+            n = l.from_node
+            if n.type == "TEX_IMAGE": return n
+            stack.extend(n.inputs)
+    return None
+
+
+def cull_hidden(me, name):
+    # Faces no ray from them can leave the model by (either side, a spread of 14 directions): the inner walls of a thick shell and anything sealed inside.
+    # A heavy collapse otherwise pushes those through the outside as shards.
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm)
+    ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
+    eps = ext * 2e-4; far = ext * 3.0
+    ring = [(math.cos(k * math.pi / 3.0), math.sin(k * math.pi / 3.0)) for k in range(6)]
+    gone = []
+    for f in bm.faces:
+        n = f.normal
+        if n.length < 0.5: continue
+        c = f.calc_center_median()
+        t1 = n.orthogonal().normalized(); t2 = n.cross(t1)
+        seen = False
+        for s in (1.0, -1.0):
+            nn = n * s
+            for d in [nn] + [(nn * 0.64 + (t1 * ca + t2 * sa) * 0.77).normalized() for ca, sa in ring]:
+                if tree.ray_cast(c + d * eps, d, far)[0] is None: seen = True; break
+            if seen: break
+        if not seen: gone.append(f)
+    bmesh.ops.delete(bm, geom=gone, context="FACES")
+    bm.to_mesh(me); bm.free(); me.update()
+    print("PROP", name, "hidden faces removed", len(gone))
+def bake_to_new_uvs(o, hi, name, size=2048):
+    # The decimated model gets its own fresh UVs and its pictures baked from the full model (a heavy collapse across the library models' many UV seams
+    # smears the old picture into speckled shards). Base and metal/roughness through emission, the normal map as Cycles bakes it.
+    sc = bpy.context.scene
+    sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 1
+    me = o.data
+    old = [l.name for l in me.uv_layers]
+    uvb = me.uv_layers.new(name="Bake"); me.uv_layers.active = uvb
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = o; o.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.004)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    hmat = hi.data.materials[0]
+    tb = _tex_node(hmat, "Base Color"); tn = _tex_node(hmat, "Normal"); tm = _tex_node(hmat, "Metallic") or _tex_node(hmat, "Roughness")
+    lmat = bpy.data.materials.new("Baked"); lmat.use_nodes = True
+    me.materials.clear(); me.materials.append(lmat)
+    ln = lmat.node_tree.nodes; lpr = next(n for n in ln if n.type == "BSDF_PRINCIPLED")
+    tgt = ln.new("ShaderNodeTexImage")
+    def img(tag, sz, noncolor):
+        im = bpy.data.images.new("Graded%s_%s" % (tag, name), sz, sz, alpha=True)   # ("Graded": shrink() scales it in place)
+        if noncolor: im.colorspace_settings.name = "Non-Color"
+        return im
+    pts = [v.co for v in me.vertices]
+    diag = (Vector([max(p[i] for p in pts) for i in range(3)]) - Vector([min(p[i] for p in pts) for i in range(3)])).length
+    hi.select_set(True); o.select_set(True); bpy.context.view_layer.objects.active = o
+    kw = dict(use_selected_to_active=True, cage_extrusion=0.01 * diag, max_ray_distance=0.03 * diag, margin=16, use_clear=True)
+    got = {}
+    if tn:
+        im = img("Normal", size // 2, True); tgt.image = im; ln.active = tgt
+        bpy.ops.object.bake(type="NORMAL", normal_space="TANGENT", **kw); got["Normal"] = im
+    out_node = next(n for n in hmat.node_tree.nodes if n.type == "OUTPUT_MATERIAL")
+    em = hmat.node_tree.nodes.new("ShaderNodeEmission")
+    hmat.node_tree.links.new(em.outputs[0], out_node.inputs["Surface"])
+    for tag, tnode, sz, nc in (("Base", tb, size, False), ("MR", tm, size // 2, True)):
+        if not tnode: continue
+        hmat.node_tree.links.new(tnode.outputs["Color"], em.inputs["Color"])
+        im = img(tag, sz, nc); tgt.image = im; ln.active = tgt
+        bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
+    ln.remove(tgt)
+    def tex(im):
+        n = ln.new("ShaderNodeTexImage"); n.image = im; return n
+    lk = lmat.node_tree.links
+    if "Base" in got: lk.new(tex(got["Base"]).outputs["Color"], lpr.inputs["Base Color"])
+    if "Normal" in got:
+        nm = ln.new("ShaderNodeNormalMap"); lk.new(tex(got["Normal"]).outputs["Color"], nm.inputs["Color"]); lk.new(nm.outputs[0], lpr.inputs["Normal"])
+    if "MR" in got: lk.new(tex(got["MR"]).outputs["Color"], lpr.inputs["Roughness"])
+    for n_ in old: me.uv_layers.remove(me.uv_layers[n_])
+    bpy.data.objects.remove(hi, do_unlink=True)
+    bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+    print("PROP", name, "baked", ", ".join(sorted(got)))
 for name in names:
     P = PROPS[name]
     f = os.path.join(src, P["file"])
@@ -174,6 +328,38 @@ for name in names:
     bpy.context.view_layer.objects.active = o; o.select_set(True)
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     me = o.data
+    tris0 = sum(len(p.vertices) - 2 for p in me.polygons)
+    if "cut" in P:
+        bm = bmesh.new(); bm.from_mesh(me)
+        gone = [f for f in bm.faces if P["cut"](f.calc_center_median())]
+        bmesh.ops.delete(bm, geom=gone, context="FACES")
+        bm.to_mesh(me); bm.free(); me.update()
+        print("PROP", name, "cut", len(gone), "faces")
+    if "reduce" in P:
+        tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
+        if tris_now > P["reduce"]:
+            hi = None
+            if P.get("bake"):
+                # (the full model stays for the bake; the copy that is reduced is welded first, since its old UV seams no longer matter and split edges stop the collapse)
+                hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
+                if P.get("cull"): cull_hidden(me, name)   # (off by default: welding and baking alone came out cleaner on the library models)
+                bm = bmesh.new(); bm.from_mesh(me)
+                ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
+                bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ext * 2e-5)
+                bm.to_mesh(me); bm.free(); me.update()
+                tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
+            bpy.ops.object.select_all(action="DESELECT"); bpy.context.view_layer.objects.active = o; o.select_set(True)
+            md = o.modifiers.new("Dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = min(1.0, P["reduce"] / float(tris_now)); md.use_collapse_triangulate = True
+            bpy.ops.object.modifier_apply(modifier=md.name)
+            me = o.data
+            if hi:
+                try:
+                    bpy.ops.mesh.customdata_custom_splitnormals_clear()
+                except Exception as e_: print("PROP", name, "custom normals kept:", e_)
+                me.shade_smooth(); me.set_sharp_from_angle(angle=math.radians(50.0))
+                bake_to_new_uvs(o, hi, name)
+                me = o.data
+    print("PROP", name, "tris from", tris0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     # (the model's own normals, by corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side. Kept as a corner attribute so cuts and bands carry them along)
     own = me.attributes.new("OwnN", "FLOAT_VECTOR", "CORNER")
     for li_ in range(len(me.loops)): own.data[li_].vector = me.corner_normals[li_].vector.copy()
@@ -199,6 +385,8 @@ for name in names:
         return pix[i], pix[i + 1], pix[i + 2]
     # into the game's frame, at the right size, grip at the origin
     M3 = axis_matrix(P["axes"])
+    if abs(M3.determinant() - 1.0) > 1e-3: raise RuntimeError("PROP %s: axes %s mirror the model" % (name, P["axes"]))
+    model_co = [v.co.copy() for v in me.vertices]   # (for the marks)
     for v in me.vertices: v.co = M3 @ v.co
     xs = [v.co for v in me.vertices]
     lo = Vector((min(c[i] for c in xs) for i in range(3))); hi = Vector((max(c[i] for c in xs) for i in range(3)))
@@ -249,6 +437,17 @@ for name in names:
         ni = IDX[P["neck"][0]]
         for v in me.vertices:
             if v.co[ni] < P["neck"][1]: v.co[ni] -= P["neck"][2]
+    if "stretch" in P:
+        si_ = IDX[P["stretch"][0]]
+        for v in me.vertices:
+            if v.co[si_] > P["stretch"][1]: v.co[si_] += P["stretch"][2]
+    for mk, (mlo, mhi) in P.get("marks", {}).items():
+        sel = [me.vertices[i].co for i, c in enumerate(model_co) if all(mlo[k] <= c[k] <= mhi[k] for k in range(3))]
+        if sel:
+            mid = sum(sel, Vector((0.0, 0.0, 0.0))) / len(sel)
+            print("PROP mark %s %s (%.1f, %.1f, %.1f) lo (%.1f, %.1f, %.1f) hi (%.1f, %.1f, %.1f) n %d" % (name, mk, mid.x, mid.y, mid.z,
+                  min(c.x for c in sel), min(c.y for c in sel), min(c.z for c in sel), max(c.x for c in sel), max(c.y for c in sel), max(c.z for c in sel), len(sel)))
+        else: print("PROP mark %s %s none" % (name, mk))
     if "blade" in P:
         si, ti = IDX[P["blade"][0]], IDX[P["blade"][1]]
         st, root_, tip_ = P["blade"][2:]
@@ -307,6 +506,30 @@ for name in names:
     forced = set(); plain = set()
     if "metal" in P or "bands" in P or "plain" in P:
         forced, plain = add_metal(me, P, M3, pix, W, H, normal)
+    # refine: faces the picture's metal/wood edge runs through are split, 'refine' times over, so the per-face mask (clean) follows the edge closely
+    # instead of drawing teeth across big triangles (the bow's fittings, 2026-11-13). Only with clean and without metal/bands/plain (those go by face index).
+    if P.get("refine") and P.get("clean") and not (forced or plain):
+        rg_ = P.get("rg")
+        def votes_of(f, uvl):
+            uvs = [Vector(l[uvl].uv) for l in f.loops]
+            c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
+            pts = [c_] + [c_ + (q - c_) * 0.85 for q in uvs] + [(uvs[i] + uvs[(i + 1) % len(uvs)]) * 0.5 * 0.85 + c_ * 0.15 for i in range(len(uvs))]
+            pc_ = f.calc_center_median()
+            return [(rg_(pc_, colour_at(q.x, q.y))[0] > 0.5 if rg_ else is_metal_px(*colour_at(q.x, q.y))) for q in pts]
+        def is_metal_px(r, g_, b):
+            mx, mn = max(r, g_, b), min(r, g_, b)
+            return (mx - mn) / max(mx, 1e-4) < 0.30 or mx < 0.06
+        t0 = sum(len(p.vertices) - 2 for p in me.polygons)
+        bm = bmesh.new(); bm.from_mesh(me)
+        for _round in range(int(P["refine"])):
+            uvl = bm.loops.layers.uv.active
+            mixed = [f for f in bm.faces if len(set(votes_of(f, uvl))) > 1]
+            if not mixed: break
+            edges = list({e for f in mixed for e in f.edges})
+            bmesh.ops.subdivide_edges(bm, edges=edges, cuts=1, use_grid_fill=True)
+            bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 3])
+        bm.to_mesh(me); bm.free(); me.update()
+        print("PROP", name, "refined edges: tris from", t0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     # the mask
     uv = me.uv_layers.active.data
     if "Mask" in me.color_attributes: me.color_attributes.remove(me.color_attributes["Mask"])
@@ -316,14 +539,54 @@ for name in names:
         mx, mn = max(r, g_, b), min(r, g_, b)
         sat = (mx - mn) / max(mx, 1e-4)
         return sat < 0.30 or mx < 0.06   # (dark steel counts, whatever faint hue it has)
+    rg = P.get("rg")
+    # islands: with clean, patches of faces smaller than this many cm2 take the answer of what surrounds them (the picture's painted shade and specks
+    # inside a fitting left dark holes in its tint, 2026-11-13)
+    island_val = {}
+    if P.get("clean") and P.get("islands"):
+        for poly in me.polygons:
+            uvs = [Vector(uv[li_].uv) for li_ in poly.loop_indices]
+            c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
+            pts = [c_] + [c_ + (q - c_) * 0.6 for q in uvs]
+            votes = sum(1 for q in pts if (rg(poly.center, colour_at(q.x, q.y))[0] > 0.5 if rg else is_metal(*colour_at(q.x, q.y))))
+            island_val[poly.index] = 1.0 if votes * 2 > len(pts) else 0.0
+        nb = {}
+        by_edge = {}
+        for poly in me.polygons:
+            for ek in poly.edge_keys:   # (by where the edge is, not its vertices: the library models are split along their UV seams)
+                pk_ = tuple(sorted(tuple(round(c, 2) for c in me.vertices[vi_].co) for vi_ in ek))
+                by_edge.setdefault(pk_, []).append(poly.index)
+        for fs in by_edge.values():
+            for a_ in fs:
+                for b_ in fs:
+                    if a_ != b_: nb.setdefault(a_, set()).add(b_)
+        area = {p.index: p.area for p in me.polygons}
+        flipped = 0
+        for want in (0.0, 1.0):   # (first the holes in the tint, then stray tinted specks)
+            seen = set()
+            for start in list(island_val):
+                if start in seen or island_val[start] != want: continue
+                comp = [start]; seen.add(start); k_ = 0
+                while k_ < len(comp):
+                    for n_ in nb.get(comp[k_], ()):
+                        if n_ not in seen and island_val[n_] == want: seen.add(n_); comp.append(n_)
+                    k_ += 1
+                if sum(area[i] for i in comp) < P["islands"]:
+                    for i in comp: island_val[i] = 1.0 - want
+                    flipped += len(comp)
+        print("PROP", name, "islands: %d faces flipped" % flipped)
     for poly in me.polygons:
         face_val = None
-        if P.get("clean"):
+        if poly.index in island_val:
+            face_val = island_val[poly.index]
+            if poly.index in plain: face_val = 0.0
+        elif P.get("clean"):
             # (one answer per face, from inside it: a corner on the edge of a wood patch in the picture picks up the grey seam around it, which drew gold streaks along the wood)
             uvs = [Vector(uv[li_].uv) for li_ in poly.loop_indices]
             c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
             pts = [c_] + [c_ + (q - c_) * 0.6 for q in uvs]
-            votes = sum(1 for q in pts if is_metal(*colour_at(q.x, q.y)))
+            pc_ = poly.center
+            votes = sum(1 for q in pts if (rg(pc_, colour_at(q.x, q.y))[0] > 0.5 if rg else is_metal(*colour_at(q.x, q.y))))
             face_val = 1.0 if votes * 2 > len(pts) else 0.0
             if poly.index in plain: face_val = 0.0
         for li_ in poly.loop_indices:
@@ -331,15 +594,17 @@ for name in names:
             mx, mn = max(r, g_, b), min(r, g_, b)
             sat = (mx - mn) / max(mx, 1e-4)
             vi = me.loops[li_].vertex_index
+            gval = rg(me.vertices[vi].co, (r, g_, b))[1] if rg else 0.0
             if face_val is not None: val = face_val
-            elif P["mask"] == "grey": val = 1.0 if is_metal(r, g_, b) else 0.0
-            elif P["mask"] == "colour": val = 1.0 if sat > 0.45 and g_ < 0.35 * r else 0.0   # (the red liquid, not the tan cork)
+            elif rg: val = rg(me.vertices[vi].co, (r, g_, b))[0]
+            elif P.get("mask") == "grey": val = 1.0 if is_metal(r, g_, b) else 0.0
+            elif P.get("mask") == "colour": val = 1.0 if sat > 0.45 and g_ < 0.35 * r else 0.0   # (the red liquid, not the tan cork)
             else: val = 0.0
             if "also" in P and me.vertices[vi].co[IDX[P["also"][0]]] > P["also"][1]: val = 1.0
             if "far" in P and abs(me.vertices[vi].co[li]) <= P["far"]: val = 0.0
             if "below" in P and me.vertices[vi].co[IDX[P["below"][0]]] >= P["below"][1]: val = 0.0
             if poly.index in forced: val = 1.0
-            ca.data[li_].color = (val, val, val, 1.0)
+            ca.data[li_].color = (val, gval, 0.0, 1.0)   # (red: the tier's or the potion's colour; green: the second colour, an arrow's feathers)
         if face_val == 0.0 and poly.index not in forced:
             woodfaces.append([tuple(uv[li_].uv) for li_ in poly.loop_indices])
     me.update()

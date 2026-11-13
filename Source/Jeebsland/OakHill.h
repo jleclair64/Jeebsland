@@ -4,6 +4,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "WorldMap.h"
+#include "OakHillFootprints.h"
 
 // Oak Hill (2026-11-11): the town's own land, roads and building plots, traced from Docs/OakHillPlan.md (the owner's approved
 // plan, drawn over Docs/OakHillSketch.webp). Header only, so the ground, the roads, the grass and the trees all read the same
@@ -468,13 +469,92 @@ namespace JeebOakHill
 		return (FMath::Sqrt(Best) - RoadWidth * 0.5f) / 100.f;
 	}
 
+	// A building's turn (Unreal yaw, degrees): the model's long side (its X, or its Y for bLongY) along the plot's long side, then
+	// whichever of the two ways puts its door toward the nearest road. AOakHillTown::BuildBuildings places the model and its walls by it.
+	inline float BuildingYaw(const FPlot& P, const FModel* Mdl)
+	{
+		const float DoorYaw = Mdl ? Mdl->DoorYaw : 90.f;
+		const FVector2D C = FromPx(P.Px, P.Py);
+		const float Yaw0 = (P.W >= P.H ? 90.f : 0.f) + P.Rot - (Mdl && Mdl->bLongY ? 90.f : 0.f);
+		float ToRoad = Yaw0 + DoorYaw, Best = 1.0e12f;
+		for (const FRoad& R : Roads())
+			for (const FVector2D& Q : R.Pts) { const float D = FVector2D::DistSquared(Q, C); if (D < Best) { Best = D; ToRoad = FMath::RadiansToDegrees(FMath::Atan2(Q.Y - C.Y, Q.X - C.X)); } }
+		auto Diff = [](float A, float B) { return FMath::Abs(FMath::FindDeltaAngleDegrees(A, B)); };
+		return Diff(Yaw0 + DoorYaw, ToRoad) <= Diff(Yaw0 + 180.f + DoorYaw, ToRoad) ? Yaw0 : Yaw0 + 180.f;
+	}
+	inline bool IsStall(const TCHAR* Model)
+	{
+		return Model && (FCString::Strcmp(Model, TEXT("GeneralStore")) == 0 || FCString::Strcmp(Model, TEXT("PotionStall")) == 0 || FCString::Strcmp(Model, TEXT("BankStall")) == 0);
+	}
+	// Each building plot's foundation walls in game cm (the same box as its solid walls in AOakHillTown::BuildBuildings), by plot
+	// index. bWalls is false where the plot's own box is used instead: no measured walls, or a market stall (its open front and
+	// the yard of barrels and crates round it stay clear of grass)
+	// Foot: the model's ground footprint (OakHillFootprints.h), used when there is one; Centre and Scale place it.
+	struct FWallBox { bool bWalls = false; FVector2D Mid = FVector2D::ZeroVector, Half = FVector2D::ZeroVector, Centre = FVector2D::ZeroVector; float Cs = 1.f, Sn = 0.f, Scale = 1.f; const FFootprint* Foot = nullptr; };
+	inline bool InFootprint(const FFootprint& F, float BX, float BY)   // (BX, BY: the model's own frame, Blender's, cm)
+	{
+		const int32 I = FMath::FloorToInt((BX - F.X0) / FootCell), J = FMath::FloorToInt((BY - F.Y0) / FootCell);
+		if (I < 0 || I >= F.NX || J < 0 || J >= F.NY) return false;
+		const char Ch = F.Hex[I * ((F.NY + 3) / 4) + J / 4];
+		const int32 Nib = Ch >= 'a' ? Ch - 'a' + 10 : Ch - '0';
+		return ((Nib >> (3 - J % 4)) & 1) != 0;
+	}
+	inline const TArray<FWallBox>& WallBoxes()
+	{
+		static const TArray<FWallBox> W = []()
+		{
+			TArray<FWallBox> A;
+			for (const FPlot& P : Plots())
+			{
+				FWallBox& B = A.AddDefaulted_GetRef();
+				if (P.Kind != EPlot::Building || !P.Model || IsStall(P.Model)) continue;
+				const FModel* Mdl = FindModel(P.Model);
+				if (!Mdl || !(Mdl->WX1 > Mdl->WX0)) continue;
+				const float Yaw = BuildingYaw(P, Mdl);
+				// (Unreal mirrors Blender's Y on import: a model's +Y in Blender is its -Y here)
+				const FVector2D Lo(Mdl->WX0 * Mdl->Scale, -Mdl->WY1 * Mdl->Scale), Hi(Mdl->WX1 * Mdl->Scale, -Mdl->WY0 * Mdl->Scale);
+				const FVector2D MidL = (Lo + Hi) * 0.5f;
+				B.Cs = FMath::Cos(FMath::DegreesToRadians(Yaw)); B.Sn = FMath::Sin(FMath::DegreesToRadians(Yaw));
+				B.Mid = FromPx(P.Px, P.Py) + FVector2D(MidL.X * B.Cs - MidL.Y * B.Sn, MidL.X * B.Sn + MidL.Y * B.Cs);
+				B.Half = (Hi - Lo) * 0.5f;
+				B.bWalls = true;
+				B.Centre = FromPx(P.Px, P.Py); B.Scale = Mdl->Scale;
+				int32 NumFeet = 0; const FFootprint* Feet = Footprints(NumFeet);
+				for (int32 f = 0; f < NumFeet; ++f) if (FCString::Strcmp(Feet[f].Model, P.Model) == 0) B.Foot = &Feet[f];
+			}
+			return A;
+		}();
+		return W;
+	}
+
 	// ------------------------------------------------------------------ what grass and other code ask
-	// Inside a building's walls (no grass, no leaves), with a margin in metres
+	// On a building's real footprint (no grass, no leaves): its walls, steps and porch floors from OakHillFootprints.h, else its
+	// foundation walls' box; with a margin in metres, the walls' box. Porch corners and the ground under eaves keep their grass
+	// (owner's ground pass, 2026-11-13: the whole model's bounds left bare corners with no building on them)
 	inline bool OnBuilding(float X, float Y, float MarginM = 0.f)
 	{
 		if (!InBox(X, Y) || !Enabled()) return false;
 		const float E = EastM(Y), N = NorthM(X);
-		for (const FPlot& P : Plots()) if (P.Kind == EPlot::Building && PlotSD(P, E, N) < MarginM) return true;
+		const TArray<FPlot>& Ps = Plots();
+		const TArray<FWallBox>& Ws = WallBoxes();
+		for (int32 i = 0; i < Ps.Num(); ++i)
+		{
+			const FPlot& P = Ps[i];
+			if (P.Kind != EPlot::Building) continue;
+			if (!Ws[i].bWalls) { if (PlotSD(P, E, N) < MarginM) return true; continue; }
+			const FWallBox& B = Ws[i];
+			if (B.Foot && MarginM <= 0.f)
+			{
+				// (into the model's frame: turn back by its yaw, undo its scale, and Unreal's Y is Blender's -Y)
+				const float FX = X - B.Centre.X, FY = Y - B.Centre.Y;
+				if (InFootprint(*B.Foot, (FX * B.Cs + FY * B.Sn) / B.Scale, -(-FX * B.Sn + FY * B.Cs) / B.Scale)) return true;
+				continue;
+			}
+			const float DX = X - B.Mid.X, DY = Y - B.Mid.Y;
+			const FVector2D Q(FMath::Abs(DX * B.Cs + DY * B.Sn) - B.Half.X, FMath::Abs(-DX * B.Sn + DY * B.Cs) - B.Half.Y);
+			const float SD = FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
+			if (SD < MarginM * 100.f) return true;
+		}
 		return false;
 	}
 	// Distance (cm) to the nearest building's walls, for the shorter grass beside buildings (1e6 far from town)

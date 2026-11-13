@@ -90,3 +90,27 @@ Meshy's Remesh (`meshy_remesh`, 5 credits) rebuilds the topology, but it is mean
   - the look in the game, in sun and in shade
 - Buildings then follow the house pipeline: `Art/Buildings` -> `Tools/BuildBuildings.ps1` -> `/Game/Buildings`. Reduce to about 300k triangles with Nanite, like the chosen house.
 - A mix of models from different uploaders may not match each other. A Meshy retexture (10 credits, `meshy_retexture`) can bring a chosen model to one consistent Oak Hill look.
+
+## Weapons, arrows, quiver, potions and amulets (owner's picks, 2026-11-12)
+The owner chose these from the library; all are free (CC0) downloads in `Art/Props`, cleaned and fitted by `Tools/prop_clean.py` (every fit number is there) and imported by `Tools/BuildProps.ps1` into `/Game/Props`. Triangles are the download's and what the game uses.
+- Sword ("Knight Sword", P_Dub, 32k to 8k): https://www.meshy.ai/posts/019faf88-878b-7466-becd-fca170e3a071 (`Sword.glb`)
+- Axe ("Viking Battle Axe", Lak1z, 125k to 8k, baked): https://www.meshy.ai/posts/019e13cd-fd11-786d-92fd-591beeeeb3b7 (`Axe.glb`)
+- Pickaxe ("Miner's Pickaxe", blizzard10000000, 16k to 6k): https://www.meshy.ai/posts/01a1be94-008b-71d0-946d-acda7abba813 (`Pickaxe2.glb`)
+- Bow ("Gilded Recurve Bow", erencakmakhtc, 3.5k, string cut off): https://www.meshy.ai/posts/01a14687-78fe-70ea-bc27-8431c0aaeddd (`Bow.glb`)
+- Longbow (jumpylion87, 34k to about 9k, string cut off): https://www.meshy.ai/posts/019cee3b-d0c2-7e1f-bf98-292b6373c775 (`Longbow2.glb`)
+- Crossbow (wlad4iaicovschi, 257k to 12k, bolt and string cut off): https://www.meshy.ai/posts/crossbow-01a1439b-a114-72ed-9644-30c8913bd151 (`Crossbow2.glb`)
+- Arrow (JaxonHyer, 9.5k to 900, baked; also its back 30 cm for the quiver): https://www.meshy.ai/posts/arrow-01a099cf-3aa6-72da-9732-a46de2f5f5c6 (`Arrow.glb`)
+- Quiver ("Archer's Quiver", Lukomuko, 381k to 8k, its own arrows cut off, baked): https://www.meshy.ai/posts/019b74bf-b1fe-7e92-97c0-77dfdcb0a107 (`Quiver.glb`)
+- Healing potion ("health potion", V01dd_, 989k to 5k, baked): https://www.meshy.ai/posts/health-potion-01a0cddd-a510-73a5-9b1d-9934aa6fc45f (`PotionRed.glb`)
+- Vigour potion ("Little shrinking potion", vael.kaltar, 261k to 5k, baked): https://www.meshy.ai/posts/019bc3fd-c69d-7c99-b225-0033caca8211 (`PotionPurple.glb`)
+- Swiftness and radar potions ("Potion flask", Arnav900, 10k to 5k; its liquid takes the potion's colour): https://www.meshy.ai/posts/0197623f-4b87-7ac7-8d14-fcef3bc4aab2 (`PotionGreen.glb`)
+- Hawk's Eye Amulet ("Eternal Ember Amulet", mertsmulku, 433k to 4k, baked): https://www.meshy.ai/posts/01994571-bf6e-7003-81fd-de986fbf8af0 (`AmuletEmber.glb`)
+- Emerald Necklace ("Scarab Beetle Amulet", pwbeaumont, 401k to 4k, baked): https://www.meshy.ai/posts/01999700-4931-7b5e-ba7a-928780c5e186 (`AmuletScarab.glb`)
+- Chaos Pendant ("Amulet of the Void Seer", SmalCrow, 1.3k): https://www.meshy.ai/posts/amulet-of-the-void-seer-01a02099-6458-72c9-8753-00f457802cb0 (`AmuletVoidSeer.glb`)
+- Guardian Amulet ("Mystic Cipher Amulet", Balsamic_Vin, 1.06M to 4k, baked): https://www.meshy.ai/posts/019b52c7-2063-7373-a478-6df6ece0bbdc (`AmuletRune.glb`)
+- Vitality Amulet ("Amulet of the Ember Heart", SmalCrow, 1.3k): https://www.meshy.ai/posts/amulet-of-the-ember-heart-01a0209a-15e5-7cf1-a3cf-94d3b3036562 (`AmuletEmberHeart.glb`)
+- Astral Prism Pendant (new 6th amulet, "Astral Prism Pendant", kikounou84, 411k to 4k, baked): https://www.meshy.ai/posts/019d6fca-23fd-781a-a8b1-a790de1d9897 (`AmuletCrystal.glb`)
+
+Lessons from this batch:
+- Finding a model the owner names: `https://www.meshy.ai/search/<words>?kind=model` works. Scroll the results page (a little script that scrolls loads more), then match the author's name in the card text.
+- A heavy reduction (to 1-2% of the model) shatters the picture into speckled shards, because the collapse runs across the model's many UV seams. `bake=True` in prop_clean.py welds the model, reduces it, gives it fresh UVs and bakes its pictures from the full model (Cycles, about 20-40 s each). Use it whenever a model is cut to a few percent.

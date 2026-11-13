@@ -222,7 +222,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	static const FEntry Entries[] = {
 		{ TEXT("Ranks & smithing"), -1 },
 		{ TEXT("Sword"), K_Sword }, { TEXT("Axe"), K_Axe }, { TEXT("Pickaxe"), K_Pickaxe }, { TEXT("Spear"), K_Spear },
-		{ TEXT("Broadsword"), K_Broadsword }, { TEXT("Battle Axe"), K_BattleAxe }, { TEXT("Katana"), K_Katana },
+		{ TEXT("Broadsword"), K_Broadsword }, { TEXT("Battle Axe"), K_BattleAxe },
 		{ TEXT("Wand"), K_Wand }, { TEXT("Wizard Staff"), K_Staff }, { TEXT("Bow"), K_Bow }, { TEXT("Longbow"), K_Longbow }, { TEXT("Crossbow"), K_Crossbow }, { TEXT("Arrows"), -2 }, { TEXT("Fishing Pole"), K_Rod },
 		{ TEXT("Shield"), K_Shield }, { TEXT("Helmet"), K_Helmet }, { TEXT("Chestplate"), K_Chest }, { TEXT("Shoulders"), K_Shoulders },
 		{ TEXT("Gauntlets"), K_Gauntlets }, { TEXT("Boots"), K_Boots }, { TEXT("Cape"), K_Cape }, { TEXT("Rings"), K_Ring }, { TEXT("Amulets"), K_Amulet },

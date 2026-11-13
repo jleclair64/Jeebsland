@@ -37,6 +37,8 @@
 #include "ProceduralMeshComponent.h"
 #include "KnightAnimator.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 // Where things sit on his back, in the chest bone's frame (UpperPivot: X forward, Y his right, Z up; measured on film)
 static constexpr float CapePinX = -19.f, CapePinZ = 12.f;   // the cape's top row
@@ -382,6 +384,99 @@ void AKnightCharacter::RefreshEquipment()
 	RebuildHeld();
 }
 
+// The worn amulet (2026-11-12, owner: a gold chain round the knight's neck): the chain lies round the base of his neck, over the collar, and drops in a V
+// to the pendant on his chest (Meshy's models, JeebProps::AmuletMesh). In the chest bone's frame (UpperPivot: X forward, Y his right, Z up), measured from
+// his neck bone; rebuilt only when the amulet changes. The first amulet among the three misc slots is the one shown.
+static float ChainBackX = -7.5f, ChainSideY = 10.5f, ChainUp = 3.f;    // round the neck: behind it, either side, how far above the neck bone
+static float ChainFrontX = 21.f, ChainDrop = 17.f;                      // where the pendant hangs: in front of the neck bone (on the chest plate), and below it
+static float ChainBareIn = 5.f;                                          // with no chest plate it lies this much nearer, on the mail
+static float PendantPitch = 8.f;                                         // the pendant leans out at the bottom, lying on the chest plate
+static float PendantScale = 1.3f;   // (the models are 6 cm tall: a little bolder than life, so it reads on the plate)
+void AKnightCharacter::UpdateAmulet()
+{
+	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
+	int32 Id = 0;
+	for (int32 C : { Skills->Worn[JeebItems::K_Amulet], Skills->Worn[JeebItems::K_Ring], Skills->RingB })
+		if (C != 0 && JeebItems::KindOf(C) == JeebItems::K_Amulet) { Id = C; break; }
+	const bool bPlate = Anim->WornTier(JeebAnim::Piece_Chest) >= 0;
+	const int32 Shown = Id * 2 + (bPlate ? 1 : 0);   // (rebuilt when the chest plate comes on or off too)
+	if (Shown == AmuletShownId) return;
+	AmuletShownId = Shown;
+	for (USceneComponent* C : AmuletParts) if (C) C->DestroyComponent();
+	AmuletParts.Reset();
+	if (Id == 0) return;
+	UStaticMesh* Pendant = JeebProps::AmuletMesh(JeebItems::VariantOf(Id));
+	if (!Pendant) return;
+	const FVector N = UpperPivot->GetComponentTransform().InverseTransformPosition(Anim->BoneWorld(JeebAnim::Neck).GetLocation());
+#if !UE_BUILD_SHIPPING
+	{   // (test pictures: -AmuletTune=<front>_<drop>_<up>_<side>_<back>_<pitch>_<scale> tries other numbers without a build: cm and degrees in tenths, the scale in hundredths, since the command line stops at a dot)
+		FString T; TArray<FString> V;
+		if (FParse::Value(FCommandLine::Get(), TEXT("AmuletTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 7)
+		{
+			ChainFrontX = FCString::Atof(*V[0]) / 10.f; ChainDrop = FCString::Atof(*V[1]) / 10.f; ChainUp = FCString::Atof(*V[2]) / 10.f; ChainSideY = FCString::Atof(*V[3]) / 10.f;
+			ChainBackX = FCString::Atof(*V[4]) / 10.f; PendantPitch = FCString::Atof(*V[5]) / 10.f; PendantScale = FCString::Atof(*V[6]) / 100.f;
+		}
+	}
+#endif
+	UE_LOG(LogTemp, Log, TEXT("JEEBAMULET id %d variant %d neck in the chest frame (%.1f, %.1f, %.1f), pendant at (%.1f, %.1f, %.1f); chest in the world %s"), Id, JeebItems::VariantOf(Id), N.X, N.Y, N.Z, N.X + ChainFrontX, 0.f, N.Z + ChainUp - ChainDrop, *UpperPivot->GetComponentLocation().ToString());
+	// the chain's line, all the way round from the pendant (a = 0) and back
+	auto At = [&](float A)
+	{
+		const float C = FMath::Cos(A), S = FMath::Sin(A);
+		if (C <= 0.f) return FVector(N.X - C * ChainBackX, ChainSideY * S, N.Z + ChainUp);
+		const float U = FMath::Pow(C, 1.6f);
+		return FVector(N.X + (ChainFrontX - (bPlate ? 0.f : ChainBareIn)) * FMath::Sin(C * HALF_PI), ChainSideY * S, N.Z + ChainUp - ChainDrop * U);
+	};
+	TArray<FVector> Line;
+	for (int32 i = 0; i <= 240; ++i) Line.Add(At(-PI + 2.f * PI * i / 240.f));
+	// links every 1.1 cm along it, each turned a quarter from the last
+	KM::FMD Link;
+	KM::Torus(Link, 0.42, 0.12, 10, 5, 1.45, 1.0, KM::Xf(FVector::ZeroVector));
+	KM::FMD Md;
+	float Walk = 0.f, NextAt = 0.f; int32 k = 0;
+	for (int32 i = 1; i < Line.Num(); ++i)
+	{
+		const FVector D = Line[i] - Line[i - 1];
+		const float Len = D.Size();
+		while (NextAt <= Walk + Len && Len > KINDA_SMALL_NUMBER)
+		{
+			const FVector P = Line[i - 1] + D * ((NextAt - Walk) / Len);
+			const FVector Out = FVector(P.X - N.X, P.Y, 0.f).GetSafeNormal(KINDA_SMALL_NUMBER, FVector::ForwardVector);
+			const FQuat Q = FRotationMatrix::MakeFromXZ(D / Len, (k & 1) ? FVector::CrossProduct(D / Len, Out) : Out).ToQuat();
+			const int32 Base = Md.V.Num();
+			for (const FVector& V : Link.V) Md.V.Add(P + Q.RotateVector(V));
+			for (int32 Ix : Link.I) Md.I.Add(Base + Ix);
+			NextAt += 1.1f; ++k;
+		}
+		Walk += Len;
+	}
+	UProceduralMeshComponent* Chain = NewObject<UProceduralMeshComponent>(this);
+	Chain->SetupAttachment(UpperPivot);
+	Chain->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Chain->SetCastShadow(false);
+	Chain->RegisterComponent();
+	TArray<FVector> Normals;
+	KM::ComputeNormals(Md, Normals);
+	TArray<int32> Tris;   // (both windings, as MakeMeshComp: the outside shows whichever way the engine treats as front)
+	for (int32 t = 0; t + 2 < Md.I.Num(); t += 3) Tris.Append({ Md.I[t], Md.I[t + 1], Md.I[t + 2], Md.I[t], Md.I[t + 2], Md.I[t + 1] });
+	Chain->CreateMeshSection_LinearColor(0, Md.V, Tris, Normals, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+	UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
+	if (UMaterialInstanceDynamic* M = Chain->CreateDynamicMaterialInstance(0, Metal ? Metal : LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"))))
+	{
+		M->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.72f, 0.22f));
+		M->SetScalarParameterValue(TEXT("Metallic"), 1.f);
+		M->SetScalarParameterValue(TEXT("Roughness"), 0.3f);
+	}
+	AmuletParts.Add(Chain);
+	if (UStaticMeshComponent* P = JeebProps::MakeStatic(this, UpperPivot, Pendant))
+	{
+		P->SetRelativeLocationAndRotation(At(0.f) + FVector(0.4f, 0.f, 0.3f), FRotator(PendantPitch, 0.f, 0.f));   // (the bail on the chain's lowest link)
+		P->SetCastShadow(false);
+		P->SetRelativeScale3D(FVector(PendantScale));
+		AmuletParts.Add(P);
+	}
+}
+
 // Where a model built around its grip, working end along -Z, sits on WristR: exactly as the code-built weapons are placed (KM::RotateEuler's order: X, then Y, then Z)
 static FTransform FistPlace()
 {
@@ -450,6 +545,7 @@ void AKnightCharacter::RebuildHeld()
 		const FQuat Q = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-35.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f));
 		for (int32 i = First; i < HeldComps.Num(); ++i)
 			HeldComps[i]->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q);   // (clear of the model's back)
+		StowPullNow = 0.f;
 		if (UStaticMeshComponent* S = JeebProps::Make(this, UpperPivot, K, T)) { S->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q); HeldStatics.Add(S); }
 		return;
 	}
@@ -489,12 +585,29 @@ void AKnightCharacter::PlaceShield(bool bOnBack)
 		{
 			P.Comp->AttachToComponent(UpperPivot, FAttachmentTransformRules::KeepRelativeTransform);
 			P.Comp->SetRelativeLocationAndRotation(FVector(ShieldBackX, -41.f, ShieldBackZ), FRotator(0.f, 180.f, 0.f));
+			StowPullNow = 0.f;
 		}
 		else
 		{
 			P.Comp->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);   // (PlaceGear places it)
 		}
 	}
+}
+
+// In a flat crawl over a ledge or onto a block the spine bends so that what is on his back stood 10-30 cm off it: it moves in toward him by Cm
+// (along the chest frame's forward axis), back to its place as he straightens
+void AKnightCharacter::PullStowed(float Cm)
+{
+	if (FMath::Abs(Cm - StowPullNow) < 0.1f) return;
+	StowPullNow = Cm;
+	if (bShieldBack)
+		for (FArmorPart& P : ArmorParts)
+			if (P.Slot == KnightDesign::SlotShield && P.Comp && P.Comp->GetAttachParent() == UpperPivot) P.Comp->SetRelativeLocation(FVector(ShieldBackX + Cm, -41.f, ShieldBackZ));
+	if (!bStowed) return;
+	for (UProceduralMeshComponent* C : HeldComps)
+		if (C && C->GetAttachParent() == UpperPivot) C->SetRelativeLocation(FVector(StowBackX + Cm, 14.f, StowZ));
+	for (UStaticMeshComponent* S : HeldStatics)
+		if (S && S->GetAttachParent() == UpperPivot) S->SetRelativeLocation(FVector(StowBackX + Cm, 14.f, StowZ));
 }
 
 // The resting shield, and the left arm that holds it. The shield stays where it was placed (in the shoulder's frame, so it

@@ -3,6 +3,7 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "KnightCharacter.h"
+#include "KnightMovement.h"
 #include "Pig.h"
 #include "FoeKnight.h"
 #include "Loot.h"
@@ -254,6 +255,21 @@ void AKnightHUD::DrawHUD()
 			const float BY = Canvas->ClipY - 46.f - 46.f - 26.f;
 			const float GW = BarW, GX = BarX;
 			Gauge(GX, BY, GW, BarH, F, FLinearColor(0.64f, 0.68f, 0.75f), Knight->IsGuardBroken());   // steel
+		}
+	}
+
+	// Climbing stamina (2026-11-12): a lime-green bar low on the screen, under the knight (never across him: the camera keeps him in the middle) and above the weapon bar, while he climbs, and while it fills again after (gone 0.6 s after
+	// it is full). Red and throbbing once emptied: no grabbing again until it is full; it throbs in the last fifth too.
+	if (const UKnightMovement* KM = Knight->KnightMove())
+	{
+		static double ClimbBarSeen = -10.0;
+		const double NowC = GetWorld()->GetTimeSeconds();
+		const float F = KM->ClimbStamina;
+		if (KM->OnWall() || KM->IsCustom(JeebClimb::ClimbUp) || F < 0.999f) ClimbBarSeen = NowC;
+		if (NowC - ClimbBarSeen < 0.6)
+		{
+			const float CW = 300.f, CH = 12.f;   // (thicker and yellower than the health bar, so the two never read as the same)
+			Gauge((Canvas->ClipX - CW) * 0.5f, Canvas->ClipY * 0.8f, CW, CH, F, KM->bClimbExhausted ? FLinearColor(0.85f, 0.28f, 0.2f) : FLinearColor(0.64f, 0.92f, 0.2f), KM->bClimbExhausted || F < 0.2f);
 		}
 	}
 

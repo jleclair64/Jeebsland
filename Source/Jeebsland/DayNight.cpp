@@ -10,6 +10,44 @@
 #include "Engine/PostProcessVolume.h"
 #include "Components/VolumetricCloudComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/CommandLine.h"
+
+// The picture's look (2026-11-12, owner: "more professional, Breath of the Wild meets Overwatch"). Console variables, so a
+// test run can try other numbers with -ExecCmds="jeeb.Look.Sat 1.1" without a build; the defaults are the chosen look.
+namespace JeebLook
+{
+	static TAutoConsoleVariable<int32> On(TEXT("jeeb.Look"), 1, TEXT("1: the 2026-11-12 grade, haze, AO and contact shadows; 0: the look before it (test pictures)"));
+	static TAutoConsoleVariable<float> Sat(TEXT("jeeb.Look.Sat"), 1.1f, TEXT("Overall colour saturation at noon (eases to 1.0 at the low sun, which is golden enough)"));
+	static TAutoConsoleVariable<float> Contrast(TEXT("jeeb.Look.Contrast"), 1.0f, TEXT("Overall contrast (the old painterly grade had 0.9)"));
+	static TAutoConsoleVariable<float> Warm(TEXT("jeeb.Look.Warm"), 0.04f, TEXT("Warmth in the highlights: red up and blue down by this much"));
+	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0.012f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
+	static TAutoConsoleVariable<float> Bloom(TEXT("jeeb.Look.Bloom"), 0.8f, TEXT("Bloom intensity (was 0.95 on every pixel)"));
+	static TAutoConsoleVariable<float> BloomThreshold(TEXT("jeeb.Look.BloomThreshold"), -1.f, TEXT("Bloom threshold: -1 every pixel blooms a little; above 0 only what is brighter blooms"));
+	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 16.f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
+	static TAutoConsoleVariable<float> HazeBlue(TEXT("jeeb.Look.HazeBlue"), 1.f, TEXT("0: the old warm grey height fog; 1: a soft blue-grey haze at noon, a warm peach-lilac at the low sun"));
+	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 2500.f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
+	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
+	static TAutoConsoleVariable<float> AO(TEXT("jeeb.Look.AO"), 0.6f, TEXT("Ambient occlusion strength (where it is on: r.AmbientOcclusionLevels, set by ApplyGraphics)"));
+	static TAutoConsoleVariable<float> AORadius(TEXT("jeeb.Look.AORadius"), 100.f, TEXT("Ambient occlusion radius in cm"));
+	static TAutoConsoleVariable<float> Contact(TEXT("jeeb.Look.Contact"), 0.f, TEXT("The sun's screen-space contact shadow length (share of the screen; 0 off: at 0.03 it cost 0.07 ms and barely showed, 2026-11-13)"));
+	static TAutoConsoleVariable<float> AerialStart(TEXT("jeeb.Look.AerialStart"), 0.35f, TEXT("Where the aerial perspective haze begins, in km (engine default 0.1)"));
+	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Look.Exposure"), 0.35f, TEXT("Exposure bias at noon, in stops (the old fixed 0.35)"));
+	static TAutoConsoleVariable<float> LowLift(TEXT("jeeb.Look.LowLift"), 0.8f, TEXT("Extra exposure at the low sun, in stops, so the golden hour glows instead of going murky"));
+	static TAutoConsoleVariable<float> Vignette(TEXT("jeeb.Look.Vignette"), 0.4f, TEXT("Darkening toward the picture's corners (engine default 0.4)"));
+
+	// (-OldLook: the look before 2026-11-12 everywhere, also ApplyGraphics' settings, for before/after test pictures)
+	bool Old()
+	{
+#if UE_BUILD_SHIPPING
+		return false;
+#else
+		static const bool bOld = FParse::Param(FCommandLine::Get(), TEXT("OldLook"));
+		return bOld || On.GetValueOnGameThread() == 0;
+#endif
+	}
+}
 
 float ADayNight::Phase = 0.f;
 float ADayNight::SunElevation = 54.f;
@@ -45,7 +83,24 @@ void ADayNight::BeginPlay()
 		bSkyRealTime = It->GetLightComponent()->bRealTimeCapture;
 		break;
 	}
-	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It) { Fog = *It; break; }
+	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It)
+	{
+		Fog = *It;
+		const UExponentialHeightFogComponent* FC = It->GetComponent();
+		OldDirGlow = FC->DirectionalInscatteringLuminance;
+		OldDirExponent = FC->DirectionalInscatteringExponent;
+		OldDirStart = FC->DirectionalInscatteringStartDistance;
+		break;
+	}
+	for (TActorIterator<AActor> It(World); It; ++It)
+		if (USkyAtmosphereComponent* SA = It->FindComponentByClass<USkyAtmosphereComponent>())
+		{
+			SA->SetMobility(EComponentMobility::Movable);   // (a static one would refuse the haze changes at run time)
+			Atmosphere = SA;
+			OldAerialStart = SA->AerialPerspectiveStartDepth;
+			UE_LOG(LogTemp, Log, TEXT("JEEBLOOK sky atmosphere found, aerial perspective scale %.2f"), SA->AerialPespectiveViewDistanceScale);
+			break;
+		}
 
 	// The sky's volumetric clouds: a lower, deeper layer, so they tower up in big billowing heaps lit by the sun
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -131,10 +186,84 @@ void ADayNight::Tick(float DeltaSeconds)
 		}
 	}
 
-	if (AExponentialHeightFog* F = Fog.Get())
+	TickLook(High);
+}
+
+// The picture's look, each frame (2026-11-12): one colour grade over everything, a haze that turns far hills soft blue (the
+// sky atmosphere's aerial perspective plus a cooler height fog that starts further out), a warm glow in the haze toward a low
+// sun, ambient occlusion's strength and the sun's contact shadows. -OldLook / jeeb.Look 0 gives the look before it.
+void ADayNight::TickLook(float High)
+{
+	using namespace JeebLook;
+	const bool bOld = Old();
+	UExponentialHeightFogComponent* FC = Fog.IsValid() ? Fog->GetComponent() : nullptr;
+	const FLinearColor OldHaze = FMath::Lerp(FLinearColor(0.42f, 0.30f, 0.34f), FLinearColor(0.60f, 0.57f, 0.58f), High);
+	if (bOld)
 	{
-		F->GetComponent()->SetFogInscatteringColor(FMath::Lerp(FLinearColor(0.42f, 0.30f, 0.34f), FLinearColor(0.60f, 0.57f, 0.58f), High));
+		if (FC) { FC->SetFogInscatteringColor(OldHaze); FC->SetStartDistance(600.f); FC->SetDirectionalInscatteringColor(OldDirGlow); FC->SetDirectionalInscatteringExponent(OldDirExponent); FC->SetDirectionalInscatteringStartDistance(OldDirStart); }
+		if (USkyAtmosphereComponent* SA = Atmosphere.Get()) { SA->SetAerialPespectiveViewDistanceScale(1.f); SA->SetAerialPerspectiveStartDepth(OldAerialStart); }
+		if (Post)
+		{
+			FPostProcessSettings& S = Post->Settings;
+			S.BloomIntensity = 0.95f;
+			S.bOverride_BloomThreshold = false;
+			S.ColorContrast = FVector4(0.9f, 0.9f, 0.9f, 1.f);
+			S.ColorOffsetShadows = FVector4(0.012f, 0.012f, 0.016f, 0.f);
+			S.bOverride_ColorSaturation = S.bOverride_ColorGainHighlights = false;
+			S.bOverride_AmbientOcclusionIntensity = S.bOverride_AmbientOcclusionRadius = false;
+			S.AutoExposureBias = 0.35f;
+			S.bOverride_VignetteIntensity = false;
+		}
+		if (ContactNow != 0.f) if (ADirectionalLight* SL = Sun.Get()) if (ULightComponent* L = SL->GetLightComponent()) { L->ContactShadowLength = 0.f; L->MarkRenderStateDirty(); ContactNow = 0.f; }
+		return;
 	}
+
+	if (FC)
+	{
+		// Noon: a light, only slightly cool grey leaning to the sky, so far hills fade toward the sky; the low sun: a warm peach-lilac that sits under the gold
+		const FLinearColor NewHaze = FMath::Lerp(FLinearColor(0.60f, 0.46f, 0.40f), FLinearColor(0.54f, 0.58f, 0.66f), High);
+		FC->SetFogInscatteringColor(FMath::Lerp(OldHaze, NewHaze, FMath::Clamp(HazeBlue.GetValueOnGameThread(), 0.f, 1.f)));
+		FC->SetStartDistance(HazeStart.GetValueOnGameThread());
+		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)
+		FLinearColor SunCol = FLinearColor::White;
+		if (ADirectionalLight* SL = Sun.Get()) SunCol = SL->GetLightComponent()->GetLightColor();
+		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High)));
+		FC->SetDirectionalInscatteringExponent(6.f);
+		FC->SetDirectionalInscatteringStartDistance(4000.f);
+	}
+	if (USkyAtmosphereComponent* SA = Atmosphere.Get())
+	{
+		SA->SetAerialPespectiveViewDistanceScale(Aerial.GetValueOnGameThread());
+		SA->SetAerialPerspectiveStartDepth(AerialStart.GetValueOnGameThread());
+	}
+
+	if (Post)
+	{
+		FPostProcessSettings& S = Post->Settings;
+		const float Sa = FMath::Lerp(1.f, Sat.GetValueOnGameThread(), High);
+		const float Co = Contrast.GetValueOnGameThread(), Wa = Warm.GetValueOnGameThread(), Sh = ShadowCool.GetValueOnGameThread();
+		S.bOverride_ColorSaturation = true;
+		S.ColorSaturation = FVector4(1.f, 1.f, 1.f, Sa);
+		S.ColorContrast = FVector4(Co, Co, Co, 1.f);
+		S.ColorOffsetShadows = FVector4(Sh * 0.9f, Sh, Sh * 1.4f, 0.f);
+		S.bOverride_ColorGainHighlights = true;
+		S.ColorGainHighlights = FVector4(1.f + Wa, 1.f + 0.3f * Wa, 1.f - Wa, 1.f);
+		S.BloomIntensity = Bloom.GetValueOnGameThread();
+		const float Th = BloomThreshold.GetValueOnGameThread();
+		S.bOverride_BloomThreshold = Th >= 0.f;
+		S.BloomThreshold = Th;
+		S.bOverride_AmbientOcclusionIntensity = S.bOverride_AmbientOcclusionRadius = true;
+		S.AmbientOcclusionIntensity = AO.GetValueOnGameThread();
+		S.AmbientOcclusionRadius = AORadius.GetValueOnGameThread();
+		S.AutoExposureBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() * (1.f - High);
+		S.bOverride_VignetteIntensity = true;
+		S.VignetteIntensity = Vignette.GetValueOnGameThread();
+	}
+
+	const float C = Contact.GetValueOnGameThread();
+	if (C != ContactNow)
+		if (ADirectionalLight* SL = Sun.Get())
+			if (ULightComponent* L = SL->GetLightComponent()) { L->ContactShadowLength = C; L->MarkRenderStateDirty(); ContactNow = C; }
 }
 
 // The clouds drift slowly overhead, and the weather changes every few minutes: sometimes a clear sky, sometimes about

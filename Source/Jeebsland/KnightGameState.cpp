@@ -5,6 +5,8 @@
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "OakHillTown.h"
+#include "OakHillLife.h"
+#include "OakHill.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Meadow.h"
@@ -35,6 +37,7 @@
 #include "Fireflies.h"
 #include "KnightHUD.h"
 #include "Terrain.h"
+#include "ProceduralMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
@@ -134,6 +137,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
 	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill: its ground east of the square, and its buildings (OakHill.h)
+	if (JeebOakHill::Enabled()) World->SpawnActor<AOakHillLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // chimney smoke, glow at the low sun, shop lamps (visual only; clients)
 
 	// The cottage, with its door facing the starting point
 	const FVector CottageSpot = JeebTerrain::CottagePos();
@@ -428,6 +432,71 @@ void AKnightGameState::BuildMoveLab()
 		}
 		World->SpawnActor<AFishingSpot>(FVector(PX, PY, Z + 5.f), FRotator::ZeroRotator, FP);
 	}
+	// Climbing and the mantle (2026-11-12, KnightMovement.h): a rock to climb, east of the start between the pond and the knights, and two fences
+	// and a stone block to mantle, south of the tower. The rock: a flat top 2.5 x 2.5 m, 5 m up; its west face (toward the start) sheer,
+	// the south one 70 degrees, the north one 55, the east one 40 (a slope he can walk back down). Tagged JeebClimb; the fences and block JeebMantle.
+	{
+		const float RH = 500.f;
+		const FVector T0(1150.f, -900.f, RH), T1(1400.f, -900.f, RH), T2(1400.f, -650.f, RH), T3(1150.f, -650.f, RH);
+		const FVector B0(1150.f, -1082.f, 0.f), B1(1996.f, -1082.f, 0.f), B2(1996.f, -300.f, 0.f), B3(1150.f, -300.f, 0.f);
+		const FVector Mid(1450.f, -700.f, 150.f);
+		UProceduralMeshComponent* Rock = NewObject<UProceduralMeshComponent>(Floor);
+		Rock->SetupAttachment(Root);
+		Rock->bUseComplexAsSimpleCollision = true;
+		Rock->RegisterComponent();
+		const TArray<TArray<FVector>> Faces = { { T0, T1, T2, T3 }, { B0, T0, T3, B3 }, { B0, B1, T1, T0 }, { B1, B2, T2, T1 }, { B2, B3, T3, T2 } };
+		for (int32 f = 0; f < Faces.Num(); ++f)
+		{
+			const TArray<FVector>& Q = Faces[f];
+			const FVector C = (Q[0] + Q[1] + Q[2] + Q[3]) * 0.25f;
+			FVector Nf = FVector::CrossProduct(Q[1] - Q[0], Q[2] - Q[0]).GetSafeNormal();
+			if (FVector::DotProduct(Nf, C - Mid) < 0.f) Nf = -Nf;   // (outward)
+			TArray<int32> Tri = { 0, 1, 2, 0, 2, 3 };
+			// (front faces as Unreal counts them: the cross product points into the rock, as in WorldTerrain)
+			if (FVector::DotProduct(FVector::CrossProduct(Q[1] - Q[0], Q[2] - Q[0]), Nf) > 0.f) { Swap(Tri[1], Tri[2]); Swap(Tri[4], Tri[5]); }
+			TArray<FVector> Nm = { Nf, Nf, Nf, Nf };
+			TArray<FVector2D> UV = { FVector2D(0, 0), FVector2D(1, 0), FVector2D(1, 1), FVector2D(0, 1) };
+			Rock->CreateMeshSection_LinearColor(f, Q, Tri, Nm, UV, TArray<FLinearColor>(), TArray<FProcMeshTangent>(), true);
+			if (Base)
+				if (UMaterialInstanceDynamic* Mi = Rock->CreateDynamicMaterialInstance(f, Base))
+					Mi->SetVectorParameterValue(TEXT("Color"), f == 0 ? FLinearColor(0.30f, 0.40f, 0.22f) : FLinearColor(0.44f, 0.41f, 0.37f));
+		}
+		Rock->SetCollisionProfileName(TEXT("BlockAll"));
+		Rock->ComponentTags.Add(FName(TEXT("JeebClimb")));
+
+		// The fences: posts and two rails, with one thin solid board standing in for them (the mantle reads it), 1 m and 1.35 m tall
+		auto Solid = [&](const FVector& Centre, const FVector& Size, bool bVisible, const FLinearColor& Col) -> UStaticMeshComponent*
+		{
+			UStaticMeshComponent* Mc = NewObject<UStaticMeshComponent>(Floor);
+			Mc->SetStaticMesh(Cube);
+			Mc->SetupAttachment(Root);
+			Mc->SetRelativeLocation(Centre);
+			Mc->SetRelativeScale3D(Size / 100.f);
+			Mc->SetCollisionEnabled(bVisible ? ECollisionEnabled::NoCollision : ECollisionEnabled::QueryAndPhysics);
+			Mc->SetCollisionResponseToAllChannels(ECR_Block);
+			Mc->SetCastShadow(bVisible);
+			Mc->SetVisibility(bVisible);
+			Mc->RegisterComponent();
+			if (bVisible && Base)
+				if (UMaterialInstanceDynamic* Mi = Mc->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), Col);
+			return Mc;
+		};
+		const FLinearColor Wood(0.36f, 0.22f, 0.11f);
+		for (const FVector& F : { FVector(300.f, 600.f, 100.f), FVector(620.f, 900.f, 135.f) })   // (from Y, to Y, height)
+		{
+			const float FX = 1000.f, Len = F.Y - F.X, H = F.Z;
+			for (float Py = F.X; Py <= F.Y + 1.f; Py += Len / FMath::Max(1.f, FMath::RoundToFloat(Len / 150.f)))
+				Solid(FVector(FX, Py, H * 0.5f), FVector(10.f, 10.f, H), true, Wood);
+			for (const float Rz : { 0.42f, 0.88f })
+				Solid(FVector(FX, (F.X + F.Y) * 0.5f, H * Rz), FVector(5.f, Len, 11.f), true, Wood);
+			UStaticMeshComponent* Board = Solid(FVector(FX, (F.X + F.Y) * 0.5f, H * 0.5f), FVector(8.f, Len, H), false, Wood);
+			Board->ComponentTags.Add(FName(TEXT("JeebMantle")));
+		}
+		// A stone block 1.2 m tall to mantle onto
+		UStaticMeshComponent* Block = Solid(FVector(1000.f, 1150.f, 60.f), FVector(200.f, 200.f, 120.f), true, FLinearColor(0.50f, 0.48f, 0.44f));
+		Block->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Block->ComponentTags.Add(FName(TEXT("JeebMantle")));
+	}
 	// Oak Hill's test house in three versions, side by side on a patch of grass past the floor's +Y edge (to the right of the start, clear of the gear wall's
 	// boards), doors toward the floor (owner, 2026-11-06: to compare them in the game; Tools\BuildBuildings.ps1). The models are 12 m long and drawn 1.2 times
 	// that (14.4 m), so the door clears the knight (owner: at 12 m it looked short for him); a box stands in for the walls and a sign says which is which.
@@ -632,6 +701,8 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						if (C >= TEXT('0') && JeebItems::K_Helmet + (C - TEXT('0')) <= JeebItems::K_Boots) S->Worn[JeebItems::K_Helmet + (C - TEXT('0'))] = 0;
 				int32 ShotShield = -1;   // (-ShotShield=<0 kite, 1 round, 2 tower>)
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotShield="), ShotShield) && ShotShield >= 0) S->Worn[JeebItems::K_Shield] = JeebItems::ShieldId(ShotShield, FMath::Max(ShotWear, 0));
+				int32 ShotAmulet = -1;   // (-ShotAmulet=<row among the amulets in Accessories.csv>: wears it, on its chain)
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotAmulet="), ShotAmulet) && ShotAmulet >= 0) S->Worn[JeebItems::K_Amulet] = JeebItems::GearId(JeebItems::K_Amulet, ShotAmulet);
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
@@ -647,6 +718,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
+			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)
 			PC->ConsoleCommand(TEXT("quit"));
 		}
 	}

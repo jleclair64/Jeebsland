@@ -1,6 +1,7 @@
 #include "KnightCharacter.h"
 #include "Messages.h"
 #include "Forest.h"
+#include "DayNight.h"
 #include "EngineUtils.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -217,6 +218,10 @@ void AKnightCharacter::ApplyGraphics()
 	if (!IsLocallyControlled() || IsNetMode(NM_DedicatedServer)) return;
 	bGraphicsApplied = true;
 	UWorld* W = GetWorld();
+#if !UE_BUILD_SHIPPING
+	static bool bShotLowDone = false;   // (-ShotLow: test pictures and frame rates start on LOW once)
+	if (!bShotLowDone) { bShotLowDone = true; if (FParse::Param(FCommandLine::Get(), TEXT("ShotLow"))) GraphicsLevel = 0; }
+#endif
 	const bool bLowest = GraphicsLevel <= 0;
 	auto Set = [&](const TCHAR* Var, int32 V) { GEngine->Exec(W, *FString::Printf(TEXT("%s %d"), Var, V)); };
 	// Plain sky light, no Lumen (the old "Fancy" level was removed 2026-10-12 for speed and size; see CLAUDE.md to bring it
@@ -239,14 +244,24 @@ void AKnightCharacter::ApplyGraphics()
 	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 2 : 4);
 	for (TActorIterator<AForest> It(W); It; ++It) It->SetLeafShadows(!bLowest);   // Lowest: no swaying leaf shadows (they blinked)
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 1);
-	Set(TEXT("r.AmbientOcclusionLevels"), 0);
+	// (2026-11-12, the picture's look) Ambient occlusion is back on HIGH in its cheapest form, one level of screen-space AO
+	// (its strength and radius are DayNight.cpp's jeeb.Look.AO / AORadius): buildings, props and the knight sit on the ground
+	// instead of floating on it. LOW keeps none. -OldLook gives the settings before it, for test pictures.
+	const bool bOldLook = JeebLook::Old();
+	Set(TEXT("r.AmbientOcclusionLevels"), (bLowest || bOldLook) ? 0 : 1);
 	Set(TEXT("sg.EffectsQuality"), bLowest ? 0 : 2);
 	Set(TEXT("r.Shadow.CSMCaching"), 1);
 	Set(TEXT("r.Shadow.CSM.MaxCascades"), bLowest ? 1 : 2);
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.7"));
 	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));
 	// a light sharpening of the final picture, which takes the softness out of TAA's upscaling (almost free)
-	GEngine->Exec(W, TEXT("r.Tonemapper.Sharpen 0.9"));
+	if (bOldLook) { GEngine->Exec(W, TEXT("r.Tonemapper.Sharpen 0.9")); return; }
+	// (2026-11-12) The temporal upscalers at their best settings whatever the PC's saved scalability says: TSR keeps a history
+	// at twice the output size and smooths the edges it has to rebuild after movement (TAA quality 2 on LOW); a firmer
+	// sharpening on LOW, whose TAA upscale is softer
+	Set(TEXT("sg.AntiAliasingQuality"), 3);
+	GEngine->Exec(W, bLowest ? TEXT("r.Tonemapper.Sharpen 1.2") : TEXT("r.Tonemapper.Sharpen 1.0"));
+	UE_LOG(LogTemp, Log, TEXT("JEEBLOOK graphics %s at %d%%"), bLowest ? TEXT("LOW") : TEXT("HIGH"), FMath::RoundToInt(RenderScale * 100.f));
 }
 
 void AKnightCharacter::SetGraphicsLevel(int32 Level)

@@ -1,5 +1,6 @@
 #include "Meadow.h"
 #include "Terrain.h"
+#include "GroundMask.h"
 #include "Canopy.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -21,6 +22,20 @@ namespace
 	inline int32 TierFor(float Dist) { return Dist < 1500.f ? 0 : (Dist < 4000.f ? 1 : 2); }
 	inline float TierDensity(int32 T) { return T == 0 ? 1.f : (T == 1 ? 0.55f : 0.3f); }
 	inline float TierSize(int32 T) { return T == 0 ? 1.f : (T == 1 ? 1.25f : 1.6f); }
+
+	// Where the meadow grows (2026-11-12): all over the world's land, so the original square, Oak Hill and the open world are one
+	// meadow with no edge (before, only within FieldR of the start and in Oak Hill's rectangle, whose straight side showed).
+	// Rock, mud, sand and water thin it out tuft by tuft (GroundMask.h). Frame-rate tests only (-JeebShot): -NoOakGrass leaves
+	// out the town's part, -NoWorldGrass everything outside the start's circle and the town.
+	bool GrowsHere(float X, float Y, float PadCm = 0.f)
+	{
+		if (X < JeebWorld::MinX - PadCm || X > JeebWorld::MaxX + PadCm || Y < JeebWorld::MinY - PadCm || Y > JeebWorld::MaxY + PadCm) return false;
+		const float E = JeebOakHill::EastM(Y), N = JeebOakHill::NorthM(X), P = PadCm / 100.f;
+		const bool bTown = JeebOakHill::Enabled() && E > -60.f - P && E < 86.f + P && N > -118.f - P && N < 120.f + P;   // (JeebOakHill::GrassArea's rectangle)
+		static const bool bNoTown = JeebOakHill::TestOff(TEXT("NoOakGrass")), bNoWorld = JeebOakHill::TestOff(TEXT("NoWorldGrass"));
+		if (bTown) return !bNoTown || FVector2D(X, Y).Size() <= FieldR + PadCm;
+		return !bNoWorld || FVector2D(X, Y).Size() <= FieldR + PadCm;
+	}
 }
 
 AMeadow::AMeadow()
@@ -224,7 +239,7 @@ void AMeadow::Tick(float Dt)
 		{
 			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
 			const float D = FVector2D::Distance(Ctr, Me);
-			if (D > Reach || (Ctr.Size() > FieldR && !JeebOakHill::GrassArea(Ctr.X, Ctr.Y, CellSize * 0.75f))) continue;   // (Oak Hill grows grass too, 2026-11-11)
+			if (D > Reach || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;   // (the whole world's land, 2026-11-12)
 			const FCell* Have = Cells.Find(FIntPoint(i, j));
 			// Pick the detail from the nearer of now and a moment ahead, and only coarsen a square once it is well behind (no flicker at the boundary)
 			const float DA = FMath::Min(D, float(FVector2D::Distance(Ctr, Ahead)));
@@ -246,6 +261,21 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 	// Far from every road, no tuft in this square can be near one: skip the (slow) road check for each tuft
 	const FVector2D Ctr((Id.X + 0.5f) * CellSize, (Id.Y + 0.5f) * CellSize);
 	bJobNearRoad = JeebTerrain::PathClearance(Ctr.X, Ctr.Y) < CellSize * 0.75f + 200.f;
+	// Near a building, each tuft asks for the doorway and drip-line wear itself: those patches are a metre or two across, finer
+	// than the grid below, which used to blur them away so the grass stood untouched right up to doors and the well
+	bJobExactWear = JeebOakHill::InBox(Ctr.X, Ctr.Y, CellSize);
+	if (!bJobExactWear && FMath::Abs(Ctr.X) < 9800.f && FMath::Abs(Ctr.Y) < 9800.f)
+		for (const JeebGround::FHutSpot& H : JeebGround::HutSpots())
+			if (FVector2D::Distance(Ctr, H.Pos) < 900.f + CellSize) { bJobExactWear = true; break; }
+	// the ground's mask on a 5 x 5 grid over the square (the roads are left out: each tuft checks those itself, below)
+	for (int32 b = 0; b < 5; ++b)
+		for (int32 a = 0; a < 5; ++a)
+		{
+			const float X = (Id.X + a * 0.25f) * CellSize, Y = (Id.Y + b * 0.25f) * CellSize;
+			const JeebGround::FMask M = JeebGround::At(X, Y, false);
+			JobAmount[b * 5 + a] = JeebGround::GrassAmount(M);
+			JobWear[b * 5 + a] = JeebGround::BuildingWear(X, Y, bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f);
+		}
 	JobXf.Reset();
 	JobXf.Reserve(JobCount);
 }
@@ -255,13 +285,19 @@ void AMeadow::StepJob(double BudgetSeconds)
 	const double End = FPlatformTime::Seconds() + BudgetSeconds;
 	while (JobDone < JobCount)
 	{
+		if ((JobDone & 15) == 15 && FPlatformTime::Seconds() > End) return;   // (checked first, so a tuft skipped below never misses it; the next call picks up here)
 		++JobDone;
 		const float X = (JobId.X + JobRand.FRand()) * CellSize, Y = (JobId.Y + JobRand.FRand()) * CellSize;
 		const float Sxy = JobRand.FRandRange(0.85f, 1.3f) * TierSize(JobTier);
 		const float Yaw = JobRand.FRandRange(0.f, 360.f), Sz = JobRand.FRandRange(0.75f, 1.3f);
-				if (FVector2D(X, Y).Size() <= FieldR || JeebOakHill::GrassArea(X, Y))
+		float Amount, Wear;
+		SampleJob(X, Y, Amount, Wear);
+		const float Keep = JobRand.FRand();
+		if (Keep >= Amount || !GrowsHere(X, Y)) continue;   // thinning out over rock, mud and sand
+		const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
+		if (bJobExactWear) Wear = JeebGround::BuildingWear(X, Y, Pc);
+		if (Keep < Amount * (1.f - 0.5f * JeebWorld::Smooth(0.3f, 0.7f, Wear)))   // and over trampled ground: sparser and short at walls and doors, never cleared (bare ground in a building's shadow reads black)
 		{
-			const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
 			if ((Pc >= -12.f || (Pc >= -40.f && JobRand.FRand() < (Pc + 40.f) / 28.f)) && !JeebTerrain::NoGroundCover(X, Y))   // a few tufts creep onto the edge of the dirt
 			{
 				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
@@ -274,13 +310,23 @@ void AMeadow::StepJob(double BudgetSeconds)
 				// easing back up to full height over about 7 m so it never reads as tall-then-suddenly-short
 				const float Near = JeebTerrain::BuildingNearness(X, Y);
 				Short *= 1.f - 0.22f * Near;   // a bit shorter beside buildings (taller than before, so the crossed cards stand up)
+				Short *= FMath::Lerp(0.55f, 1.f, Amount) * (1.f - 0.6f * JeebWorld::Smooth(0.1f, 0.6f, Wear));   // short where it thins out, and trampled by doors
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, Short) * (1.f + 0.35f * Near);   // and wider there, so the tufts overlap into one mat and the individual cards disappear
 				if (!bThin) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
 			}
 		}
-		if ((JobDone & 15) == 0 && FPlatformTime::Seconds() > End) return;
 	}
 	FinishJob();
+}
+
+void AMeadow::SampleJob(float X, float Y, float& OutAmount, float& OutWear) const
+{
+	const float U = FMath::Clamp((X / CellSize - JobId.X) * 4.f, 0.f, 3.999f), V = FMath::Clamp((Y / CellSize - JobId.Y) * 4.f, 0.f, 3.999f);
+	const int32 A = FMath::FloorToInt(U), B = FMath::FloorToInt(V);
+	const float Fu = U - A, Fv = V - B;
+	auto Bi = [&](const float* G) { return FMath::Lerp(FMath::Lerp(G[B * 5 + A], G[B * 5 + A + 1], Fu), FMath::Lerp(G[(B + 1) * 5 + A], G[(B + 1) * 5 + A + 1], Fu), Fv); };
+	OutAmount = Bi(JobAmount);
+	OutWear = Bi(JobWear);
 }
 
 void AMeadow::FinishJob()

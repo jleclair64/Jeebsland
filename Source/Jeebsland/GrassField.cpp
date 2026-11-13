@@ -1,5 +1,7 @@
 #include "GrassField.h"
 #include "Terrain.h"
+#include "GroundMask.h"
+#include "GroundDecor.h"
 #include "ChoppableTree.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -17,6 +19,7 @@ AGrassField::AGrassField()
 	Terrain = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Terrain"));
 	Terrain->SetupAttachment(Root);
 	Terrain->bUseComplexAsSimpleCollision = true;
+	Terrain->ComponentTags.Add(FName(TEXT("JeebClimb")));   // (climbable where too steep to walk, KnightMovement.h)
 
 	Grass = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Grass"));
 	Grass->SetupAttachment(Root);
@@ -90,20 +93,22 @@ void AGrassField::BuildTerrain()
 		}
 	}
 
-	// Red channel: how worn the ground is (1 beside a road, fading out over about 2.5 m), so the soil darkens into the
-	// dirt instead of the road stopping at a line. Far from every road the check is skipped (it is slow).
+	// What the ground is at every corner (GroundMask.h, 2026-11-12): R worn (beside roads and buildings, so the soil darkens into
+	// the dirt instead of the road stopping at a line), G rock, B mud, A sand. The same function paints Oak Hill's ground and
+	// the whole world's, so the three meet without a seam. The slope is read over 16 m (four grid steps) like the world's.
 	TArray<FLinearColor> Colors;
 	Colors.Reserve(Verts.Num());
-	for (const FVector& V : Verts)
-	{
-		float Worn = 0.f;
-		if ((FMath::Abs(V.X) < 9800.f && FMath::Abs(V.Y) < 9800.f) || JeebOakHill::InBox(V.X, V.Y))   // (and Oak Hill's streets, 2026-11-11)
+	const bool bServer = IsNetMode(NM_DedicatedServer);
+	const int32 K = FMath::RoundToInt(JeebGround::SlopeStep / Step);
+	auto HAt = [&](int32 i, int32 j) -> float { return (i >= 0 && i <= N && j >= 0 && j <= N) ? float(Verts[j * (N + 1) + i].Z) : JeebTerrain::HeightAt(-Half + i * Step, -Half + j * Step); };
+	for (int32 j = 0; j <= N; ++j)
+		for (int32 i = 0; i <= N; ++i)
 		{
-			const float Pc = JeebTerrain::PathClearance(V.X, V.Y);
-			Worn = 1.f - FMath::SmoothStep(-20.f, 250.f, Pc);
+			if (bServer) { Colors.Add(FLinearColor::Black); continue; }
+			const FVector& V = Verts[j * (N + 1) + i];
+			const float Up = JeebGround::Upness(HAt(i + K, j), HAt(i - K, j), HAt(i, j + K), HAt(i, j - K));
+			Colors.Add(JeebGround::At(V.X, V.Y, V.Z, Up).Color());
 		}
-		Colors.Add(FLinearColor(Worn, 0.f, 0.f, 1.f));
-	}
 	TArray<FProcMeshTangent> Tangents;
 	Terrain->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colors, Tangents, true);
 	Terrain->CreateMeshSection_LinearColor(1, Verts, TrisBack, Normals, UV, Colors, Tangents, false);
@@ -118,13 +123,26 @@ void AGrassField::BeginPlay()
 	SetActorLocation(FVector::ZeroVector); // always sit at the world origin
 
 	BuildTerrain();
-	// The ground under the tufts: a painted soil-and-grass texture (Tools/build_materials.py), or a mid green if it is missing
+	// The ground under the tufts: M_Ground, the painted ground shared with Oak Hill and the world (Tools/world_material.py), or a mid green if it is missing
 	if (UMaterialInterface* GroundMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground")))
 	{
 		for (int32 i = 0; i < Terrain->GetNumMaterials(); ++i) Terrain->SetMaterial(i, GroundMat);
 	}
 	else Tint(Terrain, FLinearColor(0.085f, 0.13f, 0.035f));
 	Tint(Grass,   FLinearColor(0.30f, 0.34f, 0.06f));
+
+	// Stones and shrubs at Blackrock's cottages' foundations (GroundDecor.h; the cottages' walls are about 7 x 5 m, the door in
+	// the middle of their +X end, turned as Village.cpp turns them)
+	{
+		TArray<JeebDecor::FFootprint> Huts;
+		for (const JeebGround::FHutSpot& H : JeebGround::HutSpots())
+		{
+			JeebDecor::FFootprint Fp;
+			Fp.Centre = H.Pos; Fp.Yaw = H.Yaw; Fp.Half = FVector2D(372.f, 268.f); Fp.DoorYaw = H.Yaw;
+			Huts.Add(Fp);
+		}
+		JeebDecor::DressFoundations(this, Huts, 4242);
+	}
 
 	FRandomStream Rand(1337); // fixed seed = same meadow every run
 

@@ -66,11 +66,16 @@ def make_material(default_base, default_mr):
     mel.connect_material_expressions(mul1, "", add1, "A"); mel.connect_material_expressions(floor, "", add1, "B")
     mul2 = E(m, unreal.MaterialExpressionMultiply, -400, -300)
     mel.connect_material_expressions(add1, "", mul2, "A"); mel.connect_material_expressions(tint, "", mul2, "B")
-    def lerp(a, an, b, bn, x, y):
+    def lerp(a, an, b, bn, x, y, ch="R"):
         l = E(m, unreal.MaterialExpressionLinearInterpolate, x, y)
-        mel.connect_material_expressions(a, an, l, "A"); mel.connect_material_expressions(b, bn, l, "B"); mel.connect_material_expressions(vc, "R", l, "Alpha")
+        mel.connect_material_expressions(a, an, l, "A"); mel.connect_material_expressions(b, bn, l, "B"); mel.connect_material_expressions(vc, ch, l, "Alpha")
         return l
-    lb = lerp(base, "RGB", mul2, "", -250, -200)
+    lb1 = lerp(base, "RGB", mul2, "", -250, -200)
+    # (2026-11-12) a second colour where the vertex colour's green says (an arrow's feathers): the same painted detail, in Tint2
+    tint2 = vec("Tint2", -900, -650, (1, 1, 1, 1))
+    mul3 = E(m, unreal.MaterialExpressionMultiply, -400, -450)
+    mel.connect_material_expressions(add1, "", mul3, "A"); mel.connect_material_expressions(tint2, "", mul3, "B")
+    lb = lerp(lb1, "", mul3, "", -150, -300, "G")
     # (a mirror-shiny tint reflects the blue sky and turns gold olive: only part of the tier's shine is metal, so its own warm colour shows too; 2026-11-11)
     share = sca("TintMetalShare", -900, 380, 0.7)
     msh = E(m, unreal.MaterialExpressionMultiply, -600, 300)

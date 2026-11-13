@@ -96,7 +96,7 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 		break;
 	}
 	case ESkillType::Climbing:
-		L.Add(TEXT("What it does is coming later"));
+		L.Add(FString::Printf(TEXT("Climbing stamina: %s seconds"), *Secs(AKnightCharacter::ClimbSeconds(Level))));
 		break;
 	case ESkillType::Lockpicking:
 		L.Add(FString::Printf(TEXT("Can pick locks up to level %d"), Level));

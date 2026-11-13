@@ -82,6 +82,9 @@ namespace JeebItems
 	inline bool IsGear(int32 Id) { return Id >= IdGearBase; }
 	inline int32 KindOf(int32 Id) { return (Id - IdGearBase) / 100; }
 	inline int32 VariantOf(int32 Id) { return (Id - IdGearBase) % 10; }   // the tier (or cape colour, or which ring)
+	// Kinds taken out of the game (owner): never sold, smithed or handed out; any already owned turn into a sword of the same tier when a save loads. The katana since 2026-11-12.
+	inline bool IsRetiredKind(int32 K) { return K == 6; }   // (K_Katana; the number, since EKind is declared below)
+	inline int32 ReplaceRetired(int32 Id) { return (IsGear(Id) && IsRetiredKind(KindOf(Id))) ? GearId(0, VariantOf(Id)) : Id; }   // (0 = K_Sword)
 	// Shields come in three styles: 0 kite (the all-rounder), 1 round (a smaller guard that recovers twice as fast, and you move
 	// quicker behind it), 2 tower (a guard half as big again, but slower to move behind)
 	constexpr int32 NumShieldStyles = 3;

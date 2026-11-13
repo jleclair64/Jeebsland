@@ -51,7 +51,7 @@ namespace JeebStore
 		auto AnyKind = [&](bool bHeavy) -> int32
 		{
 			static const int32 Light[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Wand, K_Bow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, K_Cape };
-			static const int32 Heavy[] = { K_Broadsword, K_BattleAxe, K_Katana, K_Staff, K_Chest, K_Shield, K_Bow, K_Longbow, K_Crossbow };
+			static const int32 Heavy[] = { K_Broadsword, K_BattleAxe, K_Staff, K_Chest, K_Shield, K_Bow, K_Longbow, K_Crossbow };
 			return bHeavy ? Heavy[R.RandRange(0, UE_ARRAY_COUNT(Heavy) - 1)] : Light[R.RandRange(0, UE_ARRAY_COUNT(Light) - 1)];
 		};
 		auto Has = [&](int32 Id) { for (const FWare& W : Out) if (W.Id == Id) return true; return false; };
@@ -142,7 +142,7 @@ namespace JeebStore
 			Roll -= T[i].Percent;
 		}
 		static const int32 Tools[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Wand, K_Bow, K_Rod, K_Shield };
-		static const int32 AnyGear[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Katana, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots };
+		static const int32 AnyGear[] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots };
 		auto Pick = [&](const int32* A, int32 N) { return A[R.RandRange(0, N - 1)]; };
 		OutCount = 1;
 		switch (Row)

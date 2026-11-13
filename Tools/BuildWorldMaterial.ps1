@@ -1,4 +1,4 @@
-# Builds M_WorldGround (the big world's land material) with Tools\world_material.py in a windowless editor.
+# Builds the ground's materials (M_Ground for all the land, M_Dirt for the roads, M_Stone) and pictures with Tools/world_material.py in a windowless editor.
 # The Unreal editor must be closed.
 $proj = Split-Path $PSScriptRoot -Parent
 if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }

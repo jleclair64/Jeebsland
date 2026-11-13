@@ -9,6 +9,10 @@
 #include "Engine/StaticMesh.h"
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
+#include "Engine/Texture.h"
+#include "TimerManager.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 namespace
 {
@@ -129,6 +133,143 @@ static UStaticMesh* MakeNeedleCardMesh(UObject* Outer, UMaterialInterface* Mat)
 	Descs.Add(&MD);
 	SM->BuildFromMeshDescriptions(Descs, Params);
 	return SM;
+}
+
+// ---------------------------------------------------------------- far stand-ins (M_TreeFar)
+// A corner of a far mesh: where it is, which way it faces, and its picture coordinates
+struct FFarCorner { FVector P; FVector N; FVector2D UV; };
+
+// Builds a closed, one-sided shell from loose triangles (every three corners). Each triangle is wound so its outside is the
+// front face: Unreal shows the side where (B-A)x(C-A) points AWAY from the normal (the bark tubes, wound the other way, are
+// drawn two-sided because of it).
+static UStaticMesh* MakeFarMesh(UObject* Outer, UMaterialInterface* Mat, const TArray<FFarCorner>& Corners)
+{
+	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Crown")));
+	FMeshDescription MD;
+	FStaticMeshAttributes Attr(MD);
+	Attr.Register();
+	TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+	TVertexInstanceAttributesRef<FVector3f> Nrm = Attr.GetVertexInstanceNormals();
+	TVertexInstanceAttributesRef<FVector3f> Tan = Attr.GetVertexInstanceTangents();
+	TVertexInstanceAttributesRef<float> Sign = Attr.GetVertexInstanceBinormalSigns();
+	TVertexInstanceAttributesRef<FVector2f> UVs = Attr.GetVertexInstanceUVs();
+	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
+	const FPolygonGroupID Group = MD.CreatePolygonGroup();
+	GroupSlot[Group] = FName("Crown");
+	for (int32 t = 0; t + 2 < Corners.Num(); t += 3)
+	{
+		FFarCorner A = Corners[t], B = Corners[t + 1], C = Corners[t + 2];
+		if (FVector::CrossProduct(B.P - A.P, C.P - A.P).Dot(A.N + B.N + C.N) > 0.f) Swap(B, C);
+		TArray<FVertexInstanceID> Inst;
+		for (const FFarCorner* K : { &A, &B, &C })
+		{
+			const FVertexID V = MD.CreateVertex();
+			Pos[V] = FVector3f(K->P);
+			const FVertexInstanceID I = MD.CreateVertexInstance(V);
+			const FVector N = K->N.GetSafeNormal();
+			Nrm[I] = FVector3f(N);
+			Tan[I] = FVector3f(FVector::CrossProduct(FMath::Abs(N.Z) < 0.95f ? FVector::UpVector : FVector::ForwardVector, N).GetSafeNormal());
+			Sign[I] = 1.f;
+			UVs[I] = FVector2f(K->UV);
+			Inst.Add(I);
+		}
+		MD.CreatePolygon(Group, Inst);
+	}
+	UStaticMesh::FBuildMeshDescriptionsParams Params;
+	Params.bBuildSimpleCollision = false;
+	Params.bFastBuild = true;
+	TArray<const FMeshDescription*> Descs;
+	Descs.Add(&MD);
+	SM->BuildFromMeshDescriptions(Descs, Params);
+	return SM;
+}
+
+// One far puff of a broad-leaf crown: a ball of radius 50 (a once-split icosahedron, 80 triangles), its underside a little
+// flattened like a cloud's, so a crown of them reads as soft heaped foliage
+static UStaticMesh* MakeFarPuffMesh(UObject* Outer, UMaterialInterface* Mat)
+{
+	const float G = (1.f + FMath::Sqrt(5.f)) * 0.5f;
+	TArray<FVector> V = { {-1, G, 0}, {1, G, 0}, {-1, -G, 0}, {1, -G, 0}, {0, -1, G}, {0, 1, G}, {0, -1, -G}, {0, 1, -G}, {G, 0, -1}, {G, 0, 1}, {-G, 0, -1}, {-G, 0, 1} };
+	for (FVector& P : V) P = P.GetSafeNormal();
+	const int32 F[20][3] = { {0,11,5},{0,5,1},{0,1,7},{0,7,10},{0,10,11},{1,5,9},{5,11,4},{11,10,2},{10,7,6},{7,1,8},
+		{3,9,4},{3,4,2},{3,2,6},{3,6,8},{3,8,9},{4,9,5},{2,4,11},{6,2,10},{8,6,7},{9,8,1} };
+	TArray<FFarCorner> Corners;
+	auto Add = [&](const FVector& U)   // a point on the unit ball -> a corner of the puff
+	{
+		const float Squash = U.Z < 0.f ? 0.78f : 1.f;
+		FFarCorner C;
+		C.P = FVector(U.X, U.Y, U.Z * Squash) * 50.f;
+		C.N = FVector(U.X, U.Y, U.Z / (Squash * Squash)).GetSafeNormal();
+		C.UV = FVector2D(FMath::Atan2(U.Y, U.X) / (2.f * PI) + 0.5f, FMath::Acos(FMath::Clamp(float(U.Z), -1.f, 1.f)) / PI);
+		Corners.Add(C);
+	};
+	for (const auto& Face : F)
+	{
+		const FVector A = V[Face[0]], B = V[Face[1]], C = V[Face[2]];
+		const FVector AB = (A + B).GetSafeNormal(), BC = (B + C).GetSafeNormal(), CA = (C + A).GetSafeNormal();
+		const FVector Tris[4][3] = { {A, AB, CA}, {AB, B, BC}, {CA, BC, C}, {AB, BC, CA} };
+		for (const auto& T : Tris)
+		{
+			const int32 First = Corners.Num();
+			for (const FVector& P : T) Add(P);
+			// keep a triangle that straddles the picture's seam from smearing all the way round
+			float UMax = 0.f;
+			for (int32 k = 0; k < 3; ++k) UMax = FMath::Max(UMax, float(Corners[First + k].UV.X));
+			for (int32 k = 0; k < 3; ++k) if (UMax - Corners[First + k].UV.X > 0.5f) Corners[First + k].UV.X += 1.f;
+		}
+	}
+	return MakeFarMesh(Outer, Mat, Corners);
+}
+
+// The far stand-in for a whole conifer crown: Tiers drooping skirts stacked from the lowest boughs (Z 0) to the tip (Z 100),
+// radius 50 at the bottom narrowing to TopShare of that near the top, each skirt's rim in ten points, every other one drawn in,
+// so it reads as boughs rather than a smooth cone. 60 triangles a skirt: a silhouette, kept cheap.
+static UStaticMesh* MakeFarConeMesh(UObject* Outer, UMaterialInterface* Mat, int32 Tiers, float TopShare)
+{
+	const int32 Sides = 10;
+	auto Reach = [&](float Z) { return 50.f * FMath::Lerp(1.f, TopShare, FMath::Pow(FMath::Clamp(Z / 100.f, 0.f, 1.f), 0.85f)); };
+	TArray<FFarCorner> Corners;
+	for (int32 i = 0; i < Tiers; ++i)
+	{
+		const float Zb = 96.f * i / Tiers;
+		const float Zt = (i == Tiers - 1) ? 100.f : FMath::Min(100.f, Zb + 100.f * 1.7f / Tiers);
+		const float H = Zt - Zb, Rr = Reach(Zb);
+		// the skirt's outline from its top down to the rim and back in underneath: (radius, height, how much the rim's points move it)
+		const FVector Prof[4] = {
+			FVector(i == Tiers - 1 ? 0.f : Reach(Zt) * 0.25f, Zt, 0.f),
+			FVector(Rr * 0.70f, Zb + H * 0.42f, 0.5f),
+			FVector(Rr, Zb, 1.f),
+			FVector(Rr * 0.25f, Zb + H * 0.22f, 0.f) };
+		FVector2D SegN[3];
+		for (int32 k = 0; k < 3; ++k)
+		{
+			const FVector2D D(Prof[k + 1].X - Prof[k].X, Prof[k + 1].Y - Prof[k].Y);
+			SegN[k] = FVector2D(-D.Y, D.X).GetSafeNormal();   // (radius, up): the outside of the outline
+		}
+		const float Turn = i * 0.9f;   // each skirt's points turned a little from the one below
+		auto Pt = [&](int32 k, int32 j) -> FFarCorner
+		{
+			const float A = 2.f * PI * j / Sides + Turn;
+			const float Point = (j % 2 == 0) ? 1.f : -1.f;
+			const float Wave = 1.f + 0.12f * Prof[k].Z * Point;
+			const FVector2D N2 = (k == 0) ? SegN[0] : (k == 3 ? SegN[2] : (SegN[k - 1] + SegN[k]).GetSafeNormal());
+			const FVector Out(FMath::Cos(A), FMath::Sin(A), 0.f);
+			FFarCorner C;
+			C.P = Out * Prof[k].X * Wave + FVector(0.f, 0.f, Prof[k].Y - (k == 2 ? 2.5f * Point : 0.f));   // the points droop a touch
+			C.N = Out * N2.X + FVector(0.f, 0.f, N2.Y);
+			C.UV = FVector2D(3.f * j / Sides, Prof[k].Y / 100.f * Tiers * 1.5f);
+			return C;
+		};
+		for (int32 k = 0; k < 3; ++k)
+			for (int32 j = 0; j < Sides; ++j)
+			{
+				const FFarCorner A = Pt(k, j), B = Pt(k, j + 1), C = Pt(k + 1, j), D = Pt(k + 1, j + 1);
+				if (Prof[k].X > 0.01f) Corners.Append({ A, B, D });   // (the tip is one point: one triangle per side there)
+				Corners.Append({ A, D, C });
+			}
+	}
+	return MakeFarMesh(Outer, Mat, Corners);
 }
 
 // ---------------------------------------------------------------- shaped trunks and branches
@@ -328,6 +469,14 @@ AForest::AForest()
 		C->ShadowCacheInvalidationBehavior = EShadowCacheInvalidationBehavior::Rigid;
 		C->SetNumCustomDataFloats(1);   // per bough: how deep in the crown it sits
 	}
+	// Far stand-ins: no shadows (cheap), drawn out to a kilometre; the material hides them close up (see BeginPlay)
+	const TCHAR* FarNames[8] = { TEXT("FarOak0"), TEXT("FarOak1"), TEXT("FarOak2"), TEXT("FarOak3"), TEXT("FarOak4"), TEXT("FarConeA"), TEXT("FarConeB"), TEXT("FarConeRed") };
+	for (int32 i = 0; i < 8; ++i)
+	{
+		FarCrown.Add(MakeISM(FarNames[i], CubeMesh.Object, false, 0, 100000, true));
+		FarCrown.Last()->SetNumCustomDataFloats(1);   // per puff or cone: how shaded it is
+		FarCrown.Last()->SetVisibility(false);        // (until it has its real mesh and material)
+	}
 }
 
 UInstancedStaticMeshComponent* AForest::MakeISM(const TCHAR* Name, UStaticMesh* Mesh, bool bShadow, int32 CullStart, int32 CullEnd, bool bHierarchical)
@@ -371,6 +520,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	if (!World) return nullptr;
 	AChoppableTree* Tree = World->SpawnActor<AChoppableTree>(Pos, FRotator::ZeroRotator);
 	if (!Tree) return nullptr;
+	const double BuildT0 = FPlatformTime::Seconds();
 
 	TArray<FTransform> TrunkT, BranchT, LeafT, ConeT, FillT;
 	TArray<float> FillShade;
@@ -382,6 +532,11 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	float Radius = 25.f, Height = 220.f;
 	TArray<float> LeafShade;   // how deep in the crown each leaf cluster sits (darkens it)
 	float CanopyR = 0.f;
+	TArray<FTransform> FarT;   // the far stand-in's pieces (puffs, or one tiered cone)
+	TArray<float> FarShade;
+	UInstancedStaticMeshComponent* FarComp = nullptr;
+	// (its own fixed random, from where the tree stands: R must not be drawn on, or every later tree would move)
+	FRandomStream FarR(int32(FMath::RoundToInt(Pos.X * 0.37f) * 7919 + FMath::RoundToInt(Pos.Y * 0.53f)));
 
 	// A thin square stick between two points
 	auto Stick = [](const FVector& A, const FVector& B, float Thick)
@@ -542,6 +697,55 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 				LeafShade.Add(FMath::Clamp(0.42f * Inner + 0.22f * Low, 0.f, 0.55f));
 			}
 			CanopyR = Spread * 0.9f;
+
+			// ---- The far crown: the leaf clusters gathered into a dozen or so clumps (a few rounds of k-means), each clump a soft
+			// puff as wide as its leaves spread, plus one core puff so no daylight shows between them ----
+			if (bFarCrowns)
+			{
+				FarComp = FarCrown[LeafComp ? FMath::Max(0, Leaf.IndexOfByKey(LeafComp)) : 0];
+				const int32 N = LeafT.Num();
+				const int32 K = FMath::Clamp(N / 110, 5, 16);
+				const int32 Stride = FMath::Max(1, N / 500);
+				TArray<FVector> Cen;
+				for (int32 k = 0; k < K; ++k) Cen.Add(LeafT[FMath::Min(N - 1, (k * N) / K + N / (2 * K))].GetLocation());   // seeds spread limb by limb
+				auto Nearest = [&](const FVector& P)
+				{
+					int32 Best = 0; double BestD = 1e30;
+					for (int32 k = 0; k < Cen.Num(); ++k) { const double D = FVector::DistSquared(P, Cen[k]); if (D < BestD) { BestD = D; Best = k; } }
+					return Best;
+				};
+				for (int32 It = 0; It < 6; ++It)
+				{
+					TArray<FVector> Sum; Sum.Init(FVector::ZeroVector, K);
+					TArray<int32> Cnt; Cnt.Init(0, K);
+					for (int32 i = 0; i < N; i += Stride) { const int32 k = Nearest(LeafT[i].GetLocation()); Sum[k] += LeafT[i].GetLocation(); ++Cnt[k]; }
+					for (int32 k = 0; k < K; ++k) if (Cnt[k] > 0) Cen[k] = Sum[k] / Cnt[k];
+				}
+				TArray<double> SXY, SZ, SSh; SXY.Init(0.0, K); SZ.Init(0.0, K); SSh.Init(0.0, K);
+				TArray<int32> Cnt; Cnt.Init(0, K);
+				for (int32 i = 0; i < N; ++i)
+				{
+					const FVector P = LeafT[i].GetLocation();
+					const int32 k = Nearest(P);
+					const FVector D = P - Cen[k];
+					SXY[k] += D.X * D.X + D.Y * D.Y; SZ[k] += D.Z * D.Z; SSh[k] += LeafShade[i]; ++Cnt[k];
+				}
+				const float Card = 16.f * S;   // a leaf card's half width: the clump's leaves reach that far past their centres
+				for (int32 k = 0; k < K; ++k)
+				{
+					if (Cnt[k] < 4) continue;
+					// (a ball's points spread 2/5 of its radius squared across and 1/5 up and down)
+					const float Rxy = FMath::Max(0.75f * float(FMath::Sqrt(2.5 * SXY[k] / Cnt[k])) + Card, 60.f * S);   // (a little inside the clump: the near crown is airy)
+					const float Rz = FMath::Clamp(0.75f * float(FMath::Sqrt(5.0 * SZ[k] / Cnt[k])) + Card, 0.55f * Rxy, 1.05f * Rxy);
+					FarT.Add(FTransform(FRotator(0.f, FarR.FRandRange(0.f, 360.f), 0.f).Quaternion(), Cen[k], FVector(Rxy / 50.f, Rxy / 50.f, Rz / 50.f)));
+					FarShade.Add(float(SSh[k] / Cnt[k]));
+				}
+				// the core: three tenths of the crown's spread, in its middle, a little darker
+				const float CoreR = FMath::Max(Spread * 0.3f, 60.f * S);
+				const float CoreZ = FMath::Max((ZHi - ZLo) * 0.26f, 50.f * S);
+				FarT.Add(FTransform(FQuat::Identity, Mid, FVector(CoreR / 50.f, CoreR / 50.f, CoreZ / 50.f)));
+				FarShade.Add(0.35f);
+			}
 		}
 	}
 	else if (bNeedleCards && (Kind == ETreeKind::Pine || Kind == ETreeKind::Redwood))
@@ -647,6 +851,29 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 			for (int32 k = 0; k < 4; ++k)
 				Bough(Pos + FVector(0.f, 0.f, Height * 0.97f), (FVector(R.FRandRange(-0.4f, 0.4f), R.FRandRange(-0.4f, 0.4f), 1.f)).GetSafeNormal(), CardLen * 0.55f, 0.05f, false);
 		LeafShade = Shade;   // (handed to the needle boughs below)
+
+		// ---- The far crown: one tiered cone from the lowest boughs to the tip, as wide as the boughs reach ----
+		if (bFarCrowns && Whorls > 0 && ConeT.Num() > 0)
+		{
+			FarComp = bRed ? FarCrown[7] : FarCrown[5 + FMath::Max(0, Pine.IndexOfByKey(ConeComp))];
+			float ZLo = 1e9f, ZHi = -1e9f;
+			TArray<float> Reaches;
+			for (const TArray<FTransform>* Set : { &ConeT, &FillT })
+				for (const FTransform& X : *Set)
+				{
+					const FVector A = X.GetLocation(), B = X.TransformPosition(FVector(100.f, 0.f, 0.f));
+					ZLo = FMath::Min(ZLo, float(A.Z));
+					ZHi = FMath::Max(ZHi, float(FMath::Max(A.Z, B.Z)));
+					Reaches.Add(float(FVector::Dist2D(B, Pos)));
+				}
+			Reaches.Sort();
+			const float Rb = Reaches[FMath::Clamp(int32(Reaches.Num() * 0.92f), 0, Reaches.Num() - 1)];   // all but the odd far-flung bough
+			double Sh = 0.0;
+			for (float V : Shade) Sh += V;
+			const float Base = ZLo - (bRed ? 60.f : 25.f) * S;   // (the lowest boughs droop below where they join the trunk)
+			FarT.Add(FTransform(FRotator(0.f, FarR.FRandRange(0.f, 360.f), 0.f).Quaternion(), FVector(Pos.X, Pos.Y, Base), FVector(Rb * 1.1f / 50.f, Rb * 1.1f / 50.f, (ZHi - Base) / 100.f)));
+			FarShade.Add(Shade.Num() > 0 ? float(Sh / Shade.Num()) : 0.2f);
+		}
 	}
 	else if (Kind == ETreeKind::Pine)
 	{
@@ -735,8 +962,19 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 		for (int32 i = 0; i < FillShade.Num(); ++i) FillComp->SetCustomDataValue(First + i, 0, FillShade[i], false);
 		FillComp->MarkRenderStateDirty();
 	}
+	Commit(FarComp, FarT, false);   // (a felled tree hides these with the rest of its crown)
+	if (FarComp && FarShade.Num() == FarT.Num() && FarT.Num() > 0)
+	{
+		const int32 First = FarComp->GetInstanceCount() - FarT.Num();
+		for (int32 i = 0; i < FarShade.Num(); ++i) FarComp->SetCustomDataValue(First + i, 0, FarShade[i], false);
+		FarComp->MarkRenderStateDirty();
+	}
+	FarCount += FarT.Num();
+	NearLeafCount += LeafT.Num() + ConeT.Num() + FillT.Num();
 
 	Tree->Setup(Kind, FMath::Max(Radius, 18.f), Height);
+	BuildSeconds += FPlatformTime::Seconds() - BuildT0;
+	++TreeCount;
 	if (Kind == ETreeKind::Oak)
 	{
 		// remember the canopy: thinner grass and a carpet of this tree's leaves underneath
@@ -753,6 +991,28 @@ void AForest::BeginPlay()
 
 	SetActorLocation(FVector::ZeroVector);
 
+	// Where each kind of crown hands over to its far stand-in. Test pictures can move it: -TreeBand=<percent> (1 = everything far,
+	// 500 = near crowns out to five times as far) and -NoFarTrees (the old look: crowns fade out with nothing behind them).
+	bool bWantFar = (GetNetMode() != NM_DedicatedServer);   // (purely a look: a dedicated server skips it)
+#if !UE_BUILD_SHIPPING
+	{
+		int32 BandPct = 0;
+		if (FParse::Value(FCommandLine::Get(), TEXT("TreeBand="), BandPct) && BandPct > 0)
+		{
+			BandOak *= BandPct / 100.f; BandPine *= BandPct / 100.f; BandRed *= BandPct / 100.f;
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("NoFarTrees"))) bWantFar = false;
+	}
+#endif
+	for (UInstancedStaticMeshComponent* C : Leaf) C->SetCullDistances(int32(BandOak.X), int32(BandOak.Y));
+	for (UInstancedStaticMeshComponent* C : { Pine[0], Pine[1], NeedleFill[0], NeedleFill[1] }) C->SetCullDistances(int32(BandPine.X), int32(BandPine.Y));
+	for (UInstancedStaticMeshComponent* C : { RedCone, NeedleFill[2] }) C->SetCullDistances(int32(BandRed.X), int32(BandRed.Y));
+	auto SetBand = [](UMaterialInstanceDynamic* M, const FVector2D& Band)
+	{
+		M->SetScalarParameterValue(TEXT("FadeStart"), Band.X);
+		M->SetScalarParameterValue(TEXT("FadeEnd"), Band.Y);
+	};
+
 	Tint(Trunk,    FLinearColor(0.19f, 0.12f, 0.07f));
 	Tint(RedTrunk, FLinearColor(0.29f, 0.12f, 0.06f));
 	Tint(Branch,   FLinearColor(0.18f, 0.11f, 0.06f));
@@ -765,6 +1025,7 @@ void AForest::BeginPlay()
 			Leaf[i]->SetStaticMesh(LeafMesh);
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(LeafMat, this);
 			M->SetVectorParameterValue(TEXT("Tint"), LeafColors[i]);   // the same five autumn colours as before
+			SetBand(M, BandOak);
 			Leaf[i]->SetMaterial(0, M);
 		}
 		bLeafCards = true;
@@ -785,6 +1046,7 @@ void AForest::BeginPlay()
 		{
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(NeedleMat, this);
 			M->SetVectorParameterValue(TEXT("Tint"), Greens[i]);
+			SetBand(M, i == 2 ? BandRed : BandPine);
 			for (UInstancedStaticMeshComponent* C : { Comps[i], NeedleFill[i] })
 			{
 				C->SetStaticMesh(NeedleMesh);
@@ -799,6 +1061,40 @@ void AForest::BeginPlay()
 		Tint(Pine[0],  FLinearColor(0.04f, 0.15f, 0.07f));
 		Tint(Pine[1],  FLinearColor(0.06f, 0.19f, 0.09f));
 		Tint(RedCone,  FLinearColor(0.05f, 0.17f, 0.12f));
+	}
+
+	// Far stand-ins: the same tints as the near crowns, the same leaf and needle pictures, faded in over the same band
+	UMaterialInterface* FarMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_TreeFar.M_TreeFar"));
+	UTexture* NeedleTex = LoadObject<UTexture>(nullptr, TEXT("/Game/T_PineNeedles.T_PineNeedles"));
+	if (bWantFar && FarMat && bLeafCards && bNeedleCards)
+	{
+		UStaticMesh* PuffMesh = MakeFarPuffMesh(this, FarMat);
+		UStaticMesh* PineFar = MakeFarConeMesh(this, FarMat, 4, 0.18f);
+		UStaticMesh* RedFar = MakeFarConeMesh(this, FarMat, 5, 0.24f);
+		const FLinearColor Greens[3] = { FLinearColor(0.10f, 0.26f, 0.12f), FLinearColor(0.13f, 0.31f, 0.14f), FLinearColor(0.10f, 0.27f, 0.19f) };
+		for (int32 i = 0; i < FarCrown.Num(); ++i)
+		{
+			const bool bCone = i >= 5;
+			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(FarMat, this);
+			M->SetVectorParameterValue(TEXT("Tint"), bCone ? Greens[i - 5] : LeafColors[i]);
+			SetBand(M, i == 7 ? BandRed : (bCone ? BandPine : BandOak));
+			// it folds away while its centre is this much closer than FadeStart: more than its farthest point from that centre
+			// (a cone's centre is the foot of its crown)
+			M->SetScalarParameterValue(TEXT("FoldMargin"), i == 7 ? 3400.f : (bCone ? 1500.f : 1000.f));
+			if (bCone)
+			{
+				if (NeedleTex) M->SetTextureParameterValue(TEXT("Leaves"), NeedleTex);
+				M->SetScalarParameterValue(TEXT("Conifer"), 1.f);
+			}
+			FarCrown[i]->SetStaticMesh(i == 7 ? RedFar : (bCone ? PineFar : PuffMesh));
+			FarCrown[i]->SetMaterial(0, M);
+			FarCrown[i]->SetVisibility(true);
+		}
+		bFarCrowns = true;
+	}
+	else if (bWantFar && !FarMat)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("M_TreeFar is missing: run Tools/BuildMaterials.ps1. Far trees stay bare."));
 	}
 
 		UMaterialInterface* BarkMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_BarkTint.M_BarkTint"));
@@ -839,6 +1135,16 @@ void AForest::BeginPlay()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("M_BarkTint is missing: run MakeGrassCards.bat once. Trunks and branches keep their old shapes."));
 	}
+
+	// Measured once everything has been planted (the town's trees come after this): JEEBTREES in the log
+	GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	{
+		int32 Inst[8] = {};
+		for (int32 i = 0; i < FarCrown.Num(); ++i) Inst[i] = FarCrown[i]->GetInstanceCount();
+		UE_LOG(LogTemp, Log, TEXT("JEEBTREES %d trees planted in %.2f s; near leaf cards and boughs %d; far pieces %d (oak puffs %d, pine cones %d, redwood cones %d)%s; bands oak %.0f-%.0f pine %.0f-%.0f redwood %.0f-%.0f cm"),
+			TreeCount, BuildSeconds, NearLeafCount, FarCount, Inst[0] + Inst[1] + Inst[2] + Inst[3] + Inst[4], Inst[5] + Inst[6], Inst[7],
+			bFarCrowns ? TEXT("") : TEXT(" [far stand-ins OFF]"), BandOak.X, BandOak.Y, BandPine.X, BandPine.Y, BandRed.X, BandRed.Y);
+	}));
 
 	if (bNoWoods) return;
 	FRandomStream R(777); // fixed seed = the same woods every run

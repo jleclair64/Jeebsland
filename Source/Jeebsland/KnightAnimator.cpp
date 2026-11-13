@@ -42,7 +42,8 @@ namespace
 		TEXT("CrouchIdle"), TEXT("CrouchWalk"),
 		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"),
 		TEXT("WeightedRun"), TEXT("ChestBlock"), TEXT("Drink"),
-		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold"), TEXT("SlashCombo"), TEXT("GreatCombo") };
+		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold"), TEXT("SlashCombo"), TEXT("GreatCombo"),
+		TEXT("WallHang"), TEXT("WallUp"), TEXT("WallDown"), TEXT("ShimmyL"), TEXT("ShimmyR"), TEXT("HopUp"), TEXT("HopDown"), TEXT("HopL"), TEXT("HopR"), TEXT("LedgeUp"), TEXT("VaultOver"), TEXT("ClimbOnto"), TEXT("VaultTwo") };
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -677,6 +678,7 @@ static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behin
 void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, float ActorYaw)
 {
 	if (!L.bReady) return;
+	CurFeet = Feet; CurYaw = ActorYaw;   // (the climb's scripted moves measure the capsule's travel)
 	Time += Dt;
 	Locomotion(Dt, In, Base);
 	Overlays(Dt, In, Base);
@@ -693,6 +695,14 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 		Key = 999;
 	}
 
+	// (out of a climb or a mantle the body comes back upright slowly, never a snap to standing: from the ledge and the block, crouched, he stands over 0.6 s;
+	// the floor holds for 0.4 s, so a key that follows at once (a frame of walking, the fall after letting go) can't cut the blend short)
+	if (Key != StateKey && StateKey >= 80 && StateKey <= 91 && !(Key >= 80 && Key <= 91))
+	{
+		WallExitLeft = 0.4f;
+		WallExitBlend = (StateKey == 89 || StateKey == 91) ? 0.6f : StateKey == 90 ? 0.4f : 0.5f;   // (letting go: the hang eases into the fall over half a second)
+	}
+	if (Key != StateKey && WallExitLeft > 0.f && !(Key >= 80 && Key <= 91)) BlendFor = FMath::Max(BlendFor, WallExitBlend);
 	if (Key != StateKey)
 	{
 		// (between his own walk and the sword-and-shield clips the hand turns furthest of all, and the blade shows it: never a whirl)
@@ -719,7 +729,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	}
 	// (a part-way landing or a chest-only move can leave a boot sunk: the hips rise just enough. Floor clips lie lower.)
 	{
-		const float Sole = (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
+		const float Sole = (StateKey >= 80 && StateKey <= 91) ? -100000.f : (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
 		const float Low = FMath::Min(float(BonePos(Final, LFoot).Z), float(BonePos(Final, RFoot).Z));
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
@@ -729,19 +739,20 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	ToolHeadClear(Final, In);
 	TwoHandTool(Final, In, Dt);
 	// (the crossbow in both hands, whatever the clip: owner 2026-11-11, the idle and running clips left the left hand off the stock)
-	CrossW = FMath::FInterpConstantTo(CrossW, In.Kind == JeebItems::K_Crossbow && !In.bClimbing && !In.bSitting && !In.bDrinking ? 1.f : 0.f, Dt, 4.f);
+	CrossW = FMath::FInterpConstantTo(CrossW, In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting && !In.bDrinking ? 1.f : 0.f, Dt, 4.f);
 	if (CrossW > 0.005f) L.CrossLeftHand(Final, FMath::SmoothStep(0.f, 1.f, CrossW));
 	if (GreatW > 0.005f) L.BothHandsOnGrip(Final, FMath::SmoothStep(0.f, 1.f, GreatW), GreatLeftBelow);
 	SetFists(In, Dt);
 	bHavePrev = true;
 
-	ToWorld = FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
+	ToWorld = WallFrame(In, FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet), Dt);   // (on a rock face tilted along it: KnightAnimatorClimb.cpp)
+	ClimbIK(In, Dt);
 	const int32 N = Parents.Num();
 
 	// Into the mesh (when it can be seen: the pose above is what the game reads)
 	if (Comp)
 	{
-		Comp->SetWorldLocationAndRotation(Feet, FRotator(0.f, ActorYaw + YawNow + MeshYawDeg, 0.f));
+		Comp->SetWorldLocationAndRotation(ToWorld.GetLocation(), ToWorld.GetRotation() * FQuat(FRotator(0.f, MeshYawDeg, 0.f)));
 		TArray<FTransform>& Bones = Comp->BoneSpaceTransforms;
 		if (Bones.Num() == N && (Comp->WasRecentlyRendered(0.25f) || In.bShotLog))
 		{
@@ -899,7 +910,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
 			}
 	// (the crossbow is two-handed even at ease: held low across him, whatever his legs do)
-	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.bClimbing && !In.bSitting;
+	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting;
 	if (bCross)
 		if (const FClip* I = Get(TEXT("CrossIdle"))) { Sample(*I, Time, Over, true); Overlay(B, Over, 1.f, 1.f - MoveW); }
 	if (In.BowAimAlpha > 0.01f)
@@ -1110,7 +1121,7 @@ static FVector FistHole(const FVector& Hand, const FVector& Along, const FVector
 // relaxed when the hand is empty. Built only from what every machine knows (what is in his hand, the shield on his arm, the bow's phase), so others see the same.
 void FKnightAnimator::SetFists(const FInput& In, float Dt)
 {
-	const bool bStowed = In.bClimbing || In.bSitting;   // (the weapon and shield on his back)
+	const bool bStowed = In.Stowed() || In.bSitting;   // (the weapon and shield on his back)
 	const bool bWeapon = !bStowed && JeebItems::IsWeaponKind(In.Kind);
 	// the right hand: round any weapon or tool, but a bow only while drawing its string (at rest it hangs open; the crossbow's grip is always held)
 	const float WantR = bWeapon && (!JeebItems::IsDrawnBow(In.Kind) || In.BowMode == 1) ? 1.f : 0.f;
@@ -1414,6 +1425,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	bWasDown = In.bKnockedDown;
 	if (In.bKnockedDown && In.KnockPhase == 1 && RiseLeft <= 0.f) RiseLeft = 1.f;   // (the rising plays on a little past the locked part, unless he moves off)
 
+	if (In.WallMode != WallModePrev) { WallModePrev = In.WallMode; WallModeT = 0.f; } else WallModeT += Dt;
 	// Which state
 	int32 Key = 0;
 	if (In.bKnockedDown) Key = In.KnockPhase == 1 ? 11 : 10;
@@ -1437,6 +1449,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	else if (In.StunLeft > 0.f) Key = 60 + HitSerial % 3;
 	else if (RiseLeft > 0.f && !bMoving) Key = 11;
 	else if (In.bDrinking) Key = 76;
+	else if (In.WallMode != 0) Key = WallKey(Dt, In);   // (free climbing and the mantle)
 	else if (In.bClimbing) Key = 70;
 	else if (In.bSitting) Key = 71;
 	else if (In.bSliding) Key = 72;
@@ -1482,6 +1495,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	}
 	if (Key == 0) return 0;
 	const auto& Tn = JeebTune::V();
+	if (Key >= 80 && Key <= 91) { WallPlay(Key, In, B, OutBlend); return Key; }
 	switch (Key)
 	{
 	case 10:
@@ -2109,7 +2123,8 @@ void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 
 void FKnightAnimator::MoveTo(const FVector& Feet, float ActorYaw)
 {
-	ToWorld = FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
+	ToWorld = WallRel * FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
+	ToWorld.AddToTranslation(WallOff);
 }
 
 FTransform FKnightAnimator::BoneWorld(int32 B) const
@@ -2120,7 +2135,32 @@ FTransform FKnightAnimator::BoneWorld(int32 B) const
 FTransform FKnightAnimator::ChestWorld() const
 {
 	const FTransform Chest = L.BindInGame(Final, Spine2);
-	return FTransform(Chest.GetRotation() * L.ChestRest.Inverse(), Chest.GetLocation()) * ToWorld;
+	FQuat Q = Chest.GetRotation() * L.ChestRest.Inverse();
+	// On the rock and in the climb-ups and mantles the clips arch the top of the spine back while the shoulders curl forward, and what is on his back
+	// (shield, weapon, cape) stood off it like a plank: there it lies along the back's line, hips to neck, eased in and out (BackLineW)
+	if (BackLineW > 0.f)
+	{
+		const FVector Up = (L.BindInGame(Final, Neck).GetLocation() - L.BindInGame(Final, Hips).GetLocation()).GetSafeNormal();
+		if (!Up.IsNearlyZero()) Q = FQuat::Slerp(Q, FRotationMatrix::MakeFromZX(Up, Q.GetAxisX()).ToQuat(), BackLineW);
+	}
+	return FTransform(Q, Chest.GetLocation()) * ToWorld;
+}
+
+float FKnightAnimator::StowPull() const
+{
+	// (measured on film, round 3: flat over the top of the rock the shield stood 15-25 cm off his back, on the rock itself a few cm; -StowPull=<cm> tries others)
+	static float PullCm = -1.f;
+	if (PullCm < 0.f)
+	{
+		PullCm = 18.f;
+#if !UE_BUILD_SHIPPING
+		FParse::Value(FCommandLine::Get(), TEXT("StowPull="), PullCm);
+#endif
+	}
+	if (BackLineW <= 0.f) return 0.f;
+	const FVector Up = (L.BindInGame(Final, Neck).GetLocation() - L.BindInGame(Final, Hips).GetLocation()).GetSafeNormal();
+	const float Flat = FMath::Clamp((0.8f - float(Up.Z)) / 0.6f, 0.f, 1.f);   // (within 37 degrees of upright: none; within 12 of flat: all)
+	return PullCm * Flat * BackLineW;
 }
 
 // The bottle's cork stays aimed at his mouth all through the drink (owner 2026-11-06), the hand turning about the wrist. The turn moves the bottle's middle a little, so it takes a couple of steps.

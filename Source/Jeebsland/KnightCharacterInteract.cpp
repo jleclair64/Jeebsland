@@ -42,7 +42,7 @@ void AKnightCharacter::Interact()
 {
 	bAttackDown = !(IsUIOpen() || bPanelCursor);   // (held: the sword's smash attack, see TickSmash; a click on the HUD with the cursor out (Tab) is not a game click)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
-	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
+	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || InClimbMove() || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
 	// Bows (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
 	// The crossbow (owner 2026-11-12, like a sniper rifle in Battlefield): only the right button brings it up; a left click while it is up shoots (a click while it is still coming up shoots as soon as it is).
 	if (SelectedKind() == JeebItems::K_Crossbow)
@@ -130,7 +130,7 @@ void AKnightCharacter::InteractReleased()
 	if (Smash == ESmash::Charging) { SetSmash(ESmash::Swing, SmashCharge); return; }
 	if (!bCharging) return;
 	bCharging = false;
-	if (IsUIOpen() || bAttacking || bSitting || bRolling || bSliding || bClimbing) return;
+	if (IsUIOpen() || bAttacking || bSitting || bRolling || bSliding || bClimbing || InClimbMove()) return;
 	const float C = FMath::Clamp(ChargeT / 1.0f, 0.f, 1.f);
 	StartAttack(EAtkStyle::Thrust, 1, C);
 	if (!GetCharacterMovement()->IsFalling())
@@ -231,7 +231,7 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 
 bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 {
-	if (IsUIOpen() || bRolling || bSliding || bClimbing) return false;
+	if (IsUIOpen() || bRolling || bSliding || bClimbing || InClimbMove()) return false;
 	if (bSitting || bMounted) return false;   // E to stand up or dismount still works; it just shows no prompt
 	if (GetCharacterMovement()->IsFalling()) return false;
 	int32 Idx = -1;
@@ -360,7 +360,7 @@ void AKnightCharacter::OnInteractKey()
 	if (bShopOpen) { CloseShop(); return; }
 	if (bSmithOpen) { CloseSmith(); return; }
 	if (bBankOpen) { CloseBank(); return; }
-	if (IsUIOpen() || bRolling || bSliding || bClimbing || GetCharacterMovement()->IsFalling()) return;
+	if (IsUIOpen() || bRolling || bSliding || bClimbing || InClimbMove() || GetCharacterMovement()->IsFalling()) return;
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;

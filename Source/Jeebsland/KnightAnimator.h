@@ -165,6 +165,14 @@ namespace JeebAnim
 		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
 		bool bShotLog = false;      // test pictures: log JEEBANIM
 		bool bShieldArm = false;    // a shield on his left arm, not on his back: the forearm holds it out in front
+		// free climbing and the mantle (2026-11-12, KnightMovement.h): 1 on the rock, 2 its jump, 3 the ledge climb-up, 4 a mantle over, 5 onto
+		uint8 WallMode = 0;
+		FVector WallN = FVector::BackwardVector, WallPoint = FVector::ZeroVector; bool bMantleEdge = false;   // the rock: its normal, and a point on it (world); a mantle: WallPoint is the top of the obstacle's near edge (bMantleEdge)
+		FVector LimbP[4], LimbN[4]; bool bLimbHit[4] = { false, false, false, false };   // on the rock: the surface under each hand and foot (left hand, right hand, left foot, right foot), traced from last frame's pose
+		float WallUpV = 0.f, WallRightV = 0.f;   // his speed along it: up, and to his right
+		FVector2D WallJump = FVector2D(0.f, 1.f);   // the climb jump's way along it (x right, y up)
+		float WallStamina = 1.f, ActDur = 1.f, ActHold = 0.f;   // the climbing bar; how long this scripted move lasts (s), and the stand on top after it (s, not in ActDur)
+		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5); }   // (weapon and shield on his back)
 	};
 }
 
@@ -191,6 +199,7 @@ public:
 	FTransform RightGripWorld() const;   // WristR: the weapon's joint
 	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
 	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
+	float StowPull() const;           // cm what is stowed on his back moves in toward him: bent flat over a ledge or onto a block the back is nearer than the chest frame says
 	FTransform ShieldWorld(float BlockAlpha) const;
 	FTransform BowWorld(float AimAlpha) const;
 	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
@@ -330,4 +339,28 @@ private:
 	float PlayUpper = 1.f, PlayLower = 1.f;   // the next PlayAt's weights
 	float PlayKeepOffArm = 0.f;   // the next PlayAt leaves this share of the left arm as it was (clips made for an empty off hand fling it, and he has a shield on it)
 	FVector LogPrevL = FVector::ZeroVector, LogPrevR = FVector::ZeroVector;
+
+	// free climbing and the mantle (KnightAnimatorClimb.cpp)
+	struct FWallStat { FVector H0 = FVector::ZeroVector, H1 = FVector::ZeroVector; float MeanHipZ = 100.f, MeanHipY = 0.f, HandFwd = 40.f, Start0Y = 0.f, Start0Z = 95.f, End1Y = 0.f, End1Z = 95.f, AlignYaw = 0.f; };
+	TMap<int32, FWallStat> WallStats;
+	const FWallStat& WallStat(int32 Key);
+	static const TCHAR* WallRow(int32 Key);
+	int32 WallKey(float Dt, const JeebAnim::FInput& In);
+	void WallPlay(int32 Key, const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	void PlantHands(const JeebAnim::FInput& In, FPose& B) const;   // a vault: both hands pressed onto the top of the fence while he goes over (In.WallPoint)
+	void ClimbIK(const JeebAnim::FInput& In, float Dt);   // on the rock: each hand and boot rests on the surface (1.5 cm off), never in it: two-bone reaches, the body eased off the rock if the hands need it
+	float ClimbIKW = 0.f, WallIKLogT = 0.f;
+	FVector IKSurfP[4] = { FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector, FVector::ZeroVector }, IKSurfN[4] = { FVector::BackwardVector, FVector::BackwardVector, FVector::BackwardVector, FVector::BackwardVector };
+	FTransform WallFrame(const JeebAnim::FInput& In, const FTransform& Frame, float Dt);
+	void WallLog(const JeebAnim::FInput& In, float Dt);
+	FVector CurFeet = FVector::ZeroVector, WallActFeet = FVector::ZeroVector, WallOff = FVector::ZeroVector;
+	float CurYaw = 0.f, WallPhase = 0.f, WallGrabT = 0.f, WallLogT = 0.f;
+	int32 WallMoveKey = 81;
+	FQuat WallTilt = FQuat::Identity;
+	FTransform WallRel = FTransform::Identity;
+	FVector WallLogPrev[4];
+	float WallLogSlip[4] = { 1e6f, 1e6f, 1e6f, 1e6f };   // (the slowest each limb slid along the rock in the log's last tenth of a second)
+	float WallExitLeft = 0.f, WallExitBlend = 0.f;   // (just off a climb or a mantle: the slowest blend any key change may use, for this long)
+	float BackLineW = 0.f;   // (0..1: how much what is on his back follows the back's line instead of the top of the spine, ChestWorld)
+	float WallModeT = 0.f; uint8 WallModePrev = 0;   // (how long the climb or mantle mode has been the one it is: the stand on top after a climb-up comes after its ActDur)
 };

@@ -1,6 +1,7 @@
 #include "WorldTerrain.h"
 #include "Terrain.h"
 #include "WorldMap.h"
+#include "GroundMask.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
@@ -48,7 +49,7 @@ void AWorldTerrain::BuildLand()
 		}
 	auto At = [&](int32 i, int32 j) { return H[(i + 1) * GY + (j + 1)]; };   // grid point i, j (0 .. NX, 0 .. NY)
 
-	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_WorldGround.M_WorldGround"));
+	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));   // (the one ground material, shared with the square and Oak Hill: 2026-11-12)
 	UMaterialInterface* Fallback = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 
@@ -67,19 +68,10 @@ void AWorldTerrain::BuildLand()
 					N.Add(Nrm);
 					UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
 					if (bServer) { Col.Add(FLinearColor::White); continue; }
-					// colour: green lowland, browner hills, grey rock on steep or high ground, snow up top, sand by the sea,
-					// darker mud in the river beds
-					const float Slope = 1.f - Nrm.Z;   // 0 flat .. 1 vertical
-					FLinearColor C = FMath::Lerp(FLinearColor(0.16f, 0.27f, 0.09f), FLinearColor(0.30f, 0.30f, 0.14f), JeebWorld::Smooth(300.f, 2000.f, Z));
-					C = FMath::Lerp(C, FLinearColor(0.30f, 0.29f, 0.27f), FMath::Max(JeebWorld::Smooth(0.25f, 0.45f, Slope), JeebWorld::Smooth(2200.f, 3800.f, Z)));
-					C = FMath::Lerp(C, FLinearColor(0.85f, 0.87f, 0.90f), JeebWorld::Smooth(4300.f, 5000.f, Z) * (1.f - JeebWorld::Smooth(0.45f, 0.65f, Slope)));
-					C = FMath::Lerp(C, FLinearColor(0.38f, 0.34f, 0.28f), RockMask(FVector2D(X, Y)) * 0.6f * (1.f - JeebWorld::Smooth(2200.f, 3800.f, Z)));
-					const float Shore = JeebWorld::Smooth(SeaLevel + 160.f, SeaLevel + 40.f, Z) * JeebWorld::Smooth(-4000.f, -500.f, Y - CoastY(X));
-					C = FMath::Lerp(C, FLinearColor(0.62f, 0.56f, 0.40f), Shore);
-					float Half;
-					const float Dr = RiverDistance(X, Y, Half);
-					C = FMath::Lerp(C, FLinearColor(0.20f, 0.18f, 0.13f), JeebWorld::Smooth(Half + 300.f, Half - 100.f, Dr));
-					Col.Add(C);
+					// what the ground is here (rock, mud, sand, wear: GroundMask.h, the same function as the square's and Oak Hill's
+					// ground, so they meet without a seam); M_Ground paints it. The slope over 16 m comes from this grid's neighbours.
+					const float Up = JeebGround::Upness(At(i + 1, j), At(i - 1, j), At(i, j + 1), At(i, j - 1));
+					Col.Add(JeebGround::At(X, Y, Z, Up).Color());
 				}
 			for (int32 i = CI; i < I1; ++i)
 				for (int32 j = CJ; j < J1; ++j)
@@ -109,6 +101,7 @@ void AWorldTerrain::BuildLand()
 			for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
 			PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, Col, TArray<FProcMeshTangent>(), false);
 			PM->SetCollisionProfileName(TEXT("BlockAll"));
+			PM->ComponentTags.Add(FName(TEXT("JeebClimb")));   // (hills and rock: climbable where too steep to walk, KnightMovement.h)
 			if (!bServer)
 			{
 				for (int32 s = 0; s < 2; ++s)

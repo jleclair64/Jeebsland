@@ -52,7 +52,7 @@ protected:
 public:
 
 	/** Constructor */
-	AJeebslandCharacter();	
+	AJeebslandCharacter(const FObjectInitializer& ObjectInitializer);
 
 protected:
 

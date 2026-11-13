@@ -102,10 +102,10 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 		for (int32 i = 0; i < Dest.Num(); ++i)
 		{
 			FInvSlot Sl;
-			if (Ids.IsValidIndex(i) && Counts.IsValidIndex(i) && ValidId(Ids[i]) && Ids[i] != 0)
+			if (Ids.IsValidIndex(i) && Counts.IsValidIndex(i) && ValidId(JeebItems::ReplaceRetired(Ids[i])) && Ids[i] != 0)
 			{
-				Sl.Id = Ids[i];
-				Sl.Count = FMath::Clamp(Counts[i], 1, StackSize(Ids[i]));
+				Sl.Id = JeebItems::ReplaceRetired(Ids[i]);   // (a katana becomes a sword of its tier)
+				Sl.Count = FMath::Clamp(Counts[i], 1, StackSize(Sl.Id));
 			}
 			Dest[i] = Sl;
 		}
@@ -115,9 +115,9 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Fill(Skills->Slots, SlotIds, SlotCounts);
 	Fill(Skills->Bank, BankIds, BankCounts);
 
-	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (Hotbar.IsValidIndex(i) && ValidId(Hotbar[i])) ? Hotbar[i] : 0;
+	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (Hotbar.IsValidIndex(i) && ValidId(Hotbar[i])) ? JeebItems::ReplaceRetired(Hotbar[i]) : 0;
 	Skills->SetSelected(Selected);
-	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (Worn.IsValidIndex(i) && ValidId(Worn[i])) ? Worn[i] : 0;
+	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) Skills->Worn[i] = (Worn.IsValidIndex(i) && ValidId(Worn[i])) ? JeebItems::ReplaceRetired(Worn[i]) : 0;
 	Skills->RingB = ValidId(RingB) ? RingB : 0;
 	Skills->PotionSlot = FInvSlot();
 	if (PotionId != 0 && IsPotionRange(PotionId)) { Skills->PotionSlot.Id = PotionId; Skills->PotionSlot.Count = FMath::Clamp(PotionCount, 1, StackSize(PotionId)); }

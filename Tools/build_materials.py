@@ -24,7 +24,7 @@ def set_flags(mat, flags):
             unreal.log("MATDIAG flag " + flag + ": " + str(e))
 
 
-def add_wind(mat, strength, tip_only, lift):
+def add_wind(mat, strength, tip_only, lift, attach_mask=None):
     """A gentle breeze: broad gusts sweep slowly across the land from one side, rising and fading,
     with a faint flutter on top. strength = how far a tip leans (cm) in a full gust."""
     def node(cls, **props):
@@ -121,6 +121,10 @@ def add_wind(mat, strength, tip_only, lift):
         tip = node(unreal.MaterialExpressionOneMinus); link(mask(uv, False, True, False), tip)   # V = 0 at the top of the card
         total = muln(total, tip)
         shade = add(mul(muln(gust_field, tip), 0.22), 1.0)
+    if attach_mask is not None:
+        # cloth (Tools/build_town_life_materials.py): sway only as far from the attached edge as the mask says (0 = pinned, 1 = free)
+        total = muln(total, attach_mask)
+        shade = add(mul(muln(gust_field, attach_mask), 0.10), 1.0)
 
     dirv = node(unreal.MaterialExpressionAppendVector); link(cos_a, dirv, "A"); link(sin_a, dirv, "B")
     dirv3 = node(unreal.MaterialExpressionAppendVector); link(dirv, dirv3, "A")
@@ -140,9 +144,133 @@ def soft_edges(mat, ts):
         lib.connect_material_expressions(ts, "A", d, "")
         lib.connect_material_property(d, "", unreal.MaterialProperty.MP_OPACITY_MASK)
         mat.set_editor_property("opacity_mask_clip_value", 0.35)
+        return d, ""
     except Exception as e:
         unreal.log("MATDIAG dither unavailable, plain cut-out: " + str(e))
         lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
+        return ts, "A"   # (the node and output pin that feed the opacity mask)
+
+
+# Tree crowns hand over to their far stand-ins (Forest.cpp, M_TreeFar) over a band of distance, FadeStart..FadeEnd. Both sides
+# test the same screen noise against how far into the band the pixel is: the near crown keeps a pixel where the far one drops it,
+# so the two cross-fade (smoothed by TSR / TAA) with no pop and never both on one pixel.
+FADE_NEAR_HLSL = ("#if SHADOW_DEPTH_SHADER\nreturn 1.0;\n#endif\n"   # (shadows keep the whole near crown; the far stand-ins cast none)
+                  "float n = frac(52.9829189 * frac(dot(Parameters.SvPosition.xy + float(View.StateFrameIndexMod8) * float2(2.083, 4.867), "
+                  "float2(0.06711056, 0.00583715))));\nreturn n >= F ? 1.0 : 0.0;")
+FADE_FAR_HLSL = FADE_NEAR_HLSL.replace("n >= F", "n < F")
+
+
+def tree_fade_keep(mat, far):
+    """1 where this crown (near, or its far stand-in) draws the pixel, 0 where the other one does. Shadows keep the whole
+    near crown (the far stand-ins cast none)."""
+    try:
+        g = Graph(mat)
+        d = g.node(unreal.MaterialExpressionDistance)
+        g.link(g.node(unreal.MaterialExpressionWorldPosition), d, "A"); g.link(g.node(unreal.MaterialExpressionCameraPositionWS), d, "B")
+        start, end = g.scalar("FadeStart", 7000.0), g.scalar("FadeEnd", 9000.0)
+        into = g.node(unreal.MaterialExpressionSubtract); g.link(d, into, "A"); g.link(start, into, "B")
+        width = g.node(unreal.MaterialExpressionSubtract); g.link(end, width, "A"); g.link(start, width, "B")
+        frac_in = g.node(unreal.MaterialExpressionDivide); g.link(into, frac_in, "A"); g.link(width, frac_in, "B")
+        f = g.one(unreal.MaterialExpressionSaturate, frac_in)
+        # (worked out per vertex and handed on, so the pixels only compare it with the noise)
+        try:
+            vi = g.node(unreal.MaterialExpressionVertexInterpolator)
+            if lib.connect_material_expressions(f, "", vi, "VS"):
+                f = vi
+            else:
+                unreal.log("MATDIAG tree fade: per-pixel distance (no vertex interpolator pin)")
+        except Exception as e:
+            unreal.log("MATDIAG tree fade: per-pixel distance: " + str(e))
+        c = g.node(unreal.MaterialExpressionCustom)
+        c.set_editor_property("code", FADE_FAR_HLSL if far else FADE_NEAR_HLSL)
+        c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+        c.set_editor_property("description", "TreeFade")
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", "F")
+        c.set_editor_property("inputs", [ci])
+        g.link(f, c, "F")
+        return c
+    except Exception as e:
+        unreal.log("MATDIAG tree fade skipped: " + str(e))
+        return None
+
+
+def build_tree_far():
+    """The far stand-ins for tree crowns (Forest.cpp): soft leafy puffs for broad-leaf trees, tiered cones for conifers. The same
+    average leaf (or needle) colour and Tint as the near crowns, lit softly like them (normals leaning up), darker deep in the crown
+    (per-instance data 0), soft clumps and a lumpy rim instead of a clean ball, dithered in over FadeStart..FadeEnd where the near
+    crowns dither out. Well inside the band it folds to its own centre in the vertex shader, so it costs nothing close up."""
+    patches = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")   # (soft cloudy blotches, painted by gen_textures.py)
+    mat = fresh_material("M_TreeFar")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE)
+    mat.set_editor_property("two_sided", False)
+    mat.set_editor_property("tangent_space_normal", False)
+    set_flags(mat, ("used_with_instanced_static_meshes",))
+    g = Graph(mat)
+    conifer = g.scalar("Conifer", 0.0)
+    # One picture, laid in world space (tilted, so tops and sides both get it): soft blotches about a metre across that make the
+    # crown read as heaped clumps of foliage, lighter and darker, and that bite into its outline (below). Fine leaf detail would
+    # be under a pixel out here and only shimmer, so the leaf picture itself is not used.
+    wp = g.node(unreal.MaterialExpressionWorldPosition)
+    wz = g.mask(wp, False, False, True)
+    uvw = g.addn(g.mask(wp, True, True), g.muln(g.node(unreal.MaterialExpressionConstant2Vector, r=0.5, g=0.5), wz))
+    blot = g.tex(patches, g.mul(uvw, 1.0 / 320.0))
+    blot_r = g.mask(blot, True, False)
+    # The near crown seen from afar: its picture's average colour where there are leaves (measured from T_TreeLeaves and
+    # T_PineNeedles) times the same Tint, a little lighter or darker per puff, darker deep in the crown (per-instance data 0)
+    mean = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.const3((0.762, 0.681, 0.575)), mean, "A"); g.link(g.const3((0.511, 0.598, 0.425)), mean, "B"); g.link(conifer, mean, "Alpha")
+    gain = g.node(unreal.MaterialExpressionLinearInterpolate)   # (matched by eye against the near crowns, -TreeBand=500 against =1)
+    g.link(g.scalar("Gain", 0.45), gain, "A"); g.link(g.scalar("ConeGain", 0.38), gain, "B"); g.link(conifer, gain, "Alpha")
+    col = g.desat(g.muln(g.muln(mean, g.vector("Tint", (0.5, 0.2, 0.05))), gain), 0.15)   # (the near crowns mix in glimpses of ground and shade)
+    col = g.muln(col, g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.16), 0.92))
+    clumps = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.scalar("BlotDark", 0.7), clumps, "A"); g.link(g.node(unreal.MaterialExpressionConstant, r=1.1), clumps, "B"); g.link(blot_r, clumps, "Alpha")
+    col = g.muln(col, clumps)
+    shade = g.one(unreal.MaterialExpressionOneMinus, g.node(unreal.MaterialExpressionPerInstanceCustomData, data_index=0))
+    col = g.muln(col, shade)
+    g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(col, unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+    glow = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.05, const_b=0.16); g.link(conifer, glow, "Alpha")   # (cones: a solid shell has no bright gaps, so a higher floor or it reads near black against a low sun)
+    g.out(g.muln(col, glow), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # deep shade never pitch black, as the near leaves
+    g.out(g.node(unreal.MaterialExpressionConstant, r=1.0), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.node(unreal.MaterialExpressionConstant, r=0.0), unreal.MaterialProperty.MP_SPECULAR)
+    # soft light: the surface's own normal leaned toward straight up, like the near cards' fluffy normal
+    vn = g.node(unreal.MaterialExpressionVertexNormalWS)
+    lean = g.node(unreal.MaterialExpressionLinearInterpolate)
+    soft = g.node(unreal.MaterialExpressionLinearInterpolate); g.link(g.scalar("Soft", 0.6), soft, "A"); g.link(g.scalar("ConeSoft", 0.8), soft, "B"); g.link(conifer, soft, "Alpha")
+    g.link(vn, lean, "A"); g.link(g.const3((0.0, 0.0, 1.0)), lean, "B"); g.link(soft, lean, "Alpha")
+    g.out(g.one(unreal.MaterialExpressionNormalize, lean), unreal.MaterialProperty.MP_NORMAL)
+    # a lumpy rim: toward the outline the blotches decide what stays, so the silhouette is heaped and uneven, not a clean ball
+    facing = g.node(unreal.MaterialExpressionDotProduct)
+    g.link(vn, facing, "A"); g.link(g.node(unreal.MaterialExpressionCameraVectorWS), facing, "B")
+    rim = g.one(unreal.MaterialExpressionSaturate, g.mul(g.add(g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, facing)), -0.3), 1.8))
+    rim_amt = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=1.0, const_b=0.35); g.link(conifer, rim_amt, "Alpha")   # (cones: a calmer outline, the boughs' tiers already break it; full strength tore them into shards)
+    rim = g.muln(rim, rim_amt)
+    body = g.node(unreal.MaterialExpressionLinearInterpolate)
+    # (and a few gaps inside too, where the blotches are darkest: the near crowns are airy, with ground showing through)
+    inner = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.2, const_b=0.5); g.link(conifer, inner, "Alpha")   # (cones: few gaps, they read as solid boughs)
+    g.link(g.addn(g.mul(blot_r, 1.4), inner), body, "A"); g.link(g.mul(blot_r, 1.4), body, "B"); g.link(rim, body, "Alpha")
+    cls = unreal.load_class(None, "/Script/Engine.MaterialExpressionDitherTemporalAA")   # (missing in 5.8: then a plain cut-out)
+    dith = body
+    if cls is not None:
+        dith = g.node(cls); g.link(body, dith, "")
+    mask = dith
+    keep = tree_fade_keep(mat, far=True)
+    if keep is not None:
+        mask = g.muln(dith, keep)
+    g.out(mask, unreal.MaterialProperty.MP_OPACITY_MASK)
+    mat.set_editor_property("opacity_mask_clip_value", 0.35)
+    # fold away (to the instance's centre) while the whole stand-in is still well inside the band: no pixels, no overdraw
+    obj = g.node(unreal.MaterialExpressionObjectPositionWS)
+    dist = g.node(unreal.MaterialExpressionDistance); g.link(obj, dist, "A"); g.link(g.node(unreal.MaterialExpressionCameraPositionWS), dist, "B")
+    lim = g.node(unreal.MaterialExpressionSubtract); g.link(g.scalar("FadeStart", 7000.0), lim, "A"); g.link(g.scalar("FoldMargin", 900.0), lim, "B")
+    gap = g.node(unreal.MaterialExpressionSubtract); g.link(lim, gap, "A"); g.link(dist, gap, "B")
+    fold = g.one(unreal.MaterialExpressionSaturate, g.mul(gap, 0.01))
+    to_centre = g.node(unreal.MaterialExpressionSubtract); g.link(obj, to_centre, "A"); g.link(g.node(unreal.MaterialExpressionWorldPosition), to_centre, "B")
+    g.out(g.muln(to_centre, fold), unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    finish(mat, "M_TreeFar")
 
 
 def fluffy_normal(mat, amount=0.8):
@@ -184,7 +312,7 @@ def patchy(mat, col):
     return g.muln(out, g.add(g.mul(lift, GRASS_SHADOW_LIFT), 1.0))
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False):
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False, tree_fade=False):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -239,7 +367,15 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
     spec = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -700, 400)
     spec.set_editor_property("r", 0.0)
     lib.connect_material_property(spec, "", unreal.MaterialProperty.MP_SPECULAR)
-    soft_edges(mat, ts)
+    edge, edge_pin = soft_edges(mat, ts)
+    if tree_fade:
+        # tree crowns dither out over FadeStart..FadeEnd while their far stand-ins (M_TreeFar) dither in
+        keep = tree_fade_keep(mat, far=False)
+        if keep is not None:
+            faded = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -150, 500)
+            lib.connect_material_expressions(edge, edge_pin, faded, "A")
+            lib.connect_material_expressions(keep, "", faded, "B")
+            lib.connect_material_property(faded, "", unreal.MaterialProperty.MP_OPACITY_MASK)
     fluffy_normal(mat, 0.93 if vary else 0.8)   # grass is lit almost evenly, so it reads as soft and fluffy
 
     if wind:
@@ -676,10 +812,10 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 imported(gen_textures.patches(), "T_Patches")
 build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.10)   # a softer, more natural green
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
-build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True)
+build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True, tree_fade=True)
 # pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_PineNeedles.png"), "T_PineNeedles")   # painted by BuildMaterials.ps1
-build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,          False,     0.2, param=True, gain=0.9, crown_shade=True)
+build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,          False,     0.2, param=True, gain=0.9, crown_shade=True, tree_fade=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
@@ -700,7 +836,8 @@ build_cumulus(imported(gen_textures.cumulus(), "T_Cumulus"))
 for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
     if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
         unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
-build_dirt(imported(gen_textures.dirt(), "T_Dirt"))
-build_ground(imported(gen_textures.ground(), "T_Ground"), unreal.EditorAssetLibrary.load_asset("/Game/T_Dirt"))
+# (M_Ground, M_Dirt and their textures are built by Tools/world_material.py since 2026-11-12: one ground for the whole world.
+# build_dirt and build_ground above are the old versions, no longer run, so this script never puts the old ground back.)
 build_cloth()
+build_tree_far()   # far stand-ins for tree crowns (Forest.cpp); after M_TreeLeaf and M_PineNeedle
 unreal.log("MATDIAG all materials built")

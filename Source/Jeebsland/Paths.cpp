@@ -20,6 +20,10 @@ void APaths::BeginPlay()
 	TArray<FVector> Verts, Normals;
 	TArray<int32> Tris, TrisBack;
 	TArray<FVector2D> UV;
+	TArray<FLinearColor> Colors;
+	// Oak Hill's streets are cobbled (2026-11-12): red 1 on them (M_Dirt lays cobbles down the middle, fraying into packed earth at
+	// the sides and then into the grass); Blackrock's paths stay packed earth (red 0). They are the last roads in PathDefs.
+	const int32 FirstCobbled = Defs.Num() - JeebOakHill::Roads().Num();
 
 	// Each road is resampled every 50 cm along its length and 5 points across, and every point takes its height from
 	// the ground mesh itself, so the road follows every fold of the ground instead of cutting through humps
@@ -70,6 +74,7 @@ void APaths::BeginPlay()
 				Verts.Add(FVector(P.X, P.Y, JeebTerrain::GroundMeshHeight(P.X, P.Y) + Lift));
 				Normals.Add(FVector::UpVector);
 				UV.Add(FVector2D(S + 0.5f, Along / Def.Width));
+				Colors.Add(FLinearColor(d >= FirstCobbled ? 1.f : 0.f, 0.f, 0.f, 1.f));
 			}
 		}
 		const int32 Rows = Def.bClosed ? L : L - 1;
@@ -85,12 +90,11 @@ void APaths::BeginPlay()
 		}
 	}
 
-	TArray<FLinearColor> Colors;
 	TArray<FProcMeshTangent> Tangents;
 	Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colors, Tangents, false);
 	Mesh->CreateMeshSection_LinearColor(1, Verts, TrisBack, Normals, UV, Colors, Tangents, false);
 
-	// Packed dirt: a painted dirt texture laid in world space (see Tools/build_materials.py), or a flat colour if it is missing
+	// Packed dirt (and Oak Hill's cobbles): painted textures laid in world space (Tools/world_material.py), or a flat colour if it is missing
 	UMaterialInterface* Dirt = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Dirt.M_Dirt"));
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	for (int32 i = 0; i < Mesh->GetNumMaterials(); ++i)

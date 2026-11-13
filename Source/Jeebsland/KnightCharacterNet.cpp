@@ -267,7 +267,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	{
 		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith)) || B < 0 || B >= NumTiers) break;
 		const bool bArrows = A < 0;
-		if (!bArrows && !(IsWeaponKind(A) || IsArmorKind(A) || A == K_Shield)) break;
+		if (!bArrows && (!(IsWeaponKind(A) || IsArmorKind(A) || A == K_Shield) || IsRetiredKind(A))) break;   // (no katanas: taken out of the game)
 		const bool bStyled = !bArrows && (IsArmorKind(A) || A == K_Shield);
 		if (C < 0 || C >= (bStyled ? (A == K_Shield ? NumShieldStyles : NumArmourStyles) : 1)) break;   // (never trust the style sent)
 		const FRecipe R = SmithRecipe(bArrows ? K_Bow : A, B, bArrows, IsArmorKind(A) ? C : 0);
@@ -434,7 +434,7 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
-	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown || bDrinking) return;
+	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown || bDrinking || InClimbMove()) return;   // (InClimbMove: no swings on a rock face or in a mantle)
 	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && !FightsLikeSword(SelectedKind())) return;   // (the low sweep and the dash attack are sword moves)
 	const double Now = FPlatformTime::Seconds();
 	const bool bCombo = Style == static_cast<uint8>(EAtkStyle::Sweep) && IsKicking() && bKickLanded && StunLeft <= 0.f;   // (a landed kick cut short by the sweep)
@@ -481,7 +481,7 @@ void AKnightCharacter::ServerState_Implementation(uint8 Flags)
 
 void AKnightCharacter::ServerRoll_Implementation(FVector_NetQuantizeNormal Dir)
 {
-	if (bRolling) return;
+	if (bRolling || InClimbMove()) return;
 	PendingRollDir = FVector(Dir.X, Dir.Y, 0.f).GetSafeNormal();
 	RollCooldown = 0.f;                         // (the player's machine already checked; small timing differences must not refuse it)
 	Stamina = FMath::Max(Stamina, 20.f);
@@ -491,7 +491,7 @@ void AKnightCharacter::ServerRoll_Implementation(FVector_NetQuantizeNormal Dir)
 
 void AKnightCharacter::ServerSlide_Implementation(FVector_NetQuantizeNormal Dir, float Speed)
 {
-	if (bSliding || bRolling || bMounted || bClimbing || bSitting) return;
+	if (bSliding || bRolling || bMounted || bClimbing || bSitting || InClimbMove()) return;
 	BeginSlide(Dir, Speed);
 }
 

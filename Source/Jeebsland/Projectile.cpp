@@ -1,4 +1,5 @@
 #include "Projectile.h"
+#include "JeebProps.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
@@ -121,9 +122,23 @@ void AProjectile::ApplyLaunch()
 		return;
 	}
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);
-	Paint(Body, FLinearColor(0.5f, 0.34f, 0.17f));
-	Paint(Head, JeebItems::ArrowTipColor(L.ArrowId));   // (fire: a glowing head)
-	Paint(Fletch, JeebItems::ArrowFeatherColor(L.ArrowId));
+	if (UStaticMesh* ArrowModel = JeebProps::ArrowMesh())
+	{
+		// (2026-11-12) the arrows' model: its tip is the actor's origin, as the shapes' was; its head and feathers in the arrow's colours
+		Body->SetStaticMesh(ArrowModel);
+		Body->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+		Body->SetRelativeScale3D(FVector(1.f));
+		Body->SetMaterial(0, nullptr);
+		Head->SetVisibility(false);
+		Fletch->SetVisibility(false);
+		JeebProps::TintArrow(Body, L.ArrowId);
+	}
+	else
+	{
+		Paint(Body, FLinearColor(0.5f, 0.34f, 0.17f));
+		Paint(Head, JeebItems::ArrowTipColor(L.ArrowId));   // (fire: a glowing head)
+		Paint(Fletch, JeebItems::ArrowFeatherColor(L.ArrowId));
+	}
 	if (bFire)
 	{
 		Glow = NewObject<UPointLightComponent>(this);
@@ -306,6 +321,7 @@ void AProjectile::ApplyStuck()
 			if (!Me.IsValid()) return;
 			if (Me->Glow) Me->Glow->SetVisibility(false);
 			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(Me->Head->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.12f, 0.1f, 0.09f));   // (charred)
+			if (!Me->Head->IsVisible()) JeebProps::Tint(Me->Body, FLinearColor(0.12f, 0.1f, 0.09f), 0.f, 0.8f);   // (the model's head)
 		}), 5.f, false);
 	}
 }

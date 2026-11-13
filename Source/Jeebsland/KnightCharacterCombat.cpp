@@ -151,7 +151,9 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword) { SelectHotbar(h); break; }
 	{
 		int32 ShotKind = -1;   // (-ShotKind=<number>: that weapon in the first bar slot instead)
-		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, 0); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast(); }   // (and the armour redrawn: a two-handed weapon puts the shield away)
+		int32 ShotKindTier = 0;   // (-ShotKindTier=<tier>: that weapon in that tier, to see its metal take the colour)
+		FParse::Value(FCommandLine::Get(), TEXT("ShotKindTier="), ShotKindTier);
+		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, FMath::Clamp(ShotKindTier, 0, JeebItems::NumTiers - 1)); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast(); }   // (and the armour redrawn: a two-handed weapon puts the shield away)
 	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
@@ -329,7 +331,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 void AKnightCharacter::StartBlock()
 {
 	bBlockHeld = true;
-	if (bSitting || bRolling || bClimbing || bDrinking || IsUIOpen() || !ShieldActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
+	if (bSitting || bRolling || bClimbing || InClimbMove() || bDrinking || IsUIOpen() || !ShieldActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
 	bBlocking = true;
 }
 
@@ -354,6 +356,7 @@ void AKnightCharacter::Die()
 	if (!Skills || !HasAuthority()) return;
 	if (bMounted) Dismount();
 	if (bClimbing) ExitClimb(false, false);
+	DropFromWall(true);
 	if (bSitting) StandUp();
 	if (AResourceNode* Node = ActiveNode.Get()) Node->CancelGathering();
 	if (bKnockedDown) MulticastKnock(false, 0);   // (he wakes standing)
@@ -450,12 +453,20 @@ void AKnightCharacter::ClientDrinkRefused_Implementation()
 
 bool AKnightCharacter::CanDrinkNow() const
 {
-	return !bDrinking && Health > 0.f && !bAttacking && !bKnockedDown && StunLeft <= 0.f && !bRolling && !bSliding && !bClimbing && !bSitting && !bMounted && Bow == EBow::None
+	return !bDrinking && Health > 0.f && !bAttacking && !bKnockedDown && StunLeft <= 0.f && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting && !bMounted && Bow == EBow::None
 		&& !ActiveNode.IsValid() && GetWorld()->GetTimeSeconds() - LastDrinkStart >= 0.5f;   // (not over and over: each start is a message to everyone in range)
 }
 
-// The bottle's size in the hand, and how far up it the hand holds it (the middle of its belly, in cm from the model's origin at this size). Its belly is about this thick there.
-static constexpr float BottleScale = 0.9f, BottleGripZ = 8.55f, BottleR = 6.1f;
+// The bottle in the hand: the hand is built round a belly BottleR thick, so each bottle is sized to that and held round the middle of its round belly, which
+// on the library bottles (2026-11-12) is the far end from the cork, one belly's radius in (BottleFit: the scale, then how far up the model's origin is held).
+static constexpr float BottleR = 6.1f;
+static void BottleFit(const UStaticMesh* M, float& Scale, float& GripZ)
+{
+	const FBox B = M ? M->GetBoundingBox() : FBox(FVector(-6.8f, -6.8f, -9.75f), FVector(6.8f, 6.8f, 15.75f));
+	const float R = FMath::Max(0.5f * FMath::Max(B.Max.X - B.Min.X, B.Max.Y - B.Min.Y), 1.f);
+	Scale = BottleR / R;
+	GripZ = (B.Max.Z - R) * Scale;
+}
 
 // The open right hand round the bottle (owner 2026-11-06: the skeleton has no finger bones, so the fist can't open). Plated like the gauntlet, "a tiny bit cartoonish" with crisp bevels.
 // Its frame: Z along the bottle (the cork at -Z), the palm out along +X, the fingers run on round the bottle toward +Y, the wrist at FClipLib::DrinkInHand's (9.5, -8.5, 0), the thumb toward the cork.
@@ -521,7 +532,7 @@ void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 	DrinkType = Type;
 	if (GetNetMode() == NM_DedicatedServer) return;
 	if (bStart && !BottleMesh)
-		if (UStaticMesh* Flask = JeebProps::PotionMesh())
+		if (UStaticMesh* Flask = JeebProps::PotionMesh(Type))
 		{
 			DrinkGroup = NewObject<USceneComponent>(this);
 			DrinkGroup->SetupAttachment(GetRootComponent());
@@ -530,7 +541,7 @@ void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 			BottleMesh->SetupAttachment(DrinkGroup);
 			BottleMesh->SetStaticMesh(Flask);
 			BottleMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, -BottleGripZ), FVector(BottleScale)));   // (the model's cork is along -Z: the hand round its belly, the neck past the thumb)
+			{ float S, Gz; BottleFit(Flask, S, Gz); BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, -Gz), FVector(S))); }   // (the model's cork is along -Z: the hand round its belly, the neck past the thumb)
 			BottleMesh->RegisterComponent();
 			KM::FMD Hand;
 			BuildOpenHand(Hand);
@@ -541,6 +552,7 @@ void AKnightCharacter::MulticastDrink_Implementation(uint8 Type, bool bStart)
 	{
 		if (bStart)
 		{
+			if (UStaticMesh* Flask = JeebProps::PotionMesh(Type)) if (BottleMesh->GetStaticMesh() != Flask) { BottleMesh->SetStaticMesh(Flask); BottleMesh->SetMaterial(0, nullptr); float S, Gz; BottleFit(Flask, S, Gz); BottleMesh->SetRelativeTransform(FTransform(FQuat::Identity, FVector(0.f, 0.f, -Gz), FVector(S))); }   // (each potion has its own bottle, 2026-11-12)
 			JeebProps::Tint(BottleMesh, JeebItems::PotionRow(FMath::Clamp<int32>(Type, 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
 			// (in the gauntlets' metal, or bare mail with none on. The suit's own texture is dark paint lifted and tinted, so the same tier colour on a plain surface has to be darkened to match it: HandPaint, by eye against tin and emerald)
 			static constexpr float HandPaint = 0.36f;
@@ -570,9 +582,9 @@ void AKnightCharacter::UpdateBeltFlask()
 	const int32 Id = (IsLocallyControlled() || GetNetMode() == NM_Standalone) ? (Skills ? Skills->PotionSlot.Id : 0) : LookPotion;
 	const bool bShow = !bStowed && !bDrinking && Id != 0 && JeebItems::IsPotion(Id) && Anim && Anim->WornTier(JeebAnim::Piece_Chest) >= 0;   // (the belt is part of the chest plate: with that off there is nothing to hang it from)
 	if (!BeltFlask && bShow)
-		if (UStaticMesh* Flask = JeebProps::PotionMesh())
+		if (UStaticMesh* Flask = JeebProps::PotionMesh(JeebItems::PotionType(Id)))
 		{
-			BeltFlask = NewObject<UStaticMeshComponent>(this);
+			BeltFlask =NewObject<UStaticMeshComponent>(this);
 			BeltFlask->SetupAttachment(GetRootComponent());
 			BeltFlask->SetStaticMesh(Flask);
 			BeltFlask->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -600,6 +612,7 @@ void AKnightCharacter::UpdateBeltFlask()
 	if (Id != BeltFlaskId)
 	{
 		BeltFlaskId = Id;
+		if (UStaticMesh* Flask = JeebProps::PotionMesh(JeebItems::PotionType(Id))) if (BeltFlask->GetStaticMesh() != Flask) { BeltFlask->SetStaticMesh(Flask); BeltFlask->SetMaterial(0, nullptr); }
 		JeebProps::Tint(BeltFlask, JeebItems::PotionRow(FMath::Clamp<int32>(JeebItems::PotionType(Id), 0, JeebItems::NumPotions() - 1)).Color, 0.f, 0.15f);
 	}
 	if (Anim) BeltFlask->SetWorldTransform(Anim->BeltFlaskWorld());
@@ -616,7 +629,7 @@ void AKnightCharacter::TickDrink(float Dt)
 		for (UStaticMeshComponent* C : HeldStatics) if (C) C->SetVisibility(false);
 	}
 	// A roll or anything else that takes over stops it: he keeps the potion (blows and deaths stop it in Hurt and Die)
-	const bool bStop = bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bMounted || Bow != EBow::None;
+	const bool bStop = bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || InClimbMove() || bMounted || Bow != EBow::None;
 	if (!HasAuthority())
 	{
 		// (the player's own machine keeps its own clock, so its speed cap ends with the server's; others wait for the server, and never stay stuck holding a bottle)
@@ -818,7 +831,7 @@ float AKnightCharacter::SmashTimeLeft() const
 // ---------------- The kick, and being knocked down by one ----------------
 void AKnightCharacter::StartKick()
 {
-	if (IsUIOpen() || bPanelCursor || bAttacking || bRolling || bSliding || bClimbing || bSitting || bMounted || bKnockedDown || StunLeft > 0.f) return;
+	if (IsUIOpen() || bPanelCursor || bAttacking || bRolling || bSliding || bClimbing || InClimbMove() || bSitting || bMounted || bKnockedDown || StunLeft > 0.f) return;
 	if (Smash != ESmash::None || ActiveNode.IsValid() || GetCharacterMovement()->IsFalling()) return;
 	CancelDraw();   // (kicking with a bow drawn: the string comes down)
 	StartAttack(EAtkStyle::Kick, 1, 0.f);
@@ -828,7 +841,7 @@ void AKnightCharacter::StartKick()
 // waits and comes out the moment the kick lands
 void AKnightCharacter::StartSweep()
 {
-	if (IsUIOpen() || bPanelCursor || bRolling || bSliding || bClimbing || bSitting || bMounted || bKnockedDown || StunLeft > 0.f) return;
+	if (IsUIOpen() || bPanelCursor || bRolling || bSliding || bClimbing || InClimbMove() || bSitting || bMounted || bKnockedDown || StunLeft > 0.f) return;
 	if (bAttacking && !(IsKicking() && bKickLanded))
 	{
 		if (IsKicking()) QueuedSweep = GetWorld()->GetTimeSeconds();
@@ -900,6 +913,7 @@ void AKnightCharacter::TakeReact(AActor* From, const JeebHit::FReact& R)
 {
 	if (!HasAuthority() || Health <= 0.f || bMounted || bClimbing || bSitting) return;
 	if (GetWorld()->GetTimeSeconds() < InvulnUntil) return;   // (getting up: safe)
+	DropFromWall();   // a clean hit takes him off a rock face
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation() - GetActorForwardVector())).GetSafeNormal2D();
 	if (R.bDrop) { KnockDownBy(From, true); return; }   // the low sweep: down on the spot, then up or a roll (GetUp)
 	if (R.bLaunch)
@@ -967,6 +981,7 @@ FVector AKnightCharacter::HeldDI() const
 void AKnightCharacter::KnockDownBy(AActor* From, bool bDrop)
 {
 	if (!HasAuthority() || bKnockedDown || Health <= 0.f || bMounted || bClimbing || bSitting) return;
+	DropFromWall();
 	if (bDrop) { MulticastKnock(true, 1); return; }   // (Opt 1: dropped where he stands)
 	if (bBlocking && !bGuardBroken && GuardMax > 0.f)   // a kick on a raised shield crushes half its guard (balance pass 2026-10-31)
 	{
@@ -1392,7 +1407,7 @@ void AKnightCharacter::TickGear(float Dt)
 
 	// Climbing, riding or sitting: the shield and the weapon go on the back; they come back to the hands afterwards
 	{
-		const bool bWantStow = bClimbing || bMounted || bSitting;
+		const bool bWantStow = bClimbing || ClimbStowed() || bMounted || bSitting;
 		if (bWantStow != bStowed)
 		{
 			bStowed = bWantStow;
@@ -1454,5 +1469,5 @@ void AKnightCharacter::TickGear(float Dt)
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
 	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f || bDrinking) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
-	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
+	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !InClimbMove() && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 }

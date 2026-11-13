@@ -175,6 +175,7 @@ void AGearWall::Build()
 	for (int32 col = 0; col < NumCols; ++col)
 	{
 		if (col == CrossCol + 1) continue;
+		if (col <= K_Rod - K_Sword && IsRetiredKind(WeaponOf(col))) continue;   // (the katana is out of the game: its column stays empty)
 		const bool bCrossbow = col == CrossCol;
 		const float Y = -0.5f * Len + (col + 0.5f) * WeaponColW;
 		const bool bCapes = col == NumCols - 3, bArrows = col == NumCols - 2, bFire = col == NumCols - 1;

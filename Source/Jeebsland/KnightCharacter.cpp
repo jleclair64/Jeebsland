@@ -2,6 +2,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "KnightShieldRest.h"
+#include "KnightMovement.h"
 #include "JeebSave.h"
 #include "Net/UnrealNetwork.h"
 #include "Messages.h"
@@ -41,7 +42,8 @@
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
 
-AKnightCharacter::AKnightCharacter()
+AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UKnightMovement>(ACharacter::CharacterMovementComponentName))
 {
 	// Hide the (empty) skeletal mesh slot; the knight is made of shapes instead
 	GetMesh()->SetVisibility(false);
@@ -442,6 +444,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	// server can't climb by itself because it doesn't get the W and S keys)
 	if (IsLocallyControlled() || GetNetMode() == NM_Standalone) { if (bClimbing) UpdateClimb(Dt); else TryStartClimb(); }
 	else if (bClimbing && !HasAuthority()) ClimbPhase += Vel.Z / 400.f * 7.f * Dt;   // another player's knight: hands and feet follow how fast it rises
+	TickWallClimb(Dt);   // (the free climb and the mantle: KnightMovement.h)
 
 	float SpecialSpeed = 0.f;
 	const bool bSpecial = TickRollSlide(Dt, bFalling, SpecialSpeed);

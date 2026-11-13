@@ -8,7 +8,8 @@ class UInstancedStaticMeshComponent;
 class UStaticMesh;
 class UMaterialInstanceDynamic;
 
-// Storybook grass over the whole land. Tufts grow in square cells around the player (denser close by, thinner further out)
+// Storybook grass over the whole land (the whole world's grassy ground since 2026-11-12: none on rock, mud or sand, shorter where
+// trampled, GroundMask.h). Tufts grow in square cells around the player (denser close by, thinner further out)
 // and the cells are built and dropped as you walk. Bushes and flowers are placed once across the land.
 UCLASS()
 class JEEBSLAND_API AMeadow : public AActor
@@ -37,6 +38,11 @@ private:
 	bool bJobNearRoad = true;
 	FRandomStream JobRand;
 	TArray<FTransform> JobXf;
+	// The ground's mask over the square being built, on a 5 x 5 grid (GroundMask.h), worked out once per square: how much grass
+	// grows (none on rock, mud or sand) and how trampled it is round buildings; each tuft reads it between the grid points
+	float JobAmount[25] = {}, JobWear[25] = {};
+	bool bJobExactWear = false;   // (near a building: each tuft checks the doorway wear itself)
+	void SampleJob(float X, float Y, float& OutAmount, float& OutWear) const;
 	void StartJob(const FIntPoint& Id, int32 Tier);
 	void StepJob(double BudgetSeconds);
 	void FinishJob();

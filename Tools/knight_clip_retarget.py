@@ -18,7 +18,13 @@ P = "mixamorig:"
 #   floor   the body goes down to the ground (knockdowns, get-ups, rolls): as ground, but no foot levelling
 MODE = {"JumpUp": "air", "FallIdle": "air", "Jump_SS": "air", "RunJump_SS": "air", "JumpUp2": "air", "ForwardJump": "air", "ClimbLadder": "air", "SlideHold": "floor", "SitChair": "floor",
         "KnockBack": "floor", "SweepFall": "floor", "FallDown": "floor", "Stunned": "floor", "GetUpBack": "floor", "GetUpStomach": "floor", "GetUp": "floor",
-        "KipUp": "floor", "StandBack": "floor", "StandRoll": "floor", "SprintRoll": "floor", "QuickRoll": "floor", "DeathBack": "floor", "DeathFwd": "floor"}
+        "KipUp": "floor", "StandBack": "floor", "StandRoll": "floor", "SprintRoll": "floor", "QuickRoll": "floor", "DeathBack": "floor", "DeathFwd": "floor",
+        # (2026-11-12, free climbing) "wall": the hips' straight-line travel comes out in every direction (up the wall too), no foot put on the floor.
+        # "keep": the whole path is kept (the climb jump, the ledge climb-up, the mantles: the animator takes out what the capsule travels);
+        # "keepground" as keep, with the first frame's lowest foot stood on the floor
+        "WallUp": "wall", "WallDown": "wall", "ShimmyL": "wall", "ShimmyR": "wall", "WallHang": "wall", "ClimbSlope": "wall",
+        "HopUp": "keep", "HopL": "keep", "HopR": "keep", "HopDown": "keep", "LedgeUp": "keep", "LedgePull": "keep",
+        "VaultOver": "keepground", "VaultTwo": "keepground", "ClimbOnto": "keepground"}
 
 def load_rig():
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -97,9 +103,14 @@ def retarget(path, name):
     loc = []
     for i, h in enumerate(hips):
         u = i / max(n - 1, 1)
-        x = (h.x - (d0.x + (d1.x - d0.x) * u)) * k
-        y = (h.y - (d0.y + (d1.y - d0.y) * u)) * k
-        z = h.z * k if mode != "air" else d0.z * k
+        if mode in ("keep", "keepground"):
+            x = (h.x - d0.x) * k
+            y = (h.y - d0.y) * k
+            z = h.z * k
+        else:
+            x = (h.x - (d0.x + (d1.x - d0.x) * u)) * k
+            y = (h.y - (d0.y + (d1.y - d0.y) * u)) * k
+            z = (d0.z * k) if mode == "air" else ((h.z - (d1.z - d0.z) * u) * k if mode == "wall" else h.z * k)
         loc.append(Vector((x + th["Hips"].x, y + th["Hips"].y, z)))
     # write the knight's bones, parents first, then bake
     T.animation_data_create()
@@ -124,7 +135,7 @@ def retarget(path, name):
             pb.keyframe_insert("location", frame=f - f0 + 1)
     # the floor: the lowest a foot gets, down to where the rest pose's lowest joint is
     rest_low = min(th[s].z for s in ("LeftFoot", "RightFoot", "LeftToeBase", "RightToeBase"))
-    drop = (min(feet) - rest_low) if mode == "ground" else 0.0
+    drop = (min(feet) - rest_low) if mode == "ground" else (feet[0] - rest_low) if mode == "keepground" else 0.0
     if abs(drop) > 1e-4:
         hipb = T.pose.bones[P + "Hips"]
         for i, f in enumerate(range(f0, f1 + 1)):
@@ -136,7 +147,7 @@ def retarget(path, name):
     # a check: how well the limbs follow (degrees between the knight's bone and the Y Bot's, worst frame)
     worst = 0.0
     scene.frame_set(1 + (n - 1) // 2)
-    print("CLIPDIAG %-16s %s frames %3d (%.2f s) scale %.3f drop %.1f cm" % (name, mode, n, (n - 1) / 30.0, k, drop * 100))
+    print("CLIPDIAG %-16s %s frames %3d (%.2f s) scale %.3f drop %.1f cm travel %.1f %.1f %.1f cm" % (name, mode, n, (n - 1) / 30.0, k, drop * 100, (d1.x - d0.x) * k * 100, (d1.y - d0.y) * k * 100, (d1.z - d0.z) * k * 100))
     # the file: the armature alone with this one action
     bpy.data.objects.remove(S)
     for act2 in list(bpy.data.actions):

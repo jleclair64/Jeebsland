@@ -10,6 +10,8 @@ class AExponentialHeightFog;
 class APostProcessVolume;
 class UMaterialInstanceDynamic;
 
+namespace JeebLook { bool Old(); }   // true: the picture's look before 2026-11-12 (-OldLook or jeeb.Look 0, test pictures only)
+
 // A midnight sun, like June above the Arctic Circle: the sun circles the sky, high at noon and skimming the
 // horizon at the bottom of its loop (the golden dusk), and never sets. Drives the sun's height, colour and
 // strength, the sky light and the haze colour. Other actors (stars, moon, clouds) read the shared values below.
@@ -44,7 +46,15 @@ private:
 	TWeakObjectPtr<ADirectionalLight> Sun;
 	TWeakObjectPtr<ASkyLight> Sky;
 	TWeakObjectPtr<AExponentialHeightFog> Fog;
+	TWeakObjectPtr<class USkyAtmosphereComponent> Atmosphere;
 	float Clock = 0.f;
+	FLinearColor OldDirGlow = FLinearColor::Black;   // the map's own sun glow in the haze (for -OldLook)
+	float OldDirExponent = 4.f, OldDirStart = 10000.f, OldAerialStart = 0.1f;
+	float ContactNow = -1.f;   // the sun's contact shadow length last set (it is only re-sent when it changes)
+
+	// The picture's look (2026-11-12): the colour grade, the haze toward far hills, ambient occlusion and the sun's contact
+	// shadows, eased with the sun's height; its numbers are the jeeb.Look.* console variables in DayNight.cpp
+	void TickLook(float High);
 	float RecaptureTimer = 0.f;
 	bool bSkyRealTime = false;
 

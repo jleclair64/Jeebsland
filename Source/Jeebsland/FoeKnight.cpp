@@ -106,6 +106,8 @@ void AFoeKnight::BeginPlay()
 		Paint(C, Col, JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody));
 	}
 	// His sword, in the right hand, held the way the player holds one
+	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, JeebItems::K_Sword, Tier)) S->SetRelativeTransform(JeebProps::FistPlace());   // (the sword's model, 2026-11-12)
+	else
 	{
 		TArray<WeaponDesign::FWPart> Parts;
 		WeaponDesign::Build(JeebItems::K_Sword, Parts, KM::Xf(GripPos(false), KM::DownTo(BladeDir(1))));

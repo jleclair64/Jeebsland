@@ -51,6 +51,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
 	In.bShotLog = bShotFace;
+	FillWallInput(In);   // (the free climb and the mantle: KnightCharacterClimb.cpp)
 	if (bAttacking)
 	{
 		const float D = FMath::Max(AttackDur, 0.01f);
@@ -170,6 +171,7 @@ void AKnightCharacter::PlaceGear()
 	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
 	const bool bWantBack = bStowed || ((bSwinging || bFishing) && !bBlocking);   // (both hands on a tool, or fishing: the shield goes on his back, unless he raises it)
 	if (bWantBack != bShieldBack) { bShieldBack = bWantBack; PlaceShield(bShieldBack); }
+	if (bStowed) PullStowed(Anim->StowPull());   // (bent flat over a ledge: in toward his back)
 	if (!bShieldBack)
 	{
 		const FTransform At = Anim->ShieldWorld(BlockAlpha);
@@ -199,6 +201,7 @@ void AKnightCharacter::PlaceGear()
 	UpdateBeltFlask();
 	if (QuiverParts.Num() > 0 && QuiverParts[0])
 		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());
+	UpdateAmulet();   // (the chain is measured from his neck, so once the pose has been placed)
 }
 
 // ---------------- Test pictures ----------------

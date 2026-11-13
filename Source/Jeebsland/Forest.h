@@ -36,6 +36,17 @@ private:
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> Leaf;
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> Pine;
 	UPROPERTY() UInstancedStaticMeshComponent* RedCone = nullptr;
+	// Far stand-ins (M_TreeFar): a handful of soft leafy puffs per broad-leaf crown and one tiered cone per pine or redwood, shown
+	// where the leaf cards and needle boughs fade out, so the woods stay full to the horizon. 0-4 the five leaf colours, 5-6 the
+	// two pine greens, 7 the redwood green. No shadows. (Not named Leaf or Pine: the world map counts those as crowns.)
+	UPROPERTY() TArray<UInstancedStaticMeshComponent*> FarCrown;
+	bool bFarCrowns = false;
+	// Where the near crowns hand over to the far ones (cm from the camera): x = fade starts, y = fade ends. Both sides dither
+	// against the same screen noise, so each pixel shows one or the other (FadeStart / FadeEnd in M_TreeLeaf, M_PineNeedle, M_TreeFar).
+	FVector2D BandOak = FVector2D(7000.f, 9000.f), BandPine = FVector2D(9000.f, 12000.f), BandRed = FVector2D(20000.f, 25000.f);
+	int32 FarCount = 0, NearLeafCount = 0;   // (log JEEBTREES)
+	double BuildSeconds = 0.0;   // (time spent planting, all trees)
+	int32 TreeCount = 0;
 
 			bool bBark = false;        // trunks and branches use the shaped bark meshes (M_BarkTint)
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> TrunkVar;   // four trunk shapes

@@ -439,12 +439,35 @@ void AKnightCharacter::UpdateBowBits()
 		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cube.Cube"), FLinearColor(0.9f, 0.9f, 0.9f)));             // its feathers
 		BowBits.Add(MakeBit(this, GetRootComponent(), TEXT("/Engine/BasicShapes/Cube.Cube"), FLinearColor(0.9f, 0.9f, 0.9f)));             // (across the first)
 		for (UStaticMeshComponent* C : BowBits) { C->SetUsingAbsoluteLocation(true); C->SetUsingAbsoluteRotation(true); C->SetUsingAbsoluteScale(true); }
+		// (2026-11-12) the nocked arrow is the arrows' model when there is one: the third bit takes it, and the head and feathers built from shapes go
+#if UE_BUILD_SHIPPING
+		const bool bOldArrow = false;
+#else
+		const bool bOldArrow = FParse::Param(FCommandLine::Get(), TEXT("ShotOldArrow"));   // (test pictures: the arrow built from shapes, as before the model, to compare)
+#endif
+		if (UStaticMesh* ArrowModel = bOldArrow ? nullptr : JeebProps::ArrowMesh())
+		{
+			BowBits[2]->SetStaticMesh(ArrowModel);
+			BowBits[2]->SetMaterial(0, nullptr);
+			bNockModel = true;
+		}
 	}
 	const FTransform B = BowHold->GetComponentTransform();
 	const int32 ShowId = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() : LookArrows;
 	// An arrow laid from Nock to Tip, its feathers at the nock
 	auto LayArrow = [&](const FVector& Nock, const FVector& Along, float Long, bool bShown)
 	{
+		if (bNockModel)
+		{
+			BowBits[2]->SetVisibility(bShown);
+			for (int32 i = 3; i < 6; ++i) BowBits[i]->SetVisibility(false);
+			if (!bShown) return;
+			// (the model: the tip at its origin, the shaft back along -X; a bolt is the same arrow drawn shorter along its length)
+			BowBits[2]->SetWorldLocationAndRotation(Nock + Along * Long, FRotationMatrix::MakeFromX(Along).Rotator());
+			BowBits[2]->SetWorldScale3D(FVector(Long / JeebProps::ArrowLen, 1.f, 1.f));
+			if (NockArrowId != ShowId) { NockArrowId = ShowId; JeebProps::TintArrow(BowBits[2], ShowId); }
+			return;
+		}
 		for (int32 i = 2; i < 6; ++i) BowBits[i]->SetVisibility(bShown);
 		if (!bShown) return;
 		const FVector Tip = Nock + Along * Long;
@@ -480,7 +503,7 @@ void AKnightCharacter::UpdateBowBits()
 		bBitsCross = false;
 		for (int32 i = 0; i < 2; ++i) if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(BowBits[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.9f, 0.88f, 0.78f));
 	}
-	const float TipX = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongTipX : 48.f, Brace = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongBrace : float(WeaponDesign::BowBrace);
+	const float TipX = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongTipX : JeebProps::BowTipX, Brace = SelectedKind() == JeebItems::K_Longbow ? JeebProps::LongBrace : JeebProps::BowBrace;
 	const FVector TipA = B.TransformPosition(FVector(-TipX, 0.f, Brace)), TipB = B.TransformPosition(FVector(TipX, 0.f, Brace));
 	const FVector Rest = B.TransformPosition(FVector(BowTune().Rest, 0.f, Brace));   // (the nocking point: level with the arrow rest, just above the fist)
 	// the nock: in the drawing fist while drawn, back on the bow as it is let go
@@ -490,6 +513,9 @@ void AKnightCharacter::UpdateBowBits()
 	for (int32 i = 0; i < 2; ++i) { BowBits[i]->SetVisibility(true); Rod(BowBits[i], i == 0 ? TipA : TipB, Nock, 0.3f); }
 	LayArrow(Nock, (B.TransformPosition(FVector(BowTune().Rest, 0.f, 0.f)) - Nock).GetSafeNormal(), 74.f, Bow == EBow::Drawing && ShowId != 0);   // (over the top of the fist)
 }
+// The quiver model's turn about its length on the hips (its broad face looks back, away from the hip)
+static constexpr float QuiverYaw = 90.f;
+
 
 // The quiver: a leather tube hung on his right hip like a sword's sheath (clear of the cape; owner, 2026-10-31), its mouth
 // tipped forward with fletched arrows showing, while the bow is his weapon
@@ -505,7 +531,25 @@ void AKnightCharacter::UpdateQuiver()
 		USceneComponent* Q = NewObject<USceneComponent>(this);
 		Q->SetupAttachment(GetRootComponent());
 		Q->RegisterComponent();
-		auto Bit = [&](const TCHAR* MeshPath, const FLinearColor& Col, const FVector& At, const FRotator& Rot, const FVector& Scale)
+		// (2026-11-12) the Meshy quiver and the back of the arrows' model, where they exist: the quiver turned so its flat back lies along the hip, five arrows
+		// standing in it with their feathers out of the mouth (the model stands 46 cm along Z, centred; an arrow's back runs 29.5 cm from its origin to the nock)
+		UStaticMesh* QuiverModel = GetNetMode() == NM_DedicatedServer ? nullptr : JeebProps::QuiverMesh();
+		UStaticMesh* BackModel = QuiverModel ? JeebProps::ArrowBackMesh() : nullptr;
+		if (QuiverModel && BackModel)
+		{
+			QuiverBody = JeebProps::MakeStatic(this, Q, QuiverModel);
+			QuiverBody->SetRelativeRotation(FRotator(0.f, QuiverYaw, 0.f));
+			QuiverParts.Add(QuiverBody);
+			static const FVector2D Spots[5] = { { 1.6f, 0.2f }, { -1.6f, 2.8f }, { 0.4f, -3.4f }, { -1.2f, -0.9f }, { 0.9f, 4.2f } };
+			for (int32 i = 0; i < 5; ++i)
+			{
+				UStaticMeshComponent* A = JeebProps::MakeStatic(this, Q, BackModel);
+				// (-X, toward the nock, turned up along Z; a little splay and a turn each so the feathers don't line up)
+				A->SetRelativeLocationAndRotation(FVector(Spots[i].X, Spots[i].Y, 6.f + 1.5f * (i % 3)), FRotator(-90.f + 3.f * Spots[i].X / 4.f, i * 41.f, 0.f));
+				QuiverParts.Add(A);
+			}
+		}
+		auto Bit =[&](const TCHAR* MeshPath, const FLinearColor& Col, const FVector& At, const FRotator& Rot, const FVector& Scale)
 		{
 			UStaticMeshComponent* C = MakeBit(this, Q, MeshPath, Col);
 			C->SetRelativeLocationAndRotation(At, Rot);
@@ -514,6 +558,8 @@ void AKnightCharacter::UpdateQuiver()
 		};
 		const TCHAR* Cyl = TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
 		const TCHAR* Cube = TEXT("/Engine/BasicShapes/Cube.Cube");
+		if (!QuiverBody)
+		{
 		Bit(Cyl, FLinearColor(0.32f, 0.19f, 0.09f), FVector::ZeroVector, FRotator::ZeroRotator, FVector(0.13f, 0.13f, 0.44f));               // the tube
 		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, 21.f), FRotator::ZeroRotator, FVector(0.145f, 0.145f, 0.04f));          // the rim
 		Bit(Cyl, FLinearColor(0.2f, 0.12f, 0.06f), FVector(0.f, 0.f, -20.f), FRotator::ZeroRotator, FVector(0.14f, 0.14f, 0.04f));           // the bottom
@@ -524,15 +570,20 @@ void AKnightCharacter::UpdateQuiver()
 			Bit(Cyl, FLinearColor(0.5f, 0.34f, 0.17f), P - FVector(0.f, 0.f, 8.f), FRotator::ZeroRotator, FVector(0.012f, 0.012f, 0.3f));      // shaft
 			Bit(Cube, FLinearColor(0.92f, 0.9f, 0.86f), P + FVector(0.f, 0.f, 3.f), FRotator(0.f, i * 37.f, 0.f), FVector(0.05f, 0.004f, 0.09f));   // fletching
 		}
+		}
 	}
-	// the arrows in it only while he has some (the tube, rim and bottom are the first three parts)
+	// the arrows in it only while he has some (the tube, rim and bottom are the first three parts; the model is one)
+	const int32 Fixed = QuiverBody ? 1 : 3;
 	const bool bArrows = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() != 0 : LookArrows != 0;
-	for (int32 i = 0; i < QuiverParts.Num(); ++i) if (QuiverParts[i]) QuiverParts[i]->SetVisibility(i < 3 || bArrows);
+	for (int32 i = 0; i < QuiverParts.Num(); ++i) if (QuiverParts[i]) QuiverParts[i]->SetVisibility(i < Fixed || bArrows);
 	// (the feathers are those of the arrows he is about to shoot, owner 2026-11-05: emerald arrows have green ones)
 	const int32 Id = (IsLocallyControlled() || GetNetMode() == NM_Standalone || HasAuthority()) ? ArrowSlotId() : LookArrows;
 	if (Id != QuiverArrowId && Id != 0)
 	{
 		QuiverArrowId = Id;
+		if (QuiverBody)
+			for (int32 i = 1; i < QuiverParts.Num(); ++i) JeebProps::TintArrow(QuiverParts[i], Id);
+		else
 		for (int32 i = 4; i < QuiverParts.Num(); i += 2)
 			if (QuiverParts[i])
 				if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(QuiverParts[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), JeebItems::ArrowFeatherColor(Id));

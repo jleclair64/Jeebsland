@@ -89,7 +89,7 @@ class AKnightCharacter : public AJeebslandCharacter
 	GENERATED_BODY()
 
 public:
-	AKnightCharacter();
+	AKnightCharacter(const FObjectInitializer& ObjectInitializer);
 
 	virtual void Tick(float DeltaSeconds) override;
 	// On a horse, steering is like a car: W goes forward along the horse, A and D turn it (it cannot slide sideways), S only brakes.
@@ -491,6 +491,8 @@ private:
 	// Shield and weapon go on the back (shield over the sword, both under the cape) while climbing, riding or sitting
 	bool bStowed = false;
 	void PlaceShield(bool bOnBack);
+	void PullStowed(float Cm);           // what is stowed on his back, moved this far in toward him (a flat crawl over a ledge, FKnightAnimator::StowPull)
+	float StowPullNow = 0.f;
 	// Stepping in the shield-up stance: the way the legs step (forward/back, and sideways), eased
 	float StepFw = 1.f, StepSd = 0.f;
 	// Shield guard: a raised shield stops up to its Defence in damage; once spent the guard is broken and stops only half of
@@ -748,6 +750,18 @@ private:
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
 public:
+	// Free climbing and the mantle (2026-11-12): the movement component is KnightMovement.h; the knight's side is KnightCharacterClimb.cpp
+	friend class UKnightMovement;
+	class UKnightMovement* KnightMove() const;
+	bool InClimbMove() const;            // on a rock face, its jump, the ledge climb-up or a mantle
+	bool ClimbStowed() const;            // on the rock, climbing up a ledge or mantling: shield and weapon on his back
+	mutable FVector MantleEdge = FVector::ZeroVector; mutable uint8 MantleEdgeMode = 0;   // (the pose: where the hands go on a fence, FillWallInput)
+	void DropFromWall(bool bAll = false);   // (server) a clean hit, a knockdown or death takes him off it
+	void JumpFromMove(float Dt);         // the ground jump, from inside a move (Space near a fence that turned out not to be a mantle)
+	void TickWallClimb(float Dt);
+	void TickClimbTests(float Dt);       // (test pictures: -ClimbKeys, -ClimbDo)
+	void FillWallInput(JeebAnim::FInput& In) const;
+	static float ClimbSeconds(int32 ClimbingLevel);   // a full climbing bar, climbing upward, at this Climbing level (Tuning.ini [Climb])
 	static float BowDrawSeconds(int32 ArcheryLevel);   // the bow's full draw at this Archery level (Tuning.ini [Archery]); the skills window shows it
 	static float LongbowDrawSeconds(int32 ArcheryLevel) { return BowDrawSeconds(ArcheryLevel) * JeebTune::V().LongDrawTime / FMath::Max(JeebTune::V().BowDrawTime, 0.01f); }
 private:
@@ -794,6 +808,12 @@ private:
 	bool bBitsCross = false;                                     // (the string is painted for the crossbow)
 	UPROPERTY() TArray<UStaticMeshComponent*> QuiverParts;       // the quiver of arrows on his back while the bow is in hand
 	int32 QuiverArrowId = -1;                                    // which arrows its feathers are coloured for
+	bool bNockModel = false;                                     // (the nocked arrow is the arrows' model, JeebProps)
+	int32 NockArrowId = -1;                                      // which arrows it is coloured for
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> QuiverBody;   // the quiver's model (2026-11-12)
+	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> AmuletParts;       // the worn amulet on its chain round his neck (UpdateAmulet)
+	int32 AmuletShownId = -1;
+	void UpdateAmulet();
 	void UpdateBowBits();
 	void UpdateQuiver();
 	// (online: the server's numbers, sent to everyone)

@@ -4,6 +4,7 @@
 #include "KnightMesh.h"
 #include "KnightDesign.h"
 #include "Inventory.h"
+#include "JeebProps.h"
 
 // Every weapon and tool the knight can hold, modelled in code.
 // A weapon is built around the hand's grip (the origin) with its business end pointing along -Z, so it points
@@ -44,7 +45,8 @@ namespace WeaponDesign
 
 	// The bow's string stands this far from the grip, its tips 48 cm either side (was 28.8: much deeper than a real braced bow,
 	// so at ease the string could not sit between his arm and his side without cutting through him; owner, 2026-11-01)
-	constexpr float BowBrace = 14.f;
+	constexpr float BowBrace = JeebProps::BowBrace;   // (since 2026-11-12 measured on the bow's model: JeebProps)
+	constexpr float BowTipX = JeebProps::BowTipX;
 
 	// How far the elbow is bent when the weapon is just held (long weapons are carried pointing forward)
 	// How far a held weapon reaches from its grip (cm), for its hit boxes and for keeping its point off the floor
@@ -52,12 +54,13 @@ namespace WeaponDesign
 	{
 		switch (Kind)
 		{
-		case JeebItems::K_Sword: return 79.5f;
+		case JeebItems::K_Sword: return JeebProps::SwordReach;   // (the model's point, measured)
 		case JeebItems::K_Broadsword: return 112.f;
 		case JeebItems::K_Katana: return 101.f;
 		case JeebItems::K_Spear: return 155.f;
 		case JeebItems::K_BattleAxe: return 103.f;
-		case JeebItems::K_Axe: case JeebItems::K_Pickaxe: return 71.f;
+		case JeebItems::K_Axe: return 71.f;   // (the axe model's head, 2026-11-12)
+		case JeebItems::K_Pickaxe: return 76.f;   // (the pickaxe model's head reaches 78 cm)
 		case JeebItems::K_Rod: return 128.f;
 		case JeebItems::K_Staff: return 113.f;
 		case JeebItems::K_Wand: return 43.f;
@@ -88,14 +91,7 @@ namespace WeaponDesign
 		{
 		case K_Sword:
 		{
-			// (a longer grip since the Meshy model's big fists: the guard and the pommel both show either side of the hand)
-			Lathe(Add(Leather), KnightDesign::Prof({ 0, 13.5, 2.2, 13.1, 2.5, 7, 2.2, 0, 2.5, -7, 2.2, -13.1, 0, -13.5 }), 14, 1.0, 1.0, Pl);
-			{ FMD& M = Add(Trim);
-			  Blob(M, 3.6, 3.6, 3.6, At(0, 0, 16.0));
-			  RBox(M, 1.9, 11.5, 1.8, 0.5, At(0, 0, -16.0));
-			  Blob(M, 2.6, 2.6, 2.6, At(0, 11.9, -16.0)); Blob(M, 2.6, 2.6, 2.6, At(0, -11.9, -16.0)); }
-			BladeSolid(Add(Plate), { {-17.0, 4.8, 1.4, 0}, {-58.5, 4.3, 1.2, 0}, {-68.5, 3.1, 0.9, 0}, {-75.5, 1.4, 0.6, 0}, {-79.5, 0, 0, 0} }, Pl);
-			break;
+			break;   // (a model since 2026-11-12: JeebProps, the community library's Knight Sword)
 		}
 		case K_Broadsword:
 		{
@@ -120,13 +116,7 @@ namespace WeaponDesign
 		}
 		case K_Axe:
 		{
-			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 16, 2.1, 15.5, 2.3, 0, 2.3, -60, 2.0, -70, 0, -71 }), 12, 1.0, 1.0, Pl);   // (16 behind the grip: room for the left fist in a two-handed chop)
-			{ FMD& M = Add(Trim);
-			  RBox(M, 3.6, 2.4, 6.0, 0.6, At(1, 0, -62)); }                 // socket on the haft
-			{ FMD& M = Add(Plate);                                              // (the -X side: forward as he carries it, owner 2026-11-06)
-			  RBox(M, 7.5, 1.5, 9.0, 0.7, At(-7.0, 0, -64));                   // head
-			  Ellipsoid(M, 3.0, 1.0, 13.0, 1.0, 1.0, 14, 10, At(-14.0, 0, -64)); } // curved cutting edge
-			break;
+			break;   // (a model since 2026-11-12: JeebProps; 16 cm of haft behind the grip for the left fist in a two-handed chop, the blade on the -X side, forward as he carries it)
 		}
 		case K_BattleAxe:
 		{
@@ -175,30 +165,17 @@ namespace WeaponDesign
 			Blob(AddFixed(FLinearColor(0.4f, 0.8f, 1.0f), 2.2f), 6.4, 6.4, 6.4, At(0, 0, -120));
 			break;
 		}
-		case K_Bow:
+		case K_Bow:   // (the stave is a model since 2026-11-12, JeebProps, its own string cut off; only the string is built here, last, between the model's string ends)
 		{
-			TArray<FVector> Path; TArray<FVector2D> AB;
-			const int32 N = 14;
-			for (int32 i = 0; i <= N; ++i)
-			{
-				const double X = -48.0 + 96.0 * double(i) / double(N);
-				Path.Add(V3(X, 0, BowBrace * X * X / (48.0 * 48.0)));
-				AB.Add(FVector2D(1.5 + 1.2 * (1.0 - FMath::Abs(X) / 48.0), 1.5 + 1.1 * (1.0 - FMath::Abs(X) / 48.0)));
-			}
-			Sweep(Add(Plate), Path, AB, V3(0, 1, 0), 8, 1.0, Pl);
-			{ FMD& M = Add(Leather);
-			  RBox(M, 7.5, 2.4, 2.8, 0.6, At(0, 0, 0)); }
-			{ FMD& M = Add(Trim);
-			  Blob(M, 1.4, 1.4, 1.4, At(-48, 0, BowBrace)); Blob(M, 1.4, 1.4, 1.4, At(48, 0, BowBrace)); }
-			{ TArray<FVector> SP; TArray<FVector2D> SA; // string
-			  for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-48.0 + 48.0 * i, 0, BowBrace)); SA.Add(FVector2D(0.28, 0.28)); }
-			  Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl); }
+			TArray<FVector> SP; TArray<FVector2D> SA;
+			for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-BowTipX + BowTipX * i, 0, BowBrace)); SA.Add(FVector2D(0.28, 0.28)); }
+			Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl);
 			break;
 		}
 		case K_Longbow:   // (the stave is a model, JeebProps; only its string is built here, last, as the bow's is)
 		{
 			TArray<FVector> SP; TArray<FVector2D> SA;
-			for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-76.0 + 76.0 * i, 0, 16.0)); SA.Add(FVector2D(0.3, 0.3)); }
+			for (int32 i = 0; i <= 2; ++i) { SP.Add(V3(-JeebProps::LongTipX + JeebProps::LongTipX * i, 0, JeebProps::LongBrace)); SA.Add(FVector2D(0.3, 0.3)); }
 			Sweep(AddFixed(FLinearColor(0.9f, 0.88f, 0.78f)), SP, SA, V3(0, 1, 0), 5, 1.0, Pl);
 			break;
 		}

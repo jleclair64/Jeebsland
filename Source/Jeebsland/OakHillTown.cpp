@@ -1,6 +1,8 @@
 #include "OakHillTown.h"
 #include "OakHill.h"
 #include "Terrain.h"
+#include "GroundMask.h"
+#include "GroundDecor.h"
 #include "Forest.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -20,7 +22,6 @@ namespace
 		const int32 Q = FMath::RoundToInt(V * 10.f);   // millimetres
 		for (int32 b = 0; b < 4; ++b) { H ^= uint32((Q >> (8 * b)) & 0xFF); H *= 16777619u; }
 	}
-	float AngleDiff(float A, float B) { return FMath::Abs(FMath::FindDeltaAngleDegrees(A, B)); }
 }
 
 AOakHillTown::AOakHillTown()
@@ -39,6 +40,7 @@ void AOakHillTown::BeginPlay()
 	BuildGround();
 	const double T1 = FPlatformTime::Seconds();
 	BuildBuildings();
+	if (!JeebOakHill::TestOff(TEXT("NoOakMeshes"))) JeebDecor::DressFoundations(this, Foundations, 8128);   // (stones and shrubs at the walls: visual only)
 	UE_LOG(LogTemp, Log, TEXT("JEEBOAK built ground %.0f ms, buildings %.0f ms, hash=%08x"), (T1 - T0) * 1000.0, (FPlatformTime::Seconds() - T1) * 1000.0, Hash);
 	LogChecks();
 }
@@ -59,6 +61,14 @@ void AOakHillTown::BuildGround()
 		return bAlongY ? FMath::Lerp(JeebTerrain::HeightAt(X, V0), JeebTerrain::HeightAt(X, V0 + Coarse), T)
 		               : FMath::Lerp(JeebTerrain::HeightAt(V0, Y), JeebTerrain::HeightAt(V0 + Coarse, Y), T);
 	};
+	auto CoarseMask = [&](float X, float Y, bool bAlongY)
+	{
+		auto MaskAt = [](float PX, float PY) { return JeebGround::At(PX, PY, JeebTerrain::HeightAt(PX, PY), JeebGround::Upness(PX, PY)); };
+		const float V = bAlongY ? Y : X;
+		const float V0 = FMath::FloorToFloat(V / Coarse) * Coarse, T = (V - V0) / Coarse;
+		if (T < 1.e-4f) return MaskAt(X, Y);
+		return bAlongY ? JeebGround::FMask::Lerp(MaskAt(X, V0), MaskAt(X, V0 + Coarse), T) : JeebGround::FMask::Lerp(MaskAt(V0, Y), MaskAt(V0 + Coarse, Y), T);
+	};
 	TArray<FVector> V, N; TArray<FVector2D> UV; TArray<FLinearColor> Col; TArray<int32> Tri, Back;
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 	for (int32 i = 0; i <= NI; ++i)
@@ -74,10 +84,16 @@ void AOakHillTown::BuildGround()
 			const float DY = (JeebTerrain::HeightAt(X, Y + Step) - JeebTerrain::HeightAt(X, Y - Step)) / (2.f * Step);
 			N.Add(FVector(-DX, -DY, 1.f).GetSafeNormal());
 			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
-			// red: how worn the ground is beside a road (the square's ground material, M_Ground, darkens it into the dirt)
-			float Worn = 0.f;
-			if (!bServer) Worn = 1.f - FMath::SmoothStep(-20.f, 250.f, JeebTerrain::PathClearance(X, Y));
-			Col.Add(FLinearColor(Worn, 0.f, 0.f, 1.f));
+			// what the ground is here (GroundMask.h: worn by roads and doorways, rock, mud, sand), painted by M_Ground like the square
+			// and the world. Along the three edges shared with the world's 8 m mesh it takes the straight line between that mesh's
+			// own corners, as the heights do, so the colours meet it exactly.
+			if (!bServer)
+			{
+				if (i == 0 || i == NI) Col.Add(CoarseMask(X, Y, true).Color());
+				else if (j == NJ) Col.Add(CoarseMask(X, Y, false).Color());
+				else Col.Add(JeebGround::At(X, Y, Z, JeebGround::Upness(X, Y)).Color());
+			}
+			else Col.Add(FLinearColor::Black);
 			HashIn(Hash, Z);
 		}
 	const int32 W = NJ + 1;
@@ -116,9 +132,6 @@ void AOakHillTown::BuildBuildings()
 {
 	using namespace JeebOakHill;
 	const bool bServer = IsNetMode(NM_DedicatedServer);
-	// every road's points, to turn each door toward the nearest road
-	TArray<FVector2D> RoadPts;
-	for (const FRoad& R : Roads()) RoadPts.Append(R.Pts);
 	int32 Placed = 0, Missing = 0;
 	for (const FPlot& P : Plots())
 	{
@@ -126,15 +139,8 @@ void AOakHillTown::BuildBuildings()
 		const FModel* Mdl = FindModel(P.Model);
 		const float Scale = Mdl ? Mdl->Scale : 1.f, DoorYaw = Mdl ? Mdl->DoorYaw : 90.f;
 		const FVector2D C = FromPx(P.Px, P.Py);
-		// The model's long side (its X, or its Y for bLongY) along the plot's long side, then turned whichever of the two ways puts
-		// its door toward the road
-		const float Yaw0 = (P.W >= P.H ? 90.f : 0.f) + P.Rot - (Mdl && Mdl->bLongY ? 90.f : 0.f);
-		float ToRoad = Yaw0 + DoorYaw;
-		{
-			float Best = 1.0e12f;
-			for (const FVector2D& Q : RoadPts) { const float D = FVector2D::DistSquared(Q, C); if (D < Best) { Best = D; ToRoad = FMath::RadiansToDegrees(FMath::Atan2(Q.Y - C.Y, Q.X - C.X)); } }
-		}
-		const float Yaw = AngleDiff(Yaw0 + DoorYaw, ToRoad) <= AngleDiff(Yaw0 + 180.f + DoorYaw, ToRoad) ? Yaw0 : Yaw0 + 180.f;
+		// The model's long side along the plot's long side, its door toward the road (shared with the grass's wall test, OakHill.h)
+		const float Yaw = BuildingYaw(P, Mdl);
 		const FVector At(C.X, C.Y, JeebTerrain::HeightAt(C.X, C.Y));   // (the plot is level: JeebOakHill::TownM)
 		const FString Asset = AssetName(P.Model);
 		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/Buildings/SM_%s.SM_%s"), *Asset, *Asset));
@@ -171,6 +177,15 @@ void AOakHillTown::BuildBuildings()
 		Walls->RegisterComponent();
 		HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, Yaw); HashIn(Hash, Ext.X); HashIn(Hash, Ext.Y); HashIn(Hash, Ext.Z);
 		++Placed;
+		// (its walls and door for the stones and shrubs at its foundation, GroundDecor.h; not the market stalls, which have their own
+		// clutter round them, or the well on the lawn)
+		if (FCString::Strcmp(P.Model, TEXT("GeneralStore")) != 0 && FCString::Strcmp(P.Model, TEXT("PotionStall")) != 0 && FCString::Strcmp(P.Model, TEXT("BankStall")) != 0 && FCString::Strcmp(P.Model, TEXT("OakHillWell")) != 0)
+		{
+			const FVector WallMid = At + FRotator(0.f, Yaw, 0.f).RotateVector(Mid);
+			JeebDecor::FFootprint Fp;
+			Fp.Centre = FVector2D(WallMid.X, WallMid.Y); Fp.Yaw = Yaw; Fp.Half = FVector2D(Ext.X, Ext.Y); Fp.DoorYaw = Yaw + DoorYaw;
+			Foundations.Add(Fp);
+		}
 		// the market stalls get barrels, crates and sacks round them (the bank stall has no yard behind: only beside it)
 		if (FCString::Strcmp(P.Model, TEXT("GeneralStore")) == 0 || FCString::Strcmp(P.Model, TEXT("PotionStall")) == 0 || FCString::Strcmp(P.Model, TEXT("BankStall")) == 0)
 			BuildStoreClutter(At, Yaw + DoorYaw, (Hi.X - Lo.X) * 0.5f, (Hi.Y - Lo.Y) * 0.5f, FCString::Strcmp(P.Model, TEXT("BankStall")) != 0);

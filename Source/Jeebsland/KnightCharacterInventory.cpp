@@ -43,7 +43,7 @@ void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing) { Inv(EInvOp::U
 // R (2026-11-03): the bar is the hand slot and the bow slot; R swaps between them (never to an empty one)
 void AKnightCharacter::CycleHotbar(int32 Dir)
 {
-	if (!Skills || IsUIOpen() || bClimbing) return;
+	if (!Skills || IsUIOpen() || bClimbing || InClimbMove()) return;
 	const int32 Other = Skills->Selected == 0 ? 1 : 0;
 	if (Skills->Hotbar[Other] != 0) SelectHotbar(Other);
 }

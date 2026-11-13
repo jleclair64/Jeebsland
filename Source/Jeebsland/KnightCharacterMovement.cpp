@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "KnightMovement.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Messages.h"
@@ -50,17 +51,20 @@ void AKnightCharacter::StopSprint()
 
 void AKnightCharacter::StartCrouch()
 {
+	if (UKnightMovement* KM = KnightMove()) { KM->bWantsLetGo = true; if (KM->InClimbMove()) return; }   // Ctrl on a rock face lets go (and never grabs while held)
 	if (bSitting || bRolling || bSliding || bClimbing || bMounted) return;
 	bCrouched = true;
 }
 
 void AKnightCharacter::StopCrouch()
 {
+	if (UKnightMovement* KM = KnightMove()) KM->bWantsLetGo = false;
 	bCrouched = false;
 }
 
 void AKnightCharacter::TryStartClimb()
 {
+	if (InClimbMove()) return;   // (not from a rock face or a mantle)
 	if (bSitting || bRolling || bSliding || bMounted || IsUIOpen()) return;
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	const FVector Acc = Move->GetCurrentAcceleration();
@@ -171,7 +175,7 @@ void AKnightCharacter::StartSlide()
 {
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	const float Speed = GetVelocity().Size2D();
-	if (bSliding || bRolling || bSitting || bClimbing || bMounted || SlideCooldown > 0.f || Move->IsFalling()) return;
+	if (bSliding || bRolling || bSitting || bClimbing || InClimbMove() || bMounted || SlideCooldown > 0.f || Move->IsFalling()) return;
 	if (!bSprinting || Speed < 480.f || Stamina < 10.f) return; // slides start from a sprint
 	BeginSlide(GetVelocity().GetSafeNormal2D(), FMath::Max(Speed, 750.f) * 1.15f);
 	if (IsLocallyControlled() && !HasAuthority()) ServerSlide(SlideDir, SlideSpeed);   // online: the server slides us too
@@ -197,7 +201,7 @@ void AKnightCharacter::BeginSlide(const FVector& Dir, float Speed)
 void AKnightCharacter::StartRoll()
 {
 	UCharacterMovementComponent* Move = GetCharacterMovement();
-	if (bRolling || bSliding || bSitting || bClimbing || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
+	if (bRolling || bSliding || bSitting || bClimbing || InClimbMove() || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
 	if (Smash == ESmash::Charging || MoveLocked()) return;   // (nor rolled out of, nor out of a kick; knocked down, A or D rolls: GetUp)
 	static const bool bShotMode = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
 	if (bShotMode) return;   // (test pictures: a stray Alt as the window opens would roll him)
@@ -277,12 +281,18 @@ void AKnightCharacter::CheckJumpInput(float DeltaTime)
 		return;
 	}
 	if (!bPressedJump || JumpKeyHoldTime > 0.f) return;   // nothing new
+	if (UKnightMovement* KM = KnightMove(); KM && KM->InClimbMove())   // on a rock face Space is the climb jump (KnightMovement.cpp)
+	{
+		if (KM->IsCustom(JeebClimb::Climb)) KM->QueueClimbJump();
+		return;
+	}
 	// Space just went down: leave the ground, unless something stops him
 	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
 	{
 		bPressedJump = false;
 		return;
 	}
+	if (UKnightMovement* KM = KnightMove(); KM && KM->IsMovingOnGround() && KM->MantleNearby()) { KM->AskJump(); return; }   // by a fence: the mantle, or the jump, decided in the move
 	if (M->DoJump(bClientUpdating, DeltaTime))
 	{
 		JumpCurrentCount++;
@@ -343,6 +353,16 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 	{
 		const FRotator CamYaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
 		NoteDI(FRotationMatrix(CamYaw).GetUnitAxis(EAxis::X) * Forward + FRotationMatrix(CamYaw).GetUnitAxis(EAxis::Y) * Right);
+	}
+	// On a rock face W and S climb up and down it and A and D go sideways, whatever the camera; scripted moves (climb-up, mantle) take no keys
+	if (UKnightMovement* KM = KnightMove(); KM && KM->InClimbMove())
+	{
+		if (KM->OnWall())
+		{
+			AddMovementInput(UKnightMovement::WallUp(KM->WallNormal), Forward);
+			AddMovementInput(UKnightMovement::WallRight(KM->WallNormal), Right);
+		}
+		return;
 	}
 	// Knocked down: once he has landed, A or D rolls away that way, W or S gets straight up
 	if (bKnockedDown)
@@ -517,8 +537,8 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
-	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;
-	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
+	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;
+	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
 	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
 	{
 		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)

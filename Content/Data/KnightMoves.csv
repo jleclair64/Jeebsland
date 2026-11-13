@@ -35,3 +35,15 @@ CrossFire,CrossFire,0.0,0,0,0.27,0,0.05,0
 CrossReload,CrossReload,0.2,0,0,3.1,0,0.1,0
 FishCast,FishCast,0.5,0,0,3.0,0,0.2,0
 Drink,Drink,2.0,0,0,5.7,0,0.2,0
+WallGrab,WallHang,0.4,0,0,1.3,2,0.15,0,0
+WallUp,WallUp,0,111,0,2.0,2,0.25,0,0
+WallDown,WallDown,0,111,0,2.0,2,0.25,0,0
+WallLeft,ShimmyL,0,52,0,1.17,2,0.25,0,0
+WallRight,ShimmyR,0,52,0,1.17,2,0.25,0,0
+HopUp,HopUp,0.2,0,0,1.15,2,0.12,0,0
+HopDown,HopDown,0,0,0,0.9,2,0.12,0,0
+HopLeft,HopL,0.25,0,0,1.2,2,0.12,0,0
+HopRight,HopR,0.25,0,0,1.2,2,0.12,0,0
+LedgeUp,LedgeUp,0,0,0,1.13,2,0.15,0,0
+VaultOver,VaultTwo,0,0,0,0.34,2,0.12,0,0
+ClimbOnto,LedgeUp,0.3,0,0,1.13,2,0.15,0,0

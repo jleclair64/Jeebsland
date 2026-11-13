@@ -14,4 +14,5 @@ amulet,Emerald Necklace,180,1,1,0,0,0,yes,1,0,0.85 0.85 0.9,0.1 0.8 0.35,Every h
 amulet,Chaos Pendant,160,1,1,0,-3,5,no,1,0,0.85 0.85 0.9,0.65 0.2 0.95,"Lowest damage -3, highest damage +5"
 amulet,Guardian Amulet,150,1,1.15,0,0,0,no,1,0,0.85 0.85 0.9,0.3 0.5 1.0,+15% defence
 amulet,Vitality Amulet,150,1,1,0,0,0,no,1,25,0.85 0.85 0.9,0.95 0.2 0.3,+25 maximum health
+amulet,Astral Prism Pendant,190,1.08,1.08,0,0,0,no,1,0,0.85 0.75 0.4,0.45 0.55 1.0,"+8% attack, +8% defence"
 crest,Red Helm Brush,120,1,1,0,0,0,no,1.05,0,0.80 0.10 0.10,0.80 0.10 0.10,+5% speed. A red horsehair brush along the crest of your helm
