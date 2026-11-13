@@ -1,4 +1,4 @@
-﻿#include "KnightCharacter.h"
+#include "KnightCharacter.h"
 #include "Messages.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
@@ -547,7 +547,7 @@ void AKnightCharacter::OnRep_MoveFlags()
 	bFishing = (RepMoveFlags & 128) != 0;
 }
 
-// The server says we fell: wake up in Blackrock here too
+// The server says we fell: wake up on Oak Hill's plaza here too
 void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float Yaw)
 {
 	if (bMounted) Dismount();
@@ -563,5 +563,5 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	SetActorLocation(Wake);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
 	if (AController* C = GetController()) C->SetControlRotation(FRotator(0.f, Yaw, 0.f));
-	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
+	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Oak Hill."));
 }

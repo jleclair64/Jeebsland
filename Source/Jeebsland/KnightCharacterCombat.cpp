@@ -26,6 +26,7 @@
 #include "Engine/Engine.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
+#include "OakHill.h"
 #include "ProceduralMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -346,8 +347,8 @@ void AKnightCharacter::HurtHorse(float Amount)
 
 // ---------------- Dying ----------------
 // Whatever killed you (a blow, the poison gas, anything), everything you own goes into a big sack where you fell: your pack,
-// your weapon bar, your armour and the rest of what you wore, your potions and your ingots. You wake up in Blackrock, just
-// inside the east gate, in the starting kit, at full health. Skills and levels stay with you.
+// your weapon bar, your armour and the rest of what you wore, your potions and your ingots. You wake up on Oak Hill's
+// plaza, in the starting kit, at full health. Skills and levels stay with you.
 void AKnightCharacter::Die()
 {
 	if (!Skills || !HasAuthority()) return;
@@ -375,16 +376,19 @@ void AKnightCharacter::Die()
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
+	// Oak Hill's plaza (owner 2026-11-12); Blackrock's east gate in MoveLab or a test run without the town
+	const bool bOak = JeebOakHill::Enabled() && !JeebHit::InMoveLab(GetWorld());
 	const FVector2D VC = JeebTerrain::VillageCenter();
-	const FVector2D Wake(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
+	const FVector2D Wake = bOak ? FVector2D(JeebOakHill::SpawnX, JeebOakHill::SpawnY) : FVector2D(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
+	const float WakeYaw = bOak ? JeebOakHill::SpawnYaw : 180.f;
 	const FVector WakeAt(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f);
 	SetActorLocation(WakeAt);
-	SetActorRotation(FRotator(0.f, 180.f, 0.f));
+	SetActorRotation(FRotator(0.f, WakeYaw, 0.f));
 	MaxHealth = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3;
 	Health = (float)MaxHealth;
 	LastHurtTime = -100.f;
-	if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDied(WakeAt, 180.f);   // the player's machine wakes up too
-	else JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Blackrock."));
+	if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDied(WakeAt, WakeYaw);   // the player's machine wakes up too
+	else JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Oak Hill."));
 }
 
 // ---------------- Potions ----------------

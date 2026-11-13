@@ -8,6 +8,9 @@
 #include "JeebSave.h"
 #include "JeebGameInstance.h"
 #include "Terrain.h"
+#include "OakHill.h"
+#include "HitBoxes.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Engine/World.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerState.h"
@@ -232,7 +235,11 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 
 	// A saved character comes back where it logged out (if that spot is sensible)
 	const AKnightPlayerController* KPC = Cast<AKnightPlayerController>(NewPlayer);
-	if (KPC && KPC->PendingSave && KPC->PendingSave->bHasPos)
+	const bool bLab = JeebHit::InMoveLab(GetWorld());
+	const bool bOak = !bLab && JeebOakHill::Enabled();
+	// TESTING (owner 2026-11-12): [Jeebsland.Testing] StartAtOakHill=True in DefaultGame.ini starts every login at Oak Hill, wherever it logged out
+	static const bool bAlwaysOak = []() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("StartAtOakHill"), v, GGameIni); return v; }();
+	if (KPC && KPC->PendingSave && KPC->PendingSave->bHasPos && !(bOak && bAlwaysOak))
 	{
 		const FVector P = KPC->PendingSave->Pos;
 		const float Ground = JeebTerrain::HeightAt(P.X, P.Y);
@@ -243,14 +250,15 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 		}
 	}
 
-	// The first player stands at the old starting point; the next ones on a 2 m ring round it, 60 degrees apart
-	FVector2D At(0.f, 0.f);
+	// The first player stands at the starting point (Oak Hill's plaza; the old one in MoveLab); the next ones on a 2 m ring round it, 60 degrees apart
+	const FVector2D Base = bOak ? FVector2D(JeebOakHill::SpawnX, JeebOakHill::SpawnY) : FVector2D(0.f, 0.f);
+	FVector2D At = Base;
 	if (SpawnCount > 0)
 	{
 		const float A = FMath::DegreesToRadians(60.f * (SpawnCount - 1));
-		At = FVector2D(FMath::Cos(A), FMath::Sin(A)) * 200.f;
+		At = Base + FVector2D(FMath::Cos(A), FMath::Sin(A)) * 200.f;
 	}
 	SpawnCount = (SpawnCount + 1) % 7;
 	const FVector Loc(At.X, At.Y, JeebTerrain::HeightAt(At.X, At.Y) + 130.f);
-	return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), Loc, FRotator::ZeroRotator, Params);
+	return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), Loc, FRotator(0.f, bOak ? JeebOakHill::SpawnYaw : 0.f, 0.f), Params);
 }

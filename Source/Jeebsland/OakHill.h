@@ -37,6 +37,9 @@ namespace JeebOakHill
 
 	constexpr float PosX = -3550.f, PosY = 18290.f;   // the plaza's centre (JeebWorld::Towns() "Oak Hill", FromSketch(543, 875))
 	inline FVector2D FromPx(float Px, float Py) { return FVector2D(PosX + (410.f - Py) * 25.f, PosY + (Px - 255.f) * 25.f); }
+	// Where new players, everyone after a death, and (while [Jeebsland.Testing] StartAtOakHill is on) every login appear (owner, 2026-11-12):
+	// on the plaza 8 m west of the big oak, facing it (the well is on its southeast side)
+	constexpr float SpawnX = PosX, SpawnY = PosY - 800.f, SpawnYaw = 90.f;
 	inline float EastM(float Y) { return (Y - PosY) / 100.f; }
 	inline float NorthM(float X) { return (X - PosX) / 100.f; }
 
