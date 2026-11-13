@@ -188,6 +188,27 @@ PROFILES = {
             ((33.7, 16.6, 32.2), {"keep": 1}),
         ],
     },
+    "bankstall": {   # (tile: shift, its slate is near grey) Bank_A (owner's pick, 2026-11-12): blue-grey slate roof to the town's clay tile, its grey stone warmed; brass, gold and the vault kept
+        "shift": ("tile",),
+        "anchors": [
+            ((20.3, -2.6, -8.8), {"tile": 1}),       # blue slate roof
+            ((13.7, -2.1, -8.7), {"tile": 1}),       # dark slate, roof shading
+            ((20.0, -1.0, -2.1), {"tile": 0.5, "stone": 0.5}),   # neutral grey: roof edges and stone shade
+            ((20.2, 2.3, 6.0), {"stone": 1}),        # grey stone
+            ((29.2, 2.5, 7.4), {"stone": 1}),
+            ((24.0, 5.2, 12.5), {"stone": 1}),
+            ((33.2, 5.7, 16.6), {"stone": 1}),       # beige stone
+            ((48.1, 5.4, 17.8), {"stone": 1}),       # pale stone
+            ((59.1, 4.6, 18.1), {"plaster": 1}),     # cream
+            ((12.2, 8.4, 11.6), {"wood": 1}),        # pillars and counter
+            ((17.4, 6.7, 12.0), {"wood": 1}),
+            ((18.6, 10.5, 18.5), {"wood": 1}),
+            ((36.8, 8.1, 26.3), {"keep": 1}),        # brass
+            ((46.1, 7.2, 32.8), {"keep": 1}),
+            ((57.0, 6.5, 44.7), {"keep": 1}),        # gold
+            ((69.2, 5.4, 50.7), {"keep": 1}),
+        ],
+    },
     "well": {
         "anchors": [
             ((65.8, -0.5, 9.4), {"stone": 1}),       # #a69f8f pale stone

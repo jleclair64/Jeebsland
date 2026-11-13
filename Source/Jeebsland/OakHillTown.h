@@ -30,4 +30,8 @@ private:
 	void BuildGround();
 	void BuildBuildings();
 	void LogChecks();
+	// Barrels, crates, sacks, a cart and a rope coil behind and beside the market stall (owner, 2026-11-12: stuff behind it
+	// too, like barrels or other junk, to fill in the scene): simple shapes, separate from the building's model
+	// (bBehind: also the crates, barrels, sacks and cart behind it; a stall with no yard behind gets only the pieces beside it)
+	void BuildStoreClutter(const FVector& At, float FrontYaw, float HalfWidthCm, float HalfDepthCm, bool bBehind = true);
 };

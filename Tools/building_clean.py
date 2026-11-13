@@ -25,6 +25,14 @@ BUILDINGS = {
     "OakHillTownHall_300k":    dict(file="OakHillTownHall_300k.glb",    length=2100.0, sink=20.0),
     "OakHillChurch_300k":      dict(file="OakHillChurch_300k.glb",      length=1330.0, sink=25.0),
     "OakHillWell_150k":        dict(file="OakHillWell_150k.glb",        length=340.0,  sink=10.0),
+    # The general store (owner chose candidate B, 2026-11-12; Meshy task 01a1d25f-9e40-732b-8d8b-028ff97f9972): a timber trading post with an
+    # open front (its -Y in Blender), 290k triangles as it came, its own colours kept (the palette would flatten its goods)
+    "GeneralStore_300k":       dict(file="GeneralStore_B.glb",          length=1100.0, sink=15.0),
+    # Two more market stalls (owner, 2026-11-12). The bank: Bank_A.glb repainted to the town (building_palette.py "bankstall") as
+    # BankStall_A_town.glb, open front +Y in Blender. The potion shop: PotionShop_A.glb as it came (its own colours), stretched
+    # deeper (ys) and lower (zs) because Meshy made it shallow and tall
+    "BankStall_300k":          dict(file="BankStall_A_town.glb",        length=1100.0, sink=15.0),
+    "PotionStall_300k":        dict(file="PotionShop_A.glb",            length=1100.0, sink=15.0, ys=1.5, zs=0.75),
 }
 names = a[2:] or list(BUILDINGS)
 
@@ -83,8 +91,8 @@ for name in names:
     lo, hi = co.min(axis=0), co.max(axis=0)
     S = B["length"] / (hi[0] - lo[0])
     co[:, 0] = (co[:, 0] - (lo[0] + hi[0]) * 0.5) * S
-    co[:, 1] = (co[:, 1] - (lo[1] + hi[1]) * 0.5) * S
-    co[:, 2] = (co[:, 2] - lo[2]) * S - B["sink"]
+    co[:, 1] = (co[:, 1] - (lo[1] + hi[1]) * 0.5) * S * B.get("ys", 1.0)   # (ys, zs: stretch a model that came out the wrong shape)
+    co[:, 2] = (co[:, 2] - lo[2]) * S * B.get("zs", 1.0) - B["sink"]
     me.vertices.foreach_set("co", co.reshape(-1).astype(np.float32))
     me.update()
     # the walls' rectangle: the stone base, without the porch posts or the odd stray point

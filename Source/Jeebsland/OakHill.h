@@ -9,8 +9,8 @@
 // plan, drawn over Docs/OakHillSketch.webp). Header only, so the ground, the roads, the grass and the trees all read the same
 // numbers on every machine. The buildings themselves are placed by AOakHillTown (OakHillTown.cpp).
 //
-// Coordinates: the plan is in SKETCH UNITS (pixels of the 540 x 800 sketch, north up). One unit is 25 cm. In metres from the
-// plaza's centre: east e = (px - 255) / 4, north n = (410 - py) / 4. Game cm: X = PosX + n * 100, Y = PosY + e * 100.
+// Coordinates: the plan is in SKETCH UNITS (pixels of the 540 x 800 sketch, north up). One unit is Unit metres (17.5 cm since 2026-11-12, 25 before: the owner asked for the town at about half size, so it covers half the area; the models keep their real size, and the plots were hand-settled for it with an offline map, so the spacing pass below has little left to do). In metres from the
+// plaza's centre: east e = (px - 255) * Unit, north n = (410 - py) * Unit. Game cm: X = PosX + n * 100, Y = PosY + e * 100.
 // Rotations are degrees clockwise as seen on the north-up map, which is Unreal's yaw.
 namespace JeebOakHill
 {
@@ -35,10 +35,13 @@ namespace JeebOakHill
 #endif
 	}
 
+	// Metres per sketch unit (the layout's scale), and how much of the plan's hill heights above the 4.5 m base is kept (the
+	// hills got narrower with the layout, so their rise is cut too, or the roads over them would be twice as steep)
+	constexpr float Unit = 0.175f, UnitCm = Unit * 100.f, HillRise = 0.75f;
 	constexpr float PosX = -3550.f, PosY = 18290.f;   // the plaza's centre (JeebWorld::Towns() "Oak Hill", FromSketch(543, 875))
-	inline FVector2D FromPx(float Px, float Py) { return FVector2D(PosX + (410.f - Py) * 25.f, PosY + (Px - 255.f) * 25.f); }
+	inline FVector2D FromPx(float Px, float Py) { return FVector2D(PosX + (410.f - Py) * UnitCm, PosY + (Px - 255.f) * UnitCm); }
 	// Where new players, everyone after a death, and (while [Jeebsland.Testing] StartAtOakHill is on) every login appear (owner, 2026-11-12):
-	// on the plaza 8 m west of the big oak, facing it (the well is on its southeast side)
+	// on the plaza 8 m west of the big oak (between its lawn and the ring road), facing it (the well is on its southeast side)
 	constexpr float SpawnX = PosX, SpawnY = PosY - 800.f, SpawnYaw = 90.f;
 	inline float EastM(float Y) { return (Y - PosY) / 100.f; }
 	inline float NorthM(float X) { return (X - PosX) / 100.f; }
@@ -88,9 +91,9 @@ namespace JeebOakHill
 		float Up = 0.f;
 		for (const FBump& B : Bumps())
 		{
-			const FVector2D L = Local(E, N, (B.Px - 255.f) * 0.25f, (410.f - B.Py) * 0.25f, B.Rot);
-			const float R = FMath::Sqrt(FMath::Square(L.X / (B.Rx * 0.25f)) + FMath::Square(L.Y / (B.Ry * 0.25f)));
-			const float Rise = (B.Top - 4.5f) * (1.f - JeebWorld::Smooth(B.Rin, B.Rout, R));
+			const FVector2D L = Local(E, N, (B.Px - 255.f) * Unit, (410.f - B.Py) * Unit, B.Rot);
+			const float R = FMath::Sqrt(FMath::Square(L.X / (B.Rx * Unit)) + FMath::Square(L.Y / (B.Ry * Unit)));
+			const float Rise = HillRise * (B.Top - 4.5f) * (1.f - JeebWorld::Smooth(B.Rin, B.Rout, R));
 			Up = SmoothMax(Up, Rise, 0.4f);
 		}
 		return BaseM(E, N) + Up;
@@ -100,22 +103,35 @@ namespace JeebOakHill
 	// Each Meshy model in /Game/Buildings: drawn Scale times its size (Tools/building_clean.py sets that size, by its X), its
 	// footprint in metres as drawn (its own X and Y), whether its long side is its Y, and which way its door faces in its own
 	// frame (yaw: 90 = its +Y; every model so far has it there, checked from four sides in Blender 2026-11-11).
-	struct FModel { const TCHAR* Name; float Scale; float LenX, LenY; bool bLongY; float DoorYaw; };
+	// Walls: the foundation's rectangle at foot height (cm, the model's own frame before Scale; the BUILD line's "walls x / y" from
+	// Tools/building_clean.py, the 1st..99th percentile of the points 15-45 cm up). The solid box follows it, so the knight walks
+	// right up to the stone (owner, 2026-11-12: the old box, 86% of the whole model's bounds, held him half a metre off).
+	struct FModel { const TCHAR* Name; float Scale; float LenX, LenY; bool bLongY; float DoorYaw; float WX0 = 0.f, WX1 = 0.f, WY0 = 0.f, WY1 = 0.f; };
 	inline const TArray<FModel>& Models()
 	{
 		static const TArray<FModel> M = {
-			{ TEXT("OakHillHouse"),       1.2f, 14.4f, 10.7f, false, 90.f },   // (the 12 m model drawn at 14.4 m so the door clears the knight)
-			{ TEXT("OakHillCornerHouse"), 1.2f, 10.8f, 11.8f, false, 90.f },
-			{ TEXT("OakHillSmith"),       1.f,  15.0f, 11.4f, false, 90.f },
-			{ TEXT("OakHillBank"),        1.f,  13.4f, 13.9f, false, 90.f },
-			{ TEXT("OakHillStore"),       1.f,  12.5f, 13.4f, false, 90.f },
-			{ TEXT("OakHillPotionShop"),  1.f,  12.0f, 9.6f,  false, 90.f },
-			{ TEXT("OakHillTownHall"),    1.f,  21.0f, 12.1f, false, 90.f },
-			{ TEXT("OakHillChurch"),      1.f,  13.3f, 15.1f, true,  90.f },   // (its door is on a short end)
-			{ TEXT("OakHillWell"),        1.f,  3.4f,  3.4f,  false, 90.f },
+			{ TEXT("OakHillHouse"),       1.2f, 14.4f, 10.7f, false, 90.f, -597.2f, 563.1f, -293.5f, 399.2f },   // (the 12 m model drawn at 14.4 m so the door clears the knight)
+			{ TEXT("OakHillCornerHouse"), 1.2f, 10.8f, 11.8f, false, 90.f, -410.7f, 335.6f, -459.7f, 432.6f },
+			{ TEXT("OakHillSmith"),       1.f,  15.0f, 11.4f, false, 90.f, -709.2f, 700.1f, -538.4f, 523.1f },
+			{ TEXT("OakHillBank"),        1.f,  13.4f, 13.9f, false, 90.f, -620.3f, 622.4f, -675.4f, 638.2f },
+			{ TEXT("OakHillStore"),       1.f,  12.5f, 13.4f, false, 90.f, -610.5f, 568.5f, -582.7f, 543.3f },
+			{ TEXT("OakHillPotionShop"),  1.f,  12.0f, 9.6f,  false, 90.f, -464.9f, 528.0f, -410.9f, 403.3f },
+			{ TEXT("OakHillTownHall"),    1.f,  21.0f, 12.1f, false, 90.f, -989.1f, 985.8f, -580.0f, 562.0f },
+			{ TEXT("OakHillChurch"),      1.f,  13.3f, 15.1f, true,  90.f, -591.5f, 573.5f, -709.2f, 723.0f },   // (its door is on a short end)
+			{ TEXT("OakHillWell"),        1.f,  3.4f,  3.4f,  false, 90.f, -151.8f, 121.5f, -117.9f, 117.6f },
+			// The general store (owner, 2026-11-12: candidate B, an open-fronted timber trading post; its front is -Y in Blender, which is +Y here: Unreal mirrors Blender's Y; added as a stall beside the shops). Its Y
+			// here is the stall's depth plus StoreYard metres front and back, so the spacing pass keeps room behind it for the
+			// barrels, crates and cart (AOakHillTown::BuildStoreClutter).
+			{ TEXT("GeneralStore"),       1.f,  11.0f, 7.7f + 2.f * 3.f, true,  90.f,  -533.0f, 526.0f, -374.8f, 376.8f },
+			// Two more stalls (owner, 2026-11-12), the potion shop with 1.5 m of yard front and back for its clutter, the bank 0.5 m: the bank (Bank_A repainted to
+			// the town; open front +Y in Blender, -Y here) and the potion shop (PotionShop_A, stretched deeper and lower; open front -Y
+			// in Blender, +Y here; its back is open too, so its clutter makes the back wall)
+			{ TEXT("BankStall"),          1.f,  11.0f, 9.45f + 2.f * 0.5f, false, -90.f, -508.4f, 524.3f, -459.6f, 265.1f },
+			{ TEXT("PotionStall"),        1.f,  11.0f, 7.45f + 2.f * 1.5f, false, 90.f,  -525.7f, 530.3f, -283.3f, 293.4f },
 		};
 		return M;
 	}
+	constexpr float StoreYard = 3.f, StoreDepth = 7.7f;
 	inline const FModel* FindModel(const TCHAR* Name)
 	{
 		for (const FModel& M : Models()) if (FCString::Strcmp(M.Name, Name) == 0) return &M;
@@ -145,29 +161,34 @@ namespace JeebOakHill
 				if (const FModel* M = FindModel(Model))
 				{
 					// (the model's long side, its X or its Y, lies along the plot's long side: AOakHillTown turns it so)
-					const float Long = 4.f * (M->bLongY ? M->LenY : M->LenX), Short = 4.f * (M->bLongY ? M->LenX : M->LenY);
+					const float Long = (M->bLongY ? M->LenY : M->LenX) / Unit, Short = (M->bLongY ? M->LenX : M->LenY) / Unit;
 					if (W >= H) { W = Long; H = Short; } else { W = Short; H = Long; }
 				}
 				A.Add({ Name, Model, Px, Py, W, H, Rot, EPlot::Building, true });
 			};
 			// The four shops round the plaza (16 x 11 m)
-			B(TEXT("Smith"), TEXT("OakHillSmith"), 195.f, 330.f, 64.f, 44.f, -35.f);
-			B(TEXT("Bank"), TEXT("OakHillBank"), 318.f, 345.f, 64.f, 44.f, 40.f);
-			B(TEXT("Store"), TEXT("OakHillStore"), 310.f, 485.f, 64.f, 44.f, -40.f);
-			B(TEXT("Potion Shop"), TEXT("OakHillPotionShop"), 195.f, 490.f, 64.f, 44.f, 25.f);
+			B(TEXT("Smith"), TEXT("OakHillSmith"), 183.f, 288.f, 64.f, 44.f, -35.f);
+			B(TEXT("Bank"), TEXT("OakHillBank"), 319.f, 292.f, 64.f, 44.f, 0.f);
+			B(TEXT("Store"), TEXT("OakHillStore"), 318.f, 521.f, 64.f, 44.f, -25.f);
+			B(TEXT("Potion Shop"), TEXT("OakHillPotionShop"), 163.f, 517.f, 64.f, 44.f, 25.f);
 			// The Town Hall east of the plaza, its door onto the east road (the plan's 15 x 42 m; the model is about 16 x 28)
-			B(TEXT("Town Hall"), TEXT("OakHillTownHall"), 430.f, 410.f, 64.f, 112.f, 0.f);
-			B(TEXT("Church"), TEXT("OakHillChurch"), 490.f, 150.f, 72.f, 120.f, 15.f);
+			// The market stall (owner, 2026-11-12: the new general store B, added beside the shops, not instead of one), west of the
+			// plaza by the west road; three more stalls like it are planned (smithy, bank and potion shop stalls)
+			B(TEXT("Market Stall"), TEXT("GeneralStore"), 94.f, 352.f, 50.f, 88.f, 0.f);
+			B(TEXT("Potion Stall"), TEXT("PotionStall"), 83.f, 463.f, 64.f, 44.f, 0.f);   // (opposite the market stall, south of the west road)
+			B(TEXT("Bank Stall"), TEXT("BankStall"), 379.f, 604.f, 64.f, 44.f, 45.f);   // (by the store, on the southeast road; only 0.5 m of yard, so its clutter stands beside it)
+			B(TEXT("Town Hall"), TEXT("OakHillTownHall"), 433.f, 434.f, 64.f, 112.f, 0.f);
+			B(TEXT("Church"), TEXT("OakHillChurch"), 528.f, 106.f, 72.f, 120.f, 15.f);
 			// The well on the plaza lawn, beside the big oak
-			B(TEXT("Well"), TEXT("OakHillWell"), 287.f, 440.f, 16.f, 16.f, 20.f);
+			B(TEXT("Well"), TEXT("OakHillWell"), 282.f, 435.f, 16.f, 16.f, 20.f);
 			// 16 houses (14.4 x 9 m): the first design, and the corner house where a house stands at a corner of the roads
 			struct FH { float Px, Py, Rot; bool bCorner; };
 			const FH Houses[] = {
-				{ 100.f, 100.f, -15.f, false }, { 405.f, 125.f, 10.f, false }, { 230.f, 195.f, 10.f, false }, { 205.f, 250.f, 5.f, true },
-				{ 330.f, 230.f, 15.f, false }, { 430.f, 265.f, 25.f, true }, { 500.f, 320.f, 25.f, false },   // (the plan's house at 315,280 is left out: the real bank and house overlapped there, with roads on both sides, 2026-11-12)
-				{ 130.f, 372.f, 0.f, true },
-				{ 120.f, 470.f, 0.f, true }, { 140.f, 540.f, 5.f, false }, { 75.f, 600.f, 0.f, false }, { 150.f, 680.f, 0.f, false },
-				{ 340.f, 560.f, 5.f, true }, { 380.f, 600.f, 20.f, false }, { 335.f, 680.f, 10.f, true }, { 490.f, 565.f, 30.f, false },
+				{ 97.f, 93.f, -15.f, false }, { 416.f, 117.f, 10.f, false }, { 575.f, 462.f, 0.f, false }, { 101.f, 227.f, 5.f, true },
+				{ 503.f, 195.f, 15.f, false }, { 434.f, 282.f, 25.f, true }, { 577.f, 366.f, 25.f, false },   // (the plan's house at 315,280 is left out: the real bank and house overlapped there, with roads on both sides, 2026-11-12)
+				{ 13.f, 357.f, 0.f, true },
+				{ 598.f, 261.f, -45.f, true }, { 59.f, 546.f, 5.f, false }, { 58.f, 761.f, 0.f, false }, { 157.f, 690.f, 0.f, false },
+				{ 306.f, 692.f, 5.f, true }, { 506.f, 680.f, 20.f, false }, { 335.f, 785.f, 10.f, true }, { 515.f, 570.f, 30.f, false },
 			};
 			for (const FH& H : Houses) B(TEXT("House"), H.bCorner ? TEXT("OakHillCornerHouse") : TEXT("OakHillHouse"), H.Px, H.Py, 58.f, 36.f, H.Rot);
 			// Kept empty for what isn't made yet: grass grows there, but no trees
@@ -176,31 +197,31 @@ namespace JeebOakHill
 			E(TEXT("Castle Ruins"), 240.f, 95.f, 128.f, 64.f, 20.f, EPlot::Empty, false);
 			E(TEXT("Garden"), 500.f, 440.f, 36.f, 152.f, 0.f, EPlot::Empty, false);
 			E(TEXT("Graveyard"), 470.f, 735.f, 120.f, 120.f, 0.f, EPlot::EmptyRound, false);
-			E(TEXT("North Fort"), 80.f, 295.f, 44.f, 104.f, 10.f, EPlot::Empty, false);
-			E(TEXT("South Fort"), 60.f, 525.f, 44.f, 104.f, 0.f, EPlot::Empty, false);
+			E(TEXT("North Fort"), 5.f, 246.f, 44.f, 104.f, 10.f, EPlot::Empty, false);
+			E(TEXT("South Fort"), -24.f, 574.f, 44.f, 104.f, 0.f, EPlot::Empty, false);
 			E(TEXT("Watchtower"), 140.f, 195.f, 40.f, 40.f, 0.f, EPlot::EmptyRound, false);
-			E(TEXT("Bridge"), 5.f, 410.f, 100.f, 24.f, 0.f, EPlot::Empty, false);
-			E(TEXT("Oak Lawn"), 255.f, 410.f, 88.f, 88.f, 0.f, EPlot::Lawn, false);
+			E(TEXT("Bridge"), -102.f, 410.f, 143.f, 34.f, 0.f, EPlot::Empty, false);
+			E(TEXT("Oak Lawn"), 255.f, 410.f, 84.f, 84.f, 0.f, EPlot::Lawn, false);
 			// The real models are a little bigger than some plan boxes: a building that would stand on a road steps back from it
-			// until its whole footprint is at least 1 m clear, and buildings closer than BuildingGap metres wall to wall (two
+			// until its whole footprint is at least 0.5 m clear (1 m before the town was shrunk), and buildings closer than BuildingGap metres wall to wall (two
 			// houses north of the plaza read as one lump, 2026-11-12) push each other apart, half each (the well stays put).
 			// The two rules take turns until both hold (the JEEBOAK log gives each building's final sketch spot).
 			auto Fill = [](FPlot& Pl)
 			{
-				Pl.Ce = (Pl.Px - 255.f) * 0.25f; Pl.Cn = (410.f - Pl.Py) * 0.25f;
+				Pl.Ce = (Pl.Px - 255.f) * Unit; Pl.Cn = (410.f - Pl.Py) * Unit;
 				Pl.Cs = FMath::Cos(FMath::DegreesToRadians(Pl.Rot)); Pl.Sn = FMath::Sin(FMath::DegreesToRadians(Pl.Rot));
-				Pl.Reach = 0.125f * FMath::Sqrt(Pl.W * Pl.W + Pl.H * Pl.H);
+				Pl.Reach = 0.5f * Unit * FMath::Sqrt(Pl.W * Pl.W + Pl.H * Pl.H);
 			};
 			auto Outline = [](const FPlot& Pl, int32 k)
 			{
 				const float U = (k % 6) / 5.f * 2.f - 1.f;
 				const int32 Side = k / 6;
 				const FVector2D L = Side == 0 ? FVector2D(U, 1.f) : Side == 1 ? FVector2D(U, -1.f) : Side == 2 ? FVector2D(1.f, U) : FVector2D(-1.f, U);
-				const FVector2D Lm(L.X * Pl.W * 0.125f, L.Y * Pl.H * 0.125f);
+				const FVector2D Lm(L.X * Pl.W * 0.5f * Unit, L.Y * Pl.H * 0.5f * Unit);
 				return FVector2D(Pl.Ce, Pl.Cn) + FVector2D(Lm.X * Pl.Cs + Lm.Y * Pl.Sn, -Lm.X * Pl.Sn + Lm.Y * Pl.Cs);
 			};
 			constexpr float BuildingGap = 3.f;
-			for (int32 Round = 0; Round < 16; ++Round)
+			for (int32 Round = 0; Round < 40; ++Round)
 			{
 				bool bMoved = false;
 				for (FPlot& Pl : A) Fill(Pl);
@@ -214,12 +235,15 @@ namespace JeebOakHill
 						for (int32 k = 0; k < 24; ++k) { const FVector2D Q = Outline(Pa, k); Gap = FMath::Min(Gap, PlotSD(Pb, Q.X, Q.Y)); }
 						for (int32 k = 0; k < 24; ++k) { const FVector2D Q = Outline(Pb, k); Gap = FMath::Min(Gap, PlotSD(Pa, Q.X, Q.Y)); }
 						if (Gap >= BuildingGap) continue;
-						const FVector2D Dir = (FVector2D(Pb.Ce, Pb.Cn) - FVector2D(Pa.Ce, Pa.Cn)).GetSafeNormal();
-						const bool bFixA = FCString::Strcmp(Pa.Model, TEXT("OakHillWell")) == 0, bFixB = FCString::Strcmp(Pb.Model, TEXT("OakHillWell")) == 0;
-						const float Push = (BuildingGap - Gap) + 0.3f, ShareA = bFixA ? 0.f : (bFixB ? 1.f : 0.5f);
+						// (only the one further from the plaza moves, straight out from it, so the town keeps its plan's arrangement and
+						// grows outward ring by ring instead of shops trading sides; the well never moves)
+						const bool bWellA = FCString::Strcmp(Pa.Model, TEXT("OakHillWell")) == 0, bWellB = FCString::Strcmp(Pb.Model, TEXT("OakHillWell")) == 0;
+						const bool bMoveB = bWellA || (!bWellB && FVector2D(Pb.Ce, Pb.Cn).SizeSquared() >= FVector2D(Pa.Ce, Pa.Cn).SizeSquared());
+						FPlot& Mv = bMoveB ? Pb : Pa;
+						const FVector2D Out = FVector2D(Mv.Ce, Mv.Cn).GetSafeNormal();
+						const float Push = (BuildingGap - Gap) + 0.3f;
 						// (metres east / north to sketch units: east is +Px, north is -Py)
-						Pa.Px -= Dir.X * Push * ShareA * 4.f; Pa.Py += Dir.Y * Push * ShareA * 4.f;
-						Pb.Px += Dir.X * Push * (1.f - ShareA) * 4.f; Pb.Py -= Dir.Y * Push * (1.f - ShareA) * 4.f;
+						Mv.Px += Out.X * Push / Unit; Mv.Py -= Out.Y * Push / Unit;
 						Fill(Pa); Fill(Pb);
 						bMoved = true;
 					}
@@ -228,7 +252,7 @@ namespace JeebOakHill
 				if (Pl.Kind != EPlot::Building) continue;
 				for (int32 Iter = 0; Iter < 12; ++Iter)
 				{
-					const FVector2D C((Pl.Px - 255.f) * 0.25f, (410.f - Pl.Py) * 0.25f);
+					const FVector2D C((Pl.Px - 255.f) * Unit, (410.f - Pl.Py) * Unit);
 					const float R = FMath::DegreesToRadians(Pl.Rot), Cs = FMath::Cos(R), Sn = FMath::Sin(R);
 					float Worst = 1.0e9f; FVector2D WorstAt = C, Near = C;
 					for (int32 k = 0; k < 24; ++k)
@@ -237,17 +261,17 @@ namespace JeebOakHill
 						const float U = (k % 6) / 5.f * 2.f - 1.f;
 						const int32 Side = k / 6;
 						const FVector2D L = Side == 0 ? FVector2D(U, 1.f) : Side == 1 ? FVector2D(U, -1.f) : Side == 2 ? FVector2D(1.f, U) : FVector2D(-1.f, U);
-						const FVector2D Lm(L.X * Pl.W * 0.125f, L.Y * Pl.H * 0.125f);
+						const FVector2D Lm(L.X * Pl.W * 0.5f * Unit, L.Y * Pl.H * 0.5f * Unit);
 						const FVector2D Q = C + FVector2D(Lm.X * Cs + Lm.Y * Sn, -Lm.X * Sn + Lm.Y * Cs);
 						FVector2D Nr;
 						const float D = RoadClearanceM(Q.X, Q.Y, &Nr);
 						if (D < Worst) { Worst = D; WorstAt = Q; Near = Nr; }
 					}
-					if (Worst >= 1.f) break;
+					if (Worst >= 0.5f) break;
 					const FVector2D Away = (WorstAt - Near).GetSafeNormal();
-					const float Move = (1.f - Worst) + 0.2f;
-					Pl.Px += Away.X * Move * 4.f;
-					Pl.Py -= Away.Y * Move * 4.f;
+					const float Move = (0.5f - Worst) + 0.2f;
+					Pl.Px += Away.X * Move / Unit;
+					Pl.Py -= Away.Y * Move / Unit;
 					bMoved = true;
 				}
 				}
@@ -255,9 +279,9 @@ namespace JeebOakHill
 			}
 			for (FPlot& Pl : A)
 			{
-				Pl.Ce = (Pl.Px - 255.f) * 0.25f; Pl.Cn = (410.f - Pl.Py) * 0.25f;
+				Pl.Ce = (Pl.Px - 255.f) * Unit; Pl.Cn = (410.f - Pl.Py) * Unit;
 				Pl.Cs = FMath::Cos(FMath::DegreesToRadians(Pl.Rot)); Pl.Sn = FMath::Sin(FMath::DegreesToRadians(Pl.Rot));
-				Pl.Reach = 0.125f * FMath::Sqrt(Pl.W * Pl.W + Pl.H * Pl.H);
+				Pl.Reach = 0.5f * Unit * FMath::Sqrt(Pl.W * Pl.W + Pl.H * Pl.H);
 			}
 			return A;
 		}();
@@ -268,9 +292,9 @@ namespace JeebOakHill
 	inline float PlotSD(const FPlot& P, float E, float N)
 	{
 		const float DE = E - P.Ce, DN = N - P.Cn;
-		if (P.Kind == EPlot::EmptyRound || P.Kind == EPlot::Lawn) return FMath::Sqrt(DE * DE + DN * DN) - P.W * 0.125f;
+		if (P.Kind == EPlot::EmptyRound || P.Kind == EPlot::Lawn) return FMath::Sqrt(DE * DE + DN * DN) - P.W * 0.5f * Unit;
 		const FVector2D L(DE * P.Cs - DN * P.Sn, DE * P.Sn + DN * P.Cs);
-		const FVector2D Q(FMath::Abs(L.X) - P.W * 0.125f, FMath::Abs(L.Y) - P.H * 0.125f);
+		const FVector2D Q(FMath::Abs(L.X) - P.W * 0.5f * Unit, FMath::Abs(L.Y) - P.H * 0.5f * Unit);
 		return FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
 	}
 
@@ -342,8 +366,8 @@ namespace JeebOakHill
 		return FMath::Lerp(Ground, JeebWorld::RiverLevel + TownM(E, N, (Ground - JeebWorld::RiverLevel) / 100.f) * 100.f, MPads);
 	}
 
-	// ------------------------------------------------------------------ roads (5 m wide), the plan's paths word for word
-	constexpr float RoadWidth = 500.f;
+	// ------------------------------------------------------------------ roads (3.5 m wide village lanes since the town was shrunk; 5 m before), the plan's paths
+	constexpr float RoadWidth = 350.f;
 	inline TArray<FVector2D> ParsePath(const TCHAR* S)
 	{
 		// M x y, L x y and C x1 y1 x2 y2 x y, in sketch units; returns dense game points about every 60 cm
@@ -357,7 +381,7 @@ namespace JeebOakHill
 			else if (Cmd == 'L' && Num.Num() >= 2)
 			{
 				const FVector2D To(Num[0], Num[1]);
-				const int32 Steps = FMath::Max(1, FMath::CeilToInt(FVector2D::Distance(Cur, To) * 25.f / 60.f));
+				const int32 Steps = FMath::Max(1, FMath::CeilToInt(FVector2D::Distance(Cur, To) * UnitCm / 60.f));
 				for (int32 s = 1; s <= Steps; ++s) { const FVector2D Q = FMath::Lerp(Cur, To, float(s) / Steps); Out.Add(FromPx(Q.X, Q.Y)); }
 				Cur = To;
 			}
@@ -365,7 +389,7 @@ namespace JeebOakHill
 			{
 				const FVector2D P0 = Cur, P1(Num[0], Num[1]), P2(Num[2], Num[3]), P3(Num[4], Num[5]);
 				const float Len = 0.5f * (FVector2D::Distance(P0, P3) + FVector2D::Distance(P0, P1) + FVector2D::Distance(P1, P2) + FVector2D::Distance(P2, P3));
-				const int32 Steps = FMath::Max(2, FMath::CeilToInt(Len * 25.f / 60.f));
+				const int32 Steps = FMath::Max(2, FMath::CeilToInt(Len * UnitCm / 60.f));
 				for (int32 s = 1; s <= Steps; ++s)
 				{
 					const float T = float(s) / Steps, U = 1.f - T;
@@ -402,22 +426,23 @@ namespace JeebOakHill
 		{
 			TArray<FRoad> A;
 			if (!Enabled()) return A;
-			// The ring road round the plaza (centreline radius 58 units)
+			// The ring road round the plaza (centreline radius RingR units: 8 m, its inside edge 6 m from the oak)
 			{
 				FRoad Ring; Ring.bClosed = true;
-				const int32 Pts = FMath::CeilToInt(2.f * PI * 58.f * 25.f / 60.f);
-				for (int32 i = 0; i < Pts; ++i) { const float A0 = 2.f * PI * i / Pts; Ring.Pts.Add(FromPx(255.f + 58.f * FMath::Cos(A0), 410.f + 58.f * FMath::Sin(A0))); }
+				constexpr float RingR = 64.f;
+				const int32 Pts = FMath::CeilToInt(2.f * PI * RingR * UnitCm / 60.f);
+				for (int32 i = 0; i < Pts; ++i) { const float A0 = 2.f * PI * i / Pts; Ring.Pts.Add(FromPx(255.f + RingR * FMath::Cos(A0), 410.f + RingR * FMath::Sin(A0))); }
 				A.Add(Ring);
 			}
 			const TCHAR* Paths[] = {
-				TEXT("M55 410 L197 410"),   // west, toward the bridge (not built yet: the road stops at the bank)
-				TEXT("M313 410 L400 410"),   // east, to the Town Hall's door
+				TEXT("M-31 410 L191 410"),   // west, toward the bridge (not built yet: the road stops at the bank; drawn on to the river since the town was halved)
+				TEXT("M319 410 L380 410"),   // east, to the Town Hall's door
 				TEXT("M252 352 C 250 300 262 240 295 190 C 330 135 365 80 395 0"),   // north, and its branch past the castle ruins
-				TEXT("M20 180 C 70 140 150 135 220 150 C 255 158 280 172 300 185 C 360 190 450 220 545 295 L590 322"),   // the north arc
+				TEXT("M-81 81 L20 180 C 70 140 150 135 220 150 C 255 158 280 172 300 185 C 360 190 450 220 545 295 L590 322"),   // the north arc
 				TEXT("M385 206 C 385 260 375 300 372 340 L372 494 C 372 560 440 610 545 640 L590 650"),   // behind the bank, then southeast
 				TEXT("M255 478 L255 574"),   // south, to the boxing ring
-				TEXT("M250 505 C 215 560 150 620 20 700"),   // southwest, to the river fork
-				TEXT("M262 528 C 280 565 330 600 425 698"),   // southeast, to the graveyard
+				TEXT("M250 505 C 215 560 150 620 20 700 L-81 824"),   // southwest, to the river fork (drawn on to the bank)
+				TEXT("M257 545 C 270 600 330 630 425 698"),   // southeast, to the graveyard
 			};
 			for (const TCHAR* S : Paths)
 			{
