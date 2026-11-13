@@ -111,6 +111,7 @@ FString USkillComponent::SkillName(ESkillType Skill)
 	case ESkillType::Archery:     return TEXT("Archery");
 	case ESkillType::Magic:       return TEXT("Magic");
 	case ESkillType::Lockpicking: return TEXT("Lockpicking");
+	case ESkillType::Climbing:    return TEXT("Climbing");
 	default:                      return TEXT("Fishing");
 	}
 }

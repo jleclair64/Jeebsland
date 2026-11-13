@@ -469,7 +469,7 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		D(24, 12, 2.5f, 2.5f, FLinearColor(1.f, 0.8f, 1.f));
 		break;
 	}
-	default:  // Lockpicking: a padlock
+	case 8:   // Lockpicking: a padlock
 	{
 		const FLinearColor Gold(0.95f, 0.72f, 0.15f), Dk(0.12f, 0.10f, 0.08f);
 		D(32, 26, 15, 17, FLinearColor(0.7f, 0.72f, 0.78f));
@@ -478,6 +478,17 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		Quad(14, 28, 50, 33, FLinearColor(1.f, 0.88f, 0.4f));
 		D(32, 41, 4.5f, 4.5f, Dk);
 		Quad(30, 41, 34, 52, Dk);
+		break;
+	}
+	case 9:   // Climbing: a wooden ladder leaning up a grey rock
+	default:
+	{
+		Poly({ P(30, 6), P(58, 14), P(62, 60), P(22, 60) }, FLinearColor(0.52f, 0.54f, 0.58f));
+		Poly({ P(34, 12), P(54, 18), P(56, 30), P(36, 24) }, FLinearColor(0.64f, 0.66f, 0.70f));
+		const FLinearColor Wd(0.62f, 0.40f, 0.18f);
+		Ln(10, 60, 26, 6, Wd, 4.f);
+		Ln(24, 62, 40, 8, Wd, 4.f);
+		for (int32 k = 0; k < 5; ++k) { const float u = 0.12f + k * 0.19f; Ln(10 + 16 * u, 60 - 54 * u, 24 + 16 * u, 62 - 54 * u, FLinearColor(0.78f, 0.55f, 0.28f), 3.f); }
 		break;
 	}
 	}
@@ -494,8 +505,8 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSkills(); return; }
 
 	// Order: fighting skills first, then gathering and crafting
-	static const ESkillType Order[9] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking };
+	static const ESkillType Order[10] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing };
 	int32 Total = 0;
 	for (ESkillType T : Order) Total += Sk->GetLevel(T);
 	{
@@ -505,14 +516,14 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 		HDText(Tot, FLinearColor(1.f, 0.85f, 0.3f), PX + PW - 60.f - TW, PY + 20.f, Font, 1.3f);
 	}
 
-	// A 3 x 3 board of skills: icon, name, big level number, and progress to the next level
+	// A 4 x 3 board of skills: icon, name, big level number, and progress to the next level
 	const float Gap = 14.f;
-	const float BW = (PW - 60.f - 2 * Gap) / 3.f, BH = 160.f;
+	const float BW = (PW - 60.f - 3 * Gap) / 4.f, BH = 160.f;
 	const float GX = PX + 30.f, GY = PY + 70.f;
-	for (int32 i = 0; i < 9; ++i)
+	for (int32 i = 0; i < 10; ++i)
 	{
 		const ESkillType T = Order[i];
-		const float X = GX + (i % 3) * (BW + Gap), Y = GY + (i / 3) * (BH + Gap);
+		const float X = GX + (i % 4) * (BW + Gap), Y = GY + (i / 4) * (BH + Gap);
 		const bool bOver = Over(X, Y, BW, BH);
 		Tile(X, Y, BW, BH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.36f : 0.2f);
 		DrawSkillIcon(static_cast<int32>(T), X + 16.f, Y + 16.f, 96.f);

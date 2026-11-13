@@ -95,6 +95,9 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 			if (TierRow(t).SmithLevel > Level) { L.Add(FString::Printf(TEXT("Next: %s at level %d"), TierName(t), TierRow(t).SmithLevel)); break; }
 		break;
 	}
+	case ESkillType::Climbing:
+		L.Add(TEXT("What it does is coming later"));
+		break;
 	case ESkillType::Lockpicking:
 		L.Add(FString::Printf(TEXT("Can pick locks up to level %d"), Level));
 		break;

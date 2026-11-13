@@ -320,7 +320,7 @@ namespace JeebItems
 	}
 	inline const TCHAR* SkillNameOf(ESkillType S)
 	{
-		static const TCHAR* N[] = { TEXT("Mining"), TEXT("Woodcutting"), TEXT("Smithing"), TEXT("Fishing"), TEXT("Attack"), TEXT("Defence"), TEXT("Archery"), TEXT("Magic"), TEXT("Lockpicking") };
+		static const TCHAR* N[] = { TEXT("Mining"), TEXT("Woodcutting"), TEXT("Smithing"), TEXT("Fishing"), TEXT("Attack"), TEXT("Defence"), TEXT("Archery"), TEXT("Magic"), TEXT("Lockpicking"), TEXT("Climbing") };
 		return N[FMath::Clamp(static_cast<int32>(S), 0, int32(UE_ARRAY_COUNT(N)) - 1)];
 	}
 	// Can this player wear or wield this item? If not, OutWhy says why. (Capes, rings, amulets and the brush have no gate.)
