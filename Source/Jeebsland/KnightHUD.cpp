@@ -204,9 +204,19 @@ void AKnightHUD::DrawHUD()
 			if (!PC->ProjectWorldLocationToScreen(Pt, SP)) continue;
 			const float BW = 76.f, BH = 8.f;
 			const float F = FMath::Clamp((float)H->Cur / (float)FMath::Max(1, H->Max), 0.f, 1.f);
-			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.8f), SP.X - BW * 0.5f - 2.f, SP.Y - 2.f, BW + 4.f, BH + 4.f);
-			DrawRect(FLinearColor(0.2f, 0.f, 0.f, 1.f), SP.X - BW * 0.5f, SP.Y, BW, BH);
-			DrawRect(FLinearColor(0.85f, 0.1f, 0.08f), SP.X - BW * 0.5f, SP.Y, BW * F, BH);
+			// green, then yellow, then red as it runs down, the same steps as your own bar (owner 2026-11-12)
+			const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
+			const bool bShield = H->HasShield();
+			const float SH = 5.f, SGap = 2.f;   // his shield's health: a thinner steel bar just below
+			DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.8f), SP.X - BW * 0.5f - 2.f, SP.Y - 2.f, BW + 4.f, BH + 4.f + (bShield ? SH + SGap : 0.f));
+			DrawRect(HpCol * 0.25f, SP.X - BW * 0.5f, SP.Y, BW, BH);
+			DrawRect(HpCol, SP.X - BW * 0.5f, SP.Y, BW * F, BH);
+			if (bShield)
+			{
+				const float SY = SP.Y + BH + SGap;
+				DrawRect(FLinearColor(0.08f, 0.1f, 0.13f, 1.f), SP.X - BW * 0.5f, SY, BW, SH);
+				DrawRect(FLinearColor(0.55f, 0.65f, 0.78f), SP.X - BW * 0.5f, SY, BW * H->ShieldFraction(), SH);
+			}
 		}
 		TArray<JeebCombat::FNumber>& Nums = JeebCombat::Numbers();
 		for (int32 i = Nums.Num() - 1; i >= 0; --i)

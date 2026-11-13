@@ -15,6 +15,7 @@ void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UHealthComponent, Max);
 	DOREPLIFETIME(UHealthComponent, Cur);
+	DOREPLIFETIME(UHealthComponent, ShieldShare);
 }
 
 void UHealthComponent::OnRep_Cur(int32 Old)

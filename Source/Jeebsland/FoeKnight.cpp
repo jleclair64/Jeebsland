@@ -385,6 +385,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.05f);
 	ON_SCOPE_EXIT { TickBody(Dt); };   // (his pose, whichever way Tick ends)
+	if (HasAuthority() && Hp) Hp->SetShieldShare(GuardMax > 0.f ? GuardPool / GuardMax : -1.f);   // (his shield's health, for the bar over his head on every machine)
 	const float Now = GetWorld()->GetTimeSeconds();
 
 	// ---- Beaten: topple, lie still, vanish, then stand up again in the middle of the pen ----

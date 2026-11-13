@@ -20,6 +20,11 @@ public:
 	// (online: the server's numbers, sent to every player when the owner is a replicated actor)
 	UPROPERTY(Replicated) int32 Max = 20;
 	UPROPERTY(ReplicatedUsing = OnRep_Cur) int32 Cur = 20;
+	// Its shield's health for the bar over its head (owner 2026-11-12): 0-200 = 0-100%, 255 = no shield. The server sets it (SetShieldShare).
+	UPROPERTY(Replicated) uint8 ShieldShare = 255;
+	void SetShieldShare(float F) { ShieldShare = F < 0.f ? uint8(255) : uint8(FMath::RoundToInt(FMath::Clamp(F, 0.f, 1.f) * 200.f)); }
+	bool HasShield() const { return ShieldShare != 255; }
+	float ShieldFraction() const { return HasShield() ? ShieldShare / 200.f : 0.f; }
 	float BarHeight = 150.f;        // how far above the actor's origin the bar floats
 	float HitHeight = 70.f;         // centre of the body for arrows and bolts
 	float HitRadius = 90.f;
