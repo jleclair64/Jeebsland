@@ -1,4 +1,5 @@
 #include "KnightHUD.h"
+#include "SkillTips.h"
 #include "SkillComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -371,9 +372,9 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			HDTextSize(LvS, LW, LH, Font, 1.2f);
 			HDText(LvS, FLinearColor(1.f, 0.9f, 0.5f), X + CS - LW - 4.f, Y + CS - LH - 9.f, Font, 1.2f);
 			const float F = Need > 0 ? FMath::Clamp((float)Into / (float)Need, 0.f, 1.f) : 0.f;
-			Gauge(X + 6.f, Y + CS - 7.f, CS - 12.f, 3.f, F, FLinearColor(0.35f, 0.8f, 0.3f));
+			Gauge(X + 5.f, Y + CS - 9.f, CS - 10.f, 5.f, F, FLinearColor(0.3f, 0.9f, 0.3f));   // (a small green XP bar under each icon, owner 2026-11-12)
 			if (bOver)
-				SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d / %d XP  (%d to level %d)"), Into, Need, FMath::Max(0, Need - Into), Lv + 1) });
+				SetTip(SkillTipLines(T, Lv, Into, Need));
 		}
 	}
 	if (Knight->GetLootTarget()) DrawLootWindows(Knight, IX, IY, PW);   // an open sack, to the left of your windows

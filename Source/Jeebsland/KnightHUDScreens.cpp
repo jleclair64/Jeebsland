@@ -1,4 +1,5 @@
 #include "KnightHUD.h"
+#include "SkillTips.h"
 #include "SkillComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -528,7 +529,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 		HDText(FString::Printf(TEXT("%d / %d XP"), Into, Need), FLinearColor(0.7f, 0.7f, 0.7f), X + 126.f, Y + BH - 46.f, Font, 0.9f);
 		if (bOver)
 		{
-			SetTip({ USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Lv), FString::Printf(TEXT("%d XP to level %d"), FMath::Max(0, Need - Into), Lv + 1) });
+			SetTip(SkillTipLines(T, Lv, Into, Need));
 		}
 	}
 	HDText(TEXT("K or Tab to close."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 1.0f);

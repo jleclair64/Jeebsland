@@ -281,9 +281,13 @@ void AKnightHUD::DrawTip()
 {
 	if (TipLines.Num() == 0 || !bUIHaveMouse) return;
 	UFont* Font = GEngine->GetMediumFont();
+	// A line starting with \u0001 is a green progress bar (the rest is its fraction): the skills' XP (SkillTips.h)
+	auto IsBar = [](const FString& S) { return S.Len() > 0 && S[0] == TCHAR(1); };
+	const float BarH = 10.f, BarW = 220.f;
 	float W = 0.f, H = 0.f;
 	for (int32 i = 0; i < TipLines.Num(); ++i)
 	{
+		if (IsBar(TipLines[i])) { W = FMath::Max(W, BarW); H += BarH + 8.f; continue; }
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(TipLines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
 		W = FMath::Max(W, TW); H += TH + 3.f;
@@ -295,6 +299,12 @@ void AKnightHUD::DrawTip()
 	float Cy = Y;
 	for (int32 i = 0; i < TipLines.Num(); ++i)
 	{
+		if (IsBar(TipLines[i]))
+		{
+			Gauge(X + 2.f, Cy + 4.f, W, BarH, FCString::Atof(*TipLines[i] + 1), FLinearColor(0.3f, 0.9f, 0.3f));
+			Cy += BarH + 8.f;
+			continue;
+		}
 		const float Sc = i == 0 ? 1.15f : 0.95f;
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(TipLines[i], TW, TH, Font, Sc);

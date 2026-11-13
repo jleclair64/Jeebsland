@@ -18,6 +18,10 @@ JEEB_TUNE(Movement, Weight, 1.f)
 
 // [Bow]
 JEEB_TUNE(Bow, BowDrawTime, 1.f)
+JEEB_TUNE(Archery, DrawAt1, 2.f)
+JEEB_TUNE(Archery, DrawAt10, 1.f)
+JEEB_TUNE(Archery, DrawAt30, 0.7f)
+JEEB_TUNE(Archery, DrawAt99, 0.2f)
 JEEB_TUNE(Bow, BowRecover, 0.3f)
 JEEB_TUNE(Bow, BowSpeedMin, 1000.f)
 JEEB_TUNE(Bow, BowSpeedMid, 2400.f)

@@ -139,7 +139,20 @@ void AKnightCharacter::SetBow(EBow P)
 float AKnightCharacter::DrawTimeNow() const
 {
 	const int32 K = SelectedKind();
-	return K == JeebItems::K_Crossbow ? JeebTune::V().CrossRaise : K == JeebItems::K_Longbow ? JeebTune::V().LongDrawTime : BowDrawTime;
+	if (K == JeebItems::K_Crossbow) return JeebTune::V().CrossRaise;
+	// The bow's draw follows the Archery level (owner 2026-11-12): Tuning.ini [Archery] DrawAt1/10/30/99, straight lines between them.
+	// The longbow keeps its share slower (LongDrawTime / BowDrawTime x the same).
+	const float Draw = BowDrawSeconds(Skills ? Skills->GetLevel(ESkillType::Archery) : 1);
+	return K == JeebItems::K_Longbow ? Draw * JeebTune::V().LongDrawTime / FMath::Max(BowDrawTime, 0.01f) : Draw;
+}
+
+float AKnightCharacter::BowDrawSeconds(int32 Level)
+{
+	const auto& T = JeebTune::V();
+	const float L = float(Level);
+	return L <= 10.f ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.DrawAt1, T.DrawAt10), L)
+	                 : L <= 30.f ? FMath::GetMappedRangeValueClamped(FVector2f(10.f, 30.f), FVector2f(T.DrawAt10, T.DrawAt30), L)
+	                             : FMath::GetMappedRangeValueClamped(FVector2f(30.f, 99.f), FVector2f(T.DrawAt30, T.DrawAt99), L);
 }
 
 float AKnightCharacter::BowWalkShare() const

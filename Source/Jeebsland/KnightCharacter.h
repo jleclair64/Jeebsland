@@ -747,6 +747,10 @@ private:
 	float BowAimAlpha = 0.f;       // the aiming pose and camera, eased in and out
 	float BowCamAlpha = 0.f;
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
+public:
+	static float BowDrawSeconds(int32 ArcheryLevel);   // the bow's full draw at this Archery level (Tuning.ini [Archery]); the skills window shows it
+	static float LongbowDrawSeconds(int32 ArcheryLevel) { return BowDrawSeconds(ArcheryLevel) * JeebTune::V().LongDrawTime / FMath::Max(JeebTune::V().BowDrawTime, 0.01f); }
+private:
 	static inline const float& BowDrawTime = JeebTune::Storage().BowDrawTime;   // (like the smash attack's charge)
 	bool bAimHeld = false;         // the right button is down (the player's own machine): with a bow in hand he aims, and draws again after each shot
 	void RightDown();              // the right button: guard with a shield, aim with a bow
