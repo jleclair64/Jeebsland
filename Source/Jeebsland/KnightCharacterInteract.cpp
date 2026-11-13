@@ -43,7 +43,13 @@ void AKnightCharacter::Interact()
 	bAttackDown = !(IsUIOpen() || bPanelCursor);   // (held: the sword's smash attack, see TickSmash; a click on the HUD with the cursor out (Tab) is not a game click)
 	if (bKnockedDown) { GetUp(0); return; }   // (a click gets straight up)
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
-	// Shooters (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
+	// Bows (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
+	// The crossbow (owner 2026-11-12, like a sniper rifle in Battlefield): only the right button brings it up; a left click while it is up shoots (a click while it is still coming up shoots as soon as it is).
+	if (SelectedKind() == JeebItems::K_Crossbow)
+	{
+		if (Bow == EBow::Drawing && bAimHeld) ReleaseDraw();
+		return;
+	}
 	if (JeebItems::IsShooter(SelectedKind()))
 	{
 		if (Bow == EBow::None) StartDraw();
@@ -113,6 +119,7 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
+	if (SelectedKind() == JeebItems::K_Crossbow) return;   // (letting go of the left button does nothing with the crossbow: the click shot)
 	if (Bow == EBow::Drawing && !bAimHeld)
 	{
 		if (IsUIOpen() || bPanelCursor) CancelDraw(); else ReleaseDraw();

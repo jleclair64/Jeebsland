@@ -163,7 +163,7 @@ void AKnightCharacter::RightUp()
 	StopBlock();
 	if (Bow == EBow::Drawing)
 	{
-		if (IsUIOpen() || bPanelCursor) CancelDraw();
+		if (IsUIOpen() || bPanelCursor || SelectedKind() == JeebItems::K_Crossbow) CancelDraw();   // (the crossbow is lowered without shooting)
 		else if (!bAttackDown) ReleaseDraw();   // (let go, it shoots; the left button still down keeps it drawn)
 	}
 }
@@ -320,12 +320,13 @@ void AKnightCharacter::TickBow(float Dt)
 		bAttackDown = false; bAimHeld = false;
 	}
 	// The button still down after a shot, a roll or a weapon swap: straight back to drawing
-	if (IsLocallyControlled() && (bAimHeld || bAttackDown) && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
+	const bool bAimButton = bAimHeld || (bAttackDown && !bCross);   // (only the right button aims the crossbow)
+	if (IsLocallyControlled() && bAimButton && Bow == EBow::None && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor && ArrowSlotId() != 0 && !(bCross && CrossReloadLeft > 0.f)) StartDraw();
 
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		const bool bAimCam = Bow == EBow::Drawing || ((bAimHeld || bAttackDown) && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
+		const bool bAimCam = Bow == EBow::Drawing || (bAimButton && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{
