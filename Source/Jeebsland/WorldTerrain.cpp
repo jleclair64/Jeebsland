@@ -96,7 +96,8 @@ void AWorldTerrain::BuildLand()
 			// (wound to face up: checked against the normals so the ground is solid from above whichever way the engine counts)
 			{
 				const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
-				if (Fn.Z < 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
+				// (face up as Unreal counts it, like GrassField: the cross product points down; see AOakHillTown::BuildGround)
+				if (Fn.Z > 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
 			}
 			UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
 			PM->SetupAttachment(GetRootComponent());

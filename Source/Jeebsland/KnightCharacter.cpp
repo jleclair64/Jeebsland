@@ -24,6 +24,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Terrain.h"
+#include "Components/CapsuleComponent.h"
 #include "GrassField.h"
 #include "Canopy.h"
 #include "Pig.h"

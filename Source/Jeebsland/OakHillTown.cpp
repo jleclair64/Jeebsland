@@ -90,7 +90,7 @@ void AOakHillTown::BuildGround()
 		}
 	{
 		const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
-		if (Fn.Z < 0.f) Swap(Tri, Back);   // (wound to face up, whichever way the engine counts)
+		if (Fn.Z > 0.f) Swap(Tri, Back);   // (wound to face up as Unreal counts it, like GrassField: the cross product points DOWN. The other way round the collision faced down, and a knight landing on it was never on walkable floor and stayed falling, 2026-11-12)
 	}
 	Ground = NewObject<UProceduralMeshComponent>(this, TEXT("OakHillGround"));
 	Ground->SetupAttachment(GetRootComponent());
