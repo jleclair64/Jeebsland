@@ -25,3 +25,7 @@ Build/
 # The 2.4 million triangle test house: too big for GitHub's file limit. Remake it from its Meshy task (Docs/Roadmap.md) if needed.
 Art/Buildings/*Detailed*
 Content/Buildings/*Detailed*
+
+# All library originals (filler props and animals): several GB in total. Art/Filler/Sources.md and Art/Animals/Sources.md link every page to download them again.
+Art/Filler/Originals/
+Art/Animals/Originals/
