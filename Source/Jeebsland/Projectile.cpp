@@ -206,8 +206,8 @@ void AProjectile::Tick(float DeltaSeconds)
 					{ HitT = Time; HitPart = i; HitAt = Xf.TransformPosition(HitL); }
 				}
 				if (!bAuth) { if (HitPart >= 0) { SetActorLocation(HitAt); Wait(); return; } bSpent = true; Wait(); return; }
-				const int32 OnGuard = FMath::RoundToInt(Damage * GuardMul);
-				if (BestK) BestK->Hurt(OnGuard, Shooter); else if (BestH->ShieldBlock) BestH->ShieldBlock(OnGuard, Shooter); else if (Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
+				// Arrows and bolts do no shield damage (owner 2026-11-12): a raised shield simply stops them, its guard untouched
+				if (!BestK && !BestH->ShieldBlock && Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
 				if (HitPart >= 0) StickAt(HitAt, Target, Parts[HitPart], FName(TEXT("Shield")), static_cast<uint8>(HitPart), false);
 				else Deflect(At, (At - BestWedge.Apex).GetSafeNormal2D());
 				return;
