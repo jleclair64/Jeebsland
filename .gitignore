@@ -29,3 +29,9 @@ Content/Buildings/*Detailed*
 # All library originals (filler props and animals): several GB in total. Art/Filler/Sources.md and Art/Animals/Sources.md link every page to download them again.
 Art/Filler/Originals/
 Art/Animals/Originals/
+
+# Filler lineup assets (Tools/BuildFillerLineup.ps1 remakes them from Art/Filler/Clean; about 700 MB)
+Content/Filler/
+
+# The plaza oak as Meshy made it (156 MB; Tools/plaza_oak_clean.py makes Art/Trees/PlazaOak.glb from it; the link is in Docs/MeshyCommunityLibrary.md)
+Art/Trees/*_Original*

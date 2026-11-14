@@ -197,7 +197,7 @@ FTransform FKnightAnimator::WallFrame(const FInput& In, const FTransform& Frame,
 	}
 	WallTilt = FQuat::Slerp(WallTilt, TiltWant, FMath::Min(1.f, 8.f * Dt));
 	WallExitLeft = FMath::Max(0.f, WallExitLeft - Dt);
-	BackLineW = FMath::FInterpConstantTo(BackLineW, (StateKey >= 80 && StateKey <= 91) ? 1.f : 0.f, Dt, 4.f);   // (in and out over a quarter of a second)
+	BackLineW = FMath::FInterpConstantTo(BackLineW, (StateKey >= 80 && StateKey <= 95) ? 1.f : 0.f, Dt, 4.f);   // (swimming too, 92-95)   // (in and out over a quarter of a second)
 	const FVector HpG(Final.Hip.Y, -Final.Hip.X, Final.Hip.Z);   // the hips in the game's frame (ahead, right, up)
 	WallRel = FTransform(-HpG) * FTransform(WallTilt) * FTransform(HpG);
 	FTransform Out = WallRel * Frame;

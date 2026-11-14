@@ -12,6 +12,10 @@
 #include "UObject/Package.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Net/UnrealNetwork.h"
+#include "KnightCharacter.h"
+#include "SkillComponent.h"
+#include "JeebTestKit.h"
 
 AKnightPlayerController::AKnightPlayerController()
 {
@@ -92,6 +96,79 @@ void AKnightPlayerController::Tick(float DeltaSeconds)
 	{
 		ConnectTime = FPlatformTime::Seconds() + 1.0e6;   // (only once)
 		if (AGameModeBase* GM = GetWorld()->GetAuthGameMode()) if (GM->GameSession) GM->GameSession->KickPlayer(this, FText::FromString(TEXT("You didn't log in in time.")));
+	}
+	// Server: whether this player gets the test kit (read about once a second; only the owner is told)
+	if (HasAuthority() && FPlatformTime::Seconds() - LastTestGate > 1.0) TestGate();
+}
+
+// ---------------------------------------------------------------------------------------------------
+// TEMPORARY test kit (owner, 2026-11-13; see JeebTestKit.h). The server checks the gate on every request; the client's panel
+// only asks. Remove with the [Jeebsland.Testing] section.
+// ---------------------------------------------------------------------------------------------------
+void AKnightPlayerController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME_CONDITION(AKnightPlayerController, bTestKit, COND_OwnerOnly);
+}
+
+bool AKnightPlayerController::TestGate()
+{
+	if (!HasAuthority()) return false;
+	LastTestGate = FPlatformTime::Seconds();
+	bTestKit = JeebTestKit::Allowed(GetWorld(), bLoggedIn, AccountKey);
+	return bTestKit;
+}
+
+void AKnightPlayerController::ServerTestGive_Implementation(int32 Id, bool bWear)
+{
+	if (!TestGate()) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastTestAsk < 0.08) return;   // (a click at a time)
+	LastTestAsk = Now;
+	AKnightCharacter* Knight = Cast<AKnightCharacter>(GetPawn());
+	USkillComponent* Sk = Knight ? Knight->GetSkills() : nullptr;
+	if (!Sk || !JeebTestKit::InCatalogue(Id)) return;
+	const int32 Count = JeebTestKit::GiveCount(Id);
+	int32 Free = -1;   // (gear goes into the first empty cell; remember which, to wear it from there)
+	for (int32 i = 0; i < Sk->Slots.Num() && Free < 0; ++i) if (Sk->Slots[i].Id == 0) Free = i;
+	if (!Sk->AddInvItem(Id, Count)) { Sk->Say(2.f, FColor::Orange, TEXT("Test kit: your pack is full.")); return; }
+	if (!bWear) return;
+	if (JeebItems::IsGear(Id))
+	{
+		if (Free >= 0 && Sk->Slots.IsValidIndex(Free) && Sk->Slots[Free].Id == Id && Sk->EquipFromSlot(Free)) Knight->RefreshEquipment();   // (the same as a click in the pack: the level gates still apply)
+	}
+	else if (JeebItems::IsPotion(Id))
+	{
+		for (int32 i = 0; i < Sk->Slots.Num(); ++i) if (Sk->Slots[i].Id == Id) { if (Sk->PotionSlot.Id != Id) Sk->SwapInvPotion(i); break; }
+	}
+}
+
+void AKnightPlayerController::ServerTestLevels_Implementation(int32 Level)
+{
+	if (!TestGate()) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastTestAsk < 0.25) return;
+	LastTestAsk = Now;
+	AKnightCharacter* Knight = Cast<AKnightCharacter>(GetPawn());
+	if (USkillComponent* Sk = Knight ? Knight->GetSkills() : nullptr)
+	{
+		Level = FMath::Clamp(Level, 1, USkillComponent::MaxLevel);
+		Sk->SetAllLevels(Level);
+		Sk->Say(3.f, FColor(255, 215, 90), FString::Printf(TEXT("Test kit: every skill set to level %d."), Level));
+	}
+}
+
+void AKnightPlayerController::ServerTestEmptyPack_Implementation()
+{
+	if (!TestGate()) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastTestAsk < 0.25) return;
+	LastTestAsk = Now;
+	AKnightCharacter* Knight = Cast<AKnightCharacter>(GetPawn());
+	if (USkillComponent* Sk = Knight ? Knight->GetSkills() : nullptr)
+	{
+		for (FInvSlot& S : Sk->Slots) { S.Id = 0; S.Count = 0; }
+		Sk->Say(2.f, FColor(255, 215, 90), TEXT("Test kit: pack emptied."));
 	}
 }
 

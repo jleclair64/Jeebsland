@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "KnightMovement.h"
 #include "Messages.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
@@ -8,6 +9,8 @@
 #include "GearWall.h"
 #include "EngineUtils.h"
 #include "Npc.h"
+#include "Terrain.h"
+#include "OakHill.h"
 #include "Cottage.h"
 #include "ResourceNode.h"
 #include "KnightHUD.h"
@@ -60,6 +63,17 @@ bool AKnightCharacter::NearTrader(uint8 InRole) const
 	for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
 	{
 		if (static_cast<uint8>(It->GetRole()) == InRole && FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < 800.f) return true;
+	}
+	// Oak Hill's shop counters (no shopkeepers there yet): the same range from the counter, worked out from the town's fixed plan
+	// on the server itself (OakHill.h), never from anything the player sent
+	const ENpcRole AskRole = static_cast<ENpcRole>(InRole);
+	const bool bShop = AskRole == ENpcRole::Shopkeeper || AskRole == ENpcRole::Blacksmith || AskRole == ENpcRole::Banker;
+	if (bShop)
+	{
+		const JeebOakHill::EShop Shop = AskRole == ENpcRole::Blacksmith ? JeebOakHill::EShop::Smith : AskRole == ENpcRole::Banker ? JeebOakHill::EShop::Bank : JeebOakHill::EShop::Store;
+		const FVector P = GetActorLocation();
+		if (const JeebOakHill::FCounter* C = JeebOakHill::NearCounter(Shop, P.X, P.Y, 800.f))
+			return FMath::Abs(P.Z - 90.f - JeebTerrain::HeightAt(C->At.X, C->At.Y)) < 400.f;
 	}
 	return false;
 }
@@ -134,6 +148,11 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	};
 	auto Named = [](int32 Id, int32 Count) { return Count > 1 ? FString::Printf(TEXT("%d %s"), Count, *ItemName(Id)) : ItemName(Id); };
 	auto ArmourBusy = [&](bool bArmour) { if (bArmour && (StunLeft > 0.f || MoveLocked())) { Sk->Say(2.f, Warn, TEXT("Not in the middle of a fight.")); return true; } return false; };
+
+	// On a rock face, in a mantle or in the water (2026-11-13): his hands are busy, so no taking a weapon in hand and nothing done to the world
+	// (the client refuses these too; this is the server's own check)
+	if (InClimbMove() && (Op == EInvOp::Select || Op == EInvOp::Gather || Op == EInvOp::PickArrow || Op == EInvOp::PickLock
+		|| Op == EInvOp::HutLoot || Op == EInvOp::ToggleDoor || Op == EInvOp::TakeFromWall)) return;
 
 	switch (Op)
 	{
@@ -559,6 +578,11 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	CrossReloadLeft = 0.f; bCrossQueued = false;
 	if (Bow != EBow::None) SetBow(EBow::None);
+	if (UKnightMovement* KM = KnightMove())   // (out of the water with full bars, as the server did: ForceDrop)
+	{
+		if (KM->InWater()) KM->SetMovementMode(MOVE_Falling);
+		KM->ResetWater();
+	}
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	SetActorLocation(Wake);
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));

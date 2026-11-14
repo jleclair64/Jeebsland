@@ -40,7 +40,7 @@ namespace JeebTerrain
 	inline FVector2D PondCenter() { return FVector2D(-300.f, -2900.f); }
 	constexpr float PondBowl = 900.f;       // the ground is shaped inside this radius
 	constexpr float PondFade = 1250.f;      // and blends back to the hills out to here
-	constexpr float PondDepth = 110.f;      // how far the middle of the bowl sinks
+	constexpr float PondDepth = 240.f;      // how far the middle of the bowl sinks (2026-11-13: was 110, 74 cm of water; now about 2 m in the middle, deep enough to swim: JeebWater.h)
 	constexpr float PondWaterDrop = 36.f;   // water surface sits this far below the rim
 	constexpr float PondWaterR = 650.f;     // radius of the water disc (the shoreline is a bit inside this)
 

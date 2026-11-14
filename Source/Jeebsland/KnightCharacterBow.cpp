@@ -186,7 +186,7 @@ void AKnightCharacter::StartDraw()
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Iron)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
 	if (!Skills || !JeebItems::IsShooter(SelectedKind()) || Bow != EBow::None) return;
 	if (SelectedKind() == JeebItems::K_Crossbow && CrossReloadLeft > 0.f) return;   // (not loaded yet)
-	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || bSitting || bMounted || bDrinking) return;
+	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || InClimbMove() || bSitting || bMounted || bDrinking) return;   // (InClimbMove: a rock face, a mantle or the water)
 	if (ArrowSlotId() == 0) { if (IsLocallyControlled()) JeebMsg::Post(2.f, FColor::Orange, TEXT("You have no arrows.")); return; }
 	BowKindDrawn = SelectedKind();
 	SetBow(EBow::Drawing);

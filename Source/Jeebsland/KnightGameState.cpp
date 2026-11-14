@@ -1,7 +1,9 @@
 #include "KnightGameState.h"
+#include "WaterLook.h"
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
 #include "GearWall.h"
+#include "FillerLineup.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "OakHillTown.h"
@@ -407,9 +409,9 @@ void AKnightGameState::BuildMoveLab()
 		// The pond: a stone rim and a disc of water on the floor (nothing to bump into), with fishing spots on it
 		UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 		const float PX = 1000.f, PY = -1600.f, PondR = 330.f;
-		auto Disc = [&](float Radius, float Thick, float Zc, const FLinearColor& Col)
+		auto Disc = [&](float Radius, float Thick, float Zc, const FLinearColor& Col) -> UStaticMeshComponent*
 		{
-			if (!Cyl) return;
+			if (!Cyl) return nullptr;
 			UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Floor);
 			M->SetStaticMesh(Cyl);
 			M->SetupAttachment(Root);
@@ -420,9 +422,12 @@ void AKnightGameState::BuildMoveLab()
 			M->RegisterComponent();
 			if (Base)
 				if (UMaterialInstanceDynamic* Mi = M->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), Col);
+			return M;
 		};
 		Disc(PondR + 30.f, 2.f, 1.f, FLinearColor(0.40f, 0.38f, 0.34f));
-		Disc(PondR, 3.f, 3.f, FLinearColor(0.06f, 0.24f, 0.36f));
+		// (2026-11-13) the water is see-through now (WaterLook.h) and only a few centimetres deep here, so a dark pond bed under it
+		Disc(PondR - 4.f, 1.f, 2.4f, FLinearColor(0.025f, 0.06f, 0.065f));
+		if (UStaticMeshComponent* W = Disc(PondR, 3.f, 3.f, FLinearColor(0.06f, 0.24f, 0.36f))) JeebWaterLook::Apply(W, 0, FLinearColor(0.06f, 0.24f, 0.36f));
 		FActorSpawnParameters FP;
 		FP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		for (int32 k = 0; k < 4; ++k)
@@ -540,6 +545,8 @@ void AKnightGameState::BuildMoveLab()
 			Sign->RegisterComponent();
 		}
 	}
+	// Oak Hill's filler props in labelled rows on a grass yard past the floor's -Y edge, for the owner to look at (2026-11-13; FillerLineup.cpp, /Game/Filler)
+	JeebFiller::BuildYard(World, Floor, Root, Z);
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();

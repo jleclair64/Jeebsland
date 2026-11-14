@@ -77,9 +77,11 @@ float UKnightMovement::GetMaxSpeed() const
 	if (MovementMode == MOVE_Custom)
 	{
 		const JeebTune::FValues& T = JeebTune::V();
+		if (InWater()) return T.SwimFastSpeed;
 		return FMath::Max3(T.ClimbUpSpeed, T.ClimbSideSpeed, T.ClimbDownSpeed);
 	}
-	return Super::GetMaxSpeed();
+	const float S = Super::GetMaxSpeed();
+	return MovementMode == MOVE_Walking && WaterDepth > 30.f ? S * WadeMul(WaterDepth) : S;   // (wading: slower the deeper)
 }
 
 void UKnightMovement::PhysicsRotation(float DeltaTime)
@@ -91,14 +93,19 @@ void UKnightMovement::PhysicsRotation(float DeltaTime)
 void UKnightMovement::OnMovementModeChanged(EMovementMode PrevMode, uint8 PrevCustom)
 {
 	Super::OnMovementModeChanged(PrevMode, PrevCustom);
-	const bool bWasClimb = PrevMode == MOVE_Custom;
-	const bool bIsClimb = MovementMode == MOVE_Custom;
+	// (by mode: the swim is a custom mode too, and none of the climbing's bookkeeping belongs to it)
+	auto IsClimbMode = [](EMovementMode M, uint8 C) { return M == MOVE_Custom && C >= JeebClimb::Climb && C <= JeebClimb::MantleOnto; };
+	auto IsWaterMode = [](EMovementMode M, uint8 C) { return M == MOVE_Custom && (C == JeebClimb::Swim || C == JeebClimb::Drown); };
+	const bool bWasClimb = IsClimbMode(PrevMode, PrevCustom), bIsClimb = IsClimbMode(MovementMode, CustomMovementMode);
 	if (bIsClimb && !bWasClimb)
 	{
 		ClimbBestZ = UpdatedComponent ? float(UpdatedComponent->GetComponentLocation().Z) : 0.f;
 		XPCarry = 0.f;
 	}
-	if (bWasClimb && !bIsClimb) RefillWait = JeebTune::V().ClimbRefillDelay;
+	if (bWasClimb && !bIsClimb) { RefillWait = JeebTune::V().ClimbRefillDelay; FlushClimbXP(); }
+	const bool bWasWater = IsWaterMode(PrevMode, PrevCustom), bIsWater = IsWaterMode(MovementMode, CustomMovementMode);
+	if (bIsWater && !bWasWater && UpdatedComponent) { SwimLastXY = FVector2D(UpdatedComponent->GetComponentLocation()); }
+	if (bWasWater && !bIsWater) { SwimRefillWait = JeebTune::V().SwimRefillDelay; SwimXP(true); DrownT = 0.f; bHeadUnder = false; }
 	if (MovementMode == MOVE_Walking) bNoRegrab = false;
 }
 
@@ -106,6 +113,8 @@ void UKnightMovement::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
 	bWantsLetGo = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+	bWantsFast = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	bWantsRise = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
 FNetworkPredictionData_Client* UKnightMovement::GetPredictionData_Client() const
@@ -127,6 +136,23 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	const JeebTune::FValues& T = JeebTune::V();
 	if (!IsCustom(JeebClimb::Climb)) bJumpQueued = false;
 
+	// The water at his feet (JeebWater: the same answer on every machine). Deep enough, walking, falling or climbing down into it becomes the swim.
+	SenseWater();
+	if (!InWater() && WaterDepth > T.SwimEnterDepth && (IsMovingOnGround() || IsFalling() || (IsCustom(JeebClimb::Climb) && WaterDepth > T.SwimEnterDepth + 20.f)))
+	{
+		bJumpAsked = false;
+		bTouchRock = bTouchMantle = false;
+		StartSwim();
+		return;
+	}
+	// The swimming bar refills only on dry ground, after a short wait; the breath comes back whenever his head is out (PhysSwim does it in the water)
+	if (IsMovingOnGround() && WaterDepth < T.SwimExitDepth)
+	{
+		SwimRefillWait = FMath::Max(0.f, SwimRefillWait - Dt);
+		if (SwimRefillWait <= 0.f && SwimStamina < 1.f) SwimStamina = FMath::Min(1.f, SwimStamina + T.SwimRefillPerSec * Dt);
+		Breath = FMath::Min(1.f, Breath + T.BreathRefillPerSec * Dt);
+	}
+
 	// Space on the ground near a fence: the mantle if it fits, else the normal jump (decided here, where this move's keys are known)
 	if (bJumpAsked)
 	{
@@ -146,6 +172,9 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	const bool bRock = bTouchRock, bFence = bTouchMantle;
 	bTouchRock = bTouchMantle = false;
 	if (MovementMode == MOVE_Custom) return;
+	// Walking or running into a fence or block marked for the mantle: over it or onto it by itself (owner 2026-11-13: automatic, no Space), unless
+	// Ctrl is held (crouched, he just stops at it). The last move ran into it (bFence), and he still pushes at it: the plan checks it is square on.
+	if (IsMovingOnGround() && bFence && !bWantsLetGo && Acceleration.SizeSquared2D() > 1.f && TryMantle(false)) return;
 	// In the air moving at a fence: the mantle catches it
 	if (IsFalling() && bFence && Acceleration.SizeSquared2D() > 1.f && MantleNearby() && TryMantle(true)) return;
 	if (IsMovingOnGround() || IsFalling()) { if (bRock) TryGrab(); }   // (only after running into rock: no probes for everyone else, every move)
@@ -192,7 +221,20 @@ void UKnightMovement::DropOff(bool bExhausted, float Push)
 
 void UKnightMovement::ForceDrop(bool bAll)
 {
-	if (!CharacterOwner || !CharacterOwner->HasAuthority() || !InClimbMove() || (InMantle() && !bAll)) return;
+	if (!CharacterOwner || !CharacterOwner->HasAuthority()) return;
+	if (InWater())
+	{
+		// (a hit or a knockdown doesn't take him out of the water; death does: he wakes far away with full bars)
+		if (!bAll) return;
+		Velocity = FVector::ZeroVector;
+		SetMovementMode(MOVE_Falling);   // (gives the Swimming XP he had earned: OnMovementModeChanged)
+		ResetWater();
+		LogSwim(TEXT("died"));
+		if (CharacterOwner->GetRemoteRole() == ROLE_AutonomousProxy)
+			if (FNetworkPredictionData_Server_Character* SD = GetPredictionData_Server_Character()) SD->bForceClientUpdate = true;
+		return;
+	}
+	if (!InClimbMove() || (InMantle() && !bAll)) return;
 	DropOff(false, 40.f);
 	LogClimb(TEXT("knocked off"));
 	if (CharacterOwner->GetRemoteRole() == ROLE_AutonomousProxy)
@@ -209,6 +251,8 @@ void UKnightMovement::PhysCustom(float DeltaTime, int32 Iterations)
 	case JeebClimb::Climb: PhysClimb(DeltaTime); break;
 	case JeebClimb::Jump: PhysClimbJump(DeltaTime); break;
 	case JeebClimb::ClimbUp: case JeebClimb::MantleOver: case JeebClimb::MantleOnto: PhysScripted(DeltaTime); break;
+	case JeebClimb::Swim: PhysSwim(DeltaTime); break;
+	case JeebClimb::Drown: PhysDrown(DeltaTime); break;
 	default: SetMovementMode(MOVE_Falling); break;
 	}
 }
@@ -285,14 +329,31 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 {
 	const float R = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-	const FVector C = UpdatedComponent->GetComponentLocation();
+	FVector C = UpdatedComponent->GetComponentLocation();
 	const FVector Dir = -WallNormal;
 	FHitResult H;
 	bool bOk = false;
-	// the chest first: once the rock ends below his chest while he climbs up, it is a ledge to climb onto (if there is room)
+	// Going up, the rock has to reach his hands (about 90 cm over the capsule's middle in the climbing clip): once it ends below them, he climbs up
+	// over the edge, or with no room up there he stops. (Owner 2026-11-13: he used to climb on until the rock ended below his waist and then
+	// his knees, hands and head over thin air, "an invisible wall past the ledge". The ledge clip expects the top about 90 cm up, too.)
+	if (InUp > 0.3f)
+	{
+		constexpr float HandUp = 105.f;   // (the probe's 20 cm ball misses once the top is under about 85 cm up: right at his reaching hands, measured in pictures)
+		FHitResult Hand;
+		const bool bHit = ProbeWall(C + FVector(0.f, 0.f, HandUp), Dir, R + 60.f + HandUp * FMath::Max(0.f, float(WallNormal.Z)), Hand);   // (starting inside rock, under an overhang, counts as rock)
+		const bool bRockEnds = !bHit || (!Hand.bStartPenetrating && Hand.GetComponent() && Hand.GetComponent()->ComponentHasTag(JeebClimb::ClimbTag) && Hand.ImpactNormal.Z >= GetWalkableFloorZ());   // (or it lies back to ground he can stand on)
+		if (bRockEnds)
+		{
+			if (TryLedge()) return false;
+			// no room over the top: no further up (along the wall and down still work)
+			FHitResult Back;
+			SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
+			Velocity = FVector::ZeroVector;
+			C = UpdatedComponent->GetComponentLocation();
+		}
+	}
 	bOk = ProbeWall(C, Dir, R + 40.f, H) && Climbable(H);
-	if (!bOk && InUp > 0.3f && TryLedge()) return false;
-	if (!bOk) bOk = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, H) && Climbable(H);
+	if (!bOk && InUp <= 0.3f) bOk = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, H) && Climbable(H);   // (never going up: that climbed thin air)
 	if (!bOk)
 	{
 		if (InUp > 0.3f && TryLedge()) return false;
@@ -391,19 +452,28 @@ bool UKnightMovement::PlanLedge(const FVector& C, const FVector& N, FVector& Out
 	const float R = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebLedge), true, CharacterOwner);
-	const FVector P = C + Fwd * (R + 35.f);
-	FHitResult D;
-	if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, C.Z + HH + 70.f), FVector(P.X, P.Y, C.Z - HH + 10.f), WorldObjects(), Q) || D.bStartPenetrating) return false;
-	if (D.ImpactNormal.Z < GetWalkableFloorZ()) return false;   // the top must be ground he can stand on
-	OutTop = D.ImpactPoint.Z;
-	OutTo = FVector(P.X, P.Y, OutTop + HH + 3.f);
-	if (!RoomFor(OutTo)) return false;
-	// the way there: straight up beside the wall, then over the edge
-	FHitResult B;
-	const FVector UpPt(C.X, C.Y, OutTo.Z);
-	if (GetWorld()->SweepSingleByObjectType(B, C, UpPt, FQuat::Identity, WorldObjects(), FCollisionShape::MakeSphere(20.f), Q)) return false;
-	if (GetWorld()->SweepSingleByObjectType(B, UpPt, OutTo, FQuat::Identity, WorldObjects(), FCollisionShape::MakeSphere(20.f), Q)) return false;
-	return true;
+	// a few spots past the edge, and a little higher over a top that slopes up (a capsule set 3 cm over a sloping top touches the slope behind)
+	for (const float Ahead : { R + 35.f, R + 20.f, R + 55.f })
+	{
+		const FVector P = C + Fwd * Ahead;
+		FHitResult D;
+		if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, C.Z + HH + 70.f), FVector(P.X, P.Y, C.Z - HH + 10.f), WorldObjects(), Q) || D.bStartPenetrating) continue;
+		if (D.ImpactNormal.Z < GetWalkableFloorZ()) continue;   // the top must be ground he can stand on
+		for (const float Lift : { 3.f, 20.f, 40.f })
+		{
+			const FVector To(P.X, P.Y, D.ImpactPoint.Z + HH + Lift);
+			if (!RoomFor(To)) continue;
+			// the way there: straight up beside the wall, then over the edge
+			FHitResult B;
+			const FVector UpPt(C.X, C.Y, To.Z);
+			if (GetWorld()->SweepSingleByObjectType(B, C, UpPt, FQuat::Identity, WorldObjects(), FCollisionShape::MakeSphere(20.f), Q)) continue;
+			if (GetWorld()->SweepSingleByObjectType(B, UpPt, To, FQuat::Identity, WorldObjects(), FCollisionShape::MakeSphere(20.f), Q)) continue;
+			OutTop = D.ImpactPoint.Z;
+			OutTo = To;
+			return true;
+		}
+	}
+	return false;
 }
 
 bool UKnightMovement::TryLedge()
@@ -480,7 +550,7 @@ bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInA
 bool UKnightMovement::TryMantle(bool bInAir)
 {
 	AKnightCharacter* K = Knight();
-	if (!K || K->bClimbing || K->bSitting || K->bMounted || K->bKnockedDown || K->StunLeft > 0.f) return false;
+	if (!K || K->bClimbing || K->bSitting || K->bMounted || K->bKnockedDown || K->StunLeft > 0.f || K->bRolling || K->bSliding) return false;
 	FVector Fwd = Flat(Acceleration);
 	if (Fwd.IsNearlyZero()) { if (bInAir) return false; Fwd = Flat(UpdatedComponent->GetForwardVector()); }
 	uint8 Mode; FVector To, Face; float Top;
@@ -562,8 +632,17 @@ void UKnightMovement::GiveXP()
 	{
 		const int32 N = FMath::FloorToInt(XPCarry);
 		XPCarry -= N;
-		if (AKnightCharacter* K = Knight()) if (USkillComponent* S = K->GetSkills()) S->AddXP(ESkillType::Climbing, N);
+		ClimbXPPending += N;   // (given in one lump when the climb ends: FlushClimbXP. A drop every 25 cm kept the skill popup sliding in, owner 2026-11-13)
 	}
+}
+
+void UKnightMovement::FlushClimbXP()
+{
+	if (ClimbXPPending <= 0) return;
+	const int32 N = ClimbXPPending;
+	ClimbXPPending = 0;
+	if (!CharacterOwner || !CharacterOwner->HasAuthority()) return;
+	if (AKnightCharacter* K = Knight()) if (USkillComponent* S = K->GetSkills()) S->AddXP(ESkillType::Climbing, N);
 }
 
 void UKnightMovement::LogClimb(const TCHAR* What) const
@@ -589,6 +668,7 @@ void FKnightMoveResponse::ServerFillResponseData(const UCharacterMovementCompone
 	const UKnightMovement& K = static_cast<const UKnightMovement&>(CharacterMovement);
 	Stamina = K.ClimbStamina; RefillWait = K.RefillWait; bExhausted = K.bClimbExhausted; bNoRegrab = K.bNoRegrab; WallNormal = K.WallNormal;
 	ActFrom = K.ActFrom; ActTo = K.ActTo; ActDir = K.ActDir; ActT = K.ActT; ActDur = K.ActDur; ActTop = K.ActTop; ActCarry = K.ActCarry; ActHold = K.ActHold;
+	SwimStamina = K.SwimStamina; Breath = K.Breath; SwimRefillWait = K.SwimRefillWait; DrownT = K.DrownT; bHeadUnder = K.bHeadUnder;
 	if (K.MovementMode == MOVE_Custom) bHasRotation = true;   // on the wall his facing is part of the state
 }
 
@@ -606,6 +686,8 @@ bool FKnightMoveResponse::Serialize(UCharacterMovementComponent& CharacterMoveme
 		for (FVector3f& X : V) Ar << X;
 		if (Ar.IsLoading()) { WallNormal = FVector(V[0]); ActFrom = FVector(V[1]); ActTo = FVector(V[2]); ActDir = FVector(V[3]); }
 		Ar << ActT << ActDur << ActTop << ActCarry << ActHold;
+		Ar << SwimStamina << Breath << SwimRefillWait << DrownT;
+		Ar.SerializeBits(&bHeadUnder, 1);
 		if (!bOk) return false;
 	}
 	return !Ar.IsError();
@@ -618,22 +700,25 @@ void UKnightMovement::ClientHandleMoveResponse(const FCharacterMoveResponseDataC
 	const FKnightMoveResponse& R = static_cast<const FKnightMoveResponse&>(MoveResponse);
 	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; WallNormal = R.WallNormal;
 	ActFrom = R.ActFrom; ActTo = R.ActTo; ActDir = R.ActDir; ActT = R.ActT; ActDur = R.ActDur; ActTop = R.ActTop; ActCarry = R.ActCarry; ActHold = R.ActHold;
+	SwimStamina = R.SwimStamina; Breath = R.Breath; SwimRefillWait = R.SwimRefillWait; DrownT = R.DrownT; bHeadUnder = R.bHeadUnder;
 }
 
 void FSavedMove_Knight::Clear()
 {
 	Super::Clear();
-	bSavedLetGo = false; SavedMode = 0; bSavedExhausted = false; bSavedRefilling = false;
+	bSavedLetGo = false; SavedMode = 0; bSavedExhausted = false; bSavedRefilling = false; bSavedFast = false; bSavedRise = false;
 }
 
 uint8 FSavedMove_Knight::GetCompressedFlags() const
 {
-	return uint8(Super::GetCompressedFlags() | (bSavedLetGo ? uint8(FLAG_Custom_0) : uint8(0)));
+	return uint8(Super::GetCompressedFlags() | (bSavedLetGo ? uint8(FLAG_Custom_0) : uint8(0)) | (bSavedFast ? uint8(FLAG_Custom_1) : uint8(0))
+		| (bSavedRise ? uint8(FLAG_Custom_2) : uint8(0)));
 }
 
 bool FSavedMove_Knight::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const
 {
 	const FSavedMove_Knight* O = static_cast<const FSavedMove_Knight*>(NewMove.Get());
+	if (O->bSavedFast != bSavedFast || O->bSavedRise != bSavedRise) return false;
 	if (O->bSavedLetGo != bSavedLetGo || O->SavedMode != SavedMode || O->bSavedExhausted != bSavedExhausted || SavedMode != 0 || bSavedRefilling || O->bSavedRefilling) return false;   // (the bar refilling on the ground runs per move: never merged)
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
@@ -646,14 +731,16 @@ void FSavedMove_Knight::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		bSavedLetGo = K->bWantsLetGo;
 		SavedMode = K->ClimbMode();
 		bSavedExhausted = K->bClimbExhausted;
-		bSavedRefilling = K->ClimbStamina < 1.f || K->RefillWait > 0.f;
+		bSavedRefilling = K->ClimbStamina < 1.f || K->RefillWait > 0.f || K->SwimStamina < 1.f || K->SwimRefillWait > 0.f || K->Breath < 1.f;
+		bSavedFast = K->bWantsFast;
+		bSavedRise = K->bWantsRise;
 	}
 }
 
 void FSavedMove_Knight::PrepMoveFor(ACharacter* C)
 {
 	Super::PrepMoveFor(C);
-	if (UKnightMovement* K = Cast<UKnightMovement>(C->GetCharacterMovement())) K->bWantsLetGo = bSavedLetGo;
+	if (UKnightMovement* K = Cast<UKnightMovement>(C->GetCharacterMovement())) { K->bWantsLetGo = bSavedLetGo; K->bWantsFast = bSavedFast; K->bWantsRise = bSavedRise; }
 }
 
 // What the last move ran into: the grab and the air mantle only look when it was rock or a fence (cheap for a server with many players)

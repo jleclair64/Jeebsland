@@ -29,6 +29,7 @@ private:
 	UPROPERTY() UStaticMeshComponent* Bobber = nullptr;
 	UPROPERTY() UStaticMeshComponent* Line = nullptr;
 	UPROPERTY() UStaticMeshComponent* Ripple = nullptr;
+	UPROPERTY() TArray<TObjectPtr<class UProceduralMeshComponent>> Rings;   // two thin rings spreading on the water (players' machines only)
 	float Clock = 0.f;
 };
 

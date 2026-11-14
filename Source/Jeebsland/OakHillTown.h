@@ -30,10 +30,8 @@ private:
 	uint32 Hash = 2166136261u;   // checksum of everything solid (logged as JEEBOAK hash, to compare machines)
 	void BuildGround();
 	void BuildBuildings();
+	void BuildPlazaOak();   // the plaza's big Meshy oak and its trunk's capsule
+	static class UStaticMesh* LoadPlazaOak();
 	TArray<JeebDecor::FFootprint> Foundations;   // each building's walls and door, for the stones and shrubs at its foundation (GroundDecor.h)
 	void LogChecks();
-	// Barrels, crates, sacks, a cart and a rope coil behind and beside the market stall (owner, 2026-11-12: stuff behind it
-	// too, like barrels or other junk, to fill in the scene): simple shapes, separate from the building's model
-	// (bBehind: also the crates, barrels, sacks and cart behind it; a stall with no yard behind gets only the pieces beside it)
-	void BuildStoreClutter(const FVector& At, float FrontYaw, float HalfWidthCm, float HalfDepthCm, bool bBehind = true);
 };

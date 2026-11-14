@@ -13,7 +13,7 @@ namespace JeebItems
 		const TCHAR* const TierKeys[NumTiers] = { TEXT("Tin"), TEXT("Iron"), TEXT("Silver"), TEXT("Gold"), TEXT("Emerald"), TEXT("Diamond") };
 		const TCHAR* const KindKeys[K_Count] = { TEXT("Sword"), TEXT("Axe"), TEXT("Pickaxe"), TEXT("Spear"), TEXT("Broadsword"), TEXT("BattleAxe"), TEXT("Katana"),
 			TEXT("Wand"), TEXT("Staff"), TEXT("Bow"), TEXT("Rod"), TEXT("Shield"), TEXT("Helmet"), TEXT("Chest"), TEXT("Shoulders"), TEXT("Gauntlets"), TEXT("Boots"),
-			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow") };
+			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow"), TEXT("Sword2"), TEXT("Sword3") };
 		const TCHAR* const MaterialKeys[] = { TEXT("CopperOre"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Bacon"), TEXT("PineLogs"), TEXT("RedwoodLogs"),
 			TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"),
 			TEXT("Onyx"), TEXT("Emerald") };

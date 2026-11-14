@@ -2,6 +2,8 @@
 #include "OakHillTown.h"
 #include "OakHill.h"
 #include "DayNight.h"
+#include "Terrain.h"
+#include "GameFramework/Pawn.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
@@ -15,14 +17,24 @@
 namespace
 {
 	// ---- Tuning ----
-	constexpr int32 PuffsPerStack = 10;
-	constexpr float PuffLife = 8.0f;        // seconds from the flue to gone
-	constexpr float RiseSpeed = 110.f;       // cm/s, slowing as it cools
+	// (2026-11-13, owner: "make the chimney smoke darker so it doesn't look like it lights up in the night sky. Also make it move a lot
+	// slower": it rises at about a third of the old speed, lives twice as long, drifts and turns slower, and more puffs keep the column
+	// joined at that pace)
+	constexpr int32 PuffsPerStack = 16;
+	constexpr float PuffLife = 18.0f;       // seconds from the flue to gone
+	constexpr float RiseSpeed = 40.f;        // cm/s, slowing as it cools
+	constexpr float DriftMin = 7.f, DriftMax = 25.f;   // cm/s downwind, in a lull and a full gust
 	constexpr float PuffTop = 0.36f;        // opacity of the densest puff
 	constexpr float ShowDistance = 15000.f; // beyond this the smoke is switched off (150 m)
-	// The glow of lit windows and the forge: low in the daytime, fuller as the sun nears the horizon (ADayNight::Dusk, 0..1).
-	// Multiplies each material's own GlowStrength, so the houses stay 35% dimmer than the shops (building_import.py GLOW_BY_NAME).
-	constexpr float GlowAtNoon = 0.55f, GlowAtDusk = 1.35f;
+	// The smoke's own colour: a soft mid grey in the sun, and much darker as the sun lowers, so it never glows against the dusk sky
+	// (it is unlit: its colour is all there is). x the light of the hour (ADayNight::TrailLight, already dimmer and warmer at the low sun).
+	constexpr float SmokeGrey = 0.6f, SmokeAtDusk = 0.32f;
+	// The glow of lit windows and the forge, as the sun nears the horizon (ADayNight::Dusk, 0..1). Multiplies each material's own
+	// GlowStrength, so the houses stay 35% dimmer than the shops (building_import.py GLOW_BY_NAME). Which windows are lit at all is
+	// M_Building's "Night" (each house switches on at its own moment: SetUpGlow, and building_clean.py's window vertex colours).
+	// 2026-11-13 (owner: "reduce the window brightness by another 50%"): GlowStrength halved in building_import.py, so at the low sun
+	// a lit window is half what it was.
+	constexpr float GlowAtNoon = 0.9f, GlowAtDusk = 1.35f;
 	// Shop-front lamps: a warm light that is barely there at noon and full at the low sun
 	constexpr float LampAtNoon = 0.15f, LampAtDusk = 1.0f;
 
@@ -85,7 +97,7 @@ void AOakHillLife::SetUp()
 	for (UStaticMeshComponent* C : Comps)
 	{
 		UStaticMesh* Mesh = C->GetStaticMesh();
-		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>()) continue;
+		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>() || !C->IsVisible()) continue;   // (not the hidden collision shells, SM_*_Col)
 		const FString Name = Mesh->GetName();
 		++NumBuilt;
 		Sum += C->GetComponentLocation();
@@ -116,9 +128,11 @@ void AOakHillLife::SetUp()
 			if (!Mdl) continue;
 			// the door faces the component's yaw plus DoorYaw; it stands at the walls' edge on that side
 			const float Door = C->GetComponentRotation().Yaw + Mdl->DoorYaw;
-			const float Half = (Mdl->DoorYaw > 0.f ? -Mdl->WY0 : Mdl->WY1) * Mdl->Scale;   // Unreal's Y is Blender's -Y
+			// (sized with the building as drawn, 2026-11-13: the shops are 0.65-0.85 of their model now, ScaleZ apart from width)
+			const FVector Sc = C->GetComponentScale();
+			const float Half = (Mdl->DoorYaw > 0.f ? -Mdl->WY0 : Mdl->WY1) * Sc.Y;   // Unreal's Y is Blender's -Y
 			const FVector Dir = FRotator(0.f, Door, 0.f).Vector();
-			const FVector P = C->GetComponentLocation() + Dir * (Half + 90.f) + FVector(0.f, 0.f, 260.f);
+			const FVector P = C->GetComponentLocation() + Dir * (Half + 90.f * Sc.Y) + FVector(0.f, 0.f, FMath::Max(260.f * Sc.Z, 200.f));
 			UPointLightComponent* L = NewObject<UPointLightComponent>(this);
 			L->SetupAttachment(RootComponent);
 			L->SetWorldLocation(P);
@@ -153,7 +167,11 @@ void AOakHillLife::SetUpGlow(AOakHillTown* Town)
 	for (UStaticMeshComponent* C : Comps)
 	{
 		UStaticMesh* Mesh = C->GetStaticMesh();
-		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>() || !Mesh->GetPathName().Contains(TEXT("/Game/Buildings/"))) continue;
+		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>() || !C->IsVisible() || !Mesh->GetPathName().Contains(TEXT("/Game/Buildings/"))) continue;
+		// When this house's lamps come on as the sun lowers (and go off as it rises): M_Building's HouseOffset (custom primitive data 0),
+		// 0..1, the same on every machine from where it stands. Its windows then come on one by one within a short spread.
+		const FVector L = C->GetComponentLocation();
+		C->SetCustomPrimitiveDataFloat(0, Hash01(uint32(FMath::RoundToInt(L.X * 0.1f)) * 83492791u ^ uint32(FMath::RoundToInt(L.Y * 0.1f)) * 2654435761u));
 		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
 		{
 			UMaterialInterface* M = C->GetMaterial(i);
@@ -179,7 +197,11 @@ void AOakHillLife::UpdateGlow()
 	if (FMath::Abs(D - LastGlowDusk) < 0.005f) return;
 	LastGlowDusk = D;
 	const float F = FMath::Lerp(GlowAtNoon, GlowAtDusk, D);
-	for (const FGlowMat& G : GlowBase) if (G.Base > 0.f) GlowMids[G.Mid]->SetScalarParameterValue(TEXT("GlowStrength"), G.Base * F);
+	for (const FGlowMat& G : GlowBase)
+	{
+		if (G.Base > 0.f) GlowMids[G.Mid]->SetScalarParameterValue(TEXT("GlowStrength"), G.Base * F);
+		GlowMids[G.Mid]->SetScalarParameterValue(TEXT("Night"), D);   // (each window lights when this passes its own threshold)
+	}
 }
 
 void AOakHillLife::Tick(float DeltaSeconds)
@@ -188,6 +210,22 @@ void AOakHillLife::Tick(float DeltaSeconds)
 	if (!bSetUp) { SetUp(); if (!bSetUp) return; }
 	UpdateGlow();
 	const float T = GetWorld()->GetTimeSeconds();
+#if !UE_BUILD_SHIPPING
+	{
+		// (test pictures, -OakWalkLog: where the knight stands every 0.25 s, to check the buildings' steps, porches and walls; log JEEBOAKWALK)
+		static const bool bWalkLog = FParse::Param(FCommandLine::Get(), TEXT("OakWalkLog"));
+		static float NextLog = 0.f;
+		if (bWalkLog && T >= NextLog)
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+				if (APawn* P = PC->GetPawn())
+				{
+					NextLog = T + 0.25f;
+					const FVector L = P->GetActorLocation();
+					UE_LOG(LogTemp, Log, TEXT("JEEBOAKWALK t %.2f at %.0f %.0f %.1f speed %.0f ground %.1f"), T, L.X, L.Y, L.Z, P->GetVelocity().Size2D(),
+						L.Z - JeebTerrain::HeightAt(L.X, L.Y));
+				}
+	}
+#endif
 	const float D = ADayNight::Dusk;
 
 	// shop-front lamps: a living flicker, brighter as the sun lowers
@@ -226,18 +264,18 @@ void AOakHillLife::Tick(float DeltaSeconds)
 			const float Born = (Cycle - Slot - S.Phase) * PuffLife;   // when this puff left the flue: it keeps the wind of that moment
 			// breeze at that moment: a slow, uneven swell
 			const float Gust = 0.5f + 0.5f * FMath::Sin(Born * 0.23f + S.Phase * 6.f) * FMath::Sin(Born * 0.11f + 1.3f);
-			const float Speed = 18.f + 45.f * FMath::Clamp(Gust, 0.f, 1.f);   // cm/s
+			const float Speed = DriftMin + (DriftMax - DriftMin) * FMath::Clamp(Gust, 0.f, 1.f);   // cm/s
 			const float Bend = FMath::Pow(U, 1.25f);                           // it climbs straight at first, then the wind takes it
 			const FVector Drift(Wind.X * Speed * PuffLife * Bend, Wind.Y * Speed * PuffLife * Bend, 0.f);
 			const float Rise = RiseSpeed * Age * (1.f - 0.30f * U);
-			const float Wobble = FMath::Sin(Age * 1.15f + float(i) * 2.1f + S.Phase * 9.f) * 14.f * U;
+			const float Wobble = FMath::Sin(Age * 0.45f + float(i) * 2.1f + S.Phase * 9.f) * 14.f * U;
 			const FVector Pos = S.Base + Drift + FVector(-Wind.Y * Wobble, Wind.X * Wobble, Rise);
 			const float Size = FMath::Lerp(0.30f, 1.75f, FMath::Pow(U, 0.8f)) * S.Size * (0.85f + 0.3f * Hash01(uint32(i) * 97u + uint32(S.Phase * 1000.f)));
 			const float Op = PuffTop * S.Strength * Smooth(0.f, 0.12f, U) * (1.f - Smooth(0.12f, 0.95f, U));
-			const FLinearColor Col = FLinearColor(0.82f, 0.82f, 0.84f) * Light * S.Dark;
+			const FLinearColor Col = FLinearColor(SmokeGrey, SmokeGrey, SmokeGrey * 1.02f) * Light * S.Dark * FMath::Lerp(1.f, SmokeAtDusk, D);
 			const float Custom[4] = { Col.R, Col.G, Col.B, Op };
 			Puffs->SetCustomData(N, TArrayView<const float>(Custom, 4), false);
-			Puffs->UpdateInstanceTransform(N, FTransform(FRotator(0.f, Age * 12.f, 0.f), Pos, FVector(Size)), true, N == Last, false);
+			Puffs->UpdateInstanceTransform(N, FTransform(FRotator(0.f, Age * 4.f, 0.f), Pos, FVector(Size)), true, N == Last, false);
 		}
 	}
 }

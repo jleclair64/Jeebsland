@@ -68,11 +68,14 @@ void AKnightHUD::DrawHUD()
 	// No knight: the starting screen, or (online) waiting for the server to let us in
 	APawn* Pawn = GetOwningPawn();
 	if (!Pawn) { DrawNoKnight(); return; }
-	if (!bChatOpen) HideTyping();
 	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
+	if (bLevelTyping && !(Knight && Knight->IsPanelCursor() && !Knight->IsUIOpen())) bLevelTyping = false;   // (the test kit's level box: only while the Tab windows are up)
+	if (!bChatOpen && !bLevelTyping) HideTyping();
+	else if (bLevelTyping && !bChatOpen) EnsureTyping();   // (while typing a level, the keys go to the box, not to the knight)
 	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
 	if (!Skills || !Knight) return;
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
+	TickMapSampling();   // (the world map's pictures, a little each frame until done: KnightHUDMap.cpp)
 	TipLines.Reset();
 
 	// A dropped thing close by says what it is (the same description you see in the inventory), floating above it
@@ -270,6 +273,21 @@ void AKnightHUD::DrawHUD()
 		{
 			const float CW = 300.f, CH = 12.f;   // (thicker and yellower than the health bar, so the two never read as the same)
 			Gauge((Canvas->ClipX - CW) * 0.5f, Canvas->ClipY * 0.8f, CW, CH, F, KM->bClimbExhausted ? FLinearColor(0.85f, 0.28f, 0.2f) : FLinearColor(0.64f, 0.92f, 0.2f), KM->bClimbExhausted || F < 0.2f);
+		}
+		// Swimming (2026-11-13): a sea-blue bar in the same spot (just under the climbing bar if both show) while he swims and while it fills again,
+		// red and throbbing in the last fifth; and with his head under water a thin pale breath bar over it, throbbing in its last third
+		static double SwimBarSeen = -10.0;
+		const float FS = KM->SwimStamina;
+		if (KM->InWater() || FS < 0.999f || KM->Breath < 0.999f) SwimBarSeen = NowC;
+		if (NowC - SwimBarSeen < 0.6)
+		{
+			const float CW = 300.f, CH = 12.f;
+			const float SX = (Canvas->ClipX - CW) * 0.5f;
+			const float SY = Canvas->ClipY * 0.8f + (NowC - ClimbBarSeen < 0.6 ? 20.f : 0.f);
+			const bool bLow = FS < 0.2f;
+			Gauge(SX, SY, CW, CH, FS, bLow ? FLinearColor(0.85f, 0.28f, 0.2f) : FLinearColor(0.2f, 0.62f, 0.95f), bLow);
+			if (KM->Breath < 0.999f)
+				Gauge(SX + 40.f, SY - 12.f, CW - 80.f, 6.f, KM->Breath, FLinearColor(0.82f, 0.94f, 1.f), KM->Breath < 0.34f);
 		}
 	}
 

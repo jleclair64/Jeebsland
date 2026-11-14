@@ -115,7 +115,8 @@ private:
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
 	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;
-	float RectX[8] = {}, RectY[8] = {}, RectW[8] = {}, RectH[8] = {}; int32 RectCount = 0;   // the windows on screen this frame
+	float RectX[12] = {}, RectY[12] = {}, RectW[12] = {}, RectH[12] = {}; int32 RectCount = 0;   // the windows on screen this frame
+	void AddWindowRect(float X, float Y, float W, float H) { if (RectCount < 12) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } }
 	float InvIngotX = 0.f, InvIngotY = 0.f;   // the fixed ingot cell
 	float WornCellX[10] = {}, WornCellY[10] = {}, WornCellS = 0.f; int32 WornKind[10] = {}; bool WornSecond[10] = {}; int32 WornCellCount = 0;   // the armour slots drawn this frame
 	float PotionCellX = 0.f, PotionCellY = 0.f; bool bPotionCell = false;   // the potion slot
@@ -187,7 +188,40 @@ private:
 	FVector2D MapMin = FVector2D::ZeroVector;
 	float MapSize = 1.f;
 	void BuildMapTex();
+	// X, Y, S: where on screen. With the cursor over it the wheel zooms toward the cursor and a left drag pans (both the Tab
+	// screen's map and the Escape screen's share one view). Zoomed in, roads and Oak Hill's buildings are drawn on top.
 	void DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float S);
+	float MapZoom = 1.f;                                   // 1 = the whole world
+	FVector2D MapView = FVector2D::ZeroVector;             // the world point (cm) at the map's middle
+	bool bMapPanning = false;
+	FVector2D MapPanMouse = FVector2D::ZeroVector, MapPanView = FVector2D::ZeroVector;
+	// Oak Hill close up: a finer picture of the land round the town (painted the first time you zoom in), and its box in the world
+	UPROPERTY() UTexture2D* TownTex = nullptr;
+	FVector2D TownMin = FVector2D::ZeroVector; float TownSize = 1.f;
+	void BuildTownTex();
+	// The ground's heights and river distances for both pictures are sampled a few rows a frame from the moment the knight is in
+	// the world (TickMapSampling, about 2 ms a frame), so neither picture stops the game when it is first shown: a picture still
+	// unfinished when it is needed finishes its rows at once.
+	struct FMapSamples
+	{
+		FVector2D Min = FVector2D::ZeroVector; float Size = 1.f; int32 N = 0, Row = 0;
+		TArray<float> H, RD, Half;
+		bool Started() const { return N > 0; }
+		bool Done() const { return N > 0 && Row >= N; }
+		void Start(const FVector2D& InMin, float InSize, int32 InN);
+		void Step(double Seconds);   // samples rows for this long (everything left when Seconds is huge)
+		FVector2D At(int32 U, int32 V) const { const float Cell = Size / N; return FVector2D(Min.X + (N - 1 - V + 0.5f) * Cell, Min.Y + (U + 0.5f) * Cell); }   // (north up)
+	};
+	FMapSamples WorldSamples, TownSamples;
+	void TickMapSampling();
+	// TEMPORARY test kit (owner, 2026-11-13; JeebTestKit.h): every item that can be worn or held, and a box setting every skill
+	// to one level. Only drawn when the server says this player is a tester (AKnightPlayerController::bTestKit).
+	void DrawTestKit(AKnightCharacter* Knight, float X, float Y, float MaxW, float MaxH);
+	int32 TestPage = 0;
+	bool bTestKitOpen = false;
+	bool bLevelTyping = false;
+	FString TestLevelText = TEXT("99");
+	void SubmitLevel();
 	int32 BankPage = 0;
 	int32 BankDragHot = -1;   // a weapon being dragged from the weapon bar onto the bank
 	int32 LoreCat = 0;

@@ -55,6 +55,8 @@ namespace WeaponDesign
 		switch (Kind)
 		{
 		case JeebItems::K_Sword: return JeebProps::SwordReach;   // (the model's point, measured)
+		case JeebItems::K_Sword2: return JeebProps::Sword2Reach;
+		case JeebItems::K_Sword3: return JeebProps::Sword3Reach;
 		case JeebItems::K_Broadsword: return 112.f;
 		case JeebItems::K_Katana: return 101.f;
 		case JeebItems::K_Spear: return 155.f;

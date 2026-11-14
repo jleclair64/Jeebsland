@@ -82,6 +82,12 @@ PROPS = {
                             "Stirrup": ((-0.96, -0.1, -0.3), (-0.85, 0.1, 0.3))}),
     "Sword":    dict(file="Sword.glb", axes=("Y", "X", "-Z"), length=92.0, grip=("Z", 0.890), mask="grey", clean=True, reduce=8000, stretch=("Z", 1.0, 6.0),
                      marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
+    # (2026-11-13) two library swords for the owner to look at, "Sword 2" (Ornate Twohandedsword, HollowWillow731) and "Sword 3" (a long sword from medieval times, jeremifolta99):
+    # real proportions, each sized so the point is 82 cm from the grip like the sword's; one fixed look (mask none: no tier colour). Sword 3's model stands the other way up.
+    "Sword2":   dict(file="Sword2.glb", axes=("Y", "X", "-Z"), length=95.9, grip=("Z", 0.855), mask="none", reduce=10000, bake=True,
+                     marks={"Guard": ((-0.3, -0.08, -0.42), (0.3, 0.08, -0.36)), "Tip": ((-0.03, -0.06, 0.92), (0.03, 0.06, 0.96))}),
+    "Sword3":   dict(file="Sword3.glb", axes=("Y", "-X", "Z"), length=93.3, grip=("Z", 0.879), mask="none", reduce=14000, bake=True,
+                     marks={"Guard": ((-0.3, -0.08, 0.44), (0.3, 0.08, 0.50)), "Tip": ((-0.03, -0.06, -1.0), (0.03, 0.06, -0.93))}),
     "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -47.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
                      marks={"Edge": ((-0.32, -0.1, 0.5), (-0.27, 0.1, 0.95)), "Head": ((-0.3, -0.1, 0.9), (0.3, 0.1, 0.95))}),
     "Bow":      dict(file="Bow.glb", axes=("Z", "-Y", "X"), length=124.0, grip=("X", 0.50), widen=("Z", 0.75), wood=(25.0, 0.74, 0.28, 30.0), clean=True, refine=2, islands=12.0,

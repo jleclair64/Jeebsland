@@ -762,6 +762,11 @@ public:
 	void TickClimbTests(float Dt);       // (test pictures: -ClimbKeys, -ClimbDo)
 	void FillWallInput(JeebAnim::FInput& In) const;
 	static float ClimbSeconds(int32 ClimbingLevel);   // a full climbing bar, climbing upward, at this Climbing level (Tuning.ini [Climb])
+	static float SwimSeconds(int32 SwimmingLevel);    // a full swimming bar, swimming normally, at this Swimming level (Tuning.ini [Swim])
+	static float BreathSeconds(int32 SwimmingLevel);  // how long he can keep his head under water
+	void TickSwimTests(float Dt);        // (test pictures: -SwimKeys, -SwimDo)
+	void FillSwimInput(JeebAnim::FInput& In) const;
+	bool bSwimTestFast = false;
 	static float BowDrawSeconds(int32 ArcheryLevel);   // the bow's full draw at this Archery level (Tuning.ini [Archery]); the skills window shows it
 	static float LongbowDrawSeconds(int32 ArcheryLevel) { return BowDrawSeconds(ArcheryLevel) * JeebTune::V().LongDrawTime / FMath::Max(JeebTune::V().BowDrawTime, 0.01f); }
 private:

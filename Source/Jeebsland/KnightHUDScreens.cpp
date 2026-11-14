@@ -480,6 +480,17 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		Quad(30, 41, 34, 52, Dk);
 		break;
 	}
+	case 10:   // Swimming: a swimmer's head and reaching arm over blue waves (2026-11-13)
+	{
+		const FLinearColor Deep(0.12f, 0.38f, 0.72f), Foam(0.75f, 0.90f, 1.f), Skin(0.88f, 0.70f, 0.55f);
+		Quad(4, 40, 60, 60, Deep);
+		D(26, 34, 8, 8, Skin);                                   // the head, just out of the water
+		Ln(32, 38, 50, 22, Skin, 5.f);                           // the arm reaching forward
+		D(51, 21, 3.5f, 3.5f, Skin);
+		for (int32 k = 0; k < 4; ++k) { const float x = 4.f + k * 15.f; Ln(x, 42, x + 7.5f, 37, Foam, 3.f); Ln(x + 7.5f, 37, x + 15.f, 42, Foam, 3.f); }   // the wave's crest
+		Ln(10, 52, 54, 52, FLinearColor(0.35f, 0.62f, 0.92f), 2.f);
+		break;
+	}
 	case 9:   // Climbing: a wooden ladder leaning up a grey rock
 	default:
 	{
@@ -505,8 +516,8 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSkills(); return; }
 
 	// Order: fighting skills first, then gathering and crafting
-	static const ESkillType Order[10] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing };
+	static const ESkillType Order[11] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming };
 	int32 Total = 0;
 	for (ESkillType T : Order) Total += Sk->GetLevel(T);
 	{
@@ -520,7 +531,7 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	const float Gap = 14.f;
 	const float BW = (PW - 60.f - 3 * Gap) / 4.f, BH = 160.f;
 	const float GX = PX + 30.f, GY = PY + 70.f;
-	for (int32 i = 0; i < 10; ++i)
+	for (int32 i = 0; i < 11; ++i)
 	{
 		const ESkillType T = Order[i];
 		const float X = GX + (i % 4) * (BW + Gap), Y = GY + (i / 4) * (BH + Gap);

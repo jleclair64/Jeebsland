@@ -19,7 +19,7 @@
 // It refills on the ground. Climbing gives Climbing XP for new height (server only). There is no fall damage in the game (owner).
 namespace JeebClimb
 {
-	enum EMode : uint8 { None = 0, Climb = 1, Jump = 2, ClimbUp = 3, MantleOver = 4, MantleOnto = 5 };
+	enum EMode : uint8 { None = 0, Climb = 1, Jump = 2, ClimbUp = 3, MantleOver = 4, MantleOnto = 5, Swim = 6, Drown = 7 };   // (6, 7: swimming, 2026-11-13: KnightMovementSwim.cpp)
 	static const FName ClimbTag(TEXT("JeebClimb"));
 	static const FName MantleTag(TEXT("JeebMantle"));
 	constexpr float WallGap = 4.f;   // cm between the capsule and the rock while on it
@@ -34,6 +34,8 @@ struct FKnightMoveResponse : public FCharacterMoveResponseDataContainer
 	FVector WallNormal = FVector::BackwardVector;
 	FVector ActFrom = FVector::ZeroVector, ActTo = FVector::ZeroVector, ActDir = FVector::ZeroVector;
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f, ActHold = 0.f;
+	float SwimStamina = 1.f, Breath = 1.f, SwimRefillWait = 0.f, DrownT = 0.f;   // (swimming)
+	bool bHeadUnder = false;
 	virtual void ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment) override;
 	virtual bool Serialize(UCharacterMovementComponent& CharacterMovement, FArchive& Ar, UPackageMap* PackageMap) override;
 };
@@ -51,6 +53,7 @@ public:
 	bool OnWall() const { return IsCustom(JeebClimb::Climb) || IsCustom(JeebClimb::Jump); }   // the climb itself (and its jump)
 	bool InClimbMove() const { return MovementMode == MOVE_Custom && CustomMovementMode >= JeebClimb::Climb && CustomMovementMode <= JeebClimb::MantleOnto; }
 	bool InMantle() const { return IsCustom(JeebClimb::MantleOver) || IsCustom(JeebClimb::MantleOnto); }
+	bool InWater() const { return IsCustom(JeebClimb::Swim) || IsCustom(JeebClimb::Drown); }   // swimming (or drowning): KnightMovementSwim.cpp
 	float ActionShare() const { return ActDur > 0.f ? FMath::Clamp(ActT / ActDur, 0.f, 1.f) : 0.f; }
 	float ScriptedHold() const;   // the stand on top at the end of a ledge pull-up or a climb onto, from tuning (inside ActDur; the move keeps its own copy, ActHold)
 	// The wall's own directions, from its normal: up along the face, and to his right as he faces it
@@ -93,6 +96,26 @@ public:
 	FVector ActEdge = FVector::ZeroVector;   // a mantle: the top of the fence or block's near edge, where the hands go (the pose only; not part of the move)
 	bool FindMantleEdge(const FVector& Center, const FVector& Fwd, FVector& OutEdge) const;   // (others' machines: the same edge, found as the mantle starts)
 
+	// ---- swimming (2026-11-13, KnightMovementSwim.cpp; numbers in Tuning.ini [Swim]) ----
+	// The water comes only from JeebWater::DepthAt (the drawn water has no collision). Deep water at his feet (SwimEnterDepth) turns walking or
+	// falling into the swim; standing room (SwimExitDepth) turns it back. Inputs, carried by the saved move: Ctrl (bWantsLetGo, FLAG_Custom_0)
+	// dives, Shift (bWantsFast, FLAG_Custom_1) swims fast, Space (bWantsRise, FLAG_Custom_2) rises. The swimming bar or the breath running out
+	// is drowning (mode Drown): he sinks, and the SERVER alone ends it with AKnightCharacter::Die once DrownT reaches DrownSinkTime.
+	bool bWantsFast = false, bWantsRise = false;
+	float SwimStamina = 1.f;          // 0..1, lasts AKnightCharacter::SwimSeconds(level) of normal swimming; refills only on dry ground
+	float Breath = 1.f;               // 0..1, drains with his head under water (BreathSeconds), refills with it out
+	float SwimRefillWait = 0.f;
+	float DrownT = 0.f;               // seconds drowning
+	bool bHeadUnder = false;          // (with a little hysteresis)
+	float WaterDepth = 0.f;           // cm of water over his feet at the start of this move (0: none); WaterSurface its level
+	float WaterSurface = -1.0e9f;
+	float ServerWaterWall = 0.f;      // (server) seconds of the server's own clock he has spent in the water this time
+	float ServerWaterSim = 0.f;       // (server) seconds his moves have swum or sunk this time: the backstop below drains whatever his moves fall behind the clock
+	void ResetWater();                // full bars, not drowning (death, respawn)
+	void ServerWaterBackstop(float Dt);   // (server, every frame) a player in the water whose moves stop arriving still runs out of breath and drowns
+	bool DrownedOut() const;          // drowned long enough: the server's cue for Die()
+	static float WadeMul(float Depth); // walking speed share in water this deep at his feet
+
 private:
 	bool bJumpQueued = false, bJumpAsked = false;
 	bool bTouchRock = false, bTouchMantle = false;   // (the last move ran into climbable rock, or a fence: only then are the grab and the air mantle looked for)
@@ -116,7 +139,22 @@ private:
 	bool HugWall(float Dt, float InUp, const FVector& OldLoc);   // keeps him WallGap off the rock and follows its slope; false when he left it
 	void FaceWall(float Dt);
 	void GiveXP();
+	void FlushClimbXP();                     // (server) the Climbing XP earned on this wall, in one go as he leaves it: the skill pop-up shows once, not every 25 cm
+	int32 ClimbXPPending = 0;
 	void LogClimb(const TCHAR* What) const;
+	// swimming
+	void SenseWater();                       // WaterDepth / WaterSurface at his feet, now
+	void StartSwim();
+	void PhysSwim(float Dt);
+	void PhysDrown(float Dt);
+	void SwimDrain(float Dt, float Share);   // the bar and the breath, for one stretch of time
+	void StartDrown(const TCHAR* Why);
+	bool LeaveWaterIfStanding(float FloorZ, bool bFloorOk);
+	void SwimXP(bool bFlush);                // (server) metres swum -> Swimming XP, in lumps
+	FVector2D SwimLastXY = FVector2D::ZeroVector;
+	float SwimMetres = 0.f;
+	float SwimLogT = 0.f;
+	void LogSwim(const TCHAR* What, float Extra = 0.f) const;
 };
 
 // The saved move: the let-go key, and refuses to merge moves across a change of climbing state
@@ -128,6 +166,7 @@ public:
 	uint8 SavedMode = 0;
 	bool bSavedExhausted = false;
 	bool bSavedRefilling = false;
+	bool bSavedFast = false, bSavedRise = false;   // (swimming: Shift and Space held)
 	virtual void Clear() override;
 	virtual uint8 GetCompressedFlags() const override;
 	virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;

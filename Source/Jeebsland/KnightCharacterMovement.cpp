@@ -51,7 +51,7 @@ void AKnightCharacter::StopSprint()
 
 void AKnightCharacter::StartCrouch()
 {
-	if (UKnightMovement* KM = KnightMove()) { KM->bWantsLetGo = true; if (KM->InClimbMove()) return; }   // Ctrl on a rock face lets go (and never grabs while held)
+	if (UKnightMovement* KM = KnightMove()) { KM->bWantsLetGo = true; if (KM->InClimbMove() || KM->InWater()) return; }   // Ctrl on a rock face lets go (and never grabs while held); in the water it dives
 	if (bSitting || bRolling || bSliding || bClimbing || bMounted) return;
 	bCrouched = true;
 }
@@ -226,6 +226,7 @@ void AKnightCharacter::StartRoll()
 
 void AKnightCharacter::Jump()
 {
+	if (UKnightMovement* KM = KnightMove()) { KM->bWantsRise = true; if (KM->InWater()) return; }   // (in the water Space held swims up: KnightMovementSwim.cpp)
 	if (bKnockedDown) { GetUp(0); return; }   // (Space gets straight up)
 	if (Smash == ESmash::Charging || MoveLocked()) return;   // (a smash attack or a kick can't be jumped out of)
 	if (Smash == ESmash::Deciding) SetSmash(ESmash::None);   // (jumping before it charges: just hit 1)
@@ -286,6 +287,7 @@ void AKnightCharacter::CheckJumpInput(float DeltaTime)
 		if (KM->IsCustom(JeebClimb::Climb)) KM->QueueClimbJump();
 		return;
 	}
+	if (UKnightMovement* KM = KnightMove(); KM && KM->InWater()) { bPressedJump = false; return; }   // (no jumping out of the water: Space swims up)
 	// Space just went down: leave the ground, unless something stops him
 	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
 	{
@@ -318,6 +320,7 @@ void AKnightCharacter::ClearJumpInput(float DeltaTime)
 // Letting go of Space. Unlike Unreal's, it keeps JumpKeyHoldTime: the next move needs it to tell a hop.
 void AKnightCharacter::StopJumping()
 {
+	if (UKnightMovement* KM = KnightMove()) KM->bWantsRise = false;
 	if (bPressedJump && JumpKeyHoldTime <= 0.f && !GetCharacterMovement()->IsFalling())
 	{
 		bReleaseAfterMove = true;   // no move has carried the press yet

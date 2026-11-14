@@ -23,12 +23,16 @@ namespace JeebProps
 	constexpr float ArrowLen = 70.f;
 	// The sword's point from the grip, and the axe's head (BladeReach: hit boxes and keeping the point off the floor)
 	constexpr float SwordReach = 82.f;
+	// Sword 2 and 3 (2026-11-13; Tools/prop_clean.py "PROP mark" prints the points): sized so each point is 82 cm from the grip too
+	constexpr float Sword2Reach = 82.f, Sword3Reach = 82.f;
 
 	inline const TCHAR* PathFor(int32 Kind)
 	{
 		switch (Kind)
 		{
 		case JeebItems::K_Sword: return TEXT("/Game/Props/SM_Sword.SM_Sword");
+		case JeebItems::K_Sword2: return TEXT("/Game/Props/SM_Sword2.SM_Sword2");
+		case JeebItems::K_Sword3: return TEXT("/Game/Props/SM_Sword3.SM_Sword3");
 		case JeebItems::K_Axe: return TEXT("/Game/Props/SM_Axe.SM_Axe");
 		case JeebItems::K_Bow: return TEXT("/Game/Props/SM_Bow.SM_Bow");
 		case JeebItems::K_Pickaxe: return TEXT("/Game/Props/SM_Pickaxe.SM_Pickaxe");

@@ -16,7 +16,8 @@ enum class ESkillType : uint8
 	Archery,
 	Magic,
 	Lockpicking,
-	Climbing      // (owner 2026-11-12: a skill now, its mechanics later; always add new skills at the end, saves store them by number)
+	Climbing,     // (owner 2026-11-12: a skill now, its mechanics later; always add new skills at the end, saves store them by number)
+	Swimming      // (2026-11-13: how long the swimming bar and the breath last, KnightMovementSwim.cpp)
 };
 
 UENUM(BlueprintType)
@@ -44,7 +45,7 @@ enum class EItemType : uint8
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
-constexpr int32 JeebNumSkills = 10;
+constexpr int32 JeebNumSkills = 11;
 constexpr int32 JeebNumWornKinds = 24;
 
 // One inventory slot: what is in it (see Inventory.h for ids) and how many
@@ -178,6 +179,7 @@ public:
 	static constexpr int32 MaxLevel = 99;
 	static int32 XPForLevel(ESkillType Skill, int32 Level);   // total XP needed to reach a level
 	void SetAllMaxLevel();   // testing only: every skill at 99 (see MaxLevelAccounts in DefaultGame.ini)
+	void SetAllLevels(int32 Level);   // TEMPORARY test kit (AKnightPlayerController::ServerTestLevels): every skill at exactly this level
 	int32 GetLevel(ESkillType Skill) const;
 	// XPIntoLevel / XPNeeded describe progress through the current level
 	void GetProgress(ESkillType Skill, int32& Level, int32& XPIntoLevel, int32& XPNeeded) const;

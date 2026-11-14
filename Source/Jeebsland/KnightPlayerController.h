@@ -42,6 +42,14 @@ public:
 	// This machine: waiting for the server to say yes
 	bool IsLoggingIn() const { return bSentLogin && !bLoginDone; }
 
+	// TEMPORARY test kit (owner, 2026-11-13; JeebTestKit.h): the server sets bTestKit for testers and only its owner sees it; the
+	// Tab screen then shows the test items and the set-every-skill box. Every request is checked again on the server.
+	UPROPERTY(Replicated) bool bTestKit = false;
+	UFUNCTION(Server, Reliable) void ServerTestGive(int32 Id, bool bWear);   // a full stack into the pack; bWear also wears or holds it
+	UFUNCTION(Server, Reliable) void ServerTestLevels(int32 Level);          // every skill to this level (1 to 99)
+	UFUNCTION(Server, Reliable) void ServerTestEmptyPack();                  // clears the 24 pack slots (not the ingots, worn gear or the bar)
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 private:
 	bool bSentLogin = false;
 	bool bLoginDone = false;
@@ -49,4 +57,6 @@ private:
 	UPROPERTY() ACameraActor* MenuCam = nullptr;
 	float MenuClock = 0.f;
 	void SendLogin();
+	double LastTestAsk = -10.0, LastTestGate = -10.0;   // (server: the test kit's rate limit, and when the gate was last read)
+	bool TestGate();                                    // (server: may this player use the test kit? also refreshes bTestKit)
 };

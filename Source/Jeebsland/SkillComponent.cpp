@@ -112,6 +112,7 @@ FString USkillComponent::SkillName(ESkillType Skill)
 	case ESkillType::Magic:       return TEXT("Magic");
 	case ESkillType::Lockpicking: return TEXT("Lockpicking");
 	case ESkillType::Climbing:    return TEXT("Climbing");
+	case ESkillType::Swimming:    return TEXT("Swimming");
 	default:                      return TEXT("Fishing");
 	}
 }
@@ -126,6 +127,14 @@ void USkillComponent::SetAllMaxLevel()
 {
 	if (!HasAuth()) return;
 	for (int32 i = 0; i < NumSkills; ++i) { XP[i] = XPForLevel(static_cast<ESkillType>(i), MaxLevel); Known[i] = true; }
+}
+
+// TEMPORARY test kit (owner, 2026-11-13): every skill at the start of this level (1 to 99; the server checks who may ask)
+void USkillComponent::SetAllLevels(int32 Level)
+{
+	if (!HasAuth()) return;
+	Level = FMath::Clamp(Level, 1, MaxLevel);
+	for (int32 i = 0; i < NumSkills; ++i) { XP[i] = Level <= 1 ? 0 : XPForLevel(static_cast<ESkillType>(i), Level); Known[i] = true; }
 }
 
 int32 USkillComponent::GetLevel(ESkillType Skill) const

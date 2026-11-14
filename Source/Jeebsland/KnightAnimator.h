@@ -172,7 +172,11 @@ namespace JeebAnim
 		float WallUpV = 0.f, WallRightV = 0.f;   // his speed along it: up, and to his right
 		FVector2D WallJump = FVector2D(0.f, 1.f);   // the climb jump's way along it (x right, y up)
 		float WallStamina = 1.f, ActDur = 1.f, ActHold = 0.f;   // the climbing bar; how long this scripted move lasts (s), and the stand on top after it (s, not in ActDur)
-		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5); }   // (weapon and shield on his back)
+		// swimming (2026-11-13, KnightMovementSwim.cpp): 6 swimming, 7 drowning; how far the capsule's middle is under the surface (cm), his speed across the water
+		uint8 SwimMode = 0;
+		float SwimDepth = 0.f, SwimSpeed = 0.f, SwimVz = 0.f;
+		bool bSwimUnder = false;    // his head under water
+		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0; }   // (weapon and shield on his back)
 	};
 }
 
@@ -347,6 +351,13 @@ private:
 	static const TCHAR* WallRow(int32 Key);
 	int32 WallKey(float Dt, const JeebAnim::FInput& In);
 	void WallPlay(int32 Key, const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	// swimming (2026-11-13, KnightAnimatorSwim.cpp): keys 92 treading water, 93 swimming, 95 drowning
+	int32 SwimKey(float Dt, const JeebAnim::FInput& In);
+	void SwimPlay(int32 Key, const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	float SwimMeanHip(const TCHAR* Row, float& OutY);
+	TMap<FString, FVector2D> SwimHipStats;
+	int32 SwimMoveKey = 92;
+	float SwimSlowT = 0.f, SwimPhase = 0.f, SwimHipZ = -1.f, SwimPitch = 0.f, SwimDrownT = 0.f;
 	void PlantHands(const JeebAnim::FInput& In, FPose& B) const;   // a vault: both hands pressed onto the top of the fence while he goes over (In.WallPoint)
 	void ClimbIK(const JeebAnim::FInput& In, float Dt);   // on the rock: each hand and boot rests on the surface (1.5 cm off), never in it: two-bone reaches, the body eased off the rock if the hands need it
 	float ClimbIKW = 0.f, WallIKLogT = 0.f;

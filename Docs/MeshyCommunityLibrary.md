@@ -110,6 +110,12 @@ The owner chose these from the library; all are free (CC0) downloads in `Art/Pro
 - Guardian Amulet ("Mystic Cipher Amulet", Balsamic_Vin, 1.06M to 4k, baked): https://www.meshy.ai/posts/019b52c7-2063-7373-a478-6df6ece0bbdc (`AmuletRune.glb`)
 - Vitality Amulet ("Amulet of the Ember Heart", SmalCrow, 1.3k): https://www.meshy.ai/posts/amulet-of-the-ember-heart-01a0209a-15e5-7cf1-a3cf-94d3b3036562 (`AmuletEmberHeart.glb`)
 - Astral Prism Pendant (new 6th amulet, "Astral Prism Pendant", kikounou84, 411k to 4k, baked): https://www.meshy.ai/posts/019d6fca-23fd-781a-a8b1-a790de1d9897 (`AmuletCrystal.glb`)
+- Sword 2 ("Ornate Twohandedsword", HollowWillow731, 59k to 10k, baked; the owner's pick, 2026-11-13): https://www.meshy.ai/posts/019fa43f-6c56-7b3e-9157-f89b0f17fe4b (`Sword2.glb`)
+- Sword 3 ("sword", dele, 98k untextured grey to 14k, 2026-11-13; the owner's pick): https://www.meshy.ai/posts/sword-01a1501f-5565-7052-bbeb-84eac95ee72d (`Sword3_raw.glb`; `Tools/sword3_colour.py` gives it a steel blade and a leather grip and bakes the pictures into `Sword3.glb`, which `prop_clean.py` then bakes). It was not found by searching the author (no user search); the owner sent the link.
+
+## Trees (2026-11-13)
+- Oak Hill's plaza oak ("Tree", Tansy, 1.88M faces, 9 likes, 12 stars, one 2048 colour picture, on a pale ground disc): https://www.meshy.ai/posts/tree-01a00a2c-2417-7281-b2af-de7878770b7b. Downloaded as GLB (156 MB) to `Art/Trees/PlazaOak_Original.glb` (git-ignored). `Tools/plaza_oak_clean.py` cuts the disc and the far roots, reduces it to 420k and repaints it in autumn into `Art/Trees/PlazaOak.glb`; `Tools/BuildPlazaOak.ps1` imports it to `/Game/Trees/SM_PlazaOak`.
+- Finding it: the `/tags/oak`, `/tags/tree` pages did not list it (and `/tags/oak-tree` is a 404). The community search did: on `/discover`, the "Search" button above the grid opens a box; typing "tree" and Enter opens `/search/tree?kind=model` in a NEW tab. Each card's text there is "name author likes stars", so a model is found by its author and counts (Tansy has many models all named "Tree").
 
 Lessons from this batch:
 - Finding a model the owner names: `https://www.meshy.ai/search/<words>?kind=model` works. Scroll the results page (a little script that scrolls loads more), then match the author's name in the card text.

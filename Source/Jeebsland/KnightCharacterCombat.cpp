@@ -32,6 +32,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Terrain.h"
+#include "JeebWater.h"
 #include "GrassField.h"
 #include "Canopy.h"
 #include "Pig.h"
@@ -370,7 +371,17 @@ void AKnightCharacter::Die()
 	Skills->TakeEverything(Items, Where, Ingots);
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	if (ALootDrop* Sack = GetWorld()->SpawnActor<ALootDrop>(FVector(Fell.X, Fell.Y, JeebTerrain::HeightAt(Fell.X, Fell.Y) + 2.f), FRotator::ZeroRotator, SP))
+	// (drowned, or died anywhere the ground is under water: on the nearest dry bank, since nobody can loot under water; out at sea, at the surface)
+	FVector SackAt(Fell.X, Fell.Y, JeebTerrain::HeightAt(Fell.X, Fell.Y) + 2.f);
+	{
+		float Surf;
+		if (JeebWater::DepthAt(SackAt, Surf) > 10.f)
+		{
+			FVector Shore;
+			SackAt = JeebWater::NearestShore(Fell.X, Fell.Y, 4000.f, Shore) ? Shore + FVector(0.f, 0.f, 2.f) : FVector(Fell.X, Fell.Y, Surf);
+		}
+	}
+	if (ALootDrop* Sack = GetWorld()->SpawnActor<ALootDrop>(SackAt, FRotator::ZeroRotator, SP))
 		Sack->SetupSack(Items, Where, Ingots);
 
 	Skills->ResetToStartingKit();

@@ -25,6 +25,7 @@
 #include "TextureResource.h"
 #include "RenderUtils.h"
 #include "Messages.h"
+#include "KnightPlayerController.h"
 
 using namespace JeebItems;
 
@@ -212,7 +213,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	const bool bLive = bCursor && bUIHaveMouse;   // clicks and tooltips only while the cursor is out
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
 	RectCount = 0;
-	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 8) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
+	auto AddRect = [&](float X, float Y, float W, float H) { AddWindowRect(X, Y, W, H); };
 
 	const float SS = 44.f, Gap = 5.f, Pad = 10.f;
 	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;   // a 5 x 5 pack
@@ -347,8 +348,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	// ================= Skills (down the left side of the screen) =================
 	{
 		// Only the skills you have discovered. The window grows to fit: up to 5 across, then more rows.
-		static const ESkillType Order[10] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing };
+		static const ESkillType Order[11] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming };
 		TArray<ESkillType> Shown;
 		for (ESkillType T : Order) if (Skills->IsKnown(T)) Shown.Add(T);
 		const int32 N = FMath::Max(1, Shown.Num());
@@ -377,6 +378,47 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 				SetTip(SkillTipLines(T, Lv, Into, Need));
 		}
 	}
+
+	// ================= The world map (top right; owner 2026-11-13: moved here from the Escape screen, about the same size) =================
+	// Above the Armor window when there is room (560 px, as on the Escape screen, smaller on a short screen); on a very short
+	// screen (720 tall) it goes beside the windows instead, clear of the weapon bar. The wheel over it zooms, a drag moves it (DrawWorldMap).
+	const float Frame = 6.f;   // (the map's glass frame reaches this far round it)
+	const float MapTop = (bShowFps ? 48.f : 16.f) + Frame;
+	float MS = 560.f, MX = 0.f;
+	{
+		const float Above = ArmorTopY - 12.f - Frame - MapTop;
+		if (Above >= 400.f) { MS = FMath::Min(MS, Above); MX = Canvas->ClipX - 16.f - Frame - MS; }
+		else { MS = FMath::Clamp(Canvas->ClipY - MapTop - Frame - 130.f, 200.f, MS); MX = IX - 16.f - Frame - MS; }
+		DrawWorldMap(Knight, MX, MapTop, MS);
+		AddRect(MX - Frame, MapTop - Frame, MS + 2.f * Frame, MS + 2.f * Frame);
+	}
+
+	// ================= TEMPORARY test kit (owner 2026-11-13; testers only, the server says who: AKnightPlayerController::bTestKit) =================
+	// A "Test kit" button left of the map opens it; it opens right of the Skills window when there is room, else over the left
+	// side of the screen (a short screen), and its X closes it.
+	if (const AKnightPlayerController* KPC = Cast<AKnightPlayerController>(GetOwningPlayerController()))
+		if (KPC->bTestKit)
+		{
+#if !UE_BUILD_SHIPPING
+			static const bool bShotKit = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")) && FParse::Param(FCommandLine::Get(), TEXT("ShotTestKit"));   // (test pictures: open it)
+			if (bShotKit) bTestKitOpen = true;
+#endif
+			const float MapLeft = MX - Frame;
+			if (!bTestKitOpen)
+			{
+				const float BW = 120.f, BH = 30.f, BX = MapLeft - 12.f - BW, BY = MapTop - Frame;
+				AddRect(BX, BY, BW, BH);
+				if (Btn(BX, BY, BW, BH, TEXT("Test kit"), true, false, 0.9f)) { bTestKitOpen = true; bUIClick = false; }
+				if (Over(BX, BY, BW, BH)) SetTip({ TEXT("Test kit"), TEXT("Every item to wear or hold, and every skill to one level"), TEXT("Testing only: not in the real game") });
+			}
+			else
+			{
+				const bool bRoom = 16.f + 310.f + 16.f + 450.f + 16.f <= MapLeft;   // (right of the Skills window at its widest)
+				const float KX = bRoom ? 16.f + 310.f + 16.f : 16.f, KY = bRoom ? 24.f : 16.f;
+				DrawTestKit(Knight, KX, KY, MapLeft - 16.f - KX, Canvas->ClipY - KY - (bRoom ? 150.f : 16.f));
+			}
+		}
+
 	if (Knight->GetLootTarget()) DrawLootWindows(Knight, IX, IY, PW);   // an open sack, to the left of your windows
 	bGreyGlass = false;
 }
@@ -701,7 +743,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 	UFont* Font = GEngine->GetMediumFont();
 	const bool bLive = Knight->IsPanelCursor() && bUIHaveMouse;
 	auto Hot = [&](float X, float Y, float W, float H) { return bLive && Over(X, Y, W, H); };
-	auto AddRect = [&](float X, float Y, float W, float H) { if (RectCount < 8) { RectX[RectCount] = X; RectY[RectCount] = Y; RectW[RectCount] = W; RectH[RectCount] = H; ++RectCount; } };
+	auto AddRect = [&](float X, float Y, float W, float H) { AddWindowRect(X, Y, W, H); };
 	const float SS = 44.f, Gap = 5.f, Pad = 10.f, TitleH = 30.f;
 	const float GridW = 5 * SS + 4 * Gap, GridH = 5 * SS + 4 * Gap;
 	const FLinearColor Idle(0.62f, 0.63f, 0.66f), Hover(0.86f, 0.87f, 0.9f);

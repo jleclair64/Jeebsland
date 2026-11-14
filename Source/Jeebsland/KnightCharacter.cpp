@@ -31,6 +31,7 @@
 #include "Pig.h"
 #include "Inventory.h"
 #include "Npc.h"
+#include "OakHill.h"
 #include "Horse.h"
 #include "Cottage.h"
 #include "Loot.h"
@@ -511,7 +512,10 @@ void AKnightCharacter::TickHousekeeping()
 	{
 		// Walking (or being pushed) away from whoever you are trading with ends the conversation
 		const ANpc* N = TradeNpc.Get();
-		if (!N || FVector::Dist2D(GetActorLocation(), N->GetActorLocation()) > 650.f)
+		// (an Oak Hill shop has no shopkeeper yet: there it is the distance from its counter, JeebOakHill::Counters)
+		const JeebOakHill::EShop Shop = bSmithOpen ? JeebOakHill::EShop::Smith : bBankOpen ? JeebOakHill::EShop::Bank : JeebOakHill::EShop::Store;
+		const bool bAtCounter = !N && !bDialogueOpen && JeebOakHill::NearCounter(Shop, GetActorLocation().X, GetActorLocation().Y, 650.f) != nullptr;
+		if (!bAtCounter && (!N || FVector::Dist2D(GetActorLocation(), N->GetActorLocation()) > 650.f))
 		{
 			CloseDialogue();
 			if (bShopOpen) CloseShop();

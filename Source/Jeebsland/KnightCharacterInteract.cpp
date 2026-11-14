@@ -37,6 +37,17 @@
 #include "WeaponDesign.h"
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
+#include "OakHill.h"
+
+// Oak Hill's shop counters (no shopkeepers yet, owner 2026-11-13: "We'll add NPCs to the shops later"): standing within this of a
+// counter, E opens that shop's window. The server checks its own range (NearTrader, 800 cm, like Blackrock's traders)
+static constexpr float CounterReach = 250.f;
+static const JeebOakHill::FCounter* CounterInReach(const AActor* Me)
+{
+	const FVector P = Me->GetActorLocation();
+	const JeebOakHill::FCounter* C = JeebOakHill::NearAnyCounter(P.X, P.Y, CounterReach);
+	return C && FMath::Abs(P.Z - 90.f - JeebTerrain::HeightAt(C->At.X, C->At.Y)) < 200.f ? C : nullptr;
+}
 
 void AKnightCharacter::Interact()
 {
@@ -273,6 +284,14 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	}
 	default: break;
 	}
+	// At an Oak Hill shop's counter
+	if (const JeebOakHill::FCounter* C = CounterInReach(this))
+	{
+		OutText = C->Shop == JeebOakHill::EShop::Smith ? FString(TEXT("Press E to use the forge"))
+			: C->Shop == JeebOakHill::EShop::Bank ? FString::Printf(TEXT("Press E to bank at the %s"), C->Name)
+			: FString::Printf(TEXT("Press E to trade at the %s"), C->Name);
+		return true;
+	}
 	// Facing a place to fish
 	if (!bFishing)
 	{
@@ -335,6 +354,11 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	}
 	default: break;
 	}
+	if (const JeebOakHill::FCounter* C = CounterInReach(this))
+	{
+		Float(FVector(C->At.X, C->At.Y, JeebTerrain::HeightAt(C->At.X, C->At.Y)), 120.f);   // (about the counter's height)
+		return true;
+	}
 	if (!bFishing)
 	{
 		for (TActorIterator<AFishingSpot> It(GetWorld()); It; ++It)
@@ -394,7 +418,19 @@ void AKnightCharacter::OnInteractKey()
 			Inv(EInvOp::HutLoot, 0, 0, 0, nullptr, Hut->GetActorLocation());
 		}
 		break;
-	default: break;
+	default:
+		// An Oak Hill shop's counter: straight to its window (the server checks the range on every trade, NearTrader)
+		if (const JeebOakHill::FCounter* C = CounterInReach(this))
+		{
+			TradeNpc = nullptr;   // (no shopkeeper: walking away is measured from the counter, KnightCharacter.cpp)
+			bCrouched = false;
+			bBlocking = false;
+			SetActorRotation(FRotator(0.f, C->Facing, 0.f));
+			if (C->Shop == JeebOakHill::EShop::Smith) OpenSmith();
+			else if (C->Shop == JeebOakHill::EShop::Bank) OpenBank();
+			else OpenShop();
+		}
+		break;
 	}
 }
 

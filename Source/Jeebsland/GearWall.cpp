@@ -166,8 +166,8 @@ void AGearWall::Build()
 	// ---- weapons and arrows: across the floor, facing back toward the armour (-X); seen from the start, +Y is on the right ----
 	const FRotator Back(0.f, 180.f, 0.f);
 	const int32 CrossCol = K_Rod - K_Sword + 2;   // (a crossbow's prod is far taller than a row: they take two columns, turn about, each row's clear of the next)
-	const int32 NumCols = (K_Rod - K_Sword + 1) + 3 + 3;   // (then the longbow and crossbow (two wide), capes, arrows by tier, fire arrows)
-	auto WeaponOf = [](int32 col) { return col <= K_Rod - K_Sword ? K_Sword + col : col == K_Rod - K_Sword + 1 ? int32(K_Longbow) : int32(K_Crossbow); };
+	const int32 NumCols = (K_Rod - K_Sword + 1) + 3 + 2 + 3;   // (then the longbow and crossbow (two wide), Sword 2 and Sword 3, capes, arrows by tier, fire arrows)
+	auto WeaponOf = [](int32 col) { return col <= K_Rod - K_Sword ? K_Sword + col : col == K_Rod - K_Sword + 1 ? int32(K_Longbow) : col == K_Rod - K_Sword + 2 ? int32(K_Crossbow) : col == K_Rod - K_Sword + 4 ? int32(K_Sword2) : int32(K_Sword3); };
 	const float Len = NumCols * WeaponColW;
 	AddBoard(FVector(WeaponX + 6.f, 0.f, 165.f), FVector(4.f, 0.5f * Len + 110.f, 165.f), Wood);
 	AddBoard(FVector(WeaponX + 1.f, 0.f, 140.f), FVector(1.5f, 0.5f * Len + 6.f, 135.f), Rail);
@@ -179,11 +179,12 @@ void AGearWall::Build()
 		const bool bCrossbow = col == CrossCol;
 		const float Y = -0.5f * Len + (col + 0.5f) * WeaponColW;
 		const bool bCapes = col == NumCols - 3, bArrows = col == NumCols - 2, bFire = col == NumCols - 1;
+		const bool bOnlyTin = col == K_Rod - K_Sword + 4 || col == K_Rod - K_Sword + 5;   // (Sword 2 and 3 have one fixed look: one row)
 		const FString Head = bFire ? FString(TEXT("Fire arrows")) : bArrows ? FString(TEXT("Arrows")) : bCapes ? FString(TEXT("Capes")) : FString(KindName(WeaponOf(col)));
 		AddSign(FVector(WeaponX - 2.f, bCrossbow ? Y + 0.5f * WeaponColW : Y, WeaponZ0 + NT * WeaponRowH + 16.f), Back, Head, 22.f);
 		for (int32 t = 0; t < NT; ++t)
 		{
-			if (bFire && t > 0) break;
+			if ((bFire || bOnlyTin) && t > 0) break;
 			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : bCapes ? GearId(K_Cape, t) : GearId(WeaponOf(col), t);
 			if (bCrossbow) { AddItem(Id, 1, FVector(WeaponX - 14.f, Y + (t % 2 ? WeaponColW : 0.f), WeaponZ0 + 10.f + t * WeaponRowH), WeaponSize * 0.75f, true); continue; }
 			AddItem(Id, (bFire || bArrows) ? ArrowCount : 1, FVector(WeaponX - 14.f, Y, WeaponZ0 + t * WeaponRowH), (bArrows || bFire) ? WeaponSize * 0.7f : bCapes ? WeaponSize * 0.4f : WeaponSize, !bCapes);

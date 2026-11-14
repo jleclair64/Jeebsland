@@ -1,4 +1,6 @@
 #include "Castle.h"
+#include "WaterLook.h"
+#include "ProceduralMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
@@ -40,7 +42,7 @@ void ACastle::Build()
 	UInstancedStaticMeshComponent* Banner = MakeISM(CubeMesh, FLinearColor(0.55f, 0.08f, 0.06f), false);
 	UInstancedStaticMeshComponent* Lamp   = MakeISM(CubeMesh, FLinearColor(5.0f, 2.0f, 0.4f), false);   // bright: glows
 	UInstancedStaticMeshComponent* Pillar = MakeISM(CylMesh, FLinearColor(0.40f, 0.39f, 0.42f), true);
-	UInstancedStaticMeshComponent* Water  = MakeISM(CylMesh, FLinearColor(0.04f, 0.10f, 0.18f), false);
+	// (the moat's water: a ring of M_Water below, WaterLook.h)
 	UInstancedStaticMeshComponent* Slate  = MakeISM(ConeMesh, FLinearColor(0.12f, 0.16f, 0.32f), true);
 	UInstancedStaticMeshComponent* Gilt   = MakeISM(ConeMesh, FLinearColor(0.95f, 0.70f, 0.10f), true);
 
@@ -98,8 +100,30 @@ void ACastle::Build()
 	auto Cs = [](float Deg) { return FMath::Cos(FMath::DegreesToRadians(Deg)); };
 	auto Sn = [](float Deg) { return FMath::Sin(FMath::DegreesToRadians(Deg)); };
 
-	// ---- The moat: one flat disc of water; the ground hides it everywhere except in the ditch ----
-	Round(Water, 0.f, 0.f, -52.f, -47.f, JeebTerrain::CastleMoatOut + 50.f, false);
+	// ---- The moat: a flat ring of water over the ditch (2026-11-13: a ring, not a disc: the see-through water showed wherever
+	// the courtyard dipped under its level); its surface is where the old disc's top was ----
+	if (!IsNetMode(NM_DedicatedServer))
+	{
+		const float Zw = -47.f, R0 = JeebTerrain::CastleMoatIn - 160.f, R1 = JeebTerrain::CastleMoatOut + 50.f;
+		const int32 Segs = 128;
+		TArray<FVector> V; TArray<int32> T; TArray<FVector> N; TArray<FLinearColor> Col;
+		for (int32 s = 0; s <= Segs; ++s)
+		{
+			const float A = 2.f * PI * s / Segs;
+			const FVector2D D(FMath::Cos(A), FMath::Sin(A));
+			V.Add(Pt(D.X * R0, D.Y * R0, Zw)); V.Add(Pt(D.X * R1, D.Y * R1, Zw));
+			N.Add(FVector::UpVector); N.Add(FVector::UpVector);
+			Col.Add(FLinearColor::White); Col.Add(FLinearColor::White);   // (still water)
+			if (s > 0) { const int32 k = (s - 1) * 2; T.Append({ k, k + 1, k + 2, k + 2, k + 1, k + 3, k, k + 2, k + 1, k + 2, k + 3, k + 1 }); }   // (both windings)
+		}
+		UProceduralMeshComponent* Moat = NewObject<UProceduralMeshComponent>(this);
+		Moat->SetupAttachment(RootComponent);
+		Moat->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Moat->SetCastShadow(false);
+		Moat->RegisterComponent();
+		Moat->CreateMeshSection_LinearColor(0, V, T, N, TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+		JeebWaterLook::Apply(Moat, 0, FLinearColor(0.04f, 0.10f, 0.18f));
+	}
 
 	// ---- The wall (the gate is in the -X side) ----
 	Box(Stone, W, 0.f, -40.f, Hw, Wt, W + Wt, 0.f, true);

@@ -43,7 +43,8 @@ namespace
 		TEXT("BowDraw"), TEXT("BowRecoil"), TEXT("AimIdle"), TEXT("AimWalkF"), TEXT("AimWalkB"), TEXT("AimWalkL"), TEXT("AimWalkR"),
 		TEXT("WeightedRun"), TEXT("ChestBlock"), TEXT("Drink"),
 		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold"), TEXT("SlashCombo"), TEXT("GreatCombo"),
-		TEXT("WallHang"), TEXT("WallUp"), TEXT("WallDown"), TEXT("ShimmyL"), TEXT("ShimmyR"), TEXT("HopUp"), TEXT("HopDown"), TEXT("HopL"), TEXT("HopR"), TEXT("LedgeUp"), TEXT("VaultOver"), TEXT("ClimbOnto"), TEXT("VaultTwo") };
+		TEXT("WallHang"), TEXT("WallUp"), TEXT("WallDown"), TEXT("ShimmyL"), TEXT("ShimmyR"), TEXT("HopUp"), TEXT("HopDown"), TEXT("HopL"), TEXT("HopR"), TEXT("LedgeUp"), TEXT("VaultOver"), TEXT("ClimbOnto"), TEXT("VaultTwo"),
+		TEXT("Swimming"), TEXT("TreadWater") };
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -697,12 +698,14 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 
 	// (out of a climb or a mantle the body comes back upright slowly, never a snap to standing: from the ledge and the block, crouched, he stands over 0.6 s;
 	// the floor holds for 0.4 s, so a key that follows at once (a frame of walking, the fall after letting go) can't cut the blend short)
-	if (Key != StateKey && StateKey >= 80 && StateKey <= 91 && !(Key >= 80 && Key <= 91))
+	// (keys 92-95, the swim, the same way: out of the water he comes upright over 0.6 s)
+	if (Key != StateKey && StateKey >= 80 && StateKey <= 95 && !(Key >= 80 && Key <= 95))
 	{
 		WallExitLeft = 0.4f;
-		WallExitBlend = (StateKey == 89 || StateKey == 91) ? 0.6f : StateKey == 90 ? 0.4f : 0.5f;   // (letting go: the hang eases into the fall over half a second)
+		WallExitBlend = (StateKey == 89 || StateKey == 91 || StateKey >= 92) ? 0.6f : StateKey == 90 ? 0.4f : 0.5f;   // (letting go: the hang eases into the fall over half a second)
 	}
-	if (Key != StateKey && WallExitLeft > 0.f && !(Key >= 80 && Key <= 91)) BlendFor = FMath::Max(BlendFor, WallExitBlend);
+	if (Key != StateKey && WallExitLeft > 0.f && !(Key >= 80 && Key <= 95)) BlendFor = FMath::Max(BlendFor, WallExitBlend);
+	if (Key != StateKey && Key >= 92 && Key <= 95) BlendFor = FMath::Max(BlendFor, Key == 95 ? 0.3f : 0.5f);   // (into the water, and between treading and swimming: the body tips slowly)
 	if (Key != StateKey)
 	{
 		// (between his own walk and the sword-and-shield clips the hand turns furthest of all, and the blade shows it: never a whirl)
@@ -729,7 +732,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	}
 	// (a part-way landing or a chest-only move can leave a boot sunk: the hips rise just enough. Floor clips lie lower.)
 	{
-		const float Sole = (StateKey >= 80 && StateKey <= 91) ? -100000.f : (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
+		const float Sole = (StateKey >= 80 && StateKey <= 95) ? -100000.f : (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
 		const float Low = FMath::Min(float(BonePos(Final, LFoot).Z), float(BonePos(Final, RFoot).Z));
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
@@ -1428,7 +1431,8 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	if (In.WallMode != WallModePrev) { WallModePrev = In.WallMode; WallModeT = 0.f; } else WallModeT += Dt;
 	// Which state
 	int32 Key = 0;
-	if (In.bKnockedDown) Key = In.KnockPhase == 1 ? 11 : 10;
+	if (In.SwimMode != 0) Key = SwimKey(Dt, In);   // (in the water nothing else plays: KnightAnimatorSwim.cpp)
+	else if (In.bKnockedDown) Key = In.KnockPhase == 1 ? 11 : 10;
 	else if (In.bRolling) Key = 20;
 	else if (In.Move != EMove::None)
 	{
@@ -1496,6 +1500,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	if (Key == 0) return 0;
 	const auto& Tn = JeebTune::V();
 	if (Key >= 80 && Key <= 91) { WallPlay(Key, In, B, OutBlend); return Key; }
+	if (Key >= 92 && Key <= 95) { SwimPlay(Key, In, B, OutBlend); return Key; }
 	switch (Key)
 	{
 	case 10:
@@ -1955,7 +1960,7 @@ void FClipLib::SolveGear()
 	{
 		const FTransform Hip = BindInGame(P, Hips);
 		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		FVector At(-14.f, -14.f, 14.f);   // (owner 2026-11-06: same height and spot on the belt, but touching it; it hung 5 cm clear of his back)
+		FVector At(-16.5f, -16.5f, 14.f);   // (owner 2026-11-06: same height and spot on the belt, but touching it; it hung 5 cm clear of his back. 2026-11-13: it sank into the armour, out 3.5 cm along back-left)
 		FString S; TArray<FString> Pr;   // (test pictures: -FlaskAt=X_Y_Z)
 		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
 		BeltFlaskOnHips = FTransform(FRotator(5.f, 0.f, 186.f).Quaternion(), At + Old + FVector(0.f, 0.f, 96.f), FVector(0.7f)) * Hip.Inverse();

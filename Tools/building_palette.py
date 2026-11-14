@@ -209,6 +209,30 @@ PROFILES = {
             ((69.2, 5.4, 50.7), {"keep": 1}),
         ],
     },
+    "cottage": {   # the storybook cottage (kaesar3d, owner 2026-11-13): bright orange tiles, cold blue-grey stone (shift), cream plaster, tan timber
+        "shift": ("stone",),
+        "anchors": [
+            ((65.3, 0.4, 6.1), {"stone": 1}),        # #a39d93 pale stone, steps
+            ((13.8, 5.0, 6.2), {"wood": 1}),         # #2c201a dark timber and gaps
+            ((29.6, 7.7, 12.3), {"wood": 1}),        # #574133
+            ((46.3, 2.7, 7.9), {"stone": 1}),        # #776b60
+            ((41.1, -0.5, -14.1), {"stone": 1}),     # #526277 blue-grey stone
+            ((36.8, 32.8, 22.9), {"tile": 1}),       # #8d3e33
+            ((55.8, -0.7, -4.3), {"stone": 1}),      # #80868d
+            ((26.7, 0.5, -4.6), {"stone": 1}),       # #3c3f46 stone shade
+            ((28.6, 26.3, 17.6), {"tile": 1}),       # #6d3129
+            ((75.0, 1.6, 15.4), {"plaster": 1}),     # #c7b69c
+            ((47.1, 35.5, 30.7), {"tile": 1}),       # #b0543e
+            ((52.0, 12.1, 25.9), {"wood": 1}),       # #9d7350 light timber
+            ((19.6, 17.7, 11.6), {"tile": 1}),       # #4b241f tile shade
+            ((59.6, 30.8, 34.2), {"tile": 1}),       # #d07854 lit tile faces
+            ((50.2, 27.4, 24.6), {"tile": 1}),       # #ad634f
+            ((42.3, -19.6, 24.2), {"keep": 1}),      # ivy, moss
+            ((38.0, -10.3, 12.5), {"keep": 1}),
+            ((56.0, -23.9, 38.2), {"keep": 1}),
+            ((55.0, -12.0, -25.0), {"keep": 1}),     # window glass
+        ],
+    },
     "well": {
         "anchors": [
             ((65.8, -0.5, 9.4), {"stone": 1}),       # #a69f8f pale stone

@@ -249,6 +249,8 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		switch (K)
 		{
 		case K_Sword:
+		case K_Sword2:   // (the two library swords: the sword's picture for now)
+		case K_Sword3:
 			Poly({ P(30, 2), P(34, 2), P(35, 40), P(32, 44), P(29, 40) }, Pl);
 			Quad(31.5f, 4, 32.5f, 40, Lift(Pl, 0.7f));
 			Quad(20, 40, 44, 46, Tr);

@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "GroundMask.h"
+#include "WaterLook.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
@@ -118,9 +119,10 @@ void AWorldTerrain::BuildLand()
 void AWorldTerrain::BuildWater()
 {
 	using namespace JeebWorld;
-	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
-	const FLinearColor WaterCol(0.06f, 0.20f, 0.30f);
-	auto Sheet = [&](const TArray<FVector>& V, const TArray<int32>& T)
+	// (2026-11-13) M_Water on every sheet: see-through and tinted by depth, reflecting, rippling; the rivers carry their
+	// downstream direction in the vertex colours so the ripples drift with them (WaterLook.h). The surfaces stay exactly at
+	// SeaLevel and RiverLevel, with no collision (swimming reads those levels).
+	auto Sheet = [&](const TArray<FVector>& V, const TArray<int32>& T, const TArray<FLinearColor>& Col)
 	{
 		UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
 		PM->SetupAttachment(GetRootComponent());
@@ -129,22 +131,35 @@ void AWorldTerrain::BuildWater()
 		TArray<FVector> N; N.Init(FVector::UpVector, V.Num());
 		TArray<int32> Both = T;
 		for (int32 t = 0; t + 2 < T.Num(); t += 3) Both.Append({ T[t], T[t + 2], T[t + 1] });   // both windings: seen from either side
-		PM->CreateMeshSection_LinearColor(0, V, Both, N, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
-		if (UMaterialInstanceDynamic* M = PM->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), WaterCol);
+		PM->CreateMeshSection_LinearColor(0, V, Both, N, TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+		JeebWaterLook::Apply(PM, 0, FLinearColor(0.06f, 0.20f, 0.30f));
 		PM->SetCastShadow(false);
+		PM->bAffectDistanceFieldLighting = false;
 		Water.Add(PM);
 	};
-	// The ocean: one big sheet from just inside the coast out past the world's eastern edge
+	// The ocean: one big sheet from just inside the coast out past the world's eastern edge (still water: white)
 	{
 		float WestMost = 1.0e9f;
 		for (float X = MinX; X <= MaxX; X += 2000.f) WestMost = FMath::Min(WestMost, CoastY(X));
 		const float Y0 = WestMost - 3000.f, Y1 = MaxY + 60000.f, X0 = MinX - 60000.f, X1 = MaxX + 60000.f;
-		Sheet({ FVector(X0, Y0, SeaLevel), FVector(X1, Y0, SeaLevel), FVector(X0, Y1, SeaLevel), FVector(X1, Y1, SeaLevel) }, { 0, 2, 1, 1, 2, 3 });
+		TArray<FLinearColor> White; White.Init(FLinearColor::White, 4);
+		Sheet({ FVector(X0, Y0, SeaLevel), FVector(X1, Y0, SeaLevel), FVector(X0, Y1, SeaLevel), FVector(X1, Y1, SeaLevel) }, { 0, 2, 1, 1, 2, 3 }, White);
 	}
-	// The rivers: a ribbon along each, a little wider than its channel
+	// Where rivers meet (the fork south of Blackrock: the main river's end and both branches' starts), their sheets overlap at
+	// the same height; there the flow fades to still water on all of them, so the overlapping sheets draw exactly alike
+	TArray<FVector2D> Joins;
+	{
+		const TArray<FRiver>& Rs = Rivers();
+		for (int32 a = 0; a < Rs.Num(); ++a)
+			for (const FVector2D& E : { Rs[a].Pts[0], Rs[a].Pts.Last() })
+				for (int32 b = 0; b < Rs.Num(); ++b)
+					if (b != a && (FVector2D::Distance(E, Rs[b].Pts[0]) < 100.f || FVector2D::Distance(E, Rs[b].Pts.Last()) < 100.f)) { Joins.AddUnique(E); break; }
+	}
+	// The rivers: a ribbon along each, a little wider than its channel; the points run downstream (WorldMap.h: spring to fork,
+	// fork to the sea)
 	for (const FRiver& Rv : Rivers())
 	{
-		TArray<FVector> V; TArray<int32> T;
+		TArray<FVector> V; TArray<int32> T; TArray<FLinearColor> Col;
 		for (int32 i = 0; i < Rv.Pts.Num(); ++i)
 		{
 			const FVector2D A = Rv.Pts[FMath::Max(i - 1, 0)], B = Rv.Pts[FMath::Min(i + 1, Rv.Pts.Num() - 1)];
@@ -152,8 +167,14 @@ void AWorldTerrain::BuildWater()
 			const float W = Rv.HalfWidth + 250.f;
 			const FVector2D L = Rv.Pts[i] + Side * W, R = Rv.Pts[i] - Side * W;
 			V.Add(FVector(L.X, L.Y, RiverLevel)); V.Add(FVector(R.X, R.Y, RiverLevel));
+			float NearJoin = 1.0e9f;
+			for (const FVector2D& J : Joins) NearJoin = FMath::Min(NearJoin, float(FVector2D::Distance(Rv.Pts[i], J)));
+			const float Flowing = FMath::SmoothStep(3500.f, 7000.f, NearJoin);
+			const FLinearColor F = JeebWaterLook::FlowColor(Dir);
+			const FLinearColor Here(FMath::Lerp(0.5f, F.R, Flowing), FMath::Lerp(0.5f, F.G, Flowing), 0.f, 1.f);
+			Col.Add(Here); Col.Add(Here);
 			if (i > 0) { const int32 k = (i - 1) * 2; T.Append({ k, k + 2, k + 1, k + 1, k + 2, k + 3 }); }
 		}
-		Sheet(V, T);
+		Sheet(V, T, Col);
 	}
 }

@@ -66,4 +66,18 @@ private:
 	float CloudHold = 20.f;        // seconds until the next change of weather
 	FRandomStream WeatherRand;
 	void TickClouds(float DeltaSeconds);
+
+	// How the HIGH volumetric clouds are lit and sampled (2026-11-13, owner's reference: big billowing sunlit heaps, warm light
+	// through them, soft blue-grey undersides): the jeeb.Cloud.* console variables in DayNight.cpp, re-sent only when they change
+	TWeakObjectPtr<class UVolumetricCloudComponent> CloudComp;
+	float CloudBaseScale = 0.f, CloudBaseFill = 0.f;   // the cloud material's own Layout_CloudGlobalScale and FillScatterIntensity (0: it has none)
+	FString CloudSent;
+	void ApplyCloudLook();
+
+	// LOW has no volumetric clouds (r.VolumetricCloud 0): a ring of painted cumulus cards far out round the camera instead (one
+	// mesh, one draw), shown only while the volumetric clouds are off
+	UPROPERTY() class UProceduralMeshComponent* LowClouds = nullptr;
+	UPROPERTY() UMaterialInstanceDynamic* LowCloudMat = nullptr;
+	void BuildLowClouds();
+	void TickLowClouds(float High);
 };

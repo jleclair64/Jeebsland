@@ -1,6 +1,10 @@
 #include "Pond.h"
 #include "Terrain.h"
 #include "Inventory.h"
+#include "WaterLook.h"
+#include "ProceduralMeshComponent.h"
+#include "EngineUtils.h"
+#include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/BoxComponent.h"
@@ -57,8 +61,37 @@ void AFishingSpot::BeginPlay()
 	};
 	Tint(Bobber, FLinearColor(0.9f, 0.1f, 0.08f));
 	Tint(Line, FLinearColor(0.9f, 0.9f, 0.85f));
-		Tint(Ripple, FLinearColor(0.35f, 0.6f, 0.7f));
-	Ripple->SetVisibility(true);   // a ring on the water always shows where you can fish
+	// Two thin rings always spread out from the spot on the water, so you can see where to fish (2026-11-13: were a solid pale
+	// disc, which read as a white blob on the new water). Each sinks a little as it grows, so the water dims it as it fades.
+	if (!IsNetMode(NM_DedicatedServer))
+	{
+		const int32 Segs = 48;
+		TArray<FVector> V; TArray<int32> T; TArray<FVector> N; TArray<FLinearColor> Col;
+		for (int32 k = 0; k < Segs; ++k)
+		{
+			const float A = 2.f * PI * k / Segs;
+			V.Add(FVector(88.f * FMath::Cos(A), 88.f * FMath::Sin(A), 0.f));
+			V.Add(FVector(100.f * FMath::Cos(A), 100.f * FMath::Sin(A), 0.f));
+		}
+		for (int32 k = 0; k < Segs; ++k)
+		{
+			const int32 I0 = 2 * k, O0 = 2 * k + 1, I1 = 2 * ((k + 1) % Segs), O1 = I1 + 1;
+			T.Append({ I0, O1, O0, I0, I1, O1 });
+		}
+		N.Init(FVector::UpVector, V.Num()); Col.Init(FLinearColor::White, V.Num());
+		for (int32 r = 0; r < 2; ++r)
+		{
+			UProceduralMeshComponent* Ring = NewObject<UProceduralMeshComponent>(this);
+			Ring->SetupAttachment(GetRootComponent());
+			Ring->SetUsingAbsoluteScale(true);
+			Ring->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Ring->SetCastShadow(false);
+			Ring->RegisterComponent();
+			Ring->CreateMeshSection_LinearColor(0, V, T, N, TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+			if (UMaterialInstanceDynamic* M = Ring->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.25f, 0.28f));
+			Rings.Add(Ring);
+		}
+	}
 }
 
 void AFishingSpot::Tick(float DeltaSeconds)
@@ -68,9 +101,13 @@ void AFishingSpot::Tick(float DeltaSeconds)
 	const FVector Spot = GetActorLocation();
 
 	// Ripples spread out from the spot all the time, so you can see where to fish
-	const float R = FMath::Fmod(Clock, 1.6f) / 1.6f;
-	Ripple->SetWorldScale3D(FVector(0.3f + 1.1f * R, 0.3f + 1.1f * R, 0.01f));
-	Ripple->SetWorldLocation(Spot + FVector(0.f, 0.f, 1.5f));
+	for (int32 r = 0; r < Rings.Num(); ++r)
+	{
+		const float R = FMath::Frac(Clock / 2.4f + 0.5f * r);
+		const float S = 0.2f + 0.85f * R;   // radius 20 cm to 1.05 m
+		Rings[r]->SetWorldScale3D(FVector(S, S, 1.f));
+		Rings[r]->SetWorldLocation(Spot + FVector(0.f, 0.f, 0.6f - 9.f * R * R));
+	}
 
 	const bool bOn = IsBeingGathered();
 	if (Bobber->IsVisible() != bOn)
@@ -138,7 +175,6 @@ void AFishingPond::BeginPlay()
 		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), Color);
 		return C;
 	};
-	UInstancedStaticMeshComponent* Water = MakeISM(Cyl, FLinearColor(0.06f, 0.24f, 0.36f), false);
 	UInstancedStaticMeshComponent* Plank = MakeISM(Cube, FLinearColor(0.36f, 0.22f, 0.10f), true);
 	UInstancedStaticMeshComponent* Post = MakeISM(Cyl, FLinearColor(0.20f, 0.11f, 0.05f), true);
 	UInstancedStaticMeshComponent* Stem = MakeISM(Cyl, FLinearColor(0.14f, 0.22f, 0.05f), false);
@@ -153,8 +189,33 @@ void AFishingPond::BeginPlay()
 	const float WZ = JeebTerrain::PondWaterZ();
 	auto At = [&](float Ang, float D) { return FVector2D(C.X + D * FMath::Cos(Ang), C.Y + D * FMath::Sin(Ang)); };
 
-	// ---- The water ----
-	Water->AddInstance(FTransform(FQuat::Identity, FVector(C.X, C.Y, WZ), FVector(2.f * JeebTerrain::PondWaterR / 100.f, 2.f * JeebTerrain::PondWaterR / 100.f, 0.04f)));
+	// ---- The water (2026-11-13): a flat disc of M_Water (WaterLook.h), drawn on players' machines only, no collision. Its surface
+	// is where the old 4 cm cylinder's top was, PondWaterZ + 2 (swimming reads the level from JeebWater.h). Still water: white.
+	if (!IsNetMode(NM_DedicatedServer))
+	{
+		const int32 Segs = 64;
+		const float Zs = WZ + 2.f, Rw = JeebTerrain::PondWaterR;
+		TArray<FVector> V; TArray<int32> T; TArray<FVector> N; TArray<FLinearColor> Col;
+		V.Add(FVector(C.X, C.Y, Zs));
+		for (int32 k = 0; k < Segs; ++k) { const float A = 2.f * PI * k / Segs; V.Add(FVector(C.X + Rw * FMath::Cos(A), C.Y + Rw * FMath::Sin(A), Zs)); }
+		for (int32 k = 0; k < Segs; ++k) { const int32 P1 = 1 + k, P2 = 1 + (k + 1) % Segs; T.Append({ 0, P2, P1, 0, P1, P2 }); }   // (both windings)
+		N.Init(FVector::UpVector, V.Num()); Col.Init(FLinearColor::White, V.Num());
+		UProceduralMeshComponent* Water = NewObject<UProceduralMeshComponent>(this);
+		Water->SetupAttachment(RootComponent);
+		Water->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Water->SetCastShadow(false);
+		Water->RegisterComponent();
+		Water->CreateMeshSection_LinearColor(0, V, T, N, TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+		JeebWaterLook::Apply(Water, 0, FLinearColor(0.06f, 0.24f, 0.36f));
+		// The Field map still holds the UE template's grid floor (Floor_0, SM_Template_Map_Floor, MI_ProcGrid) at Z -0.5, hidden
+		// under the land everywhere except in this pond's bowl, where it drew as a grey checker over the water. Hide it on screen
+		// (its collision is left alone: it is not ours to remove here).
+		for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+		{
+			const UStaticMeshComponent* SM = It->GetStaticMeshComponent();
+			if (SM && SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("Template_Map_Floor"))) It->SetActorHiddenInGame(true);
+		}
+	}
 
 	// ---- The pier: from the north bank out over the water ----
 	{

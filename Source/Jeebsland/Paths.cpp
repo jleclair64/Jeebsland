@@ -27,14 +27,14 @@ void APaths::BeginPlay()
 
 	// Each road is resampled every 50 cm along its length and 5 points across, and every point takes its height from
 	// the ground mesh itself, so the road follows every fold of the ground instead of cutting through humps
-	constexpr int32 Cols = 5;
+	constexpr int32 Cols = 9;
 	constexpr float StepLen = 50.f;
 	for (int32 d = 0; d < Defs.Num(); ++d)
 	{
 		const JeebTerrain::FPathDef& Def = Defs[d];
 		const int32 N = Def.Pts.Num();
 		if (N < 2) continue;
-		const float Lift = 4.f + d * 0.6f;   // a hair above the grass; each road a little higher so crossings never flicker
+		const float Lift = 1.5f + 0.12f * (d >= FirstCobbled ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
 
 		// Points along the centre line, with the road's half-width on each side
 		TArray<FVector2D> Line;

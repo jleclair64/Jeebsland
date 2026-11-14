@@ -3,7 +3,7 @@
 import os
 import unreal
 
-GRASS_DESATURATION = 0.15   # how far the grass and the ground under it are pulled toward grey
+GRASS_DESATURATION = 0.32   # how far the grass and the ground under it are pulled toward grey (0.15 until 2026-11-13: "too nuclear green"; 0.22, then 0.32 after the visual review against the reference painting)
 GRASS_SHADOW_LIFT = 0.55    # how much the darkest parts of the grass are brightened (lights untouched)
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -303,16 +303,31 @@ def patchy(mat, col):
     xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
     p = g.tex(patches, g.mul(xy, 1.0 / 4500.0))
     shade = g.node(unreal.MaterialExpressionLinearInterpolate)
-    g.link(g.const3((0.86, 1.0, 0.86)), shade, "A"); g.link(g.const3((1.04, 1.0, 0.84)), shade, "B"); g.link(p, shade, "Alpha", "R")   # deeper to lighter green
+    g.link(g.const3((0.84, 0.97, 0.86)), shade, "A"); g.link(g.const3((1.02, 1.02, 0.90)), shade, "B"); g.link(p, shade, "Alpha", "R")   # deeper to lighter green (the lighter patches no warmer than the base: it is olive already, warmer read as hay)
     each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.16), 0.92)   # a little less tuft-to-tuft speckle
-    out = g.desat(g.muln(g.muln(col, shade), each), GRASS_DESATURATION)   # 15% less vibrant, still fresh
+    # and each tuft its own warmth, from fresh olive to a dry olive-brown, as in the owner's reference painting (2026-11-13)
+    warm = g.node(unreal.MaterialExpressionLinearInterpolate)
+    g.link(g.const3((0.98, 1.0, 1.04)), warm, "A"); g.link(g.const3((1.10, 0.94, 0.70)), warm, "B")
+    g.link(g.one(unreal.MaterialExpressionFrac, g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 7.31)), warm, "Alpha")
+    out = g.desat(g.muln(g.muln(g.muln(col, shade), each), warm), GRASS_DESATURATION)   # less vibrant, still fresh
     # Softer shadows between the blades: the darkest parts are lifted (up to 55%), the light parts are left exactly as they were
     lum = g.mask(g.desat(out, 1.0), True, False)
     lift = g.one(unreal.MaterialExpressionSaturate, g.add(g.mul(lum, -3.0), 1.0))
     return g.muln(out, g.add(g.mul(lift, GRASS_SHADOW_LIFT), 1.0))
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False, tree_fade=False):
+def subsurface(mat, col, share):
+    """the light that shines through a card: its colour times share (grass: less, so a low sun behind it does not light the lawn up)"""
+    if share == 1.0:
+        lib.connect_material_property(col, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+        return
+    m = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 0)
+    lib.connect_material_expressions(col, "", m, "A")
+    m.set_editor_property("const_b", share)
+    lib.connect_material_property(m, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+
+
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False, tree_fade=False, sss=1.0):
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -356,7 +371,7 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
         except Exception as e:
             unreal.log("MATDIAG crown shade skipped: " + str(e))
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
-    lib.connect_material_property(col, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+    subsurface(mat, col, sss)
     glow = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, -100)   # a faint glow so deep shade is never pitch black
     lib.connect_material_expressions(col, "", glow, "A")
     glow.set_editor_property("const_b", glow_amt)
@@ -384,27 +399,61 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
         lib.connect_material_expressions(col, "", lit, "A")
         lib.connect_material_expressions(shade, "", lit, "B")
         lib.connect_material_property(lit, "", unreal.MaterialProperty.MP_BASE_COLOR)
-        lib.connect_material_property(lit, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
+        subsurface(mat, lit, sss)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
     unreal.log("MATDIAG built " + name)
 
 
-def build_bark(tex):
+BARK_V_SCALE = 0.5   # the trunks' UVs repeat the picture 5.5 times up a tree and twice round it: half as often up keeps the
+                     # square bark scans (about 1 m of bark each) square on a trunk instead of squashed
+
+
+def build_bark(furrow, furrow_n, plate, plate_n):
+    # Bark from CC0 scans painted into plain values (Tools/bark_textures.py, Art/Bark, 2026-11-13): furrowed broadleaf bark, or
+    # plated conifer bark where the Plates parameter is 1 (redwoods, Forest.cpp), each with its own soft normal map
     bark = fresh_material("M_BarkTint")
     bark.set_editor_property("two_sided", True)
     set_flags(bark, ("used_with_instanced_static_meshes", "used_with_static_lighting"))
     tint = lib.create_material_expression(bark, unreal.MaterialExpressionVectorParameter, -500, 0)
     tint.set_editor_property("parameter_name", "Tint")
     tint.set_editor_property("default_value", unreal.LinearColor(0.16, 0.09, 0.05, 1.0))
+    plates = lib.create_material_expression(bark, unreal.MaterialExpressionScalarParameter, -900, 300)
+    plates.set_editor_property("parameter_name", "Plates")
+    plates.set_editor_property("default_value", 0.0)
+    tc = lib.create_material_expression(bark, unreal.MaterialExpressionTextureCoordinate, -1100, 200)
+    tc.set_editor_property("u_tiling", 1.0)
+    tc.set_editor_property("v_tiling", BARK_V_SCALE)
+
+    def sample(tex, normal):
+        ts = lib.create_material_expression(bark, unreal.MaterialExpressionTextureSample, -800, 200)
+        ts.set_editor_property("texture", tex)
+        if normal:
+            ts.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+        lib.connect_material_expressions(tc, "", ts, "UVs")
+        return ts
+
+    def pick(a, b):
+        m = lib.create_material_expression(bark, unreal.MaterialExpressionLinearInterpolate, -600, 200)
+        lib.connect_material_expressions(a, "RGB", m, "A")
+        lib.connect_material_expressions(b, "RGB", m, "B")
+        lib.connect_material_expressions(plates, "", m, "Alpha")
+        return m
+
     # the bark picture (plates and fissures, about mid-grey) coloured by the tint
-    ts = lib.create_material_expression(bark, unreal.MaterialExpressionTextureSample, -700, 200)
-    ts.set_editor_property("texture", tex)
+    ts = pick(sample(furrow, False), sample(plate, False))
+    nmap = pick(sample(furrow_n, True), sample(plate_n, True))
     col = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -350, 0)
-    lib.connect_material_expressions(ts, "RGB", col, "A")
+    lib.connect_material_expressions(ts, "", col, "A")
     lib.connect_material_expressions(tint, "", col, "B")
+    calm = lib.create_material_expression(bark, unreal.MaterialExpressionDesaturation, -300, 0)   # the tints a touch calmer: the redwoods read orange (review, 2026-11-13)
+    calm.set_editor_property("luminance_factors", unreal.LinearColor(0.3, 0.59, 0.11, 0.0))
+    lib.connect_material_expressions(col, "", calm, "")
+    calm_amt = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -400, 60)
+    calm_amt.set_editor_property("r", 0.15)
+    lib.connect_material_expressions(calm_amt, "", calm, "Fraction")
     col2 = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 0)
-    lib.connect_material_expressions(col, "", col2, "A")
+    lib.connect_material_expressions(calm, "", col2, "A")
     col2.set_editor_property("const_b", 2.0)
     lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
@@ -413,12 +462,11 @@ def build_bark(tex):
     lib.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     # The trunk and branch meshes are wound so Unreal sees their outside as the back face, and a two-sided material
     # flips the normal on back faces: the bark was lit as if facing inward (sunny side dark, shadows invisible).
-    # Multiplying the normal by the two-sided sign cancels that flip, so the bark uses its outward normal on either face.
-    up = lib.create_material_expression(bark, unreal.MaterialExpressionConstant3Vector, -500, 450)
-    up.set_editor_property("constant", unreal.LinearColor(0.0, 0.0, 1.0, 0.0))
+    # Multiplying the normal by the two-sided sign cancels that flip, so the bark uses its outward normal on either face
+    # (the engine flips the whole world normal, so the bark's normal map survives it the same way).
     sign = lib.create_material_expression(bark, unreal.MaterialExpressionTwoSidedSign, -500, 550)
     signed = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -300, 500)
-    lib.connect_material_expressions(up, "", signed, "A")
+    lib.connect_material_expressions(nmap, "", signed, "A")
     lib.connect_material_expressions(sign, "", signed, "B")
     lib.connect_material_property(signed, "", unreal.MaterialProperty.MP_NORMAL)
     rough = lib.create_material_expression(bark, unreal.MaterialExpressionConstant, -500, 250)
@@ -447,6 +495,15 @@ def import_texture(png, name):
     tex.set_editor_property("compression_no_alpha", False)
     tex.set_editor_property("srgb", True)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
+
+
+def import_normal(png, name):
+    import_texture(png, name)
+    tex = unreal.EditorAssetLibrary.load_asset("/Game/" + name)
+    tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
+    tex.set_editor_property("srgb", False)
+    unreal.EditorAssetLibrary.save_asset("/Game/" + name)
+    return tex
 
 
 
@@ -723,6 +780,9 @@ def build_moon(tex):
 def build_cumulus(tex):
     # Puffy clouds: R = how much cloud, G = how lit. Lit tops and shaded undersides take their colours from the sun.
     mat, g = unlit("M_Cumulus", unreal.BlendMode.BLEND_TRANSLUCENT)
+    # (LOW's cloud ring stands 3 km out: fogged, the haze painted it pale peach whatever its own colour at the low sun.
+    # DayNight sets its colours for each sun height itself, haze included, 2026-11-13)
+    mat.set_editor_property("use_translucency_vertex_fog", False)
     t = g.tex(tex)
     col = g.node(unreal.MaterialExpressionLinearInterpolate)
     g.link(g.vector("Shade", (0.70, 0.76, 0.88)), col, "A"); g.link(g.vector("Lit", (1.0, 1.0, 1.0)), col, "B"); g.link(t, col, "Alpha", "G")
@@ -810,7 +870,13 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 imported(gen_textures.patches(), "T_Patches")
-build_foliage("M_Grass",    "T_GrassTuft",   (0.47, 0.58, 0.38, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.10)   # a softer, more natural green
+build_foliage("M_Grass",    "T_GrassTuft",   (0.64, 0.52, 0.25, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.04, sss=0.5)   # a softer, more natural green
+# (2026-11-13, owner: "too bright in the shade / low sun", "too nuclear green" in the sun, then a reference painting (a village
+# slope at the low sun: a muted olive-sage green, warm yellow-green where the sun catches it, deep olive in shade): was tint
+# 0.47, 0.58, 0.38 (lime, hue about 90-95 on screen at noon, shade a cool 120-130), then 0.58, 0.53, 0.35 (lit 82, shade still 120+
+# against the painting's 53-62), then 0.62, 0.52, 0.27, now 0.64, 0.52, 0.25 with more grey (warmer, toward olive in sun and shade), glow 0.10,
+# all of its colour shining through. The glow is what lit the shade up at the low sun, when the exposure rises; the ground under
+# the grass follows in world_material.py, GRASS_TO_MEADOW.)
 build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True, tree_fade=True)
 # pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
@@ -820,7 +886,11 @@ build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,      
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card
 build_foliage("M_FlyLeaf",  "T_LeafSingle",  (1.0, 1.0, 1.0, 0.0),    0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves stay bright even in shade
-build_bark(imported(gen_textures.bark(), "T_Bark"))
+BARK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Art", "Bark")   # painted by Tools/bark_textures.py
+build_bark(imported(os.path.join(BARK_DIR, "T_BarkFurrow.png"), "T_BarkFurrow"), import_normal(os.path.join(BARK_DIR, "T_BarkFurrowN.png"), "T_BarkFurrowN"),
+           imported(os.path.join(BARK_DIR, "T_BarkPlate.png"), "T_BarkPlate"), import_normal(os.path.join(BARK_DIR, "T_BarkPlateN.png"), "T_BarkPlateN"))
+if unreal.EditorAssetLibrary.does_asset_exist("/Game/T_Bark"):   # the old painted bark: replaced by the scans
+    unreal.EditorAssetLibrary.delete_asset("/Game/T_Bark")
 bark_tex = imported(gen_textures.wood(), "T_Wood")   # a proper wood grain, not the tree bark
 build_wood("M_WoodV", bark_tex, True)    # logs and stakes: grain runs up
 build_wood("M_WoodH", bark_tex, False)   # beams and planks: grain runs along

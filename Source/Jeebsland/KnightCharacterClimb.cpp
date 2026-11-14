@@ -1,6 +1,7 @@
 #include "KnightCharacter.h"
 #include "KnightMovement.h"
 #include "KnightAnimator.h"
+#include "SkillComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
@@ -13,13 +14,13 @@ UKnightMovement* AKnightCharacter::KnightMove() const { return Cast<UKnightMovem
 bool AKnightCharacter::InClimbMove() const
 {
 	const UKnightMovement* KM = KnightMove();
-	return KM && KM->InClimbMove();
+	return KM && (KM->InClimbMove() || KM->InWater());   // (swimming too: no swings, guard, bow, roll, slide, drinking or interacting in the water)
 }
 
 bool AKnightCharacter::ClimbStowed() const
 {
 	const UKnightMovement* KM = KnightMove();
-	return KM && KM->InClimbMove();   // (the mantles too: his hands go on the fence or the block, not round a sword)
+	return KM && (KM->InClimbMove() || KM->InWater());   // (the mantles too: his hands go on the fence or the block, not round a sword; and swimming)
 }
 
 void AKnightCharacter::DropFromWall(bool bAll)
@@ -42,6 +43,19 @@ void AKnightCharacter::JumpFromMove(float Dt)
 void AKnightCharacter::TickWallClimb(float Dt)
 {
 	TickClimbTests(Dt);
+	TickSwimTests(Dt);
+	if (UKnightMovement* KM = KnightMove(); KM && IsLocallyControlled()) KM->bWantsFast = bSprinting;   // (Shift: the fast swim; carried by his moves, FLAG_Custom_1)
+	// Drowning (server only): the bar or the breath ran out (KnightMovementSwim.cpp), he has sunk for DrownSinkTime, and he dies like any death
+	if (UKnightMovement* KM = KnightMove(); KM && HasAuthority())
+	{
+		KM->ServerWaterBackstop(Dt);   // (also resets its clocks out of the water)
+		if (KM->InWater() && KM->DrownedOut() && Health > 0.f)
+		{
+			if (Skills) Skills->Say(5.f, FColor::Red, TEXT("You drowned."));
+			Die();
+			return;
+		}
+	}
 	if (!InClimbMove()) return;
 	bCrouched = false;
 	bBlocking = false;
@@ -106,6 +120,7 @@ void AKnightCharacter::TickClimbTests(float Dt)
 // (the server's and his own machine's movement have it; others' machines find it with their own trace)
 void AKnightCharacter::FillWallInput(JeebAnim::FInput& In) const
 {
+	FillSwimInput(In);   // (KnightMovementSwim.cpp)
 	const UKnightMovement* KM = KnightMove();
 	if (!KM || !KM->InClimbMove()) { MantleEdgeMode = 0; return; }
 	const JeebTune::FValues& T = JeebTune::V();

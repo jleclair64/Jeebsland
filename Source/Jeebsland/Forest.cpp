@@ -1002,6 +1002,8 @@ void AForest::BeginPlay()
 			BandOak *= BandPct / 100.f; BandPine *= BandPct / 100.f; BandRed *= BandPct / 100.f;
 		}
 		if (FParse::Param(FCommandLine::Get(), TEXT("NoFarTrees"))) bWantFar = false;
+		// -NoWoods (test pictures only): no woods at all, to measure what the trees cost (2026-11-13; add -NoOakTrees for Oak Hill's)
+		if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot")) && FParse::Param(FCommandLine::Get(), TEXT("NoWoods"))) bNoWoods = true;
 	}
 #endif
 	for (UInstancedStaticMeshComponent* C : Leaf) C->SetCullDistances(int32(BandOak.X), int32(BandOak.Y));
@@ -1116,6 +1118,7 @@ void AForest::BeginPlay()
 				RedFortTrunk->SetStaticMesh(MakeTrunkMesh(this, BarkMat, 5, 40.f));
 				UMaterialInstanceDynamic* RM = UMaterialInstanceDynamic::Create(BarkMat, this);
 				RM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.30f, 0.13f, 0.07f));
+				RM->SetScalarParameterValue(TEXT("Plates"), 1.f);   // conifer bark in plates (the others: furrowed broadleaf bark)
 				RedTaper->SetMaterial(0, RM);
 				RedFortTrunk->SetMaterial(0, RM);
 			}

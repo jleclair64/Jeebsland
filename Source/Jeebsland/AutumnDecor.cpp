@@ -536,7 +536,7 @@ void AAutumnDecor::BeginPlay()
 	auto LooseLeaf = [&](float X, float Y)
 	{
 		if (JeebTerrain::NoGroundCover(X, Y)) return;                                        // none indoors, in the moat or on the pond
-		const float Z = JeebTerrain::PathClearance(X, Y) < 25.f ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;   // leaves on a road rest on its surface
+		const float Z = JeebTerrain::PathClearance(X, Y) < 25.f ? JeebTerrain::GroundMeshHeight(X, Y) + 5.f : Ground(X, Y) + 2.f;   // leaves on a road rest on its surface
 		const float Wd = Rand.FRandRange(36.f, 50.f);
 		const FQuat Q = FRotator(Rand.FRandRange(-10.f, 10.f), Rand.FRandRange(0.f, 360.f), Rand.FRandRange(-10.f, 10.f)).Quaternion();
 		Put(GroundLeaf[PickLeaf()], FTransform(Q, FVector(X, Y, Z), FVector(Wd / 100.f, Wd / 100.f, LeafZ)));
@@ -590,7 +590,7 @@ void AAutumnDecor::BeginPlay()
 			if (FVector2D::Distance(P, Sp.P) < 30.f) continue;                     // not inside the trunk
 			if (JeebTerrain::NoGroundCover(X, Y)) continue;
 			// on a road, rest on the road surface (it sits a little above the grass)
-			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 13.f : Ground(X, Y) + 2.f;
+			const float Z = (bNearRoad && JeebTerrain::PathClearance(X, Y) < 25.f) ? JeebTerrain::GroundMeshHeight(X, Y) + 5.f : Ground(X, Y) + 2.f;
 			const float Wd = Rand.FRandRange(40.f, 56.f);
 			// most lie flat on the ground; some rest on the short grass, tipped, so they show from the side too
 			const bool bPerched = Rand.FRand() < 0.45f;

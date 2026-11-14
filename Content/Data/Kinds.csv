@@ -26,3 +26,5 @@ Cape,Cape,1,2,200,1,0,0,0,0,0,no,"A cloak worn over the armour, in the colour of
 Ring,Ring,1,2,200,1,0,0,0,0,0,no,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."
 Amulet,Amulet,1,2,200,1,0,0,0,0,0,no,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."
 Crest,Helm Brush,1,2,200,1,0,0,0,0,0,no,
+Sword2,Sword 2,8,12,230,0.55,0,0,40,4,0,no,"Sword 2 (a look at a second sword model, for the owner to judge its length): fights exactly like the sword. A shield can be carried with it."
+Sword3,Sword 3,8,12,230,0.55,0,0,40,4,0,no,"Sword 3 (a look at a third sword model, for the owner to judge its length): fights exactly like the sword. A shield can be carried with it."

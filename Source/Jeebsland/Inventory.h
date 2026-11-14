@@ -41,6 +41,7 @@ namespace JeebItems
 		K_Ring, K_Amulet,
 		K_Crest,          // a brush along the helm's crest: worn in a miscellaneous slot like a ring or amulet
 		K_Longbow, K_Crossbow,   // (weapons, at the end so that no saved item's number moves)
+		K_Sword2, K_Sword3,      // (2026-11-13: two library swords to look at, fighting just as the sword does; one fixed look each)
 		K_Count
 	};
 
@@ -108,11 +109,11 @@ namespace JeebItems
 	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
-	inline bool IsWeaponKind(int32 K) { return (K >= K_Sword && K <= K_Rod) || K == K_Longbow || K == K_Crossbow; }
+	inline bool IsWeaponKind(int32 K) { return (K >= K_Sword && K <= K_Rod) || K == K_Longbow || K == K_Crossbow || K == K_Sword2 || K == K_Sword3; }
 	inline bool IsDrawnBow(int32 K) { return K == K_Bow || K == K_Longbow; }            // a string pulled back by hand, as far as you like
 	inline bool IsShooter(int32 K) { return IsDrawnBow(K) || K == K_Crossbow; }          // shoots arrows from the arrow slot
 	// Everything with a blade or a point plays the sword's moves (owner, 2026-11-05: until they have their own), each with hit boxes as long as it reaches
-	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear || K == K_Axe || K == K_Pickaxe || K == K_Rod; }
+	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Sword2 || K == K_Sword3 || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear || K == K_Axe || K == K_Pickaxe || K == K_Rod; }
 	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
 	inline int32 BarSlotFor(int32 K) { return IsShooter(K) ? 1 : 0; }
 	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }
