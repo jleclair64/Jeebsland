@@ -13,7 +13,7 @@
 # a fourth just slows the other three. First come, first served, but a waiter whose own copy is busy lets
 # the next one through. Locks clear by themselves when no Unreal process has run for 3 minutes; holders
 # past 30 min (build) or 12 min (run) show as OVERDUE. Waiting blocks: run it in the background.
-# Every run: -RenderOffScreen -Multiprocess -NoLiveCoding (skips the startup SDK check that otherwise waits for any build on the machine) and -abslog=<copy>/Saved/Logs/<NAME>.log.
+# Every run: -RenderOffScreen -Multiprocess -LiveCoding=false (skips the startup SDK check that otherwise waits for any build on the machine) and -abslog=<copy>/Saved/Logs/<NAME>.log.
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

@@ -20,7 +20,7 @@ You review Jeebsland changes for online play. It is an Unreal Engine 5.8 C++ gam
 1. Read the diff (`git diff` or as told) and every RPC, replicated property and `HasAuthority()` branch it touches. Trace each new piece of state: who changes it, how others learn of it.
 2. When the change affects what players do to each other or what others see, run a real test:
    - Start a world server: `Tools/RunServer.bat 1`.
-   - Start two clients with test accounts: `UnrealEditor.exe Jeebsland.uproject -game -RenderOffScreen -Multiprocess -NoLiveCoding -ResX=960 -ResY=540 -JeebAutoLogin=Name:Password:World 1[:new]`. Use test accounts only (e.g. `revA` / `revB`, created with `:new`). Never touch real players' accounts in `Saved/Accounts`.
+   - Start two clients with test accounts: `UnrealEditor.exe Jeebsland.uproject -game -RenderOffScreen -Multiprocess -LiveCoding=false -ResX=960 -ResY=540 -JeebAutoLogin=Name:Password:World 1[:new]`. Use test accounts only (e.g. `revA` / `revB`, created with `:new`). Never touch real players' accounts in `Saved/Accounts`.
    - Read `Saved/Logs` for errors, warnings about RPCs or replication, and position corrections.
    - Stop everything you started when done.
    - Delete the test accounts' files (`Saved/Accounts/reva*`, `Saved/Characters/reva*`, same for revb) after the test, and only those.
