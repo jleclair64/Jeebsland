@@ -13,12 +13,14 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/Material.h"
 #include "Components/PointLightComponent.h"
 #include "TownLabDecor.h"
 #include "DayNight.h"
 
 namespace
 {
+	TAutoConsoleVariable<float> GroundFill(TEXT("jeeb.TownLab.GroundFill"), 0.15f, TEXT("TownLab: light added to the rebuilt town's ground at the low sun (times ADayNight::Dusk), so it stays as bright as the grass blades"));
 	FString AssetName(const TCHAR* Name) { return FString(Name) + (FCString::Strcmp(Name, TEXT("OakHillWell")) == 0 ? TEXT("_150k") : TEXT("_300k")); }
 	// WHICH MODEL EACH BUILDING OF THE NEW TOWN USES. Any of the town's models can be swapped here for a new one (a Fab pack's, a
 	// Meshy remake) without touching anything else: Mesh is the new static mesh's path (its solid shape is Mesh + "_Col" when that
@@ -43,6 +45,12 @@ namespace
 		return Pick;
 	}
 	float Hash01(uint32 N) { N ^= N >> 16; N *= 0x7feb352dU; N ^= N >> 15; N *= 0x846ca68bU; N ^= N >> 16; return float(N & 0xffffff) / float(0x1000000); }
+	bool InstancingOk(UStaticMesh* Mesh)
+	{
+		for (const FStaticMaterial& M : Mesh->GetStaticMaterials())
+			if (M.MaterialInterface && M.MaterialInterface->GetMaterial() && !M.MaterialInterface->GetMaterial()->bUsedWithInstancedStaticMeshes) return false;
+		return true;
+	}
 	UStaticMesh* LoadMesh(const FString& Path)
 	{
 		const FString Name = FPaths::GetBaseFilename(Path);
@@ -83,6 +91,7 @@ void ATownLabTown::Tick(float DeltaSeconds)
 	const float D = ADayNight::Dusk;
 	if (FMath::Abs(D - LastDusk) < 0.005f) return;
 	LastDusk = D;
+	if (GroundMid) GroundMid->SetScalarParameterValue(TEXT("SkyFill"), GroundFill.GetValueOnGameThread() * D);
 	const float F = FMath::Lerp(0.9f, 1.35f, D);
 	for (int32 i = 0; i < GlowMids.Num(); ++i)
 	{
@@ -157,7 +166,7 @@ void ATownLabTown::BuildGround()
 	if (bServer) { Ground->SetVisibility(false); return; }
 	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/TownLab/M_TL_Ground.M_TL_Ground"));
 	if (!Mat) { UE_LOG(LogTemp, Warning, TEXT("JEEBLAB missing /Game/TownLab/M_TL_Ground (run Tools/BuildTownLab.ps1): M_Ground instead")); Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground")); }
-	if (Mat) Ground->SetMaterial(0, Mat);
+	if (Mat) { GroundMid = UMaterialInstanceDynamic::Create(Mat, this); Ground->SetMaterial(0, GroundMid); }
 	++DrawSets;
 	UE_LOG(LogTemp, Log, TEXT("JEEBLAB new ground %d x %d cells, %d triangles, lift %.0f cm"), NI, NJ, Tri.Num() / 3, Lift());
 }
@@ -170,7 +179,7 @@ void ATownLabTown::BuildBuildings()
 	TMap<FString, UInstancedStaticMeshComponent*> Sets, Solids;
 	TMap<FString, UInstancedStaticMeshComponent*> DecorSets;
 	TMap<UMaterialInterface*, int32> GlowOf;
-	int32 DecorPieces = 0, DecorLights = 0, LanternCount = 0;
+	int32 DecorPieces = 0, DecorLights = 0, LanternCount = 0, DecorPlain = 0;
 	TArray<JeebDecor::FFootprint> Foundations;
 	int32 Placed = 0, Rebuilt = 0;
 	int32 PlotIndex = -1;
@@ -226,23 +235,42 @@ void ATownLabTown::BuildBuildings()
 					{
 						const JeebTownLabDecor::FDecor& Pc = D->Pieces[i];
 						const FString Key = FString::Printf(TEXT("%s|%d"), Pc.Mesh, Pc.bCastShadow ? 1 : 0);
-						UInstancedStaticMeshComponent*& Ism = DecorSets.FindOrAdd(Key);
-						if (!Ism)
-						{
-							UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, Pc.Mesh);
-							if (!PM) { UE_LOG(LogTemp, Warning, TEXT("JEEBLAB missing decor %s"), Pc.Mesh); continue; }
-							Ism = NewObject<UInstancedStaticMeshComponent>(this);
-							Ism->SetStaticMesh(PM);
-							Ism->SetupAttachment(GetRootComponent());
-							Ism->SetMobility(EComponentMobility::Static);
-							Ism->SetCastShadow(Pc.bCastShadow);
-							Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-							Ism->SetCullDistances(0, 9000);
-							Ism->RegisterComponent();
-							++DrawSets;
-						}
+						UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, Pc.Mesh);
+						if (!PM) { UE_LOG(LogTemp, Warning, TEXT("JEEBLAB missing decor %s"), Pc.Mesh); continue; }
 						const FTransform PieceXf = JeebTownLabDecor::Place(Xf, Pc);
-						Ism->AddInstance(PieceXf, true);
+						// An instanced set only when every material of the piece is flagged for instanced meshes (else it draws as the
+						// engine's grey default): the Filler and townbuild materials aren't yet, so those go in as plain components
+						if (!InstancingOk(PM))
+						{
+							UStaticMeshComponent* S = NewObject<UStaticMeshComponent>(this);
+							S->SetStaticMesh(PM);
+							S->SetupAttachment(GetRootComponent());
+							S->SetMobility(EComponentMobility::Static);
+							S->SetWorldTransform(PieceXf);
+							S->SetCastShadow(Pc.bCastShadow);
+							S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+							S->SetCachedMaxDrawDistance(9000.f);
+							S->LDMaxDrawDistance = 9000.f;
+							S->RegisterComponent();
+							++DrawSets; ++DecorPlain;
+						}
+						else
+						{
+							UInstancedStaticMeshComponent*& Ism = DecorSets.FindOrAdd(Key);
+							if (!Ism)
+							{
+								Ism = NewObject<UInstancedStaticMeshComponent>(this);
+								Ism->SetStaticMesh(PM);
+								Ism->SetupAttachment(GetRootComponent());
+								Ism->SetMobility(EComponentMobility::Static);
+								Ism->SetCastShadow(Pc.bCastShadow);
+								Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+								Ism->SetCullDistances(0, 9000);
+								Ism->RegisterComponent();
+								++DrawSets;
+							}
+							Ism->AddInstance(PieceXf, true);
+						}
 						++DecorPieces;
 						// a real (shadowless) light in every third lantern; the rest glow from their material alone
 						if (Pc.bLight && (LanternCount++ % 3) == 0)
@@ -295,7 +323,7 @@ void ATownLabTown::BuildBuildings()
 		TArray<UInstancedStaticMeshComponent*> After; GetComponents(After);
 		DrawSets += After.Num() - Before.Num();
 	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBLAB new town: %d buildings of %d models (%d from the rebuilt house/store), %d glow materials, decor %d pieces in %d sets, %d lantern lights"), Placed, Sets.Num(), Rebuilt, GlowMids.Num(), DecorPieces, DecorSets.Num(), DecorLights);
+	UE_LOG(LogTemp, Log, TEXT("JEEBLAB new town: %d buildings of %d models (%d from the rebuilt house/store), %d glow materials, decor %d pieces in %d sets plus %d single (materials not flagged for instancing), %d lantern lights"), Placed, Sets.Num(), Rebuilt, GlowMids.Num(), DecorPieces, DecorSets.Num(), DecorPlain, DecorLights);
 }
 
 // The plaza's big oak, as the real town's (OakHillTown.cpp): the Meshy oak, its dappled shadow stand-in, the warm light under the crown

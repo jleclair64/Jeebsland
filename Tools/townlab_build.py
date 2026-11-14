@@ -4,7 +4,7 @@
 #
 # M_TL_Ground (the style sheet, Docs/TownLab/StyleSheet.md: Overwatch's Eichenwalde streets, Breath of the Wild's grass): one
 # material for the whole town's ground, painting everything from the mesh's vertex colours (ATownLabTown::BuildGround):
-#   R the street: mossy cobbles (Poly Haven "mossy_cobblestone", CC0, graded warm), grass in the joints, the outer stones
+#   R the street: irregular flagstone cobbles (Poly Haven "grassy_cobblestone", CC0, graded warm grey), grass in the joints, the outer stones
 #     dropping out into packed earth and grass at a worn kerb
 #   G worn earth: doorways, drip lines, the street's fringe
 #   B a wall's foot: moss and damp, a deeper green
@@ -24,8 +24,8 @@ GRASS_TO_MEADOW = (1.139, 0.759, 0.358)   # (as world_material.py: T_GrassGround
 GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)
 EARTH_BALANCE = (2.02, 2.79, 3.95)
 EARTH_AVERAGE = (0.14, 0.10, 0.062)
-COBBLE_GRADE = (1.10, 1.02, 0.92)          # warm, clean stones (the references' cream and honey cobbles)
-COBBLE_AVERAGE = (0.198, 0.148, 0.071)     # the graded picture's average (linear), what it fades to far away
+COBBLE_GRADE = (0.92, 1.00, 1.12)          # Poly Haven "grassy_cobblestone" leans red-brown: toward the warm grey of the town's own stone
+COBBLE_AVERAGE = (0.168, 0.138, 0.107)     # the graded picture's average (linear), what it fades to far away
 
 # ------------------------------------------------------------------ the map
 if EAL.does_asset_exist("/Game/TownLab/TownLab"):
@@ -160,13 +160,17 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
     near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
     near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW))
-    grass = g.lerp(near, g.c3(GRASS_AVERAGE), g.ramp(depth, 1500.0, 6000.0))
+    # past the grass blades (40 m) the ground carries the look: a broad sampling of the same picture keeps some texture out to
+    # about 80 m before it settles to the average (from the air the plain average read flat next to the real town's meadow)
+    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), g.c3(GRASS_TO_MEADOW))
+    grass = g.lerp(near, mid, g.ramp(depth, 1500.0, 4500.0))
+    grass = g.lerp(grass, g.c3(GRASS_AVERAGE), g.ramp(depth, 8000.0, 16000.0))
     grass = g.muln(grass, g.lerpc(0.90, 1.08, medm))
-    grass = g.muln(grass, g.lerp(g.c3((0.80, 0.97, 0.84)), g.c3((1.10, 1.06, 0.80)), patchy))   # deeper green hollows to sunny yellow-green swathes
+    grass = g.muln(grass, g.lerp(g.c3((0.72, 0.95, 0.80)), g.c3((1.17, 1.09, 0.74)), patchy))   # deeper green hollows to sunny yellow-green swathes
     grass = g.muln(grass, g.lerpc(0.84, 1.10, big))
     dry = g.mul(g.ramp(g.addn(dry_n, g.mul(g.add(rag, -0.5), 0.25)), 0.66, 0.82), 0.45)   # a few warm dry patches
     grass = g.lerp(grass, g.muln(grass, g.c3((1.45, 1.05, 0.55))), dry)
-    grass = g.desat(g.muln(grass, g.vector("Tint", (1.0, 1.0, 1.0))), 0.38)
+    grass = g.desat(g.muln(grass, g.vector("Tint", (1.12, 1.12, 1.08))), 0.3)   # (brighter: the grass blades catch more light than flat ground; the ground must match them where the blades stop)
 
     soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), g.c3(EARTH_BALANCE))
     soil = g.lerp(soil, g.c3(EARTH_AVERAGE), g.c(0.45))
@@ -184,24 +188,24 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     col = g.lerp(col, g.muln(col, g.c3((0.62, 0.86, 0.52))), moss_amt)
 
     # The street: mossy cobbles. Two samplings at unrelated sizes swapped in 10 m patches (no 2 m repeat lining up down a street).
-    uva = g.mul(xy, 1.0 / 200.0)
-    uvb = g.mul(g.add(xy, 913.0), 1.0 / 236.0)
+    uva = g.mul(xy, 1.0 / 330.0)
+    uvb = g.mul(g.add(xy, 913.0), 1.0 / 390.0)
     swap = g.ramp(medm, 0.49, 0.51)
     ca = g.tex(cobble, uva)
     cb = g.tex(cobble, uvb)
     ctex = g.lerp(ca, cb, swap)
     height = g.lerp(g.mul(ca, 1.0, "A"), g.mul(cb, 1.0, "A"), swap)
     stones = g.muln(g.mask(ctex, True, True, True), g.c3(COBBLE_GRADE))
-    stones = g.desat(stones, 0.12)
+    stones = g.desat(stones, 0.25)
     joint = g.one(unreal.MaterialExpressionOneMinus, g.ramp(height, 0.34, 0.46))
-    stones = g.lerp(stones, g.muln(grass, g.c3((0.85, 1.0, 0.8))), g.mul(joint, 0.55))   # grass and moss in the joints, the meadow's own green
+    stones = g.lerp(stones, g.muln(grass, g.c3((0.85, 1.0, 0.8))), g.mul(joint, 0.3))   # a little more of the meadow's green in the joints (the picture has grass in them already), the meadow's own green
     stones = g.lerp(stones, g.c3(COBBLE_AVERAGE), g.ramp(depth, 3000.0, 9000.0))
     street = g.mask(vc, True, False)
     # the outer stones drop out into earth at a worn kerb: each stone's height and brightness pick when it goes
     pick = g.addn(g.mul(height, 0.7), g.mul(g.lum(ctex), 0.9))
     t = g.addn(g.mul(street, 1.55), g.mul(g.add(rag, -0.5), 0.45))
     cob = g.sat(g.mul(g.add(g.addn(t, g.mul(pick, 0.6)), -1.05), 5.0))
-    col = g.lerp(col, soil, g.mul(g.ramp(street, 0.15, 0.4), 0.6))   # packed earth under where the stones thin out
+    col = g.lerp(col, soil, g.mul(g.ramp(street, 0.1, 0.45), 0.35))   # packed earth under where the stones thin out
     col = g.lerp(col, stones, cob)
 
     flat = g.c3((0.0, 0.0, 1.0))
@@ -213,6 +217,9 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     g.out(g.lerp(flat, bumps, cob), unreal.MaterialProperty.MP_NORMAL)
     g.out(g.lerp(g.c(0.95), g.lerp(g.c(0.72), g.c(0.92), joint), cob), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.18), unreal.MaterialProperty.MP_SPECULAR)
+    # the grass blades are lit through (two-sided foliage) and stay bright at the low sun; flat ground goes dark. SkyFill (set by
+    # ATownLabTown from ADayNight::Dusk, jeeb.TownLab.GroundFill) adds that light back where the blades stop, so no dark plain
+    g.out(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     lib.recompile_material(mat)
     EAL.save_asset(path)
     unreal.log("TOWNLABDIAG built M_TL_Ground")

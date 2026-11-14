@@ -81,22 +81,22 @@ void ATownLab::ApplyLook(bool bNew)
 {
 	struct FV { const TCHAR* Name; const TCHAR* Value; };
 	static const FV Vars[] = {
-		{ TEXT("jeeb.Look.HazeBlue"), TEXT("0.6") },      // haze leaning warm cream (at the low sun) instead of blue-grey
-		{ TEXT("jeeb.Look.Aerial"), TEXT("28") },         // strong aerial perspective: far hills fade to the sky
-		{ TEXT("jeeb.Look.AerialStart"), TEXT("0.15") },
-		{ TEXT("jeeb.Look.HazeStart"), TEXT("1200") },    // the haze starts nearer, so a street's far end already softens
-		{ TEXT("jeeb.Look.SunGlow"), TEXT("2.4") },       // the golden glow in the haze toward the sun
+		{ TEXT("jeeb.Look.HazeBlue"), TEXT("0.85") },     // the game's peach-lilac low-sun haze, a touch warmer (0.6 went grey in the first tours)
+		{ TEXT("jeeb.Look.Aerial"), TEXT("18") },         // strong aerial perspective: far hills fade to the sky
+		{ TEXT("jeeb.Look.AerialStart"), TEXT("0.3") },
+		{ TEXT("jeeb.Look.HazeStart"), TEXT("2200") },    // the haze starts nearer, so a street's far end already softens
+		{ TEXT("jeeb.Look.SunGlow"), TEXT("1.6") },       // the golden glow in the haze toward the sun
 		{ TEXT("jeeb.Look.Bloom"), TEXT("1.15") },        // soft bloom
-		{ TEXT("jeeb.Look.ShadowCool"), TEXT("0.032") },  // lifted, slightly blue shadows: never black
+		{ TEXT("jeeb.Look.ShadowCool"), TEXT("0.02") },  // lifted, slightly blue shadows: never black
 		{ TEXT("jeeb.Look.Sat"), TEXT("1.16") },
 		{ TEXT("jeeb.Look.Warm"), TEXT("0.075") },        // warm highlights
-		{ TEXT("jeeb.Look.Contrast"), TEXT("0.94") },     // a little softer: painterly
+		{ TEXT("jeeb.Look.Contrast"), TEXT("0.98") },     // a little softer: painterly
 		{ TEXT("jeeb.Look.LowLift"), TEXT("1.25") },     // more light at the low sun: golden, not murky (0.95 read dim in the first tour)
 		{ TEXT("jeeb.Look.Exposure"), TEXT("0.24") },
 		{ TEXT("jeeb.Look.Vignette"), TEXT("0.3") },
 	};
 	for (const FV& V : Vars) { if (bNew) SetVar(V.Name, V.Value); else RestoreVar(V.Name); }
-	AKnightGameState::FogScale = bNew ? 1.3f : 1.f;   // (1.7 greyed the low sun in the first tour)
+	AKnightGameState::FogScale = 1.f;   // (thicker fog, 1.15 to 1.7, bleached the noon sky and greyed the low sun in the first tours: the haze comes from the look variables alone)
 	for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
 		if (UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
 		{
@@ -115,14 +115,14 @@ void ATownLab::ApplyLook(bool bNew)
 // Cheaper sun shadows: a shorter reach (the far cascade covers less, so trees far off cast none) and nothing small casting into it
 void ATownLab::ApplyShadows(bool bCheap)
 {
-	if (bCheap) { SetVar(TEXT("r.Shadow.DistanceScale"), TEXT("0.45")); SetVar(TEXT("r.Shadow.RadiusThreshold"), TEXT("0.04")); }
+	if (bCheap) { SetVar(TEXT("r.Shadow.DistanceScale"), TEXT("0.6")); SetVar(TEXT("r.Shadow.RadiusThreshold"), TEXT("0.03")); }
 	else { RestoreVar(TEXT("r.Shadow.DistanceScale")); RestoreVar(TEXT("r.Shadow.RadiusThreshold")); }
 	UE_LOG(LogTemp, Log, TEXT("JEEBLAB shadows %s"), bCheap ? TEXT("cheap") : TEXT("game's own"));
 }
 
 void ATownLab::ApplyClouds(bool bCheap)
 {
-	if (bCheap) { SetVar(TEXT("jeeb.Cloud.Samples"), TEXT("0.5")); SetVar(TEXT("jeeb.Cloud.ShadowSamples"), TEXT("0.4")); SetVar(TEXT("jeeb.Cloud.Trace"), TEXT("25")); }
+	if (bCheap) { SetVar(TEXT("jeeb.Cloud.Samples"), TEXT("0.6")); SetVar(TEXT("jeeb.Cloud.ShadowSamples"), TEXT("0.5")); SetVar(TEXT("jeeb.Cloud.Trace"), TEXT("40")); }
 	else { RestoreVar(TEXT("jeeb.Cloud.Samples")); RestoreVar(TEXT("jeeb.Cloud.ShadowSamples")); RestoreVar(TEXT("jeeb.Cloud.Trace")); }
 	UE_LOG(LogTemp, Log, TEXT("JEEBLAB clouds %s"), bCheap ? TEXT("cheap") : TEXT("game's own"));
 }
@@ -162,6 +162,7 @@ void ATownLab::BuildTour()
 		{ TEXT("street"), 1500.f,  50.f,    170.f,  0.f,  -2.f, false },   // the north road, looking up it to the castle knoll
 		{ TEXT("edge"),   500.f,   8500.f,  220.f,  -90.f, -3.f, true },   // the open east side, looking back into the town
 		{ TEXT("hill"),   10000.f, 8200.f,  3500.f, -140.7f, -14.f, false },   // from the air to the north-east, the whole town
+		{ TEXT("house"),  -1703.f, 3184.f,  170.f,  118.f, -6.f, false },   // 7 m from the house on plot 25, its wall foot and decor up close
 	};
 	const float Phases[2] = { 0.f, 0.5f };
 	const TCHAR* PhaseNames[2] = { TEXT("noon"), TEXT("low") };

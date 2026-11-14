@@ -43,4 +43,5 @@ private:
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;
 	TArray<float> GlowBase;
 	float LastDusk = -1.f;
+	UPROPERTY() class UMaterialInstanceDynamic* GroundMid = nullptr;
 };
