@@ -737,6 +737,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
 	LiftDraggedFeet(Final, In, Dt);
+	HandsOffThighs(Final, In, Dt);
 	GreatGripLine(Final, In, Dt);
 	KeepTipUp(Final, In, Dt);
 	ToolHeadClear(Final, In);
@@ -2266,4 +2267,62 @@ JeebHit::FShieldWedge FKnightAnimator::ShieldWedge(const FVector& Centre, const 
 	constexpr float SideShare = 0.5f;   // (half way over to the shield's side: the far edge of the band still covers his sword arm)
 	W.Apex = Centre + W.Fwd * (L.ShieldInGuard.X - Mid) + Right * (L.ShieldInGuard.Y * SideShare);
 	return W;
+}
+
+// Owner 2026-11-14: at rest (Mixamo's idle, the combat idle, slow walks) a gauntlet swung into the thigh plate.
+// Each arm turns out about the shoulder just enough that the gauntlet keeps ThighGap clear of the thigh plate, eased so it never pops.
+// Measured on the bones: the thigh plate a capsule hip to knee (13 cm: the cuisse flares past the hurt box), the gauntlet balls at the wrist and toward the knuckles.
+// The clip's pose is measured each frame before the turn, so the wanted turn is absolute and fades as the clip swings clear.
+void FKnightAnimator::HandsOffThighs(FPose& P, const FInput& In, float Dt)
+{
+	constexpr float ThighPlateR = 13.f, GauntR = 6.5f, KnuckleAhead = 8.f, ThighGap = 3.f, MaxOut = 14.f;
+	const bool bOff = StateKey >= 10 || In.bSitting || In.bDrinking;   // (only standing, walking and the guard idle: every move, climb and swim places its own hands)
+	const int32 Arm[2] = { JeebAnim::LArm, JeebAnim::RArm }, Fore[2] = { JeebAnim::LFore, JeebAnim::RFore }, Hand[2] = { JeebAnim::LHand, JeebAnim::RHand };
+	const int32 Up[2] = { JeebAnim::LUp, JeebAnim::RUp }, Knee[2] = { JeebAnim::LLeg, JeebAnim::RLeg };
+	auto Clear = [&](int32 i, FVector* OutPush, FVector* OutPt)
+	{
+		const FVector F = BonePos(P, Fore[i]), Hd = BonePos(P, Hand[i]);
+		const FVector Kn = Hd + (Hd - F).GetSafeNormal() * KnuckleAhead;
+		float Best = 1e4f;
+		for (int32 s = 0; s < 2; ++s)
+		{
+			const FVector A = BonePos(P, Up[s]), B = BonePos(P, Knee[s]);
+			for (const FVector& Pt : { Hd, Kn })
+			{
+				const FVector C = FMath::ClosestPointOnSegment(Pt, A, B);
+				const float D = float(FVector::Dist(Pt, C)) - ThighPlateR - GauntR;
+				if (D < Best)
+				{
+					Best = D;
+					if (OutPush) *OutPush = FVector(i == 0 ? 1.f : -1.f, 0.f, 0.f);   // (always straight out to his side, mesh +X left: never flips)
+					if (OutPt) *OutPt = Pt;
+				}
+			}
+		}
+		return Best;
+	};
+	for (int32 i = 0; i < 2; ++i)
+	{
+		FVector Push = FVector::ZeroVector, Pt = FVector::ZeroVector;
+		const float Raw = Clear(i, &Push, &Pt);
+		const FVector Sh = BonePos(P, Arm[i]);
+		const float Lever = FMath::Max(20.f, float(FVector::Dist(Sh, Pt)));
+		const float Want = (!bOff && Raw < ThighGap) ? FMath::Min(MaxOut, FMath::RadiansToDegrees((ThighGap - Raw) / Lever)) : 0.f;
+		ThighOut[i] = bOff ? 0.f : FMath::FInterpTo(ThighOut[i], Want, Dt, Want > ThighOut[i] ? 14.f : 5.f);
+		if (ThighOut[i] > 0.01f && !Push.IsNearlyZero())
+		{
+			const FVector Axis = FVector::CrossProduct((Pt - Sh).GetSafeNormal(), Push).GetSafeNormal();
+			if (!Axis.IsNearlyZero() && !bOff) TurnInMesh(P, Arm[i], FQuat(Axis, FMath::DegreesToRadians(ThighOut[i])));
+		}
+		if (In.bShotLog)
+		{
+			ThighMinRaw[i] = FMath::Min(ThighMinRaw[i], Raw);
+			ThighMin[i] = FMath::Min(ThighMin[i], Clear(i, nullptr, nullptr));
+		}
+	}
+	if (In.bShotLog && (ThighLogT += Dt) >= 1.f)
+	{
+		UE_LOG(LogTemp, Log, TEXT("JEEBTHIGH t %.2f key %d clip L %.1f R %.1f after L %.1f R %.1f out L %.1f R %.1f (cm, min over the last second)"), Time, StateKey, ThighMinRaw[0], ThighMinRaw[1], ThighMin[0], ThighMin[1], ThighOut[0], ThighOut[1]);
+		ThighLogT = 0.f; ThighMin[0] = ThighMin[1] = ThighMinRaw[0] = ThighMinRaw[1] = 1e4f;
+	}
 }
