@@ -216,6 +216,14 @@ void AFishingPond::BeginPlay()
 			if (SM && SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("Template_Map_Floor"))) It->SetActorHiddenInGame(true);
 		}
 	}
+	// That template floor's collision goes too, on EVERY machine, the server included (2026-11-14, swimming): everywhere else it lies under
+	// the land and touches nothing, but in this bowl it was an invisible floor at the waterline that held the knight on top of the water
+	// (a trace probe found him standing on Floor_0 at Z 0), so the pond could never be swum in.
+	for (TActorIterator<AStaticMeshActor> It(GetWorld()); It; ++It)
+	{
+		const UStaticMeshComponent* SM = It->GetStaticMeshComponent();
+		if (SM && SM->GetStaticMesh() && SM->GetStaticMesh()->GetName().Contains(TEXT("Template_Map_Floor"))) It->SetActorEnableCollision(false);
+	}
 
 	// ---- The pier: from the north bank out over the water ----
 	{

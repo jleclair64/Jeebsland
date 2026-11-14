@@ -6,9 +6,11 @@ using namespace JeebAnim;
 // Swimming (2026-11-13): the pose. Keys 92-95 (ChooseAction hands them over here, before anything else: nothing else plays in the water):
 //   92 treading water (Mixamo's Treading Water, upright, at its own pace), 93 swimming (Mixamo's Swimming, a breaststroke: its stroke follows the
 //   distance swum, so faster swimming strokes faster; ClipHit is cm per stroke, Swim at the normal pace, SwimFast at the fast one), 95 drowning
-//   (the treading clip flailing fast, then slowing as he sinks).
+//   (the treading clip flailing fast, then slowing as he sinks; it takes over the dive's tilt and eases it to a 15 degree hunch, the body twisting
+//   and bobbing at 2.5 a second, weakening after 0.8 s).
 // Tread and swim change over with some hysteresis (swim above 70 cm/s, tread after a quarter second under 40), the hips sit at a smoothed depth
-// under the surface (swimming 10 cm, treading 45: his back and shoulders at the waterline), and diving or rising tips the swimming body down or up, at
+// under the surface (swimming 10 cm, treading 45: his back and shoulders at the waterline), at the surface the swimming body is tipped 22 degrees head up (helm and shoulders out, legs
+// under), and diving or rising tips the swimming body down or up, at
 // most 35 degrees (120 degrees a second, from his vertical speed); a dive with no keys swims head down too. Out of the water the body comes upright over 0.6 s (KnightAnimator.cpp, WallExitBlend).
 
 namespace
@@ -94,16 +96,34 @@ void FKnightAnimator::SwimPlay(int32 Key, const FInput& In, FPose& B, float& Out
 	// toward the surface; eased and rate limited (150 cm/s) so a change of depth or key never jumps
 	const float Want = 96.f + FMath::Min(In.SwimDepth, T.SwimFloat) - (Key == 93 ? 10.f : 45.f);
 	if (bFresh || SwimHipZ < 0.f) SwimHipZ = Want;
-	SwimHipZ = FMath::FInterpConstantTo(SwimHipZ, FMath::FInterpTo(SwimHipZ, Want, PlayDt, 6.f), PlayDt, 150.f);
+	SwimHipZ = FMath::FInterpConstantTo(SwimHipZ, FMath::FInterpTo(SwimHipZ, Want, PlayDt, 6.f), PlayDt, Key == 95 ? 60.f : 150.f);   // (drowning: the body settles slowly from however the dive left it)
 	B.Hip.Z += SwimHipZ - MeanZ;
 	B.Hip.Y -= MeanY;
 
 	// diving tips the swimming body head down, swimming up head up
 	float PitchWant = 0.f;
-	if (Key == 93) PitchWant = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(-In.SwimVz, FMath::Max(In.SwimSpeed, 80.f))), -35.f, 35.f);
+	if (Key == 93)
+	{
+		PitchWant = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(-In.SwimVz, FMath::Max(In.SwimSpeed, 80.f))), -35.f, 35.f);
+		// at the surface he swims head up (Breath of the Wild's swim): the chest tipped up SwimHeadUp degrees about the hips lifts the helm and
+		// shoulders clear of the water and drops the legs under it; the head-up share fades as a dive or rise takes over, and under water he swims flat
+		constexpr float SwimHeadUp = 22.f;
+		const float AtSurface = 1.f - Ramp(T.SwimFloat + 10.f, T.SwimFloat + 40.f, In.SwimDepth);
+		PitchWant -= SwimHeadUp * AtSurface * (1.f - FMath::Clamp(FMath::Abs(PitchWant) / 35.f, 0.f, 1.f));
+	}
+	else if (Key == 95) PitchWant = 15.f;   // drowning: hunched a little forward, never standing upright on the bottom
 	if (bFresh) SwimPitch = 0.f;
-	SwimPitch = FMath::FInterpConstantTo(SwimPitch, PitchWant, PlayDt, 120.f);   // from his vertical speed, never his depth, so it tips as the dive starts
+	// from his vertical speed, never his depth, so it tips as the dive starts; drowning takes over the dive's tilt and eases it (60 a second)
+	SwimPitch = FMath::FInterpConstantTo(SwimPitch, PitchWant, PlayDt, Key == 95 ? 60.f : 120.f);
 	if (FMath::Abs(SwimPitch) > 0.5f) TurnInMesh(B, Hips, FQuat(FVector(1.f, 0.f, 0.f), FMath::DegreesToRadians(-SwimPitch)));
+	if (Key == 95)
+	{
+		// the struggle: the body twists side to side and bobs, at 2.5 a second, full for the first 0.8 s, then weakening as he gives out
+		const float Amp = FMath::Lerp(1.f, 0.35f, Ramp(0.8f, 1.5f, ActionT)) * Ramp(0.f, 0.2f, ActionT);
+		const float Ph = 2.f * PI * 2.5f * ActionT;
+		TurnInMesh(B, Hips, FQuat(FVector(0.f, 1.f, 0.f), FMath::DegreesToRadians(14.f * Amp * FMath::Sin(Ph)))
+			* FQuat(FVector(1.f, 0.f, 0.f), FMath::DegreesToRadians(-6.f * Amp * FMath::Sin(2.f * Ph))));
+	}
 	if (In.bShotLog)
 	{
 		static float LogT = 0.f;
