@@ -12,7 +12,7 @@ STEPS = {
     # y -0.73 up to the landing z -0.751 from y -0.32; the landing's own top (picture source) x 0.20-0.42, y -0.32..-0.26
     "StorybookCottage_300k": dict(x0=0.113, x1=0.432, yfront=-0.665, ytop=-0.322, zlow=-0.912, ztop=-0.751, n=5, under=-0.94,
                                   land=(0.20, 0.42, -0.318, -0.262, -0.756, -0.746), nose=0.004,
-                                  riser=(0.20, 0.42, -0.34, -0.31, -0.786, -0.752)),   # (the top step's riser, x, y, z)
+                                  riser=(0.20, 0.42, -0.34, -0.31, -0.786, -0.752), slabs=3, gap=0.0015, bevel=0.003),   # (the top step's riser, x, y, z)
 }
 
 a = sys.argv[sys.argv.index("--") + 1:]
@@ -82,10 +82,10 @@ def ruv(x, z): return Vector(tuple(np.array((x, z, 1.0)) @ AR))
 kill = []
 for f in bm.faces:
     m = M @ f.calc_center_median(); n = (R @ f.normal).normalized()
-    if c["x0"] <= m.x <= c["x1"] and c["yfront"] - 0.012 <= m.y <= c["ytop"] + 0.004 and c["under"] <= m.z <= c["ztop"] + 0.004 and abs(n.x) < 0.6:
+    if c["x0"] <= m.x <= c["x1"] and c["yfront"] - 0.012 <= m.y <= c["ytop"] + 0.004 and c["under"] <= m.z <= c["ztop"] + 0.004 and (abs(n.x) < 0.6 or c["x0"] + 0.01 < m.x < c["x1"] - 0.01):
         kill.append(f)
     # (and the ramp's foot spilling out in front of the bottom step, whatever way it faces)
-    elif c["x0"] - 0.01 <= m.x <= c["x1"] + 0.01 and c["yfront"] - 0.09 <= m.y < c["yfront"] - 0.012 and m.z <= c["zlow"] + 0.03:
+    elif c["x0"] - 0.01 <= m.x <= c["x1"] + 0.03 and c["yfront"] - 0.09 <= m.y < c["yfront"] - 0.012 and m.z <= c["zlow"] + 0.05:
         kill.append(f)
 bmesh.ops.delete(bm, geom=kill, context="FACES")
 print("STEPS removed %d faces" % len(kill))
@@ -103,25 +103,49 @@ def face(pts, uvf, want):
     for l in f.loops:
         w = M @ l.vert.co; l[uvl].uv = uvf(w)
     new.append(f)
+# (2026-11-14, second pass) The step stone: Meshy's picture islands here are tiny (about 25 texels), so any stone stretched over a
+# whole tread came out blurred and mossy. Instead every slab is real geometry, a separate box with bevelled edges and a thin gap to
+# its neighbours, so the joints and step edges are drawn by the light (the town's flat-painted look), each wearing ONE clean texel of
+# the model's own stone: the least mossy spots of the landing, a slightly different one per slab, the darker ones on fronts and ends.
+img = next(n for n in ob.data.materials[0].node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"].links[0].from_node.image
+W, H = img.size
+px = np.empty(W * H * 4, dtype=np.float32); img.pixels.foreach_get(px); px = px.reshape(H, W, 4)
+cands = []
+for fa in np.linspace(0.1, 0.9, 9):
+    for fb in np.linspace(0.1, 0.9, 9):
+        for uv in (uv_of(lx0 + fa * (lx1 - lx0), ly0 + fb * (ly1 - ly0)), ruv(qx0 + fa * (qx1 - qx0), qz0 + fb * (qz1 - qz0))):
+            p = px[min(int(uv.y * H), H - 1), min(int(uv.x * W), W - 1), :3]
+            moss = p[1] - (p[0] + p[2]) / 2; lum = p @ np.array([0.30, 0.59, 0.11])
+            cands.append((moss, lum, uv.copy()))
+cands.sort(key=lambda t: t[0]); clean = sorted(cands[:12], key=lambda t: -t[1])   # the 12 least green, lightest first
+light, dark = [t[2] for t in clean[:6]], [t[2] for t in clean[6:]]
+print("STEPS stone texels: moss %.3f..%.3f, lightness %.2f..%.2f" % (clean[0][0], max(t[0] for t in clean), clean[-1][1], clean[0][1]))
+gap, bev = c["gap"], c["bevel"]
+slab_edges = []
+def box(xa, xb, ya, yb_, za, zb_, top_uv, side_uv):
+    vs = [V(x, y, z) for z in (za, zb_) for y in (ya, yb_) for x in (xa, xb)]   # 0..3 bottom, 4..7 top
+    quads = [((4, 5, 7, 6), (0, 0, 1), top_uv), ((0, 1, 5, 4), (0, -1, 0), side_uv), ((0, 2, 6, 4), (-1, 0, 0), side_uv),
+             ((1, 3, 7, 5), (1, 0, 0), side_uv)]   # (no back or bottom: always hidden)
+    fs = []
+    for q, want, uv in quads:
+        f = bm.faces.new([vs[k] for k in q]); f.normal_update()
+        if (R @ f.normal).dot(Vector(want)) < 0: f.normal_flip()
+        for l in f.loops: l[uvl].uv = uv
+        new.append(f); fs.append(f)
+    slab_edges.extend({e for f in fs for e in f.edges if all(len([g for g in e.link_faces if g in fs]) == 2 for _ in [0])})
+k_ = 0
 for i in range(c["n"]):
     yf = c["yfront"] + d * i - c["nose"]; zt = c["zlow"] + h * (i + 1)
-    zb = c["under"] if i == 0 else c["zlow"] + h * i
-    ye = yb if i == c["n"] - 1 else yf + d + c["nose"]
-    # tread: the landing's top stone spread across it; riser: the landing's own riser (darker, edged), so each step reads apart
-    # (the tread in K slabs across, each the landing's stone at its own size, not mirrored: the seams between them read as the
-    # joints between cut slabs; every other step shifted half a slab, like laid stone)
-    sw = (lx1 - lx0); K = max(2, int(round((x1 - x0) / sw)))
+    zb = c["under"] if i == 0 else c["zlow"] + h * i - 0.004
+    ye = yb
+    K = c["slabs"]
     edges = [x0 + (x1 - x0) * k / K for k in range(K + 1)]
-    if i % 2: edges = [x0] + [e - (x1 - x0) / (2 * K) for e in edges[1:-1]] + [x1]
-    for xa, xb in zip(edges, edges[1:]):
-        face([(xa, yf, zt), (xb, yf, zt), (xb, ye, zt), (xa, ye, zt)],
-             lambda w, yf=yf, ye=ye, xa=xa, xb=xb: uv_of(lx0 + sw * (w.x - xa) / (xb - xa), ly0 + (ly1 - ly0) * (w.y - yf) / (ye - yf)), (0, 0, 1))
-    face([(x0, yf, zb), (x1, yf, zb), (x1, yf, zt), (x0, yf, zt)], lambda w, zt=zt, zb=zb: ruv(qx0 + (qx1 - qx0) * (w.x - x0) / (x1 - x0), qz1 - (qz1 - qz0) * (zt - w.z) / (zt - zb)), (0, -1, 0))
-    # the two ends, from the ground to this tread, back to the landing (hidden where the pier and wall stand, closed where not)
-    for xe, s in ((x0, -1), (x1, 1)):
-        face([(xe, yf, c["under"]), (xe, yb, c["under"]), (xe, yb, zt), (xe, yf, zt)], lambda w, zt=zt: uv_of(lx0 + 0.01 + (lx1 - lx0 - 0.02) * (w.y - c["yfront"]) / dep, ly0 + (ly1 - ly0) * (0.1 + 0.8 * (zt - w.z) / (zt - c["under"]))), (s, 0, 0))   # (kept inside the landing's picture)
+    if i % 2: edges = [x0] + [e - (x1 - x0) / (2 * K) for e in edges[1:-1]] + [x1]   # (every other step shifted half a slab, like laid stone)
+    for a_, (xa, xb) in enumerate(zip(edges, edges[1:])):
+        box(xa + (gap / 2 if a_ else 0), xb - (gap / 2 if a_ < len(edges) - 2 else 0), yf, ye, zb, zt, light[k_ % len(light)], dark[k_ % len(dark)])
+        k_ += 1
+bmesh.ops.bevel(bm, geom=list(set(slab_edges)), offset=bev, segments=2, profile=0.5, affect="EDGES", clamp_overlap=True)
 bm.to_mesh(ob.data); bm.free()
-for p in ob.data.polygons[-len(new):]: p.use_smooth = False
-print("STEPS added %d faces" % len(new))
+print("STEPS added %d slabs" % k_)
 bpy.ops.export_scene.gltf(filepath=out, export_format="GLB")
 print("STEPS wrote", out)
