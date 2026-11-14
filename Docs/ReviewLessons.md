@@ -278,3 +278,5 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON (backs and sides): check a building's back and sides at the same brightness as its front; the baked grade can leave unseen faces dark and muddy.
 - LESSON (lantern lights): size a lantern's point light to the lantern (about 3 m, warm, no shadows), not the whole front, and check the pool at dusk from a wide shot.
 - LESSON (accent patches): a colour graded to "muted" can still read as spots when it sits in discrete patches; judge the shape, size and spacing of accent patches from a high view as well as their colour.
+- LESSON (position bakes): a bake of the low model on its own uses the low model's material, which has no emission, so it comes out all 0 silently; bake positions selected-to-active from the high model and log the range (min, median, max) before using it.
+- LESSON (regrading one colour): re-check every piece that shares that colour range (flower boxes, ivy, weeds) after a regrade; limit a roof-only grade by height.

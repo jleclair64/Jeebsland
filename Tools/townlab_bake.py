@@ -252,8 +252,13 @@ w_wood = soft(C, 10, 15) * (1 - soft(Lc, 38, 45)) * soft(H, 25, 35) * (1 - soft(
 w_thatch = soft(C, 16, 22) * soft(Lc, 38, 45) * soft(H, 62, 68) * (1 - soft(H, 95, 105)) * (1 - w_plaster)
 glass_guard = np.clip(up2(mask[..., 1]) * 4, 0, 1) if mask.shape[0] * 2 == SIZE else 0
 dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_GAIN
+# each texel's height, from the low model's own geometry (a position bake): the moss grade and the top-to-bottom gradient use it
+show(geo.outputs["Position"])
+pos = bake("Height", SMALL, False)   # (from the high model's Position, selected to active: the low model's own material has no emission, so a bake of it alone came out 0 and the gradient and foot tint fell on the whole building)
+z = up2(pos[..., 2]) * U
+log("height range cm", [round(float(x), 1) for x in np.percentile(z, [1, 50, 99])], "moss-hue share by height", [round(float(((soft(C, 10, 16) * soft(H, 100, 110) * (1 - soft(H, 170, 180))) * ((z > a) & (z <= b))).mean() * 100), 2) for a, b in ((-1e9, 260), (260, 1e9))])
 # the model's own painted moss (lime patches along the ridge, read as spots by the review 2026-11-14): muted to a soft olive
-w_moss = soft(C, 10, 16) * soft(H, 100, 110) * (1 - soft(H, 170, 180)) * (1 - w_plaster)
+w_moss = soft(C, 10, 16) * soft(H, 92, 100) * (1 - soft(H, 170, 180)) * (1 - w_plaster) * soft(z, 260.0, 320.0)   # (roof only: the flower boxes' leaves keep their green, review 2026-11-14)
 g = dict(g, moss=MOSS_GRADE)
 for w, key in ((w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_stone, "stone"), (w_moss, "moss")):
     l_, a_, b_, c_ = g[key]
@@ -268,10 +273,6 @@ lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
 lin = lin * (1 + EDGE_GAIN * edge[..., None])
-# top-to-bottom: each texel's height, from the low model's own geometry (a position bake)
-show(geo.outputs["Position"])
-pos = bake("Height", SMALL, False, selected=False)
-z = up2(pos[..., 2]) * U
 zt = np.clip((z - 0.0) / max(float(ext[2] * U) * 0.8, 1.0), 0, 1)
 gl = GRAD_BOTTOM + (GRAD_TOP - GRAD_BOTTOM) * np.sqrt(zt)
 foot = np.clip(1 - z / 120.0, 0, 1)[..., None]
