@@ -15,4 +15,9 @@ if echo "$in" | grep -q '"tool_name" *: *"Bash"' && echo "$in" | grep -q -- ' -g
 	&& echo "$in" | grep -q '[ "'"'"']/Game/' && ! echo "$in" | grep -q 'MSYS_NO_PATHCONV=1'; then
 	echo "Blocked: from Git Bash, put MSYS_NO_PATHCONV=1 before an Unreal -game command (otherwise /Game/Field becomes C:/Program Files/Git/Game/Field and the run hangs), or launch it from PowerShell." >&2; exit 2
 fi
+# With MSYS_NO_PATHCONV=1 a /c/Users/... path reaches Unreal as "c/Users/..." and it pops a visible
+# "Failed to open descriptor file" dialog over the owner's game (2026-11-14). Pass Windows paths (cygpath -w).
+if echo "$in" | grep -q 'MSYS_NO_PATHCONV=1' && echo "$in" | grep -qE '[ "'"'"'=]/[a-zA-Z]/(Users|Program)'; then
+	echo "Blocked: with MSYS_NO_PATHCONV=1, give Unreal Windows paths (cygpath -w), not /c/...: Unreal reads c/Users/... and pops a visible error dialog." >&2; exit 2
+fi
 exit 0
