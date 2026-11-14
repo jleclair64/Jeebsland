@@ -46,16 +46,21 @@ GRADE = {
     # build-c's stalls (2026-11-14): each keeps its own colours (the market stall's red-and-cream striped roof and goods, the potion
     # stall's dark timber), only nudged toward the town's rich brown wood and warm cream
     "GeneralStore_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
-                             wood=(-1.0, 1.0, -2.5, 1.05),    # rich brown, a little less orange
+                             wood=(-2.0, -2.5, 3.5, 1.0),     # rich brown: the red-orange plank back wall pulled toward the front timber (review)
                              thatch=(0.0, 0.0, 0.0, 1.0),
                              stone=(1.0, 0.5, 2.0, 1.0)),
     "PotionStall_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
-                             wood=(5.0, 1.5, 2.5, 1.1),       # its dark timber lifted and warmed a touch so it reads as rich brown wood, not grey-purple
+                             wood=(7.0, 1.5, 3.0, 1.1),       # its dark timber lifted and warmed a touch so it reads as rich brown wood, not grey-purple
                              thatch=(0.0, 0.0, 0.0, 1.0),
                              stone=(4.0, 1.5, 4.0, 1.0)),     # (its greyest timber falls in this group: warmed the same way; it has no real stone)
 }
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
+# (build-c 2026-11-14, visual review: the stalls are open boxes under a roof, so the high model's occlusion is deep everywhere inside
+# and on the two-layer cloth roof; at 0.42 it turned the cream stripes peach, the lining and goods muddy and the potion stall's back
+# logs near black. Per design: (how much darkens the colour, how much of it reaches the material's AO channel) and the chroma gain.)
+AO_BY = {"GeneralStore_300k": (0.12, 0.4), "PotionStall_300k": (0.18, 0.5)}
+CHROMA_BY = {"GeneralStore_300k": 1.0, "PotionStall_300k": 1.08}
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
 EDGE_GAIN = 0.10            # convex edges this much lighter
@@ -312,7 +317,7 @@ w_stone = (1 - soft(C, 9, 15)) * soft(Lc, 25, 32) * (1 - soft(Lc, 72, 78)) * (1 
 w_wood = soft(C, 10, 15) * (1 - soft(Lc, 38, 45)) * soft(H, 25, 35) * (1 - soft(H, 70, 80))
 w_thatch = soft(C, 16, 22) * soft(Lc, 38, 45) * soft(H, 62, 68) * (1 - soft(H, 95, 105)) * (1 - w_plaster)
 glass_guard = np.clip(up2(mask[..., 1]) * 4, 0, 1) if mask.shape[0] * 2 == SIZE else 0
-dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_GAIN
+dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_BY.get(name, CHROMA_GAIN)
 # each texel's height, from the low model's own geometry (a position bake): the moss grade and the top-to-bottom gradient use it
 show(geo.outputs["Position"])
 pos = bake("Height", SMALL, False)   # (from the high model's Position, selected to active: the low model's own material has no emission, so a bake of it alone came out 0 and the gradient and foot tint fell on the whole building)
@@ -329,7 +334,7 @@ graded = lab_to_rgb(np.stack([L2, A2, B2], -1))
 log("groups: plaster %.0f%% wood %.0f%% thatch %.0f%% stone %.0f%%" % tuple(100 * float(x.mean()) for x in (w_plaster, w_wood, w_thatch, w_stone)))
 # occlusion and edges (baked at SMALL)
 ao_s = up2(box_blur(np.clip(ao, 0, 1), AO_BLUR))
-occl = (1 - ao_s)[..., None] * AO_STRENGTH
+occl = (1 - ao_s)[..., None] * AO_BY.get(name, (AO_STRENGTH, 1.0))[0]
 lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
@@ -344,7 +349,7 @@ if isinstance(glass_guard, np.ndarray):
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)
-mr_out = np.stack([np.clip(ao, 0, 1), mr[..., 1], mr[..., 2]], -1)
+mr_out = np.stack([1 - (1 - np.clip(ao, 0, 1)) * AO_BY.get(name, (AO_STRENGTH, 1.0))[1], mr[..., 1], mr[..., 2]], -1)
 write_png(mr_out, os.path.join(out, "T_%s_MR.png" % new), False)
 if glow_img is not None: write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)   # (none for a design with no lit windows, the stalls: the importer uses T_NoGlow)
 write_png(mask, os.path.join(out, "T_%s_Mask.png" % new), False)

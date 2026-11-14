@@ -295,14 +295,14 @@ STALL_PROPS = {
     "TL_MarketStall": [
         ("left", 95, "Barrel", 0.85, 6, 0, 0, None, False),            # 0
         ("left", 165, "BarrelSmall", 0.85, 10, 20, 0, None, False),    # 1
-        ("left", 300, "HandCart", 0.8, 10, 90, 0, None, False),        # 2  side-on along the wall
-        ("left", 450, "SpiceSacks", 0.8, 8, -10, 0, None, False),      # 3  by the front-left post, the spices toward the street
+        ("left", 290, "HandCart", 0.8, 14, 90, 0, None, False),        # 2  side-on along the wall, clear of the post
+        ("left", 460, "SpiceSacks", 0.8, 12, -10, 0, None, False),      # 3  by the front-left post, the spices toward the street
         ("back", 120, "SackPileOpen", 0.8, 6, 0, 0, None, False),      # 4
         ("back", 330, "Crate", 0.85, 6, 5, 0, None, False),            # 5
         ("back", 330, "RopeCoil", 0.8, 0, 30, 0, 5, False),            # 6  on the crate
         ("back", 430, "CrateOpen", 0.8, 6, -12, 0, None, False),       # 7
-        ("right", 120, "CabbageCrate", 0.8, 8, 15, 0, None, False),    # 8  by the front-right post
-        ("right", 250, "Crate", 0.85, 6, -8, 0, None, False),          # 9
+        ("right", 120, "CabbageCrate", 0.8, 16, 15, 0, None, False),    # 8  by the front-right post
+        ("right", 260, "Crate", 0.85, 16, -8, 0, None, False),          # 9
         ("right", 250, "CrateNoLid", 0.75, 0, 14, 0, 9, False),        # 10 on the crate
         ("right", 360, "GrainSack", 0.85, 8, 25, 0, None, False),      # 11
         ("right", 420, "WheatSack", 0.8, 6, -20, 0, None, False),      # 12
@@ -315,7 +315,7 @@ STALL_PROPS = {
         ("back", 230, "Crate", 0.8, 6, -6, 0, None, False),            # 3
         ("back", 230, "ClayJug", 0.8, 0, 30, 0, 3, False),             # 4  on the crate
         ("back", 600, "CrateOpen", 0.8, 6, 10, 0, None, False),        # 5
-        ("back", 700, "PotAmphora", 0.85, 8, 0, 0, None, False),       # 6
+        ("back", 690, "PotAmphora", 0.85, 14, 0, 0, None, False),       # 6  clear of the open crate (review)
         ("right", 110, "PotJug", 0.85, 8, 0, 0, None, False),          # 7
         ("right", 200, "BarrelSmall", 0.85, 8, 0, 0, None, False),     # 8
         ("right", 200, "LanternOil", 0.85, 0, 0, 0, 8, True),          # 9  on the small barrel, lit at dusk (a 2.5k lantern, not the 20k candle cage)
@@ -460,7 +460,7 @@ for bname, B in BUILD.items():
     n_ivy = 0
     for side in sides:
         sname, start, along, outv, L = side
-        cands = [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
+        cands = [] if B.get("stall") else [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])   # (no ivy on the stalls: tall cards by bare timber read as stickers, build-c review)
         rnd.shuffle(cands)
         placed = []
         for u in cands:
@@ -512,12 +512,12 @@ for bname, B in BUILD.items():
     for side in sides:
         sname, start, along, outv, L = side
         for k_u, u in enumerate((rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150))):
-            if B.get("stall") and (k_u == 2 or sname == "front"): continue   # (a stall: only at its corner posts, its open front clear)
+            if B.get("stall"): continue   # (a stall: no stones (white specks) and no weeds (lime blobs with no soil): build-c reviews)
             pl = start + along * u
             if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
             h = surface(pl, outv, 15.0)
             face = (h - pl).dot(outv) if h is not None else 0.0
-            add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
+            if not B.get("stall"): add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
             if rnd.random() < 0.6:
                 add("weeds", "TL_Weeds", pl + outv * (face + 22.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.8, 1.2), False)
     plans[bname] = (items, bvh, sides, B, top, surface)
