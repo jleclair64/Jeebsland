@@ -22,23 +22,28 @@
 namespace JeebLook
 {
 	static TAutoConsoleVariable<int32> On(TEXT("jeeb.Look"), 1, TEXT("1: the 2026-11-12 grade, haze, AO and contact shadows; 0: the look before it (test pictures)"));
-	static TAutoConsoleVariable<float> Sat(TEXT("jeeb.Look.Sat"), 1.1f, TEXT("Overall colour saturation at noon (eases to 1.0 at the low sun, which is golden enough)"));
-	static TAutoConsoleVariable<float> Contrast(TEXT("jeeb.Look.Contrast"), 1.0f, TEXT("Overall contrast (the old painterly grade had 0.9)"));
-	static TAutoConsoleVariable<float> Warm(TEXT("jeeb.Look.Warm"), 0.04f, TEXT("Warmth in the highlights: red up and blue down by this much"));
-	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0.012f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
-	static TAutoConsoleVariable<float> Bloom(TEXT("jeeb.Look.Bloom"), 0.8f, TEXT("Bloom intensity (was 0.95 on every pixel)"));
+	static TAutoConsoleVariable<float> Sat(TEXT("jeeb.Look.Sat"), 1.16f, TEXT("Overall colour saturation at noon (eases to 1.0 at the low sun, which is golden enough)"));
+	static TAutoConsoleVariable<float> Contrast(TEXT("jeeb.Look.Contrast"), 0.98f, TEXT("Overall contrast (the old painterly grade had 0.9)"));
+	static TAutoConsoleVariable<float> Warm(TEXT("jeeb.Look.Warm"), 0.075f, TEXT("Warmth in the highlights: red up and blue down by this much"));
+	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0.02f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
+	static TAutoConsoleVariable<float> Bloom(TEXT("jeeb.Look.Bloom"), 1.15f, TEXT("Bloom intensity (was 0.95 on every pixel)"));
 	static TAutoConsoleVariable<float> BloomThreshold(TEXT("jeeb.Look.BloomThreshold"), -1.f, TEXT("Bloom threshold: -1 every pixel blooms a little; above 0 only what is brighter blooms"));
-	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 16.f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
-	static TAutoConsoleVariable<float> HazeBlue(TEXT("jeeb.Look.HazeBlue"), 1.f, TEXT("0: the old warm grey height fog; 1: a soft blue-grey haze at noon, a warm peach-lilac at the low sun"));
-	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 2500.f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
-	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
+	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 18.f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
+	static TAutoConsoleVariable<float> HazeBlue(TEXT("jeeb.Look.HazeBlue"), 0.85f, TEXT("0: the old warm grey height fog; 1: a soft blue-grey haze at noon, a warm peach-lilac at the low sun"));
+	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 2200.f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
+	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.6f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
 	static TAutoConsoleVariable<float> AO(TEXT("jeeb.Look.AO"), 0.6f, TEXT("Ambient occlusion strength (where it is on: r.AmbientOcclusionLevels, set by ApplyGraphics)"));
 	static TAutoConsoleVariable<float> AORadius(TEXT("jeeb.Look.AORadius"), 100.f, TEXT("Ambient occlusion radius in cm"));
 	static TAutoConsoleVariable<float> Contact(TEXT("jeeb.Look.Contact"), 0.f, TEXT("The sun's screen-space contact shadow length (share of the screen; 0 off: at 0.03 it cost 0.07 ms and barely showed, 2026-11-13)"));
-	static TAutoConsoleVariable<float> AerialStart(TEXT("jeeb.Look.AerialStart"), 0.35f, TEXT("Where the aerial perspective haze begins, in km (engine default 0.1)"));
-	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Look.Exposure"), 0.16f, TEXT("Exposure bias at noon, in stops (0.35 until 2026-11-13, owner: \"the whole game lower by 15%\": about -0.19 stops gives 15% less light on screen, through the tone curve)"));
-	static TAutoConsoleVariable<float> LowLift(TEXT("jeeb.Look.LowLift"), 0.8f, TEXT("Extra exposure at the low sun, in stops, so the golden hour glows instead of going murky"));
-	static TAutoConsoleVariable<float> Vignette(TEXT("jeeb.Look.Vignette"), 0.4f, TEXT("Darkening toward the picture's corners (engine default 0.4)"));
+	static TAutoConsoleVariable<float> AerialStart(TEXT("jeeb.Look.AerialStart"), 0.3f, TEXT("Where the aerial perspective haze begins, in km (engine default 0.1)"));
+	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Look.Exposure"), 0.24f, TEXT("Exposure bias at noon, in stops (0.35 until 2026-11-13, owner: \"the whole game lower by 15%\": about -0.19 stops gives 15% less light on screen, through the tone curve)"));
+	static TAutoConsoleVariable<float> LowLift(TEXT("jeeb.Look.LowLift"), 1.4f, TEXT("Extra exposure at the low sun, in stops, so the golden hour glows instead of going murky"));
+	static TAutoConsoleVariable<float> Vignette(TEXT("jeeb.Look.Vignette"), 0.3f, TEXT("Darkening toward the picture's corners (engine default 0.4)"));
+	// (2026-11-14, the owner approved TownLab's new look: golden haze, stronger aerial perspective, lifted shadows, a warmer, softer
+	// grade and gentle light shafts round the sun. Its numbers became the defaults above; the look before: Sat 1.1, Contrast 1, Warm
+	// 0.04, ShadowCool 0.012, Bloom 0.8, Aerial 16, HazeBlue 1, HazeStart 2500, SunGlow 1, AerialStart 0.35, Exposure 0.16, LowLift
+	// 0.8, Vignette 0.4, Shafts 0)
+	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
 	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 1.f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
@@ -247,6 +252,7 @@ void ADayNight::TickLook(float High)
 			S.bOverride_VignetteIntensity = false;
 		}
 		if (ContactNow != 0.f) if (ADirectionalLight* SL = Sun.Get()) if (ULightComponent* L = SL->GetLightComponent()) { L->ContactShadowLength = 0.f; L->MarkRenderStateDirty(); ContactNow = 0.f; }
+		SetShafts(0);
 		return;
 	}
 
@@ -292,10 +298,28 @@ void ADayNight::TickLook(float High)
 		S.VignetteIntensity = Vignette.GetValueOnGameThread();
 	}
 
+	SetShafts(Shafts.GetValueOnGameThread() != 0 ? 1 : 0);
 	const float C = Contact.GetValueOnGameThread();
 	if (C != ContactNow)
 		if (ADirectionalLight* SL = Sun.Get())
 			if (ULightComponent* L = SL->GetLightComponent()) { L->ContactShadowLength = C; L->MarkRenderStateDirty(); ContactNow = C; }
+}
+
+// Gentle light shafts round the sun (TownLab's new look, 2026-11-14): bloom shafts only; the occlusion pass is left off, it costs and darkens
+void ADayNight::SetShafts(int32 On)
+{
+	if (On == ShaftsNow) return;
+	ADirectionalLight* SL = Sun.Get();
+	UDirectionalLightComponent* L = SL ? Cast<UDirectionalLightComponent>(SL->GetLightComponent()) : nullptr;
+	if (!L) return;
+	L->bEnableLightShaftBloom = On != 0;
+	L->BloomScale = 0.12f;
+	L->BloomThreshold = 0.35f;
+	L->BloomMaxBrightness = 4.f;
+	L->BloomTint = FColor(255, 214, 160);
+	L->bEnableLightShaftOcclusion = false;
+	L->MarkRenderStateDirty();
+	ShaftsNow = On;
 }
 
 // The clouds drift slowly overhead, and the weather changes every few minutes: sometimes a clear sky, sometimes about

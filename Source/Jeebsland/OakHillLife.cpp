@@ -1,5 +1,6 @@
 #include "OakHillLife.h"
 #include "OakHillTown.h"
+#include "TownLabTown.h"
 #include "OakHill.h"
 #include "DayNight.h"
 #include "Terrain.h"
@@ -92,13 +93,18 @@ void AOakHillLife::SetUp()
 
 	TInlineComponentArray<UStaticMeshComponent*> Comps;
 	Town->GetComponents(Comps);
+	// (the rebuilt town, the real Oak Hill since 2026-11-14: its buildings are ATownLabTown's, which does its own window glow; its
+	// rebuilt models keep the old ones' frame, so the chimneys measured below fit them: ATownLabTown::OldMeshName)
+	for (TActorIterator<ATownLabTown> It(GetWorld()); It; ++It)
+		if (It->IsReal()) { TInlineComponentArray<UStaticMeshComponent*> More; It->GetComponents(More); Comps.Append(More); }
 	FVector Sum = FVector::ZeroVector;
 	int32 NumBuilt = 0, NumSmoking = 0, NumLamps = 0;
 	for (UStaticMeshComponent* C : Comps)
 	{
 		UStaticMesh* Mesh = C->GetStaticMesh();
-		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>() || !C->IsVisible()) continue;   // (not the hidden collision shells, SM_*_Col)
-		const FString Name = Mesh->GetName();
+		if (!Mesh || C->IsA<UInstancedStaticMeshComponent>() || !C->IsVisible() || C->bHiddenInGame) continue;   // (not the hidden collision shells, SM_*_Col)
+		const FString Name = ATownLabTown::OldMeshName(Mesh->GetName());
+		if (!Name.StartsWith(TEXT("SM_OakHill")) && !Name.StartsWith(TEXT("SM_GeneralStore")) && !Name.StartsWith(TEXT("SM_BankStall")) && !Name.StartsWith(TEXT("SM_PotionStall"))) continue;   // (buildings only: not decor or the oak)
 		++NumBuilt;
 		Sum += C->GetComponentLocation();
 		const FTransform Xf = C->GetComponentTransform();

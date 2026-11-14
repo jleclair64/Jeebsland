@@ -1,5 +1,7 @@
 #include "OakHillTown.h"
 #include "OakHill.h"
+#include "TownLab.h"
+#include "WorldTerrain.h"
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "GroundDecor.h"
@@ -38,6 +40,9 @@ void AOakHillTown::BeginPlay()
 	Super::BeginPlay();
 	SetActorLocation(FVector::ZeroVector);
 	if (!JeebOakHill::Enabled()) return;
+	// (since 2026-11-14 the real Oak Hill is the rebuilt town, ATownLabTown at the real site: this old one only with -OldOakHill, or at
+	// the TownLab map's real spot for comparison. The checks below read the shared plan, so they are logged either way.)
+	if (JeebTownLab::RealTown()) { UE_LOG(LogTemp, Log, TEXT("JEEBOAK the old town is off: the rebuilt one stands here (-OldOakHill brings it back)")); LogChecks(); return; }
 	const double T0 = FPlatformTime::Seconds();
 	BuildGround();
 	const double T1 = FPlatformTime::Seconds();
@@ -121,7 +126,7 @@ void AOakHillTown::BuildGround()
 	Ground->CreateMeshSection_LinearColor(1, V, Back, N, UV, Col, TArray<FProcMeshTangent>(), false);
 	Ground->SetCollisionProfileName(TEXT("BlockAll"));
 	if (bServer) { Ground->SetVisibility(false); return; }
-	UMaterialInterface* GroundMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));
+	UMaterialInterface* GroundMat = AWorldTerrain::SharedGround(GetWorld());
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	for (int32 s = 0; s < 2; ++s)
 	{

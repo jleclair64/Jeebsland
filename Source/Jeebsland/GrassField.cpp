@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "GroundDecor.h"
+#include "WorldTerrain.h"
 #include "ChoppableTree.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -77,10 +78,13 @@ void AGrassField::BuildTerrain()
 		}
 	}
 
+	// (the rebuilt Oak Hill draws its own ground over the part of its box inside the square: its river banks and west streets, 2026-11-14)
+	const bool bTownHole = JeebTownLab::RealTown();
 	for (int32 j = 0; j < N; ++j)
 	{
 		for (int32 i = 0; i < N; ++i)
 		{
+			if (bTownHole && JeebTownLab::InSiteCell(JeebTownLab::RealSite(), -Half + i * Step, -Half + j * Step, Step)) continue;
 			const int32 A = j * (N + 1) + i;     // this corner
 			const int32 B = A + 1;               // +X
 			const int32 C = A + (N + 1);         // +Y
@@ -124,7 +128,7 @@ void AGrassField::BeginPlay()
 
 	BuildTerrain();
 	// The ground under the tufts: M_Ground, the painted ground shared with Oak Hill and the world (Tools/world_material.py), or a mid green if it is missing
-	if (UMaterialInterface* GroundMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground")))
+	if (UMaterialInterface* GroundMat = AWorldTerrain::SharedGround(GetWorld()))
 	{
 		for (int32 i = 0; i < Terrain->GetNumMaterials(); ++i) Terrain->SetMaterial(i, GroundMat);
 	}
