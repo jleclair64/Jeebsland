@@ -256,6 +256,12 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_House": dict(src="OakHillHouse_300k", wx=(-597.1, 563.0), wy=(-293.5, 399.0), door=(-150.0, 260.0), seed=3),
     "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
 }
+BUILD.update({   # build-b (townbuild2, 2026-11-14); walls from building_clean.py's BUILD lines / OakHill.h's FModel rows
+    "TL_TownHall": dict(src="OakHillTownHall_300k", wx=(-989.1, 985.8), wy=(-580.0, 562.0), door=(-300.0, 180.0), seed=7),
+    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9),
+    "TL_Well": dict(src="OakHillWell_150k", wx=(-152.7, 123.0), wy=(-118.6, 118.5), door=(9999.0, 9999.0), seed=11, no_ivy=True, feet=1),
+    "TL_PotionShop": dict(src="OakHillPotionShop_300k", wx=(-464.4, 526.7), wy=(-408.8, 404.3), door=(-200.0, 0.0), seed=13),
+})
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
 FILLER = ["Crate", "CrateNoLid", "GrainSack", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
           "WateringCan", "Pail", "LanternBlack", "LanternOil", "Basket", "ShrubLow", "BushYellowFlowers"]
@@ -364,7 +370,7 @@ for bname, B in BUILD.items():
     n_ivy = 0
     for side in sides:
         sname, start, along, outv, L = side
-        cands = [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
+        cands = [] if B.get("no_ivy") else [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
         rnd.shuffle(cands)
         placed = []
         for u in cands:
@@ -384,7 +390,7 @@ for bname, B in BUILD.items():
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back"):
+        if sname in ("front", "back") and not B.get("no_ivy"):
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
@@ -415,7 +421,7 @@ for bname, B in BUILD.items():
     # --- stones and weeds at the foot of the walls, mostly near the corners
     for side in sides:
         sname, start, along, outv, L = side
-        for u in (rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150)):
+        for u in (rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150))[:B.get("feet", 3)]:   # (feet: how many spots per wall)
             pl = start + along * u
             if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
             h = surface(pl, outv, 15.0)
@@ -452,7 +458,7 @@ for bname, B in BUILD.items():
         for (bx, by, bz) in ((-89.0, -430.0, 146.0), (182.0, -430.0, 146.0)):
             items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((bx, by, bz)), yaw=0.0, pitch=0.0, roll=0.0,
                               scale=0.8, wb=True, light=True))
-    else:
+    elif bname == "TL_Store":
         prop("left", 160, "Crate", 0.85, turn=8)
         prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85, turn=-12)
         prop("left", 270, "GrainSack", 0.85, turn=25); prop("left", 330, "WheatSack", 0.8, turn=-15)
@@ -460,6 +466,23 @@ for bname, B in BUILD.items():
         prop("right", 260, "WateringCan", 0.8, turn=-40)
         items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -358.0, 183.0)), yaw=0.0, pitch=0.0, roll=0.0,
                           scale=0.85, wb=True, light=True))
+    # build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop
+    elif bname == "TL_TownHall":
+        prop("left", 260, "Barrel", 0.85); prop("left", 360, "Crate", 0.85, turn=10)
+        prop("back", 600, "LogStackSmall", 0.9, turn=90); prop("back", 1300, "PotRound", 0.9)
+        prop("right", 300, "BushYellowFlowers", 0.9); prop("right", 820, "PotSmall", 0.9)
+    elif bname == "TL_Church":
+        prop("left", 400, "ShrubLow", 0.9); prop("right", 900, "ShrubLow", 0.9, turn=40)
+        prop("back", 300, "PotRound", 0.9); prop("back", 820, "BushYellowFlowers", 0.9)
+        # the lantern building_clean.py took off left of the door (LANTERNS), hung back as a light
+        items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((-170.0, -658.0, 182.0)), yaw=0.0, pitch=0.0, roll=0.0,
+                          scale=0.8, wb=True, light=True))
+    elif bname == "TL_Well":
+        prop("right", 120, "Pail", 0.8, turn=25)
+    elif bname == "TL_PotionShop":
+        prop("left", 200, "PlantClump", 0.9); prop("left", 330, "PotSmall", 0.9, turn=20)
+        prop("back", 250, "Crate", 0.8, turn=-10); prop("back", 360, "Basket", 0.8, turn=30)
+        prop("right", 420, "PotRound", 0.9)
     log(bname, "pieces", len(items))
 
 # ============================================================================================================================

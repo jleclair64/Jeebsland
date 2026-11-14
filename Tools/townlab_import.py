@@ -15,6 +15,13 @@ folder = "/Game/TownLab/Buildings"   # (never /Game/Buildings: that folder belon
 NANITE = {"TL_House", "TL_Store"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx"))
 COL_FROM = {"TL_House": "OakHillHouse_300k", "TL_Store": "OakHillStore_300k"}
+# build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop
+NANITE |= {"TL_TownHall", "TL_Church", "TL_Well", "TL_PotionShop"}
+COL_FROM.update({"TL_TownHall": "OakHillTownHall_300k", "TL_Church": "OakHillChurch_300k", "TL_Well": "OakHillWell_150k", "TL_PotionShop": "OakHillPotionShop_300k"})
+# TL_ONLY=<a,b,...> (environment; BuildTownLabBuildings.ps1 -Only): import just those buildings onto the EXISTING M_TL_Building, T_NoGlow
+# and decor (several builders share those: they are never rebuilt in this mode)
+ONLY = [n for n in os.environ.get("TL_ONLY", "").split(",") if n]
+if ONLY: NAMES = [n for n in NAMES if n in ONLY]
 TEST_HOUSES = set()
 for f in ("/Game/TownLab", folder):
     if not lib.does_directory_exist(f): lib.make_directory(f)
@@ -176,8 +183,12 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     return m
 
 first = NAMES[0]
-no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows
-parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
+if ONLY:
+    no_glow = lib.load_asset(folder + "/T_NoGlow"); parent = lib.load_asset(folder + "/M_TL_Building")
+    if no_glow is None or parent is None: raise RuntimeError("BUILDDIAG TL_ONLY needs the existing M_TL_Building and T_NoGlow")
+else:
+  no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows
+  parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
 for n in NAMES:
     mi_path = folder + "/MI_" + n
@@ -264,7 +275,7 @@ for n in NAMES:
 # The decorations (Tools/townlab_decor.py): ivy and moss cards on one painted atlas (M_TL_Foliage: masked, two-sided, no Nanite),
 # moss cushions and little stone piles in their vertex colour (M_TL_VertexPaint). Placed by Source/Jeebsland/TownLabDecor.h.
 decor = os.path.join(work, "Decor")
-if os.path.isdir(decor):
+if os.path.isdir(decor) and not ONLY:
     def plain_material(name, build):
         path = folder + "/" + name
         if lib.does_asset_exist(path): lib.delete_asset(path)

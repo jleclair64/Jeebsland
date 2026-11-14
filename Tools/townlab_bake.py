@@ -44,6 +44,18 @@ GRADE = {
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
 }
+# build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop. Their roofs are red clay tiles, not thatch: an optional
+# "tile" group (saturated red-brown above tile_z cm, the roof's eave height) graded to a warm terracotta, taken out of the wood group there.
+GRADE.update({
+    "OakHillTownHall_300k":   dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
+                                   stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=560.0),
+    "OakHillChurch_300k":     dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
+                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=520.0),
+    "OakHillWell_150k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
+                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=170.0),
+    "OakHillPotionShop_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
+                                   stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=500.0),
+})
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
@@ -260,7 +272,12 @@ log("height range cm", [round(float(x), 1) for x in np.percentile(z, [1, 50, 99]
 # the model's own painted moss (lime patches along the ridge, read as spots by the review 2026-11-14): muted to a soft olive
 w_moss = soft(C, 10, 16) * soft(H, 92, 100) * (1 - soft(H, 170, 180)) * (1 - w_plaster) * soft(z, 260.0, 320.0)   # (roof only: the flower boxes' leaves keep their green, review 2026-11-14)
 g = dict(g, moss=MOSS_GRADE)
-for w, key in ((w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_stone, "stone"), (w_moss, "moss")):
+groups = [(w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_stone, "stone"), (w_moss, "moss")]
+if "tile" in g:   # (build-b: red clay roof tiles, above the eaves only)
+    w_tile = soft(C, 14, 20) * (1 - soft(H, 52, 62)) * soft(z, g["tile_z"] - 40.0, g["tile_z"] + 40.0) * (1 - w_plaster)
+    w_wood = w_wood * (1 - w_tile); groups[1] = (w_wood, "wood"); groups.append((w_tile, "tile"))
+    log("tile share %.0f%%" % (100 * float(w_tile.mean())))
+for w, key in groups:
     l_, a_, b_, c_ = g[key]
     dL += w * l_; dA += w * a_; dB += w * b_; cg *= 1 + w * (c_ - 1)
 A2 = A * cg + dA; B2 = B * cg + dB; L2 = Lc + dL
