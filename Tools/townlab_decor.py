@@ -258,7 +258,7 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
 }
 BUILD.update({   # build-b (townbuild2, 2026-11-14); walls from building_clean.py's BUILD lines / OakHill.h's FModel rows
     "TL_TownHall": dict(src="OakHillTownHall_300k", wx=(-989.1, 985.8), wy=(-580.0, 562.0), door=(-300.0, 180.0), seed=7, ivy_min=(150.0, 220.0), no_hang=True),
-    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9, ivy_min=(150.0, 220.0)),
+    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9, ivy_min=(150.0, 220.0), no_hang=True),
     "TL_Well": dict(src="OakHillWell_150k", wx=(-152.7, 123.0), wy=(-118.6, 118.5), door=(9999.0, 9999.0), seed=11, no_ivy=True, feet=1),
     "TL_PotionShop": dict(src="OakHillPotionShop_300k", wx=(-464.4, 526.7), wy=(-408.8, 404.3), door=(-200.0, 0.0), seed=13, ivy_min=(120.0, 200.0)),
 })
@@ -475,7 +475,7 @@ for bname, B in BUILD.items():
         prop("left", 400, "ShrubLow", 0.9); prop("right", 900, "ShrubLow", 0.9, turn=40)
         prop("back", 300, "PotRound", 0.9); prop("back", 820, "BushYellowFlowers", 0.9)
         # the lantern building_clean.py took off left of the door (LANTERNS), hung back as a light
-        items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((-170.0, -658.0, 182.0)), yaw=0.0, pitch=0.0, roll=0.0,
+        items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((-170.0, -685.0, 182.0)), yaw=0.0, pitch=0.0, roll=0.0,
                           scale=0.8, wb=True, light=True))
     elif bname == "TL_Well":
         prop("right", 120, "Pail", 0.8, turn=25)

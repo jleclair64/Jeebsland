@@ -165,6 +165,11 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 					L->SetAttenuationRadius(300.f);   // (a lantern's glow, not a spotlight on the whole front: visual review 2026-11-14)
 					L->SetLightColor(FLinearColor(1.f, 0.55f, 0.24f));
 					L->SetCastShadows(false);
+					{	// (lit only at a low-sun still, as the windows: the town switches its lanterns on at dusk; build-b review 2026-11-14)
+						float LightPhase = 0.f;
+						FParse::Value(FCommandLine::Get(), TEXT("ShotPhase="), LightPhase);
+						L->SetVisibility(LightPhase >= 0.35f);
+					}
 					L->RegisterComponent();
 					++Lights;
 				}

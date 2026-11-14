@@ -50,13 +50,14 @@ GRADE.update({
     "OakHillTownHall_300k":   dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=560.0),
     "OakHillChurch_300k":     dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
-                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=520.0),
+                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=260.0, fire_as_window=True),
     "OakHillWell_150k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=170.0),
     "OakHillPotionShop_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=500.0),
 })
-MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
+TILE_TARGET = (25.4, 22.7, 25.5)       # (build-b) the town's terracotta in Lab: every "tile" group is shifted to this mean (None: the fixed offsets)
+MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)   # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
@@ -227,6 +228,9 @@ if glow_img is not None:
 else:
     glow_lin = np.zeros((SMALL, SMALL, 3), np.float32)
 show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
+if GRADE.get(name, {}).get("fire_as_window"):   # (build-b: the church's stained glass came out as "fire" (0,0,0) and stayed painted orange at noon: make it windows)
+    fire = (glow_lin.max(-1) > 0.05) & (mask[..., 1] < 0.5) & (mask[..., 2] < 0.5)
+    mask[fire] = (0.5, 1.0, 0.0); log("fire texels made windows", int(fire.sum()))
 mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
 # convexity: the high model's pointiness (0.5 flat, above convex)
 show(geo.outputs["Pointiness"]); point = bake("Edge", SMALL, False)[..., 0]
@@ -276,7 +280,11 @@ groups = [(w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_sto
 if "tile" in g:   # (build-b: red clay roof tiles, above the eaves only)
     w_tile = soft(C, 14, 20) * (1 - soft(H, 52, 62)) * soft(z, g["tile_z"] - 40.0, g["tile_z"] + 40.0) * (1 - w_plaster)
     w_wood = w_wood * (1 - w_tile); groups[1] = (w_wood, "wood"); groups.append((w_tile, "tile"))
-    log("tile share %.0f%%" % (100 * float(w_tile.mean())))
+    sw = max(float(w_tile.sum()), 1.0); mL, mA, mB = (float((w_tile * x).sum()) / sw for x in (Lc, A, B))
+    k = CHROMA_GAIN * g["tile"][3]
+    if TILE_TARGET is not None and g.get("tile_to", True):   # one terracotta for the whole town (review 2026-11-14: the church read maroon, the well orange)
+        g = dict(g, tile=(TILE_TARGET[0] - mL, TILE_TARGET[1] - mA * k, TILE_TARGET[2] - mB * k, g["tile"][3]))
+    log("tile share %.0f%%, mean Lab before %.1f %.1f %.1f, after %.1f %.1f %.1f" % (100 * float(w_tile.mean()), mL, mA, mB, mL + g["tile"][0], mA * k + g["tile"][1], mB * k + g["tile"][2]))
 for w, key in groups:
     l_, a_, b_, c_ = g[key]
     dL += w * l_; dA += w * a_; dB += w * b_; cg *= 1 + w * (c_ - 1)
