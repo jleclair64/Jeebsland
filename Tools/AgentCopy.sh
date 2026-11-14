@@ -4,8 +4,11 @@
 #
 #   Tools/AgentCopy.sh new NAME     make ../JeebsAgents/NAME on branch agent/NAME from main's latest commit,
 #                                   with the big git-ignored assets linked in (not copied)
+#   Tools/AgentCopy.sh reset NAME   reuse a merged copy for the next job: its branch goes back to main's latest
+#                                   commit but its Binaries/Intermediate stay, so the next build is incremental
+#                                   (minutes, not the 10-20 of a new copy). Prefer this to remove + new.
 #   Tools/AgentCopy.sh remove NAME  unlink the shared assets, delete the copy and its branch (only once merged,
-#                                   unless FORCE=1)
+#                                   unless FORCE=1; only when the disk is short or the copy is no longer wanted)
 #   Tools/AgentCopy.sh list
 #
 # A copy needs its own first build (the whole game module, about 10-20 minutes and ~5 GB of Intermediate);
@@ -22,6 +25,20 @@ win() { cygpath -w "$1"; }
 LINK_DIRS=("Content/Filler" "Art/Filler/Originals" "Art/Animals/Originals")
 link_files() { (cd "$MAIN" && ls Art/Buildings/*_Detailed.glb Art/Trees/*_Original.glb 2>/dev/null) || true; }
 
+link_shared() {   # link any shared asset the copy is missing (new ones can appear between jobs)
+	local DST="$1"
+	for d in "${LINK_DIRS[@]}"; do
+		{ [ -d "$MAIN/$d" ] && [ ! -e "$DST/$d" ]; } || continue
+		mkdir -p "$(dirname "$DST/$d")"
+		powershell -NoProfile -Command "New-Item -ItemType Junction -Path '$(win "$DST/$d")' -Target '$(win "$MAIN/$d")' | Out-Null"
+	done
+	for f in $(link_files); do
+		[ -e "$DST/$f" ] && continue
+		mkdir -p "$(dirname "$DST/$f")"
+		powershell -NoProfile -Command "New-Item -ItemType HardLink -Path '$(win "$DST/$f")' -Target '$(win "$MAIN/$f")' | Out-Null"
+	done
+}
+
 case "$CMD" in
 	list) git -C "$MAIN" worktree list ;;
 	new)
@@ -30,16 +47,21 @@ case "$CMD" in
 		[ -e "$DST" ] && { echo "already there: $DST"; exit 1; }
 		mkdir -p "$COPIES"
 		git -C "$MAIN" worktree add -b "agent/$NAME" "$DST" main
-		for d in "${LINK_DIRS[@]}"; do
-			[ -d "$MAIN/$d" ] || continue
-			mkdir -p "$(dirname "$DST/$d")"
-			powershell -NoProfile -Command "New-Item -ItemType Junction -Path '$(win "$DST/$d")' -Target '$(win "$MAIN/$d")' | Out-Null"
-		done
-		for f in $(link_files); do
-			mkdir -p "$(dirname "$DST/$f")"
-			powershell -NoProfile -Command "New-Item -ItemType HardLink -Path '$(win "$DST/$f")' -Target '$(win "$MAIN/$f")' | Out-Null"
-		done
+		link_shared "$DST"
 		echo "copy ready: $DST (branch agent/$NAME). Project file: $(win "$DST/Jeebsland.uproject")" ;;
+	reset)
+		[ -n "$NAME" ] || { echo "usage: AgentCopy.sh reset NAME"; exit 2; }
+		DST="$COPIES/$NAME"
+		[ -d "$DST" ] || { echo "no copy at $DST: use new"; exit 1; }
+		if [ "${FORCE:-0}" != 1 ]; then
+			git -C "$MAIN" merge-base --is-ancestor "agent/$NAME" main || { echo "agent/$NAME is not merged into main: merge it first, or FORCE=1 to throw its work away"; exit 1; }
+			[ -z "$(git -C "$DST" status --porcelain --untracked-files=no)" ] || { echo "$DST has uncommitted changes: commit and merge them, or FORCE=1"; exit 1; }
+		else
+			git -C "$DST" reset -q --hard
+		fi
+		git -C "$DST" checkout -q -B "agent/$NAME" main
+		link_shared "$DST"
+		echo "copy reset to main ($(git -C "$MAIN" rev-parse --short main)) on branch agent/$NAME; build products kept, next build is incremental" ;;
 	remove)
 		[ -n "$NAME" ] || { echo "usage: AgentCopy.sh remove NAME"; exit 2; }
 		DST="$COPIES/$NAME"
@@ -51,5 +73,5 @@ case "$CMD" in
 		for f in $(link_files); do rm -f "$DST/$f"; done
 		git -C "$MAIN" worktree remove --force "$DST"
 		git -C "$MAIN" branch -D "agent/$NAME" ;;
-	*) echo "usage: AgentCopy.sh new|remove NAME, or list"; exit 2 ;;
+	*) echo "usage: AgentCopy.sh new|reset|remove NAME, or list"; exit 2 ;;
 esac

@@ -335,6 +335,22 @@ How the suit's animator works (`FKnightAnimator`, 2026-11-05):
 
 The owner's cheat sheet is `Docs/HowToTest.md` (editor Play never needs the worlds; the .bat files are the real thing). Point them to it, and keep it up to date when testing steps change. Hosting friends: `Docs/PlayWithFriends.md`.
 
+## Plan the fastest way to run every request (owner, 2026-11-14: "It needs to speed up")
+
+Before starting any request or batch, work out the most efficient way to run it, and say the plan in a line or two with the model and effort recommendation:
+- Split it into independent parts. Mark which need Unreal and which don't (Blender, Meshy, Mixamo, data, research, docs): those run beside the others freely.
+- Every agent that builds or runs Unreal gets its own project copy from its first step.
+  - Reuse kept copies with `Tools/AgentCopy.sh reset <name>`, so builds are incremental (minutes, not the 10-20 of a new copy).
+  - Make or reset the copies and start their builds in the background while writing the briefs.
+- Keep all three machine slots (`Tools/uqueue.sh`) busy. Check `uqueue.sh status` now and then, and unstick an OVERDUE holder at once.
+- Inside each agent:
+  - all edits first, then ONE build;
+  - all its pictures in as few runs as possible (several shots per run), MoveLab rather than Field when it will do;
+  - log lines measured before any pictures;
+  - every matching reviewer at once on the same build, asked for every problem in one round.
+- Merge each branch as soon as it passes review and push it. Don't hold finished parts for the slowest one.
+- Model per part: Sonnet for data, colour and small tweaks (saves usage for the rest), Opus for motion, visuals and new systems.
+
 ## Parallel agents for every multi-part request (owner, 2026-11-11; standing rule, never wait to be reminded)
 
 When a request has several independent parts, split them across background agents from the START of the turn, scaled to the size (a quick fix needs none; Opus for motion, visuals and new systems, Sonnet for data and colour tweaks). Each agent gets its own files and a full brief (the owner's words, picture paths, files it may and may not touch). Agents run their own reviewers but do not commit; the main session keeps the work that touches the most shared files, runs shared rebuilds once (e.g. ImportNewSuit, then clips, then the bare knight), and commits everything together.
@@ -345,7 +361,7 @@ Each agent works in its own project copy (owner, 2026-11-13, "let's do it"). Thi
 - `bash Tools/AgentCopy.sh new <agent>` makes `../JeebsAgents/<agent>` on branch `agent/<agent>` from main's latest commit, with the big git-ignored assets linked in (Content/Filler, Art originals); `remove <agent>` unlinks them first, then deletes the copy (only once merged). Commit everything in the main folder before making copies, or the copies start without it.
 - The agent edits, builds (Build.bat with the copy's .uproject) and runs test pictures only in its copy, and commits to its own branch (never pushes). Another agent's half-finished code can never break its build.
 - `Tools/uqueue.sh` shares the machine: at most 3 Unreal processes at once (6 cores, 32 GB, 8 GB GPU; a fourth only slows the others), first come first served, one build at a time per copy, `solo` for frame-rate timing (holds every slot). Same rules as below: run it in the background, release the moment Unreal exits, `-RenderOffScreen`, `-abslog=<copy>/Saved/Logs/<agent>.log`.
-- A copy's first build compiles the whole game module (about 10-20 minutes, ~5 GB); shaders come from the shared engine cache. Disk: about 8 GB a copy (116 GB free on 2026-11-13); remove copies after merging.
+- A copy's first build compiles the whole game module (about 10-20 minutes, ~5 GB); shaders come from the shared engine cache. Disk: about 8 GB a copy (127 GB free on 2026-11-14). Keep copies between jobs and `reset` them after merging, so their builds stay warm. `remove` only when the disk runs short.
 - The main session merges the branches into main, settles conflicts, runs the shared rebuilds once, checks the whole, commits and pushes. Unreal assets (.uasset, .umap) can't be merged: each asset folder has one owning agent per batch.
 - Linked shared assets belong to the main folder: a copy rebuilds them only if its brief says so.
 
