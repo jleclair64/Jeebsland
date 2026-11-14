@@ -24,18 +24,21 @@ import water_textures   # noqa: E402
 # Water by depth, per centimetre (Single Layer Water's units). Absorption takes red first, so depth turns teal then blue-green;
 # scattering gives the water its own body colour where it is too deep to see the bottom.
 ABSORPTION = (0.024, 0.017, 0.014)   # (owner 2026-11-13: dark natural slate, not bright blue, like a calm river below a weir)
-SCATTERING = (0.0016, 0.0021, 0.0026)   # (the slate body colour. Keep it low: the sun lights it, so at the orange low sun more
-                                        # turns the water into a muddy orange floor striped with tree shadows)
+SCATTERING = (0.0045, 0.0052, 0.0056)   # (the slate body colour, matched to the owner's river picture at noon: about sRGB 63,77,87.
+                                        # The sun lights it, so WaterLook.cpp fades it to a tenth at the low sun, else orange mud
+                                        # striped with tree shadows; the emissive Glow below keeps that water a dim slate instead)
 PHASE_G = 0.25
 BEHIND_TINT = (0.95, 1.0, 0.88)   # what is seen through the water: a touch green-brown, like a real riverbed
-ROUGHNESS = 0.14       # (lower and the sky's reflection breaks into hard white blotches)
-ROUGHNESS_FAR = 0.22
+ROUGHNESS = 0.23       # (lower and the sky's reflection breaks into hard white blotches)
+ROUGHNESS_FAR = 0.25
 SPECULAR = 0.25        # real water
 RIPPLE = 0.28          # ripple strength (1 tilts the ripples up to 35 degrees: choppy, glittering everywhere)
 FLOW_SPEED = 55.0      # cm/s downstream on the rivers
-FOAM = 0.30            # how white the shore foam gets
-FOAM_DEPTH = 14.0      # cm of water under which the foam line runs
-FOAM_COLOR = (0.78, 0.84, 0.84)
+FOAM = 0.08            # how white the shore foam gets (0.30 read as a hard white line along the river banks, 0.18 and 0.12 as bright dashes)
+FOAM_DEPTH = 10.0      # cm of water under which the foam line runs
+FOAM_COLOR = (0.62, 0.67, 0.68)   # greyish, not white
+GLOW = (0.0, 0.0, 0.0)  # a faint even slate light of the water's own (emissive, so no tree-shadow stripes); the game sets it by
+                        # the sun's height (jeeb.Water.Glow / GlowDusk in WaterLook.cpp) so the low-sun water is dim slate, not black
 FLOW_PERIOD = 3.0      # seconds per flow-map cycle
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -215,12 +218,13 @@ def build(normal_tex, foam_tex):
     g.link(thick, per, "A"); g.link(g.scalar("FoamDepth", FOAM_DEPTH), per, "B")
     shore = g.one(unreal.MaterialExpressionOneMinus, g.sat(per))
     blobs = g.mask(g.tex(foam_tex, g.addn(g.mul(xy, 1.0 / 190.0), g.muln(t, g.c2(0.012, 0.007)))), True, False)
-    foam = g.sat(g.mul(g.subn(shore, g.mul(blobs, 0.95)), 3.0))   # (the blobs cut gaps right through the line)
+    foam = g.sat(g.mul(g.subn(shore, g.mul(blobs, 1.25)), 3.0))   # (the blobs cut wide gaps right through the line)
     foam = g.muln(foam, shore)   # exactly none away from the shore: even 0.05 of foam shows in Single Layer Water as pale
                                  # hard-edged patches in the shape of the blob texture's gaps
     foam = g.muln(g.muln(foam, g.scalar("Foam", FOAM)), g.lerpc(1.0, 0.35, far))
     g.out(foam, unreal.MaterialProperty.MP_OPACITY)   # (in Single Layer Water, opacity is how much of the surface is foam)
     g.out(g.vector("FoamColor", FOAM_COLOR), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.muln(g.vector("Glow", GLOW), g.one(unreal.MaterialExpressionOneMinus, foam)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 
     # The water's body: what it does to light by depth
     out = g.node(unreal.MaterialExpressionSingleLayerWaterMaterialOutput)

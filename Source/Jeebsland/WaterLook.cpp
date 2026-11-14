@@ -6,6 +6,8 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "UObject/Package.h"
+#include "Containers/Ticker.h"
+#include "DayNight.h"
 
 namespace
 {
@@ -22,8 +24,14 @@ namespace
 	TAutoConsoleVariable<float> CVarFoam(TEXT("jeeb.Water.Foam"), -1.f, TEXT("Shore foam strength (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarFoamDepth(TEXT("jeeb.Water.FoamDepth"), -1.f, TEXT("Depth in cm under which the foam line runs (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarPhase(TEXT("jeeb.Water.PhaseG"), -2.f, TEXT("Scattering phase -1..1 (below -1: M_Water's)"));
+	TAutoConsoleVariable<float> CVarDuskScatter(TEXT("jeeb.Water.DuskScatter"), 0.10f, TEXT("Share of the water's scattering left at the low sun (1: none taken away)"));
+
+	TAutoConsoleVariable<FString> CVarGlow(TEXT("jeeb.Water.Glow"), TEXT("0.004 0.005 0.006"), TEXT("The water's own faint slate light at noon, linear R G B (emissive: no shadow stripes)"));
+	TAutoConsoleVariable<FString> CVarGlowDusk(TEXT("jeeb.Water.GlowDusk"), TEXT("0.008 0.013 0.017"), TEXT("The same at the low sun, so the water stays a dim slate there and never goes black"));
 
 	TWeakObjectPtr<UMaterialInstanceDynamic> Shared;
+	FLinearColor BaseScatter(-1.f, -1.f, -1.f, 1.f);   // the scattering before the low sun takes its share (negative: not known yet)
+	float LastDusk = -1.f;   // the sun's height the water was last set for
 
 	bool ParseRGB(const FString& S, FLinearColor& Out)
 	{
@@ -34,6 +42,23 @@ namespace
 		return true;
 	}
 
+	// The sun lights the water's own body (scattering). At the orange low sun that turned the rivers into a muddy orange floor with
+	// hard tree-shadow stripes, so most of it fades out as the sun sinks, and an even faint emissive Glow takes over so the water is
+	// a dim slate there (not black) and a wading knight's legs still show.
+	void SetScatter(UMaterialInstanceDynamic* M)
+	{
+		if (!M || BaseScatter.R < 0.f) return;
+		const float D = FMath::Clamp(ADayNight::Dusk, 0.f, 1.f);
+		if (FMath::Abs(D - LastDusk) < 0.01f) return;
+		LastDusk = D;
+		const float Share = FMath::Lerp(1.f, FMath::Clamp(CVarDuskScatter.GetValueOnGameThread(), 0.f, 1.f), D);
+		M->SetVectorParameterValue(TEXT("Scattering"), FLinearColor(BaseScatter.R * Share, BaseScatter.G * Share, BaseScatter.B * Share, 1.f));
+		FLinearColor Noon(0.f, 0.f, 0.f, 1.f), Low(0.f, 0.f, 0.f, 1.f);
+		ParseRGB(CVarGlow.GetValueOnGameThread(), Noon);
+		ParseRGB(CVarGlowDusk.GetValueOnGameThread(), Low);
+		M->SetVectorParameterValue(TEXT("Glow"), FMath::Lerp(Noon, Low, D));
+	}
+
 	// Pushes whatever jeeb.Water.* is set to onto the shared instance (when it is made, and when any console variable changes)
 	void Push()
 	{
@@ -41,7 +66,10 @@ namespace
 		if (!M) return;
 		FLinearColor C;
 		if (ParseRGB(CVarAbsorb.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("Absorption"), C);
-		if (ParseRGB(CVarScatter.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("Scattering"), C);
+		if (ParseRGB(CVarScatter.GetValueOnGameThread(), C)) BaseScatter = C;
+		else if (M->Parent) M->Parent->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("Scattering")), BaseScatter);
+		LastDusk = -1.f;
+		SetScatter(M);
 		if (ParseRGB(CVarTint.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("BehindTint"), C);
 		if (ParseRGB(CVarFoamColor.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("FoamColor"), C);
 		auto Scalar = [&](TAutoConsoleVariable<float>& V, const TCHAR* Name, float Min)
@@ -85,6 +113,12 @@ UMaterialInterface* JeebWaterLook::Material()
 	UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Base, GetTransientPackage());
 	Shared = M;   // (kept alive by the components that wear it; made again if they are all gone)
 	Push();
+	static bool bTicking = false;   // follow the sun four times a second (one ticker for the whole game)
+	if (!bTicking)
+	{
+		bTicking = true;
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float) { SetScatter(Shared.Get()); return true; }), 0.25f);
+	}
 	return M;
 }
 
