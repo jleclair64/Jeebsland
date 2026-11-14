@@ -49,7 +49,8 @@ BUILDINGS = {
     # A third house design (owner, 2026-11-13): like the library's "Storybook cottage v2" by kaesar3d (Docs/OakHillPlan.md), but remade
     # without its lanterns, pots, barrel and bench (2026-11-14): two views of the original rendered in Blender, the props painted out by
     # Meshy image-to-image, then Meshy multi-image-to-3D (303k triangles, door to -Y). Glass by building_glow.py (--mask-only --rough-max 1
-    # --hue 195,232 --sat 0.45,1 --val 0.3,0.95 --grow 6), repainted by building_palette.py "cottage". cm: the same 12.4 m height as before.
+    # --hue 195,232 --sat 0.45,1 --val 0.3,0.95 --grow 6), repainted by building_palette.py "cottage", then its soft ramp of front steps
+    # replaced by clean box steps (building_steps.py, owner: "the front stairs are weirdly smoothed over"). cm: 12.4 m tall as before.
     "StorybookCottage_300k":   dict(file="StorybookCottage_300k.glb",   cm=667.0, sink=15.0),
 }
 names = a[2:] or list(BUILDINGS)
