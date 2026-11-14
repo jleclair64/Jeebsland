@@ -91,3 +91,25 @@ No outside textures were downloaded and no Meshy credits were spent (0): everyth
 - Lineup: `-TownLabBuildings` shows them in a second yard behind the house and store (town halls and churches 36 m back, potion shops and wells 74 m back; the new one of each pair is on the left seen from the front).
 - Frame cost (performance reviewer, MoveLab 1920x1080 noon, two runs each): overview old 4.17 ms / new 4.13 ms GPU, close view old 3.95 / new 4.12 (noise 0.2-0.27 ms); about +58 draws, all decor. No Meshy credits spent.
 - For the owner: the church keeps its painted stained glass from the original model (the painted crack and drip streaks on its side plaster are painted out in the bake: `paint_out` in townlab_bake.py); the backs of the buildings read greyer only in shade, as the old ones do.
+
+## The market stall and the potion stall (build-c, 2026-11-14)
+| | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
+|---|---|---|
+| Market stall ("GeneralStore", owner's pick B) | `SM_GeneralStore_300k`: 291k triangles | `SM_TL_MarketStall`: 60k, Nanite, 1 material, no glow or mask pictures (no windows) |
+| Potion stall | `SM_PotionStall_300k`: 301k | `SM_TL_PotionStall`: 50k, Nanite, 1 material |
+| Collision | `SM_*_Col` (20k) | `SM_TL_MarketStall_Col`, `SM_TL_PotionStall_Col` (the same meshes) |
+
+- Each keeps its own colours: the market stall's red-and-cream striped cloth roof and goods, the potion stall's timber (lifted and warmed a touch from grey-purple to rich brown: `GRADE` in townlab_bake.py).
+- The market stall needed three extra settings in townlab_bake.py, all keyed by its name:
+  - `CAGE_BY`: its bake rays start 12 cm out (the thin two-layer cloth roof baked its striped underside as dark blotches with 4 cm);
+  - `SPARE_ABOVE`: everything above the eaves (430 cm) is spared in the reduction like the house's flower boxes (the overlapping roof slats tore into holes);
+  - `UV_BOOST` / `PACK_MARGIN_BY`: its thousands of small goods made thousands of little UV islands and the roof got about 7% of the picture, so its stripes smeared in game; the roof's islands are scaled 2.6x before packing and the gaps narrowed.
+- No glow picture is written for a design without lit windows; the importer then uses `T_NoGlow` for both the glow and the mask.
+- The open stalls are all inside, so the high model's occlusion is deep everywhere: `AO_BY` paints it in lightly (market 0.12, potion 0.18 of the house's strength) and `CHROMA_BY` keeps the colours as rich as the original (the cream stripes measure 0.875/0.749/0.573 against the old 0.855/0.729/0.569).
+- Rebuild only these: `Tools\BuildTownLabBuildings.ps1 -Only TL_MarketStall,TL_PotionStall` (needs `Tools\BuildBuildings.ps1 -CleanOnly GeneralStore_300k PotionStall_300k` first). `-Only` imports onto the existing `M_TL_Building` and leaves the shared decor alone. Decor: `townlab_decor.py -- <project> --only TL_MarketStall,TL_PotionStall` rewrites only those blocks of TownLabDecor.h.
+
+### Their clutter (the old engine-shape barrels and crates went 2026-11-13, owner: "We'll add our own")
+`STALL_PROPS` in townlab_decor.py places Oak Hill's filler props by hand round each stall's sides and back (the open front and the shop counter stay clear), in world cm as drawn (the stall shrinks by its FModel Scale, the props keep their real size), each pushed outward until no part of the stall is inside its box. No ivy and no foundation stones on stalls (ivy cards beside bare posts read as stickers, white stone clumps as specks: visual review); no weeds either (lime clumps with no soil read as pasted on): props only.
+- Market stall (14): barrel, small barrel with a standing oil lantern (lit at dusk), hand cart side-on, spice sacks, open sack pile, crate with a rope coil, open crate, cabbage crate, crate with a lidless crate, grain and wheat sacks. About 174k triangles of props (the hand cart alone 30k), 14 pieces, 14 draws (plus the building).
+- Potion stall (11): wooden tub, wide pot, barrel, crate with a clay jug, open crate, amphora, jug, small barrel with an oil lantern, clay jug. About 93k triangles, 11 pieces, 11 draws (plus the building).
+- `-TownLabSet=stalls | stallsold | stallsnew` shows these two, old and new, in MoveLab's lineup (`-TownLabBuildings`).

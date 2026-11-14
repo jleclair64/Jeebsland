@@ -2,8 +2,7 @@
 # 300k town models in Saved/KnightBuild/Buildings: run Tools\BuildBuildings.ps1 -CleanOnly OakHillHouse_300k OakHillStore_300k first
 # if that folder is empty), then /Game/TownLab/Buildings (Tools/townlab_import.py; the Unreal editor closed on this project).
 # -BakeOnly / -ImportOnly run one half. Every number of the look is at the top of townlab_bake.py.
-# -Only TL_A,TL_B: bake and import just those (the import then reuses the existing M_TL_Building, T_NoGlow and decor).
-param([switch]$BakeOnly, [switch]$ImportOnly, [string[]]$Only)
+param([switch]$BakeOnly, [switch]$ImportOnly, [string[]]$Only)   # -Only TL_MarketStall,TL_PotionStall: bake and import just those (the import then leaves M_TL_Building and the shared decor alone)
 $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLab'
@@ -13,7 +12,10 @@ $designs += , @('OakHillTownHall_300k', 'TL_TownHall', 60000)
 $designs += , @('OakHillChurch_300k', 'TL_Church', 60000)
 $designs += , @('OakHillWell_150k', 'TL_Well', 26000)
 $designs += , @('OakHillPotionShop_300k', 'TL_PotionShop', 50000)
-if ($Only) { $Only = @($Only | ForEach-Object { $_ -split ',' }); $designs = @($designs | Where-Object { $Only -contains $_[1] }); $env:TL_ONLY = ($Only -join ',') }
+# build-c (2026-11-14): the market stall and the potion stall
+$designs += ,@('GeneralStore_300k', 'TL_MarketStall', 60000)
+$designs += ,@('PotionStall_300k', 'TL_PotionStall', 50000)
+if ($Only) { $Only = @($Only | ForEach-Object { $_ -split ',' }); $designs = @($designs | Where-Object { $Only -contains $_[1] }); $env:TL_ONLY = ($Only -join ',') } else { $env:TL_ONLY = '' }
 if (-not $ImportOnly) {
     foreach ($d in $designs) {
         & $blender -b -P (Join-Path $PSScriptRoot 'townlab_bake.py') -- $work $out $d[0] $d[1] $d[2] --preview | Select-String -Pattern 'TLBAKE|Traceback|Error' | ForEach-Object { Write-Host $_.Line }

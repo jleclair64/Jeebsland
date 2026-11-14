@@ -10,6 +10,11 @@ fi
 if echo "$in" | grep -q -- ' -game' && ! echo "$in" | grep -qi -- '-RenderOffScreen\|-nullrhi\|-server'; then
 	echo "Blocked: an Unreal -game run must use -RenderOffScreen (no visible window; owner plays games on this PC)." >&2; exit 2
 fi
+# -RenderOffScreen still shows Unreal's message boxes ("Wait for ZenServer?" popped over the owner's game,
+# 2026-11-14); -unattended suppresses them.
+if echo "$in" | grep -q -- ' -game' && ! echo "$in" | grep -qi -- '-unattended'; then
+	echo "Blocked: add -unattended to every Unreal -game run (off-screen runs still pop message boxes like 'Wait for ZenServer?' over the owner's game)." >&2; exit 2
+fi
 # Git Bash rewrites a bare /Game/... map into C:/Program Files/Git/Game/... and the run hangs with no level.
 if echo "$in" | grep -q '"tool_name" *: *"Bash"' && echo "$in" | grep -q -- ' -game' \
 	&& echo "$in" | grep -q '[ "'"'"']/Game/' && ! echo "$in" | grep -q 'MSYS_NO_PATHCONV=1'; then

@@ -1,4 +1,4 @@
-# TownLab (2026-11-14, a temporary test map, never cooked: Config/DefaultGame.ini): makes /Game/TownLab/TownLab (a copy of Field,
+# TownLab (2026-11-14, a temporary test map, never cooked: Config/DefaultGame.ini): makes /Game/TownLab/Map/TownLab (a copy of Field,
 # like MoveLab: the game sees the map's name and builds the rebuilt Oak Hill beside the real one, TownLab.h) and the new town's
 # ground material M_TL_Ground. Run by Tools/BuildTownLab.ps1 inside a windowless editor (this copy's editor closed).
 #
@@ -28,10 +28,10 @@ COBBLE_GRADE = (0.92, 1.00, 1.12)          # Poly Haven "grassy_cobblestone" lea
 COBBLE_AVERAGE = (0.168, 0.138, 0.107)     # the graded picture's average (linear), what it fades to far away
 
 # ------------------------------------------------------------------ the map
-if EAL.does_asset_exist("/Game/TownLab/TownLab"):
+if EAL.does_asset_exist("/Game/TownLab/Map/TownLab"):
     unreal.log("TOWNLABDIAG map already there")
-elif EAL.duplicate_asset("/Game/Field", "/Game/TownLab/TownLab"):
-    EAL.save_asset("/Game/TownLab/TownLab")
+elif EAL.duplicate_asset("/Game/Field", "/Game/TownLab/Map/TownLab"):
+    EAL.save_asset("/Game/TownLab/Map/TownLab")
     unreal.log("TOWNLABDIAG map made")
 else:
     unreal.log_error("TOWNLABDIAG could not copy Field")
@@ -289,6 +289,6 @@ def build_world_ground():
     unreal.log("TOWNLABDIAG built M_TL_WorldGround (base colour from %s '%s', emissive before: %s)" % (base.get_class().get_name(), base_out, "yes" if old_em else "no"))
 
 
-build_world_ground()
+# build_world_ground()   (retired 2026-11-14: M_Ground carries this look itself, Tools/world_material.py; kept for reference)
 
 unreal.log("TOWNLABDIAG done")

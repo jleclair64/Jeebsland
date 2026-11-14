@@ -4,6 +4,6 @@ $proj = Split-Path $PSScriptRoot -Parent
 # (only an editor open on THIS project folder is in the way: other project copies run their own, 2026-11-14)
 if (Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Replace('/', '\').ToLower().Contains($proj.ToLower() + '\jeebsland.uproject') }) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'world_material.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
+$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'world_material.py').Replace('\', '/'))" -Multiprocess -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'WORLDDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'WORLDDIAG world ground material built') { Write-Host 'World material built.'; exit 0 } else { Write-Host 'World material build FAILED.'; exit 1 }

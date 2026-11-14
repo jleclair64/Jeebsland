@@ -146,13 +146,23 @@ void AKnightGameState::BuildWorld()
 		World->SpawnActor<AGrassField>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
-	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill: its ground east of the square, and its buildings (OakHill.h)
+	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill's plan checks (JEEBOAK), and the old town itself only with -OldOakHill or in TownLab (OakHill.h)
+	if (JeebTownLab::RealTown())   // Oak Hill (2026-11-14): the rebuilt town at the real plaza (TownLab.h, TownLabTown.cpp)
+		if (ATownLabTown* Town = World->SpawnActorDeferred<ATownLabTown>(ATownLabTown::StaticClass(), FTransform::Identity))
+		{
+			Town->bRealSite = true;
+			Town->FinishSpawning(FTransform::Identity);
+		}
 	if (JeebOakHill::Enabled()) World->SpawnActor<AOakHillLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // chimney smoke, glow at the low sun, shop lamps (visual only; clients)
 	if (JeebTownLab::Active())
 	{
 		World->SpawnActor<ATownLabTown>(FVector::ZeroVector, FRotator::ZeroRotator);   // (TownLab: the rebuilt Oak Hill 300 m east)
 		World->SpawnActor<ATownLab>(FVector::ZeroVector, FRotator::ZeroRotator);       // (its switches and measuring tour)
 	}
+#if !UE_BUILD_SHIPPING
+	else if (FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))
+		World->SpawnActor<ATownLab>(FVector::ZeroVector, FRotator::ZeroRotator);   // (-LabTour in Field: the measuring tour of the real town, open land and Blackrock)
+#endif
 
 	// The cottage, with its door facing the starting point
 	const FVector CottageSpot = JeebTerrain::CottagePos();
@@ -562,7 +572,9 @@ void AKnightGameState::BuildMoveLab()
 	// Oak Hill's filler props in labelled rows on a grass yard past the floor's -Y edge, for the owner to look at (2026-11-13; FillerLineup.cpp, /Game/Filler)
 	JeebFiller::BuildYard(World, Floor, Root, Z);
 	// TownLab's two rebuilt buildings beside the originals (2026-11-14, test switch -TownLabBuildings; TownLabLineup.h)
+#if !UE_BUILD_SHIPPING
 	if (FParse::Param(FCommandLine::Get(), TEXT("TownLabBuildings"))) JeebTownLab::BuildLineup(World, Floor, Root, Z);
+#endif
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();

@@ -249,6 +249,9 @@ void AMeadow::Tick(float Dt)
 	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
 	if (JeebTownLab::NewOn()) SetLabMode(JeebTownLab::InPatch(Me.X, Me.Y, bLabMode ? 2000.f : 0.f));   // (TownLab only)
+	// (the real Oak Hill, rebuilt: the same 40 m of dense grass while he is in the town, its own ground matching the blades beyond;
+	// the box less 10 m to switch on, 15 m beyond it to switch off, so walking along its edge doesn't flip it back and forth)
+	else if (JeebTownLab::RealTown()) SetLabMode(JeebOakHill::InBox(Me.X, Me.Y, bLabMode ? 1500.f : -1000.f));
 
 	TArray<FIntPoint> Far;
 	for (const TPair<FIntPoint, FCell>& P : Cells)
