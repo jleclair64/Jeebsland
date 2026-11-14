@@ -301,13 +301,12 @@ STALL_PROPS = {
         ("back", 330, "Crate", 0.85, 6, 5, 0, None, False),            # 5
         ("back", 330, "RopeCoil", 0.8, 0, 30, 0, 5, False),            # 6  on the crate
         ("back", 430, "CrateOpen", 0.8, 6, -12, 0, None, False),       # 7
-        ("back", 600, "SackStack", 0.75, 6, 0, 0, None, False),        # 8
-        ("right", 120, "CabbageCrate", 0.8, 8, 15, 0, None, False),    # 9  by the front-right post
-        ("right", 250, "Crate", 0.85, 6, -8, 0, None, False),          # 10
-        ("right", 250, "CrateNoLid", 0.75, 0, 14, 0, 10, False),       # 11 on the crate
-        ("right", 360, "GrainSack", 0.85, 8, 25, 0, None, False),      # 12
-        ("right", 420, "WheatSack", 0.8, 6, -20, 0, None, False),      # 13
-        ("left", 165, "LanternOil", 0.85, 0, 0, 0, 1, True),           # 14 standing on the small barrel, lit at dusk
+        ("right", 120, "CabbageCrate", 0.8, 8, 15, 0, None, False),    # 8  by the front-right post
+        ("right", 250, "Crate", 0.85, 6, -8, 0, None, False),          # 9
+        ("right", 250, "CrateNoLid", 0.75, 0, 14, 0, 9, False),        # 10 on the crate
+        ("right", 360, "GrainSack", 0.85, 8, 25, 0, None, False),      # 11
+        ("right", 420, "WheatSack", 0.8, 6, -20, 0, None, False),      # 12
+        ("left", 165, "LanternOil", 0.85, 0, 0, 0, 1, True),           # 13 standing on the small barrel, lit at dusk
     ],
     "TL_PotionStall": [
         ("left", 200, "WoodTub", 0.85, 10, 0, 0, None, False),         # 0  (the stall has its own cauldron on the counter)
@@ -319,7 +318,7 @@ STALL_PROPS = {
         ("back", 700, "PotAmphora", 0.85, 8, 0, 0, None, False),       # 6
         ("right", 110, "PotJug", 0.85, 8, 0, 0, None, False),          # 7
         ("right", 200, "BarrelSmall", 0.85, 8, 0, 0, None, False),     # 8
-        ("right", 200, "CandleCageShort", 0.9, 0, 0, 0, 8, True),      # 9  on the small barrel, lit at dusk
+        ("right", 200, "LanternOil", 0.85, 0, 0, 0, 8, True),          # 9  on the small barrel, lit at dusk (a 2.5k lantern, not the 20k candle cage)
         ("right", 320, "ClayJug", 0.85, 8, -25, 0, None, False),       # 10
     ],
 }
@@ -481,7 +480,7 @@ for bname, B in BUILD.items():
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back"):
+        if sname in ("front", "back") and not B.get("stall"):   # (not on a stall: it hung at the gable peak or off a bare beam, build-c review)
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue

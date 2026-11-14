@@ -147,6 +147,16 @@ if len(hi.data.color_attributes):
                 if c.z - 75.0 < p.z < c.z - 10.0 and math.hypot(c.x - p.x, c.y - p.y) < 60.0:
                     vg.add([v.index], 0.6, "REPLACE"); keep_n += 1; break   # (0.6: reduced less, never frozen: 1.0 froze 60k vertices and the house came out at 122k)
 log(new, "flower-box vertices spared", keep_n)
+# (build-c 2026-11-14: the market stall's striped cloth roof is overlapping slats; collapsed with the rest it tore into holes and its
+# stripes smeared. Everything above the eaves is spared like the flower boxes.)
+SPARE_ABOVE = {"GeneralStore_300k": (430.0, 0.8)}
+if name in SPARE_ABOVE:
+    z_from, wgt = SPARE_ABOVE[name]
+    vg = lo.vertex_groups.get("Keep") or lo.vertex_groups.new(name="Keep")
+    n0 = keep_n
+    for v in me.vertices:
+        if v.co.z * U > z_from: vg.add([v.index], wgt, "REPLACE"); keep_n += 1
+    log(new, "roof vertices spared", keep_n - n0)
 m = lo.modifiers.new("reduce", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = budget / tris; m.use_collapse_triangulate = True
 if keep_n:
     m.vertex_group = "Keep"; m.invert_vertex_group = True; m.vertex_group_factor = 3.0   # (inverted: weight 1 = spared)
@@ -165,7 +175,44 @@ while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
 me.uv_layers.new(name="UV")
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.0, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
-bpy.ops.uv.pack_islands(rotate=True, margin=MARGIN * 0.6 / SIZE)
+# (build-c 2026-11-14: the market stall's thousands of small goods came out as thousands of little islands, each with its margin, and
+# the big roof got about 7% of the picture: its stripes smeared in game. UV_BOOST scales the islands of the parts that matter (their
+# faces' middle above a height, cm) before packing, so they get that much more of the picture; PACK_MARGIN_BY narrows the gaps.)
+UV_BOOST = {"GeneralStore_300k": (430.0, 2.6)}
+PACK_MARGIN_BY = {"GeneralStore_300k": 6.0}
+if name in UV_BOOST:
+    bpy.ops.object.mode_set(mode="OBJECT")
+    z_from, k = UV_BOOST[name]
+    uvd = me.uv_layers[0].data
+    nl = len(me.loops)
+    luv = np.empty(nl * 2, np.float32); uvd.foreach_get("uv", luv); luv = luv.reshape(-1, 2)
+    lv = np.empty(nl, np.int64); me.loops.foreach_get("vertex_index", lv)
+    ls = np.empty(len(me.polygons), np.int64); me.polygons.foreach_get("loop_start", ls)
+    lt = np.empty(len(me.polygons), np.int64); me.polygons.foreach_get("loop_total", lt)
+    cz = np.empty(len(me.polygons) * 3); me.polygons.foreach_get("center", cz); cz = cz.reshape(-1, 3)[:, 2] * U
+    # islands: faces joined where they share a vertex at the same UV spot (union-find on (vertex, rounded uv) keys)
+    parent = list(range(len(me.polygons)))
+    def find(a):
+        while parent[a] != a: parent[a] = parent[parent[a]]; a = parent[a]
+        return a
+    seen = {}
+    for f in range(len(me.polygons)):
+        for li in range(ls[f], ls[f] + lt[f]):
+            key = (int(lv[li]), round(float(luv[li, 0]), 5), round(float(luv[li, 1]), 5))
+            g = seen.setdefault(key, f)
+            ra, rb = find(f), find(g)
+            if ra != rb: parent[ra] = rb
+    root = np.array([find(f) for f in range(len(me.polygons))])
+    up = {}
+    for f in range(len(me.polygons)): up.setdefault(root[f], []).append(cz[f])
+    boost = {r for r, zs in up.items() if np.median(zs) > z_from}
+    lf = np.repeat(np.arange(len(me.polygons)), lt)
+    sel = np.isin(root[lf], list(boost))
+    luv[sel] *= k
+    uvd.foreach_set("uv", luv.ravel())
+    log(new, "uv islands", len(up), "boosted", len(boost), "x%.1f" % k)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.pack_islands(rotate=True, margin=PACK_MARGIN_BY.get(name, MARGIN * 0.6) / SIZE)
 bpy.ops.object.mode_set(mode="OBJECT")
 uv = np.empty(len(me.loops) * 2); me.uv_layers[0].data.foreach_get("uv", uv)
 log("uv islands packed; uv extent", round(float(uv.max()), 3))

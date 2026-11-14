@@ -8,7 +8,7 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLab'
 $designs = @(@('OakHillHouse_300k', 'TL_House', 60000), @('OakHillStore_300k', 'TL_Store', 50000))
 # build-c (2026-11-14): the market stall and the potion stall
-$designs += ,@('GeneralStore_300k', 'TL_MarketStall', 50000)
+$designs += ,@('GeneralStore_300k', 'TL_MarketStall', 60000)
 $designs += ,@('PotionStall_300k', 'TL_PotionStall', 50000)
 if ($Only) { $designs = @($designs | Where-Object { $Only -contains $_[1] }); $env:TL_ONLY = ($Only -join ',') } else { $env:TL_ONLY = '' }
 if (-not $ImportOnly) {
