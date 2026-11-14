@@ -2275,8 +2275,9 @@ JeebHit::FShieldWedge FKnightAnimator::ShieldWedge(const FVector& Centre, const 
 // The clip's pose is measured each frame before the turn, so the wanted turn is absolute and fades as the clip swings clear.
 void FKnightAnimator::HandsOffThighs(FPose& P, const FInput& In, float Dt)
 {
-	constexpr float ThighPlateR = 13.f, GauntR = 6.5f, KnuckleAhead = 8.f, ThighGap = 3.f, MaxOut = 14.f;
-	const bool bOff = StateKey >= 10 || In.bSitting || In.bDrinking;   // (only standing, walking and the guard idle: every move, climb and swim places its own hands)
+	constexpr float ThighPlateR = 13.f, GauntR = 6.5f, KnuckleAhead = 8.f, ThighGap = 6.f, MaxOut = 14.f;
+	static const bool bNoFix = FParse::Param(FCommandLine::Get(), TEXT("NoThighFix"));   // (test pictures: the clip as it is, for before and after)
+	const bool bOff = bNoFix || StateKey >= 10 || In.bSitting || In.bDrinking;   // (only standing, walking and the guard idle: every move, climb and swim places its own hands)
 	const int32 Arm[2] = { JeebAnim::LArm, JeebAnim::RArm }, Fore[2] = { JeebAnim::LFore, JeebAnim::RFore }, Hand[2] = { JeebAnim::LHand, JeebAnim::RHand };
 	const int32 Up[2] = { JeebAnim::LUp, JeebAnim::RUp }, Knee[2] = { JeebAnim::LLeg, JeebAnim::RLeg };
 	auto Clear = [&](int32 i, FVector* OutPush, FVector* OutPt)
@@ -2307,12 +2308,12 @@ void FKnightAnimator::HandsOffThighs(FPose& P, const FInput& In, float Dt)
 		const float Raw = Clear(i, &Push, &Pt);
 		const FVector Sh = BonePos(P, Arm[i]);
 		const float Lever = FMath::Max(20.f, float(FVector::Dist(Sh, Pt)));
-		const float Want = (!bOff && Raw < ThighGap) ? FMath::Min(MaxOut, FMath::RadiansToDegrees((ThighGap - Raw) / Lever)) : 0.f;
-		ThighOut[i] = bOff ? 0.f : FMath::FInterpTo(ThighOut[i], Want, Dt, Want > ThighOut[i] ? 14.f : 5.f);
+		const float Want = (!bOff && Raw < ThighGap) ? FMath::Min(MaxOut, FMath::RadiansToDegrees((ThighGap - Raw) / Lever)) * FMath::Clamp(1.f - 2.f * In.CrouchAlpha, 0.f, 1.f) : 0.f;   // (crouched the thighs come forward under the hands: pushing out sideways would not clear them, so it fades out)
+		ThighOut[i] = FMath::FInterpTo(ThighOut[i], Want, Dt, bOff ? 25.f : Want > ThighOut[i] ? 14.f : 5.f);   // (switched off by a new move it fades in about 0.1 s, under that move's own blend: never a one-frame drop)
 		if (ThighOut[i] > 0.01f && !Push.IsNearlyZero())
 		{
 			const FVector Axis = FVector::CrossProduct((Pt - Sh).GetSafeNormal(), Push).GetSafeNormal();
-			if (!Axis.IsNearlyZero() && !bOff) TurnInMesh(P, Arm[i], FQuat(Axis, FMath::DegreesToRadians(ThighOut[i])));
+			if (!Axis.IsNearlyZero()) TurnInMesh(P, Arm[i], FQuat(Axis, FMath::DegreesToRadians(ThighOut[i])));
 		}
 		if (In.bShotLog)
 		{

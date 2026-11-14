@@ -1,4 +1,5 @@
 #include "KnightGameState.h"
+#include "GameFramework/HUD.h"
 #include "WaterLook.h"
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
@@ -665,6 +666,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					Eye->GetCameraComponent()->SetFieldOfView(Fov);
 					Eye->GetCameraComponent()->bConstrainAspectRatio = false;
 					PC->SetViewTarget(Eye);
+					if (FParse::Param(FCommandLine::Get(), TEXT("ShotNoHud")) && PC->GetHUD()) PC->GetHUD()->bShowHUD = false;   // (-ShotNoHud: close-ups with nothing over them)
 				}
 		}
 		if (!ShotMove.IsEmpty())
