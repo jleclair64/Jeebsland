@@ -40,7 +40,12 @@ clear_forgotten_runs() {   # a run slot older than 3 min whose folder has no Unr
 	done
 }
 
+kill_mangled_runs() {   # a run started from Git Bash without MSYS_NO_PATHCONV=1 never loads its map and hangs for good
+	powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name like 'UnrealEditor%'\" | Where-Object { \$_.CommandLine -like '*Git/Game/*' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force; Write-Output \"uqueue: killed hung run \$(\$_.ProcessId) (map path mangled by Git Bash)\" }" 2>/dev/null
+}
+
 clear_stale() {
+	kill_mangled_runs
 	clear_forgotten_runs
 	unreal_running && { rm -f "$G/.idle"; return; }
 	[ -e "$G/.idle" ] || { touch "$G/.idle"; return; }
