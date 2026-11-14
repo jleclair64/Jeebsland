@@ -21,10 +21,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures      # noqa: E402
 import ground_textures   # noqa: E402
 
-GRASS_DESATURATION = 0.40   # as build_materials.py's: the grass and the ground under it pulled this far toward grey
-GRASS_TO_MEADOW = (1.085, 0.810, 0.470)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
-                                         # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime), then 0.60, 0.47, 0.21 (2026-11-14): 0.85 x new R / 0.47, new G / 0.58, 0.85 x new B / 0.38
-GRASS_AVERAGE = (0.0672, 0.0978, 0.0109)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
+GRASS_DESATURATION = 0.45   # as build_materials.py's: the grass and the ground under it pulled this far toward grey
+GRASS_TO_MEADOW = (1.139, 0.759, 0.358)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
+                                         # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime), then 0.60, 0.47, 0.21 and 0.63, 0.44, 0.16 (2026-11-14): 0.85 x new R / 0.47, new G / 0.58, 0.85 x new B / 0.38
+GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
 ROCK_AVERAGE = (0.100, 0.096, 0.084)   # what the stone fades to far away: a darker neutral grey (lighter averages, with the haze over
                                        # them, read lavender or pink-beige against the green hills)
 ROCK_TINT = (1.0, 1.0, 1.0)   # the RockTint parameter's default
