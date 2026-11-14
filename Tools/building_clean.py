@@ -65,13 +65,16 @@ LANTERNS = {
     # the storybook cottage: its three lanterns, and (owner: "remove its lanterns, the barrel and the potted plants") the barrel and flower pots too
     "StorybookCottage_300k": [
         (336.0, 414.0, -112.0, -45.0, 284.0, 386.0, dict(cyl=(375.0, 108.0, 166.0), uvat=(330.0, -40.0, 335.0))), (540.0, 600.0, 25.0, 90.0, 296.0, 380.0, dict(cyl=(375.0, 108.0, 166.0), uvat=(531.0, 165.0, 340.0))), (396.0, 440.0, -180.0, -126.0, 46.0, 134.0),   # lanterns
-        (492.0, 630.0, -50.0, 105.0, -16.0, 168.0, dict(cyl=(348.0, 95.0, 190.0), uvat=(530.0, 150.0, 60.0))),                                           # the barrel (the bench stays)
-        (-150.0, -30.0, -420.0, -240.0, 104.0, 170.0, dict(z=101.0)), (-350.0, -220.0, -370.0, -190.0, 104.0, 170.0, dict(z=101.0)), (-490.0, -360.0, -290.0, -90.0, 104.0, 170.0, dict(z=101.0)),
-        (-630.0, -500.0, -180.0, 20.0, 104.0, 215.0, dict(z=101.0)),                                                                                         # pots on the garden wall
-        (40.0, 108.0, -200.0, -60.0, 158.0, 228.0, dict(z=157.0)), (286.0, 394.0, -200.0, -60.0, 166.0, 228.0, dict(z=165.0)),                                            # pots by the door
-        (16.0, 114.0, -525.0, -395.0, -16.0, 52.0, dict(z=-13.0)), (332.0, 428.0, -405.0, -265.0, -16.0, 62.0, dict(z=-13.0))],                                           # pots at the steps' foot
+        (492.0, 630.0, -50.0, 105.0, -16.0, 168.0, dict(cyl=(348.0, 95.0, 190.0), uvat=(500.0, 209.0, 60.0))),                                           # the barrel (the bench stays)
+        (-150.0, -30.0, -420.0, -240.0, 104.0, 170.0), (-350.0, -220.0, -370.0, -190.0, 104.0, 170.0),
+        (-490.0, -360.0, -290.0, -90.0, 104.0, 170.0), (-630.0, -500.0, -180.0, 20.0, 104.0, 215.0),                                                                                      # pots on the garden wall
+        (40.0, 108.0, -200.0, -60.0, 158.0, 228.0), (286.0, 394.0, -200.0, -60.0, 166.0, 228.0),                                            # pots by the door
+        (16.0, 114.0, -525.0, -395.0, -16.0, 52.0), (332.0, 428.0, -405.0, -265.0, -16.0, 62.0), (420.0, 452.0, -378.0, -292.0, 8.0, 50.0)],                                           # pots at the steps' foot (cut off: they stand loose on the ground)
 }
 LANTERN_SCRAP = 1500   # a loose piece near a lantern with fewer faces than this is what is left of its bracket
+# Where a cut-off pot leaves a flat patch on a wall top, the picture it takes: that of the kept face nearest the closest of these points
+# (this script's cm; within 1.5 m of the patch), the wall-top stone, instead of what is left of the pot round the hole
+PATCH_AT = {"StorybookCottage_300k": [(-187.0, -305.0, 100.0), (-355.0, -235.0, 100.0), (-495.0, -135.0, 100.0), (190.0, -130.0, 160.0)]}
 
 # The white plaster: what counts as plaster in the colour picture (CIE Lab of the painted cream: lightness and how colourful)
 PLASTER_L, PLASTER_CHROMA = 72.0, 26.0
@@ -182,7 +185,7 @@ def weld(me, dist):
         e.smooth = not (e.is_manifold and e.link_faces[0].normal.dot(e.link_faces[1].normal) < SHARP_COS)
     bm.to_mesh(me); bm.free()
 
-def remove_lanterns(me, boxes):
+def remove_lanterns(me, boxes, patch_at=()):
     bm = bmesh.new(); bm.from_mesh(me)
     uvl = bm.loops.layers.uv.active
     # Pressed flat instead of cut off: a box whose 7th entry is a dict. Where Meshy fused a piece into the wall it stands on, the wall
@@ -204,8 +207,12 @@ def remove_lanterns(me, boxes):
                 dx, dy = v.co.x - cx, v.co.y - cy; d = (dx * dx + dy * dy) ** 0.5
                 if d > r: v.co.x, v.co.y = cx + dx * r / d, cy + dy * r / d
             else:
-                if v.co.z > b[6]["z"]: v.co.z = b[6]["z"]
-        ring = {g for f in faces for v in f.verts for g in v.link_faces if g not in fs}
+                if v.co.z <= b[6]["z"]: continue   # (the wall itself stays where it is)
+                v.co.z = b[6]["z"]
+                if "shrink" in b[6]:   # (what is pressed is drawn in towards the middle of the box too, so it stays within the wall top)
+                    k = b[6]["shrink"]; mx, my = (b[0] + b[1]) * 0.5, (b[2] + b[3]) * 0.5
+                    v.co.x, v.co.y = mx + (v.co.x - mx) * k, my + (v.co.y - my) * k
+        ring ={g for f in faces for v in f.verts for g in v.link_faces if g not in fs}
         if ring and uvl is not None:
             if "uvat" in b[6]:   # (the picture of the kept face nearest that point: the stone or plaster it is pressed into)
                 p = mathutils.Vector(b[6]["uvat"])
@@ -252,7 +259,23 @@ def remove_lanterns(me, boxes):
     if left:
         filled = list(filled) + list(bmesh.ops.triangle_fill(bm, use_beauty=True, use_dissolve=False, edges=left)["geom"])
         filled = [f for f in filled if isinstance(f, bmesh.types.BMFace)]
-    print("BUILD   holes: %d rim edges, %d left for the second fill, %d still open" % (len(rim), len(left), sum(1 for e in rim if e.is_valid and e.is_boundary)))
+    # (and what neither closes, a rim that twists or doubles back, is closed by a fan from the middle of each open loop)
+    still = [e for e in rim if e.is_valid and e.is_boundary]
+    fans = 0
+    while still:
+        loop, todo = set(), [still[0]]
+        while todo:
+            e = todo.pop()
+            if e in loop: continue
+            loop.add(e)
+            todo.extend(g for v in e.verts for g in v.link_edges if g.is_boundary and g not in loop)
+        still = [e for e in still if e not in loop]
+        if len(loop) < 3 or len(loop) > 800: continue
+        mid = bm.verts.new(sum((v.co for e in loop for v in e.verts), mathutils.Vector()) / (2 * len(loop)))
+        for e in loop:
+            try: filled = list(filled) + [bm.faces.new((e.verts[0], e.verts[1], mid))]; fans += 1
+            except ValueError: pass
+    print("BUILD   holes: %d rim edges, %d left for the second fill, %d closed by fans, %d still open" % (len(rim), len(left), fans, sum(1 for e in rim if e.is_valid and e.is_boundary)))
     if filled:
         filled = bmesh.ops.triangulate(bm, faces=filled)["faces"]
         new = set(filled)
@@ -270,9 +293,21 @@ def remove_lanterns(me, boxes):
                         if g in new and g not in seen_f: seen_f.add(g); patch.append(g); stack.append(g)
             ring = {o.face for f in patch for l in f.loops for o in l.vert.link_loops if o.face not in new}
             if not ring: continue
-            best = max(ring, key=lambda g: g.calc_area())
+            # (a flat patch above the ground, where a pot stood on a wall top or a landing, faces up and takes the picture of the top round
+            # it: what is left of the pot round the hole can face any way)
+            for f in patch: f.normal_update()
+            area = sum(f.calc_area() for f in patch) or 1.0
+            pc = sum((f.calc_center_median() for f in patch), mathutils.Vector()) / len(patch)
+            p = min((mathutils.Vector(q) for q in patch_at), key=lambda q: (q - pc).length) if patch_at else None
+            flat = sum(abs(f.normal.z) * f.calc_area() for f in patch) / area
+            near_at = p is not None and (p - pc).length < 150.0 and abs(p.z - pc.z) < 35.0 and flat > 0.3
+            top = pc.z > 50.0 and (near_at or flat > 0.8)   # (faces of a fill can come out either way)
+            ups = [g for g in ring if g.normal.z > 0.7]
+            best = max(ups if top and ups else ring, key=lambda g: g.calc_area())
+            if top and near_at:
+                    best = min((g for g in bm.faces if g not in new and (g.calc_center_median() - p).length < 60.0), key=lambda g: (g.calc_center_median() - p).length, default=best)
             uv = best.loops[0][uvl].uv.copy() if uvl is not None else None
-            around = sum((g.normal * g.calc_area() for g in ring), mathutils.Vector())
+            around = mathutils.Vector((0.0, 0.0, 1.0)) if top else sum((g.normal * g.calc_area() for g in ring), mathutils.Vector())
             for f in patch:
                 if uv is not None:
                     for l in f.loops: l[uvl].uv = uv.copy()
@@ -440,7 +475,7 @@ for name in names:
             bpy.ops.mesh.customdata_custom_splitnormals_clear()   # (worked out again from the welded shape, then the plaster's evened)
         weld(me, S * (hi[0] - lo[0]) * 1.0e-5)
         if name in LANTERNS:
-            nd, nfill = remove_lanterns(me, LANTERNS[name])
+            nd, nfill = remove_lanterns(me, LANTERNS[name], PATCH_AT.get(name, ()))
             print("BUILD %s lanterns: %d faces taken off, %d faces fill the holes" % (name, nd, nfill))
         me.update()
         co = np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3)
