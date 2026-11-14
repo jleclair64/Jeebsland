@@ -29,7 +29,19 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
-Last updated 2026-11-13 (the "professional look" batch, climbing, library weapons and filler props committed). Everything below is built and committed.
+Last updated 2026-11-14 (the owner's 25-item batch of 2026-11-13/14 merged, built and pushed at 836a7ad). Everything below is built and committed.
+
+**Batch of 2026-11-13/14 (agents in their own project copies; reviewers passed each part; the owner has seen none of it):**
+- Water (`Tools/water_material.py`, `WaterLook.cpp`, every number a `jeeb.Water.*` console variable): slate grey-green at noon (matched to the owner's river picture 189), sun-lit scattering cut to 10% at the low sun with an even `Glow` carrying a dim slate-teal, faint foam, roughness 0.23; the pond is deep water again, fishing spots show thin ripple rings.
+- Look (`build_materials.py`, `world_material.py`, `ground_textures.py`, `gen_textures.py`): olive grass, about 15% darker, shaded lawn stays green, cobbles fray stone by stone into worn earth, feet rest on roads (Paths.cpp, AutumnDecor.cpp), real bark, cheaper HIGH clouds (0.86 ms) and reshaped LOW clouds. Trees cost about 1.5-1.9 ms at the woods' edge; Meshy trees not worth it.
+- Black ground fixed: a broken pin in M_Ground painted bare ground within 15 m black (castle island, worn patches). `world_material.py`'s `Graph.link` now stops the build on any failed connection. Test log JEEBGPU (median GPU of a still) added.
+- Buildings: collision from each model's own `SM_<Name>_Col` mesh (steps, porches, awnings walkable; no box walls), windows dark by day and lit one by one from dusk with about 30% dark (`building_import.py` deletes before importing so the colour markings survive), smooth plaster, painted lanterns removed, the well's holes gone, darker and slower smoke.
+- Swimming (its own skill, breath, drowning; head up at the surface), climbing fixes (no skill pop-up during a climb, ledge pull-up starts at the hands, automatic mantling), belt flask outside the armour.
+- Oak Hill reorganised round the plaza with smaller shops and counters; the plaza oak (autumn, Nanite); Tab map with zoom; the Test kit; MoveLab prop lineup and two new swords.
+- **Storybook cottage FAILED visual review** (patches where its lanterns, pots and barrel were cut out): left on branch `agent/buildings` (316d94b), not merged, not placed. Owner to choose: a Meshy remix without the props, or keep them and cover them later with separate decorations.
+- Owner to judge: water colour against picture 189, low-sun water darkness, wading legs; olive grass, cobble repetition, LOW clouds, bark; 30% dark windows, faint far smoke; flask position, swim speeds and bars, drowning arms, pond depth, the 22-degree head-up swim; oak brightness, lineup labels, new sword grips; castle island grass a touch darker with a stair-stepped moat edge.
+- Known: the scarecrow's hat floats a little; a pale slab at Oak Hill's edge from the air; the village fountain and quench barrel still use the old water; river sheets sit slightly above the sea where they meet; the castle is plain grey engine cubes (always was). Not packaged since 2026-11-13.
+- Process (see the sections below): agent copies with `Tools/AgentCopy.sh new|reset`, the machine queue `Tools/uqueue.sh`, never a visible Unreal window (hook `Tools/hooks/no_visible_unreal.sh`), `MSYS_NO_PATHCONV=1` for runs from Git Bash, PowerShell scripts with `-ExecutionPolicy Bypass -File`.
 
 **Batch of 2026-11-12/13 (owner asleep for most of it; reviewers passed each part; the owner has seen none of it):**
 - Look:
@@ -167,7 +179,7 @@ Last updated 2026-11-13 (the "professional look" batch, climbing, library weapon
 
 **Not yet seen working (2026-11-06):** a real ladder and a real seat (the films play those clips on the spot, unstowed), real hits between two players (the live test covered a server and two logins only), a cooked server, the mail body in a package, the new bows, drinking and the popup online with two machines. No frame rate number exists for the new knight in a package: the editor run gave about 8.8 ms GPU at 1280x720, with the frame capped near 60, so no real game-thread cost. Before friends ever play, play the new package and compare to 140 HIGH / 175 LOW. A LOD for the 50k suit is the likely first cost with many players. The under-mail costs about 0.14 ms in MoveLab with a dozen knights (173 fps against 177, editor -game, one run each).
 
-**START HERE next session:** first ask how the 2026-11-12/13 batch looks:
+**START HERE next session:** first ask how the 2026-11-13/14 batch looks (its "Owner to judge" list) and which way the storybook cottage goes. Then how the 2026-11-12/13 batch looks:
 1. The ground, grass and roads; the far trees; the grade and haze; the smoke and glow.
 2. Climbing on MoveLab's rock.
 3. The new weapons.
