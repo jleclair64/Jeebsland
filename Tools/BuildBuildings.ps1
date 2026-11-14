@@ -4,7 +4,9 @@
 # The Unreal editor must be closed for the import. -CleanOnly runs just the Blender half, -ImportOnly just the Unreal half. Pass names to do only some.
 param([switch]$CleanOnly, [switch]$ImportOnly, [switch]$NoFlatten, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Names)
 $proj = Split-Path $PSScriptRoot -Parent
-if (-not $CleanOnly -and (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue)) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }
+# (only an editor on THIS project matters: agents' project copies run their own Unreal side by side, 2026-11-14)
+$open = Get-CimInstance Win32_Process -Filter "Name like 'UnrealEditor%'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains((Join-Path $proj 'Jeebsland.uproject')) }
+if (-not $CleanOnly -and $open) { Write-Host 'The Unreal editor is still open on this project. Close it first.'; exit 1 }
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 if (-not $ImportOnly) {
