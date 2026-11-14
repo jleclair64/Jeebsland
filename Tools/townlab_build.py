@@ -228,4 +228,55 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
 cob = import_texture(os.path.join(SRC, "T_TL_Cobble.png"), "T_TL_Cobble")
 cob_n = import_texture(os.path.join(SRC, "T_TL_CobbleN.jpg"), "T_TL_CobbleN", normal=True)
 build_ground(cob, cob_n, EAL.load_asset("/Game/T_GrassGround"), EAL.load_asset("/Game/T_Dirt"), EAL.load_asset("/Game/T_Patches"))
+
+# ------------------------------------------------------------------ the world's ground, lab copy
+# M_TL_WorldGround: /Game/M_Ground copied (never edited: it is Field's), plus SkyFill, the same dusk light as M_TL_Ground, set by
+# ATownLab::TickWorldGround on the TownLab map's world chunks only. At the low sun flat ground goes near-black where no grass
+# covers it; the grass blades, lit through, stay bright. Carrying it into Field = these few nodes in world_material.py.
+def build_world_ground():
+    path = "/Game/TownLab/M_TL_WorldGround"
+    if EAL.does_asset_exist(path):
+        EAL.delete_asset(path)
+    if not EAL.duplicate_asset("/Game/M_Ground", path):
+        unreal.log_error("TOWNLABDIAG could not copy M_Ground")
+        return
+    mat = EAL.load_asset(path)
+    base = lib.get_material_property_input_node(mat, unreal.MaterialProperty.MP_BASE_COLOR)
+    if not base:
+        unreal.log_error("TOWNLABDIAG M_Ground has no base colour input")
+        return
+    try:
+        base_out = lib.get_material_property_input_node_output_name(mat, unreal.MaterialProperty.MP_BASE_COLOR)
+    except Exception:
+        base_out = ""
+    tint = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -400, 1400)
+    tint.set_editor_property("constant", unreal.LinearColor(1.12, 0.97, 0.8, 1.0))
+    fill = lib.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -400, 1500)
+    fill.set_editor_property("parameter_name", "SkyFill")
+    fill.set_editor_property("default_value", 0.0)
+    m1 = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -200, 1400)
+    m2 = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -100, 1450)
+    ok = lib.connect_material_expressions(base, base_out, m1, "A")
+    ok = lib.connect_material_expressions(tint, "", m1, "B") and ok
+    ok = lib.connect_material_expressions(m1, "", m2, "A") and ok
+    ok = lib.connect_material_expressions(fill, "", m2, "B") and ok
+    old_em = lib.get_material_property_input_node(mat, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    if old_em:
+        add = lib.create_material_expression(mat, unreal.MaterialExpressionAdd, 0, 1500)
+        old_out = lib.get_material_property_input_node_output_name(mat, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+        ok = lib.connect_material_expressions(old_em, old_out, add, "A") and ok
+        ok = lib.connect_material_expressions(m2, "", add, "B") and ok
+        ok = lib.connect_material_property(add, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR) and ok
+    else:
+        ok = lib.connect_material_property(m2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR) and ok
+    if not ok:
+        unreal.log_error("TOWNLABDIAG M_TL_WorldGround: a connection failed (base output '%s')" % base_out)
+        return
+    lib.recompile_material(mat)
+    EAL.save_asset(path)
+    unreal.log("TOWNLABDIAG built M_TL_WorldGround (base colour from %s '%s', emissive before: %s)" % (base.get_class().get_name(), base_out, "yes" if old_em else "no"))
+
+
+build_world_ground()
+
 unreal.log("TOWNLABDIAG done")

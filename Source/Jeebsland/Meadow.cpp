@@ -68,10 +68,10 @@ void AMeadow::SetLabMode(bool bOn)
 	if (bOn && !LabMat && NearMesh)
 	{
 		LabMat = UMaterialInstanceDynamic::Create(NearMesh->GetMaterial(0), this);   // (its blades fade out short of the 40 m edge, where the painted ground takes over)
-		LabMat->SetScalarParameterValue(TEXT("FadeStart"), 2600.f);
-		LabMat->SetScalarParameterValue(TEXT("FadeEnd"), 3800.f);
+		LabMat->SetScalarParameterValue(TEXT("FadeStart"), 1800.f);
+		LabMat->SetScalarParameterValue(TEXT("FadeEnd"), 3900.f);
 	}
-	CellSize = bOn ? 1500.f : 750.f; Reach = bOn ? 4000.f : 9500.f; Tier0 = bOn ? 1200.f : 1500.f; Tier1 = bOn ? 4500.f : 4000.f;
+	CellSize = bOn ? 1500.f : 750.f; Reach = bOn ? 4000.f : 9500.f; Tier0 = bOn ? 1500.f : 1500.f; Tier1 = bOn ? 2700.f : 4000.f;
 	UE_LOG(LogTemp, Log, TEXT("JEEBLAB meadow %s"), bOn ? TEXT("new way (40 m, 15 m squares)") : TEXT("as the game (95 m, 7.5 m squares)"));
 }
 
@@ -342,6 +342,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 				// easing back up to full height over about 7 m so it never reads as tall-then-suddenly-short
 				const float Near = Nearness(X, Y);
 				Short *= 1.f - 0.22f * Near;   // a bit shorter beside buildings (taller than before, so the crossed cards stand up)
+				if (bLabMode) Short *= JobTier >= 2 ? 0.45f : (JobTier == 1 ? 0.8f : 1.f);   // (lab: the blades shorten toward the 40 m edge, so they sink into the painted ground instead of stopping in a ring)
 				Short *= FMath::Lerp(0.55f, 1.f, Amount) * (1.f - 0.6f * JeebWorld::Smooth(0.1f, 0.6f, Wear));   // short where it thins out, and trampled by doors
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, Short) * (1.f + 0.35f * Near);   // and wider there, so the tufts overlap into one mat and the individual cards disappear
 				if (!bThin) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));

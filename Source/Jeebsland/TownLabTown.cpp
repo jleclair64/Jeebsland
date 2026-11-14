@@ -308,7 +308,16 @@ void ATownLabTown::BuildBuildings()
 		// (the stones and shrubs at the foundations, as the real town has them: not the open stalls or the well)
 		if (Mdl && Mdl->WX1 > Mdl->WX0 && !IsStall(P.Model) && FCString::Strcmp(P.Model, TEXT("OakHillWell")) != 0)
 		{
-			const FVector WLo = FVector(Mdl->WX0, -Mdl->WY1, 0.f) * Scale, WHi = FVector(Mdl->WX1, -Mdl->WY0, 0.f) * Scale;
+			FVector WLo = FVector(Mdl->WX0, -Mdl->WY1, 0.f) * Scale, WHi = FVector(Mdl->WX1, -Mdl->WY0, 0.f) * Scale;
+			// a swapped model: its own walls, from its solid shape (else the whole model), a little inside the eaves
+			if (bSwap)
+				if (UStaticMesh* Shape = LoadMesh(ColPath) ? LoadMesh(ColPath) : LoadMesh(Path))
+				{
+					const FBox B = Shape->GetBoundingBox();
+					const FVector BC = B.GetCenter(), H = B.GetExtent() * 0.92f;
+					WLo = FVector(BC.X - H.X, BC.Y - H.Y, 0.f) * Scale; WHi = FVector(BC.X + H.X, BC.Y + H.Y, 0.f) * Scale;
+					UE_LOG(LogTemp, Log, TEXT("JEEBLAB walls of %s: %.0f x %.0f cm (the old model said %.0f x %.0f)"), *FPaths::GetBaseFilename(Path), WHi.X - WLo.X, WHi.Y - WLo.Y, (Mdl->WX1 - Mdl->WX0) * Scale, (Mdl->WY1 - Mdl->WY0) * Scale);
+				}
 			const FVector Mid((WLo.X + WHi.X) * 0.5f, (WLo.Y + WHi.Y) * 0.5f, 0.f);
 			const FVector WallMid = At + FRotator(0.f, Yaw, 0.f).RotateVector(Mid);
 			JeebDecor::FFootprint Fp;
@@ -385,29 +394,34 @@ void ATownLabTown::PlantTrees(AForest* Forest)
 {
 	using namespace JeebOakHill;
 	if (!Forest || !JeebTownLab::NewOn()) return;
+	// The very same trees as the real town (AOakHillTown::PlantTrees: same seed, same draws, same tests made at the real town's spot,
+	// river and roads included), so both towns are compared with the same trees and the same shade on the grass
 	FRandomStream R(5150);
 	TArray<FVector2D> Got;
 	int32 Tries = 0;
-	while (Got.Num() < 170 && Tries < 5000)
+	while (Got.Num() < 150 && Tries < 4000)
 	{
 		++Tries;
-		const float E = R.FRandRange(-58.f, 92.f), N = R.FRandRange(-118.f, 124.f);
-		const float Roll = R.FRand(), Kind = R.FRand(), S = R.FRandRange(0.85f, 1.25f);
+		const float E = R.FRandRange(-50.f, 84.f), N = R.FRandRange(-110.f, 116.f);
+		const float Roll = R.FRand(), Kind = R.FRand(), S = R.FRandRange(0.85f, 1.2f);
 		const float FromPlaza = FVector2D(E, N).Size();
-		const float Want = FMath::Lerp(0.12f, 0.75f, JeebWorld::Smooth(32.f, 66.f, FromPlaza));
+		const float Want = FMath::Lerp(0.12f, 0.7f, JeebWorld::Smooth(32.f, 66.f, FromPlaza));
 		if (Roll > Want) continue;
-		const float X = JeebTownLab::PlazaX + N * 100.f, Y = JeebTownLab::PlazaY + E * 100.f;
-		if (JeebTownLab::RoadClearance(X, Y) < 450.f) continue;
+		const float OX = PosX + N * 100.f, OY = PosY + E * 100.f;
+		float Half;
+		if (JeebWorld::RiverDistance(OX, OY, Half) < Half + 600.f) continue;
+		if (JeebTerrain::PathClearance(OX, OY) < 450.f) continue;
 		bool bClear = true;
 		for (const FPlot& P : Plots()) if (PlotSD(P, E, N) < (P.Kind == EPlot::Building ? 6.f : 3.f)) { bClear = false; break; }
 		if (!bClear) continue;
-		for (const FVector2D& G : Got) if (FVector2D::DistSquared(G, FVector2D(X, Y)) < 700.f * 700.f) { bClear = false; break; }
+		for (const FVector2D& G : Got) if (FVector2D::DistSquared(G, FVector2D(OX, OY)) < 700.f * 700.f) { bClear = false; break; }
 		if (!bClear) continue;
-		Got.Add(FVector2D(X, Y));
-		const ETreeKind K = (FromPlaza > 50.f && Kind < 0.4f) ? ETreeKind::Pine : ETreeKind::Oak;
+		Got.Add(FVector2D(OX, OY));
+		const float X = JeebTownLab::PlazaX + N * 100.f, Y = JeebTownLab::PlazaY + E * 100.f;
+		const ETreeKind K = (FromPlaza > 50.f && Kind < 0.25f) ? ETreeKind::Pine : ETreeKind::Oak;
 		Forest->AddTree(K, FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 20.f * S), S, R);
 	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBLAB new town trees %d"), Got.Num());
+	UE_LOG(LogTemp, Log, TEXT("JEEBLAB new town trees %d (the real town's set)"), Got.Num());
 }
 
 // Rounded boulders, half sunk, in small groups round the town's edge (the same spots relative to each plaza): squashed spheres in

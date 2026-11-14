@@ -20,6 +20,9 @@
 #include "RenderTimer.h"
 #include "RHIStats.h"
 #include "RHI.h"
+#include "WorldTerrain.h"
+#include "Components/MeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "UnrealClient.h"
 
 namespace JeebTownLabVars
@@ -29,6 +32,7 @@ namespace JeebTownLabVars
 	static TAutoConsoleVariable<int32> CheapClouds(TEXT("jeeb.TownLab.CheapClouds"), -1, TEXT("TownLab: 1 fewer cloud samples and a shorter trace, 0 the game's, -1 follow NewLook"));
 	static TAutoConsoleVariable<int32> ShowOld(TEXT("jeeb.TownLab.ShowOld"), 1, TEXT("TownLab: 0 hides the real Oak Hill's buildings and ground (its trees and grass stay)"));
 	static TAutoConsoleVariable<int32> ShowNew(TEXT("jeeb.TownLab.ShowNew"), 1, TEXT("TownLab: 0 hides the rebuilt town's buildings and ground (its trees and grass stay)"));
+	static TAutoConsoleVariable<float> WorldFill(TEXT("jeeb.TownLab.WorldFill"), 0.2f, TEXT("TownLab: light added to the world's own ground (M_TL_WorldGround) at the low sun with the new look, times ADayNight::Dusk, so the land past the grass doesn't go black"));
 }
 
 ATownLab::ATownLab()
@@ -91,7 +95,7 @@ void ATownLab::ApplyLook(bool bNew)
 		{ TEXT("jeeb.Look.Sat"), TEXT("1.16") },
 		{ TEXT("jeeb.Look.Warm"), TEXT("0.075") },        // warm highlights
 		{ TEXT("jeeb.Look.Contrast"), TEXT("0.98") },     // a little softer: painterly
-		{ TEXT("jeeb.Look.LowLift"), TEXT("1.25") },     // more light at the low sun: golden, not murky (0.95 read dim in the first tour)
+		{ TEXT("jeeb.Look.LowLift"), TEXT("1.4") },     // more light at the low sun: golden, not murky (0.95 read dim in the first tour)
 		{ TEXT("jeeb.Look.Exposure"), TEXT("0.24") },
 		{ TEXT("jeeb.Look.Vignette"), TEXT("0.3") },
 	};
@@ -115,7 +119,7 @@ void ATownLab::ApplyLook(bool bNew)
 // Cheaper sun shadows: a shorter reach (the far cascade covers less, so trees far off cast none) and nothing small casting into it
 void ATownLab::ApplyShadows(bool bCheap)
 {
-	if (bCheap) { SetVar(TEXT("r.Shadow.DistanceScale"), TEXT("0.6")); SetVar(TEXT("r.Shadow.RadiusThreshold"), TEXT("0.03")); }
+	if (bCheap) { SetVar(TEXT("r.Shadow.RadiusThreshold"), TEXT("0.01")); }   // (only tiny far things lose their shadow: DistanceScale 0.6 with RadiusThreshold 0.03 took the trees' shade off the lawn, 2026-11-14)
 	else { RestoreVar(TEXT("r.Shadow.DistanceScale")); RestoreVar(TEXT("r.Shadow.RadiusThreshold")); }
 	UE_LOG(LogTemp, Log, TEXT("JEEBLAB shadows %s"), bCheap ? TEXT("cheap") : TEXT("game's own"));
 }
@@ -150,7 +154,45 @@ void ATownLab::Tick(float Dt)
 	const int32 O = ShowOld.GetValueOnGameThread() != 0, N = ShowNew.GetValueOnGameThread() != 0;
 	if (O != ShowOldNow) { ShowOldNow = O; ShowTown(true, O != 0); }
 	if (N != ShowNewNow) { ShowNewNow = N; ShowTown(false, N != 0); }
+	TickWorldGround(Dt);
 	if (bTour) TickTour(Dt);
+}
+
+// The world's ground (AWorldTerrain, M_Ground) goes near-black at the low sun where no grass covers it: from the air past the
+// rebuilt town's 40 m of grass. In this map only, its chunks draw with M_TL_WorldGround (Tools/townlab_build.py: M_Ground copied,
+// plus SkyFill, the same dusk light as the town's own ground), with the new look on. The chunks are swept now and then, since
+// the world builds them over its first seconds. To carry into Field: the same SkyFill in M_Ground (world_material.py), set from
+// ADayNight::Dusk by AWorldTerrain, matched in pictures against the meadow at the low sun.
+void ATownLab::TickWorldGround(float Dt)
+{
+	using namespace JeebTownLabVars;
+	if (!WorldMid)
+	{
+		static bool bTried = false;
+		if (bTried) return;
+		bTried = true;
+		UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/TownLab/M_TL_WorldGround.M_TL_WorldGround"));
+		if (!M) { UE_LOG(LogTemp, Warning, TEXT("JEEBLAB no /Game/TownLab/M_TL_WorldGround (run Tools/BuildTownLab.ps1): the world ground stays M_Ground")); return; }
+		WorldMid = UMaterialInstanceDynamic::Create(M, this);
+	}
+	WorldSweep -= Dt;
+	if (WorldSweep <= 0.f)
+	{
+		WorldSweep = 1.f;
+		const UMaterialInterface* Old = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));
+		const int32 Before = WorldSwapped;
+		for (TActorIterator<AWorldTerrain> It(GetWorld()); It; ++It)
+		{
+			TInlineComponentArray<UMeshComponent*> Comps;
+			It->GetComponents(Comps);
+			for (UMeshComponent* C : Comps)
+				for (int32 s = 0; s < C->GetNumMaterials(); ++s)
+					if (C->GetMaterial(s) == Old) { C->SetMaterial(s, WorldMid); ++WorldSwapped; }
+		}
+		if (WorldSwapped != Before) UE_LOG(LogTemp, Log, TEXT("JEEBLAB world ground: %d sections on M_TL_WorldGround"), WorldSwapped);
+	}
+	const float Fill = LookNow == 1 ? WorldFill.GetValueOnGameThread() * ADayNight::Dusk : 0.f;
+	if (FMath::Abs(Fill - WorldFillNow) > 0.002f) { WorldFillNow = Fill; WorldMid->SetScalarParameterValue(TEXT("SkyFill"), Fill); }
 }
 
 // ------------------------------------------------------------------ the tour
@@ -162,7 +204,7 @@ void ATownLab::BuildTour()
 		{ TEXT("street"), 1500.f,  50.f,    170.f,  0.f,  -2.f, false },   // the north road, looking up it to the castle knoll
 		{ TEXT("edge"),   500.f,   8500.f,  220.f,  -90.f, -3.f, true },   // the open east side, looking back into the town
 		{ TEXT("hill"),   10000.f, 8200.f,  3500.f, -140.7f, -14.f, false },   // from the air to the north-east, the whole town
-		{ TEXT("house"),  -1703.f, 3184.f,  170.f,  118.f, -6.f, false },   // 7 m from the house on plot 25, its wall foot and decor up close
+		{ TEXT("house"),  -1703.f, 3184.f,  160.f,  118.f, -14.f, false },   // 7 m from the house on plot 25, its wall foot and decor up close
 	};
 	const float Phases[2] = { 0.f, 0.5f };
 	const TCHAR* PhaseNames[2] = { TEXT("noon"), TEXT("low") };
@@ -171,6 +213,9 @@ void ATownLab::BuildTour()
 			for (const FView& V : Views)
 			{
 				if (!bTourShots && !V.bStats) continue;
+				FString Only;   // (-LabTourOnly=<spot>_<noon|low>: just that spot, in every look and shadow setting: for chasing a look problem)
+				const bool bOnly = FParse::Value(FCommandLine::Get(), TEXT("LabTourOnly="), Only);
+				if (bOnly && Only != FString::Printf(TEXT("%s_%s"), V.Name, PhaseNames[p])) continue;
 				const float PX = Town == 0 ? JeebOakHill::PosX : JeebTownLab::PlazaX, PY = Town == 0 ? JeebOakHill::PosY : JeebTownLab::PlazaY;
 				const float X = PX + V.DX, Y = PY + V.DY;
 				FStation S;
@@ -178,6 +223,9 @@ void ATownLab::BuildTour()
 				S.Town = Town; S.Eye = FVector(X, Y, JeebTerrain::HeightAt(X, Y) + V.Up); S.Yaw = V.Yaw; S.Pitch = V.Pitch; S.Phase = Phases[p];
 				S.Look = Town; S.Cheap = Town; S.bShot = bTourShots;
 				Stations.Add(S);
+				if (bOnly)
+					for (int32 v = 0; v < 4; ++v)
+						if (v != Town * 3) { FStation Var = S; Var.Look = v / 2; Var.Cheap = v % 2; Var.Name += FString::Printf(TEXT("_look%d_cheap%d"), Var.Look, Var.Cheap); Stations.Add(Var); }
 				// each town in the other's light too, at the plaza at the low sun; and the look and the cheap settings apart (numbers only)
 				if (FCString::Strcmp(V.Name, TEXT("plaza")) == 0 && p == 1)
 				{

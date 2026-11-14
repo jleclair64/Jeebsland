@@ -37,6 +37,11 @@ private:
 	void ApplyShadows(bool bCheap);
 	void ApplyClouds(bool bCheap);
 	void ShowTown(bool bOld, bool bShow);
+	// The world's own ground in this map drawn with a lab copy of M_Ground (M_TL_WorldGround) that keeps its light at the low sun
+	UPROPERTY() class UMaterialInstanceDynamic* WorldMid = nullptr;
+	float WorldSweep = 0.f, WorldFillNow = -1.f;
+	int32 WorldSwapped = 0;
+	void TickWorldGround(float Dt);
 
 	// the tour
 	struct FStation { FString Name; int32 Town; FVector Eye; float Yaw, Pitch, Phase; int32 Look, Cheap; bool bShot; };
