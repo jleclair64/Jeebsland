@@ -32,10 +32,15 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	UPROPERTY() UProceduralMeshComponent* Ground = nullptr;
 	void BuildGround();
 	void BuildBuildings();
 	void BuildPlazaOak();
+	// Window glow: one shared dynamic copy per building material, following the sun as OakHillLife does for the real town
+	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;
+	TArray<float> GlowBase;
+	float LastDusk = -1.f;
 };

@@ -91,11 +91,12 @@ void ATownLab::ApplyLook(bool bNew)
 		{ TEXT("jeeb.Look.Sat"), TEXT("1.16") },
 		{ TEXT("jeeb.Look.Warm"), TEXT("0.075") },        // warm highlights
 		{ TEXT("jeeb.Look.Contrast"), TEXT("0.94") },     // a little softer: painterly
-		{ TEXT("jeeb.Look.LowLift"), TEXT("0.95") },
+		{ TEXT("jeeb.Look.LowLift"), TEXT("1.25") },     // more light at the low sun: golden, not murky (0.95 read dim in the first tour)
+		{ TEXT("jeeb.Look.Exposure"), TEXT("0.24") },
 		{ TEXT("jeeb.Look.Vignette"), TEXT("0.3") },
 	};
 	for (const FV& V : Vars) { if (bNew) SetVar(V.Name, V.Value); else RestoreVar(V.Name); }
-	AKnightGameState::FogScale = bNew ? 1.7f : 1.f;
+	AKnightGameState::FogScale = bNew ? 1.3f : 1.f;   // (1.7 greyed the low sun in the first tour)
 	for (TActorIterator<ADirectionalLight> It(GetWorld()); It; ++It)
 		if (UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
 		{
@@ -159,8 +160,8 @@ void ATownLab::BuildTour()
 	const FView Views[] = {
 		{ TEXT("plaza"),  0.f,     -1250.f, 170.f,  90.f, -4.f, true },    // west of the oak, looking east across the plaza
 		{ TEXT("street"), 1500.f,  50.f,    170.f,  0.f,  -2.f, false },   // the north road, looking up it to the castle knoll
-		{ TEXT("edge"),   500.f,   9500.f,  220.f,  -90.f, -3.f, true },   // the open east side, looking back into the town
-		{ TEXT("hill"),   11000.f, 9000.f,  3500.f, -140.7f, -14.f, false },   // from the air to the north-east, the whole town
+		{ TEXT("edge"),   500.f,   8500.f,  220.f,  -90.f, -3.f, true },   // the open east side, looking back into the town
+		{ TEXT("hill"),   10000.f, 8200.f,  3500.f, -140.7f, -14.f, false },   // from the air to the north-east, the whole town
 	};
 	const float Phases[2] = { 0.f, 0.5f };
 	const TCHAR* PhaseNames[2] = { TEXT("noon"), TEXT("low") };
