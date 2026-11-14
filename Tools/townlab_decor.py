@@ -257,10 +257,10 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
 }
 BUILD.update({   # build-b (townbuild2, 2026-11-14); walls from building_clean.py's BUILD lines / OakHill.h's FModel rows
-    "TL_TownHall": dict(src="OakHillTownHall_300k", wx=(-989.1, 985.8), wy=(-580.0, 562.0), door=(-300.0, 180.0), seed=7),
-    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9),
+    "TL_TownHall": dict(src="OakHillTownHall_300k", wx=(-989.1, 985.8), wy=(-580.0, 562.0), door=(-300.0, 180.0), seed=7, ivy_min=(150.0, 220.0), no_hang=True),
+    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9, ivy_min=(150.0, 220.0)),
     "TL_Well": dict(src="OakHillWell_150k", wx=(-152.7, 123.0), wy=(-118.6, 118.5), door=(9999.0, 9999.0), seed=11, no_ivy=True, feet=1),
-    "TL_PotionShop": dict(src="OakHillPotionShop_300k", wx=(-464.4, 526.7), wy=(-408.8, 404.3), door=(-200.0, 0.0), seed=13),
+    "TL_PotionShop": dict(src="OakHillPotionShop_300k", wx=(-464.4, 526.7), wy=(-408.8, 404.3), door=(-200.0, 0.0), seed=13, ivy_min=(120.0, 200.0)),
 })
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
 FILLER = ["Crate", "CrateNoLid", "GrainSack", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
@@ -379,18 +379,18 @@ for bname, B in BUILD.items():
             if sname == "front" and B["door"][0] - 80 < pl.x < B["door"][1] + 80: continue
             face, clear = wall_profile(pl, outv)
             if face is None or clear < 160: continue
-            for w in (190.0, 150.0, 120.0, 95.0):
+            for w in [x for x in (190.0, 150.0, 120.0, 95.0) if x >= B.get("ivy_min", (0.0, 140.0))[0]]:   # (ivy_min: (width, height) the smallest ivy a building takes)
                 h = min(clear - 10.0, 260.0)
-                while h >= 140 and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
-                if h >= 140: break
-            if h < 140: continue
+                while h >= B.get("ivy_min", (0.0, 140.0))[1] and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
+                if h >= B.get("ivy_min", (0.0, 140.0))[1]: break
+            if h < B.get("ivy_min", (0.0, 140.0))[1]: continue
             mesh = "TL_IvyClimb"
             add("ivy", mesh, pl + outv * face, outv, round(min(w / 150.0, h / 260.0) * 1.0, 2) if h < 255 else w / 150.0, True)
             items[-1]["scale3"] = (round(w / 150.0, 2), 1.0, round(h / 260.0, 2))
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back") and not B.get("no_ivy"):
+        if sname in ("front", "back") and not B.get("no_ivy") and not B.get("no_hang"):
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
