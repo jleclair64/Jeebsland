@@ -10,4 +10,9 @@ fi
 if echo "$in" | grep -q -- ' -game' && ! echo "$in" | grep -qi -- '-RenderOffScreen\|-nullrhi\|-server'; then
 	echo "Blocked: an Unreal -game run must use -RenderOffScreen (no visible window; owner plays games on this PC)." >&2; exit 2
 fi
+# Git Bash rewrites a bare /Game/... map into C:/Program Files/Git/Game/... and the run hangs with no level.
+if echo "$in" | grep -q '"tool_name" *: *"Bash"' && echo "$in" | grep -q -- ' -game' \
+	&& echo "$in" | grep -q '[ "'"'"']/Game/' && ! echo "$in" | grep -q 'MSYS_NO_PATHCONV=1'; then
+	echo "Blocked: from Git Bash, put MSYS_NO_PATHCONV=1 before an Unreal -game command (otherwise /Game/Field becomes C:/Program Files/Git/Game/Field and the run hangs), or launch it from PowerShell." >&2; exit 2
+fi
 exit 0
