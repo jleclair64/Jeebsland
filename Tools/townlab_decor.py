@@ -260,7 +260,7 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75, hang=False, ivy_min=293),
     "TL_BankStall":   dict(src="BankStall_300k", wx=(-535.3, 527.5), wy=(-462.4, 266.5), door=(-600.0, 600.0), seed=13, bs=0.7, corners_only=True),
     "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False, ivy_min=338),
-    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False, ivy_min=220),
+    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False, ivy_min=220, ivy_w=(120.0, 95.0)),
 }
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
@@ -396,7 +396,7 @@ for bname, B in BUILD.items():
             if sname == "front" and B["door"][0] - 80 < pl.x < B["door"][1] + 80: continue
             face, clear = wall_profile(pl, outv)
             if face is None or clear < 160: continue
-            for w in (190.0, 150.0, 120.0, 95.0):
+            for w in B.get("ivy_w", (190.0, 150.0, 120.0, 95.0)):   # (ivy_w: narrower patches for a building, so they climb instead of bulging)
                 h = min(clear - 10.0, 260.0 / B.get("bs", 1.0))   # (bs: a smaller-scaled building's ivy as tall in the world as the house's)
                 while h >= B.get("ivy_min", 140) and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
                 if h >= B.get("ivy_min", 140): break
