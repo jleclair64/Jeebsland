@@ -455,7 +455,7 @@ Packaging: `RunUAT BuildCookRun ... -clientconfig=Shipping -cook -stage -pak -io
 
 ## Never open a visible Unreal window (owner, 2026-11-14; every session, agent, reviewer and script)
 
-The owner plays games on this PC; an Unreal window popping up over them broke their game. Every `-game` / test-picture run uses `-RenderOffScreen` (never `-windowed`, not even as a fallback; if off-screen pictures come out black, stop and ask). Headless servers use `-server`/`-nullrhi`. Any new script, tool or agent brief that launches Unreal must do the same. A project hook (`.claude/settings.json` -> `Tools/hooks/no_visible_unreal.sh`) blocks Claude's commands that would open one. The owner's own `Tools/RunClient.bat` is for real play and keeps its window. Opening the full editor for the owner happens only when they ask.
+The owner plays games on this PC; an Unreal window popping up over them broke their game. Every `-game` / test-picture run uses `-RenderOffScreen` (never `-windowed`, not even as a fallback; if off-screen pictures come out black, stop and ask). Every launch Claude makes (test runs, importers, commandlets, headless servers) also passes `-unattended` (2026-11-14: a "Wait for ZenServer?" dialog popped up over the owner's screen from an off-screen run; the flag stops such dialogs). Headless servers use `-server`/`-nullrhi`. Any new script, tool or agent brief that launches Unreal must do the same. A project hook (`.claude/settings.json` -> `Tools/hooks/no_visible_unreal.sh`) blocks Claude's commands that would open one. The owner's own `Tools/RunClient.bat` is for real play and keeps its window. Opening the full editor for the owner happens only when they ask.
 
 ## Build
 
