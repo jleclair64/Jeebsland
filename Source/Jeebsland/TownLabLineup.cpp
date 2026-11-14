@@ -69,6 +69,12 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		M->SetCustomPrimitiveDataFloat(0, S.bNew ? 0.37f : 0.61f);   // (when its windows light at dusk: M_Building's HouseOffset)
 		M->RegisterComponent();
+		{	// (the windows as the town lights them: M_Building's "Night" is ADayNight::Dusk there; here 0 by day and 1 at a low-sun still)
+			float Phase = 0.f;
+			FParse::Value(FCommandLine::Get(), TEXT("ShotPhase="), Phase);
+			for (int32 i = 0; i < M->GetNumMaterials(); ++i)
+				if (UMaterialInstanceDynamic* Mi = M->CreateDynamicMaterialInstance(i)) Mi->SetScalarParameterValue(TEXT("Night"), Phase >= 0.35f ? 1.f : 0.f);
+		}
 		const FString ColName = FPaths::GetBaseFilename(S.Col);
 		if (UStaticMesh* ColMesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), S.Col, *ColName)))
 		{
@@ -91,6 +97,23 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 			for (int32 i = 0; i < D->Num; ++i)
 			{
 				const JeebTownLabDecor::FDecor& P = D->Pieces[i];
+				if (!FString(P.Mesh).StartsWith(TEXT("/Game/TownLab")))
+				{
+					// (Oak Hill's filler props: one or two of each, and their materials aren't flagged for instancing, so plain components)
+					UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, P.Mesh);
+					if (!PM) { UE_LOG(LogTemp, Warning, TEXT("JEEBTLB missing decor %s"), P.Mesh); continue; }
+					UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
+					C->SetStaticMesh(PM);
+					C->SetupAttachment(Root);
+					C->SetWorldTransform(JeebTownLabDecor::Place(World, P));
+					C->SetCastShadow(P.bCastShadow);
+					C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					C->SetCachedMaxDrawDistance(9000.f);
+					C->RegisterComponent();
+					++DecorDraws; ++DecorPieces; DecorTris += Tris(PM);
+				}
+				else
+				{
 				const FString Key = FString::Printf(TEXT("%s|%d"), P.Mesh, P.bCastShadow ? 1 : 0);
 				UInstancedStaticMeshComponent*& Ism = Sets.FindOrAdd(Key);
 				if (!Ism)
@@ -109,15 +132,16 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 				Ism->AddInstance(JeebTownLabDecor::Place(World, P), true);
 				++DecorPieces;
 				DecorTris += Tris(Ism->GetStaticMesh());
+				}
 				if (P.bLight)
 				{
 					UPointLightComponent* L = NewObject<UPointLightComponent>(Owner);
 					L->SetupAttachment(Root);
 					L->SetWorldLocation(JeebTownLabDecor::Place(World, P).GetLocation() + FVector(0.f, 0.f, 25.f));
 					L->SetIntensityUnits(ELightUnits::Lumens);
-					L->SetIntensity(250.f);
-					L->SetAttenuationRadius(600.f);
-					L->SetLightColor(FLinearColor(1.f, 0.62f, 0.3f));
+					L->SetIntensity(70.f);
+					L->SetAttenuationRadius(300.f);   // (a lantern's glow, not a spotlight on the whole front: visual review 2026-11-14)
+					L->SetLightColor(FLinearColor(1.f, 0.55f, 0.24f));
 					L->SetCastShadows(false);
 					L->RegisterComponent();
 					++Lights;

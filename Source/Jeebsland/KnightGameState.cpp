@@ -6,6 +6,7 @@
 #include "GearWall.h"
 #include "FillerLineup.h"
 #include "TownLabLineup.h"
+#include "RHIStats.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "OakHillTown.h"
@@ -727,26 +728,72 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		// screenshot's hitch, so a before/after frame-cost check needs no profiler: compare runs of the same view in the same copy)
 		if (ShotMove.IsEmpty())
 		{
-			static TArray<float> GpuMs, FrameMs;
+			static TArray<float> GpuMs, FrameMs, Draws, Prims;   // (draws and triangles drawn per frame: GNumDrawCallsRHI, 2026-11-14)
 			static bool bGpuLogged = false;
 			if (ShotClock > 4.5f && ShotClock < 8.8f)
 			{
 				GpuMs.Add(FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles()));
 				FrameMs.Add(DeltaSeconds * 1000.f);
+				Draws.Add(float(GNumDrawCallsRHI[0])); Prims.Add(float(GNumPrimitivesDrawnRHI[0]));
 			}
 			else if (ShotClock >= 8.8f && !bGpuLogged && GpuMs.Num() > 0)
 			{
 				bGpuLogged = true;
-				GpuMs.Sort(); FrameMs.Sort();
-				UE_LOG(LogTemp, Display, TEXT("JEEBGPU gpu %.2f ms, frame %.2f ms (medians of %d frames)"), GpuMs[GpuMs.Num() / 2], FrameMs[FrameMs.Num() / 2], GpuMs.Num());
+				GpuMs.Sort(); FrameMs.Sort(); Draws.Sort(); Prims.Sort();
+				UE_LOG(LogTemp, Display, TEXT("JEEBGPU gpu %.2f ms, frame %.2f ms, draws %.0f, triangles %.0f (medians of %d frames)"), GpuMs[GpuMs.Num() / 2], FrameMs[FrameMs.Num() / 2], Draws[Draws.Num() / 2], Prims[Prims.Num() / 2], GpuMs.Num());
 			}
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
+		// (-ShotEyes=X_Y_Z_Yaw_Pitch+X_Y_Z_Yaw_Pitch+...: several free-camera stills in one run, <ShotName>_<n>.png, 2 s apart from
+		// 9 s on, then quit; TownLab buildings 2026-11-14: one run instead of one per view)
+		static TArray<FString> ShotEyes;
+		static const bool bEyes = []() { FString V; if (!FParse::Value(FCommandLine::Get(), TEXT("ShotEyes="), V, false)) return false; V.ParseIntoArray(ShotEyes, TEXT("+")); return ShotEyes.Num() > 0; }();
+		if (bEyes && ShotMove.IsEmpty() && PC)
+		{
+			bShotTaken = true;   // (no single still, and the quit below waits for the last)
+			static int32 EyeIdx = -1;
+			static ACameraActor* EyeCam = nullptr;
+			static int32 ShotIdx = -1;
+			// (-ShotEyesStart / -ShotEyesGap: when the first eye goes and how long each stays; 2 and 8 keep one eye through JEEBGPU's 4.5-8.8 s)
+			static float EyeStart = 7.f, EyeGap = 2.f;
+			static const bool bEyeTimes = []() { FParse::Value(FCommandLine::Get(), TEXT("ShotEyesStart="), EyeStart); FParse::Value(FCommandLine::Get(), TEXT("ShotEyesGap="), EyeGap); EyeGap = FMath::Max(EyeGap, 1.6f); return true; }();
+			(void)bEyeTimes;
+			const int32 Want = ShotClock < EyeStart ? -1 : FMath::FloorToInt((ShotClock - EyeStart) / EyeGap);
+			if (EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f)   // (1.4 s after the move: settled)
+			{
+				ShotIdx = EyeIdx;
+				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d.png"), *ShotName, EyeIdx), true, false);
+			}
+			if (Want > EyeIdx)
+			{
+				EyeIdx = Want;
+				TArray<FString> P;
+				if (EyeIdx < ShotEyes.Num()) ShotEyes[EyeIdx].ParseIntoArray(P, TEXT("_"));
+				if (P.Num() == 5)
+				{
+					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
+					const FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
+					const FRotator R(FCString::Atof(*P[4]), FCString::Atof(*P[3]), 0.f);
+					if (!EyeCam) EyeCam = GetWorld()->SpawnActor<ACameraActor>(L, R);
+					if (EyeCam)
+					{
+						EyeCam->SetActorLocationAndRotation(L, R);
+						float Fov = 70.f;
+						FParse::Value(FCommandLine::Get(), TEXT("ShotFov="), Fov);
+						EyeCam->GetCameraComponent()->SetFieldOfView(Fov);
+						EyeCam->GetCameraComponent()->bConstrainAspectRatio = false;
+						PC->SetViewTarget(EyeCam);
+						if (PC->GetHUD()) PC->GetHUD()->bShowHUD = false;
+					}
+				}
+			}
+			if (EyeIdx > ShotEyes.Num()) PC->ConsoleCommand(TEXT("quit"));
+		}
+		else if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)
