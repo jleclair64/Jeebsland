@@ -94,7 +94,7 @@ void FKnightAnimator::SwimPlay(int32 Key, const FInput& In, FPose& B, float& Out
 	const float MeanZ = SwimMeanHip(Row, MeanY);
 	// held up to the surface only while floating: deeper than the float (diving, drowning) the hips stay with the body instead of rising out of it
 	// toward the surface; eased and rate limited (150 cm/s) so a change of depth or key never jumps
-	const float Want = 96.f + FMath::Min(In.SwimDepth, T.SwimFloat) - (Key == 93 ? 10.f : 45.f);
+	const float Want = 96.f + FMath::Min(In.SwimDepth, T.SwimFloat) - (Key == 93 ? 10.f + T.SwimSink : 45.f);   // (SwimSink: owner 2026-11-14, hands flush with the water at the stroke's top)
 	if (bFresh || SwimHipZ < 0.f) SwimHipZ = Want;
 	SwimHipZ = FMath::FInterpConstantTo(SwimHipZ, FMath::FInterpTo(SwimHipZ, Want, PlayDt, 6.f), PlayDt, Key == 95 ? 60.f : 150.f);   // (drowning: the body settles slowly from however the dive left it)
 	B.Hip.Z += SwimHipZ - MeanZ;

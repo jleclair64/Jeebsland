@@ -283,6 +283,8 @@ public:
 	float GetRenderScale() const { return RenderScale; }
 	void SetRenderScale(float Value);
 
+public:
+	virtual void CalcCamera(float DeltaTime, struct FMinimalViewInfo& OutResult) override;   // (the camera never goes under the water: KnightMovementSwim.cpp)
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;

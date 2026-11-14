@@ -10,6 +10,7 @@
 #include "Engine/OverlapResult.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Camera/CameraTypes.h"
 
 // Swimming (2026-11-13, owner: "a swimming animation, a swimming skill ... with swimming stamina, and make the user drown and respawn if they go
 // underwater for too long or they run out of swimming stamina"). Custom movement mode Swim (6) of UKnightMovement, inside Unreal's movement
@@ -274,6 +275,19 @@ void AKnightCharacter::FillSwimInput(JeebAnim::FInput& In) const
 	In.bSwimUnder = GetLocalRole() == ROLE_SimulatedProxy ? In.SwimDepth > HeadUp + 5.f : KM->bHeadUnder;
 }
 
+// The camera never goes under the water (owner 2026-11-14): wherever water lies under the camera, its height is held CamOverWater over the
+// surface. Done on the view itself, after the spring arm, so it never fights the boom; one lookup a frame (none above the highest water).
+void AKnightCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+	Super::CalcCamera(DeltaTime, OutResult);
+	const FVector P = OutResult.Location;
+	const float Over = JeebTune::V().CamOverWater;
+	if (P.Z >= JeebWater::TopLevel() + Over) return;
+	float S;
+	if (!JeebWater::SurfaceAt(P.X, P.Y, S)) return;
+	OutResult.Location.Z = FMath::Max(float(P.Z), S + Over);
+}
+
 // Test pictures (standalone only), times in hundredths of a second from the start:
 //   -SwimKeys=<ahead>_<right>_<from>_<for>[x...]   keys in hundredths of full, along the way he faced when the test began
 //   -SwimDo=fast<from>_<for>|dive<from>_<for>|rise<from>_<for>[x...]   Shift, Ctrl or Space held for that stretch
@@ -309,6 +323,32 @@ void AKnightCharacter::TickSwimTests(float Dt)
 		const UKnightMovement* KM0 = KnightMove();
 		UE_LOG(LogTemp, Log, TEXT("JEEBSWIMPROBE at %s mode %d floor %s:%s"), *C.ToCompactString(), KM0 ? int32(KM0->MovementMode) : -1,
 			KM0 && KM0->CurrentFloor.HitResult.GetComponent() ? *KM0->CurrentFloor.HitResult.GetComponent()->GetName() : TEXT("-"), *S);
+	}
+	// JEEBSWIMHAND: each second's highest wrist against the water (owner 2026-11-14: hands flush at the top of the stroke), and once, standing,
+	// how high his hips (waist) are over his feet
+	if (Anim.IsValid())
+	{
+		static float Top = -1.0e9f, TopT = 0.f;
+		static bool bWaist = false;
+		const UKnightMovement* KM0 = KnightMove();
+		const FVector C = GetActorLocation();
+		const float Feet = float(C.Z) - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		if (!bWaist && KM0 && KM0->IsMovingOnGround())
+		{
+			bWaist = true;
+			UE_LOG(LogTemp, Log, TEXT("JEEBSWIMHAND waist (hips over feet) %.0f cm"), float(Anim->BoneWorld(JeebAnim::Hips).GetLocation().Z) - Feet);
+		}
+		float S;
+		if (KM0 && KM0->IsCustom(JeebClimb::Swim) && JeebWater::SurfaceAt(C.X, C.Y, S))
+		{
+			const float H = float(FMath::Max(Anim->BoneWorld(JeebAnim::LHand).GetLocation().Z, Anim->BoneWorld(JeebAnim::RHand).GetLocation().Z)) - S;
+			Top = FMath::Max(Top, H);
+			if ((TopT += Dt) > 1.0f)
+			{
+				UE_LOG(LogTemp, Log, TEXT("JEEBSWIMHAND top wrist over water %.1f cm (speed %.0f)"), Top, GetVelocity().Size2D());
+				Top = -1.0e9f; TopT = 0.f;
+			}
+		}
 	}
 	if (Keys.IsEmpty() && Do.IsEmpty()) return;
 	T += Dt;
