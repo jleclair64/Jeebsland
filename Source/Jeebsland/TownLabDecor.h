@@ -14,96 +14,58 @@ namespace JeebTownLabDecor
 	struct FBuildingDecor { const TCHAR* Building; const FDecor* Pieces; int32 Num; };
 
 	inline const FDecor HouseDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 508.0f, 271.8f, 0.0f, -0.0f, 0.0f, 0.0f, 0.80f, 1.00f, 0.96f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 508.0f, 271.8f, 0.0f, -0.0f, 0.0f, 0.0f, 0.63f, 1.00f, 0.96f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 508.0f, -379.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.63f, 1.00f, 0.92f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -502.7f, 238.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -580.7f, -39.4f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -503.2f, -344.0f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -502.7f, 238.5f, 0.0f, 90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -503.2f, -344.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 546.4f, -344.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 547.3f, 238.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 552.4f, -69.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -358.2f, 333.5f, 304.3f, 2.0f, 0.0f, 0.0f, 0.95f, 0.95f, 0.95f, true, false, false, -0.025f, 0.708f, 0.705f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -233.1f, 333.5f, 299.4f, 12.6f, 0.0f, 0.0f, 0.88f, 0.88f, 0.88f, true, false, false, -0.185f, 0.827f, 0.532f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -46.2f, 333.5f, 366.2f, 31.3f, 0.0f, 0.0f, 1.22f, 1.22f, 1.22f, true, false, false, -0.412f, 0.678f, 0.609f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 68.2f, 333.5f, 410.6f, -30.2f, 0.0f, 0.0f, 1.07f, 1.07f, 1.07f, true, false, false, 0.482f, 0.828f, 0.286f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 182.7f, 333.5f, 309.9f, -11.3f, 0.0f, 0.0f, 1.13f, 1.13f, 1.13f, true, false, false, 0.156f, 0.781f, 0.605f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 325.8f, 333.5f, 302.1f, -6.0f, 0.0f, 0.0f, 1.23f, 1.23f, 1.23f, true, false, false, 0.083f, 0.784f, 0.615f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 472.5f, -439.0f, 282.9f, 172.9f, 0.0f, 0.0f, 1.30f, 1.30f, 1.30f, true, false, false, -0.105f, -0.840f, 0.533f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 331.5f, -414.0f, 312.1f, -169.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, true, false, false, 0.145f, -0.748f, 0.647f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 161.5f, -414.0f, 311.6f, 176.2f, 0.0f, 0.0f, 0.72f, 0.72f, 0.72f, true, false, false, -0.049f, -0.730f, 0.682f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 31.8f, -414.0f, 311.9f, -175.6f, 0.0f, 0.0f, 0.94f, 0.94f, 0.94f, true, false, false, 0.058f, -0.762f, 0.645f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -139.3f, -414.0f, 316.5f, 179.1f, 0.0f, 0.0f, 0.79f, 0.79f, 0.79f, true, false, false, -0.012f, -0.781f, 0.625f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -253.5f, -414.0f, 315.1f, -174.7f, 0.0f, 0.0f, 1.22f, 1.22f, 1.22f, true, false, false, 0.075f, -0.803f, 0.591f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -394.9f, -439.0f, 284.2f, -174.9f, 0.0f, 0.0f, 1.28f, 1.28f, 1.28f, true, false, false, 0.073f, -0.820f, 0.568f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -587.1f, -3.2f, 791.2f, 90.5f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, true, false, false, -0.107f, -0.001f, 0.994f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 578.0f, 191.5f, 459.1f, -11.5f, 0.0f, 0.0f, 1.26f, 1.26f, 1.26f, true, false, false, 0.151f, 0.739f, 0.657f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 578.0f, 30.8f, 649.1f, -3.8f, 0.0f, 0.0f, 0.96f, 0.96f, 0.96f, true, false, false, 0.048f, 0.733f, 0.678f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 578.0f, -151.2f, 629.6f, 178.8f, 0.0f, 0.0f, 0.84f, 0.84f, 0.84f, true, false, false, -0.016f, -0.756f, 0.654f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 578.0f, -291.4f, 454.0f, -165.1f, 0.0f, 0.0f, 1.29f, 1.29f, 1.29f, true, false, false, 0.226f, -0.848f, 0.479f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -538.7f, 20.6f, 0.0f, -0.0f, 0.0f, 0.0f, 0.99f, 0.99f, 0.99f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -529.4f, 38.6f, 0.0f, -0.0f, 0.0f, 0.0f, 0.44f, 0.44f, 0.44f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 542.2f, 305.1f, 0.0f, -0.0f, 0.0f, 0.0f, 0.73f, 0.73f, 0.73f, false, false, false },   // stones
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 510.4f, -408.5f, 0.0f, -180.0f, 0.0f, 0.0f, 1.05f, 1.05f, 1.05f, false, false, false },   // stones
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -529.6f, -121.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.71f, 0.71f, 0.71f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -543.6f, -139.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.49f, 0.49f, 0.49f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 109.7f, -403.7f, 0.0f, -180.0f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 102.3f, -421.7f, 0.0f, -180.0f, 0.0f, 0.0f, 0.40f, 0.40f, 0.40f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -530.9f, -353.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -548.9f, -363.4f, 0.0f, 90.0f, 0.0f, 0.0f, 0.47f, 0.47f, 0.47f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -532.3f, 251.6f, 0.0f, 90.0f, 0.0f, 0.0f, 0.71f, 0.71f, 0.71f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -550.3f, 270.4f, 0.0f, 90.0f, 0.0f, 0.0f, 0.40f, 0.40f, 0.40f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -605.7f, -104.1f, 0.0f, 90.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // stones
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 576.6f, 256.8f, 0.0f, -90.0f, 0.0f, 0.0f, 1.05f, 1.05f, 1.05f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 594.6f, 271.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.40f, 0.40f, 0.40f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 574.4f, -365.9f, 0.0f, -90.0f, 0.0f, 0.0f, 1.12f, 1.12f, 1.12f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 592.4f, -394.3f, 0.0f, -90.0f, 0.0f, 0.0f, 0.38f, 0.38f, 0.38f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 575.6f, -27.3f, 0.0f, -90.0f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -570.9f, 22.1f, 0.0f, -0.0f, 0.0f, 0.0f, 0.78f, 0.78f, 0.78f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -549.4f, 32.1f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 487.0f, 300.8f, 0.0f, -0.0f, 0.0f, 0.0f, 0.72f, 0.72f, 0.72f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 539.9f, -411.3f, 0.0f, -180.0f, 0.0f, 0.0f, 1.14f, 1.14f, 1.14f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -526.8f, -329.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.95f, 0.95f, 0.95f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 128.3f, -409.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 120.4f, -419.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -538.7f, -365.2f, 0.0f, 90.0f, 0.0f, 0.0f, 0.78f, 0.78f, 0.78f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -548.7f, -335.8f, 0.0f, 90.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -536.7f, 244.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -607.2f, -9.4f, 0.0f, 90.0f, 0.0f, 0.0f, 0.89f, 0.89f, 0.89f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -617.2f, -7.8f, 0.0f, 90.0f, 0.0f, 0.0f, 1.06f, 1.06f, 1.06f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 572.0f, 231.8f, 0.0f, -90.0f, 0.0f, 0.0f, 1.17f, 1.17f, 1.17f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 582.0f, 237.3f, 0.0f, -90.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 571.6f, -339.9f, 0.0f, -90.0f, 0.0f, 0.0f, 0.82f, 0.82f, 0.82f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 581.6f, -378.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.01f, 1.01f, 1.01f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 569.7f, -99.9f, 0.0f, -90.0f, 0.0f, 0.0f, 0.97f, 0.97f, 0.97f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 579.7f, -93.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.03f, 1.03f, 1.03f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -582.2f, -279.0f, 0.0f, -0.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_LogStackSmall.SM_LogStackSmall"), -594.2f, -169.0f, 0.0f, -0.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 423.0f, -447.3f, 0.0f, -150.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), 353.0f, -439.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotSmall.SM_PotSmall"), 301.0f, -431.9f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Pail.SM_Pail"), 604.2f, -226.5f, 0.0f, -110.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_BushYellowFlowers.SM_BushYellowFlowers"), 608.4f, 173.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.60f, 0.60f, 0.60f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), -89.0f, 430.0f, 146.0f, 0.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, true, true, true },   // lantern
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), 182.0f, 430.0f, 146.0f, 0.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, true, true, true },   // lantern
 	};
 	inline const FDecor StoreDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 71.7f, -502.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 0.58f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -253.0f, -504.9f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 0.58f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -547.5f, -146.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -611.2f, 345.3f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 0.92f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -612.6f, -339.7f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 227.9f, 139.4f, 0.0f, -90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -363.8f, 573.1f, 340.3f, -22.1f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, true, false, false, 0.170f, 0.417f, 0.893f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -169.7f, 573.1f, 340.8f, -8.0f, 0.0f, 0.0f, 0.97f, 0.97f, 0.97f, true, false, false, 0.048f, 0.340f, 0.939f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 11.1f, 573.1f, 345.2f, 12.1f, 0.0f, 0.0f, 1.07f, 1.07f, 1.07f, true, false, false, -0.074f, 0.346f, 0.935f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 475.0f, -533.5f, 360.7f, -87.2f, 0.0f, 0.0f, 1.01f, 1.01f, 1.01f, true, false, false, 0.412f, 0.020f, 0.911f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 275.7f, -583.5f, 808.0f, -86.8f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, true, false, false, 0.469f, 0.026f, 0.883f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), 119.4f, -583.5f, 969.8f, -85.3f, 0.0f, 0.0f, 1.05f, 1.05f, 1.05f, true, false, false, 0.638f, 0.052f, 0.769f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -68.7f, -583.5f, 1205.9f, -73.8f, 0.0f, 0.0f, 0.92f, 0.92f, 0.92f, true, false, false, 0.412f, 0.119f, 0.904f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -208.3f, -583.5f, 1086.6f, 82.7f, 0.0f, 0.0f, 0.96f, 0.96f, 0.96f, true, false, false, -0.631f, 0.081f, 0.771f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -416.1f, -583.5f, 823.7f, 85.1f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, true, false, false, -0.687f, 0.059f, 0.724f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_MossClump.SM_TL_MossClump"), -600.6f, -342.4f, 187.2f, 116.9f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, true, false, false, -0.820f, -0.415f, 0.394f },   // moss
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 517.1f, 595.1f, 0.0f, -0.0f, 0.0f, 0.0f, 1.03f, 1.03f, 1.03f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 555.5f, 613.1f, 0.0f, -0.0f, 0.0f, 0.0f, 0.45f, 0.45f, 0.45f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 485.1f, -554.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.19f, 1.19f, 1.19f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 514.5f, -572.7f, 0.0f, -180.0f, 0.0f, 0.0f, 0.48f, 0.48f, 0.48f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -567.2f, -474.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.91f, 0.91f, 0.91f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -557.0f, -492.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.36f, 0.36f, 0.36f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 230.7f, -535.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.91f, 0.91f, 0.91f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 196.9f, -553.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.44f, 0.44f, 0.44f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -475.4f, -511.6f, 0.0f, 90.0f, 0.0f, 0.0f, 1.04f, 1.04f, 1.04f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -493.4f, -529.7f, 0.0f, 90.0f, 0.0f, 0.0f, 0.42f, 0.42f, 0.42f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -605.2f, 526.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), -623.2f, 552.3f, 0.0f, 90.0f, 0.0f, 0.0f, 0.43f, 0.43f, 0.43f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -593.3f, 400.1f, 0.0f, 90.0f, 0.0f, 0.0f, 0.79f, 0.79f, 0.79f, false, false, false },   // stones
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 237.4f, 502.4f, 0.0f, -90.0f, 0.0f, 0.0f, 0.96f, 0.96f, 0.96f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 255.4f, 502.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.36f, 0.36f, 0.36f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 535.9f, -510.9f, 0.0f, -90.0f, 0.0f, 0.0f, 1.10f, 1.10f, 1.10f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 553.9f, -517.9f, 0.0f, -90.0f, 0.0f, 0.0f, 0.36f, 0.36f, 0.36f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 373.0f, 26.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_PlantClump.SM_PlantClump"), 391.0f, 13.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.48f, 0.48f, 0.48f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyHang.SM_TL_IvyHang"), 335.7f, -459.2f, 80.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -563.9f, 560.0f, 0.0f, -0.0f, 0.0f, 0.0f, 1.07f, 1.07f, 1.07f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -589.4f, 570.0f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 534.1f, 595.1f, 0.0f, -0.0f, 0.0f, 0.0f, 0.89f, 0.89f, 0.89f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 536.2f, -444.3f, 0.0f, -180.0f, 0.0f, 0.0f, 0.77f, 0.77f, 0.77f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -547.3f, -484.3f, 0.0f, -180.0f, 0.0f, 0.0f, 0.70f, 0.70f, 0.70f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 23.4f, -515.9f, 0.0f, -180.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 50.1f, -525.9f, 0.0f, -180.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -475.9f, -509.6f, 0.0f, 90.0f, 0.0f, 0.0f, 0.79f, 0.79f, 0.79f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -613.6f, 501.8f, 0.0f, 90.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -564.8f, 123.7f, 0.0f, 90.0f, 0.0f, 0.0f, 0.89f, 0.89f, 0.89f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -574.8f, 116.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.17f, 1.17f, 1.17f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 253.1f, 544.6f, 0.0f, -90.0f, 0.0f, 0.0f, 0.99f, 0.99f, 0.99f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 263.1f, 528.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 536.7f, -500.3f, 0.0f, -90.0f, 0.0f, 0.0f, 0.88f, 0.88f, 0.88f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 546.7f, -516.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, false, false, false },   // weeds
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 599.3f, -242.6f, 0.0f, -90.0f, 0.0f, 0.0f, 0.94f, 0.94f, 0.94f, false, false, false },   // stones
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 609.3f, -223.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -680.3f, -383.5f, 0.0f, 82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), -670.9f, -383.5f, 73.3f, 102.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_GrainSack.SM_GrainSack"), -646.1f, -273.5f, 0.0f, 65.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
@@ -111,7 +73,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 361.2f, -621.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Basket.SM_Basket"), 271.2f, -549.5f, 0.0f, 140.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 593.2f, 323.1f, 0.0f, -50.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_ShrubLow.SM_ShrubLow"), 615.6f, -316.9f, 0.0f, -90.0f, 0.0f, 0.0f, 0.70f, 0.70f, 0.70f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 265.0f, 358.0f, 183.0f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, true, true, true },   // lantern
 	};
 	inline const FBuildingDecor Buildings[] = {

@@ -26,7 +26,7 @@ def log(*x): print("TLDECOR", *x, flush=True)
 S = 2048; Tl = 1024
 img = np.zeros((S, S, 4), np.float32)       # rows top to bottom (flipped to Blender's bottom-up when saved)
 rng = np.random.default_rng(1405)
-LEAF_GREENS = np.array([[0.30, 0.50, 0.13], [0.40, 0.60, 0.17], [0.50, 0.66, 0.20], [0.25, 0.43, 0.13], [0.36, 0.56, 0.22]], np.float32)
+LEAF_GREENS = np.array([[0.17, 0.31, 0.09], [0.23, 0.38, 0.11], [0.30, 0.44, 0.14], [0.13, 0.25, 0.08], [0.22, 0.34, 0.15], [0.33, 0.42, 0.16], [0.19, 0.33, 0.14], [0.36, 0.50, 0.18], [0.42, 0.52, 0.22]], np.float32)   # (deep natural ivy greens, a few olive and a few cooler: townlab review "over-saturated")
 VINE = np.array([0.36, 0.25, 0.15], np.float32)
 MOSS = np.array([[0.42, 0.55, 0.16], [0.52, 0.62, 0.19], [0.34, 0.47, 0.15], [0.58, 0.64, 0.24]], np.float32)
 
@@ -86,37 +86,37 @@ def ivy(tile_xy, shape):
     # shape(x, y) in 0..1 of the tile -> how likely a leaf is there; vines first, leaves along them, bottom layers darker
     strands = []
     if shape == "climb":
-        for i in range(9):
-            x = Tl * (0.3 + 0.4 * rng.random()); strands.append(walk(x, Tl - 10, 60, 16, 0.35))
+        for i in range(22):
+            x = Tl * (0.10 + 0.80 * rng.random()); strands.append(walk(x, Tl - 10, 60, 16, 0.6))   # (wide: the review found 20-30 cm strips)
     elif shape == "wide":
-        for i in range(14):
+        for i in range(20):
             x = Tl * (0.08 + 0.84 * rng.random()); strands.append(walk(x, Tl - 10 - rng.random() * 200, 42, 15, 0.5))
     else:   # hanging from the top edge
-        for i in range(16):
+        for i in range(22):
             x = Tl * (0.05 + 0.9 * rng.random()); strands.append(walk(x, 8, int(20 + 40 * rng.random()), 15, 0.25, up=False))
     for p in strands: vine(p, tile_xy)
     leaves = []
     for p in strands:
         for (x, y) in p[1:]:
-            for _ in range(3):
-                lx, ly = x + rng.normal(0, 14), y + rng.normal(0, 14)
+            for _ in range(7):
+                lx, ly = x + rng.normal(0, 22), y + rng.normal(0, 22)
                 if not (40 < lx < Tl - 40 and 40 < ly < Tl - 40): continue
                 fx, fy = lx / Tl, ly / Tl
                 if shape == "climb":   # a tall blob: full at the bottom, thinning and narrowing up top
-                    keep = (1 - abs(fx - 0.5) * 2 / (0.55 + 0.45 * fy)) * (0.35 + 0.65 * fy)
+                    keep = (1.1 - abs(fx - 0.5) * 2 / (0.85 + 0.15 * fy)) * (0.45 + 0.55 * fy)
                 elif shape == "wide":
                     keep = 1 - ((fx - 0.5) / 0.48) ** 2 - ((fy - 0.62) / 0.42) ** 2
                 else:
                     keep = 1 - fy * 0.9
-                if rng.random() < keep * 0.9:
+                if rng.random() < min(1.0, keep * 1.15):
                     leaves.append((lx, ly))
     rng.shuffle(leaves)
     for k, (lx, ly) in enumerate(leaves):
         layer = k / max(len(leaves), 1)          # later leaves sit on top: lighter
         col = LEAF_GREENS[rng.integers(len(LEAF_GREENS))] * (0.9 + 0.2 * rng.random())
-        size = rng.uniform(26, 44)
+        size = rng.uniform(30, 50)
         ang = rng.normal(math.pi / 2 if shape == "hang" else -math.pi / 2, 0.9)
-        stamp(lx, ly, size, ang, col, 0.72 + 0.32 * layer, tile_xy)
+        stamp(lx, ly, size, ang, col, 0.62 + 0.55 * layer, tile_xy)   # (deep underneath, lit on top: layered)
     return len(leaves)
 
 def moss(tile_xy):
@@ -166,6 +166,8 @@ def export(obj, name, colours=False):
 
 def new_obj(name, bm):
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    if len(me.color_attributes):   # (the FBX carries the active colour layer: the moss and stones are painted in it)
+        me.color_attributes.active_color = me.color_attributes[0]; me.color_attributes.render_color_index = 0
     o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o)
     for p in me.polygons: p.use_smooth = True
     return o
@@ -174,7 +176,7 @@ def card(name, tile, w, h, hang=False):
     # two layers of a gently bulged grid on one tile: the back one 2 cm off the wall, a smaller front one 7 cm off, mirrored
     bm = bmesh.new(); uvl = bm.loops.layers.uv.new("UV")
     tx, ty = tiles[tile]
-    for layer, (off, sc, mir) in enumerate(((2.0, 1.0, False), (7.0, 0.78, True))):
+    for layer, (off, sc, mir) in enumerate(((2.0, 1.0, False), (7.0, 0.8, True), (12.0, 0.6, False))):   # (three layers: fuller, townlab review)
         nx, nz = 4, 6
         grid = []
         for j in range(nz + 1):
@@ -223,9 +225,28 @@ def blob(name, count, size, flat, cols, seed, spread):
                 up = loop.vert.normal.z if loop.vert.normal.length > 0 else 0.0
                 k2 = 0.72 + 0.32 * max(up, 0.0)
                 loop[cl] = (col[0] * k2, col[1] * k2, col[2] * k2, 1.0)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)   # (the squashed lumps must face out, or the sun lights their insides)
     return new_obj(name, bm)
 
-export(blob("TL_MossClump", 5, 14.0, 0.45, [(0.44, 0.57, 0.17), (0.52, 0.63, 0.20), (0.36, 0.50, 0.15)], 7, 16.0), "TL_MossClump", True)
+export(blob("TL_MossClump", 9, 18.0, 0.22, [(0.44, 0.57, 0.17), (0.52, 0.63, 0.20), (0.36, 0.50, 0.15)], 7, 36.0), "TL_MossClump", True)
+
+def weeds(name):
+    # a leafy clump at the foot of a wall: three crossed cards on the wide ivy tile, 45 cm tall (36 triangles)
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new("UV")
+    tx, ty = tiles["wide"]
+    w, h = 60.0, 45.0
+    for k in range(3):
+        a = math.radians(k * 60.0 + 10.0); ca, sa = math.cos(a), math.sin(a)
+        vs = []
+        for (fu, fv) in ((0, 0), (1, 0), (1, 1), (0, 1)):
+            x = (fu - 0.5) * w
+            vs.append((bm.verts.new((x * ca, x * sa, fv * h + (6.0 if fv else 0.0) * 0)), fu, fv))
+        f = bm.faces.new([v for v, _, _ in vs])
+        for loop, (_, fu, fv) in zip(f.loops, vs):
+            loop[uvl].uv = ((tx + fu * Tl) / S, 1 - (ty + (1 - fv) * Tl * 0.95) / S)
+    bm.normal_update()
+    return new_obj(name, bm)
+export(weeds("TL_Weeds"), "TL_Weeds")
 export(blob("TL_Stones", 6, 13.0, 0.6, [(0.62, 0.58, 0.52), (0.55, 0.52, 0.48), (0.68, 0.63, 0.55), (0.50, 0.50, 0.47)], 11, 22.0), "TL_Stones", True)
 
 # ============================================================================================================================
@@ -233,7 +254,7 @@ export(blob("TL_Stones", 6, 13.0, 0.6, [(0.62, 0.58, 0.52), (0.55, 0.52, 0.48), 
 # ============================================================================================================================
 BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD line; front = Blender -Y (Unreal +Y), the door side
     "TL_House": dict(src="OakHillHouse_300k", wx=(-597.1, 563.0), wy=(-293.5, 399.0), door=(-150.0, 260.0), seed=3),
-    "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5),
+    "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
 }
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
 FILLER = ["Crate", "CrateNoLid", "GrainSack", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
@@ -325,6 +346,17 @@ for bname, B in BUILD.items():
             near = abs((Vector(((lo_[0] + hi_[0]) / 2, (lo_[1] + hi_[1]) / 2, 0)) - start).dot(outv)) < 100.0
             if near and lo_[0] < ax1 and hi_[0] > ax0 and lo_[1] < ay1 and hi_[1] > ay0 and lo_[2] < z1 and hi_[2] > z0: return False
         return True
+    def flat(side, u, w, h, face):
+        # the wall under a card must be one face: no door or window opening sunk into it, nothing sticking far out (a sign, a lean-to)
+        sname, start, along, outv, L = side
+        for uu in np.linspace(u - w / 2 + 8, u + w / 2 - 8, 6):
+            p0 = start + along * float(uu)
+            for z in range(30, int(h), 25):
+                hit = surface(p0, outv, float(z))
+                if hit is None: return False
+                d = (hit - p0).dot(outv)
+                if d < face - 12.0 or d > face + 30.0: return False
+        return True
     def add(kind, mesh, pos_b, out_b, scale, with_building, light=False, roll=0.0, pitch=0.0, normal=None):
         items.append(dict(kind=kind, mesh=mesh, pos=to_ue(pos_b), yaw=yaw_for(out_b), pitch=pitch, roll=roll, scale=round(scale, 2),
                           wb=with_building, light=light, n=(0.0, 0.0, 0.0) if normal is None else (round(normal.x, 3), round(-normal.y, 3), round(normal.z, 3))))
@@ -332,7 +364,7 @@ for bname, B in BUILD.items():
     n_ivy = 0
     for side in sides:
         sname, start, along, outv, L = side
-        cands = [0.55 * 100, L - 0.55 * 100] + [rnd.uniform(150, L - 150) for _ in range(6)]
+        cands = [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
         rnd.shuffle(cands)
         placed = []
         for u in cands:
@@ -341,9 +373,9 @@ for bname, B in BUILD.items():
             if sname == "front" and B["door"][0] - 80 < pl.x < B["door"][1] + 80: continue
             face, clear = wall_profile(pl, outv)
             if face is None or clear < 160: continue
-            for w in (150.0, 120.0, 95.0):
+            for w in (190.0, 150.0, 120.0, 95.0):
                 h = min(clear - 10.0, 260.0)
-                while h >= 140 and not free_rect(side, u - w / 2, u + w / 2, 0, h): h -= 20
+                while h >= 140 and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
                 if h >= 140: break
             if h < 140: continue
             mesh = "TL_IvyClimb"
@@ -362,8 +394,10 @@ for bname, B in BUILD.items():
                 add("ivy", "TL_IvyHang", pl + outv * face + Vector((0, 0, clear - 140.0)), outv, 1.0, True)
                 break
     # --- moss: cushions along the roof just above each long wall's eave line, and fringes hanging off the eaves' edge
+    # (off, 2026-11-14: in game the clumps read as round green stickers on the thatch and landed on the store's awning; the
+    #  baked colour already carries the model's own moss along the ridge. Set moss=True on a building to try them again.)
     n_moss = 0
-    for side in sides:
+    for side in (sides if B.get("moss", False) else []):
         sname, start, along, outv, L = side
         u = rnd.uniform(40, 140)
         while u < L - 40:
@@ -388,7 +422,7 @@ for bname, B in BUILD.items():
             face = (h - pl).dot(outv) if h is not None else 0.0
             add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
             if rnd.random() < 0.6:
-                add("weeds", "/Game/Filler/SM_PlantClump", pl + outv * (face + 30.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.35, 0.5), False)
+                add("weeds", "TL_Weeds", pl + outv * (face + 22.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.8, 1.2), False)
     plans[bname] = (items, bvh, sides, B, top, surface)
     log(bname, "ivy", n_ivy, "moss", n_moss, "items so far", len(items))
 
@@ -411,11 +445,9 @@ for bname, B in BUILD.items():
         return p
     if bname == "TL_House":
         prop("left", 120, "Firewood", 0.9, turn=90)
-        prop("left", 230, "LogStackSmall", 0.8, turn=90)
         prop("back", 140, "WateringCan", 0.8, turn=-30)
         prop("back", 210, "PotRound", 0.9); prop("back", 250, "PotSmall", 0.9, sidestep=12)
         prop("right", 520, "Pail", 0.85, turn=20)
-        prop("right", 120, "BushYellowFlowers", 0.6)
         # the porch lanterns building_clean.py took off (LANTERNS: its two porch posts), hung back as separate lights
         for (bx, by, bz) in ((-89.0, -430.0, 146.0), (182.0, -430.0, 146.0)):
             items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((bx, by, bz)), yaw=0.0, pitch=0.0, roll=0.0,
@@ -425,7 +457,7 @@ for bname, B in BUILD.items():
         prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85, turn=-12)
         prop("left", 270, "GrainSack", 0.85, turn=25); prop("left", 330, "WheatSack", 0.8, turn=-15)
         prop("back", 200, "Barrel", 0.85); prop("back", 290, "Basket", 0.8, turn=40)
-        prop("right", 260, "WateringCan", 0.8, turn=-40); prop("right", 900, "ShrubLow", 0.7)
+        prop("right", 260, "WateringCan", 0.8, turn=-40)
         items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -358.0, 183.0)), yaw=0.0, pitch=0.0, roll=0.0,
                           scale=0.85, wb=True, light=True))
     log(bname, "pieces", len(items))

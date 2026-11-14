@@ -6,7 +6,7 @@ param([switch]$BakeOnly, [switch]$ImportOnly)
 $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLab'
-$designs = @(@('OakHillHouse_300k', 'TL_House', 45000), @('OakHillStore_300k', 'TL_Store', 50000))
+$designs = @(@('OakHillHouse_300k', 'TL_House', 60000), @('OakHillStore_300k', 'TL_Store', 50000))
 if (-not $ImportOnly) {
     foreach ($d in $designs) {
         & $blender -b -P (Join-Path $PSScriptRoot 'townlab_bake.py') -- $work $out $d[0] $d[1] $d[2] --preview | Select-String -Pattern 'TLBAKE|Traceback|Error' | ForEach-Object { Write-Host $_.Line }

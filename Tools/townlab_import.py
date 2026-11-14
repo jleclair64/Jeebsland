@@ -38,7 +38,7 @@ def pic(name, srgb, normal=False):
 
 GLOW_STRENGTH = 1.0   # lit windows (T_<Name>_Glow): emissive = GlowTex x GlowStrength x (lit or not, below). Was 2.0 until 2026-11-13
                       #   (owner: "reduce the window brightness by another 50%")
-FIRE_LEVEL = 2.0      # the forge's fire burns all day at this x GlowStrength (as bright as before the halving)
+FIRE_LEVEL = 0.0      # (no forge on the TownLab buildings: 0, so no part of the mask can burn all day; M_Building has 2.0 for the smithy. Townlab review 2026-11-14: windows lit at noon)
 ON_FROM = 0.2         # a window lights when Night (ADayNight::Dusk) passes OnFrom + OnSpread x HouseOffset + WinSpread x its own random:
 ON_SPREAD = 0.5       #   off in broad day, the houses one by one from Dusk 0.2, the last at about 0.9 (and off again the same way)
 WIN_SPREAD = 0.2      #   (a house's windows a little apart)
@@ -64,6 +64,7 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     if lib.does_asset_exist(path): lib.delete_asset(path)
     m = tools.create_asset("M_TL_Building", folder, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("used_with_nanite", True)
+    m.set_editor_property("used_with_instanced_static_meshes", True)
     E = mel.create_material_expression
     def tex(name, y, kind, default):
         t = E(m, unreal.MaterialExpressionTextureSampleParameter2D, -700, y)
@@ -268,6 +269,7 @@ if os.path.isdir(decor):
         path = folder + "/" + name
         if lib.does_asset_exist(path): lib.delete_asset(path)
         m = tools.create_asset(name, folder, unreal.Material, unreal.MaterialFactoryNew())
+        m.set_editor_property("used_with_instanced_static_meshes", True)
         build(m); mel.recompile_material(m); lib.save_asset(path)
         return m
     task = unreal.AssetImportTask()
@@ -288,12 +290,31 @@ if os.path.isdir(decor):
         mel.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
     def vpaint(m):
         E = mel.create_material_expression
-        v = E(m, unreal.MaterialExpressionVertexColor, -400, 0)
-        mel.connect_material_property(v, "RGB", unreal.MaterialProperty.MP_BASE_COLOR)
+        m.set_editor_property("two_sided", True)
+        # (the colour is a parameter per piece, MI_TL_Moss / MI_TL_Stones; the vertex colour only adds a little lump-to-lump variation)
+        v = E(m, unreal.MaterialExpressionVertexColor, -700, 0)
+        k = E(m, unreal.MaterialExpressionMultiply, -500, 0); k.set_editor_property("const_b", 1.2)
+        mel.connect_material_expressions(v, "G", k, "A")
+        a = E(m, unreal.MaterialExpressionAdd, -400, 0); a.set_editor_property("const_b", 0.8)
+        mel.connect_material_expressions(k, "", a, "A")
+        s = E(m, unreal.MaterialExpressionSaturate, -320, 0); mel.connect_material_expressions(a, "", s, "")
+        c = E(m, unreal.MaterialExpressionVectorParameter, -500, -200); c.set_editor_property("parameter_name", "Color")
+        c.set_editor_property("default_value", unreal.LinearColor(0.3, 0.4, 0.1, 1.0))
+        mul = E(m, unreal.MaterialExpressionMultiply, -200, 0)
+        mel.connect_material_expressions(c, "", mul, "A"); mel.connect_material_expressions(s, "", mul, "B")
+        mel.connect_material_property(mul, "", unreal.MaterialProperty.MP_BASE_COLOR)
         r = E(m, unreal.MaterialExpressionConstant, -300, 200); r.set_editor_property("r", 0.9)
         mel.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
     m_fol = plain_material("M_TL_Foliage", foliage)
     m_vp = plain_material("M_TL_VertexPaint", vpaint)
+    solid = {}
+    for mi_name, col in (("MI_TL_Moss", (0.085, 0.14, 0.025)), ("MI_TL_Stones", (0.30, 0.27, 0.22))):   # (linear colours: moss yellow-green, warm grey stone)
+        p = folder + "/" + mi_name
+        if lib.does_asset_exist(p): lib.delete_asset(p)
+        mi = tools.create_asset(mi_name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, m_vp)
+        mel.set_material_instance_vector_parameter_value(mi, "Color", unreal.LinearColor(col[0], col[1], col[2], 1.0))
+        lib.save_asset(p); solid[mi_name] = mi
     for f in sorted(os.listdir(decor)):
         if not f.endswith(".fbx"): continue
         n = f[:-4]; painted = n in ("TL_MossClump", "TL_Stones")
@@ -313,7 +334,8 @@ if os.path.isdir(decor):
         tools.import_asset_tasks([task])
         sm = lib.load_asset(folder + "/SM_" + n)
         if sm is None: raise RuntimeError("BUILDDIAG " + n + " did not import")
-        sm.set_material(0, m_vp if painted else m_fol)
+        sm.set_material(0, (solid["MI_TL_Moss"] if n == "TL_MossClump" else solid["MI_TL_Stones"]) if painted else m_fol)
+        unreal.log("BUILDDIAG decor %s vertex colours %s" % (n, unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).has_vertex_colors(sm)))
         lib.save_asset(folder + "/SM_" + n)
         unreal.log("BUILDDIAG decor %s" % n)
 unreal.log("BUILDDIAG done")

@@ -14,6 +14,7 @@
 # occlusion painted softly into the colour, warm (AO_*), bevelled edges picked out a little lighter as a painter does (EDGE_*), and
 # a soft top-to-bottom gradient (lighter up top, a touch deeper and cooler at the base: GRAD_*). No grime, no dirt.
 import bpy, bmesh, sys, os, math, time
+import mathutils, mathutils.kdtree
 import numpy as np
 
 a = sys.argv[sys.argv.index("--") + 1:]
@@ -34,15 +35,16 @@ SHARP_DEG = 40.0            # the low model's hard edges
 CHROMA_GAIN = 1.15          # all colour a little richer
 # colour groups in Lab (L lightness, C chroma, h hue degrees): (name, test, dL, da, db, chroma x)
 GRADE = {
-    "OakHillHouse_300k": dict(plaster=(-3.0, 2.5, 14.0, 1.0),   # cream plaster to a warm butter cream (Eichenwalde's sunny walls)
+    "OakHillHouse_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0),    # warm cream plaster, clearly lighter and paler than the thatch (townlab review: too close to it)
                              wood=(-4.0, 1.0, -3.0, 1.05),    # rich brown, less orange
-                             thatch=(2.0, -2.0, 3.0, 1.0),     # golden straw, not orange (owner: "thatch reads a bit orange")
+                             thatch=(-9.0, 2.0, -2.0, 0.9),    # deeper golden-brown straw, not orange, set apart from the plaster
                              stone=(2.0, 1.0, 5.0, 1.0)),     # warm grey-beige stone
-    "OakHillStore_300k": dict(plaster=(0.0, 3.0, 16.0, 1.0),
+    "OakHillStore_300k": dict(plaster=(2.0, 2.0, 7.0, 1.0),
                              wood=(3.0, 1.5, -1.0, 1.1),
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
 }
+MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
@@ -111,7 +113,29 @@ bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.01 / U)
 bm.to_mesh(me); bm.free()
 tris = sum(len(p.vertices) - 2 for p in me.polygons)
 bpy.ops.object.select_all(action="DESELECT"); bpy.context.view_layer.objects.active = lo; lo.select_set(True)
+# Flower boxes keep their shape (townlab review 2026-11-14: "jagged, shard-like flower boxes"): the reduction spares what sits just
+# under a window (the boxes and their flowers), found from the window marks (G) of the high model's vertex colour.
+keep_n = 0
+if len(hi.data.color_attributes):
+    hm = hi.data; at = hm.color_attributes[0]
+    lc = np.empty(len(hm.loops) * 4, np.float32); at.data.foreach_get("color", lc); lc = lc.reshape(-1, 4)
+    ls = np.empty(len(hm.polygons), np.int64); hm.polygons.foreach_get("loop_start", ls)
+    cen = np.empty(len(hm.polygons) * 3); hm.polygons.foreach_get("center", cen); cen = cen.reshape(-1, 3) * U
+    wc = cen[lc[ls, 1] > 0.5]
+    if len(wc):
+        kd = mathutils.kdtree.KDTree(len(wc))
+        for i, c in enumerate(wc): kd.insert(c, i)
+        kd.balance()
+        vg = lo.vertex_groups.new(name="Keep")
+        for v in me.vertices:
+            p = v.co * U
+            for (c, _, _) in kd.find_range(p, 120.0):
+                if c.z - 75.0 < p.z < c.z - 10.0 and math.hypot(c.x - p.x, c.y - p.y) < 60.0:
+                    vg.add([v.index], 0.6, "REPLACE"); keep_n += 1; break   # (0.6: reduced less, never frozen: 1.0 froze 60k vertices and the house came out at 122k)
+log(new, "flower-box vertices spared", keep_n)
 m = lo.modifiers.new("reduce", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = budget / tris; m.use_collapse_triangulate = True
+if keep_n:
+    m.vertex_group = "Keep"; m.invert_vertex_group = True; m.vertex_group_factor = 3.0   # (inverted: weight 1 = spared)
 bpy.ops.object.modifier_apply(modifier=m.name)
 # hard edges over SHARP_DEG, smooth elsewhere
 for p in me.polygons: p.use_smooth = True
@@ -191,6 +215,7 @@ if glow_img is not None:
 else:
     glow_lin = np.zeros((SMALL, SMALL, 3), np.float32)
 show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
+mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
 # convexity: the high model's pointiness (0.5 flat, above convex)
 show(geo.outputs["Pointiness"]); point = bake("Edge", SMALL, False)[..., 0]
 # the normal: the high model's shape and normal map, in the low model's tangent space
@@ -227,7 +252,15 @@ w_wood = soft(C, 10, 15) * (1 - soft(Lc, 38, 45)) * soft(H, 25, 35) * (1 - soft(
 w_thatch = soft(C, 16, 22) * soft(Lc, 38, 45) * soft(H, 62, 68) * (1 - soft(H, 95, 105)) * (1 - w_plaster)
 glass_guard = np.clip(up2(mask[..., 1]) * 4, 0, 1) if mask.shape[0] * 2 == SIZE else 0
 dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_GAIN
-for w, key in ((w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_stone, "stone")):
+# each texel's height, from the low model's own geometry (a position bake): the moss grade and the top-to-bottom gradient use it
+show(geo.outputs["Position"])
+pos = bake("Height", SMALL, False)   # (from the high model's Position, selected to active: the low model's own material has no emission, so a bake of it alone came out 0 and the gradient and foot tint fell on the whole building)
+z = up2(pos[..., 2]) * U
+log("height range cm", [round(float(x), 1) for x in np.percentile(z, [1, 50, 99])], "moss-hue share by height", [round(float(((soft(C, 10, 16) * soft(H, 100, 110) * (1 - soft(H, 170, 180))) * ((z > a) & (z <= b))).mean() * 100), 2) for a, b in ((-1e9, 260), (260, 1e9))])
+# the model's own painted moss (lime patches along the ridge, read as spots by the review 2026-11-14): muted to a soft olive
+w_moss = soft(C, 10, 16) * soft(H, 92, 100) * (1 - soft(H, 170, 180)) * (1 - w_plaster) * soft(z, 260.0, 320.0)   # (roof only: the flower boxes' leaves keep their green, review 2026-11-14)
+g = dict(g, moss=MOSS_GRADE)
+for w, key in ((w_plaster, "plaster"), (w_wood, "wood"), (w_thatch, "thatch"), (w_stone, "stone"), (w_moss, "moss")):
     l_, a_, b_, c_ = g[key]
     dL += w * l_; dA += w * a_; dB += w * b_; cg *= 1 + w * (c_ - 1)
 A2 = A * cg + dA; B2 = B * cg + dB; L2 = Lc + dL
@@ -240,10 +273,6 @@ lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
 lin = lin * (1 + EDGE_GAIN * edge[..., None])
-# top-to-bottom: each texel's height, from the low model's own geometry (a position bake)
-show(geo.outputs["Position"])
-pos = bake("Height", SMALL, False, selected=False)
-z = up2(pos[..., 2]) * U
 zt = np.clip((z - 0.0) / max(float(ext[2] * U) * 0.8, 1.0), 0, 1)
 gl = GRAD_BOTTOM + (GRAD_TOP - GRAD_BOTTOM) * np.sqrt(zt)
 foot = np.clip(1 - z / 120.0, 0, 1)[..., None]
