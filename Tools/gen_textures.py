@@ -321,24 +321,29 @@ def paint_cumulus():
     ll = math.sqrt(sum(a * a for a in L))
     L = tuple(a / ll for a in L)
     px = bytearray(W * H * 4)
+    # (2026-11-14, second review: small round lobes perched on the piled puffs read as teddy-bear ears, and one heap came out
+    # a near-perfect disc. Now the heaps are flatter and wider, each tile its own build (a long low bank, two middling heaps,
+    # one taller), the piled puffs lower and broader, and the small lobes sit half inside their puff so they bump the
+    # outline instead of standing proud of it)
     for tile in range(4):
         ox, oy = (tile % 2) * T, (tile // 2) * T
         base = T * 0.74
+        wide, tall = ((1.08, 0.55), (1.0, 0.8), (0.94, 0.9), (0.98, 1.0))[tile]   # (how wide and how tall this tile's heap is)
         blobs = []
-        n = rnd.randint(7, 11)
+        n = rnd.randint(8, 12)
         for k in range(n):                                  # a row of puffs along the base, taller in the middle
-            x = T * (0.14 + 0.72 * k / (n - 1)) + rnd.uniform(-10, 10)
+            x = T * (0.5 + (k / (n - 1) - 0.5) * 0.72 * wide) + rnd.uniform(-10, 10)
             mid = 1 - abs(k / (n - 1) - 0.5) * 2
-            r = T * (0.065 + 0.075 * mid + rnd.uniform(0, 0.035))
+            r = T * (0.065 + 0.065 * mid * tall + rnd.uniform(0, 0.03))
             blobs.append((x, base - r * 0.55, r))
-        for k in range(rnd.randint(5, 8)):                  # puffs piled on top
-            x = T * rnd.uniform(0.28, 0.72)
-            r = T * rnd.uniform(0.07, 0.13)
-            blobs.append((x, base - T * rnd.uniform(0.18, 0.38), r))
-        for k in range(rnd.randint(26, 40)):                # many small lobes round the upper edge
-            a = rnd.uniform(math.pi * 1.0, math.pi * 2.0)
+        for k in range(rnd.randint(3, 5)):                  # broad puffs piled on top
+            x = T * (0.5 + rnd.uniform(-0.24, 0.24) * wide)
+            r = T * rnd.uniform(0.09, 0.14)
+            blobs.append((x, base - T * rnd.uniform(0.10, 0.22) * tall, r))
+        for k in range(rnd.randint(18, 28)):                # small lobes along the upper edge, half sunk into their puff
+            a = rnd.uniform(math.pi * 1.15, math.pi * 1.85)
             (bx, by, br) = blobs[rnd.randrange(len(blobs))]
-            blobs.append((bx + math.cos(a) * br * 0.9, by + math.sin(a) * br * 0.9, br * rnd.uniform(0.22, 0.42)))
+            blobs.append((bx + math.cos(a) * br * 0.7, by + math.sin(a) * br * 0.7, br * rnd.uniform(0.32, 0.48)))
 
         for j in range(T):
             y = j + 0.5
@@ -352,22 +357,27 @@ def paint_cumulus():
                     d2 = dx * dx + dy * dy
                     if d2 < 4.0:
                         f += math.exp(-d2 * 1.6)
-                        if d2 < 1.0:                        # inside this puff: its ball shading, outer puffs weigh most
-                            nz = math.sqrt(1.0 - d2)
-                            lam = max(0.0, dx * L[0] + dy * L[1] + nz * L[2])
-                            wgt = (1.0 - d2) ** 2 * br                  # fades to nothing at the puff's edge: no seams
+                        if d2 < 2.25:                       # in and just round this puff: its ball shading, outer puffs weigh most
+                            # (out past the ball's rim (2026-11-14) the soft fringe takes the rim's own shading, lit on top and
+                            # dark underneath, instead of a flat middle grey that drew a pale halo round the dark undersides)
+                            s = math.sqrt(d2) if d2 > 1.0 else 1.0
+                            ex, ey = dx / s, dy / s
+                            nz = math.sqrt(max(0.0, 1.0 - ex * ex - ey * ey))
+                            lam = max(0.0, ex * L[0] + ey * L[1] + nz * L[2])
+                            wgt = (1.0 - d2 / 2.25) ** 2 * br           # fades to nothing past the puff's edge: no seams
                             shade += lam * wgt
                             wsum += wgt
                 if f < 0.05:
                     continue
                 w = fbm(wisp, (ox + i) / W, (oy + j) / H)
-                density = clamp01((f - 0.34 + 0.22 * (w - 0.5)) * 2.6)
+                density = clamp01((f - 0.34 + 0.22 * (w - 0.5)) * 2.0)   # (2.6 until 2026-11-14: a softer fringe)
                 density *= clamp01((base + T * 0.05 - y) / (T * 0.06))          # soft flat underside
                 if density <= 0.0:
                     continue
                 ball = shade / wsum if wsum > 0 else 0.5
                 height = clamp01((base - y) / (T * 0.5))                          # the base is in its own shadow
-                lit = clamp01(0.15 + 0.75 * ball + 0.25 * height - 0.25 * clamp01((y - base + T * 0.08) / (T * 0.1)))
+                lit = clamp01(0.15 + 0.75 * ball + 0.25 * height - 0.45 * clamp01((y - base + T * 0.15) / (T * 0.17)))   # (the flatter heaps of v5 need a deeper shaded base: -0.25 over the bottom 0.08 before)
+                lit *= 0.75 + 0.25 * clamp01(density * 2.0)   # the thin fringe no lighter than the body: no pale halo round a heap
                 o = ((oy + j) * W + ox + i) * 4
                 px[o] = to8(density)
                 px[o + 1] = to8(lit)
@@ -376,7 +386,7 @@ def paint_cumulus():
     return W, H, px
 
 def cumulus():
-    return cached("T_Cumulus", 4, paint_cumulus)
+    return cached("T_Cumulus", 5, paint_cumulus)   # (5: flatter heaps, no ear lobes, 2026-11-14)
 
 class NoiseXY:
     """Value noise that wraps every px cells across and py cells down (for stretched, tiling patterns)"""

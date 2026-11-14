@@ -164,6 +164,8 @@ def _cobble_fields():
     vor = Voronoi(5101, 13, 0.75)
     rnd = random.Random(5200)
     stone = [(rnd.uniform(0.40, 0.55), rnd.uniform(-1, 1)) for _ in range(vor.n * vor.n)]
+    rnd_pick = random.Random(5250)   # (its own stream, so the stones keep their colours)
+    pick = [rnd_pick.uniform(0.04, 1.0) for _ in range(vor.n * vor.n)]   # alpha: each stone its own number, so M_Dirt drops stones whole where the street frays out
     tone = [Noise(5301 + i, 16 << i) for i in range(2)]
     soil = [Noise(5401 + i, 8 << i) for i in range(3)]
     warp = [Noise(5451 + i, 8 << i) for i in range(2)]
@@ -192,7 +194,7 @@ def _cobble_fields():
             g = sg * (1 - joint) + eg * joint
             b = sb * (1 - joint) + eb * joint
             o = (j * N + i) * 4
-            col[o], col[o + 1], col[o + 2], col[o + 3] = to8(r), to8(g), to8(b), 255
+            col[o], col[o + 1], col[o + 2], col[o + 3] = to8(r), to8(g), to8(b), to8(pick[k] * clamp01(edge * 4.0))   # (0 in the joints)
     _COBBLE["N"] = N
     _COBBLE["h"] = h
     _COBBLE["col"] = col
@@ -230,7 +232,7 @@ def rock():
 
 
 def cobble():
-    return cached("T_Cobble", 1, paint_cobble)
+    return cached("T_Cobble", 2, paint_cobble)   # (2: the per-stone number in alpha, 2026-11-14)
 
 
 def cobble_normal():

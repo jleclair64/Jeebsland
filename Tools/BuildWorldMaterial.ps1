@@ -1,7 +1,8 @@
 # Builds the ground's materials (M_Ground for all the land, M_Dirt for the roads, M_Stone) and pictures with Tools/world_material.py in a windowless editor.
 # The Unreal editor must be closed.
 $proj = Split-Path $PSScriptRoot -Parent
-if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }
+# (only an editor open on THIS project folder is in the way: other project copies run their own, 2026-11-14)
+if (Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Replace('/', '\').ToLower().Contains($proj.ToLower() + '\jeebsland.uproject') }) { Write-Host 'The Unreal editor is still open. Close it first.'; exit 1 }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'world_material.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'WORLDDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }

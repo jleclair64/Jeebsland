@@ -21,10 +21,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures      # noqa: E402
 import ground_textures   # noqa: E402
 
-GRASS_DESATURATION = 0.32   # as build_materials.py's: the grass and the ground under it pulled this far toward grey
-GRASS_TO_MEADOW = (1.157, 0.897, 0.559)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
-                                         # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime)
-GRASS_AVERAGE = (0.0717, 0.1083, 0.0130)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
+GRASS_DESATURATION = 0.40   # as build_materials.py's: the grass and the ground under it pulled this far toward grey
+GRASS_TO_MEADOW = (1.085, 0.810, 0.470)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
+                                         # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime), then 0.60, 0.47, 0.21 (2026-11-14): 0.85 x new R / 0.47, new G / 0.58, 0.85 x new B / 0.38
+GRASS_AVERAGE = (0.0672, 0.0978, 0.0109)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
 ROCK_AVERAGE = (0.100, 0.096, 0.084)   # what the stone fades to far away: a darker neutral grey (lighter averages, with the haze over
                                        # them, read lavender or pink-beige against the green hills)
 ROCK_TINT = (1.0, 1.0, 1.0)   # the RockTint parameter's default
@@ -42,7 +42,7 @@ def fresh_material(name):
     return tools.create_asset(name, "/Game", unreal.Material, unreal.MaterialFactoryNew())
 
 
-def import_texture(png, name, normal=False):
+def import_texture(png, name, normal=False, alpha=False):
     task = unreal.AssetImportTask()
     task.filename = png
     task.destination_path = "/Game"
@@ -58,7 +58,7 @@ def import_texture(png, name, normal=False):
         tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
         tex.set_editor_property("srgb", False)
     else:
-        tex.set_editor_property("compression_no_alpha", True)
+        tex.set_editor_property("compression_no_alpha", not alpha)   # (T_Cobble keeps its alpha: each stone's own number)
         tex.set_editor_property("srgb", True)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
     return tex
@@ -260,7 +260,8 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     far = g.tex(dirt_tex, g.mul(xy, 1.0 / 1700.0))
     var = g.lerpc(0.86, 1.14, far, "G")   # (was 0.72-1.22: near-black blotches where the cobbles fray out)
     earth = g.muln(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), g.c3(EARTH_BALANCE))
-    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    earth = g.addn(g.mul(earth, 0.9), g.c3((0.024, 0.019, 0.013)))   # the darkest earth lifted a little (second review: near-black in shade beside the stones)
+    uv =g.node(unreal.MaterialExpressionTextureCoordinate)
     edge = g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, True, False), -0.5), 2.0)))   # 0 at the sides, 1 down the middle
     # the cobbles: across nearly the whole street (2026-11-13, owner: the dirt came too far onto the path and looked
     # copy-pasted), earth washing softly over the outer stones instead of biting in. The road's own edge is at edge 0.29 (the
@@ -274,10 +275,16 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     # (speck) wash over the outer stones, so the edge frays softly instead of drawing one crisp repeated lobe)
     slow = g.mul(g.addn(g.mask(g.tex(patches, g.mul(xy, 1.0 / 650.0)), True, False), g.mask(g.tex(patches, g.mul(g.add(xy, 4409.0), 1.0 / 1130.0)), True, False)), 0.5)
     speck = g.mul(g.addn(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 32.0)), True, False), g.mask(g.tex(dirt_tex, g.mul(g.add(xy, 377.0), 1.0 / 53.0)), True, False)), 0.5)
-    cob_edge = g.addn(g.addn(g.add(edge, -0.37), g.mul(g.add(ragc, -0.5), 0.30)), g.mul(g.add(slow, -0.5), 0.18))
-    cob = g.muln(cob_on, g.sat(g.addn(g.mul(cob_edge, 3.2), g.mul(g.add(speck, -0.5), 0.9))))
-    stones = g.mask(g.tex(cobble_tex, g.mul(xy, 1.0 / 250.0)), True, True, True)
-    stones = g.muln(stones, g.lerpc(0.9, 1.08, far, "G"))
+    # (second review, 2026-11-14: the stones still ended in a crisp, crunchy cut-out. Now a wider band that starts just outside
+    # the road, in which the stones drop out WHOLE, one by one (each stone's own number in T_Cobble's alpha against how far into
+    # the band it lies), so the street thins into scattered stray stones with earth washed over them instead of a cut edge)
+    cob_edge = g.addn(g.addn(g.add(edge, -0.22), g.mul(g.add(ragc, -0.5), 0.30)), g.mul(g.add(slow, -0.5), 0.18))
+    band = g.muln(cob_on, g.sat(g.addn(g.mul(cob_edge, 2.4), g.mul(g.add(speck, -0.5), 0.25))))   # 0 just outside the road's edge, 1 from about two thirds of the way in (1.6 from -0.33 left the side streets half bare)
+    ctex = g.tex(cobble_tex, g.mul(xy, 1.0 / 250.0))
+    stones = g.muln(g.mask(ctex, True, True, True), g.lerpc(0.9, 1.08, far, "G"))
+    pick = g.mul(ctex, 1.0, "A")   # each stone's own number (0.04 to 1; 0 in the joints)
+    cob = g.sat(g.mul(g.add(g.addn(pick, g.mul(band, 1.4)), -1.0), 7.0))   # (1.4: most stones stay until the band is well under half) a stone stays if its number beats what the band leaves
+    stones = g.lerp(stones, earth, g.mul(g.one(unreal.MaterialExpressionOneMinus, band), 0.3))   # earth washed over the outer stones
     g.out(g.lerp(earth, stones, cob), unreal.MaterialProperty.MP_BASE_COLOR)
     flat = g.c3((0.0, 0.0, 1.0))
     bumps = g.mask(g.tex(cobble_n, g.mul(xy, 1.0 / 250.0), normal=True), True, True, True)
@@ -291,8 +298,8 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     # (slow: the wander a metre or two long, made above, so the edge bulges and bites in)
     alpha = g.sat(g.mul(g.addn(g.addn(g.add(edge, -0.12), g.mul(noise, -0.16)), g.mul(slow, -0.22)), 2.4))   # a broad, gentle band
     # (speck, made above: fine grit breaks the soft band into scattered specks of dirt and grass)
-    grit = g.addn(g.mul(g.add(g.mul(speck, 3.5), -1.0), 0.55), g.mul(g.add(speck, -0.5), 0.9))   # (the second, centred term since the review: the outline breaks into crumbs over a wider band, the edge's average place unchanged)
-    g.out(g.addn(g.addn(alpha, grit), g.mul(cob, 2.0)), unreal.MaterialProperty.MP_OPACITY_MASK)   # (cobbles are always solid)
+    grit = g.addn(g.mul(g.add(g.mul(speck, 3.5), -1.0), 0.40), g.mul(g.add(speck, -0.5), 0.6))   # (0.55 and 0.9 until the second review: the crumbs read pixel-noisy at 60% render scale)   # (the second, centred term since the review: the outline breaks into crumbs over a wider band, the edge's average place unchanged)
+    g.out(g.addn(g.addn(g.addn(alpha, grit), g.mul(cob, 2.0)), g.mul(band, 3.0)), unreal.MaterialProperty.MP_OPACITY_MASK)   # (stones and the street's own band are always solid: no holes to the ground below)
     finish(mat, "M_Dirt")
 
 
@@ -325,7 +332,7 @@ def build_stone(rock_tex, patches):
 
 grass_tex = import_texture(ground_textures.grass_ground(), "T_GrassGround")
 rock_tex = import_texture(ground_textures.rock(), "T_Rock")
-cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble")
+cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble", alpha=True)
 cobble_n = import_texture(ground_textures.cobble_normal(), "T_CobbleN", normal=True)
 dirt_tex = import_texture(gen_textures.dirt(), "T_Dirt")
 patches = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")

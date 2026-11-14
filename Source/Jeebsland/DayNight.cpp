@@ -54,9 +54,9 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> CloudDensity(TEXT("jeeb.Cloud.Density"), 3.f, TEXT("Multiplies the cloud material's density: higher reads as solid heaps with crisp edges and darker undersides, lower as mist"));
 	static TAutoConsoleVariable<FString> CloudSet(TEXT("jeeb.Cloud.Set"), TEXT(""), TEXT("Test pictures: any of the cloud material's scalars, Name=Value;Name=Value (the names are logged as JEEBCLOUDPARAM at the start)"));
 	static TAutoConsoleVariable<float> CloudCoverFix(TEXT("jeeb.Cloud.Cover"), -1.f, TEXT("Test pictures: hold the cloud cover (0 clear, 1 scattered, 1.5 heavy); -1 the weather decides"));
-	static TAutoConsoleVariable<float> LowCloudBright(TEXT("jeeb.Cloud.LowBright"), 2.3f, TEXT("LOW's painted cloud ring: brightness at noon"));
+	static TAutoConsoleVariable<float> LowCloudBright(TEXT("jeeb.Cloud.LowBright"), 1.8f, TEXT("LOW's painted cloud ring: brightness at noon (2.3 until 2026-11-14: the shaded bases burned out to white)"));
 	static TAutoConsoleVariable<float> LowCloudHaze(TEXT("jeeb.Cloud.LowHaze"), 0.25f, TEXT("LOW's painted cloud ring: share of the haze's colour mixed into it (it takes no fog itself)"));
-	static TAutoConsoleVariable<float> LowCloudDusk(TEXT("jeeb.Cloud.LowDusk"), 0.14f, TEXT("LOW's painted cloud ring at the low sun: share of its noon brightness"));
+	static TAutoConsoleVariable<float> LowCloudDusk(TEXT("jeeb.Cloud.LowDusk"), 0.18f, TEXT("LOW's painted cloud ring at the low sun: share of its noon brightness"));
 
 	// (-OldLook: the look before 2026-11-12 everywhere, also ApplyGraphics' settings, for before/after test pictures)
 	bool Old()
@@ -440,8 +440,13 @@ void ADayNight::TickLowClouds(float High)
 	// (M_Cumulus takes no fog, so a share of the haze's own colour is mixed in here: far heaps sit in the same air as the hills)
 	FLinearColor Haze(0.6f, 0.62f, 0.68f);
 	if (UExponentialHeightFogComponent* FC = Fog.IsValid() ? Fog->GetComponent() : nullptr) Haze = FC->FogInscatteringLuminance;
-	const float HazeShare = JeebLook::LowCloudHaze.GetValueOnGameThread();
-	LowCloudMat->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(FMath::Lerp(SunCol, FLinearColor(1.f, 0.98f, 0.94f), 0.5f * High), Haze, HazeShare));
-	LowCloudMat->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(FMath::Lerp(FLinearColor(0.42f, 0.30f, 0.34f), FLinearColor(0.70f, 0.76f, 0.86f), High), Haze, HazeShare));
+	// (second review, 2026-11-14: at the low sun the heaps read as cold lavender stickers on the orange sky. Now their lit
+	// side is the sun's colour pulled toward a warm cream-peach, their base a muted warm brown-pink, and more of the sky's
+	// own orange haze goes in as the sun sinks; noon is as before)
+	const float HazeShare = FMath::Lerp(JeebLook::LowCloudHaze.GetValueOnGameThread() + 0.1f, JeebLook::LowCloudHaze.GetValueOnGameThread(), High);
+	const FLinearColor LitLow = FMath::Lerp(SunCol, FLinearColor(1.f, 0.84f, 0.66f), 0.4f);
+	const FLinearColor LitHigh = FMath::Lerp(SunCol, FLinearColor(1.f, 0.98f, 0.94f), 0.5f);
+	LowCloudMat->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(FMath::Lerp(LitLow, LitHigh, High), Haze, HazeShare));
+	LowCloudMat->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(FMath::Lerp(FLinearColor(0.52f, 0.36f, 0.30f), FLinearColor(0.58f, 0.64f, 0.76f), High), Haze, HazeShare));
 	LowCloudMat->SetScalarParameterValue(TEXT("Bright"), JeebLook::LowCloudBright.GetValueOnGameThread() * FMath::Lerp(JeebLook::LowCloudDusk.GetValueOnGameThread(), 1.f, High));
 }
