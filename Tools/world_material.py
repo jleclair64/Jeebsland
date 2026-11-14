@@ -77,7 +77,10 @@ class Graph:
         return n
 
     def link(self, a, b, pin="", out=""):
-        lib.connect_material_expressions(a, out, b, pin)
+        # (2026-11-14: a failed link used to pass silently, leaving the input at its default 0: the near grass asked a Lerp for an
+        # "RGB" pin it doesn't have, so bare ground within about 15 m of the camera painted black. Now it stops the build.)
+        if not lib.connect_material_expressions(a, out, b, pin):
+            raise RuntimeError("WORLDDIAG link failed: %s.%s -> %s.%s" % (a.get_class().get_name(), out, b.get_class().get_name(), pin))
 
     def c(self, v):
         return self.node(unreal.MaterialExpressionConstant, r=v)
@@ -179,7 +182,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # two samplings at unrelated sizes, swapped in 10 m patches, so no 3 m repeat lines up into a grid
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
     near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
-    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW), "RGB")
+    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW))   # (no "RGB": a Lerp's one output is unnamed; asking for "RGB" left the near ground black)
     far = g.ramp(depth, 1500.0, 6000.0)
     grass = g.lerp(near, g.c3(GRASS_AVERAGE), far)
     grass = g.muln(grass, g.lerpc(0.91, 1.08, medm))
