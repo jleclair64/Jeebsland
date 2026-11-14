@@ -57,13 +57,16 @@ namespace
 	bool InstancingOk(UStaticMesh* Mesh)
 	{
 		for (const FStaticMaterial& M : Mesh->GetStaticMaterials())
-			if (M.MaterialInterface && M.MaterialInterface->GetMaterial() && !M.MaterialInterface->GetMaterial()->bUsedWithInstancedStaticMeshes) return false;
+			if (M.MaterialInterface && M.MaterialInterface->GetMaterial() && !M.MaterialInterface->GetMaterial()->GetUsageByFlag(MATUSAGE_InstancedStaticMeshes)) return false;
 		return true;
 	}
 	UStaticMesh* LoadMesh(const FString& Path)
 	{
-		static TMap<FString, UStaticMesh*> Cache;   // (asked many times per model; a miss is remembered too)
-		if (UStaticMesh** Got = Cache.Find(Path)) return *Got;
+		// (asked many times per model. Weak pointers: the cache outlives a world, and a client builds the town twice, in the login
+		// screen's world and again after travelling to the server, so a raw pointer here dangled once the first world's meshes were
+		// collected and crashed the second build, 2026-11-14; a miss is asked again)
+		static TMap<FString, TWeakObjectPtr<UStaticMesh>> Cache;
+		if (const TWeakObjectPtr<UStaticMesh>* Got = Cache.Find(Path)) if (Got->IsValid()) return Got->Get();
 		const FString Name = FPaths::GetBaseFilename(Path);
 		UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), *Path, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
 		Cache.Add(Path, M);
@@ -459,7 +462,9 @@ void ATownLabTown::BuildPlazaOak()
 		M->RegisterComponent();
 		DrawSets += 2;
 		float Fill = 12000.f;
-		FParse::Value(FCommandLine::Get(), TEXT("OakFill="), Fill);
+#if !UE_BUILD_SHIPPING
+		FParse::Value(FCommandLine::Get(), TEXT("OakFill="), Fill);   // (a test switch)
+#endif
 		if (Fill > 0.f)
 		{
 			USpotLightComponent* L = NewObject<USpotLightComponent>(this);

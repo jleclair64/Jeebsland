@@ -572,7 +572,9 @@ void AKnightGameState::BuildMoveLab()
 	// Oak Hill's filler props in labelled rows on a grass yard past the floor's -Y edge, for the owner to look at (2026-11-13; FillerLineup.cpp, /Game/Filler)
 	JeebFiller::BuildYard(World, Floor, Root, Z);
 	// TownLab's two rebuilt buildings beside the originals (2026-11-14, test switch -TownLabBuildings; TownLabLineup.h)
+#if !UE_BUILD_SHIPPING
 	if (FParse::Param(FCommandLine::Get(), TEXT("TownLabBuildings"))) JeebTownLab::BuildLineup(World, Floor, Root, Z);
+#endif
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();

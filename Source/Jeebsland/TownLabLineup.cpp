@@ -149,7 +149,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 			}
 		}
 		UE_LOG(LogTemp, Display, TEXT("JEEBTLB %s scale %.2f nanite %d fallback tris %d materials %d | decor pieces %d draws %d tris %d lights %d"),
-			*Name, Sc, Mesh->IsNaniteEnabled() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
+			*Name, Sc, Mesh->HasValidNaniteData() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
 		UTextRenderComponent* Sign = NewObject<UTextRenderComponent>(Owner);
 		Sign->SetupAttachment(Root);
 		Sign->SetRelativeLocation(FVector(S.X, YardY - 900.f, 1500.f));

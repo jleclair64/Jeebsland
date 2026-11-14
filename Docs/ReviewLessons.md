@@ -186,14 +186,17 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - (Oak Hill walls, 2026-11-12) A building's solid box is its foundation measured at foot height, not a share of the model's whole bounds (eaves, porches and chimneys held the knight half a metre off), and Unreal mirrors Blender's Y on import, so a Blender-measured rectangle or door side is flipped in Y. Check with a walk into a wall (log where he stops), on the asymmetric side.
 - (Oak Hill reorganisation, 2026-11-13) In a town review brief, name every building's model, where it stands in each overview picture and any loud colours it has on purpose (the market stall's red and cream striped roof read as a placeholder from the air), so the reviewer does not have to guess whether a piece is a leftover or a broken material.
 - When a new ground patch meets a mesh with a different material, report the visible seam to the owner as a known issue when it is built.
+- LESSON (rebuilt Oak Hill, 2026-11-14): never keep raw UObject pointers in a static or function-local cache: it outlives a world, and a client builds the world twice (the login screen's world, then again after travelling to the server), so the second build used dangling pointers and crashed. Use TWeakObjectPtr, a UPROPERTY or a plain LoadObject per world, and test anything built at BeginPlay through the real login (menu world, travel, game world), not editor Play, which skips the second build.
 
 ## Frame rate (performance-reviewer)
 - Before reading a benchmark, take one still and confirm the thing being measured is in frame, and set up the baseline so a fixed cost (such as resolution) can't hide what one object costs. Give the run a limit: a test row of three models needs a few runs, not fifteen minutes.
+- LESSON (rebuilt Oak Hill, 2026-11-14): a stats tour run once per variant cannot tell a real cost from a hitch: compare the frame counts, run each variant at least twice (or log the worst frame), and when game-thread time rises with the GPU flat, look at ticks and movable lights, not triangles.
 - LESSON (ground, 2026-11-13): before reading a benchmark of a moved or aerial view, confirm from the log's JEEBSHOT position line and the still that the view really moved (`-ShotAt`/`-ShotEye` act about 2 s into the shot clock; a quoting slip in `-ExecCmds` can swallow them), keep the capture window inside the moved part, measure before and after in the same build, and give every cost-changing feature an off-switch so before and after can be split.
 
 ## Packaged game (package-reviewer)
 - Anything loaded by name lives under `/Game` (or `/Engine/BasicShapes`); raw files under `Content/Data` (staged as UFS).
 - Code compiles for Shipping (no editor-only fields).
+- LESSON (rebuilt Oak Hill, 2026-11-14): calls made only for a log or a measurement can be editor-only (`UStaticMesh::IsNaniteEnabled`); keep test and measurement code (lineups, tours, JEEB logs) inside `#if !UE_BUILD_SHIPPING` and compile Shipping for every new file before calling a change done.
 - List the test switches that are on before every package.
 - A show-or-hide that looks a section or slot up by name logs and skips when the name is not found, because a missed name silently leaves it visible. Command-line test hooks that move gear or hit boxes are off in Shipping (`!UE_BUILD_SHIPPING`).
 - A new switch in `[Jeebsland.Testing]` goes in CLAUDE.md's TEMPORARY list in the same change, since that section ships in a package.

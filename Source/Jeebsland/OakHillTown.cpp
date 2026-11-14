@@ -239,7 +239,7 @@ static constexpr float PlazaOakFill = 12000.f, PlazaOakFillUp = 650.f, PlazaOakF
 UStaticMesh* AOakHillTown::LoadPlazaOak()
 {
 	// (-NoPlazaOak, test pictures only: the woods' own oak stands in, to measure what the Meshy oak costs)
-	static UStaticMesh* Mesh = JeebOakHill::TestOff(TEXT("NoPlazaOak")) ? nullptr : LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOak.SM_PlazaOak"));
+	UStaticMesh* Mesh = JeebOakHill::TestOff(TEXT("NoPlazaOak")) ? nullptr : LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOak.SM_PlazaOak"));
 	return Mesh;
 }
 
@@ -262,7 +262,7 @@ void AOakHillTown::BuildPlazaOak()
 		M->SetWorldPositionOffsetDisableDistance(FMath::RoundToInt(PlazaOakSwayCm));   // (world units, cm)
 		// Its shadow (visual review 2026-11-13: the dense crown cast one near-black disc): SM_PlazaOakShadow, a 60k cut-down copy
 		// with gaps cut in the leaves, hidden but drawn into the shadows, so the shade under the oak is dappled; the tree casts none.
-		static UStaticMesh* ShadowMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOakShadow.SM_PlazaOakShadow"));
+		UStaticMesh* ShadowMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOakShadow.SM_PlazaOakShadow"));
 		if (ShadowMesh)
 		{
 			M->SetCastShadow(false);
