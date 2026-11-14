@@ -46,11 +46,11 @@ BUILDINGS = {
     # deeper (ys) and lower (zs) because Meshy made it shallow and tall
     "BankStall_300k":          dict(file="BankStall_A_town.glb",        length=1100.0, sink=15.0),
     "PotionStall_300k":        dict(file="PotionShop_A.glb",            length=1100.0, sink=15.0, ys=1.5, zs=0.75),
-    # A third house design (owner, 2026-11-13): the library's "Storybook cottage v2" by kaesar3d (Docs/OakHillPlan.md), reduced from
-    # StorybookCottage_Detailed.glb by building_reduce.py, its glass found by building_glow.py (--mask-only --rough-max 1 --hue 195,232
-    # --sat 0.45,1 --val 0.3,0.95 --grow 6), then repainted by building_palette.py "cottage". It came turned 56 degrees with its door to +X: turned so the door faces -Y like the others.
-    # cm: its arched door 2.3 m tall (0.37 of the file's units), like the house's door at the house's scale.
-    "StorybookCottage_300k":   dict(file="StorybookCottage_300k.glb",   cm=620.0, sink=15.0, turn=-56.0),
+    # A third house design (owner, 2026-11-13): like the library's "Storybook cottage v2" by kaesar3d (Docs/OakHillPlan.md), but remade
+    # without its lanterns, pots, barrel and bench (2026-11-14): two views of the original rendered in Blender, the props painted out by
+    # Meshy image-to-image, then Meshy multi-image-to-3D (303k triangles, door to -Y). Glass by building_glow.py (--mask-only --rough-max 1
+    # --hue 195,232 --sat 0.45,1 --val 0.3,0.95 --grow 6), repainted by building_palette.py "cottage". cm: the same 12.4 m height as before.
+    "StorybookCottage_300k":   dict(file="StorybookCottage_300k.glb",   cm=667.0, sink=15.0),
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them
@@ -62,29 +62,11 @@ LANTERNS = {
     "OakHillHouse_300k":  [(-110.0, -68.0, -452.0, -409.5, 146.0, 230.0), (160.0, 204.0, -452.0, -409.5, 146.0, 230.0)],   # the porch posts
     "OakHillStore_300k":  [(238.0, 292.0, -394.0, -322.0, 183.0, 300.0)],                                                  # by the lean-to
     "OakHillChurch_300k": [(-212.0, -128.0, -695.0, -621.0, 182.0, 312.0)],                                                # left of the door
-    # the storybook cottage: its three lanterns, and (owner: "remove its lanterns, the barrel and the potted plants") the barrel and flower pots too
-    "StorybookCottage_300k": [
-        (336.0, 414.0, -112.0, -45.0, 284.0, 386.0, dict(cyl=(375.0, 108.0, 166.0), uvat=(330.0, -40.0, 335.0), wall=True)), (515.0, 600.0, 30.0, 90.0, 296.0, 380.0, dict(cyl=(375.0, 108.0, 166.0), uvat=(531.0, 165.0, 340.0), wall=True)), (396.0, 440.0, -180.0, -126.0, 46.0, 134.0),   # lanterns
-        (492.0, 630.0, -50.0, 105.0, -16.0, 168.0, dict(cyl=(348.0, 95.0, 190.0), uvat=(500.0, 209.0, 60.0), wall=True)),                                           # the barrel (the bench stays)
-        (-150.0, -30.0, -420.0, -240.0, 104.0, 170.0), (-350.0, -220.0, -370.0, -190.0, 104.0, 170.0),
-        (-490.0, -360.0, -290.0, -90.0, 104.0, 170.0), (-630.0, -500.0, -180.0, 20.0, 104.0, 215.0),                                                                                      # pots on the garden wall
-        # (2026-11-14, visual review: the cuts above leave each wall pot's foot standing in the bed, capped) its upright sides and cap take
-        # the picture of the stone round it (retex: nothing moves; pressing them down stretched faces from the bed's plants and the wall)
-        (-134.0, -44.0, -352.0, -262.0, 82.0, 112.0, dict(retex="all", at=(-187.0, -305.0, 100.0))),
-        (-330.0, -240.0, -307.0, -232.0, 82.0, 112.0, dict(retex="all", at=(-187.0, -305.0, 100.0))),
-        (-472.0, -368.0, -151.0, -47.0, 82.0, 112.0, dict(retex="all", at=(-495.0, -135.0, 100.0))),
-        (-609.0, -519.0, -91.0, -1.0, 82.0, 120.0, dict(retex="all", at=(-515.0, -130.0, 98.0))),
-        (40.0, 108.0, -200.0, -60.0, 158.0, 228.0),                                                                                           # the pot left of the door (cut; its patch looks to the landing's stone)
-        (286.0, 394.0, -200.0, -70.0, 160.0, 228.0, dict(z=168.0)),                                                                            # the pot right of the door: pressed onto the pier top,
-        (286.0, 394.0, -75.0, -38.0, 165.0, 250.0, dict(retex=(0.0, -1.0, 0.0))),                                                              # and what is left of its back against the wall takes the plaster's picture
-        (0.0, 114.0, -530.0, -395.0, -16.0, 52.0, dict(y=-404.0)),                                                                            # the pot at the left foot of the steps: pressed back onto the pier's front
-        (332.0, 428.0, -405.0, -265.0, -16.0, 62.0),                                                                                          # the pot at the right foot (cut: pressing it made a fin in front of the stair wall)
-        (420.0, 452.0, -378.0, -292.0, 8.0, 50.0)],                                                                                            # a tuft beside it (cut off)
 }
 LANTERN_SCRAP = 1500   # a loose piece near a lantern with fewer faces than this is what is left of its bracket
 # Where a cut-off pot leaves a flat patch on a wall top, the picture it takes: that of the kept face nearest the closest of these points
 # (this script's cm; within 1.5 m of the patch), the wall-top stone, instead of what is left of the pot round the hole
-PATCH_AT = {"StorybookCottage_300k": [(-187.0, -305.0, 100.0), (-355.0, -235.0, 100.0), (-495.0, -135.0, 100.0), (190.0, -130.0, 160.0), (490.0, -110.0, 52.0)]}   # (the last: the bench's wood top, where a lantern stood)
+PATCH_AT = {}
 
 # The white plaster: what counts as plaster in the colour picture (CIE Lab of the painted cream: lightness and how colourful)
 PLASTER_L, PLASTER_CHROMA = 72.0, 26.0
