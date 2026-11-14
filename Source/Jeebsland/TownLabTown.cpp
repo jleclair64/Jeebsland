@@ -167,6 +167,14 @@ void ATownLabTown::BuildGround()
 	const bool bBanks = bRealSite && !bServer;
 	TArray<FVector> V, N; TArray<FVector2D> UV; TArray<FLinearColor> Col, BankCol; TArray<float> BankAmt;
 	const int32 W = NJ + 1;
+	// (the ground's heights once, with a ring of cells beyond, so each vertex and its normal cost one HeightAt instead of five: the
+	// build took 1.2-1.7 s, 2026-11-14)
+	const int32 HW = NJ + 3;
+	TArray<float> H; H.SetNumUninitialized((NI + 3) * HW);
+	for (int32 i = -1; i <= NI + 1; ++i)
+		for (int32 j = -1; j <= NJ + 1; ++j)
+			H[(i + 1) * HW + (j + 1)] = JeebTerrain::HeightAt(S.X0 + i * Step, S.Y0 + j * Step);
+	auto Ht = [&](int32 i, int32 j) { return H[(i + 1) * HW + (j + 1)]; };
 	V.Reserve((NI + 1) * W); N.Reserve((NI + 1) * W); UV.Reserve((NI + 1) * W); Col.Reserve((NI + 1) * W);
 	for (int32 i = 0; i <= NI; ++i)
 		for (int32 j = 0; j <= NJ; ++j)
@@ -177,11 +185,11 @@ void ATownLabTown::BuildGround()
 			else if (i == NI) Z = EdgeLerp(X, Y, true, BeyondStep(X + 1.f, Y));
 			else if (j == 0) Z = EdgeLerp(X, Y, false, BeyondStep(X, Y - 1.f));
 			else if (j == NJ) Z = EdgeLerp(X, Y, false, BeyondStep(X, Y + 1.f));
-			else Z = JeebTerrain::HeightAt(X, Y);
+			else Z = Ht(i, j);
 			V.Add(FVector(X, Y, Z));
 			HashIn(Hash, Z);
-			const float DX = (JeebTerrain::HeightAt(X + Step, Y) - JeebTerrain::HeightAt(X - Step, Y)) / (2.f * Step);
-			const float DY = (JeebTerrain::HeightAt(X, Y + Step) - JeebTerrain::HeightAt(X, Y - Step)) / (2.f * Step);
+			const float DX = (Ht(i + 1, j) - Ht(i - 1, j)) / (2.f * Step);
+			const float DY = (Ht(i, j + 1) - Ht(i, j - 1)) / (2.f * Step);
 			N.Add(FVector(-DX, -DY, 1.f).GetSafeNormal());
 			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
 			if (bServer) { Col.Add(FLinearColor::Black); continue; }
