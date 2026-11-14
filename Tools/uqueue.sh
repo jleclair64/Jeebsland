@@ -27,7 +27,21 @@ age() { [ -e "$1" ] && echo $(( $(now) - $(date -r "$1" +%s) )) || echo 0; }
 unreal_running() { tasklist 2>/dev/null | grep -i -E "UnrealEditor|UnrealBuildTool|AutomationTool|ShaderCompileWorker" >/dev/null; }
 field() { sed -n "s/^$1=//p" "$2" 2>/dev/null; }   # key=value lines in lock and ticket files
 
+clear_forgotten_runs() {   # a run slot older than 3 min whose folder has no Unreal running was never released
+	local f old=0
+	for f in "$G"/slot*.lock; do [ -e "$f" ] && [ "$(field kind "$f")" = run ] && [ "$(age "$f")" -ge 180 ] && old=1; done
+	[ $old -eq 1 ] || return 0
+	local procs; procs="$(powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name like 'UnrealEditor%'\" | ForEach-Object { \$_.CommandLine }" 2>/dev/null | tr '\\' '/' | tr 'A-Z' 'a-z')"
+	for f in "$G"/slot*.lock; do
+		[ -e "$f" ] && [ "$(field kind "$f")" = run ] && [ "$(age "$f")" -ge 180 ] || continue
+		local dir; dir="$(field folder "$f" | tr '\\' '/' | tr 'A-Z' 'a-z')"
+		echo "$procs" | grep -qF "$dir/" && continue
+		echo "uqueue: clearing $(field name "$f")'s run slot (nothing running in $(basename "$dir") for a while)"; rm -f "$f"
+	done
+}
+
 clear_stale() {
+	clear_forgotten_runs
 	unreal_running && { rm -f "$G/.idle"; return; }
 	[ -e "$G/.idle" ] || { touch "$G/.idle"; return; }
 	if [ "$(age "$G/.idle")" -ge 180 ]; then
