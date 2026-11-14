@@ -360,6 +360,8 @@ Before starting any request or batch, work out the most efficient way to run it,
   - all its pictures in as few runs as possible (several shots per run), MoveLab rather than Field when it will do;
   - log lines measured before any pictures;
   - every matching reviewer at once on the same build, asked for every problem in one round.
+- Frame-rate timing (`uqueue.sh solo`, holds all three slots): batch it. Each agent puts all its timing views in one run, and agents that need timing coordinate to measure back to back in one solo window (owner, 2026-11-14). Not upgrading the PC for now (6 cores and an 8 GB GPU make three slots the useful limit).
+- Pictures in MoveLab (or a TownLab lineup) whenever the real map isn't needed; Field only for what depends on the town or the world (owner, 2026-11-14).
 - Merge each branch as soon as it passes review and push it. Don't hold finished parts for the slowest one.
 - Model per part: Sonnet for data, colour and small tweaks (saves usage for the rest), Opus for motion, visuals and new systems.
 
