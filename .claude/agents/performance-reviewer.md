@@ -24,7 +24,7 @@ The main agent tells you what changed (files and a summary). It also tells you t
    Estimate counts (how many of X does the world spawn?).
 2. If the diff could cost speed, measure. Run the game in the same spot before and after, with nothing else running:
    ```
-   & "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "<project>\Jeebsland.uproject" /Game/Field -game -RenderOffScreen -ResX=1280 -ResY=720 -nosound -ExecCmds="stat unit" -benchmark -fps=... 
+   & "C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe" "<project>\Jeebsland.uproject" /Game/Field -game -RenderOffScreen -Multiprocess -ResX=1280 -ResY=720 -nosound -ExecCmds="stat unit" -benchmark -fps=... 
    ```
    Or use `-csvGoogle`/`-csvprofile`, or the game's own frame-rate display (Settings "Show the frame rate"). Use whatever gives a repeatable average over 20 to 30 s. "Before" means the build at the comparison commit. If rebuilding the old version is too slow, say so and give a careful estimate from the diff instead, marked as an estimate.
    The editor must be closed before any build (`Stop-Process -Name UnrealEditor`). Build command: `& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" JeebslandEditor Win64 Development "<project>\Jeebsland.uproject" -waitmutex`.
