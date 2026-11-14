@@ -50,4 +50,15 @@ private:
 	void PlaceBushesAndFlowers();
 	void Prewarm();
 	bool bPrewarmed = false;
+	// TownLab (the test map only): the rebuilt town's roads and buildings, and the new way while the player stands in it (Meadow.cpp)
+	float CellSize = 750.f, Reach = 9500.f, Tier0 = 1500.f, Tier1 = 4000.f;
+	bool bLabMode = false;
+	UPROPERTY() UMaterialInstanceDynamic* LabMat = nullptr;
+	void SetLabMode(bool bOn);
+	bool GrowsHere(float X, float Y, float PadCm = 0.f) const;
+	int32 TierFor(float Dist) const;
+	float Clearance(float X, float Y) const;
+	float WearAt(float X, float Y, float PathClearanceCm) const;
+	bool NoCover(float X, float Y) const;
+	float Nearness(float X, float Y) const;
 };

@@ -39,3 +39,6 @@ Art/Trees/*_Original*
 # Python bytecode caches from the tool scripts
 __pycache__/
 *.pyc
+
+# TownLab: downloaded CC0 texture originals (Docs/TownLab/Sources.md)
+Art/TownLab/Textures/Sources/

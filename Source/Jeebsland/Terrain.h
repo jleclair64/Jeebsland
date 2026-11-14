@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "WorldMap.h"
 #include "OakHill.h"
+#include "TownLab.h"
 
 // Shared description of the land, so the ground mesh, trees, rocks, huts, paths and walls all agree.
 namespace JeebTerrain
@@ -255,7 +256,8 @@ namespace JeebTerrain
 		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
 		float RiverD = 1.0e9f, RiverHalf = 600.f;
 		H = JeebWorld::SeaAndRivers(X, Y, H, &RiverD, &RiverHalf);
-		return JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf);   // Oak Hill's own hills and level plots (2026-11-11)
+		H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf);   // Oak Hill's own hills and level plots (2026-11-11)
+		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
 
 	// The height of the ground mesh as actually drawn (GrassField: a 200 cm grid, each cell split along its B-C diagonal).

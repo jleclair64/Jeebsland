@@ -13,13 +13,11 @@
 
 namespace
 {
-	constexpr float CellSize = 750.f;
-	constexpr float Reach = 9500.f;          // grass grows this far around the player
+	// (the square's size and how far the grass reaches are AMeadow's CellSize and Reach: 7.5 m and 95 m; TownLab's own grass is shorter-reaching)
 	constexpr float FieldR = 9000.f;
 	constexpr float NearDensity = 0.0012f;   // full tufts per square cm, close up
 	constexpr float FarDensity = 0.0006f;    // thinner, cheaper tufts further out
 	constexpr float NearDist = 1100.f;
-	inline int32 TierFor(float Dist) { return Dist < 1500.f ? 0 : (Dist < 4000.f ? 1 : 2); }
 	inline float TierDensity(int32 T) { return T == 0 ? 1.f : (T == 1 ? 0.55f : 0.3f); }
 	inline float TierSize(int32 T) { return T == 0 ? 1.f : (T == 1 ? 1.25f : 1.6f); }
 
@@ -27,7 +25,7 @@ namespace
 	// meadow with no edge (before, only within FieldR of the start and in Oak Hill's rectangle, whose straight side showed).
 	// Rock, mud, sand and water thin it out tuft by tuft (GroundMask.h). Frame-rate tests only (-JeebShot): -NoOakGrass leaves
 	// out the town's part, -NoWorldGrass everything outside the start's circle and the town.
-	bool GrowsHere(float X, float Y, float PadCm = 0.f)
+	bool GrowsHereWorld(float X, float Y, float PadCm = 0.f)
 	{
 		if (X < JeebWorld::MinX - PadCm || X > JeebWorld::MaxX + PadCm || Y < JeebWorld::MinY - PadCm || Y > JeebWorld::MaxY + PadCm) return false;
 		const float E = JeebOakHill::EastM(Y), N = JeebOakHill::NorthM(X), P = PadCm / 100.f;
@@ -42,6 +40,39 @@ AMeadow::AMeadow()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+}
+
+// TownLab (the test map only, TownLab.h): over the rebuilt town the roads, buildings and wear are that town's; and while the player
+// stands in it, the whole meadow switches to the new way (bLabMode: dense grass only within 40 m in bigger squares, fewer draws;
+// the painted ground matches it beyond), so there is never a line where one kind of grass meets the other.
+static bool InLab(float X, float Y) { return JeebTownLab::NewOn() && JeebTownLab::InPatch(X, Y); }
+bool AMeadow::GrowsHere(float X, float Y, float PadCm) const { return GrowsHereWorld(X, Y, PadCm); }
+int32 AMeadow::TierFor(float Dist) const { return Dist < Tier0 ? 0 : (Dist < Tier1 ? 1 : 2); }
+float AMeadow::Clearance(float X, float Y) const { return InLab(X, Y) ? JeebTownLab::RoadClearance(X, Y) : JeebTerrain::PathClearance(X, Y); }
+float AMeadow::WearAt(float X, float Y, float PathClearanceCm) const
+{
+	if (!InLab(X, Y)) return JeebGround::BuildingWear(X, Y, PathClearanceCm);
+	const FVector2D O = JeebTownLab::ToOld(X, Y);
+	return JeebGround::BuildingWear(O.X, O.Y, PathClearanceCm);
+}
+bool AMeadow::NoCover(float X, float Y) const { return InLab(X, Y) ? JeebTownLab::OnBuilding(X, Y) : JeebTerrain::NoGroundCover(X, Y); }
+float AMeadow::Nearness(float X, float Y) const { return InLab(X, Y) ? 1.f - FMath::SmoothStep(0.f, 700.f, JeebTownLab::BuildingDistance(X, Y)) : JeebTerrain::BuildingNearness(X, Y); }
+void AMeadow::SetLabMode(bool bOn)
+{
+	if (bOn == bLabMode) return;
+	bLabMode = bOn;
+	if (bJob) { bJob = false; JobXf.Reset(); }
+	TArray<FIntPoint> All; Cells.GetKeys(All);
+	for (const FIntPoint& Id : All) DropCell(Id);
+	// (lab: 40 m of dense grass in 15 m squares, about 25 draws instead of about 500; full tufts within 12 m)
+	if (bOn && !LabMat && NearMesh)
+	{
+		LabMat = UMaterialInstanceDynamic::Create(NearMesh->GetMaterial(0), this);   // (its blades fade out short of the 40 m edge, where the painted ground takes over)
+		LabMat->SetScalarParameterValue(TEXT("FadeStart"), 2600.f);
+		LabMat->SetScalarParameterValue(TEXT("FadeEnd"), 3800.f);
+	}
+	CellSize = bOn ? 1500.f : 750.f; Reach = bOn ? 4000.f : 9500.f; Tier0 = bOn ? 1200.f : 1500.f; Tier1 = bOn ? 4500.f : 4000.f;
+	UE_LOG(LogTemp, Log, TEXT("JEEBLAB meadow %s"), bOn ? TEXT("new way (40 m, 15 m squares)") : TEXT("as the game (95 m, 7.5 m squares)"));
 }
 
 // A grass tuft as three crossed flat cards (6 triangles). The blades are painted on a see-through texture (M_Grass).
@@ -217,6 +248,7 @@ void AMeadow::Tick(float Dt)
 	if (!Pawn || !NearMesh) return;
 	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
+	if (JeebTownLab::NewOn()) SetLabMode(JeebTownLab::InPatch(Me.X, Me.Y, bLabMode ? 2000.f : 0.f));   // (TownLab only)
 
 	TArray<FIntPoint> Far;
 	for (const TPair<FIntPoint, FCell>& P : Cells)
@@ -260,10 +292,10 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 	JobCount = FMath::RoundToInt(CellSize * CellSize * NearDensity * TierDensity(Tier));
 	// Far from every road, no tuft in this square can be near one: skip the (slow) road check for each tuft
 	const FVector2D Ctr((Id.X + 0.5f) * CellSize, (Id.Y + 0.5f) * CellSize);
-	bJobNearRoad = JeebTerrain::PathClearance(Ctr.X, Ctr.Y) < CellSize * 0.75f + 200.f;
+	bJobNearRoad = Clearance(Ctr.X, Ctr.Y) < CellSize * 0.75f + 200.f;
 	// Near a building, each tuft asks for the doorway and drip-line wear itself: those patches are a metre or two across, finer
 	// than the grid below, which used to blur them away so the grass stood untouched right up to doors and the well
-	bJobExactWear = JeebOakHill::InBox(Ctr.X, Ctr.Y, CellSize);
+	bJobExactWear = InLab(Ctr.X, Ctr.Y) || JeebOakHill::InBox(Ctr.X, Ctr.Y, CellSize);
 	if (!bJobExactWear && FMath::Abs(Ctr.X) < 9800.f && FMath::Abs(Ctr.Y) < 9800.f)
 		for (const JeebGround::FHutSpot& H : JeebGround::HutSpots())
 			if (FVector2D::Distance(Ctr, H.Pos) < 900.f + CellSize) { bJobExactWear = true; break; }
@@ -274,7 +306,7 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 			const float X = (Id.X + a * 0.25f) * CellSize, Y = (Id.Y + b * 0.25f) * CellSize;
 			const JeebGround::FMask M = JeebGround::At(X, Y, false);
 			JobAmount[b * 5 + a] = JeebGround::GrassAmount(M);
-			JobWear[b * 5 + a] = JeebGround::BuildingWear(X, Y, bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f);
+			JobWear[b * 5 + a] = WearAt(X, Y, bJobNearRoad ? Clearance(X, Y) : 1.0e6f);
 		}
 	JobXf.Reset();
 	JobXf.Reserve(JobCount);
@@ -294,11 +326,11 @@ void AMeadow::StepJob(double BudgetSeconds)
 		SampleJob(X, Y, Amount, Wear);
 		const float Keep = JobRand.FRand();
 		if (Keep >= Amount || !GrowsHere(X, Y)) continue;   // thinning out over rock, mud and sand
-		const float Pc = bJobNearRoad ? JeebTerrain::PathClearance(X, Y) : 1.0e6f;
-		if (bJobExactWear) Wear = JeebGround::BuildingWear(X, Y, Pc);
+		const float Pc = bJobNearRoad ? Clearance(X, Y) : 1.0e6f;
+		if (bJobExactWear) Wear = WearAt(X, Y, Pc);
 		if (Keep < Amount * (1.f - 0.5f * JeebWorld::Smooth(0.3f, 0.7f, Wear)))   // and over trampled ground: sparser and short at walls and doors, never cleared (bare ground in a building's shadow reads black)
 		{
-			if ((Pc >= -12.f || (Pc >= -40.f && JobRand.FRand() < (Pc + 40.f) / 28.f)) && !JeebTerrain::NoGroundCover(X, Y))   // a few tufts creep onto the edge of the dirt
+			if ((Pc >= -12.f || (Pc >= -40.f && JobRand.FRand() < (Pc + 40.f) / 28.f)) && !NoCover(X, Y))   // a few tufts creep onto the edge of the dirt
 			{
 				// the grass grows right into the frayed edge of a path, short there and full height about a metre back
 				float Short = FMath::Lerp(0.3f, 1.f, FMath::Clamp((Pc + 12.f) / 110.f, 0.f, 1.f));
@@ -308,7 +340,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 				const bool bThin = Cov > 0.f && JobRand.FRand() < 0.35f * Cov;     // and a little sparser
 				// beside every building (huts, stalls, the castle, the village inside its palisade, the forts) the grass is a little shorter,
 				// easing back up to full height over about 7 m so it never reads as tall-then-suddenly-short
-				const float Near = JeebTerrain::BuildingNearness(X, Y);
+				const float Near = Nearness(X, Y);
 				Short *= 1.f - 0.22f * Near;   // a bit shorter beside buildings (taller than before, so the crossed cards stand up)
 				Short *= FMath::Lerp(0.55f, 1.f, Amount) * (1.f - 0.6f * JeebWorld::Smooth(0.1f, 0.6f, Wear));   // short where it thins out, and trampled by doors
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, Short) * (1.f + 0.35f * Near);   // and wider there, so the tufts overlap into one mat and the individual cards disappear
@@ -343,7 +375,7 @@ void AMeadow::FinishJob()
 		Comp->SetCastShadow(false);
 		Comp->bAffectDynamicIndirectLighting = false;
 		Comp->bAffectDistanceFieldLighting = false;
-		Comp->SetCullDistances(0, 10000);
+		Comp->SetCullDistances(0, FMath::RoundToInt(Reach + 500.f)); if (bLabMode && LabMat) Comp->SetMaterial(0, LabMat);
 		Comp->RegisterComponent();
 		Comp->AddInstances(JobXf, false, true);
 		Cell.Comp = Comp;

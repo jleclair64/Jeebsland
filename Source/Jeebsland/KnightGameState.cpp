@@ -10,6 +10,9 @@
 #include "OakHillTown.h"
 #include "OakHillLife.h"
 #include "OakHill.h"
+#include "TownLab.h"
+#include "TownLabTown.h"
+#include "TownLabDirector.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Meadow.h"
@@ -95,6 +98,7 @@ void AKnightGameState::BuildWorld()
 		}
 	}
 
+	JeebTownLab::SetActive(GetWorld()->GetMapName().Contains(TEXT("TownLab")));   // (the TownLab test map: the rebuilt Oak Hill beside the real one, TownLab.h; Field never)
 	UWorld* World = GetWorld();
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 
@@ -142,6 +146,11 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
 	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill: its ground east of the square, and its buildings (OakHill.h)
 	if (JeebOakHill::Enabled()) World->SpawnActor<AOakHillLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // chimney smoke, glow at the low sun, shop lamps (visual only; clients)
+	if (JeebTownLab::Active())
+	{
+		World->SpawnActor<ATownLabTown>(FVector::ZeroVector, FRotator::ZeroRotator);   // (TownLab: the rebuilt Oak Hill 300 m east)
+		World->SpawnActor<ATownLab>(FVector::ZeroVector, FRotator::ZeroRotator);       // (its switches and measuring tour)
+	}
 
 	// The cottage, with its door facing the starting point
 	const FVector CottageSpot = JeebTerrain::CottagePos();
@@ -236,6 +245,7 @@ void AKnightGameState::BuildWorld()
 			Forest->AddTree(ETreeKind::Oak, FVector(Spot.X, Spot.Y, JeebTerrain::HeightAt(Spot.X, Spot.Y) - 20.f * S), S, TreeRand);
 		}
 		AOakHillTown::PlantTrees(Forest);   // Oak Hill's big plaza oak and the trees round the town
+		ATownLabTown::PlantTrees(Forest);   // (TownLab only: the rebuilt town's trees)
 	}
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
@@ -738,12 +748,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				UE_LOG(LogTemp, Display, TEXT("JEEBGPU gpu %.2f ms, frame %.2f ms (medians of %d frames)"), GpuMs[GpuMs.Num() / 2], FrameMs[FrameMs.Num() / 2], GpuMs.Num());
 			}
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
+		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))
 		{
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)
@@ -759,5 +769,5 @@ void AKnightGameState::Tick(float DeltaSeconds)
 	const float Grave = 1.f - FMath::Clamp(FVector2D::Distance(FVector2D(L.X, L.Y), FVector2D(JeebTerrain::GraveyardPos())) / 1100.f, 0.f, 1.f);
 	const float Target = 0.010f + 0.007f * Woods + 0.016f * Grave;
 	FogNow = FMath::FInterpTo(FogNow, Target, DeltaSeconds, 0.6f);
-	FogActor->GetComponent()->SetFogDensity(FogNow);
+	FogActor->GetComponent()->SetFogDensity(FogNow * FogScale);
 }

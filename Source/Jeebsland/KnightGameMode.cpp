@@ -17,6 +17,7 @@
 #include "GameFramework/GameSession.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
+#include "TownLabDirector.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
 #include "HttpServerResponse.h"
@@ -233,6 +234,13 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	Params.ObjectFlags |= RF_Transient;   // players are never saved into the map
 
+	// (TownLab, the test map: always between its two towns, looking at both)
+	if (GetWorld()->GetMapName().Contains(TEXT("TownLab")))
+	{
+		float LabYaw = 0.f;
+		const FVector LabAt = ATownLab::SpawnPoint(LabYaw) + FVector(200.f * (SpawnCount++ % 7), 0.f, 0.f);
+		return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), LabAt, FRotator(0.f, LabYaw, 0.f), Params);
+	}
 	// A saved character comes back where it logged out (if that spot is sensible)
 	const AKnightPlayerController* KPC = Cast<AKnightPlayerController>(NewPlayer);
 	const bool bLab = JeebHit::InMoveLab(GetWorld());

@@ -82,6 +82,7 @@ void AWorldTerrain::BuildLand()
 					if (X0 >= -Hole && X0 + Step <= Hole && Y0 >= -Hole && Y0 + Step <= Hole) continue;
 				// and Oak Hill's own finer ground east of the square (AOakHillTown, 2026-11-11)
 				if (JeebOakHill::Enabled() && JeebOakHill::InPatchCell(X0, Y0, Step)) continue;
+				if (JeebTownLab::NewOn() && JeebTownLab::InPatchCell(X0, Y0, Step)) continue;   // (TownLab only: the rebuilt town's own 1 m ground)
 					const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
 					Tri.Append({ A, C, B, B, C, D });
 				}
