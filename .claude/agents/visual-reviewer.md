@@ -47,3 +47,5 @@ Read every picture you are given (the Read tool shows images). Look at each side
 
 ## Report
 Start with one line: `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. Then, for each FAIL, give: which picture and side, what is wrong, where (which part, which direction, roughly how many cm), and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.
+
+Never open a visible Unreal window (the owner plays games on this PC): every Unreal run uses -RenderOffScreen instead of -windowed, and takes a slot from bash Tools/ulock.sh run <name> (release it right after).

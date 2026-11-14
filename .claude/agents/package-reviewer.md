@@ -27,3 +27,5 @@ If the main agent asks for a full package, run the BuildCookRun line from CLAUDE
 
 ## Report
 Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. List the test switches that are on, as a separate list headed "Test switches still on". For each FAIL, give file:line and the fix. Keep it short. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.
+
+Never open a visible Unreal window (the owner plays games on this PC): every Unreal run uses -RenderOffScreen instead of -windowed, and takes a slot from bash Tools/ulock.sh run <name> (release it right after).

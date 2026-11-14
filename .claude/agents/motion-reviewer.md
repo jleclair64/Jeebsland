@@ -39,3 +39,5 @@ Read the timing constants for the move in `KnightCharacter.h` (e.g. `SweepDur`, 
 
 ## Report
 Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. For each FAIL, give the frame numbers, the side, what is wrong and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.
+
+Never open a visible Unreal window (the owner plays games on this PC): every Unreal run uses -RenderOffScreen instead of -windowed, and takes a slot from bash Tools/ulock.sh run <name> (release it right after).
