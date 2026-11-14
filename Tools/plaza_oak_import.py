@@ -1,5 +1,5 @@
 # Brings the plaza oak (Tools/plaza_oak_clean.py's Saved/KnightBuild/Trees/PlazaOak.fbx and T_PlazaOak_Base.png) into /Game/Trees:
-# SM_PlazaOak (Nanite, no collision of its own: OakHillTown.cpp gives the trunk a capsule), T_PlazaOak_Base and M_PlazaOak.
+# SM_PlazaOak (Nanite, no collision of its own: OakHillTown.cpp gives the trunk a capsule), SM_PlazaOakShadow, T_PlazaOak_Base and M_PlazaOak.
 # M_PlazaOak: the autumn picture, rough, two-sided (Meshy's leaf clumps are thin shells in places), and a gentle sway of the crown:
 # the world position offset grows from nothing at CalmBelow (cm above the foot) to full at FullAbove, WindCm at most, two slow
 # waves out of step across the tree. OakHillTown.cpp turns the sway off beyond 60 m (WPO disable distance).
@@ -99,4 +99,23 @@ sm.set_material(0, lib.load_asset(path))
 lib.save_asset(folder + "/SM_PlazaOak")
 b = sm.get_bounding_box()
 unreal.log("OAKDIAG nanite %s min %s max %s" % (sm.get_editor_property("nanite_settings").enabled, b.min, b.max))
-unreal.log("OAKDIAG done")
+
+# The shadow copy (plaza_oak_clean.py: 60k triangles, gaps cut in the leaves): drawn only into the sun's shadows by OakHillTown.cpp,
+# so the lawn under the crown is dappled. Not Nanite (small); the same material, so it sways with the tree.
+if os.path.exists(os.path.join(work, "PlazaOakShadow.fbx")):
+    d.set_editor_property("build_nanite", False)
+    task = unreal.AssetImportTask()
+    task.filename = os.path.join(work, "PlazaOakShadow.fbx")
+    task.destination_path = folder; task.destination_name = "SM_PlazaOakShadow"
+    task.replace_existing = True; task.automated = True; task.save = True
+    task.options = ui
+    tools.import_asset_tasks([task])
+    ss = lib.load_asset(folder + "/SM_PlazaOakShadow")
+    if ss is None: raise RuntimeError("OAKDIAG SM_PlazaOakShadow did not import")
+    ns = ss.get_editor_property("nanite_settings")   # (the import option alone left it Nanite: switch it off on the mesh)
+    ns.set_editor_property("enabled", False)
+    ss.set_editor_property("nanite_settings", ns)
+    ss.set_material(0, lib.load_asset(path))
+    lib.save_asset(folder + "/SM_PlazaOakShadow")
+    unreal.log("OAKDIAG shadow copy nanite %s" % ss.get_editor_property("nanite_settings").enabled)
+unreal.log("OAKDIAG done")   # (last: the editor may crash in Python on its way out after this; everything is saved by then)

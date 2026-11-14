@@ -44,7 +44,7 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 
 	struct FPlaced { UStaticMesh* Mesh; UStaticMesh* Flame; FString Name; FString Label; float W, D, H, Slot, LabelSize; };
-	struct FRow { FString Title; TArray<FPlaced> Pieces; float Depth = 0.f; };
+	struct FRow { FString Title; TArray<FPlaced> Pieces; float Depth = 0.f; float MaxH = 0.f; };
 	TArray<FRow> Rows;
 	for (const FFillerGroup& G : GFillerGroups)
 	{
@@ -61,7 +61,7 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 			FPlaced P;
 			P.Mesh = M; P.Flame = LoadPiece(N + TEXT("Flame")); P.Name = N; P.Label = Spaced(N);
 			P.W = FMath::Max(40.f, B.Max.X - B.Min.X); P.D = FMath::Max(40.f, B.Max.Y - B.Min.Y); P.H = B.Max.Z;
-			P.LabelSize = P.W < 90.f ? 20.f : 26.f;
+			P.LabelSize = P.W < 90.f ? 26.f : 32.f;
 			P.Slot = FMath::Max(P.W, P.Label.Len() * P.LabelSize * 0.62f);   // (room for the name too, so no two names touch)
 			if (Used > 0.f && Used + P.Slot > 2.f * YardHalfWidth)
 			{
@@ -72,6 +72,7 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 			}
 			Used += P.Slot + Gap;
 			Row->Depth = FMath::Max(Row->Depth, P.D);
+			Row->MaxH = FMath::Max(Row->MaxH, FMath::Max(P.H, IsHungBanner(N) ? 260.f : 0.f));
 			Row->Pieces.Add(P);
 		}
 	}
@@ -90,12 +91,12 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 		C->RegisterComponent();
 		return C;
 	};
-	auto Sign = [&](const FString& Text, const FVector& Loc, float Size, const FColor& Col, bool bRight = false)
+	auto Sign = [&](const FString& Text, const FVector& Loc, float Size, const FColor& Col, bool bRight = false, float Yaw = 90.f)
 	{
 		UTextRenderComponent* S = NewObject<UTextRenderComponent>(Owner);
 		S->SetupAttachment(Root);
 		S->SetRelativeLocation(Loc);
-		S->SetRelativeRotation(FRotator(0.f, 90.f, 0.f));   // (read from the floor side, looking toward -Y)
+		S->SetRelativeRotation(FRotator(0.f, Yaw, 0.f));   // (yaw 90: read from the floor side, looking toward -Y; -90 reads from the far side)
 		S->SetHorizontalAlignment(bRight ? EHTA_Left : EHTA_Center);
 		S->SetWorldSize(Size);
 		S->SetTextRenderColor(Col);
@@ -121,7 +122,8 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 		float Used = 0.f;
 		for (const FPlaced& P : R.Pieces) Used += P.Slot + Gap;
 		float X = -0.5f * (Used - Gap);
-		Sign(R.Title, FVector(X - 110.f, Y + 40.f, 330.f), 64.f, FColor(255, 224, 140), true);   // (starts beside the row's first piece and runs away from the row, toward -X: never over a piece)
+		const float TitleZ = R.MaxH + 90.f;   // (above the tallest piece of the row, so no piece can stand in front of it)
+		Sign(R.Title, FVector(X - 110.f, Y + 40.f, TitleZ), 90.f, FColor(255, 238, 130), true);   // (starts beside the first piece and runs away from the row: never over a piece)
 		for (const FPlaced& P : R.Pieces)
 		{
 			const FVector Loc(X + P.Slot * 0.5f, Line, 0.f);
@@ -146,7 +148,7 @@ void JeebFiller::BuildYard(UWorld* World, AActor* Owner, USceneComponent* Root, 
 				L->RegisterComponent();
 				++Lights;
 			}
-			Sign(P.Label, FVector(X + P.Slot * 0.5f, Y + 40.f, bHung ? 40.f : 55.f), P.LabelSize, FColor(255, 255, 255));
+			Sign(P.Label, FVector(X + P.Slot * 0.5f, Y + 40.f, bHung ? 60.f : 90.f), P.LabelSize, FColor(255, 255, 255));
 			X += P.Slot + Gap;
 			++Count;
 		}

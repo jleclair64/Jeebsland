@@ -40,7 +40,11 @@ BARK = (0.29, 0.18, 0.10)              # rich brown, lighter than Forest.cpp's t
 LEAF_GAIN = 1.0       # the leaves' brightness against the tints (1: the leaf picture's own shade averages to the tint)
 BARK_GAIN = 1.0
 SHADE_KEEP = 0.6      # how much of the painted light and shade stays (the rest is the flat tint): bright tips no longer go pale yellow
-SHADE_MAX = 1.3       # and no spot is brighter than this times the tint
+SHADOW_TRIS = 60000   # the shadow copy (not Nanite; drawn only into the sun's shadow maps)
+SHADOW_COL_SCALE = 0.6  # per metre: open shafts through the whole crown, a 2D noise across it (bright dapples on the lawn)
+SHADOW_COL_CUT = -0.15  # leaf faces where that noise is below this are cut (about a third of the crown's footprint)
+SHADOW_THIN = 0.6       # and this share of the rest singly, so the shade between the dapples is a soft grey, not black
+SHADE_MAX = 1.3      # and no spot is brighter than this times the tint
 NOISE_SCALE = 3.2     # per original unit (the tree was 1.65 units tall): clumps of a few metres turn together
 TOP_BIAS = 0.25       # the top and outside of the crown a little further into autumn than the inside
 
@@ -134,6 +138,40 @@ lum = lin @ np.array([0.2126, 0.7152, 0.0722], np.float32)
 green = (lin[:, :, 1] - np.maximum(lin[:, :, 0], lin[:, :, 2])) > 0.01
 leaf_mean = float(lum[green].mean()); bark_mean = float(lum[~green & (lum > 0.001)].mean())
 say("leaf luminance", round(leaf_mean, 4), "bark luminance", round(bark_mean, 4))
+
+# ---- the shadow (visual review 2026-11-13: the dense crown cast one near-black disc): a cut-down copy with gaps in the leaves,
+# drawn only into the shadows in game (SM_PlazaOakShadow, hidden, bCastHiddenShadow) while the real tree casts none, so the
+# lawn under it is dappled like the shade of a real oak. Bark stays whole. The crown is several leaf shells deep, so gaps in
+# each shell (a 3D noise, tried first) still added up to a solid shadow: the gaps are shafts through the whole crown (a 2D
+# noise) plus a fine thinning everywhere. OAK_SHADOW_ONLY=1 stops after it (no bake: a few minutes quicker).
+import mathutils
+sc = bpy.context.scene
+o2 = o.copy(); o2.data = o.data.copy(); o2.name = "PlazaOakShadow"; sc.collection.objects.link(o2)
+bpy.ops.object.select_all(action="DESELECT"); o2.select_set(True); bpy.context.view_layer.objects.active = o2
+m = o2.modifiers.new("reduce", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = SHADOW_TRIS / tris; m.use_collapse_triangulate = True
+bpy.ops.object.modifier_apply(modifier=m.name)
+me2 = o2.data; n2 = len(me2.polygons)
+cen2 = np.empty(n2 * 3, np.float32); me2.polygons.foreach_get("center", cen2); cen2 = cen2.reshape(-1, 3)
+ls2 = np.empty(n2, np.int32); me2.polygons.foreach_get("loop_start", ls2)
+uv2 = np.empty(len(me2.loops) * 2, np.float32); me2.uv_layers.active.data.foreach_get("uv", uv2); uv2 = uv2.reshape(-1, 2)
+fu2 = (uv2[ls2] + uv2[ls2 + 1] + uv2[ls2 + 2]) / 3.0
+c2 = lin[np.clip((fu2[:, 1] % 1.0) * (h - 1), 0, h - 1).astype(int), np.clip((fu2[:, 0] % 1.0) * (w - 1), 0, w - 1).astype(int)]
+leafy = ((c2[:, 1] - np.maximum(c2[:, 0], c2[:, 2])) > 0.002) & (cen2[:, 2] > 3.0)
+rng = np.random.default_rng(4242)
+nz = np.array([mathutils.noise.noise(mathutils.Vector((c[0] * SHADOW_COL_SCALE, c[1] * SHADOW_COL_SCALE, 0.37))) for c in cen2], np.float32)
+gap = leafy & ((nz < SHADOW_COL_CUT) | (rng.random(n2) < SHADOW_THIN))
+bm = bmesh.new(); bm.from_mesh(me2); bm.faces.ensure_lookup_table()
+bmesh.ops.delete(bm, geom=[bm.faces[i] for i in np.nonzero(gap)[0]], context="FACES")
+bm.to_mesh(me2); bm.free(); me2.update()
+say("shadow copy: %d triangles, leaf faces %d, %d of them cut for gaps (%.0f%%)" % (n2, int(leafy.sum()), int(gap.sum()), 100.0 * gap.sum() / max(1, leafy.sum())))
+fbx2 = os.path.join(OUT, "PlazaOakShadow.fbx")
+bpy.ops.export_scene.fbx(filepath=fbx2, use_selection=True, object_types={"MESH"}, apply_scale_options="FBX_SCALE_NONE", global_scale=1.0, apply_unit_scale=True,
+                         axis_forward="-Y", axis_up="Z", mesh_smooth_type="FACE", use_tspace=False, bake_anim=False, add_leaf_bones=False, path_mode="AUTO",
+                         embed_textures=False, colors_type="NONE")
+say("wrote", fbx2, round(os.path.getsize(fbx2) / 1e6, 1), "MB")
+bpy.data.objects.remove(o2, do_unlink=True)
+bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
+if os.environ.get("OAK_SHADOW_ONLY"): say("shadow only: done"); sys.exit(0)
 
 # ---- the autumn picture: a node graph baked (emission) onto the reduced model's own UVs
 mat = me.materials[0]; nt = mat.node_tree; N = nt.nodes; L = nt.links

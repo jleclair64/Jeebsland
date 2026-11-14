@@ -255,6 +255,24 @@ void AOakHillTown::BuildPlazaOak()
 		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		M->SetMobility(EComponentMobility::Static);
 		M->SetWorldPositionOffsetDisableDistance(FMath::RoundToInt(PlazaOakSwayCm));   // (world units, cm)
+		// Its shadow (visual review 2026-11-13: the dense crown cast one near-black disc): SM_PlazaOakShadow, a 60k cut-down copy
+		// with gaps cut in the leaves, hidden but drawn into the shadows, so the shade under the oak is dappled; the tree casts none.
+		static UStaticMesh* ShadowMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOakShadow.SM_PlazaOakShadow"));
+		if (ShadowMesh)
+		{
+			M->SetCastShadow(false);
+			UStaticMeshComponent* S = NewObject<UStaticMeshComponent>(this);
+			S->SetStaticMesh(ShadowMesh);
+			S->SetupAttachment(GetRootComponent());
+			S->SetWorldLocationAndRotation(At, FRotator(0.f, PlazaOakYaw, 0.f));
+			S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			S->SetMobility(EComponentMobility::Static);
+			S->SetHiddenInGame(true);
+			S->SetCastShadow(true);
+			S->bCastHiddenShadow = true;
+			S->SetWorldPositionOffsetDisableDistance(FMath::RoundToInt(PlazaOakSwayCm));
+			S->RegisterComponent();
+		}
 		M->RegisterComponent();
 		// The light the leaves let through (visual review 2026-11-13: under the dense crown the lawn and the trunk went near-black):
 		// one soft amber spot from inside the crown down onto the lawn, no shadows, reaching about the crown's edge only, so the
