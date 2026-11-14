@@ -46,7 +46,7 @@ GRADE = {
     # build-a's four (2026-11-14): the house/store palette; the bank stall keeps its own (building_palette.py "bankstall": clay tile
     # roof, warm stone, brass), so it is graded only gently
     "OakHillBank_300k":        dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-6.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
-    "BankStall_300k":          dict(plaster=(1.0, 0.5, 2.0, 1.0), wood=(-2.0, 0.5, -1.5, 1.0), thatch=(-2.0, 0.5, -0.5, 1.0), stone=(1.0, 0.5, 2.0, 1.0)),
+    "BankStall_300k":          dict(plaster=(5.0, 0.5, 3.0, 1.0), wood=(-2.0, 0.5, -1.5, 1.0), thatch=(-2.0, 0.5, -0.5, 1.0), stone=(5.0, 0.5, 3.0, 1.0)),   # (its arcade wall lifted: review read it as grey concrete)
     "OakHillSmith_300k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-8.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 4.0, 1.0)),
     "OakHillCornerHouse_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-9.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
 }
@@ -55,6 +55,7 @@ GRADE = {
 FIRE = {"OakHillSmith_300k"}
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
+AO_BY_NAME = {"BankStall_300k": 0.18}   # (build-a: the stall's open arcade sits under its roof, so full occlusion greyed its back wall)
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
 EDGE_GAIN = 0.10            # convex edges this much lighter
@@ -288,7 +289,7 @@ graded = lab_to_rgb(np.stack([L2, A2, B2], -1))
 log("groups: plaster %.0f%% wood %.0f%% thatch %.0f%% stone %.0f%%" % tuple(100 * float(x.mean()) for x in (w_plaster, w_wood, w_thatch, w_stone)))
 # occlusion and edges (baked at SMALL)
 ao_s = up2(box_blur(np.clip(ao, 0, 1), AO_BLUR))
-occl = (1 - ao_s)[..., None] * AO_STRENGTH
+occl = (1 - ao_s)[..., None] * AO_BY_NAME.get(name, AO_STRENGTH)
 lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
@@ -300,10 +301,18 @@ lin = lin * gl[..., None] * (1 - foot + foot * GRAD_FOOT_TINT)
 # the glass keeps its colour (M_TL_Building turns it to dark glass anyway)
 if isinstance(glass_guard, np.ndarray):
     lin = lin * (1 - glass_guard[..., None]) + base_lin * glass_guard[..., None]
+# Panes Meshy painted lit yellow that the window marks missed (no glow there, so M_TL_Building leaves them yellow all day: the bank's
+# back panes, review 2026-11-14): bright saturated yellow becomes dark glass in the picture itself, on the buildings listed
+PANE_FIX = {"OakHillBank_300k"}
+if name in PANE_FIX:
+    w_pane = soft(C, 34, 44) * soft(Lc, 62, 70) * soft(H, 60, 68) * (1 - soft(H, 100, 108))
+    lin = lin * (1 - w_pane[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * w_pane[..., None]
+    log(new, "yellow pane texels darkened %.2f%%" % (100 * float((w_pane > 0.5).mean())))
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)
-mr_out = np.stack([np.clip(ao, 0, 1), mr[..., 1], mr[..., 2]], -1)
+ao_mat = 1 - (1 - np.clip(ao, 0, 1)) * (AO_BY_NAME.get(name, AO_STRENGTH) / AO_STRENGTH)   # (the material's occlusion eased the same way)
+mr_out = np.stack([ao_mat, mr[..., 1], mr[..., 2]], -1)
 write_png(mr_out, os.path.join(out, "T_%s_MR.png" % new), False)
 write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)
 write_png(mask, os.path.join(out, "T_%s_Mask.png" % new), False)

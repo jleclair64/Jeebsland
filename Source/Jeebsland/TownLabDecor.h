@@ -76,8 +76,7 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 265.0f, 358.0f, 183.0f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, true, true, true },   // lantern
 	};
 	inline const FDecor BankDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -181.6f, -612.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -592.7f, -424.2f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 0.69f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -181.6f, -612.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.33f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -598.3f, 413.3f, 0.0f, -0.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -633.0f, 423.3f, 0.0f, -0.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 562.1f, 414.9f, 0.0f, -0.0f, 0.0f, 0.0f, 1.04f, 1.04f, 1.04f, false, false, false },   // stones
@@ -128,10 +127,9 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), 479.5f, -97.6f, 285.0f, -90.0f, 0.0f, 0.0f, 1.37f, 1.37f, 1.37f, true, true, true },   // lantern
 	};
 	inline const FDecor SmithDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 644.1f, 264.1f, 0.0f, -0.0f, 0.0f, 0.0f, 0.63f, 1.00f, 0.54f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 269.7f, -499.6f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -6.3f, -502.4f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -696.8f, -12.3f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 269.7f, -499.6f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.42f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -6.3f, -502.4f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.42f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -696.8f, -12.3f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.54f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 642.2f, 288.3f, 0.0f, -0.0f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 665.6f, -535.5f, 0.0f, -180.0f, 0.0f, 0.0f, 0.98f, 0.98f, 0.98f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 652.9f, -545.5f, 0.0f, -180.0f, 0.0f, 0.0f, 1.17f, 1.17f, 1.17f, false, false, false },   // weeds
@@ -161,7 +159,7 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -186.5f, -417.4f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -401.8f, 147.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 0.92f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -390.6f, -377.8f, 0.0f, 90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -407.2f, -37.6f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 0.77f, true, false, false },   // ivy
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -407.2f, -37.6f, 0.0f, 90.0f, 0.0f, 0.0f, 1.00f, 1.00f, 0.92f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 147.7f, 226.8f, 0.0f, -90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 0.92f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 280.5f, 114.7f, 0.0f, -0.0f, 0.0f, 0.0f, 0.97f, 0.97f, 0.97f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 240.7f, 124.7f, 0.0f, -0.0f, 0.0f, 0.0f, 0.84f, 0.84f, 0.84f, false, false, false },   // weeds

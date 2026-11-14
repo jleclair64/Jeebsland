@@ -257,10 +257,10 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
     # build-a (2026-11-14): walls from building_clean.py's BUILD lines; door = the stretch of the front kept clear (the bank's steps,
     # the smithy's forge lean-to and door, the stall's whole open front); bs = the FModel Scale (OakHill.h)
-    "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75, hang=False),
+    "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75, hang=False, ivy_min=293),
     "TL_BankStall":   dict(src="BankStall_300k", wx=(-535.3, 527.5), wy=(-462.4, 266.5), door=(-600.0, 600.0), seed=13, bs=0.7, corners_only=True),
-    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False),
-    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False),
+    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False, ivy_min=338),
+    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False, ivy_min=220),
 }
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
@@ -397,10 +397,10 @@ for bname, B in BUILD.items():
             face, clear = wall_profile(pl, outv)
             if face is None or clear < 160: continue
             for w in (190.0, 150.0, 120.0, 95.0):
-                h = min(clear - 10.0, 260.0)
-                while h >= 140 and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
-                if h >= 140: break
-            if h < 140: continue
+                h = min(clear - 10.0, 260.0 / B.get("bs", 1.0))   # (bs: a smaller-scaled building's ivy as tall in the world as the house's)
+                while h >= B.get("ivy_min", 140) and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
+                if h >= B.get("ivy_min", 140): break
+            if h < B.get("ivy_min", 140): continue   # (ivy_min: build-a's buildings take only tall patches: short ones read as round shrubs stuck to the wall, review 2026-11-14)
             mesh = "TL_IvyClimb"
             add("ivy", mesh, pl + outv * face, outv, round(min(w / 150.0, h / 260.0) * 1.0, 2) if h < 255 else w / 150.0, True)
             items[-1]["scale3"] = (round(w / 150.0, 2), 1.0, round(h / 260.0, 2))
