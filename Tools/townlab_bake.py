@@ -303,11 +303,43 @@ if isinstance(glass_guard, np.ndarray):
     lin = lin * (1 - glass_guard[..., None]) + base_lin * glass_guard[..., None]
 # Panes Meshy painted lit yellow that the window marks missed (no glow there, so M_TL_Building leaves them yellow all day: the bank's
 # back panes, review 2026-11-14): bright saturated yellow becomes dark glass in the picture itself, on the buildings listed
-PANE_FIX = {"OakHillBank_300k"}
+PANE_FIX = {"OakHillBank_300k", "OakHillSmith_300k", "OakHillCornerHouse_300k"}
 if name in PANE_FIX:
     w_pane = soft(C, 34, 44) * soft(Lc, 62, 70) * soft(H, 60, 68) * (1 - soft(H, 100, 108))
-    lin = lin * (1 - w_pane[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * w_pane[..., None]
-    log(new, "yellow pane texels darkened %.2f%%" % (100 * float((w_pane > 0.5).mean())))
+    # warm painted leading and stained glass inside the window marks (gold cames read as a lit window at noon, review 2026-11-14):
+    # inside the marks, anything saturated becomes the same dark glass; the frames outside the marks keep their wood
+    win_big = up2(np.clip(box_blur(mask[..., 1], 2) * 3, 0, 1)) * (1 - up2(mask[..., 2]))
+    w_lead = win_big * soft(C, 14, 24) * soft(Lc, 30, 40) * (1 - w_pane)
+    w_all = np.maximum(w_pane, w_lead)
+    lin = lin * (1 - w_all[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * w_all[..., None]
+    log(new, "yellow pane texels darkened %.2f%%, warm leading %.2f%%" % (100 * float((w_pane > 0.5).mean()), 100 * float((w_lead > 0.5).mean())))
+    # the yellow panes the window marks missed become window too (lit at dusk with the rest; half-marked panes, review 2026-11-14)
+    wp_s = w_pane.reshape(SMALL, 2, SMALL, 2).mean((1, 3))
+    add_win = (wp_s > 0.4) & (mask[..., 1] < 0.5) & (mask[..., 2] > 0.5)
+    if add_win.any():
+        rr = mask[..., 0] * (mask[..., 1] > 0.5)
+        for _ in range(6):   # each new pane texel takes a neighbouring window's random number, so a pane lights as one
+            rr = np.maximum(rr, np.maximum(np.maximum(np.roll(rr, 2, 0), np.roll(rr, -2, 0)), np.maximum(np.roll(rr, 2, 1), np.roll(rr, -2, 1))))
+        lit = glow_lin.max(-1) > 0.05
+        gcol = np.median(glow_lin[lit], 0) if lit.any() else np.array([1.0, 0.55, 0.2], np.float32)
+        mask[add_win, 0] = np.where(rr[add_win] > 0, rr[add_win], 0.5)
+        mask[add_win, 1] = 1.0; mask[add_win, 2] = 0.0
+        glow_lin[add_win] = np.maximum(glow_lin[add_win], gcol)
+        log(new, "pane texels added to the window marks", int(add_win.sum()))
+# Windows whose painted pane the marks cover only in part (the bank's two ground-floor back windows: Meshy painted a dark
+# rectangle across each pane, outside the marks, so at dusk they lit only round one edge, review 2026-11-14). Growing the marks
+# by colour can't tell that dark paint from the frame's dark wood, so these panes are boxed by hand (model cm, the bake's own
+# positions) and kept as dark windows all the time: no glow, dark glass by day, like the 30% of windows that never light
+DARK_BOXES = {"OakHillBank_300k": [(-420.0, -310.0, 540.0, 700.0, 165.0, 295.0), (310.0, 420.0, 540.0, 700.0, 165.0, 295.0)]}   # (wide of the frames: the stone round them has no marks to lose)
+if name in DARK_BOXES:
+    P = pos * U; box = np.zeros(P.shape[:2], bool)
+    for x0, x1, y0, y1, z0, z1 in DARK_BOXES[name]:
+        box |= (P[..., 0] > x0) & (P[..., 0] < x1) & (P[..., 1] > y0) & (P[..., 1] < y1) & (P[..., 2] > z0) & (P[..., 2] < z1)
+    was_win = box & (mask[..., 1] > 0.5)
+    mask[box, 1] = 0.0; mask[box, 2] = 1.0; glow_lin[box] = 0.0
+    wb = up2(was_win.astype(np.float32))
+    lin = lin * (1 - wb[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * wb[..., None]
+    log(new, "texels in hand-boxed dark windows", int(box.sum()), "of them window marks turned to dark glass", int(was_win.sum()))
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)

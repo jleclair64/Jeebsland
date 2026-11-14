@@ -259,8 +259,8 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     # the smithy's forge lean-to and door, the stall's whole open front); bs = the FModel Scale (OakHill.h)
     "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75, hang=False, ivy_min=293),
     "TL_BankStall":   dict(src="BankStall_300k", wx=(-535.3, 527.5), wy=(-462.4, 266.5), door=(-600.0, 600.0), seed=13, bs=0.7, corners_only=True),
-    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False, ivy_min=338),
-    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False, ivy_min=220, ivy_w=(120.0, 95.0)),
+    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False, ivy_min=338, ivy=False),
+    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False, ivy_min=220, ivy_w=(120.0, 95.0), ivy=False),
 }
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
@@ -385,7 +385,7 @@ for bname, B in BUILD.items():
                           wb=with_building, light=light, n=(0.0, 0.0, 0.0) if normal is None else (round(normal.x, 3), round(-normal.y, 3), round(normal.z, 3))))
     # --- ivy: at corners and on blank stretches, climbing from the ground as high as the wall runs clear
     n_ivy = 0
-    for side in sides:
+    for side in (sides if B.get("ivy", True) else []):   # (ivy=False: the smithy and corner house, where the shared climbing tile's rounded top read as topiary, review 2026-11-14)
         sname, start, along, outv, L = side
         cands = [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
         rnd.shuffle(cands)
