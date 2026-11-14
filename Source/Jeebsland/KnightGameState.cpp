@@ -7,6 +7,10 @@
 #include "FillerLineup.h"
 #include "TownLabLineup.h"
 #include "RHIStats.h"
+#include "RenderTimer.h"
+#include "UObject/UObjectIterator.h"
+#include "HAL/IConsoleManager.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "OakHillTown.h"
@@ -277,6 +281,57 @@ void AKnightGameState::BuildWorld()
 
 	// Online: the server's rock and tree counts may have arrived before the world was built
 	if (!HasAuthority()) { OnRep_Nodes(); OnRep_Doors(); }
+}
+
+// Test-only foliage mask for frame-cost runs (-ShotEyes' 7th field; foliage 2026-11-14): 1 hides the near trees (trunks, branches, leaves,
+// needles), 2 the far stand-ins, 4 takes every tree's shadow away, 8 hides all the grass (meadow and the original square). 0 restores.
+static void JeebFoliageMask(UWorld* W, int32 Mask)
+{
+	static TMap<TWeakObjectPtr<UPrimitiveComponent>, TPair<bool, bool>> Orig;   // (visible, casts shadow) as built
+	for (TActorIterator<AForest> It(W); It; ++It)
+	{
+		TArray<UInstancedStaticMeshComponent*> Comps; It->GetComponents(Comps);
+		for (UInstancedStaticMeshComponent* C : Comps)
+		{
+			if (!Orig.Contains(C)) Orig.Add(C, TPair<bool, bool>(C->IsVisible(), bool(C->CastShadow)));
+			const TPair<bool, bool> O = Orig[C];
+			const bool bFar = C->GetName().StartsWith(TEXT("Far"));
+			C->SetVisibility(O.Key && !(Mask & (bFar ? 2 : 1)));
+			C->SetCastShadow(O.Value && !(Mask & 4));
+		}
+	}
+	for (TActorIterator<AMeadow> It(W); It; ++It) It->SetActorHiddenInGame((Mask & 8) != 0);
+	for (TActorIterator<AGrassField> It(W); It; ++It) It->SetActorHiddenInGame((Mask & 8) != 0);
+	// (32, read by the -ShotEyes code: the sun creeps on every frame, as in play)
+	// 512: no cached sun shadows at all (r.Shadow.CSMCaching 0), to see what the cache saves
+	if (IConsoleVariable* Cache = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.CSMCaching")))
+		Cache->Set((Mask & 512) ? 0 : 1, ECVF_SetByConsole);
+}
+
+// (JEEBCENSUS, test only: the shown primitives within 300 m of a spot, by the class of what owns them, with how many cast shadows and
+// how many instances: where a spot's draws come from)
+static void JeebCensus(UWorld* W, const FVector& At)
+{
+	struct FRow { int32 N = 0, Shadow = 0; double Instances = 0; };
+	TMap<FString, FRow> Rows;
+	int32 Total = 0;
+	for (TObjectIterator<UPrimitiveComponent> It; It; ++It)
+	{
+		UPrimitiveComponent* C = *It;
+		if (C->GetWorld() != W || !C->IsRegistered() || !C->IsVisible() || !C->SceneProxy) continue;
+		const AActor* O = C->GetOwner();
+		if (O && O->IsHidden()) continue;
+		if (FVector::Dist(C->Bounds.Origin, At) - C->Bounds.SphereRadius > 30000.f) continue;
+		FRow& R = Rows.FindOrAdd(FString::Printf(TEXT("%s/%s"), O ? *O->GetClass()->GetName() : TEXT("-"), *C->GetClass()->GetName()));
+		++R.N; ++Total;
+		if (C->CastShadow) ++R.Shadow;
+		if (const UInstancedStaticMeshComponent* I = Cast<UInstancedStaticMeshComponent>(C)) R.Instances += I->GetInstanceCount();
+	}
+	Rows.ValueSort([](const FRow& A, const FRow& B) { return A.N > B.N; });
+	FString Line;
+	int32 k = 0;
+	for (const TPair<FString, FRow>& P : Rows) { if (k++ >= 16) break; Line += FString::Printf(TEXT(" | %s %d (shadow %d, inst %.0f)"), *P.Key, P.Value.N, P.Value.Shadow, P.Value.Instances); }
+	UE_LOG(LogTemp, Display, TEXT("JEEBCENSUS %d primitives within 300 m%s"), Total, *Line);
 }
 
 // Test screenshot mode: -JeebShot -ShotName=x -ShotPhase=0.2 -ShotPos=X,Y -ShotYaw=deg -ShotPitch=deg (-ShotMove=jab ...)
@@ -768,7 +823,29 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			static const bool bEyeTimes = []() { FParse::Value(FCommandLine::Get(), TEXT("ShotEyesStart="), EyeStart); FParse::Value(FCommandLine::Get(), TEXT("ShotEyesGap="), EyeGap); EyeGap = FMath::Max(EyeGap, 1.6f); return true; }();
 			(void)bEyeTimes;
 			const int32 Want = ShotClock < EyeStart ? -1 : FMath::FloorToInt((ShotClock - EyeStart) / EyeGap);
-			if (EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f)   // (1.4 s after the move: settled)
+			// (JEEBEYE, foliage 2026-11-14: each eye's medians of frame, game, render thread, GPU, draws and triangles, from 2 s after the move
+			// to the end of its turn, so one run measures many spots; -ShotEyesNoPics takes no pictures)
+			static TArray<float> EF, EGm, ER, EGpu, ED, EP;
+			static float EyeSunBase = -1.f;
+			static const bool bNoPics = FParse::Param(FCommandLine::Get(), TEXT("ShotEyesNoPics"));
+			const float InEye = ShotClock - EyeStart - EyeGap * EyeIdx;
+			if (EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && InEye > 2.0f && InEye < EyeGap - 0.15f)
+			{
+				EF.Add(DeltaSeconds * 1000.f); EGm.Add(FPlatformTime::ToMilliseconds(GGameThreadTime)); ER.Add(FPlatformTime::ToMilliseconds(GRenderThreadTime));
+				EGpu.Add(FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles())); ED.Add(float(GNumDrawCallsRHI[0])); EP.Add(float(GNumPrimitivesDrawnRHI[0]));
+			}
+			if (Want > EyeIdx && EyeIdx >= 0 && EF.Num() > 0)
+			{
+				if (FParse::Param(FCommandLine::Get(), TEXT("ShotCensus")) && EyeCam) JeebCensus(GetWorld(), EyeCam->GetActorLocation());
+				auto Med = [](TArray<float>& A) { A.Sort(); return A[A.Num() / 2]; };
+				UE_LOG(LogTemp, Display, TEXT("JEEBEYE %d %s frame %.2f game %.2f render %.2f gpu %.2f draws %.0f tris %.0f (%d frames)"), EyeIdx, EyeIdx < ShotEyes.Num() ? *ShotEyes[EyeIdx] : TEXT("?"),
+					Med(EF), Med(EGm), Med(ER), Med(EGpu), Med(ED), Med(EP), EF.Num());
+				EF.Reset(); EGm.Reset(); ER.Reset(); EGpu.Reset(); ED.Reset(); EP.Reset();
+			}
+			// (mask 32: the sun creeps on every frame, as in play: a frozen sun lets the cached sun shadows skip redrawing what stands still,
+			// which makes shadows look almost free in a test still)
+			if (EyeSunBase >= 0.f) { static uint32 Tick32 = 0; ADayNight::FixedPhase = EyeSunBase + 0.00004f * float(++Tick32 % 64); }
+			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f)   // (1.4 s after the move: settled)
 			{
 				ShotIdx = EyeIdx;
 				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d.png"), *ShotName, EyeIdx), true, false);
@@ -778,11 +855,20 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				EyeIdx = Want;
 				TArray<FString> P;
 				if (EyeIdx < ShotEyes.Num()) ShotEyes[EyeIdx].ParseIntoArray(P, TEXT("_"));
-				if (P.Num() == 5)
+				if (P.Num() >= 5)
 				{
+					// (optional 6th: the sun's phase there, 0 noon, 0.5 the low sun; 7th: a test mask, see JeebFoliageMask)
+					if (P.Num() >= 6) ADayNight::FixedPhase = FCString::Atof(*P[5]);
+					JeebFoliageMask(GetWorld(), P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0);
+					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
 					const FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
 					const FRotator R(FCString::Atof(*P[4]), FCString::Atof(*P[3]), 0.f);
+					if (APawn* Me = PC->GetPawn())   // (he stands under the eye, hidden, so the grass grows round the view as round a player there)
+					{
+						Me->SetActorHiddenInGame(true);
+						Me->SetActorLocation(FVector(Ex, Ey, L.Z - FCString::Atof(*P[2]) + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+					}
 					if (!EyeCam) EyeCam = GetWorld()->SpawnActor<ACameraActor>(L, R);
 					if (EyeCam)
 					{

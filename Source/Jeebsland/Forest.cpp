@@ -975,6 +975,7 @@ AChoppableTree* AForest::AddTree(ETreeKind Kind, const FVector& Pos, float S, FR
 	Tree->Setup(Kind, FMath::Max(Radius, 18.f), Height);
 	BuildSeconds += FPlatformTime::Seconds() - BuildT0;
 	++TreeCount;
+	TreeSpots.Add(FVector2D(Pos.X, Pos.Y));
 	if (Kind == ETreeKind::Oak)
 	{
 		// remember the canopy: thinner grass and a carpet of this tree's leaves underneath
@@ -1147,6 +1148,15 @@ void AForest::BeginPlay()
 		UE_LOG(LogTemp, Log, TEXT("JEEBTREES %d trees planted in %.2f s; near leaf cards and boughs %d; far pieces %d (oak puffs %d, pine cones %d, redwood cones %d)%s; bands oak %.0f-%.0f pine %.0f-%.0f redwood %.0f-%.0f cm"),
 			TreeCount, BuildSeconds, NearLeafCount, FarCount, Inst[0] + Inst[1] + Inst[2] + Inst[3] + Inst[4], Inst[5] + Inst[6], Inst[7],
 			bFarCrowns ? TEXT("") : TEXT(" [far stand-ins OFF]"), BandOak.X, BandOak.Y, BandPine.X, BandPine.Y, BandRed.X, BandRed.Y);
+		// (JEEBWOODS: the thickest spot of woods, the tree with the most others within 15 m, for frame-cost spots inside the forest)
+		int32 Best = -1, BestN = 0;
+		for (int32 i = 0; i < TreeSpots.Num(); i += 3)
+		{
+			int32 N = 0;
+			for (const FVector2D& O : TreeSpots) if (FVector2D::DistSquared(O, TreeSpots[i]) < 1500.f * 1500.f) ++N;
+			if (N > BestN) { BestN = N; Best = i; }
+		}
+		if (Best >= 0) UE_LOG(LogTemp, Log, TEXT("JEEBWOODS thickest at %.0f %.0f (%d trees within 15 m)"), TreeSpots[Best].X, TreeSpots[Best].Y, BestN);
 	}));
 
 	if (bNoWoods) return;
