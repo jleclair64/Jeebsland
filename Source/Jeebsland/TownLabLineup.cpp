@@ -1,0 +1,140 @@
+#include "TownLabLineup.h"
+#include "TownLabDecor.h"
+#include "OakHill.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/TextRenderComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "StaticMeshResources.h"
+
+namespace
+{
+	float ScaleOf(const TCHAR* Model)   // the scale Oak Hill draws this design at (OakHill.h)
+	{
+		for (const JeebOakHill::FModel& M : JeebOakHill::Models())
+			if (FCString::Strcmp(M.Name, Model) == 0) return M.Scale;
+		return 1.f;
+	}
+	int32 Tris(UStaticMesh* M)
+	{
+		const FStaticMeshRenderData* R = M ? M->GetRenderData() : nullptr;
+		return (R && R->LODResources.Num()) ? R->LODResources[0].GetNumTriangles() : 0;
+	}
+}
+
+void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Root, float FloorZ)
+{
+	if (!World || !Owner || !Root) return;
+	FString Set = TEXT("both");
+	FParse::Value(FCommandLine::Get(), TEXT("TownLabSet="), Set);
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	const float YardY = 5600.f;
+	if (Cube)   // a grass-coloured yard, 70 x 28 m, its top at the floor's height
+	{
+		UStaticMeshComponent* G = NewObject<UStaticMeshComponent>(Owner);
+		G->SetStaticMesh(Cube);
+		G->SetupAttachment(Root);
+		G->SetRelativeLocation(FVector(0.f, YardY, -50.f));
+		G->SetRelativeScale3D(FVector(70.f, 28.f, 1.f));
+		G->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		G->SetCollisionResponseToAllChannels(ECR_Block);
+		G->RegisterComponent();
+		if (Base)
+			if (UMaterialInstanceDynamic* Mi = G->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.30f, 0.14f));
+	}
+	struct FSpot { const TCHAR* Mesh; const TCHAR* Col; const TCHAR* Model; const TCHAR* Decor; const TCHAR* Sign; float X; bool bNew; };
+	const FSpot Spots[] = {
+		{ TEXT("/Game/Buildings/SM_OakHillHouse_300k"), TEXT("/Game/Buildings/SM_OakHillHouse_300k_Col"), TEXT("OakHillHouse"), nullptr, TEXT("HOUSE: OLD (300k)"), -2700.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_House"), TEXT("/Game/TownLab/Buildings/SM_TL_House_Col"), TEXT("OakHillHouse"), TEXT("TL_House"), TEXT("HOUSE: NEW"), -1000.f, true },
+		{ TEXT("/Game/Buildings/SM_OakHillStore_300k"), TEXT("/Game/Buildings/SM_OakHillStore_300k_Col"), TEXT("OakHillStore"), nullptr, TEXT("STORE: OLD (300k)"), 900.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Store"), TEXT("/Game/TownLab/Buildings/SM_TL_Store_Col"), TEXT("OakHillStore"), TEXT("TL_Store"), TEXT("STORE: NEW"), 2800.f, true },
+	};
+	for (const FSpot& S : Spots)
+	{
+		if ((Set == TEXT("old") && S.bNew) || (Set == TEXT("new") && !S.bNew)) continue;
+		const FString Name = FPaths::GetBaseFilename(S.Mesh);
+		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), S.Mesh, *Name));
+		if (!Mesh) { UE_LOG(LogTemp, Warning, TEXT("JEEBTLB missing %s"), S.Mesh); continue; }
+		const float Sc = ScaleOf(S.Model);
+		const FTransform Rel(FRotator(0.f, 180.f, 0.f), FVector(S.X, YardY, 0.f), FVector(Sc));   // (door, the model's +Y, toward the floor)
+		UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Owner);
+		M->SetStaticMesh(Mesh);
+		M->SetupAttachment(Root);
+		M->SetRelativeTransform(Rel);
+		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		M->SetCustomPrimitiveDataFloat(0, S.bNew ? 0.37f : 0.61f);   // (when its windows light at dusk: M_Building's HouseOffset)
+		M->RegisterComponent();
+		const FString ColName = FPaths::GetBaseFilename(S.Col);
+		if (UStaticMesh* ColMesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), S.Col, *ColName)))
+		{
+			UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Owner);
+			C->SetStaticMesh(ColMesh);
+			C->SetupAttachment(Root);
+			C->SetRelativeTransform(Rel);
+			C->SetHiddenInGame(true);
+			C->SetCastShadow(false);
+			C->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			C->SetCollisionResponseToAllChannels(ECR_Block);
+			C->RegisterComponent();
+		}
+		int32 DecorDraws = 0, DecorPieces = 0, DecorTris = 0, Lights = 0;
+		if (const JeebTownLabDecor::FBuildingDecor* D = S.Decor ? JeebTownLabDecor::For(S.Decor) : nullptr)
+		{
+			// one instanced set per mesh and shadow setting: a draw per kind, as the town should do it
+			TMap<FString, UInstancedStaticMeshComponent*> Sets;
+			const FTransform World = Rel * Root->GetComponentTransform();
+			for (int32 i = 0; i < D->Num; ++i)
+			{
+				const JeebTownLabDecor::FDecor& P = D->Pieces[i];
+				const FString Key = FString::Printf(TEXT("%s|%d"), P.Mesh, P.bCastShadow ? 1 : 0);
+				UInstancedStaticMeshComponent*& Ism = Sets.FindOrAdd(Key);
+				if (!Ism)
+				{
+					UStaticMesh* PM = LoadObject<UStaticMesh>(nullptr, P.Mesh);
+					if (!PM) { UE_LOG(LogTemp, Warning, TEXT("JEEBTLB missing decor %s"), P.Mesh); continue; }
+					Ism = NewObject<UInstancedStaticMeshComponent>(Owner);
+					Ism->SetStaticMesh(PM);
+					Ism->SetupAttachment(Root);
+					Ism->SetCastShadow(P.bCastShadow);
+					Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					Ism->SetCullDistances(0, 9000);
+					Ism->RegisterComponent();
+					++DecorDraws;
+				}
+				Ism->AddInstance(JeebTownLabDecor::Place(World, P), true);
+				++DecorPieces;
+				DecorTris += Tris(Ism->GetStaticMesh());
+				if (P.bLight)
+				{
+					UPointLightComponent* L = NewObject<UPointLightComponent>(Owner);
+					L->SetupAttachment(Root);
+					L->SetWorldLocation(JeebTownLabDecor::Place(World, P).GetLocation() + FVector(0.f, 0.f, 25.f));
+					L->SetIntensityUnits(ELightUnits::Lumens);
+					L->SetIntensity(250.f);
+					L->SetAttenuationRadius(600.f);
+					L->SetLightColor(FLinearColor(1.f, 0.62f, 0.3f));
+					L->SetCastShadows(false);
+					L->RegisterComponent();
+					++Lights;
+				}
+			}
+		}
+		UE_LOG(LogTemp, Display, TEXT("JEEBTLB %s scale %.2f nanite %d fallback tris %d materials %d | decor pieces %d draws %d tris %d lights %d"),
+			*Name, Sc, Mesh->IsNaniteEnabled() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
+		UTextRenderComponent* Sign = NewObject<UTextRenderComponent>(Owner);
+		Sign->SetupAttachment(Root);
+		Sign->SetRelativeLocation(FVector(S.X, YardY - 900.f, 1500.f));
+		Sign->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+		Sign->SetHorizontalAlignment(EHTA_Center);
+		Sign->SetWorldSize(70.f);
+		Sign->SetTextRenderColor(FColor::White);
+		Sign->SetText(FText::FromString(S.Sign));
+		Sign->SetCastShadow(false);
+		Sign->RegisterComponent();
+	}
+}
