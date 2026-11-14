@@ -7,6 +7,7 @@
 #include "JeebWater.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
+#include "Engine/OverlapResult.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
@@ -288,6 +289,26 @@ void AKnightCharacter::TickSwimTests(float Dt)
 		FParse::Value(FCommandLine::Get(), TEXT("SwimDo="), Do);
 		Yaw = GetActorRotation().Yaw;
 		bRead = true;
+	}
+	// (-SwimProbe: once a second, everything solid straight under him, for "what is he standing on in the water")
+	static const bool bProbe = FParse::Param(FCommandLine::Get(), TEXT("SwimProbe"));
+	static float ProbeT = 0.f;
+	if (bProbe && (ProbeT += Dt) > 1.f)
+	{
+		ProbeT = 0.f;
+		const FVector C = GetActorLocation();
+		TArray<FHitResult> Hits;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebSwimProbe), false, this);
+		GetWorld()->LineTraceMultiByChannel(Hits, C + FVector(0.f, 0.f, 50.f), C - FVector(0.f, 0.f, 400.f), ECC_Visibility, Q);
+		FCollisionObjectQueryParams O(FCollisionObjectQueryParams::AllObjects);
+		TArray<FOverlapResult> Over;
+		GetWorld()->OverlapMultiByObjectType(Over, C - FVector(0.f, 0.f, 100.f), FQuat::Identity, O, FCollisionShape::MakeSphere(30.f), Q);
+		FString S;
+		for (const FHitResult& H : Hits) S += FString::Printf(TEXT(" [%s.%s z %.0f]"), H.GetActor() ? *H.GetActor()->GetName() : TEXT("-"), H.GetComponent() ? *H.GetComponent()->GetName() : TEXT("-"), H.ImpactPoint.Z);
+		for (const FOverlapResult& Ov : Over) S += FString::Printf(TEXT(" {%s.%s}"), Ov.GetActor() ? *Ov.GetActor()->GetName() : TEXT("-"), Ov.GetComponent() ? *Ov.GetComponent()->GetName() : TEXT("-"));
+		const UKnightMovement* KM0 = KnightMove();
+		UE_LOG(LogTemp, Log, TEXT("JEEBSWIMPROBE at %s mode %d floor %s:%s"), *C.ToCompactString(), KM0 ? int32(KM0->MovementMode) : -1,
+			KM0 && KM0->CurrentFloor.HitResult.GetComponent() ? *KM0->CurrentFloor.HitResult.GetComponent()->GetName() : TEXT("-"), *S);
 	}
 	if (Keys.IsEmpty() && Do.IsEmpty()) return;
 	T += Dt;
