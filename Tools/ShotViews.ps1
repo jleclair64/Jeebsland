@@ -39,7 +39,7 @@ $facing = @{ B = 0; R = 90; F = 180; L = -90 }
 foreach ($v in $Views.ToCharArray()) {
   $tag = "$Name$v"
   Get-ChildItem $shots -Filter "$($tag)_*.png" -ErrorAction SilentlyContinue | ForEach-Object { [IO.File]::Delete($_.FullName) }
-  $a = "`"$proj`" /Game/MoveLab -game -JeebShot -ShotMove=$Move -ShotName=$tag -ShotFacing=$($facing["$v"]) -ShotYaw=0 -ShotPitch=-8 -ShotPhase=0.25 -RenderOffScreen -Multiprocess -ResX=1280 -ResY=720 -benchmark -fps=30 -nosound $Extra"
+  $a = "`"$proj`" /Game/MoveLab -game -JeebShot -ShotMove=$Move -ShotName=$tag -ShotFacing=$($facing["$v"]) -ShotYaw=0 -ShotPitch=-8 -ShotPhase=0.25 -RenderOffScreen -Multiprocess -NoLiveCoding -ResX=1280 -ResY=720 -benchmark -fps=30 -nosound $Extra"
   Start-Process $ue $a -Wait
   $pick = "$shots\$($tag)_{0:D3}.png" -f $Frame
   if (-not (Test-Path $pick)) { Write-Warning "no picture $pick"; continue }

@@ -40,4 +40,4 @@ Read the timing constants for the move in `KnightCharacter.h` (e.g. `SweepDur`, 
 ## Report
 Start with `VERDICT: PASS` or `VERDICT: FAIL`. Then give the checklist. For each FAIL, give the frame numbers, the side, what is wrong and what change would fix it if you can tell. Keep it short. Don't praise. Don't edit code. For every FAIL, end the report with one line `LESSON: <a general rule that would have prevented it>` (not the one-off fix), so it can be added to `Docs/ReviewLessons.md`.
 
-Never open a visible Unreal window (the owner plays games on this PC): every Unreal test run uses -RenderOffScreen -Multiprocess (never -windowed; -Multiprocess stops it waiting at startup for another copy's build), and takes a slot from bash Tools/uqueue.sh run <name> run in its project folder (release it right after).
+Never open a visible Unreal window (the owner plays games on this PC): every Unreal test run uses -RenderOffScreen -Multiprocess -NoLiveCoding (never -windowed; -Multiprocess stops it waiting at startup for another copy's build), and takes a slot from bash Tools/uqueue.sh run <name> run in its project folder (release it right after).
