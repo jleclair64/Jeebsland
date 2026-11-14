@@ -262,6 +262,9 @@ private:
 	void LevelCut(FPose& B, int32 Kind, float W, float HandWant, float TipWant, float Dt);
 	void ToolHeadClear(FPose& P, const FInput& In) const;
 	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
+	void HandsOffThighs(FPose& P, const FInput& In, float Dt);
+	float ThighOut[2] = { 0.f, 0.f };   // HandsOffThighs: each arm's eased outward turn (degrees)
+	float ThighLogT = 0.f, ThighMin[2] = { 1e4f, 1e4f }, ThighMinRaw[2] = { 1e4f, 1e4f };
 	void ExtendArm(FPose& P, float Deg, float W) const;
 	void TwoHandTool(FPose& P, const FInput& In, float Dt);
 	int32 ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend);
