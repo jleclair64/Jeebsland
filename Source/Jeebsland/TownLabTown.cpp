@@ -86,7 +86,9 @@ ATownLabTown::ATownLabTown()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickInterval = 0.25f;
 	bReplicates = false;
-	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
+	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	Root->SetMobility(EComponentMobility::Static);   // (its meshes are static: a movable root refused them, "cannot attach", 2026-11-14; the lantern lights are movable children, which is allowed)
+	SetRootComponent(Root);
 }
 
 const JeebTownLab::FSite& ATownLabTown::Site() const { return bRealSite ? JeebTownLab::RealSite() : JeebTownLab::LabSite(); }
@@ -101,7 +103,7 @@ FString ATownLabTown::OldMeshName(const FString& MeshName)
 void ATownLabTown::BeginPlay()
 {
 	Super::BeginPlay();
-	SetActorLocation(FVector::ZeroVector);
+	if (!GetActorLocation().IsNearlyZero()) SetActorLocation(FVector::ZeroVector);   // (spawned at the origin; a static root must not be moved)
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 	if (bServer) SetActorTickEnabled(false);
 	if (bRealSite ? !JeebTownLab::RealTown() : !JeebTownLab::NewOn()) return;

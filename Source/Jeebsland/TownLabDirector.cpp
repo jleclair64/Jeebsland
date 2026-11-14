@@ -179,7 +179,7 @@ void ATownLab::BuildTour()
 		{ TEXT("west"), JeebOakHill::PosX + 300.f, JeebOakHill::PosY - 5200.f, 220.f, 180.f, -3.f },   // the west road at the river, looking at Blackrock
 		{ TEXT("open"), JeebOakHill::PosX, JeebOakHill::PosY + 30000.f, 170.f, 20.f, -3.f },             // open rolling land 300 m east
 		{ TEXT("openair"), JeebOakHill::PosX + 10000.f, JeebOakHill::PosY + 38200.f, 3500.f, -140.7f, -14.f },
-		{ TEXT("blackrock"), JeebTerrain::VillageCenter().X - 1800.f, JeebTerrain::VillageCenter().Y, 170.f, 0.f, -3.f },
+		{ TEXT("blackrock"), JeebTerrain::VillageCenter().X - 4200.f, JeebTerrain::VillageCenter().Y, 900.f, 0.f, -10.f },   // from above the south gate, over its roofs
 	};
 	const int32 FieldLook = -1;   // (-1: StartStation leaves the look and shadow settings as they are; -ExecCmds runs after BeginPlay)
 	if (bField)
