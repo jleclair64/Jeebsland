@@ -27,7 +27,7 @@ public class Jeebsland : ModuleRules
 		// Password hashing on the server (PBKDF2-SHA256)
 		AddEngineThirdPartyPrivateStaticDependencies(Target, "OpenSSL");
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "RHI" });   // (RHIGetGPUFrameCycles: the JEEBGPU test log)
 
 		PublicIncludePaths.AddRange(new string[] {
 			"Jeebsland"

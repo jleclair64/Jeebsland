@@ -44,6 +44,7 @@
 #include "GameFramework/Pawn.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
+#include "DynamicRHI.h"
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/TextRenderComponent.h"
@@ -717,6 +718,24 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		if (bShotDressed && ShotClock > 8.f && ShotClock < 8.1f)
 			if (ACharacter* C = Cast<ACharacter>(PC ? PC->GetPawn() : nullptr))
 				UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT MaxWalkSpeed=%.1f"), C->GetCharacterMovement()->MaxWalkSpeed);
+		// (JEEBGPU, 2026-11-14: a still's median GPU and whole-frame time from 4.5 to 8.8 s, after the view has moved and before the
+		// screenshot's hitch, so a before/after frame-cost check needs no profiler: compare runs of the same view in the same copy)
+		if (ShotMove.IsEmpty())
+		{
+			static TArray<float> GpuMs, FrameMs;
+			static bool bGpuLogged = false;
+			if (ShotClock > 4.5f && ShotClock < 8.8f)
+			{
+				GpuMs.Add(FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles()));
+				FrameMs.Add(DeltaSeconds * 1000.f);
+			}
+			else if (ShotClock >= 8.8f && !bGpuLogged && GpuMs.Num() > 0)
+			{
+				bGpuLogged = true;
+				GpuMs.Sort(); FrameMs.Sort();
+				UE_LOG(LogTemp, Display, TEXT("JEEBGPU gpu %.2f ms, frame %.2f ms (medians of %d frames)"), GpuMs[GpuMs.Num() / 2], FrameMs[FrameMs.Num() / 2], GpuMs.Num());
+			}
+		}
 		if (ShotMove.IsEmpty() && ShotClock > 9.f && !bShotTaken)
 		{
 			bShotTaken = true;
