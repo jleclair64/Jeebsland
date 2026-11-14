@@ -188,6 +188,8 @@ Oak Hill is built (2026-11-12, see "Oak Hill is built" above): ask the owner how
 **Confirmed by the owner (2026-10-12):** soft branch shadows and Lowest frame rate, no Lowest shadow blinking, redwoods and fort decks, pen knight swings landing, ladders and tower jumps online, and the deep crouch as it is (about 3/4 height) all look good.
 
 **Reminders for the owner (bring these up at the start of each session until done):**
+- Emotes from Mixamo still need adding (Roadmap, Social).
+- New models are still needed for the shields, the wizard staffs and the wands (Roadmap item 17).
 - Every so often (about weekly, or before risky changes), remind them to copy `Saved/Accounts` and `Saved/Characters` to their Google Drive (account jeebsland@gmail.com; a dated folder each time): that is the only copy of every player's account and character. They chose to do this by hand for now (no automatic backup).
 
 **Next steps / open online work:** when friends eventually test it, over Tailscale (Windows only; a Mac build needs a Mac with Xcode). Not shared yet: the horse (removed until it is; idea: each player only sees their own), cats, NPC animations, time of day, sitting, cottage loot stash timers; no PvP hitting; other players' health bars not shown. Passwords travel unencrypted (fine over Tailscale; must fix before public hosting). Password hashing runs on the server's game thread (~50 ms per login). Rented hosting later: needs a source-built engine for a Linux dedicated-server build; Hetzner suggested; measure a world's memory first.
@@ -335,7 +337,23 @@ The owner's cheat sheet is `Docs/HowToTest.md` (editor Play never needs the worl
 
 ## Parallel agents for every multi-part request (owner, 2026-11-11; standing rule, never wait to be reminded)
 
-When a request has several independent parts, split them across background agents from the START of the turn, scaled to the size (a quick fix needs none; Opus for motion, visuals and new systems, Sonnet for data and colour tweaks). Each agent gets its own files and a full brief (the owner's words, picture paths, files it may and may not touch). Only one Unreal process may build, import or run test pictures at a time: close the editor first and give every agent a take/drop lock on `Saved/unreal.lock` (a small PowerShell script in the scratchpad). Agents run their own reviewers but do not commit; the main session keeps the work that touches the most shared files, runs shared rebuilds once (e.g. ImportNewSuit, then clips, then the bare knight), and commits everything together.
+When a request has several independent parts, split them across background agents from the START of the turn, scaled to the size (a quick fix needs none; Opus for motion, visuals and new systems, Sonnet for data and colour tweaks). Each agent gets its own files and a full brief (the owner's words, picture paths, files it may and may not touch). Agents run their own reviewers but do not commit; the main session keeps the work that touches the most shared files, runs shared rebuilds once (e.g. ImportNewSuit, then clips, then the bare knight), and commits everything together.
+
+Each agent works in its own project copy (owner, 2026-11-13, "let's do it"; starting with the batch after that night's):
+- `bash Tools/AgentCopy.sh new <agent>` makes `../JeebsAgents/<agent>` on branch `agent/<agent>` from main's latest commit, with the big git-ignored assets linked in (Content/Filler, Art originals); `remove <agent>` unlinks them first, then deletes the copy (only once merged). Commit everything in the main folder before making copies, or the copies start without it.
+- The agent edits, builds (Build.bat with the copy's .uproject) and runs test pictures only in its copy, and commits to its own branch (never pushes). Another agent's half-finished code can never break its build.
+- `Tools/uqueue.sh` shares the machine: at most 3 Unreal processes at once (6 cores, 32 GB, 8 GB GPU; a fourth only slows the others), first come first served, one build at a time per copy, `solo` for frame-rate timing (holds every slot). Same rules as below: run it in the background, release the moment Unreal exits, `-RenderOffScreen`, `-abslog=<copy>/Saved/Logs/<agent>.log`.
+- A copy's first build compiles the whole game module (about 10-20 minutes, ~5 GB); shaders come from the shared engine cache. Disk: about 8 GB a copy (116 GB free on 2026-11-13); remove copies after merging.
+- The main session merges the branches into main, settles conflicts, runs the shared rebuilds once, checks the whole, commits and pushes. Unreal assets (.uasset, .umap) can't be merged: each asset folder has one owning agent per batch.
+- Linked shared assets belong to the main folder: a copy rebuilds them only if its brief says so.
+
+How agents shared Unreal in one folder (owner, 2026-11-13: "find a smarter/optimal way"; a free-for-all with one lock had five agents waiting while one held it 75 minutes; still the rule for work in the main folder):
+- `Tools/ulock.sh` is a first-come-first-served queue. `build NAME` holds the exclusive build lock (`Saved/unreal.lock`) for builds, importers, material builds, the editor and packaging. `run NAME` holds one of two run slots for `-game` / test-picture runs, so two can go at once but never during a build. `release NAME` gives it back; `status` shows the queue. Waiting blocks, so agents run it in the background. Stale locks clear themselves when no Unreal process has run for 3 minutes; holders past 30 min (build) or 12 min (run) show OVERDUE.
+- Every run: `-RenderOffScreen` (no window over the owner's games) and `-abslog=<repo>/Saved/Logs/<agent>.log` (two runs at once would share Jeebsland.log). GPU timing is measured alone.
+- Hold only while Unreal runs: never while thinking, editing or waiting for reviewers.
+- Batch per agent: finish every edit first (a build compiles everyone's code, so never leave a half-edit in a file), one build, then all pictures in as few runs as possible.
+- A build failing in another agent's file: release and tell the coordinator at once with the error lines.
+- Size the batch: at most about four agents that need Unreal at once; Blender, data, research and Meshy/Mixamo work can run beside them freely.
 
 ## Reviews before the owner sees a change (owner, 2026-11-01)
 

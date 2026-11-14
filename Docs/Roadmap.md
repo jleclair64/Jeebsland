@@ -156,6 +156,7 @@ Mountain shape and climbing (owner approved this plan, 2026-11-06: something sim
 - Build AFTER the Smash-style combat basics, so bosses are made with the final moves (hit stun, knockback, guard break).
 
 ## Social
+- **Emotes (owner, 2026-11-13; reminder) [S-M]:** add some emotes from Mixamo (wave, bow, cheer, dance, sit, point...), played from a key or a chat command and shown to everyone (multicast, like the attack clips).
 - **Player chat (2026-10-29) [M]:** RuneScape style: a chat box in the corner; nearby chat shows over the speaker's head and in the box; later channels for world, private messages and friends. The server relays every message. Needs from the start: a swear filter, a mute button for players, and a way for the owner to mute or ban an account.
 - **Message board (2026-10-29) [M-L]: WAITING until there is a real rented server.** A blog-style board on the main screen for discussions, bug reports and ideas. Options then: build it into the game's own server, or link out to a hosted forum (Discord, GitHub Discussions).
 
@@ -197,6 +198,7 @@ Mountain shape and climbing (owner approved this plan, 2026-11-06: something sim
 16. **(REPLACED 2026-11-03: capes are ordinary items now.) Cape = PvP rank on the tier ladder (owner, 2026-10-30):** the ranks share the gear tiers' names and order (Tin, Iron, Bronze, Steel, Silver, Gold, then the class legendary); cape colours (Tiers.csv CapeColor): Tin linen, Iron charcoal, Bronze copper, Steel blue, Silver white, Gold gold, Onyx black / Emerald green / Diamond ice. Capes left the store and the satchel (its 12% cape row is now 25 ingots). Everyone is Tin until PvP ranks are built (step 8: JeebItems::CapeRank).
 
 17. **New weapons from Meshy (owner, 2026-11-05):** remake the code-built weapons (sword, axe, spear, broadsword, battle axe, katana, wand, staff, bow, fishing rod) as Meshy models, and shields too if wanted. Follow `Docs/ItemStyleGuide.md` for the look and the process. The pickaxe, longbow, crossbow and potion are done.
+    - **Still needed (owner, 2026-11-13): new models for the shields (kite, round, tower), the wizard staffs and the wands.**
 
 ## Sound (added 2026-11-02, later)
 - The game has no sound yet. When it gets some: a sharp "tink" on headshots, footsteps, sword hits and blocks, the bow, ambient wind and birds, music.
