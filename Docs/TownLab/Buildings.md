@@ -76,3 +76,18 @@ No outside textures were downloaded and no Meshy credits were spent (0): everyth
 - The thatch's straw is a little softer close up than the 300k model's (60k triangles plus a 4096 picture); from street distance it reads the same.
 - Kept from the original models (not changed here): a dark seam where the house chimney meets the gable, the store's darker back wall stone (same as the old store), the store's hanging sign going nearly black at dusk.
 - Moss clumps on the roofs were tried and taken out (they read as stickers); the model's own ridge moss is graded into the straw.
+
+## Town hall, church, well and potion shop (build-b, 2026-11-14)
+| | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
+|---|---|---|
+| Town hall | `SM_OakHillTownHall_300k`: 300k | `SM_TL_TownHall`: 60k, Nanite, 1 material (`MI_TL_TownHall`) |
+| Church | `SM_OakHillChurch_300k`: 299k | `SM_TL_Church`: 60k, Nanite, 1 material |
+| Potion shop | `SM_OakHillPotionShop_300k`: 300k | `SM_TL_PotionShop`: 50k, Nanite, 1 material |
+| Well | `SM_OakHillWell_150k`: 150k | `SM_TL_Well`: 26k, Nanite, 1 material (no windows) |
+- Same pivot, door (+Y) and FModel Scale as the old models; collision `SM_TL_<Name>_Col` from building_clean.py's `_Col` meshes.
+- Their roofs are red clay tiles, not thatch: townlab_bake.py's "tile" group (above `tile_z`, the eave height) is shifted to one town colour, `TILE_TARGET` (the town hall's graded terracotta), so every roof matches. The church's stained glass, which building_clean.py read as forge fire, is turned into window marks (`fire_as_window`): dark by day, lit at dusk.
+- Decor (townlab_decor.py): town hall 27 pieces, church 29 (its door lantern back as a lit lantern), potion shop 31, well 8. `ivy_min` keeps ivy to full-size patches on walls cut up by windows; `no_hang` drops the eave tress (the town hall's jetty, the church's chimney); `no_ivy` and `feet` keep the well to a pail, two stone piles and weeds.
+- Import only these: `Tools\BuildTownLabBuildings.ps1 -Only TL_TownHall,TL_Church,TL_Well,TL_PotionShop` (reuses the shared M_TL_Building, T_NoGlow and decor). Needs `Tools\BuildBuildings.ps1 -CleanOnly OakHillTownHall_300k OakHillChurch_300k OakHillWell_150k OakHillPotionShop_300k` once first.
+- Lineup: `-TownLabBuildings` shows them in a second yard behind the house and store (town halls and churches 36 m back, potion shops and wells 74 m back; the new one of each pair is on the left seen from the front).
+- Frame cost (performance reviewer, MoveLab 1920x1080 noon, two runs each): overview old 4.17 ms / new 4.13 ms GPU, close view old 3.95 / new 4.12 (noise 0.2-0.27 ms); about +58 draws, all decor. No Meshy credits spent.
+- For the owner: the church keeps a painted crack on one side's plaster and its painted stained glass from the original model; the backs of the buildings read greyer only in shade, as the old ones do.
