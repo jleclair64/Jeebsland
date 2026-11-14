@@ -35,6 +35,8 @@ namespace
 	const FLabSwap ModelSwaps[] = {
 		{ TEXT("OakHillHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_House"), 0.f, 0.f, 0.f },   // townbuild's rebuilt house
 		{ TEXT("OakHillStore"), TEXT("/Game/TownLab/Buildings/SM_TL_Store"), 0.f, 0.f, 0.f },   // townbuild's rebuilt store
+		{ TEXT("GeneralStore"), TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall"), 0.f, 0.f, 0.f },   // build-c's rebuilt market stall
+		{ TEXT("PotionStall"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall"), 0.f, 0.f, 0.f },    // build-c's rebuilt potion stall
 	};
 	struct FPlotSwap { int32 Plot; const TCHAR* Mesh; float Scale; float YawAdd; float Lift; };
 	const FPlotSwap PlotSwaps[] = {
@@ -298,9 +300,10 @@ void ATownLabTown::BuildBuildings()
 				B->RegisterComponent();
 				Sets.Add(Path);
 				++DrawSets;
-				// The rebuilt models' own decorations (TownLabDecor.h, by the model's name: SM_TL_House -> "TL_House")
-				const FString Base = FPaths::GetBaseFilename(Path);
-				const FString Kind = Base.StartsWith(TEXT("SM_TL_")) ? Base.Mid(3) : FString();
+				// The rebuilt models' own decorations (townbuild: ivy, moss, stones, lanterns), one instanced set per kind for the town
+				// (any rebuilt model SM_TL_<Name> finds its decor under "TL_<Name>"; build-c 2026-11-14: not only the house and store)
+				const FString MeshName = FPaths::GetBaseFilename(Path);
+				const FString Kind = MeshName.StartsWith(TEXT("SM_TL_")) ? MeshName.Mid(3) : FString();
 				if (const JeebTownLabDecor::FBuildingDecor* D = Kind.IsEmpty() ? nullptr : JeebTownLabDecor::For(*Kind))
 					for (int32 i = 0; i < D->Num; ++i)
 					{

@@ -43,9 +43,24 @@ GRADE = {
                              wood=(3.0, 1.5, -1.0, 1.1),
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
+    # build-c's stalls (2026-11-14): each keeps its own colours (the market stall's red-and-cream striped roof and goods, the potion
+    # stall's dark timber), only nudged toward the town's rich brown wood and warm cream
+    "GeneralStore_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
+                             wood=(-2.0, -2.5, 3.5, 1.0),     # rich brown: the red-orange plank back wall pulled toward the front timber (review)
+                             thatch=(0.0, 0.0, 0.0, 1.0),
+                             stone=(1.0, 0.5, 2.0, 1.0)),
+    "PotionStall_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
+                             wood=(7.0, 1.5, 3.0, 1.1),       # its dark timber lifted and warmed a touch so it reads as rich brown wood, not grey-purple
+                             thatch=(0.0, 0.0, 0.0, 1.0),
+                             stone=(4.0, 1.5, 4.0, 1.0)),     # (its greyest timber falls in this group: warmed the same way; it has no real stone)
 }
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
+# (build-c 2026-11-14, visual review: the stalls are open boxes under a roof, so the high model's occlusion is deep everywhere inside
+# and on the two-layer cloth roof; at 0.42 it turned the cream stripes peach, the lining and goods muddy and the potion stall's back
+# logs near black. Per design: (how much darkens the colour, how much of it reaches the material's AO channel) and the chroma gain.)
+AO_BY = {"GeneralStore_300k": (0.12, 0.4), "PotionStall_300k": (0.18, 0.5)}
+CHROMA_BY = {"GeneralStore_300k": 1.0, "PotionStall_300k": 1.08}
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
 EDGE_GAIN = 0.10            # convex edges this much lighter
@@ -72,6 +87,10 @@ ext = hi_b - lo_b
 U = 100.0 if ext.max() < 100.0 else 1.0
 log(name, "high tris", sum(len(p.vertices) - 2 for p in hi.data.polygons), "extent", [round(float(x * U), 1) for x in ext], "cm/unit", U)
 cage, max_ray = CAGE / U, MAX_RAY / U
+# (build-c 2026-11-14: the market stall's roof is a thin two-layer cloth; the reduction sinks the low roof under its top layer, so 4 cm
+# rays started under it and baked the striped underside and its full occlusion as dark red blotches. Its rays start further out.)
+CAGE_BY = {"GeneralStore_300k": (12.0, 24.0)}
+if name in CAGE_BY: cage, max_ray = CAGE_BY[name][0] / U, CAGE_BY[name][1] / U
 
 def load(path, colour):
     img = bpy.data.images.load(path)
@@ -133,6 +152,16 @@ if len(hi.data.color_attributes):
                 if c.z - 75.0 < p.z < c.z - 10.0 and math.hypot(c.x - p.x, c.y - p.y) < 60.0:
                     vg.add([v.index], 0.6, "REPLACE"); keep_n += 1; break   # (0.6: reduced less, never frozen: 1.0 froze 60k vertices and the house came out at 122k)
 log(new, "flower-box vertices spared", keep_n)
+# (build-c 2026-11-14: the market stall's striped cloth roof is overlapping slats; collapsed with the rest it tore into holes and its
+# stripes smeared. Everything above the eaves is spared like the flower boxes.)
+SPARE_ABOVE = {"GeneralStore_300k": (430.0, 0.8)}
+if name in SPARE_ABOVE:
+    z_from, wgt = SPARE_ABOVE[name]
+    vg = lo.vertex_groups.get("Keep") or lo.vertex_groups.new(name="Keep")
+    n0 = keep_n
+    for v in me.vertices:
+        if v.co.z * U > z_from: vg.add([v.index], wgt, "REPLACE"); keep_n += 1
+    log(new, "roof vertices spared", keep_n - n0)
 m = lo.modifiers.new("reduce", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.ratio = budget / tris; m.use_collapse_triangulate = True
 if keep_n:
     m.vertex_group = "Keep"; m.invert_vertex_group = True; m.vertex_group_factor = 3.0   # (inverted: weight 1 = spared)
@@ -151,7 +180,44 @@ while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
 me.uv_layers.new(name="UV")
 bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
 bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.0, area_weight=0.0, correct_aspect=True, scale_to_bounds=False)
-bpy.ops.uv.pack_islands(rotate=True, margin=MARGIN * 0.6 / SIZE)
+# (build-c 2026-11-14: the market stall's thousands of small goods came out as thousands of little islands, each with its margin, and
+# the big roof got about 7% of the picture: its stripes smeared in game. UV_BOOST scales the islands of the parts that matter (their
+# faces' middle above a height, cm) before packing, so they get that much more of the picture; PACK_MARGIN_BY narrows the gaps.)
+UV_BOOST = {"GeneralStore_300k": (430.0, 2.6)}
+PACK_MARGIN_BY = {"GeneralStore_300k": 6.0}
+if name in UV_BOOST:
+    bpy.ops.object.mode_set(mode="OBJECT")
+    z_from, k = UV_BOOST[name]
+    uvd = me.uv_layers[0].data
+    nl = len(me.loops)
+    luv = np.empty(nl * 2, np.float32); uvd.foreach_get("uv", luv); luv = luv.reshape(-1, 2)
+    lv = np.empty(nl, np.int64); me.loops.foreach_get("vertex_index", lv)
+    ls = np.empty(len(me.polygons), np.int64); me.polygons.foreach_get("loop_start", ls)
+    lt = np.empty(len(me.polygons), np.int64); me.polygons.foreach_get("loop_total", lt)
+    cz = np.empty(len(me.polygons) * 3); me.polygons.foreach_get("center", cz); cz = cz.reshape(-1, 3)[:, 2] * U
+    # islands: faces joined where they share a vertex at the same UV spot (union-find on (vertex, rounded uv) keys)
+    parent = list(range(len(me.polygons)))
+    def find(a):
+        while parent[a] != a: parent[a] = parent[parent[a]]; a = parent[a]
+        return a
+    seen = {}
+    for f in range(len(me.polygons)):
+        for li in range(ls[f], ls[f] + lt[f]):
+            key = (int(lv[li]), round(float(luv[li, 0]), 5), round(float(luv[li, 1]), 5))
+            g = seen.setdefault(key, f)
+            ra, rb = find(f), find(g)
+            if ra != rb: parent[ra] = rb
+    root = np.array([find(f) for f in range(len(me.polygons))])
+    up = {}
+    for f in range(len(me.polygons)): up.setdefault(root[f], []).append(cz[f])
+    boost = {r for r, zs in up.items() if np.median(zs) > z_from}
+    lf = np.repeat(np.arange(len(me.polygons)), lt)
+    sel = np.isin(root[lf], list(boost))
+    luv[sel] *= k
+    uvd.foreach_set("uv", luv.ravel())
+    log(new, "uv islands", len(up), "boosted", len(boost), "x%.1f" % k)
+    bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.uv.pack_islands(rotate=True, margin=PACK_MARGIN_BY.get(name, MARGIN * 0.6) / SIZE)
 bpy.ops.object.mode_set(mode="OBJECT")
 uv = np.empty(len(me.loops) * 2); me.uv_layers[0].data.foreach_get("uv", uv)
 log("uv islands packed; uv extent", round(float(uv.max()), 3))
@@ -251,7 +317,7 @@ w_stone = (1 - soft(C, 9, 15)) * soft(Lc, 25, 32) * (1 - soft(Lc, 72, 78)) * (1 
 w_wood = soft(C, 10, 15) * (1 - soft(Lc, 38, 45)) * soft(H, 25, 35) * (1 - soft(H, 70, 80))
 w_thatch = soft(C, 16, 22) * soft(Lc, 38, 45) * soft(H, 62, 68) * (1 - soft(H, 95, 105)) * (1 - w_plaster)
 glass_guard = np.clip(up2(mask[..., 1]) * 4, 0, 1) if mask.shape[0] * 2 == SIZE else 0
-dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_GAIN
+dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.ones_like(Lc) * CHROMA_BY.get(name, CHROMA_GAIN)
 # each texel's height, from the low model's own geometry (a position bake): the moss grade and the top-to-bottom gradient use it
 show(geo.outputs["Position"])
 pos = bake("Height", SMALL, False)   # (from the high model's Position, selected to active: the low model's own material has no emission, so a bake of it alone came out 0 and the gradient and foot tint fell on the whole building)
@@ -268,7 +334,7 @@ graded = lab_to_rgb(np.stack([L2, A2, B2], -1))
 log("groups: plaster %.0f%% wood %.0f%% thatch %.0f%% stone %.0f%%" % tuple(100 * float(x.mean()) for x in (w_plaster, w_wood, w_thatch, w_stone)))
 # occlusion and edges (baked at SMALL)
 ao_s = up2(box_blur(np.clip(ao, 0, 1), AO_BLUR))
-occl = (1 - ao_s)[..., None] * AO_STRENGTH
+occl = (1 - ao_s)[..., None] * AO_BY.get(name, (AO_STRENGTH, 1.0))[0]
 lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
@@ -283,9 +349,9 @@ if isinstance(glass_guard, np.ndarray):
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)
-mr_out = np.stack([np.clip(ao, 0, 1), mr[..., 1], mr[..., 2]], -1)
+mr_out = np.stack([1 - (1 - np.clip(ao, 0, 1)) * AO_BY.get(name, (AO_STRENGTH, 1.0))[1], mr[..., 1], mr[..., 2]], -1)
 write_png(mr_out, os.path.join(out, "T_%s_MR.png" % new), False)
-write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)
+if glow_img is not None: write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)   # (none for a design with no lit windows, the stalls: the importer uses T_NoGlow)
 write_png(mask, os.path.join(out, "T_%s_Mask.png" % new), False)
 log("pictures written; AO mean %.2f, edge mean %.3f" % (float(ao.mean()), float(edge.mean())))
 
