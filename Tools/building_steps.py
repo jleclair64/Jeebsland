@@ -12,7 +12,8 @@ STEPS = {
     # y -0.73 up to the landing z -0.751 from y -0.32; the landing's own top (picture source) x 0.20-0.42, y -0.32..-0.26
     "StorybookCottage_300k": dict(x0=0.113, x1=0.432, yfront=-0.665, ytop=-0.322, zlow=-0.912, ztop=-0.751, n=5, under=-0.94,
                                   land=(0.20, 0.42, -0.318, -0.262, -0.756, -0.746), nose=0.004,
-                                  riser=(0.20, 0.42, -0.34, -0.31, -0.786, -0.752), slabs=3, gap=0.0015, bevel=0.003),   # (the top step's riser, x, y, z)
+                                  riser=(0.20, 0.42, -0.34, -0.31, -0.786, -0.752), slabs=3, gap=0.0015, bevel=0.0026, into=0.003,
+                                  caps=[(0.045, 0.09, -0.64, -0.36), (0.44, 0.46, -0.60, -0.45)]),   # (the two piers' tops: the stone colour)   # (the top step's riser, x, y, z)
 }
 
 a = sys.argv[sys.argv.index("--") + 1:]
@@ -107,22 +108,39 @@ def face(pts, uvf, want):
 # whole tread came out blurred and mossy. Instead every slab is real geometry, a separate box with bevelled edges and a thin gap to
 # its neighbours, so the joints and step edges are drawn by the light (the town's flat-painted look), each wearing ONE clean texel of
 # the model's own stone: the least mossy spots of the landing, a slightly different one per slab, the darker ones on fronts and ends.
+# (third pass) The colour is the PIERS' cap stone (cool grey, crisp: the reviewer matched the steps against them), a different spot per
+# slab; the rounded edges take a faintly mossy spot of the landing, like the painted stone round them.
+from mathutils.bvhtree import BVHTree
+from mathutils.interpolate import poly_3d_calc
 img = next(n for n in ob.data.materials[0].node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"].links[0].from_node.image
 W, H = img.size
 px = np.empty(W * H * 4, dtype=np.float32); img.pixels.foreach_get(px); px = px.reshape(H, W, 4)
+def colour(uv): return px[min(int(uv.y * H), H - 1), min(int(uv.x * W), W - 1), :3]
+bm.faces.ensure_lookup_table()
+bvh = BVHTree.FromBMesh(bm)
+def uv_down(x, y, z):   # the picture spot straight under (x, y) from above z, on whatever is there
+    hit = bvh.ray_cast(Mi @ Vector((x, y, z)), (Mi.to_3x3() @ Vector((0, 0, -1))).normalized())
+    if hit[0] is None: return None
+    f = bm.faces[hit[2]]; w = poly_3d_calc([v.co for v in f.verts], hit[0])
+    return sum((l[uvl].uv * wi for l, wi in zip(f.loops, w)), Vector((0.0, 0.0)))
 cands = []
+for (ax0, ax1, ay0, ay1) in c["caps"]:
+    for fa in np.linspace(0.15, 0.85, 6):
+        for fb in np.linspace(0.1, 0.9, 10):
+            uv = uv_down(ax0 + fa * (ax1 - ax0), ay0 + fb * (ay1 - ay0), c["ztop"] + 0.2)
+            if uv is None: continue
+            p = colour(uv); cands.append((p[1] - (p[0] + p[2]) / 2, p @ np.array([0.30, 0.59, 0.11]), uv))
+cands.sort(key=lambda t: t[0]); clean = sorted(cands[:14], key=lambda t: -t[1])
+light, dark = [t[2] for t in clean[:7]], [t[2] for t in clean[7:]]
+print("STEPS cap stone: %d spots, moss %.3f..%.3f, lightness %.2f..%.2f" % (len(cands), clean[0][0], max(t[0] for t in clean), clean[-1][1], clean[0][1]))
+mossy = []
 for fa in np.linspace(0.1, 0.9, 9):
     for fb in np.linspace(0.1, 0.9, 9):
-        for uv in (uv_of(lx0 + fa * (lx1 - lx0), ly0 + fb * (ly1 - ly0)), ruv(qx0 + fa * (qx1 - qx0), qz0 + fb * (qz1 - qz0))):
-            p = px[min(int(uv.y * H), H - 1), min(int(uv.x * W), W - 1), :3]
-            moss = p[1] - (p[0] + p[2]) / 2; lum = p @ np.array([0.30, 0.59, 0.11])
-            cands.append((moss, lum, uv.copy()))
-cands.sort(key=lambda t: t[0]); clean = sorted(cands[:12], key=lambda t: -t[1])   # the 12 least green, lightest first
-light, dark = [t[2] for t in clean[:6]], [t[2] for t in clean[6:]]
-print("STEPS stone texels: moss %.3f..%.3f, lightness %.2f..%.2f" % (clean[0][0], max(t[0] for t in clean), clean[-1][1], clean[0][1]))
+        uv = uv_of(lx0 + fa * (lx1 - lx0), ly0 + fb * (ly1 - ly0)); p = colour(uv); mossy.append((p[1] - (p[0] + p[2]) / 2, uv))
+edge_uvs = dark   # (the rounded edges: the darker cap stone, a soft worn rim; a mossy or light texel drew a bright outline round every slab)
 gap, bev = c["gap"], c["bevel"]
-slab_edges = []
-def box(xa, xb, ya, yb_, za, zb_, top_uv, side_uv):
+slabs = []
+def box(xa, xb, ya, yb_, za, zb_, top_uv, side_uv, edge_uv):
     vs = [V(x, y, z) for z in (za, zb_) for y in (ya, yb_) for x in (xa, xb)]   # 0..3 bottom, 4..7 top
     quads = [((4, 5, 7, 6), (0, 0, 1), top_uv), ((0, 1, 5, 4), (0, -1, 0), side_uv), ((0, 2, 6, 4), (-1, 0, 0), side_uv),
              ((1, 3, 7, 5), (1, 0, 0), side_uv)]   # (no back or bottom: always hidden)
@@ -131,20 +149,25 @@ def box(xa, xb, ya, yb_, za, zb_, top_uv, side_uv):
         f = bm.faces.new([vs[k] for k in q]); f.normal_update()
         if (R @ f.normal).dot(Vector(want)) < 0: f.normal_flip()
         for l in f.loops: l[uvl].uv = uv
-        new.append(f); fs.append(f)
-    slab_edges.extend({e for f in fs for e in f.edges if all(len([g for g in e.link_faces if g in fs]) == 2 for _ in [0])})
+        fs.append(f)
+    slabs.append((fs, edge_uv))
 k_ = 0
+xo0, xo1 = x0 - c["into"], x1 + c["into"]   # (the ends run into the piers and wall: no sliver of a gap)
 for i in range(c["n"]):
     yf = c["yfront"] + d * i - c["nose"]; zt = c["zlow"] + h * (i + 1)
     zb = c["under"] if i == 0 else c["zlow"] + h * i - 0.004
-    ye = yb
     K = c["slabs"]
-    edges = [x0 + (x1 - x0) * k / K for k in range(K + 1)]
-    if i % 2: edges = [x0] + [e - (x1 - x0) / (2 * K) for e in edges[1:-1]] + [x1]   # (every other step shifted half a slab, like laid stone)
+    edges = [xo0 + (xo1 - xo0) * k / K for k in range(K + 1)]
+    if i % 2: edges = [xo0] + [e - (xo1 - xo0) / (2 * K) for e in edges[1:-1]] + [xo1]   # (every other step shifted half a slab, like laid stone)
     for a_, (xa, xb) in enumerate(zip(edges, edges[1:])):
-        box(xa + (gap / 2 if a_ else 0), xb - (gap / 2 if a_ < len(edges) - 2 else 0), yf, ye, zb, zt, light[k_ % len(light)], dark[k_ % len(dark)])
+        box(xa + (gap / 2 if a_ else 0), xb - (gap / 2 if a_ < len(edges) - 2 else 0), yf, yb, zb, zt,
+            light[k_ % len(light)], dark[(k_ * 3) % len(dark)], edge_uvs[k_ % len(edge_uvs)])
         k_ += 1
-bmesh.ops.bevel(bm, geom=list(set(slab_edges)), offset=bev, segments=2, profile=0.5, affect="EDGES", clamp_overlap=True)
+for fs, euv in slabs:   # round the edges where two of the slab's own faces meet, and give the rounding the faint moss
+    es = list({e for f in fs for e in f.edges if len([g for g in e.link_faces if g in fs]) == 2})
+    res = bmesh.ops.bevel(bm, geom=es, offset=bev, segments=3, profile=0.5, affect="EDGES", clamp_overlap=True)
+    for f in res["faces"]:
+        for l in f.loops: l[uvl].uv = euv
 bm.to_mesh(ob.data); bm.free()
 print("STEPS added %d slabs" % k_)
 bpy.ops.export_scene.gltf(filepath=out, export_format="GLB")
