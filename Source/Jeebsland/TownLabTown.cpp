@@ -98,6 +98,7 @@ void ATownLabTown::Tick(float DeltaSeconds)
 		if (GlowBase[i] > 0.f) GlowMids[i]->SetScalarParameterValue(TEXT("GlowStrength"), GlowBase[i] * F);
 		GlowMids[i]->SetScalarParameterValue(TEXT("Night"), D);
 	}
+	for (UPointLightComponent* L : LanternLights) if (L) L->SetIntensity(70.f * FMath::Lerp(0.15f, 1.f, D));   // (lit with the windows at dusk)
 }
 
 // The ground: a 1 m grid over the whole patch (the town's streets are 3.5 m wide: a 2 m grid blurred their edges), its four edges
@@ -272,18 +273,19 @@ void ATownLabTown::BuildBuildings()
 							Ism->AddInstance(PieceXf, true);
 						}
 						++DecorPieces;
-						// a real (shadowless) light in every third lantern; the rest glow from their material alone
-						if (Pc.bLight && (LanternCount++ % 3) == 0)
+						// a real (shadowless) light in every lantern, sized to the lantern (townbuild: 70 lm, 3 m, warm), dimmed by day in Tick
+						if (Pc.bLight && ++LanternCount > 0)
 						{
 							UPointLightComponent* L = NewObject<UPointLightComponent>(this);
 							L->SetupAttachment(GetRootComponent());
 							L->SetWorldLocation(PieceXf.GetLocation() + FVector(0.f, 0.f, 25.f));
 							L->SetIntensityUnits(ELightUnits::Lumens);
-							L->SetIntensity(250.f);
-							L->SetAttenuationRadius(600.f);
+							L->SetIntensity(70.f);
+							L->SetAttenuationRadius(300.f);
 							L->SetLightColor(FLinearColor(1.f, 0.62f, 0.3f));
 							L->SetCastShadows(false);
 							L->RegisterComponent();
+							LanternLights.Add(L);
 							++DecorLights;
 						}
 					}

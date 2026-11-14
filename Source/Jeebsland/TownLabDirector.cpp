@@ -204,7 +204,9 @@ void ATownLab::BuildTour()
 		{ TEXT("street"), 1500.f,  50.f,    170.f,  0.f,  -2.f, false },   // the north road, looking up it to the castle knoll
 		{ TEXT("edge"),   500.f,   8500.f,  220.f,  -90.f, -3.f, true },   // the open east side, looking back into the town
 		{ TEXT("hill"),   10000.f, 8200.f,  3500.f, -140.7f, -14.f, false },   // from the air to the north-east, the whole town
-		{ TEXT("house"),  -1703.f, 3184.f,  160.f,  118.f, -14.f, false },   // 7 m from the house on plot 25, its wall foot and decor up close
+		{ TEXT("house"),  -1373.f, 2565.f,  170.f,  118.f, -6.f, false },    // 14 m from the house on plot 25 (9 m from its wall): the whole front, its foot and decor
+		{ TEXT("base"),   -1608.f, 3006.f,  120.f,  118.f, -22.f, false },   // the same house's foot from 4 m: foundation stones, weeds, the ground at the wall
+		{ TEXT("store"),  -757.f,  370.f,   250.f,  154.f, -8.f, false },    // 13 m from the store on plot 5, from the plaza side
 	};
 	const float Phases[2] = { 0.f, 0.5f };
 	const TCHAR* PhaseNames[2] = { TEXT("noon"), TEXT("low") };
@@ -216,6 +218,8 @@ void ATownLab::BuildTour()
 				FString Only;   // (-LabTourOnly=<spot>_<noon|low>: just that spot, in every look and shadow setting: for chasing a look problem)
 				const bool bOnly = FParse::Value(FCommandLine::Get(), TEXT("LabTourOnly="), Only);
 				if (bOnly && Only != FString::Printf(TEXT("%s_%s"), V.Name, PhaseNames[p])) continue;
+				FString Spots;   // (-LabTourSpots=house+base: only these spots, the usual stations)
+				if (FParse::Value(FCommandLine::Get(), TEXT("LabTourSpots="), Spots) && !(TEXT("+") + Spots + TEXT("+")).Contains(FString::Printf(TEXT("+%s+"), V.Name))) continue;
 				const float PX = Town == 0 ? JeebOakHill::PosX : JeebTownLab::PlazaX, PY = Town == 0 ? JeebOakHill::PosY : JeebTownLab::PlazaY;
 				const float X = PX + V.DX, Y = PY + V.DY;
 				FStation S;

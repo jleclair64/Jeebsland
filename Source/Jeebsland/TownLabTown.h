@@ -42,6 +42,7 @@ private:
 	// Window glow: one shared dynamic copy per building material, following the sun as OakHillLife does for the real town
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;
 	TArray<float> GlowBase;
+	UPROPERTY() TArray<class UPointLightComponent*> LanternLights;
 	float LastDusk = -1.f;
 	UPROPERTY() class UMaterialInstanceDynamic* GroundMid = nullptr;
 };

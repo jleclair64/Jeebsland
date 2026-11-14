@@ -31,6 +31,8 @@ Open the console with the `` ` `` key, then type any of these:
 | `jeeb.TownLab.CheapClouds 0` / `1` | Fewer cloud samples. `-1` follows NewLook. |
 | `jeeb.TownLab.ShowOld 0` | Hides the real town's buildings and ground. Its trees stay. |
 | `jeeb.TownLab.ShowNew 0` | Hides the rebuilt town's buildings and ground. Its trees stay. |
+| `jeeb.TownLab.GroundFill 0.15` | How much dusk light the rebuilt town's ground gets back at the low sun (0 = none; 1 glows lime). |
+| `jeeb.TownLab.WorldFill 0.2` | The same for the world's ground round both towns (the lab's copy of the ground material, only while NewLook is on). |
 | `stat fps` / `stat unit` | Frame rate, and where the time goes (Game, Draw = render thread, GPU). |
 
 ## What to look at
@@ -38,9 +40,9 @@ Open the console with the `` ` `` key, then type any of these:
 - **Streets**: mossy cut cobbles with grass in the joints, fraying into the grass at the edges. The real town has painted stones on separate ribbons instead.
 - **Ground**: one material paints grass, worn earth by doors and moss at wall feet, so there are no overlapping layers.
 - **Grass**: dense only within about 40 m, then the ground's own colour takes over. From the air, compare this with the real town's grass everywhere.
-- **The house and the common store**: the townbuild agent's rebuilds, 45-50k triangles each instead of 300k, with ivy, moss, stones and lanterns. The other buildings are the real town's models for now.
+- **The house and the common store**: the townbuild agent's rebuilds, 45-50k triangles each instead of 300k, with ivy, flower boxes, foundation stones, weeds and lanterns (each with a small warm light that brightens at dusk). The other buildings are the real town's models for now.
 - **Light**: walk there at noon and again at the low sun (the day loop is 2 minutes). Toggle `jeeb.TownLab.NewLook` to compare.
 
 ## The measuring tour (for Claude, not needed by you)
 
-`-LabTour` on a test run visits 4 spots in each town (plaza, street, edge, hill) at noon and at the low sun. For each spot it logs `JEEBLAB STAT` lines and saves a picture. The numbers are in `FrameBudget.md`.
+`-LabTour` on a test run visits 7 spots in each town (plaza, street, edge, hill, and three close ones: the house on plot 25 from 14 m, its foot from 4 m, the store on plot 5 from 13 m) at noon and at the low sun. For each spot it logs `JEEBLAB STAT` lines and saves a picture. `-LabTourSpots=house+base` runs only those spots; `-LabTourOnly=<spot>_<noon|low>` runs one spot in every look and shadow setting. The numbers are in `FrameBudget.md`.

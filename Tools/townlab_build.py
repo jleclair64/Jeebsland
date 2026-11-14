@@ -249,6 +249,18 @@ def build_world_ground():
         base_out = lib.get_material_property_input_node_output_name(mat, unreal.MaterialProperty.MP_BASE_COLOR)
     except Exception:
         base_out = ""
+    # The plain round the towns, seen from a hill: M_Ground alone reads as one flat dark olive sheet next to the rebuilt town's
+    # lawn (visual review, 2026-11-14). The same broad swathes as M_TL_Ground (deeper hollows to sunny yellow-green, a
+    # slow larger drift) and its brightness (Lift, as the lawn's Tint) carry the lawn's look out to the horizon.
+    g = Graph(mat)
+    patches = EAL.load_asset("/Game/T_Patches")
+    xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
+    patchy = g.mask(g.tex(patches, g.mul(xy, 1.0 / 4500.0)), True, False)
+    big = g.mask(g.tex(patches, g.mul(g.add(xy, -7700.0), 1.0 / 26000.0)), True, False)
+    graded = g.muln(g.muln(base, g.lerp(g.c3((0.80, 0.95, 0.82)), g.c3((1.15, 1.08, 0.78)), patchy), base_out), g.lerpc(0.86, 1.08, big))
+    graded = g.muln(graded, g.vector("Lift", (1.10, 1.10, 1.04)))
+    g.out(graded, unreal.MaterialProperty.MP_BASE_COLOR)
+    base, base_out = graded, ""
     tint = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -400, 1400)
     tint.set_editor_property("constant", unreal.LinearColor(1.12, 0.97, 0.8, 1.0))
     fill = lib.create_material_expression(mat, unreal.MaterialExpressionScalarParameter, -400, 1500)
