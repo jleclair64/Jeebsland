@@ -257,10 +257,10 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
     # build-a (2026-11-14): walls from building_clean.py's BUILD lines; door = the stretch of the front kept clear (the bank's steps,
     # the smithy's forge lean-to and door, the stall's whole open front); bs = the FModel Scale (OakHill.h)
-    "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75),
+    "TL_Bank":        dict(src="OakHillBank_300k", wx=(-620.4, 621.5), wy=(-687.6, 639.0), door=(-260.0, 260.0), seed=11, bs=0.75, hang=False),
     "TL_BankStall":   dict(src="BankStall_300k", wx=(-535.3, 527.5), wy=(-462.4, 266.5), door=(-600.0, 600.0), seed=13, bs=0.7, corners_only=True),
-    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65),
-    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0),
+    "TL_Smith":       dict(src="OakHillSmith_300k", wx=(-708.1, 699.1), wy=(-537.6, 522.9), door=(-730.0, 520.0), seed=17, bs=0.65, hang=False),
+    "TL_CornerHouse": dict(src="OakHillCornerHouse_300k", wx=(-410.2, 335.1), wy=(-458.8, 432.8), door=(-280.0, 30.0), seed=19, bs=1.0, hang=False),
 }
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
@@ -274,8 +274,8 @@ BUILD_A_PROPS = {
                        ("back", 270, "PotSmall", 0.9, dict(sidestep=12)), ("right", 600, "Pail", 0.85, dict(turn=20))],
 }
 BUILD_A_LANTERNS = {
-    "TL_Bank": [("front", 320, 250.0), ("front", 920, 250.0)],
-    "TL_BankStall": [("right", 80, 285.0)],
+    "TL_Bank": [("front", 370, 250.0), ("front", 870, 250.0)],   # (between the door pillars and the windows)
+    "TL_BankStall": [("right", 560, 285.0)],   # (on the solid back half of the side wall: the front corner is open)
     "TL_Smith": [("front", 1308, 300.0)],
     "TL_CornerHouse": [("front", 470, 200.0)],
 }
@@ -407,7 +407,7 @@ for bname, B in BUILD.items():
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back"):
+        if sname in ("front", "back") and B.get("hang", True):   # (hang=False: build-a's, where the tress read as a floating clump under the eaves)
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
