@@ -50,7 +50,8 @@ GRADE.update({
     "OakHillTownHall_300k":   dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=560.0),
     "OakHillChurch_300k":     dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
-                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=260.0, fire_as_window=True),
+                                   stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=260.0, fire_as_window=True,
+                                   paint_out=[(-700.0, -150.0, -700.0, 300.0, 330.0, 800.0)]),
     "OakHillWell_150k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=170.0),
     "OakHillPotionShop_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
@@ -272,6 +273,44 @@ dL = np.zeros_like(Lc); dA = np.zeros_like(Lc); dB = np.zeros_like(Lc); cg = np.
 show(geo.outputs["Position"])
 pos = bake("Height", SMALL, False)   # (from the high model's Position, selected to active: the low model's own material has no emission, so a bake of it alone came out 0 and the gradient and foot tint fell on the whole building)
 z = up2(pos[..., 2]) * U
+def _grey_filter(x, r, f):   # square max (f=np.maximum) or min (np.minimum) filter, radius r texels
+    for ax in (0, 1):
+        p = np.pad(x, [(r, r) if i == ax else (0, 0) for i in range(2)], mode="edge"); y = np.take(p, range(0, x.shape[ax]), axis=ax)
+        for s in range(1, 2 * r + 1): y = f(y, np.take(p, range(s, s + x.shape[ax]), axis=ax))
+        x = y
+    return x
+# paint_out (build-b, 2026-11-14): Meshy painted the church's side plaster with a crack and grey drip streaks (visual review: "it still has to go").
+# Inside each box (model cm: x0, x1, y0, y1, z0, z1, from the position bake) thin dark marks on plaster are closed over: a grey closing of the
+# lightness (radius PO_R texels) fills anything narrower than about 2*PO_R texels and leaves the wider timber struts, stone and windows alone.
+PO_R = 5
+_po_boxes = GRADE.get(name, {}).get("paint_out", ())
+k_po = None
+if _po_boxes:
+    px, py = up2(pos[..., 0]) * U, up2(pos[..., 1]) * U
+    lum = np.clip(Lc, 0, 100).astype(np.float32)
+    closed = _grey_filter(_grey_filter(lum, PO_R, np.maximum), PO_R, np.minimum)
+    near_plaster = box_blur(w_plaster, 8)
+    k = np.zeros_like(lum)
+    for box in _po_boxes:
+        inbox = (px >= box[0]) & (px <= box[1]) & (py >= box[2]) & (py <= box[3]) & (z >= box[4]) & (z <= box[5])
+        kb = inbox * soft(closed - lum, 2.5, 7.0) * soft(near_plaster, 0.2, 0.35) * soft(closed, 50.0, 58.0) * (1 - soft(C, 22.0, 30.0))
+        k = np.maximum(k, kb); log("paint_out box", box, "texels in box", int(inbox.sum()), "painted", int((kb > 0.5).sum()))
+    if isinstance(glass_guard, np.ndarray): k = k * (1 - glass_guard)
+    k = np.maximum(_grey_filter(k, 2, np.maximum) * 0.9, k)   # (a rim two texels wide: the mark's soft edge was left behind and the grade turned it orange, review round 3)
+    k = np.maximum(k, box_blur(k, 1) * 0.8)   # (a soft rim so no outline of the old mark is left)
+    wpb = np.maximum(box_blur(w_plaster, 12), 1e-3); fA = box_blur(A * w_plaster, 12) / wpb; fB = box_blur(B * w_plaster, 12) / wpb   # (the plaster's own tint round the mark: a brown crack kept its own tint and left a yellow ghost)
+    target = to_lin(np.clip(lab_to_rgb(np.stack([closed, fA, fB], -1)), 0, 1))   # (set outright: a gain clipped at 8 left the darkest crack texels orange)
+    base_lin = base_lin * (1 - k[..., None]) + target * k[..., None]
+    k_po = np.clip(box_blur(k, 3) * 1.5, 0, 1)
+    if os.environ.get("TL_PODBG"):
+        dbg = srgb.copy(); dbg[k > 0.5] = (1.0, 0.0, 1.0); write_png(dbg, os.path.join(out, "PODBG_%s.png" % new), False)
+if GRADE.get(name, {}).get("paint_out"):
+    srgb = to_srgb(base_lin); lab = rgb_to_lab(srgb); Lc, A, B = lab[..., 0], lab[..., 1], lab[..., 2]
+    C = np.hypot(A, B); H = (np.degrees(np.arctan2(B, A)) + 360) % 360
+    w_plaster = soft(Lc, 56, 64) * (1 - soft(C, 22, 32))
+    w_stone = (1 - soft(C, 9, 15)) * soft(Lc, 25, 32) * (1 - soft(Lc, 72, 78)) * (1 - w_plaster)
+    w_wood = soft(C, 10, 15) * (1 - soft(Lc, 38, 45)) * soft(H, 25, 35) * (1 - soft(H, 70, 80))
+    w_thatch = soft(C, 16, 22) * soft(Lc, 38, 45) * soft(H, 62, 68) * (1 - soft(H, 95, 105)) * (1 - w_plaster)
 log("height range cm", [round(float(x), 1) for x in np.percentile(z, [1, 50, 99])], "moss-hue share by height", [round(float(((soft(C, 10, 16) * soft(H, 100, 110) * (1 - soft(H, 170, 180))) * ((z > a) & (z <= b))).mean() * 100), 2) for a, b in ((-1e9, 260), (260, 1e9))])
 # the model's own painted moss (lime patches along the ridge, read as spots by the review 2026-11-14): muted to a soft olive
 w_moss = soft(C, 10, 16) * soft(H, 92, 100) * (1 - soft(H, 170, 180)) * (1 - w_plaster) * soft(z, 260.0, 320.0)   # (roof only: the flower boxes' leaves keep their green, review 2026-11-14)
@@ -294,9 +333,11 @@ log("groups: plaster %.0f%% wood %.0f%% thatch %.0f%% stone %.0f%%" % tuple(100 
 # occlusion and edges (baked at SMALL)
 ao_s = up2(box_blur(np.clip(ao, 0, 1), AO_BLUR))
 occl = (1 - ao_s)[..., None] * AO_STRENGTH
+if k_po is not None: occl = occl * (1 - k_po[..., None])   # (the carved crack's occlusion left a warm ghost, review round 3)
 lin = to_lin(graded)
 lin = lin * (1 - occl) + lin * AO_TINT * occl
 edge = up2(box_blur(np.clip((point - 0.5) * 6.0, 0, 1), EDGE_BLUR))
+if k_po is not None: edge = edge * (1 - k_po)
 lin = lin * (1 + EDGE_GAIN * edge[..., None])
 zt = np.clip((z - 0.0) / max(float(ext[2] * U) * 0.8, 1.0), 0, 1)
 gl = GRAD_BOTTOM + (GRAD_TOP - GRAD_BOTTOM) * np.sqrt(zt)
@@ -307,8 +348,10 @@ if isinstance(glass_guard, np.ndarray):
     lin = lin * (1 - glass_guard[..., None]) + base_lin * glass_guard[..., None]
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
+if k_po is not None: nrm = nrm * (1 - k_po[..., None]) + np.array([0.5, 0.5, 1.0], np.float32) * k_po[..., None]   # (the 300k model carries the crack in its shape too: flat there)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)
 mr_out = np.stack([np.clip(ao, 0, 1), mr[..., 1], mr[..., 2]], -1)
+if k_po is not None and mr_out.shape[0] * 2 == k_po.shape[0]: mr_out[..., 0] = np.maximum(mr_out[..., 0], k_po[::2, ::2])   # (no baked occlusion in a painted-out crack)
 write_png(mr_out, os.path.join(out, "T_%s_MR.png" % new), False)
 write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)
 write_png(mask, os.path.join(out, "T_%s_Mask.png" % new), False)
