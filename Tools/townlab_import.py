@@ -15,6 +15,13 @@ folder = "/Game/TownLab/Buildings"   # (never /Game/Buildings: that folder belon
 NANITE = {"TL_House", "TL_Store"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx"))
 COL_FROM = {"TL_House": "OakHillHouse_300k", "TL_Store": "OakHillStore_300k"}
+# build-a (2026-11-14): the bank, bank stall, smithy and corner house
+NANITE |= {"TL_Bank", "TL_BankStall", "TL_Smith", "TL_CornerHouse"}
+COL_FROM.update({"TL_Bank": "OakHillBank_300k", "TL_BankStall": "BankStall_300k", "TL_Smith": "OakHillSmith_300k", "TL_CornerHouse": "OakHillCornerHouse_300k"})
+# TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just these buildings onto the M_TL_Building already there; the shared material and
+# the decor pieces are left alone (three builders work at once, each in its own project copy, and merge their new assets only)
+ONLY = [x for x in os.environ.get("TL_ONLY", "").split(",") if x]
+if ONLY: NAMES = [n for n in NAMES if n in ONLY]
 TEST_HOUSES = set()
 for f in ("/Game/TownLab", folder):
     if not lib.does_directory_exist(f): lib.make_directory(f)
@@ -49,6 +56,8 @@ GLASS_ROUGH = 0.25
 GLASS_MASK_GAIN = 2.0 # glass where the glow picture is over half bright
 # per-building overrides (owner, 2026-11-12: "the windows in all the homes 35% dimmer": the two house designs only)
 GLOW_BY_NAME = {"TL_House": GLOW_STRENGTH * 0.65}
+GLOW_BY_NAME["TL_CornerHouse"] = GLOW_STRENGTH * 0.65   # (build-a: a home, as the house)
+FIRE_BY_NAME = {"TL_Smith": 2.0}   # (build-a: the forge burns all day, as M_Building's FireLevel 2.0 for the smithy)
 
 # Lighting does the shading (owner, 2026-11-12, with Tools/building_flatten.py taking the baked light out of the colour): steadier,
 # slightly rougher surfaces, and a faint warm rim of sunlight along the edges that makes the shapes pop. All material parameters.
@@ -176,8 +185,8 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     return m
 
 first = NAMES[0]
-no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows
-parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
+no_glow = lib.load_asset(folder + "/T_NoGlow") if ONLY else pic("T_NoGlow", True)         # black: the default GlowTex, and the glow of any building without lit windows
+parent = lib.load_asset(folder + "/M_TL_Building") if ONLY else make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
 for n in NAMES:
     mi_path = folder + "/MI_" + n
@@ -190,6 +199,7 @@ for n in NAMES:
     mel.set_material_instance_texture_parameter_value(mi, "GlowTex", pic("T_%s_Glow" % n, True) or no_glow)
     mel.set_material_instance_texture_parameter_value(mi, "MaskTex", pic("T_%s_Mask" % n, False))
     if n in GLOW_BY_NAME: mel.set_material_instance_scalar_parameter_value(mi, "GlowStrength", GLOW_BY_NAME[n])
+    if n in FIRE_BY_NAME: mel.set_material_instance_scalar_parameter_value(mi, "FireLevel", FIRE_BY_NAME[n])
     if n in TEST_HOUSES: mel.set_material_instance_scalar_parameter_value(mi, "UseMask", 0.0)
     lib.save_asset(mi_path)
     ui = unreal.FbxImportUI()
@@ -264,7 +274,7 @@ for n in NAMES:
 # The decorations (Tools/townlab_decor.py): ivy and moss cards on one painted atlas (M_TL_Foliage: masked, two-sided, no Nanite),
 # moss cushions and little stone piles in their vertex colour (M_TL_VertexPaint). Placed by Source/Jeebsland/TownLabDecor.h.
 decor = os.path.join(work, "Decor")
-if os.path.isdir(decor):
+if os.path.isdir(decor) and not ONLY:
     def plain_material(name, build):
         path = folder + "/" + name
         if lib.does_asset_exist(path): lib.delete_asset(path)

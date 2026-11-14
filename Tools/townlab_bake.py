@@ -43,7 +43,16 @@ GRADE = {
                              wood=(3.0, 1.5, -1.0, 1.1),
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
+    # build-a's four (2026-11-14): the house/store palette; the bank stall keeps its own (building_palette.py "bankstall": clay tile
+    # roof, warm stone, brass), so it is graded only gently
+    "OakHillBank_300k":        dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-6.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
+    "BankStall_300k":          dict(plaster=(1.0, 0.5, 2.0, 1.0), wood=(-2.0, 0.5, -1.5, 1.0), thatch=(-2.0, 0.5, -0.5, 1.0), stone=(1.0, 0.5, 2.0, 1.0)),
+    "OakHillSmith_300k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-8.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 4.0, 1.0)),
+    "OakHillCornerHouse_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-9.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
 }
+# Buildings with a fire that burns all day (the forge): building_clean.py marks its faces (0,0,0) in the vertex colour, which the bake's
+# empty background also reads as, so their mask is baked offset (0.2 + 0.8 x colour: a real face is never 0) and decoded.
+FIRE = {"OakHillSmith_300k"}
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
@@ -214,8 +223,19 @@ if glow_img is not None:
     tg = tex(glow_img); show(tg.outputs["Color"]); glow_lin = bake("Glow", SMALL, True)
 else:
     glow_lin = np.zeros((SMALL, SMALL, 3), np.float32)
-show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
-mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
+if name in FIRE:
+    off = N("ShaderNodeMix"); off.data_type = "RGBA"; off.inputs["Factor"].default_value = 0.8
+    off.inputs[6].default_value = (1.0, 1.0, 1.0, 1.0); L(vcol.outputs["Color"], off.inputs[7])
+    show(off.outputs[2]); raw = bake("Mask", SMALL, False)
+    surf = raw.max(-1) > 0.1                    # (a real face of the model; the background stays 0)
+    mask = np.clip((raw - 0.2) / 0.8, 0, 1)
+    fire_t = surf & (mask.max(-1) < 0.15)       # the forge: (0,0,0) on the model
+    mask[fire_t] = 0.0
+    mask[..., 2] = np.where(fire_t, 0.0, np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype)))
+    log(new, "fire texels", int(fire_t.sum()), "window texels", int((mask[..., 1] > 0.5).sum()))
+else:
+    show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
+    mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
 # convexity: the high model's pointiness (0.5 flat, above convex)
 show(geo.outputs["Pointiness"]); point = bake("Edge", SMALL, False)[..., 0]
 # the normal: the high model's shape and normal map, in the low model's tangent space

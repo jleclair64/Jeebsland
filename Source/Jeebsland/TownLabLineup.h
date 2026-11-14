@@ -10,6 +10,7 @@ class UWorld;
 // (/Game/TownLab/Buildings: SM_TL_House and SM_TL_Store, about 45-50k with baked detail, Tools/BuildTownLabBuildings.ps1), the new
 // ones with their decorations from TownLabDecor.h. Doors toward the floor; collision from each one's SM_*_Col.
 //   -TownLabSet=old | new   only that pair (frame-cost comparisons); both by default
+//   -TownLabGroup=a        the bank, bank stall, smithy and corner house pairs instead (build-a, 2026-11-14), on a 150 m yard
 // Log JEEBTLB: each building's mesh, triangles (the non-Nanite fallback's LOD 0 too), materials, and the decor's draws.
 namespace JeebTownLab
 {
