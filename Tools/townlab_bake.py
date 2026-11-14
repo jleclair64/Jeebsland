@@ -43,6 +43,16 @@ GRADE = {
                              wood=(3.0, 1.5, -1.0, 1.1),
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
+    # build-c's stalls (2026-11-14): each keeps its own colours (the market stall's red-and-cream striped roof and goods, the potion
+    # stall's dark timber), only nudged toward the town's rich brown wood and warm cream
+    "GeneralStore_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
+                             wood=(-1.0, 1.0, -2.5, 1.05),    # rich brown, a little less orange
+                             thatch=(0.0, 0.0, 0.0, 1.0),
+                             stone=(1.0, 0.5, 2.0, 1.0)),
+    "PotionStall_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
+                             wood=(5.0, 1.5, 2.5, 1.1),       # its dark timber lifted and warmed a touch so it reads as rich brown wood, not grey-purple
+                             thatch=(0.0, 0.0, 0.0, 1.0),
+                             stone=(4.0, 1.5, 4.0, 1.0)),     # (its greyest timber falls in this group: warmed the same way; it has no real stone)
 }
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)    # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
@@ -72,6 +82,10 @@ ext = hi_b - lo_b
 U = 100.0 if ext.max() < 100.0 else 1.0
 log(name, "high tris", sum(len(p.vertices) - 2 for p in hi.data.polygons), "extent", [round(float(x * U), 1) for x in ext], "cm/unit", U)
 cage, max_ray = CAGE / U, MAX_RAY / U
+# (build-c 2026-11-14: the market stall's roof is a thin two-layer cloth; the reduction sinks the low roof under its top layer, so 4 cm
+# rays started under it and baked the striped underside and its full occlusion as dark red blotches. Its rays start further out.)
+CAGE_BY = {"GeneralStore_300k": (12.0, 24.0)}
+if name in CAGE_BY: cage, max_ray = CAGE_BY[name][0] / U, CAGE_BY[name][1] / U
 
 def load(path, colour):
     img = bpy.data.images.load(path)
@@ -285,7 +299,7 @@ write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 write_png(nrm, os.path.join(out, "T_%s_Normal.png" % new), False)
 mr_out = np.stack([np.clip(ao, 0, 1), mr[..., 1], mr[..., 2]], -1)
 write_png(mr_out, os.path.join(out, "T_%s_MR.png" % new), False)
-write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)
+if glow_img is not None: write_png(to_srgb(glow_lin), os.path.join(out, "T_%s_Glow.png" % new), True)   # (none for a design with no lit windows, the stalls: the importer uses T_NoGlow)
 write_png(mask, os.path.join(out, "T_%s_Mask.png" % new), False)
 log("pictures written; AO mean %.2f, edge mean %.3f" % (float(ao.mean()), float(edge.mean())))
 
