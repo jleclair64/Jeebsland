@@ -1,7 +1,8 @@
 # Paints the bush texture, then rebuilds the foliage and bark materials by running build_materials.py inside a windowless editor.
 # The Unreal editor must be closed first.
 $proj = Split-Path $PSScriptRoot -Parent
-if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) {
+# (only an editor open on THIS project folder is in the way: other project copies run their own, 2026-11-14)
+if (Get-CimInstance Win32_Process -Filter "Name='UnrealEditor.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Replace('/', '\').ToLower().Contains($proj.ToLower() + '\jeebsland.uproject') }) {
     Write-Host 'The Unreal editor is still open. Close it first.'
     exit 1
 }

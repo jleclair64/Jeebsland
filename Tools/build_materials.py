@@ -3,7 +3,7 @@
 import os
 import unreal
 
-GRASS_DESATURATION = 0.32   # how far the grass and the ground under it are pulled toward grey (0.15 until 2026-11-13: "too nuclear green"; 0.22, then 0.32 after the visual review against the reference painting)
+GRASS_DESATURATION = 0.45   # how far the grass and the ground under it are pulled toward grey (0.15 until 2026-11-13: "too nuclear green"; 0.22, then 0.32 after the visual review against the reference painting, 0.40 after the second: the sunlit foreground blades still read lime, 0.45 after the third)
 GRASS_SHADOW_LIFT = 0.55    # how much the darkest parts of the grass are brightened (lights untouched)
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -307,7 +307,7 @@ def patchy(mat, col):
     each = g.add(g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 0.16), 0.92)   # a little less tuft-to-tuft speckle
     # and each tuft its own warmth, from fresh olive to a dry olive-brown, as in the owner's reference painting (2026-11-13)
     warm = g.node(unreal.MaterialExpressionLinearInterpolate)
-    g.link(g.const3((0.98, 1.0, 1.04)), warm, "A"); g.link(g.const3((1.10, 0.94, 0.70)), warm, "B")
+    g.link(g.const3((1.03, 0.98, 0.92)), warm, "A"); g.link(g.const3((1.10, 0.94, 0.70)), warm, "B")
     g.link(g.one(unreal.MaterialExpressionFrac, g.mul(g.node(unreal.MaterialExpressionPerInstanceRandom), 7.31)), warm, "Alpha")
     out = g.desat(g.muln(g.muln(g.muln(col, shade), each), warm), GRASS_DESATURATION)   # less vibrant, still fresh
     # Softer shadows between the blades: the darkest parts are lifted (up to 55%), the light parts are left exactly as they were
@@ -870,14 +870,14 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 #              name          texture          tint                     gust lean cm  tips only  lift
 imported(gen_textures.patches(), "T_Patches")
-build_foliage("M_Grass",    "T_GrassTuft",   (0.64, 0.52, 0.25, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.04, sss=0.5)   # a softer, more natural green
+build_foliage("M_Grass",    "T_GrassTuft",   (0.63, 0.44, 0.16, 0.0), 9.0,          True,      0.0, vary=True, glow_amt=0.075, sss=0.5)   # a softer, more natural green (glow 0.04 until 2026-11-14: shaded lawn went navy-black at eye level under big trees, where the blue sky light and the ambient occlusion between the blades are all it gets; 0.075 keeps a green floor)
 # (2026-11-13, owner: "too bright in the shade / low sun", "too nuclear green" in the sun, then a reference painting (a village
 # slope at the low sun: a muted olive-sage green, warm yellow-green where the sun catches it, deep olive in shade): was tint
 # 0.47, 0.58, 0.38 (lime, hue about 90-95 on screen at noon, shade a cool 120-130), then 0.58, 0.53, 0.35 (lit 82, shade still 120+
-# against the painting's 53-62), then 0.62, 0.52, 0.27, now 0.64, 0.52, 0.25 with more grey (warmer, toward olive in sun and shade), glow 0.10,
+# against the painting's 53-62), then 0.62, 0.52, 0.27, then 0.64, 0.52, 0.25, then 0.60, 0.47, 0.21 (a little yellower and 8% darker in the sun), now 0.63, 0.44, 0.16 (third review: still a touch lime in the brightest sunlit blades; measured lit hue 70 against the painting's 53, and the lit blades a little too bright) with more grey (warmer, toward olive in sun and shade), glow 0.10,
 # all of its colour shining through. The glow is what lit the shade up at the low sun, when the exposure rises; the ground under
 # the grass follows in world_material.py, GRASS_TO_MEADOW.)
-build_foliage("M_Bush",     "T_BushLeaves",  (0.70, 0.78, 0.52, 0.0), 4.0,          True,      0.0)
+build_foliage("M_Bush",     "T_BushLeaves",  (0.66, 0.66, 0.38, 0.0), 4.0,          True,      0.0)   # (was 0.70, 0.78, 0.52 until 2026-11-14: the shrubs along the walls read lime beside the olive grass)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True, tree_fade=True)
 # pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_PineNeedles.png"), "T_PineNeedles")   # painted by BuildMaterials.ps1
