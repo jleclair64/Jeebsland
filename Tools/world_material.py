@@ -243,11 +243,22 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     snow_amt = g.muln(g.sat(g.addn(div, g.mul(g.add(rag, -0.5), 0.4))), g.ramp(nz, 0.55, 0.75))
     col = g.lerp(col, g.c3((0.82, 0.85, 0.90)), snow_amt)
 
+    # The rebuilt Oak Hill's look carried over the whole land (TownLab's M_TL_WorldGround, approved by the owner 2026-11-14): seen from
+    # a hill, M_Ground alone read as one flat dark olive sheet beside the town's lawn. The same broad swathes as the town's ground
+    # (deeper hollows to sunny yellow-green, a slow larger drift) and its brightness (Lift, as the lawn's Tint).
+    col = g.muln(col, g.lerp(g.c3((0.80, 0.95, 0.82)), g.c3((1.15, 1.08, 0.78)), patchy))
+    col = g.muln(col, g.lerpc(0.86, 1.08, big))
+    col = g.muln(col, g.vector("Lift", (1.10, 1.10, 1.04)))
+
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.lerp(g.c(0.95), g.c(0.62), m_amt), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.15), unreal.MaterialProperty.MP_SPECULAR)
-    # (no glow of its own: an emissive floor on bare earth went white by the paths at the low sun, when the exposure rises.
-    # Worn ground in shade stays mid brown through the soil's lerp toward EARTH_AVERAGE above, which is lit like everything else.)
+    # The low sun's fill (SkyFill, set by AWorldTerrain from ADayNight::Dusk; jeeb.Ground.SkyFill 0.2 at the lowest sun): the grass
+    # blades are lit through and stay bright at the low sun, flat ground goes near-black where they stop (from the air, and past the
+    # town's 40 m of grass). A small warm light on the grass only: an emissive floor on bare earth went white by the paths at the
+    # low sun, when the exposure rises (2026-11-12), so packed earth and mud take none of it.
+    bare = g.one(unreal.MaterialExpressionOneMinus, g.sat(g.addn(d_amt, m_amt)))
+    g.out(g.muln(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), bare), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Ground")
 
 

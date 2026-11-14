@@ -51,6 +51,8 @@ private:
 	FLinearColor OldDirGlow = FLinearColor::Black;   // the map's own sun glow in the haze (for -OldLook)
 	float OldDirExponent = 4.f, OldDirStart = 10000.f, OldAerialStart = 0.1f;
 	float ContactNow = -1.f;   // the sun's contact shadow length last set (it is only re-sent when it changes)
+	int32 ShaftsNow = -1;      // the sun's light shafts last set (jeeb.Look.Shafts)
+	void SetShafts(int32 On);
 
 	// The picture's look (2026-11-12): the colour grade, the haze toward far hills, ambient occlusion and the sun's contact
 	// shadows, eased with the sun's height; its numbers are the jeeb.Look.* console variables in DayNight.cpp

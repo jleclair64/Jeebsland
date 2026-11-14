@@ -62,6 +62,30 @@ The rebuilt town is cheaper or level everywhere, and clearly cheaper where most 
 
 "Town" is the spot minus empty land at the same place (`-NoOakHill -NoLabNew`).
 
+
+## In Field (the real game, 2026-11-14 evening)
+
+The rebuilt town now stands at the real Oak Hill (`-OldOakHill` brings the old one back). Measured in Field with `-LabTour=stats`, solo (`uqueue.sh solo`), editor `-game -RenderOffScreen` at 1920x1080, 60% render scale. **The sun was frozen** (test stills fix the phase). With `r.Shadow.CSMCaching` on, the cascades then stop redrawing anything that stands still, so these numbers understate shadow cost against play, where the sun turns every frame. Old and new were measured the same way, so the comparison holds. Before = `-OldOakHill "-ExecCmds=jeeb.TownLab.NewLook 0, jeeb.Ground.SkyFill 0"` (the old town and the old look on the new M_Ground).
+
+Frame / GPU ms; "new" is two runs:
+
+| Spot | Old frame | New frame (run 1 / 2) | Old GPU | New GPU (run 1 / 2) | Old draws / tris | New draws / tris |
+|---|---|---|---|---|---|---|
+| Plaza, noon | 6.08 | 6.16 / 6.97 | 5.34 | 5.36 / 5.57 | 428 / 483k | 347 / 315k |
+| Plaza, low sun | 6.49 | 6.33 / 6.75 | 4.84 | 5.57 / 5.67 | 461 / 501k | 369 / 333k |
+| Edge, noon | 7.79 | 7.05 / 8.21 | 5.71 | 6.28 / 6.19 | 3145 / 806k | 3044 / 600k |
+| Edge, low sun | 9.73 | 7.74 / 9.00 | 5.78 | 6.38 / 6.48 | 3162 / 844k | 3060 / 638k |
+| Blackrock, noon | 8.51 | 8.57 / 8.51 | 7.09 | 7.43 / 7.43 | 3012 / 991k | 3016 / 1.00M |
+| Blackrock, low sun | 8.46 | 8.54 / 10.21 | 7.50 | 7.49 / 7.51 | 3044 / 1.08M | 3054 / 1.09M |
+
+From an earlier solo pair (one run each): west road 8.61 -> 6.27 frame, 5.49 -> 5.62 GPU; open land 6.73 -> 5.60 and 4.49 -> 4.92; above open land 7.69 -> 6.00 and 5.15 -> 5.21.
+
+- **Frame time is level.** The first single runs showed the edge 2.6-4.8 ms slower, but repeats put old and new within each other's run-to-run spread (up to about 1.7 ms at one spot). Those were hitches.
+- **GPU is level to about 0.5 ms more.** The new look's haze and light shafts and M_Ground's sky fill reach the whole view: Blackrock, which did not change, measures +0.3 ms at noon.
+- Split runs: turning off the sky fill (`jeeb.Ground.SkyFill 0`) or hiding the new town's buildings and ground (`jeeb.TownLab.ShowNew 0`) moved nothing past the noise. Hiding the town takes the plaza's GPU from 5.4-5.6 to 4.2-4.3 ms: that 1.2 ms is what the rebuilt town costs there.
+- Fewer draws (plaza 428 to about 350) and fewer triangles everywhere in town.
+- Building the town at load: the ground takes about 1.2-1.3 s (old town 0.27 s), the rest about 0.5 s, once per world on every machine. Reading each height once instead of five times saved little: the time goes into the per-point street, wear and riverbank colours. Slicing it over frames would hide it if it ever matters.
+
 ## What made the difference
 
 1. **Lighter building models.** The rebuilt house and store are 45-50k triangles instead of 300k, with the detail baked into their textures. Eleven of the 26 buildings use them, and the street dropped from 916k to 330k triangles. This is the biggest saving at eye level, where the shadow passes redraw every triangle near the sun's view.
