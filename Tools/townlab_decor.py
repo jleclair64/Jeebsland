@@ -14,7 +14,11 @@ import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-proj = sys.argv[sys.argv.index("--") + 1]
+_args = sys.argv[sys.argv.index("--") + 1:]
+proj = _args[0]
+# --only TL_MarketStall,TL_PotionStall (build-c, 2026-11-14): plan just those buildings and keep every other building's block of
+# TownLabDecor.h as it is (several agents add their own designs at once); the atlas and cards are still written to Saved, unused
+ONLY = _args[_args.index("--only") + 1].split(",") if "--only" in _args else []
 out = os.path.join(proj, "Saved", "KnightBuild", "TownLab", "Decor")
 work = os.path.join(proj, "Saved", "KnightBuild", "Buildings")
 os.makedirs(out, exist_ok=True)
@@ -255,10 +259,17 @@ export(blob("TL_Stones", 6, 13.0, 0.6, [(0.62, 0.58, 0.52), (0.55, 0.52, 0.48), 
 BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD line; front = Blender -Y (Unreal +Y), the door side
     "TL_House": dict(src="OakHillHouse_300k", wx=(-597.1, 563.0), wy=(-293.5, 399.0), door=(-150.0, 260.0), seed=3),
     "TL_Store": dict(src="OakHillStore_300k", wx=(-610.6, 561.2), wy=(-583.1, 543.5), door=(-480.0, 450.0), seed=5, corners_only=True),
+    # build-c (2026-11-14): the two open stalls. Their whole front is open (door spans it), stones and weeds only at the corner
+    # posts (stall=True), and their goods and clutter are placed by hand below (STALL_PROPS); s is the FModel Scale (OakHill.h)
+    "TL_MarketStall": dict(src="GeneralStore_300k", wx=(-534.7, 525.8), wy=(-376.1, 376.7), door=(-600.0, 600.0), seed=7, corners_only=True, stall=True, s=0.7),
+    "TL_PotionStall": dict(src="PotionStall_300k", wx=(-529.3, 531.6), wy=(-283.7, 293.5), door=(-600.0, 600.0), seed=9, corners_only=True, stall=True, s=0.8, sz=1.0),
 }
+if ONLY: BUILD = {k: v for k, v in BUILD.items() if k in ONLY}
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
 FILLER = ["Crate", "CrateNoLid", "GrainSack", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
           "WateringCan", "Pail", "LanternBlack", "LanternOil", "Basket", "ShrubLow", "BushYellowFlowers"]
+FILLER += ["HandCart", "RopeCoil", "SackStack", "SackPileOpen", "SpiceSacks", "CabbageCrate", "CrateOpen", "BarrelSmall", "ClayJug",   # (build-c's stalls)
+           "PotJug", "PotAmphora", "Cauldron", "CandleCageShort", "WoodTub", "PotWide"]
 fsize = {}
 for f in FILLER:
     path = os.path.join(proj, "Art", "Filler", "Clean", f + ".glb")
@@ -272,6 +283,91 @@ for f in FILLER:
 log("filler sizes", {k: [int(x) for x in v] for k, v in fsize.items()})
 
 def to_ue(p): return (round(float(p[0]), 1), round(float(-p[1]), 1), round(float(p[2]), 1))
+
+# ---- build-c (2026-11-14): the stalls' clutter, placed by hand round each stall from Oak Hill's filler library (the old market stall's
+# 93 engine-shape barrels, crates and sacks, removed 2026-11-13, owner: "We'll add our own"). Every entry is in WORLD cm as drawn (the
+# stall shrinks by its FModel Scale, the props keep their real size): (side, u along that side from its start, mesh, scale, gap from
+# the wall's outer face to the prop's near edge, turn from facing straight out, sidestep along the side, stack on entry k or None,
+# a lantern's light). Sides as in sides() below: front (open, -Y in Blender) runs left to right from the front-left corner, back runs
+# right to left from the back-right corner, left runs back to front from the back-left corner, right front to back from the front-right.
+# Each prop is pushed outward until no part of the stall is inside its box (raycasts), so none sinks into a post or the counter.
+STALL_PROPS = {
+    "TL_MarketStall": [
+        ("left", 95, "Barrel", 0.85, 6, 0, 0, None, False),            # 0
+        ("left", 165, "BarrelSmall", 0.85, 10, 20, 0, None, False),    # 1
+        ("left", 290, "HandCart", 0.8, 14, 90, 0, None, False),        # 2  side-on along the wall, clear of the post
+        ("left", 460, "SpiceSacks", 0.8, 12, -10, 0, None, False),      # 3  by the front-left post, the spices toward the street
+        ("back", 120, "SackPileOpen", 0.8, 6, 0, 0, None, False),      # 4
+        ("back", 330, "Crate", 0.85, 6, 5, 0, None, False),            # 5
+        ("back", 330, "RopeCoil", 0.8, 0, 30, 0, 5, False),            # 6  on the crate
+        ("back", 430, "CrateOpen", 0.8, 6, -12, 0, None, False),       # 7
+        ("right", 120, "CabbageCrate", 0.8, 16, 15, 0, None, False),    # 8  by the front-right post
+        ("right", 260, "Crate", 0.85, 16, -8, 0, None, False),          # 9
+        ("right", 250, "CrateNoLid", 0.75, 0, 14, 0, 9, False),        # 10 on the crate
+        ("right", 360, "GrainSack", 0.85, 8, 25, 0, None, False),      # 11
+        ("right", 420, "WheatSack", 0.8, 6, -20, 0, None, False),      # 12
+        ("left", 165, "LanternOil", 0.85, 0, 0, 0, 1, True),           # 13 standing on the small barrel, lit at dusk
+    ],
+    "TL_PotionStall": [
+        ("left", 200, "WoodTub", 0.85, 10, 0, 0, None, False),         # 0  (the stall has its own cauldron on the counter)
+        ("left", 330, "PotWide", 0.8, 8, 20, 0, None, False),          # 1
+        ("back", 120, "Barrel", 0.85, 6, 0, 0, None, False),           # 2
+        ("back", 230, "Crate", 0.8, 6, -6, 0, None, False),            # 3
+        ("back", 230, "ClayJug", 0.8, 0, 30, 0, 3, False),             # 4  on the crate
+        ("back", 600, "CrateOpen", 0.8, 6, 10, 0, None, False),        # 5
+        ("back", 690, "PotAmphora", 0.85, 14, 0, 0, None, False),       # 6  clear of the open crate (review)
+        ("right", 110, "PotJug", 0.85, 8, 0, 0, None, False),          # 7
+        ("right", 200, "BarrelSmall", 0.85, 8, 0, 0, None, False),     # 8
+        ("right", 200, "LanternOil", 0.85, 0, 0, 0, 8, True),          # 9  on the small barrel, lit at dusk (a 2.5k lantern, not the 20k candle cage)
+        ("right", 320, "ClayJug", 0.85, 8, -25, 0, None, False),       # 10
+    ],
+}
+
+def stall_props(bname, B, bvh, items):
+    S, SZ = B["s"], B.get("sz", B["s"])
+    x0, x1 = B["wx"]; y0, y1 = B["wy"]
+    sides = {"front": (Vector((x0, y0, 0)), Vector((1, 0, 0)), Vector((0, -1, 0))),
+             "back": (Vector((x1, y1, 0)), Vector((-1, 0, 0)), Vector((0, 1, 0))),
+             "left": (Vector((x0, y1, 0)), Vector((0, -1, 0)), Vector((-1, 0, 0))),
+             "right": (Vector((x1, y0, 0)), Vector((0, 1, 0)), Vector((1, 0, 0)))}
+    def outer_face(pl, outv):
+        # the outermost part of the stall at this spot, up to 1.2 m (posts, the counter, a plank wall), as depth out from the wall line
+        best = None
+        for z in (10.0, 40.0, 80.0, 120.0):
+            h = bvh.ray_cast(pl + outv * 400.0 + Vector((0, 0, z)), -outv, 800.0)
+            if h[0] is not None:
+                d = (h[0] - pl).dot(outv)
+                if d > -150.0: best = d if best is None else max(best, d)   # (an open side: a ray that goes deep inside doesn't count)
+        return best or 0.0
+    def blocked(c, hx, hy, h):
+        # anything of the stall inside the box (model units: centre c, half sizes along X / Y, height h)?
+        for z in (6.0, h * 0.5, h * 0.9):
+            for t in (-0.8, 0.0, 0.8):
+                for (o, d, L) in ((Vector((c.x - hx, c.y + t * hy, z)), Vector((1, 0, 0)), 2 * hx), (Vector((c.x + t * hx, c.y - hy, z)), Vector((0, 1, 0)), 2 * hy)):
+                    if bvh.ray_cast(o, d, L)[0] is not None: return True
+        return False
+    tops, n_push = [], 0
+    for k, (sname, u, mesh, sc, gap, turn, step, on, light) in enumerate(STALL_PROPS[bname]):
+        start, along, outv = sides[sname]
+        size = fsize.get(mesh, np.array([60.0, 60.0, 60.0])) * sc        # world cm
+        out_t = outv.copy(); out_t.rotate(__import__("mathutils").Euler((0, 0, math.radians(turn))))
+        # the prop's extent along the wall's out direction and along the wall, turned (its front is along out_t)
+        c, s_ = abs(math.cos(math.radians(turn))), abs(math.sin(math.radians(turn)))
+        half_out = (size[1] * c + size[0] * s_) * 0.5; half_al = (size[0] * c + size[1] * s_) * 0.5
+        if on is not None:
+            base = items[tops[on][0]]; p = Vector((tops[on][1].x, tops[on][1].y, tops[on][2]))
+        else:
+            pl = start + along * (u / S) + along * (step / S)
+            face = outer_face(pl, outv)
+            p = pl + outv * (face + (gap + half_out) / S)
+            hx = (half_al if abs(along.x) > 0.5 else half_out) / S; hy = (half_out if abs(along.x) > 0.5 else half_al) / S
+            for _ in range(15):
+                if not blocked(p, hx, hy, size[2] / SZ): break
+                p = p + outv * (10.0 / S); n_push += 1
+        items.append(dict(kind="prop", mesh="/Game/Filler/SM_" + mesh, pos=to_ue(p), yaw=yaw_for(out_t), pitch=0.0, roll=0.0,
+                          scale=sc, wb=False, light=light))
+        tops.append((len(items) - 1, p, p.z + size[2] / SZ))
+    log(bname, "stall props", len(STALL_PROPS[bname]), "pushes out", n_push)
 def yaw_for(out_b):
     # the yaw (Unreal degrees) that turns a piece's front (Unreal local +Y) to face along out_b (a Blender-frame direction)
     nx, ny = out_b[0], -out_b[1]
@@ -364,7 +460,7 @@ for bname, B in BUILD.items():
     n_ivy = 0
     for side in sides:
         sname, start, along, outv, L = side
-        cands = [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
+        cands = [] if B.get("stall") else [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])   # (no ivy on the stalls: tall cards by bare timber read as stickers, build-c review)
         rnd.shuffle(cands)
         placed = []
         for u in cands:
@@ -384,7 +480,7 @@ for bname, B in BUILD.items():
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back"):
+        if sname in ("front", "back") and not B.get("stall"):   # (not on a stall: it hung at the gable peak or off a bare beam, build-c review)
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
@@ -415,12 +511,13 @@ for bname, B in BUILD.items():
     # --- stones and weeds at the foot of the walls, mostly near the corners
     for side in sides:
         sname, start, along, outv, L = side
-        for u in (rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150)):
+        for k_u, u in enumerate((rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150))):
+            if B.get("stall"): continue   # (a stall: no stones (white specks) and no weeds (lime blobs with no soil): build-c reviews)
             pl = start + along * u
             if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
             h = surface(pl, outv, 15.0)
             face = (h - pl).dot(outv) if h is not None else 0.0
-            add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
+            if not B.get("stall"): add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
             if rnd.random() < 0.6:
                 add("weeds", "TL_Weeds", pl + outv * (face + 22.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.8, 1.2), False)
     plans[bname] = (items, bvh, sides, B, top, surface)
@@ -452,6 +549,8 @@ for bname, B in BUILD.items():
         for (bx, by, bz) in ((-89.0, -430.0, 146.0), (182.0, -430.0, 146.0)):
             items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((bx, by, bz)), yaw=0.0, pitch=0.0, roll=0.0,
                               scale=0.8, wb=True, light=True))
+    elif B.get("stall"):
+        stall_props(bname, B, bvh, items)
     else:
         prop("left", 160, "Crate", 0.85, turn=8)
         prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85, turn=-12)
@@ -493,7 +592,22 @@ for bname, (items, *_r) in plans.items():
                  % (mesh, it["pos"][0], it["pos"][1], it["pos"][2], it["yaw"], it["pitch"], it["roll"], s3[0], s3[1], s3[2],
                     "true" if it["wb"] else "false", "true" if it["light"] else "false", "true" if shadow else "false", "" if not any(it.get("n", (0, 0, 0))) else ", %.3ff, %.3ff, %.3ff" % it["n"], it["kind"]))
     H.append("\t};")
+keep_names = []
+if ONLY:   # (keep every other building's block as it is in the header now, in its order, and list it first)
+    import re
+    old = open(os.path.join(proj, "Source", "Jeebsland", "TownLabDecor.h"), encoding="utf-8").read().split("\n")
+    blocks, cur = {}, None
+    for line in old:
+        m = re.match(r"\tinline const FDecor (\w+)Decor\[\] = \{", line)
+        if m: cur = m.group(1); blocks[cur] = [line]; continue
+        if cur is not None:
+            blocks[cur].append(line)
+            if line == "\t};": cur = None
+    first_block = H.index("\tinline const FDecor %sDecor[] = {" % next(iter(plans))[3:])
+    keep_names = [k for k in blocks if "TL_" + k not in plans]
+    H[first_block:first_block] = [l for k in keep_names for l in blocks[k]]
 H.append("\tinline const FBuildingDecor Buildings[] = {")
+for k in keep_names: H.append("\t\t{ TEXT(\"TL_%s\"), %sDecor, UE_ARRAY_COUNT(%sDecor) }," % (k, k, k))
 for bname in plans: H.append("\t\t{ TEXT(\"%s\"), %sDecor, UE_ARRAY_COUNT(%sDecor) }," % (bname, bname[3:], bname[3:]))
 H.append("\t};")
 H.append("")

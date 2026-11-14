@@ -5,6 +5,8 @@
 #include "WorldTerrain.generated.h"
 
 class UProceduralMeshComponent;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
 
 // The whole world's land outside the original square round the start (2026-10-30): an 8 m grid over WorldMap.h's bounds,
 // in chunks (so the far ones can be skipped when out of view), walkable everywhere, painted with M_Ground like the square and
@@ -18,6 +20,12 @@ class AWorldTerrain : public AActor
 
 public:
 	AWorldTerrain();
+	virtual void Tick(float DeltaSeconds) override;
+	// The one ground material every ground mesh draws with (the world's chunks, the original square, the rebuilt Oak Hill's river
+	// banks): a dynamic copy of M_Ground shared by all of them, made at the first ask, whose SkyFill (the low sun's fill on flat
+	// ground, so it stays as bright as the grass blades: Tools/world_material.py) this actor follows from ADayNight::Dusk.
+	// Null on a dedicated server (nothing is drawn there).
+	static UMaterialInterface* SharedGround(UWorld* World);
 
 protected:
 	virtual void BeginPlay() override;
@@ -25,6 +33,7 @@ protected:
 private:
 	UPROPERTY() TArray<UProceduralMeshComponent*> Chunks;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Water;
+	float FillNow = -1.f;
 	void BuildLand();
 	void BuildWater();
 };

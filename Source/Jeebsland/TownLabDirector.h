@@ -37,7 +37,7 @@ private:
 	void ApplyShadows(bool bCheap);
 	void ApplyClouds(bool bCheap);
 	void ShowTown(bool bOld, bool bShow);
-	// The world's own ground in this map drawn with a lab copy of M_Ground (M_TL_WorldGround) that keeps its light at the low sun
+	// (retired 2026-11-14: M_Ground carries the lab copy's look itself)
 	UPROPERTY() class UMaterialInstanceDynamic* WorldMid = nullptr;
 	float WorldSweep = 0.f, WorldFillNow = -1.f;
 	int32 WorldSwapped = 0;
