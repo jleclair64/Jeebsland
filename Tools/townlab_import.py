@@ -61,7 +61,7 @@ ON_SHARP = 12.0       # how quickly one window comes on (over 1/12 of the Dusk r
 DARK_SHARE = 0.3      # of each building's windows, this share never lights (owner: "remove the yellow lighting from some of the windows")
 GLASS_COLOR = (0.035, 0.04, 0.05)   # an unlit pane's colour (Meshy painted the panes yellow in the colour picture too)
 GLASS_ROUGH = 0.25
-GLASS_MASK_GAIN = 2.0 # glass where the glow picture is over half bright
+GLOW_COLOR = (0.787, 0.181, 0.019)   # the lit glass (linear): sRGB (0.90, 0.46, 0.14), the old glow pictures' amber, as one even tone
 # per-building overrides (owner, 2026-11-12: "the windows in all the homes 35% dimmer": the two house designs only)
 GLOW_BY_NAME = {"TL_House": GLOW_STRENGTH * 0.65}
 GLOW_BY_NAME["TL_CornerHouse"] = GLOW_STRENGTH * 0.65   # (build-a: a home, as the house)
@@ -115,12 +115,17 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     link(glow, "RGB", mul0, "A")
     link(gs, "", mul0, "B")
     # Which windows are lit (2026-11-13, owner: "some windows" dark, the houses switching on one by one as it gets darker and off again
-    # as it gets lighter). building_clean.py paints every window face's vertex colour: R a random number per window, G 1 on a window,
-    # B 1 on faces that never glow (painted specks); the forge's fire is (0,0,0) and burns all day at FireLevel. Each building gets its own
-    # random HouseOffset (custom primitive data 0, OakHillLife::SetUpGlow) and "Night" is ADayNight::Dusk (OakHillLife::UpdateGlow).
-    # A window lights when Night passes OnFrom + OnSpread x HouseOffset + WinSpread x (its own random); DarkShare of each building's
-    # windows never light. UseMask 0 (MoveLab's test houses, no window colours) keeps the old all-lit glow.
-    vc = tex("MaskTex", 900, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, default_mask)   # (the window marks as a picture)
+    # as it gets lighter). Each building gets its own random HouseOffset (custom primitive data 0, OakHillLife::SetUpGlow) and "Night"
+    # is ADayNight::Dusk (OakHillLife::UpdateGlow). A window lights when Night passes OnFrom + OnSpread x HouseOffset + WinSpread x (its
+    # own random); DarkShare of each building's windows never light.
+    # The glass (2026-11-15, owner: lit windows with no black smudges or ragged orange, "Please find a solution"): Tools/window_glass.py
+    # lays every pane as its own flat piece over the building, with straight edges, and marks it in the VERTEX colour: G 1 glass, B 0,
+    # R its window's random number (every other face B 1). Only that glass turns to GlassColor by day and glows GlowColor when lit,
+    # one even amber over the whole window; no picture decides glass any more. The pictures keep the frame and muntins (painted wood).
+    # The glow picture is left only for the forge: the mask picture's fire (G 0, B 0) burns all day at FireLevel (window texels G 1 and
+    # the rest B 1 don't). UseMask 0 turns the glass off (as on M_Building's test houses).
+    pc = node(unreal.MaterialExpressionVertexColor, -1500, 700)          # (window_glass.py's marks)
+    vc = tex("MaskTex", 900, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, default_mask)   # (the bake's marks: only the forge's fire now)
     house = node(unreal.MaterialExpressionScalarParameter, -1500, 1000, parameter_name="HouseOffset", default_value=0.5,
                  use_custom_primitive_data=True, primitive_data_index=0)
     def mad(a, a_out, k, b, c):   # a x k + b x c, as nodes
@@ -128,8 +133,8 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
         m2 = node(unreal.MaterialExpressionMultiply, -1300, 1000, const_b=c); link(b, "", m2, "A")
         ad = node(unreal.MaterialExpressionAdd, -1200, 950); link(m1, "", ad, "A"); link(m2, "", ad, "B")
         return ad
-    win_rand = node(unreal.MaterialExpressionFrac, -1100, 900); link(mad(vc, "R", 3.3, house, 5.9), "", win_rand, "")
-    dark_rand = node(unreal.MaterialExpressionFrac, -1100, 1000); link(mad(vc, "R", 7.13, house, 3.71), "", dark_rand, "")
+    win_rand = node(unreal.MaterialExpressionFrac, -1100, 900); link(mad(pc, "R", 3.3, house, 5.9), "", win_rand, "")
+    dark_rand = node(unreal.MaterialExpressionFrac, -1100, 1000); link(mad(pc, "R", 7.13, house, 3.71), "", dark_rand, "")
     t1 = node(unreal.MaterialExpressionMultiply, -1000, 850); link(scalar("OnSpread", ON_SPREAD, -1200, 800), "", t1, "A"); link(house, "", t1, "B")
     t2 = node(unreal.MaterialExpressionMultiply, -1000, 900); link(scalar("WinSpread", WIN_SPREAD, -1200, 850), "", t2, "A"); link(win_rand, "", t2, "B")
     t3 = node(unreal.MaterialExpressionAdd, -900, 850); link(t1, "", t3, "A"); link(t2, "", t3, "B")
@@ -141,21 +146,22 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     keep_k = node(unreal.MaterialExpressionMultiply, -900, 1050, const_b=1000.0); link(keep, "", keep_k, "A")
     keep_s = node(unreal.MaterialExpressionSaturate, -800, 1050); link(keep_k, "", keep_s, "")
     win = node(unreal.MaterialExpressionMultiply, -400, 900); link(on_win, "", win, "A"); link(keep_s, "", win, "B")
-    pick = node(unreal.MaterialExpressionLinearInterpolate, -300, 900); link(scalar("FireLevel", FIRE_LEVEL, -500, 960), "", pick, "A"); link(win, "", pick, "B"); link(vc, "G", pick, "Alpha")
-    never = node(unreal.MaterialExpressionOneMinus, -300, 1000); link(vc, "B", never, "")
-    on_m = node(unreal.MaterialExpressionMultiply, -200, 950); link(pick, "", on_m, "A"); link(never, "", on_m, "B")
     use = scalar("UseMask", 1.0, -300, 1050)
-    on = node(unreal.MaterialExpressionLinearInterpolate, -100, 950, const_a=1.0); link(on_m, "", on, "B"); link(use, "", on, "Alpha")
-    mul = node(unreal.MaterialExpressionMultiply, -50, 1100); link(mul0, "", mul, "A"); link(on, "", mul, "B")
-    # The glass: Meshy painted the lit panes yellow in the colour picture too, so by day an unlit window still read as lit. Where the
-    # glow picture marks a window, the colour turns to dark glass, a little glossier (a lit window's emissive goes on top of it).
-    gmax1 = node(unreal.MaterialExpressionMax, -400, 1200); link(glow, "R", gmax1, "A"); link(glow, "G", gmax1, "B")
-    gmax = node(unreal.MaterialExpressionMax, -350, 1250); link(gmax1, "", gmax, "A"); link(glow, "B", gmax, "B")
-    gm2 = node(unreal.MaterialExpressionMultiply, -300, 1250, const_b=GLASS_MASK_GAIN); link(gmax, "", gm2, "A")
-    gm3 = node(unreal.MaterialExpressionSaturate, -250, 1250); link(gm2, "", gm3, "")
-    gm4 = node(unreal.MaterialExpressionMultiply, -200, 1250); link(gm3, "", gm4, "A"); link(vc, "G", gm4, "B")
-    gm5 = node(unreal.MaterialExpressionMultiply, -150, 1250); link(gm4, "", gm5, "A"); link(never, "", gm5, "B")
-    glass = node(unreal.MaterialExpressionMultiply, -100, 1250); link(gm5, "", glass, "A"); link(use, "", glass, "B")
+    gb = node(unreal.MaterialExpressionOneMinus, -400, 1200); link(pc, "B", gb, "")
+    g1 = node(unreal.MaterialExpressionMultiply, -300, 1200); link(pc, "G", g1, "A"); link(gb, "", g1, "B")
+    glass = node(unreal.MaterialExpressionMultiply, -200, 1200); link(g1, "", glass, "A"); link(use, "", glass, "B")
+    # the lit glass: GlowColor x GlowStrength x lit x glass
+    gcl = node(unreal.MaterialExpressionVectorParameter, -400, 1000, parameter_name="GlowColor", default_value=unreal.LinearColor(*GLOW_COLOR, 1.0))
+    w1 = node(unreal.MaterialExpressionMultiply, -250, 1000); link(gcl, "", w1, "A"); link(gs, "", w1, "B")
+    w2 = node(unreal.MaterialExpressionMultiply, -150, 1000); link(win, "", w2, "A"); link(glass, "", w2, "B")
+    lit_glass = node(unreal.MaterialExpressionMultiply, -50, 1000); link(w1, "", lit_glass, "A"); link(w2, "", lit_glass, "B")
+    # the forge: GlowTex x GlowStrength x FireLevel where the mask picture is fire (G 0 and B 0)
+    fg = node(unreal.MaterialExpressionOneMinus, -500, 1150); link(vc, "G", fg, "")
+    fb = node(unreal.MaterialExpressionOneMinus, -500, 1250); link(vc, "B", fb, "")
+    f1 = node(unreal.MaterialExpressionMultiply, -400, 1150); link(fg, "", f1, "A"); link(fb, "", f1, "B")
+    f2 = node(unreal.MaterialExpressionMultiply, -300, 1150); link(f1, "", f2, "A"); link(scalar("FireLevel", FIRE_LEVEL, -500, 1300), "", f2, "B")
+    fire = node(unreal.MaterialExpressionMultiply, -200, 1100); link(mul0, "", fire, "A"); link(f2, "", fire, "B")
+    mul = node(unreal.MaterialExpressionAdd, -50, 1100); link(lit_glass, "", mul, "A"); link(fire, "", mul, "B")
     gcol = node(unreal.MaterialExpressionVectorParameter, -400, 1350, parameter_name="GlassColor", default_value=unreal.LinearColor(*GLASS_COLOR, 1.0))
     bc = node(unreal.MaterialExpressionLinearInterpolate, 0, -200); link(base, "RGB", bc, "A"); link(gcol, "", bc, "B"); link(glass, "", bc, "Alpha")
     mel.connect_material_property(bc, "", MP.MP_BASE_COLOR)
@@ -231,8 +237,8 @@ for n in NAMES:
     d.set_editor_property("generate_lightmap_u_vs", False)
     d.set_editor_property("convert_scene", True)
     d.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
-    d.set_editor_property("vertex_color_import_option",   # (the window colours: see make_material)
-                          unreal.VertexColorImportOption.IGNORE)
+    d.set_editor_property("vertex_color_import_option",   # (window_glass.py's glass marks: see make_material)
+                          unreal.VertexColorImportOption.REPLACE)
     d.set_editor_property("build_nanite", n in NANITE)
     # (a fresh asset every time: importing over an existing mesh keeps ITS old import settings, so the window colours above were
     # silently dropped from every building imported before they existed, 2026-11-13; nothing holds a reference, the game loads by name)
@@ -245,6 +251,8 @@ for n in NAMES:
     tools.import_asset_tasks([task])
     sm = lib.load_asset(folder + "/SM_" + n)
     if sm is None: raise RuntimeError("BUILDDIAG " + n + " did not import")
+    if not unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).has_vertex_colors(sm):
+        raise RuntimeError("BUILDDIAG " + n + " has no glass marks (vertex colours): run Tools/window_glass.py on it")
     sm.set_material(0, mi)
     lib.save_asset(folder + "/SM_" + n)
     b = sm.get_bounding_box()

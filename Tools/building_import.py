@@ -13,6 +13,8 @@ NANITE = {"OakHillHouse_Detailed", "OakHillHouse_300k", "OakHillCornerHouse_300k
           "OakHillPotionShop_300k", "OakHillTownHall_300k", "OakHillChurch_300k", "OakHillWell_150k", "GeneralStore_300k", "BankStall_300k", "PotionStall_300k", "StorybookCottage_300k"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx") and not n.endswith("_Col.fbx")
                and n[:-4] not in ("OakHillHouse_Detailed",))   # (the 2.4M MoveLab test house stays out of Content: too big to cook, 2026-11-13)
+ONLY = [x for x in os.environ.get("BUILD_ONLY", "").split(",") if x]   # (BuildBuildings.ps1 with names: just those; M_Building is rebuilt in place)
+if ONLY: NAMES = [n for n in NAMES if n in ONLY]
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # (no window colours: building_clean.py leaves them as Meshy made them)
 if not lib.does_directory_exist(folder): lib.make_directory(folder)
 
@@ -43,6 +45,8 @@ DARK_SHARE = 0.3      # of each building's windows, this share never lights (own
 GLASS_COLOR = (0.035, 0.04, 0.05)   # an unlit pane's colour (Meshy painted the panes yellow in the colour picture too)
 GLASS_ROUGH = 0.25
 GLASS_MASK_GAIN = 2.0 # glass where the glow picture is over half bright
+GLOW_COLOR = (0.787, 0.181, 0.019)   # (GeomGlass) the lit glass, linear: sRGB (0.90, 0.46, 0.14), one even amber
+GEOM_GLASS = {"OakHillChurch_300k"}  # models given their own glass by Tools/window_glass.py (BuildBuildings.ps1)
 # per-building overrides (owner, 2026-11-12: "the windows in all the homes 35% dimmer": the two house designs only)
 GLOW_BY_NAME = {"OakHillHouse_300k": GLOW_STRENGTH * 0.65, "OakHillCornerHouse_300k": GLOW_STRENGTH * 0.65}
 
@@ -57,8 +61,9 @@ RIM_SHADE = 0.25      #   face turns to the sun) x halfway between the surface's
 def make_material(default_base, default_mr, default_normal, default_glow):
     # (a picture slot with no default picture doesn't compile, and the game then silently draws it in plain grey: check the log for "Failed to compile Material")
     path = folder + "/M_Building"
-    if lib.does_asset_exist(path): lib.delete_asset(path)
-    m = tools.create_asset("M_Building", folder, unreal.Material, unreal.MaterialFactoryNew())
+    if lib.does_asset_exist(path):   # (kept and emptied, not deleted: the material instances of buildings not imported this time keep their parent)
+        m = lib.load_asset(path); mel.delete_all_material_expressions(m)
+    else: m = tools.create_asset("M_Building", folder, unreal.Material, unreal.MaterialFactoryNew())
     m.set_editor_property("used_with_nanite", True)
     E = mel.create_material_expression
     def tex(name, y, kind, default):
@@ -88,8 +93,13 @@ def make_material(default_base, default_mr, default_normal, default_glow):
     link(scalar("RoughEven", ROUGH_EVEN, -700, 440), "", rough, "Alpha")
     glow = tex("GlowTex", 1000, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR, default_glow)
     gs = scalar("GlowStrength", GLOW_STRENGTH, -700, 1300)
+    # GeomGlass 1 (the church, 2026-11-15): Tools/window_glass.py has laid each pane as its own flat glass with straight edges (G 1, B 0,
+    # R its window's number) and taken the old window faces off (B 1): the glass is exactly the marked faces, glowing one even GlowColor.
+    geo = scalar("GeomGlass", 0.0, -700, 1400)
+    gsrc = node(unreal.MaterialExpressionLinearInterpolate, -450, 1100); link(glow, "RGB", gsrc, "A"); link(geo, "", gsrc, "Alpha")
+    link(node(unreal.MaterialExpressionVectorParameter, -700, 1200, parameter_name="GlowColor", default_value=unreal.LinearColor(*GLOW_COLOR, 1.0)), "", gsrc, "B")
     mul0 = node(unreal.MaterialExpressionMultiply, -350, 1100)
-    link(glow, "RGB", mul0, "A")
+    link(gsrc, "", mul0, "A")
     link(gs, "", mul0, "B")
     # Which windows are lit (2026-11-13, owner: "some windows" dark, the houses switching on one by one as it gets darker and off again
     # as it gets lighter). building_clean.py paints every window face's vertex colour: R a random number per window, G 1 on a window,
@@ -132,7 +142,9 @@ def make_material(default_base, default_mr, default_normal, default_glow):
     gm3 = node(unreal.MaterialExpressionSaturate, -250, 1250); link(gm2, "", gm3, "")
     gm4 = node(unreal.MaterialExpressionMultiply, -200, 1250); link(gm3, "", gm4, "A"); link(vc, "G", gm4, "B")
     gm5 = node(unreal.MaterialExpressionMultiply, -150, 1250); link(gm4, "", gm5, "A"); link(never, "", gm5, "B")
-    glass = node(unreal.MaterialExpressionMultiply, -100, 1250); link(gm5, "", glass, "A"); link(use, "", glass, "B")
+    gm6 = node(unreal.MaterialExpressionMultiply, -150, 1350); link(vc, "G", gm6, "A"); link(never, "", gm6, "B")
+    gm7 = node(unreal.MaterialExpressionLinearInterpolate, -120, 1300); link(gm5, "", gm7, "A"); link(gm6, "", gm7, "B"); link(geo, "", gm7, "Alpha")
+    glass = node(unreal.MaterialExpressionMultiply, -100, 1250); link(gm7, "", glass, "A"); link(use, "", glass, "B")
     gcol = node(unreal.MaterialExpressionVectorParameter, -400, 1350, parameter_name="GlassColor", default_value=unreal.LinearColor(*GLASS_COLOR, 1.0))
     bc = node(unreal.MaterialExpressionLinearInterpolate, 0, -200); link(base, "RGB", bc, "A"); link(gcol, "", bc, "B"); link(glass, "", bc, "Alpha")
     mel.connect_material_property(bc, "", MP.MP_BASE_COLOR)
@@ -184,6 +196,7 @@ for n in NAMES:
     mel.set_material_instance_texture_parameter_value(mi, "GlowTex", pic("T_%s_Glow" % n, True) or no_glow)
     if n in GLOW_BY_NAME: mel.set_material_instance_scalar_parameter_value(mi, "GlowStrength", GLOW_BY_NAME[n])
     if n in TEST_HOUSES: mel.set_material_instance_scalar_parameter_value(mi, "UseMask", 0.0)
+    if n in GEOM_GLASS: mel.set_material_instance_scalar_parameter_value(mi, "GeomGlass", 1.0)
     lib.save_asset(mi_path)
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)
