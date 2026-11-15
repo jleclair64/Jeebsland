@@ -13,6 +13,9 @@
 # Textures: 2 new (the cobbles with their height in alpha, 2k; their normal map, 2k), the rest shared with M_Ground.
 import os
 import unreal
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import grass_field   # noqa: E402  (one field colour for the blades, the world and this lawn, 2026-11-14)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(os.path.dirname(HERE), "Art", "TownLab", "Textures", "Sources")
@@ -148,13 +151,8 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     vc = g.node(unreal.MaterialExpressionVertexColor)
     depth = g.node(unreal.MaterialExpressionPixelDepth)
 
-    rag = g.mask(g.tex(patches, g.mul(xy, 1.0 / 170.0)), True, False)
-    med = g.mask(g.tex(patches, g.mul(g.add(xy, 3100.0), 1.0 / 1100.0)), True, False)
-    med2 = g.mask(g.tex(patches, g.mul(g.add(xy, -5300.0), 1.0 / 1730.0)), True, False)
-    medm = g.mul(g.addn(med, med2), 0.5)
-    patchy = g.mask(g.tex(patches, g.mul(xy, 1.0 / 4500.0)), True, False)
-    big = g.mask(g.tex(patches, g.mul(g.add(xy, -7700.0), 1.0 / 26000.0)), True, False)
-    dry_n = g.mask(g.tex(patches, g.mul(g.add(xy, 9100.0), 1.0 / 3300.0)), True, False)
+    fn = grass_field.noises(g, xy, patches)   # (shared with M_Grass and M_Ground, Tools/grass_field.py)
+    rag, med, medm = fn["rag"], fn["med"], fn["medm"]
 
     # Grass ground: as M_Ground's (so it meets the world's ground and the meadow's tufts), with stronger Breath of the Wild drift
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
@@ -165,12 +163,8 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), g.c3(GRASS_TO_MEADOW))
     grass = g.lerp(near, mid, g.ramp(depth, 1500.0, 4500.0))
     grass = g.lerp(grass, g.c3(GRASS_AVERAGE), g.ramp(depth, 8000.0, 16000.0))
-    grass = g.muln(grass, g.lerpc(0.90, 1.08, medm))
-    grass = g.muln(grass, g.lerp(g.c3((0.72, 0.95, 0.80)), g.c3((1.17, 1.09, 0.74)), patchy))   # deeper green hollows to sunny yellow-green swathes
-    grass = g.muln(grass, g.lerpc(0.84, 1.10, big))
-    dry = g.mul(g.ramp(g.addn(dry_n, g.mul(g.add(rag, -0.5), 0.25)), 0.66, 0.82), 0.45)   # a few warm dry patches
-    grass = g.lerp(grass, g.muln(grass, g.c3((1.45, 1.05, 0.55))), dry)
-    grass = g.desat(g.muln(grass, g.vector("Tint", (1.12, 1.12, 1.08))), 0.3)   # (brighter: the grass blades catch more light than flat ground; the ground must match them where the blades stop)
+    grass = grass_field.before_grey(g, grass, fn)   # (Tools/grass_field.py: the same field colour as the blades, M_Grass, and the world, M_Ground)
+    grass = grass_field.ground_lift(g, grass_field.grey(g, grass))   # (brighter: the grass blades catch more light than flat ground; the ground must match them where the blades stop)
 
     soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), g.c3(EARTH_BALANCE))
     soil = g.lerp(soil, g.c3(EARTH_AVERAGE), g.c(0.45))
@@ -225,8 +219,14 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     unreal.log("TOWNLABDIAG built M_TL_Ground")
 
 
-cob = import_texture(os.path.join(SRC, "T_TL_Cobble.png"), "T_TL_Cobble")
-cob_n = import_texture(os.path.join(SRC, "T_TL_CobbleN.jpg"), "T_TL_CobbleN", normal=True)
+# (the sources are git-ignored: where they are missing, as in an agent's copy, the pictures already in /Game/TownLab are used)
+def picture(file, name, **kw):
+    p = os.path.join(SRC, file)
+    return import_texture(p, name, **kw) if os.path.exists(p) else EAL.load_asset("/Game/TownLab/" + name)
+
+
+cob = picture("T_TL_Cobble.png", "T_TL_Cobble")
+cob_n = picture("T_TL_CobbleN.jpg", "T_TL_CobbleN", normal=True)
 build_ground(cob, cob_n, EAL.load_asset("/Game/T_GrassGround"), EAL.load_asset("/Game/T_Dirt"), EAL.load_asset("/Game/T_Patches"))
 
 # ------------------------------------------------------------------ the world's ground, lab copy

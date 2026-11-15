@@ -53,7 +53,7 @@ Last updated 2026-11-14 (the owner's 25-item batch of 2026-11-13/14 merged, buil
     - Worn aprons at doors, the well and stalls.
     - Small stones, shrubs and flowers along the walls (22 Oak Hill buildings, 13 cottages).
     - Grass stops at each building's real footprint (`OakHillFootprints.h`, scanned from the models: rescan if a model changes).
-    - **Meadow grass now covers the whole open world** (about 1.3 ms GPU there; one line in `AMeadow::GrowsHere` turns it off).
+    - **Meadow grass now covers the whole open world** (one line in `AMeadow::GrowsHere` turns it off; since 2026-11-14 only within 50 m of the player, see "Grass overhaul").
   - **Far trees** keep a stand-in crown instead of turning into poles (`Forest.cpp`, `M_TreeFar`, `Docs/TreeLook`).
   - **Colour grade, haze, ambient occlusion, sharpness** (`ADayNight::TickLook`, every number a `jeeb.Look.*` console variable; `Docs/PictureLook`). AO is on HIGH only, about 0.16-0.23 ms. Render scale stays 60% (75% costs about 1.6 ms).
   - **Town life** (`AOakHillLife`):
@@ -233,6 +233,13 @@ Oak Hill is built (2026-11-12, see "Oak Hill is built" above): ask the owner how
 - Candles and carved pumpkins glow via `M_Flame` halos plus flickering point lights (see AutumnDecor.cpp); every 4th candle and every 2nd lit pumpkin has a real light.
 - The original walled town is named BLACKROCK (lore text, and a banner when you walk in through the walls).
 - Grass shading: darkest parts lifted by `GRASS_SHADOW_LIFT` in build_materials.py (lights untouched), almost-even normals for a fluffy look.
+- Grass overhaul (2026-11-14, owner: like the reference pictures; the owner has not seen it yet):
+  - One field colour (`Tools/grass_field.py`: patches, swathes, dry patches and one desaturation, the approved town lawn's recipe) is shared by the blades (`M_Grass`, worked out per tuft in the vertex shader), the world's ground (`M_Ground`) and Oak Hill's lawn (`M_TL_Ground`, `Tools/BuildTownLab.ps1`). Change it there, then rebuild all three. Flat ground alone gets `Lift`: the blades are lit through.
+  - `AMeadow`: dense grass within 50 m everywhere, in 15 m squares (about 35 draws), thinning past 17 m. Blades sink into the ground over `FadeStart`..`FadeEnd` (26-49 m, M_Grass) and lose a little contrast as they go, and past that the painted ground carries the look.
+  - Blade tint (0.52, 0.46, 0.33), measured against Breath of the Wild's meadow (the old yellow 0.63, 0.44, 0.16 read lime at noon and hay at the low sun). At the low sun the blades cool (`Dusk`, set each frame on `AMeadow::GrassMid` from `ADayNight::Dusk`). The cut-out reads the picture two mips sharper (seen from above, the low mips made half-opaque squares).
+  - Sporadic long-grass patches (`LongGrassNoise`/`LongGrassRoom` in Meadow.cpp: about 19% of the land, up to 2.3x the height, light tips through per-instance data 0). Never on or by roads, at buildings, under trees, on trampled ground or within 45 m of a plaza.
+  - Small flower clumps (`MakeFlowerMesh`, `M_GrassFlower`, colour from per-instance data 0-2) within about 27 m. The old sphere flowers are gone.
+  - Log JEEBGRASS (coverage; `-GrassNear=X_Y` finds a long patch and a flower clump).
 - The wind (BotW-style soft gust field in `add_wind`, Tools/build_materials.py) is approved: keep it.
 - Defence XP comes only from blows blocked with a raised shield (armour hits and hazards train nothing). Attack and Defence level quietly: no skill popup. Hazards (`Hurt(..., bEnvironmental=true)`) ignore armour and train nothing.
 - Inventory drag and drop (`AKnightHUD::ProcessDrag`): drag between the 5x5 pack (24 slots + fixed ingot cell) and the weapon bar; items trade places; only weapons go on the bar; clicking empty screen leaves Tab pointer mode. `FillPracticePack()` is called from KnightCharacter::BeginPlay as a TEMPORARY stock of random gear: remove it when the owner is done practising.
