@@ -21,17 +21,23 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures      # noqa: E402
 import ground_textures   # noqa: E402
 import grass_field       # noqa: E402  (the field colour shared with the grass blades, M_Grass)
+import palette           # noqa: E402  (2026-11-15: the world palette, Content/Data/Palette.ini; Docs/Palette.md)
 
 GRASS_DESATURATION = grass_field.GRASS_DESATURATION   # the grass and the ground under it pulled this far toward grey (one number, grass_field.py)
-GRASS_TO_MEADOW = (1.139, 0.759, 0.358)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
+GRASS_TO_MEADOW = palette.rgb("GroundGrass")   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
                                          # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime), then 0.60, 0.47, 0.21 and 0.63, 0.44, 0.16 (2026-11-14): 0.85 x new R / 0.47, new G / 0.58, 0.85 x new B / 0.38
 GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
-ROCK_AVERAGE = (0.100, 0.096, 0.084)   # what the stone fades to far away: a darker neutral grey (lighter averages, with the haze over
+ROCK_AVERAGE = palette.rgb("RockFar")   # what the stone fades to far away: a darker neutral grey (lighter averages, with the haze over
                                        # them, read lavender or pink-beige against the green hills)
 ROCK_TINT = (1.0, 1.0, 1.0)   # the RockTint parameter's default
-EARTH_BALANCE = (2.02, 2.79, 3.95)   # T_Dirt (average linear 0.069, 0.036, 0.016: dark rust) times this averages a light packed tan
+EARTH_BALANCE = palette.rgb("Earth")   # T_Dirt (average linear 0.069, 0.036, 0.016: dark rust) times this averages a light packed tan
                                      # (0.14, 0.10, 0.062): roads and worn ground never read as dark stains beside cobbles and grass
 EARTH_AVERAGE = (0.14, 0.10, 0.062)   # T_Dirt x EARTH_BALANCE's average (linear)
+
+# (the averages are the pictures' own times the palette's colour: kept here as the picture's part, so a palette change moves both)
+# (the pictures' own averages: GRASS_AVERAGE and EARTH_AVERAGE above divided by the multipliers they were measured with)
+GRASS_PICTURE_AVERAGE = (0.0705 / 1.139, 0.0916 / 0.759, 0.0083 / 0.358)
+EARTH_PICTURE_AVERAGE = (0.14 / 2.02, 0.10 / 2.79, 0.062 / 3.95)
 
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 lib = unreal.MaterialEditingLibrary
@@ -180,19 +186,20 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # two samplings at unrelated sizes, swapped in 10 m patches, so no 3 m repeat lines up into a grid
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
     near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
-    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW))   # (no "RGB": a Lerp's one output is unnamed; asking for "RGB" left the near ground black)
+    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), palette.colour(mat, "GroundGrass"))   # (no "RGB": a Lerp's one output is unnamed; asking for "RGB" left the near ground black)
     # past the grass blades (40 m since 2026-11-14) the ground carries the look: a broad sampling of the same picture keeps some
     # texture out to about 80 m before it settles to the average (as the rebuilt town's lawn, M_TL_Ground)
-    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), g.c3(GRASS_TO_MEADOW))
+    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), palette.colour(mat, "GroundGrass"))
     near = g.lerp(near, mid, g.ramp(depth, 1500.0, 4500.0))
     far = g.ramp(depth, 8000.0, 16000.0)
-    grass = g.lerp(near, g.c3(GRASS_AVERAGE), far)
+    grass = g.lerp(near, g.muln(g.c3(GRASS_PICTURE_AVERAGE), palette.colour(mat, "GroundGrass")), far)
     grass = grass_field.before_grey(g, grass, fn)   # lightness and hue patches and the dry patches, exactly as the blades
     grass = g.desat(g.muln(grass, g.vector("Tint", (1.0, 1.0, 1.0))), GRASS_DESATURATION)
+    grass = palette.grade_plant_extra(mat, grass)   # the palette's season and Greenness on the grass only (World on the whole, below)
 
     # Soil (packed earth) for worn ground, mud and the fringe of rock
-    soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), g.c3(EARTH_BALANCE))   # (light packed tan: M_Dirt's earth is the same)
-    soil = g.lerp(soil, g.c3(EARTH_AVERAGE), g.c(0.45))   # its darkest specks pulled up: worn ground at walls never reads as a black stain
+    soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), palette.colour(mat, "Earth"))   # (light packed tan: M_Dirt's earth is the same)
+    soil = g.lerp(soil, g.muln(g.c3(EARTH_PICTURE_AVERAGE), palette.colour(mat, "Earth")), g.c(0.45))   # its darkest specks pulled up: worn ground at walls never reads as a black stain
 
     # Worn: first trampled grass (paler, a little earth showing through), then packed earth, in ragged patches
     worn = g.mask(vc, True, False)
@@ -212,7 +219,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     side_uv = g.lerp(g.append(g.mask(wp, True, False), wz), g.append(g.mask(g.mask(wp, False, True), True, False), wz), g.ramp(g.subn(nx, ny), -0.05, 0.05))
     side = g.mask(g.tex(rock_tex, g.mul(side_uv, 1.0 / 450.0)), True, True, True)
     rock = g.lerp(top, side, g.ramp(g.addn(g.one(unreal.MaterialExpressionOneMinus, nz), g.mul(rag, 0.1)), 0.42, 0.58))
-    rock = g.lerp(rock, g.c3(ROCK_AVERAGE), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
+    rock = g.lerp(rock, palette.colour(mat, "RockFar"), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
     r_amt = g.sat(g.mul(g.add(g.addn(g.mul(rock_m, 1.5), g.mul(med, 0.5)), -0.5), 2.6))
     far_rock = g.ramp(depth, 30000.0, 90000.0)   # (hills a kilometre off: less stone, no earth halo, so no pasted-on blobs)
@@ -230,7 +237,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # Sand: the beach, warm and pale, with the earth picture's grain in it
     sand_m = g.mul(vc, 1.0, "A")   # (the vertex colour's plain output is RGB only: alpha comes from its own pin)
     s_amt = g.sat(g.mul(g.add(g.addn(g.mul(sand_m, 1.4), g.mul(g.add(rag, -0.5), 0.4)), -0.25), 2.6))
-    sand = g.muln(g.c3((0.40, 0.33, 0.21)), g.lerpc(0.86, 1.08, g.mul(g.lum(soil), 7.5)))
+    sand = g.muln(palette.colour(mat, "Sand"), g.lerpc(0.86, 1.08, g.mul(g.lum(soil), 7.5)))
     col = g.lerp(col, sand, s_amt)
 
     # Snow by height on gentle ground, off until the mountains are built (SnowFrom 60 m: nothing is that high yet)
@@ -239,10 +246,11 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     span = g.subn(snow_to, snow_from)
     div = g.node(unreal.MaterialExpressionDivide); g.link(up, div, "A"); g.link(span, div, "B")
     snow_amt = g.muln(g.sat(g.addn(div, g.mul(g.add(rag, -0.5), 0.4))), g.ramp(nz, 0.55, 0.75))
-    col = g.lerp(col, g.c3((0.82, 0.85, 0.90)), snow_amt)
+    col = g.lerp(col, palette.colour(mat, "Snow"), snow_amt)
 
     # (2026-11-14: the swathes are now in grass_field.before_grey, on the grass only, the same as the blades and the town's lawn; flat ground is a little brighter than the blades, which are lit through)
     col = grass_field.ground_lift(g, col)
+    col = palette.grade_world(mat, col)   # the palette's Warmth, Saturation and Brightness (identity at the defaults)
 
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.lerp(g.c(0.95), g.c(0.62), m_amt), unreal.MaterialProperty.MP_ROUGHNESS)
@@ -267,7 +275,7 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     near = g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0))
     far = g.tex(dirt_tex, g.mul(xy, 1.0 / 1700.0))
     var = g.lerpc(0.86, 1.14, far, "G")   # (was 0.72-1.22: near-black blotches where the cobbles fray out)
-    earth = g.muln(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), g.c3(EARTH_BALANCE))
+    earth = g.muln(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), palette.colour(mat, "Earth"))
     earth = g.addn(g.mul(earth, 0.9), g.c3((0.024, 0.019, 0.013)))   # the darkest earth lifted a little (second review: near-black in shade beside the stones)
     uv =g.node(unreal.MaterialExpressionTextureCoordinate)
     edge = g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, True, False), -0.5), 2.0)))   # 0 at the sides, 1 down the middle
@@ -293,7 +301,7 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     pick = g.mul(ctex, 1.0, "A")   # each stone's own number (0.04 to 1; 0 in the joints)
     cob = g.sat(g.mul(g.add(g.addn(pick, g.mul(band, 1.4)), -1.0), 7.0))   # (1.4: most stones stay until the band is well under half) a stone stays if its number beats what the band leaves
     stones = g.lerp(stones, earth, g.mul(g.one(unreal.MaterialExpressionOneMinus, band), 0.3))   # earth washed over the outer stones
-    g.out(g.lerp(earth, stones, cob), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(palette.grade_world(mat, g.lerp(earth, stones, cob)), unreal.MaterialProperty.MP_BASE_COLOR)
     flat = g.c3((0.0, 0.0, 1.0))
     bumps = g.mask(g.tex(cobble_n, g.mul(xy, 1.0 / 250.0), normal=True), True, True, True)
     g.out(g.lerp(flat, bumps, cob), unreal.MaterialProperty.MP_NORMAL)
@@ -331,13 +339,14 @@ def build_stone(rock_tex, patches):
     col = g.lerp(side, top, g.ramp(nz, 0.45, 0.75))
     col = g.muln(col, g.vector("Tint", (1.0, 1.0, 1.0)))
     moss = g.mul(g.muln(g.ramp(nz, 0.6, 0.9), g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 90.0)), True, False)), 0.45)
-    col = g.lerp(col, g.c3((0.07, 0.11, 0.035)), moss)
-    g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
+    col = g.lerp(col, palette.grade_plant_extra(mat, palette.colour(mat, "Moss")), moss)
+    g.out(palette.grade_world(mat, col), unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.c(0.85), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.25), unreal.MaterialProperty.MP_SPECULAR)
     finish(mat, "M_Stone")
 
 
+palette.ensure_mpc()
 grass_tex = import_texture(ground_textures.grass_ground(), "T_GrassGround")
 rock_tex = import_texture(ground_textures.rock(), "T_Rock")
 cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble", alpha=True)

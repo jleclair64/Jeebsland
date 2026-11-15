@@ -1,4 +1,5 @@
 #include "Meadow.h"
+#include "Palette.h"
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "Canopy.h"
@@ -11,6 +12,27 @@
 #include "GameFramework/Pawn.h"
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+
+// Which grass the meadow grows (2026-11-15, owner: "lean towards realism with the grass"; the packs are the owner's Fab library,
+// git-ignored, set up by Tools/BuildGrassPacks.ps1). Changing any of these regrows the grass round you at once (a short hitch).
+static TAutoConsoleVariable<int32> CVarGrassPack(TEXT("jeeb.Grass.Pack"), 1,
+	TEXT("Meadow grass: 0 our painted cards, 1 Grass Library + Meadow Flowers (realistic, Fab), 2 Open World Foliage (realistic, cheaper, Fab)"));
+static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1"), 12.0f, TEXT("Grass Library clumps per square metre close by"));
+static TAutoConsoleVariable<float> CVarGrassDensity2(TEXT("jeeb.Grass.Density2"), 11.0f, TEXT("Open World Foliage clumps per square metre close by"));
+static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 5000.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer; 50 m since 2026-11-15, owner: twice as far)"));
+static TAutoConsoleVariable<int32> CVarGrassFarCards(TEXT("jeeb.Grass.FarCards"), 0, TEXT("1: our painted cards rise where the realistic grass sinks, carrying the meadow to 50 m; 0: painted ground only beyond it"));
+static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT(""), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
+static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT(""), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack2)"));
+static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
+static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.3f, TEXT("How far the realistic blades are pulled toward grey (live)"));
+static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
+static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.45f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
 
 namespace
 {
@@ -293,6 +315,10 @@ void AMeadow::BeginPlay()
 		UE_LOG(LogTemp, Warning, TEXT("M_GrassFlower is missing: run Tools/BuildMaterials.ps1. No meadow flowers."));
 	PlaceBushesAndFlowers();
 	{
+		int32 P = -1;   // (-GrassPack=N: the grass for test runs and Play, as jeeb.Grass.Pack)
+		if (FParse::Value(FCommandLine::Get(), TEXT("GrassPack="), P) && P >= 0) CVarGrassPack->Set(P, ECVF_SetByCommandline);
+	}
+	{
 		// (log JEEBGRASS: how much of the land the long patches cover, from a fixed sample, to tune LongGrassNoise without pictures)
 		FRandomStream R(99);
 		int32 N = 0; float Long = 0.f, Heart = 0.f, Fl = 0.f;
@@ -349,8 +375,81 @@ void AMeadow::DropCell(const FIntPoint& Id)
 	{
 		if (C->Comp) C->Comp->DestroyComponent();
 		if (C->Flowers) C->Flowers->DestroyComponent();
+		for (UInstancedStaticMeshComponent* P : C->Packed) if (P) P->DestroyComponent();
 		Cells.Remove(Id);
 	}
+}
+
+static FLinearColor ParseRgb(const FString& S)
+{
+	TArray<FString> P; S.ParseIntoArrayWS(P);
+	return FLinearColor(P.Num() > 0 ? FCString::Atof(*P[0]) : 1.f, P.Num() > 1 ? FCString::Atof(*P[1]) : 1.f, P.Num() > 2 ? FCString::Atof(*P[2]) : 1.f);
+}
+
+// The pack's meshes from Content/Data/GrassPacks.csv (Pack, Role short|long|flower, Mesh, Weight, Height, Width), each with its own
+// material instance (the pack's, whose parent Tools/grass_packs.py made from the pack's master with our field colour and sinking)
+void AMeadow::LoadPack(int32 P)
+{
+	Kinds.Reset();
+	KeepAlive.Reset();
+	if (P <= 0) return;
+	FString Text;
+	const FString Path = FPaths::ProjectContentDir() / TEXT("Data/GrassPacks.csv");
+	if (!FFileHelper::LoadFileToString(Text, *Path)) { UE_LOG(LogTemp, Warning, TEXT("JEEBGRASS pack %d: no %s, our own grass instead"), P, *Path); return; }
+	TArray<FString> Lines; Text.ParseIntoArrayLines(Lines);
+	for (const FString& L : Lines)
+	{
+		TArray<FString> C; L.ParseIntoArray(C, TEXT(","), false);
+		if (C.Num() < 6 || !C[0].IsNumeric() || FCString::Atoi(*C[0]) != P) continue;
+		const FString RoleName = C[1].TrimStartAndEnd().ToLower();
+		FKind K;
+		K.Role = RoleName == TEXT("long") ? 1 : (RoleName == TEXT("flower") ? 2 : 0);
+		const FString MeshPath = C[2].TrimStartAndEnd();
+		K.Mesh = LoadObject<UStaticMesh>(nullptr, *(MeshPath + TEXT(".") + FPaths::GetBaseFilename(MeshPath)));
+		if (!K.Mesh) { UE_LOG(LogTemp, Warning, TEXT("JEEBGRASS pack %d: %s is missing (are the Fab packs in Content?)"), P, *MeshPath); continue; }
+		K.Weight = FCString::Atof(*C[3]); K.Height = FCString::Atof(*C[4]); K.Width = FCString::Atof(*C[5]);
+		K.NaturalH = FMath::Max(10.f, float(K.Mesh->GetBoundingBox().Max.Z));
+		if (UMaterialInterface* M = K.Mesh->GetMaterial(0)) K.Mid = UMaterialInstanceDynamic::Create(M, this);
+		JeebPalette::BindGrade(K.Mid);   // (the palette's knobs: these materials take the grade as parameters, not from the collection)
+		UE_LOG(LogTemp, Log, TEXT("JEEBGRASS kind %s role %d: %.0f..%.0f cm tall, %d material slots, %d LODs"), *FPaths::GetBaseFilename(MeshPath), K.Role, K.Mesh->GetBoundingBox().Min.Z, K.Mesh->GetBoundingBox().Max.Z, K.Mesh->GetStaticMaterials().Num(), K.Mesh->GetNumLODs());
+		KeepAlive.Add(K.Mesh);
+		if (K.Mid) KeepAlive.Add(K.Mid);
+		Kinds.Add(K);
+	}
+	if (!Kinds.ContainsByPredicate([](const FKind& K) { return K.Role == 0; }))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("JEEBGRASS pack %d: no short grass loaded, our own grass instead"), P);
+		Kinds.Reset(); KeepAlive.Reset();
+		return;
+	}
+	PackFadeEnd = FMath::Max(600.f, CVarGrassPackFade.GetValueOnGameThread());
+	PackFadeStart = FMath::Max(200.f, PackFadeEnd - 800.f);
+	bFarCards = CVarGrassFarCards.GetValueOnGameThread() != 0;
+	const float Density = P == 1 ? CVarGrassDensity1.GetValueOnGameThread() : CVarGrassDensity2.GetValueOnGameThread();
+	PackChance = FMath::Clamp(Density / (NearDensity * 10000.f), 0.f, 1.f);
+	for (FKind& K : Kinds)
+		if (K.Mid) { K.Mid->SetScalarParameterValue(TEXT("FadeStart"), PackFadeStart); K.Mid->SetScalarParameterValue(TEXT("FadeEnd"), PackFadeEnd); }
+	UE_LOG(LogTemp, Log, TEXT("JEEBGRASS pack %d: %d kinds, %.1f clumps per m2 (%.0f%% of the spots), sinking %.0f..%.0f m, far cards %d"),
+		P, Kinds.Num(), Density, PackChance * 100.f, PackFadeStart / 100.f, PackFadeEnd / 100.f, bFarCards ? 1 : 0);
+}
+
+// Every square in reach grown at once round a spot (the start, a changed grass setting, or a test still's jump across the map)
+void AMeadow::RegrowAround(const FVector2D& Me)
+{
+	TArray<FIntPoint> All; Cells.GetKeys(All);
+	for (const FIntPoint& Id : All) DropCell(Id);
+	bJob = false;
+	const int32 Cx = FMath::FloorToInt(Me.X / CellSize), Cy = FMath::FloorToInt(Me.Y / CellSize);
+	const int32 Span = FMath::CeilToInt(Reach / CellSize) + 1;
+	for (int32 j = Cy - Span; j <= Cy + Span; ++j)
+		for (int32 i = Cx - Span; i <= Cx + Span; ++i)
+		{
+			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
+			const float D = FVector2D::Distance(Ctr, Me);
+			if (D > Reach || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;
+			StartJob(FIntPoint(i, j), TierFor(D));
+			StepJob(1.0e6);
+		}
 }
 
 void AMeadow::Tick(float Dt)
@@ -360,8 +459,53 @@ void AMeadow::Tick(float Dt)
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (!Pawn || !NearMesh) return;
 	if (GrassMid) GrassMid->SetScalarParameterValue(TEXT("Dusk"), ADayNight::Dusk);
-	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
+	{
+		// the grass setting (jeeb.Grass.*): a change regrows everything round you; the first tick grows the start (the woods are
+		// planted by now, so grass can thin under them)
+		static FString Was;
+		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
+			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread());
+		bool bRegrow = !bPrewarmed || Now != Was;
+#if !UE_BUILD_SHIPPING
+		static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
+		if (bShot && bPrewarmed && FVector2D::Distance(Me, LastMe) > 3000.f) bRegrow = true;   // (test stills jump across the map)
+#endif
+		if (bRegrow)
+		{
+			if (Now != Was || !bPrewarmed)
+			{
+				const int32 Want = CVarGrassPack.GetValueOnGameThread();
+				LoadPack(Want);
+				Pack = Kinds.Num() > 0 ? Want : 0;
+				if (GrassMid)   // (our cards rise where the realistic grass sinks, M_Grass NearStart..NearEnd; off for our own grass)
+				{
+					const bool bRise = Pack != 0 && bFarCards;
+					GrassMid->SetScalarParameterValue(TEXT("NearStart"), bRise ? PackFadeStart : -2.f);
+					GrassMid->SetScalarParameterValue(TEXT("NearEnd"), bRise ? PackFadeEnd : -1.f);
+				}
+			}
+			Was = Now;
+			bPrewarmed = true;
+			RegrowAround(Me);
+		}
+		LastMe = Me;
+		if (Pack != 0)
+		{
+			const FString TintS = Pack == 1 ? CVarGrassTint1.GetValueOnGameThread() : CVarGrassTint2.GetValueOnGameThread();
+			const FLinearColor Tint = TintS.TrimStartAndEnd().IsEmpty() ? JeebPalette::Raw(Pack == 1 ? FName(TEXT("GrassPack1")) : FName(TEXT("GrassPack2"))) : ParseRgb(TintS);   // (the material grades it with the palette's knobs)
+			for (FKind& K : Kinds)
+				if (K.Mid)
+				{
+					K.Mid->SetScalarParameterValue(TEXT("Dusk"), ADayNight::Dusk);
+					const bool bFlower = K.Role == 2;   // (petals keep their own colours; only a little of the field's light and shade)
+					K.Mid->SetVectorParameterValue(TEXT("JeebTint"), bFlower ? FLinearColor::White : Tint);
+					K.Mid->SetScalarParameterValue(TEXT("JeebField"), CVarGrassField.GetValueOnGameThread() * (bFlower ? 0.3f : 1.f));
+					K.Mid->SetScalarParameterValue(TEXT("JeebDesat"), bFlower ? 0.f : CVarGrassPackDesat.GetValueOnGameThread());
+					K.Mid->SetScalarParameterValue(TEXT("JeebGreenDry"), CVarGrassGreenDry.GetValueOnGameThread());
+				}
+		}
+	}
 
 	TArray<FIntPoint> Far;
 	for (const TPair<FIntPoint, FCell>& P : Cells)
@@ -423,11 +567,32 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 		}
 	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
 	JobXf.Reserve(JobCount); JobTall.Reserve(JobCount);
+	JobKindXf.SetNum(Kinds.Num());
+	for (TArray<FTransform>& K : JobKindXf) K.Reset();
+}
+
+// A realistic clump's kind at a spot: each kind grows in its own drifts (a species-patch noise picks the main one there), mixed
+static int32 PickKind(const TArray<int32>& Of, const TArray<float>& W, float X, float Y, FRandomStream& R)
+{
+	if (Of.Num() == 0) return -1;
+	if (Of.Num() > 1 && R.FRand() < 0.55f)
+	{
+		const float N = FMath::PerlinNoise2D(FVector2D(X / 900.f + 41.7f, Y / 900.f - 12.3f)) * 0.5f + 0.5f;
+		return Of[FMath::Clamp(FMath::FloorToInt(FMath::Clamp(N * 1.4f - 0.2f, 0.f, 0.999f) * Of.Num()), 0, Of.Num() - 1)];
+	}
+	float Sum = 0.f; for (float V : W) Sum += V;
+	float Pick = R.FRand() * Sum;
+	for (int32 i = 0; i < Of.Num(); ++i) { Pick -= W[i]; if (Pick <= 0.f) return Of[i]; }
+	return Of.Last();
 }
 
 void AMeadow::StepJob(double BudgetSeconds)
 {
 	const double End = FPlatformTime::Seconds() + BudgetSeconds;
+	TArray<int32> Of[3]; TArray<float> OfW[3];   // (the pack's kinds by role: short, long, flower)
+	for (int32 k = 0; k < Kinds.Num(); ++k) { Of[Kinds[k].Role].Add(k); OfW[Kinds[k].Role].Add(Kinds[k].Weight); }
+	const float FlowerShare = CVarGrassFlowers.GetValueOnGameThread();
+	static const float TierChance[3] = { 1.f, 0.85f, 0.6f }, TierWide[3] = { 1.f, 1.1f, 1.3f };
 	while (JobDone < JobCount)
 	{
 		if ((JobDone & 15) == 15 && FPlatformTime::Seconds() > End) return;   // (checked first, so a tuft skipped below never misses it; the next call picks up here)
@@ -462,8 +627,40 @@ void AMeadow::StepJob(double BudgetSeconds)
 				Short *= 0.82f * (1.f + 1.3f * Tall * JobRand.FRandRange(0.8f, 1.15f));
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, FMath::Min(Short, 1.f)) * (1.f + 0.35f * Near) * (1.f + 0.12f * Tall);   // and wider by buildings, so the tufts overlap into one mat and the individual cards disappear
 				if (bThin) continue;
-				JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
-				JobTall.Add(Tall);
+				const float Gz = JeebTerrain::HeightAt(X, Y);
+				if (Pack == 0 || bFarCards)
+				{
+					JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, Gz + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
+					JobTall.Add(Tall);
+				}
+				if (Pack != 0)
+				{
+					// a realistic clump at about this spot's card height (48 cm card x its scale), keeping its own proportions: long-patch kinds
+					// where the long grass is (more often toward a patch's heart), the short field kinds elsewhere
+					// (2026-11-15, for speed: past about 17 m fewer, wider clumps of fewer kinds, so the far ring costs less but still reads as grass)
+					if (JobRand.FRand() < PackChance * TierChance[FMath::Min(JobTier, 2)])
+					{
+						const int32 Kr = (Of[1].Num() > 0 && Tall > 0.2f && JobRand.FRand() < Tall * 1.25f) ? 1 : 0;
+						const int32 KindsHere = JobTier == 0 ? Of[Kr].Num() : FMath::Min(Of[Kr].Num(), JobTier == 1 ? 2 : 1);
+						TArray<int32> FarOf(Of[Kr].GetData(), KindsHere); TArray<float> FarW(OfW[Kr].GetData(), KindsHere);
+						const int32 K = PickKind(FarOf, FarW, X, Y, JobRand);
+						const FKind& Kd = Kinds[K];
+						const float TargetH = 48.f * Sz * (1.f + 0.1f * JobTier) * Short * Kd.Height;
+						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * JobRand.FRandRange(0.85f, 1.15f) * (1.f + 0.25f * Near) * TierWide[FMath::Min(JobTier, 2)];
+						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy * 0.55f, Xy * 1.6f);   // (never squashed or stretched far from its own shape)
+						JobKindXf[K].Add(FTransform(FRotator(JobRand.FRandRange(-4.f, 4.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-4.f, 4.f)), FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
+					}
+					// a flower clump now and then (a clump holds several, so fewer than our single flowers), one kind per drift
+					if (Of[2].Num() > 0 && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov) * FlowerShare)
+					{
+						const float Fn = FMath::Clamp((FMath::PerlinNoise2D(FVector2D(X / 1700.f - 21.3f, Y / 1700.f + 5.1f)) * 0.5f + 0.5f) * 1.5f - 0.25f, 0.f, 0.999f);
+						const int32 K = JobRand.FRand() < 0.85f ? Of[2][FMath::FloorToInt(Fn * Of[2].Num())] : Of[2][JobRand.RandRange(0, Of[2].Num() - 1)];
+						const float S = JobRand.FRandRange(0.85f, 1.15f) * Kinds[K].Width;
+						const float Fx = X + JobRand.FRandRange(-20.f, 20.f), Fy = Y + JobRand.FRandRange(-20.f, 20.f);
+						JobKindXf[K].Add(FTransform(FRotator(0.f, JobRand.FRandRange(0.f, 360.f), 0.f), FVector(Fx, Fy, JeebTerrain::HeightAt(Fx, Fy)), FVector(S, S, S * Kinds[K].Height)));
+					}
+					continue;
+				}
 				// a flower beside this tuft now and then, its head just above the blades round it (tiers 0 and 1: within about 27 m;
 				// none on paths, trampled ground or under trees)
 				if (FlowerMesh && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov))
@@ -536,6 +733,25 @@ void AMeadow::FinishJob()
 		static int32 Logged = 0;
 		if (Logged++ < 6) UE_LOG(LogTemp, Log, TEXT("JEEBGRASS square %d %d tier %d: %d tufts, %d flowers (first at %s, colour %s)"), JobId.X, JobId.Y, JobTier, JobXf.Num(), JobFlowerXf.Num(), *JobFlowerXf[0].GetLocation().ToString(), *JobFlowerCol[0].ToString());
 	}
+	// the realistic clumps, one set per kind (drawn only out to where they have sunk away)
+	for (int32 k = 0; k < JobKindXf.Num() && k < Kinds.Num(); ++k)
+	{
+		if (JobKindXf[k].Num() == 0) continue;
+		UInstancedStaticMeshComponent* P = NewObject<UInstancedStaticMeshComponent>(this);
+		P->SetStaticMesh(Kinds[k].Mesh);
+		if (Kinds[k].Mid) P->SetMaterial(0, Kinds[k].Mid);
+		P->SetupAttachment(RootComponent);
+		P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		P->SetCastShadow(false);
+		P->bAffectDynamicIndirectLighting = false;
+		P->bAffectDistanceFieldLighting = false;
+		P->SetCullDistances(0, FMath::RoundToInt(PackFadeEnd + 200.f));
+		if (JobTier >= 2 && Kinds[k].Mesh->GetNumLODs() > 1) { P->bOverrideMinLOD = true; P->MinLOD = 1; }   // (the far ring: the pack's simpler model)
+		P->RegisterComponent();
+		P->AddInstances(JobKindXf[k], false, true);
+		Cell.Packed.Add(P);
+		JobKindXf[k].Reset();
+	}
 	Cells.Add(JobId, Cell);
 	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
 }
@@ -574,4 +790,37 @@ void AMeadow::PlaceBushesAndFlowers()
 		Bushes->AddInstance(FTransform(FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 2.f), FVector(Size, Size, Size * Rand.FRandRange(0.85f, 1.15f))));
 	}
 
+}
+
+// (test only, -GrassLineup in MoveLab, 2026-11-15: every grass type of the Fab packs in rows a metre apart, for choosing which to grow.
+// X -400: Grass Library grass_01..12 (variant 03) then lowGrass_01..10 (variant 02); X -1000: Meadow Flowers 01..20 (the biggest
+// clump of each); X -1600: Open World Foliage grass 01_01..02_03 (variants 01 and 04) then flowers 01..06 (variant 02). Y from -1000.)
+void JeebGrassLineup(UWorld* W)
+{
+#if !UE_BUILD_SHIPPING
+	if (!W || !FParse::Param(FCommandLine::Get(), TEXT("GrassLineup"))) return;
+	const float Z = JeebTerrain::HeightAt(0.f, 0.f);
+	auto Row = [&](float X, const TArray<FString>& Paths)
+	{
+		for (int32 i = 0; i < Paths.Num(); ++i)
+		{
+			UStaticMesh* M = LoadObject<UStaticMesh>(nullptr, *(Paths[i] + TEXT(".") + FPaths::GetBaseFilename(Paths[i])));
+			if (!M) { UE_LOG(LogTemp, Warning, TEXT("JEEBGRASS lineup: no %s"), *Paths[i]); continue; }
+			if (AStaticMeshActor* A = W->SpawnActor<AStaticMeshActor>(FVector(X, -1000.f + i * 100.f, Z), FRotator::ZeroRotator))
+			{
+				A->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+				A->GetStaticMeshComponent()->SetStaticMesh(M);
+			}
+		}
+	};
+	const int32 FlowerVariants[20] = { 4, 4, 5, 4, 5, 4, 4, 4, 6, 7, 4, 4, 7, 6, 5, 5, 6, 4, 5, 3 };
+	TArray<FString> A, B, C;
+	for (int32 t = 1; t <= 12; ++t) A.Add(FString::Printf(TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/grass_%02d_03_mesh"), t));
+	for (int32 t = 1; t <= 10; ++t) A.Add(FString::Printf(TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/lowGrass_%02d_02_SM"), t));
+	for (int32 t = 1; t <= 20; ++t) B.Add(FString::Printf(TEXT("/Game/PN_MeadowFlowers/Meshes/flowerMesh/flower_%02d_%02d"), t, FlowerVariants[t - 1]));
+	for (int32 g = 1; g <= 2; ++g) for (int32 h = 1; h <= 3; ++h) for (int32 v : { 1, 4 }) C.Add(FString::Printf(TEXT("/Game/PN_OpenWorldFoliage/Meshes/openWorld_grass_%02d_%02d_%02d"), g, h, v));
+	for (int32 t = 1; t <= 6; ++t) C.Add(FString::Printf(TEXT("/Game/PN_OpenWorldFoliage/Meshes/openWorld_flower_%02d_02"), t));
+	Row(-400.f, A); Row(-1000.f, B); Row(-1600.f, C);
+	UE_LOG(LogTemp, Log, TEXT("JEEBGRASS lineup: %d + %d + %d meshes"), A.Num(), B.Num(), C.Num());
+#endif
 }

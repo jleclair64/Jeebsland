@@ -16,6 +16,7 @@ import unreal
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import grass_field   # noqa: E402  (one field colour for the blades, the world and this lawn, 2026-11-14)
+import palette       # noqa: E402  (2026-11-15: the world palette, Content/Data/Palette.ini; Docs/Palette.md)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(os.path.dirname(HERE), "Art", "TownLab", "Textures", "Sources")
@@ -23,12 +24,11 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 lib = unreal.MaterialEditingLibrary
 EAL = unreal.EditorAssetLibrary
 
-GRASS_TO_MEADOW = (1.139, 0.759, 0.358)   # (as world_material.py: T_GrassGround times this reads like the meadow's tufts)
-GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)
-EARTH_BALANCE = (2.02, 2.79, 3.95)
-EARTH_AVERAGE = (0.14, 0.10, 0.062)
-COBBLE_GRADE = (0.92, 1.00, 1.12)          # Poly Haven "grassy_cobblestone" leans red-brown: toward the warm grey of the town's own stone
-COBBLE_AVERAGE = (0.168, 0.138, 0.107)     # the graded picture's average (linear), what it fades to far away
+# (2026-11-15: the multipliers are the palette's GroundGrass, Earth and Cobble, Content/Data/Palette.ini; these are the pictures' own
+# averages, measured as the averages after those multipliers divided by them, so a palette change moves both)
+GRASS_PICTURE_AVERAGE = (0.0705 / 1.139, 0.0916 / 0.759, 0.0083 / 0.358)   # T_GrassGround (as world_material.py)
+EARTH_PICTURE_AVERAGE = (0.14 / 2.02, 0.10 / 2.79, 0.062 / 3.95)          # T_Dirt
+COBBLE_PICTURE_AVERAGE = (0.168 / 0.92, 0.138 / 1.00, 0.107 / 1.12)       # Poly Haven "grassy_cobblestone" (leans red-brown: Cobble greys it)
 
 # ------------------------------------------------------------------ the map
 if EAL.does_asset_exist("/Game/TownLab/Map/TownLab"):
@@ -141,6 +141,7 @@ class Graph:
 
 
 def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
+    palette.ensure_mpc()
     path = "/Game/TownLab/M_TL_Ground"
     if EAL.does_asset_exist(path):
         EAL.delete_asset(path)
@@ -157,17 +158,18 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     # Grass ground: as M_Ground's (so it meets the world's ground and the meadow's tufts), with stronger Breath of the Wild drift
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
     near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
-    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW))
+    near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), palette.colour(mat, "GroundGrass"))
     # past the grass blades (40 m) the ground carries the look: a broad sampling of the same picture keeps some texture out to
     # about 80 m before it settles to the average (from the air the plain average read flat next to the real town's meadow)
-    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), g.c3(GRASS_TO_MEADOW))
+    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), palette.colour(mat, "GroundGrass"))
     grass = g.lerp(near, mid, g.ramp(depth, 1500.0, 4500.0))
-    grass = g.lerp(grass, g.c3(GRASS_AVERAGE), g.ramp(depth, 8000.0, 16000.0))
+    grass = g.lerp(grass, g.muln(g.c3(GRASS_PICTURE_AVERAGE), palette.colour(mat, "GroundGrass")), g.ramp(depth, 8000.0, 16000.0))
     grass = grass_field.before_grey(g, grass, fn)   # (Tools/grass_field.py: the same field colour as the blades, M_Grass, and the world, M_Ground)
     grass = grass_field.ground_lift(g, grass_field.grey(g, grass))   # (brighter: the grass blades catch more light than flat ground; the ground must match them where the blades stop)
+    grass = palette.grade_plant_extra(mat, grass)   # the palette's season and Greenness on the grass only (World on the whole, below)
 
-    soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), g.c3(EARTH_BALANCE))
-    soil = g.lerp(soil, g.c3(EARTH_AVERAGE), g.c(0.45))
+    soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), palette.colour(mat, "Earth"))
+    soil = g.lerp(soil, g.muln(g.c3(EARTH_PICTURE_AVERAGE), palette.colour(mat, "Earth")), g.c(0.45))
 
     worn = g.mask(g.mask(vc, False, True), True, False)
     trampled = g.lerp(g.muln(grass, g.c3((1.07, 1.04, 0.93))), soil, g.c(0.22))
@@ -189,11 +191,11 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     cb = g.tex(cobble, uvb)
     ctex = g.lerp(ca, cb, swap)
     height = g.lerp(g.mul(ca, 1.0, "A"), g.mul(cb, 1.0, "A"), swap)
-    stones = g.muln(g.mask(ctex, True, True, True), g.c3(COBBLE_GRADE))
+    stones = g.muln(g.mask(ctex, True, True, True), palette.colour(mat, "Cobble"))
     stones = g.desat(stones, 0.25)
     joint = g.one(unreal.MaterialExpressionOneMinus, g.ramp(height, 0.34, 0.46))
     stones = g.lerp(stones, g.muln(grass, g.c3((0.85, 1.0, 0.8))), g.mul(joint, 0.3))   # a little more of the meadow's green in the joints (the picture has grass in them already), the meadow's own green
-    stones = g.lerp(stones, g.c3(COBBLE_AVERAGE), g.ramp(depth, 3000.0, 9000.0))
+    stones = g.lerp(stones, g.muln(g.c3(COBBLE_PICTURE_AVERAGE), palette.colour(mat, "Cobble")), g.ramp(depth, 3000.0, 9000.0))
     street = g.mask(vc, True, False)
     # the outer stones drop out into earth at a worn kerb: each stone's height and brightness pick when it goes
     pick = g.addn(g.mul(height, 0.7), g.mul(g.lum(ctex), 0.9))
@@ -201,6 +203,7 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     cob = g.sat(g.mul(g.add(g.addn(t, g.mul(pick, 0.6)), -1.05), 5.0))
     col = g.lerp(col, soil, g.mul(g.ramp(street, 0.1, 0.45), 0.35))   # packed earth under where the stones thin out
     col = g.lerp(col, stones, cob)
+    col = palette.grade_world(mat, col)   # the palette's Warmth, Saturation and Brightness (identity at the defaults)
 
     flat = g.c3((0.0, 0.0, 1.0))
     na = g.mask(g.tex(cobble_n, uva, normal=True), True, True, True)

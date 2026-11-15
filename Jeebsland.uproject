@@ -1,4 +1,4 @@
-{
+﻿{
     "FileVersion":  3,
     "EngineAssociation":  "5.8",
     "Category":  "",
@@ -40,6 +40,13 @@
                     {
                         "Name":  "EditorScriptingUtilities",
                         "Enabled":  true
+                    },
+                    {
+                        "Name":  "ProceduralVegetationEditor",
+                        "Enabled":  true,
+                        "TargetAllowList":  [
+                                                "Editor"
+                                            ]
                     }
                 ]
 }

@@ -1,7 +1,12 @@
 # Rebuilds the foliage and bark materials (M_Grass, M_Bush, M_TreeLeaf, M_BarkTint) from the textures already in /Game.
 # Run with Tools\BuildMaterials.ps1 (the editor must be closed). The textures were painted by MakeGrassCards.bat.
 import os
+import sys
 import unreal
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import palette   # noqa: E402  (2026-11-15: the world palette, Content/Data/Palette.ini and /Game/MPC_JeebPalette; Docs/Palette.md)
+palette.ensure_mpc()   # (first: every material below reads it)
 
 GRASS_DESATURATION = 0.45   # (the old build_ground below only; the grass and the ground use grass_field.GRASS_DESATURATION since 2026-11-14)
 GRASS_SHADOW_LIFT = 0.55    # how much the darkest parts of the grass are brightened (lights untouched)
@@ -138,21 +143,21 @@ def add_wind(mat, strength, tip_only, lift, attach_mask=None, keep=None, wpo_add
     return shade
 
 
-def soft_edges(mat, ts):
+def soft_edges(mat, ts, pin="A"):
     """Opacity through a temporal dither, so cut-out edges blend softly with anti-aliasing instead of stair-stepping"""
     try:
         cls = unreal.load_class(None, "/Script/Engine.MaterialExpressionDitherTemporalAA")
         if cls is None:
             raise RuntimeError("no DitherTemporalAA class")
         d = lib.create_material_expression(mat, cls, -300, 500)
-        lib.connect_material_expressions(ts, "A", d, "")
+        lib.connect_material_expressions(ts, pin, d, "")
         lib.connect_material_property(d, "", unreal.MaterialProperty.MP_OPACITY_MASK)
         mat.set_editor_property("opacity_mask_clip_value", 0.35)
         return d, ""
     except Exception as e:
         unreal.log("MATDIAG dither unavailable, plain cut-out: " + str(e))
-        lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
-        return ts, "A"   # (the node and output pin that feed the opacity mask)
+        lib.connect_material_property(ts, pin, unreal.MaterialProperty.MP_OPACITY_MASK)
+        return ts, pin   # (the node and output pin that feed the opacity mask)
 
 
 # Tree crowns hand over to their far stand-ins (Forest.cpp, M_TreeFar) over a band of distance, FadeStart..FadeEnd. Both sides
@@ -234,6 +239,7 @@ def build_tree_far():
     col = g.muln(col, clumps)
     shade = g.one(unreal.MaterialExpressionOneMinus, g.node(unreal.MaterialExpressionPerInstanceCustomData, data_index=0))
     col = g.muln(col, shade)
+    col = palette.grade_plant(mat, col, share=conifer)   # the palette's knobs, as the near crowns (cones as the needles: a share of the season)
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(col, unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
     glow = g.node(unreal.MaterialExpressionLinearInterpolate, const_a=0.05, const_b=0.16); g.link(conifer, glow, "Alpha")   # (cones: a solid shell has no bright gaps, so a higher floor or it reads near black against a low sun)
@@ -331,7 +337,9 @@ def subsurface(mat, col, share):
     lib.connect_material_property(m, "", unreal.MaterialProperty.MP_SUBSURFACE_COLOR)
 
 
-def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False, tree_fade=False, sss=1.0):
+def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=False, gain=1.0, wind=True, vary=False, glow_amt=0.05, crown_shade=False, tree_fade=False, sss=1.0, tint_key=None, evergreen=False):
+    """tint_key: a palette colour (Palette.ini) for the tint instead of tint_rgb; evergreen: the needles take only a share of the
+    palette's season (pines stay green when the world turns gold)"""
     tex = unreal.EditorAssetLibrary.load_asset("/Game/" + tex_name)
     if tex is None:
         raise RuntimeError("MATDIAG missing texture " + tex_name + ": run MakeGrassCards.bat once")
@@ -348,6 +356,8 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
         tint = lib.create_material_expression(mat, unreal.MaterialExpressionVectorParameter, -700, -200)
         tint.set_editor_property("parameter_name", "Tint")
         tint.set_editor_property("default_value", unreal.LinearColor(*tint_rgb))
+    elif tint_key:
+        tint = palette.colour(mat, tint_key)   # (the palette's colour, same value as the old constant)
     else:
         tint = lib.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -700, -200)
         tint.set_editor_property("constant", unreal.LinearColor(*tint_rgb))
@@ -374,6 +384,7 @@ def build_foliage(name, tex_name, tint_rgb, strength, tip_only, lift, param=Fals
             col = shaded
         except Exception as e:
             unreal.log("MATDIAG crown shade skipped: " + str(e))
+    col = palette.grade_plant(mat, col, share=True if evergreen else None)   # the palette's knobs (identity at the defaults)
     lib.connect_material_property(col, "", unreal.MaterialProperty.MP_BASE_COLOR)
     subsurface(mat, col, sss)
     glow = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -250, -100)   # a faint glow so deep shade is never pitch black
@@ -414,10 +425,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import grass_field   # noqa: E402  (the field colour the blades share with the ground under them, 2026-11-14)
 
 
-def grass_sink(g, start, end):
+def grass_sink(g, start, end, near=False):
     """(keep, offset) for World Position Offset: past FadeStart a blade sinks into the ground, gone by FadeEnd, so the grass
     thins out over distance into the painted ground instead of stopping at a line (the tufts' own pivot's distance: a whole
-    tuft sinks together). keep is 1 near, 0 gone; offset pulls each vertex down by its height above the pivot times 1 - keep."""
+    tuft sinks together). keep is 1 near, 0 gone; offset pulls each vertex down by its height above the pivot times 1 - keep.
+    near (M_Grass, 2026-11-15): the blades also lie sunk closer than NearStart and rise by NearEnd, where the realistic Fab grass
+    (Meadow.cpp, jeeb.Grass.Pack) sinks away; the defaults (-2, -1) leave every blade up."""
     wp = g.node(unreal.MaterialExpressionWorldPosition)
     obj = g.node(unreal.MaterialExpressionObjectPositionWS)
     cam = g.node(unreal.MaterialExpressionCameraPositionWS)
@@ -426,6 +439,12 @@ def grass_sink(g, start, end):
     div = g.node(unreal.MaterialExpressionDivide); g.link(g.subn(dist, g.scalar("FadeStart", start)), div, "A"); g.link(span, div, "B")
     gone = g.sat(div)
     gone = g.muln(gone, gone)                                          # (eases in: most of the blade's height stays to the middle of the band)
+    if near:
+        nspan = g.subn(g.scalar("NearEnd", -1.0), g.scalar("NearStart", -2.0))
+        ndiv = g.node(unreal.MaterialExpressionDivide); g.link(g.subn(dist, g.scalar("NearStart", -2.0)), ndiv, "A"); g.link(nspan, ndiv, "B")
+        low = g.one(unreal.MaterialExpressionOneMinus, g.sat(ndiv))
+        mx = g.node(unreal.MaterialExpressionMax); g.link(gone, mx, "A"); g.link(low, mx, "B")
+        gone = mx
     keep = g.one(unreal.MaterialExpressionOneMinus, gone)
     up = g.subn(g.mask(wp, False, False, True), g.mask(obj, False, False, True))
     down = g.muln(g.c3((0.0, 0.0, -1.0)), g.muln(up, gone))
@@ -454,7 +473,7 @@ def build_grass():
     cut.set_editor_property("const_mip_value", -2)
     # the blades' tint: greener and bluer than the old (0.63, 0.44, 0.16), which read lime and yellow in full sun and hay-yellow
     # at the low sun; measured against Breath of the Wild's meadow (ref_13: green 1.5x red, blue 0.44x green)
-    col = g.muln(g.mask(ts, True, True, True), g.c3((0.52, 0.46, 0.33)))
+    col = g.muln(g.mask(ts, True, True, True), palette.colour(mat, "GrassBlade"))   # (Palette.ini; 0.52, 0.46, 0.33 when it moved there)
     rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
     col = g.muln(col, g.lerpc(0.95, 1.05, rnd))                                  # each tuft a shade lighter or darker, gently
     col = g.muln(col, g.lerp(g.c3((1.01, 1.0, 0.97)), g.c3((1.05, 0.98, 0.88)), g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 7.31))))
@@ -480,9 +499,10 @@ def build_grass():
     # (Dusk is set each frame by Meadow.cpp's material instance from ADayNight::Dusk, 0 at noon, 1 at the lowest sun)
     col = g.lerp(col, g.muln(col, g.c3((0.80, 1.04, 1.30))), g.mul(g.scalar("Dusk", 0.0), 0.85))
 
-    keep, down = grass_sink(g, 2600.0, 4900.0)
+    keep, down = grass_sink(g, 2600.0, 4900.0, near=True)
     # and as they sink, the blades' contrast eases toward the painted ground beyond (a little greyer, no lime edge at the hand-over)
     col = g.lerp(col, g.muln(g.lum(col), g.c3((1.0, 1.0, 1.0))), g.mul(g.one(unreal.MaterialExpressionOneMinus, keep), 0.3))
+    col = palette.grade_plant(mat, col)   # the palette's knobs (identity at the defaults)
     shade = add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
     lit = g.muln(col, shade)                                                         # blades catch more light where a gust passes
     g.out(lit, unreal.MaterialProperty.MP_BASE_COLOR)
@@ -490,7 +510,9 @@ def build_grass():
     g.out(g.mul(col, 0.10), unreal.MaterialProperty.MP_EMISSIVE_COLOR)              # a green floor in deep shade (2026-11-14)
     g.out(g.c(1.0), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.0), unreal.MaterialProperty.MP_SPECULAR)
-    soft_edges(mat, cut)
+    # nothing at the card's very top: the picture used to repeat, so the top edge picked up the solid blade bases of its bottom row as
+    # a thin dark line along every card (owner 2026-11-15: "black lines from the grass"; T_GrassTuft is clamped vertically too)
+    soft_edges(mat, g.muln(cut, g.sat(g.mul(v, 30.0)), out_a="A"), pin="")
     fluffy_normal(mat, 0.93)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/M_Grass")
@@ -508,7 +530,8 @@ def build_grass_flower():
     cd = [g.node(unreal.MaterialExpressionPerInstanceCustomData, data_index=i) for i in range(3)]
     head = g.append(g.append(cd[0], cd[1]), cd[2])
     vc = g.mask(g.node(unreal.MaterialExpressionVertexColor), True, False)
-    col = g.lerp(g.c3((0.075, 0.085, 0.022)), head, vc)
+    stem = palette.grade_plant_extra(mat, palette.colour(mat, "GrassStem"))   # (the stem is a plant: the season moves it; the petals not)
+    col = palette.grade_world(mat, g.lerp(stem, head, vc))
     keep, down = grass_sink(g, 1500.0, 2600.0)
     add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
@@ -570,6 +593,7 @@ def build_bark(furrow, furrow_n, plate, plate_n):
     col2 = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 0)
     lib.connect_material_expressions(calm, "", col2, "A")
     col2.set_editor_property("const_b", 2.0)
+    col2 = palette.grade_world(bark, col2)   # the palette's knobs: bark is not a plant's leaf, the season leaves it
     lib.connect_material_property(col2, "", unreal.MaterialProperty.MP_BASE_COLOR)
     glow = lib.create_material_expression(bark, unreal.MaterialExpressionMultiply, -250, 100)   # trunks in deep shade stay a readable brown
     lib.connect_material_expressions(col2, "", glow, "A")
@@ -981,6 +1005,9 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
+_tuft = unreal.EditorAssetLibrary.load_asset("/Game/T_GrassTuft")   # (clamped top to bottom: see build_grass)
+_tuft.set_editor_property("address_y", unreal.TextureAddress.TA_CLAMP)
+unreal.EditorAssetLibrary.save_asset("/Game/T_GrassTuft")
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_TreeLeaves.png"), "T_TreeLeaves")   # painted by BuildMaterials.ps1
 
 #              name          texture          tint                     gust lean cm  tips only  lift
@@ -993,11 +1020,11 @@ build_grass_flower()   # the meadow flowers (Meadow.cpp)
 # against the painting's 53-62), then 0.62, 0.52, 0.27, then 0.64, 0.52, 0.25, then 0.60, 0.47, 0.21 (a little yellower and 8% darker in the sun), now 0.63, 0.44, 0.16 (third review: still a touch lime in the brightest sunlit blades; measured lit hue 70 against the painting's 53, and the lit blades a little too bright) with more grey (warmer, toward olive in sun and shade), glow 0.10,
 # all of its colour shining through. The glow is what lit the shade up at the low sun, when the exposure rises; the ground under
 # the grass follows in world_material.py, GRASS_TO_MEADOW.)
-build_foliage("M_Bush",     "T_BushLeaves",  (0.66, 0.66, 0.38, 0.0), 4.0,          True,      0.0)   # (was 0.70, 0.78, 0.52 until 2026-11-14: the shrubs along the walls read lime beside the olive grass)
+build_foliage("M_Bush",     "T_BushLeaves",  (0.66, 0.66, 0.38, 0.0), 4.0,          True,      0.0, tint_key="Bush")   # (was 0.70, 0.78, 0.52 until 2026-11-14: the shrubs along the walls read lime beside the olive grass)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True, tree_fade=True)
 # pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_PineNeedles.png"), "T_PineNeedles")   # painted by BuildMaterials.ps1
-build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,          False,     0.2, param=True, gain=0.9, crown_shade=True, tree_fade=True)
+build_foliage("M_PineNeedle", "T_PineNeedles", (1.0, 1.0, 1.0, 0.0),  6.0,          False,     0.2, param=True, gain=0.9, crown_shade=True, tree_fade=True, evergreen=True)
 # one loose leaf (flying, falling, lying on the ground and in piles): same painted style and tints as the tree leaves, no wind sway
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafLitter.png"), "T_LeafLitter")   # painted by BuildMaterials.ps1
 build_foliage("M_LeafLitter", "T_LeafLitter", (1.0, 1.0, 1.0, 0.0),   0.0,          False,     0.0, param=True, gain=1.0, wind=False, glow_amt=0.14)   # fallen leaves: a scatter of small leaves per card

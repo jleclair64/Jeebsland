@@ -1,4 +1,5 @@
 #include "DayNight.h"
+#include "Palette.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/DirectionalLight.h"
@@ -46,9 +47,9 @@ namespace JeebLook
 	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
-	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 1.f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
-	static TAutoConsoleVariable<float> CloudShadowSamples(TEXT("jeeb.Cloud.ShadowSamples"), 1.f, TEXT("Samples toward the sun inside the clouds (ShadowViewSampleCountScale, engine default 1)"));
-	static TAutoConsoleVariable<float> CloudTrace(TEXT("jeeb.Cloud.Trace"), 60.f, TEXT("How far the clouds are traced, km (was 60)"));
+	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
+	static TAutoConsoleVariable<float> CloudShadowSamples(TEXT("jeeb.Cloud.ShadowSamples"), 0.5f, TEXT("Samples toward the sun inside the clouds (ShadowViewSampleCountScale, engine default 1)"));
+	static TAutoConsoleVariable<float> CloudTrace(TEXT("jeeb.Cloud.Trace"), 40.f, TEXT("How far the clouds are traced, km (was 60; 2026-11-15 the owner approved the cheaper clouds: Samples 0.6, ShadowSamples 0.5, Trace 40, were 1, 1, 60)"));
 	static TAutoConsoleVariable<float> CloudBottom(TEXT("jeeb.Cloud.Bottom"), 1.6f, TEXT("The cloud layer's bottom, km"));
 	static TAutoConsoleVariable<float> CloudHeight(TEXT("jeeb.Cloud.Height"), 5.f, TEXT("The cloud layer's depth, km: deep layers tower up in heaps"));
 	static TAutoConsoleVariable<float> CloudUnder(TEXT("jeeb.Cloud.Under"), 0.2f, TEXT("How much sky light the undersides keep (SkyLightCloudBottomOcclusion, engine default 0.5; lower is darker, shapelier undersides)"));
@@ -259,7 +260,8 @@ void ADayNight::TickLook(float High)
 	if (FC)
 	{
 		// Noon: a light, only slightly cool grey leaning to the sky, so far hills fade toward the sky; the low sun: a warm peach-lilac that sits under the gold
-		const FLinearColor NewHaze = FMath::Lerp(FLinearColor(0.60f, 0.46f, 0.40f), FLinearColor(0.54f, 0.58f, 0.66f), High);
+		static const FName HazeLowKey(TEXT("HazeLow")), HazeNoonKey(TEXT("HazeNoon"));
+		const FLinearColor NewHaze = FMath::Lerp(JeebPalette::Graded(HazeLowKey), JeebPalette::Graded(HazeNoonKey), High);   // (the world palette's, Palette.ini: 0.60, 0.46, 0.40 and 0.54, 0.58, 0.66)
 		FC->SetFogInscatteringColor(FMath::Lerp(OldHaze, NewHaze, FMath::Clamp(HazeBlue.GetValueOnGameThread(), 0.f, 1.f)));
 		FC->SetStartDistance(HazeStart.GetValueOnGameThread());
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)

@@ -13,9 +13,14 @@
 GRASS_DESATURATION = 0.30   # how far the grass and the ground under it are pulled toward grey (0.45 for the blades and the world
                             # until 2026-11-14's overhaul; the lawn's 0.30 now everywhere)
 
-HOLLOW = (0.72, 0.95, 0.80)      # the 45 m patches: deeper green hollows ...
-SUNNY = (1.17, 1.09, 0.74)       # ... to sunny yellow-green swathes
-DRY = (1.45, 1.05, 0.55)         # sporadic warm dry patches, about 30 m across (Breath of the Wild's golden meadow patches)
+import os as _os
+import sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import palette   # noqa: E402  (2026-11-15: the colours live in Content/Data/Palette.ini; the materials read them from MPC_JeebPalette)
+
+HOLLOW = palette.rgb("FieldHollow")   # the 45 m patches: deeper green hollows ...
+SUNNY = palette.rgb("FieldSunny")     # ... to sunny yellow-green swathes
+DRY = palette.rgb("FieldDry")         # sporadic warm dry patches, about 30 m across (Breath of the Wild's golden meadow patches)
 DRY_SHARE = 0.45                 # how far a dry patch goes toward DRY at its heart
 LIFT = (1.12, 1.12, 1.08)        # flat ground only, never the blades: the blades are lit through and catch more light than flat
                                  # ground, so the ground is this much brighter to meet them where they stop (the lawn's Tint)
@@ -38,11 +43,11 @@ def noises(g, xy, patches):
 def before_grey(g, col, n):
     """lightness patches, the hollows and sunny swathes, a gentle hue wander and the dry patches; before the pull toward grey"""
     col = g.muln(col, g.lerpc(0.90, 1.08, n["medm"]))
-    col = g.muln(col, g.lerp(g.c3(HOLLOW), g.c3(SUNNY), n["patchy"]))
+    col = g.muln(col, g.lerp(palette.colour(g.mat, "FieldHollow"), palette.colour(g.mat, "FieldSunny"), n["patchy"]))
     col = g.muln(col, g.lerpc(0.84, 1.10, n["big"]))
     col = g.muln(col, g.lerp(g.c3((0.97, 1.0, 1.02)), g.c3((1.02, 1.0, 0.95)), n["med2"]))
     dry = g.mul(g.ramp(g.addn(n["dry"], g.mul(g.add(n["rag"], -0.5), 0.25)), 0.66, 0.82), DRY_SHARE)
-    return g.lerp(col, g.muln(col, g.c3(DRY)), dry)
+    return g.lerp(col, g.muln(col, palette.colour(g.mat, "FieldDry")), dry)
 
 
 def grey(g, col):

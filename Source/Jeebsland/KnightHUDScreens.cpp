@@ -51,9 +51,15 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	const bool bClicked = bUIClick;
 
 	// Tabs
+#if !UE_BUILD_SHIPPING
+	const int32 NumTabs = 6;   // (the LOOK tab, for tuning the picture, is not in the game players get)
+	const float TabW = 140.f, TabH = 32.f, TabY = PY + 10.f;
+#else
+	const int32 NumTabs = 5;
 	const float TabW = 170.f, TabH = 32.f, TabY = PY + 10.f;
-	const TCHAR* TabNames[5] = { TEXT("MAP"), TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE") };
-	for (int32 t = 0; t < 5; ++t)
+#endif
+	const TCHAR* TabNames[6] = { TEXT("MAP"), TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE"), TEXT("LOOK") };
+	for (int32 t = 0; t < NumTabs; ++t)
 	{
 		const float TX = PX + 20.f + t * (TabW + 8.f);
 		if (Btn(TX, TabY, TabW, TabH, TabNames[t], true, SettingsTab == t, 1.2f))
@@ -203,6 +209,12 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		}
 		HDText(TEXT("Press Esc to close."), FLinearColor(0.8f, 0.8f, 0.8f), PX + 30.f, PY + PH - 40.f, Font, 1.0f);
 	}
+#if !UE_BUILD_SHIPPING
+	else if (SettingsTab == 5)
+	{
+		DrawLookTab(PX, PY, PW, PH);
+	}
+#endif
 	else if (SettingsTab == 3)
 	{
 		DrawDictionary(PX, PY, PW, PH);
