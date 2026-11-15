@@ -70,8 +70,9 @@ void AKnightHUD::DrawHUD()
 	if (!Pawn) { DrawNoKnight(); return; }
 	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
 	if (bLevelTyping && !(Knight && Knight->IsPanelCursor() && !Knight->IsUIOpen())) bLevelTyping = false;   // (the test kit's level box: only while the Tab windows are up)
-	if (!bChatOpen && !bLevelTyping) HideTyping();
-	else if (bLevelTyping && !bChatOpen) EnsureTyping();   // (while typing a level, the keys go to the box, not to the knight)
+	if (bLookTyping && !(Knight && Knight->IsSettingsOpen() && SettingsTab == 5)) bLookTyping = false;   // (the look tab's preset name box)
+	if (!bChatOpen && !bLevelTyping && !bLookTyping) HideTyping();
+	else if ((bLevelTyping || bLookTyping) && !bChatOpen) EnsureTyping();   // (while typing a level, the keys go to the box, not to the knight)
 	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
 	if (!Skills || !Knight) return;
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;

@@ -799,6 +799,19 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
 			}
+#if !UE_BUILD_SHIPPING
+		{   // (-ShotLookPanel: opens the Escape screen on the LOOK tab at 6.5 s; the tab then moves a slider and saves and loads a preset itself, log JEEBLOOK)
+			static const bool bShotLookPanel = FParse::Param(FCommandLine::Get(), TEXT("ShotLookPanel"));
+			static bool bLookOpened = false;
+			if (bShotLookPanel && !bLookOpened && ShotClock > 6.5f)
+				if (AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr))
+				{
+					bLookOpened = true;
+					K->ToggleSettings();
+					if (AKnightHUD* H = Cast<AKnightHUD>(PC->GetHUD())) H->ShotOpenLook();
+				}
+		}
+#endif
 		if (bShotDressed && ShotClock > 8.f && ShotClock < 8.1f)
 			if (ACharacter* C = Cast<ACharacter>(PC ? PC->GetPawn() : nullptr))
 				UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT MaxWalkSpeed=%.1f"), C->GetCharacterMovement()->MaxWalkSpeed);

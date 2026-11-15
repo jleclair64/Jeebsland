@@ -28,6 +28,7 @@ public:
 	bool ChatKey(const FKey& Key);
 	void ChatChar(TCHAR C);
 	bool IsChatOpen() const { return bChatOpen; }
+	void ShotOpenLook() { SettingsTab = 5; bSettingsWasOpen = true; }   // (test pictures: -ShotLookPanel)
 
 	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
 	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
@@ -174,7 +175,14 @@ private:
 	float ShopMsgUntil = 0.f;
 
 	// Settings screen
-	int32 SettingsTab = 0;       // 0 = map, 1 = settings, 2 = controls, 3 = dictionary, 4 = lore
+	int32 SettingsTab = 0;       // 0 = map, 1 = settings, 2 = controls, 3 = dictionary, 4 = lore, 5 = look (not in Shipping)
+	// The LOOK tab (KnightHUDLook.cpp)
+	void DrawLookTab(float PX, float PY, float PW, float PH);
+	void LookTypeChar(TCHAR C);
+	void LookTypeKey(const FKey& Key);
+	int32 LookGroup = 0;
+	bool bLookTyping = false;
+	FString LookName;
 	bool bSettingsWasOpen = false;
 	float SavedNoteUntil = 0.f;  // "Saved" shows on the button for a moment
 	// The world map (KnightHUDMap.cpp): painted once into a texture; north (+X) is up
