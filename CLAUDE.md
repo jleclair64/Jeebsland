@@ -399,9 +399,18 @@ How agents shared Unreal in one folder (owner, 2026-11-13: "find a smarter/optim
 - A build failing in another agent's file: release and tell the coordinator at once with the error lines.
 - Size the batch: at most about four agents that need Unreal at once; Blender, data, research and Meshy/Mixamo work can run beside them freely.
 
+## How much checking a change gets (owner, 2026-11-15: "make sure we're not doing an unnecessary amount of checks"; overrides "every change" below)
+
+- **Small** (numbers, colours the owner named, removals, one-file tweaks): no pictures, no reviewers. Build, and the owner looks in the editor.
+- **Medium** (tuning a look, moving or resizing things): build, one quick look of my own (a few pictures or log lines), then the owner judges it live. A reviewer only where something could clip, break, cost frame time or go wrong online.
+- **Large** (new systems, combat, online, new models or materials in the world, anything the owner can't easily judge by eye): the full reviewer rounds below.
+- **Taste first, polish after:** for looks, show the owner a rough version quickly (live console variables `jeeb.*` whenever possible, so they can try values in Play themselves). Only polish and review what they said they like.
+- **At most two review rounds.** After two FAILs, stop and bring the owner the pictures and the problem; change the approach, not just the values.
+- **Timing only when frame time can change,** batched into one solo window. Pictures and other work run in the free slots meanwhile; nothing sits idle waiting for solo.
+
 ## Reviews before the owner sees a change (owner, 2026-11-01)
 
-Every change is checked by the matching reviewer agents in `.claude/agents/` (Sonnet) BEFORE it is reported to the owner as done. Fix whatever they FAIL and review again. Only results that pass reach the owner. Say which reviewers ran in the report. Routing:
+Large changes (see above) are checked by the matching reviewer agents in `.claude/agents/` (Sonnet) BEFORE they are reported to the owner as done. Fix whatever they FAIL and review again. Only results that pass reach the owner. Say which reviewers ran in the report. Routing:
 - Cosmetic (poses, held items, gear, models, trails, HUD looks): `visual-reviewer`, with pictures from `Tools/ShotViews.ps1` from every side that matters (B, R, F, L).
 - Moves, animation, walking or running, any movement feel: `motion-reviewer` (frame sheets, `-Frames`), plus `visual-reviewer` if the look changed.
 - Lights, shadows, meshes, materials, world building, heavy Tick code: `performance-reviewer` (baseline 140 fps HIGH / 175 LOW packaged).
