@@ -35,6 +35,10 @@ GLOW_SRGB = (0.90, 0.46, 0.14)    # the pane's glow (sRGB): the old glow picture
 R_SPREAD = 24              # texels each window's random number is carried out past its pane (see below)
 WIN_CELLS = 100           # a window's glass parts closer than the model's size / this (about 20 cm on a house, a transom's width) are one window
 BOX_PAD = 0.04            # (m) round a window's box, for the unmarked lit paint below
+PLANE_TOL = 0.15          # (m) texels this close to a window's glass plane belong to it: the glass and its muntins (they stand a few cm proud of it)
+STONE_R = 20              # (texels, the old church) how far round a pane red tracery paint is made stone
+STONE_TRACERY = {"OakHillChurch_300k", "TL_Church"}   # (the churches: stone tracery round stained glass)
+OUTLINE_BIN = 0.08        # (m) rows and columns of a window's outline (a texel is about 10 cm on the town hall)
 ENCLOSE = 14               # texels: dark inside a window mark with lit pane this close on all four sides is a blotch (made pane)
 CRACK = 2                  # texels: a gap this narrow (or less) with pane on both sides is a crack through the pane, filled
 CRACK_GLOW = 0.08          # (and only where the glow picture had some light: the bars Meshy painted are dark there)
@@ -206,7 +210,7 @@ for n in names:
     # and on the model itself: the low model's UVs cut many windows into two or more islands (smart_project), whose parts lie apart on
     # the picture, so the step above could not join them and one half lit while the other stayed dark (2026-11-15). Pane texels whose
     # spots on the model lie within a cell of each other are one window and take one number.
-    margin = np.zeros_like(pane); onface = np.ones_like(pane)
+    margin = np.zeros_like(pane); onface = np.ones_like(pane); force_bar = np.zeros_like(pane); glow_only = np.zeros_like(pane)
     fbx = os.path.join(folder, "%s.fbx" % n)
     if not old and os.path.exists(fbx):
         pos = surface(fbx, S); onface = ~np.isnan(pos[..., 0])
@@ -229,6 +233,59 @@ for n in names:
                     pane[cy[inb], cx[inb]] = True; r[cy[inb], cx[inb]] = votes[gi].argmax() / 31.0; added += int(inb.sum())
             log(n, "unmarked lit paint or dark marked glass in a window made pane: %d texels" % added)
             log(n, "windows on the model: %d (cell %.3f)" % (len(np.unique(g)), cell))
+            # Each window filled whole in its own plane (2026-11-15, the town hall's cuts: one-texel strips of frame paint across the glass
+            # read as thick black slashes when lit, since a texel here is about 10 cm): inside the glass's outline, every texel within
+            # PLANE_TOL of the glass's plane is pane, its muntins too: a lit window is one flat orange (the reviewer, 2026-11-15: bars at
+            # this texel size came out torn and chipped against the glow), and by day the muntins are painted one wood over dark glass.
+            for pass_ in range(2):   # (twice: a window whose panes were two groups apart is one group once its bars are filled)
+                if pass_:
+                    sel = pane & onface; pts = pos[sel]; g = groups3d(pts, cell)
+                    q = np.round(np.clip(r[sel], 0, 1) * 31.0).astype(np.int64)
+                    votes = np.zeros((g.max() + 1, 32), np.int64); np.add.at(votes, (g, q), 1); r[sel] = votes.argmax(1)[g] / 31.0
+                    gu = np.unique(g); lo3 = np.full((g.max() + 1, 3), np.inf, np.float32); hi3 = np.full((g.max() + 1, 3), -np.inf, np.float32)
+                    np.minimum.at(lo3, g, pts); np.maximum.at(hi3, g, pts)
+                sy, sx = np.nonzero(sel)
+                oy, ox = np.nonzero(onface & ~fire); op = pos[oy, ox]
+                nfix = nbar = 0 if not pass_ else nfix
+                for gi in gu:
+                    gp = pts[g == gi]
+                    if len(gp) < 40: continue
+                    c0 = gp.mean(0); ev, evec = np.linalg.eigh(np.cov((gp - c0).T))
+                    nrm = evec[:, 0]; uax = np.cross([0.0, 0.0, 1.0], nrm)
+                    if np.linalg.norm(uax) < 0.3: continue   # (a skylight: left as it is)
+                    uax /= np.linalg.norm(uax); vax = np.cross(nrm, uax)
+                    inb = np.all((op >= lo3[gi] - BOX_PAD) & (op <= hi3[gi] + BOX_PAD), 1) & (np.abs((op - c0) @ nrm) < PLANE_TOL)
+                    if inb.sum() < 40: continue
+                    ty, tx = oy[inb], ox[inb]; PP = op[inb] - c0
+                    u = PP @ uax; v = PP @ vax
+                    gu_ = (gp - c0) @ uax; gv_ = (gp - c0) @ vax
+                    bu = np.floor(u / OUTLINE_BIN).astype(int); bv = np.floor(v / OUTLINE_BIN).astype(int)
+                    gbu = np.floor(gu_ / OUTLINE_BIN).astype(int); gbv = np.floor(gv_ / OUTLINE_BIN).astype(int)
+                    ou, ov = bu.min(), bv.min(); bu -= ou; bv -= ov; gbu = np.clip(gbu - ou, 0, bu.max()); gbv = np.clip(gbv - ov, 0, bv.max())
+                    NU, NV = bu.max() + 1, bv.max() + 1
+                    # the glass's outline: per row its span along u, per column its span along v (arched tops kept)
+                    rlo = np.full(NV, 10**9); rhi = np.full(NV, -1); np.minimum.at(rlo, gbv, gbu); np.maximum.at(rhi, gbv, gbu)
+                    clo = np.full(NU, 10**9); chi = np.full(NU, -1); np.minimum.at(clo, gbu, gbv); np.maximum.at(chi, gbu, gbv)
+                    # (a row or column that is all bar, a muntin, has no glass: it takes the span of the glass rows either side of it)
+                    def bridge(lo_, hi_):
+                        has = hi_ >= 0; idx = np.nonzero(has)[0]
+                        if len(idx) < 2: return lo_, hi_
+                        for i in range(idx[0], idx[-1] + 1):
+                            if not has[i]:
+                                a_ = idx[idx < i][-1]; b_ = idx[idx > i][0]
+                                lo_[i] = min(lo_[a_], lo_[b_]); hi_[i] = max(hi_[a_], hi_[b_])
+                        return lo_, hi_
+                    rlo, rhi = bridge(rlo, rhi); clo, chi = bridge(clo, chi)
+                    ins = (bu >= rlo[bv]) & (bu <= rhi[bv]) & (bv >= clo[bu]) & (bv <= chi[bu])
+                    if ins.sum() < 40: continue
+                    isbar = ~pane[ty, tx]
+                    lines = np.zeros(len(u), bool)   # (in the glass's own plane there are no real bars at this picture's size: about 10 cm a texel on the town hall; the muntins stand in front of it and are not touched)
+                    newbar = ins & lines; newpane = ins & ~lines
+                    nfix += int((newpane & isbar).sum()); nbar += int(newbar.sum())
+                    was = pane[ty, tx] | win[ty, tx]
+                    pane[ty[newpane], tx[newpane]] = True; r[ty[newpane], tx[newpane]] = votes[gi].argmax() / 31.0
+                    glow_only[ty[newpane & ~was], tx[newpane & ~was]] = True   # (a muntin: lit with the pane, painted wood by day)
+            log(n, "windows filled in their own plane: %d texels of cut or blotch made pane" % nfix)
         # Off the model's faces round a pane (the island's edge): pane too. A texel there is never shown itself, but filtering and mips
         # mix it into the pane's edge texels, and as frame it drew dark cracks along every UV seam through a lit window (2026-11-15).
         margin = dilate(pane, 3) & ~onface & ~fire & ~dilate(onface & ~pane, 1)
@@ -261,8 +318,9 @@ for n in names:
     # a lit window by day; the rest of the window's rim keeps its paint (the frame)
     bw = BAR_W * (2 if old else 1)
     bar = ~pane & ~fire & (b2.max(-1) > 0.02) & ((within(pane, 0, 1, bw) & within(pane, 0, -1, bw)) | (within(pane, 1, 1, bw) & within(pane, 1, -1, bw)))
+    bar |= force_bar & ~pane
     up = lambda m: np.repeat(np.repeat(m, k, 0), k, 1)
-    pane_b = up(pane); bar_b = up(bar)
+    pane_b = up(pane & ~glow_only); bar_b = up(bar | glow_only)
     pane_b |= dilate(pane_b, 1) & up(dilate(pane, 1) & win) & ~bar_b
     new_base = base.copy(); new_base[pane_b] = GLASS_SRGB; new_base[bar_b] = BAR_SRGB
     # and the rest of the rim, where Meshy's lit-pane paint (warm, bright) spilled onto the frame, is that wood too: no orange left by day
@@ -272,6 +330,18 @@ for n in names:
         warm = (Lr > 45) & (Cr > 25) & (Hr > 45) & (Hr < 95)
         idx = np.nonzero(rim_b); new_base[idx[0][warm], idx[1][warm]] = BAR_SRGB
         log(n, "warm paint on the rim made wood: %d texels" % int(warm.sum()))
+    # The old church's tracery (the stone round its rose and lancets) was painted red and orange like stained glass: by day the window
+    # read red round dark glass (2026-11-15). Saturated warm paint round its panes becomes the stone the tracery is cut from (the median
+    # of the unsaturated paint there).
+    if n in STONE_TRACERY:
+        ring = up(dilate(pane, STONE_R) & ~pane & ~fire) & ~pane_b
+        if ring.any():
+            Ls, Cs, Hs = lch(base[ring])
+            red = ((Cs > 40) & ((Hs < 55) | (Hs > 330))) | ((Ls > 55) & (Cs > 40) & (Hs < 95)) | bar_b[ring] | np.all(new_base[ring] == np.array(BAR_SRGB, np.float32), -1)   # (and the bars: stone here, not wood)
+            grey = (Cs < 12) & (Ls > 25)   # (unsaturated, and not the black fill between islands)
+            stone = np.median(base[ring][grey], 0) if grey.sum() > 50 else np.array([0.45, 0.44, 0.42])
+            idx = np.nonzero(ring); new_base[idx[0][red], idx[1][red]] = stone
+            log(n, "red tracery paint made stone %s: %d texels" % (np.round(stone, 2), int(red.sum())))
     dropped = win & ~pane
     log(n, "window texels %d, pane %d, bars %d, forge %d, holes filled %d, seam margin %d, frame left unlit %d"
         % (int(win.sum()), int(pane.sum()), int(bar.sum()), int(fire.sum()), int(hole.sum()), int(margin.sum()), int(dropped.sum())))
