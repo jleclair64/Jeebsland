@@ -184,3 +184,13 @@ Realistic (the owner's pick of direction):
 Stylized (if the owner returns to a painted look): StyleHex Studio's FREE Stylized Foliage (https://www.fab.com/listings/b494d1c5-8d02-48c4-9038-54bb8970a26f) and FREE Stylized Forest Sample (https://www.fab.com/listings/3c1a31b6-e523-4a0f-97d0-26b0db69b6bc), anime / BotW-like. Cozy Nature (owned) reads flat lime.
 
 Plan once claimed: keep AMeadow (where grass grows, density, distance sink, the field colour, wind cut-off) and swap in the pack's clusters and material; compare in the river meadow at ankle and standing height, noon and low sun, and measure frame time (performance-reviewer) before it replaces ours.
+
+## Tree packs (2026-11-15; owner: "Can we do something similar with trees")
+
+All free on Fab with the Professional licence at $0 (checked on each listing's licence tiers). Nothing claimed.
+- **temperate Vegetation: Spruce Forest** (Project Nature, 4.7 from 119): https://www.fab.com/listings/f8044501-17a2-498f-b198-5f1bc71ee87a . 15 photo-scanned spruces in growth stages, high and low vertex versions of the big ones, impostors for distance, shader wind and replicated interaction. Game-ready; same family as the grass. First choice for conifers.
+- **Megaplants: English Oak** (https://www.fab.com/listings/83642c38-7661-4df1-8629-0422e1898d26) and **European Hornbeam** (https://www.fab.com/listings/43679e75-6ed0-4b03-9288-9e2bc49376d2) (Quixel; also Silver Birch, Norway Spruce, Black Alder, Baltic Pine, Black Poplar). The best-looking broadleaf trees, procedural (Procedural Vegetation Editor), Nanite foliage, Dynamic Wind. BUT both the PVE plugin and Nanite Foliage are Experimental and Epic advises not shipping with them: test first, bake to plain meshes if it works.
+- **DZ Sample Trees** (DropZone, 4.8 from 22, UE 5.1-5.8, Nanite): https://www.fab.com/listings/7c95ac5f-246e-42fb-9d2a-4807db87f69d . Realistic pine (plus a palm); the safe non-experimental fallback.
+- KV Beech Tree 01 (https://www.fab.com/listings/fb155516-1b56-47b9-82ae-bba8343fad9b): one cinematic beech with seasonal colours incl. autumn, 206k tris in its low version: too heavy for a forest, a showpiece at most.
+- Not trees, but goes with the grass: temperate Vegetation: Foliage Collection (https://www.fab.com/listings/6a5ae8db-d80f-4b23-b276-87da390cfe56): the grass library, ground plants and flowers (277 clusters).
+Our forest is autumn: any pack's leaves need our autumn tints. Trees cost 1.5-1.9 ms at the woods' edge today; measure before switching, as with the grass.
