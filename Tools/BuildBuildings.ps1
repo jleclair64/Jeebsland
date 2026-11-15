@@ -12,6 +12,9 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 if (-not $ImportOnly) {
 & $blender -b -P (Join-Path $PSScriptRoot 'building_clean.py') -- (Join-Path $proj 'Art\Buildings') $work @Names | Select-String -Pattern 'BUILD |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 if (-not $NoFlatten) { & $blender -b -P (Join-Path $PSScriptRoot 'building_flatten.py') -- $work @Names | Select-String -Pattern 'FLAT |Traceback|Error' | ForEach-Object { Write-Host $_.Line } }
+# even window panes (townlab_panes.py, owner 2026-11-15): every model with lit windows, after the flatten (which repaints the colour)
+$paneNames = if ($Names) { $Names } else { Get-ChildItem $work -Filter '*.fbx' | Where-Object { $_.Name -notlike '*_Col.fbx' } | ForEach-Object { $_.BaseName } }
+& $blender -b -P (Join-Path $PSScriptRoot 'townlab_panes.py') -- $work @paneNames | Select-String -Pattern 'TLPANES|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 }
 if ($CleanOnly) { exit 0 }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'

@@ -26,6 +26,8 @@ if (-not $ImportOnly) {
     foreach ($d in $designs) {
         & $blender -b -P (Join-Path $PSScriptRoot 'townlab_bake.py') -- $work $out $d[0] $d[1] $d[2] --preview | Select-String -Pattern 'TLBAKE|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
     }
+    # even window panes: one dark glass by day, one amber when lit (townlab_panes.py, owner 2026-11-15)
+    & $blender -b -P (Join-Path $PSScriptRoot 'townlab_panes.py') -- $out @($designs | ForEach-Object { $_[1] }) | Select-String -Pattern 'TLPANES|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 }
 if ($BakeOnly) { exit 0 }
 $open = Get-CimInstance Win32_Process -Filter "Name like 'UnrealEditor%'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains((Join-Path $proj 'Jeebsland.uproject')) }
