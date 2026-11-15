@@ -444,6 +444,7 @@ def build_grass():
     mat.set_editor_property("two_sided", True)
     mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_TWO_SIDED_FOLIAGE)
     set_flags(mat, ("used_with_instanced_static_meshes", "used_with_static_lighting"))
+    mat.set_editor_property("opacity_mask_clip_value", 0.4)   # (as before: lower, the cards' faint background shows as squares from above)
     g = grass_field.FieldGraph(mat)
     ts = g.node(unreal.MaterialExpressionTextureSample, texture=tex)
     col = g.muln(g.mask(ts, True, True, True), g.c3((0.63, 0.44, 0.16)))   # (the blades' tint since 2026-11-14's third review)
@@ -485,8 +486,8 @@ def build_grass():
 
 def build_grass_flower():
     """M_GrassFlower: the small meadow flowers among the tufts (Meadow.cpp, MakeFlowerMesh): the stem the grass's green (vertex
-    red 0), the head its own colour from per-instance data 0-2 (vertex red 1); swaying exactly as a blade at the same height
-    (the mesh's V runs as a 48 cm tuft's) and sinking far off as the grass does."""
+    red 0), the head its own colour from per-instance data 0-2 (vertex red 1); swaying as the blade tips round it
+    (the mesh's V runs from 1 at the ground to 0 at the head, as a card's) and sinking far off as the grass does."""
     mat = fresh_material("M_GrassFlower")
     mat.set_editor_property("two_sided", True)
     set_flags(mat, ("used_with_instanced_static_meshes",))
@@ -498,7 +499,7 @@ def build_grass_flower():
     keep, down = grass_sink(g, 1500.0, 2600.0)
     add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
-    g.out(g.mul(col, 0.08), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    g.out(g.mul(col, 0.15), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # (a little of their own light: small bright dots, as the references' flowers)
     g.out(g.c(0.75), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.2), unreal.MaterialProperty.MP_SPECULAR)
     lib.recompile_material(mat)

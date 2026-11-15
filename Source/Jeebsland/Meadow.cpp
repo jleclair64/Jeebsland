@@ -78,8 +78,8 @@ static float LongGrassRoom(float X, float Y, float Pc, float Near, float Cov, fl
 // The meadow's flowers (2026-11-14, "a few flowers"): small heads on thin stems among the tufts, in clumps of one colour, as the
 // references' meadows have them. Colours (linear): cream white, butter yellow, lilac, soft blue, rose.
 static const FLinearColor FlowerColours[5] = {
-	FLinearColor(0.78f, 0.76f, 0.64f), FLinearColor(0.82f, 0.58f, 0.08f), FLinearColor(0.40f, 0.24f, 0.60f),
-	FLinearColor(0.26f, 0.36f, 0.72f), FLinearColor(0.78f, 0.30f, 0.40f) };
+	FLinearColor(0.90f, 0.88f, 0.76f), FLinearColor(0.95f, 0.70f, 0.12f), FLinearColor(0.64f, 0.44f, 0.88f),
+	FLinearColor(0.44f, 0.58f, 0.96f), FLinearColor(0.94f, 0.44f, 0.56f) };
 static float FlowerChance(float X, float Y)
 {
 	const float N = FMath::PerlinNoise2D(FVector2D(X / 1100.f + 3.7f, Y / 1100.f + 11.9f));
@@ -91,8 +91,8 @@ static int32 FlowerKind(float X, float Y)
 	return FMath::Clamp(FMath::FloorToInt(N * 5.f), 0, 4);
 }
 
-// A flower: a thin crossed stem and a five-petal head 30 cm up (vertex red 0 stem, 1 head: M_GrassFlower). Its V runs as a 48 cm
-// grass tuft's (0 at 48 cm, 1 at the ground), so the wind sways it exactly as a blade at the same height.
+// A flower: a thin crossed stem and a five-petal head 30 cm up (vertex red 0 stem, 1 head: M_GrassFlower). Its V runs as a tuft's
+// card (0 at the head, 1 at the ground): placed with its head at the blades' tips, it sways as they do.
 static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
@@ -121,7 +121,7 @@ static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
 			Nrm[I] = FVector3f(N);
 			Tan[I] = FVector3f(1.f, 0.f, 0.f);
 			Sign[I] = 1.f;
-			UVs[I] = FVector2f(0.5f, 1.f - float(Pts[k].Z) / 48.f);
+			UVs[I] = FVector2f(0.5f, FMath::Max(0.f, 1.f - float(Pts[k].Z) / 30.f));
 			Cols[I] = FVector4f(Head, 0.f, 0.f, 1.f);
 			Inst.Add(I);
 		}
@@ -135,10 +135,10 @@ static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
 		Tri(-S, S, S + FVector(0, 0, H), N, 0.f);
 		Tri(-S, S + FVector(0, 0, H), -S + FVector(0, 0, H), N, 0.f);
 	}
-	const FVector Ctr(0.f, 0.f, H + 0.4f);   // the head: five rounded petals as a ten-point star, cupped a little
-	for (int32 k = 0; k < 10; ++k)
+	const FVector Ctr(0.f, 0.f, H + 0.4f);   // the head: five rounded petals (a 20-point outline with five soft lobes), cupped a little
+	for (int32 k = 0; k < 20; ++k)
 	{
-		auto P = [&](int32 i) { const float A = i * PI / 5.f; const float R = (i % 2 == 0) ? 5.0f : 2.0f; return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, H + ((i % 2 == 0) ? 1.0f : 0.3f)); };
+		auto P = [&](int32 i) { const float A = i * PI / 10.f; const float L = FMath::Abs(FMath::Cos(A * 2.5f)); const float R = 2.6f + 3.2f * L; return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, H + 0.9f * L); };
 		Tri(Ctr, P(k), P(k + 1), FVector(0.f, 0.f, 1.f), 1.f);
 	}
 	UStaticMesh::FBuildMeshDescriptionsParams Params;
@@ -466,7 +466,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 				if (FlowerMesh && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov))
 				{
 					const float Fx = X + JobRand.FRandRange(-20.f, 20.f), Fy = Y + JobRand.FRandRange(-20.f, 20.f);
-					const float Up = FMath::Clamp(Sz * Short * 1.45f * JobRand.FRandRange(0.85f, 1.15f), 0.6f, 2.0f);
+					const float Up = FMath::Clamp(Sz * Short * 1.75f * JobRand.FRandRange(0.9f, 1.1f), 0.7f, 2.4f);   // (the head at the blades' tips, 30 cm x Up against a 48 cm card)
 					const float S = JobRand.FRandRange(0.85f, 1.2f);
 					JobFlowerXf.Add(FTransform(FRotator(JobRand.FRandRange(-8.f, 8.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-8.f, 8.f)), FVector(Fx, Fy, JeebTerrain::HeightAt(Fx, Fy) + 1.f), FVector(S, S, Up)));
 					const int32 K = JobRand.FRand() < 0.85f ? FlowerKind(X, Y) : JobRand.RandRange(0, 4);
@@ -530,6 +530,8 @@ void AMeadow::FinishJob()
 		}
 		F->MarkRenderStateDirty();
 		Cell.Flowers = F;
+		static int32 Logged = 0;
+		if (Logged++ < 6) UE_LOG(LogTemp, Log, TEXT("JEEBGRASS square %d %d tier %d: %d tufts, %d flowers (first at %s, colour %s)"), JobId.X, JobId.Y, JobTier, JobXf.Num(), JobFlowerXf.Num(), *JobFlowerXf[0].GetLocation().ToString(), *JobFlowerCol[0].ToString());
 	}
 	Cells.Add(JobId, Cell);
 	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
