@@ -553,3 +553,7 @@ Mixamo has no official API, so there is no connector or key. Use Claude in Chrom
 ## Credit
 
 The first knight model and the current suit's pieces come from Meshy (free tier, Meshy 6 Lite, CC BY 4.0: credit Meshy in the game's credits). Animation clips come from Mixamo. The pickaxe, longbow, crossbow and potion were made on the paid plan (`Art/Props`): no credit needed. Shields, the cape and the other held weapons are built in code (`KnightDesign.h`, `WeaponDesign.h`); loot and item pictures still use the old code-built armour shapes from `KnightDesign.h`.
+
+## Look board (2026-11-15)
+
+`Tools/LookBoard.ps1` (see Docs/HowToTest.md): 12 fixed views at noon and the low sun from one `-ShotEyes` run, tiled 2 views a row with the owner's `Docs/TownLab/Refs` pictures under them (`Saved/LookBoard`); `-Compare` cuts the newest two boards back apart by their fixed layout. No C++ changes. A stale copy binary showed no eyes at all (the run took the single-still path): build the copy first. The field of view is one value per run (80).

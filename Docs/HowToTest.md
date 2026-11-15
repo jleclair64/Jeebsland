@@ -60,3 +60,11 @@ For working on attacks and movement: in the editor's Content Browser double-clic
 **Arrows where they land:** an arrow sticks wherever it lands for 2 minutes: in the ground, a tree trunk, a wall, a knight's armour, or the shield itself (it moves with the shield). One that only touches the blue range of a raised shield (not the shield) glances off to that side and drops into the grass. Arrows lying in the world can be picked up again with E ("Press E to pick up the arrow"); arrows that struck a knight's armour or shield (and ones that glanced off a shield) are spent: they are never offered, so nobody is asked mid-fight. A shield takes an arrow's damage out of its health, one for one, and the archer never bounces back. In MoveLab arrows hit other players too (PvP testing).
 
 **Hitstun:** a clean sword hit stops whatever the knight was doing; he can't move, swing, block, roll or jump for a moment (0.45 s after jab hit 1, so hit 2 always follows; 0.32 s after hit 2, which pushes him clear; 0.5 to 0.8 s after a smash). Your attack beats his if it lands first. The pen knight's cut stuns you for 0.35 s, and he now reaches 2 m (was 2.4 m, further than your sword).
+
+## Look board (2026-11-15)
+
+One command shows the whole look at a glance, always from the same 12 views (noon and low sun each) beside the reference pictures:
+
+    powershell -ExecutionPolicy Bypass -File Tools\LookBoard.ps1
+
+It takes a machine run slot, makes one off-screen Unreal run (about 2 minutes) and writes `Saved\LookBoard\<yyyy-MM-dd_HHmm>.jpg` (a contact sheet, about 0.7 MB; the last 10 are kept). After a change, run it again and then `... LookBoard.ps1 -Compare`: `<time>_compare.jpg` puts the newest two boards side by side, view by view (before | after). `-ProjectDir <folder>` runs it in another copy; `-KeepShots` keeps the raw stills. The views are the `$Views` list at the top of the script (name, X, Y, eye height, yaw, pitch, mask); edit a position there.
