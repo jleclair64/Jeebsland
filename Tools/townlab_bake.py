@@ -61,7 +61,13 @@ GRADE.update({
                                    stone=(2.0, 1.0, 5.0, 1.0), tile=(3.0, -1.0, 6.0, 0.95), tile_z=560.0),
     "OakHillChurch_300k":     dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=260.0, fire_as_window=True,
-                                   paint_out=[(-700.0, -150.0, -700.0, 300.0, 330.0, 800.0)]),
+                                   # the -X side wall's retouch (see "Retouch" further down): the two rows under the dormer, the big panel left of them
+                                   wall_fill=[(-330.0, -280.0, -352.0, 218.0, 545.0, 760.0, 0, 3.5),   # (depth_x here: cm proud of the wall)
+                                              (-400.0, -240.0, 250.0, 720.0, 380.0, 525.0, 3, -1e9)],
+                                   paint_fill=[(-400.0, -240.0, -230.0, -180.0, 653.0, 721.0), (-400.0, -240.0, -135.0, -82.0, 653.0, 721.0),
+                                               (-400.0, -240.0, -38.0, 5.0, 653.0, 721.0), (-400.0, -240.0, 58.0, 105.0, 653.0, 721.0)],   # the four stumps
+                                   flat_out=[(-380.0, -280.0, -350.0, 215.0, 657.0, 722.0, -301.0)],
+                                   paint_keep=[(-400.0, -240.0, -360.0, 225.0, 628.0, 652.0)]),
     "OakHillWell_150k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
                                    stone=(3.0, 1.0, 5.0, 1.0), tile=(4.0, -1.5, 7.0, 0.95), tile_z=170.0),
     "OakHillPotionShop_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-4.0, 0.0, 0.0, 0.95),
@@ -180,6 +186,19 @@ m = lo.modifiers.new("reduce", "DECIMATE"); m.decimate_type = "COLLAPSE"; m.rati
 if keep_n:
     m.vertex_group = "Keep"; m.invert_vertex_group = True; m.vertex_group_factor = 3.0   # (inverted: weight 1 = spared)
 bpy.ops.object.modifier_apply(modifier=m.name)
+# flat_out (build-b, 2026-11-14): boxes (model cm: x0, x1, y0, y1, z0, z1, plane) where the low model's relief standing out past a wall
+# plane at x = plane is pressed back onto it. The church's four timber stumps hanging mid-panel under the dormer are carved in the 300k
+# model; painted over as plaster they still showed as pale ghosts (review round 3), so their shape goes too (paint_fill does the colour).
+for (x0, x1, y0, y1, z0, z1, plane, *deep) in GRADE.get(name, {}).get("flat_out", ()):   # (deep: the plane for the lowest 6 cm, the face of the beam they stand on)
+    nflat = 0
+    for v in me.vertices:
+        x, y, zz = v.co.x * U, v.co.y * U, v.co.z * U
+        p = deep[0] if deep and zz < z0 + 6.0 else plane   # (the stumps' feet only back to the beam's face, so no slope runs down onto the beam)
+        if x0 <= x <= x1 and y0 <= y <= y1 and z0 <= zz <= z1 and x < p: v.co.x = p / U; nflat += 1
+    me.update(); log(new, "flat_out vertices pressed back", nflat)
+    bmf = bmesh.new(); bmf.from_mesh(me); nb = len(bmf.faces)   # (the stumps' sides are now slivers of no width: dissolved, or their smoothed normals drew pale outlines, review round 4)
+    inb = lambda co: x0 - 20 <= co.x * U <= x1 + 20 and y0 - 20 <= co.y * U <= y1 + 20 and z0 - 20 <= co.z * U <= z1 + 20
+    bmesh.ops.dissolve_degenerate(bmf, dist=1.0 / U, edges=[e for e in bmf.edges if inb(e.verts[0].co) and inb(e.verts[1].co)]); bmf.to_mesh(me); log(new, "flat_out faces dissolved", nb - len(bmf.faces)); bmf.free(); me.update()
 # hard edges over SHARP_DEG, smooth elsewhere
 for p in me.polygons: p.use_smooth = True
 try:
@@ -345,32 +364,42 @@ def _grey_filter(x, r, f):   # square max (f=np.maximum) or min (np.minimum) fil
         for s in range(1, 2 * r + 1): y = f(y, np.take(p, range(s, s + x.shape[ax]), axis=ax))
         x = y
     return x
-# paint_out (build-b, 2026-11-14): Meshy painted the church's side plaster with a crack and grey drip streaks (visual review: "it still has to go").
-# Inside each box (model cm: x0, x1, y0, y1, z0, z1, from the position bake) thin dark marks on plaster are closed over: a grey closing of the
-# lightness (radius PO_R texels) fills anything narrower than about 2*PO_R texels and leaves the wider timber struts, stone and windows alone.
-PO_R = 5
-_po_boxes = GRADE.get(name, {}).get("paint_out", ())
+_rt = GRADE.get(name, {})
 k_po = None
-if _po_boxes:
+if _rt.get("wall_fill") or _rt.get("paint_fill"):
+    # Retouch (build-b, 2026-11-14; the church's side wall under the dormer: a painted crack, drip streaks and grime, review rounds 2-4).
+    # wall_fill boxes (model cm x0, x1, y0, y1, z0, z1, open_r, depth_x): the plaster is everything in the box that is not timber, and it
+    # is painted one flat colour (fill_lab). Timber = the dark texels (lightness under 55 or wood-brown) that survive an opening of
+    # open_r texels (so marks and stains narrower than 2*open_r+1 texels go, struts and beams stay), plus any dark texel standing out
+    # past depth_x (the beams and posts are carved: their own shape keeps them, however thin). A hard mask traced on the timber's edges,
+    # not soft per-patch fills (review round 4: those left patch edges, grime and ragged beam edges).
     px, py = up2(pos[..., 0]) * U, up2(pos[..., 1]) * U
     lum = np.clip(Lc, 0, 100).astype(np.float32)
-    closed = _grey_filter(_grey_filter(lum, PO_R, np.maximum), PO_R, np.minimum)
-    near_plaster = box_blur(w_plaster, 8)
-    k = np.zeros_like(lum)
-    for box in _po_boxes:
-        inbox = (px >= box[0]) & (px <= box[1]) & (py >= box[2]) & (py <= box[3]) & (z >= box[4]) & (z <= box[5])
-        kb = inbox * soft(closed - lum, 2.5, 7.0) * soft(near_plaster, 0.2, 0.35) * soft(closed, 50.0, 58.0) * (1 - soft(C, 22.0, 30.0))
-        k = np.maximum(k, kb); log("paint_out box", box, "texels in box", int(inbox.sum()), "painted", int((kb > 0.5).sum()))
-    if isinstance(glass_guard, np.ndarray): k = k * (1 - glass_guard)
-    k = np.maximum(_grey_filter(k, 2, np.maximum) * 0.9, k)   # (a rim two texels wide: the mark's soft edge was left behind and the grade turned it orange, review round 3)
-    k = np.maximum(k, box_blur(k, 1) * 0.8)   # (a soft rim so no outline of the old mark is left)
-    wpb = np.maximum(box_blur(w_plaster, 12), 1e-3); fA = box_blur(A * w_plaster, 12) / wpb; fB = box_blur(B * w_plaster, 12) / wpb   # (the plaster's own tint round the mark: a brown crack kept its own tint and left a yellow ghost)
-    target = to_lin(np.clip(lab_to_rgb(np.stack([closed, fA, fB], -1)), 0, 1))   # (set outright: a gain clipped at 8 left the darkest crack texels orange)
-    base_lin = base_lin * (1 - k[..., None]) + target * k[..., None]
-    k_po = np.clip(box_blur(k, 3) * 1.5, 0, 1)
+    dark = ((lum < 55.0) | (w_wood > 0.5)).astype(np.float32)
+    kf = np.zeros_like(lum)
+    for (x0, x1, y0, y1, z0, z1, open_r, depth_x) in _rt.get("wall_fill", ()):
+        inbox = (px >= x0) & (px <= x1) & (py >= y0) & (py <= y1) & (z >= z0) & (z <= z1)
+        if open_r == 0:   # (the wall is not quite flat: each texel is measured against the most recessed surface within about 40 cm of it in the picture)
+            wall = _grey_filter(np.where(inbox, px, -1e9).astype(np.float32), 15, np.maximum)
+        timber = _grey_filter(_grey_filter((px < wall - depth_x).astype(np.float32), 2, np.minimum), 2, np.maximum) if open_r == 0 else np.maximum(_grey_filter(_grey_filter(dark, open_r, np.minimum), open_r, np.maximum), dark * (px < depth_x))   # (open_r 0: by depth alone, every carved timber face of 5 texels or more kept, the plaster painted up to its edge, grime included)
+        timber = _grey_filter(timber, 1, np.maximum)   # (the timber keeps its own soft edge texel)
+        fb = (inbox & (timber < 0.5) & (C < 24.0)).astype(np.float32)   # (C: never the red roof tiles)
+        kf = np.maximum(kf, fb); log("wall_fill box", (x0, x1, y0, y1, z0, z1), "plaster texels", int(fb.sum()), "of", int(inbox.sum()))
+    for box in _rt.get("paint_fill", ()):   # (boxes painted outright: the church's four timber stumps hanging mid-panel, carved in the 300k model too; flat_out presses their shape back)
+        fb = ((px >= box[0]) & (px <= box[1]) & (py >= box[2]) & (py <= box[3]) & (z >= box[4]) & (z <= box[5])).astype(np.float32)
+        kf = np.maximum(kf, fb); log("paint_fill box", box, "texels", int(fb.sum()))
+    kf_ao = kf.copy()   # (no baked occlusion where the stumps were, the beam under them included: they shaded it)
+    for box in _rt.get("paint_keep", ()):   # (boxes never painted: the top of the middle beam under the stumps)
+        kb2 = ((px >= box[0]) & (px <= box[1]) & (py >= box[2]) & (py <= box[3]) & (z >= box[4]) & (z <= box[5])).astype(np.float32)
+        kf = kf * (1 - kb2); log("paint_keep box", box, "texels", int(kb2.sum()))
+    if isinstance(glass_guard, np.ndarray): kf = kf * (1 - glass_guard)
+    fl = _rt.get("fill_lab", (78.0, 1.0, 10.0))   # (one clean warm off-white; the plaster grade then lifts it like the town's other plaster)
+    target = to_lin(np.clip(lab_to_rgb(np.broadcast_to(np.array(fl, np.float32), lum.shape + (3,)).copy()), 0, 1))
+    base_lin = base_lin * (1 - kf[..., None]) + target * kf[..., None]
+    k_po = np.clip(box_blur(np.maximum(kf, kf_ao), 2) * 1.5, 0, 1)   # (no baked occlusion, edge or ripple on the painted plaster)
     if os.environ.get("TL_PODBG"):
-        dbg = srgb.copy(); dbg[k > 0.5] = (1.0, 0.0, 1.0); write_png(dbg, os.path.join(out, "PODBG_%s.png" % new), False)
-if GRADE.get(name, {}).get("paint_out"):
+        dbg = srgb.copy(); dbg[kf > 0.5] = (0.0, 1.0, 0.0); write_png(dbg, os.path.join(out, "PODBG_%s.png" % new), False)
+if k_po is not None:
     srgb = to_srgb(base_lin); lab = rgb_to_lab(srgb); Lc, A, B = lab[..., 0], lab[..., 1], lab[..., 2]
     C = np.hypot(A, B); H = (np.degrees(np.arctan2(B, A)) + 360) % 360
     w_plaster = soft(Lc, 56, 64) * (1 - soft(C, 22, 32))
