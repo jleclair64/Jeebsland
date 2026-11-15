@@ -1,4 +1,5 @@
 #include "Meadow.h"
+#include "Palette.h"
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "Canopy.h"
@@ -26,8 +27,8 @@ static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1")
 static TAutoConsoleVariable<float> CVarGrassDensity2(TEXT("jeeb.Grass.Density2"), 11.0f, TEXT("Open World Foliage clumps per square metre close by"));
 static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 5000.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer; 50 m since 2026-11-15, owner: twice as far)"));
 static TAutoConsoleVariable<int32> CVarGrassFarCards(TEXT("jeeb.Grass.FarCards"), 0, TEXT("1: our painted cards rise where the realistic grass sinks, carrying the meadow to 50 m; 0: painted ground only beyond it"));
-static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT("0.9 0.92 0.84"), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live)"));
-static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT("0.86 0.9 0.8"), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live)"));
+static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT(""), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
+static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT(""), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack2)"));
 static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
 static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.3f, TEXT("How far the realistic blades are pulled toward grey (live)"));
 static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
@@ -409,6 +410,7 @@ void AMeadow::LoadPack(int32 P)
 		K.Weight = FCString::Atof(*C[3]); K.Height = FCString::Atof(*C[4]); K.Width = FCString::Atof(*C[5]);
 		K.NaturalH = FMath::Max(10.f, float(K.Mesh->GetBoundingBox().Max.Z));
 		if (UMaterialInterface* M = K.Mesh->GetMaterial(0)) K.Mid = UMaterialInstanceDynamic::Create(M, this);
+		JeebPalette::BindGrade(K.Mid);   // (the palette's knobs: these materials take the grade as parameters, not from the collection)
 		UE_LOG(LogTemp, Log, TEXT("JEEBGRASS kind %s role %d: %.0f..%.0f cm tall, %d material slots, %d LODs"), *FPaths::GetBaseFilename(MeshPath), K.Role, K.Mesh->GetBoundingBox().Min.Z, K.Mesh->GetBoundingBox().Max.Z, K.Mesh->GetStaticMaterials().Num(), K.Mesh->GetNumLODs());
 		KeepAlive.Add(K.Mesh);
 		if (K.Mid) KeepAlive.Add(K.Mid);
@@ -490,7 +492,8 @@ void AMeadow::Tick(float Dt)
 		LastMe = Me;
 		if (Pack != 0)
 		{
-			const FLinearColor Tint = ParseRgb(Pack == 1 ? CVarGrassTint1.GetValueOnGameThread() : CVarGrassTint2.GetValueOnGameThread());
+			const FString TintS = Pack == 1 ? CVarGrassTint1.GetValueOnGameThread() : CVarGrassTint2.GetValueOnGameThread();
+			const FLinearColor Tint = TintS.TrimStartAndEnd().IsEmpty() ? JeebPalette::Raw(Pack == 1 ? FName(TEXT("GrassPack1")) : FName(TEXT("GrassPack2"))) : ParseRgb(TintS);   // (the material grades it with the palette's knobs)
 			for (FKind& K : Kinds)
 				if (K.Mid)
 				{

@@ -1,4 +1,5 @@
 #include "KnightGameState.h"
+#include "Palette.h"
 #include "GameFramework/HUD.h"
 #include "WaterLook.h"
 #include "GameFramework/GameUserSettings.h"
@@ -85,6 +86,7 @@ AKnightGameState::AKnightGameState()
 void AKnightGameState::BeginPlay()
 {
 	Super::BeginPlay();
+	JeebPalette::ApplyToWorld(GetWorld());   // the world palette's colours and knobs into this world's MPC_JeebPalette (Content/Data/Palette.ini)
 	BuildWorld();
 }
 
