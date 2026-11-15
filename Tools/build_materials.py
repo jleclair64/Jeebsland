@@ -138,21 +138,21 @@ def add_wind(mat, strength, tip_only, lift, attach_mask=None, keep=None, wpo_add
     return shade
 
 
-def soft_edges(mat, ts):
+def soft_edges(mat, ts, pin="A"):
     """Opacity through a temporal dither, so cut-out edges blend softly with anti-aliasing instead of stair-stepping"""
     try:
         cls = unreal.load_class(None, "/Script/Engine.MaterialExpressionDitherTemporalAA")
         if cls is None:
             raise RuntimeError("no DitherTemporalAA class")
         d = lib.create_material_expression(mat, cls, -300, 500)
-        lib.connect_material_expressions(ts, "A", d, "")
+        lib.connect_material_expressions(ts, pin, d, "")
         lib.connect_material_property(d, "", unreal.MaterialProperty.MP_OPACITY_MASK)
         mat.set_editor_property("opacity_mask_clip_value", 0.35)
         return d, ""
     except Exception as e:
         unreal.log("MATDIAG dither unavailable, plain cut-out: " + str(e))
-        lib.connect_material_property(ts, "A", unreal.MaterialProperty.MP_OPACITY_MASK)
-        return ts, "A"   # (the node and output pin that feed the opacity mask)
+        lib.connect_material_property(ts, pin, unreal.MaterialProperty.MP_OPACITY_MASK)
+        return ts, pin   # (the node and output pin that feed the opacity mask)
 
 
 # Tree crowns hand over to their far stand-ins (Forest.cpp, M_TreeFar) over a band of distance, FadeStart..FadeEnd. Both sides
@@ -490,7 +490,9 @@ def build_grass():
     g.out(g.mul(col, 0.10), unreal.MaterialProperty.MP_EMISSIVE_COLOR)              # a green floor in deep shade (2026-11-14)
     g.out(g.c(1.0), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.0), unreal.MaterialProperty.MP_SPECULAR)
-    soft_edges(mat, cut)
+    # nothing at the card's very top: the picture used to repeat, so the top edge picked up the solid blade bases of its bottom row as
+    # a thin dark line along every card (owner 2026-11-15: "black lines from the grass"; T_GrassTuft is clamped vertically too)
+    soft_edges(mat, g.muln(cut, g.sat(g.mul(v, 30.0)), out_a="A"), pin="")
     fluffy_normal(mat, 0.93)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/M_Grass")
@@ -981,6 +983,9 @@ import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "S
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
+_tuft = unreal.EditorAssetLibrary.load_asset("/Game/T_GrassTuft")   # (clamped top to bottom: see build_grass)
+_tuft.set_editor_property("address_y", unreal.TextureAddress.TA_CLAMP)
+unreal.EditorAssetLibrary.save_asset("/Game/T_GrassTuft")
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_TreeLeaves.png"), "T_TreeLeaves")   # painted by BuildMaterials.ps1
 
 #              name          texture          tint                     gust lean cm  tips only  lift
