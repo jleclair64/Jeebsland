@@ -19,6 +19,7 @@ import unreal
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import grass_field   # noqa: E402
+import palette       # noqa: E402  (2026-11-15: the world palette's knobs, Docs/Palette.md)
 
 lib = unreal.MaterialEditingLibrary
 EAL = unreal.EditorAssetLibrary
@@ -104,11 +105,13 @@ def rewire(mat, flowers):
     keep, down, calm = sink(g, 4200.0, 5000.0)
     # as it sinks, the clump's contrast eases toward the painted ground beyond
     col = g.lerp(col, g.lum(col), g.mul(g.one(unreal.MaterialExpressionOneMinus, keep), 0.3))
+    col = palette.grade_world(mat, col) if flowers else palette.grade_plant(mat, col)   # the palette's knobs (identity at the defaults)
     g.out(col, MP.MP_BASE_COLOR)
     if sss:
         # the light through the blades, cooled and dimmed at the low sun too (backlit, it alone turned the Grass Library to hay)
         scol = g.muln(g.muln(greener(g, g.muln(sss, g.c3((1.0, 1.0, 1.0)), out_a=sss_out), flowers), fieldmix), tint)
         scol = g.lerp(scol, g.muln(scol, g.c3((0.40, 0.62, 0.80))), g.mul(g.scalar("Dusk", 0.0), 0.3 if flowers else 0.9))
+        scol = palette.grade_world(mat, scol) if flowers else palette.grade_plant(mat, scol)
         g.out(scol, MP.MP_SUBSURFACE_COLOR)
     if wpo:
         moved = g.muln(g.muln(wpo, keep, out_a=wpo_out), calm)          # (the pack's wind and bending, easing out as it sinks)
@@ -175,6 +178,7 @@ def log_collections():
                 unreal.log("MATDIAG collection %s %s %s = %s" % (path.split("/")[2], kind, nm, dv))
 
 
+palette.ensure_mpc()
 log_collections()
 move_unused_owf()
 for args in PACKS:

@@ -1,4 +1,5 @@
 #include "Forest.h"
+#include "Palette.h"
 #include "Terrain.h"
 #include "Canopy.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -17,6 +18,11 @@
 namespace
 {
 
+	// the five autumn leaf colours and the three needle greens are named in the world palette (Content/Data/Palette.ini); the colours
+	// below are only for the old blocky stand-ins when the leaf materials are missing
+	const FName LeafKeys[5] = { TEXT("LeafOrange"), TEXT("LeafRed"), TEXT("LeafAmber"), TEXT("LeafGold"), TEXT("LeafGreen") };
+	const FName NeedleKeys[3] = { TEXT("Needle"), TEXT("NeedleLight"), TEXT("NeedleRedwood") };
+	const FName BarkKeys[4] = { TEXT("Bark"), TEXT("BarkWarm"), TEXT("BarkGrey"), TEXT("BarkRed") };
 	const FLinearColor LeafColors[5] = {
 		FLinearColor(0.50f, 0.17f, 0.045f), // burnt orange
 		FLinearColor(0.36f, 0.07f, 0.045f), // deep red
@@ -1027,7 +1033,7 @@ void AForest::BeginPlay()
 		{
 			Leaf[i]->SetStaticMesh(LeafMesh);
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(LeafMat, this);
-			M->SetVectorParameterValue(TEXT("Tint"), LeafColors[i]);   // the same five autumn colours as before
+			JeebPalette::Bind(M, TEXT("Tint"), LeafKeys[i]);   // the same five autumn colours as before (the palette's; M_TreeLeaf grades them)
 			SetBand(M, BandOak);
 			Leaf[i]->SetMaterial(0, M);
 		}
@@ -1043,12 +1049,11 @@ void AForest::BeginPlay()
 	{
 		// painted needle boughs, in three greens: two for pines, a bluer one for the redwoods
 		UStaticMesh* NeedleMesh = MakeNeedleCardMesh(this, NeedleMat);
-		const FLinearColor Greens[3] = { FLinearColor(0.10f, 0.26f, 0.12f), FLinearColor(0.13f, 0.31f, 0.14f), FLinearColor(0.10f, 0.27f, 0.19f) };
 		UInstancedStaticMeshComponent* Comps[3] = { Pine[0], Pine[1], RedCone };
 		for (int32 i = 0; i < 3; ++i)
 		{
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(NeedleMat, this);
-			M->SetVectorParameterValue(TEXT("Tint"), Greens[i]);
+			JeebPalette::Bind(M, TEXT("Tint"), NeedleKeys[i]);
 			SetBand(M, i == 2 ? BandRed : BandPine);
 			for (UInstancedStaticMeshComponent* C : { Comps[i], NeedleFill[i] })
 			{
@@ -1074,12 +1079,11 @@ void AForest::BeginPlay()
 		UStaticMesh* PuffMesh = MakeFarPuffMesh(this, FarMat);
 		UStaticMesh* PineFar = MakeFarConeMesh(this, FarMat, 4, 0.18f);
 		UStaticMesh* RedFar = MakeFarConeMesh(this, FarMat, 5, 0.24f);
-		const FLinearColor Greens[3] = { FLinearColor(0.10f, 0.26f, 0.12f), FLinearColor(0.13f, 0.31f, 0.14f), FLinearColor(0.10f, 0.27f, 0.19f) };
 		for (int32 i = 0; i < FarCrown.Num(); ++i)
 		{
 			const bool bCone = i >= 5;
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(FarMat, this);
-			M->SetVectorParameterValue(TEXT("Tint"), bCone ? Greens[i - 5] : LeafColors[i]);
+			JeebPalette::Bind(M, TEXT("Tint"), bCone ? NeedleKeys[i - 5] : LeafKeys[i]);
 			SetBand(M, i == 7 ? BandRed : (bCone ? BandPine : BandOak));
 			// it folds away while its centre is this much closer than FadeStart: more than its farthest point from that centre
 			// (a cone's centre is the foot of its crown)
@@ -1103,11 +1107,6 @@ void AForest::BeginPlay()
 		UMaterialInterface* BarkMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_BarkTint.M_BarkTint"));
 	if (BarkMat)
 	{
-		const FLinearColor BarkColors[4] = {
-			FLinearColor(0.20f, 0.13f, 0.07f),    // brown
-			FLinearColor(0.26f, 0.17f, 0.10f),    // warm brown
-			FLinearColor(0.21f, 0.155f, 0.11f),  // grey-brown
-			FLinearColor(0.26f, 0.14f, 0.07f) };  // reddish
 		UStaticMesh* BranchMesh = MakeBranchMesh(this, BarkMat);
 		for (int32 v = 0; v < 4; ++v)
 		{
@@ -1118,20 +1117,20 @@ void AForest::BeginPlay()
 				RedTaper->SetStaticMesh(MakeTrunkMesh(this, BarkMat, 4, 40.f));
 				RedFortTrunk->SetStaticMesh(MakeTrunkMesh(this, BarkMat, 5, 40.f));
 				UMaterialInstanceDynamic* RM = UMaterialInstanceDynamic::Create(BarkMat, this);
-				RM->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.30f, 0.13f, 0.07f));
+				JeebPalette::Bind(RM, TEXT("Tint"), TEXT("BarkRedwood"));
 				RM->SetScalarParameterValue(TEXT("Plates"), 1.f);   // conifer bark in plates (the others: furrowed broadleaf bark)
 				RedTaper->SetMaterial(0, RM);
 				RedFortTrunk->SetMaterial(0, RM);
 			}
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(BarkMat, this);
-			M->SetVectorParameterValue(TEXT("Tint"), BarkColors[v]);
+			JeebPalette::Bind(M, TEXT("Tint"), BarkKeys[v]);   // (brown, warm brown, grey-brown, reddish: the palette's)
 			TrunkVar[v]->SetMaterial(0, M);
 			BranchVar[v]->SetStaticMesh(BranchMesh);
 			BranchVar[v]->SetMaterial(0, M);   // the very same bark as the trunk it grows from
 		}
 		Branch->SetStaticMesh(BranchMesh);
 		UMaterialInstanceDynamic* BM = UMaterialInstanceDynamic::Create(BarkMat, this);
-		BM->SetVectorParameterValue(TEXT("Tint"), BarkColors[0]);
+		JeebPalette::Bind(BM, TEXT("Tint"), BarkKeys[0]);
 		Branch->SetMaterial(0, BM);
 		bBark = true;
 	}

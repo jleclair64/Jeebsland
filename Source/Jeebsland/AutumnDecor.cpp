@@ -1,4 +1,5 @@
 #include "AutumnDecor.h"
+#include "Palette.h"
 #include "Scarecrow.h"
 #include "Cottage.h"
 #include "ChoppableTree.h"
@@ -29,6 +30,12 @@ namespace
 		FLinearColor(0.42f, 0.27f, 0.07f),  // gold-brown
 		FLinearColor(0.17f, 0.22f, 0.07f),  // last green holdout
 	};
+	// (the leaf cards take these from the world palette, Content/Data/Palette.ini; the colours above only tint the plain fallback squares)
+	FName LeafKey(int32 T)
+	{
+		static const FName Keys[NumLeafTypes] = { TEXT("LeafOrange"), TEXT("LeafRed"), TEXT("LeafAmber"), TEXT("LeafGold"), TEXT("LeafGreen") };
+		return Keys[FMath::Clamp(T, 0, NumLeafTypes - 1)];
+	}
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;
 	constexpr float GustDuration = 5.2f;   // about twice as long, so leaves carry much further before they fade
@@ -235,7 +242,7 @@ void AAutumnDecor::BeginPlay()
 		for (int32 t = 0; t < NumLeafTypes; ++t)
 		{
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(LeafMat, this);
-			M->SetVectorParameterValue(TEXT("Tint"), LeafPalette[t]);
+			JeebPalette::Bind(M, TEXT("Tint"), LeafKey(t));   // (the palette's leaf colours, as the trees')
 			for (UInstancedStaticMeshComponent* C : { GroundLeaf[t], FallLeaf[t], GustLeaf[t] })
 			{
 				C->SetStaticMesh(LeafMesh);
@@ -245,7 +252,7 @@ void AAutumnDecor::BeginPlay()
 			if (UMaterialInterface* LitterMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_LeafLitter.M_LeafLitter")))
 			{
 				UMaterialInstanceDynamic* L = UMaterialInstanceDynamic::Create(LitterMat, this);
-				L->SetVectorParameterValue(TEXT("Tint"), LeafPalette[t]);
+				JeebPalette::Bind(L, TEXT("Tint"), LeafKey(t));
 				GroundLeaf[t]->SetMaterial(0, L);
 			}
 		}

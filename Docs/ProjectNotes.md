@@ -497,6 +497,20 @@ Foliage and bark materials (`M_Grass`, `M_Bush`, `M_TreeLeaf`, `M_BarkTint`, inc
 
 Procedural textures (moon, cirrus, dirt) are painted by `Tools/gen_textures.py` and cached in `Saved/` by version number; bump the version to repaint.
 
+## Palette (2026-11-15)
+
+One world palette, `Content/Data/Palette.ini`, read by grass (our cards and the realistic Fab grass), the ground (M_Ground, M_Dirt, M_Stone), Oak Hill's lawn (M_TL_Ground), tree leaves, needles and bark (near and far), bushes, fallen leaves, water and haze. The guide is `Docs/Palette.md`.
+- Five knobs, live in Play: `jeeb.Palette.Autumn|Warmth|Greenness|Saturation|Brightness` (-1..1, 0 = today's look exactly). Also `jeeb.Palette.Reload` and `jeeb.Palette.Set <Name> R G B`.
+- The materials grade their own final base colour from `/Game/MPC_JeebPalette`. Plants get a season shift and a matrix, mixed materials grade only their grass layer by season, and earth and bark get only the world matrix. The game writes the matrices when a knob changes (`Source/Jeebsland/Palette.cpp`). Code-set colours come from `JeebPalette::Raw`/`Bind`. The haze and water take `JeebPalette::Graded`.
+- Python side: `Tools/palette.py` (`colour`, `grade_plant`, `grade_world`, `ensure_mpc`) and `Tools/BuildPalette.ps1` (the collection, a one-time grade of the committed `/Game/GrassReal` copies, instruction counts).
+- Two catches, both in `Docs/Palette.md`:
+  - A material may read only two collections, so the Fab grass `M_GrassLibrary` and `M_MeadowFlowers` (whose wind reads two)
+    take the grade as `Pal*` parameters set by Meadow.cpp.
+  - Never rewrite the collection's list from Python: it gives the parameters new hidden Ids, and every material built before
+    loads grey. `ensure_mpc` goes through the C++ `UJeebPaletteTools::SyncVectorDefaults`. `BuildPalette.ps1` checks every
+    palette material after a fresh load.
+- Not yet on it: buildings (phase 2), M_Color props, the plaza oak, the town's weeds and ivy.
+
 ## Time of day
 
 `ADayNight` (DayNight.h): a midnight-sun loop that never sets. `HalfLoopSeconds` is noon to the low golden point (60 s for preview; the owner may ask for 1200). Stars, moon and clouds read `ADayNight::Dusk`.

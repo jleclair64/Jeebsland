@@ -1,4 +1,5 @@
 #include "DayNight.h"
+#include "Palette.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Engine/DirectionalLight.h"
@@ -259,7 +260,8 @@ void ADayNight::TickLook(float High)
 	if (FC)
 	{
 		// Noon: a light, only slightly cool grey leaning to the sky, so far hills fade toward the sky; the low sun: a warm peach-lilac that sits under the gold
-		const FLinearColor NewHaze = FMath::Lerp(FLinearColor(0.60f, 0.46f, 0.40f), FLinearColor(0.54f, 0.58f, 0.66f), High);
+		static const FName HazeLowKey(TEXT("HazeLow")), HazeNoonKey(TEXT("HazeNoon"));
+		const FLinearColor NewHaze = FMath::Lerp(JeebPalette::Graded(HazeLowKey), JeebPalette::Graded(HazeNoonKey), High);   // (the world palette's, Palette.ini: 0.60, 0.46, 0.40 and 0.54, 0.58, 0.66)
 		FC->SetFogInscatteringColor(FMath::Lerp(OldHaze, NewHaze, FMath::Clamp(HazeBlue.GetValueOnGameThread(), 0.f, 1.f)));
 		FC->SetStartDistance(HazeStart.GetValueOnGameThread());
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)

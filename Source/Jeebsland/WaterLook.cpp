@@ -8,10 +8,12 @@
 #include "UObject/Package.h"
 #include "Containers/Ticker.h"
 #include "DayNight.h"
+#include "Palette.h"
 
 namespace
 {
-	// Overrides for M_Water's parameters while the game runs (empty or negative: the material's own value, Tools/water_material.py)
+	// Overrides for M_Water's parameters while the game runs (empty or negative: the material's own value, Tools/water_material.py;
+	// the colours, when empty: the world palette's Water* colours, Content/Data/Palette.ini, graded by its knobs)
 	TAutoConsoleVariable<FString> CVarAbsorb(TEXT("jeeb.Water.Absorb"), TEXT(""), TEXT("Water absorption per cm, \"R G B\" (empty: M_Water's)"));
 	TAutoConsoleVariable<FString> CVarScatter(TEXT("jeeb.Water.Scatter"), TEXT(""), TEXT("Water scattering per cm, \"R G B\" (empty: M_Water's)"));
 	TAutoConsoleVariable<FString> CVarTint(TEXT("jeeb.Water.Tint"), TEXT(""), TEXT("Colour scale of what is seen through the water, \"R G B\" (empty: M_Water's)"));
@@ -26,8 +28,8 @@ namespace
 	TAutoConsoleVariable<float> CVarPhase(TEXT("jeeb.Water.PhaseG"), -2.f, TEXT("Scattering phase -1..1 (below -1: M_Water's)"));
 	TAutoConsoleVariable<float> CVarDuskScatter(TEXT("jeeb.Water.DuskScatter"), 0.10f, TEXT("Share of the water's scattering left at the low sun (1: none taken away)"));
 
-	TAutoConsoleVariable<FString> CVarGlow(TEXT("jeeb.Water.Glow"), TEXT("0.004 0.005 0.006"), TEXT("The water's own faint slate light at noon, linear R G B (emissive: no shadow stripes)"));
-	TAutoConsoleVariable<FString> CVarGlowDusk(TEXT("jeeb.Water.GlowDusk"), TEXT("0.008 0.013 0.017"), TEXT("The same at the low sun, so the water stays a dim slate there and never goes black"));
+	TAutoConsoleVariable<FString> CVarGlow(TEXT("jeeb.Water.Glow"), TEXT(""), TEXT("The water's own faint slate light at noon, linear R G B (emissive: no shadow stripes; empty: the palette's WaterGlow)"));
+	TAutoConsoleVariable<FString> CVarGlowDusk(TEXT("jeeb.Water.GlowDusk"), TEXT(""), TEXT("The same at the low sun, so the water stays a dim slate there and never goes black (empty: the palette's WaterGlowDusk)"));
 
 	TWeakObjectPtr<UMaterialInstanceDynamic> Shared;
 	FLinearColor BaseScatter(-1.f, -1.f, -1.f, 1.f);   // the scattering before the low sun takes its share (negative: not known yet)
@@ -54,8 +56,8 @@ namespace
 		const float Share = FMath::Lerp(1.f, FMath::Clamp(CVarDuskScatter.GetValueOnGameThread(), 0.f, 1.f), D);
 		M->SetVectorParameterValue(TEXT("Scattering"), FLinearColor(BaseScatter.R * Share, BaseScatter.G * Share, BaseScatter.B * Share, 1.f));
 		FLinearColor Noon(0.f, 0.f, 0.f, 1.f), Low(0.f, 0.f, 0.f, 1.f);
-		ParseRGB(CVarGlow.GetValueOnGameThread(), Noon);
-		ParseRGB(CVarGlowDusk.GetValueOnGameThread(), Low);
+		if (!ParseRGB(CVarGlow.GetValueOnGameThread(), Noon)) Noon = JeebPalette::Graded(TEXT("WaterGlow"));
+		if (!ParseRGB(CVarGlowDusk.GetValueOnGameThread(), Low)) Low = JeebPalette::Graded(TEXT("WaterGlowDusk"));
 		M->SetVectorParameterValue(TEXT("Glow"), FMath::Lerp(Noon, Low, D));
 	}
 
@@ -65,13 +67,12 @@ namespace
 		UMaterialInstanceDynamic* M = Shared.Get();
 		if (!M) return;
 		FLinearColor C;
-		if (ParseRGB(CVarAbsorb.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("Absorption"), C);
-		if (ParseRGB(CVarScatter.GetValueOnGameThread(), C)) BaseScatter = C;
-		else if (M->Parent) M->Parent->GetVectorParameterValue(FHashedMaterialParameterInfo(TEXT("Scattering")), BaseScatter);
+		M->SetVectorParameterValue(TEXT("Absorption"), ParseRGB(CVarAbsorb.GetValueOnGameThread(), C) ? C : JeebPalette::Graded(TEXT("WaterAbsorb")));
+		BaseScatter = ParseRGB(CVarScatter.GetValueOnGameThread(), C) ? C : JeebPalette::Graded(TEXT("WaterScatter"));
 		LastDusk = -1.f;
 		SetScatter(M);
-		if (ParseRGB(CVarTint.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("BehindTint"), C);
-		if (ParseRGB(CVarFoamColor.GetValueOnGameThread(), C)) M->SetVectorParameterValue(TEXT("FoamColor"), C);
+		M->SetVectorParameterValue(TEXT("BehindTint"), ParseRGB(CVarTint.GetValueOnGameThread(), C) ? C : JeebPalette::Graded(TEXT("WaterBehind")));
+		M->SetVectorParameterValue(TEXT("FoamColor"), ParseRGB(CVarFoamColor.GetValueOnGameThread(), C) ? C : JeebPalette::Graded(TEXT("WaterFoam")));
 		auto Scalar = [&](TAutoConsoleVariable<float>& V, const TCHAR* Name, float Min)
 		{
 			const float X = V.GetValueOnGameThread();
@@ -117,6 +118,7 @@ UMaterialInterface* JeebWaterLook::Material()
 	if (!bTicking)
 	{
 		bTicking = true;
+		JeebPalette::OnChanged().AddLambda([]() { Push(); });   // (the palette's knobs or colours changed)
 		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float) { SetScatter(Shared.Get()); return true; }), 0.25f);
 	}
 	return M;
