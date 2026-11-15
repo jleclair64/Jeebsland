@@ -557,3 +557,7 @@ The first knight model and the current suit's pieces come from Meshy (free tier,
 ## Look board (2026-11-15)
 
 `Tools/LookBoard.ps1` (see Docs/HowToTest.md): 12 fixed views at noon and the low sun from one `-ShotEyes` run, tiled 2 views a row with the owner's `Docs/TownLab/Refs` pictures under them (`Saved/LookBoard`); `-Compare` cuts the newest two boards back apart by their fixed layout. No C++ changes. A stale copy binary showed no eyes at all (the run took the single-still path): build the copy first. The field of view is one value per run (80).
+
+## Look panel (2026-11-15)
+
+The Escape screen's LOOK tab (`KnightHUDLook.cpp`, `#if !UE_BUILD_SHIPPING`) tunes 40 console variables live: `jeeb.Look.*`, `jeeb.Cloud.*`, `jeeb.Water.*`, `jeeb.Grass.*`, `jeeb.Ground.SkyFill`. The list is the `Items[]` table at the top of the file (group, label, cvar, min, max, deferred); add a row to add a slider. RGB string cvars get one slider per number (grass tint) or a brightness multiplier (water glow). Water cvars whose default is "the material's" (negative) use the numbers from `Tools/water_material.py` as their default. "Default" on the panel is the cvar's value when the tab was first opened in that run. Presets: `Saved/LookPresets/<name>.ini`; `<name>_defaults.txt` lists old -> new defaults. Name typing reuses the Slate key catcher (`bLookTyping`, like the test kit's level box). Test: `-ShotLookPanel` (JEEBLOOK lines).
