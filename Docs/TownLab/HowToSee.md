@@ -11,7 +11,7 @@ Hills, trees, boulders, sky and the day loop are the same round both towns, so t
 ## Open it
 
 1. Open the project in the editor.
-2. In the Content Browser, double-click `TownLab/TownLab`.
+2. In the Content Browser, double-click `TownLab/Map/TownLab`.
 3. Press Play.
 
 You start on open land 170 m north of the two towns, facing south:

@@ -7,15 +7,21 @@
 class UProceduralMeshComponent;
 class UInstancedStaticMeshComponent;
 class AForest;
+namespace JeebTownLab { struct FSite; }
 
-// TownLab's rebuilt Oak Hill (2026-11-14, the test map only; TownLab.h): Oak Hill's own plan 300 m east of the real town, built
-// the way professional games do it (Docs/TownLab/FrameBudget.md):
-//  - one ground mesh on a 1 m grid whose single material (M_TL_Ground) paints grass, earth and mossy cobbled streets itself
-//    from its vertex colours, instead of a ground plus separate road ribbons (fewer draws, no overlapping layers)
-//  - every copy of a building model drawn as ONE instanced set (16 houses: one draw, not 16), and its solid shape likewise
-//  - the foundation stones, shrubs and flowers instanced as before (one set per kind)
-//  - the grass: the same meadow, which switches to 40 m of dense grass in 15 m squares while you stand here (Meadow.cpp)
-// Not replicated, visual plus solid ground and walls (every machine builds the same).
+// The rebuilt Oak Hill (2026-11-14; TownLab.h): Oak Hill's own plan built the way professional games do it
+// (Docs/TownLab/FrameBudget.md). Since the owner approved it, it is the real Oak Hill in Field (bRealSite: at the real plaza, on the
+// real land, spawned by AKnightGameState while JeebTownLab::RealTown()); in the TownLab test map a second one stands 300 m east.
+//  - one ground mesh on a 1 m grid whose single material (M_TL_Ground) paints grass, earth and mossy cobbled streets itself from its
+//    vertex colours, instead of a ground plus separate road ribbons (fewer draws, no overlapping layers); at the real site its river
+//    banks (mud, rock) are drawn with the world's own ground material in a second section, so they meet the river as before
+//  - one plain component per building (Nanite draws them in one pass), the rebuilt SM_TL_* models where they exist (ModelSwaps),
+//    each with its solid shape (SM_*_Col, on every machine: the server decides where players walk)
+//  - each rebuilt model's decor (TownLabDecor.h: ivy, moss, stones, props, lanterns with a small real light), in instanced sets
+//  - the foundation stones, shrubs and flowers, the plaza's oak, boulders round the edge
+//  - the grass: the meadow switches to 40 m of dense grass in 15 m squares while you stand in the town (Meadow.cpp)
+// Not replicated: every machine builds the same from fixed numbers (JEEBOAK hash to compare); a dedicated server builds only the
+// ground's collision, the buildings' solid shapes, the oak's trunk and the boulders, all hidden.
 UCLASS()
 class ATownLabTown : public AActor
 {
@@ -23,12 +29,17 @@ class ATownLabTown : public AActor
 
 public:
 	ATownLabTown();
-	// The trees round the rebuilt town (the woods' own tree maker, like AOakHillTown::PlantTrees, with more dark pines in the ring)
+	// The trees round the rebuilt town in the TownLab map (the real town's trees are AOakHillTown::PlantTrees, the very same set)
 	static void PlantTrees(AForest* Forest);
-	// Rounded boulders round a town, the same set round both (PlazaX, PlazaY: that town's plaza): the lab's shared surroundings
-	static void PlaceBoulders(AActor* Owner, float PlazaX, float PlazaY);
+	// Rounded boulders round a town (PlazaX, PlazaY: that town's plaza; Site: also keep off its streets and buildings)
+	static void PlaceBoulders(AActor* Owner, float PlazaX, float PlazaY, const JeebTownLab::FSite* Site = nullptr);
+	// The old model a rebuilt mesh stands in for ("SM_TL_House" -> "SM_OakHillHouse_300k": the same frame, so the chimneys measured
+	// on the old models fit, AOakHillLife), or the name itself
+	static FString OldMeshName(const FString& MeshName);
 
-	int32 DrawSets = 0;   // how many drawn components the town made (logged, JEEBLAB)
+	UPROPERTY() bool bRealSite = false;   // set before BeginPlay (SpawnActorDeferred): the real Oak Hill in Field
+	bool IsReal() const { return bRealSite; }
+	int32 DrawSets = 0;   // how many drawn components the town made (logged)
 
 protected:
 	virtual void BeginPlay() override;
@@ -36,10 +47,13 @@ protected:
 
 private:
 	UPROPERTY() UProceduralMeshComponent* Ground = nullptr;
+	const JeebTownLab::FSite& Site() const;
+	const TCHAR* Tag() const { return bRealSite ? TEXT("JEEBOAK") : TEXT("JEEBLAB"); }
+	uint32 Hash = 2166136261u;   // checksum of everything solid (logged, to compare machines)
 	void BuildGround();
 	void BuildBuildings();
 	void BuildPlazaOak();
-	// Window glow: one shared dynamic copy per building material, following the sun as OakHillLife does for the real town
+	// Window glow: one shared dynamic copy per building material, following the sun
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;
 	TArray<float> GlowBase;
 	UPROPERTY() TArray<class UPointLightComponent*> LanternLights;

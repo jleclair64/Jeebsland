@@ -3,18 +3,36 @@
 #include "WorldMap.h"
 #include "GroundMask.h"
 #include "WaterLook.h"
+#include "DayNight.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
 	constexpr int32 ChunkCells = 40;   // cells per chunk side
+	TAutoConsoleVariable<float> SkyFillVar(TEXT("jeeb.Ground.SkyFill"), 0.2f, TEXT("Light added to flat ground (M_Ground's grass) at the low sun, times ADayNight::Dusk: the grass blades are lit through and stay bright, flat ground would go dark where they stop (TownLab's WorldFill, 2026-11-14)"));
+	TWeakObjectPtr<UMaterialInstanceDynamic> GSharedGround;
+	TWeakObjectPtr<UWorld> GSharedWorld;
+}
+
+UMaterialInterface* AWorldTerrain::SharedGround(UWorld* World)
+{
+	if (!World || World->GetNetMode() == NM_DedicatedServer) return nullptr;
+	if (GSharedGround.IsValid() && GSharedWorld.Get() == World) return GSharedGround.Get();
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));
+	if (!Base) return nullptr;
+	UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Base, World);
+	Mid->SetScalarParameterValue(TEXT("SkyFill"), SkyFillVar.GetValueOnGameThread() * ADayNight::Dusk);
+	GSharedGround = Mid; GSharedWorld = World;
+	return Mid;
 }
 
 AWorldTerrain::AWorldTerrain()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickInterval = 0.5f;   // (the sun moves slowly: twice a second is plenty for the ground's fill)
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 }
 
@@ -23,6 +41,18 @@ void AWorldTerrain::BeginPlay()
 	Super::BeginPlay();
 	BuildLand();
 	if (!IsNetMode(NM_DedicatedServer)) BuildWater();
+	else SetActorTickEnabled(false);
+}
+
+void AWorldTerrain::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(SharedGround(GetWorld()));
+	if (!Mid) return;
+	const float Fill = SkyFillVar.GetValueOnGameThread() * ADayNight::Dusk;
+	if (FMath::Abs(Fill - FillNow) < 0.002f) return;
+	FillNow = Fill;
+	Mid->SetScalarParameterValue(TEXT("SkyFill"), Fill);
 }
 
 void AWorldTerrain::BuildLand()
@@ -50,7 +80,7 @@ void AWorldTerrain::BuildLand()
 		}
 	auto At = [&](int32 i, int32 j) { return H[(i + 1) * GY + (j + 1)]; };   // grid point i, j (0 .. NX, 0 .. NY)
 
-	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));   // (the one ground material, shared with the square and Oak Hill: 2026-11-12)
+	UMaterialInterface* Mat = SharedGround(GetWorld());   // (the one ground material, shared with the square and Oak Hill: 2026-11-12; a dynamic copy for the low sun's fill)
 	UMaterialInterface* Fallback = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 
@@ -81,7 +111,7 @@ void AWorldTerrain::BuildLand()
 					const float X0 = MinX + i * Step, Y0 = MinY + j * Step;
 					if (X0 >= -Hole && X0 + Step <= Hole && Y0 >= -Hole && Y0 + Step <= Hole) continue;
 				// and Oak Hill's own finer ground east of the square (AOakHillTown, 2026-11-11)
-				if (JeebOakHill::Enabled() && JeebOakHill::InPatchCell(X0, Y0, Step)) continue;
+				if (JeebOakHill::Enabled() && JeebOakHill::InPatchCell(X0, Y0, Step)) continue;   // (the rebuilt town covers the same cells and the square's part of its box: JeebTownLab::RealSite)
 				if (JeebTownLab::NewOn() && JeebTownLab::InPatchCell(X0, Y0, Step)) continue;   // (TownLab only: the rebuilt town's own 1 m ground)
 					const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
 					Tri.Append({ A, C, B, B, C, D });

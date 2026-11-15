@@ -92,3 +92,26 @@ Made the same way as the house and store: `Tools\BuildBuildings.ps1 -CleanOnly O
 - The bank's back panes, painted lit yellow by Meshy but missed by the window marks, are darkened in the picture itself (`PANE_FIX`).
 - Decor (townlab_decor.py `BUILD`, `BUILD_A_PROPS`, `BUILD_A_LANTERNS`): no hanging ivy tress, and ivy only in patches at least as tall as the house's in the world (`ivy_min`, scaled by `bs`, the FModel Scale); props and lanterns keep their real size on the smaller-scaled buildings (`bs`). Wall lanterns are LanternBlack at the house's world size.
 - `-TownLabBuildings -TownLabGroup=a` shows the four old/new pairs in MoveLab (old at X -6800, -3100, 400, 4100; new at -5000, -1500, 2200, 5800; the camera looking +Y has +X on its LEFT). Frame cost (performance reviewer, solo, two runs each): overview of all four 3.17 ms old against 3.34 new (inside noise), street view 3.41 against 3.80 (+0.4 ms, the decor: library props with shadows and the lanterns).
+- After the third visual review: painted gold leading and stained glass inside the window marks are dark glass by day (`PANE_FIX` in townlab_bake.py, also the smithy and corner house), yellow panes the marks missed are window too, the bank's two ground-floor back windows are kept dark (`DARK_BOXES`: Meshy painted a dark rectangle across them, so they could only light along one edge), and the smithy and corner house have no ivy (`ivy=False` in townlab_decor.py: the shared climbing tile read as topiary on them). The smithy's log stack is firewood (only props in `/Game/TownDecor` ship).
+
+## The market stall and the potion stall (build-c, 2026-11-14)
+| | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
+|---|---|---|
+| Market stall ("GeneralStore", owner's pick B) | `SM_GeneralStore_300k`: 291k triangles | `SM_TL_MarketStall`: 60k, Nanite, 1 material, no glow or mask pictures (no windows) |
+| Potion stall | `SM_PotionStall_300k`: 301k | `SM_TL_PotionStall`: 50k, Nanite, 1 material |
+| Collision | `SM_*_Col` (20k) | `SM_TL_MarketStall_Col`, `SM_TL_PotionStall_Col` (the same meshes) |
+
+- Each keeps its own colours: the market stall's red-and-cream striped cloth roof and goods, the potion stall's timber (lifted and warmed a touch from grey-purple to rich brown: `GRADE` in townlab_bake.py).
+- The market stall needed three extra settings in townlab_bake.py, all keyed by its name:
+  - `CAGE_BY`: its bake rays start 12 cm out (the thin two-layer cloth roof baked its striped underside as dark blotches with 4 cm);
+  - `SPARE_ABOVE`: everything above the eaves (430 cm) is spared in the reduction like the house's flower boxes (the overlapping roof slats tore into holes);
+  - `UV_BOOST` / `PACK_MARGIN_BY`: its thousands of small goods made thousands of little UV islands and the roof got about 7% of the picture, so its stripes smeared in game; the roof's islands are scaled 2.6x before packing and the gaps narrowed.
+- No glow picture is written for a design without lit windows; the importer then uses `T_NoGlow` for both the glow and the mask.
+- The open stalls are all inside, so the high model's occlusion is deep everywhere: `AO_BY` paints it in lightly (market 0.12, potion 0.18 of the house's strength) and `CHROMA_BY` keeps the colours as rich as the original (the cream stripes measure 0.875/0.749/0.573 against the old 0.855/0.729/0.569).
+- Rebuild only these: `Tools\BuildTownLabBuildings.ps1 -Only TL_MarketStall,TL_PotionStall` (needs `Tools\BuildBuildings.ps1 -CleanOnly GeneralStore_300k PotionStall_300k` first). `-Only` imports onto the existing `M_TL_Building` and leaves the shared decor alone. Decor: `townlab_decor.py -- <project> --only TL_MarketStall,TL_PotionStall` rewrites only those blocks of TownLabDecor.h.
+
+### Their clutter (the old engine-shape barrels and crates went 2026-11-13, owner: "We'll add our own")
+`STALL_PROPS` in townlab_decor.py places Oak Hill's filler props by hand round each stall's sides and back (the open front and the shop counter stay clear), in world cm as drawn (the stall shrinks by its FModel Scale, the props keep their real size), each pushed outward until no part of the stall is inside its box. No ivy and no foundation stones on stalls (ivy cards beside bare posts read as stickers, white stone clumps as specks: visual review); no weeds either (lime clumps with no soil read as pasted on): props only.
+- Market stall (14): barrel, small barrel with a standing oil lantern (lit at dusk), hand cart side-on, spice sacks, open sack pile, crate with a rope coil, open crate, cabbage crate, crate with a lidless crate, grain and wheat sacks. About 174k triangles of props (the hand cart alone 30k), 14 pieces, 14 draws (plus the building).
+- Potion stall (11): wooden tub, wide pot, barrel, crate with a clay jug, open crate, amphora, jug, small barrel with an oil lantern, clay jug. About 93k triangles, 11 pieces, 11 draws (plus the building).
+- `-TownLabSet=stalls | stallsold | stallsnew` shows these two, old and new, in MoveLab's lineup (`-TownLabBuildings`).

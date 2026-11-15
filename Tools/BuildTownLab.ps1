@@ -1,4 +1,4 @@
-# TownLab (temporary test map, never cooked): makes /Game/TownLab/TownLab (a copy of Field) and the new town's ground material
+# TownLab (temporary test map, never cooked): makes /Game/TownLab/Map/TownLab (a copy of Field) and the new town's ground material
 # M_TL_Ground with Tools/townlab_build.py in a windowless editor. This copy's editor must be closed.
 # The cobble pictures come from Art/TownLab/Textures/Sources (git-ignored; Docs/TownLab/Sources.md says where to get them again).
 $proj = Split-Path $PSScriptRoot -Parent

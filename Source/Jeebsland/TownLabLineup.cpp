@@ -19,6 +19,12 @@ namespace
 			if (FCString::Strcmp(M.Name, Model) == 0) return M.Scale;
 		return 1.f;
 	}
+	float ScaleZOf(const TCHAR* Model)   // its height's scale (the potion stall keeps its full height: FModel ScaleZ)
+	{
+		for (const JeebOakHill::FModel& M : JeebOakHill::Models())
+			if (FCString::Strcmp(M.Name, Model) == 0) return M.ScaleZ > 0.f ? M.ScaleZ : M.Scale;
+		return 1.f;
+	}
 	int32 Tris(UStaticMesh* M)
 	{
 		const FStaticMeshRenderData* R = M ? M->GetRenderData() : nullptr;
@@ -67,14 +73,24 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		{ TEXT("/Game/Buildings/SM_OakHillCornerHouse_300k"), TEXT("/Game/Buildings/SM_OakHillCornerHouse_300k_Col"), TEXT("OakHillCornerHouse"), nullptr, TEXT("CORNER: OLD"), 4100.f, false },
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse_Col"), TEXT("OakHillCornerHouse"), TEXT("TL_CornerHouse"), TEXT("CORNER: NEW"), 5800.f, true },
 	};
-	for (const FSpot& S : bGroupA ? TArrayView<const FSpot>(SpotsA) : TArrayView<const FSpot>(Spots))
+	// build-c (2026-11-14): -TownLabSet=stalls | stallsold | stallsnew shows the market stall and the potion stall, old and new, in the
+	// same four spots instead
+	const FSpot StallSpots[] = {
+		{ TEXT("/Game/Buildings/SM_GeneralStore_300k"), TEXT("/Game/Buildings/SM_GeneralStore_300k_Col"), TEXT("GeneralStore"), nullptr, TEXT("MARKET STALL: OLD (300k)"), -2700.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall"), TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall_Col"), TEXT("GeneralStore"), TEXT("TL_MarketStall"), TEXT("MARKET STALL: NEW"), -1000.f, true },
+		{ TEXT("/Game/Buildings/SM_PotionStall_300k"), TEXT("/Game/Buildings/SM_PotionStall_300k_Col"), TEXT("PotionStall"), nullptr, TEXT("POTION STALL: OLD (300k)"), 900.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall_Col"), TEXT("PotionStall"), TEXT("TL_PotionStall"), TEXT("POTION STALL: NEW"), 2800.f, true },
+	};
+	const bool bStalls = Set.StartsWith(TEXT("stalls"));
+	if (bStalls) Set = Set.Mid(6).IsEmpty() ? FString(TEXT("both")) : Set.Mid(6);
+	for (const FSpot& S : bGroupA ? TArrayView<const FSpot>(SpotsA) : bStalls ? TArrayView<const FSpot>(StallSpots) : TArrayView<const FSpot>(Spots))
 	{
 		if ((Set == TEXT("old") && S.bNew) || (Set == TEXT("new") && !S.bNew)) continue;
 		const FString Name = FPaths::GetBaseFilename(S.Mesh);
 		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), S.Mesh, *Name));
 		if (!Mesh) { UE_LOG(LogTemp, Warning, TEXT("JEEBTLB missing %s"), S.Mesh); continue; }
 		const float Sc = ScaleOf(S.Model);
-		const FTransform Rel(FRotator(0.f, 180.f, 0.f), FVector(S.X, YardY, 0.f), FVector(Sc));   // (door, the model's +Y, toward the floor)
+		const FTransform Rel(FRotator(0.f, 180.f, 0.f), FVector(S.X, YardY, 0.f), FVector(Sc, Sc, ScaleZOf(S.Model)));   // (door, the model's +Y, toward the floor)
 		UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Owner);
 		M->SetStaticMesh(Mesh);
 		M->SetupAttachment(Root);
@@ -162,7 +178,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 			}
 		}
 		UE_LOG(LogTemp, Display, TEXT("JEEBTLB %s scale %.2f nanite %d fallback tris %d materials %d | decor pieces %d draws %d tris %d lights %d"),
-			*Name, Sc, Mesh->IsNaniteEnabled() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
+			*Name, Sc, Mesh->HasValidNaniteData() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
 		UTextRenderComponent* Sign = NewObject<UTextRenderComponent>(Owner);
 		Sign->SetupAttachment(Root);
 		Sign->SetRelativeLocation(FVector(S.X, YardY - 900.f, 1500.f));

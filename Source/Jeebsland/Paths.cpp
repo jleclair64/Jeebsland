@@ -34,6 +34,7 @@ void APaths::BeginPlay()
 		const JeebTerrain::FPathDef& Def = Defs[d];
 		const int32 N = Def.Pts.Num();
 		if (N < 2) continue;
+		if (d >= FirstCobbled && JeebTownLab::RealTown()) continue;   // (the rebuilt Oak Hill paints its own streets into its ground, 2026-11-14: no ribbons)
 		const float Lift = 1.5f + 0.12f * (d >= FirstCobbled ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
 
 		// Points along the centre line, with the road's half-width on each side

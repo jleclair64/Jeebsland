@@ -18,10 +18,15 @@ COL_FROM = {"TL_House": "OakHillHouse_300k", "TL_Store": "OakHillStore_300k"}
 # build-a (2026-11-14): the bank, bank stall, smithy and corner house
 NANITE |= {"TL_Bank", "TL_BankStall", "TL_Smith", "TL_CornerHouse"}
 COL_FROM.update({"TL_Bank": "OakHillBank_300k", "TL_BankStall": "BankStall_300k", "TL_Smith": "OakHillSmith_300k", "TL_CornerHouse": "OakHillCornerHouse_300k"})
-# TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just these buildings onto the M_TL_Building already there; the shared material and
-# the decor pieces are left alone (three builders work at once, each in its own project copy, and merge their new assets only)
-ONLY = [x for x in os.environ.get("TL_ONLY", "").split(",") if x]
-if ONLY: NAMES = [n for n in NAMES if n in ONLY]
+# build-c (2026-11-14): the market stall and the potion stall
+NANITE |= {"TL_MarketStall", "TL_PotionStall"}
+COL_FROM.update({"TL_MarketStall": "GeneralStore_300k", "TL_PotionStall": "PotionStall_300k"})
+# TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just those buildings onto the existing M_TL_Building, leaving it, the other
+# buildings and the shared decor untouched (several agents rebuild their own designs at once)
+ONLY = [n for n in os.environ.get("TL_ONLY", "").split(",") if n]
+if ONLY:
+    NAMES = [n for n in NAMES if n in ONLY]
+    if sorted(NAMES) != sorted(ONLY): raise RuntimeError("BUILDDIAG TL_ONLY asks for %s but Saved/KnightBuild/TownLab has %s" % (ONLY, NAMES))
 TEST_HOUSES = set()
 for f in ("/Game/TownLab", folder):
     if not lib.does_directory_exist(f): lib.make_directory(f)
@@ -185,8 +190,13 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     return m
 
 first = NAMES[0]
-no_glow = lib.load_asset(folder + "/T_NoGlow") if ONLY else pic("T_NoGlow", True)         # black: the default GlowTex, and the glow of any building without lit windows
-parent = lib.load_asset(folder + "/M_TL_Building") if ONLY else make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
+if ONLY:
+    no_glow = lib.load_asset(folder + "/T_NoGlow")
+    parent = lib.load_asset(folder + "/M_TL_Building")
+    if parent is None or no_glow is None: raise RuntimeError("BUILDDIAG TL_ONLY needs the existing M_TL_Building and T_NoGlow")
+else:
+    no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows
+    parent = make_material(pic("T_%s_Base" % first, True), pic("T_%s_MR" % first, False), pic("T_%s_Normal" % first, False, True), no_glow, pic("T_%s_Mask" % first, False))
 unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
 for n in NAMES:
     mi_path = folder + "/MI_" + n
@@ -196,8 +206,11 @@ for n in NAMES:
     mel.set_material_instance_texture_parameter_value(mi, "BaseTex", pic("T_%s_Base" % n, True))
     mel.set_material_instance_texture_parameter_value(mi, "MRTex", pic("T_%s_MR" % n, False))
     mel.set_material_instance_texture_parameter_value(mi, "NormalTex", pic("T_%s_Normal" % n, False, True))
-    mel.set_material_instance_texture_parameter_value(mi, "GlowTex", pic("T_%s_Glow" % n, True) or no_glow)
-    mel.set_material_instance_texture_parameter_value(mi, "MaskTex", pic("T_%s_Mask" % n, False))
+    glow_t = pic("T_%s_Glow" % n, True)
+    mel.set_material_instance_texture_parameter_value(mi, "GlowTex", glow_t or no_glow)
+    # (no lit windows, as the open stalls: no glow picture, so nothing glows or turns to glass whatever the mask says; the black
+    # T_NoGlow stands in for the mask too rather than a 2048 picture of nothing)
+    mel.set_material_instance_texture_parameter_value(mi, "MaskTex", pic("T_%s_Mask" % n, False) if glow_t else no_glow)
     if n in GLOW_BY_NAME: mel.set_material_instance_scalar_parameter_value(mi, "GlowStrength", GLOW_BY_NAME[n])
     if n in FIRE_BY_NAME: mel.set_material_instance_scalar_parameter_value(mi, "FireLevel", FIRE_BY_NAME[n])
     if n in TEST_HOUSES: mel.set_material_instance_scalar_parameter_value(mi, "UseMask", 0.0)

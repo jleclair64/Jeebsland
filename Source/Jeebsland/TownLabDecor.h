@@ -75,6 +75,35 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 593.2f, 323.1f, 0.0f, -50.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 265.0f, 358.0f, 183.0f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, true, true, true },   // lantern
 	};
+	inline const FDecor MarketStallDecor[] = {
+		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), -598.3f, -241.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_BarrelSmall.SM_BarrelSmall"), -590.6f, -141.0f, 0.0f, 70.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_HandCart.SM_HandCart"), -719.9f, 37.6f, 0.0f, -0.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_SpiceSacks.SM_SpiceSacks"), -593.0f, 280.4f, 0.0f, 100.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_SackPileOpen.SM_SackPileOpen"), 354.4f, -479.3f, 0.0f, -180.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 54.4f, -449.2f, 0.0f, 175.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_RopeCoil.SM_RopeCoil"), 54.4f, -449.2f, 104.7f, 150.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_CrateOpen.SM_CrateOpen"), -88.5f, -491.0f, 0.0f, -168.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_CabbageCrate.SM_CabbageCrate"), 615.2f, 204.7f, 0.0f, -105.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 613.3f, 4.7f, 0.0f, -82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), 613.3f, 4.7f, 104.7f, -104.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_GrainSack.SM_GrainSack"), 592.7f, -138.2f, 0.0f, -115.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), 584.2f, -223.9f, 0.0f, -70.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), -590.6f, -141.0f, 123.9f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, true, true },   // prop
+	};
+	inline const FDecor PotionStallDecor[] = {
+		{ TEXT("/Game/Filler/SM_WoodTub.SM_WoodTub"), -482.3f, -43.5f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_PotWide.SM_PotWide"), -448.1f, 119.0f, 0.0f, 70.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 381.6f, -361.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 244.1f, -353.9f, 0.0f, -174.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_ClayJug.SM_ClayJug"), 244.1f, -353.9f, 69.0f, 150.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_CrateOpen.SM_CrateOpen"), -218.4f, -388.6f, 0.0f, 170.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_PotAmphora.SM_PotAmphora"), -330.9f, -338.2f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_PotJug.SM_PotJug"), 447.8f, 146.2f, 0.0f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_BarrelSmall.SM_BarrelSmall"), 479.3f, 33.7f, 0.0f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 479.3f, 33.7f, 86.7f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, true, true },   // prop
+		{ TEXT("/Game/Filler/SM_ClayJug.SM_ClayJug"), 462.5f, -116.3f, 0.0f, -65.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+	};
 	inline const FDecor BankDecor[] = {
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -181.6f, -612.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.33f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), -598.3f, 413.3f, 0.0f, -0.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, false },   // stones
@@ -140,7 +169,7 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 711.1f, 496.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.94f, 0.94f, 0.94f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 720.1f, -497.2f, 0.0f, -90.0f, 0.0f, 0.0f, 0.77f, 0.77f, 0.77f, false, false, false },   // stones
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Stones.SM_TL_Stones"), 712.4f, -327.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.11f, 1.11f, 1.11f, false, false, false },   // stones
-		{ TEXT("/Game/Filler/SM_LogStackSmall.SM_LogStackSmall"), -550.9f, -612.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -550.9f, -612.8f, 0.0f, -160.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -400.9f, -614.3f, 0.0f, 170.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 783.8f, 237.6f, 0.0f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Pail.SM_Pail"), 739.4f, 147.6f, 0.0f, -110.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
@@ -178,6 +207,8 @@ namespace JeebTownLabDecor
 	inline const FBuildingDecor Buildings[] = {
 		{ TEXT("TL_House"), HouseDecor, UE_ARRAY_COUNT(HouseDecor) },
 		{ TEXT("TL_Store"), StoreDecor, UE_ARRAY_COUNT(StoreDecor) },
+		{ TEXT("TL_MarketStall"), MarketStallDecor, UE_ARRAY_COUNT(MarketStallDecor) },
+		{ TEXT("TL_PotionStall"), PotionStallDecor, UE_ARRAY_COUNT(PotionStallDecor) },
 		{ TEXT("TL_Bank"), BankDecor, UE_ARRAY_COUNT(BankDecor) },
 		{ TEXT("TL_BankStall"), BankStallDecor, UE_ARRAY_COUNT(BankStallDecor) },
 		{ TEXT("TL_Smith"), SmithDecor, UE_ARRAY_COUNT(SmithDecor) },
