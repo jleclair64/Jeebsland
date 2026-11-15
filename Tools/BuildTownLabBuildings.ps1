@@ -3,10 +3,16 @@
 # if that folder is empty), then /Game/TownLab/Buildings (Tools/townlab_import.py; the Unreal editor closed on this project).
 # -BakeOnly / -ImportOnly run one half. Every number of the look is at the top of townlab_bake.py.
 param([switch]$BakeOnly, [switch]$ImportOnly, [string[]]$Only)   # -Only TL_MarketStall,TL_PotionStall: bake and import just those (the import then leaves M_TL_Building and the shared decor alone)
+$Only = @($Only | ForEach-Object { $_ -split "," } | Where-Object { $_ })   # (-File passes "TL_Bank,TL_Smith" as one string)
 $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLab'
 $designs = @(@('OakHillHouse_300k', 'TL_House', 60000), @('OakHillStore_300k', 'TL_Store', 50000))
+# build-a (2026-11-14): the bank, bank stall, smithy and corner house
+$designs += , @('OakHillBank_300k', 'TL_Bank', 55000)
+$designs += , @('BankStall_300k', 'TL_BankStall', 50000)
+$designs += , @('OakHillSmith_300k', 'TL_Smith', 55000)
+$designs += , @('OakHillCornerHouse_300k', 'TL_CornerHouse', 55000)
 # build-c (2026-11-14): the market stall and the potion stall
 $designs += ,@('GeneralStore_300k', 'TL_MarketStall', 60000)
 $designs += ,@('PotionStall_300k', 'TL_PotionStall', 50000)

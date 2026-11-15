@@ -77,6 +77,23 @@ No outside textures were downloaded and no Meshy credits were spent (0): everyth
 - Kept from the original models (not changed here): a dark seam where the house chimney meets the gable, the store's darker back wall stone (same as the old store), the store's hanging sign going nearly black at dusk.
 - Moss clumps on the roofs were tried and taken out (they read as stickers); the model's own ridge moss is graded into the straw.
 
+## The bank, bank stall, smithy and corner house (build-a, 2026-11-14)
+Made the same way as the house and store: `Tools\BuildBuildings.ps1 -CleanOnly OakHillBank_300k BankStall_300k OakHillSmith_300k OakHillCornerHouse_300k`, then `Tools\BuildTownLabBuildings.ps1 -Only TL_Bank,TL_BankStall,TL_Smith,TL_CornerHouse` (`-Only` bakes and imports just those, onto the M_TL_Building already there; the shared material and decor pieces are left alone).
+
+| | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
+|---|---|---|
+| Bank (Scale 0.75) | `SM_OakHillBank_300k`: 300k, Nanite | `SM_TL_Bank`: 55k, Nanite, 1 material, 28 decor pieces in 10 draws, 2 lanterns |
+| Bank stall (0.7) | `SM_BankStall_300k`: 298k | `SM_TL_BankStall`: 50k, 19 pieces in 6 draws, 1 lantern |
+| Smithy (0.65) | `SM_OakHillSmith_300k`: 300k | `SM_TL_Smith`: 55k, 25 pieces in 9 draws, 1 lantern |
+| Corner house (1.0) | `SM_OakHillCornerHouse_300k`: 300k | `SM_TL_CornerHouse`: 55k, 28 pieces in 9 draws, 1 lantern |
+
+- The clay-tile roofs keep their own colour; plaster, wood and stone get the house's grade (`GRADE` in townlab_bake.py). The bank stall keeps its own palette (building_palette.py "bankstall"), graded only gently, with its arcade's occlusion eased (`AO_BY_NAME`).
+- The smithy's forge burns all day: its faces are (0,0,0) in building_clean.py's vertex colour, which the bake's empty background also reads, so its mask is baked offset and decoded (`FIRE` in townlab_bake.py), and `MI_TL_Smith` sets FireLevel 2.0 (`FIRE_BY_NAME` in townlab_import.py). The corner house's windows are 65% like the house's.
+- The bank's back panes, painted lit yellow by Meshy but missed by the window marks, are darkened in the picture itself (`PANE_FIX`).
+- Decor (townlab_decor.py `BUILD`, `BUILD_A_PROPS`, `BUILD_A_LANTERNS`): no hanging ivy tress, and ivy only in patches at least as tall as the house's in the world (`ivy_min`, scaled by `bs`, the FModel Scale); props and lanterns keep their real size on the smaller-scaled buildings (`bs`). Wall lanterns are LanternBlack at the house's world size.
+- `-TownLabBuildings -TownLabGroup=a` shows the four old/new pairs in MoveLab (old at X -6800, -3100, 400, 4100; new at -5000, -1500, 2200, 5800; the camera looking +Y has +X on its LEFT). Frame cost (performance reviewer, solo, two runs each): overview of all four 3.17 ms old against 3.34 new (inside noise), street view 3.41 against 3.80 (+0.4 ms, the decor: library props with shadows and the lanterns).
+- After the third visual review: painted gold leading and stained glass inside the window marks are dark glass by day (`PANE_FIX` in townlab_bake.py, also the smithy and corner house), yellow panes the marks missed are window too, the bank's two ground-floor back windows are kept dark (`DARK_BOXES`: Meshy painted a dark rectangle across them, so they could only light along one edge), and the smithy and corner house have no ivy (`ivy=False` in townlab_decor.py: the shared climbing tile read as topiary on them). The smithy's log stack is firewood (only props in `/Game/TownDecor` ship).
+
 ## The market stall and the potion stall (build-c, 2026-11-14)
 | | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
 |---|---|---|

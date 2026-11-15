@@ -37,6 +37,9 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 	if (!World || !Owner || !Root) return;
 	FString Set = TEXT("both");
 	FParse::Value(FCommandLine::Get(), TEXT("TownLabSet="), Set);
+	FString Group;   // -TownLabGroup=a: build-a's four pairs (bank, bank stall, smithy, corner house) instead of the house and store
+	FParse::Value(FCommandLine::Get(), TEXT("TownLabGroup="), Group);
+	const bool bGroupA = Group == TEXT("a");
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	const float YardY = 5600.f;
@@ -46,7 +49,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		G->SetStaticMesh(Cube);
 		G->SetupAttachment(Root);
 		G->SetRelativeLocation(FVector(0.f, YardY, -50.f));
-		G->SetRelativeScale3D(FVector(70.f, 28.f, 1.f));
+		G->SetRelativeScale3D(FVector(bGroupA ? 150.f : 70.f, 28.f, 1.f));
 		G->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		G->SetCollisionResponseToAllChannels(ECR_Block);
 		G->RegisterComponent();
@@ -60,6 +63,16 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		{ TEXT("/Game/Buildings/SM_OakHillStore_300k"), TEXT("/Game/Buildings/SM_OakHillStore_300k_Col"), TEXT("OakHillStore"), nullptr, TEXT("STORE: OLD (300k)"), 900.f, false },
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Store"), TEXT("/Game/TownLab/Buildings/SM_TL_Store_Col"), TEXT("OakHillStore"), TEXT("TL_Store"), TEXT("STORE: NEW"), 2800.f, true },
 	};
+	const FSpot SpotsA[] = {   // (build-a, 2026-11-14)
+		{ TEXT("/Game/Buildings/SM_OakHillBank_300k"), TEXT("/Game/Buildings/SM_OakHillBank_300k_Col"), TEXT("OakHillBank"), nullptr, TEXT("BANK: OLD (300k)"), -6800.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Bank"), TEXT("/Game/TownLab/Buildings/SM_TL_Bank_Col"), TEXT("OakHillBank"), TEXT("TL_Bank"), TEXT("BANK: NEW"), -5000.f, true },
+		{ TEXT("/Game/Buildings/SM_BankStall_300k"), TEXT("/Game/Buildings/SM_BankStall_300k_Col"), TEXT("BankStall"), nullptr, TEXT("STALL: OLD"), -3100.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_BankStall"), TEXT("/Game/TownLab/Buildings/SM_TL_BankStall_Col"), TEXT("BankStall"), TEXT("TL_BankStall"), TEXT("STALL: NEW"), -1500.f, true },
+		{ TEXT("/Game/Buildings/SM_OakHillSmith_300k"), TEXT("/Game/Buildings/SM_OakHillSmith_300k_Col"), TEXT("OakHillSmith"), nullptr, TEXT("SMITH: OLD"), 400.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Smith"), TEXT("/Game/TownLab/Buildings/SM_TL_Smith_Col"), TEXT("OakHillSmith"), TEXT("TL_Smith"), TEXT("SMITH: NEW"), 2200.f, true },
+		{ TEXT("/Game/Buildings/SM_OakHillCornerHouse_300k"), TEXT("/Game/Buildings/SM_OakHillCornerHouse_300k_Col"), TEXT("OakHillCornerHouse"), nullptr, TEXT("CORNER: OLD"), 4100.f, false },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse_Col"), TEXT("OakHillCornerHouse"), TEXT("TL_CornerHouse"), TEXT("CORNER: NEW"), 5800.f, true },
+	};
 	// build-c (2026-11-14): -TownLabSet=stalls | stallsold | stallsnew shows the market stall and the potion stall, old and new, in the
 	// same four spots instead
 	const FSpot StallSpots[] = {
@@ -70,7 +83,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 	};
 	const bool bStalls = Set.StartsWith(TEXT("stalls"));
 	if (bStalls) Set = Set.Mid(6).IsEmpty() ? FString(TEXT("both")) : Set.Mid(6);
-	for (const FSpot& S : bStalls ? TArrayView<const FSpot>(StallSpots) : TArrayView<const FSpot>(Spots))
+	for (const FSpot& S : bGroupA ? TArrayView<const FSpot>(SpotsA) : bStalls ? TArrayView<const FSpot>(StallSpots) : TArrayView<const FSpot>(Spots))
 	{
 		if ((Set == TEXT("old") && S.bNew) || (Set == TEXT("new") && !S.bNew)) continue;
 		const FString Name = FPaths::GetBaseFilename(S.Mesh);
