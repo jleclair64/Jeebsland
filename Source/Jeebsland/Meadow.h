@@ -24,8 +24,23 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	struct FCell { UInstancedStaticMeshComponent* Comp = nullptr; UInstancedStaticMeshComponent* Flowers = nullptr; int32 Tier = 0; };
+	struct FCell { UInstancedStaticMeshComponent* Comp = nullptr; UInstancedStaticMeshComponent* Flowers = nullptr; TArray<UInstancedStaticMeshComponent*> Packed; int32 Tier = 0; };
 	TMap<FIntPoint, FCell> Cells;
+
+	// Realistic grass from the owner's Fab packs (2026-11-15, owner: "lean towards realism with the grass"): jeeb.Grass.Pack 0 is our
+	// painted cards, 1 the Grass Library with Meadow Flowers, 2 Open World Foliage. Where the grass grows, how dense, the long patches
+	// and the field colour stay ours; only the near tufts' meshes and material change. The meshes are listed in Content/Data/GrassPacks.csv.
+	struct FKind { UStaticMesh* Mesh = nullptr; UMaterialInstanceDynamic* Mid = nullptr; int32 Role = 0; float Weight = 1.f, Height = 1.f, Width = 1.f, NaturalH = 50.f; };
+	TArray<FKind> Kinds;                 // the grown pack's kinds (Role 0 short field grass, 1 long-patch grass, 2 flowers)
+	UPROPERTY() TArray<UObject*> KeepAlive;
+	int32 Pack = 0;                      // the pack the grass now standing was grown with
+	float PackChance = 0.f;              // the share of tuft spots that get a pack clump
+	float PackFadeStart = 1800.f, PackFadeEnd = 2600.f;
+	bool bFarCards = true;               // our painted cards still carry the meadow past the pack's reach
+	void LoadPack(int32 P);
+	void RegrowAround(const FVector2D& Me);
+	FVector2D LastMe = FVector2D(1e9f, 1e9f);
+	TArray<TArray<FTransform>> JobKindXf;
 
 	UPROPERTY() TArray<UMaterialInstanceDynamic*> BladeMats;   // root, middle, tip
 	UPROPERTY() UStaticMesh* NearMesh = nullptr;
@@ -65,3 +80,6 @@ private:
 	bool NoCover(float X, float Y) const;
 	float Nearness(float X, float Y) const;
 };
+
+// (test only, -GrassLineup in MoveLab: every grass and flower type of the Fab packs in rows, for choosing them; Meadow.cpp)
+void JeebGrassLineup(UWorld* World);
