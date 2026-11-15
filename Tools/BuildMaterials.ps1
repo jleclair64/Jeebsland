@@ -206,7 +206,7 @@ $bmp6.Save($png6, [System.Drawing.Imaging.ImageFormat]::Png)
 $bmp6.Dispose()
 
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$py = Join-Path $PSScriptRoot 'build_materials.py'
+$py = (Join-Path $PSScriptRoot 'build_materials.py').Replace('\', '/')   # (forward slashes: Unreal read the "\t" of a copy's folder JeebsAgents\townbuild3 as a tab, 2026-11-15)
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$py" -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'MATDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'MATDIAG all materials built') { Write-Host 'Materials built.'; exit 0 } else { Write-Host 'Material build FAILED.'; exit 1 }

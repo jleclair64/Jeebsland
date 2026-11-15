@@ -142,6 +142,7 @@ void AKnightGameState::BuildWorld()
 		// (the sun and its light, as in the game, but three times as fast so the light can be judged quickly: owner, 2026-11-06)
 		if (ADayNight* LabSun = World->SpawnActor<ADayNight>(FVector::ZeroVector, FRotator::ZeroRotator)) LabSun->ClockSpeed = 3.f;
 		BuildMoveLab();
+		JeebGrassLineup(World);   // (test only, -GrassLineup: the Fab grass packs' types in rows, Meadow.cpp)
 		if (GEngine) GEngine->bEnableOnScreenDebugMessages = false;
 		return;
 	}
@@ -830,6 +831,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			static int32 EyeIdx = -1;
 			static ACameraActor* EyeCam = nullptr;
 			static int32 ShotIdx = -1;
+			static uint64 EyeMovedFrame = 0;
 			// (-ShotEyesStart / -ShotEyesGap: when the first eye goes and how long each stays; 2 and 8 keep one eye through JEEBGPU's 4.5-8.8 s)
 			static float EyeStart = 7.f, EyeGap = 2.f;
 			static const bool bEyeTimes = []() { FParse::Value(FCommandLine::Get(), TEXT("ShotEyesStart="), EyeStart); FParse::Value(FCommandLine::Get(), TEXT("ShotEyesGap="), EyeGap); EyeGap = FMath::Max(EyeGap, 1.6f); return true; }();
@@ -857,7 +859,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			// (mask 32: the sun creeps on every frame, as in play: a frozen sun lets the cached sun shadows skip redrawing what stands still,
 			// which makes shadows look almost free in a test still)
 			if (EyeSunBase >= 0.f) { static uint32 Tick32 = 0; ADayNight::FixedPhase = EyeSunBase + 0.00004f * float(++Tick32 % 64); }
-			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f)   // (1.4 s after the move: settled)
+			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f && GFrameCounter > EyeMovedFrame + 30)   // (1.4 s and 30 frames after the move: settled, even after a long frame regrowing the grass)
 			{
 				ShotIdx = EyeIdx;
 				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d.png"), *ShotName, EyeIdx), true, false);
@@ -865,12 +867,17 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			if (Want > EyeIdx)
 			{
 				EyeIdx = Want;
+				EyeMovedFrame = GFrameCounter;
 				TArray<FString> P;
 				if (EyeIdx < ShotEyes.Num()) ShotEyes[EyeIdx].ParseIntoArray(P, TEXT("_"));
 				if (P.Num() >= 5)
 				{
 					// (optional 6th: the sun's phase there, 0 noon, 0.5 the low sun; 7th: a test mask, see JeebFoliageMask)
 					if (P.Num() >= 6) ADayNight::FixedPhase = FCString::Atof(*P[5]);
+					// (8th, 2026-11-15: the meadow's grass for this eye, jeeb.Grass.Pack 0 ours, 1 Grass Library, 2 Open World Foliage)
+					if (P.Num() >= 8)
+						if (IConsoleVariable* Pack = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Grass.Pack")))
+							Pack->Set(FCString::Atoi(*P[7]), ECVF_SetByConsole);
 					JeebFoliageMask(GetWorld(), P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0);
 					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
@@ -878,8 +885,14 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					const FRotator R(FCString::Atof(*P[4]), FCString::Atof(*P[3]), 0.f);
 					if (APawn* Me = PC->GetPawn())   // (he stands under the eye, hidden, so the grass grows round the view as round a player there)
 					{
-						Me->SetActorHiddenInGame(true);
-						Me->SetActorLocation(FVector(Ex, Ey, L.Z - FCString::Atof(*P[2]) + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+						// (mask 1024, 2026-11-15: he stands in view instead, 3.5 m ahead of the eye with his back to it, for a third-person look)
+						const bool bShow = P.Num() >= 7 && (FCString::Atoi(*P[6]) & 1024);
+						const FVector Fw = FRotator(0.f, R.Yaw, 0.f).Vector();
+						const float Ax = bShow ? Ex + Fw.X * 350.f : Ex, Ay = bShow ? Ey + Fw.Y * 350.f : Ey;
+						Me->SetActorHiddenInGame(!bShow);
+						const float Gz = GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? L.Z - FCString::Atof(*P[2]) : JeebTerrain::HeightAt(Ax, Ay);
+						Me->SetActorLocation(FVector(Ax, Ay, Gz + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+						if (bShow) { Me->SetActorRotation(FRotator(0.f, R.Yaw, 0.f)); if (AController* Ctl = Me->GetController()) Ctl->SetControlRotation(FRotator(0.f, R.Yaw, 0.f)); }
 					}
 					if (!EyeCam) EyeCam = GetWorld()->SpawnActor<ACameraActor>(L, R);
 					if (EyeCam)

@@ -414,10 +414,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import grass_field   # noqa: E402  (the field colour the blades share with the ground under them, 2026-11-14)
 
 
-def grass_sink(g, start, end):
+def grass_sink(g, start, end, near=False):
     """(keep, offset) for World Position Offset: past FadeStart a blade sinks into the ground, gone by FadeEnd, so the grass
     thins out over distance into the painted ground instead of stopping at a line (the tufts' own pivot's distance: a whole
-    tuft sinks together). keep is 1 near, 0 gone; offset pulls each vertex down by its height above the pivot times 1 - keep."""
+    tuft sinks together). keep is 1 near, 0 gone; offset pulls each vertex down by its height above the pivot times 1 - keep.
+    near (M_Grass, 2026-11-15): the blades also lie sunk closer than NearStart and rise by NearEnd, where the realistic Fab grass
+    (Meadow.cpp, jeeb.Grass.Pack) sinks away; the defaults (-2, -1) leave every blade up."""
     wp = g.node(unreal.MaterialExpressionWorldPosition)
     obj = g.node(unreal.MaterialExpressionObjectPositionWS)
     cam = g.node(unreal.MaterialExpressionCameraPositionWS)
@@ -426,6 +428,12 @@ def grass_sink(g, start, end):
     div = g.node(unreal.MaterialExpressionDivide); g.link(g.subn(dist, g.scalar("FadeStart", start)), div, "A"); g.link(span, div, "B")
     gone = g.sat(div)
     gone = g.muln(gone, gone)                                          # (eases in: most of the blade's height stays to the middle of the band)
+    if near:
+        nspan = g.subn(g.scalar("NearEnd", -1.0), g.scalar("NearStart", -2.0))
+        ndiv = g.node(unreal.MaterialExpressionDivide); g.link(g.subn(dist, g.scalar("NearStart", -2.0)), ndiv, "A"); g.link(nspan, ndiv, "B")
+        low = g.one(unreal.MaterialExpressionOneMinus, g.sat(ndiv))
+        mx = g.node(unreal.MaterialExpressionMax); g.link(gone, mx, "A"); g.link(low, mx, "B")
+        gone = mx
     keep = g.one(unreal.MaterialExpressionOneMinus, gone)
     up = g.subn(g.mask(wp, False, False, True), g.mask(obj, False, False, True))
     down = g.muln(g.c3((0.0, 0.0, -1.0)), g.muln(up, gone))
@@ -480,7 +488,7 @@ def build_grass():
     # (Dusk is set each frame by Meadow.cpp's material instance from ADayNight::Dusk, 0 at noon, 1 at the lowest sun)
     col = g.lerp(col, g.muln(col, g.c3((0.80, 1.04, 1.30))), g.mul(g.scalar("Dusk", 0.0), 0.85))
 
-    keep, down = grass_sink(g, 2600.0, 4900.0)
+    keep, down = grass_sink(g, 2600.0, 4900.0, near=True)
     # and as they sink, the blades' contrast eases toward the painted ground beyond (a little greyer, no lime edge at the hand-over)
     col = g.lerp(col, g.muln(g.lum(col), g.c3((1.0, 1.0, 1.0))), g.mul(g.one(unreal.MaterialExpressionOneMinus, keep), 0.3))
     shade = add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
