@@ -47,6 +47,7 @@ private:
 	int32 FarCount = 0, NearLeafCount = 0;   // (log JEEBTREES)
 	double BuildSeconds = 0.0;   // (time spent planting, all trees)
 	int32 TreeCount = 0;
+	TArray<FVector2D> TreeSpots;   // (where each tree stands: JEEBWOODS finds the thickest woods for frame-cost spots)
 
 			bool bBark = false;        // trunks and branches use the shaped bark meshes (M_BarkTint)
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> TrunkVar;   // four trunk shapes

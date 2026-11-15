@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "Canopy.h"
+#include "DayNight.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
@@ -13,7 +14,7 @@
 
 namespace
 {
-	// (the square's size and how far the grass reaches are AMeadow's CellSize and Reach: 7.5 m and 95 m; TownLab's own grass is shorter-reaching)
+	// (the square's size and how far the grass reaches are AMeadow's CellSize and Reach: 15 m and 50 m since 2026-11-14, was 7.5 m and 95 m)
 	constexpr float FieldR = 9000.f;
 	constexpr float NearDensity = 0.0012f;   // full tufts per square cm, close up
 	constexpr float FarDensity = 0.0006f;    // thinner, cheaper tufts further out
@@ -42,9 +43,7 @@ AMeadow::AMeadow()
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("Root")));
 }
 
-// TownLab (the test map only, TownLab.h): over the rebuilt town the roads, buildings and wear are that town's; and while the player
-// stands in it, the whole meadow switches to the new way (bLabMode: dense grass only within 40 m in bigger squares, fewer draws;
-// the painted ground matches it beyond), so there is never a line where one kind of grass meets the other.
+// TownLab (the test map only, TownLab.h): over the rebuilt town the roads, buildings and wear are that town's.
 static bool InLab(float X, float Y) { return JeebTownLab::NewOn() && JeebTownLab::InPatch(X, Y); }
 bool AMeadow::GrowsHere(float X, float Y, float PadCm) const { return GrowsHereWorld(X, Y, PadCm); }
 int32 AMeadow::TierFor(float Dist) const { return Dist < Tier0 ? 0 : (Dist < Tier1 ? 1 : 2); }
@@ -57,22 +56,99 @@ float AMeadow::WearAt(float X, float Y, float PathClearanceCm) const
 }
 bool AMeadow::NoCover(float X, float Y) const { return InLab(X, Y) ? JeebTownLab::OnBuilding(X, Y) : JeebTerrain::NoGroundCover(X, Y); }
 float AMeadow::Nearness(float X, float Y) const { return InLab(X, Y) ? 1.f - FMath::SmoothStep(0.f, 700.f, JeebTownLab::BuildingDistance(X, Y)) : JeebTerrain::BuildingNearness(X, Y); }
-void AMeadow::SetLabMode(bool bOn)
+// Sporadic patches of longer grass (owner, 2026-11-14: "mix short and longer grassy patches like in the art pictures ... spread it
+// around sporadically to make it look natural"; Breath of the Wild's and Hogwarts Legacy's meadows): soft, irregular shapes of
+// different sizes from two octaves of world-space noise, never a grid. 0 = the short field, 1 = the heart of a long patch.
+static float LongGrassNoise(float X, float Y)
 {
-	if (bOn == bLabMode) return;
-	bLabMode = bOn;
-	if (bJob) { bJob = false; JobXf.Reset(); }
-	TArray<FIntPoint> All; Cells.GetKeys(All);
-	for (const FIntPoint& Id : All) DropCell(Id);
-	// (lab: 40 m of dense grass in 15 m squares, about 25 draws instead of about 500; full tufts within 12 m)
-	if (bOn && !LabMat && NearMesh)
+	const float N = 0.62f * FMath::PerlinNoise2D(FVector2D(X / 2600.f + 17.31f, Y / 2600.f - 4.17f))
+	              + 0.38f * FMath::PerlinNoise2D(FVector2D(X / 820.f - 9.73f, Y / 820.f + 31.29f));
+	return JeebWorld::Smooth(0.02f, 0.26f, N);
+}
+
+// Where long grass may grow: never on or beside a road (full room 4.5 m from its edge), at a building (the shorter-grass rule
+// there wins), under a tree's crown, on trampled ground, or on a town's plaza
+static float LongGrassRoom(float X, float Y, float Pc, float Near, float Cov, float Wear)
+{
+	float R = JeebWorld::Smooth(150.f, 450.f, Pc) * (1.f - Near) * (1.f - Cov) * (1.f - JeebWorld::Smooth(0.05f, 0.3f, Wear));
+	R *= JeebWorld::Smooth(4500.f, 7000.f, FVector2D::Distance(FVector2D(X, Y), FVector2D(JeebOakHill::PosX, JeebOakHill::PosY)));
+	if (JeebTownLab::NewOn()) R *= JeebWorld::Smooth(4500.f, 7000.f, FVector2D::Distance(FVector2D(X, Y), FVector2D(JeebTownLab::PlazaX, JeebTownLab::PlazaY)));
+	return R;
+}
+
+// The meadow's flowers (2026-11-14, "a few flowers"): small heads on thin stems among the tufts, in clumps of one colour, as the
+// references' meadows have them. Colours (linear): cream white, butter yellow, lilac, soft blue, rose.
+static const FLinearColor FlowerColours[5] = {
+	FLinearColor(0.95f, 0.93f, 0.82f), FLinearColor(1.0f, 0.82f, 0.25f), FLinearColor(0.82f, 0.66f, 1.0f),
+	FLinearColor(0.62f, 0.75f, 1.0f), FLinearColor(1.0f, 0.60f, 0.70f) };   // (lighter since the first review: the blue read navy)
+static float FlowerChance(float X, float Y)
+{
+	const float N = FMath::PerlinNoise2D(FVector2D(X / 1100.f + 3.7f, Y / 1100.f + 11.9f));
+	return 0.01f + 0.16f * JeebWorld::Smooth(0.15f, 0.42f, N);   // (a few anywhere, clumps where the noise is high)
+}
+static int32 FlowerKind(float X, float Y)
+{
+	const float N = FMath::PerlinNoise2D(FVector2D(X / 1700.f - 21.3f, Y / 1700.f + 5.1f)) * 0.5f + 0.5f;   // (one colour per clump, mostly)
+	return FMath::Clamp(FMath::FloorToInt(N * 5.f), 0, 4);
+}
+
+// A flower: a thin crossed stem and a five-petal head 30 cm up (vertex red 0 stem, 1 head: M_GrassFlower). Its V runs as a tuft's
+// card (0 at the head, 1 at the ground): placed with its head at the blades' tips, it sways as they do.
+static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
+{
+	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
+	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Flower")));
+	FMeshDescription MD;
+	FStaticMeshAttributes Attr(MD);
+	Attr.Register();
+	TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
+	TVertexInstanceAttributesRef<FVector3f> Nrm = Attr.GetVertexInstanceNormals();
+	TVertexInstanceAttributesRef<FVector3f> Tan = Attr.GetVertexInstanceTangents();
+	TVertexInstanceAttributesRef<float> Sign = Attr.GetVertexInstanceBinormalSigns();
+	TVertexInstanceAttributesRef<FVector2f> UVs = Attr.GetVertexInstanceUVs();
+	TVertexInstanceAttributesRef<FVector4f> Cols = Attr.GetVertexInstanceColors();
+	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
+	const FPolygonGroupID Group = MD.CreatePolygonGroup();
+	GroupSlot[Group] = FName("Flower");
+	auto Tri = [&](const FVector& A, const FVector& B, const FVector& C, const FVector& N, float Head)
 	{
-		LabMat = UMaterialInstanceDynamic::Create(NearMesh->GetMaterial(0), this);   // (its blades fade out short of the 40 m edge, where the painted ground takes over)
-		LabMat->SetScalarParameterValue(TEXT("FadeStart"), 1800.f);
-		LabMat->SetScalarParameterValue(TEXT("FadeEnd"), 3900.f);
+		const FVector Pts[3] = { A, B, C };
+		TArray<FVertexInstanceID> Inst;
+		for (int32 k = 0; k < 3; ++k)
+		{
+			const FVertexID V = MD.CreateVertex();
+			Pos[V] = FVector3f(Pts[k]);
+			const FVertexInstanceID I = MD.CreateVertexInstance(V);
+			Nrm[I] = FVector3f(N);
+			Tan[I] = FVector3f(1.f, 0.f, 0.f);
+			Sign[I] = 1.f;
+			UVs[I] = FVector2f(0.5f, FMath::Max(0.f, 1.f - float(Pts[k].Z) / 30.f));
+			Cols[I] = FVector4f(Head, 0.f, 0.f, 1.f);
+			Inst.Add(I);
+		}
+		MD.CreatePolygon(Group, Inst);
+	};
+	const float H = 30.f, StemW = 0.7f;
+	for (int32 c = 0; c < 2; ++c)   // the stem: two crossed thin strips
+	{
+		const FVector S = c == 0 ? FVector(StemW, 0.f, 0.f) : FVector(0.f, StemW, 0.f);
+		const FVector N = c == 0 ? FVector(0.f, 1.f, 0.f) : FVector(1.f, 0.f, 0.f);
+		Tri(-S, S, S + FVector(0, 0, H), N, 0.f);
+		Tri(-S, S + FVector(0, 0, H), -S + FVector(0, 0, H), N, 0.f);
 	}
-	CellSize = bOn ? 1500.f : 750.f; Reach = bOn ? 4000.f : 9500.f; Tier0 = bOn ? 1500.f : 1500.f; Tier1 = bOn ? 2700.f : 4000.f;
-	UE_LOG(LogTemp, Log, TEXT("JEEBLAB meadow %s"), bOn ? TEXT("new way (40 m, 15 m squares)") : TEXT("as the game (95 m, 7.5 m squares)"));
+	const FVector Ctr(0.f, 0.f, H + 0.4f);   // the head: five rounded petals (a 20-point outline with five soft lobes), cupped a little
+	for (int32 k = 0; k < 20; ++k)
+	{
+		auto P = [&](int32 i) { const float A = i * PI / 10.f; const float L = FMath::Abs(FMath::Cos(A * 2.5f)); const float R = 3.5f + 4.3f * L; return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, H + 0.9f * L); };
+		Tri(Ctr, P(k), P(k + 1), FVector(0.f, 0.f, 1.f), 1.f);
+	}
+	UStaticMesh::FBuildMeshDescriptionsParams Params;
+	Params.bBuildSimpleCollision = false;
+	Params.bFastBuild = true;
+	TArray<const FMeshDescription*> Descs;
+	Descs.Add(&MD);
+	SM->BuildFromMeshDescriptions(Descs, Params);
+	return SM;
 }
 
 // A grass tuft as three crossed flat cards (6 triangles). The blades are painted on a see-through texture (M_Grass).
@@ -203,14 +279,50 @@ void AMeadow::BeginPlay()
 	UMaterialInterface* GrassMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Grass.M_Grass"));
 	if (GrassMat)
 	{
-		NearMesh = MakeCardMesh(this, GrassMat, 75.f, 48.f);
+		GrassMid = UMaterialInstanceDynamic::Create(GrassMat, this);
+		NearMesh = MakeCardMesh(this, GrassMid, 75.f, 48.f);
 		FarMesh = NearMesh;
 	}
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("M_Grass is missing: run MakeGrassCards.bat once. No grass tufts will grow."));
 	}
+	if (UMaterialInterface* FlowerMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_GrassFlower.M_GrassFlower")))
+		FlowerMesh = MakeFlowerMesh(this, FlowerMat);
+	else
+		UE_LOG(LogTemp, Warning, TEXT("M_GrassFlower is missing: run Tools/BuildMaterials.ps1. No meadow flowers."));
 	PlaceBushesAndFlowers();
+	{
+		// (log JEEBGRASS: how much of the land the long patches cover, from a fixed sample, to tune LongGrassNoise without pictures)
+		FRandomStream R(99);
+		int32 N = 0; float Long = 0.f, Heart = 0.f, Fl = 0.f;
+		for (int32 i = 0; i < 20000; ++i)
+		{
+			const float X = R.FRandRange(JeebWorld::MinX, JeebWorld::MaxX), Y = R.FRandRange(JeebWorld::MinY, JeebWorld::MaxY);
+			const float L = LongGrassNoise(X, Y);
+			++N; Long += L; Heart += L > 0.7f ? 1.f : 0.f; Fl += FlowerChance(X, Y);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBGRASS long grass: mean %.2f, heart of a patch on %.0f%% of the land; flowers %.2f per 100 tufts; reach %.0f m in %.0f m squares"),
+			Long / N, 100.f * Heart / N, 100.f * Fl / N, Reach / 100.f, CellSize / 100.f);
+		// (test pictures: the nearest open spot to -GrassNear=X_Y with a long patch's heart, and with a clump of flowers)
+		FString Near;
+		if (FParse::Value(FCommandLine::Get(), TEXT("GrassNear="), Near, false))
+		{
+			TArray<FString> P; Near.ParseIntoArray(P, TEXT("_"));
+			const FVector2D O(P.Num() > 0 ? FCString::Atof(*P[0]) : 0.f, P.Num() > 1 ? FCString::Atof(*P[1]) : 0.f);
+			FVector2D BestL(O), BestF(O); float DL = 1e9f, DF = 1e9f;
+			for (int32 j = -60; j <= 60; ++j)
+				for (int32 i = -60; i <= 60; ++i)
+				{
+					const FVector2D Q = O + FVector2D(i, j) * 200.f;
+					const float D = FVector2D::Distance(Q, O);
+					if (!GrowsHere(Q.X, Q.Y) || JeebTerrain::PathClearance(Q.X, Q.Y) < 800.f || JeebCanopy::Cover(Q.X, Q.Y) > 0.f || JeebTerrain::BuildingNearness(Q.X, Q.Y) > 0.f) continue;
+					if (D < DL && LongGrassNoise(Q.X, Q.Y) > 0.9f) { DL = D; BestL = Q; }
+					if (D < DF && FlowerChance(Q.X, Q.Y) > 0.07f) { DF = D; BestF = Q; }
+				}
+			UE_LOG(LogTemp, Log, TEXT("JEEBGRASS near %.0f %.0f: long patch at %.0f %.0f, flowers at %.0f %.0f"), O.X, O.Y, BestL.X, BestL.Y, BestF.X, BestF.Y);
+		}
+	}
 
 }
 
@@ -236,6 +348,7 @@ void AMeadow::DropCell(const FIntPoint& Id)
 	if (FCell* C = Cells.Find(Id))
 	{
 		if (C->Comp) C->Comp->DestroyComponent();
+		if (C->Flowers) C->Flowers->DestroyComponent();
 		Cells.Remove(Id);
 	}
 }
@@ -246,12 +359,9 @@ void AMeadow::Tick(float Dt)
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (!Pawn || !NearMesh) return;
+	if (GrassMid) GrassMid->SetScalarParameterValue(TEXT("Dusk"), ADayNight::Dusk);
 	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
-	if (JeebTownLab::NewOn()) SetLabMode(JeebTownLab::InPatch(Me.X, Me.Y, bLabMode ? 2000.f : 0.f));   // (TownLab only)
-	// (the real Oak Hill, rebuilt: the same 40 m of dense grass while he is in the town, its own ground matching the blades beyond;
-	// the box less 10 m to switch on, 15 m beyond it to switch off, so walking along its edge doesn't flip it back and forth)
-	else if (JeebTownLab::RealTown()) SetLabMode(JeebOakHill::InBox(Me.X, Me.Y, bLabMode ? 1500.f : -1000.f));
 
 	TArray<FIntPoint> Far;
 	for (const TPair<FIntPoint, FCell>& P : Cells)
@@ -311,8 +421,8 @@ void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 			JobAmount[b * 5 + a] = JeebGround::GrassAmount(M);
 			JobWear[b * 5 + a] = WearAt(X, Y, bJobNearRoad ? Clearance(X, Y) : 1.0e6f);
 		}
-	JobXf.Reset();
-	JobXf.Reserve(JobCount);
+	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
+	JobXf.Reserve(JobCount); JobTall.Reserve(JobCount);
 }
 
 void AMeadow::StepJob(double BudgetSeconds)
@@ -345,10 +455,26 @@ void AMeadow::StepJob(double BudgetSeconds)
 				// easing back up to full height over about 7 m so it never reads as tall-then-suddenly-short
 				const float Near = Nearness(X, Y);
 				Short *= 1.f - 0.22f * Near;   // a bit shorter beside buildings (taller than before, so the crossed cards stand up)
-				if (bLabMode) Short *= JobTier >= 2 ? 0.45f : (JobTier == 1 ? 0.8f : 1.f);   // (lab: the blades shorten toward the 40 m edge, so they sink into the painted ground instead of stopping in a ring)
 				Short *= FMath::Lerp(0.55f, 1.f, Amount) * (1.f - 0.6f * JeebWorld::Smooth(0.1f, 0.6f, Wear));   // short where it thins out, and trampled by doors
-				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, Short) * (1.f + 0.35f * Near);   // and wider there, so the tufts overlap into one mat and the individual cards disappear
-				if (!bThin) JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
+				// (2026-11-14) the open field a little shorter than before, so the long patches stand out of it; the long patches up
+				// to twice that, a touch wider, never where LongGrassRoom says no (roads, buildings, trees, trampled ground, plazas)
+				const float Tall = LongGrassNoise(X, Y) * LongGrassRoom(X, Y, Pc, Near, Cov, Wear);
+				Short *= 0.82f * (1.f + 1.3f * Tall * JobRand.FRandRange(0.8f, 1.15f));
+				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, FMath::Min(Short, 1.f)) * (1.f + 0.35f * Near) * (1.f + 0.12f * Tall);   // and wider by buildings, so the tufts overlap into one mat and the individual cards disappear
+				if (bThin) continue;
+				JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
+				JobTall.Add(Tall);
+				// a flower beside this tuft now and then, its head just above the blades round it (tiers 0 and 1: within about 27 m;
+				// none on paths, trampled ground or under trees)
+				if (FlowerMesh && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov))
+				{
+					const float Fx = X + JobRand.FRandRange(-20.f, 20.f), Fy = Y + JobRand.FRandRange(-20.f, 20.f);
+					const float Up = FMath::Clamp(Sz * Short * 1.75f * JobRand.FRandRange(0.9f, 1.1f), 0.7f, 2.4f);   // (the head at the blades' tips, 30 cm x Up against a 48 cm card)
+					const float S = JobRand.FRandRange(0.85f, 1.2f);
+					JobFlowerXf.Add(FTransform(FRotator(JobRand.FRandRange(-8.f, 8.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-8.f, 8.f)), FVector(Fx, Fy, JeebTerrain::HeightAt(Fx, Fy) + 1.f), FVector(S, S, Up)));
+					const int32 K = JobRand.FRand() < 0.85f ? FlowerKind(X, Y) : JobRand.RandRange(0, 4);
+					JobFlowerCol.Add(FlowerColours[K] * JobRand.FRandRange(0.85f, 1.1f));
+				}
 			}
 		}
 	}
@@ -379,35 +505,43 @@ void AMeadow::FinishJob()
 		Comp->SetCastShadow(false);
 		Comp->bAffectDynamicIndirectLighting = false;
 		Comp->bAffectDistanceFieldLighting = false;
-		Comp->SetCullDistances(0, FMath::RoundToInt(Reach + 500.f)); if (bLabMode && LabMat) Comp->SetMaterial(0, LabMat);
+		Comp->SetCullDistances(0, FMath::RoundToInt(Reach + 500.f));
+		Comp->SetNumCustomDataFloats(1);   // (each tuft's long-grass share: M_Grass's golden tips)
 		Comp->RegisterComponent();
 		Comp->AddInstances(JobXf, false, true);
+		for (int32 i = 0; i < JobTall.Num(); ++i) if (JobTall[i] > 0.f) Comp->SetCustomDataValue(i, 0, JobTall[i], false);
+		Comp->MarkRenderStateDirty();
 		Cell.Comp = Comp;
 	}
+	if (JobFlowerXf.Num() > 0)
+	{
+		UInstancedStaticMeshComponent* F = NewObject<UInstancedStaticMeshComponent>(this);
+		F->SetStaticMesh(FlowerMesh);
+		F->SetupAttachment(RootComponent);
+		F->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		F->SetCastShadow(false);
+		F->bAffectDynamicIndirectLighting = false;
+		F->bAffectDistanceFieldLighting = false;
+		F->SetCullDistances(0, 2800);
+		F->SetNumCustomDataFloats(3);   // (the head's colour, M_GrassFlower)
+		F->RegisterComponent();
+		F->AddInstances(JobFlowerXf, false, true);
+		for (int32 i = 0; i < JobFlowerCol.Num(); ++i)
+		{
+			const float C[3] = { JobFlowerCol[i].R, JobFlowerCol[i].G, JobFlowerCol[i].B };
+			F->SetCustomData(i, MakeArrayView(C, 3), false);
+		}
+		F->MarkRenderStateDirty();
+		Cell.Flowers = F;
+		static int32 Logged = 0;
+		if (Logged++ < 6) UE_LOG(LogTemp, Log, TEXT("JEEBGRASS square %d %d tier %d: %d tufts, %d flowers (first at %s, colour %s)"), JobId.X, JobId.Y, JobTier, JobXf.Num(), JobFlowerXf.Num(), *JobFlowerXf[0].GetLocation().ToString(), *JobFlowerCol[0].ToString());
+	}
 	Cells.Add(JobId, Cell);
-	JobXf.Reset();
+	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
 }
 
 void AMeadow::PlaceBushesAndFlowers()
 {
-	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
-	UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	auto MakeISM = [&](const FLinearColor& Color, bool bShadow)
-	{
-		UInstancedStaticMeshComponent* I = NewObject<UInstancedStaticMeshComponent>(this);
-		I->SetStaticMesh(Ball);
-		I->SetupAttachment(RootComponent);
-		I->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		I->SetCastShadow(bShadow);
-		I->bAffectDynamicIndirectLighting = false;
-		I->bAffectDistanceFieldLighting = false;
-		I->RegisterComponent();
-		if (UMaterialInstanceDynamic* M = I->CreateDynamicMaterialInstance(0, BaseMat)) M->SetVectorParameterValue(TEXT("Color"), Color);
-		return I;
-	};
-	UInstancedStaticMeshComponent* PetalA = MakeISM(FLinearColor(0.9f, 0.85f, 0.7f), false);
-	UInstancedStaticMeshComponent* PetalB = MakeISM(FLinearColor(0.9f, 0.55f, 0.1f), false);
-
 	FRandomStream Rand(2024);
 	auto Spot = [&](float& X, float& Y)
 	{
@@ -440,12 +574,4 @@ void AMeadow::PlaceBushesAndFlowers()
 		Bushes->AddInstance(FTransform(FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 2.f), FVector(Size, Size, Size * Rand.FRandRange(0.85f, 1.15f))));
 	}
 
-	// flowers: 30% of the test plot's amount
-	for (int32 n = 0; n < 1000; ++n)
-	{
-		float X, Y; Spot(X, Y);
-		if (JeebTerrain::PathClearance(X, Y) < 60.f || JeebTerrain::NoGroundCover(X, Y)) continue;
-		const FVector P(X, Y, JeebTerrain::HeightAt(X, Y) + Rand.FRandRange(14.f, 24.f));
-		(Rand.FRand() < 0.5f ? PetalA : PetalB)->AddInstance(FTransform(FRotator::ZeroRotator, P, FVector(0.16f, 0.16f, 0.08f)));
-	}
 }

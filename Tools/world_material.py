@@ -20,8 +20,9 @@ import unreal
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures      # noqa: E402
 import ground_textures   # noqa: E402
+import grass_field       # noqa: E402  (the field colour shared with the grass blades, M_Grass)
 
-GRASS_DESATURATION = 0.45   # as build_materials.py's: the grass and the ground under it pulled this far toward grey
+GRASS_DESATURATION = grass_field.GRASS_DESATURATION   # the grass and the ground under it pulled this far toward grey (one number, grass_field.py)
 GRASS_TO_MEADOW = (1.139, 0.759, 0.358)   # T_GrassGround times this reads like the meadow tufts seen from afar (no line where the grass ends);
                                          # was (0.85, 1, 0.85) until M_Grass's tint went from 0.47, 0.58, 0.38 to 0.64, 0.52, 0.25 (2026-11-13: olive, not lime), then 0.60, 0.47, 0.21 and 0.63, 0.44, 0.16 (2026-11-14): 0.85 x new R / 0.47, new G / 0.58, 0.85 x new B / 0.38
 GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
@@ -172,24 +173,21 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
 
     # soft noise at a few scales (the small T_Patches picture: cheap), shared by every layer's edge
     rag = g.mask(g.tex(patches, g.mul(xy, 1.0 / 170.0)), True, False)            # ragged edges, about 1.5 m
-    med = g.mask(g.tex(patches, g.mul(g.add(xy, 3100.0), 1.0 / 1100.0)), True, False)   # 10 m patches
-    med2 = g.mask(g.tex(patches, g.mul(g.add(xy, -5300.0), 1.0 / 1730.0)), True, False)   # the same at an unrelated size:
-    medm = g.mul(g.addn(med, med2), 0.5)                                                  # averaged, neither one's repeat shows from the air
-    patchy = g.mask(g.tex(patches, g.mul(xy, 1.0 / 4500.0)), True, False)         # the meadow tufts' own patches (M_Grass)
-    big = g.mask(g.tex(patches, g.mul(g.add(xy, -7700.0), 1.0 / 26000.0)), True, False)   # broad swathes, a few hundred metres
+    fn = grass_field.noises(g, xy, patches)   # (10 m, 17 m, 45 m, broad swathes and the dry patches: the same as the blades', M_Grass)
+    med, medm = fn["med"], fn["medm"]
 
     # Grass: the painted picture, fading to its average far away (no tiling, no shimmer), lighter and darker in soft patches
     # two samplings at unrelated sizes, swapped in 10 m patches, so no 3 m repeat lines up into a grid
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
     near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
     near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), g.c3(GRASS_TO_MEADOW))   # (no "RGB": a Lerp's one output is unnamed; asking for "RGB" left the near ground black)
-    far = g.ramp(depth, 1500.0, 6000.0)
+    # past the grass blades (40 m since 2026-11-14) the ground carries the look: a broad sampling of the same picture keeps some
+    # texture out to about 80 m before it settles to the average (as the rebuilt town's lawn, M_TL_Ground)
+    mid = g.muln(g.tex(grass_tex, g.mul(g.add(xy, 4321.0), 1.0 / 1400.0)), g.c3(GRASS_TO_MEADOW))
+    near = g.lerp(near, mid, g.ramp(depth, 1500.0, 4500.0))
+    far = g.ramp(depth, 8000.0, 16000.0)
     grass = g.lerp(near, g.c3(GRASS_AVERAGE), far)
-    grass = g.muln(grass, g.lerpc(0.91, 1.08, medm))
-    shade = g.lerp(g.c3((0.84, 0.97, 0.86)), g.c3((1.02, 1.02, 0.90)), patchy)        # deeper to lighter green, exactly as the tufts
-    grass = g.muln(grass, shade)
-    grass = g.muln(grass, g.lerpc(0.82, 1.10, big))                               # broad lightness swathes, so the far land isn't flat
-    grass = g.muln(grass, g.lerp(g.c3((0.95, 1.0, 1.03)), g.c3((1.03, 1.0, 0.92)), med2))   # and a gentle hue wander, cooler to warmer green (never yellow)
+    grass = grass_field.before_grey(g, grass, fn)   # lightness and hue patches and the dry patches, exactly as the blades
     grass = g.desat(g.muln(grass, g.vector("Tint", (1.0, 1.0, 1.0))), GRASS_DESATURATION)
 
     # Soil (packed earth) for worn ground, mud and the fringe of rock
@@ -243,12 +241,8 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     snow_amt = g.muln(g.sat(g.addn(div, g.mul(g.add(rag, -0.5), 0.4))), g.ramp(nz, 0.55, 0.75))
     col = g.lerp(col, g.c3((0.82, 0.85, 0.90)), snow_amt)
 
-    # The rebuilt Oak Hill's look carried over the whole land (TownLab's M_TL_WorldGround, approved by the owner 2026-11-14): seen from
-    # a hill, M_Ground alone read as one flat dark olive sheet beside the town's lawn. The same broad swathes as the town's ground
-    # (deeper hollows to sunny yellow-green, a slow larger drift) and its brightness (Lift, as the lawn's Tint).
-    col = g.muln(col, g.lerp(g.c3((0.80, 0.95, 0.82)), g.c3((1.15, 1.08, 0.78)), patchy))
-    col = g.muln(col, g.lerpc(0.86, 1.08, big))
-    col = g.muln(col, g.vector("Lift", (1.10, 1.10, 1.04)))
+    # (2026-11-14: the swathes are now in grass_field.before_grey, on the grass only, the same as the blades and the town's lawn; flat ground is a little brighter than the blades, which are lit through)
+    col = grass_field.ground_lift(g, col)
 
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.lerp(g.c(0.95), g.c(0.62), m_amt), unreal.MaterialProperty.MP_ROUGHNESS)

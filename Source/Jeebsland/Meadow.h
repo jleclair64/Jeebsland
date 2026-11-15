@@ -24,12 +24,14 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	struct FCell { UInstancedStaticMeshComponent* Comp = nullptr; int32 Tier = 0; };
+	struct FCell { UInstancedStaticMeshComponent* Comp = nullptr; UInstancedStaticMeshComponent* Flowers = nullptr; int32 Tier = 0; };
 	TMap<FIntPoint, FCell> Cells;
 
 	UPROPERTY() TArray<UMaterialInstanceDynamic*> BladeMats;   // root, middle, tip
 	UPROPERTY() UStaticMesh* NearMesh = nullptr;
 	UPROPERTY() UStaticMesh* FarMesh = nullptr;
+	UPROPERTY() UStaticMesh* FlowerMesh = nullptr;
+	UPROPERTY() UMaterialInstanceDynamic* GrassMid = nullptr;   // M_Grass with the low sun's Dusk set each frame (cooler blades at the golden sun)
 
 		// A square is built a little each frame (a time budget) and only appears when it is finished, so walking never hitches
 	bool bJob = false;
@@ -38,6 +40,9 @@ private:
 	bool bJobNearRoad = true;
 	FRandomStream JobRand;
 	TArray<FTransform> JobXf;
+	TArray<float> JobTall;            // each tuft's long-grass share (0..1, per-instance data 0: M_Grass warms its tips)
+	TArray<FTransform> JobFlowerXf;   // the flowers in this square (tiers 0 and 1)
+	TArray<FLinearColor> JobFlowerCol;
 	// The ground's mask over the square being built, on a 5 x 5 grid (GroundMask.h), worked out once per square: how much grass
 	// grows (none on rock, mud or sand) and how trampled it is round buildings; each tuft reads it between the grid points
 	float JobAmount[25] = {}, JobWear[25] = {};
@@ -50,11 +55,9 @@ private:
 	void PlaceBushesAndFlowers();
 	void Prewarm();
 	bool bPrewarmed = false;
-	// TownLab (the test map only): the rebuilt town's roads and buildings, and the new way while the player stands in it (Meadow.cpp)
-	float CellSize = 750.f, Reach = 9500.f, Tier0 = 1500.f, Tier1 = 4000.f;
-	bool bLabMode = false;
-	UPROPERTY() UMaterialInstanceDynamic* LabMat = nullptr;
-	void SetLabMode(bool bOn);
+	// One way everywhere since 2026-11-14 (the rebuilt Oak Hill's, first tried in TownLab): dense grass only within 40 m, in 15 m squares (about
+	// 25 draws instead of about 500), thinning past 15 m and sinking into the painted ground by 39 m (M_Grass FadeStart..FadeEnd)
+	float CellSize = 1500.f, Reach = 5000.f, Tier0 = 1700.f, Tier1 = 3200.f;
 	bool GrowsHere(float X, float Y, float PadCm = 0.f) const;
 	int32 TierFor(float Dist) const;
 	float Clearance(float X, float Y) const;

@@ -40,6 +40,10 @@ namespace
 		{ TEXT("OakHillChurch"), TEXT("/Game/TownLab/Buildings/SM_TL_Church"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillWell"), TEXT("/Game/TownLab/Buildings/SM_TL_Well"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillPotionShop"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionShop"), 0.f, 0.f, 0.f },
+		{ TEXT("OakHillBank"), TEXT("/Game/TownLab/Buildings/SM_TL_Bank"), 0.f, 0.f, 0.f },   // build-a: the bank
+		{ TEXT("BankStall"), TEXT("/Game/TownLab/Buildings/SM_TL_BankStall"), 0.f, 0.f, 0.f },   // build-a: the bank stall
+		{ TEXT("OakHillSmith"), TEXT("/Game/TownLab/Buildings/SM_TL_Smith"), 0.f, 0.f, 0.f },   // build-a: the smithy (its forge burns all day)
+		{ TEXT("OakHillCornerHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse"), 0.f, 0.f, 0.f },   // build-a: the corner house
 		{ TEXT("GeneralStore"), TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall"), 0.f, 0.f, 0.f },   // build-c's rebuilt market stall
 		{ TEXT("PotionStall"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall"), 0.f, 0.f, 0.f },    // build-c's rebuilt potion stall
 	};

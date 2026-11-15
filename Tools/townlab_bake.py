@@ -43,6 +43,12 @@ GRADE = {
                              wood=(3.0, 1.5, -1.0, 1.1),
                              thatch=(-2.0, -2.5, 1.0, 0.95),
                              stone=(2.0, 0.5, 3.0, 1.0)),
+    # build-a's four (2026-11-14): the house/store palette; the bank stall keeps its own (building_palette.py "bankstall": clay tile
+    # roof, warm stone, brass), so it is graded only gently
+    "OakHillBank_300k":        dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-6.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
+    "BankStall_300k":          dict(plaster=(5.0, 0.5, 3.0, 1.0), wood=(-2.0, 0.5, -1.5, 1.0), thatch=(-2.0, 0.5, -0.5, 1.0), stone=(5.0, 0.5, 3.0, 1.0)),   # (its arcade wall lifted: review read it as grey concrete)
+    "OakHillSmith_300k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-8.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 4.0, 1.0)),
+    "OakHillCornerHouse_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-9.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
     # build-c's stalls (2026-11-14): each keeps its own colours (the market stall's red-and-cream striped roof and goods, the potion
     # stall's dark timber), only nudged toward the town's rich brown wood and warm cream
     "GeneralStore_300k": dict(plaster=(1.0, 1.0, 3.0, 1.0),
@@ -75,11 +81,14 @@ GRADE.update({
 })
 TILE_TARGET = (25.4, 22.7, 25.5)       # (build-b) the town's terracotta in Lab: every "tile" group is shifted to this mean (None: the fixed offsets)
 MOSS_GRADE = (-6.0, 6.0, 10.0, 0.3)   # green moss: pulled most of the way into the straw (a faint olive-brown tinge: the review read brighter olive as patches)
+# Buildings with a fire that burns all day (the forge): building_clean.py marks its faces (0,0,0) in the vertex colour, which the bake's
+# empty background also reads as, so their mask is baked offset (0.2 + 0.8 x colour: a real face is never 0) and decoded.
+FIRE = {"OakHillSmith_300k"}
 AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 # (build-c 2026-11-14, visual review: the stalls are open boxes under a roof, so the high model's occlusion is deep everywhere inside
 # and on the two-layer cloth roof; at 0.42 it turned the cream stripes peach, the lining and goods muddy and the potion stall's back
 # logs near black. Per design: (how much darkens the colour, how much of it reaches the material's AO channel) and the chroma gain.)
-AO_BY = {"GeneralStore_300k": (0.12, 0.4), "PotionStall_300k": (0.18, 0.5)}
+AO_BY = {"GeneralStore_300k": (0.12, 0.4), "PotionStall_300k": (0.18, 0.5), "BankStall_300k": (0.18, 0.18 / AO_STRENGTH)}   # (build-a: the bank stall's open arcade sits under its roof, so full occlusion greyed its back wall)
 CHROMA_BY = {"GeneralStore_300k": 1.0, "PotionStall_300k": 1.08}
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
@@ -313,11 +322,22 @@ if glow_img is not None:
     tg = tex(glow_img); show(tg.outputs["Color"]); glow_lin = bake("Glow", SMALL, True)
 else:
     glow_lin = np.zeros((SMALL, SMALL, 3), np.float32)
-show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
-if GRADE.get(name, {}).get("fire_as_window"):   # (build-b: the church's stained glass came out as "fire" (0,0,0) and stayed painted orange at noon: make it windows)
-    fire = (glow_lin.max(-1) > 0.05) & (mask[..., 1] < 0.5) & (mask[..., 2] < 0.5)
-    mask[fire] = (0.5, 1.0, 0.0); log("fire texels made windows", int(fire.sum()))
-mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
+if name in FIRE:
+    off = N("ShaderNodeMix"); off.data_type = "RGBA"; off.inputs["Factor"].default_value = 0.8
+    off.inputs[6].default_value = (1.0, 1.0, 1.0, 1.0); L(vcol.outputs["Color"], off.inputs[7])
+    show(off.outputs[2]); raw = bake("Mask", SMALL, False)
+    surf = raw.max(-1) > 0.1                    # (a real face of the model; the background stays 0)
+    mask = np.clip((raw - 0.2) / 0.8, 0, 1)
+    fire_t = surf & (mask.max(-1) < 0.15)       # the forge: (0,0,0) on the model
+    mask[fire_t] = 0.0
+    mask[..., 2] = np.where(fire_t, 0.0, np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype)))
+    log(new, "fire texels", int(fire_t.sum()), "window texels", int((mask[..., 1] > 0.5).sum()))
+else:
+    show(vcol.outputs["Color"]); mask = bake("Mask", SMALL, False)
+    if GRADE.get(name, {}).get("fire_as_window"):   # (build-b: the church's stained glass came out as "fire" (0,0,0) and stayed painted orange at noon: make it windows)
+        fire = (glow_lin.max(-1) > 0.05) & (mask[..., 1] < 0.5) & (mask[..., 2] < 0.5)
+        mask[fire] = (0.5, 1.0, 0.0); log("fire texels made windows", int(fire.sum()))
+    mask[..., 2] = np.maximum(mask[..., 2], (mask[..., 1] < 0.5).astype(mask.dtype))   # (anything not a window never glows: the bake's empty background and island edges must not read as the forge's (0,0,0))
 # convexity: the high model's pointiness (0.5 flat, above convex)
 show(geo.outputs["Pointiness"]); point = bake("Edge", SMALL, False)[..., 0]
 # the normal: the high model's shape and normal map, in the low model's tangent space
@@ -441,6 +461,45 @@ lin = lin * gl[..., None] * (1 - foot + foot * GRAD_FOOT_TINT)
 # the glass keeps its colour (M_TL_Building turns it to dark glass anyway)
 if isinstance(glass_guard, np.ndarray):
     lin = lin * (1 - glass_guard[..., None]) + base_lin * glass_guard[..., None]
+# Panes Meshy painted lit yellow that the window marks missed (no glow there, so M_TL_Building leaves them yellow all day: the bank's
+# back panes, review 2026-11-14): bright saturated yellow becomes dark glass in the picture itself, on the buildings listed
+PANE_FIX = {"OakHillBank_300k", "OakHillSmith_300k", "OakHillCornerHouse_300k"}
+if name in PANE_FIX:
+    w_pane = soft(C, 34, 44) * soft(Lc, 62, 70) * soft(H, 60, 68) * (1 - soft(H, 100, 108))
+    # warm painted leading and stained glass inside the window marks (gold cames read as a lit window at noon, review 2026-11-14):
+    # inside the marks, anything saturated becomes the same dark glass; the frames outside the marks keep their wood
+    win_big = up2(np.clip(box_blur(mask[..., 1], 2) * 3, 0, 1)) * (1 - up2(mask[..., 2]))
+    w_lead = win_big * soft(C, 14, 24) * soft(Lc, 30, 40) * (1 - w_pane)
+    w_all = np.maximum(w_pane, w_lead)
+    lin = lin * (1 - w_all[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * w_all[..., None]
+    log(new, "yellow pane texels darkened %.2f%%, warm leading %.2f%%" % (100 * float((w_pane > 0.5).mean()), 100 * float((w_lead > 0.5).mean())))
+    # the yellow panes the window marks missed become window too (lit at dusk with the rest; half-marked panes, review 2026-11-14)
+    wp_s = w_pane.reshape(SMALL, 2, SMALL, 2).mean((1, 3))
+    add_win = (wp_s > 0.4) & (mask[..., 1] < 0.5) & (mask[..., 2] > 0.5)
+    if add_win.any():
+        rr = mask[..., 0] * (mask[..., 1] > 0.5)
+        for _ in range(6):   # each new pane texel takes a neighbouring window's random number, so a pane lights as one
+            rr = np.maximum(rr, np.maximum(np.maximum(np.roll(rr, 2, 0), np.roll(rr, -2, 0)), np.maximum(np.roll(rr, 2, 1), np.roll(rr, -2, 1))))
+        lit = glow_lin.max(-1) > 0.05
+        gcol = np.median(glow_lin[lit], 0) if lit.any() else np.array([1.0, 0.55, 0.2], np.float32)
+        mask[add_win, 0] = np.where(rr[add_win] > 0, rr[add_win], 0.5)
+        mask[add_win, 1] = 1.0; mask[add_win, 2] = 0.0
+        glow_lin[add_win] = np.maximum(glow_lin[add_win], gcol)
+        log(new, "pane texels added to the window marks", int(add_win.sum()))
+# Windows whose painted pane the marks cover only in part (the bank's two ground-floor back windows: Meshy painted a dark
+# rectangle across each pane, outside the marks, so at dusk they lit only round one edge, review 2026-11-14). Growing the marks
+# by colour can't tell that dark paint from the frame's dark wood, so these panes are boxed by hand (model cm, the bake's own
+# positions) and kept as dark windows all the time: no glow, dark glass by day, like the 30% of windows that never light
+DARK_BOXES = {"OakHillBank_300k": [(-420.0, -310.0, 540.0, 700.0, 165.0, 295.0), (310.0, 420.0, 540.0, 700.0, 165.0, 295.0)]}   # (wide of the frames: the stone round them has no marks to lose)
+if name in DARK_BOXES:
+    P = pos * U; box = np.zeros(P.shape[:2], bool)
+    for x0, x1, y0, y1, z0, z1 in DARK_BOXES[name]:
+        box |= (P[..., 0] > x0) & (P[..., 0] < x1) & (P[..., 1] > y0) & (P[..., 1] < y1) & (P[..., 2] > z0) & (P[..., 2] < z1)
+    was_win = box & (mask[..., 1] > 0.5)
+    mask[box, 1] = 0.0; mask[box, 2] = 1.0; glow_lin[box] = 0.0
+    wb = up2(was_win.astype(np.float32))
+    lin = lin * (1 - wb[..., None]) + np.array([0.035, 0.04, 0.05], np.float32) * wb[..., None]
+    log(new, "texels in hand-boxed dark windows", int(box.sum()), "of them window marks turned to dark glass", int(was_win.sum()))
 base_out = to_srgb(lin)
 write_png(base_out, os.path.join(out, "T_%s_Base.png" % new), True)
 if k_po is not None: nrm = nrm * (1 - k_po[..., None]) + np.array([0.5, 0.5, 1.0], np.float32) * k_po[..., None]   # (the 300k model carries the crack in its shape too: flat there)
