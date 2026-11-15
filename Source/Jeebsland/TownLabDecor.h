@@ -317,7 +317,7 @@ namespace JeebTownLabDecor
 		{ TEXT("TL_Smith"), SmithDecor, UE_ARRAY_COUNT(SmithDecor) },
 		{ TEXT("TL_CornerHouse"), CornerHouseDecor, UE_ARRAY_COUNT(CornerHouseDecor) },
 		{ TEXT("TL_TownHall"), TownHallDecor, UE_ARRAY_COUNT(TownHallDecor) },
-		{ TEXT("TL_Church"), ChurchDecor, UE_ARRAY_COUNT(ChurchDecor) },
+		// TL_Church left out with its model (Docs/TownLab/Buildings.md "for later"); ChurchDecor stays for when it goes in
 		{ TEXT("TL_Well"), WellDecor, UE_ARRAY_COUNT(WellDecor) },
 		{ TEXT("TL_PotionShop"), PotionShopDecor, UE_ARRAY_COUNT(PotionShopDecor) },
 	};
