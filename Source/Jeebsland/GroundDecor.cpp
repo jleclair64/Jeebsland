@@ -168,7 +168,7 @@ void JeebDecor::DressFoundations(AActor* Owner, const TArray<FFootprint>& Fps, i
 	const FLinearColor StoneTints[3] = { FLinearColor(1.06f, 1.0f, 0.92f), FLinearColor(0.95f, 0.95f, 0.95f), FLinearColor(0.9f, 0.94f, 1.0f) };
 	for (int32 k = 0; k < 3; ++k)
 	{
-		Stones[k] = NewSet(Owner, MakeStoneMesh(Owner, StoneMat ? StoneMat : Plain, 7100 + k * 31), true);
+		Stones[k] = NewSet(Owner, MakeStoneMesh(Owner, StoneMat ? StoneMat : Plain, 7100 + k * 31), false);   // (no shadows from the small stones since 2026-11-15: speed)
 		if (StoneMat) Tint(Stones[k], StoneMat, TEXT("Tint"), StoneTints[k]);
 		else Tint(Stones[k], Plain, TEXT("Color"), FLinearColor(0.25f, 0.24f, 0.22f));
 	}

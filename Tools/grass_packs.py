@@ -58,7 +58,21 @@ def sink(g, start, end):
     keep = g.one(unreal.MaterialExpressionOneMinus, gone)
     up = g.subn(g.mask(wp, False, False, True), g.mask(obj, False, False, True))
     down = g.muln(g.c3((0.0, 0.0, -1.0)), g.muln(up, gone))
-    return keep, down
+    # (2026-11-15, for speed: the pack's wind eases out between WindStill - 10 m and WindStill; nobody sees far blades sway)
+    calm = g.sat(g.mul(g.subn(g.scalar("WindStill", 3000.0), dist), 0.001))
+    return keep, down, calm
+
+
+def greener(g, c, flowers):
+    """the pack's straw-yellow stems and seed heads pulled to the green blades' colour at the same brightness (owner, 2026-11-15:
+    'recolor the yellow blades ... they stand out too much'). Yellow is where red comes near green; JeebGreenDry 0 turns it off."""
+    if flowers:
+        return c
+    red = g.mask(c, True, False)
+    grn = g.mask(c, False, True)
+    yellow = g.sat(g.mul(g.subn(red, g.mul(grn, 0.72)), 6.0))
+    green = g.muln(g.lum(c), g.vector("JeebDryGreen", (0.66, 1.12, 0.42)))
+    return g.lerp(c, green, g.muln(yellow, g.scalar("JeebGreenDry", 1.0)))
 
 
 def rewire(mat, flowers):
@@ -80,24 +94,24 @@ def rewire(mat, flowers):
     g.link(grass_field.before_grey(g, g.c3((1.0, 1.0, 1.0)), fn), field)
     fieldmix = g.lerp(g.c3((1.0, 1.0, 1.0)), field, g.scalar("JeebField", 1.0))
     tint = g.vector("JeebTint", (1.0, 1.0, 1.0))
-    col = g.muln(g.muln(base, fieldmix, out_a=base_out), tint)
+    col = g.muln(g.muln(greener(g, g.muln(base, g.c3((1.0, 1.0, 1.0)), out_a=base_out), flowers), fieldmix), tint)
     d = g.node(unreal.MaterialExpressionDesaturation, luminance_factors=unreal.LinearColor(0.3, 0.59, 0.11, 0.0))
     g.link(col, d, "")
     g.link(g.scalar("JeebDesat", 0.15), d, "Fraction")
     col = d
     # cooler at the low sun (as M_Grass: the warm light turned blades mustard); flowers only a little
     col = g.lerp(col, g.muln(col, g.c3((0.80, 1.04, 1.30))), g.mul(g.scalar("Dusk", 0.0), 0.4 if flowers else 0.85))
-    keep, down = sink(g, 1800.0, 2600.0)
+    keep, down, calm = sink(g, 4200.0, 5000.0)
     # as it sinks, the clump's contrast eases toward the painted ground beyond
     col = g.lerp(col, g.lum(col), g.mul(g.one(unreal.MaterialExpressionOneMinus, keep), 0.3))
     g.out(col, MP.MP_BASE_COLOR)
     if sss:
         # the light through the blades, cooled and dimmed at the low sun too (backlit, it alone turned the Grass Library to hay)
-        scol = g.muln(g.muln(sss, fieldmix, out_a=sss_out), tint)
+        scol = g.muln(g.muln(greener(g, g.muln(sss, g.c3((1.0, 1.0, 1.0)), out_a=sss_out), flowers), fieldmix), tint)
         scol = g.lerp(scol, g.muln(scol, g.c3((0.40, 0.62, 0.80))), g.mul(g.scalar("Dusk", 0.0), 0.3 if flowers else 0.9))
         g.out(scol, MP.MP_SUBSURFACE_COLOR)
     if wpo:
-        moved = g.muln(wpo, keep, out_a=wpo_out)          # (the pack's wind and bending, easing out as it sinks)
+        moved = g.muln(g.muln(wpo, keep, out_a=wpo_out), calm)          # (the pack's wind and bending, easing out as it sinks)
         g.out(g.addn(moved, down), MP.MP_WORLD_POSITION_OFFSET)
     else:
         g.out(down, MP.MP_WORLD_POSITION_OFFSET)

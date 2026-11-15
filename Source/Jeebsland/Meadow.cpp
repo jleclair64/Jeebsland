@@ -20,16 +20,17 @@
 
 // Which grass the meadow grows (2026-11-15, owner: "lean towards realism with the grass"; the packs are the owner's Fab library,
 // git-ignored, set up by Tools/BuildGrassPacks.ps1). Changing any of these regrows the grass round you at once (a short hitch).
-static TAutoConsoleVariable<int32> CVarGrassPack(TEXT("jeeb.Grass.Pack"), 0,
+static TAutoConsoleVariable<int32> CVarGrassPack(TEXT("jeeb.Grass.Pack"), 1,
 	TEXT("Meadow grass: 0 our painted cards, 1 Grass Library + Meadow Flowers (realistic, Fab), 2 Open World Foliage (realistic, cheaper, Fab)"));
 static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1"), 12.0f, TEXT("Grass Library clumps per square metre close by"));
 static TAutoConsoleVariable<float> CVarGrassDensity2(TEXT("jeeb.Grass.Density2"), 11.0f, TEXT("Open World Foliage clumps per square metre close by"));
-static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 2600.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer)"));
+static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 5000.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer; 50 m since 2026-11-15, owner: twice as far)"));
 static TAutoConsoleVariable<int32> CVarGrassFarCards(TEXT("jeeb.Grass.FarCards"), 0, TEXT("1: our painted cards rise where the realistic grass sinks, carrying the meadow to 50 m; 0: painted ground only beyond it"));
 static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT("0.9 0.92 0.84"), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live)"));
 static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT("0.86 0.9 0.8"), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live)"));
 static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
 static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.3f, TEXT("How far the realistic blades are pulled toward grey (live)"));
+static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
 static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.45f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
 
 namespace
@@ -408,7 +409,7 @@ void AMeadow::LoadPack(int32 P)
 		K.Weight = FCString::Atof(*C[3]); K.Height = FCString::Atof(*C[4]); K.Width = FCString::Atof(*C[5]);
 		K.NaturalH = FMath::Max(10.f, float(K.Mesh->GetBoundingBox().Max.Z));
 		if (UMaterialInterface* M = K.Mesh->GetMaterial(0)) K.Mid = UMaterialInstanceDynamic::Create(M, this);
-		UE_LOG(LogTemp, Log, TEXT("JEEBGRASS kind %s role %d: %.0f..%.0f cm tall, %d material slots"), *FPaths::GetBaseFilename(MeshPath), K.Role, K.Mesh->GetBoundingBox().Min.Z, K.Mesh->GetBoundingBox().Max.Z, K.Mesh->GetStaticMaterials().Num());
+		UE_LOG(LogTemp, Log, TEXT("JEEBGRASS kind %s role %d: %.0f..%.0f cm tall, %d material slots, %d LODs"), *FPaths::GetBaseFilename(MeshPath), K.Role, K.Mesh->GetBoundingBox().Min.Z, K.Mesh->GetBoundingBox().Max.Z, K.Mesh->GetStaticMaterials().Num(), K.Mesh->GetNumLODs());
 		KeepAlive.Add(K.Mesh);
 		if (K.Mid) KeepAlive.Add(K.Mid);
 		Kinds.Add(K);
@@ -498,6 +499,7 @@ void AMeadow::Tick(float Dt)
 					K.Mid->SetVectorParameterValue(TEXT("JeebTint"), bFlower ? FLinearColor::White : Tint);
 					K.Mid->SetScalarParameterValue(TEXT("JeebField"), CVarGrassField.GetValueOnGameThread() * (bFlower ? 0.3f : 1.f));
 					K.Mid->SetScalarParameterValue(TEXT("JeebDesat"), bFlower ? 0.f : CVarGrassPackDesat.GetValueOnGameThread());
+					K.Mid->SetScalarParameterValue(TEXT("JeebGreenDry"), CVarGrassGreenDry.GetValueOnGameThread());
 				}
 		}
 	}
@@ -587,6 +589,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 	TArray<int32> Of[3]; TArray<float> OfW[3];   // (the pack's kinds by role: short, long, flower)
 	for (int32 k = 0; k < Kinds.Num(); ++k) { Of[Kinds[k].Role].Add(k); OfW[Kinds[k].Role].Add(Kinds[k].Weight); }
 	const float FlowerShare = CVarGrassFlowers.GetValueOnGameThread();
+	static const float TierChance[3] = { 1.f, 0.85f, 0.6f }, TierWide[3] = { 1.f, 1.1f, 1.3f };
 	while (JobDone < JobCount)
 	{
 		if ((JobDone & 15) == 15 && FPlatformTime::Seconds() > End) return;   // (checked first, so a tuft skipped below never misses it; the next call picks up here)
@@ -631,13 +634,16 @@ void AMeadow::StepJob(double BudgetSeconds)
 				{
 					// a realistic clump at about this spot's card height (48 cm card x its scale), keeping its own proportions: long-patch kinds
 					// where the long grass is (more often toward a patch's heart), the short field kinds elsewhere
-					if (JobRand.FRand() < PackChance)
+					// (2026-11-15, for speed: past about 17 m fewer, wider clumps of fewer kinds, so the far ring costs less but still reads as grass)
+					if (JobRand.FRand() < PackChance * TierChance[FMath::Min(JobTier, 2)])
 					{
 						const int32 Kr = (Of[1].Num() > 0 && Tall > 0.2f && JobRand.FRand() < Tall * 1.25f) ? 1 : 0;
-						const int32 K = PickKind(Of[Kr], OfW[Kr], X, Y, JobRand);
+						const int32 KindsHere = JobTier == 0 ? Of[Kr].Num() : FMath::Min(Of[Kr].Num(), JobTier == 1 ? 2 : 1);
+						TArray<int32> FarOf(Of[Kr].GetData(), KindsHere); TArray<float> FarW(OfW[Kr].GetData(), KindsHere);
+						const int32 K = PickKind(FarOf, FarW, X, Y, JobRand);
 						const FKind& Kd = Kinds[K];
 						const float TargetH = 48.f * Sz * (1.f + 0.1f * JobTier) * Short * Kd.Height;
-						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * JobRand.FRandRange(0.85f, 1.15f) * (1.f + 0.25f * Near);
+						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * JobRand.FRandRange(0.85f, 1.15f) * (1.f + 0.25f * Near) * TierWide[FMath::Min(JobTier, 2)];
 						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy * 0.55f, Xy * 1.6f);   // (never squashed or stretched far from its own shape)
 						JobKindXf[K].Add(FTransform(FRotator(JobRand.FRandRange(-4.f, 4.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-4.f, 4.f)), FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
 					}
@@ -737,6 +743,7 @@ void AMeadow::FinishJob()
 		P->bAffectDynamicIndirectLighting = false;
 		P->bAffectDistanceFieldLighting = false;
 		P->SetCullDistances(0, FMath::RoundToInt(PackFadeEnd + 200.f));
+		if (JobTier >= 2 && Kinds[k].Mesh->GetNumLODs() > 1) { P->bOverrideMinLOD = true; P->MinLOD = 1; }   // (the far ring: the pack's simpler model)
 		P->RegisterComponent();
 		P->AddInstances(JobKindXf[k], false, true);
 		Cell.Packed.Add(P);
