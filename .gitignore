@@ -42,3 +42,8 @@ __pycache__/
 
 # TownLab: downloaded CC0 texture originals (Docs/TownLab/Sources.md)
 Art/TownLab/Textures/Sources/
+
+# Project Nature grass packs from the owner's Fab library (about 1.5 GB; Docs/TownLab/AssetScout.md "Grass packs"): add them again with the launcher's Add to project
+Content/PN_GrassLibrary/
+Content/PN_MeadowFlowers/
+Content/PN_OpenWorldFoliage/
