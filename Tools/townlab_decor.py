@@ -270,6 +270,12 @@ BUILD = {   # walls rectangle (Blender frame, cm) from building_clean.py's BUILD
     "TL_MarketStall": dict(src="GeneralStore_300k", wx=(-534.7, 525.8), wy=(-376.1, 376.7), door=(-600.0, 600.0), seed=7, corners_only=True, stall=True, s=0.7),
     "TL_PotionStall": dict(src="PotionStall_300k", wx=(-529.3, 531.6), wy=(-283.7, 293.5), door=(-600.0, 600.0), seed=9, corners_only=True, stall=True, s=0.8, sz=1.0),
 }
+BUILD.update({   # build-b (townbuild2, 2026-11-14); walls from building_clean.py's BUILD lines / OakHill.h's FModel rows
+    "TL_TownHall": dict(src="OakHillTownHall_300k", wx=(-989.1, 985.8), wy=(-580.0, 562.0), door=(-300.0, 180.0), seed=7, ivy_min=(150.0, 220.0), no_hang=True),
+    "TL_Church": dict(src="OakHillChurch_300k", wx=(-591.5, 573.5), wy=(-709.2, 723.0), door=(-130.0, 130.0), seed=9, ivy_min=(150.0, 220.0), no_hang=True),
+    "TL_Well": dict(src="OakHillWell_150k", wx=(-152.7, 123.0), wy=(-118.6, 118.5), door=(9999.0, 9999.0), seed=11, no_ivy=True, feet=1),
+    "TL_PotionShop": dict(src="OakHillPotionShop_300k", wx=(-464.4, 526.7), wy=(-408.8, 404.3), door=(-200.0, 0.0), seed=13, ivy_min=(120.0, 200.0)),
+})
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
 BUILD_A_PROPS = {
@@ -484,7 +490,7 @@ for bname, B in BUILD.items():
     n_ivy = 0
     for side in (sides if B.get("ivy", True) else []):   # (ivy=False: the smithy and corner house, where the shared climbing tile's rounded top read as topiary, review 2026-11-14)
         sname, start, along, outv, L = side
-        cands = [] if B.get("stall") else [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])   # (no ivy on the stalls: tall cards by bare timber read as stickers, build-c review)
+        cands = [] if (B.get("no_ivy") or B.get("stall")) else [0.55 * 100, L - 0.55 * 100] + ([] if B.get("corners_only") else [rnd.uniform(150, L - 150) for _ in range(6)])
         rnd.shuffle(cands)
         placed = []
         for u in cands:
@@ -493,18 +499,19 @@ for bname, B in BUILD.items():
             if sname == "front" and B["door"][0] - 80 < pl.x < B["door"][1] + 80: continue
             face, clear = wall_profile(pl, outv)
             if face is None or clear < 160: continue
-            for w in B.get("ivy_w", (190.0, 150.0, 120.0, 95.0)):   # (ivy_w: narrower patches for a building, so they climb instead of bulging)
+            imin = B.get("ivy_min", 140); wmin, hmin = imin if isinstance(imin, tuple) else (0.0, imin)   # (ivy_min: the smallest ivy a building takes, a height or (width, height); build-a's take only tall patches: short ones read as round shrubs stuck to the wall)
+            for w in [x for x in B.get("ivy_w", (190.0, 150.0, 120.0, 95.0)) if x >= wmin]:   # (ivy_w: narrower patches for a building, so they climb instead of bulging)
                 h = min(clear - 10.0, 260.0 / B.get("bs", 1.0))   # (bs: a smaller-scaled building's ivy as tall in the world as the house's)
-                while h >= B.get("ivy_min", 140) and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
-                if h >= B.get("ivy_min", 140): break
-            if h < B.get("ivy_min", 140): continue   # (ivy_min: build-a's buildings take only tall patches: short ones read as round shrubs stuck to the wall, review 2026-11-14)
+                while h >= hmin and not (free_rect(side, u - w / 2, u + w / 2, 0, h) and flat(side, u, w, h, face)): h -= 20
+                if h >= hmin: break
+            if h < hmin: continue
             mesh = "TL_IvyClimb"
             add("ivy", mesh, pl + outv * face, outv, round(min(w / 150.0, h / 260.0) * 1.0, 2) if h < 255 else w / 150.0, True)
             items[-1]["scale3"] = (round(w / 150.0, 2), 1.0, round(h / 260.0, 2))
             placed.append(u); n_ivy += 1
             if len(placed) >= (3 if sname in ("left", "right") else 2): break
         # a hanging tress from the eaves over one clear spot per long wall
-        if sname in ("front", "back") and B.get("hang", True) and not B.get("stall"):   # (hang=False: build-a's, where the tress read as a floating clump under the eaves; never on a stall: it hung at the gable peak or off a bare beam, build-c review)
+        if sname in ("front", "back") and B.get("hang", True) and not B.get("no_ivy") and not B.get("no_hang") and not B.get("stall"):   # (hang=False / no_hang: where the tress read as a floating clump under the eaves; never on a stall)
             for _ in range(8):
                 u = rnd.uniform(120, L - 120); pl = start + along * u
                 if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
@@ -535,7 +542,7 @@ for bname, B in BUILD.items():
     # --- stones and weeds at the foot of the walls, mostly near the corners
     for side in sides:
         sname, start, along, outv, L = side
-        for k_u, u in enumerate((rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150))):
+        for k_u, u in enumerate((rnd.uniform(20, 90), L - rnd.uniform(20, 90), rnd.uniform(150, L - 150))[:B.get("feet", 3)]):   # (feet: how many spots per wall)
             if B.get("stall"): continue   # (a stall: no stones (white specks) and no weeds (lime blobs with no soil): build-c reviews)
             pl = start + along * u
             if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
@@ -583,6 +590,24 @@ for bname, B in BUILD.items():
         prop("right", 260, "WateringCan", 0.8, turn=-40)
         items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -358.0, 183.0)), yaw=0.0, pitch=0.0, roll=0.0,
                           scale=0.85, wb=True, light=True))
+    # build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop
+    # (build-b: only pieces already shipped in /Game/TownDecor, so the town needs no new copies)
+    elif bname == "TL_TownHall":
+        prop("left", 260, "Barrel", 0.85); prop("left", 360, "Crate", 0.85, turn=10)
+        prop("back", 600, "Firewood", 0.9, turn=90); prop("back", 1300, "PotRound", 0.9)
+        prop("right", 300, "PotWide", 0.9); prop("right", 820, "PotSmall", 0.9)
+    elif bname == "TL_Church":
+        prop("left", 400, "PotWide", 0.9); prop("right", 900, "PotAmphora", 0.9, turn=40)
+        prop("back", 300, "PotRound", 0.9); prop("back", 820, "PotJug", 0.9)
+        # the lantern building_clean.py took off left of the door (LANTERNS), hung back as a light
+        items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternBlack", pos=to_ue((-170.0, -685.0, 182.0)), yaw=0.0, pitch=0.0, roll=0.0,
+                          scale=0.8, wb=True, light=True))
+    elif bname == "TL_Well":
+        prop("right", 120, "Pail", 0.8, turn=25)
+    elif bname == "TL_PotionShop":
+        prop("left", 200, "ClayJug", 0.9); prop("left", 330, "PotSmall", 0.9, turn=20)
+        prop("back", 250, "Crate", 0.8, turn=-10); prop("back", 360, "Basket", 0.8, turn=30)
+        prop("right", 420, "PotRound", 0.9)
     elif bname in BUILD_A_PROPS:   # build-a's four (2026-11-14)
         BS = B.get("bs", 1.0)
         for (sname, u, mesh, sc_, kw) in BUILD_A_PROPS[bname]:

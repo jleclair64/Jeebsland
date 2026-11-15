@@ -35,6 +35,11 @@ namespace
 	const FLabSwap ModelSwaps[] = {
 		{ TEXT("OakHillHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_House"), 0.f, 0.f, 0.f },   // townbuild's rebuilt house
 		{ TEXT("OakHillStore"), TEXT("/Game/TownLab/Buildings/SM_TL_Store"), 0.f, 0.f, 0.f },   // townbuild's rebuilt store
+		// build-b's four (townbuild2, 2026-11-14)
+		{ TEXT("OakHillTownHall"), TEXT("/Game/TownLab/Buildings/SM_TL_TownHall"), 0.f, 0.f, 0.f },
+		// (the church stays on its old model in town: its rebuilt -X side wall failed visual review, see Docs/TownLab/Buildings.md "for later")
+		{ TEXT("OakHillWell"), TEXT("/Game/TownLab/Buildings/SM_TL_Well"), 0.f, 0.f, 0.f },
+		{ TEXT("OakHillPotionShop"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionShop"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillBank"), TEXT("/Game/TownLab/Buildings/SM_TL_Bank"), 0.f, 0.f, 0.f },   // build-a: the bank
 		{ TEXT("BankStall"), TEXT("/Game/TownLab/Buildings/SM_TL_BankStall"), 0.f, 0.f, 0.f },   // build-a: the bank stall
 		{ TEXT("OakHillSmith"), TEXT("/Game/TownLab/Buildings/SM_TL_Smith"), 0.f, 0.f, 0.f },   // build-a: the smithy (its forge burns all day)

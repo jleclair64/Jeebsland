@@ -56,12 +56,34 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		if (Base)
 			if (UMaterialInstanceDynamic* Mi = G->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.30f, 0.14f));
 	}
-	struct FSpot { const TCHAR* Mesh; const TCHAR* Col; const TCHAR* Model; const TCHAR* Decor; const TCHAR* Sign; float X; bool bNew; };
+	if (Cube)   // build-b's two rows behind it (town hall and church, then potion shop and well): one more yard, 76 x 72 m
+	{
+		UStaticMeshComponent* G = NewObject<UStaticMeshComponent>(Owner);
+		G->SetStaticMesh(Cube);
+		G->SetupAttachment(Root);
+		G->SetRelativeLocation(FVector(0.f, YardY + 5400.f, -50.f));
+		G->SetRelativeScale3D(FVector(76.f, 72.f, 1.f));
+		G->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		G->SetCollisionResponseToAllChannels(ECR_Block);
+		G->RegisterComponent();
+		if (Base)
+			if (UMaterialInstanceDynamic* Mi = G->CreateDynamicMaterialInstance(0, Base)) Mi->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.30f, 0.14f));
+	}
+	struct FSpot { const TCHAR* Mesh; const TCHAR* Col; const TCHAR* Model; const TCHAR* Decor; const TCHAR* Sign; float X; bool bNew; float Row = 0.f; };   // (Row: cm behind the first row, +Y)
 	const FSpot Spots[] = {
 		{ TEXT("/Game/Buildings/SM_OakHillHouse_300k"), TEXT("/Game/Buildings/SM_OakHillHouse_300k_Col"), TEXT("OakHillHouse"), nullptr, TEXT("HOUSE: OLD (300k)"), -2700.f, false },
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_House"), TEXT("/Game/TownLab/Buildings/SM_TL_House_Col"), TEXT("OakHillHouse"), TEXT("TL_House"), TEXT("HOUSE: NEW"), -1000.f, true },
 		{ TEXT("/Game/Buildings/SM_OakHillStore_300k"), TEXT("/Game/Buildings/SM_OakHillStore_300k_Col"), TEXT("OakHillStore"), nullptr, TEXT("STORE: OLD (300k)"), 900.f, false },
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Store"), TEXT("/Game/TownLab/Buildings/SM_TL_Store_Col"), TEXT("OakHillStore"), TEXT("TL_Store"), TEXT("STORE: NEW"), 2800.f, true },
+		// build-b (townbuild2): town hall and church 36 m behind, potion shop and well 74 m behind
+		{ TEXT("/Game/Buildings/SM_OakHillTownHall_300k"), TEXT("/Game/Buildings/SM_OakHillTownHall_300k_Col"), TEXT("OakHillTownHall"), nullptr, TEXT("TOWN HALL: OLD"), -2600.f, false, 3600.f },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_TownHall"), TEXT("/Game/TownLab/Buildings/SM_TL_TownHall_Col"), TEXT("OakHillTownHall"), TEXT("TL_TownHall"), TEXT("TOWN HALL: NEW"), -600.f, true, 3600.f },
+		{ TEXT("/Game/Buildings/SM_OakHillChurch_300k"), TEXT("/Game/Buildings/SM_OakHillChurch_300k_Col"), TEXT("OakHillChurch"), nullptr, TEXT("CHURCH: OLD"), 1300.f, false, 3600.f },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Church"), TEXT("/Game/TownLab/Buildings/SM_TL_Church_Col"), TEXT("OakHillChurch"), TEXT("TL_Church"), TEXT("CHURCH: NEW"), 2900.f, true, 3600.f },
+		{ TEXT("/Game/Buildings/SM_OakHillPotionShop_300k"), TEXT("/Game/Buildings/SM_OakHillPotionShop_300k_Col"), TEXT("OakHillPotionShop"), nullptr, TEXT("POTIONS: OLD"), -2200.f, false, 7400.f },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_PotionShop"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionShop_Col"), TEXT("OakHillPotionShop"), TEXT("TL_PotionShop"), TEXT("POTIONS: NEW"), -700.f, true, 7400.f },
+		{ TEXT("/Game/Buildings/SM_OakHillWell_150k"), TEXT("/Game/Buildings/SM_OakHillWell_150k_Col"), TEXT("OakHillWell"), nullptr, TEXT("WELL: OLD"), 1000.f, false, 7400.f },
+		{ TEXT("/Game/TownLab/Buildings/SM_TL_Well"), TEXT("/Game/TownLab/Buildings/SM_TL_Well_Col"), TEXT("OakHillWell"), TEXT("TL_Well"), TEXT("WELL: NEW"), 1800.f, true, 7400.f },
 	};
 	const FSpot SpotsA[] = {   // (build-a, 2026-11-14)
 		{ TEXT("/Game/Buildings/SM_OakHillBank_300k"), TEXT("/Game/Buildings/SM_OakHillBank_300k_Col"), TEXT("OakHillBank"), nullptr, TEXT("BANK: OLD (300k)"), -6800.f, false },
@@ -90,7 +112,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 		UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), S.Mesh, *Name));
 		if (!Mesh) { UE_LOG(LogTemp, Warning, TEXT("JEEBTLB missing %s"), S.Mesh); continue; }
 		const float Sc = ScaleOf(S.Model);
-		const FTransform Rel(FRotator(0.f, 180.f, 0.f), FVector(S.X, YardY, 0.f), FVector(Sc, Sc, ScaleZOf(S.Model)));   // (door, the model's +Y, toward the floor)
+		const FTransform Rel(FRotator(0.f, 180.f, 0.f), FVector(S.X, YardY + S.Row, 0.f), FVector(Sc, Sc, ScaleZOf(S.Model)));   // (door, the model's +Y, toward the floor)
 		UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(Owner);
 		M->SetStaticMesh(Mesh);
 		M->SetupAttachment(Root);
@@ -172,6 +194,11 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 					L->SetAttenuationRadius(300.f);   // (a lantern's glow, not a spotlight on the whole front: visual review 2026-11-14)
 					L->SetLightColor(FLinearColor(1.f, 0.55f, 0.24f));
 					L->SetCastShadows(false);
+					{	// (lit only at a low-sun still, as the windows: the town switches its lanterns on at dusk; build-b review 2026-11-14)
+						float LightPhase = 0.f;
+						FParse::Value(FCommandLine::Get(), TEXT("ShotPhase="), LightPhase);
+						L->SetVisibility(LightPhase >= 0.35f);
+					}
 					L->RegisterComponent();
 					++Lights;
 				}
@@ -181,7 +208,7 @@ void JeebTownLab::BuildLineup(UWorld* World, AActor* Owner, USceneComponent* Roo
 			*Name, Sc, Mesh->HasValidNaniteData() ? 1 : 0, Tris(Mesh), Mesh->GetStaticMaterials().Num(), DecorPieces, DecorDraws, DecorTris, Lights);
 		UTextRenderComponent* Sign = NewObject<UTextRenderComponent>(Owner);
 		Sign->SetupAttachment(Root);
-		Sign->SetRelativeLocation(FVector(S.X, YardY - 900.f, 1500.f));
+		Sign->SetRelativeLocation(FVector(S.X, YardY + S.Row - 900.f, S.Row > 0.f ? 2600.f : 1500.f));
 		Sign->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
 		Sign->SetHorizontalAlignment(EHTA_Center);
 		Sign->SetWorldSize(70.f);

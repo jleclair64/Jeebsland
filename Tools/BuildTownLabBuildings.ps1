@@ -8,6 +8,11 @@ $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLab'
 $designs = @(@('OakHillHouse_300k', 'TL_House', 60000), @('OakHillStore_300k', 'TL_Store', 50000))
+# build-b (townbuild2, 2026-11-14)
+$designs += , @('OakHillTownHall_300k', 'TL_TownHall', 60000)
+$designs += , @('OakHillChurch_300k', 'TL_Church', 60000)
+$designs += , @('OakHillWell_150k', 'TL_Well', 26000)
+$designs += , @('OakHillPotionShop_300k', 'TL_PotionShop', 50000)
 # build-a (2026-11-14): the bank, bank stall, smithy and corner house
 $designs += , @('OakHillBank_300k', 'TL_Bank', 55000)
 $designs += , @('BankStall_300k', 'TL_BankStall', 50000)
@@ -16,7 +21,7 @@ $designs += , @('OakHillCornerHouse_300k', 'TL_CornerHouse', 55000)
 # build-c (2026-11-14): the market stall and the potion stall
 $designs += ,@('GeneralStore_300k', 'TL_MarketStall', 60000)
 $designs += ,@('PotionStall_300k', 'TL_PotionStall', 50000)
-if ($Only) { $designs = @($designs | Where-Object { $Only -contains $_[1] }); $env:TL_ONLY = ($Only -join ',') } else { $env:TL_ONLY = '' }
+if ($Only) { $Only = @($Only | ForEach-Object { $_ -split ',' }); $designs = @($designs | Where-Object { $Only -contains $_[1] }); $env:TL_ONLY = ($Only -join ',') } else { $env:TL_ONLY = '' }
 if (-not $ImportOnly) {
     foreach ($d in $designs) {
         & $blender -b -P (Join-Path $PSScriptRoot 'townlab_bake.py') -- $work $out $d[0] $d[1] $d[2] --preview | Select-String -Pattern 'TLBAKE|Traceback|Error' | ForEach-Object { Write-Host $_.Line }

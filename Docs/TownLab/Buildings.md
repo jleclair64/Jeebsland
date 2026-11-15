@@ -77,6 +77,28 @@ No outside textures were downloaded and no Meshy credits were spent (0): everyth
 - Kept from the original models (not changed here): a dark seam where the house chimney meets the gable, the store's darker back wall stone (same as the old store), the store's hanging sign going nearly black at dusk.
 - Moss clumps on the roofs were tried and taken out (they read as stickers); the model's own ridge moss is graded into the straw.
 
+## Town hall, church, well and potion shop (build-b, 2026-11-14)
+| | Old (`/Game/Buildings`) | New (`/Game/TownLab/Buildings`) |
+|---|---|---|
+| Town hall | `SM_OakHillTownHall_300k`: 300k | `SM_TL_TownHall`: 60k, Nanite, 1 material (`MI_TL_TownHall`) |
+| Church | `SM_OakHillChurch_300k`: 299k | `SM_TL_Church`: 60k, Nanite, 1 material |
+| Potion shop | `SM_OakHillPotionShop_300k`: 300k | `SM_TL_PotionShop`: 50k, Nanite, 1 material |
+| Well | `SM_OakHillWell_150k`: 150k | `SM_TL_Well`: 26k, Nanite, 1 material (no windows) |
+- Same pivot, door (+Y) and FModel Scale as the old models; collision `SM_TL_<Name>_Col` from building_clean.py's `_Col` meshes.
+- Their roofs are red clay tiles, not thatch: townlab_bake.py's "tile" group (above `tile_z`, the eave height) is shifted to one town colour, `TILE_TARGET` (the town hall's graded terracotta), so every roof matches. The church's stained glass, which building_clean.py read as forge fire, is turned into window marks (`fire_as_window`): dark by day, lit at dusk.
+- Decor (townlab_decor.py): town hall 27 pieces, church 29 (its door lantern back as a lit lantern), potion shop 31, well 8. `ivy_min` keeps ivy to full-size patches on walls cut up by windows; `no_hang` drops the eave tress (the town hall's jetty, the church's chimney); `no_ivy` and `feet` keep the well to a pail, two stone piles and weeds.
+- Import only these: `Tools\BuildTownLabBuildings.ps1 -Only TL_TownHall,TL_Church,TL_Well,TL_PotionShop` (reuses the shared M_TL_Building, T_NoGlow and decor). Needs `Tools\BuildBuildings.ps1 -CleanOnly OakHillTownHall_300k OakHillChurch_300k OakHillWell_150k OakHillPotionShop_300k` once first.
+- Lineup: `-TownLabBuildings` shows them in a second yard behind the house and store (town halls and churches 36 m back, potion shops and wells 74 m back; the new one of each pair is on the left seen from the front).
+- Frame cost (performance reviewer, MoveLab 1920x1080 noon, two runs each): overview old 4.17 ms / new 4.13 ms GPU, close view old 3.95 / new 4.12 (noise 0.2-0.27 ms); about +58 draws, all decor. No Meshy credits spent.
+- In town: the town hall, well and potion shop (ModelSwaps in TownLabTown.cpp). The church is NOT: it stays on its old 300k model (its swap row and its row in TownLabDecor.h's table are commented out); the new church is only in the MoveLab lineup.
+- For the owner: the backs of the buildings read greyer only in shade, as the old ones do.
+
+### Church: for later
+The new church (`SM_TL_Church`, `MI_TL_Church`, `T_TL_Church_*`, `ChurchDecor` 29 pieces) is built and kept, but failed visual review on one wall after about 20 rounds (time cap, coordinator 2026-11-14). The rest of the building passed every round.
+- The problem: the -X side wall under the dormer (two rows of timber-framed plaster panels and a braced panel to their left). Meshy painted a crack, drip streaks and grime into that plaster, and the 300k model carves beam stumps across it. At the bake's texture density (about 0.8 texel a cm) no texel retouch gave clean, straight panel edges.
+- Where it stands (townlab_bake.py, the church's GRADE entry and the "plaster quads" block): every panel there is a flat sheet of geometry (`quad_rects`: a 10 cm grid laid 1 cm in front of the low wall by ray casts, edges on its fitted plane), sampling one block of `sheet_lin` colour painted into an empty corner of the texture. The middle rail and posts (`frame_bars`) and the braced panel's two struts (fitted from the texture's dark texels) are wood bars of geometry. The stumps are pressed flat (`flat_out`), the panel faces get one normal (`flat_shade`), and pale chips on the beams are painted wood.
+- Last review (round 20): the geometry is clean (no z-fighting or floating; bars straight). It failed on colour: the sheets read cool grey at noon (about #A9ADAB in the shade) and saturated orange at low sun, against the old church's and town hall's warm cream (about #E8DCC0). Close-up nitpicks: a slightly wavy top edge on the upper sheet, small wedges at two panel corners, faint blotches, and the wood bars a little darker and flatter than the textured timber.
+- Next try: measure the cream of a passed TownLab building's plaster in game at noon and low sun, and set `sheet_lin`/`sheet_ao` to match it (or give the sheets a small strip of that building's real plaster texels instead of one flat colour). Alternatively, a Meshy retexture of the church without the painted damage would make all of this unnecessary. Then put the two rows back.
 ## The bank, bank stall, smithy and corner house (build-a, 2026-11-14)
 Made the same way as the house and store: `Tools\BuildBuildings.ps1 -CleanOnly OakHillBank_300k BankStall_300k OakHillSmith_300k OakHillCornerHouse_300k`, then `Tools\BuildTownLabBuildings.ps1 -Only TL_Bank,TL_BankStall,TL_Smith,TL_CornerHouse` (`-Only` bakes and imports just those, onto the M_TL_Building already there; the shared material and decor pieces are left alone).
 

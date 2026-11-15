@@ -15,6 +15,9 @@ folder = "/Game/TownLab/Buildings"   # (never /Game/Buildings: that folder belon
 NANITE = {"TL_House", "TL_Store"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx"))
 COL_FROM = {"TL_House": "OakHillHouse_300k", "TL_Store": "OakHillStore_300k"}
+# build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop
+NANITE |= {"TL_TownHall", "TL_Church", "TL_Well", "TL_PotionShop"}
+COL_FROM.update({"TL_TownHall": "OakHillTownHall_300k", "TL_Church": "OakHillChurch_300k", "TL_Well": "OakHillWell_150k", "TL_PotionShop": "OakHillPotionShop_300k"})
 # build-a (2026-11-14): the bank, bank stall, smithy and corner house
 NANITE |= {"TL_Bank", "TL_BankStall", "TL_Smith", "TL_CornerHouse"}
 COL_FROM.update({"TL_Bank": "OakHillBank_300k", "TL_BankStall": "BankStall_300k", "TL_Smith": "OakHillSmith_300k", "TL_CornerHouse": "OakHillCornerHouse_300k"})
