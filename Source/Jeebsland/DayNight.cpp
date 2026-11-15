@@ -45,6 +45,8 @@ namespace JeebLook
 	// 0.04, ShadowCool 0.012, Bloom 0.8, Aerial 16, HazeBlue 1, HazeStart 2500, SunGlow 1, AerialStart 0.35, Exposure 0.16, LowLift
 	// 0.8, Vignette 0.4, Shafts 0)
 	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
+	// (2026-11-15, owner: "a slider for me to move the sun in the sky"; the LOOK tab's SKY + HAZE group. This machine's view only.)
+	static TAutoConsoleVariable<float> SunPhase(TEXT("jeeb.Sun.Phase"), -1.f, TEXT("Holds the sun at a point of its daily loop: 0 noon (high), 0.25 afternoon, 0.5 the golden low point, 0.75 morning; negative: the clock moves it"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
 	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
@@ -184,7 +186,8 @@ void ADayNight::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	Clock += DeltaSeconds * ClockSpeed;
 	TickClouds(DeltaSeconds);
-	Phase = FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
+	const float HeldPhase = JeebLook::SunPhase.GetValueOnGameThread();
+	Phase = HeldPhase >= 0.f ? FMath::Fmod(HeldPhase, 1.f) : FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
 
 	// A midnight sun: it circles the whole sky once a day, high at noon (phase 0) and skimming low over the
 	// horizon at the bottom of its loop (phase 0.5), where the light is the old golden dusk. It never sets.
