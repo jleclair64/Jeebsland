@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "Canopy.h"
+#include "DayNight.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
@@ -13,7 +14,7 @@
 
 namespace
 {
-	// (the square's size and how far the grass reaches are AMeadow's CellSize and Reach: 15 m and 40 m since 2026-11-14, was 7.5 m and 95 m)
+	// (the square's size and how far the grass reaches are AMeadow's CellSize and Reach: 15 m and 50 m since 2026-11-14, was 7.5 m and 95 m)
 	constexpr float FieldR = 9000.f;
 	constexpr float NearDensity = 0.0012f;   // full tufts per square cm, close up
 	constexpr float FarDensity = 0.0006f;    // thinner, cheaper tufts further out
@@ -78,12 +79,12 @@ static float LongGrassRoom(float X, float Y, float Pc, float Near, float Cov, fl
 // The meadow's flowers (2026-11-14, "a few flowers"): small heads on thin stems among the tufts, in clumps of one colour, as the
 // references' meadows have them. Colours (linear): cream white, butter yellow, lilac, soft blue, rose.
 static const FLinearColor FlowerColours[5] = {
-	FLinearColor(0.90f, 0.88f, 0.76f), FLinearColor(0.95f, 0.70f, 0.12f), FLinearColor(0.64f, 0.44f, 0.88f),
-	FLinearColor(0.44f, 0.58f, 0.96f), FLinearColor(0.94f, 0.44f, 0.56f) };
+	FLinearColor(0.95f, 0.93f, 0.82f), FLinearColor(1.0f, 0.82f, 0.25f), FLinearColor(0.82f, 0.66f, 1.0f),
+	FLinearColor(0.62f, 0.75f, 1.0f), FLinearColor(1.0f, 0.60f, 0.70f) };   // (lighter since the first review: the blue read navy)
 static float FlowerChance(float X, float Y)
 {
 	const float N = FMath::PerlinNoise2D(FVector2D(X / 1100.f + 3.7f, Y / 1100.f + 11.9f));
-	return 0.006f + 0.08f * JeebWorld::Smooth(0.15f, 0.42f, N);   // (a few anywhere, clumps where the noise is high)
+	return 0.01f + 0.16f * JeebWorld::Smooth(0.15f, 0.42f, N);   // (a few anywhere, clumps where the noise is high)
 }
 static int32 FlowerKind(float X, float Y)
 {
@@ -138,7 +139,7 @@ static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
 	const FVector Ctr(0.f, 0.f, H + 0.4f);   // the head: five rounded petals (a 20-point outline with five soft lobes), cupped a little
 	for (int32 k = 0; k < 20; ++k)
 	{
-		auto P = [&](int32 i) { const float A = i * PI / 10.f; const float L = FMath::Abs(FMath::Cos(A * 2.5f)); const float R = 2.6f + 3.2f * L; return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, H + 0.9f * L); };
+		auto P = [&](int32 i) { const float A = i * PI / 10.f; const float L = FMath::Abs(FMath::Cos(A * 2.5f)); const float R = 3.5f + 4.3f * L; return FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, H + 0.9f * L); };
 		Tri(Ctr, P(k), P(k + 1), FVector(0.f, 0.f, 1.f), 1.f);
 	}
 	UStaticMesh::FBuildMeshDescriptionsParams Params;
@@ -278,7 +279,8 @@ void AMeadow::BeginPlay()
 	UMaterialInterface* GrassMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Grass.M_Grass"));
 	if (GrassMat)
 	{
-		NearMesh = MakeCardMesh(this, GrassMat, 75.f, 48.f);
+		GrassMid = UMaterialInstanceDynamic::Create(GrassMat, this);
+		NearMesh = MakeCardMesh(this, GrassMid, 75.f, 48.f);
 		FarMesh = NearMesh;
 	}
 	else
@@ -357,6 +359,7 @@ void AMeadow::Tick(float Dt)
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (!Pawn || !NearMesh) return;
+	if (GrassMid) GrassMid->SetScalarParameterValue(TEXT("Dusk"), ADayNight::Dusk);
 	if (!bPrewarmed) { bPrewarmed = true; Prewarm(); }   // first tick: the woods are planted by now, so grass can thin under them
 	const FVector2D Me(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
 
@@ -456,7 +459,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 				// (2026-11-14) the open field a little shorter than before, so the long patches stand out of it; the long patches up
 				// to twice that, a touch wider, never where LongGrassRoom says no (roads, buildings, trees, trampled ground, plazas)
 				const float Tall = LongGrassNoise(X, Y) * LongGrassRoom(X, Y, Pc, Near, Cov, Wear);
-				Short *= 0.82f * (1.f + 1.0f * Tall * JobRand.FRandRange(0.8f, 1.15f));
+				Short *= 0.82f * (1.f + 1.3f * Tall * JobRand.FRandRange(0.8f, 1.15f));
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, FMath::Min(Short, 1.f)) * (1.f + 0.35f * Near) * (1.f + 0.12f * Tall);   // and wider by buildings, so the tufts overlap into one mat and the individual cards disappear
 				if (bThin) continue;
 				JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));

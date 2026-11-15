@@ -31,6 +31,7 @@ private:
 	UPROPERTY() UStaticMesh* NearMesh = nullptr;
 	UPROPERTY() UStaticMesh* FarMesh = nullptr;
 	UPROPERTY() UStaticMesh* FlowerMesh = nullptr;
+	UPROPERTY() UMaterialInstanceDynamic* GrassMid = nullptr;   // M_Grass with the low sun's Dusk set each frame (cooler blades at the golden sun)
 
 		// A square is built a little each frame (a time budget) and only appears when it is finished, so walking never hitches
 	bool bJob = false;
@@ -56,7 +57,7 @@ private:
 	bool bPrewarmed = false;
 	// One way everywhere since 2026-11-14 (the rebuilt Oak Hill's, first tried in TownLab): dense grass only within 40 m, in 15 m squares (about
 	// 25 draws instead of about 500), thinning past 15 m and sinking into the painted ground by 39 m (M_Grass FadeStart..FadeEnd)
-	float CellSize = 1500.f, Reach = 4000.f, Tier0 = 1500.f, Tier1 = 2700.f;
+	float CellSize = 1500.f, Reach = 5000.f, Tier0 = 1700.f, Tier1 = 3200.f;
 	bool GrowsHere(float X, float Y, float PadCm = 0.f) const;
 	int32 TierFor(float Dist) const;
 	float Clearance(float X, float Y) const;

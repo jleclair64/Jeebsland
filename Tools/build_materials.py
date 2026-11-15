@@ -447,7 +447,14 @@ def build_grass():
     mat.set_editor_property("opacity_mask_clip_value", 0.4)   # (as before: lower, the cards' faint background shows as squares from above)
     g = grass_field.FieldGraph(mat)
     ts = g.node(unreal.MaterialExpressionTextureSample, texture=tex)
-    col = g.muln(g.mask(ts, True, True, True), g.c3((0.63, 0.44, 0.16)))   # (the blades' tint since 2026-11-14's third review)
+    # the cut-out read two mips sharper: seen steeply from above, the cards' low mips smear the blades and the clear gaps
+    # between them into one half-opaque square, which showed as dark squares on the ground (first grass review, 2026-11-14)
+    cut = g.node(unreal.MaterialExpressionTextureSample, texture=tex)
+    cut.set_editor_property("mip_value_mode", unreal.TextureMipValueMode.TMVM_MIP_BIAS)
+    cut.set_editor_property("const_mip_value", -2)
+    # the blades' tint: greener and bluer than the old (0.63, 0.44, 0.16), which read lime and yellow in full sun and hay-yellow
+    # at the low sun; measured against Breath of the Wild's meadow (ref_13: green 1.5x red, blue 0.44x green)
+    col = g.muln(g.mask(ts, True, True, True), g.c3((0.52, 0.46, 0.33)))
     rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
     col = g.muln(col, g.lerpc(0.95, 1.05, rnd))                                  # each tuft a shade lighter or darker, gently
     col = g.muln(col, g.lerp(g.c3((1.01, 1.0, 0.97)), g.c3((1.05, 0.98, 0.88)), g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 7.31))))
@@ -463,21 +470,27 @@ def build_grass():
     v = g.mask(uv, False, True)                                                      # 0 at the top of the card, 1 at the ground
     tall = g.node(unreal.MaterialExpressionPerInstanceCustomData, data_index=0)
     tip = g.muln(tall, g.one(unreal.MaterialExpressionOneMinus, v))
-    col = g.lerp(col, g.muln(col, g.c3((1.14, 1.02, 0.70))), g.mul(tip, 0.65))
+    col = g.lerp(col, g.muln(col, g.c3((1.12, 1.10, 0.94))), g.mul(tip, 0.7))   # (light, fresh tips: gold read as hay)
     col = g.muln(col, g.lerpc(1.0, 0.86, g.muln(tall, v)))
     # softer shadows between the blades: the darkest parts lifted, the light parts left as they were
     lift = g.sat(g.add(g.mul(g.lum(col), -3.0), 1.0))
-    col = g.muln(col, g.add(g.mul(lift, GRASS_SHADOW_LIFT), 1.0))
+    col = g.muln(col, g.add(g.mul(lift, 0.85), 1.0))   # (more than GRASS_SHADOW_LIFT: the dark blades read near-black against lit ones)
 
-    keep, down = grass_sink(g, 1800.0, 3900.0)
+    # at the low sun the warm light turned the blades mustard and hay (first grass review): cooler blades as the sun sinks
+    # (Dusk is set each frame by Meadow.cpp's material instance from ADayNight::Dusk, 0 at noon, 1 at the lowest sun)
+    col = g.lerp(col, g.muln(col, g.c3((0.80, 1.04, 1.30))), g.mul(g.scalar("Dusk", 0.0), 0.85))
+
+    keep, down = grass_sink(g, 2600.0, 4900.0)
+    # and as they sink, the blades' contrast eases toward the painted ground beyond (a little greyer, no lime edge at the hand-over)
+    col = g.lerp(col, g.muln(g.lum(col), g.c3((1.0, 1.0, 1.0))), g.mul(g.one(unreal.MaterialExpressionOneMinus, keep), 0.3))
     shade = add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
     lit = g.muln(col, shade)                                                         # blades catch more light where a gust passes
     g.out(lit, unreal.MaterialProperty.MP_BASE_COLOR)
     g.out(g.mul(lit, 0.5), unreal.MaterialProperty.MP_SUBSURFACE_COLOR)             # (half shines through: a low sun behind doesn't light the lawn up)
-    g.out(g.mul(col, 0.075), unreal.MaterialProperty.MP_EMISSIVE_COLOR)             # a green floor in deep shade (2026-11-14)
+    g.out(g.mul(col, 0.10), unreal.MaterialProperty.MP_EMISSIVE_COLOR)              # a green floor in deep shade (2026-11-14)
     g.out(g.c(1.0), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.0), unreal.MaterialProperty.MP_SPECULAR)
-    soft_edges(mat, ts)
+    soft_edges(mat, cut)
     fluffy_normal(mat, 0.93)
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/M_Grass")
@@ -499,7 +512,7 @@ def build_grass_flower():
     keep, down = grass_sink(g, 1500.0, 2600.0)
     add_wind(mat, 9.0, True, 0.0, keep=keep, wpo_add=down)
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
-    g.out(g.mul(col, 0.15), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # (a little of their own light: small bright dots, as the references' flowers)
+    g.out(g.mul(col, 0.25), unreal.MaterialProperty.MP_EMISSIVE_COLOR)   # (a little of their own light: small bright dots, as the references' flowers)
     g.out(g.c(0.75), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.2), unreal.MaterialProperty.MP_SPECULAR)
     lib.recompile_material(mat)
