@@ -118,13 +118,13 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     # as it gets lighter). Each building gets its own random HouseOffset (custom primitive data 0, OakHillLife::SetUpGlow) and "Night"
     # is ADayNight::Dusk (OakHillLife::UpdateGlow). A window lights when Night passes OnFrom + OnSpread x HouseOffset + WinSpread x (its
     # own random); DarkShare of each building's windows never light.
-    # The glass (2026-11-15, owner: lit windows with no black smudges or ragged orange, "Please find a solution"): Tools/window_glass.py
-    # lays every pane as its own flat piece over the building, with straight edges, and marks it in the VERTEX colour: G 1 glass, B 0,
-    # R its window's random number (every other face B 1). Only that glass turns to GlassColor by day and glows GlowColor when lit,
-    # one even amber over the whole window; no picture decides glass any more. The pictures keep the frame and muntins (painted wood).
+    # The glass (2026-11-15, owner, third round: glass flush in its opening, one piece with dividers, fitted to the frame): Tools/window_inserts.py
+    # cuts each old window out of the model and builds one glass in at its own depth, with real muntin bars, and marks the glass in the
+    # VERTEX colour: G 1 glass, B 0, R its window's random number (every other face B 1). Only that glass turns to GlassColor by day and
+    # glows GlowColor when lit, one even amber over the whole window; no picture decides glass any more.
     # The glow picture is left only for the forge: the mask picture's fire (G 0, B 0) burns all day at FireLevel (window texels G 1 and
     # the rest B 1 don't). UseMask 0 turns the glass off (as on M_Building's test houses).
-    pc = node(unreal.MaterialExpressionVertexColor, -1500, 700)          # (window_glass.py's marks)
+    pc = node(unreal.MaterialExpressionVertexColor, -1500, 700)          # (the glass marks of window_inserts.py)
     vc = tex("MaskTex", 900, unreal.MaterialSamplerType.SAMPLERTYPE_MASKS, default_mask)   # (the bake's marks: only the forge's fire now)
     house = node(unreal.MaterialExpressionScalarParameter, -1500, 1000, parameter_name="HouseOffset", default_value=0.5,
                  use_custom_primitive_data=True, primitive_data_index=0)
@@ -160,7 +160,7 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     fb = node(unreal.MaterialExpressionOneMinus, -500, 1250); link(vc, "B", fb, "")
     f1 = node(unreal.MaterialExpressionMultiply, -400, 1150); link(fg, "", f1, "A"); link(fb, "", f1, "B")
     f2 = node(unreal.MaterialExpressionMultiply, -300, 1150); link(f1, "", f2, "A"); link(scalar("FireLevel", FIRE_LEVEL, -500, 1300), "", f2, "B")
-    # (and only on faces window_glass.py marks fire in the vertex colour, G 0 and B 0, those near the 300k model's forge: the baked mask
+    # (and only on faces window_inserts.py marks fire in the vertex colour, G 0 and B 0, those near the 300k model's forge: the baked mask
     # also read fire in a fleck round the smithy's windows, 2026-11-15)
     pg_ = node(unreal.MaterialExpressionOneMinus, -500, 1350); link(pc, "G", pg_, "")
     pb_ = node(unreal.MaterialExpressionOneMinus, -500, 1400); link(pc, "B", pb_, "")
@@ -204,6 +204,14 @@ def make_material(default_base, default_mr, default_normal, default_glow, defaul
     lib.save_asset(path)
     return m
 
+def has_colours(sm):
+    """Whether a mesh carries vertex colours. The editor subsystem is missing when this runs as a commandlet
+    (UnrealEditor-Cmd -run=pythonscript, which agent copies use: -ExecutePythonScript can hang at startup there), and the older
+    library answers False there for meshes that do carry them (2026-11-15): None then, and Tools/window_inserts.py is trusted."""
+    sub = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+    if sub: return sub.has_vertex_colors(sm)
+    return None
+
 first = NAMES[0]
 if ONLY:
     no_glow = lib.load_asset(folder + "/T_NoGlow")
@@ -243,7 +251,7 @@ for n in NAMES:
     d.set_editor_property("generate_lightmap_u_vs", False)
     d.set_editor_property("convert_scene", True)
     d.set_editor_property("normal_import_method", unreal.FBXNormalImportMethod.FBXNIM_IMPORT_NORMALS)
-    d.set_editor_property("vertex_color_import_option",   # (window_glass.py's glass marks: see make_material)
+    d.set_editor_property("vertex_color_import_option",   # (the glass marks of window_inserts.py: see make_material)
                           unreal.VertexColorImportOption.REPLACE)
     d.set_editor_property("build_nanite", n in NANITE)
     # (a fresh asset every time: importing over an existing mesh keeps ITS old import settings, so the window colours above were
@@ -257,8 +265,9 @@ for n in NAMES:
     tools.import_asset_tasks([task])
     sm = lib.load_asset(folder + "/SM_" + n)
     if sm is None: raise RuntimeError("BUILDDIAG " + n + " did not import")
-    if not unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).has_vertex_colors(sm):
-        raise RuntimeError("BUILDDIAG " + n + " has no glass marks (vertex colours): run Tools/window_glass.py on it")
+    vc_ = has_colours(sm); unreal.log("BUILDDIAG %s vertex colours %s" % (n, vc_))
+    if vc_ is False:
+        raise RuntimeError("BUILDDIAG " + n + " has no glass marks (vertex colours): run Tools/window_inserts.py on it")
     sm.set_material(0, mi)
     lib.save_asset(folder + "/SM_" + n)
     b = sm.get_bounding_box()
@@ -375,7 +384,7 @@ if os.path.isdir(decor) and not ONLY:
         sm = lib.load_asset(folder + "/SM_" + n)
         if sm is None: raise RuntimeError("BUILDDIAG " + n + " did not import")
         sm.set_material(0, (solid["MI_TL_Moss"] if n == "TL_MossClump" else solid["MI_TL_Stones"]) if painted else m_fol)
-        unreal.log("BUILDDIAG decor %s vertex colours %s" % (n, unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem).has_vertex_colors(sm)))
+        unreal.log("BUILDDIAG decor %s vertex colours %s" % (n, has_colours(sm)))
         lib.save_asset(folder + "/SM_" + n)
         unreal.log("BUILDDIAG decor %s" % n)
 unreal.log("BUILDDIAG done")
