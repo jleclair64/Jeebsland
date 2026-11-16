@@ -15,7 +15,10 @@
 # Per window (and per flat part of it, if it bends), the faces in front are drawn flat at 1 cm a texel in the window's own plane; small
 # gaps (leading) are closed, slivers and spikes opened away, and each piece left is one pane. A pane that fills its box is that box (the
 # usual case: straight sides, square corners); any other (round, arched) is the outline round it (convex hull), straight from corner to
-# corner. The pane's glass sits GLASS_LIFT in front of the building's surface there (traced on the low model), facing out.
+# corner. GLASS IN FRONT (owner, 2026-11-15, after panes laid at the glass failed two reviews: the low model's decimated muntins and frames
+# came through them as dark wedges): the panes of one opening become one flat sheet, laid GLASS_LIFT in front of all of the low model inside
+# the panes' outline (up to WALL_PROUD past the wall round the window), glass where the panes are and one even texel of the building's own
+# painted frame for the bars between them and a FRAME_BAND rim, so nothing of the model can come through the glass.
 import bpy, bmesh, sys, os, math
 import numpy as np
 from mathutils import Vector
@@ -40,7 +43,18 @@ GLASS_LIFT = 0.5     # cm in front of the building's surface
 NEAR_MARK = 6        # texels: (an old model by its colour) glass within this of the window marks
 GLASS_SRGB = (0.16, 0.17, 0.19)   # (townlab_panes.py's GLASS_SRGB: the pane colour it paints)
 GLASS_TOL = 0.035    # how close to it a texel is glass
-DEPTH_CAP = 8.0      # cm: the glass sits in front of the furthest-out point of the low model inside the pane, at most this past the middle one
+FRAME_BAND = 2.0     # cm: the sheet runs this far past its panes all round, painted frame (its edge straight, over the model's ragged frame)
+WALL_IN, WALL_OUT = 6.0, 16.0   # cm: the wall round a window, this far out from its sheet's edge
+WALL_PROUD = 12.0    # cm: the sheet may come this far out past that wall (a frame standing proud of it), never further
+JOIN_GAP = 20.0      # cm: openings of one window closer than this are one sheet (the panes of one window between thick muntins came
+                     # out as sheets at different depths; sheets over each other would fight; a lattice split by a mullion)
+UNEVEN = 1.25        # box sizes within this of each other are one size; a sheet of more than two widths or heights is uneven: one glass
+ROUND_FIT = 0.85     # a round opening's outline must match a round or arched light this well (overlap over union), else it is a box
+NO_GLASS_ABOVE = {"TL_Church": 1300.0}   # cm: no glass above this (the church tower's belfry louvres are marked as windows; lit, they showed as
+                     # an amber sliver at the tower top)
+LATTICE = 12         # an opening of more panes than this (a lattice, the potion shop's shop window) is one glass
+FIRE_NEAR = 30.0     # cm: the low model's faces this near the 300k model's fire (the forge) are marked fire (0, 0, 0), the only faces that may burn
+BAR_MIN = 0.8        # cm: panes closer than this have no bar between them (or overlap): one pane
 MIN_SIDE = 6.0       # cm: a pane narrower than this either way is a sliver, dropped
 GLASS = (0.0, 1.0, 0.0)   # the mark: G 1 glass, B 0 (R the window's number)
 NOT = (0.0, 0.0, 1.0)     # every other face: never glass (B 1)
@@ -224,11 +238,11 @@ def panes(src, fc, base=None):
     win = (fc[:, 1] > 0.5) & (fc[:, 2] < 0.5)
     rid = np.round(fc[:, 0] * 1e6).astype(np.int64)
     cen = P.mean(1)
-    res = []; nwin = 0; nwhole = 0; kinds = {}
+    res = []; nwin = 0; nwhole = 0; kinds = {}; nmerged = 0; npanes = 0; nhidden = 0; nround = 0; nlattice = 0; nuneven = 0; nparts = 0
     for wid in np.unique(rid[win]):
         left = win & (rid == wid)
         R = float(fc[np.nonzero(left)[0][0], 0])
-        nwin += 1
+        nwin += 1; w_first = len(res)
         while left.any() and fa[left].sum() > MIN_PANE:
             n = (fn[left] * fa[left, None]).sum(0); n /= max(np.linalg.norm(n), 1e-9)
             part = left & ((fn @ n) > PLANE_DOT)
@@ -249,6 +263,14 @@ def panes(src, fc, base=None):
             who, B0, B1 = draw(T2, (P[idx] - c0) @ n, W, H)
             M = np.zeros((H, W), bool); ok = who >= 0
             M[ok] = part[tp[idx[who[ok]]]]
+            proj = float((fa[part] * np.abs(fn[part] @ n)).sum())
+            if base is None and M.sum() * PX * PX < 0.4 * proj:
+                # (a window whose glass sits behind something, a shop window's goods or a lattice: most of its marked glass is hidden,
+                # leaving scattered flecks. Its marks are drawn on their own; the sheet goes in front of what stood before them)
+                gi = np.nonzero(part[tp[idx]])[0]
+                w2, _, _ = draw(T2[gi], ((P[idx] - c0) @ n)[gi], W, H)
+                M = w2 >= 0; nhidden += 1
+                log("hidden glass", TAG, "window", nwin, "marks drawn alone %.0f cm2 of %.0f" % (float(M.sum()) * PX * PX, proj))
             if base is not None:
                 # (a model whose colour picture townlab_panes.py painted: its panes are one flat glass colour there, crisper than the
                 # marks, which run onto the tracery and join the lights of a lancet; glass is that colour near the window's marks)
@@ -287,75 +309,276 @@ def panes(src, fc, base=None):
                     nwhole += 1
             # a pane that is no clean shape among two or more boxes of its window (a blotch cut a corner off it) takes its own box
             if sum(1 for x in found_here if x[1] == "box") >= 2: found_here = [(x[2], "box", None) if (not x[1] and x[2]) else x for x in found_here]
-            polys = []
+            # Glass in front (owner, 2026-11-15): the panes of one opening become one flat sheet laid in front of everything there,
+            # glass where the panes are and painted frame between them and round their edge, so nothing of the model comes through
+            groups = {}
             for (poly, kind, _) in found_here:
                 kinds[kind if kind else "outline"] = kinds.get(kind if kind else "outline", 0) + 1
-                pts3 = [c0 + h * (x0 + px * PX) + v * (y0 + py * PX) for (px, py) in poly]
-                res.append((R, n, pts3)); polys.append(poly)
+                cx_, cy_ = np.mean([q[0] for q in poly]), np.mean([q[1] for q in poly])
+                k = olab[min(H - 1, max(0, int(cy_))), min(W - 1, max(0, int(cx_)))]
+                groups.setdefault(int(k) if k >= 0 else -1 - len(groups), []).append(([(x0 + px * PX, y0 + py * PX) for (px, py) in poly], kind))
+            # (openings whose sheets would overlap are one sheet: two sheets over each other fight, and a lattice split by a
+            # mullion came out as a big glass and a column of little ones)
+            items = [([k], gp) for k, gp in groups.items()]
+            again = True
+            while again:
+                again = False
+                for i in range(len(items)):
+                    for j in range(i + 1, len(items)):
+                        ra = hull([q for (p, _) in items[i][1] for q in p]); rb = hull([q for (p, _) in items[j][1] for q in p])
+                        if not apart(ra, rb, JOIN_GAP):
+                            items[i] = (items[i][0] + items[j][0], items[i][1] + items[j][1]); del items[j]; again = True; break
+                    if again: break
+            polys = []
+            for ks, gp in items:
+                om_ = np.isin(olab, [k for k in ks if k >= 0]) & raw
+                ys_, xs_ = np.nonzero(om_)
+                if len(xs_) * PX * PX >= MIN_PANE:
+                    # (a round window, the church's rose: its lights between the tracery came out as small boxes, and the box round
+                    # them overlapped the stone ring; a round opening is one round glass, the outline round its marks)
+                    cp = np.concatenate([np.stack([xs_, ys_], 1) + np.array(d_) for d_ in ((0, 0), (1, 0), (0, 1), (1, 1))])
+                    hk = hull(cp)
+                    bx0, bx1, by0, by1 = xs_.min(), xs_.max() + 1, ys_.min(), ys_.max() + 1
+                    if len(hk) >= 3 and area(hk) / float((bx1 - bx0) * (by1 - by0)) < 0.86:
+                        # (its clean shape: the round light or the arched one that matches the outline best; an outline neither
+                        # matches, the potion shop's tilted blob of marks in a square opening, is the box round it)
+                        mx, my, w2, a = (bx0 + bx1) / 2, (by0 + by1) / 2, (bx1 - bx0) / 2, min((bx1 - bx0) / 2, (by1 - by0) * 0.5)
+                        tgt = inside(hk, H, W); best, bi = [(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)], 0.0
+                        for cand in (ellipse(mx, my, w2, (by1 - by0) / 2, 0, 2 * math.pi, 40)[:-1], [(bx0, by0), (bx1, by0)] + ellipse(mx, by1 - a, w2, a, 0, math.pi, 20)):
+                            m = inside(cand, H, W); iou = (m & tgt).sum() / max((m | tgt).sum(), 1)
+                            if iou > bi: bi, best = iou, cand
+                        if bi < ROUND_FIT: best = [(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)]
+                        gp = [([(x0 + px * PX, y0 + py * PX) for (px, py) in best], "round" if bi >= ROUND_FIT else "box")]; nround += 1
+                if len(gp) > LATTICE:
+                    lp = [q for (p, _) in gp for q in p]
+                    if len(xs_):   # (the whole opening's marks: its lights found may miss a row or a column)
+                        lp += [(x0 + xs_.min() * PX, y0 + ys_.min() * PX), (x0 + (xs_.max() + 1) * PX, y0 + (ys_.max() + 1) * PX)]
+                    gp = [(bbox(lp), "box")]; nlattice += 1   # (a lattice of many small lights, uneven in the model: one glass, lit whole)
+                if any(kd == "box" for (_, kd) in gp): gp = [(p, kd) if kd else (bbox(p), "box") for (p, kd) in gp]   # (among boxes, a pane of no clean shape is its box)
+                gp, nm = merge_touching(gp); nmerged += nm
+                if len(gp) >= 3 and all(upright(p) for p in gp):
+                    # (boxes of uneven sizes, the smithy's blotchy marks: no straight rows of bars to keep, one glass, lit whole)
+                    wd = [p[2][0] - p[0][0] for p in map(bbox, gp)]; ht = [p[2][1] - p[0][1] for p in map(bbox, gp)]
+                    nx = sizes([p[0][0] + 100.0 for p in map(bbox, gp)], 3.0); ny = sizes([p[0][1] + 100.0 for p in map(bbox, gp)], 3.0)   # (the rows and columns the panes start on)
+                    if sizes(wd) > 2 or sizes(ht) > 2 or len(gp) < 0.75 * nx * ny:   # (or panes that fill no grid: the store back's scattered little lights)
+                        gp = [bbox([q for p in gp for q in p])]; nuneven += 1
+                ring = hull([(x + dx, y + dy) for p in gp for (x, y) in p for dx in (-FRAME_BAND, FRAME_BAND) for dy in (-FRAME_BAND, FRAME_BAND)])
+                if all(upright(p) for p in gp): ring = ccw(bbox(ring))   # (boxes: a box round them, laid as a grid)
+                res.append(dict(R=R, n=n, c0=c0, h=h, v=v, ring=ring, panes=[ccw(p) for p in gp]))
+                npanes += len(gp)
+                polys += [[((x - x0) / PX, (y - y0) / PX) for (x, y) in p] for p in gp + [ring]]
             if DEBUG: debug_pic("%s_%03d_%03d" % (TAG, nwin, len(res)), raw, M, polys)
-    log("windows", nwin, "panes", len(res), kinds, "whole openings", nwhole)
+        # (one window's second flat part facing the same way gave a second sheet over the first, and its bars cut thin dark lines
+        # through the first one's glass, 2026-11-15: sheets of one window facing alike that overlap are one sheet)
+        mine = list(range(w_first, len(res))); again = True
+        while again:
+            again = False
+            for i in mine:
+                for j in mine:
+                    if j <= i or res[i] is None or res[j] is None: continue
+                    A, B = res[i], res[j]
+                    if float(np.dot(A["n"], B["n"])) < 0.95: continue
+                    to_a = lambda pts: [(float((B["c0"] + B["h"] * x + B["v"] * y - A["c0"]) @ A["h"]), float((B["c0"] + B["h"] * x + B["v"] * y - A["c0"]) @ A["v"])) for (x, y) in pts]
+                    if apart(A["ring"], hull(to_a(B["ring"])), JOIN_GAP): continue
+                    bp = [hull(to_a(p)) for p in B["panes"]]
+                    if any(upright(p) for p in A["panes"]): bp = [bbox(p) for p in bp]
+                    gp = [(p, "box" if upright(p) else False) for p in A["panes"]] + [(p, "box" if upright(p) else False) for p in bp if all(apart(p, q, BAR_MIN) for q in A["panes"])]   # (the second part's panes over the first's are the same panes)
+                    if any(kd == "box" for (_, kd) in gp): gp = [(p, kd) if kd else (bbox(p), "box") for (p, kd) in gp]
+                    gp, nm = merge_touching(gp); nmerged += nm
+                    ring = hull([(x + dx, y + dy) for p in gp for (x, y) in p for dx in (-FRAME_BAND, FRAME_BAND) for dy in (-FRAME_BAND, FRAME_BAND)])
+                    if all(upright(p) for p in gp): ring = ccw(bbox(ring))
+                    res[i] = dict(A, ring=ring, panes=[ccw(p) for p in gp]); res[j] = None; nparts += 1; again = True
+        res[:] = [r for r in res if r is not None]
+    log("windows", nwin, "sheets", len(res), "panes", npanes, kinds, "whole openings", nwhole, "touching panes merged", nmerged, "hidden glass drawn alone", nhidden, "round openings", nround, "lattices", nlattice, "uneven made whole", nuneven, "parts joined", nparts)
     return res
 
-def add_glass(o, found, keep_marks):
-    """Lay the panes on o (world metres) and colour every face: the glass (R, 1, 0), the rest NOT (keeping fire, B 0 G 0, if keep_marks)."""
+def sizes(xs, gap=None):   # how many distinct sizes (each within UNEVEN times, or gap cm, of the last)
+    xs = sorted(xs); return 1 + sum(1 for a, b in zip(xs, xs[1:]) if (b - a > gap if gap else b > UNEVEN * max(a, 1e-6)))
+
+def upright(p):   # (an axis-aligned box)
+    return len(p) == 4 and all(abs(p[i][0] - p[(i + 1) % 4][0]) < 1e-6 or abs(p[i][1] - p[(i + 1) % 4][1]) < 1e-6 for i in range(4))
+
+def ccw(p):
+    s = sum(p[i][0] * p[(i + 1) % len(p)][1] - p[(i + 1) % len(p)][0] * p[i][1] for i in range(len(p)))
+    return list(p) if s > 0 else list(reversed(p))
+
+def apart(a, b, gap):
+    """Two convex outlines at least gap apart along one of their edges' normals (separating axis)."""
+    for poly in (a, b):
+        for i in range(len(poly)):
+            (ax, ay), (bx, by) = poly[i], poly[(i + 1) % len(poly)]
+            nx, ny = by - ay, ax - bx; l = math.hypot(nx, ny)
+            if l < 1e-9: continue
+            pa = [(x * nx + y * ny) / l for (x, y) in a]; pb = [(x * nx + y * ny) / l for (x, y) in b]
+            if min(pb) - max(pa) > gap or min(pa) - max(pb) > gap: return True
+    return False
+
+def bbox(p):
+    xs = [q[0] for q in p]; ys = [q[1] for q in p]
+    return [(min(xs), min(ys)), (max(xs), min(ys)), (max(xs), max(ys)), (min(xs), max(ys))]
+
+def merge_touching(gp):
+    """Panes closer than BAR_MIN (overlapping box snaps, or no bar between them) become one pane: two boxes the box round both,
+    else the outline round both. Returns the outlines."""
+    gp = [(hull(p), kd) for (p, kd) in gp]; merged = 0; again = True
+    while again:
+        again = False
+        for i in range(len(gp)):
+            for j in range(i + 1, len(gp)):
+                if not apart(gp[i][0], gp[j][0], BAR_MIN):
+                    both = gp[i][0] + gp[j][0]
+                    gp[i] = (bbox(both), "box") if gp[i][1] == gp[j][1] == "box" else (hull(both), False); del gp[j]; merged += 1; again = True; break
+            if again: break
+    return [p for (p, _) in gp], merged
+
+def in_convex(poly, x, y, m):
+    """(x, y) inside a counter-clockwise convex outline grown by -m cm (m > 0: at least m inside it)."""
+    for i in range(len(poly)):
+        (ax, ay), (bx, by) = poly[i], poly[(i + 1) % len(poly)]
+        l = math.hypot(bx - ax, by - ay)
+        if l > 1e-9 and ((bx - ax) * (y - ay) - (by - ay) * (x - ax)) / l < m: return False
+    return True
+
+def hit_uv(me, uvl, co, fi, p):
+    """The building's UV where a trace hit face fi at p (cm)."""
+    pg = me.polygons[fi]
+    if pg.loop_total != 3: return tuple(uvl[pg.loop_start].uv)
+    A, B, C = (co[me.loops[pg.loop_start + k].vertex_index] for k in range(3))
+    v0, v1, v2 = B - A, C - A, p - A
+    d00, d01, d11, d20, d21 = v0 @ v0, v0 @ v1, v1 @ v1, v2 @ v0, v2 @ v1
+    den = d00 * d11 - d01 * d01
+    if abs(den) < 1e-12: return tuple(uvl[pg.loop_start].uv)
+    b1 = (d11 * d20 - d01 * d21) / den; b2 = (d00 * d21 - d01 * d20) / den; b0 = 1 - b1 - b2
+    return tuple(b0 * np.array(uvl[pg.loop_start].uv) + b1 * np.array(uvl[pg.loop_start + 1].uv) + b2 * np.array(uvl[pg.loop_start + 2].uv))
+
+def frame_uv(cands, base, nrm):
+    """One texel of the building's own painted frame round a sheet, for all of its bars: the middle shade of that frame, where the
+    picture is even and its normal flat (every bar points at it: one even colour, no smudge, no tilted light)."""
+    U = np.array(cands, np.float64)
+    if base is None: return tuple(U[0])
+    Sy, Sx = base.shape[:2]
+    ix = np.clip((U[:, 0] % 1.0 * Sx).astype(np.int64), 1, Sx - 2); iy = np.clip((U[:, 1] % 1.0 * Sy).astype(np.int64), 1, Sy - 2)
+    col = base[iy, ix, :3]; lum = col @ np.array([0.3, 0.59, 0.11])
+    ok = np.abs(col - np.array(GLASS_SRGB)).max(-1) > 2 * GLASS_TOL   # (never the painted pane colour)
+    if not ok.any(): ok[:] = True
+    med = np.median(lum[ok])
+    spread = np.max([np.abs(base[iy + dy, ix + dx, :3] - col).max(-1) for dy in (-1, 0, 1) for dx in (-1, 0, 1)], 0)
+    score = np.abs(lum - med) + spread + np.where(ok, 0.0, 10.0)
+    if nrm is not None:
+        Ny, Nx = nrm.shape[:2]
+        score = score + np.abs(nrm[np.clip((U[:, 1] % 1.0 * Ny).astype(np.int64), 0, Ny - 1), np.clip((U[:, 0] % 1.0 * Nx).astype(np.int64), 0, Nx - 1), :2] - 0.5).sum(-1)
+    i = int(np.argmin(score))
+    return ((ix[i] + 0.5) / Sx, (iy[i] + 0.5) / Sy)
+
+def tri_area(a, b, c):
+    return abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2
+
+def add_glass(o, found, keep_marks, base=None, nrm=None, fire_pts=None):
+    """Lay each window's sheet on o (world metres): its panes glass (R, 1, 0), its bars and rim the building's own frame colour (one
+    texel of it, NOT), the rest NOT (keeping fire, B 0 G 0, if keep_marks). The sheet sits GLASS_LIFT in front of all of the low model
+    inside it, so no decimated triangle of a muntin or frame can come through the glass."""
+    from mathutils.geometry import tessellate_polygon
     me = o.data
     cn_old = [tuple(c.vector) for c in me.corner_normals]
     nf0 = len(me.polygons)
     old = marks(me, np.array([p.loop_start for p in me.polygons], np.int64)) if keep_marks else None
-    # trace the building's surface (in cm)
-    co = np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3) * 100.0
+    co = np.empty(len(me.vertices) * 3); me.vertices.foreach_get("co", co); co = co.reshape(-1, 3) * 100.0   # (cm)
     bvh = BVHTree.FromPolygons([Vector(c) for c in co], [tuple(p.vertices) for p in me.polygons], all_triangles=False)
     uvl = me.uv_layers[0].data
     bm = bmesh.new(); bm.from_mesh(me)
     uvb = bm.loops.layers.uv[0]
-    pl_ = bm.faces.layers.int.new("pane")      # (0 the building, i + 1 the i-th pane laid: triangulation copies it)
-    Rs = []; skipped = 0; capped = 0
-    for (R, n, pts) in found:
-        nn = Vector(n); c = sum(pts, np.zeros(3)) / len(pts)
-        # every 2 cm over the pane, a little in from its edge (the low model's decimated triangles cross a pane at a slant: a sparse
-        # sample missed them and they came through the glass as dark diagonal cracks)
-        P2 = np.array(pts); e1 = P2[1] - P2[0]; e1 /= max(np.linalg.norm(e1), 1e-9); e2 = np.cross(n, e1)
-        u_, v_ = (P2 - c) @ e1, (P2 - c) @ e2
-        gu, gv = np.meshgrid(np.arange(u_.min() + 1.0, u_.max() - 1.0, 2.0), np.arange(v_.min() + 1.0, v_.max() - 1.0, 2.0))
-        cand = c + gu.ravel()[:, None] * e1 + gv.ravel()[:, None] * e2
-        polyuv = list(zip(u_, v_))
-        def _in(px, py):
-            s = [(bx - ax) * (py - ay) - (by - ay) * (px - ax) for (ax, ay), (bx, by) in zip(polyuv, polyuv[1:] + polyuv[:1])]
-            return all(x >= 0 for x in s) or all(x <= 0 for x in s)
-        samp = [c] + [p for p, a_, b_ in zip(cand, gu.ravel(), gv.ravel()) if _in(a_, b_)]
-        depth = []; uv = None
-        for s in samp:
-            hit = bvh.ray_cast(Vector(s) + nn * 40.0, -nn, 80.0)
+    pl_ = bm.faces.layers.int.new("pane")      # (0 the building, -1 a sheet's bars and rim, i + 1 the i-th pane: triangulation copies it)
+    Rs = []; skipped = 0; capped = 0; spreads = []; nbar = 0; badfill = 0; ngrid = 0
+    for g in found:
+        n = np.array(g["n"]); nn = Vector(n); c0 = np.array(g["c0"]); h = np.array(g["h"]); v = np.array(g["v"]); ring = g["ring"]; pn = g["panes"]
+        if TAG in NO_GLASS_ABOVE and (c0 + h * np.mean([p[0] for p in ring]) + v * np.mean([p[1] for p in ring]))[2] > NO_GLASS_ABOVE[TAG]: skipped += 1; continue
+        xs = [p[0] for p in ring]; ys = [p[1] for p in ring]
+        gx, gy = np.meshgrid(np.arange(min(xs) - WALL_OUT, max(xs) + WALL_OUT + 1e-6, 2.0), np.arange(min(ys) - WALL_OUT, max(ys) + WALL_OUT + 1e-6, 2.0))
+        depth = []; fuv = []; anyuv = None; wall = []
+        for x, y in list(zip(gx.ravel(), gy.ravel())) + [tuple(p) for p in ring]:
+            on = in_convex(ring, x, y, 0.0)
+            if not on and not (in_convex(ring, x, y, -WALL_OUT) and not in_convex(ring, x, y, -WALL_IN)): continue
+            hit = bvh.ray_cast(Vector(c0 + h * x + v * y) + nn * 80.0, -nn, 160.0)
             if hit[0] is None: continue
-            depth.append((np.array(hit[0]) - c) @ n)
-            if uv is None: uv = tuple(uvl[me.polygons[hit[2]].loop_start].uv)
-        if len(depth) < max(2, len(samp) // 3): skipped += 1; continue
-        med = float(np.median(depth)); capped += max(depth) > med + DEPTH_CAP; d = min(max(depth), med + DEPTH_CAP) + GLASS_LIFT   # (in front of all of the low model inside the pane: its decimated surface wanders a few cm and tore the glass where it came through)
-        vs = [bm.verts.new(Vector((np.array(p) + np.array(n) * d) / 100.0)) for p in pts]
-        f = bm.faces.new(vs)
-        f.normal_update()
-        if f.normal.dot(nn) < 0: f.normal_flip()
-        for l in f.loops: l[uvb].uv = uv
-        Rs.append(R); f[pl_] = len(Rs)
+            hp = np.array(hit[0]); z = (hp - c0) @ n
+            if not on: wall.append(z); continue   # (the wall round the window)
+            if in_convex(ring, x, y, FRAME_BAND - 0.5): depth.append(z)   # (inside the panes' outline: the rim may tuck under a deep frame or sill, the glass never)
+            if anyuv is None: anyuv = hit_uv(me, uvl, co, hit[2], hp)
+            if not any(in_convex(p, x, y, -1.0) for p in pn): fuv.append(hit_uv(me, uvl, co, hit[2], hp))   # (a bar or the rim, 1 cm clear of glass)
+        if len(depth) < 3: skipped += 1; continue
+        dd = np.array(depth); med = float(np.median(dd))
+        # The sheet goes in front of every frame, muntin and sill inside the window, which can stand out to the wall's face (a deep-set
+        # window: the house's glass is 30 cm in); anything further out than WALL_PROUD past the wall round it stands in front of the
+        # window (an awning, a beam) and is left to hide the glass as it would
+        top = (float(np.median(wall)) if len(wall) >= 8 else med) + WALL_PROUD
+        keep = dd[dd <= max(top, med)]
+        mx = float(keep.max()) if len(keep) else med; spreads.append(mx - med)
+        capped += bool((dd > max(top, med)).any()); d = mx + GLASS_LIFT
+        if DEBUG: log("sheet", TAG, "R %.3f" % g["R"], "glass median %.1f wall %.1f laid at %.1f, %d of %d samples further out (to %.1f), centre %s" % (med, top - WALL_PROUD, d, (dd > max(top, med)).sum(), len(dd), dd.max(), np.round(c0 + h * np.mean([p[0] for p in ring]) + v * np.mean([p[1] for p in ring])).astype(int)))
+        uv = frame_uv(fuv, base, nrm) if fuv else anyuv
+        new = []
+        if all(upright(p) for p in pn + [ring]):
+            # (boxes in a box: a grid through every pane edge, each cell glass or bar, every cell sharing its corners. The polygon fill
+            # left sliver triangles across the panes where many edges line up, thin dark lines through lit glass)
+            gxs = sorted({round(x, 3) for p in pn + [ring] for (x, _) in p}); gys = sorted({round(y, 3) for p in pn + [ring] for (_, y) in p})
+            vg = {(x, y): bm.verts.new(Vector((c0 + h * x + v * y + n * d) / 100.0)) for x in gxs for y in gys}
+            first = len(Rs); Rs += [g["R"]] * len(pn)
+            for i in range(len(gxs) - 1):
+                for j in range(len(gys) - 1):
+                    cx_, cy_ = (gxs[i] + gxs[i + 1]) / 2, (gys[j] + gys[j + 1]) / 2
+                    if not in_convex(ring, cx_, cy_, 0.0): continue
+                    k = next((t for t, p in enumerate(pn) if in_convex(p, cx_, cy_, 0.0)), -1)
+                    f = bm.faces.new((vg[(gxs[i], gys[j])], vg[(gxs[i + 1], gys[j])], vg[(gxs[i + 1], gys[j + 1])], vg[(gxs[i], gys[j + 1])]))
+                    f[pl_] = first + k + 1 if k >= 0 else -1; new.append(f); nbar += k < 0
+            ngrid += 1; pn = []
+        P2 = [tuple(p) for p in ring] + [tuple(q) for p in pn for q in p]
+        allv = [bm.verts.new(Vector((c0 + h * x + v * y + n * d) / 100.0)) for (x, y) in P2] if pn else []
+        tris = [] if not pn else tessellate_polygon([[Vector((x, y, 0.0)) for (x, y) in ring]] + [[Vector((x, y, 0.0)) for (x, y) in p] for p in pn])
+        fill = sum(tri_area(P2[a], P2[b], P2[c]) for (a, b, c) in tris)
+        want = area(ring) - sum(area(p) for p in pn)
+        if pn and abs(fill - want) > 0.02 * area(ring) + 4.0: badfill += 1
+        for (a, b, c) in tris:
+            if len({a, b, c}) < 3: continue
+            try: f = bm.faces.new((allv[a], allv[b], allv[c]))
+            except ValueError: continue
+            f[pl_] = -1; new.append(f); nbar += 1
+        k = len(ring)
+        for p in pn:
+            f = bm.faces.new(allv[k:k + len(p)]); k += len(p); Rs.append(g["R"]); f[pl_] = len(Rs); new.append(f)
+        for f in new:
+            f.normal_update()
+            if f.normal.dot(nn) < 0: f.normal_flip()
+            for l in f.loops: l[uvb].uv = uv
     nq = len(Rs)
-    added = [f for f in bm.faces if f[pl_] > 0]
+    added = [f for f in bm.faces if f[pl_] != 0]
     bmesh.ops.triangulate(bm, faces=added)
     bm.to_mesh(me); bm.free(); me.update()
     nf = len(me.polygons)
     pane = np.empty(nf, np.int32); me.attributes["pane"].data.foreach_get("value", pane); me.attributes.remove(me.attributes["pane"])
-    assert (pane[:nf0] == 0).all() and (pane[nf0:] > 0).all(), "the building's own faces moved"
+    assert (pane[:nf0] == 0).all() and (pane[nf0:] != 0).all(), "the building's own faces moved"
     cols = np.zeros((nf, 3), np.float32); cols[:] = NOT
     if old is not None:
         fire = (old[:, 1] < 0.5) & (old[:, 2] < 0.5)
         cols[:nf0][fire] = (0.0, 0.0, 0.0)
+    if fire_pts is not None and len(fire_pts):
+        from mathutils.kdtree import KDTree
+        kd = KDTree(len(fire_pts))
+        for i, p in enumerate(fire_pts): kd.insert(Vector(p), i)
+        kd.balance()
+        cen = np.empty(nf * 3); me.polygons.foreach_get("center", cen); cen = cen.reshape(-1, 3)[:nf0] * 100.0
+        near = np.array([kd.find(Vector(c))[2] < FIRE_NEAR for c in cen])
+        cols[:nf0][near] = (0.0, 0.0, 0.0); log("fire faces", int(near.sum()), "from", len(fire_pts), "fire triangles")
     Ra = np.array([0.0] + Rs, np.float32)
-    cols[nf0:, 0] = Ra[pane[nf0:]]; cols[nf0:, 1] = 1.0; cols[nf0:, 2] = 0.0
+    gl = pane > 0
+    cols[gl, 0] = Ra[pane[gl]]; cols[gl, 1] = 1.0; cols[gl, 2] = 0.0
     for at in list(me.color_attributes): me.color_attributes.remove(at)
     attr = me.color_attributes.new("WindowMask", "FLOAT_COLOR", "CORNER")
     lt = np.array([p.loop_total for p in me.polygons]); pl = np.repeat(np.concatenate([cols, np.ones((nf, 1), np.float32)], 1), lt, axis=0)
     attr.data.foreach_set("color", pl.ravel()); me.color_attributes.active_color = attr
     me.normals_split_custom_set(cn_old + [tuple(me.polygons[pi].normal) for pi in range(nf0, nf) for _ in me.polygons[pi].loop_indices]); me.update()
-    log("glass laid", nq, "skipped", skipped, "capped", capped, "triangles added", nf - nf0)
+    sp = np.array(spreads) if spreads else np.zeros(1)
+    log("sheets laid", len(found) - skipped, "skipped", skipped, "panes", nq, "bar pieces", nbar, "grids", ngrid, "fill off", badfill, "capped", capped,
+        "front spread cm median %.1f p90 %.1f max %.1f" % (np.median(sp), np.percentile(sp, 90), sp.max()), "triangles added", nf - nf0)
     return nf - nf0
 
 def export(o, path):
@@ -378,6 +601,9 @@ def fresh(path):
     ours = os.path.exists(stamp) and open(stamp).read().strip() == "%.3f" % os.path.getmtime(path)
     if not ours or not os.path.exists(orig): shutil.copy2(path, orig)
     return orig, stamp
+def pics(folder, name):   # (the painted picture and its normals, for the bars' frame colour)
+    p = [os.path.join(folder, "T_%s_%s.png" % (name, k)) for k in ("Base", "Normal")]
+    return [picture(x) if os.path.exists(x) else None for x in p]
 def done(path, stamp):
     open(stamp, "w").write("%.3f" % os.path.getmtime(path))
 
@@ -390,21 +616,26 @@ for pr in pairs:
         fc = marks(o.data, np.array([p.loop_start for p in o.data.polygons], np.int64))
         bp = os.path.join(work, "T_%s_Base.png" % name)
         found = panes(o, fc, picture(bp) if os.path.exists(os.path.join(work, "PrePanes", "T_%s_Base.png" % name)) else None)
-        add_glass(o, found, True)
+        add_glass(o, found, True, *pics(work, name))
         export(o, src_path); done(src_path, stamp)
         log(name, "written", src_path)
     else:
         low = os.path.join(out, new + ".fbx")
         orig, stamp = fresh(low)
-        found = []
+        found = []; fire_pts = None
         if not os.path.exists(src_path): log(new, "no source model", src_path, "(an open stall: no glass)")
         else:
             pre = os.path.join(work, "PreGlass", name + ".fbx")
             ours = os.path.exists(pre + ".glass") and open(pre + ".glass").read().strip() == "%.3f" % os.path.getmtime(src_path)
             src = load(pre if ours else src_path)   # (an old model already given its own glass: its own marks are in the copy)
             fc = marks(src.data, np.array([p.loop_start for p in src.data.polygons], np.int64))
-            if fc is not None: found = panes(src, fc)
+            if fc is not None:
+                found = panes(src, fc)
+                fi_ = np.nonzero((fc[:, 0] < 0.5) & (fc[:, 1] < 0.5) & (fc[:, 2] < 0.5))[0]
+                if len(fi_):   # (the forge: its fire stays where it was, and nowhere else can burn, the window edges' baked fleck included)
+                    ar_ = arrays(src.data); fire_pts = ar_[1][np.isin(ar_[2], fi_)].mean(1)
+                    if new in NO_GLASS_ABOVE: fire_pts = fire_pts[fire_pts[:, 2] <= NO_GLASS_ABOVE[new]]   # (the church belfry's painted slot read as fire: a lit amber sliver at dusk)
         o = load(orig)
-        add_glass(o, found, False)
+        add_glass(o, found, False, *pics(out, new), fire_pts=fire_pts)
         export(o, low); done(low, stamp)
         log(new, "written")
