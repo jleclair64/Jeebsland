@@ -12,9 +12,15 @@ $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 if (-not $ImportOnly) {
 & $blender -b -P (Join-Path $PSScriptRoot 'building_clean.py') -- (Join-Path $proj 'Art\Buildings') $work @Names | Select-String -Pattern 'BUILD |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 if (-not $NoFlatten) { & $blender -b -P (Join-Path $PSScriptRoot 'building_flatten.py') -- $work @Names | Select-String -Pattern 'FLAT |Traceback|Error' | ForEach-Object { Write-Host $_.Line } }
+# even window panes (townlab_panes.py, owner 2026-11-15): every model with lit windows, after the flatten (which repaints the colour)
+$paneNames = if ($Names) { $Names } else { Get-ChildItem $work -Filter '*.fbx' | Where-Object { $_.Name -notlike '*_Col.fbx' } | ForEach-Object { $_.BaseName } }
+& $blender -b -P (Join-Path $PSScriptRoot 'townlab_panes.py') -- $work @paneNames | Select-String -Pattern 'TLPANES|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+# each pane its own flat glass with straight edges (window_glass.py, owner 2026-11-15): the models M_Building lights by GeomGlass
+$glassNames = @(@('OakHillChurch_300k') | Where-Object { -not $Names -or $Names -contains $_ })
+if ($glassNames) { & $blender -b -P (Join-Path $PSScriptRoot 'window_glass.py') -- $work - @glassNames | Select-String -Pattern 'WGLASS|Traceback|Error' | ForEach-Object { Write-Host $_.Line } }
 }
 if ($CleanOnly) { exit 0 }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'building_import.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
+$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'building_import.py').Replace('\', '/'))" -unattended -nosplash -stdout -FullStdOutLogOutput -Multiprocess -LiveCoding=false
 $out | Select-String -Pattern 'BUILDDIAG|Traceback|Failed to compile Material' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'BUILDDIAG done') { Write-Host 'Buildings imported.'; exit 0 } else { Write-Host 'Buildings import FAILED.'; exit 1 }

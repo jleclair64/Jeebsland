@@ -9,6 +9,10 @@
 # T_<NewName>_Glow.png and T_<NewName>_Mask.png (the window marks of building_clean.py's vertex colour, as a picture: R a random
 # number per window, G 1 on a window, B 1 where it never glows; M_TL_Building reads it instead of the vertex colour, so the low
 # model needs none) and, with --preview, <NewName>_preview.png (old and new side by side in Blender).
+# The window glass is NOT decided here any more (2026-11-15): Tools/window_glass.py runs after this and townlab_panes.py
+# (BuildTownLabBuildings.ps1) and lays every pane of the high model as its own flat glass on the low model, with straight edges, marked
+# in the low model's vertex colour (G 1 glass, R the window's number, B 1 everything else); M_TL_Building lights only that glass and
+# reads the mask picture just for the forge's fire. Bake the low model, then always run window_glass.py on it.
 #
 # The painted look (Overwatch's Eichenwalde): each colour group graded warmer and a little richer (GRADE), the high model's ambient
 # occlusion painted softly into the colour, warm (AO_*), bevelled edges picked out a little lighter as a painter does (EDGE_*), and
