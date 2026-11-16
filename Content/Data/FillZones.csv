@@ -16,16 +16,17 @@ OakBridge,0,0.5,Dock:2 RiverRest:1,109,road,0
 OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:2 FlowerClump:1,110,wall,0
 OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,road,0.01
 # The original square (owner 2026-11-15: Blackrock and the square's medium places now). Density: sets per 100 m^2 of fillable ground
-# (a set is 3-6 pieces). Set high on purpose (2026-11-16): fillcore throws (want x 6) random spots per 32 m square and most
-# land outside a small zone or on a building, so the real yield in game is about a third of this (JEEBFILL zone lines).
-Blackrock,1,3.5,Blackrock:4 BlackrockPalisade:2 StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1 AmphoraRow:1 BlackrockGate:1,201,wall,0.03
+# (a set is 3-6 pieces). Since fillfix (2026-11-16) spots are drawn only inside the zone's own open ground, so the yield in game is
+# close to Density x area (JEEBFILL zone lines); the densities were lowered to keep the piece count. Blackrock's fountain yard is
+# hand-placed (FillOakHill.csv, Site Square) before this zone runs.
+Blackrock,1,2.2,Blackrock:4 BlackrockPalisade:2 StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1 AmphoraRow:1 BlackrockGate:1,201,wall,0.03
 MarketYard,1,10,ShopFront:2 BarrelRow:3 SackCorner:3 AmphoraRow:2 StorageCorner:1 VegCorner:1 FlowerClump:1,202,road,0
 Cottage,1,5,FlowerClump:3 BushClump:2 WashingCorner:1 KitchenGarden:1 LogCorner:1,203,wall,0
-HutYards,1,2.5,Blackrock:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:2 FlowerClump:1,204,wall,0.02
+HutYards,1,1.8,Blackrock:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:2 FlowerClump:1,204,wall,0.02
 PigPen,1,6,PenSide:2 SackCorner:2 BarrelRow:1 BushClump:1,205,random,0
-Pond,1,6,RiverRest:1 BushClump:3 FlowerClump:2,206,random,0
-Castle,1,5,GarrisonTable:2 BarrelRow:2 SackCorner:2 GarrisonBanner:1 StorageCorner:1 Garrison:1,207,random,0
-Graveyard,1,6,GraveyardRow:1 GraveyardBench:1 CypressPair:1 DoorstepCandles:2 FlowerClump:2,208,random,0
+Pond,1,4.5,RiverRest:1 BushClump:3 FlowerClump:2,206,random,0
+Castle,1,3,GarrisonTable:2 BarrelRow:2 SackCorner:2 GarrisonBanner:1 StorageCorner:1 Garrison:1,207,random,0
+Graveyard,1,3.5,GraveyardBench:1 CypressPair:1 DoorstepCandles:2 FlowerClump:2,208,random,0
 # The world beyond (owner 2026-11-15: no open-world scatter or roadside sets yet). Coded, Off; mixes ready for later.
 Roadside,0,0.15,Junction:1 JunctionArrow:1 FenceRun:2 BushClump:2 Boulders:1 CartCorner:1,301,road,0.01
 RiverBank,0,0.15,RiverRest:3 Boulders:1 BushClump:1,302,random,0.02

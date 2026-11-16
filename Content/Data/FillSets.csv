@@ -402,3 +402,49 @@ WallTorch,TorchWall,0,0,1.4,0,1,hang
 # StonePole: a stone banner pole at a road into town
 StonePole,BannerPoleStone,0,0,0,0,1,
 StonePole,BushSpiky,0,-1.6,0,0,1,turn=180|drop
+# GraveyardEnclosure (fillfix 2026-11-16): the Oak Hill graveyard plot's low stone wall, 0.5 m inside its 16.8 m square, laid for that plot only (set
+# frame: X north, Y east of the plot's middle; place it at yaw 0). Wall panels joined end to end with stone posts at the corners, the middle
+# of each side and both sides of the way in, which is the open north-west corner where the lane comes in.
+GraveyardEnclosure,WallPillarEnd,-7.900,-7.900,0,90,1,
+GraveyardEnclosure,WallPillarEnd,-7.900,7.900,0,90,1,
+GraveyardEnclosure,WallPillarEnd,-7.900,0.000,0,90,1,
+GraveyardEnclosure,WallPillarEnd,7.900,7.900,0,0,1,
+GraveyardEnclosure,WallPillarEnd,0.000,7.900,0,0,1,
+GraveyardEnclosure,WallPillarEnd,7.900,-3.600,0,90,1,
+GraveyardEnclosure,WallPillarEnd,7.900,2.150,0,90,1,
+GraveyardEnclosure,WallPillarEnd,-2.000,-7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-7.900,1.480,0,90,1,
+GraveyardEnclosure,WallPillar,-7.900,-1.480,0,90,1,
+GraveyardEnclosure,WallPillar,1.480,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-1.480,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-7.900,3.950,0,90,1,
+GraveyardEnclosure,WallPillar,-7.900,-3.950,0,90,1,
+GraveyardEnclosure,WallPillar,3.950,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-3.950,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-7.900,6.420,0,90,1,
+GraveyardEnclosure,WallPillar,-7.900,-6.420,0,90,1,
+GraveyardEnclosure,WallPillar,6.420,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-6.420,7.900,0,0,1,
+GraveyardEnclosure,WallPillar,7.900,-2.013,0,90,1,
+GraveyardEnclosure,WallPillar,7.900,0.564,0,90,1,
+GraveyardEnclosure,WallPillar,7.900,3.737,0,90,1,
+GraveyardEnclosure,WallPillar,7.900,6.314,0,90,1,
+GraveyardEnclosure,WallPillar,-6.263,-7.900,0,0,1,
+GraveyardEnclosure,WallPillar,-3.636,-7.900,0,0,1,
+# GraveRow (fillfix 2026-11-16): five graves side by side along X, fronts +Y. No headstone model exists in TownDecor or Filler, so each
+# grave is a stone post (WallPillarEnd at 65%, turned to face front) at its head, a planted bed (PlantClump) in front and a grave candle.
+GraveRow,WallPillarEnd,-4,0,0,90,0.65,
+GraveRow,PlantClump,-4,0.98,0,90,1,
+GraveRow,CandleCageShort,-3.45,0.15,0,0,1,drop
+GraveRow,WallPillarEnd,-2,0,0,90,0.65,
+GraveRow,PlantClump,-2,0.98,0,90,1,
+GraveRow,CandleCageTall,-1.45,0.15,0,0,1,drop
+GraveRow,WallPillarEnd,0,0,0,90,0.65,
+GraveRow,PlantClump,0,0.98,0,90,1,
+GraveRow,CandleCageShort,0.55,0.15,0,0,1,drop
+GraveRow,WallPillarEnd,2,0,0,90,0.65,
+GraveRow,PlantClump,2,0.98,0,90,1,
+GraveRow,CandleCageTall,2.55,0.15,0,0,1,drop
+GraveRow,WallPillarEnd,4,0,0,90,0.65,
+GraveRow,PlantClump,4,0.98,0,90,1,
+GraveRow,CandleCageShort,4.55,0.15,0,0,1,drop

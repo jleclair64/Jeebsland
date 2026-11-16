@@ -19,7 +19,8 @@ class UPointLightComponent;
 //  - Checked after placing: a flood fill with the knight's capsule from the spawn reaches every door, counter, yard and plot
 //    (JEEBFILL UNREACHABLE), no two footprints overlap (JEEBFILL OVERLAP), and the largest empty spot in town (JEEBFILL GAP).
 // Switches: -NoFill, -FillZone=<name> / jeeb.Fill.Zone (one zone only), -FillDump (Saved/Fill: the grid, zones and shapes for
-// Tools/FillMap.ps1), -FillData=<folder> (test CSVs), -FillQuit (quit once built); jeeb.Fill.Show 0/1, jeeb.Fill.CullScale.
+// Tools/FillMap.ps1), -FillData=<folder> (test CSVs), -FillQuit (quit once built), -FillGallery (every kind once, floating far off,
+// for test pictures); jeeb.Fill.Show 0/1, jeeb.Fill.CullScale.
 UCLASS()
 class AWorldFill : public AActor
 {
@@ -49,7 +50,8 @@ private:
 
 namespace JeebFill
 {
-	// Ground covered by a fill piece bigger than 1 m^2 (wagons, stalls, wells, beds): the grass and the fallen leaves skip it (1 m cells)
+	// Ground under a solid fill piece bigger than 1 m^2 (wagons, stalls, wells, beds), inside its collision footprint with a dithered
+	// soft rim: the grass and the fallen leaves skip it
 	bool Covered(float X, float Y);
 	bool AnyCovered();
 }

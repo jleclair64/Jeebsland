@@ -54,18 +54,6 @@ namespace
 		return FParse::Param(FCommandLine::Get(), Name);
 #endif
 	}
-
-	// ---------------------------------------------------------------------------------------------- covered ground (grass, leaves)
-	TSet<int64> GCovered;
-	FBox2D GCoveredBox(ForceInit);
-	int64 CoverKey(int32 I, int32 J) { return (int64(I) << 32) ^ int64(uint32(J)); }
-}
-
-bool JeebFill::AnyCovered() { return GCovered.Num() > 0; }
-bool JeebFill::Covered(float X, float Y)
-{
-	if (GCovered.Num() == 0 || X < GCoveredBox.Min.X || X > GCoveredBox.Max.X || Y < GCoveredBox.Min.Y || Y > GCoveredBox.Max.Y) return false;
-	return GCovered.Contains(CoverKey(FMath::FloorToInt(X / 100.f), FMath::FloorToInt(Y / 100.f)));
 }
 
 // ====================================================================================================== the data files
@@ -235,7 +223,7 @@ void JeebFill::LoadData(FData& D)
 		else
 		{
 			const int32 cSet = C.Col({ TEXT("Set") }), cE = C.Col({ TEXT("E") }), cN = C.Col({ TEXT("N") }), cYaw = C.Col({ TEXT("Yaw") }), cSeed = C.Col({ TEXT("Seed") });
-			const int32 cVar = C.Col({ TEXT("Var") }), cPlot = C.Col({ TEXT("Plot") }), cNote = C.Col({ TEXT("Note") });
+			const int32 cVar = C.Col({ TEXT("Var") }), cPlot = C.Col({ TEXT("Plot") }), cNote = C.Col({ TEXT("Note") }), cSite = C.Col({ TEXT("Site") });
 			for (int32 r = 0; r < C.Rows.Num(); ++r)
 			{
 				FOakRow O;
@@ -243,6 +231,7 @@ void JeebFill::LoadData(FData& D)
 				if (O.Set.IsEmpty()) continue;
 				O.E = C.F(r, cE, 0.f); O.N = C.F(r, cN, 0.f); O.Yaw = C.F(r, cYaw, 0.f);
 				O.Seed = C.I(r, cSeed, r + 1); O.bVar = C.I(r, cVar, 0) != 0; O.Plot = C.I(r, cPlot, -1); O.Note = C.S(r, cNote); O.Line = C.Lines[r];
+				O.bSquare = C.S(r, cSite).StartsWith(TEXT("sq"), ESearchCase::IgnoreCase);
 				D.Oak.Add(O);
 			}
 		}
@@ -383,6 +372,55 @@ namespace
 		const int32 Q = FMath::RoundToInt(V * 10.f);   // millimetres
 		for (int32 b = 0; b < 4; ++b) { H ^= uint32((Q >> (8 * b)) & 0xFF); H *= 16777619u; }
 	}
+
+	// ---------------------------------------------------------------------------------------------- covered ground (grass, leaves)
+	// (fillfix 2026-11-16: each solid piece's own collision footprint, not whole 1 m cells, so a cart no longer leaves a bare square;
+	// its rim is dithered over Edge cm, so the grass thins into it instead of stopping at a hard line)
+	struct FCover { FShape S; float Edge; };
+	TArray<FCover> GCover;
+	TMap<FIntPoint, TArray<int32>> GCoverBuckets;   // (4 m squares)
+	FBox2D GCoveredBox(ForceInit);
+	int32 GCoverCells = 0;                          // (m^2 covered, for the log)
+	void ResetCover() { GCover.Reset(); GCoverBuckets.Reset(); GCoveredBox = FBox2D(ForceInit); GCoverCells = 0; }
+	void AddCover(const FShape& S)
+	{
+		const float Edge = FMath::Min(40.f, 0.4f * (S.Type == 0 ? FMath::Min(S.H.X, S.H.Y) : S.R));
+		const int32 Ci = GCover.Add({ S, Edge });
+		const FBox2D B = S.Bounds();
+		GCoveredBox += B;
+		for (int32 Hx = FMath::FloorToInt(B.Min.X / 400.f); Hx <= FMath::FloorToInt(B.Max.X / 400.f); ++Hx)
+			for (int32 Hy = FMath::FloorToInt(B.Min.Y / 400.f); Hy <= FMath::FloorToInt(B.Max.Y / 400.f); ++Hy) GCoverBuckets.FindOrAdd(FIntPoint(Hx, Hy)).Add(Ci);
+		GCoverCells += FMath::RoundToInt(S.Area() / 10000.f);
+	}
+}
+
+bool JeebFill::AnyCovered() { return GCover.Num() > 0; }
+bool JeebFill::Covered(float X, float Y)
+{
+	if (GCover.Num() == 0 || X < GCoveredBox.Min.X || X > GCoveredBox.Max.X || Y < GCoveredBox.Min.Y || Y > GCoveredBox.Max.Y) return false;
+	const TArray<int32>* L = GCoverBuckets.Find(FIntPoint(FMath::FloorToInt(X / 400.f), FMath::FloorToInt(Y / 400.f)));
+	if (!L) return false;
+	const FVector2D P(X, Y);
+	for (int32 Ci : *L)
+	{
+		const FCover& C = GCover[Ci];
+		// how far inside the footprint (cm)
+		float In;
+		if (C.S.Type == 1) In = C.S.R - float(FVector2D::Distance(P, C.S.C));
+		else { const FVector2D Lc = C.S.Local(P); In = FMath::Min(C.S.H.X - FMath::Abs(Lc.X), C.S.H.Y - FMath::Abs(Lc.Y)); }
+		if (In <= 0.f) continue;
+		if (In >= C.Edge) return true;
+		// the soft rim: fewer and fewer tufts toward the inside (a fixed dither per spot, the same every time it is asked)
+		const float T = In / FMath::Max(C.Edge, 1.f), Want = T * T * (3.f - 2.f * T);
+		const uint32 H = HashU(uint32(FMath::FloorToInt(X)) * 73856093u ^ uint32(FMath::FloorToInt(Y)) * 19349663u ^ 0x5bd1e995u);
+		if (float(H & 0xffff) / 65536.f < Want) return true;
+	}
+	return false;
+}
+
+namespace
+{
+	using namespace JeebFill;
 
 	struct FNamedShape { FShape S; uint16 Bit; FString Name; };
 
@@ -1036,6 +1074,17 @@ struct FFillBuilder
 	}
 	struct FTry { const FKind* Kind; FTransform Xf; FShape Foot; bool bGround, bSolid, bWalkBlock, bDrop; };
 
+	// A solid piece's collision footprint in plan (the box BuildComponents gives it): its footprint box, or for round and capsule kinds
+	// a square 85% of its width, here the circle inside that square
+	static FShape SolidFoot(const FKind& K, const FShape& Foot, float Scale, float Yaw)
+	{
+		if (K.Shape == EShape::Circle || K.Col == ECol::Capsule)
+		{
+			const float Side = (K.Shape == EShape::Box ? FMath::Min(K.FootX, K.FootY) : K.FootX) * 0.85f * Scale;
+			return FShape::Circle(Foot.C, Side * 0.5f);
+		}
+		return FShape::Box(Foot.C, FVector2D(K.FootX, K.FootY) * 0.5f * Scale, Yaw);
+	}
 	FShape FootOf(const FKind& K, const FVector2D& At, float Yaw, float Scale) const
 	{
 		const FShape Fr = FShape::Box(At, FVector2D(1.f, 1.f), Yaw);
@@ -1149,10 +1198,13 @@ struct FFillBuilder
 			const FBox2D B = T.Foot.Bounds();
 			for (int32 Hx = FMath::FloorToInt(B.Min.X / 400.f); Hx <= FMath::FloorToInt(B.Max.X / 400.f); ++Hx)
 				for (int32 Hy = FMath::FloorToInt(B.Min.Y / 400.f); Hy <= FMath::FloorToInt(B.Max.Y / 400.f); ++Hy) PieceHash.FindOrAdd(FIntPoint(Hx, Hy)).Add(Pi);
-			if (T.Foot.Area() > 10000.f)
-				for (int32 I = FMath::FloorToInt(B.Min.X / 100.f); I <= FMath::FloorToInt(B.Max.X / 100.f); ++I)
-					for (int32 J = FMath::FloorToInt(B.Min.Y / 100.f); J <= FMath::FloorToInt(B.Max.Y / 100.f); ++J)
-						if (T.Foot.Contains(FVector2D((I + 0.5f) * 100.f, (J + 0.5f) * 100.f), 0.f)) { GCovered.Add(CoverKey(I, J)); GCoveredBox += FVector2D(I * 100.f, J * 100.f); GCoveredBox += FVector2D(I * 100.f + 100.f, J * 100.f + 100.f); }
+			// the grass and fallen leaves give way under a solid piece over 1 m^2, inside its collision footprint only (no larger: the
+			// same box, or the round kinds' capsule, that BuildComponents makes), with a soft rim
+			if (T.bSolid && T.Kind->Col != ECol::Mesh)
+			{
+				const FShape Col = SolidFoot(*T.Kind, T.Foot, T.Xf.GetScale3D().X, T.Xf.Rotator().Yaw);
+				if (Col.Area() > 10000.f) AddCover(Col);
+			}
 		}
 		const FVector L = T.Xf.GetLocation();
 		uint32& H = St.Hash;
@@ -1247,26 +1299,34 @@ struct FFillBuilder
 
 	bool ZoneWanted(const FString& Name) const { return OnlyZone.IsEmpty() || OnlyZone.Equals(Name, ESearchCase::IgnoreCase); }
 
+	// The hand-placed rows: Oak Hill's, then the square's (Site Square, stats "SquareRows"), before any rule zone
 	void PlaceOakHill()
 	{
-		if (!OakOn() || D.Oak.Num() == 0 || !ZoneWanted(TEXT("OakHill"))) return;
-		const double T0 = FPlatformTime::Seconds();
-		FStats& St = Stats.FindOrAdd(TEXT("OakHill"));
-		int32 Failed = 0;
-		for (const FOakRow& R : D.Oak)
+		for (int32 Pass = 0; Pass < 2; ++Pass)
 		{
-			const FVector2D At(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
-			FString Why;
-			const int32 Before = St.Pieces;
-			const int32 N = PlaceSet(R.Set, At, R.Yaw, HashU(uint32(R.Seed) * 2654435761u + 17u), R.bVar, false, ZoneAt(At.X, At.Y), St, &Why);
-			if (N == 0 || !Why.IsEmpty())
+			const bool bSq = Pass == 1;
+			const TCHAR* Key = bSq ? TEXT("SquareRows") : TEXT("OakHill");
+			if ((!bSq && !OakOn()) || !ZoneWanted(Key)) continue;
+			const double T0 = FPlatformTime::Seconds();
+			int32 Failed = 0, Rows = 0;
+			for (const FOakRow& R : D.Oak)
 			{
-				++Failed;
-				UE_LOG(LogTemp, Log, TEXT("JEEBFILL OAKROW line %d %s at E %.1f N %.1f: %d of its pieces placed%s%s"), R.Line, *R.Set, R.E, R.N, St.Pieces - Before, Why.IsEmpty() ? TEXT("") : TEXT("; skipped "), *Why);
+				if (R.bSquare != bSq) continue;
+				FStats& St = Stats.FindOrAdd(Key);
+				++Rows;
+				const FVector2D At = bSq ? FVector2D(R.N * 100.f, R.E * 100.f) : FVector2D(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
+				FString Why;
+				const int32 Before = St.Pieces;
+				const int32 N = PlaceSet(R.Set, At, R.Yaw, HashU(uint32(R.Seed) * 2654435761u + 17u), R.bVar, false, ZoneAt(At.X, At.Y), St, &Why);
+				if (N == 0 || !Why.IsEmpty())
+				{
+					++Failed;
+					UE_LOG(LogTemp, Log, TEXT("JEEBFILL OAKROW line %d %s at %s E %.1f N %.1f: %d of its pieces placed%s%s"), R.Line, *R.Set, bSq ? TEXT("square") : TEXT("Oak Hill"), R.E, R.N, St.Pieces - Before, Why.IsEmpty() ? TEXT("") : TEXT("; skipped "), *Why);
+				}
 			}
+			if (FStats* St = Stats.Find(Key)) St->Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFILL %s rows %d, %d with pieces left out (JEEBFILL OAKROW lines)"), Key, Rows, Failed);
 		}
-		St.Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
-		UE_LOG(LogTemp, Log, TEXT("JEEBFILL OakHill rows %d, %d with pieces left out (JEEBFILL OAKROW lines)"), D.Oak.Num(), Failed);
 	}
 
 	void PlaceZones()
@@ -1288,18 +1348,22 @@ struct FFillBuilder
 				for (int32 Cx = Cx0; Cx <= Cx1; ++Cx)
 				{
 					const FVector2D O(Cx * ChunkCm, Cy * ChunkCm);
-					// how much of this 32 m square is this zone's open ground (an 8 x 8 sample)
-					int32 InZone = 0, Open = 0;
-					for (int32 a = 0; a < 8; ++a)
-						for (int32 b = 0; b < 8; ++b)
+					// this 32 m square's open ground in the zone, on a 2 m lattice (fillfix 2026-11-16: spots are drawn from these cells only,
+					// not from the whole square, so a small zone such as the pig pen's ring gets its share instead of one set)
+					constexpr int32 Lat = 16;
+					constexpr float LatCm = ChunkCm / Lat;
+					int32 InZone = 0;
+					TArray<FVector2D> OpenCells;
+					for (int32 a = 0; a < Lat; ++a)
+						for (int32 b = 0; b < Lat; ++b)
 						{
-							const FVector2D P = O + FVector2D((a + 0.5f) * 400.f, (b + 0.5f) * 400.f);
+							const FVector2D P = O + FVector2D((a + 0.5f) * LatCm, (b + 0.5f) * LatCm);
 							if (ZoneAt(P.X, P.Y) != Z) continue;
 							++InZone;
-							if (!(Grid.At(FGrid::G(P.X), FGrid::G(P.Y)) & (NoProp | F_ROAD))) ++Open;
+							if (!(Grid.At(FGrid::G(P.X), FGrid::G(P.Y)) & (NoProp | F_ROAD))) OpenCells.Add(P);
 						}
-					if (InZone == 0) continue;
-					const float Area = Open / 64.f * (ChunkCm * ChunkCm / 10000.f);   // m^2
+					if (InZone == 0 || OpenCells.Num() == 0) continue;
+					const float Area = OpenCells.Num() * (LatCm * LatCm / 10000.f);   // m^2
 					FRandomStream R(int32(HashU(uint32(Cx) * 73856093u ^ uint32(Cy) * 19349663u ^ ZSeed) & 0x7fffffff));
 					const float WantF = Zr->Density * Area / 100.f, TreesF = Zr->Trees * Area / 100.f;
 					const float FracRoll = R.FRand(), TreeFrac = R.FRand();
@@ -1307,14 +1371,15 @@ struct FFillBuilder
 					const int32 WantTrees = FMath::FloorToInt(TreesF) + (TreeFrac < FMath::Frac(TreesF) ? 1 : 0);
 					// every number this square uses, drawn before anything is tried (so a skip never shifts the rest)
 					const int32 NTry = FMath::Clamp((Want + WantTrees) * 6, 4, 96);
-					struct FRoll { float U, V, Set, Yaw; uint32 Var; };
+					struct FRoll { float Pick, U, V, Set, Yaw; uint32 Var; };
 					TArray<FRoll> Rolls;
-					for (int32 t = 0; t < NTry; ++t) Rolls.Add({ R.FRand(), R.FRand(), R.FRand(), R.FRand(), uint32(R.GetUnsignedInt()) });
+					for (int32 t = 0; t < NTry; ++t) Rolls.Add({ R.FRand(), R.FRand(), R.FRand(), R.FRand(), R.FRand(), uint32(R.GetUnsignedInt()) });
 					int32 GotTrees = 0, GotSets = 0;
 					for (const FRoll& Ro : Rolls)
 					{
 						if (GotTrees >= WantTrees && GotSets >= Want) break;
-						FVector2D At = O + FVector2D(Ro.U, Ro.V) * ChunkCm;
+						// one of the zone's open cells, anywhere inside it
+						FVector2D At = OpenCells[FMath::Min(int32(Ro.Pick * OpenCells.Num()), OpenCells.Num() - 1)] + FVector2D(Ro.U - 0.5f, Ro.V - 0.5f) * LatCm;
 						if (ZoneAt(At.X, At.Y) != Z) { St.Skipped.FindOrAdd(TEXT("zone"))++; continue; }
 						if (GotTrees < WantTrees)
 						{
@@ -1719,6 +1784,44 @@ struct FFillBuilder
 				++LightCount;
 			}
 		}
+#if !UE_BUILD_SHIPPING
+		// -FillGallery (test pictures only, fillfix 2026-11-16): every kind in FillKinds.csv once, fronts toward +X, floating 20 m over the
+		// open grass far from everything (sky behind), in 15 m strips; each strip's -ShotEyes eye is logged. Shot with r.ForceLOD 0 and
+		// then the last LOD, it shows any kind that draws black, unlit, untextured or broken by its generated LODs.
+		if (TestSwitch(TEXT("FillGallery")))
+		{
+			TArray<FString> Names; D.Kinds.GetKeys(Names); Names.Sort();
+			const FVector2D Org(-60000.f, -20000.f);
+			constexpr float StripLen = 1500.f, StripStep = 4500.f, Gap = 60.f;
+			// (one height for the whole gallery: 20 m over the highest ground under it)
+			float Z0 = -1.0e9f;
+			for (float Sx = Org.X - 1000.f; Sx <= Org.X + 1500.f; Sx += 500.f)
+				for (float Sy = Org.Y - 500.f; Sy <= Org.Y + 20.f * StripStep; Sy += 500.f) Z0 = FMath::Max(Z0, JeebTerrain::HeightAt(Sx, Sy));
+			Z0 += 2000.f;
+			int32 Strip = 0; float Y = 0.f; FString InStrip;
+			auto EndStrip = [&]()
+			{
+				const float Ex = Org.X + 1000.f, Ey = Org.Y + Strip * StripStep + StripLen * 0.5f;
+				UE_LOG(LogTemp, Log, TEXT("JEEBFILL GALLERY strip %d eye %.0f_%.0f_%.0f_180_-8 kinds%s"), Strip, Ex, Ey, Z0 + 180.f - JeebTerrain::HeightAt(Ex, Ey), *InStrip);
+				++Strip; Y = 0.f; InStrip.Reset();
+			};
+			for (const FString& N : Names)
+			{
+				const FKind& K = D.Kinds[N];
+				UStaticMesh* M = MeshFor(K);
+				if (!M) continue;
+				const FBox B = M->GetBoundingBox();
+				const float W = B.GetSize().X;
+				if (Y > 0.f && Y + W > StripLen) EndStrip();
+				const float Y0 = Org.Y + Strip * StripStep + Y;
+				// (yaw -90: the kind's front, local +Y, faces +X; its local X runs along world -Y)
+				Draw(M, K, FTransform(FRotator(0.f, -90.f, 0.f), FVector(Org.X - B.GetCenter().Y, Y0 + W * 0.5f + B.GetCenter().X, Z0 - B.Min.Z)), false);
+				InStrip += TEXT(" ") + N;
+				Y += W + Gap;
+			}
+			if (Y > 0.f) EndStrip();
+		}
+#endif
 	}
 	TMap<const FKind*, UStaticMesh*> MeshCache;
 	UStaticMesh* MeshFor(const FKind& K)
@@ -1796,8 +1899,8 @@ struct FFillBuilder
 		if (bDump) Dump(TEXT("filled"), As, &Reach, &ReachSize);
 		const double T1 = FPlatformTime::Seconds();
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL total sets %d pieces %d solid %d kinds %d hash %08x (%s)"), All.Sets, All.Pieces, All.Solid, All.Kinds.Num(), Total, bServer ? TEXT("server") : TEXT("client or standalone"));
-		UE_LOG(LogTemp, Log, TEXT("JEEBFILL sets %d drawn (+%d plain: materials not flagged for instancing), %d solid sets with %d bodies, %d lights, %d missing meshes, %d covered m^2"),
-			Owner->DrawSets.Num(), DrawPlain, Owner->SolidSets.Num(), BodyCount, LightCount, Missing, GCovered.Num());
+		UE_LOG(LogTemp, Log, TEXT("JEEBFILL sets %d drawn (+%d plain: materials not flagged for instancing), %d solid sets with %d bodies, %d lights, %d missing meshes, %d covered m^2 under %d pieces"),
+			Owner->DrawSets.Num(), DrawPlain, Owner->SolidSets.Num(), BodyCount, LightCount, Missing, GCoverCells, GCover.Num());
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL ms %.0f (blockers %.0f, placing %.0f, checks %.0f, components %.0f; grid chunks made %.0f) grid %d chunks %d KB"),
 			(T1 - T0) * 1000.0, (TS1 - TS) * 1000.0, (TP - TPl) * 1000.0, (TC - TP) * 1000.0, (T1 - TC) * 1000.0, Grid.MakeSeconds * 1000.0, Grid.Chunks.Num(), Grid.Chunks.Num() * ChunkN * ChunkN * 2 / 1024);
 	}
@@ -1846,8 +1949,7 @@ void AWorldFill::BeginPlay()
 		CVarFillCull->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { JeebFillApplyCull(); }));
 		CVarFillShow->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { JeebFillApplyShow(); }));
 	}
-	GCovered.Reset();
-	GCoveredBox = FBox2D(ForceInit);
+	ResetCover();
 	if (TestSwitch(TEXT("NoFill"))) { UE_LOG(LogTemp, Log, TEXT("JEEBFILL off (-NoFill)")); return; }
 	if (JeebTownLab::Active()) { UE_LOG(LogTemp, Log, TEXT("JEEBFILL off in the TownLab map")); return; }
 	Build();
@@ -1869,8 +1971,7 @@ void AWorldFill::BeginPlay()
 void AWorldFill::EndPlay(const EEndPlayReason::Type Reason)
 {
 	GetWorldTimerManager().ClearTimer(LightTimer);
-	GCovered.Reset();
-	GCoveredBox = FBox2D(ForceInit);
+	ResetCover();
 	Super::EndPlay(Reason);
 }
 
