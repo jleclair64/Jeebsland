@@ -137,3 +137,7 @@ instructions per pixel for a plant grade and about 10 for a world grade.
 - The plaza oak's and the town's weeds and ivy's imported materials.
 - M_Water itself. It is not rebuilt; WaterLook pushes every water colour.
 - The sun and the sky light. These are lighting, not surfaces.
+
+## 2026-11-15: ground and bushes matched to the new grass
+
+After the owner's LOOK preset made the Fab grass warmer (`GrassPack1` 1.01, 0.83, 1.0), `GroundGrass` went from 1.139, 0.759, 0.358 to 1.28, 0.86, 0.46 (a little lighter and less saturated, so the ground between and beyond the blades matches them at noon) and `Bush` from 0.66, 0.66, 0.38 to 1.6, 0.70, 2.2 (the shrubs were a vivid green beside the muted blades). Both are multipliers on pictures, so no rebuild is needed.
