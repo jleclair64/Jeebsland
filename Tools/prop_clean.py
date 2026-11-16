@@ -88,12 +88,12 @@ PROPS = {
                      marks={"Guard": ((-0.3, -0.08, -0.42), (0.3, 0.08, -0.36)), "Tip": ((-0.03, -0.06, 0.92), (0.03, 0.06, 0.96))}),
     "Sword3":   dict(file="Sword3.glb", axes=("Y", "-X", "Z"), length=93.3, grip=("Z", 0.879), mask="none", reduce=14000, bake=True,
                      marks={"Guard": ((-0.3, -0.08, 0.44), (0.3, 0.08, 0.50)), "Tip": ((-0.03, -0.06, -1.0), (0.03, 0.06, -0.93))}),
-    "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -47.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
+    "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -58.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
                      marks={"Edge": ((-0.32, -0.1, 0.5), (-0.27, 0.1, 0.95)), "Head": ((-0.3, -0.1, 0.9), (0.3, 0.1, 0.95))}),
     "Bow":      dict(file="Bow.glb", axes=("Z", "-Y", "X"), length=124.0, grip=("X", 0.50), widen=("Z", 0.75), wood=(25.0, 0.74, 0.28, 30.0), clean=True, refine=2, islands=12.0,
                      cut=lambda p: p[0] > 0.18 and abs(p[2]) < 0.738,
                      # (the gold fittings take the tier's colour: pale yellow, not the orange wood or the dark leather)
-                     rg=lambda co, c: (1.0 if (28.0 <= _hue(c)[0] <= 65.0 and _hue(c)[2] > 0.10 and _hue(c)[1] > 0.2) else 0.0, 0.0),
+                     rg=lambda co, c: (1.0 if (28.0 <= _hue(c)[0] <= 65.0 and _hue(c)[2] > 0.10 and _hue(c)[1] > 0.2 and not 26.0 < abs(co[0]) < 55.0) else 0.0, 0.0),   # (2026-11-15: the limbs's pale pinstripes passed the gold test and became patches of tier steel, which mirrors the dark surroundings: black holes along the limbs. Fittings only at the collars and tips)
                      marks={"WrapTop": ((0.12, -0.08, 0.72), (0.23, 0.08, 0.84)), "WrapLow": ((0.12, -0.08, -0.84), (0.23, 0.08, -0.72))}),
     "Arrow":    dict(file="Arrow.glb", axes=("Y", "Z", "X"), length=70.0, grip=("X", 1.0), wood=(25.0, 0.74, 0.28, 60.0), reduce=900, bake=True,
                      rg=lambda co, c: (1.0 if co.x > -9.0 else 0.0, 1.0 if (co.x < -52.0 and math.hypot(co.y, co.z) > 0.9) else 0.0)),
