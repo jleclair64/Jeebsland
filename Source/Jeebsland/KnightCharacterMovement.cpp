@@ -204,9 +204,9 @@ void AKnightCharacter::StartRoll()
 	if (bRolling || bSliding || bSitting || bClimbing || InClimbMove() || bMounted || RollCooldown > 0.f || Move->IsFalling() || Stamina < 20.f) return;
 	if (Smash == ESmash::Charging || MoveLocked()) return;   // (nor rolled out of, nor out of a kick; knocked down, A or D rolls: GetUp)
 	static const bool bShotMode = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
-	if (bShotMode) return;   // (test pictures: a stray Alt as the window opens would roll him)
+	if (bShotMode && !bTestWheelRoll) return;   // (test pictures: a stray key as the window opens would roll him)
 
-	// Roll the way you are steering, or straight ahead if you are standing still
+	// Roll the way the wheel-down call named (RollWheel), else the way you are steering, or straight ahead if you are standing still
 	FVector Dir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;
 	PendingRollDir = FVector::ZeroVector;
 	if (Dir.IsNearlyZero()) Dir = GetActorForwardVector().GetSafeNormal2D();
@@ -248,85 +248,33 @@ void AKnightCharacter::Jump()
 	Super::Jump();
 }
 
-// The jump (rebuilt 2026-11-05, owner: it floated on the way up): one push at takeoff, the full jump's speed, then only gravity, so
-// the arc is a plain ballistic one. Letting go of Space early cuts the rise short: within HopHold (Tuning.ini) he tops out at the
-// short hop, at FullJumpHold or later at the full jump, in between in between. The cut happens once, in the move where the key is
-// seen released, and only ever takes speed away. The height is exact: a top at H above the takeoff, having already climbed C, needs
-// v*v = 2g(H - C), and C comes from the takeoff speed and the time held, so nothing has to be tracked.
-// Online: decided only from what Unreal's saved moves carry (bPressedJump, JumpKeyHoldTime) and each move's time, here, which the
-// player's machine, the server and correction replays all run (the live move is recorded AFTER this function and the hold time is
-// cleared in ClearJumpInput, after it). p.ResetJumpStateDuringResimIfNotFalling=0 (DefaultEngine.ini) so replays get each move's own
-// jump state back.
+// The jump is Unreal's own (returned to the engine defaults 2026-11-15, owner's request). Only the gates are ours: a new Space press on the
+// ground is first offered to the climb (the climb jump), the water (Space swims up), the blocked states and the mantle; otherwise the engine jumps.
 void AKnightCharacter::CheckJumpInput(float DeltaTime)
 {
-	JumpCurrentCountPreJump = JumpCurrentCount;   // (the saved move records this one)
 	UCharacterMovementComponent* M = GetCharacterMovement();
-	if (!M) return;
-	if (M->IsFalling())
+	if (M && !M->IsFalling() && bPressedJump && JumpKeyHoldTime <= 0.f)   // a new press
 	{
-		if (bPressedJump && JumpKeyHoldTime <= 0.f) bPressedJump = false;   // a new press in the air: no jumping there
-		else if (!bPressedJump)
+		if (UKnightMovement* KM = KnightMove(); KM && KM->InClimbMove())   // on a rock face Space is the climb jump (KnightMovement.cpp)
 		{
-			if (JumpKeyHoldTime > 0.f && M->Velocity.Z > 0.f)   // just let go: the rise is cut to the height this hold earns
-			{
-				const float G = -M->GetGravityZ();
-				const float H0 = FMath::Min(JeebTune::V().HopHold, JumpMaxHoldTime - 0.01f), H1 = JumpMaxHoldTime;
-				const float Hop = HopSpeed * HopSpeed / (2.f * G), Full = FullJumpSpeed * FullJumpSpeed / (2.f * G);
-				const float Top = FMath::Lerp(Hop, Full, FMath::Clamp((JumpKeyHoldTime - H0) / FMath::Max(H1 - H0, 0.001f), 0.f, 1.f));
-				const float Climbed = FullJumpSpeed * JumpKeyHoldTime - 0.5f * G * JumpKeyHoldTime * JumpKeyHoldTime;
-				const float Want = FMath::Sqrt(FMath::Max(0.f, 2.f * G * (Top - Climbed)));
-				M->Velocity.Z = FMath::Min(float(M->Velocity.Z), Want);
-			}
-			JumpKeyHoldTime = 0.f;
+			if (KM->IsCustom(JeebClimb::Climb)) KM->QueueClimbJump();
+			return;
 		}
-		return;
+		if (UKnightMovement* KM = KnightMove(); KM && KM->InWater()) { bPressedJump = false; return; }   // (no jumping out of the water: Space swims up)
+		if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
+		{
+			bPressedJump = false;
+			return;
+		}
+		if (UKnightMovement* KM = KnightMove(); KM && KM->IsMovingOnGround() && KM->MantleNearby()) { KM->AskJump(); return; }   // by a fence: the mantle, or the jump, decided in the move
 	}
-	if (!bPressedJump || JumpKeyHoldTime > 0.f) return;   // nothing new
-	if (UKnightMovement* KM = KnightMove(); KM && KM->InClimbMove())   // on a rock face Space is the climb jump (KnightMovement.cpp)
-	{
-		if (KM->IsCustom(JeebClimb::Climb)) KM->QueueClimbJump();
-		return;
-	}
-	if (UKnightMovement* KM = KnightMove(); KM && KM->InWater()) { bPressedJump = false; return; }   // (no jumping out of the water: Space swims up)
-	// Space just went down: leave the ground, unless something stops him
-	if (bKnockedDown || bClimbing || bSitting || bRolling || MoveLocked() || Smash == ESmash::Charging || !CanJump())
-	{
-		bPressedJump = false;
-		return;
-	}
-	if (UKnightMovement* KM = KnightMove(); KM && KM->IsMovingOnGround() && KM->MantleNearby()) { KM->AskJump(); return; }   // by a fence: the mantle, or the jump, decided in the move
-	if (M->DoJump(bClientUpdating, DeltaTime))
-	{
-		JumpCurrentCount++;
-		OnJumped();
-	}
-	else bPressedJump = false;
+	Super::CheckJumpInput(DeltaTime);
 }
 
-// After the move is recorded: the hold is over once he has let go. A tap shorter than one frame is let go here, after one
-// move has carried the press, so the server sees it too.
-void AKnightCharacter::ClearJumpInput(float DeltaTime)
-{
-	const bool bWasPressed = bPressedJump;
-	Super::ClearJumpInput(DeltaTime);
-	if (!bWasPressed) JumpKeyHoldTime = 0.f;
-	if (bReleaseAfterMove && !bClientUpdating)
-	{
-		bReleaseAfterMove = false;
-		bPressedJump = false;
-	}
-}
-
-// Letting go of Space. Unlike Unreal's, it keeps JumpKeyHoldTime: the next move needs it to tell a hop.
 void AKnightCharacter::StopJumping()
 {
 	if (UKnightMovement* KM = KnightMove()) KM->bWantsRise = false;
-	if (bPressedJump && JumpKeyHoldTime <= 0.f && !GetCharacterMovement()->IsFalling())
-	{
-		bReleaseAfterMove = true;   // no move has carried the press yet
-		return;
-	}
-	bPressedJump = false;
+	Super::StopJumping();
 }
 
 void AKnightCharacter::AddControllerYawInput(float Val)
@@ -414,20 +362,32 @@ void AKnightCharacter::DoMove(float Right, float Forward)
 	else AddMovementInput(GetActorForwardVector(), FMath::Max(Forward, 0.f));
 }
 
-// A movement key (A, D, W or S) tapped twice within a quarter second, always (shield or not): a roll that way, relative to the
-// camera. Any other movement key pressed in between breaks the pair, so "A D A D" (strafing back and forth) never rolls.
-void AKnightCharacter::TapKey(int32 Key)
+// The wheel down is the roll (owner, 2026-11-15; the double-tap on W/A/S/D and V/Alt are gone). The way W, A, S, D are held decides the
+// direction, relative to the camera (two keys: the diagonal); with none held he rolls straight ahead. The rest is StartRoll, which
+// the server repeats (ServerRoll). The low sweep that used to be on the wheel down is shelved (2026-11-15, owner): StartSweep and its data stay.
+void AKnightCharacter::ScrollDown()
 {
-	const double Now = GetWorld()->GetTimeSeconds();
-	const bool bDouble = (Key == LastTapKey) && (Now - LastTapTime) < 0.28;
-	LastTapKey = Key;
-	LastTapTime = Now;
-	if (!bDouble || bMounted || IsUIOpen() || !GetController()) return;
-	const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
-	const FVector Fwd = FRotationMatrix(Yaw).GetUnitAxis(EAxis::X), Right = FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y);
-	PendingRollDir = Key == 0 ? -Right : (Key == 1 ? Right : (Key == 2 ? Fwd : -Fwd));
-	LastTapKey = -1;   // a third tap does not start another
-	StartRoll();
+	if (bMounted || IsUIOpen() || bPanelCursor) return;
+	float Fwd = 0.f, Right = 0.f;
+	if (const APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (PC->IsInputKeyDown(EKeys::W)) Fwd += 1.f;
+		if (PC->IsInputKeyDown(EKeys::S)) Fwd -= 1.f;
+		if (PC->IsInputKeyDown(EKeys::D)) Right += 1.f;
+		if (PC->IsInputKeyDown(EKeys::A)) Right -= 1.f;
+	}
+	RollWheel(Fwd, Right);
+}
+
+void AKnightCharacter::RollWheel(float Fwd, float Right)
+{
+	PendingRollDir = FVector::ZeroVector;
+	if ((!FMath::IsNearlyZero(Fwd) || !FMath::IsNearlyZero(Right)) && GetController())
+	{
+		const FRotator Yaw(0.f, GetController()->GetControlRotation().Yaw, 0.f);
+		PendingRollDir = (FRotationMatrix(Yaw).GetUnitAxis(EAxis::X) * Fwd + FRotationMatrix(Yaw).GetUnitAxis(EAxis::Y) * Right).GetSafeNormal2D();
+	}
+	StartRoll();   // (no direction: it rolls the way he steers, else straight ahead)
 	PendingRollDir = FVector::ZeroVector;
 }
 

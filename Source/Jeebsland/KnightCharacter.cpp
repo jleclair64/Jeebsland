@@ -56,7 +56,6 @@ AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 480.f, 0.f);
-	ApplyTuning();
 
 	// Camera: a bit further back and higher, with gentle lag for a smooth follow
 	if (USpringArmComponent* Boom = GetCameraBoom())
@@ -297,24 +296,13 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	CrouchAction = MakeBool(TEXT("KnightCrouch"));
 	BlockAction  = MakeBool(TEXT("KnightBlock"));
 	SlideAction  = MakeBool(TEXT("KnightSlide"));
-	RollAction   = MakeBool(TEXT("KnightRoll"));
 	StrafeAction = MakeBool(TEXT("KnightStrafe"));
 	SitAction    = MakeBool(TEXT("KnightSit"));
 	KnightContext->MapKey(CrouchAction, EKeys::LeftControl);
 	KnightContext->MapKey(BlockAction, EKeys::RightMouseButton);
 	KnightContext->MapKey(SlideAction, EKeys::C);
-	KnightContext->MapKey(RollAction, EKeys::V);
-	KnightContext->MapKey(RollAction, EKeys::LeftAlt);
 	KnightContext->MapKey(StrafeAction, EKeys::MiddleMouseButton);   // strafe mode; X does the same (laptops have no wheel click)
 	KnightContext->MapKey(StrafeAction, EKeys::X);
-	DodgeLAction = MakeBool(TEXT("KnightDodgeL"));
-	KnightContext->MapKey(DodgeLAction, EKeys::A);
-	DodgeRAction = MakeBool(TEXT("KnightDodgeR"));
-	KnightContext->MapKey(DodgeRAction, EKeys::D);
-	DodgeFAction = MakeBool(TEXT("KnightDodgeF"));
-	KnightContext->MapKey(DodgeFAction, EKeys::W);
-	DodgeBAction = MakeBool(TEXT("KnightDodgeB"));
-	KnightContext->MapKey(DodgeBAction, EKeys::S);
 	PotionAction = MakeBool(TEXT("KnightPotion"));
 	KnightContext->MapKey(PotionAction, EKeys::Q);
 	KnightContext->MapKey(SitAction, EKeys::E);
@@ -330,7 +318,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		ScrollUpAction = MakeBool(TEXT("KnightScrollUp"));
 	KnightContext->MapKey(ScrollUpAction, EKeys::MouseScrollUp);
 	ScrollDownAction = MakeBool(TEXT("KnightScrollDown"));
-	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);   // (the low sweep)
+	KnightContext->MapKey(ScrollDownAction, EKeys::MouseScrollDown);   // (the roll, with W/A/S/D held; the low sweep is shelved 2026-11-15, owner)
 	NextWeaponAction = MakeBool(TEXT("KnightNextWeapon"));
 	KnightContext->MapKey(NextWeaponAction, EKeys::R);   // (R steps through the weapon bar; the wheel no longer does)
 	ArrowsAction = MakeBool(TEXT("KnightArrows"));
@@ -395,15 +383,10 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(BlockAction, ETriggerEvent::Started, this, &AKnightCharacter::RightDown);
 		EIC->BindAction(BlockAction, ETriggerEvent::Completed, this, &AKnightCharacter::RightUp);
 		EIC->BindAction(SlideAction, ETriggerEvent::Started, this, &AKnightCharacter::StartSlide);
-		EIC->BindAction(RollAction, ETriggerEvent::Started, this, &AKnightCharacter::StartRoll);
 		EIC->BindAction(StrafeAction, ETriggerEvent::Started, this, &AKnightCharacter::ToggleStrafe);
 		EIC->BindAction(SitAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInteractKey);
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AKnightCharacter::OnInventoryKey);
 		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
-		EIC->BindAction(DodgeLAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeLeft);
-		EIC->BindAction(DodgeRAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeRight);
-		EIC->BindAction(DodgeFAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeFwd);
-		EIC->BindAction(DodgeBAction, ETriggerEvent::Started, this, &AKnightCharacter::DodgeBack);
 		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
@@ -465,28 +448,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 }
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader
-// Numbers from Content/Data/Tuning.ini that the engine keeps itself (the jump), set again whenever the file is reloaded.
-// The jump (KnightCharacterMovement.cpp, CheckJumpInput): he leaves the ground at the full jump's speed; letting go early cuts it to
-// HopSpeed's height at the least. JumpMaxHoldTime is when Unreal lets go of Space for us. Speeds for a height: h = v*v/2g.
-void AKnightCharacter::ApplyTuning()
-{
-	const JeebTune::FValues& T = JeebTune::V();
-	TunedVersion = JeebTune::Version();
-	UCharacterMovementComponent* M = GetCharacterMovement();
-	if (!M) return;
-	M->GravityScale = FMath::Clamp(T.Weight, 0.5f, 3.f);   // a heavier knight: he rises and falls faster at the same heights
-	const float G = 980.f * M->GravityScale;   // (the world's gravity; the constructor has no world to ask)
-	const float Full = FMath::Max(1.f, T.JumpHeight);
-	FullJumpSpeed = FMath::Sqrt(2.f * G * Full);
-	HopSpeed = FMath::Sqrt(2.f * G * Full * FMath::Clamp(T.HopShare, 0.05f, 1.f));
-	M->JumpZVelocity = FullJumpSpeed;
-	JumpMaxHoldTime = FMath::Clamp(T.FullJumpHold, 0.01f, 0.3f);
-}
-
 void AKnightCharacter::TickHousekeeping()
 {
 	JeebTune::Poll();   // (Tuning.ini saved while playing: the new numbers take over at once)
-	if (TunedVersion != JeebTune::Version()) ApplyTuning();
 	if (HasAuthority()) UpdateRadar();
 	if (HasAuthority()) SendLook();   // online: the server tells everyone what this knight now wears and holds
 	SendState();                      // online: our sprint / crouch / shield button, to the server

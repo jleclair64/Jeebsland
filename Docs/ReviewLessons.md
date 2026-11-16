@@ -96,11 +96,10 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When a clip drives a slow gait at an unusual speed, measure the planted-foot slide in the log (the aim shuffle skated at 150 cm/s; his own walk's legs at that speed fall to about 10).
 - Moves come from reference key poses (the owner's clips), never guessed.
 - Judge walking from frames well into the walk (about 12 to 28), not the first frames.
-- Measure first with log lines (JEEBJUMP, JEEBDASH, JEEBSWEEP, JEEBWEIGHT); a wrong number should cost a rebuild, not a review round.
+- Measure first with log lines (JEEBDASH, JEEBSWEEP, JEEBWEIGHT); a wrong number should cost a rebuild, not a review round.
 - MoveLab views: B faces +X; R faces +Y (that is where the guarding knight stands). Use `-LabKnight=` and `-LabKnightYaw=` to put the target in shot and in reach.
 - Ground friction kills a slide: use separate braking with no friction for a skid.
 - `LaunchCharacter` with a zero vector does nothing; use `StopMovementImmediately` to stop someone.
-- Test taps just under and just over every input threshold (e.g. `-ShotMove=hop100` / `hop170` around the jump's hold times), not only a quick tap and a long hold.
 - Plates at a bending joint (knee, elbow cops): line the plate's middle up with the real joint first, then give it one even set of weights so it stays solid, and check it from the side, front and back at the fully bent frame, not only at rest: off-joint plates lever away from the limb, and one that looks solid from the side can still show stepped seams and a sharp tip from other angles.
 - Share only the plate itself between two bones, never part of a neighbouring ring. A forearm's collar half caught in the elbow plate's share turned at two speeds and twisted into claws at a full bend; blunting the points didn't help until the collar followed the forearm alone. (2026-11-05, the arm harness.)
 - Check every moving joint at full bend for loose pointed tips: pieces that look clean at rest develop spikes where plates overlap when they turn.
@@ -152,8 +151,6 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When the client changes predicted state at once (the hand, Selected) and the server may refuse it, the client runs the same check first, or the server sends the refusal back as a correction.
 - Anything that changes game state is decided on the server; the client only asks.
 - A server-side rate limit comes from the same tuning number as the action's length (or a share of it), never a fixed number: a quicker move can fall under a fixed limit, and the server then drops the follow-up without telling the client.
-- Anything decided inside the engine's movement prediction (CheckJumpInput and the like) must be reproducible from what `FSavedMove_Character` records, and the live move is recorded AFTER CheckJumpInput: keep per-move state alive until the move is done (clear it in ClearJumpInput), and plan how server and client both learn every choice. (2026-11-02, the jump squat.)
-- A prediction rule that runs on replayed moves may only read what the saved move restores for the START of that move (bPressedJump, JumpKeyHoldTime); derived counters like JumpCurrentCount are one move behind in a replay.
 - Speeds the client predicts must come from state the owner's machine also has (owner-replicated `Worn`, shared CSVs and Tuning.ini), or every step gets corrected.
 - Test-only code lives inside `-JeebShot` (`bShotMode`) branches.
 - Servers and players must run the same Tuning.ini and CSVs: repackage after changing movement numbers.
