@@ -277,15 +277,19 @@ void AKnightHUD::DrawLookTab(float PX, float PY, float PW, float PH)
 		if (Btn(PX + 20.f + g * 104.f, GY, 100.f, 28.f, Groups[g], true, LookGroup == g, 0.9f)) { LookGroup = g; Dragging = -1; }
 
 	// Sliders, two columns
-	const float ColW = 300.f, RowH = 62.f, Top = PY + 100.f;
-	auto ColX = [&](int32 Slot) { return PX + 24.f + (Slot / 6) * (ColW + 24.f); };
+	// (a tab with more than 12 sliders gets longer columns, rows closer together, instead of a third column over the presets)
+	int32 InGroup = 0;
+	for (int32 i = 0; i < NumItems; ++i) if (Items[i].Group == LookGroup) ++InGroup;
+	const int32 Rows = FMath::Max(6, (InGroup + 1) / 2);
+	const float ColW = 300.f, Top = PY + 100.f, RowH = FMath::Min(62.f, (PH - 120.f) / Rows);
+	auto ColX = [&](int32 Slot) { return PX + 24.f + (Slot / Rows) * (ColW + 24.f); };
 	int32 Shown = 0;
 	for (int32 i = 0; i < NumItems; ++i)
 	{
 		const FLookItem& It = Items[i];
 		if (It.Group != LookGroup) continue;
 		const float X = ColX(Shown);
-		const float Y = Top + (Shown % 6) * RowH;
+		const float Y = Top + (Shown % Rows) * RowH;
 		++Shown;
 		const float BarW = ColW - 62.f;
 		const bool bPend = It.bDeferred && Pending[i] > -9000.f;
