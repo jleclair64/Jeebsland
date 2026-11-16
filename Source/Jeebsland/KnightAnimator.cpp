@@ -2236,8 +2236,12 @@ FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
 // Where the bow rests in his fist, the quiver and the belt flask: live in Play (owner 2026-11-15: the quiver floated off his hip, the flask leant out,
 // the resting bow's string went through his hip). Quiver "X_Y_Z_Pitch_Yaw_Roll" and Flask "X_Y_Z_Pitch_Yaw_Roll_Scale" are cm and degrees in his
 // own frame at rest (X ahead, Y to his right, Z up), from where the old hips carried them.
-static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), 130.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; 130 (owner 2026-11-15) keeps the string outside his hip)."), ECVF_Default);
-static const TCHAR* const QuiverDefault = TEXT("-16_21_-29_-5_0_4");
+// (owner 2026-11-15: "I want the string to be in between the knight's forearm and hip": 130 put it far out past the forearm, 60 went through the hip; 95 hangs it
+// outside the hip and behind the forearm)
+static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), 95.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; 95 (owner 2026-11-15) hangs the string between his forearm and hip)."), ECVF_Default);
+// (owner 2026-11-15: "move the location of the quiver so that it's the same height, but sits on the right side of the right thigh, not behind him on his butt": same height,
+// beside the thigh's outer face (X 0, Y 28), turned 90 degrees so its broad side lies against the thigh)
+static const TCHAR* const QuiverDefault = TEXT("0_28_-29_-5_90_4");
 static const TCHAR* const FlaskDefault = TEXT("-16.5_-16.5_14_13_0_172_0.8");
 static TAutoConsoleVariable<FString> CVarQuiver(TEXT("jeeb.Knight.Quiver"), QuiverDefault, TEXT("The quiver on his right hip: X_Y_Z_Pitch_Yaw_Roll (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarFlask(TEXT("jeeb.Knight.Flask"), FlaskDefault, TEXT("The flask on his belt, back left: X_Y_Z_Pitch_Yaw_Roll_Scale (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
