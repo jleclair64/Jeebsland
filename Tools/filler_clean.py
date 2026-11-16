@@ -76,7 +76,6 @@ PIECES = {
     "Crate":         dict(src="CrateLid_japaninazuma000", fam="storage", moves=[(("comp", 1), (0.0, 0.0, -0.715))], size=("Z", 0.72),
                           tris=12000, mats=WOOD_IRON, sharp=40),
     "CrateNoLid":    dict(src="CrateLid_japaninazuma000", fam="storage", take=[("comp", 0)], size=("Z", 0.62), tris=12000, mats=WOOD_IRON, sharp=40),
-    "GrainSack":     dict(src="GrainSack_rafael", fam="storage", size=("Z", 0.72), tris=4000, subdiv=1, mats=["burlap", "grain"], sharp=80),
     # the cart scene: the cart with its two sacks, the loose sacks, barrels and the jug round it (fused into one mesh where they touch)
     "HandCart":      dict(src="CartSacks_eromaxi", fam="farm", drop=[("comp", 1, 2), ("box", (-0.83, 0.2, -0.6), (-0.40, 0.65, 0.0)),
                           ("box", (-0.5, -0.8, -0.6), (0.25, -0.09, 0.0)), ("box", (-0.45, -0.12, -0.6), (0.1, 0.0, -0.14))], fill=40, speck=0.03, size=("L", 2.6),

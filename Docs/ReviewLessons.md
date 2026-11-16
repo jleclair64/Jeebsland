@@ -245,11 +245,11 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON (billboard clouds, 2026-11-14): painted cloud cards take the time of day on both their lit and shaded sides (warm cream and brown-pink at the low sun, never a fixed cool shade), their soft fringe takes the rim shading of the puff it belongs to (a flat middle value draws a pale halo), and the sprite set has no near-circles or small lobes standing proud of the outline (they read as ears).
 - LESSON: never give ground a constant emissive glow to lift it in shade: the low-sun exposure rises and it shows as white patches; brighten its base colour instead, and check bare earth at the low sun as well as at noon.
 
-## Lineups and library swords (2026-11-13, MoveLab filler yard, Sword 2 and 3)
+## Lineups and library props (2026-11-13, MoveLab filler yard)
 - LESSON (lineup labels): labels in a prop lineup must be readable at the viewing distance and clear of every piece and of neighbouring labels: row titles beside the row (not on the ground over it), each name's slot as wide as its text.
 - LESSON (held-item colour): a prop that looks purple or blue in the game when it should be steel and gold has lost its textures, not been tinted: `Tools/prop_clean.py` given relative output paths saves its PNGs nowhere (Blender resolves them against its own folder) and the import then falls back to the shared material's default pictures. Always pass absolute paths (BuildProps.ps1 does) and check `Saved/KnightBuild/Props/T_<Name>_Base.png` exists and is not the default.
 - LESSON (held-item review): a held-item review needs close crops of the grip and a picture of the new asset's own texture; a contact sheet of 360-pixel frames cannot show whether it is held or what colour it is.
-- LESSON (untextured library models): prop_clean.py's bake needs a textured model; an untextured Meshy download goes through `Tools/sword3_colour.py`-style first (colour by position, fresh UVs, bake base and metal/roughness, write a GLB).
+- LESSON (untextured library models): prop_clean.py's bake needs a textured model; an untextured Meshy download needs colouring and fresh UVs first (colour by position, bake base and metal/roughness, write a GLB) (colour by position, fresh UVs, bake base and metal/roughness, write a GLB).
 - LESSON (test-only assets, package): when a folder of test-only assets is loaded by `LoadObject` and kept out of the cook (`DirectoriesToNeverCook`), the loader must null-check the first asset and do nothing in a package, and no map, Blueprint or default object may reference the folder.
 
 ## Buildings (2026-11-13, collision, window lights, cracks, baked-in pieces)
