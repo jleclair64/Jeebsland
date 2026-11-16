@@ -22,7 +22,7 @@ CMD="${1:-list}"; NAME="${2:-}"
 win() { cygpath -w "$1"; }
 
 # git-ignored folders and files a copy needs, linked from the main folder
-LINK_DIRS=("Content/Filler" "Art/Filler/Originals" "Art/Animals/Originals")
+LINK_DIRS=("Content/Filler" "Art/Filler/Originals" "Art/Animals/Originals" "Content/DZ_Assets" "Content/PN_interactiveSpruceForest" "Content/PN_GrassLibrary" "Content/PN_MeadowFlowers" "Content/PN_OpenWorldFoliage")   # (the Fab packs are linked: never save inside them from a copy)
 link_files() { (cd "$MAIN" && ls Art/Buildings/*_Detailed.glb Art/Trees/*_Original.glb 2>/dev/null) || true; }
 
 link_shared() {   # link any shared asset the copy is missing (new ones can appear between jobs)
