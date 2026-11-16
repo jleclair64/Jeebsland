@@ -6,8 +6,11 @@
 # pieces, the spawn, the oak, the river), then re-checked against the blocker dump fillcore wrote (blockers_OakHill.txt and blockers_shapes.csv:
 # its roads, kept-clear shapes, resource trees and rocks, decor): zero overlaps, 30 cm from every kept-clear shape, every door, counter
 # and plot reachable, no fillable spot 3 m or more from something.
-# Rows by zone: OakPlaza 43 OakStreet 129 OakYard 277 OakGarden 10 OakBoxingRing 8 OakRuins 11 OakGraveyard 16 OakForts 15 OakWatchtower 4 OakBridge 8 OakFringe 11.
-Set,E,N,Yaw,Seed,Var,Plot,Note
+# Rows by zone (filllayout): OakPlaza 43 OakStreet 129 OakYard 277 OakGarden 10 OakBoxingRing 8 OakRuins 11 OakGraveyard 16 OakForts 15 OakWatchtower 4 OakBridge 8 OakFringe 11.
+# fillfix 2026-11-16: the graveyard plot (29) is now a walled GraveyardEnclosure with three GraveRows, cypresses and a bench (seeds 700-712);
+# 18 yard rows into open grass (seeds 5000-5017); Site "Square" rows place on the original square, E,N from the world origin (Blackrock's
+# fountain yard, seeds 6000-6012).
+Set,E,N,Yaw,Seed,Var,Plot,Note,Site
 MarketRed,-4.7,8.14,60,1,0,-1,plaza market stall on the lawn edge facing the oak
 MarketGreen,2.99,9.58,120,2,0,-1,plaza market stall on the lawn edge facing the oak
 BenchNook,0.84,5.86,100,3,0,-1,bench on the lawn facing the oak
@@ -171,21 +174,6 @@ Allotment,46.46,-12.84,90,160,1,28,garden plot
 KitchenGarden,43.46,2.16,0,161,1,28,garden plot
 BenchNookStone,46.46,-7.84,90,162,1,28,garden plot
 CypressPair,41.46,-6.84,0,163,1,28,garden plot
-GraveyardRow,33.7,-48.9,0,164,1,29,graveyard plot
-GraveyardBench,24.7,-42.9,-109.23,165,1,29,graveyard plot
-GraveyardRow,25.7,-45.9,-108.8,166,1,29,graveyard plot
-CypressPair,32.7,-38.9,170.93,167,1,29,graveyard plot
-FlowerClump,36.7,-42.9,0,168,1,29,graveyard plot
-GraveyardRow,30.7,-53.9,-90,169,1,29,graveyard plot
-GraveyardBench,38.7,-48.9,180,170,1,29,graveyard plot
-GraveyardRow,31.7,-42.9,-71.91,171,1,29,graveyard plot
-CypressPair,22.7,-48.9,-82.69,172,1,29,graveyard plot
-FlowerClump,26.7,-36.9,130.3,173,1,29,graveyard plot
-GraveyardRow,36.7,-51.9,180,174,1,29,graveyard plot
-GraveyardBench,29.7,-46.9,-131.88,175,1,29,graveyard plot
-GraveyardRow,28.7,-36.9,-34.91,176,1,29,graveyard plot
-CypressPair,36.7,-44.9,90,177,1,29,graveyard plot
-FlowerClump,26.7,-51.9,180,178,1,29,graveyard plot
 GarrisonLion,-44.1,32.55,-50.75,179,1,30,north fort plot
 Garrison,-43.52,24.33,-100,180,1,30,north fort plot
 GarrisonTable,-43.63,29.42,-50.54,181,1,30,north fort plot
@@ -267,7 +255,7 @@ HedgeRun,44.13,64.13,164.67,256,1,-1,yard gap
 WoodStack,-37.87,19.63,-68.41,257,1,-1,yard gap
 VegCorner,-1.37,-71.37,-54.93,258,1,-1,yard gap
 KitchenGarden,70.13,-4.37,-144.29,259,1,-1,yard gap
-VegCorner,36.63,-36.37,-63.26,260,1,-1,yard gap
+VegCorner,37.13,-35.87,-63.26,260,1,-1,yard gap
 StumpCorner,33.13,56.13,-174.61,261,1,-1,yard gap
 BushClump,-40.37,-66.37,-107.82,262,1,-1,yard gap
 Orchard,48.13,-53.37,-89.49,263,1,-1,yard gap
@@ -462,7 +450,7 @@ ShrubLow,28.63,58.13,-105,451,1,-1,filler
 ShrubLow,-24.87,63.13,-135,452,1,-1,filler
 BushBerries,-13.87,64.13,-135,453,1,-1,filler
 ShrubLow,12.13,-60.87,165,454,1,-1,filler
-BushSpiky,22.63,-53.87,15,455,1,-1,filler
+BushSpiky,22.63,-54.87,15,455,1,-1,filler
 PlantClump,64.13,-43.87,-135,456,1,-1,filler
 ShrubLow,54.13,-27.87,-15,457,1,-1,filler
 BushYellowFlowers,-42.87,-62.87,165,458,1,-1,filler
@@ -540,3 +528,52 @@ BushSpiky,7.56,-7.31,-15,529,1,-1,filler
 BushSpiky,71.77,16.27,75,530,1,-1,filler
 BushDome,-29.87,26.63,75,531,1,-1,filler
 StumpGrass,3.69,36.69,-15,532,1,-1,filler
+# fillfix 2026-11-16: the graveyard plot (29) made to read as a graveyard: a walled square with the way in at its north-west corner
+# where the lane comes in, three rows of graves (no headstone model exists: stone posts, planted beds, grave candles), cypresses in
+# the corners and at the way in, and a bench facing the graves. Replaces the scattered GraveyardRow and cypress sets.
+GraveyardEnclosure,30.1,-45.5,0,700,0,29,graveyard plot: the wall round it
+GraveRow,30.6,-51.8,-90,701,1,29,graveyard plot: graves
+GraveRow,30.6,-48,-90,702,1,29,graveyard plot: graves
+GraveRow,30.6,-44.2,-90,703,1,29,graveyard plot: graves
+Cypress,36.8,-52.2,0,704,0,29,graveyard plot: corner cypress
+Cypress,36.8,-38.8,0,705,0,29,graveyard plot: corner cypress
+Cypress,23.4,-52.2,0,706,0,29,graveyard plot: corner cypress
+Cypress,27.4,-38.8,0,707,0,29,graveyard plot: cypress at the way in
+Cypress,23.4,-46.6,0,708,0,29,graveyard plot: cypress at the way in
+BenchStone,31,-39.6,90,709,0,29,graveyard plot: bench facing the graves
+PotVase,32.2,-39.4,0,710,0,29,graveyard plot: flowers by the bench
+CandleCageTall,29.8,-39.4,0,711,0,29,graveyard plot: candle by the bench
+FlowerClump,24,-49.6,90,712,1,29,graveyard plot: flowers in the west corner
+# fillfix 2026-11-16: the thinnest open grass round and between the houses (yards and lanes), cozier
+BushClump,49.73,9.88,30,5000,1,-1,fillfix: open grass
+DoorstepPots,30.48,26.13,195,5001,1,-1,fillfix: open grass
+FlowerClump,27.23,29.63,150,5002,1,-1,fillfix: open grass
+BarrelRow,28.98,-11.63,60,5003,1,-1,fillfix: open grass
+AmphoraRow,20.48,49.63,120,5004,1,-1,fillfix: open grass
+SackCorner,-35.02,2.13,270,5005,1,-1,fillfix: open grass
+StorageCorner,15.22,42.38,30,5006,1,-1,fillfix: open grass
+BushClump,4.22,-46.63,330,5007,1,-1,fillfix: open grass
+FlowerClump,-27.52,16.88,75,5008,1,-1,fillfix: open grass
+Workbench,20.98,19.63,210,5009,1,-1,fillfix: open grass
+StorageCorner,32.98,-30.38,150,5010,1,-1,fillfix: open grass
+StumpCorner,21.73,14.88,270,5011,1,-1,fillfix: open grass
+LogCorner,-15.03,61.13,330,5012,1,-1,fillfix: open grass
+WashingCorner,-2.27,-44.13,225,5013,1,-1,fillfix: open grass
+SackCorner,-19.77,-44.63,150,5014,1,-1,fillfix: open grass
+BarrelRow,3.48,-39.63,225,5015,1,-1,fillfix: open grass
+FlowerClump,15.47,-39.38,345,5016,1,-1,fillfix: open grass
+BushClump,68.97,-21.13,0,5017,1,-1,fillfix: open grass
+# fillfix 2026-11-16: Blackrock's fountain yard, inside the village walls (Site Square: E, N are metres from the world's origin)
+SackCorner,-8.13,-17.63,255,6000,1,-1,fillfix: Blackrock fountain yard,Square
+BarrelRow,2.63,-18.38,240,6001,1,-1,fillfix: Blackrock fountain yard,Square
+StorageCorner,8.38,-25.88,285,6002,1,-1,fillfix: Blackrock fountain yard,Square
+Blackrock,-9.13,-38.38,30,6003,1,-1,fillfix: Blackrock fountain yard,Square
+Workbench,-14.13,-31.88,330,6004,1,-1,fillfix: Blackrock fountain yard,Square
+CartCorner,12.38,-25.88,270,6005,1,-1,fillfix: Blackrock fountain yard,Square
+AmphoraRow,-11.88,-43.88,270,6006,1,-1,fillfix: Blackrock fountain yard,Square
+BarrelRow,9.13,-21.38,270,6007,1,-1,fillfix: Blackrock fountain yard,Square
+Workbench,-10.63,-24.63,195,6008,1,-1,fillfix: Blackrock fountain yard,Square
+BushClump,8.88,-39.13,15,6009,1,-1,fillfix: Blackrock fountain yard,Square
+Workbench,9.38,-32.88,270,6010,1,-1,fillfix: Blackrock fountain yard,Square
+WashingCorner,4.13,-23.38,45,6011,1,-1,fillfix: Blackrock fountain yard,Square
+BarrelRow,0.38,-36.88,90,6012,1,-1,fillfix: Blackrock fountain yard,Square

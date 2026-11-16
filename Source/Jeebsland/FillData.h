@@ -14,7 +14,9 @@
 //                 20, or 30 for bushes, plants, flowers, rocks, logs and stumps), Flags
 //                 (light|hang|flame=<Kind>). Every kind's front is its local +Y.
 //  FillSets.csv   (filllayout) Set, Kind, X, Y, Z, Yaw, Scale, Flags (drop|alt=A/B|turn=N|stack|hang): one row per piece, set-local metres.
-//  FillOakHill.csv(filllayout) Set, E, N, Yaw, Seed, Var, Plot, Note: one placed set (or a single Kind) per row, metres from the plaza.
+//  FillOakHill.csv(filllayout) Set, E, N, Yaw, Seed, Var, Plot, Note, optional Site: one placed set (or a single Kind) per row, metres
+//                 from Oak Hill's plaza; Site "Square" (fillfix 2026-11-16): E, N are metres from the world's origin instead (X = N, Y = E),
+//                 for hand-placed sets on the original square (Blackrock's fountain yard).
 //  FillZones.csv  (filllayout) Zone, On, Density (sets per 100 m^2), Mix ("Set:Weight Set:Weight"), optional Seed, Facing
 //                 (random|road|wall), Trees (tree spots per 100 m^2).
 //  FillTrees.csv  (filllayout) Site, E, N, Class (shade|street|conifer|orchard), Radius (m kept clear), Note.
@@ -47,7 +49,7 @@ namespace JeebFill
 		TArray<FString> Alts;
 	};
 	struct FSet { FString Name; TArray<FPiece> Pieces; float Reach = 0.f; };
-	struct FOakRow { FString Set; float E = 0.f, N = 0.f, Yaw = 0.f; int32 Seed = 0; bool bVar = false; int32 Plot = -1; FString Note; int32 Line = 0; };
+	struct FOakRow { FString Set; float E = 0.f, N = 0.f, Yaw = 0.f; int32 Seed = 0; bool bVar = false; int32 Plot = -1; FString Note; int32 Line = 0; bool bSquare = false; };
 	struct FZone { FString Name; bool bOn = false; float Density = 0.f; TArray<TPair<FString, float>> Mix; int32 Seed = 0; EFacing Facing = EFacing::Random; float Trees = 0.f; };
 	struct FTreeRow { FString Site, Class, Note; float E = 0.f, N = 0.f, Radius = 150.f; };
 
