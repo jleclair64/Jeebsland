@@ -767,7 +767,9 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
 	LiftDraggedFeet(Final, In, Dt);
+	BowArmOut(Final, In, Dt);   // (before HandsOffThighs, which then pushes out only what is still missing)
 	HandsOffThighs(Final, In, Dt);
+	LogBowGap(Final, In, Dt);
 	GreatGripLine(Final, In, Dt);
 	KeepTipUp(Final, In, Dt);
 	ToolHeadClear(Final, In);
@@ -2238,9 +2240,12 @@ FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
 // own frame at rest (X ahead, Y to his right, Z up), from where the old hips carried them.
 // (owner 2026-11-15: "I want the string to be in between the knight's forearm and hip": 130 put it far out past the forearm, 60 went through the hip; 95 hangs it
 // outside the hip and behind the forearm)
-static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), -85.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; -85 turns the string side to his body, owner 2026-11-15: string between his forearm and hip)."), ECVF_Default);
-// (owner 2026-11-15: "the string to be in between the knight's forearm and hip": turned the other way (-85) so the string faces his body, and 14 cm out from it)
-static TAutoConsoleVariable<float> CVarBowRestOut(TEXT("jeeb.Knight.BowRestOut"), 14.f, TEXT("cm the resting bow sits outward (to his left, away from his body) in his left fist."), ECVF_Default);
+// (2026-11-16, with the arm out instead of the bow slid out: -110 tips the string side a little below level toward his body, and with jeeb.Knight.BowArmOut 20 the string
+// stays 4-10 cm off his hip plates standing and about 18 walking (log JEEBBOWGAP); -85 with the arm out kept it at the plates, -120 looked the same as -110)
+static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), -110.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; -85 turns the string side level toward his body, -110 a little below level; owner 2026-11-15: string between his forearm and hip)."), ECVF_Default);
+// (owner 2026-11-15: "the string to be in between the knight's forearm and hip": turned the other way (-85) so the string faces his body. Sliding it 14 cm out
+// left the bow hanging beside his fist ("the knight isn't holding the bow anymore", 2026-11-16): now 0, and the arm comes out instead (jeeb.Knight.BowArmOut))
+static TAutoConsoleVariable<float> CVarBowRestOut(TEXT("jeeb.Knight.BowRestOut"), 0.f, TEXT("cm the resting bow slides outward (to his left, away from his body) from his left fist (0: in the fist; the arm holds it out instead, jeeb.Knight.BowArmOut)."), ECVF_Default);
 // (owner 2026-11-15: "move the location of the quiver so that it's the same height, but sits on the right side of the right thigh, not behind him on his butt": same height,
 // beside the thigh's outer face (X 0, Y 28), turned 90 degrees so its broad side lies against the thigh)
 // (owner 2026-11-15: "Yellow is where the quiver currently is, and red is where I want it to be": higher, top at the belt by his hanging gauntlet, slanting top forward / bottom back, ending mid-thigh clear of the knee: Z -11, roll -42)
@@ -2278,14 +2283,78 @@ FTransform FKnightAnimator::BeltFlaskWorld() const
 	return FTransform(FRotator(V[3], V[4], V[5]).Quaternion(), FVector(V[0], V[1], V[2]) + L.OnHipsFrom, FVector(V[6])) * L.HipsRestInv * BoneWorld(JeebAnim::Hips);
 }
 
-FTransform FKnightAnimator::BowWorld(float AimAlpha) const
+// (the resting bow in the left hand's frame)
+static FTransform BowRestInHand(const FClipLib& L)
 {
 	const float Roll = CVarBowRestRoll.GetValueOnGameThread();
 	const float Out = CVarBowRestOut.GetValueOnGameThread();
-	const FTransform Rest = (Roll == 0.f && Out == 0.f) ? L.BowAtRest : FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(Roll)) * L.BowRestBase.GetRotation(), L.BowRestBase.GetLocation() + FVector(0.f, -Out, 0.f)) * L.BowRestHandInv;
+	return (Roll == 0.f && Out == 0.f) ? L.BowAtRest : FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(Roll)) * L.BowRestBase.GetRotation(), L.BowRestBase.GetLocation() + FVector(0.f, -Out, 0.f)) * L.BowRestHandInv;
+}
+
+FTransform FKnightAnimator::BowWorld(float AimAlpha) const
+{
 	FTransform Hold;
-	Hold.Blend(Rest, L.BowAtAim, AimAlpha);
+	Hold.Blend(BowRestInHand(L), L.BowAtAim, AimAlpha);
 	return Hold * BoneWorld(LHand);
+}
+
+// The resting bow's string runs between his left forearm and his hip, touching neither (owner 2026-11-16: "the knight isn't holding the bow anymore": sliding the bow
+// 14 cm out of the fist, jeeb.Knight.BowRestOut, left it hanging beside his hand). So the fist and the bow come out together: standing, walking and running with a bow
+// at ease, the left upper arm turns out from his side and the elbow eases a little forward, a relaxed carry. The hand keeps its own turn, so the bow does too.
+// (HandsOffThighs already turns the arm out about 8-10 degrees to keep the fist off the thigh plates and adds only what is still missing after this, so 20 here shows
+// as about 10 more than before: 13 moved the string only 4 cm. Turning the bow about its grip, front tip out, did not help: the string meets the hip plates near
+// its middle.) Walking, the swing already carries the string 17-21 cm clear, so the arm comes in to half of this (the review read 20 while walking as a mild A-pose).
+// Aiming, any move, sitting, drinking or climbing turn it off (eased).
+static TAutoConsoleVariable<float> CVarBowArmOut(TEXT("jeeb.Knight.BowArmOut"), 20.f, TEXT("Degrees the left arm turns out from his side while he carries a bow at ease (the bow stays in his fist; its string passes between the forearm and his hip)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBowArmBend(TEXT("jeeb.Knight.BowArmBend"), 6.f, TEXT("Degrees the left elbow bends a little further forward while he carries a bow at ease."), ECVF_Default);
+
+void FKnightAnimator::BowArmOut(FPose& P, const FInput& In, float Dt)
+{
+	const bool bOn = JeebItems::IsDrawnBow(In.Kind) && !In.Stowed() && !In.bSitting && !In.bDrinking && StateKey < 10;
+	const float Want = bOn ? 1.f - FMath::Clamp(In.BowAimAlpha, 0.f, 1.f) : 0.f;
+	BowArmW = FMath::FInterpTo(BowArmW, Want, Dt, 9.f);
+	if (BowArmW > 0.005f)
+	{
+		const float W = FMath::SmoothStep(0.f, 1.f, BowArmW);
+		const float OutW = W * FMath::Lerp(1.f, 0.5f, FMath::SmoothStep(20.f, 150.f, float(FVector2D(In.Vel.X, In.Vel.Y).Size())));   // (half while walking or running)
+		FQuat HandRot;
+		BonePos(P, LHand, &HandRot);
+		// the elbow: the forearm a little toward ahead (mesh +Y)
+		const FVector El = BonePos(P, LFore), Hd = BonePos(P, LHand);
+		const FVector BendAxis = FVector::CrossProduct((Hd - El).GetSafeNormal(), FVector(0.f, 1.f, 0.f)).GetSafeNormal();
+		if (!BendAxis.IsNearlyZero()) TurnInMesh(P, LFore, FQuat(BendAxis, FMath::DegreesToRadians(CVarBowArmBend.GetValueOnGameThread() * W)));
+		// the upper arm: the fist out to his left (mesh +X), about the shoulder, whatever the walk's swing is doing
+		const FVector Sh = BonePos(P, LArm), Fist = BonePos(P, LHand);
+		const FVector OutAxis = FVector::CrossProduct((Fist - Sh).GetSafeNormal(), FVector(1.f, 0.f, 0.f)).GetSafeNormal();
+		if (!OutAxis.IsNearlyZero()) TurnInMesh(P, LArm, FQuat(OutAxis, FMath::DegreesToRadians(CVarBowArmOut.GetValueOnGameThread() * OutW)));
+		FQuat Turned;
+		BonePos(P, LHand, &Turned);
+		TurnInMesh(P, LHand, HandRot * Turned.Inverse());
+	}
+}
+
+void FKnightAnimator::LogBowGap(const FPose& P, const FInput& In, float Dt)
+{
+	// (test pictures: how far the string stays from his hip (thigh and torso plates) and from his forearm, cm, the least over each second; under 0 is through it)
+	if (In.bShotLog && JeebItems::IsDrawnBow(In.Kind) && In.BowAimAlpha < 0.01f)
+	{
+		const bool bLong = In.Kind == JeebItems::K_Longbow;
+		const float TipX = bLong ? JeebProps::LongTipX : JeebProps::BowTipX, Brace = bLong ? JeebProps::LongBrace : JeebProps::BowBrace;
+		const FTransform Hand = L.BindInGame(P, LHand);
+		const FTransform Bow = BowRestInHand(L) * Hand;
+		const FVector SA = Bow.TransformPosition(FVector(-TipX, 0.f, Brace)), SB = Bow.TransformPosition(FVector(TipX, 0.f, Brace));
+		auto Gap = [&](const FVector& A, const FVector& B, float R) { FVector P1, P2; FMath::SegmentDistToSegmentSafe(SA, SB, A, B, P1, P2); return float((P1 - P2).Size()) - R; };
+		const FVector Hp = L.BindInGame(P, Hips).GetLocation(), S2 = L.BindInGame(P, Spine2).GetLocation();
+		const float Hip = FMath::Min(Gap(L.BindInGame(P, LUp).GetLocation(), L.BindInGame(P, LLeg).GetLocation(), 13.f), Gap(Hp + FVector(0.f, 0.f, -2.f), S2, 17.f));
+		const float Arm = Gap(L.BindInGame(P, LFore).GetLocation(), Hand.GetLocation(), 6.f);
+		BowGapMin[0] = FMath::Min(BowGapMin[0], Hip); BowGapMin[1] = FMath::Min(BowGapMin[1], Arm);
+		if ((BowGapT += Dt) >= 1.f)
+		{
+			UE_LOG(LogTemp, Log, TEXT("JEEBBOWGAP t %.2f key %d speed %.0f armout %.1f bend %.1f on %.2f: string to hip %.1f, to forearm %.1f (cm, least over the last second)"), Time, StateKey,
+				FVector2D(In.Vel.X, In.Vel.Y).Size(), CVarBowArmOut.GetValueOnGameThread(), CVarBowArmBend.GetValueOnGameThread(), BowArmW, BowGapMin[0], BowGapMin[1]);
+			BowGapT = 0.f; BowGapMin[0] = BowGapMin[1] = 1e4f;
+		}
+	}
 }
 
 // ---------------- Hurt boxes: capsules on the bones, the size of the plates on them (owner, 2026-11-05: fat old ones did not match) ----------------
