@@ -2,6 +2,7 @@
 #include "ChoppableTree.h"
 #include "MiningRock.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "KnightAnimator.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
@@ -207,9 +208,23 @@ void AKnightCharacter::PlaceGear()
 // ---------------- Test pictures ----------------
 // -SuitWalk=<direction>_<share>_<from>_<for>: walks that way (0 = where he faces, 90 = his right), at that share of his top speed, starting <from> seconds in and
 // lasting <for>. -SuitSprint sprints. -SuitDo=roll<deg>, stun<hundredths>, knock, drop, crouch: done to him once the pictures have started.
+#if !UE_BUILD_SHIPPING
+// (2026-11-15: set per -ShotEyes eye with -ShotEyesSet, so one run has him standing, walking and running)
+static TAutoConsoleVariable<float> CVarTestWalk(TEXT("jeeb.Test.Walk"), 0.f, TEXT("Test pictures only: he moves the way he faces at this share of full speed (1 runs), 2 sprints, 0 stands."), ECVF_Default);
+#endif
 void AKnightCharacter::TickSuitTests(float Dt)
 {
 	if (!IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
+#if !UE_BUILD_SHIPPING
+	if (bShotFace)
+	{
+		static bool bTestSprint = false;
+		const float W = CVarTestWalk.GetValueOnGameThread();
+		if (W > 1.5f && !bTestSprint) { bTestSprint = true; StartSprint(); }
+		if (W <= 1.5f && bTestSprint) { bTestSprint = false; StopSprint(); }
+		if (W > 0.f) AddMovementInput(GetActorForwardVector(), FMath::Min(W, 1.f));
+	}
+#endif
 	{
 		static float TurnRate = 0.f;   // (-ShotTurn=200: the camera swings round at that many degrees a second, to check what he does in a move; log JEEBTURN)
 		static const bool bTurnTest = FParse::Value(FCommandLine::Get(), TEXT("ShotTurn="), TurnRate);

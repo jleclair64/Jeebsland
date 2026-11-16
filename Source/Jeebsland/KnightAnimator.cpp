@@ -678,15 +678,17 @@ static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behin
 
 // Polished plate (owner 2026-11-15: "very shiny, reflective like a mirror"): live in Play through jeeb.Armour.Rough (the plate's roughness; the tier's own
 // polish from Tiers.csv is overridden) and jeeb.Armour.Shine (brightness of the steel's base colour, 1 = as before; the metal itself is full metal).
-static TAutoConsoleVariable<float> CVarArmourRough(TEXT("jeeb.Armour.Rough"), 0.12f, TEXT("Roughness of metal plate armour (0 mirror, 0.3 satin); -1 uses the tier's own from Tiers.csv."), ECVF_Default);
-static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 1.6f, TEXT("Brightness of metal plate armour's base colour (1 = the old grey, 2 = bright silver)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarArmourRough(TEXT("jeeb.Armour.Rough"), 0.14f, TEXT("Roughness of metal plate armour (0 mirror, 0.3 satin); -1 gives the whole look before 2026-11-15 (every tier as Tiers.csv has it)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 2.6f, TEXT("Brightness of metal plate armour's base colour (1 = the old grey; 2.6 bright polished silver, 2026-11-15)."), ECVF_Default);
+
+static TAutoConsoleVariable<float> CVarArmourMetal(TEXT("jeeb.Armour.Metal"), 1.f, TEXT("How much of metal plate is pure mirror (1); below 1 some plain lit grey stays where the mirror shows something dark."), ECVF_Default);
 
 static void ApplyPlateLook(UMaterialInstanceDynamic* M, int32 Tier)
 {
-	const bool bMetal = JeebItems::TierIsMetal(Tier);
 	const float R = CVarArmourRough.GetValueOnGameThread(), S = CVarArmourShine.GetValueOnGameThread();
-	M->SetScalarParameterValue(TEXT("MetalScale"), bMetal ? 1.f : JeebItems::TierMetal(Tier) * 0.75f);
-	M->SetScalarParameterValue(TEXT("TierRough"), (bMetal && R >= 0.f) ? R : JeebItems::TierRough(Tier));
+	const bool bMetal = JeebItems::TierIsMetal(Tier) && R >= 0.f;   // (Rough -1: the look before 2026-11-15, every tier as Tiers.csv has it)
+	M->SetScalarParameterValue(TEXT("MetalScale"), bMetal ? CVarArmourMetal.GetValueOnGameThread() : JeebItems::TierMetal(Tier) * 0.75f);
+	M->SetScalarParameterValue(TEXT("TierRough"), bMetal ? R : JeebItems::TierRough(Tier));
 	M->SetScalarParameterValue(TEXT("RoughMix"), bMetal ? 0.95f : 0.85f);
 	M->SetScalarParameterValue(TEXT("Desat"), 1.f);
 	M->SetScalarParameterValue(TEXT("DesatGain"), bMetal ? 2.3f * S : 2.3f);
@@ -1950,8 +1952,9 @@ void FClipLib::SolveGear()
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
 			const FTransform Hand = BindInGame(P, LHand);
-			float RestRollDeg = 0.f; if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("BowRestRoll="), RestRollDeg);   /* (test pictures: -BowRestRoll=<deg> turns the resting bow about his forward axis, in the hand) */
-			BowAtRest = FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(RestRollDeg)) * KnightBowRestQuat(), Hand.TransformPosition(GripInLeftHand(LeftGrip))) * Hand.Inverse();   // (in the closed fist's hole, 2026-11-11)
+			BowRestBase = FTransform(KnightBowRestQuat(), Hand.TransformPosition(GripInLeftHand(LeftGrip)));   // (in the closed fist's hole, 2026-11-11; BowWorld turns it by jeeb.Knight.BowRestRoll)
+			BowRestHandInv = Hand.Inverse();
+			BowAtRest = BowRestBase * BowRestHandInv;
 		}
 		const FClip* AimC = Find(TEXT("AimIdle"));
 		if (AimC) Sample(*AimC, AimC->Len * 0.5f, P, true);
@@ -1969,27 +1972,12 @@ void FClipLib::SolveGear()
 	}
 	P.Rot = RefRot;
 	P.Hip = RefPos[Bone[Hips]];
-	// The quiver: where the old hips carried it, on the new hips (their rest heights differ little)
+	// The quiver and the belt flask hang from the hips; where exactly is live (jeeb.Knight.Quiver, jeeb.Knight.Flask: QuiverWorld, BeltFlaskWorld),
+	// measured from where the old hips carried them (their rest heights differ little)
 	{
 		const FTransform Hip = BindInGame(P, Hips);
-		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		FVector At(-22.f, 24.f, -29.f); FRotator Rot(-5.f, 0.f, -6.f);   // (test pictures: -QuiverAt=X_Y_Z, -QuiverRot=P_Y_R)
-		FString S; TArray<FString> Pr;
-		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("QuiverAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
-		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("QuiverRot="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) Rot = FRotator(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
-		QuiverOnHips = FTransform(Rot, At + Old + FVector(0.f, 0.f, 96.f)) * Hip.Inverse();
-	}
-	// The flask on his belt: the other side from the quiver, its neck tucked behind the belt (the model's cork is along -Z)
-	{
-		const FTransform Hip = BindInGame(P, Hips);
-		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		FVector At(-16.5f, -16.5f, 14.f);   // (owner 2026-11-06: same height and spot on the belt, but touching it; it hung 5 cm clear of his back. 2026-11-13: it sank into the armour, out 3.5 cm along back-left)
-		FString S; TArray<FString> Pr;   // (test pictures: -FlaskAt=X_Y_Z)
-		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
-		FRotator FRot(5.f, 0.f, 186.f); float FScale = 0.8f;   /* (owner 2026-11-15: slightly larger, +15%) */   // (test pictures: -FlaskRot=P_Y_R, -FlaskScale=)
-		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskRot="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) FRot = FRotator(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
-		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("FlaskScale="), FScale);
-		BeltFlaskOnHips = FTransform(FRot.Quaternion(), At + Old + FVector(0.f, 0.f, 96.f), FVector(FScale)) * Hip.Inverse();
+		OnHipsFrom = KnightDesign::PivotPos(KnightDesign::P_Body) + FVector(0.f, 0.f, 96.f);
+		HipsRestInv = Hip.Inverse();
 	}
 	// The crossbow in the right hand: as the rifle lies in the aiming clip, along the line from the right fist to the left
 	if (const FClip* C = Find(TEXT("CrossAim")))
@@ -2041,6 +2029,7 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 	Comp->SetSkinnedAssetAndUpdate(Asset);
 	Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Comp->SetBoundsScale(2.5f);   // (a roll or a kick reaches well past the standing bounds)
+	Comp->SetLightingChannels(true, true, false);   // (channel 1: the sun's glint on polished plate, ADayNight's Glint light; the world's sun gives no shine, 2026-11-15)
 	Comp->RegisterComponent();
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
@@ -2233,10 +2222,50 @@ FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
 	return Strap * BoneWorld(LFore);
 }
 
+// Where the bow rests in his fist, the quiver and the belt flask: live in Play (owner 2026-11-15: the quiver floated off his hip, the flask leant out,
+// the resting bow's string went through his hip). Quiver "X_Y_Z_Pitch_Yaw_Roll" and Flask "X_Y_Z_Pitch_Yaw_Roll_Scale" are cm and degrees in his
+// own frame at rest (X ahead, Y to his right, Z up), from where the old hips carried them.
+static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), 130.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; 130 (owner 2026-11-15) keeps the string outside his hip)."), ECVF_Default);
+static const TCHAR* const QuiverDefault = TEXT("-16_21_-29_-5_0_4");
+static const TCHAR* const FlaskDefault = TEXT("-16.5_-16.5_14_13_0_172_0.8");
+static TAutoConsoleVariable<FString> CVarQuiver(TEXT("jeeb.Knight.Quiver"), QuiverDefault, TEXT("The quiver on his right hip: X_Y_Z_Pitch_Yaw_Roll (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarFlask(TEXT("jeeb.Knight.Flask"), FlaskDefault, TEXT("The flask on his belt, back left: X_Y_Z_Pitch_Yaw_Roll_Scale (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
+
+// A cvar's "a_b_c..." into numbers, kept until the text changes (game thread only)
+static const TArray<float>& CVarNumbers(const TAutoConsoleVariable<FString>& V, const TCHAR* Default, FString& Last, TArray<float>& Nums, int32 Want)
+{
+	const FString Now = V.GetValueOnGameThread();
+	if (Now != Last || Nums.Num() != Want)
+	{
+		Last = Now;
+		TArray<FString> P; Now.ParseIntoArray(P, TEXT("_"));
+		if (P.Num() < Want) FString(Default).ParseIntoArray(P, TEXT("_"));   // (a typo: the default)
+		Nums.SetNumZeroed(Want);
+		for (int32 i = 0; i < Want && i < P.Num(); ++i) Nums[i] = FCString::Atof(*P[i]);
+	}
+	return Nums;
+}
+
+FTransform FKnightAnimator::QuiverWorld() const
+{
+	static FString Last; static TArray<float> N;
+	const TArray<float>& V = CVarNumbers(CVarQuiver, QuiverDefault, Last, N, 6);
+	return FTransform(FRotator(V[3], V[4], V[5]), FVector(V[0], V[1], V[2]) + L.OnHipsFrom) * L.HipsRestInv * BoneWorld(JeebAnim::Hips);
+}
+
+FTransform FKnightAnimator::BeltFlaskWorld() const
+{
+	static FString Last; static TArray<float> N;
+	const TArray<float>& V = CVarNumbers(CVarFlask, FlaskDefault, Last, N, 7);
+	return FTransform(FRotator(V[3], V[4], V[5]).Quaternion(), FVector(V[0], V[1], V[2]) + L.OnHipsFrom, FVector(V[6])) * L.HipsRestInv * BoneWorld(JeebAnim::Hips);
+}
+
 FTransform FKnightAnimator::BowWorld(float AimAlpha) const
 {
+	const float Roll = CVarBowRestRoll.GetValueOnGameThread();
+	const FTransform Rest = Roll == 0.f ? L.BowAtRest : FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(Roll)) * L.BowRestBase.GetRotation(), L.BowRestBase.GetLocation()) * L.BowRestHandInv;
 	FTransform Hold;
-	Hold.Blend(L.BowAtRest, L.BowAtAim, AimAlpha);
+	Hold.Blend(Rest, L.BowAtAim, AimAlpha);
 	return Hold * BoneWorld(LHand);
 }
 

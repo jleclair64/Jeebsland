@@ -80,7 +80,10 @@ namespace
 		// (added at the end so the test run's item numbers below stay put)
 		{ 1, TEXT("Sun: 0 noon, .5 low, -1 moving (reset)"), TEXT("jeeb.Sun.Phase"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 0, TEXT("Armour: plate roughness (0 mirror)"), TEXT("jeeb.Armour.Rough"), EK::Float, 0, 0.f, 0.4f, false, NoDef },
-		{ 0, TEXT("Armour: plate brightness"), TEXT("jeeb.Armour.Shine"), EK::Float, 0, 0.5f, 3.f, false, NoDef },
+		{ 0, TEXT("Armour: plate brightness"), TEXT("jeeb.Armour.Shine"), EK::Float, 0, 0.5f, 5.f, false, NoDef },
+		{ 0, TEXT("Armour: sun glint on plate"), TEXT("jeeb.Armour.Glint"), EK::Float, 0, 0.f, 4.f, false, NoDef },
+		{ 0, TEXT("Armour: mirror share (1 pure metal)"), TEXT("jeeb.Armour.Metal"), EK::Float, 0, 0.5f, 1.f, false, NoDef },
+		{ 1, TEXT("Sky: ground colour below the horizon"), TEXT("jeeb.Sky.Ground"), EK::Float, 0, 0.f, 3.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)
