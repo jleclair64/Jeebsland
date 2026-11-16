@@ -13,8 +13,40 @@ namespace
 {
 	constexpr int32 ChunkCells = 40;   // cells per chunk side
 	TAutoConsoleVariable<float> SkyFillVar(TEXT("jeeb.Ground.SkyFill"), 0.2f, TEXT("Light added to flat ground (M_Ground's grass) at the low sun, times ADayNight::Dusk: the grass blades are lit through and stay bright, flat ground would go dark where they stop (TownLab's WorldFill, 2026-11-14)"));
+	// (2026-11-15, owner: "when it's dark and there's shade, the bottom layer on the ground is brighter than the grass and seems to glow".
+	// The fill is emissive, which no shadow dims: among the blades it now gives way to a darker floor; Tools/grass_field.py)
+	TAutoConsoleVariable<float> UnderFillVar(TEXT("jeeb.Ground.UnderFill"), 0.f, TEXT("How much of the low sun's fill (jeeb.Ground.SkyFill) the ground keeps among the grass blades: 0 none (2026-11-15), 1 all of it (the old look, which glowed in shade at dusk)"));
+	TAutoConsoleVariable<float> FloorVar(TEXT("jeeb.Ground.Floor"), 0.9f, TEXT("The ground among the grass blades at the lowest sun, times this (1 at noon, eased in with ADayNight::Dusk): the meadow's shaded floor, a touch darker than the blades. 1 = unchanged"));
+	TAutoConsoleVariable<float> FillFromVar(TEXT("jeeb.Ground.FillFrom"), 0.5f, TEXT("Share of the grass's reach (jeeb.Grass.PackFade) where the ground's low-sun fill and its usual brightness start to come back (all of it at the reach)"));
 	TWeakObjectPtr<UMaterialInstanceDynamic> GSharedGround;
 	TWeakObjectPtr<UWorld> GSharedWorld;
+	struct FUnderGrass { float Fill = -1.f, From = 0.f, To = 0.f, Under = 0.f, Floor = 0.f; };
+	TMap<TWeakObjectPtr<UMaterialInstanceDynamic>, FUnderGrass> GUnderGrassSet;   // (what each ground copy was last given)
+}
+
+float AWorldTerrain::LowSunFill()
+{
+	return FMath::Max(0.f, SkyFillVar.GetValueOnGameThread()) * ADayNight::Dusk;
+}
+
+bool AWorldTerrain::SetUnderGrass(UMaterialInstanceDynamic* Mid, float Fill)
+{
+	if (!Mid) return false;
+	static IConsoleVariable* Reach = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Grass.PackFade"));
+	const float To = FMath::Max(600.f, Reach ? Reach->GetFloat() : 5000.f);
+	const float From = To * FMath::Clamp(FillFromVar.GetValueOnGameThread(), 0.f, 0.98f);
+	const float Under = FMath::Clamp(UnderFillVar.GetValueOnGameThread(), 0.f, 1.f);
+	const float Floor = FMath::Lerp(1.f, FMath::Clamp(FloorVar.GetValueOnGameThread(), 0.2f, 1.5f), ADayNight::Dusk);
+	if (const FUnderGrass* W = GUnderGrassSet.Find(Mid))
+		if (FMath::Abs(W->Fill - Fill) < 0.002f && FMath::Abs(W->From - From) < 1.f && FMath::Abs(W->To - To) < 1.f && FMath::Abs(W->Under - Under) < 0.002f
+			&& FMath::Abs(W->Floor - Floor) < 0.002f) return false;
+	GUnderGrassSet.Add(Mid, FUnderGrass{ Fill, From, To, Under, Floor });
+	Mid->SetScalarParameterValue(TEXT("SkyFill"), Fill);
+	Mid->SetScalarParameterValue(TEXT("FillFrom"), From);
+	Mid->SetScalarParameterValue(TEXT("FillTo"), To);
+	Mid->SetScalarParameterValue(TEXT("UnderFill"), Under);
+	Mid->SetScalarParameterValue(TEXT("Floor"), Floor);
+	return true;
 }
 
 UMaterialInterface* AWorldTerrain::SharedGround(UWorld* World)
@@ -24,7 +56,7 @@ UMaterialInterface* AWorldTerrain::SharedGround(UWorld* World)
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Ground.M_Ground"));
 	if (!Base) return nullptr;
 	UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Base, World);
-	Mid->SetScalarParameterValue(TEXT("SkyFill"), SkyFillVar.GetValueOnGameThread() * ADayNight::Dusk);
+	SetUnderGrass(Mid, LowSunFill());
 	GSharedGround = Mid; GSharedWorld = World;
 	return Mid;
 }
@@ -49,10 +81,7 @@ void AWorldTerrain::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	UMaterialInstanceDynamic* Mid = Cast<UMaterialInstanceDynamic>(SharedGround(GetWorld()));
 	if (!Mid) return;
-	const float Fill = SkyFillVar.GetValueOnGameThread() * ADayNight::Dusk;
-	if (FMath::Abs(Fill - FillNow) < 0.002f) return;
-	FillNow = Fill;
-	Mid->SetScalarParameterValue(TEXT("SkyFill"), Fill);
+	SetUnderGrass(Mid, LowSunFill());   // (sets only what changed: the sun, the reach, jeeb.Ground.*)
 }
 
 void AWorldTerrain::BuildLand()

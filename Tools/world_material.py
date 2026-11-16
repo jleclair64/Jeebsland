@@ -196,6 +196,8 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     grass = grass_field.before_grey(g, grass, fn)   # lightness and hue patches and the dry patches, exactly as the blades
     grass = g.desat(g.muln(grass, g.vector("Tint", (1.0, 1.0, 1.0))), GRASS_DESATURATION)
     grass = palette.grade_plant_extra(mat, grass)   # the palette's season and Greenness on the grass only (World on the whole, below)
+    beyond = grass_field.beyond_blades(g, depth)   # (0 among the grass blades near the camera, 1 past them; grass_field.py, 2026-11-15)
+    grass = grass_field.under_grass_floor(g, grass, beyond)   # the meadow's shaded floor among the blades at the low sun
 
     # Soil (packed earth) for worn ground, mud and the fringe of rock
     soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), palette.colour(mat, "Earth"))   # (light packed tan: M_Dirt's earth is the same)
@@ -260,7 +262,10 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # town's 40 m of grass). A small warm light on the grass only: an emissive floor on bare earth went white by the paths at the
     # low sun, when the exposure rises (2026-11-12), so packed earth and mud take none of it.
     bare = g.one(unreal.MaterialExpressionOneMinus, g.sat(g.addn(d_amt, m_amt)))
-    g.out(g.muln(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), bare), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    # (2026-11-15: emissive ignores shadow, so among the blades it lit the ground under trees at dusk above the shaded blades, owner:
+    # "seems to glow". Now it comes in only past the blades: grass_field.under_grass_fill.)
+    fill = g.muln(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), bare)
+    g.out(grass_field.under_grass_fill(g, fill, beyond), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Ground")
 
 

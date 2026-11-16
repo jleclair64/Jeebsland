@@ -31,7 +31,7 @@ Open the console with the `` ` `` key, then type any of these:
 | `jeeb.TownLab.CheapClouds 0` / `1` | Fewer cloud samples. `-1` follows NewLook. |
 | `jeeb.TownLab.ShowOld 0` | Hides the real town's buildings and ground. Its trees stay. |
 | `jeeb.TownLab.ShowNew 0` | Hides the rebuilt town's buildings and ground. Its trees stay. |
-| `jeeb.TownLab.GroundFill 0.15` | How much dusk light the rebuilt town's ground gets back at the low sun (0 = none; 1 glows lime). |
+| `jeeb.Ground.SkyFill 0.2` | (was `jeeb.TownLab.GroundFill`; since 2026-11-15 one setting for the town and the world) How much dusk light the ground gets back at the low sun, only past the grass blades (0 = none; 1 glows lime). |
 | `jeeb.TownLab.WorldFill 0.2` | The same for the world's ground round both towns (the lab's copy of the ground material, only while NewLook is on). |
 | `stat fps` / `stat unit` | Frame rate, and where the time goes (Game, Draw = render thread, GPU). |
 

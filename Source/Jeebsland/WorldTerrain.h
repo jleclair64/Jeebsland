@@ -26,6 +26,12 @@ public:
 	// ground, so it stays as bright as the grass blades: Tools/world_material.py) this actor follows from ADayNight::Dusk.
 	// Null on a dedicated server (nothing is drawn there).
 	static UMaterialInterface* SharedGround(UWorld* World);
+	// The low sun's fill and the ground among the grass blades (2026-11-15, owner: the ground "seems to glow" in shade at dusk): sets
+	// SkyFill (Fill) and the under-grass values (grass_field.py: FillFrom/FillTo from jeeb.Grass.PackFade, UnderFill, Floor) on a
+	// ground material (M_Ground's shared copy, or Oak Hill's lawn, M_TL_Ground). Returns false if nothing changed since the last call.
+	static bool SetUnderGrass(UMaterialInstanceDynamic* Mid, float Fill);
+	// The one low-sun fill for every ground (the world's and Oak Hill's lawn): jeeb.Ground.SkyFill times ADayNight::Dusk
+	static float LowSunFill();
 
 protected:
 	virtual void BeginPlay() override;
@@ -33,7 +39,6 @@ protected:
 private:
 	UPROPERTY() TArray<UProceduralMeshComponent*> Chunks;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Water;
-	float FillNow = -1.f;
 	void BuildLand();
 	void BuildWater();
 };

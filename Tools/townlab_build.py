@@ -166,6 +166,8 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     grass = g.lerp(grass, g.muln(g.c3(GRASS_PICTURE_AVERAGE), palette.colour(mat, "GroundGrass")), g.ramp(depth, 8000.0, 16000.0))
     grass = grass_field.before_grey(g, grass, fn)   # (Tools/grass_field.py: the same field colour as the blades, M_Grass, and the world, M_Ground)
     grass = grass_field.ground_lift(g, grass_field.grey(g, grass))   # (brighter: the grass blades catch more light than flat ground; the ground must match them where the blades stop)
+    beyond = grass_field.beyond_blades(g, depth)   # (0 among the grass blades near the camera, 1 past them; grass_field.py, 2026-11-15)
+    grass = grass_field.under_grass_floor(g, grass, beyond)   # the meadow's shaded floor among the blades at the low sun
     grass = palette.grade_plant_extra(mat, grass)   # the palette's season and Greenness on the grass only (World on the whole, below)
 
     soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), palette.colour(mat, "Earth"))
@@ -216,7 +218,9 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     g.out(g.c(0.18), unreal.MaterialProperty.MP_SPECULAR)
     # the grass blades are lit through (two-sided foliage) and stay bright at the low sun; flat ground goes dark. SkyFill (set by
     # ATownLabTown from ADayNight::Dusk, jeeb.TownLab.GroundFill) adds that light back where the blades stop, so no dark plain
-    g.out(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    # (2026-11-15: only past the blades; emissive ignores shadow and lit the shaded lawn above its blades at dusk, grass_field.py)
+    fill = g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0))
+    g.out(grass_field.under_grass_fill(g, fill, beyond), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     lib.recompile_material(mat)
     EAL.save_asset(path)
     unreal.log("TOWNLABDIAG built M_TL_Ground")

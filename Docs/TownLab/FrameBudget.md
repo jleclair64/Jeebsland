@@ -115,7 +115,7 @@ From an earlier solo pair (one run each): west road 8.61 -> 6.27 frame, 5.49 -> 
 
 - **The ground beyond the grass at the low sun.**
   - The blades are lit through and stay bright, but flat ground goes dark.
-  - The lab adds back a small, dusk-scaled light (`jeeb.TownLab.GroundFill`, 0.15).
+  - The lab adds back a small, dusk-scaled light (`jeeb.Ground.SkyFill`, 0.2 since 2026-11-15, shared with the world's ground and only past the grass blades; was `jeeb.TownLab.GroundFill` 0.15).
   - At 1.0 it glowed lime, confirming the old lesson that ground must not be lifted with emissive.
   - The proper fix for the real game is a foliage-style lighting model or a bent normal on the ground, matched against the blades in pictures.
 - **No chimney smoke yet**, and no Fab buildings yet. Every building other than the house and store is the real town's model.

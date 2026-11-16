@@ -59,6 +59,36 @@ def ground_lift(g, col):
     return g.muln(col, g.vector("Lift", LIFT))
 
 
+# The ground under the blades (2026-11-15, owner: "when it's dark and there's shade, the bottom layer on the ground is brighter than
+# the grass and seems to glow"). The low sun's fill (SkyFill) is emissive: it ignores shadow, so under trees and buildings at dusk the
+# painted ground between the blades stayed lit while the blades went dark. The fill is only wanted where the blades have stopped
+# (they are lit through; bare flat ground goes dark at the low sun), so it now comes in only past them, and under them the ground is
+# the meadow's shaded floor, a touch darker than the blades at the low sun (Floor). AWorldTerrain / ATownLabTown set every value
+# live from jeeb.Grass.PackFade, ADayNight::Dusk and jeeb.Ground.* (AWorldTerrain::SetUnderGrass); the defaults here are HIGH's.
+def beyond_blades(g, depth):
+    """0 among the grass blades near the camera, rising to 1 where they have sunk into the ground (FillFrom..FillTo, cm)"""
+    lo = g.scalar("FillFrom", 2500.0)
+    hi = g.scalar("FillTo", 5000.0)
+    up = g.node(unreal.MaterialExpressionSubtract); g.link(depth, up, "A"); g.link(lo, up, "B")
+    span = g.node(unreal.MaterialExpressionSubtract); g.link(hi, span, "A"); g.link(lo, span, "B")
+    div = g.node(unreal.MaterialExpressionDivide); g.link(up, div, "A"); g.link(span, div, "B")
+    return g.sat(div)
+
+
+def under_grass_floor(g, col, beyond):
+    """the grass ground's colour times Floor among the blades (1 at noon, jeeb.Ground.Floor at the low sun), unchanged past them"""
+    k = g.node(unreal.MaterialExpressionLinearInterpolate, const_b=1.0)
+    g.link(g.scalar("Floor", 1.0), k, "A"); g.link(beyond, k, "Alpha")
+    return g.muln(col, k)
+
+
+def under_grass_fill(g, fill, beyond):
+    """the low sun's emissive fill: UnderFill of it among the blades (0 none, 1 the old look), all of it past them"""
+    k = g.node(unreal.MaterialExpressionLinearInterpolate, const_b=1.0)
+    g.link(g.scalar("UnderFill", 0.0), k, "A"); g.link(beyond, k, "Alpha")
+    return g.muln(fill, k)
+
+
 try:
     import unreal
     lib = unreal.MaterialEditingLibrary

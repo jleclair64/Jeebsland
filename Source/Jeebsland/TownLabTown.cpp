@@ -22,7 +22,8 @@
 
 namespace
 {
-	TAutoConsoleVariable<float> GroundFill(TEXT("jeeb.TownLab.GroundFill"), 0.15f, TEXT("Light added to the rebuilt town's ground at the low sun (times ADayNight::Dusk), so it stays as bright as the grass blades"));
+	// (the town's ground's low-sun fill was its own jeeb.TownLab.GroundFill, 0.15, until 2026-11-15: the owner's LOOK slider moved the
+	// world's ground but not the town's, a hard seam at the town's edge. Now both follow jeeb.Ground.SkyFill, AWorldTerrain::SetUnderGrass)
 	FString AssetName(const TCHAR* Name) { return FString(Name) + (FCString::Strcmp(Name, TEXT("OakHillWell")) == 0 ? TEXT("_150k") : TEXT("_300k")); }
 	// WHICH MODEL EACH BUILDING OF THE NEW TOWN USES. Any of the town's models can be swapped here for a new one (a Fab pack's, a
 	// Meshy remake) without touching anything else: Mesh is the new static mesh's path (its solid shape is Mesh + "_Col" when that
@@ -137,9 +138,9 @@ void ATownLabTown::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float D = ADayNight::Dusk;
+	AWorldTerrain::SetUnderGrass(GroundMid, AWorldTerrain::LowSunFill());   // (every tick, before the early-out: a LOOK slider moved at a held sun must reach the town too; it sets only what changed)
 	if (FMath::Abs(D - LastDusk) < 0.005f) return;
 	LastDusk = D;
-	if (GroundMid) GroundMid->SetScalarParameterValue(TEXT("SkyFill"), GroundFill.GetValueOnGameThread() * D);
 	const float F = FMath::Lerp(0.9f, 1.35f, D);
 	for (int32 i = 0; i < GlowMids.Num(); ++i)
 	{
