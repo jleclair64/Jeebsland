@@ -50,7 +50,7 @@
                     },
                     {
                         "Name":  "ProceduralVegetationEditor",
-                        "Enabled":  true,
+                        "Enabled":  false,
                         "TargetAllowList":  [
                                                 "Editor"
                                             ]

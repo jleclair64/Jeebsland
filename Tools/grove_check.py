@@ -2,7 +2,7 @@
 import unreal, os
 mel = unreal.MaterialEditingLibrary
 out = []
-for n in ['MI_Fall_HornbeamFoliage', 'MI_Fall_EnglishOakFoliage', 'MI_Fall_AspenLeavesBig']:
+for n in ['MI_Fall_AspenLeavesBig']:
     m = unreal.load_asset('/Game/TreeGroves/' + n)
     out.append('== %s parent %s' % (n, m.get_editor_property('parent').get_path_name()))
     for s in mel.get_static_switch_parameter_names(m):

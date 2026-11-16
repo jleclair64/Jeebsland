@@ -15,7 +15,7 @@ def dump_mat(m, seen):
         for n in mel.get_scalar_parameter_names(m): log("    scalar %s = %s" % (n, mel.get_material_instance_scalar_parameter_value(m, n)))
         for n in mel.get_vector_parameter_names(m): log("    vector %s = %s" % (n, mel.get_material_instance_vector_parameter_value(m, n)))
         for n in mel.get_static_switch_parameter_names(m): log("    switch %s = %s" % (n, mel.get_material_instance_static_switch_parameter_value(m, n)))
-ROOTS = ['/Game/PN_interactiveSpruceForest/Meshes', '/Game/DZ_Assets/DZ_Trees/Meshes', '/Game/Megaplant_Library/Tree_EnglishOak/Tree_EnglishOak_01', '/Game/Megaplant_Library/Tree_Hornbeam/Tree_Hornbeam_01']
+ROOTS = ['/Game/PN_interactiveSpruceForest/Meshes', '/Game/DZ_Assets/DZ_Trees/Meshes']
 seen = set()
 for r in ROOTS:
     for p in sorted(EAL.list_assets(r, recursive=True)):

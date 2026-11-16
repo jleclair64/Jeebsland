@@ -9,14 +9,11 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 DST = '/Game/TreeGroves'
 if not EAL.does_directory_exist(DST): EAL.make_directory(DST)
 DZ = '/Game/DZ_Assets/DZ_Trees/Material_Instances'
-MP = '/Game/Megaplant_Library'
 # (new name, parent, static switches, scalars)
 JOBS = [
     ('MI_Fall_AspenLeavesBig',   DZ + '/Aspen/MI_Aspen_Leaves_Big_1',      {'Use Fall Setup?': True}, {'Fall Color Amount': 1.0}),
     ('MI_Fall_AspenLeavesSmall', DZ + '/Aspen/MI_Aspen_Leaves_Small_7',    {'Use Fall Setup?': True}, {'Fall Color Amount': 1.0}),
     ('MI_Fall_CorkOakLeaves',    DZ + '/Cork_Oak/MI_Cork_Oak_Leaves_1',    {'Use Fall Setup?': True}, {'Fall Color Amount': 1.0}),
-    ('MI_Fall_HornbeamFoliage',  MP + '/Tree_Hornbeam/Materials/MI_Tree_Hornbeam_01_Foliage', {'Seasons': True}, {}),
-    ('MI_Fall_EnglishOakFoliage', MP + '/Tree_EnglishOak/Materials/MI_Tree_EnglishOak_01_Foliage', {'Seasons': True}, {}),
 ]
 for name, parent, switches, scalars in JOBS:
     path = DST + '/' + name

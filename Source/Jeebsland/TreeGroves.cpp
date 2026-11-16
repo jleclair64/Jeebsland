@@ -66,8 +66,6 @@ namespace
 			{ TEXT("MI_Aspen_Leaves_Big_1"), TEXT("MI_Fall_AspenLeavesBig"), false },
 			{ TEXT("MI_Aspen_Leaves_Small_7"), TEXT("MI_Fall_AspenLeavesSmall"), false },
 			{ TEXT("MI_Cork_Oak_Leaves_1"), TEXT("MI_Fall_CorkOakLeaves"), false },
-			{ TEXT("MI_Tree_Hornbeam_01_Foliage"), TEXT("MI_Fall_HornbeamFoliage"), true },
-			{ TEXT("MI_Tree_EnglishOak_01_Foliage"), TEXT("MI_Fall_EnglishOakFoliage"), true },
 		};
 		int32 Done = 0;
 		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
@@ -157,20 +155,7 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Windmill_Palm/SM_Windmill_Palm_1.SM_Windmill_Palm_1"), 1, 1.f, 1.f, ECover::None, false, false },
 		};
 		Groves.Add(FGrove{ TEXT("DZ SAMPLE TREES"), TEXT("DZ Assets, Fab"), TArray<FKind>(D, UE_ARRAY_COUNT(D)), 32 });
-		const FKind O[] = {   // Megaplants English Oak: the four assemblies, autumn tints
-			{ TEXT("/Game/Megaplant_Library/Tree_EnglishOak/Tree_EnglishOak_01/SK_EnglishOak_01_A.SK_EnglishOak_01_A"), 3, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_EnglishOak/Tree_EnglishOak_01/SK_EnglishOak_01_B.SK_EnglishOak_01_B"), 3, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_EnglishOak/Tree_EnglishOak_01/SK_EnglishOak_01_C.SK_EnglishOak_01_C"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_EnglishOak/Tree_EnglishOak_01/SK_EnglishOak_01_D.SK_EnglishOak_01_D"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-		};
-		Groves.Add(FGrove{ TEXT("ENGLISH OAK"), TEXT("Megaplants, Quixel (USD import)"), TArray<FKind>(O, UE_ARRAY_COUNT(O)), 33 });
-		const FKind H[] = {   // Megaplants Hornbeam
-			{ TEXT("/Game/Megaplant_Library/Tree_Hornbeam/Tree_Hornbeam_01/SK_Hornbeam_01_A.SK_Hornbeam_01_A"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_Hornbeam/Tree_Hornbeam_01/SK_Hornbeam_01_B.SK_Hornbeam_01_B"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_Hornbeam/Tree_Hornbeam_01/SK_Hornbeam_01_C.SK_Hornbeam_01_C"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/Megaplant_Library/Tree_Hornbeam/Tree_Hornbeam_01/SK_Hornbeam_01_D.SK_Hornbeam_01_D"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-		};
-		Groves.Add(FGrove{ TEXT("EUROPEAN HORNBEAM"), TEXT("Megaplants, Quixel"), TArray<FKind>(H, UE_ARRAY_COUNT(H)), 34 });
+		// (The Megaplants English Oak and Hornbeam groves went 2026-11-16, owner: keep only DZ and the Spruce Forest; the pack is deleted.)
 	}
 	const int32 NumGroves = Groves.Num() + 1;   // (+ the world's own trees, the last grove)
 
