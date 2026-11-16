@@ -12,6 +12,8 @@
 #include "UObject/UObjectIterator.h"
 #include "HAL/IConsoleManager.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
 #include "OakHillTown.h"
@@ -633,6 +635,41 @@ void AKnightGameState::BuildMoveLab()
 #if !UE_BUILD_SHIPPING
 	if (FParse::Param(FCommandLine::Get(), TEXT("TownLabBuildings"))) JeebTownLab::BuildLineup(World, Floor, Root, Z);
 #endif
+	// Imported meshes in a row past the floor's +X edge, for test pictures (-LabMeshes=/Game/a+/Game/b+...; static or skeletal; foliage 2026-11-15)
+	{
+		FString List;
+		TArray<FString> Paths;
+		if (FParse::Value(FCommandLine::Get(), TEXT("LabMeshes="), List, false) && List.ParseIntoArray(Paths, TEXT("+")) > 0)
+		{
+			float Gap = 1400.f, AtX = 3200.f;
+			FParse::Value(FCommandLine::Get(), TEXT("LabMeshGap="), Gap);
+			FParse::Value(FCommandLine::Get(), TEXT("LabMeshX="), AtX);
+			for (int32 i = 0; i < Paths.Num(); ++i)
+			{
+				const FVector At(AtX, (i - (Paths.Num() - 1) * 0.5f) * Gap, -1.f);
+				UObject* Asset = LoadObject<UObject>(nullptr, *Paths[i]);
+				if (USkeletalMesh* Sk = Cast<USkeletalMesh>(Asset))
+				{
+					USkeletalMeshComponent* C = NewObject<USkeletalMeshComponent>(Floor);
+					C->SetSkeletalMeshAsset(Sk);
+					C->SetupAttachment(Root);
+					C->SetRelativeLocation(At);
+					C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					C->RegisterComponent();
+				}
+				else if (UStaticMesh* St = Cast<UStaticMesh>(Asset))
+				{
+					UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(Floor);
+					C->SetStaticMesh(St);
+					C->SetupAttachment(Root);
+					C->SetRelativeLocation(At);
+					C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					C->RegisterComponent();
+				}
+				UE_LOG(LogTemp, Display, TEXT("JEEBLABMESH %s %s at %s"), *Paths[i], Asset ? *Asset->GetClass()->GetName() : TEXT("MISSING"), *At.ToString());
+			}
+		}
+	}
 	// The gear wall behind the start (every machine builds its own; pegs go by number): every armour piece, shield and weapon, potion, ring, amulet and gatherable
 	World->SpawnActor<AGearWall>(AGearWall::StaticClass(), FVector(-700.f, 0.f, Z), FRotator::ZeroRotator);
 	SetupShotMode();

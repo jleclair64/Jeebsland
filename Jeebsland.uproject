@@ -42,6 +42,13 @@
                         "Enabled":  true
                     },
                     {
+                        "Name":  "USDImporter",
+                        "Enabled":  true,
+                        "TargetAllowList":  [
+                                                "Editor"
+                                            ]
+                    },
+                    {
                         "Name":  "ProceduralVegetationEditor",
                         "Enabled":  true,
                         "TargetAllowList":  [
