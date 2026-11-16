@@ -574,6 +574,7 @@ void AAutumnDecor::BeginPlay()
 	auto Gauss = [&]() { return FMath::Sqrt(-2.f * FMath::Loge(FMath::Max(Rand.FRand(), 1e-4f))) * FMath::Cos(2.f * PI * Rand.FRand()); };
 	for (const JeebCanopy::FSpot& Sp : JeebCanopy::Spots())
 	{
+		if (Sp.Color < 0) continue;   // (a conifer's canopy record: it thins the grass but drops no leaves: TreeGroves.cpp)
 		const float R = Sp.R;
 		const int32 Count = FMath::Min(FMath::RoundToInt(PI * R * R / 520.f * Rand.FRandRange(0.8f, 1.2f)), 800);
 		const int32 Own = FMath::Clamp(Sp.Color, 0, NumLeafTypes - 1);

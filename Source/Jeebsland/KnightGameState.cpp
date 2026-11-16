@@ -6,6 +6,7 @@
 #include "KnightCharacter.h"
 #include "GearWall.h"
 #include "FillerLineup.h"
+#include "TreeGroves.h"
 #include "TownLabLineup.h"
 #include "RHIStats.h"
 #include "RenderTimer.h"
@@ -268,6 +269,7 @@ void AKnightGameState::BuildWorld()
 		AOakHillTown::PlantTrees(Forest);   // Oak Hill's big plaza oak and the trees round the town
 		ATownLabTown::PlantTrees(Forest);   // (TownLab only: the rebuilt town's trees)
 	}
+	JeebGroves::Build(World, Forest);   // GROVES (TEMPORARY test setting, 2026-11-15): sample tree groves east of Oak Hill; non-Shipping, `jeeb.Test.Groves 0` leaves them out (TreeGroves.h)
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
