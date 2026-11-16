@@ -1,0 +1,125 @@
+Kind,Mesh,Shape,FootX,FootY,FootCX,FootCY,Height,Collision,Shadow,Cull,Slope,Flags,Where,Render,Tris,LodTris,SizeX,SizeY,MinZ,TwoSided
+AwningStriped,/Game/TownDecor/SM_AwningStriped,box,2.86,2.11,0.00,0.00,0.54,none,yes,large,,hang,M,lods,9174,300,2.86,2.11,0.00,1
+BannerGriffin,/Game/TownDecor/SM_BannerGriffin,box,1.34,0.10,0.00,0.00,1.80,none,no,medium,,hang,C B,lods,1951,299,1.34,0.11,-1.80,1
+BannerKnot,/Game/TownDecor/SM_BannerKnot,box,1.18,0.02,0.00,-0.00,1.92,none,no,medium,,hang,C,lods,7999,300,1.18,0.04,-1.92,1
+BannerLion,/Game/TownDecor/SM_BannerLion,box,0.84,0.11,-0.06,-0.00,1.82,none,no,medium,,hang,C P,lods,1422,300,1.01,0.12,-1.86,1
+BannerPoleGriffin,/Game/TownDecor/SM_BannerPoleGriffin,circle,0.62,0.62,-0.34,-0.00,3.12,capsule,yes,large,,,P C R B,lods,9950,300,1.13,0.46,0.00,1
+BannerPoleLion,/Game/TownDecor/SM_BannerPoleLion,circle,0.62,0.62,-0.34,-0.00,3.12,capsule,yes,large,,,P C R,lods,9421,299,1.13,0.46,0.00,1
+BannerPoleStone,/Game/TownDecor/SM_BannerPoleStone,circle,0.62,0.62,-0.34,-0.00,3.12,capsule,yes,large,,,P C R,lods,7999,299,1.13,0.46,0.00,0
+BannerPoleSwordShield,/Game/TownDecor/SM_BannerPoleSwordShield,circle,0.62,0.62,-0.34,-0.00,3.12,capsule,yes,large,,,P C R,lods,15998,299,1.13,0.46,0.00,1
+BannerPostKnot,/Game/TownDecor/SM_BannerPostKnot,circle,0.71,0.71,-0.36,0.00,3.12,capsule,yes,large,,,P C R,lods,15454,299,1.29,0.51,0.00,1
+BannerPostSwords,/Game/TownDecor/SM_BannerPostSwords,circle,0.71,0.71,-0.36,0.00,3.12,capsule,yes,large,,,P C R,lods,14287,300,1.29,0.51,0.00,1
+BannerPostTattered,/Game/TownDecor/SM_BannerPostTattered,circle,0.71,0.71,-0.36,0.00,3.12,capsule,yes,large,,,C K,lods,7455,299,1.29,0.51,0.00,0
+BannerSwordShield,/Game/TownDecor/SM_BannerSwordShield,box,0.98,0.24,-0.00,-0.01,1.80,none,no,medium,,hang,C,lods,7999,299,0.98,0.27,-1.80,1
+BannerSwords,/Game/TownDecor/SM_BannerSwords,box,1.26,0.13,-0.00,0.01,1.80,none,no,medium,,hang,C,lods,6832,300,1.26,0.16,-1.80,1
+Barrel,/Game/TownDecor/SM_Barrel,circle,1.12,1.12,0.00,-0.00,1.14,capsule,yes,medium,,,S M Y K C B,lods,12000,300,1.11,1.11,0.00,0
+BarrelSmall,/Game/TownDecor/SM_BarrelSmall,circle,0.71,0.71,0.00,0.00,1.02,capsule,near,medium,,,S M Y K,lods,9999,300,0.70,0.69,0.00,0
+Basket,/Game/TownDecor/SM_Basket,box,0.49,0.45,0.00,-0.00,0.60,none,no,small,,,M G Y,lods,7999,300,0.49,0.45,0.00,0
+BenchCarved,/Game/TownDecor/SM_BenchCarved,box,1.97,0.72,-0.00,0.01,1.26,box,near,medium,12,,P S V W G,lods,14000,300,1.97,0.74,0.00,0
+BenchStone,/Game/TownDecor/SM_BenchStone,box,1.53,0.47,0.00,-0.00,0.56,box,near,medium,12,,P S V W G,lods,7998,300,1.53,0.47,-0.00,0
+BoulderMossy,/Game/TownDecor/SM_BoulderMossy,box,2.37,2.40,0.00,0.00,1.28,box,yes,large,,,W F,lods,15998,300,2.37,2.40,0.00,0
+BushBall,/Game/TownDecor/SM_BushBall,circle,1.40,1.40,-0.01,0.00,1.11,none,near,medium,,,S Y G E W R,lods,11536,300,1.35,1.32,0.04,0
+BushBerries,/Game/TownDecor/SM_BushBerries,circle,1.49,1.49,-0.01,0.00,1.16,none,near,medium,,,S Y G E W R,lods,11885,300,1.33,1.45,0.02,0
+BushDome,/Game/TownDecor/SM_BushDome,circle,1.25,1.25,-0.00,0.01,1.29,none,near,medium,,,S Y G E W R,lods,11946,300,1.18,1.16,0.01,0
+BushLeafy,/Game/TownDecor/SM_BushLeafy,circle,1.54,1.54,-0.01,0.02,1.13,none,near,medium,,,S Y G E W R,lods,11696,300,1.44,1.44,0.01,0
+BushRound,/Game/TownDecor/SM_BushRound,circle,1.50,1.50,-0.01,-0.00,1.17,none,near,medium,,,S Y G E W R,lods,11792,300,1.46,1.44,0.01,0
+BushSpiky,/Game/TownDecor/SM_BushSpiky,circle,1.80,1.80,-0.01,0.00,1.06,none,near,medium,,,S Y G E W R,lods,12233,299,1.76,1.68,-0.01,1
+BushWhiteFlowers,/Game/TownDecor/SM_BushWhiteFlowers,circle,1.33,1.33,0.00,-0.00,1.05,none,near,medium,,,S Y G E W R,lods,11782,300,1.22,1.26,0.00,0
+BushYellowFlowers,/Game/TownDecor/SM_BushYellowFlowers,circle,1.28,1.28,-0.01,0.00,1.02,none,near,medium,,,S Y G E W R,lods,11858,300,1.24,1.19,0.04,0
+ButcherBlock,/Game/TownDecor/SM_ButcherBlock,box,1.23,0.93,0.00,-0.00,0.90,box,near,medium,,,Y K,lods,8000,300,1.23,0.93,0.00,0
+CabbageCrate,/Game/TownDecor/SM_CabbageCrate,box,0.96,0.81,0.00,-0.00,0.52,none,no,small,,,G M,lods,15864,300,0.96,0.81,0.00,0
+CandleCageShort,/Game/TownDecor/SM_CandleCageShort,circle,0.31,0.31,0.00,0.00,0.46,none,no,tiny,,light,V,lods,19997,300,0.30,0.30,0.00,0
+CandleCageTall,/Game/TownDecor/SM_CandleCageTall,circle,0.35,0.35,0.00,-0.00,0.60,none,no,small,,light,V,lods,19995,300,0.32,0.31,0.00,0
+Cauldron,/Game/TownDecor/SM_Cauldron,circle,1.34,1.34,-0.00,0.00,1.15,box,yes,medium,,,K Y,lods,23996,299,1.29,1.24,-0.00,0
+ChickenCoop,/Game/TownDecor/SM_ChickenCoop,box,1.25,1.74,-0.01,0.07,1.80,box,yes,medium,12,,Y F,lods,20000,300,1.50,1.88,-0.00,0
+ChoppingBlock,/Game/TownDecor/SM_ChoppingBlock,box,0.99,1.00,0.01,0.00,1.43,box,near,medium,,,Y K,lods,10996,300,0.99,1.00,0.00,0
+ClayJug,/Game/TownDecor/SM_ClayJug,circle,0.42,0.42,-0.00,0.00,0.48,none,no,tiny,,,S M Y,lods,5999,300,0.41,0.41,-0.00,0
+ClayPitcher,/Game/TownDecor/SM_ClayPitcher,circle,0.43,0.43,0.00,0.00,0.60,none,no,small,,,S M Y,lods,7036,300,0.43,0.42,0.00,0
+Crate,/Game/TownDecor/SM_Crate,box,1.44,0.87,-0.00,0.00,0.86,box,near,medium,,,M Y K C B,lods,12000,296,1.44,0.87,0.00,0
+CrateNoLid,/Game/TownDecor/SM_CrateNoLid,box,1.38,0.87,-0.00,0.00,0.74,box,near,medium,,,M Y,lods,12000,300,1.38,0.87,0.00,0
+CrateOpen,/Game/TownDecor/SM_CrateOpen,box,1.10,1.60,-0.00,0.00,0.84,box,near,medium,,,M G F,lods,13998,300,1.10,1.60,0.00,0
+Cypress,/Game/TownDecor/SM_Cypress,circle,1.39,1.39,-0.02,0.00,3.00,capsule,yes,large,,,V G P,lods,12000,300,1.18,1.31,0.02,0
+FencePalisade,/Game/TownDecor/SM_FencePalisade,box,3.71,0.22,0.00,0.01,1.92,box,yes,large,12,,C B K,lods,19993,300,3.71,0.24,0.00,0
+FencePicket,/Game/TownDecor/SM_FencePicket,box,2.95,0.11,0.00,-0.00,1.14,box,near,large,12,,Y G,lods,7999,300,2.95,0.11,-0.00,0
+FencePicketEnd,/Game/TownDecor/SM_FencePicketEnd,box,0.30,0.11,0.00,-0.00,1.14,box,near,medium,,,Y G,lods,3000,300,0.30,0.11,-0.00,0
+FenceStick,/Game/TownDecor/SM_FenceStick,box,1.87,0.26,0.00,0.00,1.32,box,near,medium,12,,F R E,lods,14000,300,1.87,0.26,0.00,0
+FenceStickPost,/Game/TownDecor/SM_FenceStickPost,box,0.21,0.26,0.00,0.00,1.36,box,near,medium,,,F R E,lods,2998,300,0.21,0.27,-0.00,0
+Firewood,/Game/TownDecor/SM_Firewood,box,0.56,1.20,-0.00,-0.00,0.63,none,no,medium,,,Y K,lods,12000,300,0.56,1.20,0.00,0
+FirewoodRack,/Game/TownDecor/SM_FirewoodRack,box,2.88,0.61,-0.00,-0.00,0.98,box,yes,large,12,,Y B,lods,29997,300,2.88,0.61,0.00,0
+FlowerBoxIvy,/Game/TownDecor/SM_FlowerBoxIvy,box,1.20,0.34,-0.00,0.00,0.69,none,no,medium,,,S,lods,16000,300,1.20,0.34,0.00,1
+FlowerBoxLong,/Game/TownDecor/SM_FlowerBoxLong,box,1.32,0.65,0.00,-0.00,0.46,none,no,medium,,,S,lods,29995,294,1.32,0.65,0.00,1
+HandCart,/Game/TownDecor/SM_HandCart,box,3.12,1.76,-0.00,-0.00,2.09,box,yes,large,12,,M R Y,lods,29991,296,3.12,1.76,-0.00,0
+HayBale,/Game/TownDecor/SM_HayBale,box,1.14,0.63,-0.00,0.00,0.50,box,yes,medium,,,F Y R,lods,9985,300,1.14,0.63,0.01,0
+HayBaleRound,/Game/TownDecor/SM_HayBaleRound,box,1.60,1.31,-0.03,0.03,1.56,box,yes,medium,,,F,lods,11937,300,1.60,1.36,0.02,0
+HayWagon,/Game/TownDecor/SM_HayWagon,box,2.62,1.65,0.02,0.00,2.12,box,yes,large,12,,F R,lods,29978,300,3.12,1.87,0.00,0
+HedgeBox,/Game/TownDecor/SM_HedgeBox,box,1.84,0.63,0.00,0.00,1.20,box,yes,medium,12,,S Y G,lods,20000,300,1.84,0.63,-0.00,0
+HedgeEnd,/Game/TownDecor/SM_HedgeEnd,box,0.96,0.99,0.04,-0.00,1.10,box,yes,medium,,,S Y G,lods,9819,300,0.96,0.99,0.02,0
+HedgeSegment,/Game/TownDecor/SM_HedgeSegment,box,1.45,1.03,-0.00,-0.00,1.07,box,yes,medium,12,,S Y G,lods,13941,300,1.45,1.03,0.03,0
+LampPostGallows,/Game/TownDecor/SM_LampPostGallows,circle,0.52,0.52,0.48,-0.03,3.00,capsule,yes,large,,light,P S R,lods,10000,300,2.10,0.63,0.00,0
+LampPostPillar,/Game/TownDecor/SM_LampPostPillar,circle,0.52,0.52,0.16,0.00,3.12,capsule,yes,large,,light,P S R,lods,15998,300,1.14,0.45,0.00,0
+LampPostRope,/Game/TownDecor/SM_LampPostRope,circle,1.54,1.54,-0.07,0.00,2.88,capsule,yes,large,,light,P S R,lods,20000,300,1.64,1.27,0.00,0
+LampPostStone,/Game/TownDecor/SM_LampPostStone,circle,0.95,0.95,0.08,-0.00,2.88,capsule,yes,large,,light,P S R,lods,16000,300,1.06,0.81,0.00,0
+LanternBlack,/Game/TownDecor/SM_LanternBlack,box,0.25,0.25,0.00,-0.00,0.60,none,no,small,,light,S M Y,lods,6000,300,0.25,0.25,0.00,0
+LanternOil,/Game/TownDecor/SM_LanternOil,box,0.27,0.22,0.00,0.00,0.50,none,no,small,,light,S M Y,lods,2513,299,0.27,0.22,0.00,0
+LogMossy,/Game/TownDecor/SM_LogMossy,box,2.89,0.81,-0.00,0.00,0.79,box,yes,large,,,W E,lods,15989,300,2.89,0.81,0.00,0
+LogPile,/Game/TownDecor/SM_LogPile,box,2.88,2.87,-0.00,-0.00,1.25,box,yes,large,,,Y E F,lods,29984,300,2.88,2.87,-0.00,0
+LogStack,/Game/TownDecor/SM_LogStack,box,2.40,1.51,0.00,-0.00,1.45,box,yes,medium,,,Y E,lods,15999,300,2.40,1.52,-0.00,0
+LogStackSmall,/Game/TownDecor/SM_LogStackSmall,box,1.19,1.09,0.00,0.00,0.90,none,near,medium,,,Y K,lods,4200,300,1.19,1.09,0.00,0
+NestingBoxes,/Game/TownDecor/SM_NestingBoxes,box,1.89,0.89,0.00,0.02,1.43,box,yes,medium,12,,Y F,lods,15995,299,2.03,0.93,0.00,0
+Pail,/Game/TownDecor/SM_Pail,circle,0.45,0.45,0.00,-0.00,0.54,none,no,small,,,Y G F W,lods,7000,300,0.45,0.40,0.00,0
+PlantClump,/Game/TownDecor/SM_PlantClump,box,1.42,0.81,-0.00,0.01,0.62,none,no,medium,,,S Y E W,lods,13954,300,1.42,0.81,0.00,0
+PlanterGilded,/Game/TownDecor/SM_PlanterGilded,box,1.92,0.95,-0.00,0.00,0.84,box,near,medium,12,,P,lods,19998,298,1.92,0.95,-0.00,1
+PotAmphora,/Game/TownDecor/SM_PotAmphora,box,0.72,0.57,-0.00,-0.00,0.96,none,near,small,,,M S,lods,8000,300,0.72,0.57,0.00,0
+PotJug,/Game/TownDecor/SM_PotJug,circle,0.40,0.40,-0.00,0.00,0.65,none,no,small,,,S M Y,lods,6000,300,0.38,0.37,0.00,0
+PotRound,/Game/TownDecor/SM_PotRound,circle,0.40,0.40,0.00,-0.00,0.41,none,no,tiny,,,S M Y,lods,5000,300,0.39,0.39,-0.00,0
+PotSmall,/Game/TownDecor/SM_PotSmall,circle,0.24,0.24,0.00,-0.00,0.28,none,no,tiny,,,S M Y,lods,3998,300,0.23,0.23,0.00,0
+PotVase,/Game/TownDecor/SM_PotVase,circle,0.25,0.25,-0.00,0.00,0.47,none,no,tiny,,,S M Y,lods,5000,300,0.24,0.24,0.00,0
+PotWide,/Game/TownDecor/SM_PotWide,circle,0.49,0.49,0.00,-0.00,0.44,none,no,tiny,,,S M Y,lods,6000,300,0.49,0.44,0.00,0
+RaisedBed,/Game/TownDecor/SM_RaisedBed,box,2.40,1.30,0.00,-0.00,0.72,box,near,medium,12,,G Y,lods,19998,300,2.40,1.30,0.00,1
+RockPale,/Game/TownDecor/SM_RockPale,circle,2.03,2.03,0.00,0.00,1.06,box,yes,medium,,,W R,lods,2964,300,1.81,1.92,0.00,0
+RopeCoil,/Game/TownDecor/SM_RopeCoil,circle,0.74,0.74,0.00,-0.00,0.26,none,no,small,,,W M C K,lods,7998,300,0.72,0.70,-0.00,0
+RopeHank,/Game/TownDecor/SM_RopeHank,box,0.84,0.34,0.00,0.00,0.19,none,no,small,,,W M C K,lods,7999,300,0.84,0.34,0.00,0
+SackPileOpen,/Game/TownDecor/SM_SackPileOpen,box,1.74,1.60,0.00,0.00,0.99,box,near,medium,,,M F,lods,15996,299,1.74,1.60,0.00,1
+SackStack,/Game/TownDecor/SM_SackStack,box,2.79,0.81,0.00,-0.00,0.84,box,near,large,12,,M F B,lods,19994,300,2.79,0.81,-0.00,0
+SackWall,/Game/TownDecor/SM_SackWall,box,2.48,1.29,0.00,-0.00,0.84,box,near,medium,12,,M F B,lods,19991,298,2.48,1.29,-0.00,0
+Scarecrow,/Game/TownDecor/SM_Scarecrow,circle,0.92,0.92,0.19,0.00,2.40,capsule,yes,medium,,,G F,lods,15998,300,1.46,0.68,0.00,1
+Sconce,/Game/TownDecor/SM_Sconce,box,0.17,0.18,-0.00,0.09,0.54,none,no,small,,hang|light|flame=SconceFlame,C B K,lods,6000,300,0.17,0.18,0.00,0
+SconceFlame,/Game/TownDecor/SM_SconceFlame,box,0.03,0.02,-0.00,0.09,0.08,none,no,tiny,,part,,lods,314,110,0.03,0.02,0.53,0
+ShrubLow,/Game/TownDecor/SM_ShrubLow,circle,0.96,0.96,-0.00,0.01,0.69,none,no,small,,,S Y E W,lods,11757,300,0.87,0.87,0.01,0
+SignArrow,/Game/TownDecor/SM_SignArrow,circle,0.25,0.25,0.02,-0.04,2.40,capsule,yes,medium,,,R S,lods,6000,300,1.47,0.27,-0.00,0
+SignSkillIssue,/Game/TownDecor/SM_SignSkillIssue,circle,0.18,0.18,0.02,-0.08,2.16,capsule,yes,medium,,,P,lods,8000,300,0.96,0.35,0.00,0
+Signpost,/Game/TownDecor/SM_Signpost,circle,0.18,0.18,-0.00,-0.04,2.40,capsule,yes,medium,,,R S,lods,7999,300,1.22,0.25,0.00,0
+SpiceSacks,/Game/TownDecor/SM_SpiceSacks,box,2.10,0.50,0.00,0.00,0.66,none,no,medium,,,M,lods,16000,300,2.10,0.50,-0.00,0
+StairsStone,/Game/TownDecor/SM_StairsStone,box,1.64,2.50,-0.00,0.00,1.43,mesh,yes,medium,12,,Y C,lods,15924,300,1.64,2.50,-0.00,0
+StairsStoneShort,/Game/TownDecor/SM_StairsStoneShort,box,1.64,1.02,-0.00,0.00,0.79,mesh,yes,medium,12,,Y C,lods,7944,299,1.64,1.02,-0.00,0
+StairsWalled,/Game/TownDecor/SM_StairsWalled,box,2.74,2.72,-0.00,-0.00,1.64,mesh,yes,large,12,,Y C,lods,20000,300,2.74,2.72,-0.00,0
+StallGreen,/Game/TownDecor/SM_StallGreen,box,1.83,1.41,-0.00,-0.16,2.88,box,yes,large,12,,P M,lods,20000,300,1.91,1.73,0.00,1
+StallRedTent,/Game/TownDecor/SM_StallRedTent,box,4.01,2.38,0.00,-0.29,2.78,box,yes,large,12,,P M,lods,6306,299,4.15,3.12,0.09,1
+Stump,/Game/TownDecor/SM_Stump,circle,1.49,1.49,-0.00,0.00,0.54,box,near,medium,,,Y E,lods,11999,300,1.32,1.28,-0.00,0
+StumpGrass,/Game/TownDecor/SM_StumpGrass,circle,1.65,1.65,0.00,-0.00,0.91,box,near,medium,,,Y E W,lods,11997,300,1.43,1.44,0.00,0
+StumpMushroom,/Game/TownDecor/SM_StumpMushroom,circle,1.89,1.89,-0.00,0.00,0.77,box,near,medium,,,Y E W,lods,15995,300,1.68,1.64,0.00,0
+StumpPainted,/Game/TownDecor/SM_StumpPainted,circle,1.62,1.62,-0.00,-0.00,0.77,box,near,medium,,,Y E W,lods,11999,300,1.39,1.44,-0.00,0
+StumpRooty,/Game/TownDecor/SM_StumpRooty,circle,2.19,2.19,-0.00,0.00,1.44,box,near,medium,,,Y E W,lods,15999,300,1.92,1.92,-0.00,0
+StumpStones,/Game/TownDecor/SM_StumpStones,circle,1.76,1.76,-0.00,0.00,1.19,box,near,medium,,,Y E W,lods,15998,300,1.67,1.68,0.00,1
+ThatchWagon,/Game/TownDecor/SM_ThatchWagon,box,1.77,2.87,0.01,-0.00,2.29,box,yes,large,12,,F R,lods,29998,300,2.04,3.12,0.00,0
+TorchBlazing,/Game/TownDecor/SM_TorchBlazing,circle,0.19,0.19,-0.00,-0.00,0.74,none,no,small,,light|flame=TorchBlazingFlame,C B K,lods,6000,300,0.18,0.18,0.00,0
+TorchBlazingFlame,/Game/TownDecor/SM_TorchBlazingFlame,circle,0.18,0.18,0.00,0.01,0.33,none,no,tiny,,part,,lods,2000,300,0.18,0.15,0.63,0
+TorchUnlitRope,/Game/TownDecor/SM_TorchUnlitRope,circle,0.10,0.10,0.00,-0.00,0.84,none,no,small,,,K C,lods,5998,300,0.09,0.09,0.00,0
+TorchUnlitTar,/Game/TownDecor/SM_TorchUnlitTar,circle,0.09,0.09,0.00,-0.00,0.84,none,no,small,,,K C,lods,6000,300,0.09,0.09,0.00,0
+TorchWall,/Game/TownDecor/SM_TorchWall,box,0.18,0.42,-0.00,0.21,0.96,none,no,small,,hang|light|flame=TorchWallFlame,C B K,lods,8000,299,0.18,0.42,0.00,0
+TorchWallFlame,/Game/TownDecor/SM_TorchWallFlame,circle,0.14,0.14,0.00,0.32,0.25,none,no,tiny,,part,,lods,2000,300,0.12,0.12,0.84,0
+TrestleTable,/Game/TownDecor/SM_TrestleTable,box,2.55,1.16,-0.00,0.00,0.94,box,near,large,12,,M K Y,lods,10000,300,2.55,1.16,0.00,0
+TulipBed,/Game/TownDecor/SM_TulipBed,box,2.16,0.69,0.00,-0.00,0.19,box,near,medium,12,,G Y,lods,19863,297,2.16,0.69,0.00,1
+VegCart,/Game/TownDecor/SM_VegCart,box,2.41,1.83,0.12,0.00,2.49,box,yes,large,12,,M G,lods,29982,298,2.64,1.83,0.00,0
+WallPillar,/Game/TownDecor/SM_WallPillar,box,2.39,0.55,0.00,-0.00,1.44,box,yes,medium,12,,Y F V C R,lods,15997,300,2.39,0.55,-0.00,0
+WallPillarEnd,/Game/TownDecor/SM_WallPillarEnd,box,0.41,0.53,-0.00,-0.00,1.44,box,yes,medium,,,Y F V C R,lods,5999,300,0.41,0.53,0.00,0
+WallStone,/Game/TownDecor/SM_WallStone,box,2.27,0.75,0.00,-0.00,1.20,box,yes,medium,12,,Y F V C R,lods,12000,300,2.27,0.75,-0.00,0
+WallStoneEnd,/Game/TownDecor/SM_WallStoneEnd,box,0.54,0.74,-0.00,-0.00,1.20,box,yes,medium,,,Y F V C R,lods,4998,300,0.54,0.74,-0.00,0
+WateringCan,/Game/TownDecor/SM_WateringCan,box,0.65,0.33,0.00,-0.00,0.50,none,no,small,,,Y G F W,lods,9000,300,0.65,0.33,0.00,0
+WellCobble,/Game/TownDecor/SM_WellCobble,circle,6.60,6.60,-0.00,0.00,4.98,box,yes,landmark,12,,B,lods,40000,300,6.60,6.60,0.00,0
+WellOld,/Game/TownDecor/SM_WellOld,circle,2.58,2.58,-0.13,0.00,3.40,capsule,yes,large,12,,C F,lods,7872,299,2.64,2.48,0.00,0
+WellThatched,/Game/TownDecor/SM_WellThatched,circle,2.33,2.33,-0.19,-0.00,3.59,capsule,yes,large,12,,B F,lods,29998,300,3.36,2.30,0.00,0
+WellVillage,/Game/TownDecor/SM_WellVillage,circle,3.20,3.20,-0.09,0.00,3.29,capsule,yes,large,12,light,B F,lods,30000,300,3.36,3.10,0.00,0
+WheatSack,/Game/TownDecor/SM_WheatSack,box,0.89,0.61,0.00,-0.00,1.02,none,no,medium,,,M F Y,lods,6000,300,0.89,0.61,0.00,0
+WindowBoxRed,/Game/TownDecor/SM_WindowBoxRed,box,1.08,0.52,0.00,-0.00,0.61,none,no,medium,,hang,S,lods,12000,298,1.08,0.52,0.00,1
+WoodTub,/Game/TownDecor/SM_WoodTub,circle,0.72,0.72,-0.00,0.00,0.56,none,no,small,,,Y G F W,lods,10000,300,0.72,0.68,0.00,0
