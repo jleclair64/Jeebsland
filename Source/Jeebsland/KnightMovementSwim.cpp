@@ -302,11 +302,32 @@ void AKnightCharacter::TickSwimTests(float Dt)
 		FParse::Value(FCommandLine::Get(), TEXT("SwimKeys="), Keys);
 		FParse::Value(FCommandLine::Get(), TEXT("SwimDo="), Do);
 		Yaw = GetActorRotation().Yaw;
+		{ const FVector2D Cc = JeebTerrain::CastlePos(); float Sx = -1.f; const bool bS = JeebWater::SurfaceAt(Cc.X - 1625.f, Cc.Y, Sx); UE_LOG(LogTemp, Log, TEXT("JEEBMOAT castle level %.0f moat surface %.0f; ground at centre %.0f, at the ring's middle %.0f, SurfaceAt there %d %.0f; top level %.0f"), JeebTerrain::CastleLevel(), JeebWater::MoatZ(), JeebTerrain::HeightAt(Cc.X, Cc.Y), JeebTerrain::HeightAt(Cc.X - 1625.f, Cc.Y), bS ? 1 : 0, Sx, JeebWater::TopLevel()); }
+		if (FParse::Param(FCommandLine::Get(), TEXT("WaterScan")))   // (-WaterScan: where the drawn sea now counts as water but the old coast rule (3.5 km inside the coast) did not, and where ground lies below it)
+		{
+			int32 Newly = 0, Wet = 0; float DeepX = 0.f, DeepY = 0.f, Deep = 0.f, MinXs = 1.0e9f, MaxXs = -1.0e9f, MinYs = 1.0e9f, MaxYs = -1.0e9f;
+			for (float X = JeebWorld::MinX; X <= JeebWorld::MaxX; X += 400.f)
+				for (float Y = JeebWorld::MinY; Y <= JeebWorld::MaxY; Y += 400.f)
+				{
+					float S;
+					if (!JeebWater::SurfaceAt(X, Y, S)) continue;
+					const float G = JeebTerrain::HeightAt(X, Y);
+					if (G >= S - 100.f) continue;   // (not 1 m deep: nobody swims there)
+					++Wet;
+					if (S == JeebWorld::SeaLevel && !(Y - JeebWorld::CoastY(X) > -3500.f))
+					{
+						++Newly; MinXs = FMath::Min(MinXs, X); MaxXs = FMath::Max(MaxXs, X); MinYs = FMath::Min(MinYs, Y); MaxYs = FMath::Max(MaxYs, Y);
+						if (S - G > Deep) { Deep = S - G; DeepX = X; DeepY = Y; }
+					}
+				}
+			UE_LOG(LogTemp, Log, TEXT("JEEBWATERSCAN deep (over 1 m) wet cells %d; of them sea cells the old coast rule missed %d, in X %.0f..%.0f Y %.0f..%.0f, deepest %.0f cm at (%.0f,%.0f); sea west edge Y %.0f"), Wet, Newly, MinXs, MaxXs, MinYs, MaxYs, Deep, DeepX, DeepY, JeebWater::SeaWestEdge());
+		}
 		bRead = true;
 	}
 	// (-SwimProbe: once a second, everything solid straight under him, for "what is he standing on in the water")
 	static const bool bProbe = FParse::Param(FCommandLine::Get(), TEXT("SwimProbe"));
-	static float ProbeT = 0.f;
+	static float ProbeT = 0.f; static int32 ProbeMaxLog = 0;
+	{ static float MaxD = 0.f; if (const UKnightMovement* KMd = KnightMove()) { MaxD = FMath::Max(MaxD, KMd->WaterDepth); if (bProbe && MaxD > 0.f && ProbeMaxLog++ % 3 == 0) UE_LOG(LogTemp, Log, TEXT("JEEBWATERDEPTH now %.0f max so far %.0f at (%.0f,%.0f)"), KMd->WaterDepth, MaxD, GetActorLocation().X, GetActorLocation().Y); } }
 	if (bProbe && (ProbeT += Dt) > 1.f)
 	{
 		ProbeT = 0.f;
