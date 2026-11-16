@@ -347,3 +347,5 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 
 ## World fill (2026-11-16, Oak Hill filled with the TownDecor props)
 - LESSON: (visual-reviewer) a prop that clears grass or casts a shadow must use a footprint no larger than its collision bounds, and every placed piece must be checked from the camera it will be seen from (dusk too) for a black, unlit or missing-material render.
+- LESSON: (package-reviewer) a function defined inside `#if !UE_BUILD_SHIPPING` must have every caller inside the same guard. Compile and link Shipping after any change to a file with such a block; compiling the touched files alone can pass while the link fails (the LOOK tab's LookTypeChar/LookTypeKey, 2026-11-16).
+- LESSON: (online-reviewer) the fill's blocker scan reads every non-replicated pawn-blocking actor, so a visual-only actor that the server skips must never get a pawn-blocking collider, or the server's and clients' layouts drift. Compare the JEEBFILL hash line on server and client after any world change.

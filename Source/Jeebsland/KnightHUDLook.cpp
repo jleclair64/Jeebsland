@@ -242,17 +242,6 @@ namespace
 	}
 }
 
-void AKnightHUD::LookTypeChar(TCHAR C)
-{
-	if (C >= 32 && C != 127 && LookName.Len() < 24) LookName.AppendChar(C);
-}
-
-void AKnightHUD::LookTypeKey(const FKey& Key)
-{
-	if (Key == EKeys::BackSpace) { if (LookName.Len() > 0) LookName.LeftChopInline(1); }
-	else if (Key == EKeys::Enter || Key == EKeys::Escape || Key == EKeys::Tab) bLookTyping = false;
-}
-
 void AKnightHUD::DrawLookTab(float PX, float PY, float PW, float PH)
 {
 	UFont* Font = GEngine->GetMediumFont();
@@ -368,3 +357,15 @@ void AKnightHUD::DrawLookTab(float PX, float PY, float PW, float PH)
 }
 
 #endif
+
+// (outside the guard: KnightHUDMenu.cpp calls these in every build; in Shipping bLookTyping is never set, so they never run)
+void AKnightHUD::LookTypeChar(TCHAR C)
+{
+	if (C >= 32 && C != 127 && LookName.Len() < 24) LookName.AppendChar(C);
+}
+
+void AKnightHUD::LookTypeKey(const FKey& Key)
+{
+	if (Key == EKeys::BackSpace) { if (LookName.Len() > 0) LookName.LeftChopInline(1); }
+	else if (Key == EKeys::Enter || Key == EKeys::Escape || Key == EKeys::Tab) bLookTyping = false;
+}
