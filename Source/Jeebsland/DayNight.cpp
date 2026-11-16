@@ -2,6 +2,7 @@
 #include "Palette.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "Engine/DirectionalLight.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Engine/SkyLight.h"
@@ -187,7 +188,9 @@ void ADayNight::BeginPlay()
 void ADayNight::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	Clock += DeltaSeconds * ClockSpeed;
+	// (2026-11-15) the server's clock, so every player online sees the sun in the same place (each machine kept its own until then)
+	const AGameStateBase* GS = GetWorld()->GetGameState();
+	Clock = GS ? float(GS->GetServerWorldTimeSeconds()) * ClockSpeed : Clock + DeltaSeconds * ClockSpeed;
 	TickClouds(DeltaSeconds);
 	const float HeldPhase = JeebLook::SunPhase.GetValueOnGameThread();
 	Phase = HeldPhase >= 0.f ? FMath::Fmod(HeldPhase, 1.f) : FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);

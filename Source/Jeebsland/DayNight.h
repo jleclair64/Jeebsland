@@ -25,7 +25,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	// Noon to the low golden point (and the same back). 60 s to preview; set to 1200 for 20 minutes.
-	static constexpr float HalfLoopSeconds = 60.f;
+	static constexpr float HalfLoopSeconds = 600.f;   // a full loop of the sun every 20 minutes (owner, 2026-11-15; was 2 minutes)
 	float ClockSpeed = 1.f;   // how fast this sun runs (MoveLab sets 3, to see the light change quickly; the world stays at 1)
 
 	// Shared state, updated every frame
