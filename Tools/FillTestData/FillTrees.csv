@@ -1,0 +1,4 @@
+# PLACEHOLDER (fillcore's test data; the real file is filllayout's Content/Data/FillTrees.csv). E,N metres; Radius metres kept clear.
+Site,E,N,Class,Radius,Note
+OakHill,30,30,shade,2.5,test
+OakHill,-35,-25,street,1.5,test

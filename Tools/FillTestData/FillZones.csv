@@ -1,0 +1,22 @@
+# PLACEHOLDER (fillcore's test data; the real file is filllayout's Content/Data/FillZones.csv). Density: sets per 100 m^2.
+Zone,On,Density,Mix,Seed,Facing,Trees
+OakYard,1,1.2,BarrelPair:2 CrateStack:2 Woodpile:1 BushPair:3,0,wall,0
+OakStreet,1,0.25,BenchCorner:1 Lamp:1 BushPair:1,0,road,0
+OakPlaza,1,0.15,BenchCorner:1,0,road,0
+OakFringe,1,0.15,BushPair:3 Woodpile:1,0,random,0.2
+OakGarden,1,0.8,BushPair:3 BasketOnly:1,0,random,0
+OakBoxingRing,1,0.6,BarrelPair:1 CrateStack:1 HayCart:1,0,random,0
+OakRuins,1,0.6,BushPair:2 Woodpile:1,0,random,0
+OakGraveyard,1,0.4,BushPair:1,0,random,0
+OakForts,1,0.6,BarrelPair:1 CrateStack:2,0,random,0
+OakWatchtower,1,0.6,CrateStack:1 Woodpile:1,0,random,0
+OakBridge,1,0.5,BarrelPair:1,0,road,0
+Blackrock,1,0.5,BarrelPair:2 CrateStack:2 HayCart:1,0,wall,0
+MarketYard,1,0.6,CrateStack:2 BarrelPair:2,0,random,0
+HutYards,1,0.4,Woodpile:2 BushPair:2,0,wall,0
+Cottage,1,0.4,Woodpile:1 BushPair:2,0,random,0
+PigPen,1,0.4,HayCart:1 BarrelPair:1,0,random,0
+Pond,1,0.2,BushPair:1,0,random,0
+Castle,1,0.3,BarrelPair:1 CrateStack:1,0,random,0
+Graveyard,1,0.2,BushPair:1,0,random,0
+Roadside,0,0.1,Lamp:1,0,road,0

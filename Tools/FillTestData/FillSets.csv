@@ -1,0 +1,18 @@
+# PLACEHOLDER (fillcore's test data; the real file is filllayout's Content/Data/FillSets.csv). Set-local metres, Unreal axes, front = +Y.
+Set,Kind,X,Y,Z,Yaw,Scale,Flags
+BarrelPair,Barrel,0,0,0,0,1,
+BarrelPair,BarrelSmall,0.65,0.1,0,30,1,drop|turn=40
+CrateStack,Crate,0,0,0,0,1,turn=10
+CrateStack,CrateOpen,0.95,0,0,15,1,alt=Crate|drop
+CrateStack,Basket,0.5,0.75,0,0,1,drop
+CrateStack,ClayJug,-0.6,0.6,0,0,1,drop
+Woodpile,Firewood,0,0,0,0,1,
+Woodpile,LogMossy,0,-0.9,0,5,1,drop
+BushPair,BushRound,0,0,0,0,1,alt=BushLeafy|turn=180
+BushPair,BushBerries,1.1,0.3,0,0,0.9,drop|turn=180
+BenchCorner,BenchStone,0,0,0,0,1,
+BenchCorner,BushLeafy,1.4,-0.2,0,0,0.8,drop|turn=180
+HayCart,HandCart,0,0,0,0,1,
+HayCart,HayBale,1.2,0.4,0,10,1,drop
+HayCart,HayBale,1.2,0.4,0.5,-5,1,drop|stack
+Lamp,LampPostStone,0,0,0,0,1,
