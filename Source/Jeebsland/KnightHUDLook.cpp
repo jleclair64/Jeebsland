@@ -75,7 +75,7 @@ namespace
 		{ 4, TEXT("Grass: pulled toward grey"), TEXT("jeeb.Grass.PackDesat"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 4, TEXT("Grass: flower clumps"), TEXT("jeeb.Grass.PackFlowers"), EK::Float, 0, 0.f, 1.5f, false, NoDef },
 
-		{ 5, TEXT("Ground: sky light at the low sun"), TEXT("jeeb.Ground.SkyFill"), EK::Float, 0, 0.f, 1.f, false, NoDef },
+		{ 5, TEXT("Ground: low-sun light past the grass"), TEXT("jeeb.Ground.SkyFill"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 
 		// (added at the end so the test run's item numbers below stay put)
 		{ 1, TEXT("Sun: 0 noon, .5 low, -1 moving (reset)"), TEXT("jeeb.Sun.Phase"), EK::Float, 0, 0.f, 1.f, false, NoDef },
@@ -83,6 +83,8 @@ namespace
 		{ 0, TEXT("Armour: plate brightness"), TEXT("jeeb.Armour.Shine"), EK::Float, 0, 0.5f, 5.f, false, NoDef },
 		{ 0, TEXT("Armour: sun glint on plate"), TEXT("jeeb.Armour.Glint"), EK::Float, 0, 0.f, 4.f, false, NoDef },
 		{ 0, TEXT("Armour: mirror share (1 pure metal)"), TEXT("jeeb.Armour.Metal"), EK::Float, 0, 0.5f, 1.f, false, NoDef },
+		{ 5, TEXT("Ground under the grass at low sun (1 same)"), TEXT("jeeb.Ground.Floor"), EK::Float, 0, 0.4f, 1.2f, false, NoDef },
+		{ 5, TEXT("Ground: low-sun light kept under grass"), TEXT("jeeb.Ground.UnderFill"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Sky: ground colour below the horizon"), TEXT("jeeb.Sky.Ground"), EK::Float, 0, 0.f, 3.f, false, NoDef },
 		{ 0, TEXT("Knight gravity x real (-1 Tuning.ini; reset)"), TEXT("jeeb.Knight.Gravity"), EK::Float, 0, 0.5f, 3.f, false, NoDef },
 	};
