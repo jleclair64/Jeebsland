@@ -2238,10 +2238,13 @@ FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
 // own frame at rest (X ahead, Y to his right, Z up), from where the old hips carried them.
 // (owner 2026-11-15: "I want the string to be in between the knight's forearm and hip": 130 put it far out past the forearm, 60 went through the hip; 95 hangs it
 // outside the hip and behind the forearm)
-static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), 95.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; 95 (owner 2026-11-15) hangs the string between his forearm and hip)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBowRestRoll(TEXT("jeeb.Knight.BowRestRoll"), -85.f, TEXT("Degrees the resting bow turns in his left fist about his forward axis (counterclockwise seen from behind; -85 turns the string side to his body, owner 2026-11-15: string between his forearm and hip)."), ECVF_Default);
+// (owner 2026-11-15: "the string to be in between the knight's forearm and hip": turned the other way (-85) so the string faces his body, and 14 cm out from it)
+static TAutoConsoleVariable<float> CVarBowRestOut(TEXT("jeeb.Knight.BowRestOut"), 14.f, TEXT("cm the resting bow sits outward (to his left, away from his body) in his left fist."), ECVF_Default);
 // (owner 2026-11-15: "move the location of the quiver so that it's the same height, but sits on the right side of the right thigh, not behind him on his butt": same height,
 // beside the thigh's outer face (X 0, Y 28), turned 90 degrees so its broad side lies against the thigh)
-static const TCHAR* const QuiverDefault = TEXT("0_28_-29_-5_90_4");
+// (owner 2026-11-15: "Yellow is where the quiver currently is, and red is where I want it to be": higher, top at the belt by his hanging gauntlet, slanting top forward / bottom back, ending mid-thigh clear of the knee: Z -11, roll -42)
+static const TCHAR* const QuiverDefault = TEXT("3_28_-11_-5_90_-42");
 static const TCHAR* const FlaskDefault = TEXT("-16.5_-16.5_14_13_0_172_0.8");
 static TAutoConsoleVariable<FString> CVarQuiver(TEXT("jeeb.Knight.Quiver"), QuiverDefault, TEXT("The quiver on his right hip: X_Y_Z_Pitch_Yaw_Roll (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarFlask(TEXT("jeeb.Knight.Flask"), FlaskDefault, TEXT("The flask on his belt, back left: X_Y_Z_Pitch_Yaw_Roll_Scale (cm, degrees; X ahead, Y right, Z up)."), ECVF_Default);
@@ -2278,7 +2281,8 @@ FTransform FKnightAnimator::BeltFlaskWorld() const
 FTransform FKnightAnimator::BowWorld(float AimAlpha) const
 {
 	const float Roll = CVarBowRestRoll.GetValueOnGameThread();
-	const FTransform Rest = Roll == 0.f ? L.BowAtRest : FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(Roll)) * L.BowRestBase.GetRotation(), L.BowRestBase.GetLocation()) * L.BowRestHandInv;
+	const float Out = CVarBowRestOut.GetValueOnGameThread();
+	const FTransform Rest = (Roll == 0.f && Out == 0.f) ? L.BowAtRest : FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(Roll)) * L.BowRestBase.GetRotation(), L.BowRestBase.GetLocation() + FVector(0.f, -Out, 0.f)) * L.BowRestHandInv;
 	FTransform Hold;
 	Hold.Blend(Rest, L.BowAtAim, AimAlpha);
 	return Hold * BoneWorld(LHand);
