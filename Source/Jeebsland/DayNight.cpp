@@ -52,8 +52,8 @@ namespace JeebLook
 	// (2026-11-15, owner: "a slider for me to move the sun in the sky"; the LOOK tab's SKY + HAZE group. This machine's view only.)
 	static TAutoConsoleVariable<float> SunPhase(TEXT("jeeb.Sun.Phase"), -1.f, TEXT("Holds the sun at a point of its daily loop: 0 noon (high), 0.25 afternoon, 0.5 the golden low point, 0.75 morning; negative: the clock moves it"));
 	// (2026-11-15, owner: the silver armour "much too flat/grey ... reflective like a mirror": the sun's own shine is off for the whole world, so plate had no highlight at all)
-	static TAutoConsoleVariable<float> SkyGround(TEXT("jeeb.Sky.Ground"), 0.5f, TEXT("The sky light's colour from below the horizon, a meadow green-brown at this strength (0: the sky atmosphere's own, nearly black, as before 2026-11-15): what polished armour mirrors facing down"));
-	static TAutoConsoleVariable<float> ArmourGlint(TEXT("jeeb.Armour.Glint"), 1.f, TEXT("The sun's glint on the knights' plate armour (shine only, lighting channel 1): 0 none, 1 as bright as the sun"));
+	static TAutoConsoleVariable<float> SkyGround(TEXT("jeeb.Sky.Ground"), 0.f, TEXT("The sky light's colour from below the horizon, a meadow green-brown at this strength (0: the sky atmosphere's own, nearly black, as before 2026-11-15): what polished armour mirrors facing down"));
+	static TAutoConsoleVariable<float> ArmourGlint(TEXT("jeeb.Armour.Glint"), 0.f, TEXT("The sun's glint on the knights' plate armour (shine only, lighting channel 1): 0 none, 1 as bright as the sun"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
 	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
