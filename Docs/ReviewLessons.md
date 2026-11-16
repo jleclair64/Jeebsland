@@ -202,6 +202,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 ## Code pitfalls
 - `FMath::SmoothStep(A, B, X)` needs A < B; use `JeebWorld::Smooth` for ramps that go down.
 - Don't call `GetGravityZ` in a constructor (use 980 x GravityScale).
+- LESSON: never read a function's out-parameter in the same expression that calls it (`RiverDistance(X, Y, Half) < Half + 250`): C++ doesn't fix the order, MSVC read `Half` before the call set it, and the rivers stopped counting as water (no swimming, 2026-11-15). Call first, compare on the next line (`JeebWorld::NearRiver`).
+- LESSON: when ground is shaped in stages (world, hills, pads), check the finished height, not one stage: capping only the hills left the pads' 3 m fade by the river as a 52 degree step (2026-11-15).
 - PowerShell: matching text in CRLF files needs `` `r`n ``, and short function names can clash with aliases (R, Rp); prefer the Edit tool for multi-line changes.
 
 - Text on any browse board (titles, headers, row labels) needs its own clear strip outside the item area and must be legible from where the player first sees it; check from the start spot as well as close up.
