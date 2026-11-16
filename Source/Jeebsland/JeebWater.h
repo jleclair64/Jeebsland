@@ -8,14 +8,27 @@
 // collision (WorldTerrain.cpp, Pond.cpp), so swimming, wading and drowning come only from here, never from the drawn water.
 //   - the pond in the original square: within PondWaterR of its middle, at PondWaterZ (its bowl is about 2 m deep in the middle)
 //   - the rivers: within the drawn ribbon (half width + 250 cm) of each river's line, at RiverLevel
-//   - the sea: east of the coast, at SeaLevel
-// (The castle moat is left out: about 1.2 m deep, never deep enough to swim.)
+//   - the sea: the exact sheet WorldTerrain.cpp draws (SeaSheet*: from 30 m west of the westmost coast, out past the world), at SeaLevel
+//   - the castle moat (2026-11-15, was missing: it is about 1.2 m deep): the ring Castle.cpp draws, at the castle level - MoatSurfaceDrop
 namespace JeebWater
 {
+	// The castle moat's drawn ring (Castle.cpp: Zw = -47 from the castle's level, between these two radii from CastlePos)
+	constexpr float MoatSurfaceDrop = 47.f;
+	inline float MoatInner() { return JeebTerrain::CastleMoatIn - 160.f; }
+	inline float MoatOuter() { return JeebTerrain::CastleMoatOut + 50.f; }
+	inline float MoatZ() { static const float Z = JeebTerrain::CastleLevel() - MoatSurfaceDrop; return Z; }
+
+	// The ocean sheet as WorldTerrain.cpp BuildWater draws it: a rectangle, its west edge 30 m west of the westmost point of the coast
+	inline float SeaWestEdge()
+	{
+		static const float Y = []() { float W = 1.0e9f; for (float X = JeebWorld::MinX; X <= JeebWorld::MaxX; X += 2000.f) W = FMath::Min(W, JeebWorld::CoastY(X)); return W - 3000.f; }();
+		return Y;
+	}
+
 	// No body of water is higher than this: anything standing above it needs no lookup (most players on land pay one compare)
 	inline float TopLevel()
 	{
-		static const float Top = FMath::Max(JeebTerrain::PondWaterZ(), JeebWorld::RiverLevel) + 1.f;
+		static const float Top = FMath::Max3(JeebTerrain::PondWaterZ(), JeebWorld::RiverLevel, MoatZ()) + 1.f;
 		return Top;
 	}
 
@@ -26,7 +39,9 @@ namespace JeebWater
 		if (FVector2D::DistSquared(FVector2D(X, Y), JeebTerrain::PondCenter()) < FMath::Square(JeebTerrain::PondWaterR)) { OutZ = JeebTerrain::PondWaterZ(); return true; }
 		float Half;
 		if (RiverDistance(X, Y, Half) < Half + 250.f) { OutZ = RiverLevel; return true; }
-		if (Y - CoastY(X) > -3500.f) { OutZ = SeaLevel; return true; }
+		const float Dc = FVector2D::Distance(FVector2D(X, Y), JeebTerrain::CastlePos());
+		if (Dc > MoatInner() && Dc < MoatOuter()) { OutZ = MoatZ(); return true; }
+		if (Y > SeaWestEdge()) { OutZ = SeaLevel; return true; }   // (the drawn sheet; land stands above it, so land stays dry)
 		return false;
 	}
 

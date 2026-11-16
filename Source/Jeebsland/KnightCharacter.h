@@ -95,9 +95,8 @@ public:
 	// On a horse, steering is like a car: W goes forward along the horse, A and D turn it (it cannot slide sideways), S only brakes.
 	virtual void DoMove(float Right, float Forward) override;
 	virtual void Jump() override; // also stands you up from a bench, and ends a slide
-	virtual void StopJumping() override;                     // the short hop (KnightCharacterMovement.cpp): keeps the hold time
-	virtual void CheckJumpInput(float DeltaTime) override;   // ...leaves at the hop's speed, pushes up to the full jump if still held
-	virtual void ClearJumpInput(float DeltaTime) override;
+	virtual void StopJumping() override;                     // (the engine's jump; ours only clears bWantsRise)
+	virtual void CheckJumpInput(float DeltaTime) override;   // (offers a new press to climb, water and mantle first)
 	// Online: what the knight stands on is never used as its "movement base" unless it is a shared (replicated) actor. The
 	// ground, Blackrock, the towers and forts are built separately on every machine, so the server can't name them to the
 	// player's machine: a correction that names one is thrown away there, and the two copies of the knight drift apart
@@ -419,13 +418,8 @@ protected:
 	void StartBlock();          // right click (hold)
 	void StopBlock();
 	void StartSlide();          // C while sprinting
-	void StartRoll();           // V or Alt
-	void DodgeLeft() { TapKey(0); }     // A, D, W and S each tapped twice in a row (nothing else pressed between): a roll that way
-	void DodgeRight() { TapKey(1); }
-	void DodgeFwd() { TapKey(2); }
-	void DodgeBack() { TapKey(3); }
-	void TapKey(int32 Key);   // 0 A, 1 D, 2 W, 3 S
-	int32 LastTapKey = -1; double LastTapTime = -10.0;
+	void StartRoll();           // (wheel down: ScrollDown / RollWheel)
+	void RollWheel(float Fwd, float Right);   // wheel down: the roll, the way W/A/S/D point (relative to the camera); none held: straight ahead
 	FVector PendingRollDir = FVector::ZeroVector;
 	void OnInteractKey();       // E: sit, trade, talk, mount, open doors ...
 	void UseDoor(ACottage* Hut);   // open, close, or try to pick the lock
@@ -444,7 +438,8 @@ protected:
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
 	void ScrollUp() { StartKick(); }   // (the wheel up kicks)
-	void ScrollDown() { StartSweep(); }   // (the wheel down sweeps low)
+	void ScrollDown();   // (the wheel down rolls, 2026-11-15, owner; the low sweep, StartSweep, is shelved: no longer bound)
+	bool bTestWheelRoll = false;   // test pictures: let the wheel roll run under -JeebShot
 	void NextWeapon() { CycleHotbar(1); }   // R: the next weapon on the bar, left to right (round to the first again)
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
@@ -470,12 +465,7 @@ private:
 	UPROPERTY() UInputAction* CrouchAction = nullptr;
 	UPROPERTY() UInputAction* BlockAction = nullptr;
 	UPROPERTY() UInputAction* SlideAction = nullptr;
-	UPROPERTY() UInputAction* RollAction = nullptr;
 	UPROPERTY() UInputAction* StrafeAction = nullptr;   // mouse wheel click (or X): strafe mode on/off
-	UPROPERTY() UInputAction* DodgeLAction = nullptr;
-	UPROPERTY() UInputAction* DodgeRAction = nullptr;
-	UPROPERTY() UInputAction* DodgeFAction = nullptr;
-	UPROPERTY() UInputAction* DodgeBAction = nullptr;
 	UPROPERTY() UInputAction* SitAction = nullptr;
 	UPROPERTY() UInputAction* InventoryAction = nullptr;
 	UPROPERTY() UInputAction* CallHorseAction = nullptr;
@@ -533,8 +523,6 @@ private:
 
 	// The steps of Tick, in order (see AKnightCharacter::Tick for which file each lives in)
 	void TickHousekeeping();
-	void ApplyTuning();          // (Tuning.ini numbers the engine keeps itself: the jump; again on each reload)
-	int32 TunedVersion = -1;
 	void TickGatherReach();
 	void TickGatherWalk(float Dt);
 	FVector GatherSpot = FVector::ZeroVector;   // where he stands so that the tool's blow lands on the node
@@ -717,8 +705,6 @@ private:
 	float ShotSweepAt = -1.f;      // test pictures (kicksweep): the low sweep at this time
 	float ShotJumpFrom = -1.0e9f;  // test pictures (jump, hop): his height at take-off
 	float ShotJumpT = 0.f;         // ...and when Space went down
-	float HopSpeed = 0.f, FullJumpSpeed = 0.f;   // take-off speeds of the short hop and the full jump (ApplyTuning)
-	bool bReleaseAfterMove = false;              // a tap shorter than one frame: let go once a move has carried the press
 	float ShotBowAt = -1.f;        // test pictures (bow60): let the string go at this time
 	float ShotStrafe = 0.f;        // test pictures (-ShotStrafe=1): walk sideways to his right (-1 left) while shooting
 	bool bShotWalk = false;        // test pictures (-ShotMove=bowwalk): walk straight ahead with the bow in hand

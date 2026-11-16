@@ -156,10 +156,23 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		FParse::Value(FCommandLine::Get(), TEXT("ShotKindTier="), ShotKindTier);
 		if (FParse::Value(FCommandLine::Get(), TEXT("ShotKind="), ShotKind)) { Skills->Hotbar[0] = JeebItems::GearId(ShotKind, FMath::Clamp(ShotKindTier, 0, JeebItems::NumTiers - 1)); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast(); }   // (and the armour redrawn: a two-handed weapon puts the shield away)
 	}
+	if (Move == TEXT("wheelroll"))   // the wheel-down roll with keys held: -ShotRollKeys=<fwd>,<right> (1,0 W; 0,1 D; none = 0,0). Log JEEBROLL gives where he went, in his start frame
+	{
+		FString Keys; float KF = 0.f, KR = 0.f;
+		if (FParse::Value(FCommandLine::Get(), TEXT("ShotRollKeys="), Keys, false)) { FString A, B; if (Keys.Split(TEXT(","), &A, &B)) { KF = FCString::Atof(*A); KR = FCString::Atof(*B); } }
+		bTestWheelRoll = true;
+		const FVector P0 = GetActorLocation(); const FRotator Y0 = FRotator(0.f, GetController() ? GetController()->GetControlRotation().Yaw : 0.f, 0.f); const FRotator A0 = FRotator(0.f, GetActorRotation().Yaw, 0.f);
+		RollWheel(KF, KR);
+		FTimerHandle T;
+		GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this, P0, Y0, A0, KF, KR]() {
+			const FVector D = GetActorLocation() - P0;
+			UE_LOG(LogTemp, Log, TEXT("JEEBROLL keys fwd %.0f right %.0f rolling %d moved: camera-forward %.0f camera-right %.0f; knight-forward %.0f knight-right %.0f"), KF, KR, bRolling ? 1 : 0, FVector::DotProduct(D, Y0.Vector()), FVector::DotProduct(D, FRotationMatrix(Y0).GetUnitAxis(EAxis::Y)), FVector::DotProduct(D, A0.Vector()), FVector::DotProduct(D, FRotationMatrix(A0).GetUnitAxis(EAxis::Y)));
+		}), 0.9f, false);
+	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("kick")) StartAttack(EAtkStyle::Kick, 1, 0.f);                             // the kick (wheel up)
-	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down)
+	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down: shelved 2026-11-15, owner; the wheel rolls now)
 	if (Move == TEXT("dash")) StartAttack(EAtkStyle::Dash, 1, 0.f);                              // the dash attack (sprint + click): the lunge
 	if (Move == TEXT("kickcombo")) { StartAttack(EAtkStyle::Kick, 1, 0.f); QueuedSweep = GetWorld()->GetTimeSeconds() + 0.1f; }   // a kick with the wheel-down buffered: the sweep cuts in when it lands
 	int32 TestBow = JeebItems::K_Bow;   // (-ShotBowKind=21 longbow, 22 crossbow)
@@ -848,7 +861,7 @@ void AKnightCharacter::StartKick()
 	StartAttack(EAtkStyle::Kick, 1, 0.f);
 }
 
-// The low sweep (wheel down): sword only. It can cut short a kick that has landed (the combo); pressed earlier in the kick, it
+// The low sweep (SHELVED 2026-11-15, owner: the wheel down rolls now, nothing calls this but the sweep test and the kick combo buffer; keep it for later): sword only. It can cut short a kick that has landed (the combo); pressed earlier in the kick, it
 // waits and comes out the moment the kick lands
 void AKnightCharacter::StartSweep()
 {
