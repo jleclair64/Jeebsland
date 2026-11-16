@@ -172,7 +172,11 @@ void JeebFill::LoadData(FData& D)
 				const FString Cu = C.S(r, cCull).ToLower();
 				K.Cull = Cu.StartsWith(TEXT("t")) ? ECull::Tiny : Cu.StartsWith(TEXT("s")) ? ECull::Small : Cu.StartsWith(TEXT("m")) ? ECull::Medium : Cu.StartsWith(TEXT("la")) ? ECull::Large : Cu.StartsWith(TEXT("lan")) || Cu.StartsWith(TEXT("lm")) ? ECull::Landmark : ECull::Medium;
 				if (Cu.StartsWith(TEXT("land"))) K.Cull = ECull::Landmark;
-				K.Slope = C.F(r, cSl, 12.f);
+				{
+					// (no Slope given: 20 degrees, or 30 for the soft and natural kinds; Oak Hill's ground runs 12-20 degrees in many places, the oak's lawn 13)
+					const bool bNatural = K.Name.StartsWith(TEXT("Bush")) || K.Name.StartsWith(TEXT("Shrub")) || K.Name.StartsWith(TEXT("Plant")) || K.Name.StartsWith(TEXT("Flower")) || K.Name.StartsWith(TEXT("Rock")) || K.Name.StartsWith(TEXT("Boulder")) || K.Name.StartsWith(TEXT("Log")) || K.Name.StartsWith(TEXT("Stump"));
+					K.Slope = C.F(r, cSl, bNatural ? 30.f : 20.f);
+				}
 				TArray<FString> Fl; C.S(r, cFl).ParseIntoArray(Fl, TEXT("|"));
 				for (FString F : Fl)
 				{
@@ -1025,7 +1029,7 @@ struct FFillBuilder
 		const bool bSoft = Name.StartsWith(TEXT("Bush")) || Name.StartsWith(TEXT("Shrub")) || Name.StartsWith(TEXT("Plant")) || Name.StartsWith(TEXT("Banner")) && !Name.Contains(TEXT("Pole")) && !Name.Contains(TEXT("Post"));
 		K.Col = (bSoft || K.Height < 40.f || K.FootX * K.FootY < 1500.f) ? ECol::None : ECol::Box;
 		K.Shadow = Big > 150.f ? EShadow::Yes : Big > 60.f ? EShadow::Near : EShadow::No;
-		K.Slope = (Name.StartsWith(TEXT("Rock")) || Name.StartsWith(TEXT("Boulder")) || Name.StartsWith(TEXT("Log"))) ? 30.f : 12.f;
+		K.Slope = (Name.StartsWith(TEXT("Rock")) || Name.StartsWith(TEXT("Boulder")) || Name.StartsWith(TEXT("Log")) || bSoft || Name.StartsWith(TEXT("Stump")) || Name.StartsWith(TEXT("Flower"))) ? 30.f : 20.f;
 		K.bLight = Name.Contains(TEXT("LampPost")) || Name.Contains(TEXT("Lantern")) || Name.Contains(TEXT("CandleCage")) || Name == TEXT("WellVillage");
 		K.bFromCsv = false;
 		UE_LOG(LogTemp, Warning, TEXT("JEEBFILL NODATA %s: not in FillKinds.csv, sized from its mesh %.0f x %.0f x %.0f cm (test only)"), *Name, K.FootX, K.FootY, K.Height);
@@ -1080,9 +1084,12 @@ struct FFillBuilder
 		if (F.Type == 0) { Pts[1] = F.World(FVector2D(F.H.X, F.H.Y)); Pts[2] = F.World(FVector2D(-F.H.X, F.H.Y)); Pts[3] = F.World(FVector2D(F.H.X, -F.H.Y)); Pts[4] = F.World(FVector2D(-F.H.X, -F.H.Y)); }
 		else { Pts[1] = F.C + FVector2D(F.R, 0.f); Pts[2] = F.C - FVector2D(F.R, 0.f); Pts[3] = F.C + FVector2D(0.f, F.R); Pts[4] = F.C - FVector2D(0.f, F.R); }
 		float Lo = 1.0e9f, Hi = -1.0e9f;
-		for (const FVector2D& P : Pts) { const float Z = JeebTerrain::HeightAt(P.X, P.Y); Lo = FMath::Min(Lo, Z); Hi = FMath::Max(Hi, Z); }
-		const float Span = FMath::Max(F.Type == 0 ? 2.f * FMath::Min(F.H.X, F.H.Y) : 2.f * F.R, 20.f);
-		OutSlopeDeg = FMath::RadiansToDegrees(FMath::Atan2(Hi - Lo, Span));
+		float Zs[5]; int32 n = 0;
+		for (const FVector2D& P : Pts) { const float Z = JeebTerrain::HeightAt(P.X, P.Y); Zs[n++] = Z; Lo = FMath::Min(Lo, Z); Hi = FMath::Max(Hi, Z); }
+		// (the steepest rise between any two of the five spots: the ground's own slope, whichever way the piece is turned)
+		float Grad = 0.f;
+		for (int32 a = 0; a < 5; ++a) for (int32 b = a + 1; b < 5; ++b) { const float Dd = FVector2D::Distance(Pts[a], Pts[b]); if (Dd > 10.f) Grad = FMath::Max(Grad, FMath::Abs(Zs[a] - Zs[b]) / Dd); }
+		OutSlopeDeg = FMath::RadiansToDegrees(FMath::Atan(Grad));
 		return Lo;
 	}
 
@@ -1129,7 +1136,7 @@ struct FFillBuilder
 				{
 					St.Skipped.FindOrAdd(WhyName(W))++;
 					if (bAll && !P.bDrop) { if (OutWhy) *OutWhy = FString::Printf(TEXT("%s: %s"), *KName, WhyName(W)); return 0; }
-					if (OutWhy) *OutWhy += FString::Printf(TEXT("%s%s: %s"), OutWhy->IsEmpty() ? TEXT("") : TEXT(", "), *KName, WhyName(W));
+					if (OutWhy) *OutWhy += FString::Printf(TEXT("%s%s: %s"), OutWhy->IsEmpty() ? TEXT("") : TEXT(", "), *KName, W == EWhy::Slope ? *FString::Printf(TEXT("slope %.0f>%.0f"), Slope, K->Slope) : WhyName(W));
 					continue;
 				}
 			}
@@ -1165,8 +1172,32 @@ struct FFillBuilder
 		St.Kinds.Add(T.Kind->Name);
 	}
 
-	// The way a set's front (+Y) turns: toward the nearest road, or away from the nearest wall (onto which it is moved, 30 cm off it)
-	bool Facing(EFacing F, FVector2D& At, float& Yaw)
+	// How far a set's ground pieces reach behind its origin (its -Y), cm: a wall-facing set is moved out by this so its back clears the wall
+	TMap<FString, float> BackCache;
+	float SetBack(const FString& SetName)
+	{
+		if (const float* Got = BackCache.Find(SetName)) return *Got;
+		float Back = 0.f;
+		auto Reach = [&](const FString& KName, const FPiece& P)
+		{
+			if (const FKind* K = KindOf(KName)) Back = FMath::Max(Back, -P.Pos.Y + 0.5f * FMath::Max(K->FootX, K->FootY) * P.Scale);
+		};
+		if (const FSet* S = D.Sets.Find(SetName))
+		{
+			for (const FPiece& P : S->Pieces)
+			{
+				if (P.bStack || P.bHang) continue;
+				Reach(P.Kind, P);
+				for (const FString& A : P.Alts) Reach(A, P);
+			}
+		}
+		else Reach(KindName(SetName), FPiece());
+		BackCache.Add(SetName, Back);
+		return Back;
+	}
+
+	// The way a set's front (+Y) turns: toward the nearest road, or away from the nearest wall (onto which it is moved, its back 35 cm off it)
+	bool Facing(EFacing F, FVector2D& At, float& Yaw, float Back = 0.f)   // (Back: how far the set reaches behind its origin, cm)
 	{
 		auto YawFor = [](const FVector2D& Dir) { return FMath::RadiansToDegrees(FMath::Atan2(-Dir.X, Dir.Y)); };   // (R(yaw) * (0,1) = Dir)
 		if (F == EFacing::Road)
@@ -1216,7 +1247,7 @@ struct FFillBuilder
 				}
 			}
 			if (Best >= 800.f) return false;
-			At = BestPt + BestOut * 30.f;
+			At = BestPt + BestOut * (35.f + Back);   // (its back 35 cm off the wall: clear of the 30 cm rule margin)
 			Yaw = YawFor(BestOut);
 			return true;
 		}
@@ -1312,7 +1343,7 @@ struct FFillBuilder
 							if (SetName.IsEmpty()) SetName = Zr->Mix.Last().Key;
 						}
 						float Yaw = Ro.Yaw * 360.f;
-						if (!Facing(Zr->Facing, At, Yaw)) { St.Skipped.FindOrAdd(TEXT("nowall"))++; continue; }
+						if (!Facing(Zr->Facing, At, Yaw, SetBack(SetName))) { St.Skipped.FindOrAdd(TEXT("nowall"))++; continue; }
 						if (PlaceSet(SetName, At, Yaw, Ro.Var, true, true, Z, St) > 0) ++GotSets;
 						else St.Skipped.FindOrAdd(TEXT("set"))++;
 					}

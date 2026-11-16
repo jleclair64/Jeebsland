@@ -10,7 +10,8 @@
 // plain commas. Metres and degrees unless a header says cm.
 //  FillKinds.csv  (fillassets) Kind, Mesh, Shape (box|circle), FootX, FootY (the footprint along the kind's own X and Y at foot height;
 //                 a circle's FootX is its diameter), FootCX, FootCY (the footprint's middle from the pivot), Height, Collision
-//                 (none|box|capsule|mesh), Shadow (yes|near|no), Cull (tiny|small|medium|large|landmark), Slope (max degrees), Flags
+//                 (none|box|capsule|mesh), Shadow (yes|near|no), Cull (tiny|small|medium|large|landmark), Slope (max degrees; empty:
+//                 20, or 30 for bushes, plants, flowers, rocks, logs and stumps), Flags
 //                 (light|hang|flame=<Kind>). Every kind's front is its local +Y.
 //  FillSets.csv   (filllayout) Set, Kind, X, Y, Z, Yaw, Scale, Flags (drop|alt=A/B|turn=N|stack|hang): one row per piece, set-local metres.
 //  FillOakHill.csv(filllayout) Set, E, N, Yaw, Seed, Var, Plot, Note: one placed set (or a single Kind) per row, metres from the plaza.
@@ -33,7 +34,7 @@ namespace JeebFill
 		ECol Col = ECol::None;
 		EShadow Shadow = EShadow::Near;
 		ECull Cull = ECull::Small;
-		float Slope = 12.f;
+		float Slope = 20.f;
 		bool bLight = false, bHang = false;
 		bool bFromCsv = false;   // false: guessed from the mesh's bounds (test only: machines may differ)
 	};
