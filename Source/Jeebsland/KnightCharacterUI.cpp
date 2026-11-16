@@ -233,10 +233,15 @@ void AKnightCharacter::ApplyGraphics()
 	// cheap FXAA edge smoothing instead of TSR, and simpler post-processing (no ambient occlusion)
 	Set(TEXT("r.VolumetricCloud"), bLowest ? 0 : 1);
 	Set(TEXT("r.Shadow.Virtual.Enable"), 0);   // standard shadow maps on both levels (virtual ones overloaded in the pine woods)
-	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);
+	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
 	// Soft shadows that blur with distance from the caster (the sun's size sets how much): high branches leave soft dapples
 	// on the ground instead of a sharp dark web
-	Set(TEXT("r.Shadow.FilterMethod"), 1);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
+	Set(TEXT("r.Shadow.FilterMethod"), 1);
+	// (2026-11-15, owner: "glitchy looking shadows near my feet") The soft shadows search round each pixel for what casts them with
+	// a per-pixel scatter of samples that only the anti-aliasing's history smooths; wherever a shadow moves (the knight's own, swaying
+	// grass) that history is thrown away and the scatter showed as a speckled dither. The engine's search reached 40 shadow-map texels
+	// (most of a metre): 12 on HIGH (and 6 on LOW, whose single cascade has coarser texels) keeps branch shadows soft and the speckle gone.
+	Set(TEXT("r.Shadow.MaxSoftKernelSize"), bLowest ? 6 : 12);
 	// Speed pass (2026-10-29, owner wants high frame rates): plain temporal smoothing (TAA) on both levels instead of TSR
 	// (about 2 ms less on the graphics card), cheaper post-processing, cached sun shadows with fewer cascades and a shorter reach
 	// (2026-11-01, owner wanted a sharper knight: HIGH uses TSR again, which rebuilds fine detail from the 60% render far

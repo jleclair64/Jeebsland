@@ -771,6 +771,16 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			const bool bLab = GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
 			if (APawn* P = PC ? PC->GetPawn() : nullptr) P->SetActorLocation(FVector(AtX, AtY, (bLab ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(AtX, AtY)) + 100.f));
 		}
+		// (-ShotCmds=a~1;b~2: console commands at 3 s, after the graphics settings are applied ('~' a space, ';' between), so a film
+		// can be taken with one setting changed; shadow check 2026-11-15)
+		static bool bShotCmdsDone = false;
+		FString ShotCmds;
+		if (!bShotCmdsDone && ShotClock > 3.f && FParse::Value(FCommandLine::Get(), TEXT("ShotCmds="), ShotCmds, false))
+		{
+			bShotCmdsDone = true;
+			TArray<FString> Cmds; ShotCmds.Replace(TEXT("~"), TEXT(" ")).ParseIntoArray(Cmds, TEXT(";"));
+			for (const FString& C : Cmds) { GEngine->Exec(GetWorld(), *C); UE_LOG(LogTemp, Display, TEXT("JEEBSHOTCMD %s"), *C); }
+		}
 		// (-ShotEye=X_Y_Z: a free camera there, looking along -ShotYaw / -ShotPitch, for pictures from the air: Oak Hill, 2026-11-11)
 		static bool bShotEyeDone = false;
 		FString ShotEye;
@@ -930,6 +940,13 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					if (P.Num() >= 8)
 						if (IConsoleVariable* Pack = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Grass.Pack")))
 							Pack->Set(FCString::Atoi(*P[7]), ECVF_SetByConsole);
+					// (9th, shadow check 2026-11-15: console commands for this eye, ';' between commands and '~' for a space, e.g.
+					// r.Shadow.FilterMethod~0;r.ScreenPercentage~100; they stay set for later eyes, so each eye names every toggle it relies on)
+					if (P.Num() >= 9)
+					{
+						TArray<FString> Cmds; P[8].Replace(TEXT("~"), TEXT(" ")).ParseIntoArray(Cmds, TEXT(";"));
+						for (const FString& Cmd : Cmds) { GEngine->Exec(GetWorld(), *Cmd); UE_LOG(LogTemp, Display, TEXT("JEEBEYECMD %d %s"), EyeIdx, *Cmd); }
+					}
 					JeebFoliageMask(GetWorld(), P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0);
 					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
