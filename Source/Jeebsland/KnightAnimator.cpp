@@ -676,10 +676,27 @@ void FKnightAnimator::ToolHeadClear(FPose& P, const FInput& In) const
 
 static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behind the right fist's grip point the left fist's goes, along the grip)
 
+// Polished plate (owner 2026-11-15: "very shiny, reflective like a mirror"): live in Play through jeeb.Armour.Rough (the plate's roughness; the tier's own
+// polish from Tiers.csv is overridden) and jeeb.Armour.Shine (brightness of the steel's base colour, 1 = as before; the metal itself is full metal).
+static TAutoConsoleVariable<float> CVarArmourRough(TEXT("jeeb.Armour.Rough"), 0.12f, TEXT("Roughness of metal plate armour (0 mirror, 0.3 satin); -1 uses the tier's own from Tiers.csv."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 1.6f, TEXT("Brightness of metal plate armour's base colour (1 = the old grey, 2 = bright silver)."), ECVF_Default);
+
+static void ApplyPlateLook(UMaterialInstanceDynamic* M, int32 Tier)
+{
+	const bool bMetal = JeebItems::TierIsMetal(Tier);
+	const float R = CVarArmourRough.GetValueOnGameThread(), S = CVarArmourShine.GetValueOnGameThread();
+	M->SetScalarParameterValue(TEXT("MetalScale"), bMetal ? 1.f : JeebItems::TierMetal(Tier) * 0.75f);
+	M->SetScalarParameterValue(TEXT("TierRough"), (bMetal && R >= 0.f) ? R : JeebItems::TierRough(Tier));
+	M->SetScalarParameterValue(TEXT("RoughMix"), bMetal ? 0.95f : 0.85f);
+	M->SetScalarParameterValue(TEXT("Desat"), 1.f);
+	M->SetScalarParameterValue(TEXT("DesatGain"), bMetal ? 2.3f * S : 2.3f);
+}
+
 void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, float ActorYaw)
 {
 	if (!L.bReady) return;
 	CurFeet = Feet; CurYaw = ActorYaw;   // (the climb's scripted moves measure the capsule's travel)
+	for (int32 p = 0; p < JeebAnim::Piece_Count; ++p) if (WornTiers[p] >= 0 && PieceMid[p]) ApplyPlateLook(PieceMid[p], WornTiers[p]);   // (live tuning; a MID ignores an unchanged value)
 	Time += Dt;
 	Locomotion(Dt, In, Base);
 	Overlays(Dt, In, Base);
@@ -1933,7 +1950,8 @@ void FClipLib::SolveGear()
 		if (RestC) Sample(*RestC, 0.f, P, false);
 		{
 			const FTransform Hand = BindInGame(P, LHand);
-			BowAtRest = FTransform(KnightBowRestQuat(), Hand.TransformPosition(GripInLeftHand(LeftGrip))) * Hand.Inverse();   // (in the closed fist's hole, 2026-11-11)
+			float RestRollDeg = 0.f; if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("BowRestRoll="), RestRollDeg);   /* (test pictures: -BowRestRoll=<deg> turns the resting bow about his forward axis, in the hand) */
+			BowAtRest = FTransform(FQuat(FVector::ForwardVector, FMath::DegreesToRadians(RestRollDeg)) * KnightBowRestQuat(), Hand.TransformPosition(GripInLeftHand(LeftGrip))) * Hand.Inverse();   // (in the closed fist's hole, 2026-11-11)
 		}
 		const FClip* AimC = Find(TEXT("AimIdle"));
 		if (AimC) Sample(*AimC, AimC->Len * 0.5f, P, true);
@@ -1955,7 +1973,11 @@ void FClipLib::SolveGear()
 	{
 		const FTransform Hip = BindInGame(P, Hips);
 		const FVector Old = KnightDesign::PivotPos(KnightDesign::P_Body);
-		QuiverOnHips = FTransform(FRotator(-5.f, 0.f, -6.f), FVector(-22.f, 24.f, -29.f) + Old + FVector(0.f, 0.f, 96.f)) * Hip.Inverse();
+		FVector At(-22.f, 24.f, -29.f); FRotator Rot(-5.f, 0.f, -6.f);   // (test pictures: -QuiverAt=X_Y_Z, -QuiverRot=P_Y_R)
+		FString S; TArray<FString> Pr;
+		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("QuiverAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
+		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("QuiverRot="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) Rot = FRotator(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
+		QuiverOnHips = FTransform(Rot, At + Old + FVector(0.f, 0.f, 96.f)) * Hip.Inverse();
 	}
 	// The flask on his belt: the other side from the quiver, its neck tucked behind the belt (the model's cork is along -Z)
 	{
@@ -1964,7 +1986,10 @@ void FClipLib::SolveGear()
 		FVector At(-16.5f, -16.5f, 14.f);   // (owner 2026-11-06: same height and spot on the belt, but touching it; it hung 5 cm clear of his back. 2026-11-13: it sank into the armour, out 3.5 cm along back-left)
 		FString S; TArray<FString> Pr;   // (test pictures: -FlaskAt=X_Y_Z)
 		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) At = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
-		BeltFlaskOnHips = FTransform(FRotator(5.f, 0.f, 186.f).Quaternion(), At + Old + FVector(0.f, 0.f, 96.f), FVector(0.7f)) * Hip.Inverse();
+		FRotator FRot(5.f, 0.f, 186.f); float FScale = 0.8f;   /* (owner 2026-11-15: slightly larger, +15%) */   // (test pictures: -FlaskRot=P_Y_R, -FlaskScale=)
+		if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("FlaskRot="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 3) FRot = FRotator(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2]));
+		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("FlaskScale="), FScale);
+		BeltFlaskOnHips = FTransform(FRot.Quaternion(), At + Old + FVector(0.f, 0.f, 96.f), FVector(FScale)) * Hip.Inverse();
 	}
 	// The crossbow in the right hand: as the rifle lies in the aiming clip, along the line from the right fist to the left
 	if (const FClip* C = Find(TEXT("CrossAim")))
@@ -2066,11 +2091,7 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 		// The tier's colour and shine (Tiers.csv). Meshy painted this steel dark, so it is greyed and lifted before the tint. MetalShare: at Tiers.csv's full metal it mirrors the dark surroundings and looks nearly black.
 		const FLinearColor Steel(0.90f, 0.97f, 1.0f), C = JeebItems::Palette(Tier, 0);
 		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FMath::Min(C.R / Steel.R, 2.f), FMath::Min(C.G / Steel.G, 2.f), FMath::Min(C.B / Steel.B, 2.f), 1.f));
-		M->SetScalarParameterValue(TEXT("MetalScale"), JeebItems::TierMetal(Tier) * 0.75f);
-		M->SetScalarParameterValue(TEXT("TierRough"), JeebItems::TierRough(Tier));
-		M->SetScalarParameterValue(TEXT("RoughMix"), 0.85f);
-		M->SetScalarParameterValue(TEXT("Desat"), 1.f);
-		M->SetScalarParameterValue(TEXT("DesatGain"), 2.3f);
+		ApplyPlateLook(M, Tier);
 	}
 }
 

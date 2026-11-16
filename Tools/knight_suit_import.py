@@ -30,6 +30,10 @@ def pic(name, srgb):
     return t
 
 parent = lib.load_asset("/Game/Knight/M_KnightSkin")
+# the gauntlets carry the FistR / FistL morph targets: without this flag the game draws them in the default material (unpainted)
+parent.set_editor_property("used_with_morph_targets", True)
+unreal.MaterialEditingLibrary.recompile_material(parent)
+lib.save_asset("/Game/Knight/M_KnightSkin")
 flat = lib.load_asset("/Engine/EngineMaterials/FlatNormal")
 mats = {}
 for p in PIECES:
