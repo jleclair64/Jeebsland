@@ -28,8 +28,9 @@ if (-not $ImportOnly) {
     }
     # even window panes: one dark glass by day, one amber when lit (townlab_panes.py, owner 2026-11-15)
     & $blender -b -P (Join-Path $PSScriptRoot 'townlab_panes.py') -- $out @($designs | ForEach-Object { $_[1] }) | Select-String -Pattern 'TLPANES|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
-    # each pane its own flat glass with straight edges, marked in the vertex colour (window_glass.py, owner 2026-11-15): M_TL_Building lights only that
-    & $blender -b -P (Join-Path $PSScriptRoot 'window_glass.py') -- $work $out @($designs | ForEach-Object { $_[0] + ':' + $_[1] }) | Select-String -Pattern 'WGLASS|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+    # the windows rebuilt in the model (window_inserts.py, owner 2026-11-15, third round): each old window cut out and one glass fitted to its
+    # opening built in at the glass's own depth, with real muntin bars; the glass marked in the vertex colour, which M_TL_Building lights
+    & $blender -b -P (Join-Path $PSScriptRoot 'window_inserts.py') -- $work $out @($designs | ForEach-Object { $_[0] + ':' + $_[1] }) | Select-String -Pattern 'WINS (windows|rebuilt|open check|OPEN|left)|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 }
 if ($BakeOnly) { exit 0 }
 $open = Get-CimInstance Win32_Process -Filter "Name like 'UnrealEditor%'" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -and $_.CommandLine.Contains((Join-Path $proj 'Jeebsland.uproject')) }
