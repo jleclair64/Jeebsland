@@ -1,0 +1,36 @@
+# Rule zones for the fill (filllayout 2026-11-15; Docs/FillPlan.md section 2). Zone,On,Density,Mix,Seed,Facing,Trees.
+# Zone names as AWorldFill classifies them (first match wins). On 0/1. Density: sets per 100 m^2 of fillable ground. Mix: Set:Weight,
+# space-separated (sets in FillSets.csv). Seed: the zone's seed. Facing: which way a set's +Y turns (random|road|wall).
+# Trees: tree spots per 100 m^2 (logged as JEEBFILL TREESPOT; Oak Hill's are hand-placed in FillTrees.csv).
+Zone,On,Density,Mix,Seed,Facing,Trees
+# Oak Hill: hand-placed in FillOakHill.csv, so these rule rows stay Off (On 1 would scatter on top of the hand-placed sets).
+OakPlaza,0,0.6,FlowerClump:2 BushClump:1 PlanterPair:1,101,road,0
+OakStreet,0,0.5,BushClump:3 FlowerClump:2 HedgeRun:2 BenchNook:1 HedgeBoxPair:1,102,road,0
+OakGarden,0,1,Allotment:3 AllotmentScarecrow:1 KitchenGarden:1 BenchNookStone:1 CypressPair:1,103,random,0
+OakBoxingRing,0,0.8,TrainingGround:1 RingCorner:2 RingBanner:1 SpectatorBench:1,104,random,0
+OakRuins,0,0.6,Ruin:2 RuinPillar:1 RuinWell:1 RuinSteps:1 RuinRubble:2,105,random,0
+OakGraveyard,0,0.8,GraveyardRow:2 GraveyardBench:1 CypressPair:1 FlowerClump:1,106,random,0
+OakForts,0,0.8,Garrison:2 GarrisonTable:1 GarrisonLion:1,107,random,0
+OakWatchtower,0,0.8,TowerYard:2 GarrisonLion:1,108,random,0
+OakBridge,0,0.5,Dock:2 RiverRest:1,109,road,0
+OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:2 FlowerClump:1,110,wall,0
+OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,road,0.01
+# The original square (owner 2026-11-15: Blackrock and the square's medium places now). Density: sets per 100 m^2 of fillable ground
+# (a set is 3-6 pieces: Blackrock about 3-4 pieces per 100 m^2, the market yard 4-6, the plan's section 2).
+Blackrock,1,0.8,Blackrock:4 BlackrockPalisade:2 StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:1 WashingCorner:1 BushClump:1 BlackrockGate:1,201,wall,0.03
+MarketYard,1,1.1,ShopFront:3 StorageCorner:3 BarrelRow:2 CartCorner:2 SackCorner:2 AmphoraRow:1 VegCorner:1,202,road,0
+Cottage,1,0.35,WoodYard:2 KitchenGarden:2 FlowerClump:1 WashingCorner:1,203,wall,0.1
+HutYards,1,0.6,Blackrock:2 WoodYard:2 SackCorner:1 LogCorner:1 BushClump:1,204,wall,0.03
+PigPen,1,0.8,PenSide:3 SackCorner:1 FenceRun:1,205,wall,0
+Pond,1,0.6,Dock:2 RiverRest:2 BushClump:1,206,random,0.05
+Castle,1,0.55,Garrison:3 GarrisonTable:2 GarrisonBanner:1,207,random,0
+Graveyard,1,0.8,GraveyardRow:2 GraveyardBench:2 CypressPair:1 DoorstepCandles:1 FlowerClump:1,208,random,0.03
+# The world beyond (owner 2026-11-15: no open-world scatter or roadside sets yet). Coded, Off; mixes ready for later.
+Roadside,0,0.15,Junction:1 JunctionArrow:1 FenceRun:2 BushClump:2 Boulders:1 CartCorner:1,301,road,0.01
+RiverBank,0,0.15,RiverRest:3 Boulders:1 BushClump:1,302,random,0.02
+WoodsEdge,0,0.3,ForestFloor:3 BushClump:2 StumpCorner:1,303,random,0
+WoodsFloor,0,0.12,ForestFloor:4 StumpCorner:1,304,random,0
+Grove,0,0.2,Campsite:1 ForestFloor:2,305,random,0
+Open,0,0.03,Boulders:3 FallenTree:2 RockGroup:1 BushClump:2 Hayfield:1 Farmstead:1 Campsite:1,306,random,0.01
+Mountain,0,0.01,RockGroup:1 Boulders:1,307,random,0
+PvP,0,0.04,Boulders:2 FallenTree:2 RockGroup:1,308,random,0
