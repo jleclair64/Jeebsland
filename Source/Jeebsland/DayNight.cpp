@@ -51,6 +51,9 @@ namespace JeebLook
 	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
 	// (2026-11-15, owner: "a slider for me to move the sun in the sky"; the LOOK tab's SKY + HAZE group. This machine's view only.)
 	static TAutoConsoleVariable<float> SunPhase(TEXT("jeeb.Sun.Phase"), -1.f, TEXT("Holds the sun at a point of its daily loop: 0 noon (high), 0.25 afternoon, 0.5 the golden low point, 0.75 morning; negative: the clock moves it"));
+	// (2026-11-15, owner: the silver armour "much too flat/grey ... reflective like a mirror": the sun's own shine is off for the whole world, so plate had no highlight at all)
+	static TAutoConsoleVariable<float> SkyGround(TEXT("jeeb.Sky.Ground"), 0.5f, TEXT("The sky light's colour from below the horizon, a meadow green-brown at this strength (0: the sky atmosphere's own, nearly black, as before 2026-11-15): what polished armour mirrors facing down"));
+	static TAutoConsoleVariable<float> ArmourGlint(TEXT("jeeb.Armour.Glint"), 1.f, TEXT("The sun's glint on the knights' plate armour (shine only, lighting channel 1): 0 none, 1 as bright as the sun"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
 	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
@@ -106,6 +109,7 @@ void ADayNight::BeginPlay()
 		if (UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(It->GetLightComponent()))
 		{
 			L->LightSourceAngle = 4.f;   // a bigger sun disc: shadow edges soften with distance from what casts them (branch shadows blur)
+			L->ForwardShadingPriority = 1;   // (the one for water, glass and fog, ahead of the armour's glint light below)
 			L->MarkRenderStateDirty();
 		}
 		break;
@@ -114,6 +118,8 @@ void ADayNight::BeginPlay()
 	{
 		Sky = *It;
 		bSkyRealTime = It->GetLightComponent()->bRealTimeCapture;
+		bSkyLowerBlack = It->GetLightComponent()->bLowerHemisphereIsBlack;
+		UE_LOG(LogTemp, Log, TEXT("JEEBSKY real-time capture %d, lower hemisphere black %d, source %d"), bSkyRealTime ? 1 : 0, It->GetLightComponent()->bLowerHemisphereIsBlack ? 1 : 0, int32(It->GetLightComponent()->SourceType));
 		break;
 	}
 	for (TActorIterator<AExponentialHeightFog> It(World); It; ++It)
@@ -217,6 +223,31 @@ void ADayNight::Tick(float DeltaSeconds)
 		const FLinearColor Low = FMath::Lerp(Ember, Golden, FMath::SmoothStep(11.f, 20.f, E));   // a little redder right down by the horizon
 		L->SetIntensity(3.5f + 2.7f * High);   // 6.2 at noon: bright, but not glaring
 		L->SetLightColor(FMath::Lerp(Low, Noon, High));
+		// The glint follows the sun exactly; only its shine reaches the plate (DiffuseScale 0), so the armour's look in the shade is unchanged
+		const float G = JeebLook::ArmourGlint.GetValueOnGameThread();
+		if (!Glint && G > 0.f)
+		{
+			Glint = NewObject<UDirectionalLightComponent>(this, TEXT("ArmourGlint"));
+			Glint->SetMobility(EComponentMobility::Movable);
+			Glint->SetupAttachment(GetRootComponent());
+			Glint->SetUsingAbsoluteRotation(true);
+			Glint->SetCastShadows(false);
+			Glint->SetAtmosphereSunLight(false);
+			Glint->bAffectTranslucentLighting = false;
+			Glint->SetVolumetricScatteringIntensity(0.f);
+			Glint->LightSourceAngle = 0.6f;   // (the real sun's size: a small crisp highlight; the world's sun is 4 degrees for soft shadows)
+			Glint->SetDiffuseScale(0.f);
+			Glint->SetLightingChannels(false, true, false);
+			Glint->RegisterComponent();
+		}
+		if (Glint)
+		{
+			Glint->SetVisibility(G > 0.f);
+			Glint->SetWorldRotation(S->GetActorRotation());
+			Glint->SetIntensity(L->Intensity);
+			Glint->SetLightColor(L->GetLightColor());
+			Glint->SetSpecularScale(G);
+		}
 	}
 
 	if (ASkyLight* SL = Sky.Get())
@@ -224,6 +255,18 @@ void ADayNight::Tick(float DeltaSeconds)
 		USkyLightComponent* C = SL->GetLightComponent();
 		C->SetLightColor(FMath::Lerp(FLinearColor(0.66f, 0.66f, 0.86f), FLinearColor(0.88f, 0.88f, 0.96f), High));
 		C->SetIntensity(1.7f + 0.5f * High);   // generous sky light: shade stays soft and readable, never black
+		{   // (2026-11-15) what the sky light gives from below the horizon: black left polished plate mirroring black wherever it faced down
+			// (the map's sky light takes the sky atmosphere's own planet ground below the horizon, nearly black: jeeb.Sky.Ground > 0 puts a meadow colour there instead)
+			const float Gd = FMath::Max(JeebLook::SkyGround.GetValueOnGameThread(), 0.f);
+			if (Gd != SkyGroundNow)
+			{
+				SkyGroundNow = Gd;
+				C->bLowerHemisphereIsBlack = Gd > 0.f ? true : bSkyLowerBlack;
+				C->SetLowerHemisphereColor(FLinearColor(0.11f, 0.13f, 0.07f) * Gd);
+				C->MarkRenderStateDirty();
+				C->RecaptureSky();
+			}
+		}
 		if (!bSkyRealTime)
 		{
 			RecaptureTimer += DeltaSeconds;

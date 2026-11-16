@@ -43,6 +43,9 @@ protected:
 
 private:
 	UPROPERTY() APostProcessVolume* Post = nullptr;
+	// The sun's glint on polished armour (2026-11-15): the world's sun gives no shine (no glare on the grass), so this second sun,
+	// shine only, no shadows, lights only lighting channel 1 (the knight's plate); jeeb.Armour.Glint is its strength
+	UPROPERTY() class UDirectionalLightComponent* Glint = nullptr;
 	TWeakObjectPtr<ADirectionalLight> Sun;
 	TWeakObjectPtr<ASkyLight> Sky;
 	TWeakObjectPtr<AExponentialHeightFog> Fog;
@@ -59,6 +62,8 @@ private:
 	void TickLook(float High);
 	float RecaptureTimer = 0.f;
 	bool bSkyRealTime = false;
+	bool bSkyLowerBlack = false;   // the map's own sky light setting, for jeeb.Sky.Ground 0
+	float SkyGroundNow = -1.f;
 
 	// Sky weather: the cloud layer drifts overhead and its cover wanders between a clear sky, scattered cloud and heavy cloud
 	UPROPERTY() UMaterialInstanceDynamic* CloudMat = nullptr;

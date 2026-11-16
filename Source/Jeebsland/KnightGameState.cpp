@@ -750,6 +750,34 @@ void AKnightGameState::ApplyStore(UWorld* World)
 	for (int32 i = 0; i < W.Num(); ++i) W[i].Stock = GS->StoreLeft[i];
 }
 
+// (test pictures, 2026-11-15: -ShotEyesSet=<eye>:<cvar>=<value>;...: a console variable set as that eye of -ShotEyes starts, to try placements
+// and looks in one run; <eye> '*' is set once at the start, in a film too. wear=<tier> puts on a full suit of that tier. Log JEEBEYESET.)
+static void ShotEyesSet(APlayerController* PC, int32 EyeIdx)
+{
+	static TArray<FString> Sets;
+	static const bool bSets = []() { FString V; if (!FParse::Value(FCommandLine::Get(), TEXT("ShotEyesSet="), V, false)) return false; V.ParseIntoArray(Sets, TEXT(";")); return true; }();
+	(void)bSets;
+	for (const FString& Set : Sets)
+	{
+		FString Eye, Rest, Name, Val;
+		if (!Set.Split(TEXT(":"), &Eye, &Rest) || !Rest.Split(TEXT("="), &Name, &Val)) continue;
+		if (EyeIdx < 0 ? Eye != TEXT("*") : (Eye == TEXT("*") || FCString::Atoi(*Eye) != EyeIdx)) continue;
+		if (Name == TEXT("wear"))
+		{
+			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
+			if (USkillComponent* S = K ? K->GetSkills() : nullptr)
+			{
+				for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = JeebItems::ArmourId(Kd, 0, FMath::Clamp(FCString::Atoi(*Val), 0, JeebItems::NumTiers - 1));
+				S->OnGearChanged.Broadcast();
+				UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d wear tier %s"), EyeIdx, *Val);
+			}
+			continue;
+		}
+		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(*Name)) { V->Set(*Val, ECVF_SetByConsole); UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d %s = %s"), EyeIdx, *Name, *Val); }
+		else UE_LOG(LogTemp, Warning, TEXT("JEEBEYESET no console variable %s"), *Name);
+	}
+}
+
 // Light haze everywhere, a little thicker among dense trees and over the graveyard
 void AKnightGameState::Tick(float DeltaSeconds)
 {
@@ -761,6 +789,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		ShotClock += DeltaSeconds;
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC) PC->SetControlRotation(ShotRot);
+		{ static bool bStarSets = false; if (!bStarSets && ShotClock > 1.f) { bStarSets = true; ShotEyesSet(PC, -1); } }   // (-ShotEyesSet's '*' entries)
 		// (test pictures, where -ShotPos doesn't move him: -ShotAt=X,Y stands him there once the world has settled, on the ground, or on the floor's height in MoveLab)
 		static bool bShotAtDone = false;
 		FString ShotAt, ShotAtX, ShotAtY;
@@ -804,8 +833,14 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		{
 			// A move, picture by picture
 			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
-			if (K && ShotClock > 7.f && ShotMoveClock < 0.f) { ShotMoveClock = 0.f; K->ShotPlayMove(ShotMove, ShotRot.Yaw + ShotFacing); }
-			if (ShotMoveClock >= 0.f)
+			if (K && ShotClock > 7.f && ShotMoveClock < 0.f)
+			{
+				ShotMoveClock = 0.f; K->ShotPlayMove(ShotMove, ShotRot.Yaw + ShotFacing);
+				if (FParse::Param(FCommandLine::Get(), TEXT("ShotNoHud")) && PC && PC->GetHUD()) PC->GetHUD()->bShowHUD = false;   // (a film with nothing over him)
+			}
+			// (with -ShotEyes too, 2026-11-15: the move only sets him up, e.g. -ShotMove=bowidle for the bow in hand, and the eyes take the pictures)
+			static const bool bEyesToo = FCString::Strifind(FCommandLine::Get(), TEXT("ShotEyes=")) != nullptr;
+			if (ShotMoveClock >= 0.f && !bEyesToo)
 			{
 				ShotMoveClock += DeltaSeconds;
 				static float ShotSeconds = 2.6f;   // (-ShotSeconds=6: a longer series, for a chain of moves)
@@ -887,11 +922,13 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		// 9 s on, then quit; TownLab buildings 2026-11-14: one run instead of one per view)
 		static TArray<FString> ShotEyes;
 		static const bool bEyes = []() { FString V; if (!FParse::Value(FCommandLine::Get(), TEXT("ShotEyes="), V, false)) return false; V.ParseIntoArray(ShotEyes, TEXT("+")); return ShotEyes.Num() > 0; }();
-		if (bEyes && ShotMove.IsEmpty() && PC)
+		if (bEyes && PC)
 		{
 			bShotTaken = true;   // (no single still, and the quit below waits for the last)
 			static int32 EyeIdx = -1;
 			static ACameraActor* EyeCam = nullptr;
+			static bool EyeFollowOn = false;
+			static FVector EyeFollowOffset = FVector::ZeroVector;
 			static int32 ShotIdx = -1;
 			static uint64 EyeMovedFrame = 0;
 			// (-ShotEyesStart / -ShotEyesGap: when the first eye goes and how long each stays; 2 and 8 keep one eye through JEEBGPU's 4.5-8.8 s)
@@ -921,6 +958,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			// (mask 32: the sun creeps on every frame, as in play: a frozen sun lets the cached sun shadows skip redrawing what stands still,
 			// which makes shadows look almost free in a test still)
 			if (EyeSunBase >= 0.f) { static uint32 Tick32 = 0; ADayNight::FixedPhase = EyeSunBase + 0.00004f * float(++Tick32 % 64); }
+			if (EyeCam && EyeFollowOn) if (const APawn* Me = PC->GetPawn()) EyeCam->SetActorLocation(Me->GetActorLocation() + EyeFollowOffset);   // (a close-up keeps up with him: jeeb.Test.Walk)
 			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f && GFrameCounter > EyeMovedFrame + 30)   // (1.4 s and 30 frames after the move: settled, even after a long frame regrowing the grass)
 			{
 				ShotIdx = EyeIdx;
@@ -937,7 +975,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					// (optional 6th: the sun's phase there, 0 noon, 0.5 the low sun; 7th: a test mask, see JeebFoliageMask)
 					if (P.Num() >= 6) ADayNight::FixedPhase = FCString::Atof(*P[5]);
 					// (8th, 2026-11-15: the meadow's grass for this eye, jeeb.Grass.Pack 0 ours, 1 Grass Library, 2 Open World Foliage)
-					if (P.Num() >= 8)
+					if (P.Num() >= 8 && FCString::Atoi(*P[7]) >= 0)   // (-1: leave it)
 						if (IConsoleVariable* Pack = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Grass.Pack")))
 							Pack->Set(FCString::Atoi(*P[7]), ECVF_SetByConsole);
 					// (9th, shadow check 2026-11-15: console commands for this eye, ';' between commands and '~' for a space, e.g.
@@ -950,19 +988,34 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					JeebFoliageMask(GetWorld(), P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0);
 					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
-					const FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
+					FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
 					const FRotator R(FCString::Atof(*P[4]), FCString::Atof(*P[3]), 0.f);
 					if (APawn* Me = PC->GetPawn())   // (he stands under the eye, hidden, so the grass grows round the view as round a player there)
 					{
 						// (mask 1024, 2026-11-15: he stands in view instead, 3.5 m ahead of the eye with his back to it, for a third-person look)
 						const bool bShow = P.Num() >= 7 && (FCString::Atoi(*P[6]) & 1024);
+						// (9th and 10th, 2026-11-15: he turns that many degrees from the eye's way (0 his back to it, 180 facing it, 90 his right side to it),
+						// and stands that many cm ahead (350); for close-ups of his gear)
+						const float Turn = P.Num() >= 9 ? FCString::Atof(*P[8]) : 0.f;
+						const float Ahead = P.Num() >= 10 ? FCString::Atof(*P[9]) : 350.f;
 						const FVector Fw = FRotator(0.f, R.Yaw, 0.f).Vector();
-						const float Ax = bShow ? Ex + Fw.X * 350.f : Ex, Ay = bShow ? Ey + Fw.Y * 350.f : Ey;
+						const float Ax = bShow ? Ex + Fw.X * Ahead : Ex, Ay = bShow ? Ey + Fw.Y * Ahead : Ey;
 						Me->SetActorHiddenInGame(!bShow);
 						const float Gz = GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? L.Z - FCString::Atof(*P[2]) : JeebTerrain::HeightAt(Ax, Ay);
+						if (bShow && P.Num() >= 10) L.Z = Gz + FCString::Atof(*P[2]);   // (a close-up: the eye's height is above his ground, not its own)
 						Me->SetActorLocation(FVector(Ax, Ay, Gz + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
-						if (bShow) { Me->SetActorRotation(FRotator(0.f, R.Yaw, 0.f)); if (AController* Ctl = Me->GetController()) Ctl->SetControlRotation(FRotator(0.f, R.Yaw, 0.f)); }
+						EyeFollowOn = bShow && P.Num() >= 10;
+						EyeFollowOffset = L - Me->GetActorLocation();
+						if (bShow)
+						{
+							const FRotator Face(0.f, R.Yaw + Turn, 0.f);
+							Me->SetActorRotation(Face);
+							ShotRot.Yaw = Face.Yaw;   // (the control rotation, set every frame above, agrees, so he doesn't turn back)
+							if (AController* Ctl = Me->GetController()) Ctl->SetControlRotation(Face);
+							if (AKnightCharacter* K = Cast<AKnightCharacter>(Me)) K->ShotFaceYaw = Face.Yaw;
+						}
 					}
+					ShotEyesSet(PC, EyeIdx);
 					if (!EyeCam) EyeCam = GetWorld()->SpawnActor<ACameraActor>(L, R);
 					if (EyeCam)
 					{

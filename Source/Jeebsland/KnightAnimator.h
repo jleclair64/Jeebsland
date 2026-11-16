@@ -82,8 +82,9 @@ namespace JeebAnim
 		FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity, ShieldAtBlock = FTransform::Identity;   // the shield in the left forearm's frame: hanging, strapped on a raised forearm, held up to guard
 		FVector ShieldInGuard = FVector(45.f, -26.f, 112.f);   // where the raised shield's face is, from between his feet (game frame)
 		FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the left hand's frame
-		FTransform QuiverOnHips = FTransform::Identity;
-		FTransform BeltFlaskOnHips = FTransform::Identity;
+		FTransform BowRestBase = FTransform::Identity, BowRestHandInv = FTransform::Identity;   // the resting bow before jeeb.Knight.BowRestRoll (game frame, rest pose), and that pose's left hand undone
+		FVector OnHipsFrom = FVector::ZeroVector;       // where jeeb.Knight.Quiver and jeeb.Knight.Flask measure from (game frame, rest pose)
+		FTransform HipsRestInv = FTransform::Identity;  // the rest pose's hips undone
 		FTransform CrossInHand = FTransform::Identity;
 		FTransform LeftOnCross = FTransform::Identity;  // the left hand on the crossbow's stock, in the crossbow's frame (as the aiming clip holds it)
 		FTransform DrinkInHand = FTransform::Identity;
@@ -206,8 +207,8 @@ public:
 	float StowPull() const;           // cm what is stowed on his back moves in toward him: bent flat over a ledge or onto a block the back is nearer than the chest frame says
 	FTransform ShieldWorld(float BlockAlpha) const;
 	FTransform BowWorld(float AimAlpha) const;
-	FTransform QuiverWorld() const { return L.QuiverOnHips * BoneWorld(JeebAnim::Hips); }
-	FTransform BeltFlaskWorld() const { return L.BeltFlaskOnHips * BoneWorld(JeebAnim::Hips); }
+	FTransform QuiverWorld() const;     // on his right hip (jeeb.Knight.Quiver, live)
+	FTransform BeltFlaskWorld() const;  // on his belt, back left (jeeb.Knight.Flask, live)
 	FTransform CrossWorld() const { return L.CrossInHand * BoneWorld(JeebAnim::RHand); }
 	FTransform DrinkWorld() const;     // the open hand and its bottle, the cork aimed at his mouth
 	FVector MouthWorld() const { return BoneWorld(JeebAnim::Head).TransformPosition(L.MouthInHead); }
