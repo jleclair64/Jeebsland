@@ -1,0 +1,409 @@
+# Fill sets (vignettes): small themed groups of filler props in a fixed local layout (filllayout 2026-11-15; Docs/FillPlan.md, section 2).
+# One row per piece. Set,Kind,X,Y,Z,Yaw,Scale,Flags. X,Y,Z: metres in the set's own frame, Unreal axes (Z: lift above the ground, e.g.
+# a pot on a table). Yaw: Unreal yaw in the set frame. Every kind's own front is its local +Y (Tools/filler_clean.py: front = Blender -Y),
+# and a set's front (the side that faces the street or the viewer) is also its +Y. Wall-backed sets (named in the comment above them)
+# have their back on Y = 0: nothing of them is behind that line. Sizes are the GLBs' as drawn (1.2x real), Scale 1.
+# Flags ('|'-separated): drop = seeded variation may leave it out; alt=A/B = may become one of these same-size siblings;
+# turn=N = seeded yaw jitter up to +-N degrees (round kinds only); stack = stands on another piece of the set (no ground footprint);
+# hang = hung on a wall or post (no ground footprint, never solid). Flames are their own rows (TorchBlazingFlame etc., stack or hang).
+# The pieces of one set were checked against each other with all their alternatives (0.05 m apart); runs of fence, wall and hedge
+# pieces join end to end on purpose, so a set's own pieces need no overlap test against each other.
+Set,Kind,X,Y,Z,Yaw,Scale,Flags
+# WoodYard (wall-backed): firewood rack against a back wall with a chopping block and logs
+WoodYard,FirewoodRack,0,0.35,0,0,1,
+WoodYard,ChoppingBlock,2.15,0.75,0,0,1,turn=180
+WoodYard,Firewood,-2.15,0.62,0,0,1,
+WoodYard,LogStackSmall,-0.9,1.35,0,0,1,drop|turn=180
+WoodYard,Stump,0.77,1.48,0,0,1,drop|alt=StumpPainted|turn=180
+# KitchenGarden: two raised beds behind a picket run with a cabbage crate and can
+KitchenGarden,FencePicket,-1.55,-0.95,0,0,1,
+KitchenGarden,FencePicket,1.55,-0.95,0,0,1,
+KitchenGarden,FencePicketEnd,-3.15,-0.95,0,0,1,
+KitchenGarden,FencePicketEnd,3.15,-0.95,0,0,1,
+KitchenGarden,RaisedBed,-1.35,0,0,0,1,
+KitchenGarden,TulipBed,1.35,0,0,0,1,alt=RaisedBed
+KitchenGarden,CabbageCrate,-0.9,1.2,0,0,1,
+KitchenGarden,WateringCan,0.45,1.1,0,30,1,
+KitchenGarden,Pail,1.13,1.16,0,0,1,drop|turn=180
+# ChickenYard: coop and nesting boxes behind a stick fence with feed and water
+ChickenYard,FenceStick,-1.2,-1.35,0,0,1,
+ChickenYard,FenceStick,0.75,-1.35,0,0,1,
+ChickenYard,FenceStickPost,1.85,-1.35,0,0,1,
+ChickenYard,FenceStickPost,-2.3,-1.35,0,0,1,
+ChickenYard,ChickenCoop,-1.25,0,0,0,1,
+ChickenYard,NestingBoxes,1.05,-0.55,0,0,1,
+ChickenYard,WoodTub,0.55,0.75,0,0,1,turn=180
+ChickenYard,WheatSack,1.55,0.75,0,-20,1,
+ChickenYard,Basket,-0.15,1.25,0,0,1,drop|turn=180
+# WashingCorner (wall-backed): tub and pail with a basket and a stone bench by a wall
+WashingCorner,WoodTub,-1.15,0.45,0,0,1,turn=180
+WashingCorner,Pail,-0.45,0.35,0,0,1,turn=180
+WashingCorner,Basket,0.13,0.41,0,0,1,turn=180
+WashingCorner,BenchStone,1.24,0.3,0,0,1,
+WashingCorner,PotWide,-1.05,1.15,0,0,1,drop|turn=180
+# StorageCorner (wall-backed): barrels and a stacked crate with a sack stack
+StorageCorner,Barrel,-1.55,0.6,0,0,1,turn=180
+StorageCorner,BarrelSmall,-1.5,1.63,0,0,1,drop|turn=180
+StorageCorner,Crate,0.1,0.51,0,4,1,
+StorageCorner,CrateNoLid,0.1,0.51,0.86,-8,1,stack
+StorageCorner,SackWall,2.35,0.7,0,0,1,alt=SackStack
+StorageCorner,RopeCoil,0.37,1.43,0,0,1,drop|turn=180
+# BarrelRow (wall-backed): three barrels and a lantern on a crate
+BarrelRow,Barrel,-1.25,0.6,0,0,1,turn=180
+BarrelRow,Barrel,0,0.6,0,0,1,turn=180
+BarrelRow,BarrelSmall,1.05,0.4,0,0,1,turn=180
+BarrelRow,Crate,0.48,1.93,0,80,1,drop
+BarrelRow,LanternOil,0.48,1.93,0.86,0,1,stack|drop
+# SackCorner (wall-backed): grain stores: sack pile sacks and a barrel
+SackCorner,SackPileOpen,-0.8,0.85,0,0,1,
+SackCorner,WheatSack,0.67,0.41,0,10,1,
+SackCorner,WheatSack,1.74,0.51,0,-15,1,drop
+SackCorner,BarrelSmall,0.8,1.25,0,0,1,turn=180
+# LogCorner (wall-backed): a log stack and a cauldron on the ground by the back door
+LogCorner,LogStack,-0.6,0.8,0,0,1,
+LogCorner,Cauldron,1.4,0.7,0,0,1,turn=180
+LogCorner,Firewood,2.43,0.65,0,0,1,drop
+# Workbench (wall-backed): butcher block and trestle table with jugs
+Workbench,TrestleTable,0,0.6,0,0,1,
+Workbench,ClayJug,-0.6,0.6,0.92,0,1,stack|alt=ClayPitcher
+Workbench,PotJug,0.5,0.55,0.92,0,1,stack|drop
+Workbench,ButcherBlock,2.1,0.5,0,0,1,
+Workbench,Pail,-1.7,0.45,0,0,1,turn=180
+# HedgeRun: a short hedge with ends for yard edges
+HedgeRun,HedgeEnd,-1.75,0,0,90,1,
+HedgeRun,HedgeSegment,-0.6,0,0,0,1,
+HedgeRun,HedgeSegment,0.9,0,0,0,1,
+HedgeRun,HedgeEnd,2.05,0,0,-90,1,
+# HedgeBoxPair: two box hedges with a flowering bush
+HedgeBoxPair,HedgeBox,-1,0,0,0,1,
+HedgeBoxPair,HedgeBox,1,0,0,0,1,
+HedgeBoxPair,BushWhiteFlowers,0.03,0.98,0,0,1,alt=BushYellowFlowers|turn=180
+# PicketCorner: an L of picket fence round a bush and a tub
+PicketCorner,FencePicket,0,-0.85,0,0,1,
+PicketCorner,FencePicketEnd,1.6,-0.85,0,0,1,
+PicketCorner,FencePicket,-1.55,0.75,0,90,1,
+PicketCorner,FencePicketEnd,-1.55,2.35,0,90,1,
+PicketCorner,BushRound,-0.45,0.25,0,0,1,turn=180|alt=BushLeafy
+PicketCorner,WoodTub,0.9,0,0,0,1,drop|turn=180
+# StumpCorner: an old stump with a shrub and a plant clump
+StumpCorner,StumpRooty,0,0,0,0,1,turn=180|alt=StumpGrass/StumpMushroom
+StumpCorner,ShrubLow,1.47,0.27,0,0,1,turn=180
+StumpCorner,PlantClump,-0.41,1.44,0,15,1,drop
+# BushClump: three bushes
+BushClump,BushLeafy,0,0,0,0,1,turn=180|alt=BushRound/BushBall/BushSpiky
+BushClump,BushBerries,1.55,0.34,0,0,1,turn=180|alt=BushDome
+BushClump,ShrubLow,0.57,1.19,0,0,1,turn=180|drop
+# FlowerClump: flowering bushes and a low shrub
+FlowerClump,BushYellowFlowers,0,0,0,0,1,turn=180
+FlowerClump,BushWhiteFlowers,1.24,0.26,0,0,1,turn=180
+FlowerClump,ShrubLow,0.5,1.06,0,0,1,turn=180|drop
+# CypressPair: two cypresses with a bush between
+CypressPair,Cypress,-1,0,0,0,1,turn=180
+CypressPair,Cypress,1,0,0,0,1,turn=180
+CypressPair,ShrubLow,0,0.85,0,0,1,turn=180|drop
+# DoorstepBox (wall-backed): a flower box and two pots beside a door
+DoorstepBox,FlowerBoxLong,0,0.38,0,0,1,alt=FlowerBoxIvy/WindowBoxRed
+DoorstepBox,PotRound,0.98,0.28,0,0,1,turn=180|alt=PotWide
+DoorstepBox,PotSmall,1.45,0.21,0,0,1,turn=180|drop
+# DoorstepPots (wall-backed): jugs and a vase by a door
+DoorstepPots,PotJug,0,0.22,0,0,1,turn=180
+DoorstepPots,PotVase,0.44,0.18,0,0,1,turn=180
+DoorstepPots,ClayPitcher,0.24,0.69,0,0,1,turn=180|drop
+DoorstepPots,PotAmphora,-0.63,0.4,0,0,1,turn=30
+# DoorstepBench (wall-backed): a carved bench with a pot beside it
+DoorstepBench,BenchCarved,0,0.4,0,0,1,
+DoorstepBench,PotRound,1.33,0.28,0,0,1,turn=180|alt=PotWide
+# DoorstepIvy (wall-backed): an ivy box and a watering can
+DoorstepIvy,FlowerBoxIvy,0,0.29,0,0,1,alt=WindowBoxRed
+DoorstepIvy,WateringCan,1.07,0.28,0,20,1,
+# DoorstepCandles (wall-backed): candle cages and a vase (church graveyard side)
+DoorstepCandles,CandleCageTall,0,0.2,0,0,1,
+DoorstepCandles,CandleCageShort,0.44,0.2,0,0,1,
+DoorstepCandles,PotVase,0.84,0.2,0,0,1,turn=180
+# LampStone: stone lamp post with a shrub at its foot
+LampStone,LampPostStone,0,0,0,0,1,
+LampStone,ShrubLow,0,-1.05,0,0,1,turn=180|drop
+# LampRope: rope lamp post with a bush
+LampRope,LampPostRope,0,0,0,0,1,
+LampRope,BushBall,0,-1.5,0,0,1,turn=180|drop|alt=BushDome
+# LampPillar: pillar lamp post with a shrub
+LampPillar,LampPostPillar,0,0,0,0,1,
+LampPillar,ShrubLow,0,-0.85,0,0,1,turn=180|drop
+# LampGallows: gallows lamp post with a plant clump
+LampGallows,LampPostGallows,0,0,0,0,1,
+LampGallows,PlantClump,0,-1,0,0,1,drop
+# Junction: a signpost with a bush and a pale rock
+Junction,Signpost,0,0,0,0,1,
+Junction,BushBall,-1.26,-0.6,0,0,1,turn=180|alt=BushRound
+Junction,RockPale,1.47,-0.79,0,0,1,turn=180|drop
+# JunctionArrow: an arrow sign with shrubs
+JunctionArrow,SignArrow,0,0,0,0,1,
+JunctionArrow,ShrubLow,-1.25,-0.3,0,0,1,turn=180
+JunctionArrow,BushDome,1.35,-0.55,0,0,1,turn=180|drop
+# BenchNook: a carved bench between two flowering bushes
+BenchNook,BenchCarved,0,0,0,0,1,
+BenchNook,BushRound,-1.79,-0.1,0,0,1,turn=180|alt=BushYellowFlowers
+BenchNook,BushWhiteFlowers,1.7,-0.1,0,0,1,turn=180|alt=BushYellowFlowers
+# BenchNookStone: a stone bench with a plant clump and an amphora
+BenchNookStone,BenchStone,0,0,0,0,1,
+BenchNookStone,PlantClump,0,-0.85,0,0,1,
+BenchNookStone,PotAmphora,1.23,0,0,0,1,turn=180
+# ShopFront (wall-backed): a trestle table of goods with a crate and a small barrel
+ShopFront,TrestleTable,0,0.6,0,0,1,
+ShopFront,Basket,-0.65,0.6,0.92,0,1,stack|turn=180
+ShopFront,CabbageCrate,0.5,0.6,0.92,0,1,stack
+ShopFront,Crate,2,0.74,0,90,1,
+ShopFront,BarrelSmall,-1.75,0.4,0,0,1,turn=180
+# MarketGreen: the green stall with crates a basket and spice sacks
+MarketGreen,StallGreen,0,0,0,0,1,
+MarketGreen,Crate,-1.75,-0.35,0,90,1,
+MarketGreen,CrateNoLid,-1.75,-0.35,0.86,85,1,stack
+MarketGreen,Basket,1.35,0.45,0,0,1,turn=180
+MarketGreen,SpiceSacks,2,-0.55,0,90,1,
+# MarketRed: the red tent stall with a cabbage crate basket crate and barrel
+MarketRed,StallRedTent,0,0,0,0,1,
+MarketRed,CabbageCrate,-2.65,0.75,0,90,1,
+MarketRed,Basket,-2.6,-0.25,0,0,1,turn=180
+MarketRed,Crate,2.7,-0.6,0,90,1,
+MarketRed,BarrelSmall,2.6,0.8,0,0,1,turn=180
+# VegCorner: the veg cart with a cabbage crate and baskets
+VegCorner,VegCart,0,0,0,0,1,
+VegCorner,CabbageCrate,-1.85,0.65,0,90,1,
+VegCorner,Basket,1.7,0.6,0,0,1,turn=180
+VegCorner,Basket,1.65,-0.1,0,0,1,turn=180|drop
+# CartCorner: a hand cart with sacks and a crate
+CartCorner,HandCart,0,0,0,0,1,
+CartCorner,WheatSack,-0.6,1.35,0,10,1,
+CartCorner,Crate,1,1.45,0,0,1,drop
+# AmphoraRow (wall-backed): amphorae and pots along a shop wall
+AmphoraRow,PotAmphora,-0.8,0.4,0,0,1,turn=30
+AmphoraRow,PotAmphora,0.04,0.4,0,0,1,turn=30
+AmphoraRow,PotWide,0.75,0.3,0,0,1,turn=180
+AmphoraRow,ClayJug,1.29,0.3,0,0,1,turn=180
+# SmithYard (wall-backed): the smith: cauldron chopping block barrel rope and an unlit torch
+SmithYard,Cauldron,-1.4,0.75,0,0,1,turn=180
+SmithYard,ChoppingBlock,0.15,0.6,0,0,1,turn=180
+SmithYard,Barrel,1.45,0.6,0,0,1,turn=180
+SmithYard,RopeHank,0.15,1.55,0,15,1,
+SmithYard,LogStackSmall,-0.76,2.12,0,0,1,drop
+# PlanterPair: a gilded planter (round the lawn)
+PlanterPair,PlanterGilded,0,0,0,0,1,
+# BannerLionPole: Oak Hill banner pole (lion)
+BannerLionPole,BannerPoleLion,0,0,0,0,1,
+BannerLionPole,ShrubLow,0,-0.95,0,0,1,turn=180|drop
+# Allotment: garden plot row: raised bed tulips cabbage crate can
+Allotment,RaisedBed,-1.35,0,0,0,1,
+Allotment,TulipBed,1.35,0,0,0,1,
+Allotment,CabbageCrate,-0.7,1.2,0,0,1,drop
+Allotment,WateringCan,0.6,1.1,0,-20,1,
+# AllotmentScarecrow: a scarecrow over two beds
+AllotmentScarecrow,RaisedBed,-1.4,0,0,0,1,
+AllotmentScarecrow,Scarecrow,0.75,0.95,0,0,1,
+AllotmentScarecrow,TulipBed,1.35,-0.15,0,0,1,alt=RaisedBed
+AllotmentScarecrow,Pail,-0.33,1.33,0,0,1,turn=180
+# TrainingGround: boxing ring plot: hay targets barrels spectator bench and the Skill Issue sign
+TrainingGround,SignSkillIssue,0,0,0,0,1,
+TrainingGround,HayBale,-1.4,0.15,0,0,1,
+TrainingGround,HayBale,-1.4,0.15,0.5,10,1,stack
+TrainingGround,Barrel,1.4,0.1,0,0,1,turn=180
+TrainingGround,BenchCarved,0.1,1.45,0,180,1,
+# RingCorner: a corner post: torch rope pail and tub
+RingCorner,TorchBlazing,0,0,0,0,1,
+RingCorner,TorchBlazingFlame,0,0,0,0,1,stack
+RingCorner,RopeCoil,0.7,0.3,0,0,1,turn=180
+RingCorner,Pail,0.15,0.75,0,0,1,turn=180
+RingCorner,WoodTub,-0.75,0.35,0,0,1,turn=180|drop
+# RingBanner: a sword banner post with crates
+RingBanner,BannerPostSwords,0,0,0,0,1,alt=BannerPoleSwordShield
+RingBanner,Crate,1.45,0.15,0,90,1,
+RingBanner,RopeHank,1.45,0.15,0.86,20,1,stack
+# SpectatorBench: two benches side by side with a barrel
+SpectatorBench,BenchCarved,-1.1,0,0,0,1,
+SpectatorBench,BenchStone,1.1,0,0,0,1,
+SpectatorBench,BarrelSmall,2.35,0.1,0,0,1,turn=180
+# Ruin: castle ruins: broken stone wall pillar end tattered banner rocks
+Ruin,WallStoneEnd,-2.5,0,0,0,1,
+Ruin,WallStone,-1.15,0,0,0,1,
+Ruin,WallStone,1.15,0,0,8,1,
+Ruin,WallPillarEnd,2.6,0.1,0,0,1,
+Ruin,TorchWall,-1.15,0.37,0.25,0,1,hang
+Ruin,TorchWallFlame,-1.15,0.37,0.25,0,1,hang
+Ruin,BannerPostTattered,0.4,1.6,0,0,1,
+Ruin,RockPale,-1.6,1.6,0,0,1,turn=180
+Ruin,StumpStones,2.3,1.65,0,0,1,turn=180|drop
+# RuinPillar: a pillar wall run with a mossy log and a snag
+RuinPillar,WallPillar,0,0,0,0,1,
+RuinPillar,WallPillarEnd,1.45,0,0,0,1,
+RuinPillar,LogMossy,-0.4,1.35,0,6,1,
+RuinPillar,ShrubLow,1.75,1.1,0,0,1,turn=180
+# RuinWell: an old mossy well with rubble
+RuinWell,WellMossy,0,0,0,0,1,alt=WellOld
+RuinWell,RockCluster,3.05,-0.3,0,0,1,turn=180
+RuinWell,PlantClump,-0.23,1.75,0,0,1,
+# RuinSteps: old walled steps going nowhere with a snag
+RuinSteps,StairsWalled,0,0,0,0,1,alt=StairsStone/StairsStoneShort
+RuinSteps,TreeSnag,3.84,0.12,0,30,1,
+# RuinRubble: rubble: rocks stump and log
+RuinRubble,RocksForest,0,0,0,0,1,turn=180
+RuinRubble,StumpMushroom,2.29,0.2,0,0,1,turn=180
+RuinRubble,LogHollow,0.33,2.29,0,4,1,
+# GraveyardRow: graveyard plot: a low wall with cypresses and candles
+GraveyardRow,Cypress,-2.25,0,0,0,1,turn=180
+GraveyardRow,WallStoneEnd,-1.22,0,0,0,1,
+GraveyardRow,WallStone,0,0,0,0,1,
+GraveyardRow,WallStoneEnd,1.3,0,0,0,1,
+GraveyardRow,Cypress,2.33,0,0,0,1,turn=180
+GraveyardRow,CandleCageTall,-0.6,0.65,0,0,1,
+GraveyardRow,CandleCageShort,0.58,0.63,0,0,1,
+GraveyardRow,BushWhiteFlowers,0,1.35,0,0,1,turn=180|drop
+# GraveyardBench: a stone bench under two cypresses with a vase
+GraveyardBench,Cypress,-1.5,-0.35,0,0,1,turn=180
+GraveyardBench,BenchStone,0.04,0.01,0,0,1,
+GraveyardBench,Cypress,1.58,-0.37,0,0,1,turn=180
+GraveyardBench,PotVase,0.95,0.45,0,0,1,turn=180
+GraveyardBench,CandleCageShort,-0.95,0.45,0,0,1,
+# Garrison: fort plot: palisade crates barrels and a burning torch
+Garrison,FencePalisade,0,0,0,0,1,
+Garrison,Crate,-1.2,0.95,0,0,1,
+Garrison,CrateNoLid,-1.2,0.95,0.86,6,1,stack
+Garrison,Barrel,0.45,0.85,0,0,1,turn=180
+Garrison,TorchBlazing,1.55,0.55,0,0,1,
+Garrison,TorchBlazingFlame,1.55,0.55,0,0,1,stack
+Garrison,TorchUnlitTar,1.55,1.05,0,0,1,drop
+# GarrisonTable: a trestle table with jugs a barrel and spare torches
+GarrisonTable,TrestleTable,0,0,0,0,1,
+GarrisonTable,ClayJug,-0.5,0,0.92,0,1,stack
+GarrisonTable,LanternBlack,0.6,0,0.92,0,1,stack|alt=LanternOil
+GarrisonTable,Barrel,2,0,0,0,1,turn=180
+GarrisonTable,TorchUnlitRope,-1.75,0.2,0,0,1,
+# GarrisonBanner: a knot banner post with a log stack
+GarrisonBanner,BannerPostKnot,0,0,0,0,1,
+GarrisonBanner,LogStack,0.45,1.65,0,0,1,
+# TowerYard: watchtower plot: firewood crate rope and a spare torch
+TowerYard,Firewood,-0.9,0,0,0,1,
+TowerYard,Crate,0.45,0,0,0,1,
+TowerYard,RopeHank,0.45,0,0.86,10,1,stack
+TowerYard,TorchUnlitTar,1.4,0.15,0,0,1,
+TowerYard,LogStackSmall,-0.18,1.13,0,0,1,
+# Dock: by the bridge plot: rope coil barrel bench and rocks
+Dock,BenchStone,0,0,0,0,1,
+Dock,RopeCoil,1.24,0.1,0,0,1,turn=180
+Dock,Barrel,-1.47,0.11,0,0,1,turn=180
+Dock,RockPale,0.3,-1.4,0,0,1,turn=180|drop
+# Hayfield: round bales in two rows square bales the hay wagon and a scarecrow
+Hayfield,HayBaleRound,-4.2,0,0,0,1,turn=180
+Hayfield,HayBaleRound,-1.8,0,0,0,1,turn=180
+Hayfield,HayBaleRound,0.6,0,0,0,1,turn=180|drop
+Hayfield,HayBaleRound,-3,2.4,0,0,1,turn=180
+Hayfield,HayBaleRound,-0.6,2.4,0,0,1,turn=180|drop
+Hayfield,HayWagon,3.6,1.2,0,0,1,alt=ThatchWagon
+Hayfield,HayBale,3.2,-1.1,0,0,1,
+Hayfield,HayBale,4.6,-1.1,0,0,1,
+Hayfield,HayBale,3.9,-1.1,0.5,5,1,stack|drop
+Hayfield,Scarecrow,1.6,4.2,0,0,1,
+# Farmstead: a well coop veg cart hand cart and a log pile behind stick fences
+Farmstead,WellThatched,0,0,0,0,1,alt=WellRedRoof/WellStylised
+Farmstead,ChickenCoop,3.6,0.4,0,0,1,
+Farmstead,NestingBoxes,3.6,-1.6,0,0,1,
+Farmstead,VegCart,-3.9,0.6,0,0,1,
+Farmstead,HandCart,-3.9,-2,0,0,1,
+Farmstead,LogPile,0.3,-3.6,0,0,1,
+Farmstead,FenceStick,-1.6,3,0,0,1,
+Farmstead,FenceStick,0.4,3,0,0,1,
+Farmstead,FenceStickPost,1.45,3,0,0,1,
+Farmstead,FenceStickPost,-2.65,3,0,0,1,
+# FenceRun: a stick fence run with posts
+FenceRun,FenceStickPost,-2.95,0,0,0,1,
+FenceRun,FenceStick,-1.95,0,0,0,1,
+FenceRun,FenceStick,0,0,0,0,1,
+FenceRun,FenceStick,1.95,0,0,0,1,
+FenceRun,FenceStickPost,2.95,0,0,0,1,
+# WoodStack: a log pile and stump by a road out of town
+WoodStack,LogPile,0,0,0,0,1,
+WoodStack,Stump,2.25,0.4,0,0,1,turn=180|alt=StumpPainted
+# Orchard: between orchard tree spots: a ladder-less cart baskets and crates
+Orchard,CrateOpen,0,0,0,0,1,
+Orchard,Basket,1,0.2,0,0,1,turn=180
+Orchard,Basket,1.1,-0.45,0,0,1,turn=180|drop
+Orchard,WheatSack,-1.12,0.22,0,0,1,
+# Boulders: a field boulder group
+Boulders,BoulderMossy,0,0,0,0,1,turn=180|alt=BoulderScan
+Boulders,RockPale,2.19,0.66,0,0,1,turn=180|drop
+Boulders,ShrubLow,-0.31,1.68,0,0,1,turn=180
+# FieldWell: the village well on a crossroads (landmark)
+FieldWell,WellVillage,0,0,0,0,1,
+FieldWell,Pail,2,0.2,0,0,1,turn=180
+FieldWell,BenchStone,0,2.15,0,180,1,
+# CobbleWell: the big cobbled well (one landmark)
+CobbleWell,WellCobble,0,0,0,0,1,
+# Campsite: log seats round a stone ring cauldron torch crate and rope
+Campsite,RockPale,0,0,0,0,1,turn=180
+Campsite,LogCartoon,0,2.1,0,0,1,
+Campsite,LogCartoon,-2,-0.6,0,72,1,
+Campsite,LogCartoon,2,-0.6,0,-72,1,
+Campsite,Cauldron,-2.2,2.2,0,0,1,turn=180
+Campsite,TorchBlazing,2.3,2,0,0,1,
+Campsite,TorchBlazingFlame,2.3,2,0,0,1,stack
+Campsite,Crate,0.1,-2.3,0,0,1,
+Campsite,RopeCoil,1.35,-2.2,0,0,1,turn=180
+Campsite,Firewood,-1.39,-2.24,0,90,1,
+Campsite,BannerPostTattered,3.4,0.4,0,0,1,drop
+# RiverRest: rocks a mossy log a berry bush and a bench at a view
+RiverRest,RockCluster,0,0,0,0,1,turn=180
+RiverRest,LogMossy,2.98,0.41,0,10,1,
+RiverRest,BushBerries,-2.2,0.7,0,0,1,turn=180
+RiverRest,BenchStone,1.6,2,0,180,1,drop
+# ForestFloor: stumps a log rocks and low plants
+ForestFloor,StumpGrass,0,0,0,0,1,turn=180|alt=StumpMushroom/StumpRooty
+ForestFloor,LogPine,2.71,0.41,0,0,1,alt=LogRoots
+ForestFloor,RocksForest,-2.4,0.6,0,0,1,turn=180|drop
+ForestFloor,PlantClump,0.2,1.6,0,0,1,
+ForestFloor,ShrubLow,-1,-1.1,0,0,1,turn=180
+# RockGroup: open-land rocks: a tall rock with a boulder
+RockGroup,RockTall,0,0,0,0,1,turn=180
+RockGroup,BoulderScan,2.9,0.5,0,0,1,turn=180|drop
+RockGroup,ShrubLow,-2.15,1.02,0,0,1,turn=180
+# FallenTree: a fallen tree with its snag
+FallenTree,LogRoots,0,0,0,0,1,
+FallenTree,TreeSnag,3.6,0.2,0,0,1,drop
+FallenTree,BushLeafy,-2.42,0.63,0,0,1,turn=180
+# Blackrock (wall-backed): Blackrock hut side: sack wall crate barrel and a griffin banner pole
+Blackrock,SackWall,-1,0.7,0,0,1,
+Blackrock,Crate,1.09,0.49,0,0,1,
+Blackrock,Barrel,2.47,0.63,0,0,1,turn=180
+Blackrock,BannerPoleGriffin,0.6,1.75,0,0,1,drop
+# BlackrockPalisade: palisade repair with a log stack and torch
+BlackrockPalisade,FencePalisade,0,0,0,0,1,
+BlackrockPalisade,LogStack,-0.6,1.15,0,0,1,
+BlackrockPalisade,TorchBlazing,1.5,0.5,0,0,1,
+BlackrockPalisade,TorchBlazingFlame,1.5,0.5,0,0,1,stack
+# BlackrockGate: Blackrock banners: griffin pole and banner post
+BlackrockGate,BannerPoleGriffin,0,0,0,0,1,
+BlackrockGate,Sconce,0,0.24,1.2,0,1,hang|drop
+BlackrockGate,SconceFlame,0,0.24,1.2,0,1,hang|drop
+# PenSide: pig pen: tub pail hay bale and an open sack pile
+PenSide,WoodTub,0,0,0,0,1,turn=180
+PenSide,Pail,0.7,0.1,0,0,1,turn=180
+PenSide,HayBale,-1.2,0.1,0,0,1,
+PenSide,SackPileOpen,0.4,1.35,0,0,1,
+# WallBannerLion (wall-backed) (hung on a building wall: Z up the wall): Oak Hill lion banner hung on a wall
+WallBannerLion,BannerLion,0,0.07,3.3,0,1,hang
+# WallBannerSwordShield (wall-backed) (hung on a building wall: Z up the wall): sword-and-shield banner hung on a wall
+WallBannerSwordShield,BannerSwordShield,0,0.15,3,0,1,hang
+# WallBannerSwords (wall-backed) (hung on a building wall: Z up the wall): crossed-swords banner hung on a wall
+WallBannerSwords,BannerSwords,0,0.09,3,0,1,hang
+# WallBannerKnot (wall-backed) (hung on a building wall: Z up the wall): knot banner hung on a wall
+WallBannerKnot,BannerKnot,0,0.04,3.2,0,1,hang
+# WallBannerGriffin (wall-backed) (hung on a building wall: Z up the wall): Blackrock griffin banner hung on a wall
+WallBannerGriffin,BannerGriffin,0,0.06,3,0,1,hang
+# WallAwning (wall-backed) (hung on a building wall: Z up the wall): a striped awning over a wall (with ShopFront below)
+WallAwning,AwningStriped,0,1.05,2.35,0,1,hang
+# WallSconce (wall-backed) (hung on a building wall: Z up the wall): a sconce with its flame
+WallSconce,Sconce,0,0,1.9,0,1,hang
+WallSconce,SconceFlame,0,0,1.9,0,1,hang
+# WallTorch (wall-backed) (hung on a building wall: Z up the wall): a wall torch with its flame
+WallTorch,TorchWall,0,0,1.4,0,1,hang
+WallTorch,TorchWallFlame,0,0,1.4,0,1,hang
+# StonePole: a stone banner pole at a road into town
+StonePole,BannerPoleStone,0,0,0,0,1,
+StonePole,BushSpiky,0,-1.6,0,0,1,turn=180|drop
