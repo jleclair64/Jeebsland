@@ -18,6 +18,7 @@
 #include "Materials/Material.h"
 #include "Components/PointLightComponent.h"
 #include "TownLabDecor.h"
+#include "TownLabSwaps.h"
 #include "DayNight.h"
 
 namespace
@@ -25,29 +26,10 @@ namespace
 	// (the town's ground's low-sun fill was its own jeeb.TownLab.GroundFill, 0.15, until 2026-11-15: the owner's LOOK slider moved the
 	// world's ground but not the town's, a hard seam at the town's edge. Now both follow jeeb.Ground.SkyFill, AWorldTerrain::SetUnderGrass)
 	FString AssetName(const TCHAR* Name) { return FString(Name) + (FCString::Strcmp(Name, TEXT("OakHillWell")) == 0 ? TEXT("_150k") : TEXT("_300k")); }
-	// WHICH MODEL EACH BUILDING OF THE NEW TOWN USES. Any of the town's models can be swapped here for a new one (a Fab pack's, a
-	// Meshy remake) without touching anything else: Mesh is the new static mesh's path (its solid shape is Mesh + "_Col" when that
-	// exists, else the old model's), Scale replaces OakHill.h's FModel Scale when above 0, YawAdd turns it (its door must face +Y as
-	// the old models' do, or say so here), Lift raises it in cm. A missing mesh falls back to the old model, so a row can wait for
-	// its asset. PlotSwaps does the same for single plots (the plot's index in JeebOakHill::Plots(), from the PLOT log lines).
-	// Keep the old model's frame and Scale 0 where possible: the shop counters (OakHill.h Counters), the grass's footprints
-	// (OakHillFootprints.h) and the chimneys (OakHillLife.cpp) are all measured on the old models.
-	struct FLabSwap { const TCHAR* Model; const TCHAR* Mesh; float Scale; float YawAdd; float Lift; };
-	const FLabSwap ModelSwaps[] = {
-		{ TEXT("OakHillHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_House"), 0.f, 0.f, 0.f },   // townbuild's rebuilt house
-		{ TEXT("OakHillStore"), TEXT("/Game/TownLab/Buildings/SM_TL_Store"), 0.f, 0.f, 0.f },   // townbuild's rebuilt store
-		// build-b's four (townbuild2, 2026-11-14)
-		{ TEXT("OakHillTownHall"), TEXT("/Game/TownLab/Buildings/SM_TL_TownHall"), 0.f, 0.f, 0.f },
-		{ TEXT("OakHillChurch"), TEXT("/Game/TownLab/Buildings/SM_TL_Church"), 0.f, 0.f, 0.f },   // (owner, 2026-11-15: the rebuilt church, for its clean window glass; its -X side wall is Docs/TownLab/Buildings.md "for later")
-		{ TEXT("OakHillWell"), TEXT("/Game/TownLab/Buildings/SM_TL_Well"), 0.f, 0.f, 0.f },
-		{ TEXT("OakHillPotionShop"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionShop"), 0.f, 0.f, 0.f },
-		{ TEXT("OakHillBank"), TEXT("/Game/TownLab/Buildings/SM_TL_Bank"), 0.f, 0.f, 0.f },   // build-a: the bank
-		{ TEXT("BankStall"), TEXT("/Game/TownLab/Buildings/SM_TL_BankStall"), 0.f, 0.f, 0.f },   // build-a: the bank stall
-		{ TEXT("OakHillSmith"), TEXT("/Game/TownLab/Buildings/SM_TL_Smith"), 0.f, 0.f, 0.f },   // build-a: the smithy (its forge burns all day)
-		{ TEXT("OakHillCornerHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse"), 0.f, 0.f, 0.f },   // build-a: the corner house
-		{ TEXT("GeneralStore"), TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall"), 0.f, 0.f, 0.f },   // build-c's rebuilt market stall
-		{ TEXT("PotionStall"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall"), 0.f, 0.f, 0.f },    // build-c's rebuilt potion stall
-	};
+	// WHICH MODEL EACH BUILDING OF THE NEW TOWN USES: JeebTownLab::ModelSwaps in TownLabSwaps.h (shared with the town fill, Fill.cpp).
+	// PlotSwaps does the same for single plots (the plot's index in JeebOakHill::Plots(), from the PLOT log lines).
+	using JeebTownLab::FLabSwap;
+	using JeebTownLab::ModelSwaps;
 	struct FPlotSwap { int32 Plot; const TCHAR* Mesh; float Scale; float YawAdd; float Lift; };
 	const FPlotSwap PlotSwaps[] = {
 		{ -1, nullptr, 0.f, 0.f, 0.f },   // (none yet)

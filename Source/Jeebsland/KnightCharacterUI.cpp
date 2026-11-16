@@ -260,6 +260,8 @@ void AKnightCharacter::ApplyGraphics()
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.6"));   // (HIGH 0.7 until 2026-11-15: the owner approved a shorter shadow reach to pay for the realistic grass)
 	// the realistic grass reaches 50 m on HIGH, 26 m on LOW (Meadow.cpp regrows round you when it changes)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.PackFade 2600") : TEXT("jeeb.Grass.PackFade 5000"));
+	// the town fill's tiny and small props draw half as far on LOW, as the grass does (Fill.cpp)
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Fill.CullScale 0.5") : TEXT("jeeb.Fill.CullScale 1"));
 	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));
 	// a light sharpening of the final picture, which takes the softness out of TAA's upscaling (almost free)
 	if (bOldLook) { GEngine->Exec(W, TEXT("r.Tonemapper.Sharpen 0.9")); return; }

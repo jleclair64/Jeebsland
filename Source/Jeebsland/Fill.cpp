@@ -3,6 +3,7 @@
 #include "OakHill.h"
 #include "TownLab.h"
 #include "TownLabDecor.h"
+#include "TownLabSwaps.h"
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "DayNight.h"
@@ -545,18 +546,8 @@ namespace
 		return FBox2D(FVector2D(JeebWorld::MinX, JeebWorld::MinY), FVector2D(JeebWorld::MaxX, JeebWorld::MaxY));
 	}
 
-	// The model each Oak Hill building is drawn with (as TownLabTown.cpp's ModelSwaps: keep the two in step), for its TownLab decor
-	const TCHAR* TownLabName(const TCHAR* Model)
-	{
-		static const TCHAR* Map[][2] = {
-			{ TEXT("OakHillHouse"), TEXT("TL_House") }, { TEXT("OakHillStore"), TEXT("TL_Store") }, { TEXT("OakHillTownHall"), TEXT("TL_TownHall") },
-			{ TEXT("OakHillChurch"), TEXT("TL_Church") }, { TEXT("OakHillWell"), TEXT("TL_Well") }, { TEXT("OakHillPotionShop"), TEXT("TL_PotionShop") },
-			{ TEXT("OakHillBank"), TEXT("TL_Bank") }, { TEXT("BankStall"), TEXT("TL_BankStall") }, { TEXT("OakHillSmith"), TEXT("TL_Smith") },
-			{ TEXT("OakHillCornerHouse"), TEXT("TL_CornerHouse") }, { TEXT("GeneralStore"), TEXT("TL_MarketStall") }, { TEXT("PotionStall"), TEXT("TL_PotionStall") },
-		};
-		for (const auto& M : Map) if (Model && FCString::Strcmp(M[0], Model) == 0) return M[1];
-		return nullptr;
-	}
+	// The model each Oak Hill building is drawn with, for its TownLab decor (TownLabSwaps.h, shared with TownLabTown.cpp)
+	const TCHAR* TownLabName(const TCHAR* Model) { return JeebTownLab::RebuiltName(Model); }
 
 	UStaticMesh* LoadMeshPath(const FString& InPath)
 	{
@@ -1563,6 +1554,21 @@ struct FFillBuilder
 					Zs.AppendChar('\n');
 				}
 				FFileHelper::SaveStringToFile(Zs, *(Dir / FString::Printf(TEXT("zones_%s.txt"), *Ar.Name)));
+				// the ground's height at every 25 cm cell centre (JeebTerrain::HeightAt, the same the slope test reads), whole cm, for offline layout tools
+				FString Hs;
+				Hs.Reserve(Nx * (Ny * 6 + 2) + 512);
+				Hs += FString::Printf(TEXT("# JEEBFILL heights %s. Ground height (cm) at each 25 cm cell centre, the same cells as blockers_%s.txt: rows north to south, columns west to east, comma separated.\n"), *Ar.Name, *Ar.Name);
+				Hs += FString::Printf(TEXT("# rows %d cols %d plaza E0 %.3f N0 %.3f (E = E0 + 0.25 c, N = N0 - 0.25 r)\n"), Nx, Ny, JeebOakHill::EastM((Gy0 + 0.5f) * Cell), JeebOakHill::NorthM((Gx0 + Nx - 0.5f) * Cell));
+				for (int32 i = Nx - 1; i >= 0; --i)
+				{
+					for (int32 j = 0; j < Ny; ++j)
+					{
+						if (j) Hs.AppendChar(',');
+						Hs.AppendInt(FMath::RoundToInt(JeebTerrain::HeightAt((Gx0 + i + 0.5f) * Cell, (Gy0 + j + 0.5f) * Cell)));
+					}
+					Hs.AppendChar('\n');
+				}
+				FFileHelper::SaveStringToFile(Hs, *(Dir / FString::Printf(TEXT("heights_%s.txt"), *Ar.Name)));
 			}
 		}
 		// the shapes: named blockers, targets, plots, tree spots and (after placing) every piece
