@@ -10,8 +10,8 @@ OakGarden,0,1,Allotment:3 AllotmentScarecrow:1 KitchenGarden:1 BenchNookStone:1 
 OakBoxingRing,0,0.8,TrainingGround:1 RingCorner:2 RingBanner:1 SpectatorBench:1,104,random,0
 OakRuins,0,0.6,Ruin:2 RuinPillar:1 RuinWell:1 RuinSteps:1 RuinRubble:2,105,random,0
 OakGraveyard,0,0.8,GraveyardRow:2 GraveyardBench:1 CypressPair:1 FlowerClump:1,106,random,0
-OakForts,0,0.8,Garrison:2 GarrisonTable:1 GarrisonBanner:1,107,random,0
-OakWatchtower,0,0.8,TowerYard:2 GarrisonBanner:1,108,random,0
+OakForts,0,0.8,Garrison:2 GarrisonTable:1 GarrisonLion:1,107,random,0
+OakWatchtower,0,0.8,TowerYard:2 GarrisonLion:1,108,random,0
 OakBridge,0,0.5,Dock:2 RiverRest:1,109,road,0
 OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:2 FlowerClump:1,110,wall,0
 OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,road,0.01

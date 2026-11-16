@@ -5,7 +5,7 @@
 # have their back on Y = 0: nothing of them is behind that line. Sizes are the GLBs' as drawn (1.2x real), Scale 1.
 # Flags ('|'-separated): drop = seeded variation may leave it out; alt=A/B = may become one of these same-size siblings;
 # turn=N = seeded yaw jitter up to +-N degrees (round kinds only); stack = stands on another piece of the set (no ground footprint);
-# hang = hung on a wall or post (no ground footprint, never solid). Flames are their own rows (TorchBlazingFlame etc., stack or hang).
+# hang = hung on a wall or post (no ground footprint, never solid). Torches and sconces get their <Kind>Flame drawn by AWorldFill.
 # The pieces of one set were checked against each other with all their alternatives (0.05 m apart); runs of fence, wall and hedge
 # pieces join end to end on purpose, so a set's own pieces need no overlap test against each other.
 Set,Kind,X,Y,Z,Yaw,Scale,Flags
@@ -209,7 +209,6 @@ TrainingGround,Barrel,1.4,0.1,0,0,1,turn=180
 TrainingGround,BenchCarved,0.1,1.45,0,180,1,
 # RingCorner: a corner post: torch rope pail and tub
 RingCorner,TorchBlazing,0,0,0,0,1,
-RingCorner,TorchBlazingFlame,0,0,0,0,1,stack
 RingCorner,RopeCoil,0.7,0.3,0,0,1,turn=180
 RingCorner,Pail,0.15,0.75,0,0,1,turn=180
 RingCorner,WoodTub,-0.75,0.35,0,0,1,turn=180|drop
@@ -227,7 +226,6 @@ Ruin,WallStone,-1.15,0,0,0,1,
 Ruin,WallStone,1.15,0,0,8,1,
 Ruin,WallPillarEnd,2.6,0.1,0,0,1,
 Ruin,TorchWall,-1.15,0.37,0.25,0,1,hang
-Ruin,TorchWallFlame,-1.15,0.37,0.25,0,1,hang
 Ruin,BannerPostTattered,0.4,1.6,0,0,1,
 Ruin,RockPale,-1.6,1.6,0,0,1,turn=180
 Ruin,StumpStones,2.3,1.65,0,0,1,turn=180|drop
@@ -268,7 +266,6 @@ Garrison,Crate,-1.2,0.95,0,0,1,
 Garrison,CrateNoLid,-1.2,0.95,0.86,6,1,stack
 Garrison,Barrel,0.45,0.85,0,0,1,turn=180
 Garrison,TorchBlazing,1.55,0.55,0,0,1,
-Garrison,TorchBlazingFlame,1.55,0.55,0,0,1,stack
 Garrison,TorchUnlitTar,1.55,1.05,0,0,1,drop
 # GarrisonTable: a trestle table with jugs a barrel and spare torches
 GarrisonTable,TrestleTable,0,0,0,0,1,
@@ -279,6 +276,9 @@ GarrisonTable,TorchUnlitRope,-1.75,0.2,0,0,1,
 # GarrisonBanner: a knot banner post with a log stack
 GarrisonBanner,BannerPostKnot,0,0,0,0,1,
 GarrisonBanner,LogStack,0.45,1.65,0,0,1,
+# GarrisonLion: Oak Hill fort: lion banner pole with a log stack
+GarrisonLion,BannerPoleLion,0,0,0,0,1,
+GarrisonLion,LogStack,0.45,1.65,0,0,1,
 # TowerYard: watchtower plot: firewood crate rope and a spare torch
 TowerYard,Firewood,-0.9,0,0,0,1,
 TowerYard,Crate,0.45,0,0,0,1,
@@ -343,7 +343,6 @@ Campsite,LogCartoon,-2,-0.6,0,72,1,
 Campsite,LogCartoon,2,-0.6,0,-72,1,
 Campsite,Cauldron,-2.2,2.2,0,0,1,turn=180
 Campsite,TorchBlazing,2.3,2,0,0,1,
-Campsite,TorchBlazingFlame,2.3,2,0,0,1,stack
 Campsite,Crate,0.1,-2.3,0,0,1,
 Campsite,RopeCoil,1.35,-2.2,0,0,1,turn=180
 Campsite,Firewood,-1.39,-2.24,0,90,1,
@@ -376,11 +375,9 @@ Blackrock,BannerPoleGriffin,0.6,1.75,0,0,1,drop
 BlackrockPalisade,FencePalisade,0,0,0,0,1,
 BlackrockPalisade,LogStack,-0.6,1.15,0,0,1,
 BlackrockPalisade,TorchBlazing,1.5,0.5,0,0,1,
-BlackrockPalisade,TorchBlazingFlame,1.5,0.5,0,0,1,stack
 # BlackrockGate: Blackrock banners: griffin pole and banner post
 BlackrockGate,BannerPoleGriffin,0,0,0,0,1,
 BlackrockGate,Sconce,0,0.24,1.2,0,1,hang|drop
-BlackrockGate,SconceFlame,0,0.24,1.2,0,1,hang|drop
 # PenSide: pig pen: tub pail hay bale and an open sack pile
 PenSide,WoodTub,0,0,0,0,1,turn=180
 PenSide,Pail,0.7,0.1,0,0,1,turn=180
@@ -400,10 +397,8 @@ WallBannerGriffin,BannerGriffin,0,0.06,3,0,1,hang
 WallAwning,AwningStriped,0,1.05,2.35,0,1,hang
 # WallSconce (wall-backed) (hung on a building wall: Z up the wall): a sconce with its flame
 WallSconce,Sconce,0,0,1.9,0,1,hang
-WallSconce,SconceFlame,0,0,1.9,0,1,hang
 # WallTorch (wall-backed) (hung on a building wall: Z up the wall): a wall torch with its flame
 WallTorch,TorchWall,0,0,1.4,0,1,hang
-WallTorch,TorchWallFlame,0,0,1.4,0,1,hang
 # StonePole: a stone banner pole at a road into town
 StonePole,BannerPoleStone,0,0,0,0,1,
 StonePole,BushSpiky,0,-1.6,0,0,1,turn=180|drop

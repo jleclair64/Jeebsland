@@ -4,7 +4,7 @@
 # drop/alt/turn flags apply (every row was checked with all alternatives present). Plot: JeebOakHill::Plots() index (-1 none), for logs.
 # Laid out offline on a reproduction of OakHill.h (plots from the JEEBOAK PLOT log, roads, counters, doors, foundation stones, TownLabDecor
 # pieces, the spawn, the oak, the river): zero overlaps, every door, counter and plot reachable, no fillable spot over 2.6 m from something.
-# Rows by zone: OakPlaza 51 OakStreet 148 OakYard 245 OakGarden 8 OakBoxingRing 4 OakRuins 6 OakGraveyard 16 OakForts 17 OakWatchtower 2 OakFringe 14.
+# Rows by zone: OakPlaza 51 OakStreet 150 OakYard 242 OakGarden 8 OakBoxingRing 4 OakRuins 6 OakGraveyard 16 OakForts 16 OakWatchtower 2 OakFringe 14.
 Set,E,N,Yaw,Seed,Var,Plot,Note
 MarketRed,-4.7,8.14,60,1,0,-1,plaza market stall on the lawn edge facing the oak
 MarketGreen,7.81,6.56,150,2,0,-1,plaza market stall on the lawn edge facing the oak
@@ -25,35 +25,35 @@ BannerLionPole,-26.48,-2.65,-90,16,0,-1,Oak Hill lion banner pole at the road ou
 DoorstepPots,9.86,13.82,114,17,1,1,doorstep of bank 1
 DoorstepPots,3.6,16.6,114,18,1,1,doorstep of bank 1
 DoorstepPots,-14.21,-9.89,-25,19,1,4,doorstep of potion shop 4
-DoorstepBox,28.89,-2.51,180,20,1,7,doorstep of town hall 7
+DoorstepBench,28.89,-2.84,180,20,1,7,doorstep of town hall 7
 DoorstepBox,28.89,3.02,180,21,1,7,doorstep of town hall 7
 DoorstepCandles,39.34,37.61,105,22,1,8,doorstep of church 8
 DoorstepCandles,35.07,38.75,105,23,1,8,doorstep of church 8
 DoorstepPots,-18.39,42.4,75,24,1,10,doorstep of house 10
-DoorstepBench,-24.05,40.88,75,25,1,10,doorstep of house 10
+DoorstepIvy,-23.91,40.92,75,25,1,10,doorstep of house 10
 DoorstepBench,27.45,46.38,-80,26,1,11,doorstep of house 11
 DoorstepPots,49.34,-12.61,180,27,1,12,doorstep of house 12
-DoorstepPots,-23.43,27.86,-85,28,1,13,doorstep of house 13
+DoorstepBox,-23.1,27.84,-85,28,1,13,doorstep of house 13
 DoorstepPots,-18.6,27.44,-85,29,1,13,doorstep of house 13
 DoorstepIvy,36.86,26.9,105,30,1,14,doorstep of house 14
-DoorstepPots,32.56,28.06,105,31,1,14,doorstep of house 14
+DoorstepIvy,31.72,28.28,105,31,1,14,doorstep of house 14
 DoorstepIvy,53.5,18.84,45,32,1,15,doorstep of house 15
 DoorstepPots,52.42,2.72,180,33,1,16,doorstep of house 16
-DoorstepBench,52.42,8.83,180,34,1,16,doorstep of house 16
-DoorstepPots,-28.73,4.65,90,35,1,17,doorstep of house 17
-DoorstepPots,63.81,25.03,45,36,1,18,doorstep of house 18
-DoorstepPots,-27.27,-23.44,95,37,1,19,doorstep of house 19
+DoorstepIvy,52.42,8.69,180,34,1,16,doorstep of house 16
+DoorstepBox,-29.06,4.65,90,35,1,17,doorstep of house 17
+DoorstepIvy,63.54,24.75,45,36,1,18,doorstep of house 18
+DoorstepBox,-27.6,-23.41,95,37,1,19,doorstep of house 19
 DoorstepBench,-33.11,-22.93,95,38,1,19,doorstep of house 19
 DoorstepPots,-30.04,-45.98,-90,39,1,20,doorstep of house 20
-DoorstepBench,-24.18,-45.98,-90,40,1,20,doorstep of house 20
-DoorstepPots,-15.9,-35.76,-90,41,1,21,doorstep of house 21
+DoorstepIvy,-24.32,-45.98,-90,40,1,20,doorstep of house 20
+DoorstepBox,-15.57,-35.76,-90,41,1,21,doorstep of house 21
 DoorstepBench,-10.04,-35.76,-90,42,1,21,doorstep of house 21
 DoorstepPots,13.74,-37.24,-85,43,1,22,doorstep of house 22
-DoorstepPots,46.17,-37.33,-70,44,1,23,doorstep of house 23
+DoorstepBox,46.48,-37.44,-70,44,1,23,doorstep of house 23
 DoorstepBench,51.68,-39.33,-70,45,1,23,doorstep of house 23
-DoorstepPots,-1.31,-48.5,-80,46,1,24,doorstep of house 24
+DoorstepIvy,-0.93,-48.57,-80,46,1,24,doorstep of house 24
 DoorstepPots,3.47,-49.35,-80,47,1,24,doorstep of house 24
-DoorstepPots,39.24,-24.36,120,48,1,25,doorstep of house 25
+DoorstepBox,38.95,-24.19,120,48,1,25,doorstep of house 25
 DoorstepBench,34.16,-21.43,120,49,1,25,doorstep of house 25
 WallBannerLion,28.93,3.2,180,50,0,7,banner hung on the town hall front (check it sits on the wall)
 WallBannerLion,28.93,-3.6,180,51,0,7,banner hung on the town hall front (check it sits on the wall)
@@ -200,22 +200,22 @@ CypressPair,36.7,-44.9,-90,191,1,29,graveyard plot
 FlowerClump,26.7,-51.9,180,192,1,29,graveyard plot
 GraveyardRow,27.7,-50.9,-90,193,1,29,graveyard plot
 GraveyardBench,35.7,-38.9,-155.25,194,1,29,graveyard plot
-Garrison,-44.1,32.55,-50.75,195,1,30,north fort plot
-GarrisonTable,-41.37,24.96,-100,196,1,30,north fort plot
-GarrisonBanner,-48.27,26.18,170,197,1,30,north fort plot
+GarrisonLion,-44.1,32.55,-50.75,195,1,30,north fort plot
+Garrison,-41.37,24.96,-100,196,1,30,north fort plot
+GarrisonTable,-48.27,26.18,170,197,1,30,north fort plot
 Garrison,-42.24,20.04,80,198,1,30,north fort plot
-Garrison,-43.81,28.44,-10,199,1,30,north fort plot
-GarrisonTable,-46.12,26.82,-10,200,1,30,north fort plot
-GarrisonBanner,-47.05,33.07,130.94,201,1,30,north fort plot
-Garrison,-39.52,29.71,-50.79,202,1,30,north fort plot
-Garrison,-44.8,-25.98,0,203,1,31,south fort plot
-GarrisonTable,-49.8,-21.98,0,204,1,31,south fort plot
-GarrisonBanner,-46.8,-34.98,180,205,1,31,south fort plot
-Garrison,-49.8,-27.98,0,206,1,31,south fort plot
-Garrison,-44.8,-29.98,90,207,1,31,south fort plot
-GarrisonTable,-47.8,-22.98,0,208,1,31,south fort plot
-GarrisonBanner,-44.8,-33.98,90,209,1,31,south fort plot
-Garrison,-45.8,-20.98,0,210,1,31,south fort plot
+GarrisonLion,-43.81,28.44,-10,199,1,30,north fort plot
+Garrison,-46.12,26.82,-10,200,1,30,north fort plot
+GarrisonTable,-47.05,33.07,-49.06,201,1,30,north fort plot
+Garrison,-48.96,22.24,80,202,1,30,north fort plot
+GarrisonLion,-44.8,-25.98,0,203,1,31,south fort plot
+Garrison,-49.8,-21.98,0,204,1,31,south fort plot
+GarrisonTable,-46.8,-22.98,180,205,1,31,south fort plot
+Garrison,-46.8,-34.98,90,206,1,31,south fort plot
+GarrisonLion,-49.8,-27.98,0,207,1,31,south fort plot
+Garrison,-44.8,-29.98,-90,208,1,31,south fort plot
+GarrisonTable,-45.8,-32.98,-90,209,1,31,south fort plot
+Garrison,-44.8,-20.98,0,210,1,31,south fort plot
 TowerYard,-14.8,29.4,90.33,211,1,32,watchtower plot
 Dock,-49.97,-2.94,-89.18,212,1,33,bridge plot
 CobbleWell,60,-62,45,213,0,-1,the big cobbled well: a landmark on the fringe
@@ -265,255 +265,253 @@ BushClump,-16.87,-20.37,51.96,256,1,-1,yard gap
 KitchenGarden,61.63,37.63,121.3,257,1,-1,yard gap
 HedgeRun,-30.87,-7.87,-89.21,258,1,-1,yard gap
 VegCorner,-12.87,-50.87,-123.4,259,1,-1,yard gap
-VegCorner,58.13,-20.87,127.67,260,1,-1,yard gap
-BushClump,-3.87,51.63,100.81,261,1,-1,yard gap
-BushClump,-20.37,54.63,85.62,262,1,-1,yard gap
-BushClump,-42.87,-41.37,36.71,263,1,-1,yard gap
+BushClump,-42.87,-40.87,39.73,260,1,-1,yard gap
+VegCorner,58.13,-20.87,127.67,261,1,-1,yard gap
+BushClump,-3.87,51.63,100.81,262,1,-1,yard gap
+BushClump,-20.37,54.63,85.62,263,1,-1,yard gap
 CartCorner,55.63,-32.37,170.51,264,1,-1,yard gap
 BushClump,9.13,51.63,26.46,265,1,-1,yard gap
 BushClump,-5.87,29.63,-75.86,266,1,-1,yard gap
 HedgeRun,-34.37,-58.37,-142.32,267,1,-1,yard gap
-CartCorner,-44.37,-14.87,-90.63,268,1,-1,yard gap
-StumpCorner,19.13,35.63,109.9,269,1,-1,yard gap
-BushClump,64.63,-8.37,-130.58,270,1,-1,yard gap
-CartCorner,26.13,58.63,169.37,271,1,-1,yard gap
-ChickenYard,25.63,-30.37,-43.77,272,1,-1,yard gap
-BushClump,46.63,31.63,124.71,273,1,-1,yard gap
-HedgeRun,17.63,-51.87,-61.88,274,1,-1,yard gap
-BushClump,-38.87,-26.87,59.44,275,1,-1,yard gap
-BushClump,63.13,-18.37,134.24,276,1,-1,yard gap
-CartCorner,68.63,35.63,132.99,277,1,-1,yard gap
+StumpCorner,19.13,35.63,109.9,268,1,-1,yard gap
+BushClump,64.63,-8.37,-130.58,269,1,-1,yard gap
+CartCorner,26.13,58.63,169.37,270,1,-1,yard gap
+ChickenYard,25.63,-30.37,-43.77,271,1,-1,yard gap
+BushClump,46.63,31.63,124.71,272,1,-1,yard gap
+HedgeRun,17.63,-51.87,-61.88,273,1,-1,yard gap
+VegCorner,-43.87,-14.87,-90.25,274,1,-1,yard gap
+BushClump,63.13,-18.37,134.24,275,1,-1,yard gap
+CartCorner,68.63,35.63,132.99,276,1,-1,yard gap
+Orchard,48.63,-26.87,102.64,277,1,-1,yard gap
 HedgeRun,-40.87,-60.37,-119.64,278,1,-1,yard gap
-BushClump,48.63,-26.87,102.64,279,1,-1,yard gap
-Orchard,-48.37,20.13,-50.17,280,1,-1,yard gap
-CartCorner,0.63,-40.87,-53.78,281,1,-1,yard gap
-BushClump,9.13,-59.87,-55.31,282,1,-1,yard gap
-BushClump,43.63,-51.87,-75.65,283,1,-1,yard gap
-BushClump,21.63,-22.37,-25.35,284,1,-1,yard gap
-ChickenYard,-34.37,50.13,129.11,285,1,-1,yard gap
-BushClump,-14.87,60.13,89.69,286,1,-1,yard gap
-KitchenGarden,-41.37,14.63,90.66,287,1,-1,yard gap
-VegCorner,-41.87,6.63,92.32,288,1,-1,yard gap
-StumpCorner,-24.37,52.13,79.03,289,1,-1,yard gap
-KitchenGarden,-32.87,40.13,126.9,290,1,-1,yard gap
-VegCorner,14.13,59.63,22.12,291,1,-1,yard gap
-VegCorner,63.13,16.13,166.8,292,1,-1,yard gap
-FlowerClump,-11.87,-16.37,-51.69,293,1,-1,yard gap
-HedgeRun,-36.87,-6.37,-88.91,294,1,-1,yard gap
-HedgeRun,50.13,44.13,123.68,295,1,-1,yard gap
-CartCorner,51.13,-21.37,103.01,296,1,-1,yard gap
-BushClump,24.63,36.13,98.9,297,1,-1,yard gap
-StumpCorner,-7.87,53.63,96.64,298,1,-1,yard gap
-BushClump,63.63,-50.87,-131.58,299,1,-1,yard gap
-Orchard,-37.87,-37.37,38.75,300,1,-1,yard gap
-CartCorner,31.63,15.13,-55.87,301,1,-1,yard gap
-VegCorner,-32.37,-64.37,-140.33,302,1,-1,yard gap
-KitchenGarden,-13.37,-63.37,-170,303,1,-1,yard gap
-ChickenYard,-30.37,-31.37,95,304,1,-1,yard gap
-BushClump,-13.87,50.63,91.12,305,1,-1,yard gap
+CartCorner,0.63,-40.87,-53.78,279,1,-1,yard gap
+BushClump,9.13,-59.87,-55.31,280,1,-1,yard gap
+BushClump,43.63,-51.87,-75.65,281,1,-1,yard gap
+BushClump,21.63,-22.37,-25.35,282,1,-1,yard gap
+ChickenYard,-34.37,50.13,129.11,283,1,-1,yard gap
+BushClump,-14.87,60.13,89.69,284,1,-1,yard gap
+VegCorner,-38.37,-26.87,57.6,285,1,-1,yard gap
+KitchenGarden,-41.37,14.63,90.66,286,1,-1,yard gap
+VegCorner,-41.87,6.63,92.32,287,1,-1,yard gap
+StumpCorner,-24.37,52.13,79.03,288,1,-1,yard gap
+BushClump,-32.87,40.13,126.9,289,1,-1,yard gap
+VegCorner,14.13,59.63,22.12,290,1,-1,yard gap
+VegCorner,63.13,16.13,166.8,291,1,-1,yard gap
+FlowerClump,-11.87,-16.37,-51.69,292,1,-1,yard gap
+HedgeRun,-36.87,-6.37,-88.91,293,1,-1,yard gap
+HedgeRun,50.13,44.13,123.68,294,1,-1,yard gap
+CartCorner,51.13,-21.37,103.01,295,1,-1,yard gap
+BushClump,24.63,36.13,98.9,296,1,-1,yard gap
+StumpCorner,-7.87,53.63,96.64,297,1,-1,yard gap
+BushClump,63.63,-50.87,-131.58,298,1,-1,yard gap
+Orchard,-37.87,-37.37,38.75,299,1,-1,yard gap
+CartCorner,31.63,15.13,-55.87,300,1,-1,yard gap
+HedgeRun,-32.37,-64.37,-140.33,301,1,-1,yard gap
+KitchenGarden,-13.37,-63.37,-170,302,1,-1,yard gap
+ChickenYard,-30.37,-31.37,95,303,1,-1,yard gap
+BushClump,-13.87,50.63,91.12,304,1,-1,yard gap
+HedgeBoxPair,-36.37,27.63,-52.78,305,1,-1,yard gap
 BushClump,66.13,4.63,-158.19,306,1,-1,yard gap
 CartCorner,48.13,51.13,-167.59,307,1,-1,yard gap
 BenchNook,20.13,-16.37,-12.84,308,1,-1,yard gap
 KitchenGarden,-16.37,-55.37,-121.95,309,1,-1,yard gap
 HedgeRun,69.63,26.13,148.72,310,1,-1,yard gap
 BenchNook,-8.87,-31.37,-129.07,311,1,-1,yard gap
-HedgeRun,-30.87,26.63,-109.96,312,1,-1,yard gap
-BenchNook,33.13,-33.87,-60.76,313,1,-1,yard gap
-CartCorner,-8.87,-67.37,-121.97,314,1,-1,yard gap
-BushClump,62.13,-2.37,-136.01,315,1,-1,yard gap
+BenchNook,33.13,-33.87,-60.76,312,1,-1,yard gap
+ChickenYard,62.13,-2.37,180,313,1,-1,yard gap
+CartCorner,-30.87,26.63,-109.96,314,1,-1,yard gap
+CartCorner,-8.87,-67.37,-121.97,315,1,-1,yard gap
 BushClump,8.63,46.63,27.47,316,1,-1,yard gap
-BushClump,-37.37,19.13,-71.11,317,1,-1,yard gap
-Orchard,-9.37,-57.37,-123.67,318,1,-1,yard gap
-Orchard,42.13,-55.87,-75.94,319,1,-1,yard gap
-FlowerClump,-18.37,-24.37,51.54,320,1,-1,yard gap
-CartCorner,-22.87,-60.37,-140.79,321,1,-1,yard gap
-VegCorner,61.63,-41.87,-148.16,322,1,-1,yard gap
-HedgeRun,51.13,55.63,105,323,1,-1,yard gap
-HedgeBoxPair,-23.37,-41.37,-119.97,324,1,-1,yard gap
-BushClump,71.13,-2.37,-148.76,325,1,-1,yard gap
-VegCorner,71.63,41.13,130.64,326,1,-1,yard gap
-BushClump,32.13,58.13,176.69,327,1,-1,yard gap
-BushClump,13.13,-61.37,-63.11,328,1,-1,yard gap
-BushClump,63.63,-35.87,-171.56,329,1,-1,yard gap
-BushClump,-30.87,57.13,129.33,330,1,-1,yard gap
-FlowerClump,-10.87,31.63,-85.25,331,1,-1,yard gap
-BushClump,-20.87,-18.87,52.67,332,1,-1,yard gap
-BushClump,-1.87,29.13,29.32,333,1,-1,yard gap
-FlowerClump,15.13,-27.87,120.89,334,1,-1,yard gap
-ChickenYard,-30.87,19.63,-99.15,335,1,-1,yard gap
-BenchNook,-35.87,-53.37,-142.79,336,1,-1,yard gap
-ChickenYard,-45.87,-6.87,95,337,1,-1,yard gap
-CartCorner,58.13,-27.87,149.77,338,1,-1,yard gap
-VegCorner,57.13,35.63,121.35,339,1,-1,yard gap
-HedgeRun,-3.37,-63.87,10,340,1,-1,yard gap
-KitchenGarden,52.13,-56.87,-99.33,341,1,-1,yard gap
-HedgeRun,10.63,-53.37,10,342,1,-1,yard gap
-VegCorner,55.63,-37.37,-152.74,343,1,-1,yard gap
-HedgeRun,-29.37,-59.87,-140.29,344,1,-1,yard gap
-BushClump,14.63,35.63,-150.29,345,1,-1,yard gap
-BushClump,-27.37,-10.87,-88.94,346,1,-1,yard gap
-KitchenGarden,75.13,24.63,-135,347,1,-1,yard gap
-CartCorner,-36.37,55.63,130.24,348,1,-1,yard gap
-StumpCorner,43.63,28.63,124.71,349,1,-1,yard gap
+HedgeRun,-22.37,-42.37,-90,317,1,-1,yard gap
+BushClump,-37.37,19.13,-71.11,318,1,-1,yard gap
+Orchard,-9.37,-57.37,-123.67,319,1,-1,yard gap
+Orchard,42.13,-55.87,-75.94,320,1,-1,yard gap
+FlowerClump,-18.37,-24.37,51.54,321,1,-1,yard gap
+CartCorner,-22.87,-60.37,-140.79,322,1,-1,yard gap
+VegCorner,61.63,-41.87,-148.16,323,1,-1,yard gap
+VegCorner,-41.87,-35.87,37.97,324,1,-1,yard gap
+HedgeRun,51.13,55.63,105,325,1,-1,yard gap
+Orchard,71.13,-2.37,-148.76,326,1,-1,yard gap
+VegCorner,71.63,41.13,130.64,327,1,-1,yard gap
+BushClump,32.13,58.13,176.69,328,1,-1,yard gap
+BushClump,13.13,-61.37,-63.11,329,1,-1,yard gap
+BushClump,63.63,-35.87,-171.56,330,1,-1,yard gap
+BushClump,-30.87,57.13,129.33,331,1,-1,yard gap
+FlowerClump,-10.87,31.63,-85.25,332,1,-1,yard gap
+BushClump,-20.87,-18.87,52.67,333,1,-1,yard gap
+BushClump,-1.87,29.13,29.32,334,1,-1,yard gap
+FlowerClump,15.13,-27.87,120.89,335,1,-1,yard gap
+ChickenYard,-30.87,19.63,-99.15,336,1,-1,yard gap
+BenchNook,-35.87,-53.37,-142.79,337,1,-1,yard gap
+HedgeRun,-45.87,-6.87,-175,338,1,-1,yard gap
+CartCorner,58.13,-27.87,149.77,339,1,-1,yard gap
+VegCorner,57.13,35.63,121.35,340,1,-1,yard gap
+HedgeRun,-3.37,-63.87,10,341,1,-1,yard gap
+KitchenGarden,52.13,-56.87,-99.33,342,1,-1,yard gap
+HedgeRun,10.63,-53.37,10,343,1,-1,yard gap
+VegCorner,55.63,-37.37,-152.74,344,1,-1,yard gap
+HedgeRun,-29.37,-59.87,-90,345,1,-1,yard gap
+BushClump,14.63,35.63,-150.29,346,1,-1,yard gap
+BushClump,-27.37,-10.87,-88.94,347,1,-1,yard gap
+KitchenGarden,75.13,24.63,-135,348,1,-1,yard gap
+CartCorner,-36.37,55.63,130.24,349,1,-1,yard gap
 Orchard,47.63,-51.87,-87.88,350,1,-1,yard gap
-BushClump,57.13,-43.37,-132.08,351,1,-1,yard gap
-BushClump,42.63,55.63,-175.59,352,1,-1,yard gap
-Orchard,20.13,-45.37,-53.98,353,1,-1,yard gap
-BushClump,66.63,18.13,163.6,354,1,-1,yard gap
-FlowerClump,0.13,40.13,110.64,355,1,-1,yard gap
-ChickenYard,55.13,47.63,-165,356,1,-1,yard gap
-FlowerClump,13.13,54.63,26.83,357,1,-1,yard gap
-BushClump,-25.87,55.63,78.41,358,1,-1,yard gap
-FlowerClump,18.13,23.13,-69.67,359,1,-1,yard gap
-Orchard,-41.37,-64.37,-105.91,360,1,-1,yard gap
-HedgeBoxPair,-34.37,-35.37,54.54,361,1,-1,yard gap
-StumpCorner,-41.87,-18.87,-90.81,362,1,-1,yard gap
-HedgeBoxPair,19.63,19.13,-6.76,363,1,-1,yard gap
-BushClump,49.63,40.13,124.44,364,1,-1,yard gap
-PlanterPair,-11.87,-19.87,50.75,365,1,-1,yard gap
-BushClump,67.13,-5.37,-138.82,366,1,-1,yard gap
-PicketCorner,-39.87,10.13,180,367,1,-1,yard gap
-BushClump,29.13,49.63,-156.99,368,1,-1,yard gap
-ChickenYard,50.13,59.63,175.83,369,1,-1,yard gap
-BushYellowFlowers,-53.37,4.63,75,370,1,-1,filler
-StumpGrass,-20.17,33.92,15,371,1,-1,filler
-ShrubLow,-49.87,3.63,135,372,1,-1,filler
-StumpPainted,-16.87,34.63,-165,373,1,-1,filler
-BushBall,-22.87,-30.87,-135,374,1,-1,filler
-BushBall,-31.87,-2.87,-135,375,1,-1,filler
-PlantClump,-24.87,33.13,-75,376,1,-1,filler
-ShrubLow,21.13,-35.37,135,377,1,-1,filler
-BushSpiky,-10.31,40.19,-45,378,1,-1,filler
-BushWhiteFlowers,30.42,-28.58,165,379,1,-1,filler
-ShrubLow,36.63,22.13,75,380,1,-1,filler
-ShrubLow,9.42,42.33,15,381,1,-1,filler
-BushYellowFlowers,-28.87,31.63,-105,382,1,-1,filler
-BushSpiky,20.83,60.33,15,383,1,-1,filler
-StumpPainted,37.42,14.92,15,384,1,-1,filler
-ShrubLow,-42.87,-48.87,-75,385,1,-1,filler
-ShrubLow,-4.37,-15.87,-105,386,1,-1,filler
-StumpPainted,-27.81,-41.44,-165,387,1,-1,filler
-ShrubLow,13.42,49.83,165,388,1,-1,filler
-BushDome,-36.87,-41.37,-165,389,1,-1,filler
-BushYellowFlowers,-19.37,-28.37,-45,390,1,-1,filler
-BushBall,8.42,-33.08,75,391,1,-1,filler
-BushWhiteFlowers,-12.87,-23.87,105,392,1,-1,filler
-BushWhiteFlowers,-45.17,2.83,-135,393,1,-1,filler
-BushDome,50.63,-32.37,45,394,1,-1,filler
-BushLeafy,-9.37,-5.87,75,395,1,-1,filler
-BushYellowFlowers,27.69,21.56,-75,396,1,-1,filler
-BushBall,6.42,-9.17,-75,397,1,-1,filler
-BushYellowFlowers,-38.87,-2.87,-75,398,1,-1,filler
-PlantClump,-3.31,39.19,-45,399,1,-1,filler
-BushDome,-7.87,34.13,45,400,1,-1,filler
-ShrubLow,11.63,-28.87,-165,401,1,-1,filler
-BushSpiky,17.83,-32.17,-15,402,1,-1,filler
-BushSpiky,45.63,-29.87,-105,403,1,-1,filler
+StumpCorner,43.63,28.63,124.71,351,1,-1,yard gap
+BushClump,57.13,-43.37,-132.08,352,1,-1,yard gap
+BushClump,42.63,55.63,-175.59,353,1,-1,yard gap
+Orchard,20.13,-45.37,-53.98,354,1,-1,yard gap
+HedgeBoxPair,-42.87,-44.87,38.8,355,1,-1,yard gap
+FlowerClump,51.63,-29.87,131.75,356,1,-1,yard gap
+BushClump,66.63,18.13,163.6,357,1,-1,yard gap
+FlowerClump,0.13,40.13,110.64,358,1,-1,yard gap
+ChickenYard,55.13,47.63,-165,359,1,-1,yard gap
+FlowerClump,13.13,54.63,26.83,360,1,-1,yard gap
+BushClump,-25.87,55.63,78.41,361,1,-1,yard gap
+HedgeBoxPair,18.13,23.13,-69.67,362,1,-1,yard gap
+BushClump,-41.37,-64.37,-105.91,363,1,-1,yard gap
+FlowerClump,-34.37,-35.37,54.54,364,1,-1,yard gap
+BushClump,49.63,40.13,124.44,365,1,-1,yard gap
+PlanterPair,-11.87,-19.87,50.75,366,1,-1,yard gap
+BushClump,67.13,-5.37,-138.82,367,1,-1,yard gap
+PicketCorner,-39.87,10.13,180,368,1,-1,yard gap
+BushClump,29.13,49.63,-156.99,369,1,-1,yard gap
+ChickenYard,50.13,59.63,175.83,370,1,-1,yard gap
+BenchNook,19.63,19.13,-6.76,371,1,-1,yard gap
+BushYellowFlowers,-53.37,4.63,75,372,1,-1,filler
+StumpGrass,-20.17,33.92,15,373,1,-1,filler
+ShrubLow,-49.87,3.63,135,374,1,-1,filler
+StumpPainted,-16.87,34.63,-165,375,1,-1,filler
+BushBall,-22.87,-30.87,-135,376,1,-1,filler
+BushBall,-31.87,-2.87,-135,377,1,-1,filler
+PlantClump,-24.87,33.13,-75,378,1,-1,filler
+ShrubLow,21.13,-35.37,135,379,1,-1,filler
+BushSpiky,-10.31,40.19,-45,380,1,-1,filler
+BushWhiteFlowers,30.42,-28.58,165,381,1,-1,filler
+ShrubLow,36.63,22.13,75,382,1,-1,filler
+ShrubLow,9.42,42.33,15,383,1,-1,filler
+StumpPainted,-27.81,-41.44,-165,384,1,-1,filler
+BushYellowFlowers,-28.87,31.63,-105,385,1,-1,filler
+BushSpiky,20.83,60.33,15,386,1,-1,filler
+StumpPainted,37.42,14.92,15,387,1,-1,filler
+BushWhiteFlowers,-37.17,39.33,-165,388,1,-1,filler
+ShrubLow,-4.37,-15.87,-105,389,1,-1,filler
+BushDome,46.63,-30.37,165,390,1,-1,filler
+ShrubLow,13.42,49.83,165,391,1,-1,filler
+BushYellowFlowers,-19.37,-28.37,-45,392,1,-1,filler
+BushBall,8.42,-33.08,75,393,1,-1,filler
+BushWhiteFlowers,-12.87,-23.87,105,394,1,-1,filler
+BushWhiteFlowers,-45.17,2.83,-135,395,1,-1,filler
+BushBall,6.42,-9.17,-75,396,1,-1,filler
+BushLeafy,-9.37,-5.87,75,397,1,-1,filler
+BushYellowFlowers,27.69,21.56,-75,398,1,-1,filler
+BushYellowFlowers,-38.87,-2.87,-75,399,1,-1,filler
+PlantClump,-3.31,39.19,-45,400,1,-1,filler
+BushDome,-7.87,34.13,45,401,1,-1,filler
+ShrubLow,11.63,-28.87,-165,402,1,-1,filler
+BushSpiky,17.83,-32.17,-15,403,1,-1,filler
 BushLeafy,11.13,-1.37,-45,404,1,-1,filler
-BushLeafy,-3.37,33.13,135,405,1,-1,filler
-BushRound,22.63,-13.37,105,406,1,-1,filler
-BushRound,-8.58,-14.58,105,407,1,-1,filler
-BushRound,-34.08,29.42,135,408,1,-1,filler
-BushRound,37.42,-33.08,-105,409,1,-1,filler
-StumpPainted,-8.87,-27.87,-165,410,1,-1,filler
-BushRound,14.92,26.92,-75,411,1,-1,filler
-BushDome,-32.87,35.63,-105,412,1,-1,filler
-BushWhiteFlowers,28.13,13.13,105,413,1,-1,filler
-ShrubLow,44.63,10.63,15,414,1,-1,filler
-BushLeafy,-13.37,-31.37,15,415,1,-1,filler
-BushBall,28.63,-14.37,165,416,1,-1,filler
-BushWhiteFlowers,-40.17,2.83,-75,417,1,-1,filler
-ShrubLow,14.13,39.63,75,418,1,-1,filler
-PlantClump,33.92,-31.08,105,419,1,-1,filler
-BushDome,1.63,31.13,105,420,1,-1,filler
-BushRound,10.63,33.63,-75,421,1,-1,filler
-BushWhiteFlowers,-37.17,39.33,-165,422,1,-1,filler
-PlantClump,-38.17,-51.58,-135,423,1,-1,filler
-ShrubLow,23.63,-18.37,-135,424,1,-1,filler
-BushBall,40.42,12.92,75,425,1,-1,filler
-ShrubLow,-53.37,2.13,165,426,1,-1,filler
-StumpPainted,-42.87,36.63,-165,427,1,-1,filler
-ShrubLow,-25.87,-27.37,-135,428,1,-1,filler
-BushDome,22.13,56.13,-75,429,1,-1,filler
-PlantClump,-26.58,-33.17,-15,430,1,-1,filler
-BushRound,-30.73,-26.73,-75,431,1,-1,filler
-BushYellowFlowers,-35.37,-2.87,15,432,1,-1,filler
-BushWhiteFlowers,10.92,27.92,105,433,1,-1,filler
-BushDome,34.63,23.63,45,434,1,-1,filler
-BushLeafy,20.42,24.92,-45,435,1,-1,filler
-PlantClump,-12.87,34.63,-165,436,1,-1,filler
-BushLeafy,-6.87,39.63,-105,437,1,-1,filler
+BushRound,14.92,26.92,-75,405,1,-1,filler
+BushLeafy,-3.37,33.13,135,406,1,-1,filler
+BushRound,22.63,-13.37,105,407,1,-1,filler
+BushDome,-32.87,35.63,-105,408,1,-1,filler
+BushRound,-8.58,-14.58,105,409,1,-1,filler
+BushRound,37.42,-33.08,-105,410,1,-1,filler
+ShrubLow,-42.87,-48.87,-75,411,1,-1,filler
+StumpPainted,-8.87,-27.87,-165,412,1,-1,filler
+BushDome,50.63,-34.87,165,413,1,-1,filler
+BushWhiteFlowers,28.13,13.13,105,414,1,-1,filler
+ShrubLow,44.63,10.63,15,415,1,-1,filler
+BushLeafy,-13.37,-31.37,15,416,1,-1,filler
+BushBall,28.63,-14.37,165,417,1,-1,filler
+BushWhiteFlowers,-40.17,2.83,-75,418,1,-1,filler
+ShrubLow,14.13,39.63,75,419,1,-1,filler
+PlantClump,33.92,-31.08,105,420,1,-1,filler
+ShrubLow,32.13,25.63,-15,421,1,-1,filler
+BushDome,1.63,31.13,105,422,1,-1,filler
+BushRound,10.63,33.63,-75,423,1,-1,filler
+BushBall,-36.08,-40.17,-45,424,1,-1,filler
+PlantClump,-38.17,-51.58,-135,425,1,-1,filler
+ShrubLow,23.63,-18.37,-135,426,1,-1,filler
+BushBall,40.42,12.92,75,427,1,-1,filler
+ShrubLow,-53.37,2.13,165,428,1,-1,filler
+ShrubLow,-25.87,-27.37,-135,429,1,-1,filler
+BushDome,22.13,56.13,-75,430,1,-1,filler
+PlantClump,-26.58,-33.17,-15,431,1,-1,filler
+BushRound,-30.73,-26.73,-75,432,1,-1,filler
+BushYellowFlowers,-35.37,-2.87,15,433,1,-1,filler
+BushWhiteFlowers,10.92,27.92,105,434,1,-1,filler
+PlantClump,-12.87,34.63,-165,435,1,-1,filler
+BushLeafy,-6.87,39.63,-105,436,1,-1,filler
+PlantClump,-0.87,-44.87,-15,437,1,-1,filler
 ShrubLow,49.13,3.63,-15,438,1,-1,filler
-BushSpiky,28.13,16.63,135,439,1,-1,filler
-BushSpiky,-0.58,26.33,135,440,1,-1,filler
-BushDome,17.83,31.83,-135,441,1,-1,filler
-StumpPainted,22.13,16.13,165,442,1,-1,filler
-BushLeafy,-1.37,-44.37,-15,443,1,-1,filler
+BushBerries,22.13,18.63,15,439,1,-1,filler
+BushSpiky,28.13,16.63,135,440,1,-1,filler
+BushSpiky,-0.58,26.33,135,441,1,-1,filler
+BushDome,17.83,31.83,-135,442,1,-1,filler
+StumpGrass,65.13,21.13,45,443,1,-1,filler
 BushBerries,16.92,58.83,75,444,1,-1,filler
 BushYellowFlowers,-31.02,-42.73,-15,445,1,-1,filler
-StumpGrass,65.13,21.13,45,446,1,-1,filler
-BushYellowFlowers,24.63,32.63,-135,447,1,-1,filler
-BushRound,1.63,-44.87,-165,448,1,-1,filler
-ShrubLow,11.13,2.63,-135,449,1,-1,filler
-PlantClump,-13.87,40.13,-105,450,1,-1,filler
-ShrubLow,-15.87,-48.37,15,451,1,-1,filler
-ShrubLow,68.13,-11.37,75,452,1,-1,filler
-BushLeafy,-36.87,-9.87,-75,453,1,-1,filler
-BushLeafy,-17.87,58.13,105,454,1,-1,filler
-BushDome,51.13,-35.37,-15,455,1,-1,filler
-BushBall,31.63,25.63,-15,456,1,-1,filler
-BushYellowFlowers,-4.87,47.63,75,457,1,-1,filler
-PlantClump,-18.37,31.13,135,458,1,-1,filler
-ShrubLow,61.13,42.63,135,459,1,-1,filler
-BushBall,19.63,-57.37,105,460,1,-1,filler
-ShrubLow,25.63,54.13,-45,461,1,-1,filler
-ShrubLow,58.13,-49.87,105,462,1,-1,filler
-BushLeafy,-35.08,-38.67,-15,463,1,-1,filler
-BushBall,-9.87,-21.37,-105,464,1,-1,filler
-BushDome,4.77,10.27,15,465,1,-1,filler
-PlantClump,-28.87,38.13,15,466,1,-1,filler
-BushYellowFlowers,54.13,39.13,165,467,1,-1,filler
-ShrubLow,24.63,-20.87,-105,468,1,-1,filler
-BushWhiteFlowers,64.63,8.13,15,469,1,-1,filler
-PlantClump,48.83,7.92,-45,470,1,-1,filler
-BushDome,-37.37,26.13,-105,471,1,-1,filler
-ShrubLow,22.63,-52.87,75,472,1,-1,filler
-ShrubLow,18.63,-23.87,135,473,1,-1,filler
-BushYellowFlowers,63.63,0.63,-135,474,1,-1,filler
-BushRound,-12.37,26.63,105,475,1,-1,filler
-ShrubLow,48.13,34.63,-165,476,1,-1,filler
-ShrubLow,32.13,51.63,15,477,1,-1,filler
-BushBerries,-10.87,-53.87,165,478,1,-1,filler
-BushLeafy,23.63,-36.87,-105,479,1,-1,filler
-StumpPainted,-40.37,-13.37,-135,480,1,-1,filler
-BushLeafy,62.63,-12.37,-15,481,1,-1,filler
-PlantClump,71.13,1.13,-15,482,1,-1,filler
-ShrubLow,42.13,59.13,45,483,1,-1,filler
-PlantClump,-14.87,-25.37,75,484,1,-1,filler
-ShrubLow,-29.37,-4.87,-45,485,1,-1,filler
-BushYellowFlowers,-23.37,-2.87,135,486,1,-1,filler
-BushBall,-22.37,13.63,-75,487,1,-1,filler
-BushYellowFlowers,34.42,16.92,-165,488,1,-1,filler
-BushBall,51.63,31.13,15,489,1,-1,filler
-ShrubLow,63.63,40.63,-15,490,1,-1,filler
-BushSpiky,-2.37,-36.87,-105,491,1,-1,filler
-BushSpiky,-31.87,-11.37,-165,492,1,-1,filler
-ShrubLow,-33.87,-27.37,75,493,1,-1,filler
+BushYellowFlowers,24.63,32.63,-135,446,1,-1,filler
+ShrubLow,11.13,2.63,-135,447,1,-1,filler
+PlantClump,-28.87,38.13,15,448,1,-1,filler
+PlantClump,-13.87,40.13,-105,449,1,-1,filler
+ShrubLow,-15.87,-48.37,15,450,1,-1,filler
+ShrubLow,68.13,-11.37,75,451,1,-1,filler
+BushLeafy,-36.87,-9.87,-75,452,1,-1,filler
+BushLeafy,-17.87,58.13,105,453,1,-1,filler
+BushYellowFlowers,-4.87,47.63,75,454,1,-1,filler
+PlantClump,-18.37,31.13,135,455,1,-1,filler
+ShrubLow,61.13,42.63,135,456,1,-1,filler
+BushBall,19.63,-57.37,105,457,1,-1,filler
+BushWhiteFlowers,-36.08,30.92,-135,458,1,-1,filler
+ShrubLow,25.63,54.13,-45,459,1,-1,filler
+ShrubLow,58.13,-49.87,105,460,1,-1,filler
+BushBall,-9.87,-21.37,-105,461,1,-1,filler
+BushDome,4.77,10.27,15,462,1,-1,filler
+BushYellowFlowers,54.13,39.13,165,463,1,-1,filler
+ShrubLow,24.63,-20.87,-105,464,1,-1,filler
+BushWhiteFlowers,64.63,8.13,15,465,1,-1,filler
+ShrubLow,22.63,-52.87,75,466,1,-1,filler
+ShrubLow,18.63,-23.87,135,467,1,-1,filler
+BushLeafy,20.42,24.92,-45,468,1,-1,filler
+BushRound,-12.37,26.63,105,469,1,-1,filler
+ShrubLow,48.13,34.63,-165,470,1,-1,filler
+ShrubLow,32.13,51.63,15,471,1,-1,filler
+BushLeafy,48.98,7.27,105,472,1,-1,filler
+BushBerries,-10.87,-53.87,165,473,1,-1,filler
+BushLeafy,23.63,-36.87,-105,474,1,-1,filler
+BushLeafy,62.63,-12.37,-15,475,1,-1,filler
+ShrubLow,42.13,59.13,45,476,1,-1,filler
+PlantClump,-14.87,-25.37,75,477,1,-1,filler
+BushLeafy,-2.94,-22.44,75,478,1,-1,filler
+ShrubLow,-29.37,-4.87,-45,479,1,-1,filler
+BushYellowFlowers,-23.37,-2.87,135,480,1,-1,filler
+BushBall,-22.37,13.63,-75,481,1,-1,filler
+BushYellowFlowers,34.42,16.92,-165,482,1,-1,filler
+BushBall,51.63,31.13,15,483,1,-1,filler
+BushRound,-42.58,36.42,-75,484,1,-1,filler
+ShrubLow,63.63,40.63,-15,485,1,-1,filler
+BushRound,2.13,-44.87,-135,486,1,-1,filler
+BushSpiky,-2.37,-36.87,-105,487,1,-1,filler
+BushSpiky,-31.87,-11.37,-165,488,1,-1,filler
+ShrubLow,70.63,1.63,-15,489,1,-1,filler
+ShrubLow,22.63,15.63,75,490,1,-1,filler
+ShrubLow,-33.37,-37.87,75,491,1,-1,filler
+ShrubLow,-33.87,-27.37,75,492,1,-1,filler
+BushBerries,-38.87,-12.87,-135,493,1,-1,filler
 BushBall,-11.08,-12.58,75,494,1,-1,filler
-BushLeafy,38.13,-26.87,-45,495,1,-1,filler
-BushLeafy,-2.94,-22.44,75,496,1,-1,filler
-ShrubLow,2.13,-67.87,-15,497,1,-1,filler
-PlantClump,-36.17,-49.08,-165,498,1,-1,filler
-PlantClump,42.63,-47.87,135,499,1,-1,filler
-BushLeafy,-40.37,-29.87,-165,500,1,-1,filler
-BushYellowFlowers,52.13,-29.87,-15,501,1,-1,filler
-StumpGrass,-41.37,-23.87,15,502,1,-1,filler
-BushLeafy,-22.73,31.48,135,503,1,-1,filler
-StumpPainted,10.56,45.19,75,504,1,-1,filler
-PlantClump,33.63,54.13,-45,505,1,-1,filler
-ShrubLow,17.77,-39.23,165,506,1,-1,filler
-BushBall,29.13,-17.37,-45,507,1,-1,filler
-BushWhiteFlowers,-9.87,28.63,-165,508,1,-1,filler
-StumpGrass,-17.31,40.19,15,509,1,-1,filler
-BushBall,-32.37,46.13,75,510,1,-1,filler
-BushWhiteFlowers,33.63,-23.37,135,511,1,-1,filler
+ShrubLow,2.13,-67.87,-15,495,1,-1,filler
+PlantClump,-36.17,-49.08,-165,496,1,-1,filler
+BushLeafy,38.13,-26.87,-45,497,1,-1,filler
+PlantClump,42.63,-47.87,135,498,1,-1,filler
+BushLeafy,-22.73,31.48,135,499,1,-1,filler
+StumpPainted,10.56,45.19,75,500,1,-1,filler
+PlantClump,33.63,54.13,-45,501,1,-1,filler
+ShrubLow,17.77,-39.23,165,502,1,-1,filler
+BushLeafy,-25.87,-39.37,135,503,1,-1,filler
+BushYellowFlowers,43.83,-29.67,-165,504,1,-1,filler
+BushBall,29.13,-17.37,-45,505,1,-1,filler
+BushWhiteFlowers,-9.87,28.63,-165,506,1,-1,filler
+StumpGrass,-17.31,40.19,15,507,1,-1,filler
+BushBall,-32.37,46.13,75,508,1,-1,filler
+BushWhiteFlowers,33.63,-23.37,135,509,1,-1,filler
