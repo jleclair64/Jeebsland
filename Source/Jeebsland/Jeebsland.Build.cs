@@ -29,10 +29,10 @@ public class Jeebsland : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "RHI", "RenderCore" });   // (RHIGetGPUFrameCycles: the JEEBGPU test log)
 
-		// Editor-only import helpers (JeebEditorTools: Megaplant dynamic wind from Fab's USD download)
+		// Editor-only (the Megaplants DynamicWind import helper went with the pack, 2026-11-16)
 		if (Target.bBuildEditor)
 		{
-			PrivateDependencyModuleNames.AddRange(new string[] { "DynamicWind", "DynamicWindEditor", "Json", "JsonUtilities" });
+			PrivateDependencyModuleNames.AddRange(new string[] { "Json", "JsonUtilities" });
 		}
 
 		PublicIncludePaths.AddRange(new string[] {
