@@ -279,7 +279,7 @@ BUILD.update({   # build-b (townbuild2, 2026-11-14); walls from building_clean.p
 # build-a's props (side, u along the wall from its left end seen from outside, filler piece, its scale, extras) and wall lanterns
 # (side, u, height in the model's cm)
 BUILD_A_PROPS = {
-    "TL_Bank": [("left", 200, "Barrel", 0.85, {}), ("left", 290, "Crate", 0.85, dict(turn=10)), ("back", 250, "GrainSack", 0.85, dict(turn=20)),
+    "TL_Bank": [("left", 200, "Barrel", 0.85, {}), ("left", 290, "Crate", 0.85, dict(turn=10)),
                 ("back", 330, "WheatSack", 0.8, dict(turn=-15)), ("right", 400, "PotRound", 0.9, {})],
     "TL_BankStall": [("back", 150, "Barrel", 0.85, {}), ("back", 240, "Crate", 0.85, dict(turn=10)), ("left", 200, "PotRound", 0.9, {})],
     "TL_Smith": [("back", 1250, "Firewood", 0.9, dict(turn=-20)),   # (Firewood, not LogStackSmall: that one is not in the shipped /Game/TownDecor)
@@ -296,7 +296,7 @@ BUILD_A_LANTERNS = {
 }
 if ONLY: BUILD = {k: v for k, v in BUILD.items() if k in ONLY}
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
-FILLER = ["Crate", "CrateNoLid", "GrainSack", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
+FILLER = ["Crate", "CrateNoLid", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
           "WateringCan", "Pail", "LanternBlack", "LanternOil", "Basket", "ShrubLow", "BushYellowFlowers"]
 FILLER += ["HandCart", "RopeCoil", "SackStack", "SackPileOpen", "SpiceSacks", "CabbageCrate", "CrateOpen", "BarrelSmall", "ClayJug",   # (build-c's stalls)
            "PotJug", "PotAmphora", "Cauldron", "CandleCageShort", "WoodTub", "PotWide"]
@@ -334,7 +334,6 @@ STALL_PROPS = {
         ("right", 120, "CabbageCrate", 0.8, 16, 15, 0, None, False),    # 8  by the front-right post
         ("right", 260, "Crate", 0.85, 16, -8, 0, None, False),          # 9
         ("right", 250, "CrateNoLid", 0.75, 0, 14, 0, 9, False),        # 10 on the crate
-        ("right", 360, "GrainSack", 0.85, 8, 25, 0, None, False),      # 11
         ("right", 420, "WheatSack", 0.8, 6, -20, 0, None, False),      # 12
         ("left", 165, "LanternOil", 0.85, 0, 0, 0, 1, True),           # 13 standing on the small barrel, lit at dusk
     ],
@@ -585,7 +584,7 @@ for bname, B in BUILD.items():
     elif bname == "TL_Store":
         prop("left", 160, "Crate", 0.85, turn=8)
         prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85, turn=-12)
-        prop("left", 270, "GrainSack", 0.85, turn=25); prop("left", 330, "WheatSack", 0.8, turn=-15)
+        prop("left", 330, "WheatSack", 0.8, turn=-15)
         prop("back", 200, "Barrel", 0.85); prop("back", 290, "Basket", 0.8, turn=40)
         prop("right", 260, "WateringCan", 0.8, turn=-40)
         items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -358.0, 183.0)), yaw=0.0, pitch=0.0, roll=0.0,

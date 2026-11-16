@@ -2,7 +2,7 @@
 #pragma once
 struct FFillerGroup { const char* Title; const char* Names; };   // Names: space separated asset names (SM_<name> in /Game/Filler)
 static const FFillerGroup GFillerGroups[] = {
-	{ "Storage: barrels, crates and sacks", "Barrel BarrelSmall Crate CrateNoLid CrateOpen GrainSack SackPileOpen SackStack SackWall SpiceSacks WheatSack" },
+	{ "Storage: barrels, crates and sacks", "Barrel BarrelSmall Crate CrateNoLid CrateOpen SackPileOpen SackStack SackWall SpiceSacks WheatSack" },
 	{ "Firewood and rope", "Firewood FirewoodRack LogPile LogStack LogStackSmall RopeCoil RopeHank" },
 	{ "Pots, jugs and cauldrons", "Basket Cauldron ClayJug ClayPitcher PotAmphora PotJug PotRound PotSmall PotVase PotWide" },
 	{ "Hay, carts and farm things", "ChickenCoop HandCart HayBale HayBaleRound HayWagon NestingBoxes Pail ThatchWagon WateringCan WoodTub" },

@@ -68,7 +68,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 609.3f, -223.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -680.3f, -383.5f, 0.0f, 82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), -670.9f, -383.5f, 73.3f, 102.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_GrainSack.SM_GrainSack"), -646.1f, -273.5f, 0.0f, 65.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), -554.2f, -213.5f, 0.0f, 105.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 361.2f, -621.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Basket.SM_Basket"), 271.2f, -549.5f, 0.0f, 140.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
@@ -87,7 +86,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_CabbageCrate.SM_CabbageCrate"), 615.2f, 204.7f, 0.0f, -105.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 613.3f, 4.7f, 0.0f, -82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), 613.3f, 4.7f, 104.7f, -104.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_GrainSack.SM_GrainSack"), 592.7f, -138.2f, 0.0f, -115.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), 584.2f, -223.9f, 0.0f, -70.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), -590.6f, -141.0f, 123.9f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, true, true },   // prop
 	};
@@ -128,7 +126,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 248.6f, 508.6f, 0.0f, -90.0f, 0.0f, 0.0f, 1.13f, 1.13f, 1.13f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), -689.9f, -439.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -705.9f, -349.0f, 0.0f, 80.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_GrainSack.SM_GrainSack"), 371.5f, -689.6f, 0.0f, 160.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), 291.5f, -689.3f, 0.0f, -165.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), 648.0f, 287.6f, 0.0f, -90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), -250.4f, 383.2f, 250.0f, -0.0f, 0.0f, 0.0f, 1.28f, 1.28f, 1.28f, true, true, true },   // lantern

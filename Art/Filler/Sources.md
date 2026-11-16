@@ -15,7 +15,6 @@ Every original here came from Meshy's free community library (CC0, Meshy terms s
 | SpiceSacks_gtarcan.glb | gtarcan | https://www.meshy.ai/posts/019919f2-c3bf-7258-a85e-5848e73314fb | CC0 |
 | SackWall_Nighthawk666.glb | Nighthawk666 | https://www.meshy.ai/posts/019cce8c-1614-7eef-beac-48aeddbd036d | CC0 |
 | SackPyramid_theanh75.glb | theanh75 | https://www.meshy.ai/posts/019e71aa-f230-7fd0-bdda-ff34728e52a6 | CC0 |
-| GrainSack_rafael.glb | rafael | https://www.meshy.ai/posts/trigo-01a17547-0ab9-713f-93c5-a18de7680ec7 | CC0 |
 | CoiledRope_theanh75.glb | theanh75 | https://www.meshy.ai/posts/019fb61f-b8ad-7fb1-b979-2957f92e4a17 | CC0 |
 | KnottedRope_HackerYacker.glb | HackerYacker | https://www.meshy.ai/posts/01a04307-dac0-718b-80b0-181612640af9 | CC0 |
 | BraidedRope_UltrasombrA.glb | UltrasombrA | https://www.meshy.ai/posts/019a7e68-b21f-7a14-b316-2f342020b571 | CC0 |
