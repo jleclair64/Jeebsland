@@ -1,5 +1,6 @@
 #include "KnightHUD.h"
 #include "KnightCharacter.h"
+#include "Palette.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
@@ -23,6 +24,7 @@ namespace
 		int32 Group; const TCHAR* Label; const TCHAR* Cvar; EK Kind; int32 Comp;
 		float Min, Max; bool bDeferred;   // deferred: applied when the slider is let go (it regrows the grass)
 		float DefaultOverride;            // for cvars whose own default is "use the material's": that value; else -1000
+		const TCHAR* Pal;                 // Scale items whose cvar is empty by default ("the palette's colour"): that palette entry
 	};
 	const TCHAR* Groups[6] = { TEXT("PICTURE"), TEXT("SKY + HAZE"), TEXT("CLOUDS"), TEXT("WATER"), TEXT("GRASS"), TEXT("GROUND") };
 	const float NoDef = -1000.f;
@@ -60,8 +62,8 @@ namespace
 		{ 3, TEXT("Water: shine (specular)"), TEXT("jeeb.Water.Spec"), EK::Float, 0, 0.f, 1.f, false, 0.25f },
 		{ 3, TEXT("Water: shore foam"), TEXT("jeeb.Water.Foam"), EK::Float, 0, 0.f, 0.4f, false, 0.08f },
 		{ 3, TEXT("Water: river flow speed"), TEXT("jeeb.Water.Flow"), EK::Float, 0, 0.f, 200.f, false, 55.f },
-		{ 3, TEXT("Water: own glow at noon"), TEXT("jeeb.Water.Glow"), EK::Scale, 0, 0.f, 6.f, false, NoDef },
-		{ 3, TEXT("Water: own glow at low sun"), TEXT("jeeb.Water.GlowDusk"), EK::Scale, 0, 0.f, 6.f, false, NoDef },
+		{ 3, TEXT("Water: own glow at noon"), TEXT("jeeb.Water.Glow"), EK::Scale, 0, 0.f, 6.f, false, NoDef, TEXT("WaterGlow") },
+		{ 3, TEXT("Water: own glow at low sun"), TEXT("jeeb.Water.GlowDusk"), EK::Scale, 0, 0.f, 6.f, false, NoDef, TEXT("WaterGlowDusk") },
 
 		{ 4, TEXT("Grass: how far it reaches (cm)"), TEXT("jeeb.Grass.PackFade"), EK::Float, 0, 1500.f, 8000.f, true, NoDef },
 		{ 4, TEXT("Grass: clumps per square metre"), TEXT("jeeb.Grass.Density1"), EK::Float, 0, 2.f, 30.f, true, NoDef },
@@ -74,6 +76,9 @@ namespace
 		{ 4, TEXT("Grass: flower clumps"), TEXT("jeeb.Grass.PackFlowers"), EK::Float, 0, 0.f, 1.5f, false, NoDef },
 
 		{ 5, TEXT("Ground: sky light at the low sun"), TEXT("jeeb.Ground.SkyFill"), EK::Float, 0, 0.f, 1.f, false, NoDef },
+
+		// (added at the end so the test run's item numbers below stay put)
+		{ 1, TEXT("Sun: 0 noon, .5 low, -1 moving (reset)"), TEXT("jeeb.Sun.Phase"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)
@@ -117,6 +122,17 @@ namespace
 		if (It.Kind == EK::Scale) return 1.f;
 		float C[3]; ParseRgb(*B, C); return C[It.Comp];
 	}
+	void BaseRgb(const FLookItem& It, float Out[3])   // the colour a Scale slider multiplies: the opening value, or the palette's
+	{
+		const FString* B = Base.Find(It.Cvar);
+		if ((!B || B->TrimStartAndEnd().IsEmpty()) && It.Pal)
+		{
+			const FLinearColor P = JeebPalette::Graded(It.Pal);
+			Out[0] = P.R; Out[1] = P.G; Out[2] = P.B;
+			return;
+		}
+		ParseRgb(B ? *B : FString(), Out);
+	}
 	float ValueOf(const FLookItem& It)
 	{
 		IConsoleVariable* V = Var(It.Cvar);
@@ -126,9 +142,10 @@ namespace
 			const float X = V->GetFloat();
 			return (X < -0.5f && It.DefaultOverride > -999.f) ? It.DefaultOverride : X;   // (negative: the material's own number)
 		}
+		if (It.Kind == EK::Scale && V->GetString().TrimStartAndEnd().IsEmpty()) return 1.f;   // (empty: the palette's own colour)
 		float C[3]; ParseRgb(V->GetString(), C);
 		if (It.Kind == EK::Comp) return C[It.Comp];
-		float D[3]; ParseRgb(Base.Contains(It.Cvar) ? Base[It.Cvar] : FString(), D);
+		float D[3]; BaseRgb(It, D);
 		return D[0] > 1e-5f ? C[0] / D[0] : 1.f;
 	}
 	void SetValue(const FLookItem& It, float X)
@@ -139,13 +156,17 @@ namespace
 		if (It.Kind == EK::Float) { V->Set(*Num(X), ECVF_SetByConsole); return; }
 		float C[3];
 		if (It.Kind == EK::Comp) { ParseRgb(V->GetString(), C); C[It.Comp] = X; }
-		else { float D[3]; ParseRgb(Base.Contains(It.Cvar) ? Base[It.Cvar] : FString(), D); for (int32 i = 0; i < 3; ++i) C[i] = D[i] * X; }
+		else { float D[3]; BaseRgb(It, D); for (int32 i = 0; i < 3; ++i) C[i] = D[i] * X; }
 		V->Set(*FString::Printf(TEXT("%s %s %s"), *Num(C[0]), *Num(C[1]), *Num(C[2])), ECVF_SetByConsole);
 	}
 	void ResetItem(int32 i)
 	{
 		const FLookItem& It = Items[i];
-		if (It.Kind == EK::Float && It.DefaultOverride <= -999.f) { if (IConsoleVariable* V = Var(It.Cvar)) if (const FString* B = Base.Find(It.Cvar)) V->Set(**B, ECVF_SetByConsole); }
+		// (back to exactly what the cvar held when the tab opened: an empty water glow means "the palette's colour", and writing
+		// "1 1 1" there instead turned the river white, 2026-11-15)
+		const FString* B = Base.Find(It.Cvar);
+		IConsoleVariable* V = Var(It.Cvar);
+		if (V && B && (It.Kind != EK::Comp || B->TrimStartAndEnd().IsEmpty())) V->Set(**B, ECVF_SetByConsole);
 		else SetValue(It, DefaultOf(It));
 		Pending[i] = -9999.f;
 	}

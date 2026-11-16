@@ -198,6 +198,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Code compiles for Shipping (no editor-only fields).
 - LESSON (rebuilt Oak Hill, 2026-11-14): calls made only for a log or a measurement can be editor-only (`UStaticMesh::IsNaniteEnabled`); keep test and measurement code (lineups, tours, JEEB logs) inside `#if !UE_BUILD_SHIPPING` and compile Shipping for every new file before calling a change done.
 - List the test switches that are on before every package.
+- LESSON (old Oak Hill models removed, 2026-11-15): before deleting assets, check for references from EVERY asset you keep, including the ones in the same folder. A material's default texture values count as references. M_Building still pointed at three deleted bank-stall textures, failed to compile, and left the old church unpainted. After a deletion, grep the game log for `LoadErrors` and `Failed to compile`.
 - A show-or-hide that looks a section or slot up by name logs and skips when the name is not found, because a missed name silently leaves it visible. Command-line test hooks that move gear or hit boxes are off in Shipping (`!UE_BUILD_SHIPPING`).
 - A new switch in `[Jeebsland.Testing]` goes in CLAUDE.md's TEMPORARY list in the same change, since that section ships in a package.
 
