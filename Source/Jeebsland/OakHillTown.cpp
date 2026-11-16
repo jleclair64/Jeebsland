@@ -337,8 +337,7 @@ void AOakHillTown::PlantTrees(AForest* Forest)
 		const float Want = FMath::Lerp(0.12f, 0.7f, JeebWorld::Smooth(32.f, 66.f, FromPlaza));
 		if (Roll > Want) continue;
 		const float X = PosX + N * 100.f, Y = PosY + E * 100.f;
-		float Half;
-		if (JeebWorld::RiverDistance(X, Y, Half) < Half + 600.f) continue;
+		if (JeebWorld::NearRiver(X, Y, 600.f)) continue;
 		if (JeebTerrain::PathClearance(X, Y) < 450.f) continue;
 		bool bClear = true;
 		for (const FPlot& P : Plots()) if (PlotSD(P, E, N) < (P.Kind == EPlot::Building ? 6.f : 3.f)) { bClear = false; break; }
@@ -409,8 +408,7 @@ void AOakHillTown::LogChecks()
 		for (float N = -95.f; N <= 115.f; N += 2.f)
 		{
 			const float X = PosX + N * 100.f, Y = PosY + E * 100.f;
-			float Half;
-			if (JeebWorld::RiverDistance(X, Y, Half) < Half + 1200.f) continue;
+			if (JeebWorld::NearRiver(X, Y, 1200.f)) continue;
 			const float G = FVector2D(JeebTerrain::HeightAt(X + 100.f, Y) - JeebTerrain::HeightAt(X - 100.f, Y), JeebTerrain::HeightAt(X, Y + 100.f) - JeebTerrain::HeightAt(X, Y - 100.f)).Size() / 200.f;
 			if (G > Steep) { Steep = G; SteepAt = FVector2D(E, N); }
 		}

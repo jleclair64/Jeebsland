@@ -386,17 +386,39 @@ namespace JeebOakHill
 		return JeebWorld::Smooth(-62.f, -56.f, E) * JeebWorld::Smooth(87.f, 72.f, E) * JeebWorld::Smooth(-115.f, -100.f, N) * JeebWorld::Smooth(120.f, 105.f, N)
 			* JeebWorld::Smooth(RiverHalf + 150.f, RiverHalf + 150.f + Fade, RiverD);
 	}
-	// The ground (cm), given the world's height there and the distance to the nearest river (from JeebWorld::SeaAndRivers)
-	inline float Apply(float X, float Y, float H, float RiverD, float RiverHalf)
+	// How much a point is a building's ground (1 on its plot and the flat 1.5 m round it, fading out over 4 m more)
+	inline float BuildingKeep(float E, float N)
 	{
-		if (!InBox(X, Y) || !Enabled()) return H;
+		float K = 0.f;
+		for (const FPlot& P : Plots())
+		{
+			if (P.Kind != EPlot::Building) continue;
+			if (FMath::Square(E - P.Ce) + FMath::Square(N - P.Cn) > FMath::Square(P.Reach + PadFlat + 4.f)) continue;
+			K = FMath::Max(K, 1.f - JeebWorld::Smooth(PadFlat, PadFlat + 4.f, PlotSD(P, E, N)));
+		}
+		return K;
+	}
+	// The ground (cm), given the world's height there and the distance to the nearest river (from JeebWorld::SeaAndRivers)
+	// bCap: the rivers' bank cap (WorldMap.h UnderBankCap) trims the world and the hills before the level plots go on, and the
+	// finished ground once more everywhere but on a building's plot: a walk up from the river never meets a steep lip (the pads'
+	// 3 m fade by the water made a 52 degree step under the North Fort when only the hills were capped), and the houses near
+	// the river (13-15 m from its edge) keep their own levels (capping their ground cut up to 59 cm from under them, 2026-11-15).
+	inline bool Covers(float X, float Y) { return InBox(X, Y) && Enabled(); }
+	inline float Apply(float X, float Y, float H, float RiverD, float RiverHalf, bool bCap = true)
+	{
+		if (!Covers(X, Y)) return H;
+		if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
 		const float E = EastM(Y), N = NorthM(X);
 		const float MHills = Mask(E, N, RiverD, RiverHalf, 1000.f);
 		if (MHills <= 0.f) return H;
-		const float Ground = FMath::Lerp(H, JeebWorld::RiverLevel + HillsM(E, N) * 100.f, MHills);
+		float Ground = FMath::Lerp(H, JeebWorld::RiverLevel + HillsM(E, N) * 100.f, MHills);
+		if (bCap) Ground = JeebWorld::UnderBankCap(X, Y, Ground, RiverD);
 		const float MPads = Mask(E, N, RiverD, RiverHalf, 300.f);
 		if (MPads <= 0.f) return Ground;
-		return FMath::Lerp(Ground, JeebWorld::RiverLevel + TownM(E, N, (Ground - JeebWorld::RiverLevel) / 100.f) * 100.f, MPads);
+		const float Padded = FMath::Lerp(Ground, JeebWorld::RiverLevel + TownM(E, N, (Ground - JeebWorld::RiverLevel) / 100.f) * 100.f, MPads);
+		if (!bCap) return Padded;
+		const float Capped = JeebWorld::UnderBankCap(X, Y, Padded, RiverD);
+		return Capped >= Padded ? Padded : FMath::Lerp(Capped, Padded, BuildingKeep(E, N));
 	}
 
 	// ------------------------------------------------------------------ roads (3.5 m wide village lanes since the town was shrunk; 5 m before: RoadWidth), the plan's paths
@@ -481,7 +503,7 @@ namespace JeebOakHill
 			{
 				FRoad Rd; Rd.Pts = ParsePath(S);
 				// a road that the plan draws to the river's edge stops on the bank, not in the water
-				auto Wet = [](const FVector2D& Q) { float Half; return JeebWorld::RiverDistance(Q.X, Q.Y, Half) < Half + 300.f; };
+				auto Wet = [](const FVector2D& Q) { return JeebWorld::NearRiver(Q.X, Q.Y, 300.f); };
 				while (Rd.Pts.Num() > 2 && Wet(Rd.Pts[0])) Rd.Pts.RemoveAt(0);
 				while (Rd.Pts.Num() > 2 && Wet(Rd.Pts.Last())) Rd.Pts.Pop();
 				if (Rd.Pts.Num() >= 2) A.Add(Rd);

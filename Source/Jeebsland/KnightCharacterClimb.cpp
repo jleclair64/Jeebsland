@@ -44,6 +44,7 @@ void AKnightCharacter::TickWallClimb(float Dt)
 {
 	TickClimbTests(Dt);
 	TickSwimTests(Dt);
+	TickWaterWalk(Dt);
 	if (UKnightMovement* KM = KnightMove(); KM && IsLocallyControlled()) KM->bWantsFast = bSprinting;   // (Shift: the fast swim; carried by his moves, FLAG_Custom_1)
 	// Drowning (server only): the bar or the breath ran out (KnightMovementSwim.cpp), he has sunk for DrownSinkTime, and he dies like any death
 	if (UKnightMovement* KM = KnightMove(); KM && HasAuthority())
