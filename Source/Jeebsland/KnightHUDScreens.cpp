@@ -38,7 +38,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	UFont* Font = GEngine->GetMediumFont();
 	const float Scale = 1.3f;
 	const float PW = 980.f, PH = 640.f;
-	const float PX = (Canvas->ClipX - PW) * 0.5f;
+	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f);   // on the right side of the screen, so the knight stays in view while the LOOK sliders change him (owner, 2026-11-15)
 	const float PY = (Canvas->ClipY - PH) * 0.5f;
 	// Solid, not see-through: a dark grey backing under the glass
 	FillRR(PX, PY, PW, PH, 30.f, [&](float t) { return FLinearColor(FMath::Lerp(0.10f, 0.05f, t), FMath::Lerp(0.10f, 0.05f, t), FMath::Lerp(0.11f, 0.06f, t), 1.f); });
