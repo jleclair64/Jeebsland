@@ -84,6 +84,7 @@ namespace
 		{ 0, TEXT("Armour: sun glint on plate"), TEXT("jeeb.Armour.Glint"), EK::Float, 0, 0.f, 4.f, false, NoDef },
 		{ 0, TEXT("Armour: mirror share (1 pure metal)"), TEXT("jeeb.Armour.Metal"), EK::Float, 0, 0.5f, 1.f, false, NoDef },
 		{ 1, TEXT("Sky: ground colour below the horizon"), TEXT("jeeb.Sky.Ground"), EK::Float, 0, 0.f, 3.f, false, NoDef },
+		{ 0, TEXT("Knight gravity x real (-1 Tuning.ini; reset)"), TEXT("jeeb.Knight.Gravity"), EK::Float, 0, 0.5f, 3.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)

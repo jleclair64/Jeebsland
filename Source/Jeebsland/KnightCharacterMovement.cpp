@@ -1,6 +1,7 @@
 #include "KnightCharacter.h"
 #include "KnightMovement.h"
 #include "Misc/CommandLine.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/Parse.h"
 #include "Messages.h"
 #include "Components/StaticMeshComponent.h"
@@ -465,11 +466,22 @@ bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bS
 	return bWantSprint;
 }
 
+// Knight gravity (owner, 2026-11-15: "same height, falls faster"): KnightGravity in Tuning.ini is how many times real gravity
+// pulls him; the jump push grows with its square root, so a jump still peaks at about 90 cm (Unreal's default 420 cm/s at 1x)
+// and only goes up and comes down quicker. jeeb.Knight.Gravity (LOOK tab) overrides the file while trying values.
+static TAutoConsoleVariable<float> CVarKnightGravity(TEXT("jeeb.Knight.Gravity"), -1.f, TEXT("Times real gravity on the knight (jump height stays the same); -1 uses KnightGravity in Tuning.ini."), ECVF_Default);
+
 // How fast the knight may go this frame (on foot, on the horse, in the shield stance, strafing, in the air), and turning to
 // face the camera. Returns whether the knight faces the camera (strafe mode or the shield stance).
 bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, bool bSpecial, float SpecialSpeed, bool bWantSprint)
 {
 	UCharacterMovementComponent* Move = GetCharacterMovement();
+	{
+		const float Over = CVarKnightGravity.GetValueOnGameThread();
+		const float G = FMath::Clamp(Over > 0.f ? Over : JeebTune::V().KnightGravity, 0.25f, 5.f);
+		Move->GravityScale = G;
+		Move->JumpZVelocity = 420.f * FMath::Sqrt(G);
+	}
 	const float AirMul = 0.69f;
 	// Riding: twice the walking speed, and twice the sprint. The horse sprints for about four seconds, then needs
 	// its 100-point bar to refill completely before the next gallop.

@@ -10,6 +10,7 @@ JEEB_TUNE(Movement, SprintSpeed, 733.1f)
 JEEB_TUNE(Movement, CrouchSpeed, 240.f)
 JEEB_TUNE(Movement, WalkAccel, 30000.f)
 JEEB_TUNE(Movement, SprintAccel, 2048.f)
+JEEB_TUNE(Movement, KnightGravity, 2.f)
 
 // [Bow]
 JEEB_TUNE(Bow, BowDrawTime, 1.f)
