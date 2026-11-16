@@ -3,519 +3,489 @@
 # so yaw 0 turns the set's front (+Y) east, -90 north, 90 south, 180 west). Set may also be a single Kind. Var 0/1: whether the set's
 # drop/alt/turn flags apply (every row was checked with all alternatives present). Plot: JeebOakHill::Plots() index (-1 none), for logs.
 # Laid out offline on a reproduction of OakHill.h (plots from the JEEBOAK PLOT log, roads, counters, doors, foundation stones, TownLabDecor
-# pieces, the spawn, the oak, the river): zero overlaps, every door, counter and plot reachable, no fillable spot over 2.6 m from something.
-# Rows by zone: OakPlaza 50 OakStreet 152 OakYard 244 OakGarden 9 OakBoxingRing 4 OakRuins 6 OakGraveyard 16 OakForts 16 OakWatchtower 2 OakFringe 14.
+# pieces, the spawn, the oak, the river), then re-checked against the blocker dump fillcore wrote (blockers_OakHill.txt and blockers_shapes.csv:
+# its roads, kept-clear shapes, resource trees and rocks, decor): zero overlaps, 30 cm from every kept-clear shape, every door, counter
+# and plot reachable, no fillable spot 3 m or more from something.
+# Rows by zone: OakPlaza 45 OakStreet 141 OakYard 230 OakGarden 10 OakBoxingRing 3 OakRuins 6 OakGraveyard 17 OakForts 14 OakWatchtower 1 OakFringe 14.
 Set,E,N,Yaw,Seed,Var,Plot,Note
 MarketRed,-4.7,8.14,60,1,0,-1,plaza market stall on the lawn edge facing the oak
 MarketGreen,7.81,6.56,150,2,0,-1,plaza market stall on the lawn edge facing the oak
 BenchNook,1.2,6.8,100,3,0,-1,bench on the lawn facing the oak
-BenchNook,1.79,-6.66,-105,4,0,-1,bench on the lawn facing the oak
+BenchNook,1.29,-6.66,-97,4,0,-1,bench on the lawn facing the oak
 BenchNook,-4.44,-5.29,-50,5,0,-1,bench on the lawn facing the oak
 VegCorner,9.76,-2.61,-165,6,0,-1,plaza: veg corner on the lawn edge
 CartCorner,-2.64,-9.85,-75,7,0,-1,plaza: cart corner on the lawn edge
 BenchNook,6.48,2.36,160,8,0,-1,plaza: bench nook on the lawn edge
 FlowerClump,4.37,6.19,32,9,0,-1,plaza: flower clump on the lawn edge
 FlowerClump,5.62,-8.99,-122,10,0,-1,plaza: flower clump on the lawn edge
-BushClump,-5.7,4.26,30,11,0,-1,plaza: bush clump on the lawn edge
-LampStone,2.01,11.37,-80,12,0,-1,lamp post on the plaza ring
-LampPillar,-9.46,6.62,-145,13,0,-1,lamp post on the plaza ring
-LampStone,-6.62,-9.46,125,14,0,-1,lamp post on the plaza ring
-LampPillar,10,-5.78,30,15,0,-1,lamp post on the plaza ring
-BannerLionPole,19.02,2.41,90,16,0,-1,Oak Hill lion banner pole at the road out of the plaza
-BannerLionPole,22,-2.9,-90,17,0,-1,Oak Hill lion banner pole at the road out of the plaza
-BannerLionPole,-26.98,3.15,90,18,0,-1,Oak Hill lion banner pole at the road out of the plaza
-BannerLionPole,-26.48,-2.65,-90,19,0,-1,Oak Hill lion banner pole at the road out of the plaza
-DoorstepPots,10.09,13.72,114,20,1,1,doorstep of bank 1
-DoorstepPots,3.6,16.6,114,21,1,1,doorstep of bank 1
-DoorstepPots,-14.21,-9.89,-25,22,1,4,doorstep of potion shop 4
-DoorstepBench,28.89,-2.63,180,23,1,7,doorstep of town hall 7
-DoorstepBox,28.89,3.23,180,24,1,7,doorstep of town hall 7
-DoorstepCandles,40.23,37.37,105,25,1,8,doorstep of church 8
-DoorstepPots,-18.39,42.4,75,26,1,10,doorstep of house 10
-DoorstepIvy,-23.92,40.92,75,27,1,10,doorstep of house 10
-DoorstepBench,27.45,46.38,-80,28,1,11,doorstep of house 11
-DoorstepPots,49.34,-12.61,180,29,1,12,doorstep of house 12
-DoorstepIvy,49.34,-6.89,180,30,1,12,doorstep of house 12
-DoorstepBox,-23.92,27.91,-85,31,1,13,doorstep of house 13
-DoorstepPots,-19.42,27.51,-85,32,1,13,doorstep of house 13
-DoorstepIvy,36.86,26.9,105,33,1,14,doorstep of house 14
-DoorstepIvy,30.27,28.67,105,34,1,14,doorstep of house 14
-DoorstepPots,52.42,2.72,180,35,1,16,doorstep of house 16
-DoorstepIvy,52.42,8.94,180,36,1,16,doorstep of house 16
-DoorstepPots,-27.91,4.65,90,37,1,17,doorstep of house 17
-DoorstepPots,-33.51,4.65,90,38,1,17,doorstep of house 17
-DoorstepIvy,64.12,25.33,45,39,1,18,doorstep of house 18
-DoorstepPots,-27.28,-23.44,95,40,1,19,doorstep of house 19
-DoorstepBench,-33.11,-22.92,95,41,1,19,doorstep of house 19
-DoorstepPots,-30.04,-45.98,-90,42,1,20,doorstep of house 20
-DoorstepIvy,-24.32,-45.98,-90,43,1,20,doorstep of house 20
-DoorstepPots,-15.9,-35.76,-90,44,1,21,doorstep of house 21
-DoorstepBench,-10.04,-35.76,-90,45,1,21,doorstep of house 21
-DoorstepPots,46.17,-37.33,-70,46,1,23,doorstep of house 23
-DoorstepBench,51.68,-39.33,-70,47,1,23,doorstep of house 23
-DoorstepIvy,-1.74,-48.43,-80,48,1,24,doorstep of house 24
-DoorstepPots,3.39,-49.33,-80,49,1,24,doorstep of house 24
-DoorstepPots,39.23,-24.36,120,50,1,25,doorstep of house 25
-DoorstepBench,34.16,-21.43,120,51,1,25,doorstep of house 25
-WallBannerLion,28.93,3.2,180,52,0,7,banner hung on the town hall front (check it sits on the wall)
-WallBannerLion,28.93,-3.6,180,53,0,7,banner hung on the town hall front (check it sits on the wall)
-WallBannerSwordShield,4.04,16.45,114,54,0,1,banner hung on the bank front (check it sits on the wall)
-WallBannerSwordShield,9.52,14.01,114,55,0,1,banner hung on the bank front (check it sits on the wall)
-WallBannerSwords,-9.66,14.06,65,56,0,2,banner hung on the smith front (check it sits on the wall)
-WallBannerKnot,40.36,37.37,105,57,0,8,banner hung on the church front (check it sits on the wall)
-BarrelRow,21.4,4.93,66,58,1,0,barrel row by bank stall 0
-HedgeBoxPair,18.31,13.09,-114,59,1,0,hedge box pair by bank stall 0
-BarrelRow,20.74,11.25,-24,60,1,0,barrel row by bank stall 0
-BarrelRow,12.78,13.99,24,61,1,1,barrel row by bank 1
-BarrelRow,14.5,17.84,24,62,1,1,barrel row by bank 1
-SmithYard,-4.25,22.51,-25,63,1,2,smith yard by smith 2
-SmithYard,-14.86,17.34,155,64,1,2,smith yard by smith 2
-SmithYard,-13.83,21.21,-115,65,1,2,smith yard by smith 2
-SmithYard,-9.24,23.35,-115,66,1,2,smith yard by smith 2
-AmphoraRow,-13.71,10.98,-67,67,1,3,amphora row by potion stall 3
-AmphoraRow,-17.07,12.4,-67,68,1,3,amphora row by potion stall 3
-AmphoraRow,-20.87,3.7,113,69,1,3,amphora row by potion stall 3
-AmphoraRow,-19.07,-14.56,65,70,1,4,amphora row by potion shop 4
-WashingCorner,-15.45,-12.87,65,71,1,4,washing corner by potion shop 4
-WashingCorner,-21.45,-13.43,155,72,1,4,washing corner by potion shop 4
-WashingCorner,-23.36,-9.33,155,73,1,4,washing corner by potion shop 4
-SackCorner,16.12,-19.65,-25,74,1,5,sack corner by store 5
-SackCorner,14.04,-15.2,-25,75,1,5,sack corner by store 5
-SackCorner,14.15,-22.98,65,76,1,5,sack corner by store 5
-HedgeRun,37.22,10.25,-90,77,1,7,hedge run by town hall 7
-BenchNookStone,32.91,10.98,-90,78,1,7,bench nook stone by town hall 7
-BenchNookStone,41.23,8.44,0,79,1,7,bench nook stone by town hall 7
-HedgeRun,40.5,3.61,0,80,1,7,hedge run by town hall 7
-CypressPair,44.66,37.01,15,81,1,8,cypress pair by church 8
-CypressPair,45.91,41.67,15,82,1,8,cypress pair by church 8
-CypressPair,33.1,47.43,-165,83,1,8,cypress pair by church 8
-CypressPair,37.97,52.69,-75,84,1,8,cypress pair by church 8
-CypressPair,42.63,51.44,-75,85,1,8,cypress pair by church 8
-WashingCorner,-28.96,42.67,165,86,1,10,washing corner by house 10
-WashingCorner,30.62,39.73,10,87,1,11,washing corner by house 11
-LogCorner,49.39,-16.25,90,88,1,12,log corner by house 12
-Workbench,54.92,-2.47,-90,89,1,12,workbench by house 12
-KitchenGarden,58.38,-6.29,0,90,1,12,kitchen garden by house 12
-ChickenYard,58.86,-13,0,91,1,12,chicken yard by house 12
-WashingCorner,-26.74,27.11,-175,92,1,13,washing corner by house 13
-WashingCorner,-27.14,22.61,-175,93,1,13,washing corner by house 13
-WashingCorner,-16.96,23.01,5,94,1,13,washing corner by house 13
-WashingCorner,-20.01,17.22,95,95,1,13,washing corner by house 13
-SackCorner,-24.67,17.63,95,96,1,13,sack corner by house 13
-WashingCorner,29,35.22,-165,97,1,14,washing corner by house 14
-WashingCorner,31.48,36.66,-75,98,1,14,washing corner by house 14
-StorageCorner,54.02,21.68,-45,99,1,15,storage corner by house 15
-BarrelRow,49.38,26.32,-45,100,1,15,barrel row by house 15
-WashingCorner,42.19,19.23,135,101,1,15,washing corner by house 15
-WoodYard,42.84,22.75,-135,102,1,15,wood yard by house 15
-ChickenYard,57.52,14.35,-90,103,1,16,chicken yard by house 16
-SackCorner,60.45,10.67,0,104,1,16,sack corner by house 16
-LogCorner,60.45,5.63,0,105,1,16,log corner by house 16
-WoodYard,-25.49,9.61,0,106,1,17,wood yard by house 17
-StorageCorner,-35.6,12.33,180,107,1,17,storage corner by house 17
-BarrelRow,-35.6,5.77,180,108,1,17,barrel row by house 17
-LogCorner,-33.28,14.96,-90,109,1,17,log corner by house 17
-WashingCorner,-28.06,14.96,-90,110,1,17,washing corner by house 17
-KitchenGarden,64.81,30.03,-45,111,1,18,kitchen garden by house 18
-SackCorner,-23.66,-23.84,5,112,1,19,sack corner by house 19
-BarrelRow,-36.88,-16.87,-175,113,1,19,barrel row by house 19
-BarrelRow,-37.25,-21.07,-175,114,1,19,barrel row by house 19
-BarrelRow,-34.36,-14.76,-85,115,1,19,barrel row by house 19
-SackCorner,-29.8,-15.15,-85,116,1,19,sack corner by house 19
-WashingCorner,-33.68,-47.74,180,117,1,20,washing corner by house 20
-Workbench,-19.9,-51.56,0,118,1,20,workbench by house 20
-ChickenYard,-22.83,-55.5,90,119,1,20,chicken yard by house 20
-ChickenYard,-28.3,-55.5,90,120,1,20,chicken yard by house 20
-Workbench,-19.54,-36.94,180,121,1,21,workbench by house 21
-WoodYard,-5.76,-40.84,0,122,1,21,wood yard by house 21
-StorageCorner,-8.39,-43.79,90,123,1,21,storage corner by house 21
-LogCorner,-14.94,-43.79,90,124,1,21,log corner by house 21
-StorageCorner,15.08,-45.06,5,125,1,22,storage corner by house 22
-BarrelRow,12.53,-47.47,95,126,1,22,barrel row by house 22
-BarrelRow,8.34,-47.11,95,127,1,22,barrel row by house 22
-SackCorner,42.61,-36.48,-160,128,1,23,sack corner by house 23
-WashingCorner,53.65,-46.44,20,129,1,23,washing corner by house 23
-BarrelRow,50.77,-47.55,110,130,1,23,barrel row by house 23
-BarrelRow,46.34,-45.94,110,131,1,23,barrel row by house 23
-BarrelRow,-4.73,-49.26,-170,132,1,24,barrel row by house 24
-BarrelRow,-5.46,-53.41,-170,133,1,24,barrel row by house 24
-WashingCorner,4.02,-57.84,10,134,1,24,washing corner by house 24
-BarrelRow,4.85,-53.1,10,135,1,24,barrel row by house 24
-StorageCorner,1.07,-59.39,100,136,1,24,storage corner by house 24
-WashingCorner,42.26,-26.39,30,137,1,25,washing corner by house 25
-BarrelRow,44.92,-21.78,30,138,1,25,barrel row by house 25
-WashingCorner,33.45,-14.09,-150,139,1,25,washing corner by house 25
-WashingCorner,31.19,-18,-150,140,1,25,washing corner by house 25
-WashingCorner,36.23,-13.35,-60,141,1,25,washing corner by house 25
-WashingCorner,40.14,-15.61,-60,142,1,25,washing corner by house 25
-LampGallows,-43.94,-2.6,-90,143,0,-1,street lamp
-LampStone,21.01,53.85,-157.85,144,0,-1,street lamp
-LampStone,-45.89,46.27,129.47,145,0,-1,street lamp
-LampRope,-38.67,33.59,-50.53,146,0,-1,street lamp
-LampPillar,20.6,30.34,110.4,147,0,-1,street lamp
-LampStone,30.41,19.46,-58.68,148,0,-1,street lamp
-LampStone,22.05,21.93,-5.97,149,0,-1,street lamp
-LampGallows,27.59,-12.1,180,150,0,-1,street lamp
-LampPillar,27.94,-25.55,-40.17,151,0,-1,street lamp
-LampStone,42.89,-29.27,113.26,152,0,-1,street lamp
-LampPillar,3.1,-21.77,180,153,0,-1,street lamp
-LampGallows,-7.49,-19.39,46.35,154,0,-1,street lamp
-LampStone,-16.55,-32.77,-125.01,155,0,-1,street lamp
-LampPillar,-30.47,-36.03,57.83,156,0,-1,street lamp
-JunctionArrow,1.5,-11.4,86.76,157,0,-1,sign at a junction
-Junction,-2.3,-24.89,-40,158,0,-1,sign at a junction
-JunctionArrow,-5.42,-15.4,-75.5,159,0,-1,sign at a junction
-Junction,1.32,-26.91,-40.49,160,0,-1,sign at a junction
-StonePole,-40.54,-54.41,-141.66,161,0,-1,stone banner pole where a lane leaves town
-TrainingGround,2.52,-31.44,-51.74,162,1,26,boxing ring plot
-RingCorner,-2.48,-34.44,-90,163,1,26,boxing ring plot
-RingBanner,-2.48,-29.44,-42.97,164,1,26,boxing ring plot
-SpectatorBench,0.52,-34.44,-50.21,165,1,26,boxing ring plot
-RingCorner,-4.48,-30.44,-129.89,166,1,26,boxing ring plot
-Ruin,-5.73,42.78,-80.72,167,1,27,castle ruins plot
-RuinPillar,3.16,43.8,121.72,168,1,27,castle ruins plot
-RuinWell,-9.4,47.31,-110,169,1,27,castle ruins plot
-RuinSteps,-0.26,46.11,70,170,1,27,castle ruins plot
-RuinRubble,4.61,39.02,121.65,171,1,27,castle ruins plot
-Allotment,45.46,-3.84,0,172,1,28,garden plot
-AllotmentScarecrow,42.46,-12.84,-90,173,1,28,garden plot
-Allotment,46.46,4.16,-86.91,174,1,28,garden plot
-KitchenGarden,43.46,0.16,0,175,1,28,garden plot
-BenchNookStone,45.46,-7.84,90,176,1,28,garden plot
-CypressPair,41.46,-5.84,0,177,1,28,garden plot
-Allotment,45.46,7.16,-74.41,178,1,28,garden plot
-GraveyardRow,33.7,-48.9,0,179,1,29,graveyard plot
-GraveyardBench,21.7,-41.9,-57.78,180,1,29,graveyard plot
-GraveyardRow,25.7,-45.9,-108.8,181,1,29,graveyard plot
-CypressPair,32.7,-38.9,170.93,182,1,29,graveyard plot
-FlowerClump,36.7,-42.9,0,183,1,29,graveyard plot
-GraveyardRow,30.7,-53.9,-90,184,1,29,graveyard plot
-GraveyardBench,38.7,-48.9,180,185,1,29,graveyard plot
-GraveyardRow,31.7,-42.9,-71.91,186,1,29,graveyard plot
-CypressPair,22.7,-48.9,-82.69,187,1,29,graveyard plot
-FlowerClump,26.7,-36.9,130.3,188,1,29,graveyard plot
-GraveyardRow,36.7,-51.9,0,189,1,29,graveyard plot
-GraveyardBench,29.7,-46.9,-131.88,190,1,29,graveyard plot
-GraveyardRow,28.7,-36.9,-34.91,191,1,29,graveyard plot
-CypressPair,36.7,-44.9,-90,192,1,29,graveyard plot
-FlowerClump,26.7,-51.9,180,193,1,29,graveyard plot
-GraveyardRow,27.7,-50.9,-90,194,1,29,graveyard plot
-GraveyardBench,35.7,-38.9,-155.25,195,1,29,graveyard plot
-GarrisonLion,-44.1,32.55,-50.75,196,1,30,north fort plot
-Garrison,-41.37,24.96,-100,197,1,30,north fort plot
-GarrisonTable,-48.27,26.18,170,198,1,30,north fort plot
-Garrison,-43.81,28.44,80,199,1,30,north fort plot
-GarrisonLion,-45.6,29.77,-100,200,1,30,north fort plot
-Garrison,-40.51,29.89,-48.36,201,1,30,north fort plot
-GarrisonTable,-42.42,36.32,-52.83,202,1,30,north fort plot
-Garrison,-46.82,22.88,80,203,1,30,north fort plot
-GarrisonLion,-44.8,-25.98,0,204,1,31,south fort plot
-Garrison,-49.8,-21.98,0,205,1,31,south fort plot
-GarrisonTable,-46.8,-22.98,180,206,1,31,south fort plot
-Garrison,-46.8,-34.98,90,207,1,31,south fort plot
-GarrisonLion,-49.8,-27.98,0,208,1,31,south fort plot
-Garrison,-44.8,-29.98,-90,209,1,31,south fort plot
-GarrisonTable,-45.8,-32.98,-90,210,1,31,south fort plot
-Garrison,-44.8,-20.98,0,211,1,31,south fort plot
-TowerYard,-14.8,29.4,90.33,212,1,32,watchtower plot
-GarrisonLion,-16.8,30.4,176.59,213,1,32,watchtower plot
-Dock,-49.97,-2.94,-89.18,214,1,33,bridge plot
-CobbleWell,60,-62,45,215,0,-1,the big cobbled well: a landmark on the fringe
-Hayfield,64.3,-29.01,-30,216,1,-1,fringe farmland
-Hayfield,-30,-72,30,217,1,-1,fringe farmland
-Farmstead,70.68,12.71,-60,218,1,-1,fringe farmland
-Farmstead,6.68,-69.29,-150,219,1,-1,fringe farmland
-FieldWell,38,58,180,220,1,-1,fringe farmland
-WoodStack,-40,52,0,221,1,-1,fringe farmland
-WoodStack,70,-48,0,222,1,-1,fringe farmland
-FenceRun,78,-14,90,223,1,-1,fringe farmland
-FenceRun,54.5,-62,10,224,1,-1,fringe farmland
-FenceRun,-14,-75,0,225,1,-1,fringe farmland
-FenceRun,30,64,0,226,1,-1,fringe farmland
-Boulders,-48.48,39.75,90,227,1,-1,fringe farmland
-Boulders,82,40,0,228,1,-1,fringe farmland
-Boulders,20,-82,0,229,1,-1,fringe farmland
-Boulders,-30,62,0,230,1,-1,fringe farmland
-Hayfield,62,48,-30,231,1,-1,fringe farmland
-StumpCorner,-7.37,60.13,96.01,232,1,-1,yard gap
-StumpCorner,8.63,58.13,21.97,233,1,-1,yard gap
-KitchenGarden,-45.87,12.63,89.37,234,1,-1,yard gap
-CartCorner,14.13,-58.37,-61.81,235,1,-1,yard gap
-Orchard,-36.87,-63.87,-128.15,236,1,-1,yard gap
-Orchard,-13.87,-58.87,-122.55,237,1,-1,yard gap
-BushClump,-13.37,55.63,92.39,238,1,-1,yard gap
-Orchard,53.63,-25.87,124.58,239,1,-1,yard gap
-StumpCorner,-29.87,53.13,73.61,240,1,-1,yard gap
-KitchenGarden,-36.87,-31.87,59.99,241,1,-1,yard gap
-CartCorner,61.13,-46.87,-134.01,242,1,-1,yard gap
-KitchenGarden,46.63,58.13,178.46,243,1,-1,yard gap
-CartCorner,-41.37,-9.87,-90.98,244,1,-1,yard gap
-BushClump,65.63,-1.37,-143.82,245,1,-1,yard gap
-HedgeRun,66.63,-14.87,134.38,246,1,-1,yard gap
-KitchenGarden,21.13,-27.87,125.82,247,1,-1,yard gap
-HedgeRun,52.13,50.13,-167.39,248,1,-1,yard gap
-CartCorner,52.13,36.13,125.77,249,1,-1,yard gap
-BushClump,30.13,54.63,-165.23,250,1,-1,yard gap
-KitchenGarden,73.13,29.63,146.58,251,1,-1,yard gap
-VegCorner,-34.37,22.63,-81.24,252,1,-1,yard gap
-CartCorner,-7.87,-62.37,-122.35,253,1,-1,yard gap
-BushClump,-35.87,45.63,128.4,254,1,-1,yard gap
-HedgeRun,59.13,-37.87,-158.45,255,1,-1,yard gap
-CartCorner,55.63,-53.37,-110.33,256,1,-1,yard gap
-VegCorner,-19.37,-62.87,-141.43,257,1,-1,yard gap
-BushClump,-16.87,-20.37,51.96,258,1,-1,yard gap
-KitchenGarden,61.63,37.63,121.3,259,1,-1,yard gap
-HedgeRun,-30.87,-7.87,-89.21,260,1,-1,yard gap
-VegCorner,-12.87,-50.87,-123.4,261,1,-1,yard gap
-BushClump,-42.87,-40.87,39.73,262,1,-1,yard gap
-KitchenGarden,57.13,-20.87,124.74,263,1,-1,yard gap
-BushClump,-3.87,51.63,100.81,264,1,-1,yard gap
-BushClump,-20.37,54.63,85.62,265,1,-1,yard gap
-CartCorner,55.13,-31.87,165.82,266,1,-1,yard gap
-Orchard,18.63,-53.37,-68.38,267,1,-1,yard gap
-BushClump,9.13,51.63,26.46,268,1,-1,yard gap
-Orchard,-42.87,7.13,88.93,269,1,-1,yard gap
-BushClump,17.63,36.13,105.57,270,1,-1,yard gap
-BushClump,-5.87,29.63,-75.86,271,1,-1,yard gap
-HedgeRun,-34.37,-58.37,-142.32,272,1,-1,yard gap
-BushClump,64.63,-8.37,-130.58,273,1,-1,yard gap
-Orchard,71.13,-0.87,-151.42,274,1,-1,yard gap
-CartCorner,26.13,58.63,169.37,275,1,-1,yard gap
-BushClump,46.63,31.63,124.71,276,1,-1,yard gap
-VegCorner,-43.87,-14.87,-90.25,277,1,-1,yard gap
-BushClump,63.13,-18.37,134.24,278,1,-1,yard gap
-CartCorner,68.63,35.63,132.99,279,1,-1,yard gap
-HedgeRun,-40.87,-60.37,-119.64,280,1,-1,yard gap
-ChickenYard,48.13,-26.87,103.43,281,1,-1,yard gap
-BushClump,43.63,-51.87,-75.65,282,1,-1,yard gap
-ChickenYard,-34.37,50.13,129.11,283,1,-1,yard gap
-BushClump,-14.87,60.13,89.69,284,1,-1,yard gap
-VegCorner,-38.37,-26.87,57.6,285,1,-1,yard gap
-BushClump,23.63,36.13,89.67,286,1,-1,yard gap
-BushClump,66.13,3.63,-155.66,287,1,-1,yard gap
-HedgeRun,-40.37,17.13,-63.63,288,1,-1,yard gap
-StumpCorner,-24.37,52.13,79.03,289,1,-1,yard gap
-BushClump,63.13,16.63,165.14,290,1,-1,yard gap
-BushClump,-32.87,40.13,126.9,291,1,-1,yard gap
-VegCorner,14.13,59.63,22.12,292,1,-1,yard gap
-CartCorner,27.63,-30.37,-45.71,293,1,-1,yard gap
-KitchenGarden,9.13,-60.37,-53.81,294,1,-1,yard gap
-ChickenYard,21.63,-21.87,-26.22,295,1,-1,yard gap
-FlowerClump,-11.87,-16.37,-51.69,296,1,-1,yard gap
-HedgeRun,-36.87,-6.37,-88.91,297,1,-1,yard gap
-CartCorner,0.63,-39.37,-55.08,298,1,-1,yard gap
-HedgeRun,50.13,44.13,123.68,299,1,-1,yard gap
-CartCorner,51.13,-21.37,103.01,300,1,-1,yard gap
-StumpCorner,-7.87,53.63,96.64,301,1,-1,yard gap
-BushClump,63.63,-50.87,-131.58,302,1,-1,yard gap
-Orchard,-37.87,-37.37,38.75,303,1,-1,yard gap
-ChickenYard,15.13,-63.87,-69.78,304,1,-1,yard gap
-CartCorner,31.63,15.13,-55.87,305,1,-1,yard gap
-VegCorner,-32.37,-64.37,-140.33,306,1,-1,yard gap
-KitchenGarden,-13.37,-63.37,-170,307,1,-1,yard gap
-BushClump,-13.87,50.63,91.12,308,1,-1,yard gap
-HedgeRun,11.13,-53.37,-54.57,309,1,-1,yard gap
-CartCorner,48.13,51.13,-167.59,310,1,-1,yard gap
-BenchNook,20.13,-16.37,-12.84,311,1,-1,yard gap
-Orchard,49.13,-0.37,-99.94,312,1,-1,yard gap
-KitchenGarden,-16.37,-55.37,-121.95,313,1,-1,yard gap
-BenchNook,-8.87,-31.37,-129.07,314,1,-1,yard gap
-Orchard,-22.87,-42.37,-119.42,315,1,-1,yard gap
-CartCorner,-30.87,26.63,-109.96,316,1,-1,yard gap
-CartCorner,-8.87,-67.37,-121.97,317,1,-1,yard gap
-HedgeBoxPair,33.13,-33.87,-60.76,318,1,-1,yard gap
-CartCorner,-30.87,-31.37,54.3,319,1,-1,yard gap
-BushClump,8.63,46.63,27.47,320,1,-1,yard gap
-Orchard,-9.37,-57.37,-123.67,321,1,-1,yard gap
-Orchard,42.13,-55.87,-75.94,322,1,-1,yard gap
-VegCorner,23.63,-32.87,126.06,323,1,-1,yard gap
-HedgeRun,-45.87,17.13,180,324,1,-1,yard gap
-BenchNook,15.63,-27.87,125.28,325,1,-1,yard gap
-FlowerClump,-18.37,-24.37,51.54,326,1,-1,yard gap
-CartCorner,-22.87,-60.37,-140.79,327,1,-1,yard gap
-BushClump,61.63,-41.87,-148.16,328,1,-1,yard gap
-KitchenGarden,-41.87,-35.87,0,329,1,-1,yard gap
-HedgeRun,-40.37,10.63,89.85,330,1,-1,yard gap
-ChickenYard,51.13,55.63,-176.78,331,1,-1,yard gap
-BenchNook,-35.87,-53.37,-142.79,332,1,-1,yard gap
-VegCorner,71.63,41.13,130.64,333,1,-1,yard gap
-BushClump,32.13,58.13,176.69,334,1,-1,yard gap
-Orchard,69.63,26.63,147.81,335,1,-1,yard gap
-ChickenYard,58.13,-27.87,149.77,336,1,-1,yard gap
-BushClump,-30.87,57.13,129.33,337,1,-1,yard gap
-FlowerClump,-10.87,31.63,-85.25,338,1,-1,yard gap
-BushClump,19.13,-57.37,-74.67,339,1,-1,yard gap
-Orchard,63.63,-35.87,-171.56,340,1,-1,yard gap
-Orchard,55.63,-36.87,-155.91,341,1,-1,yard gap
-Orchard,-20.87,-18.87,52.67,342,1,-1,yard gap
-BushClump,-1.87,29.13,29.32,343,1,-1,yard gap
-VegCorner,-30.87,19.63,-99.15,344,1,-1,yard gap
-VegCorner,-38.37,20.13,-65.61,345,1,-1,yard gap
-HedgeRun,-45.87,-6.87,-175,346,1,-1,yard gap
-VegCorner,57.13,35.63,121.35,347,1,-1,yard gap
-KitchenGarden,52.13,-56.87,-99.33,348,1,-1,yard gap
-Orchard,25.63,53.13,-160.99,349,1,-1,yard gap
-HedgeRun,-29.37,-59.87,-140.29,350,1,-1,yard gap
-BushClump,67.13,-5.37,-138.82,351,1,-1,yard gap
-Orchard,47.63,-51.87,-87.88,352,1,-1,yard gap
-VegCorner,-27.37,-10.87,-88.94,353,1,-1,yard gap
-ChickenYard,-36.37,55.63,130.24,354,1,-1,yard gap
-VegCorner,73.13,24.13,155.77,355,1,-1,yard gap
-StumpCorner,43.63,28.63,124.71,356,1,-1,yard gap
-VegCorner,-3.87,-60.37,-55.99,357,1,-1,yard gap
-ChickenYard,-36.37,26.63,-85,358,1,-1,yard gap
-BushClump,42.63,55.63,-175.59,359,1,-1,yard gap
-Orchard,20.13,-45.37,-53.98,360,1,-1,yard gap
-HedgeBoxPair,-42.87,-44.87,38.8,361,1,-1,yard gap
-FlowerClump,0.13,40.13,110.64,362,1,-1,yard gap
-VegCorner,-47.37,35.13,-50.62,363,1,-1,yard gap
-Orchard,17.13,-49.87,-55.06,364,1,-1,yard gap
-BushClump,55.13,47.63,124.94,365,1,-1,yard gap
-BushClump,13.13,54.63,26.83,366,1,-1,yard gap
-BushClump,-25.87,55.63,78.41,367,1,-1,yard gap
-HedgeBoxPair,18.13,23.13,-69.67,368,1,-1,yard gap
-BushClump,-41.37,-64.37,-105.91,369,1,-1,yard gap
-FlowerClump,-34.37,-35.37,54.54,370,1,-1,yard gap
-BushClump,49.63,40.13,124.44,371,1,-1,yard gap
-HedgeBoxPair,-23.37,-28.37,55.16,372,1,-1,yard gap
-PlanterPair,-11.87,-19.87,50.75,373,1,-1,yard gap
-CartCorner,64.63,7.13,-90,374,1,-1,yard gap
-BushClump,29.13,49.63,-156.99,375,1,-1,yard gap
-BenchNook,19.63,19.13,-6.76,376,1,-1,yard gap
-BushYellowFlowers,-53.37,4.63,75,377,1,-1,filler
-StumpPainted,11.63,33.63,-135,378,1,-1,filler
-ShrubLow,-49.87,4.13,-135,379,1,-1,filler
-ShrubLow,-24.44,33.56,45,380,1,-1,filler
-BushBall,-31.87,-2.87,-135,381,1,-1,filler
-StumpGrass,13.33,37.92,165,382,1,-1,filler
-BushSpiky,-10.31,40.19,-45,383,1,-1,filler
-PlantClump,-17.37,34.63,-15,384,1,-1,filler
-BushWhiteFlowers,-45.17,2.83,-135,385,1,-1,filler
-ShrubLow,36.63,22.13,75,386,1,-1,filler
-BushLeafy,-27.87,32.13,45,387,1,-1,filler
-BushSpiky,20.83,60.33,15,388,1,-1,filler
-StumpPainted,37.42,14.92,15,389,1,-1,filler
-BushWhiteFlowers,-37.17,39.33,-165,390,1,-1,filler
-BushYellowFlowers,9.27,41.98,165,391,1,-1,filler
-BushWhiteFlowers,-41.17,2.83,-15,392,1,-1,filler
-ShrubLow,13.42,49.83,165,393,1,-1,filler
-BushDome,7.63,-32.37,75,394,1,-1,filler
-BushWhiteFlowers,-12.87,-23.87,105,395,1,-1,filler
-BushYellowFlowers,-38.87,-2.87,-75,396,1,-1,filler
-PlantClump,-3.31,39.19,-45,397,1,-1,filler
-BushRound,37.42,-33.08,-105,398,1,-1,filler
-BushDome,-7.87,34.13,45,399,1,-1,filler
-ShrubLow,-53.37,2.13,165,400,1,-1,filler
-StumpGrass,-0.37,-44.37,165,401,1,-1,filler
-BushLeafy,-9.37,-5.87,75,402,1,-1,filler
-BushYellowFlowers,27.69,21.56,-75,403,1,-1,filler
-BushDome,17.98,-33.02,-135,404,1,-1,filler
-BushRound,14.92,26.92,-75,405,1,-1,filler
-PlantClump,-18.37,-27.87,15,406,1,-1,filler
-BushLeafy,-3.37,33.13,135,407,1,-1,filler
-BushDome,-32.87,35.63,-105,408,1,-1,filler
-PlantClump,-30.87,-42.87,15,409,1,-1,filler
-StumpPainted,49.69,-30.81,135,410,1,-1,filler
-ShrubLow,-42.87,-48.87,-75,411,1,-1,filler
-StumpPainted,-8.87,-27.87,-165,412,1,-1,filler
-BushRound,22.63,-13.37,105,413,1,-1,filler
-ShrubLow,11.63,-28.87,-165,414,1,-1,filler
-BushWhiteFlowers,28.13,13.13,105,415,1,-1,filler
-BushLeafy,16.33,32.33,165,416,1,-1,filler
-BushLeafy,-13.37,-31.37,15,417,1,-1,filler
-ShrubLow,-35.23,30.77,-15,418,1,-1,filler
-BushDome,1.63,31.13,105,419,1,-1,filler
-BushBall,-36.08,-40.17,-45,420,1,-1,filler
-StumpPainted,31.92,-29.58,-45,421,1,-1,filler
-PlantClump,-38.17,-51.58,-135,422,1,-1,filler
-PlantClump,-26.94,-32.81,-15,423,1,-1,filler
-StumpGrass,41.06,12.06,165,424,1,-1,filler
-BushWhiteFlowers,65.13,20.63,-165,425,1,-1,filler
-BushLeafy,-31.37,-27.37,-165,426,1,-1,filler
-BushBerries,50.98,-34.52,-165,427,1,-1,filler
-ShrubLow,23.13,-16.87,165,428,1,-1,filler
-ShrubLow,37.13,-26.37,45,429,1,-1,filler
-StumpPainted,-13.37,34.63,-135,430,1,-1,filler
-BushDome,21.33,-35.17,15,431,1,-1,filler
-BushBall,-20.67,34.42,-165,432,1,-1,filler
-BushYellowFlowers,25.13,-21.87,-135,433,1,-1,filler
-BushYellowFlowers,16.92,57.83,15,434,1,-1,filler
-BushYellowFlowers,-35.37,-2.87,15,435,1,-1,filler
-BushWhiteFlowers,10.92,27.92,105,436,1,-1,filler
-BushLeafy,-6.87,39.63,-105,437,1,-1,filler
-BushBerries,22.13,18.63,15,438,1,-1,filler
-ShrubLow,-10.58,-13.08,-105,439,1,-1,filler
-BushLeafy,10.92,2.83,75,440,1,-1,filler
-BushSpiky,28.13,16.63,135,441,1,-1,filler
-BushSpiky,-0.58,26.33,135,442,1,-1,filler
-BushYellowFlowers,14.83,-30.67,75,443,1,-1,filler
-StumpGrass,-23.87,-38.37,75,444,1,-1,filler
-BushYellowFlowers,25.33,32.33,-135,445,1,-1,filler
-PlantClump,-28.87,38.13,15,446,1,-1,filler
-BushYellowFlowers,46.83,-30.17,-75,447,1,-1,filler
-BushSpiky,43.56,10.56,-135,448,1,-1,filler
-PlantClump,-13.87,40.13,-105,449,1,-1,filler
-BushBerries,22.13,51.13,105,450,1,-1,filler
-ShrubLow,-15.87,-48.37,15,451,1,-1,filler
-ShrubLow,68.13,-11.37,75,452,1,-1,filler
-BushLeafy,-36.87,-9.87,-75,453,1,-1,filler
-BushLeafy,-17.87,58.13,105,454,1,-1,filler
-PlantClump,-23.37,-31.37,-135,455,1,-1,filler
-BushLeafy,-31.37,29.63,75,456,1,-1,filler
-BushYellowFlowers,-4.87,47.63,75,457,1,-1,filler
-ShrubLow,61.13,42.63,135,458,1,-1,filler
-BushDome,8.63,-55.87,15,459,1,-1,filler
-BushLeafy,-25.87,-26.87,-15,460,1,-1,filler
-BushDome,59.63,-17.87,-165,461,1,-1,filler
-ShrubLow,58.13,-49.87,105,462,1,-1,filler
-BushBall,-9.87,-21.37,-105,463,1,-1,filler
-BushDome,4.77,10.27,15,464,1,-1,filler
-BushYellowFlowers,54.13,39.13,165,465,1,-1,filler
-BushBall,15.13,41.13,-75,466,1,-1,filler
-ShrubLow,22.63,-52.87,75,467,1,-1,filler
-BushSpiky,-31.87,-11.37,-165,468,1,-1,filler
-ShrubLow,69.13,2.13,-75,469,1,-1,filler
-BushLeafy,20.42,24.92,-45,470,1,-1,filler
-BushRound,-12.37,26.63,105,471,1,-1,filler
-ShrubLow,-23.37,31.13,105,472,1,-1,filler
-ShrubLow,48.13,34.63,-165,473,1,-1,filler
-ShrubLow,32.13,51.63,15,474,1,-1,filler
-BushBerries,-10.87,-53.87,165,475,1,-1,filler
-BushBerries,28.63,-15.87,75,476,1,-1,filler
-BushWhiteFlowers,33.63,-23.37,135,477,1,-1,filler
-BushLeafy,62.63,-12.37,-15,478,1,-1,filler
-BushYellowFlowers,-37.17,2.83,-15,479,1,-1,filler
-PlantClump,55.13,53.63,75,480,1,-1,filler
-ShrubLow,42.13,59.13,45,481,1,-1,filler
-BushRound,-5.37,-64.87,-165,482,1,-1,filler
-PlantClump,-14.87,-25.37,75,483,1,-1,filler
-BushLeafy,-2.94,-22.44,75,484,1,-1,filler
-ShrubLow,-29.37,-4.87,-45,485,1,-1,filler
-BushYellowFlowers,-23.37,-2.87,135,486,1,-1,filler
-BushBall,-22.37,13.63,-75,487,1,-1,filler
-BushYellowFlowers,34.42,16.92,-165,488,1,-1,filler
-BushBall,71.63,18.63,-15,489,1,-1,filler
-BushBall,51.63,31.13,15,490,1,-1,filler
-ShrubLow,63.63,40.63,-15,491,1,-1,filler
-StumpPainted,10.56,45.19,75,492,1,-1,filler
-ShrubLow,24.13,-37.37,-15,493,1,-1,filler
-StumpGrass,24.63,-25.37,165,494,1,-1,filler
-StumpPainted,57.13,-44.37,-45,495,1,-1,filler
-ShrubLow,22.63,15.63,75,496,1,-1,filler
-BushYellowFlowers,22.63,57.13,15,497,1,-1,filler
-BushRound,1.13,-67.87,-75,498,1,-1,filler
-ShrubLow,-33.37,-37.87,75,499,1,-1,filler
-BushBerries,39.63,-27.87,15,500,1,-1,filler
-BushBerries,-38.87,-12.87,-135,501,1,-1,filler
-BushSpiky,7.92,-7.67,-15,502,1,-1,filler
-BushDome,61.13,-2.87,-135,503,1,-1,filler
-PlantClump,-36.17,-49.08,-165,504,1,-1,filler
-PlantClump,42.63,-47.87,135,505,1,-1,filler
-PlantClump,33.63,54.13,-45,506,1,-1,filler
-ShrubLow,17.77,-39.23,165,507,1,-1,filler
-BushDome,58.63,-33.37,165,508,1,-1,filler
-BushWhiteFlowers,-9.87,28.63,-165,509,1,-1,filler
-StumpGrass,-17.31,40.19,15,510,1,-1,filler
-BushBall,-32.37,46.13,75,511,1,-1,filler
-ShrubLow,34.83,23.42,-135,512,1,-1,filler
-BushRound,29.63,26.63,-75,513,1,-1,filler
+LampStone,2.01,11.37,-80,11,0,-1,lamp post on the plaza ring
+LampPillar,-9.46,6.62,-145,12,0,-1,lamp post on the plaza ring
+LampStone,-6.62,-9.46,125,13,0,-1,lamp post on the plaza ring
+LampPillar,10,-5.78,30,14,0,-1,lamp post on the plaza ring
+BannerLionPole,19.02,2.41,90,15,0,-1,Oak Hill lion banner pole at the road out of the plaza
+BannerLionPole,22,-2.9,-90,16,0,-1,Oak Hill lion banner pole at the road out of the plaza
+BannerLionPole,-26.98,3.15,90,17,0,-1,Oak Hill lion banner pole at the road out of the plaza
+BannerLionPole,-26.48,-2.65,-90,18,0,-1,Oak Hill lion banner pole at the road out of the plaza
+DoorstepPots,10.32,13.62,114,19,1,1,doorstep of bank 1
+DoorstepCandles,40.47,37.3,105,20,1,8,doorstep of church 8
+DoorstepIvy,-24.16,40.86,75,21,1,10,doorstep of house 10
+DoorstepPots,27.44,46.38,-80,22,1,11,doorstep of house 11
+DoorstepIvy,49.34,-5.89,180,23,1,12,doorstep of house 12
+DoorstepBox,-23.92,27.91,-85,24,1,13,doorstep of house 13
+DoorstepPots,52.42,2.47,180,25,1,16,doorstep of house 16
+DoorstepIvy,52.42,8.94,180,26,1,16,doorstep of house 16
+DoorstepPots,-27.91,4.65,90,27,1,17,doorstep of house 17
+DoorstepIvy,64.12,25.33,45,28,1,18,doorstep of house 18
+DoorstepPots,-27.03,-23.46,95,29,1,19,doorstep of house 19
+DoorstepPots,-33.1,-22.93,95,30,1,19,doorstep of house 19
+DoorstepIvy,-23.82,-45.98,-90,31,1,20,doorstep of house 20
+DoorstepPots,-10.05,-35.76,-90,32,1,21,doorstep of house 21
+DoorstepBench,52.15,-39.51,-70,33,1,23,doorstep of house 23
+DoorstepIvy,-1.74,-48.43,-80,34,1,24,doorstep of house 24
+DoorstepPots,34.17,-21.43,120,35,1,25,doorstep of house 25
+WallBannerLion,28.93,3.2,180,36,0,7,banner hung on the town hall front (check it sits on the wall)
+WallBannerLion,28.93,-3.6,180,37,0,7,banner hung on the town hall front (check it sits on the wall)
+WallBannerSwordShield,4.04,16.45,114,38,0,1,banner hung on the bank front (check it sits on the wall)
+WallBannerSwordShield,9.52,14.01,114,39,0,1,banner hung on the bank front (check it sits on the wall)
+WallBannerSwords,-9.66,14.06,65,40,0,2,banner hung on the smith front (check it sits on the wall)
+WallBannerKnot,40.36,37.37,105,41,0,8,banner hung on the church front (check it sits on the wall)
+BarrelRow,18.53,12.85,-114,42,1,0,barrel row by bank stall 0
+BarrelRow,14.69,11.14,-114,43,1,0,barrel row by bank stall 0
+BarrelRow,20.74,11.25,-24,44,1,0,barrel row by bank stall 0
+BarrelRow,14.61,18.11,24,45,1,1,barrel row by bank 1
+SmithYard,-4.25,22.51,-25,46,1,2,smith yard by smith 2
+SmithYard,-14.86,17.34,155,47,1,2,smith yard by smith 2
+SmithYard,-13.83,21.21,-115,48,1,2,smith yard by smith 2
+SmithYard,-9.24,23.35,-115,49,1,2,smith yard by smith 2
+AmphoraRow,-13.71,10.98,-67,50,1,3,amphora row by potion stall 3
+AmphoraRow,-17.07,12.4,-67,51,1,3,amphora row by potion stall 3
+AmphoraRow,-20.87,3.7,113,52,1,3,amphora row by potion stall 3
+AmphoraRow,-19.07,-14.56,65,53,1,4,amphora row by potion shop 4
+WashingCorner,-15.45,-12.87,65,54,1,4,washing corner by potion shop 4
+WashingCorner,-21.45,-13.43,155,55,1,4,washing corner by potion shop 4
+WashingCorner,-23.36,-9.33,155,56,1,4,washing corner by potion shop 4
+SackCorner,16.12,-19.65,-25,57,1,5,sack corner by store 5
+SackCorner,14.04,-15.2,-25,58,1,5,sack corner by store 5
+SackCorner,14.15,-22.98,65,59,1,5,sack corner by store 5
+HedgeRun,37.22,10.25,-90,60,1,7,hedge run by town hall 7
+HedgeBoxPair,31.76,10.04,-90,61,1,7,hedge box pair by town hall 7
+BenchNookStone,41.23,8.44,0,62,1,7,bench nook stone by town hall 7
+HedgeRun,40.5,3.61,0,63,1,7,hedge run by town hall 7
+CypressPair,44.66,37.01,15,64,1,8,cypress pair by church 8
+CypressPair,45.91,41.67,15,65,1,8,cypress pair by church 8
+CypressPair,33.1,47.43,-165,66,1,8,cypress pair by church 8
+CypressPair,37.97,52.69,-75,67,1,8,cypress pair by church 8
+CypressPair,42.63,51.44,-75,68,1,8,cypress pair by church 8
+WashingCorner,-28.96,42.67,165,69,1,10,washing corner by house 10
+WashingCorner,30.62,39.73,10,70,1,11,washing corner by house 11
+LogCorner,49.39,-16.25,90,71,1,12,log corner by house 12
+Workbench,54.92,-2.47,-90,72,1,12,workbench by house 12
+KitchenGarden,58.38,-6.29,0,73,1,12,kitchen garden by house 12
+ChickenYard,58.86,-13,0,74,1,12,chicken yard by house 12
+WashingCorner,-26.74,27.11,-175,75,1,13,washing corner by house 13
+WashingCorner,-27.14,22.61,-175,76,1,13,washing corner by house 13
+WashingCorner,-16.96,23.01,5,77,1,13,washing corner by house 13
+WashingCorner,-20.01,17.22,95,78,1,13,washing corner by house 13
+SackCorner,-24.67,17.63,95,79,1,13,sack corner by house 13
+WashingCorner,29,35.22,-165,80,1,14,washing corner by house 14
+WashingCorner,31.48,36.66,-75,81,1,14,washing corner by house 14
+StorageCorner,54.02,21.68,-45,82,1,15,storage corner by house 15
+BarrelRow,49.38,26.32,-45,83,1,15,barrel row by house 15
+WashingCorner,42.19,19.23,135,84,1,15,washing corner by house 15
+WoodYard,42.84,22.75,-135,85,1,15,wood yard by house 15
+ChickenYard,57.52,14.35,-90,86,1,16,chicken yard by house 16
+SackCorner,60.45,10.67,0,87,1,16,sack corner by house 16
+LogCorner,60.45,5.63,0,88,1,16,log corner by house 16
+WoodYard,-25.49,9.61,0,89,1,17,wood yard by house 17
+StorageCorner,-35.6,12.33,180,90,1,17,storage corner by house 17
+BarrelRow,-35.6,5.77,180,91,1,17,barrel row by house 17
+LogCorner,-33.28,14.96,-90,92,1,17,log corner by house 17
+WashingCorner,-28.06,14.96,-90,93,1,17,washing corner by house 17
+KitchenGarden,64.81,30.03,-45,94,1,18,kitchen garden by house 18
+SackCorner,-23.66,-23.84,5,95,1,19,sack corner by house 19
+BarrelRow,-36.88,-16.87,-175,96,1,19,barrel row by house 19
+BarrelRow,-37.25,-21.07,-175,97,1,19,barrel row by house 19
+BarrelRow,-34.36,-14.76,-85,98,1,19,barrel row by house 19
+SackCorner,-29.8,-15.15,-85,99,1,19,sack corner by house 19
+WashingCorner,-33.68,-47.74,180,100,1,20,washing corner by house 20
+Workbench,-19.9,-51.56,0,101,1,20,workbench by house 20
+ChickenYard,-22.83,-55.5,90,102,1,20,chicken yard by house 20
+ChickenYard,-28.3,-55.5,90,103,1,20,chicken yard by house 20
+Workbench,-19.54,-36.94,180,104,1,21,workbench by house 21
+WoodYard,-5.76,-40.84,0,105,1,21,wood yard by house 21
+StorageCorner,-8.39,-43.79,90,106,1,21,storage corner by house 21
+LogCorner,-14.94,-43.79,90,107,1,21,log corner by house 21
+StorageCorner,15.08,-45.06,5,108,1,22,storage corner by house 22
+BarrelRow,12.53,-47.47,95,109,1,22,barrel row by house 22
+BarrelRow,8.34,-47.11,95,110,1,22,barrel row by house 22
+SackCorner,42.61,-36.48,-160,111,1,23,sack corner by house 23
+WashingCorner,53.65,-46.44,20,112,1,23,washing corner by house 23
+BarrelRow,50.77,-47.55,110,113,1,23,barrel row by house 23
+BarrelRow,46.34,-45.94,110,114,1,23,barrel row by house 23
+BarrelRow,-4.73,-49.26,-170,115,1,24,barrel row by house 24
+BarrelRow,-5.46,-53.41,-170,116,1,24,barrel row by house 24
+WashingCorner,4.02,-57.84,10,117,1,24,washing corner by house 24
+BarrelRow,4.85,-53.1,10,118,1,24,barrel row by house 24
+StorageCorner,1.07,-59.39,100,119,1,24,storage corner by house 24
+WashingCorner,42.26,-26.39,30,120,1,25,washing corner by house 25
+BarrelRow,44.92,-21.78,30,121,1,25,barrel row by house 25
+WashingCorner,33.45,-14.09,-150,122,1,25,washing corner by house 25
+WashingCorner,31.19,-18,-150,123,1,25,washing corner by house 25
+WashingCorner,36.23,-13.35,-60,124,1,25,washing corner by house 25
+WashingCorner,40.14,-15.61,-60,125,1,25,washing corner by house 25
+LampGallows,-43.94,-2.6,-90,126,0,-1,street lamp
+LampPillar,21.69,2.6,90,127,0,-1,street lamp
+LampStone,21.01,53.85,-157.85,128,0,-1,street lamp
+LampStone,-45.89,46.27,129.47,129,0,-1,street lamp
+LampRope,-38.67,33.59,-50.53,130,0,-1,street lamp
+LampPillar,20.6,30.34,110.4,131,0,-1,street lamp
+LampStone,30.41,19.46,-58.68,132,0,-1,street lamp
+LampStone,22.05,21.93,-5.97,133,0,-1,street lamp
+LampGallows,27.59,-12.1,180,134,0,-1,street lamp
+LampPillar,27.94,-25.55,-40.17,135,0,-1,street lamp
+LampStone,42.89,-29.27,113.26,136,0,-1,street lamp
+LampGallows,-7.49,-19.39,46.35,137,0,-1,street lamp
+LampStone,-16.3,-33.21,-125.01,138,0,-1,street lamp
+LampPillar,-30.47,-36.03,57.83,139,0,-1,street lamp
+JunctionArrow,1.5,-11.4,86.76,140,0,-1,sign at a junction
+Junction,-2.3,-24.89,-40,141,0,-1,sign at a junction
+JunctionArrow,-5.42,-15.4,-75.5,142,0,-1,sign at a junction
+Junction,1.32,-26.91,-40.49,143,0,-1,sign at a junction
+StonePole,-40.54,-54.41,-141.66,144,0,-1,stone banner pole where a lane leaves town
+TrainingGround,2.52,-31.44,-51.74,145,1,26,boxing ring plot
+RingCorner,-1.48,-27.44,108.28,146,1,26,boxing ring plot
+RingBanner,-2.48,-29.44,-42.97,147,1,26,boxing ring plot
+SpectatorBench,-4.48,-30.44,-39.89,148,1,26,boxing ring plot
+RingCorner,3.52,-34.44,-51.24,149,1,26,boxing ring plot
+Ruin,-5.73,42.78,-80.72,150,1,27,castle ruins plot
+RuinPillar,3.16,43.8,121.72,151,1,27,castle ruins plot
+Allotment,45.46,-3.84,0,152,1,28,garden plot
+AllotmentScarecrow,42.46,-12.84,-90,153,1,28,garden plot
+Allotment,46.46,4.16,3.09,154,1,28,garden plot
+KitchenGarden,43.46,0.16,0,155,1,28,garden plot
+BenchNookStone,43.46,4.16,-67.14,156,1,28,garden plot
+CypressPair,41.46,-5.84,0,157,1,28,garden plot
+GraveyardRow,33.7,-48.9,0,158,1,29,graveyard plot
+GraveyardBench,24.7,-42.9,-109.23,159,1,29,graveyard plot
+GraveyardRow,25.7,-45.9,-108.8,160,1,29,graveyard plot
+CypressPair,32.7,-38.9,170.93,161,1,29,graveyard plot
+FlowerClump,36.7,-42.9,0,162,1,29,graveyard plot
+GraveyardRow,30.7,-53.9,-90,163,1,29,graveyard plot
+GraveyardBench,38.7,-48.9,180,164,1,29,graveyard plot
+GraveyardRow,31.7,-42.9,-71.91,165,1,29,graveyard plot
+CypressPair,22.7,-48.9,-82.69,166,1,29,graveyard plot
+FlowerClump,26.7,-36.9,130.3,167,1,29,graveyard plot
+GraveyardRow,36.7,-51.9,180,168,1,29,graveyard plot
+GraveyardBench,29.7,-46.9,-131.88,169,1,29,graveyard plot
+GraveyardRow,28.7,-36.9,-34.91,170,1,29,graveyard plot
+CypressPair,36.7,-44.9,-90,171,1,29,graveyard plot
+FlowerClump,26.7,-51.9,180,172,1,29,graveyard plot
+GraveyardRow,27.7,-50.9,-90,173,1,29,graveyard plot
+GraveyardBench,35.7,-38.9,-155.25,174,1,29,graveyard plot
+GarrisonLion,-44.1,32.55,-50.75,175,1,30,north fort plot
+Garrison,-41.37,24.96,-100,176,1,30,north fort plot
+GarrisonTable,-48.27,26.18,170,177,1,30,north fort plot
+Garrison,-43.81,28.44,80,178,1,30,north fort plot
+GarrisonLion,-40.51,29.89,41.64,179,1,30,north fort plot
+Garrison,-48.96,22.24,80,180,1,30,north fort plot
+GarrisonTable,-42.42,36.32,-52.83,181,1,30,north fort plot
+Garrison,-46.7,35.04,-140.43,182,1,30,north fort plot
+GarrisonLion,-44.8,-25.98,0,183,1,31,south fort plot
+Garrison,-49.8,-21.98,0,184,1,31,south fort plot
+GarrisonTable,-46.8,-22.98,180,185,1,31,south fort plot
+Garrison,-46.8,-34.98,90,186,1,31,south fort plot
+GarrisonLion,-49.8,-27.98,0,187,1,31,south fort plot
+Garrison,-44.8,-29.98,-90,188,1,31,south fort plot
+GarrisonTable,-45.8,-32.98,-90,189,1,31,south fort plot
+TowerYard,-15.8,29.4,-91.34,190,1,32,watchtower plot
+Dock,-49.97,-2.94,-89.18,191,1,33,bridge plot
+CobbleWell,58.02,-61.75,45,192,0,-1,the big cobbled well: a landmark on the fringe
+Hayfield,61.65,-29.06,90,193,1,-1,fringe farmland
+Hayfield,-30.25,-75.99,120,194,1,-1,fringe farmland
+Farmstead,77.83,14.88,180,195,1,-1,fringe farmland
+Farmstead,12.1,-73.66,-150,196,1,-1,fringe farmland
+FieldWell,37.75,57.57,180,197,1,-1,fringe farmland
+WoodStack,-40.25,52.43,0,198,1,-1,fringe farmland
+WoodStack,70.5,-48,30,199,1,-1,fringe farmland
+FenceRun,78,-14,90,200,1,-1,fringe farmland
+FenceRun,53.47,-60.02,40,201,1,-1,fringe farmland
+FenceRun,-14,-75,90,202,1,-1,fringe farmland
+FenceRun,30,64,0,203,1,-1,fringe farmland
+Boulders,-48.48,39.75,90,204,1,-1,fringe farmland
+Boulders,82,40,0,205,1,-1,fringe farmland
+Boulders,20,-82,30,206,1,-1,fringe farmland
+Boulders,-30,62,0,207,1,-1,fringe farmland
+Hayfield,62,48,-30,208,1,-1,fringe farmland
+StumpCorner,-10.87,58.13,93.85,209,1,-1,yard gap
+VegCorner,-10.37,-60.87,-122.96,210,1,-1,yard gap
+CartCorner,-16.87,-20.37,51.96,211,1,-1,yard gap
+VegCorner,-45.87,15.63,89.49,212,1,-1,yard gap
+Orchard,-42.87,-40.87,39.73,213,1,-1,yard gap
+BushClump,30.63,53.63,-161.1,214,1,-1,yard gap
+BushClump,-19.87,55.13,85.39,215,1,-1,yard gap
+CartCorner,61.13,37.63,120.46,216,1,-1,yard gap
+ChickenYard,-35.37,58.63,130.28,217,1,-1,yard gap
+ChickenYard,-35.37,44.63,131.4,218,1,-1,yard gap
+StumpCorner,7.13,47.63,29,219,1,-1,yard gap
+KitchenGarden,48.63,53.13,-171.62,220,1,-1,yard gap
+VegCorner,-14.87,-66.37,-141.56,221,1,-1,yard gap
+Orchard,50.13,-26.87,105.18,222,1,-1,yard gap
+BushClump,17.63,36.13,105.57,223,1,-1,yard gap
+CartCorner,49.13,33.13,126.04,224,1,-1,yard gap
+ChickenYard,-34.37,-58.37,-142.32,225,1,-1,yard gap
+BushClump,-5.37,29.13,-75.16,226,1,-1,yard gap
+HedgeRun,58.13,43.13,127.15,227,1,-1,yard gap
+KitchenGarden,-33.37,-30.87,59.74,228,1,-1,yard gap
+HedgeRun,-38.87,-6.87,-92.29,229,1,-1,yard gap
+HedgeRun,54.63,-52.87,-108.17,230,1,-1,yard gap
+CartCorner,13.13,59.63,18.96,231,1,-1,yard gap
+HedgeRun,-4.87,-62.37,-122.67,232,1,-1,yard gap
+Orchard,25.63,-30.37,-43.77,233,1,-1,yard gap
+VegCorner,65.63,1.63,-150.27,234,1,-1,yard gap
+CartCorner,-38.37,-36.87,39.42,235,1,-1,yard gap
+BushClump,-4.37,51.63,98.94,236,1,-1,yard gap
+KitchenGarden,55.63,-19.87,118.09,237,1,-1,yard gap
+KitchenGarden,70.63,33.63,138.08,238,1,-1,yard gap
+VegCorner,15.13,-62.37,-68.53,239,1,-1,yard gap
+PlanterPair,-12.37,-16.87,-55.95,240,1,-1,yard gap
+BushClump,67.13,-21.87,148.08,241,1,-1,yard gap
+KitchenGarden,-40.37,17.13,90,242,1,-1,yard gap
+BushClump,45.13,29.13,125.54,243,1,-1,yard gap
+HedgeRun,50.63,43.63,123.59,244,1,-1,yard gap
+BushClump,-31.37,49.63,130.19,245,1,-1,yard gap
+BushClump,-14.37,52.63,91.43,246,1,-1,yard gap
+CartCorner,45.63,-56.87,-83.44,247,1,-1,yard gap
+HedgeRun,53.63,54.13,-174.5,248,1,-1,yard gap
+KitchenGarden,70.13,-4.37,-144.29,249,1,-1,yard gap
+VegCorner,58.13,-40.37,-145.41,250,1,-1,yard gap
+Orchard,54.63,-33.37,177.96,251,1,-1,yard gap
+Orchard,-45.87,-16.87,-89.53,252,1,-1,yard gap
+StumpCorner,-23.87,52.13,80.87,253,1,-1,yard gap
+BushClump,-36.37,-26.37,58.41,254,1,-1,yard gap
+HedgeRun,-32.37,39.63,62.95,255,1,-1,yard gap
+HedgeRun,-45.87,-7.37,-88.92,256,1,-1,yard gap
+ChickenYard,40.13,-56.87,-134.6,257,1,-1,yard gap
+HedgeBoxPair,21.63,-21.37,-21.72,258,1,-1,yard gap
+BushClump,23.63,36.13,89.67,259,1,-1,yard gap
+HedgeRun,13.63,-53.87,-53.11,260,1,-1,yard gap
+CartCorner,0.13,-39.37,-53.23,261,1,-1,yard gap
+BushClump,73.63,37.63,136.56,262,1,-1,yard gap
+CartCorner,-14.37,-57.87,-122.82,263,1,-1,yard gap
+VegCorner,31.63,15.13,-55.87,264,1,-1,yard gap
+BenchNook,-8.87,-31.37,-129.07,265,1,-1,yard gap
+StumpCorner,-12.37,44.63,94.11,266,1,-1,yard gap
+BushClump,-7.87,54.13,96.45,267,1,-1,yard gap
+Orchard,63.63,-13.87,127.84,268,1,-1,yard gap
+BushClump,75.13,23.63,158.17,269,1,-1,yard gap
+CartCorner,-27.87,-7.37,-89.2,270,1,-1,yard gap
+BenchNook,-23.37,-41.37,-119.97,271,1,-1,yard gap
+HedgeBoxPair,33.13,-33.87,-60.76,272,1,-1,yard gap
+BenchNook,21.63,-31.87,120.98,273,1,-1,yard gap
+Orchard,51.13,-22.87,104.76,274,1,-1,yard gap
+FlowerClump,20.13,-16.37,-12.84,275,1,-1,yard gap
+HedgeRun,67.13,-16.87,138.38,276,1,-1,yard gap
+ChickenYard,64.13,14.13,174.02,277,1,-1,yard gap
+CartCorner,54.13,33.63,120.33,278,1,-1,yard gap
+StumpCorner,-15.37,57.63,89.99,279,1,-1,yard gap
+HedgeRun,31.63,57.63,178.93,280,1,-1,yard gap
+StumpCorner,-23.87,56.63,81.2,281,1,-1,yard gap
+VegCorner,-37.87,21.63,-64.81,282,1,-1,yard gap
+PicketCorner,25.63,53.63,-159.23,283,1,-1,yard gap
+BushClump,48.63,-52.87,-90.97,284,1,-1,yard gap
+FlowerClump,15.13,-27.87,120.89,285,1,-1,yard gap
+FlowerClump,-1.37,29.63,29.44,286,1,-1,yard gap
+BenchNook,-35.87,-53.37,-142.79,287,1,-1,yard gap
+KitchenGarden,46.13,59.63,-165,288,1,-1,yard gap
+Orchard,-2.37,-65.37,-56.29,289,1,-1,yard gap
+BushClump,-37.87,-10.87,-90.4,290,1,-1,yard gap
+KitchenGarden,-22.37,-64.37,-90,291,1,-1,yard gap
+Orchard,-11.37,-48.37,-124.5,292,1,-1,yard gap
+BushClump,20.13,-45.37,-53.98,293,1,-1,yard gap
+KitchenGarden,69.63,43.13,126.42,294,1,-1,yard gap
+Orchard,-15.87,-48.87,-124.01,295,1,-1,yard gap
+HedgeBoxPair,-18.87,-24.87,57.49,296,1,-1,yard gap
+StumpCorner,48.63,38.13,125.22,297,1,-1,yard gap
+BenchNook,-35.37,27.63,-61.59,298,1,-1,yard gap
+Orchard,65.63,34.63,130.01,299,1,-1,yard gap
+HedgeRun,63.13,-52.87,-127.57,300,1,-1,yard gap
+HedgeBoxPair,-45.87,5.63,88.59,301,1,-1,yard gap
+CartCorner,-30.37,19.13,-100.93,302,1,-1,yard gap
+Orchard,62.63,-9.87,-125.32,303,1,-1,yard gap
+BushClump,-42.37,-35.87,39.58,304,1,-1,yard gap
+BushClump,-20.87,-18.87,52.67,305,1,-1,yard gap
+VegCorner,17.63,-57.37,-70.1,306,1,-1,yard gap
+BushClump,49.63,-0.37,-102.11,307,1,-1,yard gap
+BushClump,11.13,50.63,26.42,308,1,-1,yard gap
+HedgeRun,63.63,40.63,120.58,309,1,-1,yard gap
+Orchard,60.63,-23.37,140.32,310,1,-1,yard gap
+ChickenYard,-25.87,-11.87,-25,311,1,-1,yard gap
+BushClump,4.63,38.63,34.15,312,1,-1,yard gap
+CartCorner,-32.87,53.63,129.6,313,1,-1,yard gap
+HedgeRun,-31.37,-61.87,-140.99,314,1,-1,yard gap
+BenchNook,18.13,23.13,-69.67,315,1,-1,yard gap
+HedgeRun,-5.37,47.63,100.26,316,1,-1,yard gap
+BenchNook,0.13,40.13,110.64,317,1,-1,yard gap
+VegCorner,-11.37,-68.37,-141.58,318,1,-1,yard gap
+HedgeBoxPair,-23.37,-28.37,55.16,319,1,-1,yard gap
+StumpGrass,12.19,33.69,-105,320,1,-1,filler
+BushYellowFlowers,-52.87,3.63,-105,321,1,-1,filler
+BushBerries,-20.31,33.56,45,322,1,-1,filler
+ShrubLow,-9.87,34.63,45,323,1,-1,filler
+PlantClump,13.13,37.13,135,324,1,-1,filler
+BushRound,-33.87,-2.87,105,325,1,-1,filler
+StumpGrass,-13.87,34.63,-105,326,1,-1,filler
+BushSpiky,20.98,59.98,105,327,1,-1,filler
+StumpGrass,-25.37,32.63,15,328,1,-1,filler
+BushBerries,-27.37,-33.87,-15,329,1,-1,filler
+ShrubLow,36.63,22.13,75,330,1,-1,filler
+StumpPainted,49.69,-30.81,135,331,1,-1,filler
+BushRound,9.42,42.83,105,332,1,-1,filler
+BushLeafy,-31.37,29.63,75,333,1,-1,filler
+StumpPainted,31.06,-29.44,135,334,1,-1,filler
+StumpPainted,37.42,14.92,15,335,1,-1,filler
+BushBerries,-9.87,40.13,165,336,1,-1,filler
+BushRound,-38.87,-64.37,-45,337,1,-1,filler
+ShrubLow,-42.87,-48.87,-75,338,1,-1,filler
+BushRound,-38.37,-2.87,-45,339,1,-1,filler
+BushYellowFlowers,-12.08,-23.17,135,340,1,-1,filler
+BushLeafy,15.42,55.33,75,341,1,-1,filler
+StumpPainted,-41.37,3.13,-105,342,1,-1,filler
+ShrubLow,22.42,18.33,-165,343,1,-1,filler
+BushDome,7.63,-32.37,75,344,1,-1,filler
+BushLeafy,-8.87,-5.87,75,345,1,-1,filler
+ShrubLow,-30.58,-42.08,75,346,1,-1,filler
+BushYellowFlowers,27.69,21.56,-75,347,1,-1,filler
+BushDome,-36.87,-41.37,-165,348,1,-1,filler
+BushDome,-32.87,35.63,-105,349,1,-1,filler
+BushLeafy,-3.37,33.13,135,350,1,-1,filler
+ShrubLow,11.63,-28.87,-165,351,1,-1,filler
+ShrubLow,22.83,-36.17,165,352,1,-1,filler
+BushBall,45.13,10.13,75,353,1,-1,filler
+ShrubLow,5.63,35.63,75,354,1,-1,filler
+BushBerries,11.56,47.19,15,355,1,-1,filler
+BushSpiky,-37.87,40.13,-135,356,1,-1,filler
+StumpGrass,-0.37,-44.37,165,357,1,-1,filler
+ShrubLow,38.33,-27.17,-45,358,1,-1,filler
+BushWhiteFlowers,13.42,27.42,-15,359,1,-1,filler
+BushWhiteFlowers,-45.87,10.63,-165,360,1,-1,filler
+BushWhiteFlowers,28.13,13.13,105,361,1,-1,filler
+StumpGrass,-42.87,-63.37,15,362,1,-1,filler
+BushLeafy,-12.31,-30.94,15,363,1,-1,filler
+BushSpiky,17.19,-31.81,45,364,1,-1,filler
+BushWhiteFlowers,-5.17,39.33,-165,365,1,-1,filler
+StumpPainted,70.13,4.13,-135,366,1,-1,filler
+BushYellowFlowers,22.63,-54.87,-165,367,1,-1,filler
+BushBerries,16.63,-50.87,75,368,1,-1,filler
+BushLeafy,-25.17,-39.08,135,369,1,-1,filler
+BushBall,19.42,-40.58,105,370,1,-1,filler
+BushBerries,50.98,-34.52,-165,371,1,-1,filler
+PlantClump,-38.17,-51.58,-135,372,1,-1,filler
+BushLeafy,-8.67,-27.58,-165,373,1,-1,filler
+BushRound,16.83,32.33,135,374,1,-1,filler
+BushDome,-10.23,-13.23,165,375,1,-1,filler
+StumpGrass,41.06,12.06,165,376,1,-1,filler
+ShrubLow,-33.37,-37.87,75,377,1,-1,filler
+BushYellowFlowers,-48.17,2.83,-75,378,1,-1,filler
+StumpPainted,33.06,17.56,-165,379,1,-1,filler
+StumpGrass,-40.87,12.13,45,380,1,-1,filler
+BushYellowFlowers,25.13,-21.87,-135,381,1,-1,filler
+ShrubLow,-0.08,26.83,15,382,1,-1,filler
+BushLeafy,16.56,26.06,15,383,1,-1,filler
+ShrubLow,8.13,-56.87,45,384,1,-1,filler
+StumpGrass,23.13,-17.37,75,385,1,-1,filler
+BushSpiky,-18.87,-27.87,15,386,1,-1,filler
+BushDome,1.63,31.13,105,387,1,-1,filler
+ShrubLow,8.63,58.13,15,388,1,-1,filler
+BushBerries,20.33,-34.17,15,389,1,-1,filler
+ShrubLow,22.77,-12.52,105,390,1,-1,filler
+BushYellowFlowers,62.63,-2.37,-15,391,1,-1,filler
+PlantClump,-29.87,-2.87,105,392,1,-1,filler
+BushBall,-27.87,51.63,-105,393,1,-1,filler
+BushWhiteFlowers,-36.08,30.92,-135,394,1,-1,filler
+BushLeafy,10.92,2.83,75,395,1,-1,filler
+StumpPainted,-29.37,37.63,-75,396,1,-1,filler
+BushSpiky,28.13,16.63,135,397,1,-1,filler
+PlantClump,-17.37,34.63,-15,398,1,-1,filler
+ShrubLow,-22.37,-59.87,-165,399,1,-1,filler
+BushLeafy,30.13,26.63,15,400,1,-1,filler
+PlantClump,-27.87,58.13,-15,401,1,-1,filler
+BushLeafy,42.63,-48.87,75,402,1,-1,filler
+PlantClump,-15.58,-25.67,75,403,1,-1,filler
+BushRound,-23.87,-31.37,135,404,1,-1,filler
+BushLeafy,20.42,24.92,-45,405,1,-1,filler
+ShrubLow,56.63,39.63,105,406,1,-1,filler
+BushLeafy,62.13,-37.87,-135,407,1,-1,filler
+BushRound,35.92,-32.08,165,408,1,-1,filler
+BushLeafy,10.13,28.13,45,409,1,-1,filler
+PlantClump,-13.87,40.13,-105,410,1,-1,filler
+BushSpiky,66.63,-9.37,45,411,1,-1,filler
+BushYellowFlowers,25.33,32.33,-135,412,1,-1,filler
+BushLeafy,63.63,-48.37,165,413,1,-1,filler
+BushBerries,53.63,-28.87,-105,414,1,-1,filler
+BushBerries,16.92,58.83,75,415,1,-1,filler
+BushBerries,-3.87,-68.87,165,416,1,-1,filler
+BushRound,-6.87,33.63,-45,417,1,-1,filler
+BushBerries,-6.37,58.63,-135,418,1,-1,filler
+BushYellowFlowers,46.83,-30.17,-75,419,1,-1,filler
+BushLeafy,-17.31,40.19,15,420,1,-1,filler
+BushBerries,-28.87,31.63,45,421,1,-1,filler
+BushDome,2.33,36.83,-165,422,1,-1,filler
+BushBall,15.13,40.63,75,423,1,-1,filler
+BushYellowFlowers,66.13,-2.87,165,424,1,-1,filler
+StumpPainted,8.13,-67.87,105,425,1,-1,filler
+BushRound,14.13,-65.87,-15,426,1,-1,filler
+BushSpiky,-1.31,38.69,45,427,1,-1,filler
+BushWhiteFlowers,-24.87,60.13,45,428,1,-1,filler
+ShrubLow,-16.37,-61.87,-45,429,1,-1,filler
+BushBall,-26.37,-40.87,-75,430,1,-1,filler
+StumpGrass,-40.87,6.63,-105,431,1,-1,filler
+ShrubLow,8.63,-59.87,-105,432,1,-1,filler
+BushWhiteFlowers,33.63,-23.37,135,433,1,-1,filler
+BushWhiteFlowers,63.63,-43.87,-165,434,1,-1,filler
+BushDome,4.77,10.27,15,435,1,-1,filler
+BushWhiteFlowers,56.13,36.63,-45,436,1,-1,filler
+ShrubLow,-30.87,56.63,-105,437,1,-1,filler
+BushBerries,28.13,57.13,-75,438,1,-1,filler
+StumpGrass,67.13,23.13,-135,439,1,-1,filler
+BushWhiteFlowers,-35.87,-62.87,45,440,1,-1,filler
+BushBerries,-9.87,-56.37,-105,441,1,-1,filler
+BushWhiteFlowers,-28.87,-30.87,15,442,1,-1,filler
+BushBall,44.13,-8.37,165,443,1,-1,filler
+BushRound,42.13,55.13,45,444,1,-1,filler
+BushYellowFlowers,12.13,55.63,45,445,1,-1,filler
+ShrubLow,-39.37,-24.87,-45,446,1,-1,filler
+BushSpiky,-25.37,-58.87,-45,447,1,-1,filler
+BushBall,24.13,-25.37,-165,448,1,-1,filler
+BushYellowFlowers,13.63,-58.37,-75,449,1,-1,filler
+BushBerries,29.13,-15.87,75,450,1,-1,filler
+BushYellowFlowers,-37.17,2.83,-15,451,1,-1,filler
+ShrubLow,19.63,19.13,-105,452,1,-1,filler
+BushDome,61.63,-41.37,105,453,1,-1,filler
+BushLeafy,-25.87,-27.37,-105,454,1,-1,filler
+BushLeafy,-2.94,-22.44,75,455,1,-1,filler
+BushYellowFlowers,-23.37,-2.87,135,456,1,-1,filler
+BushBall,-22.37,13.63,-75,457,1,-1,filler
+PlantClump,61.13,17.63,75,458,1,-1,filler
+StumpPainted,-36.87,25.13,105,459,1,-1,filler
+BushDome,-30.37,26.63,-15,460,1,-1,filler
+StumpPainted,28.13,49.63,-105,461,1,-1,filler
+BushRound,58.63,-54.87,-165,462,1,-1,filler
+StumpGrass,69.13,0.13,45,463,1,-1,filler
+ShrubLow,22.63,15.63,75,464,1,-1,filler
+BushBerries,-18.87,30.63,165,465,1,-1,filler
+BushBall,-16.87,-54.37,-45,466,1,-1,filler
+ShrubLow,56.63,-48.87,-45,467,1,-1,filler
+BushLeafy,56.13,-36.87,-75,468,1,-1,filler
+ShrubLow,46.13,-25.87,105,469,1,-1,filler
+StumpPainted,54.63,-23.87,-105,470,1,-1,filler
+BushSpiky,7.92,-7.67,-15,471,1,-1,filler
+BushLeafy,72.13,13.13,45,472,1,-1,filler
+PlantClump,75.13,31.63,-45,473,1,-1,filler
+BushBerries,10.63,-55.37,165,474,1,-1,filler
+PlantClump,-35.37,-48.37,-165,475,1,-1,filler
+PlantClump,-10.87,-20.37,-45,476,1,-1,filler
+BushWhiteFlowers,-9.37,31.63,-135,477,1,-1,filler
+BushWhiteFlowers,22.13,-51.87,-15,478,1,-1,filler
+ShrubLow,-41.87,-17.87,-15,479,1,-1,filler
+BushBerries,45.13,33.13,-15,480,1,-1,filler
+BushSpiky,71.77,16.27,75,481,1,-1,filler
