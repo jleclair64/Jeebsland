@@ -266,6 +266,10 @@ private:
 	void HandsOffThighs(FPose& P, const FInput& In, float Dt);
 	float ThighOut[2] = { 0.f, 0.f };   // HandsOffThighs: each arm's eased outward turn (degrees)
 	float ThighLogT = 0.f, ThighMin[2] = { 1e4f, 1e4f }, ThighMinRaw[2] = { 1e4f, 1e4f };
+	void BowArmOut(FPose& P, const FInput& In, float Dt);   // the resting bow's arm held a little out from his body, the bow still in the fist
+	float BowArmW = 0.f;   // BowArmOut: how far it is on (eased)
+	void LogBowGap(const FPose& P, const FInput& In, float Dt);   // test pictures: the resting string's gaps to his hip and forearm (JEEBBOWGAP)
+	float BowGapT = 0.f, BowGapMin[2] = { 1e4f, 1e4f };
 	void ExtendArm(FPose& P, float Deg, float W) const;
 	void TwoHandTool(FPose& P, const FInput& In, float Dt);
 	int32 ChooseAction(float Dt, const FInput& In, FPose& B, float& OutBlend);

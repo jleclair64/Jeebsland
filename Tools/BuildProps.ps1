@@ -5,6 +5,7 @@ if (Get-Process -Name 'UnrealEditor' -ErrorAction SilentlyContinue) { Write-Host
 $work = Join-Path $proj 'Saved\KnightBuild\Props'
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 & $blender -b -P (Join-Path $PSScriptRoot 'prop_clean.py') -- (Join-Path $proj 'Art\Props') $work @args | Select-String -Pattern 'PROP |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+$env:JEEB_PROPS = ($args -join ',')   # (prop_import.py imports only these when some are named)
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
 $out = & $exe (Join-Path $proj 'Jeebsland.uproject') -run=pythonscript "-script=$((Join-Path $PSScriptRoot 'prop_import.py').Replace([char]92,'/'))" -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'PROPDIAG|Traceback' | ForEach-Object { Write-Host $_.Line }

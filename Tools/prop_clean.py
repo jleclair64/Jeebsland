@@ -84,7 +84,7 @@ PROPS = {
                      marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
     "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -58.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
                      marks={"Edge": ((-0.32, -0.1, 0.5), (-0.27, 0.1, 0.95)), "Head": ((-0.3, -0.1, 0.9), (0.3, 0.1, 0.95))}),
-    "Bow":      dict(file="Bow.glb", axes=("Z", "-Y", "X"), length=124.0, grip=("X", 0.50), widen=("Z", 0.75), wood=(25.0, 0.74, 0.28, 30.0), clean=True, refine=2, islands=12.0,
+    "Bow":      dict(file="Bow.glb", axes=("Z", "-Y", "X"), length=124.0, grip=("X", 0.50), widen=("Z", 0.75), wood=(25.0, 0.74, 0.28, 30.0), clean=True, refine=2, islands=12.0, despeck=0.6,
                      cut=lambda p: p[0] > 0.18 and abs(p[2]) < 0.738,
                      # (the gold fittings take the tier's colour: pale yellow, not the orange wood or the dark leather)
                      rg=lambda co, c: (1.0 if (28.0 <= _hue(c)[0] <= 65.0 and _hue(c)[2] > 0.10 and _hue(c)[1] > 0.2 and not 26.0 < abs(co[0]) < 55.0) else 0.0, 0.0),   # (2026-11-15: the limbs's pale pinstripes passed the gold test and became patches of tier steel, which mirrors the dark surroundings: black holes along the limbs. Fittings only at the collars and tips)
@@ -636,6 +636,31 @@ for name in names:
         arr[..., :3][fix] = fill[fix]
         graded.pixels.foreach_set(arr.reshape(-1)); graded.update(); base = graded
         print("PROP", name, "wood faces %d, seam pixels evened %.1f%%" % (len(woodfaces), 100.0 * fix.mean()))
+        # (2026-11-16) ...and plain wood in the metal/roughness picture too. Meshy painted the bow's pale pinstripes, and the longbow's whole stave, as polished
+        # metal: evened to brown above, those faces still mirrored the dark surroundings (the sun gives no shine), the black holes and blotches along the limbs.
+        # Wood faces: no metal, and a polished wood's roughness. (The tinted fittings take the tier's metal and roughness from the material, not this picture.)
+        if mr:
+            MW, MH = mr.size
+            ma = np.array(mr.pixels[:], dtype=np.float32).reshape(MH, MW, 4)
+            wm = in_wood[np.ix_(np.arange(MH) * H // MH, np.arange(MW) * W // MW)]
+            was = float((ma[..., 2][wm] > 0.5).mean()) if wm.any() else 0.0
+            ma[..., 2][wm] = 0.0
+            ma[..., 1][wm] = np.clip(ma[..., 1][wm], 0.42, 0.62)
+            mrc = bpy.data.images.new("GradedMR", MW, MH, alpha=True)
+            mrc.colorspace_settings.name = "Non-Color"
+            mrc.pixels.foreach_set(ma.reshape(-1)); mrc.update(); mr = mrc
+            print("PROP", name, "wood faces made non-metal: %.1f%% of their pixels were metal" % (100.0 * was))
+    # despeck: (fraction) pixels darker than this share of what is around them take the colour around them (the bow's painted rust specks read as pits, 2026-11-16)
+    if P.get("despeck") and "wood" in P:
+        Vd = arr[..., :3].max(axis=2); used = Vd > 0.015
+        rad_d = max(2, W // 256)
+        cnt = blur(used.astype(np.float64), rad_d)
+        locV = blur(np.where(used, Vd, 0.0), rad_d) / np.maximum(cnt, 1.0)
+        spk = used & (Vd < P["despeck"] * locV)
+        loc = np.stack([blur(np.where(used, arr[..., c], 0.0), rad_d) for c in range(3)], axis=-1) / np.maximum(cnt, 1.0)[..., None]
+        arr[..., :3][spk] = loc[spk]
+        graded.pixels.foreach_set(arr.reshape(-1)); graded.update(); base = graded
+        print("PROP", name, "despeck: %.2f%% of the picture lifted" % (100.0 * spk.mean()))
     # the pictures
     shrink(base, 1024, os.path.join(out, "T_%s_Base.png" % name))
     if normal: shrink(normal, 512, os.path.join(out, "T_%s_Normal.png" % name))

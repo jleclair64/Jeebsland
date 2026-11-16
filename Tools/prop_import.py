@@ -10,6 +10,8 @@ proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 work = os.path.join(proj, "Saved", "KnightBuild", "Props")
 folder = "/Game/Props"
 NAMES = [n[:-4] for n in os.listdir(work) if n.endswith(".fbx")]
+ONLY = [s for s in os.environ.get("JEEB_PROPS", "").split(",") if s]   # (BuildProps.ps1 Bow Longbow: only the props named, not every model left in the work folder; 2026-11-16)
+if ONLY: NAMES = [n for n in NAMES if n in ONLY]
 if not lib.does_directory_exist(folder): lib.make_directory(folder)
 
 def pic(name, srgb, normal=False):
