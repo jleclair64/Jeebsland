@@ -753,6 +753,7 @@ public:
 	static float SwimSeconds(int32 SwimmingLevel);    // a full swimming bar, swimming normally, at this Swimming level (Tuning.ini [Swim])
 	static float BreathSeconds(int32 SwimmingLevel);  // how long he can keep his head under water
 	void TickSwimTests(float Dt);        // (test pictures: -SwimKeys, -SwimDo)
+	void TickWaterWalk(float Dt);        // (test runs: -BankScan, -WaterWalk; KnightWaterTests.cpp)
 	void FillSwimInput(JeebAnim::FInput& In) const;
 	bool bSwimTestFast = false;
 	static float BowDrawSeconds(int32 ArcheryLevel);   // the bow's full draw at this Archery level (Tuning.ini [Archery]); the skills window shows it

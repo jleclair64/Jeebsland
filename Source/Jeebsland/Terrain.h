@@ -247,7 +247,8 @@ namespace JeebTerrain
 	// whole world's land (WorldMap.h: mountains, the rocky south-west, level town sites), then the sea, the coast and the river
 	// valleys and channels everywhere (the river runs down through the east side of the original square).
 	constexpr float GroundHalfForBlend = 16000.f;
-	inline float HeightAt(float X, float Y)
+	// (bCap false: without the rivers' bank cap, for the bank scan's "what did the cap cut" only)
+	inline float HeightAt(float X, float Y, bool bCap = true)
 	{
 		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
 		float H;
@@ -256,7 +257,10 @@ namespace JeebTerrain
 		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
 		float RiverD = 1.0e9f, RiverHalf = 600.f;
 		H = JeebWorld::SeaAndRivers(X, Y, H, &RiverD, &RiverHalf);
-		H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf);   // Oak Hill's own hills and level plots (2026-11-11)
+		// nothing steeper than a walk up from any river (2026-11-15, WorldMap.h UnderBankCap); in Oak Hill the cap trims its hills
+		// before its level plots go on (OakHill.h Apply), so no building's ground is cut
+		if (JeebOakHill::Covers(X, Y)) H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Oak Hill's own hills and level plots (2026-11-11)
+		else if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
 

@@ -387,13 +387,19 @@ namespace JeebOakHill
 			* JeebWorld::Smooth(RiverHalf + 150.f, RiverHalf + 150.f + Fade, RiverD);
 	}
 	// The ground (cm), given the world's height there and the distance to the nearest river (from JeebWorld::SeaAndRivers)
-	inline float Apply(float X, float Y, float H, float RiverD, float RiverHalf)
+	// bCap: the rivers' bank cap (WorldMap.h UnderBankCap) trims the hills, before the level plots go on: a walk up from the river
+	// never meets a steep lip, and the building pads near the river (two houses 13-15 m from its edge) keep their own levels
+	// (capping the finished ground cut 59 cm from under them, 2026-11-15). The pads' own blends are gentle (at most about 14 degrees).
+	inline bool Covers(float X, float Y) { return InBox(X, Y) && Enabled(); }
+	inline float Apply(float X, float Y, float H, float RiverD, float RiverHalf, bool bCap = true)
 	{
-		if (!InBox(X, Y) || !Enabled()) return H;
+		if (!Covers(X, Y)) return H;
+		if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
 		const float E = EastM(Y), N = NorthM(X);
 		const float MHills = Mask(E, N, RiverD, RiverHalf, 1000.f);
 		if (MHills <= 0.f) return H;
-		const float Ground = FMath::Lerp(H, JeebWorld::RiverLevel + HillsM(E, N) * 100.f, MHills);
+		float Ground = FMath::Lerp(H, JeebWorld::RiverLevel + HillsM(E, N) * 100.f, MHills);
+		if (bCap) Ground = JeebWorld::UnderBankCap(X, Y, Ground, RiverD);
 		const float MPads = Mask(E, N, RiverD, RiverHalf, 300.f);
 		if (MPads <= 0.f) return Ground;
 		return FMath::Lerp(Ground, JeebWorld::RiverLevel + TownM(E, N, (Ground - JeebWorld::RiverLevel) / 100.f) * 100.f, MPads);
@@ -481,7 +487,7 @@ namespace JeebOakHill
 			{
 				FRoad Rd; Rd.Pts = ParsePath(S);
 				// a road that the plan draws to the river's edge stops on the bank, not in the water
-				auto Wet = [](const FVector2D& Q) { float Half; return JeebWorld::RiverDistance(Q.X, Q.Y, Half) < Half + 300.f; };
+				auto Wet = [](const FVector2D& Q) { return JeebWorld::NearRiver(Q.X, Q.Y, 300.f); };
 				while (Rd.Pts.Num() > 2 && Wet(Rd.Pts[0])) Rd.Pts.RemoveAt(0);
 				while (Rd.Pts.Num() > 2 && Wet(Rd.Pts.Last())) Rd.Pts.Pop();
 				if (Rd.Pts.Num() >= 2) A.Add(Rd);

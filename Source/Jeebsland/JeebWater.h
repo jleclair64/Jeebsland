@@ -37,8 +37,7 @@ namespace JeebWater
 	{
 		using namespace JeebWorld;
 		if (FVector2D::DistSquared(FVector2D(X, Y), JeebTerrain::PondCenter()) < FMath::Square(JeebTerrain::PondWaterR)) { OutZ = JeebTerrain::PondWaterZ(); return true; }
-		float Half;
-		if (RiverDistance(X, Y, Half) < Half + 250.f) { OutZ = RiverLevel; return true; }
+		if (NearRiver(X, Y, 250.f)) { OutZ = RiverLevel; return true; }   // (measured, then compared: see WorldMap.h NearRiver)
 		const float Dc = FVector2D::Distance(FVector2D(X, Y), JeebTerrain::CastlePos());
 		if (Dc > MoatInner() && Dc < MoatOuter()) { OutZ = MoatZ(); return true; }
 		if (Y > SeaWestEdge()) { OutZ = SeaLevel; return true; }   // (the drawn sheet; land stands above it, so land stays dry)

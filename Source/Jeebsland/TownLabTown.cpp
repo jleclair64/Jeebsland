@@ -530,8 +530,7 @@ void ATownLabTown::PlantTrees(AForest* Forest)
 		const float Want = FMath::Lerp(0.12f, 0.7f, JeebWorld::Smooth(32.f, 66.f, FromPlaza));
 		if (Roll > Want) continue;
 		const float OX = PosX + N * 100.f, OY = PosY + E * 100.f;
-		float Half;
-		if (JeebWorld::RiverDistance(OX, OY, Half) < Half + 600.f) continue;
+		if (JeebWorld::NearRiver(OX, OY, 600.f)) continue;
 		if (JeebTerrain::PathClearance(OX, OY) < 450.f) continue;
 		bool bClear = true;
 		for (const FPlot& P : Plots()) if (PlotSD(P, E, N) < (P.Kind == EPlot::Building ? 6.f : 3.f)) { bClear = false; break; }
@@ -591,8 +590,7 @@ void ATownLabTown::PlaceBoulders(AActor* Owner, float PlazaX, float PlazaY, cons
 				const float Pe = JeebOakHill::EastM(O.Y), Pn = JeebOakHill::NorthM(O.X);
 				bool bOnPlot = false;
 				for (const JeebOakHill::FPlot& P : JeebOakHill::Plots()) if (JeebOakHill::PlotSD(P, Pe, Pn) < 4.f) { bOnPlot = true; break; }
-				float Half;
-				if (bOnPlot || JeebWorld::RiverDistance(O.X, O.Y, Half) < Half + 900.f) continue;
+				if (bOnPlot || JeebWorld::NearRiver(O.X, O.Y, 900.f)) continue;
 			}
 			I->AddInstance(FTransform(Rot, FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 0.18f * Sz * 100.f), FVector(Sx, Sy, Sz)), true);
 			++Count;

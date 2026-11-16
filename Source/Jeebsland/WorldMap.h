@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 // The whole world (2026-10-30), traced from the owner's hand-drawn map (Docs/MapSketch.jpg, with Blackrock and Oak Hill
 // swapped: Blackrock WEST of the river, Oak Hill east of it). Blank for now: the land's shape only (mountains, the river and
@@ -227,6 +229,81 @@ namespace JeebWorld
 		}
 		return H;
 	}
+	// ------------------------------------------------------------------ the rivers' banks
+	// (2026-11-15, owner: "I need the land going down to the river to be less steep, the knight can't climb up it.") The old channel
+	// was a bowl 18-20 m across whose sides reached 34 degrees at the water, with a 70 cm step where it met the valley floor: on the fine
+	// grounds (the square's 2 m, Oak Hill's 1 m) that read as a 45 degree lip the knight could not walk up. Now one smooth curve runs
+	// from the bed up to the valley floor: the water's edge stays where it was (Half + 100 cm from the middle), the middle stays
+	// RiverDepth deep, and the steepest part (under the water) is about 25 degrees; the walkable limit is 44.8. UnderBankCap then keeps
+	// whatever the land above does (Oak Hill's hills and pads, mountains at the spring) under a slope of BankCapSlope for 15 m past
+	// the bank's top, so the climb out never meets a steep lip anywhere. -OldRiverBanks (test builds) brings the old shape back,
+	// for comparisons only (give every machine of a test the same switch).
+	constexpr float RiverDepth = 240.f;     // the bed in the middle, under RiverLevel (swimming starts at SwimEnterDepth)
+	constexpr float RiverFloorUp = 130.f;   // the valley floor over RiverLevel
+	constexpr float BankWater = 0.6f;       // the share of the bank's run that lies under the water (where the curve crosses RiverLevel)
+	constexpr float BankCapSlope = 0.42f;   // the steepest the land may rise past the bank's top (23 degrees), for BankCapReach
+	constexpr float BankCapReach = 1500.f;
+	inline bool OldBanks()
+	{
+#if UE_BUILD_SHIPPING
+		return false;
+#else
+		static const bool b = FParse::Param(FCommandLine::Get(), TEXT("OldRiverBanks"));
+		return b;
+#endif
+	}
+	// Where a river's bank meets the valley floor (cm from its middle): the water's edge (Half + 100) is BankWater of the way out
+	inline float BankTop(float Half) { return (Half + 100.f) / BankWater; }
+	// The ground of the channel and its bank at Dr from a river's middle (Dr < BankTop): RiverLevel - RiverDepth in the middle,
+	// RiverLevel at the water's edge, RiverLevel + RiverFloorUp at the top, level at both ends (a smoothstep: steepest 1.5 x rise / run)
+	inline float BankHeight(float Dr, float Half)
+	{
+		const float T = FMath::Clamp(Dr / BankTop(Half), 0.f, 1.f);
+		return RiverLevel - RiverDepth + (RiverDepth + RiverFloorUp) * T * T * (3.f - 2.f * T);
+	}
+	// The highest the land may stand at Dr from a river's middle: the bank itself, then rising gently past its top (the slope eases in
+	// over the first 3 m), then ever faster after BankCapReach, so that further out it never touches the land
+	inline float BankCapAt(float Dr, float Half)
+	{
+		const float Top = BankTop(Half);
+		if (Dr <= Top) return BankHeight(Dr, Half);
+		const float X = Dr - Top;
+		const float Rise = X < 300.f ? BankCapSlope * X * X / 600.f : BankCapSlope * (X - 150.f);
+		const float Past = FMath::Max(0.f, X - BankCapReach);
+		return RiverLevel + RiverFloorUp + Rise + 0.002f * Past * Past;
+	}
+	// The cap over every river near (X, Y) (the lowest wins, so it has no seam where two rivers' nearest stretches meet at the fork)
+	inline float BankCap(float X, float Y)
+	{
+		const FVector2D P(X, Y);
+		float Cap = 1.0e9f;
+		for (const FRiver& Rv : Rivers())
+		{
+			if (!Rv.Bounds.IsInside(P)) continue;
+			float Best = 1.0e18f;
+			for (int32 i = 0; i + 1 < Rv.Pts.Num(); ++i)
+			{
+				const FVector2D A = Rv.Pts[i], AB = Rv.Pts[i + 1] - A;
+				const float T = FMath::Clamp(FVector2D::DotProduct(P - A, AB) / FMath::Max(AB.SizeSquared(), 1.f), 0.f, 1.f);
+				Best = FMath::Min(Best, float(FVector2D::DistSquared(P, A + AB * T)));
+			}
+			Cap = FMath::Min(Cap, BankCapAt(FMath::Sqrt(Best), Rv.HalfWidth));
+		}
+		return Cap;
+	}
+	// The land kept under the cap, with a soft corner (50 cm) where the two meet, so the cut never shows as a crease. Applied last,
+	// after Oak Hill's own shape (JeebTerrain::HeightAt).
+	inline float UnderBankCap(float X, float Y, float H, float NearestRiverD)
+	{
+		if (OldBanks() || NearestRiverD > 4500.f) return H;   // (from 3 km past a bank's top the cap stands over 57 m: above any land)
+		const float C = BankCap(X, Y);
+		const float K = 50.f, D = C - H;
+		if (D >= K) return H;
+		if (D <= -K) return C;
+		const float Hh = (K - FMath::Abs(D)) / K;
+		return FMath::Min(H, C) - Hh * Hh * K * 0.25f;
+	}
+
 	// The full world height (without the original square round the start): the land, then the sea and the coast, then the
 	// river valleys and channels
 	inline float SeaAndRivers(float X, float Y, float H, float* OutRiverD = nullptr, float* OutRiverHalf = nullptr)
@@ -251,20 +328,37 @@ namespace JeebWorld
 		if (OutRiverHalf) *OutRiverHalf = Half;
 		if (Dr < 6000.f)
 		{
-			const float Floor = RiverLevel + 130.f;
-			H = FMath::Lerp(H, FMath::Min(H, Floor), Smooth(6000.f, Half + 500.f, Dr));
-			if (Dr < Half + 200.f)
+			const float Floor = RiverLevel + RiverFloorUp;
+			if (OldBanks())
 			{
-				const float U = FMath::Clamp(Dr / (Half + 200.f), 0.f, 1.f);
-				H = FMath::Min(H, RiverLevel - 240.f * (1.f - U * U) + 60.f * U * U);
+				H = FMath::Lerp(H, FMath::Min(H, Floor), Smooth(6000.f, Half + 500.f, Dr));
+				if (Dr < Half + 200.f)
+				{
+					const float U = FMath::Clamp(Dr / (Half + 200.f), 0.f, 1.f);
+					H = FMath::Min(H, RiverLevel - 240.f * (1.f - U * U) + 60.f * U * U);
+				}
+				return H;
 			}
+			// the valley eases down to the floor, which meets the bank's top; the channel and its bank are one curve (BankHeight)
+			const float Top = BankTop(Half);
+			H = FMath::Lerp(H, FMath::Min(H, Floor), Smooth(6000.f, Top, Dr));
+			if (Dr < Top) H = FMath::Min(H, BankHeight(Dr, Half));
 		}
 		return H;
+	}
+	// Within Margin cm of a river's edge line (its half width from the middle). Always use this (or measure first, then compare):
+	// "RiverDistance(X, Y, Half) < Half + M" in one expression may read Half before RiverDistance has set it, since C++ leaves the
+	// order of the two sides open (2026-11-15: MSVC read it first, so the river counted as water only 2.5 m either side of its
+	// middle, or not at all, and swimming in it barely ever started).
+	inline bool NearRiver(float X, float Y, float Margin)
+	{
+		float Half = 600.f;
+		const float Dr = RiverDistance(X, Y, Half);
+		return Dr < Half + Margin;
 	}
 	inline bool InWater(float X, float Y)
 	{
 		if (Y - CoastY(X) > 300.f) return true;
-		float Half;
-		return RiverDistance(X, Y, Half) < Half;
+		return NearRiver(X, Y, 0.f);
 	}
 }
