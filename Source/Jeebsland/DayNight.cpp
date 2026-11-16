@@ -29,10 +29,10 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0.02f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
 	static TAutoConsoleVariable<float> Bloom(TEXT("jeeb.Look.Bloom"), 1.15f, TEXT("Bloom intensity (was 0.95 on every pixel)"));
 	static TAutoConsoleVariable<float> BloomThreshold(TEXT("jeeb.Look.BloomThreshold"), -1.f, TEXT("Bloom threshold: -1 every pixel blooms a little; above 0 only what is brighter blooms"));
-	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 18.f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
+	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 18.35f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
 	static TAutoConsoleVariable<float> HazeBlue(TEXT("jeeb.Look.HazeBlue"), 0.85f, TEXT("0: the old warm grey height fog; 1: a soft blue-grey haze at noon, a warm peach-lilac at the low sun"));
-	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 2200.f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
-	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.6f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
+	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 1240.f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
+	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.63f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
 	static TAutoConsoleVariable<float> AO(TEXT("jeeb.Look.AO"), 0.6f, TEXT("Ambient occlusion strength (where it is on: r.AmbientOcclusionLevels, set by ApplyGraphics)"));
 	static TAutoConsoleVariable<float> AORadius(TEXT("jeeb.Look.AORadius"), 100.f, TEXT("Ambient occlusion radius in cm"));
 	static TAutoConsoleVariable<float> Contact(TEXT("jeeb.Look.Contact"), 0.f, TEXT("The sun's screen-space contact shadow length (share of the screen; 0 off: at 0.03 it cost 0.07 ms and barely showed, 2026-11-13)"));
@@ -44,6 +44,9 @@ namespace JeebLook
 	// grade and gentle light shafts round the sun. Its numbers became the defaults above; the look before: Sat 1.1, Contrast 1, Warm
 	// 0.04, ShadowCool 0.012, Bloom 0.8, Aerial 16, HazeBlue 1, HazeStart 2500, SunGlow 1, AerialStart 0.35, Exposure 0.16, LowLift
 	// 0.8, Vignette 0.4, Shafts 0)
+	// (2026-11-15, owner: the LOOK preset Save1_20261115 became the defaults: haze from 12.4 m (was 22), thin low clouds (density
+	// 0.5, was 3; bottom 0.8 km, was 1.6), glossy rippled water (Ripple 1, Rough 0.02, no noon glow), grass tint 1.01 0.83 1.0 in
+	// Palette.ini; the rest were within a hair of the old defaults. Its held sun, 0.49, was left out: the clock still moves the sun.)
 	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
 	// (2026-11-15, owner: "a slider for me to move the sun in the sky"; the LOOK tab's SKY + HAZE group. This machine's view only.)
 	static TAutoConsoleVariable<float> SunPhase(TEXT("jeeb.Sun.Phase"), -1.f, TEXT("Holds the sun at a point of its daily loop: 0 noon (high), 0.25 afternoon, 0.5 the golden low point, 0.75 morning; negative: the clock moves it"));
@@ -52,17 +55,17 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
 	static TAutoConsoleVariable<float> CloudShadowSamples(TEXT("jeeb.Cloud.ShadowSamples"), 0.5f, TEXT("Samples toward the sun inside the clouds (ShadowViewSampleCountScale, engine default 1)"));
 	static TAutoConsoleVariable<float> CloudTrace(TEXT("jeeb.Cloud.Trace"), 40.f, TEXT("How far the clouds are traced, km (was 60; 2026-11-15 the owner approved the cheaper clouds: Samples 0.6, ShadowSamples 0.5, Trace 40, were 1, 1, 60)"));
-	static TAutoConsoleVariable<float> CloudBottom(TEXT("jeeb.Cloud.Bottom"), 1.6f, TEXT("The cloud layer's bottom, km"));
+	static TAutoConsoleVariable<float> CloudBottom(TEXT("jeeb.Cloud.Bottom"), 0.8f, TEXT("The cloud layer's bottom, km"));
 	static TAutoConsoleVariable<float> CloudHeight(TEXT("jeeb.Cloud.Height"), 5.f, TEXT("The cloud layer's depth, km: deep layers tower up in heaps"));
 	static TAutoConsoleVariable<float> CloudUnder(TEXT("jeeb.Cloud.Under"), 0.2f, TEXT("How much sky light the undersides keep (SkyLightCloudBottomOcclusion, engine default 0.5; lower is darker, shapelier undersides)"));
-	static TAutoConsoleVariable<float> CloudBounce(TEXT("jeeb.Cloud.Bounce"), 0.45f, TEXT("Light bounced up from the ground into the undersides (GroundAlbedo grey level; warm-tinted above 0.3)"));
+	static TAutoConsoleVariable<float> CloudBounce(TEXT("jeeb.Cloud.Bounce"), 0.46f, TEXT("Light bounced up from the ground into the undersides (GroundAlbedo grey level; warm-tinted above 0.3)"));
 	static TAutoConsoleVariable<float> CloudScale(TEXT("jeeb.Cloud.Scale"), 1.3f, TEXT("Size of the cloud pattern (multiplies the material's Layout_CloudGlobalScale): above 1 bigger heaps"));
-	static TAutoConsoleVariable<float> CloudFill(TEXT("jeeb.Cloud.Fill"), 1.f, TEXT("Multiplies the material's FillScatterIntensity: light filling the shaded side"));
-	static TAutoConsoleVariable<float> CloudWarm(TEXT("jeeb.Cloud.Warm"), 0.5f, TEXT("Warmth of the sunlight scattered in the clouds (the sun's cloud luminance tint: 0 white, 1 golden)"));
-	static TAutoConsoleVariable<float> CloudDensity(TEXT("jeeb.Cloud.Density"), 3.f, TEXT("Multiplies the cloud material's density: higher reads as solid heaps with crisp edges and darker undersides, lower as mist"));
+	static TAutoConsoleVariable<float> CloudFill(TEXT("jeeb.Cloud.Fill"), 0.95f, TEXT("Multiplies the material's FillScatterIntensity: light filling the shaded side"));
+	static TAutoConsoleVariable<float> CloudWarm(TEXT("jeeb.Cloud.Warm"), 0.51f, TEXT("Warmth of the sunlight scattered in the clouds (the sun's cloud luminance tint: 0 white, 1 golden)"));
+	static TAutoConsoleVariable<float> CloudDensity(TEXT("jeeb.Cloud.Density"), 0.5f, TEXT("Multiplies the cloud material's density: higher reads as solid heaps with crisp edges and darker undersides, lower as mist"));
 	static TAutoConsoleVariable<FString> CloudSet(TEXT("jeeb.Cloud.Set"), TEXT(""), TEXT("Test pictures: any of the cloud material's scalars, Name=Value;Name=Value (the names are logged as JEEBCLOUDPARAM at the start)"));
 	static TAutoConsoleVariable<float> CloudCoverFix(TEXT("jeeb.Cloud.Cover"), -1.f, TEXT("Test pictures: hold the cloud cover (0 clear, 1 scattered, 1.5 heavy); -1 the weather decides"));
-	static TAutoConsoleVariable<float> LowCloudBright(TEXT("jeeb.Cloud.LowBright"), 1.8f, TEXT("LOW's painted cloud ring: brightness at noon (2.3 until 2026-11-14: the shaded bases burned out to white)"));
+	static TAutoConsoleVariable<float> LowCloudBright(TEXT("jeeb.Cloud.LowBright"), 1.76f, TEXT("LOW's painted cloud ring: brightness at noon (2.3 until 2026-11-14: the shaded bases burned out to white)"));
 	static TAutoConsoleVariable<float> LowCloudHaze(TEXT("jeeb.Cloud.LowHaze"), 0.25f, TEXT("LOW's painted cloud ring: share of the haze's colour mixed into it (it takes no fog itself)"));
 	static TAutoConsoleVariable<float> LowCloudDusk(TEXT("jeeb.Cloud.LowDusk"), 0.18f, TEXT("LOW's painted cloud ring at the low sun: share of its noon brightness"));
 
