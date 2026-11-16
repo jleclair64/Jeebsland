@@ -1,4 +1,6 @@
 #include "Meadow.h"
+#include "Fill.h"
+#include "EngineUtils.h"
 #include "Palette.h"
 #include "Terrain.h"
 #include "GroundMask.h"
@@ -604,6 +606,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 		SampleJob(X, Y, Amount, Wear);
 		const float Keep = JobRand.FRand();
 		if (Keep >= Amount || !GrowsHere(X, Y)) continue;   // thinning out over rock, mud and sand
+		if (JeebFill::Covered(X, Y)) continue;   // (under a filler wagon, stall or well: Fill.h)
 		const float Pc = bJobNearRoad ? Clearance(X, Y) : 1.0e6f;
 		if (bJobExactWear) Wear = WearAt(X, Y, Pc);
 		if (Keep < Amount * (1.f - 0.5f * JeebWorld::Smooth(0.3f, 0.7f, Wear)))   // and over trampled ground: sparser and short at walls and doors, never cleared (bare ground in a building's shadow reads black)
@@ -771,7 +774,7 @@ void AMeadow::PlaceBushesAndFlowers()
 	UInstancedStaticMeshComponent* Bushes = nullptr;
 	if (BushMat)
 	{
-		Bushes = NewObject<UInstancedStaticMeshComponent>(this);
+		Bushes = NewObject<UInstancedStaticMeshComponent>(this, TEXT("MeadowBushes"));   // (named: JeebMeadowDropCovered finds it)
 		Bushes->SetStaticMesh(MakeBushMesh(this, BushMat));
 		Bushes->SetupAttachment(RootComponent);
 		Bushes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -823,4 +826,28 @@ void JeebGrassLineup(UWorld* W)
 	Row(-400.f, A); Row(-1000.f, B); Row(-1600.f, C);
 	UE_LOG(LogTemp, Log, TEXT("JEEBGRASS lineup: %d + %d + %d meshes"), A.Num(), B.Num(), C.Num());
 #endif
+}
+
+// The world fill (Fill.h), once built on a client: the card bushes standing where a filler piece now covers the ground go
+void JeebMeadowDropCovered(UWorld* World)
+{
+	if (!World || !JeebFill::AnyCovered()) return;
+	int32 Dropped = 0;
+	for (TActorIterator<AMeadow> It(World); It; ++It)
+	{
+		TArray<UInstancedStaticMeshComponent*> Comps;
+		It->GetComponents(Comps);
+		for (UInstancedStaticMeshComponent* I : Comps)
+		{
+			if (!I || I->GetName() != TEXT("MeadowBushes")) continue;
+			TArray<int32> Gone;
+			for (int32 k = 0; k < I->GetInstanceCount(); ++k)
+			{
+				FTransform Xf; I->GetInstanceTransform(k, Xf, true);
+				if (JeebFill::Covered(Xf.GetLocation().X, Xf.GetLocation().Y)) Gone.Add(k);
+			}
+			if (Gone.Num() > 0) { I->RemoveInstances(Gone); Dropped += Gone.Num(); }
+		}
+	}
+	if (Dropped > 0) UE_LOG(LogTemp, Log, TEXT("JEEBFILL meadow bushes under fill pieces dropped: %d"), Dropped);
 }

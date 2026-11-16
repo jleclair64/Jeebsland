@@ -30,6 +30,7 @@
 #include "ChoppableTree.h"
 #include "Forest.h"
 #include "AutumnDecor.h"
+#include "Fill.h"
 #include "Paths.h"
 #include "Village.h"
 #include "PigPen.h"
@@ -271,6 +272,7 @@ void AKnightGameState::BuildWorld()
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
 
 	// Three cats that roam near the town: an orange tabby, a black cat and a grey-and-white one

@@ -1,0 +1,7 @@
+# PLACEHOLDER (fillcore's test data; the real file is filllayout's Content/Data/FillOakHill.csv). E,N metres from the plaza; Yaw Unreal.
+Set,E,N,Yaw,Seed,Var,Plot,Note
+HayWagon,22,-6,0,1,0,-1,test: a single kind
+CrateStack,-20,8,90,2,1,-1,test
+BarrelPair,16,18,45,3,1,-1,test
+Lamp,10,-14,0,4,0,-1,test
+BenchCorner,0,0,0,5,0,-1,test: on the plaza oak (should be refused: keepclear)

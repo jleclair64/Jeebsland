@@ -1,0 +1,18 @@
+# PLACEHOLDER (fillcore's test data, Tools/FillTestData; the real file is fillassets' Content/Data/FillKinds.csv). Metres and degrees.
+# Run with -FillData=<copy>\Tools\FillTestData. ClayJug is left out on purpose (JEEBFILL NODATA: sized from its mesh).
+Kind,Mesh,Shape,FootX,FootY,FootCX,FootCY,Height,Collision,Shadow,Cull,Slope,Flags
+Barrel,/Game/Filler/SM_Barrel,circle,0.62,0.62,0,0,0.95,box,near,small,12,
+BarrelSmall,/Game/Filler/SM_BarrelSmall,circle,0.48,0.48,0,0,0.7,box,near,small,12,
+Crate,/Game/Filler/SM_Crate,box,0.8,0.8,0,0,0.75,box,near,small,12,
+CrateOpen,/Game/Filler/SM_CrateOpen,box,0.8,0.8,0,0,0.6,box,near,small,12,
+Basket,/Game/Filler/SM_Basket,circle,0.45,0.45,0,0,0.35,none,no,tiny,15,
+HayBale,/Game/Filler/SM_HayBale,box,1.1,0.6,0,0,0.5,box,near,small,12,
+HandCart,/Game/Filler/SM_HandCart,box,1.0,1.9,0,0,1.0,box,yes,medium,8,
+HayWagon,/Game/Filler/SM_HayWagon,box,1.9,3.6,0,0,2.2,box,yes,large,6,
+BenchStone,/Game/Filler/SM_BenchStone,box,1.6,0.5,0,0,0.5,box,near,small,8,
+BushRound,/Game/Filler/SM_BushRound,circle,1.1,1.1,0,0,0.9,none,near,small,25,
+BushLeafy,/Game/Filler/SM_BushLeafy,circle,1.0,1.0,0,0,0.8,none,near,small,25,
+BushBerries,/Game/Filler/SM_BushBerries,circle,0.9,0.9,0,0,0.7,none,no,small,25,
+LampPostStone,/Game/Filler/SM_LampPostStone,box,0.45,0.45,0,0,2.6,capsule,yes,medium,10,light
+Firewood,/Game/Filler/SM_Firewood,box,1.2,0.5,0,0,0.6,box,near,small,10,
+LogMossy,/Game/Filler/SM_LogMossy,box,2.2,0.6,0,0,0.5,box,near,medium,30,

@@ -1,4 +1,5 @@
 #include "AutumnDecor.h"
+#include "Fill.h"
 #include "Palette.h"
 #include "Scarecrow.h"
 #include "Cottage.h"
@@ -938,4 +939,28 @@ void AAutumnDecor::SetGustLeaves(float Fade)
 		}
 		GustLeaf[L.Type]->UpdateInstanceTransform(L.Index, T, true, i == LastOfType[L.Type], true);
 	}
+}
+
+// The world fill (Fill.h), once built on a client: the fallen leaves lying where a filler piece now covers the ground go
+void JeebAutumnDropCovered(UWorld* World)
+{
+	if (!World || !JeebFill::AnyCovered()) return;
+	int32 Dropped = 0;
+	for (TActorIterator<AAutumnDecor> It(World); It; ++It)
+	{
+		TArray<UInstancedStaticMeshComponent*> Comps;
+		It->GetComponents(Comps);
+		for (UInstancedStaticMeshComponent* I : Comps)
+		{
+			if (!I || !I->GetName().StartsWith(TEXT("GroundLeaf"))) continue;
+			TArray<int32> Gone;
+			for (int32 k = 0; k < I->GetInstanceCount(); ++k)
+			{
+				FTransform Xf; I->GetInstanceTransform(k, Xf, true);
+				if (JeebFill::Covered(Xf.GetLocation().X, Xf.GetLocation().Y)) Gone.Add(k);
+			}
+			if (Gone.Num() > 0) { I->RemoveInstances(Gone); Dropped += Gone.Num(); }
+		}
+	}
+	if (Dropped > 0) UE_LOG(LogTemp, Log, TEXT("JEEBFILL fallen leaves under fill pieces dropped: %d"), Dropped);
 }
