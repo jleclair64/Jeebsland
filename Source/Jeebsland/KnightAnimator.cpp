@@ -524,7 +524,17 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 	float CycleLen = 0.f;
 	for (int32 i = 0; i < 9; ++i) if (Use[i]) CycleLen += W[i] * Use[i]->Len;
 	CycleLen = FMath::Max(CycleLen / FMath::Max(TotalW, 0.01f), 0.1f);
-	const float Rate = FMath::Clamp(Speed / FMath::Max(Stride, 1.f), 0.45f / CycleLen, 1.45f / CycleLen);
+	float Rate = FMath::Clamp(Speed / FMath::Max(Stride, 1.f), 0.45f / CycleLen, 1.45f / CycleLen);
+	// The run plays 10% slower than the distance it covers asks for (owner, 2026-11-15); the run's ground speed is unchanged, so its
+	// feet glide about 10% of the foot speed (log JEEBRUNRATE). The sprint and the walk keep their distance-timed rate.
+	{
+		const float RunShare = FMath::Clamp(W[4] + W[5] + W[6] + W[7], 0.f, 1.f);
+		const float RateBefore = Rate;
+		Rate *= 1.f - 0.10f * RunShare;
+		static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
+		static float LogT = 0.f;
+		if (bLog && (RunShare > 0.9f || USprint > 0.9f) && (LogT += Dt) > 1.f) { LogT = 0.f; UE_LOG(LogTemp, Log, TEXT("JEEBRUNRATE sprint %d speed %.0f stride %.0f cycle %.2f s: rate %.3f -> %.3f cycles/s (was period %.3f s, now %.3f s)"), USprint > 0.9f ? 1 : 0, Speed, Stride, CycleLen, RateBefore, Rate, 1.f / RateBefore, 1.f / Rate); }
+	}
 	// In the air nothing pushes on the ground, so the legs have no stride to keep up with: they carry on at half their pace and settle back on landing (owner, 2026-11-05; 50% more on 2026-11-06)
 	AirLegs = FMath::FInterpTo(AirLegs, In.bFalling ? 0.5f : 1.f, Dt, In.bFalling ? 9.f : 14.f);
 	Phase = FMath::Fmod(Phase + Rate * AirLegs * Dt, 1.f);

@@ -6,7 +6,7 @@
 
 // [Movement]
 JEEB_TUNE(Movement, WalkSpeed, 500.f)
-JEEB_TUNE(Movement, SprintSpeed, 637.5f)
+JEEB_TUNE(Movement, SprintSpeed, 733.1f)
 JEEB_TUNE(Movement, CrouchSpeed, 240.f)
 JEEB_TUNE(Movement, WalkAccel, 30000.f)
 JEEB_TUNE(Movement, SprintAccel, 2048.f)
