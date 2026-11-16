@@ -4,7 +4,7 @@ Unreal Engine 5.8 C++ project (Windows), becoming an online game set up like Run
 
 - Default game mode `KnightGameMode` (Config/DefaultEngine.ini); `KnightGameState` builds the world on every machine from fixed seeds. Map `/Game/Field`; `/Game/MoveLab` for moves; `/Game/TownLab/Map` (never cooked) for town work.
 - `Game Updates.txt` is the owner's private notes. Don't read or act on it; requests come through chat.
-- **The detail of every system and past batch is in `Docs/ProjectNotes.md`** (the old CLAUDE.md, moved 2026-11-15 so sessions read less). Grep it for the system you're touching before changing it: combat, hit boxes, bow, armour, animation, climbing, items, online, world, Oak Hill, grass, look, packaging and more. Other key docs: `Docs/Roadmap.md` (build order, open questions), `Docs/HowToTest.md` (the owner's cheat sheet; keep it current), `Docs/ReviewLessons.md` (read the matching section before building), `Docs/ItemStyleGuide.md`, `Docs/EditingItems.md`, `Docs/TownLab/`.
+- **The detail of every system and past batch is in `Docs/ProjectNotes.md`** (the old CLAUDE.md, moved 2026-11-15 so sessions read less). Grep it for the system you're touching before changing it: combat, hit boxes, bow, armour, animation, climbing, items, online, world, Oak Hill, grass, look, packaging and more. Other key docs: `Docs/Roadmap.md` (build order, open questions), `Docs/HowToTest.md` (the owner's cheat sheet; keep it current), `Docs/ReviewLessons.md` (read the matching section before building), `Docs/ItemStyleGuide.md`, `Docs/EditingItems.md`, `Docs/TownLab/`, `Docs/Windows.md` (how to build any building's windows; read it before touching windows).
 
 ## Art direction (owner, 2026-11-05; applies to every design choice)
 
