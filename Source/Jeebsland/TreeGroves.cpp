@@ -9,6 +9,7 @@ void JeebGroves::Build(UWorld*, AForest*) {}
 #include "Engine/SkeletalMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -30,13 +31,39 @@ namespace
 	constexpr float GroveR = 1150.f;     // a grove's radius (23 m across)
 	constexpr float Pitch = 3700.f;      // from one grove's middle to the next's along the row (13.5 m between neighbours' edges)
 
-	// Autumn leaf colours the Megaplants and the DZ broadleaves are tinted with, and the index of the world's fallen-leaf colour that goes with each
-	// (AutumnDecor.cpp: 0 orange, 1 red, 2 amber, 3 gold, 4 green holdout)
-	struct FAutumn { FLinearColor Tint; int32 Leaf; FLinearColor Dz; };   // (Dz: multiplies the DZ materials' own red fall colour: more green lifts it toward orange and gold)
-	const FAutumn GAutumn[] = {
-		{ FLinearColor(1.00f, 0.55f, 0.20f), 0, FLinearColor(1.f, 3.f, 0.5f) }, { FLinearColor(0.95f, 0.30f, 0.15f), 1, FLinearColor(1.f, 1.f, 1.f) }, { FLinearColor(1.00f, 0.72f, 0.22f), 2, FLinearColor(1.f, 5.f, 0.5f) },
-		{ FLinearColor(0.95f, 0.80f, 0.30f), 3, FLinearColor(1.f, 8.f, 0.6f) }, { FLinearColor(0.80f, 0.90f, 0.40f), 4, FLinearColor(0.7f, 6.f, 1.f) },
+	// The four DZ forests (owner, 2026-11-16: "four forests of DZ sample trees, one green, red, orange, and yellow ... three sliders to adjust
+	// their rgb"): every leaf of a forest's trees takes that forest's colour (the "Fall Color Tint" of the one-colour leaf materials,
+	// Tools/grove_materials.py), live from its console variable, "r g b" (linear; the LOOK tab's TREES group has a slider per number).
+	// Leaf: the world's fallen-leaf colour under them (AutumnDecor.cpp: 0 orange, 1 red, 2 amber, 3 gold, 4 green holdout; -1 none: the green
+	// forest is summer, so it drops no leaves, as the conifers).
+	TAutoConsoleVariable<FString> CVarDzGreen(TEXT("jeeb.Trees.DzGreen"), TEXT("0.2 0.36 0.07"), TEXT("Leaf colour of the DZ GREEN test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzRed(TEXT("jeeb.Trees.DzRed"), TEXT("0.5 0.07 0.035"), TEXT("Leaf colour of the DZ RED test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzOrange(TEXT("jeeb.Trees.DzOrange"), TEXT("0.62 0.22 0.04"), TEXT("Leaf colour of the DZ ORANGE test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzYellow(TEXT("jeeb.Trees.DzYellow"), TEXT("0.7 0.45 0.05"), TEXT("Leaf colour of the DZ YELLOW test forest, \"r g b\" (live)"), ECVF_Default);
+	struct FForest { const TCHAR* Title; TAutoConsoleVariable<FString>* Cvar; int32 Leaf; int32 Seed; };
+	const FForest GForests[] = {
+		{ TEXT("DZ GREEN"), &CVarDzGreen, -1, 32 }, { TEXT("DZ RED"), &CVarDzRed, 1, 33 }, { TEXT("DZ ORANGE"), &CVarDzOrange, 0, 34 }, { TEXT("DZ YELLOW"), &CVarDzYellow, 3, 36 },
 	};
+	constexpr int32 NumForests = UE_ARRAY_COUNT(GForests);
+	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GForestMids[NumForests];   // (each forest's leaf materials, one per leaf kind, shared by its trees)
+
+	FLinearColor ForestTint(int32 F)
+	{
+		FString S = GForests[F].Cvar->GetValueOnGameThread();
+		S.ReplaceCharInline(TEXT(','), TEXT(' ')); S.ReplaceCharInline(TEXT('_'), TEXT(' '));   // (also "r,g,b" or "r_g_b", for the command line)
+		TArray<FString> P; S.ParseIntoArrayWS(P);
+		float C[3] = { 0.5f, 0.5f, 0.5f };
+		for (int32 i = 0; i < 3 && i < P.Num(); ++i) C[i] = FMath::Max(0.f, FCString::Atof(*P[i]));
+		return FLinearColor(C[0], C[1], C[2]);
+	}
+	void ApplyForestTints(IConsoleVariable* = nullptr)
+	{
+		for (int32 F = 0; F < NumForests; ++F)
+		{
+			const FLinearColor T = ForestTint(F);
+			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& M : GForestMids[F]) if (M.IsValid()) M->SetVectorParameterValue(TEXT("Fall Color Tint"), T);
+		}
+	}
 
 	enum class ECover : uint8 { None, Broad, Conifer };   // what the grass and the fallen leaves do under it
 	struct FKind
@@ -45,7 +72,7 @@ namespace
 		int32 Count;
 		float S0, S1;        // scale range
 		ECover Cover;
-		bool bAutumn;        // tinted with GAutumn (the pack has no autumn material of its own)
+		bool bAutumn;        // its leaves take the forest's colour (GForests; the pack has no one-colour autumn material of its own)
 		bool bUnder;         // understory: planted after the big trees, close between them
 	};
 	struct FGrove
@@ -54,18 +81,20 @@ namespace
 		const TCHAR* Source;
 		TArray<FKind> Kinds;
 		int32 Seed;
+		int32 Forest = -1;   // one of GForests: the colour its leaves take
 	};
 
 	struct FPlan { UObject* Asset; const FKind* K; FVector2D P; float Scale, Yaw, Crown; int32 Autumn; };
 
-	// Gives a tree's leaf materials their autumn twins (/Game/TreeGroves, Tools/grove_materials.py: the pack's own leaf material with its fall or season
-	// switch on) and this tree's own colour. Other slots (bark, branches) keep the pack's materials.
-	int32 ApplyFall(UMeshComponent* C, const FAutumn& A)
+	// Gives a tree's leaf materials the one-colour twins (/Game/TreeGroves, Tools/grove_materials.py: the pack's own leaf material with its fall
+	// switch on and the leaf-by-leaf colour mix taken out) in forest F's colour. One dynamic instance per leaf kind per forest, shared by its
+	// trees, so a slider recolours a whole forest by changing three materials. Other slots (bark, branches) keep the pack's materials.
+	int32 ApplyFall(UMeshComponent* C, int32 F, UObject* Outer)
 	{
-		static const struct { const TCHAR* From; const TCHAR* To; bool bSeasons; } Swaps[] = {
-			{ TEXT("MI_Aspen_Leaves_Big_1"), TEXT("MI_Fall_AspenLeavesBig"), false },
-			{ TEXT("MI_Aspen_Leaves_Small_7"), TEXT("MI_Fall_AspenLeavesSmall"), false },
-			{ TEXT("MI_Cork_Oak_Leaves_1"), TEXT("MI_Fall_CorkOakLeaves"), false },
+		static const struct { const TCHAR* From; const TCHAR* To; } Swaps[] = {
+			{ TEXT("MI_Aspen_Leaves_Big_1"), TEXT("MI_Fall_AspenLeavesBig") },
+			{ TEXT("MI_Aspen_Leaves_Small_7"), TEXT("MI_Fall_AspenLeavesSmall") },
+			{ TEXT("MI_Cork_Oak_Leaves_1"), TEXT("MI_Fall_CorkOakLeaves") },
 		};
 		int32 Done = 0;
 		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
@@ -77,24 +106,36 @@ namespace
 				if (M->GetName() != S.From) continue;
 				UMaterialInterface* Fall = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/TreeGroves/%s.%s"), S.To, S.To), nullptr, LOAD_Quiet | LOAD_NoWarn);
 				if (!Fall) break;
-				UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(Fall, C);
-				if (S.bSeasons)
+				UMaterialInstanceDynamic* D = nullptr;
+				for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GForestMids[F]) if (Old.IsValid() && Old->Parent == Fall) { D = Old.Get(); break; }
+				if (!D)
 				{
-					D->SetVectorParameterValue(TEXT("Season Color 1"), A.Tint * 0.55f);
-					D->SetVectorParameterValue(TEXT("Season Color 2"), A.Tint);
-					D->SetScalarParameterValue(TEXT("Season Strength"), 1.f);
-					// (the seasons switch alone left the leaves green in the first picture run: the tint and the health overlay say the colour outright)
-					D->SetScalarParameterValue(TEXT("Health Offset"), 1.f);
-					D->SetVectorParameterValue(TEXT("Health Color Overlay"), A.Tint * 0.6f);
-					D->SetVectorParameterValue(TEXT("BaseColor Tint"), A.Tint * 0.5f);
+					D = UMaterialInstanceDynamic::Create(Fall, Outer);
+					D->SetVectorParameterValue(TEXT("Fall Color Tint"), ForestTint(F));
+					GForestMids[F].Add(D);
 				}
-				else D->SetVectorParameterValue(TEXT("Fall Color Tint"), A.Dz);
 				C->SetMaterial(i, D);
 				++Done;
 				break;
 			}
 		}
 		return Done;
+	}
+
+	// The trunk each grove tree is given to stand against (owner, 2026-11-16: "the knight can't run through them and arrows stick to them"):
+	// its radius near the base and where its crown starts, in cm at scale 1, measured from the meshes (bark vertices 20-80 cm up, 90th
+	// percentile out from the pivot; the lowest leaves), 2026-11-16. Zero radius: a sapling a knight walks through.
+	void TrunkOf(const FString& Mesh, float& OutR, float& OutCrown)
+	{
+		static const struct { const TCHAR* Prefix; float R, Crown; } Table[] = {
+			{ TEXT("spruce_full_"), 22.f, 300.f }, { TEXT("spruce_half_"), 20.f, 600.f },
+			{ TEXT("spruce_small_05"), 10.f, 300.f }, { TEXT("spruce_small_06"), 10.f, 300.f }, { TEXT("spruce_small_07"), 11.f, 300.f },
+			{ TEXT("spruce_small_"), 0.f, 0.f },   // (01-04: knee to shoulder high)
+			{ TEXT("SM_Columnar_Aspen"), 16.f, 510.f }, { TEXT("SM_Cork_Oak"), 38.f, 370.f }, { TEXT("SM_Pine"), 42.f, 1000.f },
+			{ TEXT("SM_Coconut_Tree"), 40.f, 1000.f }, { TEXT("SM_Windmill_Palm"), 32.f, 1000.f },
+		};
+		for (const auto& T : Table) if (Mesh.StartsWith(T.Prefix)) { OutR = T.R; OutCrown = T.Crown; return; }
+		OutR = -1.f; OutCrown = 300.f;   // (unknown: from the bounds, below)
 	}
 
 	// Validity of a grove spot (all in cm): dry land, not on a road, a building, Oak Hill's own ground or the river's valley, and nearly level.
@@ -126,6 +167,13 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 {
 	if (!World || CVarGroves.GetValueOnGameThread() == 0) return;
 	const bool bServer = World->GetNetMode() == NM_DedicatedServer;
+	for (TArray<TWeakObjectPtr<UMaterialInstanceDynamic>>& L : GForestMids) L.Reset();
+	static bool bHooked = false;   // (the forests' sliders: recolour live when a jeeb.Trees.Dz* value changes)
+	if (!bHooked)
+	{
+		bHooked = true;
+		for (const FForest& F : GForests) F.Cvar->AsVariable()->OnChangedDelegate().AddStatic(&ApplyForestTints);
+	}
 
 	// ------------------------------------------------------------------ what each grove holds
 	TArray<FGrove> Groves;
@@ -147,14 +195,16 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 			{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_04.spruce_small_04"), 2, 0.9f, 1.4f, ECover::None, false, true },
 		};
 		Groves.Add(FGrove{ TEXT("SPRUCE FOREST"), TEXT("Project Nature, Fab"), TArray<FKind>(S, UE_ARRAY_COUNT(S)), 31 });
-		const FKind D[] = {   // DZ Sample Trees: aspen (gold in autumn), cork oak, pine, and its two palms
-			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Aspen/SM_Columnar_Aspen_1.SM_Columnar_Aspen_1"), 3, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Cork_Oak/SM_Cork_Oak_1.SM_Cork_Oak_1"), 2, 0.85f, 1.15f, ECover::Broad, true, false },
-			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Pine/SM_Pine_1.SM_Pine_1"), 3, 0.85f, 1.15f, ECover::Conifer, false, false },
-			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Coconut_Tree/SM_Coconut_Tree_1.SM_Coconut_Tree_1"), 1, 1.f, 1.f, ECover::None, false, false },
-			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Windmill_Palm/SM_Windmill_Palm_1.SM_Windmill_Palm_1"), 1, 1.f, 1.f, ECover::None, false, false },
+		const FKind D[] = {   // DZ Sample Trees, the broadleaves only (2026-11-16): columnar aspens and cork oaks; no palms, and no pine (it takes no colour)
+			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Cork_Oak/SM_Cork_Oak_1.SM_Cork_Oak_1"), 2, 0.85f, 1.1f, ECover::Broad, true, false },
+			{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Aspen/SM_Columnar_Aspen_1.SM_Columnar_Aspen_1"), 4, 0.8f, 1.1f, ECover::Broad, true, false },
 		};
-		Groves.Add(FGrove{ TEXT("DZ SAMPLE TREES"), TEXT("DZ Assets, Fab"), TArray<FKind>(D, UE_ARRAY_COUNT(D)), 32 });
+		for (int32 F = 0; F < NumForests; ++F)   // four forests, one leaf colour each
+		{
+			FGrove G{ GForests[F].Title, TEXT("DZ Assets, Fab"), TArray<FKind>(D, UE_ARRAY_COUNT(D)), GForests[F].Seed };
+			G.Forest = F;
+			Groves.Add(MoveTemp(G));
+		}
 		// (The Megaplants English Oak and Hornbeam groves went 2026-11-16, owner: keep only DZ and the Spruce Forest; the pack is deleted.)
 	}
 	const int32 NumGroves = Groves.Num() + 1;   // (+ the world's own trees, the last grove)
@@ -233,7 +283,9 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 		const bool bOwn = g == NumGroves - 1;
 		FRandomStream R(bOwn ? 35 : Groves[g].Seed);
 		const float GroundC = JeebTerrain::HeightAt(C.X, C.Y);
-		int32 Planted = 0, Skipped = 0, Falls = 0;
+		int32 Planted = 0, Skipped = 0, Falls = 0, Trunks = 0;
+		float RMin = 1.0e9f, RMax = 0.f;
+		UCapsuleComponent* FirstTrunk = nullptr;
 		TMap<FString, int32> Names;
 		FString Title, Detail;
 
@@ -289,7 +341,7 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 						Pl.Scale = R.FRandRange(K.S0, K.S1);
 						Pl.Yaw = R.FRandRange(0.f, 360.f);
 						Pl.Crown = FMath::Max(40.f, 0.8f * FMath::Min(B.BoxExtent.X, B.BoxExtent.Y) * Pl.Scale);
-						Pl.Autumn = K.bAutumn ? R.RandRange(0, UE_ARRAY_COUNT(GAutumn) - 2) + (R.FRand() < 0.1f ? 1 : 0) : -1;
+						Pl.Autumn = K.bAutumn ? G.Forest : -1;
 						// a spot in the grove, not touching the others (crowns may overlap a little, as trees do)
 						float Gap = K.bUnder ? 0.5f : 0.8f;
 						bool bOk = false;
@@ -305,11 +357,38 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 						Plans.Add(Pl);
 						// the fallen leaves and thinner grass under the crown (the world's own canopy record: Canopy.h)
 						if (Pl.K->Cover != ECover::None)
-							JeebCanopy::Add(Pl.P, FMath::Clamp(Pl.Crown * (Pl.K->Cover == ECover::Broad ? 1.f : 0.7f), 160.f, 1100.f), Pl.K->Cover == ECover::Broad ? (Pl.Autumn >= 0 ? GAutumn[Pl.Autumn].Leaf : 3) : -1);
+							JeebCanopy::Add(Pl.P, FMath::Clamp(Pl.Crown * (Pl.K->Cover == ECover::Broad ? 1.f : 0.7f), 160.f, 1100.f), Pl.K->Cover == ECover::Broad ? (Pl.Autumn >= 0 ? GForests[Pl.Autumn].Leaf : 3) : -1);
 					}
 				}
 			}
 			Detail = FString::Printf(TEXT("%s, %d trees"), G.Source, Plans.Num());
+			// A solid trunk for each tree, on the server and every client alike (the knight's movement is checked on the server): a capsule from
+			// the ground to where the crown starts, blocking players and arrows (they trace Visibility) but not the camera. The mesh itself stays
+			// without collision, so the leaves never stop anyone.
+			for (const FPlan& Pl : Plans)
+			{
+				float TR, TCrown;
+				const FString Base = FPaths::GetBaseFilename(Pl.K->Path);
+				TrunkOf(Base, TR, TCrown);
+				if (TR < 0.f)
+				{
+					const UStaticMesh* Sm = Cast<UStaticMesh>(Pl.Asset);
+					const float H = Sm ? Sm->GetBounds().GetBox().Max.Z : 0.f;
+					TR = H >= 300.f ? FMath::Clamp(0.05f * Pl.Crown / Pl.Scale, 8.f, 40.f) : 0.f;
+				}
+				if (TR <= 0.f) continue;
+				const float Rad = TR * Pl.Scale, HalfH = FMath::Max(0.5f * FMath::Max(TCrown, 300.f) * Pl.Scale, Rad + 1.f);
+				UCapsuleComponent* Trunk = NewObject<UCapsuleComponent>(Owner);
+				Trunk->SetupAttachment(Root);
+				Trunk->SetCapsuleSize(Rad, HalfH);
+				Trunk->SetRelativeLocation(FVector(Pl.P.X, Pl.P.Y, JeebTerrain::HeightAt(Pl.P.X, Pl.P.Y) + HalfH - 40.f));   // (sunk 40 cm: no gap on a slope)
+				Trunk->SetCollisionProfileName(TEXT("BlockAll"));
+				Trunk->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);   // (the camera slides past trunks, as with the world's own trees)
+				Trunk->SetCanEverAffectNavigation(false);
+				Trunk->RegisterComponent();
+				++Trunks; RMin = FMath::Min(RMin, Rad); RMax = FMath::Max(RMax, Rad);
+				if (!FirstTrunk) FirstTrunk = Trunk;
+			}
 			if (!bServer)
 			{
 				for (const FPlan& Pl : Plans)
@@ -335,7 +414,7 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 					Comp->SetRelativeScale3D(FVector(Pl.Scale));
 					Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 					Comp->RegisterComponent();
-					if (Pl.Autumn >= 0) Falls += ApplyFall(Comp, GAutumn[Pl.Autumn]);
+					if (Pl.Autumn >= 0) Falls += ApplyFall(Comp, Pl.Autumn, Owner);
 				}
 			}
 			for (const FPlan& Pl : Plans) Names.FindOrAdd(FPaths::GetBaseFilename(Pl.K->Path)) += 1;
@@ -344,7 +423,18 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 		Sign(FVector(C.X, C.Y - GroveR - 120.f, GroundC), Title, bOwn ? Detail : Detail);
 		FString List;
 		for (const TPair<FString, int32>& N : Names) List += FString::Printf(TEXT(" %s x%d"), *N.Key, N.Value);
-		UE_LOG(LogTemp, Display, TEXT("JEEBGROVE %d %s at %.0f %.0f (ground %.0f): %d trees, %d skipped, %d autumn leaf materials:%s"), g, *Title, C.X, C.Y, GroundC, Planted, Skipped, Falls, *List);
+		UE_LOG(LogTemp, Display, TEXT("JEEBGROVE %d %s at %.0f %.0f (ground %.0f): %d trees, %d skipped, %d coloured leaf materials (%s), %d trunk capsules r %.0f-%.0f cm:%s"), g, *Title, C.X, C.Y, GroundC, Planted, Skipped, Falls,
+			(!bOwn && Groves[g].Forest >= 0) ? *ForestTint(Groves[g].Forest).ToString() : TEXT("-"), Trunks, Trunks ? RMin : 0.f, RMax, *List);
+		// (test runs: an arrow's trace across the first trunk, as Projectile.cpp makes it, and what the trunk does to a player)
+		if (FirstTrunk && FParse::Param(FCommandLine::Get(), TEXT("JeebShot")))
+		{
+			const FVector T = FirstTrunk->GetComponentLocation();
+			FHitResult Hit;
+			const bool bHit = World->LineTraceSingleByChannel(Hit, FVector(T.X, T.Y - 600.f, T.Z), FVector(T.X, T.Y + 600.f, T.Z), ECC_Visibility);
+			UE_LOG(LogTemp, Display, TEXT("JEEBGROVE %d arrow trace across the trunk at %.0f %.0f: %s on %s / %s; pawn response %d (2 block)"), g, T.X, T.Y,
+				bHit ? *Hit.ImpactPoint.ToCompactString() : TEXT("no hit"), bHit && Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("-"), bHit && Hit.GetComponent() ? *Hit.GetComponent()->GetName() : TEXT("-"),
+				int32(FirstTrunk->GetCollisionResponseToChannel(ECC_Pawn)));
+		}
 	}
 }
 
