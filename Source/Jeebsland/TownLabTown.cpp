@@ -20,6 +20,7 @@
 #include "TownLabDecor.h"
 #include "TownLabSwaps.h"
 #include "DayNight.h"
+#include "LampLook.h"
 
 namespace
 {
@@ -324,6 +325,7 @@ void ATownLabTown::BuildBuildings()
 							Sm->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 							Sm->SetCachedMaxDrawDistance(9000.f);
 							Sm->LDMaxDrawDistance = 9000.f;
+							JeebLamp::ApplyToMesh(Sm, this);
 							Sm->RegisterComponent();
 							++DrawSets; ++DecorPlain;
 						}
@@ -339,6 +341,7 @@ void ATownLabTown::BuildBuildings()
 								Ism->SetCastShadow(Pc.bCastShadow);
 								Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 								Ism->SetCullDistances(0, 9000);
+								JeebLamp::ApplyToMesh(Ism, this);
 								Ism->RegisterComponent();
 								++DrawSets;
 							}
@@ -354,7 +357,7 @@ void ATownLabTown::BuildBuildings()
 							L->SetIntensityUnits(ELightUnits::Lumens);
 							L->SetIntensity(70.f);
 							L->SetAttenuationRadius(300.f);
-							L->SetLightColor(FLinearColor(1.f, 0.62f, 0.3f));
+							JeebLamp::TrackLight(L);
 							L->SetCastShadows(false);
 							L->RegisterComponent();
 							LanternLights.Add(L);

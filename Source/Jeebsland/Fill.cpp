@@ -37,6 +37,7 @@
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
 #include "Misc/Crc.h"
+#include "LampLook.h"
 #include "UObject/UObjectIterator.h"
 
 // ====================================================================================================== switches
@@ -2708,6 +2709,7 @@ struct FFillBuilder
 				C->SetStaticMesh(M); C->SetupAttachment(Root); C->SetMobility(EComponentMobility::Static); C->SetWorldTransform(Xf);
 				C->SetCollisionEnabled(ECollisionEnabled::NoCollision); C->SetCastShadow(!bFlame && K.Shadow != EShadow::No); C->bCastFarShadow = K.Shadow == EShadow::Yes;
 				C->SetCachedMaxDrawDistance(CullCm(K.Cull)); C->LDMaxDrawDistance = CullCm(K.Cull);
+				JeebLamp::ApplyToMesh(C, Owner);
 				C->RegisterComponent();
 				++DrawPlain;
 				return;
@@ -2727,6 +2729,7 @@ struct FFillBuilder
 				const float Cull = CullCm(K.Cull) * ((K.Cull == ECull::Tiny || K.Cull == ECull::Small) ? CullScale : 1.f);
 				I->SetCullDistances(int32(Cull * 0.85f), int32(Cull));
 				I->SetVisibility(CVarFillShow.GetValueOnGameThread() != 0);
+				JeebLamp::ApplyToMesh(I, Owner);
 				I->RegisterComponent();
 				Owner->DrawSets.Add(I);
 				Owner->DrawCull.Add(uint8(K.Cull));
@@ -2757,7 +2760,7 @@ struct FFillBuilder
 				L->SetIntensityUnits(ELightUnits::Lumens);
 				L->SetIntensity(100.f);
 				L->SetAttenuationRadius(380.f);
-				L->SetLightColor(FLinearColor(1.f, 0.62f, 0.3f));
+				JeebLamp::TrackLight(L);
 				L->SetCastShadows(false);
 				L->MaxDrawDistance = 4000.f;
 				L->SetVisibility(CVarFillShow.GetValueOnGameThread() != 0);

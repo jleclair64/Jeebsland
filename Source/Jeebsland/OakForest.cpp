@@ -1,4 +1,5 @@
 #include "OakForest.h"
+#include "TreeLook.h"
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "OakHill.h"
@@ -32,7 +33,7 @@ namespace
 	// The four colours, shared with the sample groves (TreeGroves.cpp) and the LOOK tab's TREES sliders: found by name, or made here in a
 	// build without the groves (Shipping), with the groves' defaults
 	const TCHAR* const TintNames[4] = { TEXT("jeeb.Trees.DzGreen"), TEXT("jeeb.Trees.DzRed"), TEXT("jeeb.Trees.DzOrange"), TEXT("jeeb.Trees.DzYellow") };
-	const TCHAR* const TintDefaults[4] = { TEXT("0.2 0.36 0.07"), TEXT("0.5 0.07 0.035"), TEXT("0.62 0.22 0.04"), TEXT("0.7 0.45 0.05") };
+	const TCHAR* const TintDefaults[4] = { TEXT("0.1714 0.2315 0.0595"), TEXT("0.3613 0.0506 0.0253"), TEXT("0.5935 0.209 0.0334"), TEXT("0.595 0.3825 0.0439") };
 	const int32 TintLeaf[4] = { -1, 1, 0, 3 };   // the fallen leaves under a town tree of that colour (AutumnDecor: 0 orange, 1 red, 3 gold; green drops none)
 	const TCHAR* const TintTitle[4] = { TEXT("green"), TEXT("red"), TEXT("orange"), TEXT("yellow") };
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GTintMids[4];
@@ -52,7 +53,7 @@ namespace
 		TArray<FString> P; S.ParseIntoArrayWS(P);
 		float C[3] = { 0.5f, 0.5f, 0.5f };
 		for (int32 i = 0; i < 3 && i < P.Num(); ++i) C[i] = FMath::Max(0.f, FCString::Atof(*P[i]));
-		return FLinearColor(C[0], C[1], C[2]);
+		return JeebTreeLook::Saturate(FLinearColor(C[0], C[1], C[2]));   // (jeeb.Trees.Saturation on top)
 	}
 	void ApplyTints(IConsoleVariable* = nullptr)
 	{
@@ -63,6 +64,52 @@ namespace
 		}
 	}
 
+
+	// The spruces' needle colour (owner, 2026-11-16: the LOOK tab's jeeb.Trees.Spruce sliders must reach the forest's and the town's spruces too).
+	// The same variable and parameters as TreeGroves.cpp's TintSpruce: "Leaf Tint" (_leaf materials), "Branch Tint" (_branch), the imposters' "Tint".
+	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GSpruceMids;   // (one per distinct spruce material, shared by every spruce of the forest)
+	IConsoleVariable* SpruceVar()
+	{
+		IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Trees.Spruce"));
+		if (!V) V = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Trees.Spruce"), TEXT("0.8 0.9 0.92"), TEXT("Needle colour multiplier of every spruce, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
+		return V;
+	}
+	FLinearColor SpruceTint()
+	{
+		IConsoleVariable* V = SpruceVar();
+		return JeebTreeLook::Saturate(JeebTreeLook::ParseRGB(V ? V->GetString() : FString(TEXT("0.8 0.9 0.92")), FLinearColor(1.f, 1.f, 1.f, 0.f)));   // (the pack's tints have alpha 0)
+	}
+	const TCHAR* SpruceParam(const FString& MaterialName)
+	{
+		if (MaterialName.Contains(TEXT("imposter"))) return TEXT("Tint");
+		if (MaterialName.Contains(TEXT("_leaf"))) return TEXT("Leaf Tint");
+		if (MaterialName.Contains(TEXT("_branch"))) return TEXT("Branch Tint");
+		return nullptr;   // (trunk: bark and moss keep the pack's colour)
+	}
+	void ApplySpruce(IConsoleVariable* = nullptr)
+	{
+		const FLinearColor Sp = SpruceTint();
+		for (const TWeakObjectPtr<UMaterialInstanceDynamic>& M : GSpruceMids)
+			if (M.IsValid() && M->Parent) if (const TCHAR* Param = SpruceParam(M->Parent->GetName())) M->SetVectorParameterValue(Param, Sp);
+	}
+	// every needle slot of a spruce set gets the shared dynamic instance of its material, in the spruce tint
+	int32 TintSpruceSet(UMeshComponent* C, UObject* Outer)
+	{
+		int32 Done = 0;
+		const FLinearColor Sp = SpruceTint();
+		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+		{
+			UMaterialInterface* M = C->GetMaterial(i);
+			const TCHAR* Param = M ? SpruceParam(M->GetName()) : nullptr;
+			if (!Param) continue;
+			UMaterialInstanceDynamic* D = nullptr;
+			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GSpruceMids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
+			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); GSpruceMids.Add(D); }
+			C->SetMaterial(i, D);
+			++Done;
+		}
+		return Done;
+	}
 	// ------------------------------------------------------------------ the kinds
 	enum EKind : uint8
 	{
@@ -171,13 +218,14 @@ namespace
 
 	float Noise(const FVector2D& P, float Scale, float Ox, float Oy) { return FMath::PerlinNoise2D(FVector2D(P.X / Scale + Ox, P.Y / Scale + Oy)); }
 
-	// Which of the four colours a neighbourhood takes: two slow noises split the land into patches (about 80-150 m), and one tree
-	// in eight takes another colour, so a patch is mostly one colour with a few others mixed in
+	// Which of the four colours a neighbourhood takes: two slow noises split the land into patches (about 80-150 m), one tree in eight takes
+	// another colour. Owner, 2026-11-16 (the trees were too colourful): green gets about 40% of the land and of the strays, the rest is shared
+	// among red (a quarter of it), orange and yellow. Deterministic: the same noise and the same stream draws on every machine.
 	int32 ColourAt(const FVector2D& P, FRandomStream& R)
 	{
 		const float A = Noise(P, 9000.f, 11.3f, 4.1f), B = Noise(P, 11000.f, -7.7f, 19.2f);
-		int32 C = (A > 0.f ? 1 : 0) + (B > 0.f ? 2 : 0);   // 0 green, 1 red, 2 orange, 3 yellow
-		if (R.FRand() < 0.125f) C = R.RandRange(0, 3);
+		int32 C = A < -0.08f ? 0 : (B < -0.15f ? 1 : B < 0.15f ? 2 : 3);   // 0 green, 1 red, 2 orange, 3 yellow
+		if (R.FRand() < 0.125f) C = R.FRand() < 0.4f ? 0 : 1 + R.RandRange(0, 2);
 		return C;
 	}
 
@@ -621,6 +669,7 @@ struct FOakForestBuild
 		if (!bServer)
 		{
 			for (int32 F = 0; F < 4; ++F) GTintMids[F].Reset();
+			GSpruceMids.Reset();
 			for (TPair<int32, TArray<FTransform>>& V : Visual)
 			{
 				const int32 Kd = V.Key / 4, Col = V.Key % 4;
@@ -638,6 +687,7 @@ struct FOakForestBuild
 				C->bCastFarShadow = false;
 				C->SetWorldPositionOffsetDisableDistance(bTree ? 6000 : 3000);   // (the wind stops swaying them beyond 60 m)
 				if (K.bTint) Swapped += TintLeaves(C, Col);
+				if (IsSpruce(Kd) || Kd == K_Sapling) Swapped += TintSpruceSet(C, Self);
 				Self->Drawn.Add(C); Self->DrawnReach.Add(K.Reach); Self->DrawnIsTree.Add(bTree); Self->DrawnShadow.Add(K.bShadow && !bTree);
 				C->RegisterComponent();
 				C->AddInstances(V.Value, false, true, false);
@@ -656,6 +706,7 @@ struct FOakForestBuild
 					S->bCastFarShadow = false;
 					S->SetWorldPositionOffsetDisableDistance(6000);
 					if (K.bTint) TintLeaves(S, Col);
+					if (IsSpruce(Kd) || Kd == K_Sapling) TintSpruceSet(S, Self);
 					S->RegisterComponent();
 					const int32 Si = Self->ShadowSets.Add(S);
 					Self->ShadowAll.Add(V.Value);
@@ -727,6 +778,8 @@ void AOakForest::BeginPlay()
 	{
 		bHooked = true;
 		for (int32 F = 0; F < 4; ++F) if (IConsoleVariable* V = TintVar(F)) V->OnChangedDelegate().AddStatic(&ApplyTints);
+		if (IConsoleVariable* V = SpruceVar()) V->OnChangedDelegate().AddStatic(&ApplySpruce);
+		JeebTreeLook::OnChanged().AddLambda([]() { ApplyTints(); ApplySpruce(); });
 		CVarReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadows->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadowReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->UpdateShadows(true); }));
