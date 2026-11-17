@@ -29,12 +29,12 @@ static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1")
 static TAutoConsoleVariable<float> CVarGrassDensity2(TEXT("jeeb.Grass.Density2"), 11.0f, TEXT("Open World Foliage clumps per square metre close by"));
 static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 5000.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer; 50 m since 2026-11-15, owner: twice as far)"));
 static TAutoConsoleVariable<int32> CVarGrassFarCards(TEXT("jeeb.Grass.FarCards"), 0, TEXT("1: our painted cards rise where the realistic grass sinks, carrying the meadow to 50 m; 0: painted ground only beyond it"));
-static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT(""), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
+static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT("1.0101 0.8294 1"), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
 static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT(""), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack2)"));
 static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
-static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.3f, TEXT("How far the realistic blades are pulled toward grey (live)"));
+static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.2983f, TEXT("How far the realistic blades are pulled toward grey (live)"));
 static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
-static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.43f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
+static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.4286f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
 
 namespace
 {

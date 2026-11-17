@@ -102,6 +102,9 @@ namespace
 		{ 6, TEXT("DZ yellow forest: red"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 0, 0.f, 1.4f, false, NoDef },
 		{ 6, TEXT("DZ yellow forest: green"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 1, 0.f, 0.9f, false, NoDef },
 		{ 6, TEXT("DZ yellow forest: blue"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 2, 0.f, 0.1f, false, NoDef },
+		{ 6, TEXT("Spruce forest: red"), TEXT("jeeb.Trees.Spruce"), EK::Comp, 0, 0.f, 2.f, false, NoDef },
+		{ 6, TEXT("Spruce forest: green"), TEXT("jeeb.Trees.Spruce"), EK::Comp, 1, 0.f, 2.f, false, NoDef },
+		{ 6, TEXT("Spruce forest: blue"), TEXT("jeeb.Trees.Spruce"), EK::Comp, 2, 0.f, 2.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)
