@@ -25,18 +25,24 @@ namespace
 
 	// ------------------------------------------------------------------ the shape
 	// Heights (cm): out past RingFrom..RingTo from the plaza the hills stand RingBase plus up to RingTop more where the broad noise is high
-	// (its valleys and saddles about 200-300 m apart), with smaller bumps of up to Bumps on everything (less near the town)
-	constexpr float RingFrom = 8000.f, RingTo = 32000.f, RingBase = 1500.f, RingTop = 1500.f, Bumps = 900.f;
+	// (its valleys and saddles about 200-300 m apart), plus ridges and single hills of up to Ridges where a ridged noise crests (about
+	// 150 m apart), with smaller bumps of up to Bumps on everything. Second pass (2026-11-16, the first read as a gentle swell): they
+	// start 10 m past the town's box, are full height by 90 m, and stand tall right by the town, so from the plaza and the road ends a
+	// forested skyline stands 20-40 m up every way but down the river valleys
+	constexpr float RingFrom = 3000.f, RingTo = 16000.f, RingBase = 1800.f, RingTop = 1500.f, Ridges = 1100.f, Bumps = 800.f;
 	// Edges (cm): the rim (full to RimIn from the plaza, none by RimOut), the town's box, the original square, the rivers' water
 	constexpr float RimIn = 47000.f, RimOut = 62000.f;
-	constexpr float TownFrom = 3000.f, TownTo = 14000.f;
+	constexpr float TownFrom = 1000.f, TownTo = 9000.f;
 	constexpr float SquareFrom = 1500.f, SquareTo = 12000.f;
-	constexpr float RiverFrom = 3000.f, RiverTo = 20000.f;
+	constexpr float RiverFrom = 3000.f, RiverTo = 17000.f;
+	// The steepest the hills may make the ground (rise per run): 0.7 is 35 degrees, kept with a cut over the whole grid (only ever
+	// lowering a hill), then one soft blur so the cut leaves no crease; the knight walks up to 44.8 and trees grow to 0.7
+	constexpr float MaxSlope = 0.7f;
 	// The forest roads' corridors: level across RoadFlat cm from the middle, then easing into the hills over 3.5 x the cut or fill
 	// (12 to 45 m)
 	constexpr float RoadFlat = 400.f, RoadEaseMin = 1200.f, RoadEaseMax = 4500.f, RoadEaseBy = 3.5f;
 	// The highest the land and the hills may stand together (cm, world Z): eased in over TopSoft below it
-	constexpr float TopZ = 5600.f, TopSoft = 800.f;
+	constexpr float TopZ = 5750.f, TopSoft = 600.f;
 
 	// ------------------------------------------------------------------ the forest roads' profiles
 	struct FRoadProfile
@@ -56,6 +62,7 @@ namespace
 		int32 RoadsN = 0;
 		float MaxCut = 0.f, MaxFill = 0.f;
 		int32 Capped = 0;
+		int32 Sloped = 0;
 	};
 
 	FGrid BuildGrid()
@@ -97,6 +104,20 @@ namespace
 			for (int32 i = 0; i < M; ++i)
 			{
 				R.Hill[i] = 0.5f * (Lo[i] + Hi[i]) - Base[i];
+			}
+			// a fork (a road that starts on an earlier one) starts at that road's own height there, eased in over its first 60 m, so the
+			// two profiles meet without a step (2026-11-16: 6.3 degrees where the east road leaves the north road)
+			for (const FRoadProfile& Prev : Roads)
+			{
+				float Best = 1.0e18f; int32 BestK = 0;
+				for (int32 k = 0; k < Prev.Pts.Num(); ++k) { const float D2 = FVector2D::DistSquared(Prev.Pts[k], R.Pts[0]); if (D2 < Best) { Best = D2; BestK = k; } }
+				if (Best > 1000.f * 1000.f) continue;
+				const float Step = Prev.Hill[BestK] + JeebTerrain::HeightAt(Prev.Pts[BestK].X, Prev.Pts[BestK].Y, true, 0) - (R.Hill[0] + Base[0]);
+				for (int32 i = 0; i < M && S[i] < 6000.f; ++i) R.Hill[i] += Step * (1.f - Smooth(0.f, 6000.f, S[i]));
+				break;
+			}
+			for (int32 i = 0; i < M; ++i)
+			{
 				const float Diff = R.Hill[i] - Raw[i];
 				G.MaxCut = FMath::Max(G.MaxCut, -Diff); G.MaxFill = FMath::Max(G.MaxFill, Diff);
 				R.Ease[i] = FMath::Clamp(RoadEaseBy * FMath::Abs(Diff), RoadEaseMin, RoadEaseMax);
@@ -135,16 +156,63 @@ namespace
 					const float Odds = FMath::Min(W / FMath::Max(1.f - W, 1e-5f), 1.0e5f);
 					Sum += Odds * FMath::Lerp(R.Hill[BestI], R.Hill[BestI + 1], BestT); Weight += Odds;
 				}
-				float V = Sum / Weight;
-				// never up into the snow (M_Ground paints snow on gentle ground from 60 m, Tools/world_material.py SnowFrom): the land and the
-				// hills together ease under TopZ (2026-11-16: the north-east, where the land already climbs toward the mountains, had a snowfield)
+				G.V[i * G.N + j] = Sum / Weight;
+			}
+
+		// The land under the hills, then no slope over MaxSlope: the ground (land + hills) is cut down to the lowest cone of that slope
+		// standing on any point (two sweeps each way of an 8-neighbour chamfer), the hills keeping only what is left over the land
+		const int32 N = G.N;
+		TArray<float> Base, T;
+		Base.SetNumUninitialized(N * N); T.SetNumUninitialized(N * N);
+		for (int32 i = 0; i < N; ++i)
+			for (int32 j = 0; j < N; ++j)
+			{
+				const int32 k = i * N + j;
+				Base[k] = JeebTerrain::HeightAt(X0 + i * JeebHills::GridStep, Y0 + j * JeebHills::GridStep, true, 0);
+				T[k] = Base[k] + G.V[k];
+			}
+		{
+			const float S1 = MaxSlope * JeebHills::GridStep, S2 = S1 * 1.41421356f;
+			for (int32 Pass = 0; Pass < 2; ++Pass)
+			{
+				for (int32 i = 0; i < N; ++i)
+					for (int32 j = 0; j < N; ++j)
+					{
+						float& Here = T[i * N + j];
+						if (i > 0) { Here = FMath::Min(Here, T[(i - 1) * N + j] + S1); if (j > 0) Here = FMath::Min(Here, T[(i - 1) * N + j - 1] + S2); if (j + 1 < N) Here = FMath::Min(Here, T[(i - 1) * N + j + 1] + S2); }
+						if (j > 0) Here = FMath::Min(Here, T[i * N + j - 1] + S1);
+					}
+				for (int32 i = N - 1; i >= 0; --i)
+					for (int32 j = N - 1; j >= 0; --j)
+					{
+						float& Here = T[i * N + j];
+						if (i + 1 < N) { Here = FMath::Min(Here, T[(i + 1) * N + j] + S1); if (j + 1 < N) Here = FMath::Min(Here, T[(i + 1) * N + j + 1] + S2); if (j > 0) Here = FMath::Min(Here, T[(i + 1) * N + j - 1] + S2); }
+						if (j + 1 < N) Here = FMath::Min(Here, T[i * N + j + 1] + S1);
+					}
+			}
+		}
+		TArray<float> Cut; Cut.SetNumUninitialized(N * N);
+		for (int32 k = 0; k < N * N; ++k) { Cut[k] = G.V[k] > 0.f ? FMath::Max(0.f, T[k] - Base[k]) : G.V[k]; if (Cut[k] < G.V[k] - 1.f) ++G.Sloped; }
+		// one 3x3 blur of the hills (where there are hills all round), then never up into the snow: M_Ground paints snow on gentle ground
+		// from 60 m (Tools/world_material.py SnowFrom, its noise from about 58.4 m), so the land and the hills together ease under TopZ
+		// (2026-11-16: the north-east, where the land already climbs toward the mountains, had a snowfield)
+		for (int32 i = 0; i < N; ++i)
+			for (int32 j = 0; j < N; ++j)
+			{
+				const int32 k = i * N + j;
+				float V = Cut[k];
+				if (V > 0.f && i > 0 && j > 0 && i + 1 < N && j + 1 < N)
+				{
+					float Sum = 0.f;
+					for (int32 a = -1; a <= 1; ++a) for (int32 b = -1; b <= 1; ++b) Sum += Cut[(i + a) * N + j + b];
+					V = Sum / 9.f;
+				}
 				if (V > 0.f)
 				{
-					const float Base = JeebTerrain::HeightAt(P.X, P.Y, true, 0), Knee = TopZ - TopSoft;
-					const float H = Base + V;
-					if (H > Knee) { const float Soft = Knee + TopSoft * (1.f - FMath::Exp(-(H - Knee) / TopSoft)); V = FMath::Max(0.f, Soft - Base); ++G.Capped; }
+					const float Knee = TopZ - TopSoft, H = Base[k] + V;
+					if (H > Knee) { const float Soft = Knee + TopSoft * (1.f - FMath::Exp(-(H - Knee) / TopSoft)); V = FMath::Max(0.f, Soft - Base[k]); ++G.Capped; }
 				}
-				G.V[i * G.N + j] = V;
+				G.V[k] = V;
 			}
 		G.Hash = FCrc::MemCrc32(G.V.GetData(), G.V.Num() * sizeof(float));
 		G.Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
@@ -216,7 +284,10 @@ float JeebHills::Raw(float X, float Y)
 	const float Broad = 0.7f * Perlin(P, 26000.f, 3.1f, 7.7f) + 0.3f * Perlin(P, 15000.f, -1.9f, 4.4f);
 	const float Big = Smooth(-0.5f, 0.55f, Broad);   // 0 in the valleys and saddles, 1 on the tops
 	const float Small = 0.5f + 0.5f * Perlin(P, 11000.f, -5.3f, 2.2f);
-	return Sc * K * (Ring * (RingBase + RingTop * Big) + Bumps * Small * (0.4f + 0.6f * Ring));
+	// ridges and single hills: where a ridged noise crests (its zero line), sharpened, and patchy so some stand alone
+	const float Crest = FMath::Square(FMath::Max(0.f, 1.f - 1.6f * FMath::Abs(Perlin(P, 17000.f, 8.2f, -3.6f))));
+	const float Ridge = Crest * Smooth(-0.25f, 0.35f, Perlin(P, 23000.f, -2.7f, 6.1f));
+	return Sc * K * (Ring * (RingBase + RingTop * Big + Ridges * Ridge) + Bumps * Small * (0.5f + 0.5f * Ring));
 }
 
 float JeebHills::Offset(float X, float Y)
@@ -244,8 +315,8 @@ void JeebHills::Prepare()
 	const FGrid& G = Grid();
 	float Top = 0.f;
 	for (float V : G.V) Top = FMath::Max(Top, V);
-	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS grid %dx%d (%.0f m step) over %.0f m round the plaza, scale %.2f, highest %.1f m, %d forest roads levelled (deepest cut %.1f m, highest bank %.1f m), %d grid points eased under the snow line (%.0f m), built in %.0f ms; hash=%08x"),
-		G.N, G.N, GridStep / 100.f, GridHalf / 100.f, Scale(), Top / 100.f, G.RoadsN, G.MaxCut / 100.f, G.MaxFill / 100.f, G.Capped, TopZ / 100.f, G.Ms, G.Hash);
+	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS grid %dx%d (%.0f m step) over %.0f m round the plaza, scale %.2f, highest %.1f m, %d forest roads levelled (deepest cut %.1f m, highest bank %.1f m), %d grid points lowered to keep slopes under %.0f deg, %d eased under the snow line (%.0f m), built in %.0f ms; hash=%08x"),
+		G.N, G.N, GridStep / 100.f, GridHalf / 100.f, Scale(), Top / 100.f, G.RoadsN, G.MaxCut / 100.f, G.MaxFill / 100.f, G.Sloped, FMath::RadiansToDegrees(FMath::Atan(MaxSlope)), G.Capped, TopZ / 100.f, G.Ms, G.Hash);
 }
 
 void JeebHills::LogStats()
