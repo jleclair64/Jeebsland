@@ -50,6 +50,7 @@
 #include "Castle.h"
 #include "Horse.h"
 #include "SmokeCloud.h"
+#include "OakHill.h"
 #include "Cat.h"
 #include "Fireflies.h"
 #include "KnightHUD.h"
@@ -93,6 +94,10 @@ void AKnightGameState::BeginPlay()
 	JeebPalette::ApplyToWorld(GetWorld());   // the world palette's colours and knobs into this world's MPC_JeebPalette (Content/Data/Palette.ini)
 	BuildWorld();
 }
+
+#if !UE_BUILD_SHIPPING
+static TAutoConsoleVariable<int32> CVarTestHorse(TEXT("jeeb.Test.Horse"), 1, TEXT("TEMPORARY test setting: 1 (default) puts a horse beside the start in single player at the next load, 0 leaves it out. Never online, never in Shipping."), ECVF_Default);
+#endif
 
 void AKnightGameState::BuildWorld()
 {
@@ -248,10 +253,20 @@ void AKnightGameState::BuildWorld()
 		}
 	}
 
-	// Your horse, waiting near the start (T calls it)
+	// Your horse (TEMPORARY test setting, owner 2026-11-16): single player and editor Play only, never on a server or an online client (horses aren't shared online),
+	// never in Shipping. It waits on open ground beside the start (Oak Hill's plaza, or the old spot elsewhere); T calls it, E beside it mounts. `jeeb.Test.Horse 0` leaves it out.
+#if !UE_BUILD_SHIPPING
+	if (GetNetMode() == NM_Standalone && CVarTestHorse.GetValueOnGameThread() != 0)
+	{
+		const bool bOakStart = JeebOakHill::Enabled() && !GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
+		const FVector2D HorseAt = bOakStart ? FVector2D(JeebOakHill::SpawnX + 450.f, JeebOakHill::SpawnY) : FVector2D(650.f, 420.f);
+		AHorse* H = World->SpawnActor<AHorse>(FVector(HorseAt.X, HorseAt.Y, JeebTerrain::HeightAt(HorseAt.X, HorseAt.Y)), FRotator(0.f, bOakStart ? JeebOakHill::SpawnYaw + 180.f : 200.f, 0.f));
+		UE_LOG(LogTemp, Display, TEXT("JEEBHORSE spawned at %.0f,%.0f (%s)"), HorseAt.X, HorseAt.Y, H ? TEXT("ok") : TEXT("failed"));
+	}
+#endif
 	{
 		const FVector2D HP(650.f, 420.f);
-		// (no horse for now: horses aren't shared online yet. One game for everyone: single player has none either.)
+		// (the horse itself is spawned above; the smoke cloud stays where the old spot was)
 		// A cloud of purple poison smoke a few metres from the horse, to see how a hazard looks and feels
 		World->SpawnActor<ASmokeCloud>(FVector(HP.X + 380.f, HP.Y, JeebTerrain::HeightAt(HP.X + 380.f, HP.Y)), FRotator::ZeroRotator);
 	}
@@ -803,6 +818,21 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			const float AtX = FCString::Atof(*ShotAtX), AtY = FCString::Atof(*ShotAtY);
 			const bool bLab = GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
 			if (APawn* P = PC ? PC->GetPawn() : nullptr) P->SetActorLocation(FVector(AtX, AtY, (bLab ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(AtX, AtY)) + 100.f));
+		}
+		// (-ShotMount: at 3.5 s the test horse is brought beside him and he mounts it, for riding pictures; log JEEBHORSE)
+		static bool bShotMountDone = false;
+		if (!bShotMountDone && ShotClock > 3.5f && FParse::Param(FCommandLine::Get(), TEXT("ShotMount")))
+		{
+			bShotMountDone = true;
+			AKnightCharacter* Me = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
+			AHorse* Mount = nullptr;
+			for (TActorIterator<AHorse> It(GetWorld()); It; ++It) { Mount = *It; break; }
+			if (Me && Mount)
+			{
+				Mount->SetActorLocation(Me->GetActorLocation() + FVector(0.f, 0.f, -96.f));
+				Me->MountHorse(Mount);
+			}
+			UE_LOG(LogTemp, Display, TEXT("JEEBHORSE ShotMount: knight %d horse %d mounted %d"), Me ? 1 : 0, Mount ? 1 : 0, Me && Me->IsMounted() ? 1 : 0);
 		}
 		// (-ShotCmds=a~1;b~2: console commands at 3 s, after the graphics settings are applied ('~' a space, ';' between), so a film
 		// can be taken with one setting changed; shadow check 2026-11-15)

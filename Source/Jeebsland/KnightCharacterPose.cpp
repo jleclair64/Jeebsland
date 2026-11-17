@@ -43,6 +43,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bClimbing = bClimbing;
 	In.ClimbPhase = ClimbPhase;
 	In.bSitting = bSitting;
+	In.bMounted = bMounted;
 	In.bSliding = bSliding;
 	In.bFishing = bFishing;
 	In.bDrinking = bDrinking;

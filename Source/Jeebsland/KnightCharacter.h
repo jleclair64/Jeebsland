@@ -213,6 +213,7 @@ public:
 	float GetStaminaMult() const;
 	// Riding: T calls the horse, E beside it mounts. The bar counts 100 down while sprinting, then refills before the next sprint.
 	bool IsMounted() const { return bMounted; }
+	void MountHorse(AHorse* H) { Mount(H); }   // (test pictures: -ShotMount)
 	float GetHorseEnergy() const { return HorseEnergy; }   // 0 - 100
 	float GetHorseHealth() const { return HorseHealth; }
 	float GetHorseMaxHealth() const { return HorseMaxHealth; }

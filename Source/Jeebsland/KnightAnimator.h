@@ -160,6 +160,7 @@ namespace JeebAnim
 		float AimPitch = 0.f;
 		bool bClimbing = false; float ClimbPhase = 0.f;
 		bool bSitting = false;
+		bool bMounted = false;   // riding (the test horse): the sitting pose, raised to the saddle
 		bool bSliding = false;
 		bool bFishing = false;
 		bool bDrinking = false; float DrinkU = 0.f;   // a potion on its way down: 0..1
