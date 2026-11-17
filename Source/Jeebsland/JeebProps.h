@@ -73,23 +73,30 @@ namespace JeebProps
 		return Load(Paths[FMath::Clamp<int32>(Variant, 0, int32(UE_ARRAY_COUNT(Paths)) - 1)]);
 	}
 
+	// (every material slot: a model can come in with more than one, and its faces need not be on the first; 2026-11-16 the baked longbow drew plain grey)
 	inline void Tint(UStaticMeshComponent* C, const FLinearColor& Col, float Metal = 0.f, float Rough = 0.5f)
 	{
 		if (!C) return;
-		UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0));
-		if (!M) M = C->CreateDynamicMaterialInstance(0);
-		if (!M) return;
-		M->SetVectorParameterValue(TEXT("Tint"), Col);
-		M->SetScalarParameterValue(TEXT("TintMetal"), Metal);
-		M->SetScalarParameterValue(TEXT("TintRough"), Rough);
+		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+		{
+			UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(i));
+			if (!M) M = C->CreateDynamicMaterialInstance(i);
+			if (!M) continue;
+			M->SetVectorParameterValue(TEXT("Tint"), Col);
+			M->SetScalarParameterValue(TEXT("TintMetal"), Metal);
+			M->SetScalarParameterValue(TEXT("TintRough"), Rough);
+		}
 	}
 	// The second colour, on what the vertex colour's green marks (an arrow's feathers)
 	inline void Tint2(UStaticMeshComponent* C, const FLinearColor& Col)
 	{
 		if (!C) return;
-		UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(0));
-		if (!M) M = C->CreateDynamicMaterialInstance(0);
-		if (M) M->SetVectorParameterValue(TEXT("Tint2"), Col);
+		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
+		{
+			UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(C->GetMaterial(i));
+			if (!M) M = C->CreateDynamicMaterialInstance(i);
+			if (M) M->SetVectorParameterValue(TEXT("Tint2"), Col);
+		}
 	}
 	// An arrow's head and feathers in its kind's colours (ArrowTipColor / ArrowFeatherColor: steel, fire, and the tiers)
 	inline void TintArrow(UStaticMeshComponent* C, int32 ArrowId)

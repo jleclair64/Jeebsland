@@ -82,6 +82,7 @@ namespace JeebAnim
 		FTransform ShieldAtRest = FTransform::Identity, ShieldAtGuard = FTransform::Identity, ShieldAtBlock = FTransform::Identity;   // the shield in the left forearm's frame: hanging, strapped on a raised forearm, held up to guard
 		FVector ShieldInGuard = FVector(45.f, -26.f, 112.f);   // where the raised shield's face is, from between his feet (game frame)
 		FTransform BowAtRest = FTransform::Identity, BowAtAim = FTransform::Identity;           // the bow's hold in the left hand's frame
+		FVector BowRestFore = FVector::ZeroVector;   // down his left forearm as he stands at rest (game frame): the resting bow's string lies up it, tipped in (jeeb.Knight.BowRestTilt)
 		FTransform BowRestBase = FTransform::Identity, BowRestHandInv = FTransform::Identity;   // the resting bow before jeeb.Knight.BowRestRoll (game frame, rest pose), and that pose's left hand undone
 		FVector OnHipsFrom = FVector::ZeroVector;       // where jeeb.Knight.Quiver and jeeb.Knight.Flask measure from (game frame, rest pose)
 		FTransform HipsRestInv = FTransform::Identity;  // the rest pose's hips undone
@@ -268,6 +269,8 @@ private:
 	float ThighOut[2] = { 0.f, 0.f };   // HandsOffThighs: each arm's eased outward turn (degrees)
 	float ThighLogT = 0.f, ThighMin[2] = { 1e4f, 1e4f }, ThighMinRaw[2] = { 1e4f, 1e4f };
 	void BowArmOut(FPose& P, const FInput& In, float Dt);   // the resting bow's arm held a little out from his body, the bow still in the fist
+	void BowFistTurn(FPose& P, const FInput& In);   // the resting bow held steady at the wrist: the string stays up the inside of the forearm whatever the clip does with the hand
+	float BowArmDeg = 0.f;   // BowArmOut: degrees the arm was opened this frame (JEEBBOWGAP)
 	float BowArmW = 0.f;   // BowArmOut: how far it is on (eased)
 	void LogBowGap(const FPose& P, const FInput& In, float Dt);   // test pictures: the resting string's gaps to his hip and forearm (JEEBBOWGAP)
 	float BowGapT = 0.f, BowGapMin[2] = { 1e4f, 1e4f };

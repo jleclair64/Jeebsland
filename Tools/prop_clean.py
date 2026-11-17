@@ -37,6 +37,8 @@ os.makedirs(out, exist_ok=True)
 # Added 2026-11-12 for the community-library models (Docs/MeshyCommunityLibrary.md lists their pages):
 #  reduce: triangles to keep (Blender's collapse decimation, before anything else; the library models come at 3k to 1M).
 #  bake: the reduced model is welded, gets fresh UVs and its pictures baked from the full one (a heavy reduction otherwise shatters the picture into shards).
+#  fill: with bake, holes left open by 'cut' are closed once the model is welded (the longbow's tips, where its string was tied on).
+#  swatch: with bake, a steel-grey square is painted into an empty corner of the pictures, for added bands to take their colour from (a model with no steel of its own).
 #  cull: before a bake, delete faces no ray from them can leave the model by (inner walls). Off unless asked: it ate a crystal face and frayed a medallion.
 #  refine: N rounds of splitting the faces the picture's metal/wood edge runs through, so a 'clean' mask follows the edge instead of making teeth (2026-11-13).
 #  cut: lambda on a face's centre in the MODEL's own frame (as Blender imports it, metres): those faces are deleted (the crossbow's bolt and string, the bows' strings, the quiver's arrows).
@@ -70,7 +72,7 @@ def _grey(c):
 AMULET = dict(length=6.0, grip=("Z", 1.0), mask="none", reduce=4000, bake=True)
 PROPS = {
     "Pickaxe":  dict(file="Pickaxe2.glb", axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), wood=(25.0, 0.74, 0.30, 60.0), clean=True, reduce=6000),
-    "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=3000,
+    "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=5000, bake=True, swatch=True, fill=True,   # (2026-11-16: baked to fresh UVs. Reduced to 3000 without a bake, the stave's picture and normal map shattered into scaly shards with dark pits: the owner's "holes")
                      cut=lambda p: p[0] > 0.136 and -0.925 < p[2] < 0.905,
                      marks={"TipTop": ((0.10, -0.05, 0.86), (0.16, 0.05, 0.97)), "TipLow": ((0.10, -0.05, -0.98), (0.16, 0.05, -0.88))},
                      clean=True, plain=[[("|X|", 15.0, 68.0)]], bands=[("|X|", 9.5, 22.0), ("|X|", 41.0, 45.0), ("|X|", 64.0, 80.0)]),
@@ -131,7 +133,8 @@ def steel_uv(pix, W, H, normal):
     import numpy as np
     arr = np.array(pix, dtype=np.float32).reshape(H, W, 4)[..., :3]
     V = arr.max(axis=2); S = (V - arr.min(axis=2)) / np.maximum(V, 1e-4)
-    steel = S < 0.2
+    steel = (S < 0.2) & (V > 0.03)   # (not the black around a baked picture's islands)
+    if not steel.any(): steel = S < 0.2
     med = float(np.median(V[steel]))
     k = 6
     def box(a_):
@@ -266,7 +269,7 @@ def cull_hidden(me, name):
     bmesh.ops.delete(bm, geom=gone, context="FACES")
     bm.to_mesh(me); bm.free(); me.update()
     print("PROP", name, "hidden faces removed", len(gone))
-def bake_to_new_uvs(o, hi, name, size=2048):
+def bake_to_new_uvs(o, hi, name, size=2048, swatch=False):
     # The decimated model gets its own fresh UVs and its pictures baked from the full model (a heavy collapse across the library models' many UV seams
     # smears the old picture into speckled shards). Base and metal/roughness through emission, the normal map as Cycles bakes it.
     sc = bpy.context.scene
@@ -305,6 +308,24 @@ def bake_to_new_uvs(o, hi, name, size=2048):
         hmat.node_tree.links.new(tnode.outputs["Color"], em.inputs["Color"])
         im = img(tag, sz, nc); tgt.image = im; ln.active = tgt
         bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
+    if swatch and "Base" in got:
+        # (a model with no steel of its own, the longbow: added bands need a calm steel spot to take their colour from, and a baked picture is black between its
+        # islands. A small steel-grey square goes into an empty corner of every picture, for steel_uv to find)
+        import numpy as np
+        bw = got["Base"].size[0]; ba = np.array(got["Base"].pixels[:], dtype=np.float32).reshape(bw, bw, 4)
+        q = bw // 32; spot = None
+        for cy in range(bw // q - 1, -1, -1):
+            for cx in range(bw // q - 1, -1, -1):
+                if ba[cy * q:(cy + 1) * q, cx * q:(cx + 1) * q, :3].max() < 0.004: spot = (cx, cy); break
+            if spot: break
+        if spot:
+            for tag, col in (("Base", (0.45, 0.46, 0.48, 1.0)), ("MR", (0.0, 0.35, 1.0, 1.0)), ("Normal", (0.5, 0.5, 1.0, 1.0))):
+                if tag not in got: continue
+                w_ = got[tag].size[0]; q_ = w_ // 32
+                a_ = np.array(got[tag].pixels[:], dtype=np.float32).reshape(w_, w_, 4)
+                a_[spot[1] * q_:(spot[1] + 1) * q_, spot[0] * q_:(spot[0] + 1) * q_] = col
+                got[tag].pixels.foreach_set(a_.reshape(-1)); got[tag].update()
+            print("PROP", name, "steel swatch at square", spot)
     ln.remove(tgt)
     def tex(im):
         n = ln.new("ShaderNodeTexImage"); n.image = im; return n
@@ -346,6 +367,14 @@ for name in names:
                 bm = bmesh.new(); bm.from_mesh(me)
                 ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
                 bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ext * 2e-5)
+                if P.get("fill"):
+                    # (the cut-away string left an open, ragged crater in each tip where it was tied on: real holes, the inside showing. Welded, the only open
+                    # edges left are those rims, so they are closed here)
+                    rim = [e for e in bm.edges if e.is_boundary]
+                    made = bmesh.ops.holes_fill(bm, edges=rim, sides=0)["faces"] if rim else []
+                    if made: bmesh.ops.triangulate(bm, faces=made)
+                    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+                    print("PROP", name, "open edges", len(rim), "closed with", len(made), "faces; still open", sum(1 for e in bm.edges if e.is_boundary))
                 bm.to_mesh(me); bm.free(); me.update()
                 tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
             bpy.ops.object.select_all(action="DESELECT"); bpy.context.view_layer.objects.active = o; o.select_set(True)
@@ -357,7 +386,7 @@ for name in names:
                     bpy.ops.mesh.customdata_custom_splitnormals_clear()
                 except Exception as e_: print("PROP", name, "custom normals kept:", e_)
                 me.shade_smooth(); me.set_sharp_from_angle(angle=math.radians(50.0))
-                bake_to_new_uvs(o, hi, name)
+                bake_to_new_uvs(o, hi, name, swatch=bool(P.get("swatch")))
                 me = o.data
     print("PROP", name, "tris from", tris0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     # (the model's own normals, by corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side. Kept as a corner attribute so cuts and bands carry them along)
