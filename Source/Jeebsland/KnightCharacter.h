@@ -214,6 +214,10 @@ public:
 	// Riding: T calls the horse, E beside it mounts. The bar counts 100 down while sprinting, then refills before the next sprint.
 	bool IsMounted() const { return bMounted; }
 	void MountHorse(AHorse* H) { Mount(H); }   // (test pictures: -ShotMount)
+	void DismountHorse() { Dismount(); }      // (test pictures: -ShotDismount)
+	void SetStrafeForTest(bool bOn) { bStrafeMode = bOn; }
+	void SprintForTest(bool bOn) { if (bOn) StartSprint(); else StopSprint(); }
+	bool OrientsToMovement() const;
 	float GetHorseEnergy() const { return HorseEnergy; }   // 0 - 100
 	float GetHorseHealth() const { return HorseHealth; }
 	float GetHorseMaxHealth() const { return HorseMaxHealth; }

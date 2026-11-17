@@ -834,6 +834,56 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			}
 			UE_LOG(LogTemp, Display, TEXT("JEEBHORSE ShotMount: knight %d horse %d mounted %d"), Me ? 1 : 0, Mount ? 1 : 0, Me && Me->IsMounted() ? 1 : 0);
 		}
+		// (-ShotMount -ShotDismount=6.6: a whole ride, logged as JEEBHORSE lines, 2026-11-16. Strafe off, he walks north (1.2-2.8 s) and
+		// his facing is logged; strafe on (the default) for the mount at 3.5 s; he rides forward (3.7 s) and gallops (5 s), the top
+		// speed logged; he gets off at the given time, strafe off, and walks north, east, south and west, 0.9 s each from 7 s, his
+		// facing logged at the end of each. Facing and walking direction should match before and after the ride.)
+		float DismountAt = 0.f;
+		if (FParse::Param(FCommandLine::Get(), TEXT("ShotMount")) && FParse::Value(FCommandLine::Get(), TEXT("ShotDismount="), DismountAt))
+		if (AKnightCharacter* Me = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr)
+		{
+			static int32 Logged = 0;   // a bit per logged step
+			static float TopSpeed = 0.f;
+			auto Report = [&](int32 Bit, const TCHAR* What, float WantYaw)
+			{
+				if (Logged & Bit) return;
+				Logged |= Bit;
+				const FVector V = Me->GetVelocity();
+				const float VelYaw = V.Rotation().Yaw;
+				UE_LOG(LogTemp, Display, TEXT("JEEBHORSE %s: walking toward %.0f, moving %.0f at %.0f cm/s, facing %.1f (off by %.1f), turns to movement %d, mounted %d"),
+					What, WantYaw, VelYaw, V.Size2D(), Me->GetActorRotation().Yaw, FMath::Abs(FMath::FindDeltaAngleDegrees(Me->GetActorRotation().Yaw, VelYaw)), Me->OrientsToMovement() ? 1 : 0, Me->IsMounted() ? 1 : 0);
+			};
+			const float T = ShotClock;
+			if (T > 1.f && T < 3.f) Me->SetStrafeForTest(false);
+			if (T > 1.2f && T < 2.8f) Me->AddMovementInput(FVector(1.f, 0.f, 0.f), 1.f);
+			if (T >= 2.75f) Report(1, TEXT("before the ride"), 0.f);
+			if (T > 3.f && T < 3.2f) Me->SetStrafeForTest(true);
+			if (Me->IsMounted() && T > 3.7f && T < DismountAt)
+			{
+				if (T > 5.f) Me->SprintForTest(true);
+				Me->DoMove(0.f, 1.f);
+				TopSpeed = FMath::Max(TopSpeed, float(Me->GetVelocity().Size2D()));
+				if (T > 4.9f && !(Logged & 2)) { Logged |= 2; UE_LOG(LogTemp, Display, TEXT("JEEBHORSE riding: %.0f cm/s (top so far %.0f), max %.0f"), Me->GetVelocity().Size2D(), TopSpeed, Me->GetCharacterMovement()->MaxWalkSpeed); }
+			}
+			if (T >= DismountAt && Me->IsMounted())
+			{
+				UE_LOG(LogTemp, Display, TEXT("JEEBHORSE galloping: %.0f cm/s (top %.0f), max %.0f; getting off"), Me->GetVelocity().Size2D(), TopSpeed, Me->GetCharacterMovement()->MaxWalkSpeed);
+				Me->SprintForTest(false);
+				Me->DismountHorse();
+			}
+			if (T > DismountAt + 0.1f) Me->SetStrafeForTest(false);
+			static const float Dirs[4] = { 0.f, 90.f, 180.f, -90.f };
+			static const TCHAR* Names[4] = { TEXT("after the ride, north"), TEXT("after the ride, east"), TEXT("after the ride, south"), TEXT("after the ride, west") };
+			for (int32 i = 0; i < 4; ++i)
+			{
+				const float From = 7.f + 0.9f * i;
+				if (T > From && T < From + 0.9f)
+				{
+					Me->AddMovementInput(FRotator(0.f, Dirs[i], 0.f).Vector(), 1.f);
+					if (T > From + 0.85f) Report(4 << i, Names[i], Dirs[i]);
+				}
+			}
+		}
 		// (-ShotCmds=a~1;b~2: console commands at 3 s, after the graphics settings are applied ('~' a space, ';' between), so a film
 		// can be taken with one setting changed; shadow check 2026-11-15)
 		static bool bShotCmdsDone = false;

@@ -135,7 +135,7 @@ void AHorse::Tick(float DeltaSeconds)
 		else
 		{
 			const FVector2D Dir = FVector2D(To.X, To.Y).GetSafeNormal();
-			const float Speed = FMath::Min(1040.f, 240.f + D * 1.2f);   // 20% slower than before
+			const float Speed = FMath::Min(2080.f, 480.f + D * 2.4f);   // twice as fast since 2026-11-16 (was 1040 at most)
 			FVector NewLoc(Me.X + Dir.X * Speed * Dt, Me.Y + Dir.Y * Speed * Dt, 0.f);
 			NewLoc.Z = JeebTerrain::HeightAt(NewLoc.X, NewLoc.Y);
 			SetActorLocation(NewLoc);
@@ -148,11 +148,11 @@ void AHorse::Tick(float DeltaSeconds)
 	const FVector Now = GetActorLocation();
 	const float Speed = FVector2D(Now.X - LastPos.X, Now.Y - LastPos.Y).Size() / FMath::Max(Dt, 0.001f);
 	LastPos = Now;
-	SpeedBlend = FMath::FInterpTo(SpeedBlend, FMath::Clamp(Speed / 250.f, 0.f, 1.f), Dt, 8.f);
+	SpeedBlend = FMath::FInterpTo(SpeedBlend, FMath::Clamp(Speed / 500.f, 0.f, 1.f), Dt, 8.f);
 	// Gait: a trot swings the legs in diagonal pairs; at a full gallop the two front legs swing together and the two back legs
 	// swing together (a bound), the back pair a little ahead of the front, with the whole body rocking and lifting with each stride.
-	const float Gallop = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((Speed - 850.f) / 250.f, 0.f, 1.f));
-	if (SpeedBlend > 0.02f) Phase += Dt * (4.f + Speed * 0.006f) * FMath::Lerp(1.f, 0.85f, Gallop);
+	const float Gallop = FMath::SmoothStep(0.f, 1.f, FMath::Clamp((Speed - 1700.f) / 500.f, 0.f, 1.f));   // (doubled with the horse's speeds, 2026-11-16: a trot at 16 m/s, the gallop at 23 m/s)
+	if (SpeedBlend > 0.02f) Phase += Dt * (4.f + Speed * 0.004f) * FMath::Lerp(1.f, 0.85f, Gallop);
 
 	const float Amp = (25.f + 30.f * Gallop) * SpeedBlend;
 	const float SinA = FMath::Sin(Phase), SinFront = FMath::Sin(Phase), SinBack = FMath::Sin(Phase + 2.1f);
