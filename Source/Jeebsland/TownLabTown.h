@@ -18,10 +18,10 @@ namespace JeebTownLab { struct FSite; }
 //  - one plain component per building (Nanite draws them in one pass), the rebuilt SM_TL_* models where they exist (ModelSwaps),
 //    each with its solid shape (SM_*_Col, on every machine: the server decides where players walk)
 //  - each rebuilt model's decor (TownLabDecor.h: ivy, moss, stones, props, lanterns with a small real light), in instanced sets
-//  - the foundation stones, shrubs and flowers, the plaza's oak, boulders round the edge
+//  - the foundation stones, shrubs and flowers, boulders round the edge (its trees: AOakForest, OakForest.cpp)
 //  - the grass: the meadow switches to 40 m of dense grass in 15 m squares while you stand in the town (Meadow.cpp)
 // Not replicated: every machine builds the same from fixed numbers (JEEBOAK hash to compare); a dedicated server builds only the
-// ground's collision, the buildings' solid shapes, the oak's trunk and the boulders, all hidden.
+// ground's collision, the buildings' solid shapes and the boulders, all hidden.
 UCLASS()
 class ATownLabTown : public AActor
 {
@@ -29,8 +29,6 @@ class ATownLabTown : public AActor
 
 public:
 	ATownLabTown();
-	// The trees round the rebuilt town in the TownLab map (the real town's trees are AOakHillTown::PlantTrees, the very same set)
-	static void PlantTrees(AForest* Forest);
 	// Rounded boulders round a town (PlazaX, PlazaY: that town's plaza; Site: also keep off its streets and buildings)
 	static void PlaceBoulders(AActor* Owner, float PlazaX, float PlazaY, const JeebTownLab::FSite* Site = nullptr);
 	// The old model a rebuilt mesh stands in for ("SM_TL_House" -> "SM_OakHillHouse_300k": the same frame, so the chimneys measured
@@ -52,7 +50,6 @@ private:
 	uint32 Hash = 2166136261u;   // checksum of everything solid (logged, to compare machines)
 	void BuildGround();
 	void BuildBuildings();
-	void BuildPlazaOak();
 	// Window glow: one shared dynamic copy per building material, following the sun
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;
 	TArray<float> GlowBase;

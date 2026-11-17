@@ -5,7 +5,7 @@
 #include "Terrain.h"
 #include "GroundMask.h"
 #include "GroundDecor.h"
-#include "Forest.h"
+
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -47,7 +47,6 @@ void AOakHillTown::BeginPlay()
 	BuildGround();
 	const double T1 = FPlatformTime::Seconds();
 	BuildBuildings();
-	BuildPlazaOak();
 	if (!JeebOakHill::TestOff(TEXT("NoOakMeshes"))) JeebDecor::DressFoundations(this, Foundations, 8128);   // (stones and shrubs at the walls: visual only)
 	UE_LOG(LogTemp, Log, TEXT("JEEBOAK built ground %.0f ms, buildings %.0f ms, hash=%08x"), (T1 - T0) * 1000.0, (FPlatformTime::Seconds() - T1) * 1000.0, Hash);
 	LogChecks();
@@ -228,128 +227,8 @@ void AOakHillTown::BuildBuildings()
 	UE_LOG(LogTemp, Log, TEXT("JEEBOAK %d buildings placed, %d models missing"), Placed, Missing);
 }
 
-// The plaza's big oak (2026-11-13, owner: "Here's an oak tree for the middle of oak hill. See if you can color it autumn colors"):
-// Meshy's library "Tree" by Tansy, cleaned and repainted in autumn by Tools/plaza_oak_clean.py (built at its real size, 16.6 m tall,
-// its crown about 9.2 m in radius over the 8.4 m lawn, its roots cut 5 m out), /Game/Trees/SM_PlazaOak. Drawn on clients (Nanite, its crown swaying gently
-// in M_PlazaOak; the sway stops beyond PlazaOakSwayCm); the trunk's capsule blocks on every machine, the server too.
-static constexpr float PlazaOakYaw = 35.f;            // (fixed: the same on every machine)
-static constexpr float PlazaOakTrunkR = 110.f, PlazaOakTrunkHalfH = 150.f;   // (the trunk measured 1.45 m in radius at 1 m with its root flare, 0.9 m at 2 m)
-static constexpr float PlazaOakSwayCm = 6000.f;
-static constexpr float PlazaOakFill = 12000.f, PlazaOakFillUp = 650.f, PlazaOakFillCone = 54.f;   // (the fill light under the crown: tan 54 x 6.5 m = 8.9 m on the lawn)
-UStaticMesh* AOakHillTown::LoadPlazaOak()
-{
-	// (-NoPlazaOak, test pictures only: the woods' own oak stands in, to measure what the Meshy oak costs)
-	UStaticMesh* Mesh = JeebOakHill::TestOff(TEXT("NoPlazaOak")) ? nullptr : LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOak.SM_PlazaOak"));
-	return Mesh;
-}
-
-void AOakHillTown::BuildPlazaOak()
-{
-	using namespace JeebOakHill;
-	if (TestOff(TEXT("NoOakTrees"))) return;
-	UStaticMesh* Mesh = LoadPlazaOak();
-	if (!Mesh) { UE_LOG(LogTemp, Warning, TEXT("JEEBOAK missing /Game/Trees/SM_PlazaOak (run Tools/BuildPlazaOak.ps1): the woods' oak stands in")); return; }
-	const FVector2D C = FromPx(255.f, 410.f);
-	const FVector At(C.X, C.Y, JeebTerrain::HeightAt(C.X, C.Y));
-	if (!IsNetMode(NM_DedicatedServer) && !TestOff(TEXT("NoOakMeshes")))
-	{
-		UStaticMeshComponent* M = NewObject<UStaticMeshComponent>(this);
-		M->SetStaticMesh(Mesh);
-		M->SetupAttachment(GetRootComponent());
-		M->SetWorldLocationAndRotation(At, FRotator(0.f, PlazaOakYaw, 0.f));
-		M->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		M->SetMobility(EComponentMobility::Static);
-		M->SetWorldPositionOffsetDisableDistance(FMath::RoundToInt(PlazaOakSwayCm));   // (world units, cm)
-		// Its shadow (visual review 2026-11-13: the dense crown cast one near-black disc): SM_PlazaOakShadow, a 60k cut-down copy
-		// with gaps cut in the leaves, hidden but drawn into the shadows, so the shade under the oak is dappled; the tree casts none.
-		UStaticMesh* ShadowMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Trees/SM_PlazaOakShadow.SM_PlazaOakShadow"));
-		if (ShadowMesh)
-		{
-			M->SetCastShadow(false);
-			UStaticMeshComponent* S = NewObject<UStaticMeshComponent>(this);
-			S->SetStaticMesh(ShadowMesh);
-			S->SetupAttachment(GetRootComponent());
-			S->SetWorldLocationAndRotation(At, FRotator(0.f, PlazaOakYaw, 0.f));
-			S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			S->SetMobility(EComponentMobility::Static);
-			S->SetHiddenInGame(true);
-			S->SetCastShadow(true);
-			S->bCastHiddenShadow = true;
-			S->SetWorldPositionOffsetDisableDistance(FMath::RoundToInt(PlazaOakSwayCm));
-			S->RegisterComponent();
-		}
-		M->RegisterComponent();
-		// The light the leaves let through (visual review 2026-11-13: under the dense crown the lawn and the trunk went near-black):
-		// one soft amber spot from inside the crown down onto the lawn, no shadows, reaching about the crown's edge only, so the
-		// shop fronts beyond it keep their own light. -OakFill=<intensity> overrides it in test pictures.
-		float Fill = PlazaOakFill;
-		FParse::Value(FCommandLine::Get(), TEXT("OakFill="), Fill);
-		if (Fill > 0.f)
-		{
-			USpotLightComponent* L = NewObject<USpotLightComponent>(this);
-			L->SetupAttachment(GetRootComponent());
-			L->SetWorldLocationAndRotation(At + FVector(0.f, 0.f, PlazaOakFillUp), FRotator(-90.f, 0.f, 0.f));
-			L->SetMobility(EComponentMobility::Movable);
-			L->SetIntensity(Fill);
-			L->SetLightColor(FLinearColor(1.0f, 0.70f, 0.40f));
-			L->SetAttenuationRadius(PlazaOakFillUp * 1.9f);
-			L->SetInnerConeAngle(30.f);
-			L->SetOuterConeAngle(PlazaOakFillCone);
-			L->SetCastShadows(false);
-			L->RegisterComponent();
-		}
-	}
-	UCapsuleComponent* Trunk = NewObject<UCapsuleComponent>(this);
-	Trunk->SetupAttachment(GetRootComponent());
-	Trunk->SetCapsuleSize(PlazaOakTrunkR, PlazaOakTrunkHalfH);
-	Trunk->SetWorldLocation(At + FVector(0.f, 0.f, PlazaOakTrunkHalfH - 50.f));
-	Trunk->SetCollisionProfileName(TEXT("BlockAll"));
-	Trunk->SetMobility(EComponentMobility::Static);
-	Trunk->SetCanEverAffectNavigation(false);
-	Trunk->RegisterComponent();
-	HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, PlazaOakTrunkR);
-	const FBox B = Mesh->GetBoundingBox();
-	UE_LOG(LogTemp, Log, TEXT("JEEBOAK plaza oak at %.0f %.0f %.0f, %.0f x %.0f x %.0f cm, trunk capsule r %.0f"), At.X, At.Y, At.Z, B.GetSize().X, B.GetSize().Y, B.GetSize().Z, PlazaOakTrunkR);
-}
-
-void AOakHillTown::PlantTrees(AForest* Forest)
-{
-	using namespace JeebOakHill;
-	if (!Forest || !Enabled() || TestOff(TEXT("NoOakTrees"))) return;
-	FRandomStream R(5150);   // fixed: the same trees on every machine
-	// The big oak in the middle of the plaza's lawn: the Meshy oak (BuildPlazaOak) when it is there, else the woods' own oak
-	if (!LoadPlazaOak())
-	{
-		const FVector2D C = FromPx(255.f, 410.f);
-		const float S = 1.9f;
-		Forest->AddTree(ETreeKind::Oak, FVector(C.X, C.Y, JeebTerrain::HeightAt(C.X, C.Y) - 20.f * S), S, R);
-	}
-	// Trees in the gaps between the plots (few in the middle of town, more toward its edges), never on a road, a plot, the lawn
-	// or a river bank, and at least 7 m apart
-	TArray<FVector2D> Got;
-	int32 Tries = 0;
-	while (Got.Num() < 150 && Tries < 4000)
-	{
-		++Tries;
-		const float E = R.FRandRange(-50.f, 84.f), N = R.FRandRange(-110.f, 116.f);
-		const float Roll = R.FRand(), Kind = R.FRand(), S = R.FRandRange(0.85f, 1.2f);
-		const float FromPlaza = FVector2D(E, N).Size();
-		const float Want = FMath::Lerp(0.12f, 0.7f, JeebWorld::Smooth(32.f, 66.f, FromPlaza));
-		if (Roll > Want) continue;
-		const float X = PosX + N * 100.f, Y = PosY + E * 100.f;
-		if (JeebWorld::NearRiver(X, Y, 600.f)) continue;
-		if (JeebTerrain::PathClearance(X, Y) < 450.f) continue;
-		bool bClear = true;
-		for (const FPlot& P : Plots()) if (PlotSD(P, E, N) < (P.Kind == EPlot::Building ? 6.f : 3.f)) { bClear = false; break; }
-		if (!bClear) continue;
-		for (const FVector2D& G : Got) if (FVector2D::DistSquared(G, FVector2D(X, Y)) < 700.f * 700.f) { bClear = false; break; }
-		if (!bClear) continue;
-		Got.Add(FVector2D(X, Y));
-		const ETreeKind K = (FromPlaza > 50.f && Kind < 0.25f) ? ETreeKind::Pine : ETreeKind::Oak;
-		Forest->AddTree(K, FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 20.f * S), S, R);
-	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBOAK trees %d (+ the plaza oak)"), Got.Num());
-}
+// (The plaza's big Meshy oak was deleted 2026-11-16, owner: "it looks awful too. I don't want it in the game. Full delete"; the town's trees are
+// the pack trees of AOakForest, OakForest.cpp.)
 
 // Measured once per world build, so a wrong number shows in the log before any picture: heights at the named spots against
 // the plan, each road's steepest grade, and the steepest ground away from the river banks.
@@ -367,7 +246,7 @@ void AOakHillTown::LogChecks()
 	}
 	// The shop counters (E there opens the shop's window)
 	for (const FCounter& C : Counters())
-		UE_LOG(LogTemp, Log, TEXT("JEEBOAK counter %s (%s) at %.0f %.0f %.0f, facing %.0f, %.1f m from the oak"), C.Name, C.Shop == EShop::Smith ? TEXT("smithy") : C.Shop == EShop::Bank ? TEXT("bank") : TEXT("store"),
+		UE_LOG(LogTemp, Log, TEXT("JEEBOAK counter %s (%s) at %.0f %.0f %.0f, facing %.0f, %.1f m from the plaza's middle"), C.Name, C.Shop == EShop::Smith ? TEXT("smithy") : C.Shop == EShop::Bank ? TEXT("bank") : TEXT("store"),
 			C.At.X, C.At.Y, JeebTerrain::HeightAt(C.At.X, C.At.Y), C.Facing, FVector2D::Distance(C.At, FVector2D(PosX, PosY)) / 100.f);
 	for (int32 r = 0; r < Roads().Num(); ++r)
 	{

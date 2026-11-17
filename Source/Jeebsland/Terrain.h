@@ -5,6 +5,9 @@
 #include "OakHill.h"
 #include "TownLab.h"
 
+// The forest's roads round Oak Hill (OakForest.cpp), made paths below
+namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
+
 // Shared description of the land, so the ground mesh, trees, rocks, huts, paths and walls all agree.
 namespace JeebTerrain
 {
@@ -280,6 +283,27 @@ namespace JeebTerrain
 		const float D = HeightAt(X0 + GroundStep, Y0 + GroundStep);
 		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);                 // triangle B, C, D
 	}
+	// The world's 8 m ground mesh as drawn outside the square and Oak Hill (AWorldTerrain::BuildLand: each cell split along its B-C
+	// diagonal, as above)
+	inline float WorldMeshHeight(float X, float Y)
+	{
+		const float S = JeebWorld::WorldStep;
+		const float GX = (X - JeebWorld::MinX) / S, GY = (Y - JeebWorld::MinY) / S;
+		const float I = FMath::FloorToFloat(GX), J = FMath::FloorToFloat(GY);
+		const float Fx = GX - I, Fy = GY - J;
+		const float X0 = JeebWorld::MinX + I * S, Y0 = JeebWorld::MinY + J * S;
+		const float A = HeightAt(X0, Y0), B = HeightAt(X0 + S, Y0), C = HeightAt(X0, Y0 + S);
+		if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;
+		const float D = HeightAt(X0 + S, Y0 + S);
+		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
+	}
+	// The ground as drawn anywhere: Oak Hill's own 1 m ground (HeightAt), the original square's 2 m mesh, else the world's 8 m mesh
+	inline float DrawnHeight(float X, float Y)
+	{
+		if (JeebOakHill::Enabled() && JeebOakHill::InBox(X, Y)) return HeightAt(X, Y);
+		if (FMath::Max(FMath::Abs(X), FMath::Abs(Y)) < GroundHalf) return GroundMeshHeight(X, Y);
+		return WorldMeshHeight(X, Y);
+	}
 
 	// 0..1 map of where the woods are. Low values are open valleys and meadows.
 	inline float WoodsDensity(float X, float Y)
@@ -308,6 +332,7 @@ namespace JeebTerrain
 		// Where it lies and its widest half: a point further than this from the box can skip the road (2026-11-11, PathClearance)
 		FBox2D Bounds = FBox2D(ForceInit);
 		float MaxHalf = 0.f;
+		uint8 Kind = 0;   // 0 Blackrock's packed earth, 1 Oak Hill's cobbled streets, 2 the forest's dirt roads round Oak Hill (OakForest.h)
 	};
 
 	// Fills HalfL / HalfR from the distance along the road (Seed makes each road different)
@@ -360,6 +385,13 @@ namespace JeebTerrain
 		return Out;
 	}
 
+	inline const TArray<FPathDef>& PathDefs();
+	// Near any of the forest's roads (a box test: the fill marks roads only where it asks for them)
+	inline bool ForestRoadNear(const FBox2D& Box)
+	{
+		for (const FPathDef& P : PathDefs()) if (P.Kind == 2 && P.Bounds.ExpandBy(P.MaxHalf + 100.f).Intersect(Box)) return true;
+		return false;
+	}
 	inline const TArray<FPathDef>& PathDefs()
 	{
 		static const TArray<FPathDef> Defs = []()
@@ -411,8 +443,26 @@ namespace JeebTerrain
 				P.Pts = R.Pts;
 				P.Width = JeebOakHill::RoadWidth;
 				P.bClosed = R.bClosed;
+				P.Kind = 1;
 				ShapeRoadEdges(P, D.Num());
 				D.Add(P);
+			}
+			// The forest's dirt roads out of Oak Hill (2026-11-16, OakForest.cpp; always last): each shaped whole, then cut into pieces of
+			// about 100 m so PathClearance's quick box test still skips the far ones
+			for (const TArray<FVector2D>& Line : JeebOakForest::RoadLines())
+			{
+				FPathDef Whole;
+				Whole.Pts = Line;
+				Whole.Width = 300.f;
+				ShapeRoadEdges(Whole, D.Num());
+				for (int32 s = 0; s + 1 < Line.Num(); s += 160)
+				{
+					FPathDef P;
+					P.Width = 300.f;
+					P.Kind = 2;
+					for (int32 i = s; i <= FMath::Min(s + 160, Line.Num() - 1); ++i) { P.Pts.Add(Whole.Pts[i]); P.HalfL.Add(Whole.HalfL[i]); P.HalfR.Add(Whole.HalfR[i]); }
+					D.Add(P);
+				}
 			}
 			for (FPathDef& P : D)
 			{

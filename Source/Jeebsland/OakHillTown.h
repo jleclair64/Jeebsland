@@ -19,8 +19,6 @@ class AOakHillTown : public AActor
 
 public:
 	AOakHillTown();
-	// The big oak on the plaza and trees round the town, through the woods' own tree maker (the same on every machine)
-	static void PlantTrees(AForest* Forest);
 
 protected:
 	virtual void BeginPlay() override;
@@ -30,8 +28,6 @@ private:
 	uint32 Hash = 2166136261u;   // checksum of everything solid (logged as JEEBOAK hash, to compare machines)
 	void BuildGround();
 	void BuildBuildings();
-	void BuildPlazaOak();   // the plaza's big Meshy oak and its trunk's capsule
-	static class UStaticMesh* LoadPlazaOak();
 	TArray<JeebDecor::FFootprint> Foundations;   // each building's walls and door, for the stones and shrubs at its foundation (GroundDecor.h)
 	void LogChecks();
 };
