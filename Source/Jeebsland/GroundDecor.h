@@ -4,10 +4,8 @@
 
 class AActor;
 
-// Grounding the buildings (2026-11-12, owner: buildings must not look pasted on): a few small pieces at each building's foundation,
-// separate from the building models (owner rule: a model is only the shell): loose rounded stones in the painted rock (M_Stone),
-// small leafy shrubs (M_Bush) and a few flowers, in little clusters along the walls, never on the door side, on a road or in the
-// gap to a neighbour. Visual only: no collision, nothing on a dedicated server, the same on every machine (seeded).
+// Grounding the buildings (2026-11-12): the buildings' footprints (walls and door), gathered for their foundations. The stones,
+// shrubs and flowers once placed here were removed (owner, 2026-11-16): DressFoundations places nothing now (GroundDecor.cpp).
 // The worn ground round foundations and doorways is the ground's own (GroundMask.h).
 namespace JeebDecor
 {

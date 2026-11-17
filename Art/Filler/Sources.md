@@ -53,7 +53,7 @@ Every original here came from Meshy's free community library (CC0, Meshy terms s
 | HedgeBox_idan.shmueli.sk.glb | idan.shmueli.sk | https://www.meshy.ai/posts/019fcccc-6869-743f-9eaf-7044aaed2f3a | CC0 |
 | BushTrunk_Tansy.glb | Tansy | https://www.meshy.ai/posts/0197a6f7-0a29-77fc-89d4-cc18a786c439 | CC0 |
 | BushWhiteFlowers_axx.s.glb | axx.s | https://www.meshy.ai/posts/01965f0c-7542-7ee0-a9eb-09ec68cbefa4 | CC0 |
-| BushYellowFlowers_TooPH.glb | TooPH | https://www.meshy.ai/posts/01978790-dfb6-709b-a1b2-ff8748860218 | CC0 |
+| BushYellowFlowers_TooPH.glb | TooPH | https://www.meshy.ai/posts/01978790-dfb6-709b-a1b2-ff8748860218 | CC0 (deleted from the game 2026-11-16) |
 | Cypress_dra86.glb | dra86 | https://www.meshy.ai/posts/019a98ca-a0ea-74c8-95a0-b339f0897d24 | CC0 |
 | BenchPark_pokemonpikaaaa.glb | pokemonpikaaaa | https://www.meshy.ai/posts/019a9371-f4e1-7bfd-aa49-7339d5c0e183 | CC0 |
 | BenchArms_EvanieStarchild.glb | EvanieStarchild | https://www.meshy.ai/posts/01971b05-ef73-7e8a-b020-2d3df73f9c2a | CC0 |
@@ -118,7 +118,7 @@ Found but not downloadable (no Download button on these older posts): Workbench 
 | BoulderScan_bk2sanity.glb | bk2sanity | https://www.meshy.ai/posts/019b2152-0d63-7432-8b03-d823824470cf | CC0 |
 | RockTall_axx.s.glb | axx.s | https://www.meshy.ai/posts/01a1a874-9172-75ba-b6a5-94bcb4c13b4d | CC0 |
 | RockCluster_somany.glb | somany | https://www.meshy.ai/posts/019f6f03-eb10-7aa1-9d55-226de327c78d | CC0 |
-| RockPale_Zahra.glb | Zahra | https://www.meshy.ai/posts/019a531c-429d-7e93-a3e3-b1655eed83ea | CC0 |
+| RockPale_Zahra.glb | Zahra | https://www.meshy.ai/posts/019a531c-429d-7e93-a3e3-b1655eed83ea | CC0 (deleted from the game 2026-11-16) |
 | RocksForest_ethanjones333.glb | ethanjones333 | https://www.meshy.ai/posts/mossy-forest-rocks-01a1c048-d933-7683-b0f6-2838fad2df6f | CC0 |
 | BushLeafy_Tansy.glb | Tansy | https://www.meshy.ai/posts/0197a654-2b3f-7438-b896-55396929acca | CC0 |
 | BushSpiky_rennan.alecrim.glb | rennan.alecrim | https://www.meshy.ai/posts/019a8746-3728-793b-acba-8a93de5bcd77 | CC0 |

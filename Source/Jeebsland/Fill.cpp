@@ -215,6 +215,17 @@ void JeebFill::LoadData(FData& D)
 				S.Pieces.Add(P);
 				S.Reach = FMath::Max(S.Reach, float(FVector2D(P.Pos.X, P.Pos.Y).Size()) + 150.f);
 			}
+			// (the wall-backed sets are named in the comment above their rows: "# BarrelRow (wall-backed): ...")
+			TArray<FString> Lines;
+			if (FFileHelper::LoadFileToStringArray(Lines, *Path(TEXT("FillSets.csv"))))
+				for (const FString& L : Lines)
+				{
+					if (!L.StartsWith(TEXT("# ")) || !L.Contains(TEXT("(wall-backed"))) continue;
+					FString Name = L.Mid(2);
+					int32 Sp = INDEX_NONE;
+					if (Name.FindChar(TEXT(' '), Sp)) Name.LeftInline(Sp);
+					if (FSet* S = D.Sets.Find(Name)) S->bWall = true;
+				}
 		}
 	}
 	// ---- Oak Hill's hand-placed sets
@@ -676,6 +687,7 @@ struct FFillBuilder
 		FTransform Xf;
 		FShape Foot;
 		bool bGround = true, bSolid = false, bWalkBlock = false;
+		bool bSnug = false;   // (pulled onto a building's real wall face: checked against the wall's own collision, not the 50 cm grid)
 		int32 Zone = 0;
 		FString Set;
 		int32 Group = -1;   // (a hand-placed row: its pieces may join end to end, so they are never checked against each other)
@@ -922,7 +934,7 @@ struct FFillBuilder
 			LaneToRoad(Ct.At, 75.f, FString::Printf(TEXT("counter %s"), Ct.Name));
 			Target(FString::Printf(TEXT("counter %s"), Ct.Name), Ct.At, 0);
 		}
-		Keep(FShape::Circle(FromPx(255.f, 410.f), 500.f), TEXT("plaza oak roots"));
+		// (the plaza oak is gone, 2026-11-16: its spot is a low flower bed, a FillOakHill row, so no roots keep)
 		Keep(FShape::Circle(FVector2D(SpawnX, SpawnY), 500.f), TEXT("Oak Hill spawn"));
 		// the rebuilt buildings' own decor (TownLabDecor.h: stones, weeds, props at their feet): visual, walkable, not to be covered
 		int32 Pi = -1;
@@ -1126,7 +1138,7 @@ struct FFillBuilder
 		switch (W) { case EWhy::Road: return TEXT("road"); case EWhy::Water: return TEXT("water"); case EWhy::Build: return TEXT("building"); case EWhy::Keep: return TEXT("keepclear");
 		case EWhy::Game: return TEXT("solid"); case EWhy::Tree: return TEXT("treespot"); case EWhy::Prop: return TEXT("prop"); case EWhy::Slope: return TEXT("slope"); case EWhy::Missing: return TEXT("missing"); case EWhy::Plot: return TEXT("outsideplot"); case EWhy::Goods: return TEXT("goods"); default: return TEXT("ok"); }
 	}
-	struct FTry { const FKind* Kind; FTransform Xf; FShape Foot; bool bGround, bSolid, bWalkBlock, bDrop; };
+	struct FTry { const FKind* Kind; FTransform Xf; FShape Foot; bool bGround, bSolid, bWalkBlock, bDrop; bool bSnug = false; };
 
 	// A solid piece's collision footprint in plan (the box BuildComponents gives it): its footprint box, or for round and capsule kinds
 	// a square 85% of its width, here the circle inside that square
@@ -1146,14 +1158,135 @@ struct FFillBuilder
 		if (K.Shape == EShape::Circle) return FShape::Circle(Mid, 0.5f * K.FootX * Scale);
 		return FShape::Box(Mid, FVector2D(K.FootX, K.FootY) * 0.5f * Scale, Yaw);
 	}
+	// Does a footprint reach into a building's walls (OakHill.h's wall boxes, 2 cm of slack)? (the wall-backed sets pulled onto
+	// the wall: checked against the walls themselves, not the grid's 25 cm building cells)
+	bool BodyHits(const FShape& F, float /*Z*/) const
+	{
+		if (!OakOn() || F.Type == 2) return false;
+		const FBox2D B = F.Bounds();
+		for (const JeebOakHill::FWallBox& Wb : JeebOakHill::WallBoxes())
+		{
+			if (!Wb.bWalls) continue;
+			FShape Bx = FShape::Box(Wb.Mid, Wb.Half - FVector2D(2.f, 2.f), 0.f); Bx.Cs = Wb.Cs; Bx.Sn = Wb.Sn;
+			if (!Bx.Bounds().Intersect(B)) continue;
+			if (Touch(F, Bx, 0.f)) return true;
+		}
+		return false;
+	}
+	// A wall-backed set (FSet::bWall) is pulled back until its back is a few cm off the real wall face behind it: the building's own
+	// collision, traced at three spots along the set and two heights (a hung set: across its hung pieces), the nearest face wins. Up to
+	// 1.5 m back, or out if it already reaches into the wall; nothing behind (a fence, open ground): it stays. (Owner 2026-11-16: "move
+	// the barrels closer to the building's wall"; the banners flat on the wall.) Every machine has the same buildings when the fill runs.
+	bool bSnugOk = true;   // (false while a plot dresses its fences and rows: never pulled through a fence onto the house behind it)
+	int32 SnugCount = 0, SnugMiss = 0, SnugTrace = 0, SnugBox = 0, SnugCells = 0;   // (lines that found the wall by the scene, the wall box, the grid)
+	bool Snug(const FSet& S, FVector2D& At, float Yaw)
+	{
+		if (!S.bWall || !bSnugOk) return false;
+		const float Rad = FMath::DegreesToRadians(Yaw);
+		const FVector2D Fwd(-FMath::Sin(Rad), FMath::Cos(Rad)), Side(FMath::Cos(Rad), FMath::Sin(Rad));
+		float Back = -1.0e9f, Wid = 0.f;
+		bool bHung = false;
+		TArray<float> Hs;
+		for (const FPiece& P : S.Pieces)
+		{
+			const FKind* K = KindOf(P.Kind);
+			if (!K || P.bStack) continue;
+			const bool bH = P.bHang || K->bHang;
+			const float Py = FMath::DegreesToRadians(P.Yaw);
+			const float ExtY = 0.5f * P.Scale * (FMath::Abs(FMath::Sin(Py)) * K->FootX + FMath::Abs(FMath::Cos(Py)) * K->FootY);
+			Back = FMath::Max(Back, -P.Pos.Y + ExtY);
+			Wid = FMath::Max(Wid, FMath::Abs(P.Pos.X));
+			if (bH) { bHung = true; Hs.Add(P.Pos.Z - 40.f); Hs.Add(P.Pos.Z - 120.f); }
+		}
+		if (Back < -1.0e8f) return false;
+		if (!bHung) { Hs.Add(30.f); Hs.Add(75.f); }
+		const float G = JeebTerrain::HeightAt(At.X, At.Y);
+		const float Lat = FMath::Min(Wid * 0.8f, 120.f);
+		const float Far = bHung ? 250.f : 150.f;   // (how far back a wall is looked for: a hung banner may have been set out past a porch or steps)
+		const float Reach = Back + Far;
+		float Gap = 1.0e9f;
+		int32 Hits = 0, Misses = 0;   // (traces that met a wall body, and bodies near that the trace missed)
+		const float Lats[3] = { -Lat, 0.f, Lat };
+		for (const float L : Lats)
+		{
+			if (Lat < 1.f && L != 0.f) continue;
+			for (const float H : Hs)
+			{
+				const FVector2D P0 = At + Side * L + Fwd * 40.f, P1 = At + Side * L - Fwd * Reach;
+				const FVector A3(P0.X, P0.Y, G + H), B3(P1.X, P1.Y, G + H);
+				// where the wall is behind this line, cm from P0: the scene's own collision when it answers (a big static mesh: a building),
+				// else the building's wall box from OakHill.h (its walls' real extents; 8 cm allowed for the plinth), unless the grid's
+				// building cells (porches, footprints) start well before it. (Body traces and overlaps on the instanced buildings return
+				// nothing at fill time.)
+				float WallD = -1.f;
+				{
+					FHitResult Hit;
+					FCollisionQueryParams Qp(SCENE_QUERY_STAT(JeebFillSnug), true, Owner);
+					if (World && World->LineTraceSingleByObjectType(Hit, A3, B3, FCollisionObjectQueryParams(ECC_WorldStatic), Qp) && !Hit.bStartPenetrating
+						&& Hit.GetComponent() && Hit.GetComponent()->Bounds.BoxExtent.Size2D() > 300.f && FMath::Abs(Hit.ImpactNormal.Z) < 0.5f)   // (a wall, not rising ground)
+					{ WallD = Hit.Distance; ++SnugTrace; }
+				}
+				if (WallD < 0.f && OakOn())
+				{
+					const FVector2D Dir = -Fwd;
+					const float Len = 40.f + Reach;
+					float DBox = -1.f;
+					for (const JeebOakHill::FWallBox& Wb : JeebOakHill::WallBoxes())
+					{
+						if (!Wb.bWalls) continue;
+						FShape Bx = FShape::Box(Wb.Mid, Wb.Half, 0.f); Bx.Cs = Wb.Cs; Bx.Sn = Wb.Sn;
+						const FVector2D O = Bx.Local(P0), V = Bx.Local(P0 + Dir) - O;
+						float T0 = 0.f, T1 = Len;
+						bool bOk = true;
+						for (int32 a = 0; a < 2 && bOk; ++a)
+						{
+							const float o = a ? O.Y : O.X, v = a ? V.Y : V.X, h = a ? Bx.H.Y : Bx.H.X;
+							if (FMath::Abs(v) < 1.0e-6f) { if (FMath::Abs(o) > h) bOk = false; continue; }
+							float Ta = (-h - o) / v, Tb = (h - o) / v;
+							if (Ta > Tb) Swap(Ta, Tb);
+							T0 = FMath::Max(T0, Ta); T1 = FMath::Min(T1, Tb);
+							if (T0 > T1) bOk = false;
+						}
+						if (bOk && T0 > 0.f && (DBox < 0.f || T0 < DBox)) DBox = T0;
+					}
+					float DGrid = -1.f;
+					for (float T = 0.f; T <= Len; T += 5.f)
+					{
+						const FVector2D Q = P0 + Dir * T;
+						if (Grid.At(FGrid::G(Q.X), FGrid::G(Q.Y)) & F_BUILD) { DGrid = T; break; }
+					}
+					if (DBox > 0.f && (DGrid < 0.f || DGrid > DBox - 35.f)) { WallD = DBox - 8.f; ++SnugBox; }
+					else if (DGrid > 0.f) { WallD = DGrid - 5.f; ++SnugCells; }
+				}
+				if (WallD >= 0.f) { ++Hits; Gap = FMath::Min(Gap, WallD - 40.f - Back); }
+				else ++Misses;
+			}
+		}
+		if (Gap > Far || Gap < -30.f)
+		{
+			if (SnugMiss++ < 8) UE_LOG(LogTemp, Log, TEXT("JEEBFILL SNUG %s at %.0f %.0f: stays (gap %.0f cm, traces that met a wall %d, missed %d)"), *S.Name, At.X, At.Y, Gap > 1.0e8f ? -1.f : Gap, Hits, Misses);
+			return false;
+		}
+		const float Want = bHung ? 1.f : 3.f;   // (the back this far off the face)
+		At -= Fwd * (Gap - Want);
+		++SnugCount;
+		return true;
+	}
 	// bHand (FillOakHill rows, laid out and checked by hand): 5 cm from buildings, not 30 (doorstep sets stand 6 cm off the door wall),
 	// and a row's own pieces are not tested against each other (fence, wall and hedge runs join end to end)
 	EWhy Fits(const FTry& T, const TArray<FTry>& Pending, bool bHand)
 	{
 		const bool bPost = T.Kind->Height > 150.f && FMath::Max(T.Kind->FootX, T.Kind->FootY) < 60.f;
 		if (Grid.Hits(T.Foot, bPost ? 20.f : 40.f, F_ROAD)) return EWhy::Road;
-		const uint16 Mask = bHand ? uint16(NoProp & ~F_BUILD) : NoProp;
-		if (bHand && Grid.Hits(T.Foot, 5.f, F_BUILD)) return EWhy::Build;
+		uint16 Mask = bHand ? uint16(NoProp & ~F_BUILD) : NoProp;
+		if (T.bSnug)
+		{
+			// (a wall-backed set pulled onto the wall: the wall's own collision decides, and the low decor keeps get 5 cm, not 30)
+			Mask &= ~uint16(F_BUILD | F_SOFT | F_GAME);
+			if (BodyHits(T.Foot, T.Xf.GetLocation().Z)) return EWhy::Build;
+			if (Grid.Hits(T.Foot, 5.f, F_SOFT | F_GAME)) return EWhy::Game;   // (a building's own steps, posts and downpipes are small solids: 5 cm from them too)
+		}
+		else if (bHand && Grid.Hits(T.Foot, 5.f, F_BUILD)) return EWhy::Build;
 		if (Grid.Hits(T.Foot, 30.f, Mask))
 		{
 			// (which kind of blocker, for the logs)
@@ -1200,7 +1333,9 @@ struct FFillBuilder
 			S = &Single;
 		}
 		FRandomStream V(int32(Seed & 0x7fffffff));
-		const FShape Fr = FShape::Box(At, FVector2D(1.f, 1.f), Yaw);
+		FVector2D At2 = At;
+		const bool bSnug = Snug(*S, At2, Yaw);
+		const FShape Fr = FShape::Box(At2, FVector2D(1.f, 1.f), Yaw);
 		TArray<FTry> Tries;
 		for (const FPiece& P : S->Pieces)
 		{
@@ -1220,11 +1355,35 @@ struct FFillBuilder
 			T.bSolid = K->Col != ECol::None && !P.bHang && !K->bHang;
 			T.bWalkBlock = T.bSolid && T.bGround && K->Height * P.Scale > 45.f;
 			T.bDrop = P.bDrop;
+			T.bSnug = bSnug;
 			T.Foot = FootOf(*K, Pw, PYaw, P.Scale);
 			float Slope = 0.f;
 			const float Gz = GroundUnder(T.Foot, Slope);
 			const float Sink = K->Height * P.Scale < 60.f ? 2.f : 0.f;
 			T.Xf = FTransform(FRotator(0.f, PYaw, 0.f), FVector(Pw.X, Pw.Y, Gz - Sink + P.Pos.Z), FVector(P.Scale));
+			// (a lantern never stands on the ground (owner 2026-11-16): on a barrel, crate or post, or hung; and a stacked piece only
+			// where the piece it stands on was placed: its crate dropped or refused, it is left out too, never left floating)
+			if (T.bGround && K->bLight && K->Name.StartsWith(TEXT("Lantern")))
+			{
+				St.Skipped.FindOrAdd(TEXT("lantern on ground"))++;
+				continue;
+			}
+			if (P.bStack)
+			{
+				const FVector Pz = T.Xf.GetLocation();
+				const bool bOn = Tries.ContainsByPredicate([&](const FTry& B)
+				{
+					if (!B.bGround || !B.Foot.Contains(FVector2D(Pz.X, Pz.Y), 5.f)) return false;
+					const float Top = B.Xf.GetLocation().Z + B.Kind->Height * B.Xf.GetScale3D().Z;
+					return FMath::Abs(Top - Pz.Z) < 35.f;
+				});
+				if (!bOn)
+				{
+					St.Skipped.FindOrAdd(TEXT("nobase"))++;
+					if (OutWhy) *OutWhy += FString::Printf(TEXT("%s%s: nobase"), OutWhy->IsEmpty() ? TEXT("") : TEXT(", "), *KName);
+					continue;
+				}
+			}
 			if (T.bGround)
 			{
 				EWhy W = Slope > K->Slope ? EWhy::Slope : Fits(T, Tries, !bAll);
@@ -1248,7 +1407,7 @@ struct FFillBuilder
 	int32 NextGroup = 0;
 	void Commit(const FTry& T, int32 Zone, const FString& SetName, FStats& St, int32 Group)
 	{
-		const int32 Pi = Placed.Add({ T.Kind, T.Xf, T.Foot, T.bGround, T.bSolid, T.bWalkBlock, Zone, SetName, Group, CurUse });
+		const int32 Pi = Placed.Add({ T.Kind, T.Xf, T.Foot, T.bGround, T.bSolid, T.bWalkBlock, T.bSnug, Zone, SetName, Group, CurUse });
 		if (T.bGround)
 		{
 			Grid.Mark(T.Foot, F_PROP | (T.bWalkBlock ? F_PSOLID : 0));
@@ -1888,11 +2047,14 @@ struct FFillBuilder
 				const FVector2D G1 = Pl.Gate - Dir * (Pl.GateW * 0.5f + GPost->FootX * 0.5f), G2 = Pl.Gate + Dir * (Pl.GateW * 0.5f + GPost->FootX * 0.5f);
 				const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
 				Tries.Add(PostAt(*GPost, G1, Yaw)); Tries.Add(PostAt(*GPost, G2, Yaw)); Pl.Posts += 2;
+				// (a fence's gate posts stand 30% taller than its other posts, so the opening reads as a gate)
+				if (GPost == Post && Panel->Name.StartsWith(TEXT("Fence")))
+					for (int32 k = Tries.Num() - 2; k < Tries.Num(); ++k) Tries[k].Xf.SetScale3D(FVector(1.f, 1.f, 1.3f));
 				if (Panel->Height < 1.5f * 100.f && Panel->Name.StartsWith(TEXT("Fence")))
 				{
 					// the gate itself: a panel cut to the opening, hung on the first post and swung open into the plot
 					const FVector2D In = -Pl.GateOut;
-					const float W = Pl.GateW - 8.f, Ang = FMath::DegreesToRadians(100.f);
+					const float W = Pl.GateW - 8.f, Ang = FMath::DegreesToRadians(140.f);   // (swung well back against the fence inside: 100 read as a stub of fence)
 					const FVector2D Dl = Dir * FMath::Cos(Ang) + In * FMath::Sin(Ang);
 					const FVector2D H = G1 + Dir * (GPost->FootX * 0.5f + 4.f), C = H + Dl * (W * 0.5f);
 					FTry T;
@@ -2049,7 +2211,10 @@ struct FFillBuilder
 					const float Yaw = U.Anchor == EAnchor::Open && Pl.GateEdge >= 0 ? YawOf((Pl.Gate - Pts[k]).GetSafeNormal()) : RowYaw;
 					// (an open set, a farmstead or a hayfield, is laid out like a hand row: each piece that fits is placed)
 					FString W;
-					if (PlaceSet(U.Set, Pts[k], Yaw, VarSeed + uint32(k), true, U.Anchor != EAnchor::Open, Pl.Zone, St, &W) > 0) { ++Got; ++Sets; }
+					bSnugOk = false;
+					const int32 Got1 = PlaceSet(U.Set, Pts[k], Yaw, VarSeed + uint32(k), true, U.Anchor != EAnchor::Open, Pl.Zone, St, &W);
+					bSnugOk = true;
+					if (Got1 > 0) { ++Got; ++Sets; }
 					else Whys.FindOrAdd(W)++;
 				}
 				if (Pts.Num() == 0) Whys.FindOrAdd(TEXT("no lattice spot"))++;
@@ -2069,7 +2234,10 @@ struct FFillBuilder
 						const float Off = A.Type == uint8(EAnchor::Wall) || A.Type == uint8(EAnchor::Front) ? 50.f + Back : PanelHalf + 14.f + Back;
 					ClipPoly = A.Type == uint8(EAnchor::Front) || A.Type == uint8(EAnchor::Outside) ? nullptr : &Pl.Poly;
 						FString W;
-						if (PlaceSet(U.Set, A.P + A.N * Off, YawOf(A.N), VarSeed + uint32(k), true, true, Pl.Zone, St, &W) > 0)
+						bSnugOk = A.Type == uint8(EAnchor::Wall) || A.Type == uint8(EAnchor::Front);
+						const int32 Got1 = PlaceSet(U.Set, A.P + A.N * Off, YawOf(A.N), VarSeed + uint32(k), true, true, Pl.Zone, St, &W);
+						bSnugOk = true;
+						if (Got1 > 0)
 						{
 							++Got; ++Sets;
 							for (int32 j = 0; j < As.Num(); ++j) if (FVector2D::DistSquared(As[j].P, A.P) < 150.f * 150.f) Used[j] = 1;
@@ -2360,9 +2528,23 @@ struct FFillBuilder
 			FShape In = P.Foot;
 			const float Sh = P.Set.EndsWith(TEXT(" run")) ? 13.f : 5.f;   // (a run's end post stands 12 cm off its house's wall: half a cell)
 			if (In.Type == 0) In.H -= FVector2D(Sh, Sh); else In.R -= Sh;
-			if (Grid.Hits(In, 0.f, F_BUILD | F_WATER) && OnBlock++ < 5) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL OVERLAP %s (%s) on a building or water at %.0f %.0f"), *P.Kind->Name, *P.Set, P.Foot.C.X, P.Foot.C.Y);
+			const bool bOnBlock = P.bSnug ? (Grid.Hits(In, 0.f, F_WATER) || BodyHits(P.Foot, P.Xf.GetLocation().Z)) : Grid.Hits(In, 0.f, F_BUILD | F_WATER);
+			if (bOnBlock && OnBlock++ < 5) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL OVERLAP %s (%s) on a building or water at %.0f %.0f"), *P.Kind->Name, *P.Set, P.Foot.C.X, P.Foot.C.Y);
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL OVERLAP %d (pieces on pieces %d, on buildings or water %d)"), Pairs + OnBlock, Pairs, OnBlock);
+		// every lantern stands on something (a barrel, crate, table or post) or hangs: none on the ground or in the air
+		int32 Lanterns = 0, Loose = 0;
+		for (const FPlaced& P : Placed)
+		{
+			if (!P.Kind->Name.StartsWith(TEXT("Lantern")) || P.Kind->bHang) continue;
+			++Lanterns;
+			const FVector L = P.Xf.GetLocation();
+			bool bOn = false;
+			for (const FPlaced& B : Placed)
+				if (&B != &P && B.bGround && B.Foot.Contains(FVector2D(L.X, L.Y), 5.f) && FMath::Abs(B.Xf.GetLocation().Z + B.Kind->Height * B.Xf.GetScale3D().Z - L.Z) < 35.f) { bOn = true; break; }
+			if (!bOn && Loose++ < 5) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL LANTERN %s (%s) on nothing at %.0f %.0f %.0f"), *P.Kind->Name, *P.Set, L.X, L.Y, L.Z);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBFILL LANTERNS %d, on nothing %d; wall-backed sets pulled onto the wall %d (lines: scene %d, wall box %d, grid %d)"), Lanterns, Loose, SnugCount, SnugTrace, SnugBox, SnugCells);
 	}
 
 	// ------------------------------------------------------------------ the dump (Saved/Fill, for Tools/FillMap.ps1 and the layout work)

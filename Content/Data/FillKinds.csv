@@ -25,7 +25,6 @@ BushLeafy,/Game/TownDecor/SM_BushLeafy,circle,1.54,1.54,-0.01,0.02,1.13,none,nea
 BushRound,/Game/TownDecor/SM_BushRound,circle,1.50,1.50,-0.01,-0.00,1.17,none,near,medium,,,S Y G E W R,lods,11792,300,1.46,1.44,0.01,0
 BushSpiky,/Game/TownDecor/SM_BushSpiky,circle,1.80,1.80,-0.01,0.00,1.06,none,near,medium,,,S Y G E W R,lods,12233,299,1.76,1.68,-0.01,1
 BushWhiteFlowers,/Game/TownDecor/SM_BushWhiteFlowers,circle,1.33,1.33,0.00,-0.00,1.05,none,near,medium,,,S Y G E W R,lods,11782,300,1.22,1.26,0.00,0
-BushYellowFlowers,/Game/TownDecor/SM_BushYellowFlowers,circle,1.28,1.28,-0.01,0.00,1.02,none,near,medium,,,S Y G E W R,lods,11858,300,1.24,1.19,0.04,0
 ButcherBlock,/Game/TownDecor/SM_ButcherBlock,box,1.23,0.93,0.00,-0.00,0.90,box,near,medium,,,Y K,lods,8000,300,1.23,0.93,0.00,0
 CabbageCrate,/Game/TownDecor/SM_CabbageCrate,box,0.96,0.81,0.00,-0.00,0.52,none,no,small,,,G M,lods,15864,300,0.96,0.81,0.00,0
 CandleCageShort,/Game/TownDecor/SM_CandleCageShort,circle,0.31,0.31,0.00,0.00,0.46,none,no,tiny,,light,V,lods,19997,300,0.30,0.30,0.00,0
@@ -76,7 +75,6 @@ PotSmall,/Game/TownDecor/SM_PotSmall,circle,0.24,0.24,0.00,-0.00,0.28,none,no,ti
 PotVase,/Game/TownDecor/SM_PotVase,circle,0.25,0.25,-0.00,0.00,0.47,none,no,tiny,,,S M Y,lods,5000,300,0.24,0.24,0.00,0
 PotWide,/Game/TownDecor/SM_PotWide,circle,0.49,0.49,0.00,-0.00,0.44,none,no,tiny,,,S M Y,lods,6000,300,0.49,0.44,0.00,0
 RaisedBed,/Game/TownDecor/SM_RaisedBed,box,2.40,1.30,0.00,-0.00,0.72,box,near,medium,12,,G Y,lods,19998,300,2.40,1.30,0.00,1
-RockPale,/Game/TownDecor/SM_RockPale,circle,2.03,2.03,0.00,0.00,1.06,box,yes,medium,,,W R,lods,2964,300,1.81,1.92,0.00,0
 RopeCoil,/Game/TownDecor/SM_RopeCoil,circle,0.74,0.74,0.00,-0.00,0.26,none,no,small,,,W M C K,lods,7998,300,0.72,0.70,-0.00,0
 RopeHank,/Game/TownDecor/SM_RopeHank,box,0.84,0.34,0.00,0.00,0.19,none,no,small,,,W M C K,lods,7999,300,0.84,0.34,0.00,0
 SackPileOpen,/Game/TownDecor/SM_SackPileOpen,box,1.74,1.60,0.00,0.00,0.99,box,near,medium,,,M F,lods,15996,299,1.74,1.60,0.00,1

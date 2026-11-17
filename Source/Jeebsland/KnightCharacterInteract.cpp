@@ -356,7 +356,10 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	}
 	if (const JeebOakHill::FCounter* C = CounterInReach(this))
 	{
-		Float(FVector(C->At.X, C->At.Y, JeebTerrain::HeightAt(C->At.X, C->At.Y)), 120.f);   // (about the counter's height)
+		// at the shop's front, not out at the counter spot (owner 2026-11-16: "move the E prompt closer to the store"), the same height
+		const FVector2D Dir(FMath::Cos(FMath::DegreesToRadians(C->Facing)), FMath::Sin(FMath::DegreesToRadians(C->Facing)));
+		const FVector2D P = C->At + Dir * (JeebOakHill::CounterOut - 25.f);
+		Out = FVector(P.X, P.Y, JeebTerrain::HeightAt(C->At.X, C->At.Y) + 120.f);   // (about the counter's height)
 		return true;
 	}
 	if (!bFishing)

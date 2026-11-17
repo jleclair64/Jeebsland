@@ -43,7 +43,7 @@ StorageCorner,RopeCoil,0.37,1.43,0,0,1,drop|turn=180
 BarrelRow,Barrel,-1.25,0.6,0,0,1,turn=180
 BarrelRow,Barrel,0,0.6,0,0,1,turn=180
 BarrelRow,BarrelSmall,1.05,0.4,0,0,1,turn=180
-BarrelRow,Crate,0.48,1.93,0,80,1,drop
+BarrelRow,Crate,0.48,1.93,0,80,1,
 BarrelRow,LanternOil,0.48,1.93,0.86,0,1,stack|drop
 # SackCorner (wall-backed): grain stores: sack pile sacks and a barrel
 SackCorner,SackPileOpen,-0.8,0.85,0,0,1,
@@ -68,7 +68,7 @@ HedgeRun,HedgeEnd,2.05,0,0,-90,1,
 # HedgeBoxPair: two box hedges with a flowering bush
 HedgeBoxPair,HedgeBox,-1,0,0,0,1,
 HedgeBoxPair,HedgeBox,1,0,0,0,1,
-HedgeBoxPair,BushWhiteFlowers,0.12,1.06,0,0,1,alt=BushYellowFlowers|turn=180
+HedgeBoxPair,BushWhiteFlowers,0.12,1.06,0,0,1,alt=BushBerries|turn=180
 # PicketCorner: an L of picket fence round a bush and a tub
 PicketCorner,FencePicket,0,-0.85,0,0,1,
 PicketCorner,FencePicketEnd,1.6,-0.85,0,0,1,
@@ -85,7 +85,7 @@ BushClump,BushLeafy,0,0,0,0,1,turn=180|alt=BushRound/BushBall/BushSpiky
 BushClump,BushBerries,1.74,0.39,0,0,1,turn=180|alt=BushDome
 BushClump,ShrubLow,0.64,1.33,0,0,1,turn=180|drop
 # FlowerClump: flowering bushes and a low shrub
-FlowerClump,BushYellowFlowers,0,0,0,0,1,turn=180
+FlowerClump,BushBerries,0,0,0,0,1,turn=180
 FlowerClump,BushWhiteFlowers,1.4,0.29,0,0,1,turn=180
 FlowerClump,ShrubLow,0.5,1.15,0,0,1,turn=180|drop
 # CypressPair: two cypresses with a bush between
@@ -123,18 +123,18 @@ LampPillar,ShrubLow,0,-0.85,0,0,1,turn=180|drop
 # LampGallows: gallows lamp post with a plant clump
 LampGallows,LampPostGallows,0,0,0,0,1,
 LampGallows,PlantClump,0,-1,0,0,1,drop
-# Junction: a signpost with a bush and a pale rock
+# Junction: a signpost with a bush and a small mossy boulder
 Junction,Signpost,0,0,0,0,1,
 Junction,BushBall,-1.15,-0.55,0,0,1,turn=180|alt=BushRound
-Junction,RockPale,1.4,-0.75,0,0,1,turn=180|drop
+Junction,BoulderMossy,1.4,-0.75,0,0,0.5,turn=180|drop
 # JunctionArrow: an arrow sign with shrubs
 JunctionArrow,SignArrow,0,0,0,0,1,
 JunctionArrow,ShrubLow,-1.25,-0.3,0,0,1,turn=180
 JunctionArrow,BushDome,1.35,-0.55,0,0,1,turn=180|drop
 # BenchNook: a carved bench between two flowering bushes
 BenchNook,BenchCarved,0,0,0,0,1,
-BenchNook,BushRound,-1.83,-0.1,0,0,1,turn=180|alt=BushYellowFlowers
-BenchNook,BushWhiteFlowers,1.74,-0.1,0,0,1,turn=180|alt=BushYellowFlowers
+BenchNook,BushRound,-1.83,-0.1,0,0,1,turn=180|alt=BushBerries
+BenchNook,BushWhiteFlowers,1.74,-0.1,0,0,1,turn=180|alt=BushBerries
 # BenchNookStone: a stone bench with a plant clump and an amphora
 BenchNookStone,BenchStone,0,0,0,0,1,
 BenchNookStone,PlantClump,0,-0.85,0,0,1,
@@ -218,7 +218,7 @@ Ruin,WallStone,1.15,0,0,8,1,
 Ruin,WallPillarEnd,2.6,0.1,0,0,1,
 Ruin,TorchWall,-1.15,0.37,0.25,0,1,hang
 Ruin,BannerPostTattered,0.4,1.6,0,0,1,
-Ruin,RockPale,-1.6,1.6,0,0,1,turn=180
+Ruin,BoulderMossy,-1.6,1.6,0,0,0.6,turn=180
 Ruin,StumpStones,2.3,1.65,0,0,1,turn=180|drop
 # RuinPillar: a pillar wall run with a mossy log and a snag
 RuinPillar,WallPillar,0,0,0,0,1,
@@ -227,13 +227,13 @@ RuinPillar,LogMossy,-0.4,1.35,0,6,1,
 RuinPillar,ShrubLow,1.75,1.1,0,0,1,turn=180
 # RuinWell: an old well with rubble
 RuinWell,WellOld,0,0,0,0,1,
-RuinWell,RockPale,3.05,-0.3,0,0,1,turn=180
+RuinWell,BoulderMossy,3.05,-0.3,0,0,0.6,turn=180
 RuinWell,PlantClump,-0.23,1.79,0,0,1,
 # RuinSteps: old walled steps going nowhere with a rooty stump
 RuinSteps,StairsWalled,0,0,0,0,1,alt=StairsStone/StairsStoneShort
 RuinSteps,StumpRooty,3.2,0.1,0,30,1,
 # RuinRubble: rubble: rocks stump and log
-RuinRubble,RockPale,0,0,0,0,1,turn=180
+RuinRubble,BoulderMossy,0,0,0,0,0.6,turn=180
 RuinRubble,StumpMushroom,2.25,0.2,0,0,1,turn=180
 RuinRubble,LogMossy,0.3,2.05,0,4,1,
 # GraveyardRow: graveyard plot: a low wall with cypresses and candles
@@ -279,7 +279,7 @@ TowerYard,LogStackSmall,-0.09,1.27,0,0,1,
 Dock,BenchStone,0,0,0,0,1,
 Dock,RopeCoil,1.24,0.1,0,0,1,turn=180
 Dock,Barrel,-1.43,0.11,0,0,1,turn=180
-Dock,RockPale,0.3,-1.4,0,0,1,turn=180|drop
+Dock,BoulderMossy,0.3,-1.4,0,0,0.6,turn=180|drop
 # Hayfield: round bales in two rows square bales the hay wagon and a scarecrow
 Hayfield,HayBaleRound,-4.2,0,0,0,1,turn=180
 Hayfield,HayBaleRound,-1.8,0,0,0,1,turn=180
@@ -314,7 +314,7 @@ Orchard,Basket,1.12,-0.57,0,0,1,turn=180|drop
 Orchard,WheatSack,-1.12,0.22,0,0,1,
 # Boulders: a field boulder group
 Boulders,BoulderMossy,0,0,0,0,1,turn=180
-Boulders,RockPale,2.69,0.81,0,0,1,turn=180|drop
+Boulders,BoulderMossy,2.69,0.81,0,0,0.6,turn=180|drop
 Boulders,ShrubLow,-0.42,2.23,0,0,1,turn=180
 # FieldWell: the village well on a crossroads (landmark)
 FieldWell,WellVillage,0,0,0,0,1,
@@ -323,7 +323,7 @@ FieldWell,BenchStone,0,2.15,0,180,1,
 # CobbleWell: the big cobbled well (one landmark)
 CobbleWell,WellCobble,0,0,0,0,1,
 # Campsite: log seats round a stone ring cauldron torch crate and rope
-Campsite,RockPale,0,0,0,0,1,turn=180
+Campsite,BoulderMossy,0,0,0,0,0.6,turn=180
 Campsite,LogCartoon,0,2.1,0,0,1,
 Campsite,LogCartoon,-2,-0.6,0,72,1,
 Campsite,LogCartoon,2,-0.6,0,-72,1,
@@ -334,7 +334,7 @@ Campsite,RopeCoil,1.35,-2.2,0,0,1,turn=180
 Campsite,Firewood,-1.39,-2.24,0,90,1,
 Campsite,BannerPostTattered,3.4,0.4,0,0,1,drop
 # RiverRest: rocks a mossy log a berry bush and a bench at a view
-RiverRest,RockPale,0,0,0,0,1,turn=180
+RiverRest,BoulderMossy,0,0,0,0,0.6,turn=180
 RiverRest,LogMossy,2.9,0.4,0,10,1,
 RiverRest,BushBerries,-2.2,0.7,0,0,1,turn=180
 RiverRest,BenchStone,1.6,2,0,180,1,drop
@@ -436,7 +436,7 @@ GraveRow,PlantClump,4,0.98,0,90,1,
 GraveRow,CandleCageShort,4.55,0.15,0,0,1,drop
 # --- Placement v2 (2026-11-16): small sets that plot uses place (FillUses.csv); fences now come only from the plots' runs
 # Bush1 (fence or corner): one bush of a seeded kind
-Bush1,BushRound,0,0.5,0,0,1,alt=BushLeafy/BushDome/BushBall/BushBerries/BushWhiteFlowers/BushYellowFlowers|turn=180
+Bush1,BushRound,0,0.5,0,0,1,alt=BushLeafy/BushDome/BushBall/BushBerries/BushWhiteFlowers|turn=180
 # GardenBed (row): one raised bed, cabbages or tulips
 GardenBed,RaisedBed,0,0,0,0,1,alt=TulipBed
 # GardenTools (fence-backed, by the gate): watering can, basket and pail
@@ -464,5 +464,16 @@ FrontPots,PotAmphora,0,0.4,0,0,1,turn=180
 FrontPots,PotJug,0.55,0.3,0,0,1,drop|turn=180
 FrontPots,PlantClump,-0.95,0.45,0,0,1,drop|turn=180
 # FrontFlowers (against a house's front wall): a flower bush pair
-FrontFlowers,BushYellowFlowers,-0.7,0.65,0,0,1,turn=180|alt=BushWhiteFlowers
+FrontFlowers,BushWhiteFlowers,-0.7,0.65,0,0,1,turn=180|alt=BushBerries
 FrontFlowers,ShrubLow,0.6,0.5,0,0,1,drop|turn=180
+# StallStock: a barrel and a crate with an open crate on it, at a market stall's corner (townbuild2)
+StallStock,Barrel,-0.2,0,0,0,1,
+StallStock,Crate,0.95,0.1,0,8,1,
+StallStock,CrateNoLid,0.95,0.1,0.86,-6,1,stack
+# PlazaBed: a low bed of tulips with white flowering bushes at its ends, where the plaza oak stood (townbuild2)
+PlazaBed,TulipBed,0,0.4,0,0,1,
+PlazaBed,TulipBed,0,-0.4,0,180,1,
+PlazaBed,BushWhiteFlowers,-1.85,0,0,0,0.8,
+PlazaBed,BushWhiteFlowers,1.85,0,0,0,0.8,
+# WallBannerLionNarrow (wall-backed) (hung on a building wall: Z up the wall): the lion banner at three quarters, for the town hall's narrow bays between the door arch and the timber posts (townbuild2)
+WallBannerLionNarrow,BannerLion,0,0.07,3.3,0,0.75,hang

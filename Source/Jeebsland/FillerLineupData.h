@@ -7,7 +7,7 @@ static const FFillerGroup GFillerGroups[] = {
 	{ "Pots, jugs and cauldrons", "Basket Cauldron ClayJug ClayPitcher PotAmphora PotJug PotRound PotSmall PotVase PotWide" },
 	{ "Hay, carts and farm things", "ChickenCoop HandCart HayBale HayBaleRound HayWagon NestingBoxes Pail ThatchWagon WateringCan WoodTub" },
 	{ "Garden, beds and blocks", "ButcherBlock CabbageCrate ChoppingBlock RaisedBed Scarecrow Stump TulipBed VegCart" },
-	{ "Bushes, hedges and plants", "BushBall BushBerries BushDome BushLeafy BushRound BushSpiky BushWhiteFlowers BushYellowFlowers Cypress HedgeBox HedgeEnd HedgeSegment PlantClump ShrubLow" },
+	{ "Bushes, hedges and plants", "BushBall BushBerries BushDome BushLeafy BushRound BushSpiky BushWhiteFlowers Cypress HedgeBox HedgeEnd HedgeSegment PlantClump ShrubLow" },
 	{ "Walls, fences and stairs", "FencePalisade FencePicket FencePicketEnd FenceStick FenceStickPost StairsStone StairsStoneShort StairsWalled WallPillar WallPillarEnd WallStone WallStoneEnd" },
 	{ "Benches, tables and signs", "BenchCarved BenchStone SignArrow SignSkillIssue Signpost TrestleTable" },
 	{ "Lamp posts, lanterns and awnings", "AwningStriped CandleCageShort CandleCageTall LampPostGallows LampPostPillar LampPostRope LampPostStone LanternBlack LanternOil" },
@@ -16,7 +16,7 @@ static const FFillerGroup GFillerGroups[] = {
 	{ "Wells", "WellCobble WellMossy WellOld WellRedRoof WellStylised WellThatched WellVillage" },
 	{ "Torches and sconces", "Sconce TorchBlazing TorchUnlitRope TorchUnlitTar TorchWall" },
 	{ "Planters and flower boxes", "FlowerBoxIvy FlowerBoxLong PlanterGilded WindowBoxRed" },
-	{ "Rocks and boulders", "BoulderMossy BoulderScan RockCluster RockPale RockTall RocksForest" },
+	{ "Rocks and boulders", "BoulderMossy BoulderScan RockCluster RockTall RocksForest" },
 	{ "Fallen wood", "LogCartoon LogHollow LogMossy LogPine LogRoots TreeSnag" },
 	{ "Stumps", "StumpGrass StumpMushroom StumpPainted StumpRooty StumpStones" },
 };

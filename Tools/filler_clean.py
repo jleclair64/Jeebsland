@@ -148,7 +148,6 @@ PIECES = {
                           targets={"leaf": (54.0, -24.0, 32.0)}),
     "BushRound":     dict(src="BushRound_Tansy", fam="bushes", size=("Z", 1.0), remesh=0.015, tris=12000, mats=["leaf"], sharp=80, targets={"leaf": (58.0, -22.0, 38.0)}),
     "BushWhiteFlowers": dict(src="BushWhiteFlowers_axx.s", fam="bushes", size=("Z", 0.9), remesh=0.015, tris=12000, mats=["leaf", "keep"], sharp=80),
-    "BushYellowFlowers": dict(src="BushYellowFlowers_TooPH", fam="bushes", size=("Z", 0.9), remesh=0.015, tris=12000, mats=["leaf", "bark", "keep"], sharp=80),
     "BushBall":      dict(src="BushLeafy_Tansy", fam="bushes", size=("Z", 1.0), remesh=0.015, tris=12000, mats=["leaf"], sharp=80, targets={"leaf": (55.0, -24.0, 34.0)}),
     "BushSpiky":     dict(src="BushSpiky_rennan.alecrim", fam="bushes", size=("Z", 0.85), tris=12000, mats=["leaf"], sharp=80, two_sided=True),
     "BushDome":      dict(src="Bush01_idan.shmueli.sk", fam="bushes", size=("Z", 1.1), remesh=0.015, tris=12000, mats=["leaf"], sharp=80, targets={"leaf": (54.0, -22.0, 36.0)}),
@@ -173,7 +172,6 @@ PIECES = {
     "BoulderScan":   dict(src="BoulderScan_bk2sanity", fam="rocks", size=("L", 1.8), tris=16000, tex=2048, mats=["stone", "moss"], sharp=50),
     "RockTall":      dict(src="RockTall_axx.s", fam="rocks", size=("Z", 2.4), tris=5200, mats=["stone", "moss"], sharp=40),
     "RockCluster":   dict(src="RockCluster_somany", fam="rocks", drop=[("comp", 1)], size=("L", 2.4), tris=20000, tex=2048, mats=["stone", "leaf"], sharp=50, two_sided=True),
-    "RockPale":      dict(src="RockPale_Zahra", fam="rocks", size=("L", 1.6), tris=3000, mats=["stone"], keepL=0.45, sharp=40),
     "RocksForest":   dict(src="RocksForest_ethanjones333", fam="rocks", size=("L", 2.2), tris=20000, tex=2048, mats=["stone", "moss"], sharp=50),
     # fallen wood (bark and cut faces on the log palette, moss on the palette)
     "LogMossy":      dict(src="LogMossy_Natural-Ai", fam="logs", size=("L", 2.4), tris=16000, tex=2048, mats=["bark", "woodcut", "moss"], sharp=45),
