@@ -31,7 +31,8 @@ WORLD = {
     "Ruin": dict(file="Originals/Ruin_Original.glb", axes=("Y", "-X", "Z"), height=500.0, reduce=40000,
                  thin=0.012, cut=lambda p, c, n: (_hsv(c)[2] < 0.10) or (p[2] < -0.50 and _hsv(c)[2] < 0.30 and _hsv(c)[1] > 0.35),
                  cut_final=lambda p, n: (p.x < -215.0 and p.z > 290.0) or (p.x < -170.0 and 300.0 < p.z < 350.0 and abs(n.z) > 0.5),
-                 stone=(36.0, 0.13, 0.52, 0.55, 0.45), hulls=(70.0, 35.0)),
+                 tuck=(lambda p: -200.0 < p.x < 100.0 and p.y < -130.0 and 295.0 < p.z < 370.0, 240.0, 300.0, 6.0),
+                 recalc=False, stone=(36.0, 0.13, 0.52, 0.55, 0.45), hulls=(70.0, 35.0)),
 }
 names = a[2:] or list(WORLD)
 IDX = {"X": 0, "Y": 1, "Z": 2}
@@ -219,7 +220,9 @@ for name in names:
     bm = bmesh.new(); bm.from_mesh(me)
     ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ext * 2e-5)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    # (recalc, 2026-11-17: off for the ruin. On its open, scanned shell Blender's outward guess flipped whole patches inward: the game culls
+    # those as back faces, so a solid column read as a paper-thin panel and the wall top as hanging curved sheets; the model's own winding is right)
+    if P.get("recalc", True): bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me); bm.free(); me.update()
     tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
     md = o.modifiers.new("Dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = min(1.0, P["reduce"] / float(tris_now)); md.use_collapse_triangulate = True
@@ -250,6 +253,27 @@ for name in names:
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
         bm.to_mesh(me); bm.free(); me.update()
         print("WPROP", name, "cut_final", len(gone), "faces")
+    # tuck (2026-11-17, review round 3): a thin ledge that juts out over a wall, pulled back onto it instead of cut (cutting the ruin's ledge left a
+    # see-through band: it is the wall's top). P["tuck"] = (ledge test on a point (cm), wall z from, wall z to, slack cm): every vertex of a flat-ish face
+    # (|normal z| > 0.5) that passes the test moves, across the ground only, onto the nearest vertex of the upright wall faces between those heights,
+    # when it is more than 'slack' from it
+    if "tuck" in P:
+        from mathutils import kdtree
+        inb, wz0, wz1, slack = P["tuck"]
+        wall = [v.co.copy() for f in me.polygons if abs(f.normal.z) < 0.4 and wz0 < f.center.z < wz1 for v in (me.vertices[i] for i in f.vertices)]
+        kd = kdtree.KDTree(len(wall))
+        for i, c in enumerate(wall): kd.insert(Vector((c.x, c.y, 0.0)), i)
+        kd.balance()
+        moved = set()
+        for f in me.polygons:
+            if abs(f.normal.z) <= 0.5 or not inb(f.center): continue
+            for vi in f.vertices:
+                if vi in moved: continue
+                v = me.vertices[vi]
+                q, j, d = kd.find(Vector((v.co.x, v.co.y, 0.0)))
+                if d > slack: v.co.x, v.co.y = q.x, q.y; moved.add(vi)
+        me.update()
+        print("WPROP", name, "tuck moved", len(moved), "ledge vertices onto the wall below (", len(wall), "wall vertices)")
     xs = [v.co.copy() for v in me.vertices]
     lo = Vector((min(c[i] for c in xs) for i in range(3))); hi_ = Vector((max(c[i] for c in xs) for i in range(3)))
     print("WPROP", name, "size cm", tuple(round(hi_[i] - lo[i]) for i in range(3)), "lo", tuple(round(x) for x in lo), "hi", tuple(round(x) for x in hi_))

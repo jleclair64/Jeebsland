@@ -794,6 +794,10 @@ static void ShotEyesSet(APlayerController* PC, int32 EyeIdx)
 			if (USkillComponent* S = K ? K->GetSkills() : nullptr)
 			{
 				for (int32 Kd = JeebItems::K_Helmet; Kd <= JeebItems::K_Boots; ++Kd) S->Worn[Kd] = JeebItems::ArmourId(Kd, 0, FMath::Clamp(FCString::Atoi(*Val), 0, JeebItems::NumTiers - 1));
+				// (2026-11-17: a worn shield takes the same tier, keeping its style, so one run shows a shield at every tier)
+				const int32 Sh = S->Worn[JeebItems::K_Shield];
+				if (JeebItems::IsGear(Sh) && JeebItems::KindOf(Sh) == JeebItems::K_Shield)
+					S->Worn[JeebItems::K_Shield] = JeebItems::ShieldId(JeebItems::StyleOf(Sh), FMath::Clamp(FCString::Atoi(*Val), 0, JeebItems::NumTiers - 1));
 				S->OnGearChanged.Broadcast();
 				UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d wear tier %s"), EyeIdx, *Val);
 			}

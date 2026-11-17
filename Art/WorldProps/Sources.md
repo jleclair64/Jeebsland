@@ -7,3 +7,5 @@ The originals (`Art/WorldProps/Originals/`, git-ignored) were downloaded from th
 | Ruin (`SM_Ruin`, the forest ruins) | "Ruined Fortress", https://www.meshy.ai/posts/0199d8d2-0c26-7cbe-9409-c5b748eca915 | eromaxi | CC0 | 820,287 |
 
 Chosen by the owner, 2026-11-16.
+
+2026-11-17: built with the model's own face winding (recalculating normals had flipped patches inward), and the curved ledge round the top of one wall pulled back onto the wall line (`worldprop_clean.py` `recalc`, `tuck`). Its ragged top course is still not clean up close.

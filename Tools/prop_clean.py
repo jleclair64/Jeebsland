@@ -125,11 +125,14 @@ PROPS = {
                         dict(name="red", test=lambda Hd, S, V, Vb: ((Hd < 12.0) | (Hd > 340.0)) & (S > 0.6) & (V > 0.12), to=(2.0, 0.8, 0.45), fine=0.25, slow=0.3, rough=0.5, metal=0.0, open=1),
                         dict(name="iron", test=lambda Hd, S, V, Vb: (S < 0.25) & (V > 0.05), fine=0.3, sat=0.2, rough=0.4, metal=1.0, open=2),
                         dict(name="wood", test=lambda Hd, S, V, Vb: V >= 0.0, to=(25.0, 0.74, 0.28), fine=0.45, slow=0.25, rough=0.55, metal=0.0)]),
-    # Tower: the warm bronze frame and star boss take the tier's colour; everything grey (the weathered planks and their pale streaks, which an iron class
-    # turned into silver blotches across the planks: review round 2) becomes rich brown wood
-    "ShieldTower": dict(SHIELD, file="Originals/ShieldTower_Original.glb", length=SHIELD_H[2], tier=[0], vote=5, relief=(0.06, 0.012, "-Y"), paint=[
-                        dict(name="bronze", test=lambda Hd, S, V, Vb: (_SB[0] > 0.2) & ((Hd < 60.0) | (Hd > 330.0)) & (V > 0.06), fine=0.4, rough=0.35, metal=1.0, open=4),
-                        dict(name="wood", test=lambda Hd, S, V, Vb: V >= 0.0, to=(25.0, 0.74, 0.28), fine=0.25, slow=0.25, rough=0.55, metal=0.0, open=3, spill=0)]),
+    # Tower (2026-11-16): the library picture's planks were weathered grey and its bronze worn, both full of pale streaks (review rounds 1-2).
+    # (2026-11-17) That picture's pale wear and scratches still showed at Silver after two rounds, so the model was retextured by Meshy (10 credits,
+    # enable_original_uv: the same mesh and UVs; prompt in Art/Props/Sources.md) as clean painted planks and clean dark steel: ShieldTower_Retex.glb.
+    # Colour now tells them apart cleanly (the planks are saturated, the steel grey), so the relief split is no longer needed. All the steel (frame, X
+    # bands, boss, edging, side knots) takes the tier's colour.
+    "ShieldTower": dict(SHIELD, file="Originals/ShieldTower_Retex.glb", length=SHIELD_H[2], tier=[1], vote=3, paint=[
+                        dict(name="wood", test=lambda Hd, S, V, Vb: ((Hd < 50.0) | (Hd > 340.0)) & (S > 0.35) & (V > 0.04), to=(25.0, 0.74, 0.28), fine=0.45, slow=0.25, rough=0.55, metal=0.0, open=2),
+                        dict(name="steel", test=lambda Hd, S, V, Vb: V >= 0.0, fine=0.35, sat=0.3, rough=0.35, metal=1.0)]),
 }
 names = a[2:] or list(PROPS)
 IDX = {"X": 0, "Y": 1, "Z": 2}

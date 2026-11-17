@@ -121,8 +121,8 @@ Lessons from this batch:
 
 ## Shields and the forest ruin (2026-11-16; the owner picked all four from community cards)
 - Kite shield, style 0 ("Shield", enricobarre, 445k to 6k, baked, repainted): https://www.meshy.ai/posts/shield-01a1ac81-5804-76ed-a09d-318142199ecc (`Art/Props/Originals/ShieldKite_Original.glb`)
-- Tower shield, style 2 ("Fantasy Tower Shield - Game Asset", joernpeba, 85k to 6k, baked, planks repainted rich brown): https://www.meshy.ai/posts/fantasy-tower-shield-game-asset-01a1cb14-580a-75a1-ad3f-b52d7fd62889 (`ShieldTower_Original.glb`)
+- Tower shield, style 2 ("Fantasy Tower Shield - Game Asset", joernpeba, 85k to 6k, baked; retextured by Meshy 2026-11-17 for 10 credits, see `Art/Props/Sources.md`): https://www.meshy.ai/posts/fantasy-tower-shield-game-asset-01a1cb14-580a-75a1-ad3f-b52d7fd62889 (`ShieldTower_Original.glb`)
 - Round shield, style 1 ("Warhammer fantasy primitive and rough Orc Round Shield...", terhunemary, 69k to 6k, baked): https://www.meshy.ai/posts/0195e711-f26b-778e-bd82-f96b8197b07e (`ShieldRound_Original.glb`)
-- Forest ruin ("Ruined Fortress", eromaxi, 820k to 40k, baked, dirt pile and roof slab cut away, stone repainted pale): https://www.meshy.ai/posts/0199d8d2-0c26-7cbe-9409-c5b748eca915 (`Art/WorldProps/Originals/Ruin_Original.glb`; `Tools/BuildWorldProps.ps1`)
+- Forest ruin ("Ruined Fortress", eromaxi, 820k to 40k, baked, dirt pile and roof slab cut away, the ledge round the wall top pulled back onto the wall, stone repainted pale): https://www.meshy.ai/posts/0199d8d2-0c26-7cbe-9409-c5b748eca915 (`Art/WorldProps/Originals/Ruin_Original.glb`; `Tools/BuildWorldProps.ps1`)
 - Downloads: the card's "..." menu, then Download, GLB; open the menu only after the model viewer has loaded, or the click lands on nothing. All four CC0; 0 credits spent.
 - The tier colour on the shields is a per-pixel mask picture (`T_<Name>_Mask`, M_Prop's `MaskTex`), not vertex colour: on a 6k reduced model, per-face colour made jagged shards along the rim.
