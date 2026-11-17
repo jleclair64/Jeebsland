@@ -160,6 +160,10 @@ namespace
 
 float JeebHills::Scale()
 {
+#if UE_BUILD_SHIPPING
+	return 1.f;   // (the packaged game: always as built. The scale shapes the solid ground, so a player who set it alone would walk on other
+	               // ground than the server's: online review 2026-11-16)
+#else
 	static const float S = []()
 	{
 		float V = CVarScale.GetValueOnAnyThread();
@@ -167,6 +171,7 @@ float JeebHills::Scale()
 		return FMath::Clamp(V, 0.f, 3.f);
 	}();
 	return S;
+#endif
 }
 
 float JeebHills::KeepOut(float X, float Y)
@@ -289,7 +294,7 @@ void JeebHills::LogStats()
 	static const TCHAR* Names[8] = { TEXT("N"), TEXT("NE"), TEXT("E"), TEXT("SE"), TEXT("S"), TEXT("SW"), TEXT("W"), TEXT("NW") };
 	FString Dirs;
 	for (int32 k = 0; k < 8; ++k) if (SectorTop[k] > 0.f) Dirs += FString::Printf(TEXT(" %s %.0f..%.0f"), Names[k], SectorLow[k] / 100.f, SectorTop[k] / 100.f);
-	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS stats: %d hill cells (8 m) within %.0f m; highest ground %.1f m (world) at %.0f %.0f; slope over 0.5 (27 deg) %.1f%%, over 0.7 (35 deg) %.2f%%, over 1 (45 deg, not walkable) %d; steepest %.2f (%.0f deg) at %.0f %.0f; ground over the plaza (m) 250-500 m out by direction:%s; mesh sag up to %.0f cm at %.0f %.0f (over 20 cm at %.1f%% of %d spots; without the hills up to %.0f cm, over 20 cm at %.1f%%); %.0f ms"),
-		Cells, JeebOakForest::Reach / 100.f, Peak / 100.f, PeakAt.X, PeakAt.Y, Cells ? 100.f * Over50 / Cells : 0.f, Cells ? 100.f * Over70 / Cells : 0.f, Over100, Steepest, FMath::RadiansToDegrees(FMath::Atan(Steepest)),
+	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS stats: %d hill cells (8 m) within %.0f m; finished ground hash=%08x (%d heights, rivers and towns applied); highest ground %.1f m (world) at %.0f %.0f; slope over 0.5 (27 deg) %.1f%%, over 0.7 (35 deg) %.2f%%, over 1 (45 deg, not walkable) %d; steepest %.2f (%.0f deg) at %.0f %.0f; ground over the plaza (m) 250-500 m out by direction:%s; mesh sag up to %.0f cm at %.0f %.0f (over 20 cm at %.1f%% of %d spots; without the hills up to %.0f cm, over 20 cm at %.1f%%); %.0f ms"),
+		Cells, JeebOakForest::Reach / 100.f, FCrc::MemCrc32(H.GetData(), H.Num() * sizeof(float)), H.Num(), Peak / 100.f, PeakAt.X, PeakAt.Y, Cells ? 100.f * Over50 / Cells : 0.f, Cells ? 100.f * Over70 / Cells : 0.f, Over100, Steepest, FMath::RadiansToDegrees(FMath::Atan(Steepest)),
 		SteepAt.X, SteepAt.Y, *Dirs, Sag, SagAt.X, SagAt.Y, SagN ? 100.f * Sag20 / SagN : 0.f, SagN, Sag0, SagN ? 100.f * Sag0_20 / SagN : 0.f, (FPlatformTime::Seconds() - T0) * 1000.0);
 }

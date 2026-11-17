@@ -189,6 +189,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When a new ground patch meets a mesh with a different material, report the visible seam to the owner as a known issue when it is built.
 - LESSON (rebuilt Oak Hill, 2026-11-14): never keep raw UObject pointers in a static or function-local cache: it outlives a world, and a client builds the world twice (the login screen's world, then again after travelling to the server), so the second build used dangling pointers and crashed. Use TWeakObjectPtr, a UPROPERTY or a plain LoadObject per world, and test anything built at BeginPlay through the real login (menu world, travel, game world), not editor Play, which skips the second build.
 
+- LESSON (hills round Oak Hill, 2026-11-16): a tunable that changes solid world geometry must be fixed at build time (Shipping) or checked against the server at join; a client-readable cvar or ini value that shapes collision will desync.
+
 ## Frame rate (performance-reviewer)
 - Before reading a benchmark, take one still and confirm the thing being measured is in frame, and set up the baseline so a fixed cost (such as resolution) can't hide what one object costs. Give the run a limit: a test row of three models needs a few runs, not fifteen minutes.
 - LESSON (rebuilt Oak Hill, 2026-11-14): a stats tour run once per variant cannot tell a real cost from a hitch: compare the frame counts, run each variant at least twice (or log the worst frame), and when game-thread time rises with the GPU flat, look at ticks and movable lights, not triangles.

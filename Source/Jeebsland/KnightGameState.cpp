@@ -121,7 +121,9 @@ void AKnightGameState::BuildWorld()
 	UWorld* World = GetWorld();
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 	JeebHills::Prepare();    // the forested hills round Oak Hill (Hills.h): worked out once, here on the game thread before anything asks for a height; logs JEEBHILLS
-	JeebHills::LogStats();
+#if !UE_BUILD_SHIPPING
+	JeebHills::LogStats();   // (about 30 ms of checks: slopes, heights, the finished ground's hash)
+#endif
 
 	// Cosy autumn evening: low golden sun, cool dusky shadows, soft haze
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)
