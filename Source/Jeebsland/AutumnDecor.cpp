@@ -1,6 +1,8 @@
 #include "AutumnDecor.h"
 #include "Fill.h"
 #include "Palette.h"
+#include "TreeLook.h"
+#include "HAL/IConsoleManager.h"
 #include "Scarecrow.h"
 #include "Cottage.h"
 #include "ChoppableTree.h"
@@ -36,6 +38,35 @@ namespace
 	{
 		static const FName Keys[NumLeafTypes] = { TEXT("LeafOrange"), TEXT("LeafRed"), TEXT("LeafAmber"), TEXT("LeafGold"), TEXT("LeafGreen") };
 		return Keys[FMath::Clamp(T, 0, NumLeafTypes - 1)];
+	}
+	// Fallen and flying leaves: the palette's leaf colour, pulled toward grey by jeeb.Trees.Saturation (so they follow the trees) and dimmed by
+	// jeeb.Leaves.Brightness (owner, 2026-11-16: "the leaves on the ground look too bright", they glowed in the trees' shade). Live.
+	TAutoConsoleVariable<float> CVarLeafBright(TEXT("jeeb.Leaves.Brightness"), 0.65f,
+		TEXT("Brightness of the fallen and drifting leaves, times their palette colour (1 = as before 2026-11-16, 0.65 default). Live; looks only."), ECVF_Default);
+	struct FLeafMid { TWeakObjectPtr<UMaterialInstanceDynamic> M; int32 Type; };
+	TArray<FLeafMid> GLeafMids;
+	void ApplyLeafTints()
+	{
+		const float B = FMath::Clamp(CVarLeafBright.GetValueOnGameThread(), 0.f, 3.f);
+		GLeafMids.RemoveAll([](const FLeafMid& L) { return !L.M.IsValid(); });
+		for (const FLeafMid& L : GLeafMids)
+		{
+			const FLinearColor C = JeebTreeLook::Saturate(JeebPalette::Raw(LeafKey(L.Type))) * B;
+			L.M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(C.R, C.G, C.B, 0.f));
+		}
+	}
+	void BindLeaf(UMaterialInstanceDynamic* M, int32 Type)
+	{
+		GLeafMids.Add({ M, Type });
+		static bool bHooked = false;
+		if (!bHooked)
+		{
+			bHooked = true;
+			CVarLeafBright->OnChangedDelegate().AddLambda([](IConsoleVariable*) { ApplyLeafTints(); });
+			JeebTreeLook::OnChanged().AddLambda([]() { ApplyLeafTints(); });
+			JeebPalette::OnChanged().AddLambda([]() { ApplyLeafTints(); });
+		}
+		ApplyLeafTints();
 	}
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;
@@ -243,7 +274,7 @@ void AAutumnDecor::BeginPlay()
 		for (int32 t = 0; t < NumLeafTypes; ++t)
 		{
 			UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(LeafMat, this);
-			JeebPalette::Bind(M, TEXT("Tint"), LeafKey(t));   // (the palette's leaf colours, as the trees')
+			BindLeaf(M, t);   // (the palette's leaf colours, toned: see ApplyLeafTints)
 			for (UInstancedStaticMeshComponent* C : { GroundLeaf[t], FallLeaf[t], GustLeaf[t] })
 			{
 				C->SetStaticMesh(LeafMesh);
@@ -253,7 +284,7 @@ void AAutumnDecor::BeginPlay()
 			if (UMaterialInterface* LitterMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_LeafLitter.M_LeafLitter")))
 			{
 				UMaterialInstanceDynamic* L = UMaterialInstanceDynamic::Create(LitterMat, this);
-				JeebPalette::Bind(L, TEXT("Tint"), LeafKey(t));
+				BindLeaf(L, t);
 				GroundLeaf[t]->SetMaterial(0, L);
 			}
 		}

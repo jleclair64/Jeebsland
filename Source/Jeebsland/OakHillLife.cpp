@@ -1,4 +1,5 @@
 #include "OakHillLife.h"
+#include "LampLook.h"
 #include "OakHillTown.h"
 #include "TownLabTown.h"
 #include "OakHill.h"
@@ -143,7 +144,8 @@ void AOakHillLife::SetUp()
 			L->SetupAttachment(RootComponent);
 			L->SetWorldLocation(P);
 			L->SetIntensity(0.f);
-			L->SetLightColor(Name.Contains(TEXT("Smith")) ? FLinearColor(1.0f, 0.45f, 0.14f) : FLinearColor(1.0f, 0.66f, 0.30f));
+			L->SetLightColor(FLinearColor(1.0f, 0.45f, 0.14f));
+			if (!Name.Contains(TEXT("Smith"))) JeebLamp::TrackLight(L);   // (the forge keeps its redder fire)
 			L->SetAttenuationRadius(800.f);
 			L->SetCastShadows(false);
 			L->RegisterComponent();

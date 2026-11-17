@@ -1,4 +1,5 @@
 #include "TreeGroves.h"
+#include "TreeLook.h"
 
 #if UE_BUILD_SHIPPING
 void JeebGroves::Build(UWorld*, AForest*) {}
@@ -38,14 +39,14 @@ namespace
 	// Tools/grove_materials.py), live from its console variable, "r g b" (linear; the LOOK tab's TREES group has a slider per number).
 	// Leaf: the world's fallen-leaf colour under them (AutumnDecor.cpp: 0 orange, 1 red, 2 amber, 3 gold, 4 green holdout; -1 none: the green
 	// forest is summer, so it drops no leaves, as the conifers).
-	TAutoConsoleVariable<FString> CVarDzGreen(TEXT("jeeb.Trees.DzGreen"), TEXT("0.2017 0.2723 0.07"), TEXT("Leaf colour of the DZ GREEN test forest, \"r g b\" (live)"), ECVF_Default);
-	TAutoConsoleVariable<FString> CVarDzRed(TEXT("jeeb.Trees.DzRed"), TEXT("0.425 0.0595 0.02975"), TEXT("Leaf colour of the DZ RED test forest, \"r g b\" (live)"), ECVF_Default);
-	TAutoConsoleVariable<FString> CVarDzOrange(TEXT("jeeb.Trees.DzOrange"), TEXT("0.6982 0.2459 0.0393"), TEXT("Leaf colour of the DZ ORANGE test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzGreen(TEXT("jeeb.Trees.DzGreen"), TEXT("0.1714 0.2315 0.0595"), TEXT("Leaf colour of the DZ GREEN test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzRed(TEXT("jeeb.Trees.DzRed"), TEXT("0.3613 0.0506 0.0253"), TEXT("Leaf colour of the DZ RED test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzOrange(TEXT("jeeb.Trees.DzOrange"), TEXT("0.5935 0.209 0.0334"), TEXT("Leaf colour of the DZ ORANGE test forest, \"r g b\" (live)"), ECVF_Default);
 	// The Spruce Forest's needles (owner, 2026-11-16: "colour sliders for the spruce trees"): a tint, 1 1 1 = the pack's own colour. It goes on the pack's
 	// "Leaf Tint" (the _leaf materials), "Branch Tint" (the _branch materials: the needles on the twigs) and the imposters' "Tint" (the far ring); bark and moss stay.
-	TAutoConsoleVariable<FString> CVarSpruce(TEXT("jeeb.Trees.Spruce"), TEXT("1 1 1"), TEXT("Needle colour multiplier of the Spruce Forest, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarSpruce(TEXT("jeeb.Trees.Spruce"), TEXT("0.8 0.9 0.92"), TEXT("Needle colour multiplier of every spruce (the sample Spruce Forest, the town and the forest), \"r g b\" (1 1 1 = as the pack has it; the default is a little darker and cooler; live)"), ECVF_Default);
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GSpruceMids;   // (one per distinct spruce material, shared by the trees)
-	TAutoConsoleVariable<FString> CVarDzYellow(TEXT("jeeb.Trees.DzYellow"), TEXT("0.7 0.45 0.0517"), TEXT("Leaf colour of the DZ YELLOW test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzYellow(TEXT("jeeb.Trees.DzYellow"), TEXT("0.595 0.3825 0.0439"), TEXT("Leaf colour of the DZ YELLOW test forest, \"r g b\" (live)"), ECVF_Default);
 	struct FForest { const TCHAR* Title; TAutoConsoleVariable<FString>* Cvar; int32 Leaf; int32 Seed; };
 	const FForest GForests[] = {
 		{ TEXT("DZ GREEN"), &CVarDzGreen, -1, 32 }, { TEXT("DZ RED"), &CVarDzRed, 1, 33 }, { TEXT("DZ ORANGE"), &CVarDzOrange, 0, 34 }, { TEXT("DZ YELLOW"), &CVarDzYellow, 3, 36 },
@@ -60,7 +61,7 @@ namespace
 		TArray<FString> P; S.ParseIntoArrayWS(P);
 		float C[3] = { 0.5f, 0.5f, 0.5f };
 		for (int32 i = 0; i < 3 && i < P.Num(); ++i) C[i] = FMath::Max(0.f, FCString::Atof(*P[i]));
-		return FLinearColor(C[0], C[1], C[2]);
+		return JeebTreeLook::Saturate(FLinearColor(C[0], C[1], C[2]));   // (jeeb.Trees.Saturation on top)
 	}
 	FLinearColor SpruceTint()
 	{
@@ -69,7 +70,7 @@ namespace
 		TArray<FString> P; S.ParseIntoArrayWS(P);
 		float C[3] = { 1.f, 1.f, 1.f };
 		for (int32 i = 0; i < 3 && i < P.Num(); ++i) C[i] = FMath::Max(0.f, FCString::Atof(*P[i]));
-		return FLinearColor(C[0], C[1], C[2], 0.f);   // (the pack's tints have alpha 0)
+		return JeebTreeLook::Saturate(FLinearColor(C[0], C[1], C[2], 0.f));   // (the pack's tints have alpha 0)
 	}
 	const TCHAR* SpruceParam(const FString& MaterialName)
 	{
@@ -267,6 +268,7 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 		bHooked = true;
 		for (const FForest& F : GForests) F.Cvar->AsVariable()->OnChangedDelegate().AddStatic(&ApplyForestTints);
 		CVarSpruce->OnChangedDelegate().AddStatic(&ApplyForestTints);
+		JeebTreeLook::OnChanged().AddLambda([]() { ApplyForestTints(); });
 		if (FParse::Param(FCommandLine::Get(), TEXT("ShotSpruceTint")))   // (test run: 6 s on, set the tint and read a leaf material back)
 			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float)
 			{
