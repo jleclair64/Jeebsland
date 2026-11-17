@@ -81,7 +81,7 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 
 	TArray<JeebItemModel::FPart> Parts;
 	JeebItemModel::Build(Id, Parts);
-	UStaticMesh* Prop = JeebItems::IsGear(Id) ? JeebProps::MeshFor(JeebItems::KindOf(Id)) : nullptr;   // (a model from /Game/Props)
+	UStaticMesh* Prop = JeebItems::IsGear(Id) ? JeebProps::MeshForItem(Id) : nullptr;   // (a model from /Game/Props)
 	if (Parts.Num() == 0 && !Prop) return;
 	FBox Bx(ForceInit);
 	if (Prop) Bx = Prop->GetBoundingBox();
@@ -111,7 +111,7 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 	UMaterialInterface* MetalMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
 	const FVector Centre = Bx.GetCenter();
 	if (Prop)
-		if (UStaticMeshComponent* S = JeebProps::Make(this, Holder, JeebItems::KindOf(Id), JeebItems::VariantOf(Id))) { S->SetRelativeLocation(-Centre); S->SetCastShadow(false); }
+		if (UStaticMeshComponent* S = JeebProps::MakeItem(this, Holder, Id)) { S->SetRelativeLocation(-Centre); S->SetCastShadow(false); }
 	if (!Prop) for (const JeebItemModel::FPart& Pt : Parts)
 	{
 		UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);

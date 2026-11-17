@@ -73,6 +73,29 @@ namespace JeebProps
 		return Load(Paths[FMath::Clamp<int32>(Variant, 0, int32(UE_ARRAY_COUNT(Paths)) - 1)]);
 	}
 
+	// Shields (2026-11-16, the owner's picks from Meshy's library: Art/Props/Sources.md): one model per style, 0 kite, 1 round, 2 tower (JeebItems::StyleOf).
+	// Each is built face along +X, up +Z, its back at the origin (Tools\prop_clean.py SHIELD); ShieldPlace puts it where the code-built shield of that
+	// style was, in KnightDesign's shield frame (the shield part's own frame: the part follows the arm, or lies on his back, and the model with it).
+	// The code-built parts stay, hidden, for what arrows stick in (GetShieldParts) and on the server.
+	inline UStaticMesh* ShieldMesh(int32 Style)
+	{
+		static const TCHAR* const Paths[] = { TEXT("/Game/Props/SM_ShieldKite.SM_ShieldKite"), TEXT("/Game/Props/SM_ShieldRound.SM_ShieldRound"), TEXT("/Game/Props/SM_ShieldTower.SM_ShieldTower") };
+		return Load(Paths[FMath::Clamp<int32>(Style, 0, 2)]);
+	}
+	// Where each style's back sits (X), its middle (Y, Z), in KnightDesign's shield frame: the old shields' back plane was X 14, their middles Y -41 and
+	// Z -15 (kite), -6 (round), -16 (tower). The tower's handle stands 5 cm off its back, so it goes that much nearer the arm.
+	inline FTransform ShieldPlace(int32 Style)
+	{
+		static const FVector At[] = { FVector(13.5f, -41.f, -15.f), FVector(13.5f, -41.f, -6.f), FVector(9.5f, -41.f, -16.f) };
+		return FTransform(At[FMath::Clamp<int32>(Style, 0, 2)]);
+	}
+	// A gear item's model by its id (a shield's style is in its id), or null
+	inline UStaticMesh* MeshForItem(int32 Id)
+	{
+		const int32 K = JeebItems::KindOf(Id);
+		return K == JeebItems::K_Shield ? ShieldMesh(JeebItems::StyleOf(Id)) : MeshFor(K);
+	}
+
 	// (every material slot: a model can come in with more than one, and its faces need not be on the first; 2026-11-16 the baked longbow drew plain grey)
 	inline void Tint(UStaticMeshComponent* C, const FLinearColor& Col, float Metal = 0.f, float Rough = 0.5f)
 	{
@@ -123,6 +146,29 @@ namespace JeebProps
 		if (!C) return nullptr;
 		const bool bShiny = JeebItems::TierRow(Tier).Metal > 0.5f;
 		Tint(C, JeebItems::Palette(Tier, 0), bShiny ? 0.8f : 0.2f, JeebItems::TierRough(Tier));
+		return C;
+	}
+	inline void TintTier(UStaticMeshComponent* C, int32 Tier)
+	{
+		Tint(C, JeebItems::Palette(Tier, 0), JeebItems::TierRow(Tier).Metal > 0.5f ? 0.8f : 0.2f, JeebItems::TierRough(Tier));
+	}
+	// The same by item id (a shield: its style's model)
+	inline UStaticMeshComponent* MakeItem(AActor* Owner, USceneComponent* Attach, int32 Id)
+	{
+		if (!Owner || Owner->GetNetMode() == NM_DedicatedServer) return nullptr;
+		UStaticMeshComponent* C = MakeStatic(Owner, Attach, MeshForItem(Id));
+		if (C) TintTier(C, JeebItems::VariantOf(Id));
+		return C;
+	}
+	// A shield's model on one of its code-built parts (the plate of that style), in the tier's colour; the caller hides the code-built parts of that
+	// style (still there for arrows). Null on a server or with no model.
+	inline UStaticMeshComponent* AddShieldModel(AActor* Owner, USceneComponent* Plate, int32 Style, int32 Tier)
+	{
+		if (!Owner || !Plate || Owner->GetNetMode() == NM_DedicatedServer) return nullptr;
+		UStaticMeshComponent* C = MakeStatic(Owner, Plate, ShieldMesh(Style));
+		if (!C) return nullptr;
+		C->SetRelativeTransform(ShieldPlace(Style));
+		TintTier(C, Tier);
 		return C;
 	}
 }

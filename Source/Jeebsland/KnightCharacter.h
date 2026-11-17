@@ -38,6 +38,7 @@ struct FArmorPart
 	bool bBare = false;              // skin / hair: shown only while the slot is empty
 	bool bFixedColor = false;        // always its Fixed colour, matte (black eye openings, the red brush)
 	int32 Style = 0;                 // shields: which shield style the piece belongs to
+	class UStaticMeshComponent* Model = nullptr;   // shields: the library model of its style, on its plate (JeebProps::AddShieldModel); the code-built parts are then hidden
 	float Shade = 1.f;
 };
 

@@ -70,6 +70,11 @@ def _grey(c):
     return (mx - mn) / max(mx, 1e-4) < 0.30 or mx < 0.06
 
 AMULET = dict(length=6.0, grip=("Z", 1.0), mask="none", reduce=4000, bake=True)
+SHIELD = dict(axes=("Y", "-X", "Z"), grip=("Z", 0.5), pivot=(0.0, 0.5, 0.5), mask="none", reduce=6000, bake=True, src_paint=True)   # (the tier mask by pixel: paint, tier)
+def _tower_wood(Hd, S, V, Vb):   # (the tower's weathered grey-blue planks: everything else on its face is bronze or iron)
+    return (_SB[0] < 0.24) & (Vb < 0.42)   # (by the saturation round each pixel: the bronze is a warm metal, the planks are grey)
+_SB = [None]   # (the paint step sets it: the saturation blurred over a few pixels)
+SHIELD_H = (66.0, 42.0, 78.0)   # kite, round, tower: the longest side in cm (JeebProps::ShieldSize says the same)
 PROPS = {
     "Pickaxe":  dict(file="Pickaxe2.glb", axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), wood=(25.0, 0.74, 0.30, 60.0), clean=True, reduce=6000),
     "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=5000, bake=True, swatch=True, fill=True,   # (2026-11-16: baked to fresh UVs. Reduced to 3000 without a bake, the stave's picture and normal map shattered into scaly shards with dark pits: the owner's "holes")
@@ -108,6 +113,23 @@ PROPS = {
     "AmuletCrystal":    dict(AMULET, file="AmuletCrystal.glb",    axes=("Z", "-Y", "X")),
     "AmuletVoidSeer":   dict(AMULET, file="AmuletVoidSeer.glb",   axes=("-Y", "X", "Z")),
     "AmuletEmber":      dict(AMULET, file="AmuletEmber.glb",      axes=("-Y", "X", "Z")),
+    # Shields (2026-11-16, the owner's picks from the library; originals git-ignored in Art/Props/Originals, links in Art/Props/Sources.md): the face looks
+    # along +X, up +Z, the width along Y; the origin at the back of the box, in the middle (KnightDesign's shield frame: JeebProps::ShieldPlace)
+    # Kite: the dark face (scratches and grime off: one clean charcoal), the steel rim, rivets and cross take the tier's colour (its rusty rivets become steel)
+    "ShieldKite":  dict(SHIELD, file="Originals/ShieldKite_Original.glb",  length=SHIELD_H[0], tier=[0, 1], vote=3, zone_else=2, zones=lambda u, v, rim: rim > 0.9 or (abs(u) < 0.2 and 0.1 < v < 0.9) or (abs(v - 0.6) < 0.11 and abs(u) < 0.62), paint=[
+                        dict(name="rivets", test=lambda Hd, S, V, Vb: (Hd < 50.0) & (S > 0.22) & (V > 0.09), to=(215.0, 0.04, 0.48), fine=0.3, slow=0.3, rough=0.35, metal=1.0, open=1),
+                        dict(name="steel", test=lambda Hd, S, V, Vb: (Vb > 0.32) & (V > 0.3) & (S < 0.3), fine=0.35, gain=1.1, sat=0.3, rough=0.35, metal=1.0, open=2),
+                        dict(name="face", test=lambda Hd, S, V, Vb: V >= 0.0, to=(220.0, 0.12, 0.10), fine=0.08, slow=0.25, rough=0.6, metal=0.0)]),
+    # Round: the planks rich brown with a touch of grain, the red ring a clean rich red, the iron rim, studs and boss take the tier's colour
+    "ShieldRound": dict(SHIELD, file="Originals/ShieldRound_Original.glb", length=SHIELD_H[1], tier=[1], vote=3, paint=[
+                        dict(name="red", test=lambda Hd, S, V, Vb: ((Hd < 12.0) | (Hd > 340.0)) & (S > 0.6) & (V > 0.12), to=(2.0, 0.8, 0.45), fine=0.25, slow=0.3, rough=0.5, metal=0.0, open=1),
+                        dict(name="iron", test=lambda Hd, S, V, Vb: (S < 0.25) & (V > 0.05), fine=0.3, sat=0.2, rough=0.4, metal=1.0, open=2),
+                        dict(name="wood", test=lambda Hd, S, V, Vb: V >= 0.0, to=(25.0, 0.74, 0.28), fine=0.45, slow=0.25, rough=0.55, metal=0.0)]),
+    # Tower: the warm bronze frame and star boss take the tier's colour; everything grey (the weathered planks and their pale streaks, which an iron class
+    # turned into silver blotches across the planks: review round 2) becomes rich brown wood
+    "ShieldTower": dict(SHIELD, file="Originals/ShieldTower_Original.glb", length=SHIELD_H[2], tier=[0], vote=5, relief=(0.06, 0.012, "-Y"), paint=[
+                        dict(name="bronze", test=lambda Hd, S, V, Vb: (_SB[0] > 0.2) & ((Hd < 60.0) | (Hd > 330.0)) & (V > 0.06), fine=0.4, rough=0.35, metal=1.0, open=4),
+                        dict(name="wood", test=lambda Hd, S, V, Vb: V >= 0.0, to=(25.0, 0.74, 0.28), fine=0.25, slow=0.25, rough=0.55, metal=0.0, open=3, spill=0)]),
 }
 names = a[2:] or list(PROPS)
 IDX = {"X": 0, "Y": 1, "Z": 2}
@@ -269,7 +291,7 @@ def cull_hidden(me, name):
     bmesh.ops.delete(bm, geom=gone, context="FACES")
     bm.to_mesh(me); bm.free(); me.update()
     print("PROP", name, "hidden faces removed", len(gone))
-def bake_to_new_uvs(o, hi, name, size=2048, swatch=False):
+def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
     # The decimated model gets its own fresh UVs and its pictures baked from the full model (a heavy collapse across the library models' many UV seams
     # smears the old picture into speckled shards). Base and metal/roughness through emission, the normal map as Cycles bakes it.
     sc = bpy.context.scene
@@ -308,6 +330,11 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False):
         hmat.node_tree.links.new(tnode.outputs["Color"], em.inputs["Color"])
         im = img(tag, sz, nc); tgt.image = im; ln.active = tgt
         bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
+    for tag, eim in (extra or {}).items():   # (more pictures laid on the full model, baked the same way: the shields' tier mask)
+        en = hmat.node_tree.nodes.new("ShaderNodeTexImage"); en.image = eim
+        hmat.node_tree.links.new(en.outputs["Color"], em.inputs["Color"])
+        im = img(tag, size // 2, True); tgt.image = im; ln.active = tgt
+        bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
     if swatch and "Base" in got:
         # (a model with no steel of its own, the longbow: added bands need a calm steel spot to take their colour from, and a baked picture is black between its
         # islands. A small steel-grey square goes into an empty corner of every picture, for steel_uv to find)
@@ -334,10 +361,196 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False):
     if "Normal" in got:
         nm = ln.new("ShaderNodeNormalMap"); lk.new(tex(got["Normal"]).outputs["Color"], nm.inputs["Color"]); lk.new(nm.outputs[0], lpr.inputs["Normal"])
     if "MR" in got: lk.new(tex(got["MR"]).outputs["Color"], lpr.inputs["Roughness"])
+    extra_got = {t: got[t] for t in (extra or {}) if t in got}
     for n_ in old: me.uv_layers.remove(me.uv_layers[n_])
     bpy.data.objects.remove(hi, do_unlink=True)
     bpy.ops.object.select_all(action="DESELECT"); o.select_set(True); bpy.context.view_layer.objects.active = o
     print("PROP", name, "baked", ", ".join(sorted(got)))
+    return extra_got
+def zone_classes(me, P, name, side):
+    # zones (2026-11-16, the kite, review round 2): its face has bright worn chips the same steel grey as the rim and cross, raised like them too, so
+    # neither colour nor shape tells them apart; where they are does. Each face of the model is placed on the shield's front (u: -1..1 across, v: 0
+    # bottom .. 1 top, rim: how near the outline it is, 0..1 of the half width) and P["zones"](u, v, rim) says whether metal may be there; elsewhere
+    # its pixels are forced to class P["zone_else"] (the face). Everything else is decided by colour as before.
+    import numpy as np
+    fax = P["relief"][2] if "relief" in P else "-Y"
+    ai = IDX[fax[-1]]
+    ui, vi = [i for i in range(3) if i != ai and i != 2][0], 2
+    co = [v.co for v in me.vertices]
+    u0, u1 = min(c[ui] for c in co), max(c[ui] for c in co); v0, v1 = min(c[vi] for c in co), max(c[vi] for c in co)
+    hw = (u1 - u0) * 0.5; uc = (u0 + u1) * 0.5
+    nb = 64
+    rowmax = [0.0] * (nb + 1); colmax = [-1e9] * (nb + 1); colmin = [1e9] * (nb + 1)
+    for c in co:
+        r_ = int((c[vi] - v0) / (v1 - v0) * nb); k_ = int((c[ui] - u0) / (u1 - u0) * nb)
+        rowmax[r_] = max(rowmax[r_], abs(c[ui] - uc)); colmax[k_] = max(colmax[k_], c[vi]); colmin[k_] = min(colmin[k_], c[vi])
+    uvl = me.uv_layers.active.data
+    force = np.full((side, side), -1, dtype=np.int32)
+    n_free = 0
+    for poly in me.polygons:
+        c = poly.center
+        u = (c[ui] - uc) / hw; v = (c[vi] - v0) / (v1 - v0)
+        r_ = int(v * nb); k_ = int((c[ui] - u0) / (u1 - u0) * nb)
+        edge = min(rowmax[r_] - abs(c[ui] - uc), colmax[k_] - c[vi], c[vi] - colmin[k_])
+        if P["zones"](u, v, 1.0 - min(1.0, edge / hw)): continue
+        n_free += 1
+        q = [(uvl[li_].uv[0] * side - 0.5, uvl[li_].uv[1] * side - 0.5) for li_ in poly.loop_indices]
+        for k2 in range(1, len(q) - 1):
+            (x0, y0), (x1, y1), (x2, y2) = q[0], q[k2], q[k2 + 1]
+            den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            if abs(den) < 1e-9: continue
+            xa = max(0, int(math.floor(min(x0, x1, x2)))); xb = min(side - 1, int(math.ceil(max(x0, x1, x2))))
+            ya = max(0, int(math.floor(min(y0, y1, y2)))); yb = min(side - 1, int(math.ceil(max(y0, y1, y2))))
+            if xb < xa or yb < ya: continue
+            gx, gy = np.meshgrid(np.arange(xa, xb + 1), np.arange(ya, yb + 1))
+            l0 = ((y1 - y2) * (gx - x2) + (x2 - x1) * (gy - y2)) / den
+            l1 = ((y2 - y0) * (gx - x2) + (x0 - x2) * (gy - y2)) / den
+            ok = (l0 >= -0.02) & (l1 >= -0.02) & (1.0 - l0 - l1 >= -0.02)
+            force[ya:yb + 1, xa:xb + 1][ok] = P["zone_else"]
+    print("PROP", name, "zones: %d of %d faces kept plain" % (n_free, len(me.polygons)))
+    return force
+
+def relief_classes(me, P, name, side):
+    # relief (2026-11-16, the tower shield, review round 2): its picture can't tell the weathered grey planks from the worn bronze (both pale, streaked,
+    # in hundreds of tiny islands), but its shape can: the frame, bosses and studs stand out from the planks. Each vertex's height above the lowest
+    # surface within 'reach' (a share of the model's height) of it, on the side it faces; raised or edge-on faces are class 0, the rest class 1,
+    # drawn into the model's own UV space. P["relief"] = (reach share, raised share, front axis as "-Y" etc.)
+    import numpy as np
+    from mathutils import kdtree
+    reach_s, raised_s, fax = P["relief"][:3]
+    c_up, c_flat = (P["relief"][3], P["relief"][4]) if len(P["relief"]) > 4 else (0, 1)   # (the classes for raised and flat)
+    use_mean = len(P["relief"]) > 5 and P["relief"][5] == "mean"
+    ai = IDX[fax[-1]]; sg = -1.0 if fax.startswith("-") else 1.0
+    co = [v.co.copy() for v in me.vertices]
+    span = max(max(c[i] for c in co) - min(c[i] for c in co) for i in range(3))
+    reach, raised = reach_s * span, raised_s * span
+    kd = kdtree.KDTree(len(co))
+    for i, c in enumerate(co):
+        q = c.copy(); q[ai] = 0.0; kd.insert(q, i)
+    kd.balance()
+    vnorm = [v.normal[ai] * sg for v in me.vertices]
+    rel = np.zeros(len(co)); side_ = np.zeros(len(co), dtype=bool)
+    for i, c in enumerate(co):
+        q = c.copy(); q[ai] = 0.0
+        facing = 1.0 if vnorm[i] >= 0.0 else -1.0
+        ds = [co[j][ai] * sg * facing for (_q, j, _d) in kd.find_range(q, reach) if vnorm[j] * facing > 0.3]
+        if len(ds) < 4: continue
+        ds.sort()
+        rel[i] = c[ai] * sg * facing - (sum(ds) / len(ds) if use_mean else ds[len(ds) // 3])   # (mean: a domed or sloped face averages out; else a third of the way up, the grooves between the planks are not the planks)
+        side_[i] = abs(vnorm[i]) < 0.35
+    uvl = me.uv_layers.active.data
+    force = np.full((side, side), -1, dtype=np.int32)
+    n_raised = 0
+    for poly in me.polygons:
+        vs = list(poly.vertices)
+        up = sum(1 for v in vs if rel[v] > raised or side_[v]) * 2 > len(vs)
+        n_raised += up
+        q = [(uvl[li_].uv[0] * side - 0.5, uvl[li_].uv[1] * side - 0.5) for li_ in poly.loop_indices]
+        for k_ in range(1, len(q) - 1):
+            (x0, y0), (x1, y1), (x2, y2) = q[0], q[k_], q[k_ + 1]
+            den = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2)
+            if abs(den) < 1e-9: continue
+            xa = max(0, int(math.floor(min(x0, x1, x2)))); xb = min(side - 1, int(math.ceil(max(x0, x1, x2))))
+            ya = max(0, int(math.floor(min(y0, y1, y2)))); yb = min(side - 1, int(math.ceil(max(y0, y1, y2))))
+            if xb < xa or yb < ya: continue
+            gx, gy = np.meshgrid(np.arange(xa, xb + 1), np.arange(ya, yb + 1))
+            l0 = ((y1 - y2) * (gx - x2) + (x2 - x1) * (gy - y2)) / den
+            l1 = ((y2 - y0) * (gx - x2) + (x0 - x2) * (gy - y2)) / den
+            ok = (l0 >= -0.02) & (l1 >= -0.02) & (1.0 - l0 - l1 >= -0.02)
+            force[ya:yb + 1, xa:xb + 1][ok] = c_up if up else c_flat
+    print("PROP", name, "relief: %d of %d faces raised (reach %.3f, raised %.4f model units)" % (n_raised, len(me.polygons), reach, raised))
+    return force
+
+def paint_pixels(P, name, arr, mr, force=None):
+    # (the paint classes on one picture, arr H x W x 4 floats; returns the repainted picture, the metal/roughness picture, the class map and the used pixels)
+    import numpy as np
+    H, W = arr.shape[0], arr.shape[1]
+    rgb = arr[..., :3]
+    V = rgb.max(axis=2); Cc = V - rgb.min(axis=2); S = Cc / np.maximum(V, 1e-4)
+    Hd = np.zeros_like(V)
+    r_, g_c, b_ = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    mx_ = np.maximum(Cc, 1e-6)
+    Hd = np.where(V == r_, ((g_c - b_) / mx_) % 6.0, np.where(V == g_c, (b_ - r_) / mx_ + 2.0, (r_ - g_c) / mx_ + 4.0)) * 60.0
+    used = V > 0.012
+    def pblur(a_, rad):
+        for ax in (0, 1):
+            c = np.cumsum(a_, axis=ax, dtype=np.float64)
+            n = a_.shape[ax]
+            hi_ = np.minimum(np.arange(n) + rad, n - 1); lo_ = np.maximum(np.arange(n) - rad - 1, -1)
+            t = np.take(c, hi_, axis=ax); b_v = np.take(c, np.maximum(lo_, 0), axis=ax)
+            shape = [1, 1]; shape[ax] = n
+            a_ = t - np.where(lo_.reshape(shape) < 0, 0.0, b_v)
+        return a_
+    near = P.get("near", max(2, W // 160))
+    cnt0 = pblur(used.astype(np.float64), near)
+    Vb = pblur(np.where(used, V, 0.0), near) / np.maximum(cnt0, 1.0)
+    _SB[0] = pblur(np.where(used, S, 0.0), near * 2) / np.maximum(pblur(used.astype(np.float64), near * 2), 1.0)
+    cls_map = np.full((H, W), -1, dtype=np.int32)
+    if force is not None:   # (classes already known by pixel, from the model's shape: relief)
+        cls_map[used & (force >= 0)] = force[used & (force >= 0)]
+    for k, cl in enumerate(P["paint"]):
+        m = used & (cls_map < 0) & cl["test"](Hd, S, V, Vb)
+        cls_map[m] = k
+    # vote: each pixel takes the class most of its neighbours within 'vote' pixels have (blotches and specks smaller than that go)
+    if P.get("vote"):
+        sc_ = np.stack([pblur((cls_map == k).astype(np.float64), P["vote"]) for k in range(len(P["paint"]))], axis=0)
+        cls_map = np.where(used, np.argmax(sc_, axis=0).astype(np.int32), -1)
+    # open: a class's specks and thin streaks narrower than about 2 x open pixels (a scratch across the face read as steel) go to class 'spill'
+    def _grow(a_, r_, op):
+        for _i in range(r_):
+            a_ = op.reduce([a_, np.roll(a_, 1, 0), np.roll(a_, -1, 0), np.roll(a_, 1, 1), np.roll(a_, -1, 1)])
+        return a_
+    for k, cl in enumerate(P["paint"]):
+        if not cl.get("open"): continue
+        m = cls_map == k
+        kept = _grow(_grow(m, cl["open"], np.logical_and), cl["open"], np.logical_or) & m
+        cls_map[m & ~kept] = cl.get("spill", len(P["paint"]) - 1)
+        print("PROP %s paint class %d: %.1f%% of its pixels were specks" % (name, k, 100.0 * (m & ~kept).sum() / max(1, m.sum())))
+    outc = rgb.copy()
+    rad = max(3, W // 48)
+    for k, cl in enumerate(P["paint"]):
+        m = cls_map == k
+        if not m.any(): continue
+        wt_ = pblur(m.astype(np.float64), rad)
+        slow = pblur(np.where(m, V, 0.0), rad) / np.maximum(wt_, 1.0)
+        fine = np.where(m, V / np.maximum(slow, 0.01), 1.0)
+        mean_ = max(float(V[m].mean()), 0.01)
+        to = cl.get("to")
+        if to is not None:
+            h0, s0, v0 = to
+            Vn = v0 * np.power(np.maximum(slow, 0.01) / mean_, cl.get("slow", 0.3)) * np.power(fine, cl.get("fine", 0.2))
+            dh = ((Hd - h0 + 180.0) % 360.0) - 180.0
+            Hn = (h0 + cl.get("hue_keep", 0.1) * np.clip(dh, -40.0, 40.0)) % 360.0
+            Sn = np.clip(s0 + 0.15 * (S - s0), 0.0, 1.0) if s0 > 0.02 else np.full_like(S, s0)
+        else:
+            Vn = slow * np.power(fine, cl.get("fine", 0.2)) * cl.get("gain", 1.0)
+            Hn = Hd; Sn = S * cl.get("sat", 1.0)
+        Vn = np.clip(Vn, 0.0, 1.0)
+        h6 = Hn / 60.0
+        Xh = 1.0 - np.abs(h6 % 2.0 - 1.0)
+        Cn = Vn * Sn; Xn = Cn * Xh; mn = Vn - Cn
+        seg = np.floor(h6).astype(np.int32) % 6
+        R = np.choose(seg, [Cn, Xn, 0 * Cn, 0 * Cn, Xn, Cn]); G = np.choose(seg, [Xn, Cn, Cn, Xn, 0 * Cn, 0 * Cn]); B = np.choose(seg, [0 * Cn, 0 * Cn, Xn, Cn, Cn, Xn])
+        outc[..., 0] = np.where(m, R + mn, outc[..., 0]); outc[..., 1] = np.where(m, G + mn, outc[..., 1]); outc[..., 2] = np.where(m, B + mn, outc[..., 2])
+        print("PROP %s paint class %d (%s): %.1f%% of the picture" % (name, k, cl.get("name", ""), 100.0 * m.sum() / max(1, used.sum())))
+    arr[..., :3] = outc
+    # the metal/roughness picture: the classes' own roughness and metal (G and B)
+    if any("rough" in cl or "metal" in cl for cl in P["paint"]):
+        if mr is not None:
+            MW, MH = mr.size
+            ma = np.array(mr.pixels[:], dtype=np.float32).reshape(MH, MW, 4)
+        else:
+            MW, MH = W // 2, H // 2
+            ma = np.zeros((MH, MW, 4), dtype=np.float32); ma[..., 1] = 0.6; ma[..., 3] = 1.0
+        cm = cls_map[np.ix_(np.arange(MH) * H // MH, np.arange(MW) * W // MW)]
+        for k, cl in enumerate(P["paint"]):
+            if "rough" in cl: ma[..., 1][cm == k] = cl["rough"]
+            if "metal" in cl: ma[..., 2][cm == k] = cl["metal"]
+        mrc = bpy.data.images.new("GradedMRPaint", MW, MH, alpha=True)
+        mrc.colorspace_settings.name = "Non-Color"
+        mrc.pixels.foreach_set(ma.reshape(-1)); mrc.update(); mr = mrc
+    return arr, mr, cls_map, used
+
 for name in names:
     P = PROPS[name]
     f = os.path.join(src, P["file"])
@@ -356,6 +569,45 @@ for name in names:
         bmesh.ops.delete(bm, geom=gone, context="FACES")
         bm.to_mesh(me); bm.free(); me.update()
         print("PROP", name, "cut", len(gone), "faces")
+    # src_paint (2026-11-16, review round 2): the paint classes run on the model's OWN picture, before the bake. Its islands are whole parts (the face, the
+    # frame, a plank), so a class is judged with its neighbours; the baked picture of a 6000-triangle model is hundreds of tiny islands, where a scratch or
+    # a worn edge was judged alone and came out as chalky silver blotches on the face and planks. The tier mask is then baked like the colour.
+    src_mask = None
+    if P.get("src_paint") and "paint" in P and P.get("bake"):
+        import numpy as np
+        smat = me.materials[0]; spr = next(n for n in smat.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        def _src_node(sock_name):
+            stack = [spr.inputs[sock_name]]
+            while stack:
+                s = stack.pop()
+                for l in s.links:
+                    if l.from_node.type == "TEX_IMAGE": return l.from_node
+                    stack.extend(i for i in l.from_node.inputs)
+            return None
+        bn = _src_node("Base Color"); mn_ = _src_node("Metallic") or _src_node("Roughness")
+        side = min(2048, bn.image.size[0])
+        sb = bn.image.copy(); sb.scale(side, side)
+        sarr = np.array(sb.pixels[:], dtype=np.float32).reshape(side, side, 4)
+        smr = None
+        if mn_:
+            smr = mn_.image.copy(); smr.scale(side // 2, side // 2)
+        force = relief_classes(me, P, name, side) if P.get("relief") else (zone_classes(me, P, name, side) if P.get("zones") else None)
+        sarr, smr, scls, sused = paint_pixels(P, name, sarr, smr, force)
+        gb = bpy.data.images.new("SrcPaint_%s" % name, side, side, alpha=True)
+        gb.pixels.foreach_set(sarr.reshape(-1)); gb.update(); bn.image = gb
+        if mn_: mn_.image = smr
+        else:   # (no metal/roughness picture of its own: the new one feeds Roughness, where the bake looks for it)
+            tn_ = smat.node_tree.nodes.new("ShaderNodeTexImage"); tn_.image = smr
+            smat.node_tree.links.new(tn_.outputs["Color"], spr.inputs["Roughness"])
+        mk_ = np.isin(scls, list(P.get("tier", []))).astype(np.float32)
+        for _d in range(4):   # (into the margin round each island, so the bake's edge samples don't pull a tinted part toward untinted)
+            nb_ = np.maximum.reduce([np.roll(mk_, 1, 0), np.roll(mk_, -1, 0), np.roll(mk_, 1, 1), np.roll(mk_, -1, 1)])
+            mk_ = np.where(sused, mk_, np.maximum(mk_, nb_))
+        ma_ = np.zeros((side, side, 4), dtype=np.float32); ma_[..., 0] = mk_; ma_[..., 1] = mk_; ma_[..., 2] = mk_; ma_[..., 3] = 1.0
+        src_mask = bpy.data.images.new("SrcMask_%s" % name, side, side, alpha=True); src_mask.colorspace_settings.name = "Non-Color"
+        src_mask.pixels.foreach_set(ma_.reshape(-1)); src_mask.update()
+        print("PROP", name, "painted its own %dpx picture; tier mask %.0f%% of it" % (side, 100.0 * mk_[sused].mean()))
+    baked_extra = None
     if "reduce" in P:
         tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
         if tris_now > P["reduce"]:
@@ -386,7 +638,7 @@ for name in names:
                     bpy.ops.mesh.customdata_custom_splitnormals_clear()
                 except Exception as e_: print("PROP", name, "custom normals kept:", e_)
                 me.shade_smooth(); me.set_sharp_from_angle(angle=math.radians(50.0))
-                bake_to_new_uvs(o, hi, name, swatch=bool(P.get("swatch")))
+                baked_extra = bake_to_new_uvs(o, hi, name, swatch=bool(P.get("swatch")), extra={"Mask": src_mask} if src_mask else None)
                 me = o.data
     print("PROP", name, "tris from", tris0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     # (the model's own normals, by corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side. Kept as a corner attribute so cuts and bands carry them along)
@@ -427,6 +679,8 @@ for name in names:
     if band:
         for i in range(3):
             if i != li: g[i] = (min(c[i] for c in band) + max(c[i] for c in band)) * 0.5
+    for i, sh_ in enumerate(P.get("pivot", (None, None, None))):   # (shields: the origin at these shares of the box, 0 = low side, 1 = high side)
+        if sh_ is not None: g[i] = lo[i] + (hi[i] - lo[i]) * sh_
     for v in me.vertices: v.co = (v.co - g) * S
     # one gentle arc along the long axis: take out the stave's own bends, tips toward +axis
     if "bend" in P:
@@ -531,6 +785,23 @@ for name in names:
         graded.update()
         base = graded
         print("PROP", name, "wood %.0f%% of the picture" % (100.0 * wood.mean()))
+    # paint (2026-11-16, the library shields: clean off the grime and scratches, keep the design): each pixel of the picture goes to the first class
+    # whose test (hue degrees, saturation, value, value blurred over 'near' pixels: numpy arrays) it passes; a class repaints its pixels in one clean
+    # colour ('to': hue, saturation, value; None keeps each pixel's own hue and saturation), keeping 'slow' of the gentle shading and 'fine' of the
+    # fine detail (scratches, grime and specks are fine detail: 0.1-0.3 cleans them off). 'rough'/'metal' set the class in the metal/roughness picture
+    # (made if the model has none). tier: the classes that take the tier's colour (the mask, by class, decided once per face).
+    cls_map = None
+    if "paint" in P and not P.get("src_paint"):
+        import numpy as np
+        arr = np.array(pix, dtype=np.float32).reshape(H, W, 4)
+        arr, mr, cls_map, used = paint_pixels(P, name, arr, mr)
+        pix = arr.reshape(-1).tolist()
+        graded = bpy.data.images.new("GradedPaint", W, H, alpha=True)
+        graded.pixels.foreach_set(arr.reshape(-1)); graded.update(); base = graded
+    def cls_at(u, v):
+        x = min(W - 1, max(0, int((u % 1.0) * W))); y = min(H - 1, max(0, int((v % 1.0) * H)))
+        return int(cls_map[y, x])
+    tier_cls = set(P["tier"]) if "tier" in P else None
     # more metal (owner, 2026-11-11: the tier's colour should stand out; the same model in every tier): whole parts made metal, and raised metal bands
     forced = set(); plain = set()
     if "metal" in P or "bands" in P or "plain" in P:
@@ -569,6 +840,10 @@ for name in names:
         sat = (mx - mn) / max(mx, 1e-4)
         return sat < 0.30 or mx < 0.06   # (dark steel counts, whatever faint hue it has)
     rg = P.get("rg")
+    def tier_vote(pc_, q):
+        if tier_cls is not None and cls_map is not None: return cls_at(q.x, q.y) in tier_cls
+        c_ = colour_at(q.x, q.y)
+        return rg(pc_, c_)[0] > 0.5 if rg else is_metal(*c_)
     # islands: with clean, patches of faces smaller than this many cm2 take the answer of what surrounds them (the picture's painted shade and specks
     # inside a fitting left dark holes in its tint, 2026-11-13)
     island_val = {}
@@ -577,7 +852,7 @@ for name in names:
             uvs = [Vector(uv[li_].uv) for li_ in poly.loop_indices]
             c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
             pts = [c_] + [c_ + (q - c_) * 0.6 for q in uvs]
-            votes = sum(1 for q in pts if (rg(poly.center, colour_at(q.x, q.y))[0] > 0.5 if rg else is_metal(*colour_at(q.x, q.y))))
+            votes = sum(1 for q in pts if tier_vote(poly.center, q))
             island_val[poly.index] = 1.0 if votes * 2 > len(pts) else 0.0
         nb = {}
         by_edge = {}
@@ -615,7 +890,7 @@ for name in names:
             c_ = sum(uvs, Vector((0.0, 0.0))) / len(uvs)
             pts = [c_] + [c_ + (q - c_) * 0.6 for q in uvs]
             pc_ = poly.center
-            votes = sum(1 for q in pts if (rg(pc_, colour_at(q.x, q.y))[0] > 0.5 if rg else is_metal(*colour_at(q.x, q.y))))
+            votes = sum(1 for q in pts if tier_vote(pc_, q))
             face_val = 1.0 if votes * 2 > len(pts) else 0.0
             if poly.index in plain: face_val = 0.0
         for li_ in poly.loop_indices:
@@ -692,6 +967,22 @@ for name in names:
         print("PROP", name, "despeck: %.2f%% of the picture lifted" % (100.0 * spk.mean()))
     # the pictures
     shrink(base, 1024, os.path.join(out, "T_%s_Base.png" % name))
+    if baked_extra and "Mask" in baked_extra:   # (src_paint: the tier mask baked from the model's own picture)
+        shrink(baked_extra["Mask"], 1024, os.path.join(out, "T_%s_Mask.png" % name))
+        print("PROP", name, "tier mask baked")
+    elif tier_cls is not None and cls_map is not None:
+        # (the shields: the tier's colour by pixel, not by face: a picture of its own, M_Prop's MaskTex. Clean edges where the bronze meets the planks,
+        # which a mask by face drew as teeth across the big triangles of a 6000-triangle model)
+        import numpy as np
+        mk = np.isin(cls_map, list(tier_cls)).astype(np.float32)
+        for _d in range(6):   # (grown into the empty margin round each island, so the edges of a tinted part don't filter toward untinted)
+            nb_ = np.maximum.reduce([np.roll(mk, 1, 0), np.roll(mk, -1, 0), np.roll(mk, 1, 1), np.roll(mk, -1, 1)])
+            mk = np.where(used, mk, np.maximum(mk, nb_))
+        ma_ = np.zeros((H, W, 4), dtype=np.float32); ma_[..., 0] = mk; ma_[..., 1] = mk; ma_[..., 2] = mk; ma_[..., 3] = 1.0
+        mim = bpy.data.images.new("GradedMask_%s" % name, W, H, alpha=True); mim.colorspace_settings.name = "Non-Color"
+        mim.pixels.foreach_set(ma_.reshape(-1)); mim.update()
+        shrink(mim, 1024, os.path.join(out, "T_%s_Mask.png" % name))
+        print("PROP", name, "tier mask by pixel: %.0f%% of the picture" % (100.0 * mk.mean()))
     if normal: shrink(normal, 512, os.path.join(out, "T_%s_Normal.png" % name))
     if mr: shrink(mr, 512, os.path.join(out, "T_%s_MR.png" % name))
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
