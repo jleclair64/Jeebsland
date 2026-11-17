@@ -470,16 +470,26 @@ void AKnightCharacter::Mount(AHorse* H)
 	HorseEnergy = 100.f;
 	bHorseTired = false;
 	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 2.f;
-	bSavedOrientMount = GetCharacterMovement()->bOrientRotationToMovement;
-	GetCharacterMovement()->bOrientRotationToMovement = false;   // the horse faces where it steers, not where it is pushed
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 3.2f;   // (TickGroundSpeed sets the real riding speed from the next frame)
+	// The on-foot facing to come back to. Strafe mode (on by default), the bow's draw or the shield stance have already turned
+	// turning-to-movement off for themselves (bBackOrient, TickGroundSpeed), so the real on-foot value is the one they saved, not
+	// the live one, and they let go of it here. Before 2026-11-16 the live "off" was saved, TickGroundSpeed then handed the
+	// strafe's saved "on" back mid-ride, and the dismount restored "off" for good: with strafe mode off after a ride, the knight
+	// no longer turned to where he walked.
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	bSavedOrientMount = bBackOrient ? bBackSavedOrient : Move->bOrientRotationToMovement;
+	bBackOrient = false;
+	Move->bOrientRotationToMovement = false;   // the horse faces where it steers, not where it is pushed
 }
+
+bool AKnightCharacter::OrientsToMovement() const { return GetCharacterMovement()->bOrientRotationToMovement; }
 
 void AKnightCharacter::Dismount()
 {
 	if (!bMounted) return;
 	bMounted = false;
-	GetCharacterMovement()->bOrientRotationToMovement = bSavedOrientMount;
+	GetCharacterMovement()->bOrientRotationToMovement = bSavedOrientMount;   // (strafe mode takes it over again next frame if it is on)
+	bBackOrient = false;
 	if (AHorse* H = MyHorse.Get()) H->SetRider(nullptr);
 	// Hop off to the right of the horse
 	SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));

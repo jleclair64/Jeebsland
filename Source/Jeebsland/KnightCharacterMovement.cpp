@@ -501,13 +501,16 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 			if (bHorseTired && HorseEnergy >= 4.f) bHorseTired = false;
 		}
 	}
-	// The horse is 20% slower than before, and builds up to a gallop: it does not jump to full speed when you sprint
-	float HorseTarget = 0.8f * (bHorseSprint ? 2.f * SprintSpeed : 2.f * WalkSpeed);
+	// The horse builds up to a gallop: it does not jump to full speed when you sprint. Twice as fast since 2026-11-16 (owner:
+	// "make the horse twice as fast"; was 1.6 x the knight's walk and sprint, now 3.2 x). The build-up and the easing off are
+	// doubled too, so the gallop still comes in over about 1.7 s. (Backing up stays at half the knight's walk: bBackStep below.)
+	const float HorseMul = 3.2f;
+	float HorseTarget = HorseMul * (bHorseSprint ? SprintSpeed : WalkSpeed);
 	if (!bMounted) HorseSpeedNow = 0.f;
 	else
 	{
-		if (HorseSpeedNow < 1.f) HorseSpeedNow = 0.8f * 2.f * WalkSpeed;
-		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 330.f : 900.f);   // speeds up over about 1.7 s, eases off quicker
+		if (HorseSpeedNow < 1.f) HorseSpeedNow = HorseMul * WalkSpeed;
+		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 660.f : 1800.f);
 	}
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
