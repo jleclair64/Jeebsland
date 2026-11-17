@@ -48,6 +48,8 @@ def pic(name, srgb, normal=False):
         t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
         t.set_editor_property("flip_green_channel", True)   # (glTF's normal maps point green the other way from Unreal's)
     elif not srgb: t.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
+    # 2026-11-16: our building pictures (up to 4096) go in our own groups (Project01 colour, Project02 normal), uncapped, so the 2048 cap on World/WorldNormalMap (Config/DefaultDeviceProfiles.ini) only hits the Fab packs. Always set: the editor's own cap (2048) hides the real size here.
+    t.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_PROJECT02 if normal else unreal.TextureGroup.TEXTUREGROUP_PROJECT01)
     lib.save_asset(folder + "/" + name)
     return t
 
