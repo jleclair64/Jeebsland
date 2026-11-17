@@ -748,7 +748,7 @@ void AAutumnDecor::BeginPlay()
 			PerType[Lf.Type].Add(FTransform(FQuat::Identity, Lf.Pos, FVector(LeafXY, LeafXY, LeafZ)));
 			Falling.Add(Lf);
 		}
-		for (int32 t = 0; t < NumLeafTypes; ++t) FallLeaf[t]->AddInstances(PerType[t], false, false, false);
+		for (int32 t = 0; t < NumLeafTypes; ++t) { FallLeaf[t]->AddInstances(PerType[t], false, false, false); FallLeaf[t]->SetHasPerInstancePrevTransforms(true); }   // motion vectors for TAA: no ghost trails
 	}
 
 	// ---------------- Gust leaves (hidden until a gust blows through) ----------------
@@ -768,7 +768,7 @@ void AAutumnDecor::BeginPlay()
 			PerType[L.Type].Add(FTransform(FQuat::Identity, FVector(0, 0, -5000.f), FVector(0.001f)));
 			GustLeaves.Add(L);
 		}
-		for (int32 t = 0; t < NumLeafTypes; ++t) GustLeaf[t]->AddInstances(PerType[t], false, false, false);
+		for (int32 t = 0; t < NumLeafTypes; ++t) { GustLeaf[t]->AddInstances(PerType[t], false, false, false); GustLeaf[t]->SetHasPerInstancePrevTransforms(true); }
 		bGustHidden = true;
 	}
 }
@@ -800,7 +800,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			{
 				const float Ph = PHaloPhase[i] * 5.f;
 				const float F = 1.f + 0.20f * FMath::Sin(Time * 9.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
-				PumpkinHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, PHaloPos[i], FVector(PHaloScale[i] * (0.86f + 0.22f * F))), true, i == PHaloPos.Num() - 1, true);
+				PumpkinHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, PHaloPos[i], FVector(PHaloScale[i] * (0.86f + 0.22f * F))), true, false, true);
 			}
 		}
 	}
@@ -815,8 +815,8 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Ph = FlamePhase[i];
 			const float Flicker = 1.f + 0.20f * FMath::Sin(Time * 11.f + Ph) + 0.10f * FMath::Sin(Time * 23.f + Ph * 2.f);
 			const FVector P = FlameBase[i] + FVector(0.4f * FMath::Sin(Time * 7.f + Ph), 0.4f * FMath::Cos(Time * 6.f + Ph), 3.2f * (Flicker - 1.f));
-			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.04f, 0.04f, 0.09f * Flicker)), true, i == FlameBase.Num() - 1, true);
-			CandleHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, FlameBase[i] + FVector(0.f, 0.f, 1.f), FVector(0.10f * (0.85f + 0.25f * Flicker))), true, i == FlameBase.Num() - 1, true);
+			Flame->UpdateInstanceTransform(i, FTransform(FQuat::Identity, P, FVector(0.04f, 0.04f, 0.09f * Flicker)), true, false, true);
+			CandleHalo->UpdateInstanceTransform(i, FTransform(FQuat::Identity, FlameBase[i] + FVector(0.f, 0.f, 1.f), FVector(0.10f * (0.85f + 0.25f * Flicker))), true, false, true);
 		}
 		// Torch flames lick and sway
 		for (int32 i = 0; i < TorchFlamePos.Num(); ++i)
@@ -826,9 +826,8 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Wd = 1.f - 0.10f * FMath::Sin(Time * 11.f + Ph * 1.3f);
 			const FQuat Lean = FRotator(5.f * FMath::Sin(Time * 3.1f + Ph), 0.f, 5.f * FMath::Cos(Time * 2.7f + Ph)).Quaternion();
 			const FVector F = TorchFlamePos[i] + FVector(0.f, 0.f, 18.f * (H - 1.f));
-			const bool bLast = i == TorchFlamePos.Num() - 1;
-			TorchFlame->UpdateInstanceTransform(i, FTransform(Lean, F, FVector(0.16f * Wd, 0.16f * Wd, 0.36f * H)), true, bLast, true);
-			TorchCore->UpdateInstanceTransform(i, FTransform(Lean, F - FVector(0.f, 0.f, 5.f), FVector(0.09f * Wd, 0.09f * Wd, 0.22f * H)), true, bLast, true);
+			TorchFlame->UpdateInstanceTransform(i, FTransform(Lean, F, FVector(0.16f * Wd, 0.16f * Wd, 0.36f * H)), true, false, true);
+			TorchCore->UpdateInstanceTransform(i, FTransform(Lean, F - FVector(0.f, 0.f, 5.f), FVector(0.09f * Wd, 0.09f * Wd, 0.22f * H)), true, false, true);
 		}
 	}
 	// ---- Gust of wind: every few seconds a flurry of leaves whips past in an open part of the map ----
@@ -888,13 +887,14 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 	if (!Pawn) return;
 	const FVector C = Pawn->GetActorLocation();
 
-	int32 LastOfType[NumLeafTypes];
-	for (int32 t = 0; t < NumLeafTypes; ++t) LastOfType[t] = -1;
-	for (int32 i = 0; i < Falling.Num(); ++i) LastOfType[Falling[i].Type] = i;
+	// New and previous-frame transforms per leaf type, one batch call each (the previous ones give TAA its motion vectors)
+	TArray<FTransform> NewT[NumLeafTypes], PrevT[NumLeafTypes];
+	for (int32 t = 0; t < NumLeafTypes; ++t) { NewT[t].SetNum(FallLeaf[t]->GetInstanceCount()); PrevT[t].SetNum(NewT[t].Num()); }
 
 	for (int32 i = 0; i < Falling.Num(); ++i)
 	{
 		FFallingLeaf& L = Falling[i];
+		bool bJumped = false;
 		L.Pos.Z -= L.Fall * DeltaSeconds;
 		L.Pos.X += 45.f * FMath::Sin(Time * 0.9f + L.Phase) * DeltaSeconds;
 		L.Pos.Y += 45.f * FMath::Cos(Time * 0.7f + L.Phase) * DeltaSeconds;
@@ -906,11 +906,18 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			const float Ang = Rand.FRandRange(0.f, 2.f * PI);
 			const float Rad = 1600.f * FMath::Sqrt(Rand.FRand());
 			L.Pos = FVector(C.X + Rad * FMath::Cos(Ang), C.Y + Rad * FMath::Sin(Ang), C.Z + Rand.FRandRange(250.f, 900.f));
+			bJumped = true;
 		}
 
 		const FQuat Q = FRotator(Time * L.Spin * 50.f + L.Phase * 40.f, Time * L.Spin * 70.f, Time * 35.f).Quaternion();
-		FallLeaf[L.Type]->UpdateInstanceTransform(L.Index, FTransform(Q, L.Pos, FVector(LeafXY, LeafXY, LeafZ)), true, i == LastOfType[L.Type], true);
+		const FTransform NewTf(Q, L.Pos, FVector(LeafXY, LeafXY, LeafZ));
+		FTransform Prev = NewTf;
+		if (!bJumped) FallLeaf[L.Type]->GetInstanceTransform(L.Index, Prev, true);
+		NewT[L.Type][L.Index] = NewTf;
+		PrevT[L.Type][L.Index] = Prev;
 	}
+	for (int32 t = 0; t < NumLeafTypes; ++t)
+		if (NewT[t].Num() > 0) FallLeaf[t]->BatchUpdateInstancesTransforms(0, NewT[t], PrevT[t], true, false, true);
 }
 
 void AAutumnDecor::SetGustLeaves(float Fade)
@@ -918,9 +925,8 @@ void AAutumnDecor::SetGustLeaves(float Fade)
 	const FVector2D Perp(-GustDir.Y, GustDir.X);
 	const FVector2D Center = FVector2D(GustOrigin.X, GustOrigin.Y) + GustDir * (GustSpeed * GustT);
 
-	int32 LastOfType[NumLeafTypes];
-	for (int32 t = 0; t < NumLeafTypes; ++t) LastOfType[t] = -1;
-	for (int32 i = 0; i < GustLeaves.Num(); ++i) LastOfType[GustLeaves[i].Type] = i;
+	TArray<FTransform> NewT[NumLeafTypes], PrevT[NumLeafTypes];
+	for (int32 t = 0; t < NumLeafTypes; ++t) { NewT[t].SetNum(GustLeaf[t]->GetInstanceCount()); PrevT[t].SetNum(NewT[t].Num()); }
 
 	for (int32 i = 0; i < GustLeaves.Num(); ++i)
 	{
@@ -938,8 +944,13 @@ void AAutumnDecor::SetGustLeaves(float Fade)
 			const FQuat Q = FRotator(GustT * L.Spin * 260.f, GustT * L.Spin * 340.f + L.Phase * 50.f, GustT * 200.f).Quaternion();
 			T = FTransform(Q, FVector(P.X, P.Y, Z), FVector(FMath::Max(LeafXY * Fade, 0.001f), FMath::Max(LeafXY * Fade, 0.001f), LeafZ));
 		}
-		GustLeaf[L.Type]->UpdateInstanceTransform(L.Index, T, true, i == LastOfType[L.Type], true);
+		FTransform Prev = T, Old;
+		if (GustLeaf[L.Type]->GetInstanceTransform(L.Index, Old, true) && Old.GetLocation().Z > -4000.f && T.GetLocation().Z > -4000.f) Prev = Old;   // parked leaves jump: no streak
+		NewT[L.Type][L.Index] = T;
+		PrevT[L.Type][L.Index] = Prev;
 	}
+	for (int32 t = 0; t < NumLeafTypes; ++t)
+		if (NewT[t].Num() > 0) GustLeaf[t]->BatchUpdateInstancesTransforms(0, NewT[t], PrevT[t], true, false, true);
 }
 
 // The world fill (Fill.h), once built on a client: the fallen leaves lying where a filler piece now covers the ground go
