@@ -1,6 +1,8 @@
 #include "Paths.h"
 #include "Terrain.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 
 APaths::APaths()
 {
@@ -105,4 +107,15 @@ void APaths::BeginPlay()
 		if (Dirt) Mesh->SetMaterial(i, Dirt);
 		else if (UMaterialInstanceDynamic* M = Mesh->CreateDynamicMaterialInstance(i, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.24f, 0.16f, 0.08f));
 	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBPATHS material %s, bounds %s, visible %d"), Mesh->GetMaterial(0) ? *Mesh->GetMaterial(0)->GetPathName() : TEXT("none"), *Mesh->Bounds.GetBox().ToString(), Mesh->IsVisible() ? 1 : 0);
+#if !UE_BUILD_SHIPPING
+	// (test pictures: the console command jeeb.Test.PathsRed paints the ribbons flat red with the engine's plain material, to tell the mesh from the material)
+	static FAutoConsoleCommandWithWorld PathsRed(TEXT("jeeb.Test.PathsRed"), TEXT("Paints the road ribbons flat red (test pictures)"), FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W)
+	{
+		UMaterialInterface* Plain = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		for (TActorIterator<APaths> It(W); It && Plain; ++It)
+			for (int32 i = 0; i < It->Mesh->GetNumMaterials(); ++i)
+				if (UMaterialInstanceDynamic* M = It->Mesh->CreateDynamicMaterialInstance(i, Plain)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.f, 0.f, 0.f));
+	}));
+#endif
 }
