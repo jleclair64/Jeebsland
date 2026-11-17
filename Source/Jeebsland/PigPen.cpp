@@ -84,7 +84,7 @@ void APigPen::BeginPlay()
 			const float Z = Ground(Mid.X, Mid.Y);
 			Put(Rail, FTransform(Q, FVector(Mid.X, Mid.Y, Z + 50.f),  FVector(L / 100.f, 0.07f, 0.12f)));
 			Put(Rail, FTransform(Q, FVector(Mid.X, Mid.Y, Z + 100.f), FVector(L / 100.f, 0.07f, 0.12f)));
-			AddSolid(FVector(Mid.X, Mid.Y, Z + 80.f), FVector(L * 0.5f, 12.f, 80.f)); // knee-high wall to the knight, so no sneaking through
+			AddSolid(FVector(Mid.X, Mid.Y, Z + 54.f), FVector(L * 0.5f, 12.f, 54.f)); // a solid up to the top rail (1.08 m), so no sneaking through; low enough to vault (2026-11-16, was 1.6 m)
 		};
 		if (bGap)
 		{

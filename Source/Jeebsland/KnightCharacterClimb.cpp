@@ -4,6 +4,99 @@
 #include "SkillComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Terrain.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Engine/World.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+
+// The mantle in the real map (2026-11-16; not in Shipping):
+//   -MantleAt=<x>_<y>_<yaw>_<back>_<share>   (test pictures) as the pictures start he stands <back> cm short of (x, y) facing <yaw>, on the ground there, and
+//                                            0.6 s later walks that way at <share> hundredths of full speed (100 runs) for 3 s; [_<side>_<up>]: a still camera side-on, <side> cm to his right (negative: left; default 550), <up> cm up (150).
+//   -NetMantle=<x>_<y>_<yaw>_<back>_<share>  (online, on the server and the client): the server stands the player there 4 s after he arrives; his machine walks
+//                                            him that way from 8 s to 11 s and logs JEEBNETFIX, the corrections it took while walking (0: the two agreed).
+void AKnightCharacter::TickMantleTests(float Dt)
+{
+#if !UE_BUILD_SHIPPING
+	static FString AtS, NetS;
+	static const bool bAt = FParse::Value(FCommandLine::Get(), TEXT("MantleAt="), AtS);
+	static const bool bNet = FParse::Value(FCommandLine::Get(), TEXT("NetMantle="), NetS);
+	if (!bAt && !bNet) return;
+	// (-MantleAt takes several, joined by 'x': one every 5 s, each filmed by a still camera side-on to it, <side> cm off (a 6th field, default 450;
+	// negative: from the other side). The pictures' frame k*75 is where the k-th starts, at 15 pictures a second)
+	static float AtT = -1.f;
+	TArray<FString> Segs;
+	(bNet ? NetS : AtS).ParseIntoArray(Segs, TEXT("x"));
+	const int32 Seg = bNet ? 0 : FMath::Clamp(int32(FMath::Max(AtT, 0.f) / 5.f), 0, FMath::Max(Segs.Num() - 1, 0));
+	TArray<FString> P;
+	if (Segs.IsValidIndex(Seg)) Segs[Seg].ParseIntoArray(P, TEXT("_"));
+	if (P.Num() < 5) return;
+	const FVector2D Spot(FCString::Atof(*P[0]), FCString::Atof(*P[1]));
+	const float Yaw = FCString::Atof(*P[2]), Back = FCString::Atof(*P[3]), Share = FCString::Atoi(*P[4]) / 100.f;
+	const FVector Dir = FRotator(0.f, Yaw, 0.f).Vector();
+	auto Place = [&]()
+	{
+		const FVector2D At = Spot - FVector2D(Dir) * Back;
+		const float HH = GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+		FHitResult H;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebMantleTest), true, this);
+		const float Top = JeebTerrain::HeightAt(At.X, At.Y) + 400.f;
+		const float Z = GetWorld()->LineTraceSingleByChannel(H, FVector(At.X, At.Y, Top), FVector(At.X, At.Y, Top - 1500.f), ECC_Pawn, Q) ? float(H.ImpactPoint.Z) : Top - 400.f;
+		SetActorLocationAndRotation(FVector(At.X, At.Y, Z + HH + 3.f), FRotator(0.f, Yaw, 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+		GetCharacterMovement()->Velocity = FVector::ZeroVector;
+		ShotFaceYaw = Yaw;
+		UE_LOG(LogTemp, Log, TEXT("JEEBMANTLE test placed at (%.0f,%.0f,%.0f) facing %.0f, %.0f cm short of (%.0f,%.0f)"), At.X, At.Y, Z, Yaw, Back, Spot.X, Spot.Y);
+	};
+	if (bAt)
+	{
+		if (!bShotFace || !IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
+		static int32 Placed = -1, Filmed = -1;
+		if (AtT < 0.f) AtT = 0.f;
+		if (Placed != Seg) { Placed = Seg; Place(); }
+		if (Filmed != Seg && AtT - Seg * 5.f >= 0.55f)   // (the camera once he has settled on the ground: placed from a height, he drops first)
+		{
+			Filmed = Seg;
+			const float Side = P.Num() >= 6 ? FCString::Atof(*P[5]) : 550.f;
+			const float Up = P.Num() >= 7 ? FCString::Atof(*P[6]) : 150.f;   // (a 7th field: the camera's height over his ground)
+			const float G = float(GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+			const FVector Look(Spot.X, Spot.Y, G + 80.f);
+			const FVector Eye = FVector(Spot.X, Spot.Y, G + Up) - FVector(Dir) * 40.f + FRotator(0.f, Yaw + 90.f, 0.f).Vector() * Side;
+			if (APlayerController* PC = Cast<APlayerController>(Controller))
+				if (ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Eye, (Look - Eye).Rotation()))
+				{
+					Cam->GetCameraComponent()->SetFieldOfView(55.f);
+					Cam->GetCameraComponent()->bConstrainAspectRatio = false;
+					PC->SetViewTarget(Cam);
+				}
+			UE_LOG(LogTemp, Log, TEXT("JEEBMANTLE test %d starts at %.2f s (picture %d)"), Seg, AtT, FMath::RoundToInt(AtT * 15.f));
+		}
+		const float T = AtT - Seg * 5.f;
+		AtT += Dt;
+		if (T > 0.6f && T < 3.6f) AddMovementInput(Dir, Share);
+		return;
+	}
+	if (!Controller || !Controller->IsA<APlayerController>()) return;
+	NetMantleT += Dt;
+	const UKnightMovement* KM = KnightMove();
+	if (HasAuthority() && !IsLocallyControlled())
+	{
+		if (NetMantleT >= 4.f && NetMantleT - Dt < 4.f) Place();
+	}
+	else if (IsLocallyControlled() && GetNetMode() == NM_Client && KM)
+	{
+		static int32 FixesAtStart = 0;
+		if (NetMantleT >= 8.f && NetMantleT - Dt < 8.f)
+		{
+			FixesAtStart = KM->NetFixes;
+			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client walks from (%.0f,%.0f,%.0f), %d corrections so far"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes);
+		}
+		if (NetMantleT >= 8.f && NetMantleT < 11.f) AddMovementInput(Dir, Share);
+		if (NetMantleT >= 12.f && NetMantleT - Dt < 12.f)
+			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client done at (%.0f,%.0f,%.0f): %d corrections while walking and mantling"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes - FixesAtStart);
+	}
+#endif
+}
 
 // Free climbing and the mantle (2026-11-12): the knight's side. The movement itself (grabbing, the climb, its stamina, the climb jump,
 // the ledge climb-up, the mantle) is UKnightMovement (KnightMovement.cpp), inside Unreal's movement prediction; the pose is
@@ -69,6 +162,7 @@ void AKnightCharacter::TickWallClimb(float Dt)
 //   -ClimbDo=jump<at>[x...]  letgo<at>[x...]  space<at>   (hundredths): a climb jump (Space on the rock), Ctrl for 0.3 s, or Space (a mantle by a fence)
 void AKnightCharacter::TickClimbTests(float Dt)
 {
+	TickMantleTests(Dt);
 	if (!bShotFace || !IsLocallyControlled() || GetNetMode() != NM_Standalone) return;
 	static FString Keys, Do;
 	static bool bRead = false;

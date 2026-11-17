@@ -12,8 +12,10 @@
 //
 // What can be climbed (one rule, Climbable): a surface whose component carries the tag JeebClimb (the world's ground, the original square's
 // ground, MoveLab's climbing rock: hills and rock only), too steep to walk (its normal under the walkable limit, about 45 degrees) and not an
-// overhang of more than 15 degrees. What can be mantled: a component tagged JeebMantle (fences, low walls, crates) whose top is MantleMin to
-// MantleMax (Tuning.ini [Climb]) above his feet.
+// overhang of more than 15 degrees. What can be mantled (2026-11-16, owner: "any object just too high for the knight to jump over, but not so high
+// that it looks weird"): any solid he can't walk through whose top is MantleMin to MantleMax (Tuning.ini [Climb]) above his feet, decided from its
+// own collision (MantleCandidate: not a pawn, not moving, not climbable rock, no taller than he can get over, not a post, standing on the ground),
+// so new props work by themselves. JeebNoMantle on a component or its actor opts it out; JeebMantle marks one in by hand (MoveLab's test fences).
 //
 // Climbing stamina is a bar from 0 to 1; how long it lasts comes from the Climbing level (AKnightCharacter::ClimbSeconds, Tuning.ini [Climb]).
 // It refills on the ground. Climbing gives Climbing XP for new height (server only). There is no fall damage in the game (owner).
@@ -22,6 +24,7 @@ namespace JeebClimb
 	enum EMode : uint8 { None = 0, Climb = 1, Jump = 2, ClimbUp = 3, MantleOver = 4, MantleOnto = 5, Swim = 6, Drown = 7 };   // (6, 7: swimming, 2026-11-13: KnightMovementSwim.cpp)
 	static const FName ClimbTag(TEXT("JeebClimb"));
 	static const FName MantleTag(TEXT("JeebMantle"));
+	static const FName NoMantleTag(TEXT("JeebNoMantle"));
 	constexpr float WallGap = 4.f;   // cm between the capsule and the rock while on it
 }
 
@@ -68,7 +71,12 @@ public:
 	bool bWantsLetGo = false;     // Ctrl held (FLAG_Custom_0): on the wall he lets go, and he never grabs while it is held
 	void QueueClimbJump() { bJumpQueued = true; }   // a fresh Space press on the wall (AKnightCharacter::CheckJumpInput, inside the move)
 	void AskJump() { bJumpAsked = true; }           // a fresh Space press on the ground near something mantleable: mantle, or else jump, decided in the move
-	bool MantleNearby() const;                       // anything marked JeebMantle within reach (a cheap first check)
+	bool MantleNearby() const;                       // anything he might mantle within reach (a cheap first check: one overlap, no traces)
+	// Whether this solid (an instanced one: its instance Item) is something he may mantle, judged from its own collision and size, no traces (cheap
+	// enough for every impact). bFace: the side he runs into, which must also stand on the ground at his feet (not a beam or a deck).
+	bool MantleCandidate(const UPrimitiveComponent* C, int32 Item, float FeetZ, bool bFace) const;
+	int32 NetFixes = 0;   // (tests: corrections this machine has taken from the server, log JEEBNETFIX)
+	mutable FString MantleWhy;   // (the log: why the last plan found no mantle)
 	// The server drops him off the wall (a clean hit, a knockdown, death); the correction carries it to his machine
 	void ForceDrop(bool bAll = false);   // bAll: a mantle too (death moves him away)
 
@@ -82,6 +90,7 @@ public:
 	virtual float GetMaxSpeed() const override;
 	virtual void ClientHandleMoveResponse(const FCharacterMoveResponseDataContainer& MoveResponse) override;
 	virtual void HandleImpact(const FHitResult& Hit, float TimeSlice = 0.f, const FVector& MoveDelta = FVector::ZeroVector) override;
+	virtual void OnMovementUpdated(float DeltaSeconds, const FVector& OldLocation, const FVector& OldVelocity) override;
 
 	// The climbing state (simulated on the server and predicted on the player's machine; the server's travels back in corrections)
 	float ClimbStamina = 1.f;
