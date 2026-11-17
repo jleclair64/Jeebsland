@@ -38,6 +38,7 @@ namespace JeebFill
 		ECull Cull = ECull::Small;
 		float Slope = 20.f;
 		bool bLight = false, bHang = false;
+		bool bGoods = false;     // (Flags "goods": wares for sale; only at Oak Hill's plaza market, a shop front or the square's market yard)
 		bool bFromCsv = false;   // false: guessed from the mesh's bounds (test only: machines may differ)
 	};
 	struct FPiece
@@ -52,6 +53,15 @@ namespace JeebFill
 	struct FOakRow { FString Set; float E = 0.f, N = 0.f, Yaw = 0.f; int32 Seed = 0; bool bVar = false; int32 Plot = -1; FString Note; int32 Line = 0; bool bSquare = false; };
 	struct FZone { FString Name; bool bOn = false; float Density = 0.f; TArray<TPair<FString, float>> Mix; int32 Seed = 0; EFacing Facing = EFacing::Random; float Trees = 0.f; };
 	struct FTreeRow { FString Site, Class, Note; float E = 0.f, N = 0.f, Radius = 150.f; };
+	// Placement v2 (2026-11-16, Docs/FillPlan.md "Placement v2"): plots with a use, fenced by continuous runs, dressed by their use
+	//  FillPlots.csv  Plot, Site (OakHill|Square), Use, Building (index in JeebOakHill::Plots(); -1 none), Outline ("E N;E N;..." metres
+	//                 from Oak Hill's plaza, or world metres X = N, Y = E with Site Square; empty: the yard is made from the building's
+	//                 walls), Bound (picket|stick|stone|pillar|none), Depth, Side (metres the yard may reach behind and beside the building:
+	//                 shrunk until clear), Gate (auto|none), Seed, Note.
+	//  FillUses.csv   Use, Set, Anchor (wall|fence|corner|gate|row|trees|open), Min, Max: what each use places, in order.
+	enum class EAnchor : uint8 { Wall, Fence, Corner, Gate, Row, Trees, Open };
+	struct FPlotRow { FString Name, Site, Use, Bound, Gate, Note; int32 Building = -1; TArray<FVector2D> Outline; float Depth = 8.f, Side = 3.f; int32 Seed = 0; int32 Line = 0; };
+	struct FUseRow { FString Set; EAnchor Anchor = EAnchor::Wall; int32 Min = 0, Max = 1; };
 
 	struct FData
 	{
@@ -60,12 +70,14 @@ namespace JeebFill
 		TArray<FOakRow> Oak;
 		TMap<FString, FZone> Zones;
 		TArray<FTreeRow> Trees;
+		TArray<FPlotRow> Plots;
+		TMap<FString, TArray<FUseRow>> Uses;
 		FString Folder;                  // where the files were read
 		TArray<FString> Notes;           // what was missing or odd (logged)
 		bool bKindsCm = false;           // (FillKinds.csv's sizes turned out to be centimetres)
 	};
 
-	// Reads the five files from Content/Data (or -FillData=<folder>, test builds only). Missing files are only notes: the fill places
+	// Reads the seven files from Content/Data (or -FillData=<folder>, test builds only). Missing files are only notes: the fill places
 	// what it can (no sets: nothing).
 	void LoadData(FData& Out);
 }

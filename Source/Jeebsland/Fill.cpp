@@ -173,6 +173,7 @@ void JeebFill::LoadData(FData& D)
 					const FString L = F.ToLower();
 					if (L == TEXT("light")) K.bLight = true;
 					else if (L == TEXT("hang") || L == TEXT("hung")) K.bHang = true;
+					else if (L == TEXT("goods")) K.bGoods = true;
 					else if (L.StartsWith(TEXT("flame="))) K.Flame = KindName(F.Mid(6));
 				}
 				if (cLight >= 0 && (C.S(r, cLight) == TEXT("1") || C.S(r, cLight).ToLower() == TEXT("yes") || C.S(r, cLight).ToLower() == TEXT("true"))) K.bLight = true;
@@ -280,6 +281,57 @@ void JeebFill::LoadData(FData& D)
 				T.Site = C.S(r, cSite); if (T.Site.IsEmpty()) T.Site = TEXT("OakHill");
 				T.E = C.F(r, cE, 0.f); T.N = C.F(r, cN, 0.f); T.Class = C.S(r, cCl); T.Radius = C.F(r, cR, 1.5f) * 100.f; T.Note = C.S(r, cNote);
 				D.Trees.Add(T);
+			}
+		}
+	}
+	// ---- plots (Placement v2)
+	{
+		FCsv C;
+		if (!ReadCsv(Path(TEXT("FillPlots.csv")), C)) D.Notes.Add(TEXT("no FillPlots.csv (no plots, no fence runs)"));
+		else
+		{
+			const int32 cP = C.Col({ TEXT("Plot"), TEXT("Name") }), cSite = C.Col({ TEXT("Site") }), cUse = C.Col({ TEXT("Use") }), cB = C.Col({ TEXT("Building") });
+			const int32 cO = C.Col({ TEXT("Outline") }), cBo = C.Col({ TEXT("Bound") }), cD = C.Col({ TEXT("Depth") }), cS = C.Col({ TEXT("Side") });
+			const int32 cG = C.Col({ TEXT("Gate") }), cSeed = C.Col({ TEXT("Seed") }), cNote = C.Col({ TEXT("Note") });
+			for (int32 r = 0; r < C.Rows.Num(); ++r)
+			{
+				FPlotRow P;
+				P.Name = C.S(r, cP); P.Use = C.S(r, cUse);
+				if (P.Name.IsEmpty() || P.Use.IsEmpty()) continue;
+				P.Site = C.S(r, cSite); if (P.Site.IsEmpty()) P.Site = TEXT("OakHill");
+				P.Building = C.I(r, cB, -1);
+				TArray<FString> Pts; C.S(r, cO).ParseIntoArray(Pts, TEXT(";"));
+				for (const FString& Pt : Pts)
+				{
+					TArray<FString> V; Pt.TrimStartAndEnd().ParseIntoArray(V, TEXT(" "));
+					if (V.Num() >= 2) P.Outline.Add(FVector2D(FCString::Atof(*V[0]), FCString::Atof(*V[1])));
+				}
+				P.Bound = C.S(r, cBo).ToLower(); if (P.Bound.IsEmpty()) P.Bound = TEXT("none");
+				P.Depth = C.F(r, cD, 8.f); P.Side = C.F(r, cS, 3.f);
+				P.Gate = C.S(r, cG).ToLower(); if (P.Gate.IsEmpty()) P.Gate = TEXT("auto");
+				P.Seed = C.I(r, cSeed, r + 1); P.Note = C.S(r, cNote); P.Line = C.Lines[r];
+				D.Plots.Add(P);
+			}
+		}
+	}
+	// ---- what each use places
+	{
+		FCsv C;
+		if (!ReadCsv(Path(TEXT("FillUses.csv")), C)) D.Notes.Add(TEXT("no FillUses.csv (plots get their runs only)"));
+		else
+		{
+			const int32 cU = C.Col({ TEXT("Use") }), cSet = C.Col({ TEXT("Set") }), cA = C.Col({ TEXT("Anchor") }), cMin = C.Col({ TEXT("Min") }), cMax = C.Col({ TEXT("Max") });
+			for (int32 r = 0; r < C.Rows.Num(); ++r)
+			{
+				FUseRow U;
+				const FString Use = C.S(r, cU);
+				U.Set = C.S(r, cSet);
+				if (Use.IsEmpty() || U.Set.IsEmpty()) continue;
+				const FString A = C.S(r, cA).ToLower();
+				U.Anchor = A.StartsWith(TEXT("f")) ? EAnchor::Fence : A.StartsWith(TEXT("c")) ? EAnchor::Corner : A.StartsWith(TEXT("g")) ? EAnchor::Gate
+					: A.StartsWith(TEXT("r")) ? EAnchor::Row : A.StartsWith(TEXT("t")) ? EAnchor::Trees : A.StartsWith(TEXT("o")) ? EAnchor::Open : EAnchor::Wall;
+				U.Min = C.I(r, cMin, 0); U.Max = FMath::Max(U.Min, C.I(r, cMax, 1));
+				D.Uses.FindOrAdd(Use).Add(U);
 			}
 		}
 	}
@@ -626,6 +678,7 @@ struct FFillBuilder
 		int32 Zone = 0;
 		FString Set;
 		int32 Group = -1;   // (a hand-placed row: its pieces may join end to end, so they are never checked against each other)
+		FString Use;        // (the plot use that placed it, Placement v2; empty: a hand row or a rule zone)
 	};
 	TArray<FPlaced> Placed;
 	TMap<FIntPoint, TArray<int32>> PieceHash;   // ground footprints by 4 m square
@@ -1066,11 +1119,11 @@ struct FFillBuilder
 	}
 
 	// ------------------------------------------------------------------ placing
-	enum class EWhy : uint8 { Ok, Road, Water, Build, Keep, Game, Tree, Prop, Slope, Missing };
+	enum class EWhy : uint8 { Ok, Road, Water, Build, Keep, Game, Tree, Prop, Slope, Missing, Plot, Goods };
 	static const TCHAR* WhyName(EWhy W)
 	{
 		switch (W) { case EWhy::Road: return TEXT("road"); case EWhy::Water: return TEXT("water"); case EWhy::Build: return TEXT("building"); case EWhy::Keep: return TEXT("keepclear");
-		case EWhy::Game: return TEXT("solid"); case EWhy::Tree: return TEXT("treespot"); case EWhy::Prop: return TEXT("prop"); case EWhy::Slope: return TEXT("slope"); case EWhy::Missing: return TEXT("missing"); default: return TEXT("ok"); }
+		case EWhy::Game: return TEXT("solid"); case EWhy::Tree: return TEXT("treespot"); case EWhy::Prop: return TEXT("prop"); case EWhy::Slope: return TEXT("slope"); case EWhy::Missing: return TEXT("missing"); case EWhy::Plot: return TEXT("outsideplot"); case EWhy::Goods: return TEXT("goods"); default: return TEXT("ok"); }
 	}
 	struct FTry { const FKind* Kind; FTransform Xf; FShape Foot; bool bGround, bSolid, bWalkBlock, bDrop; };
 
@@ -1156,6 +1209,8 @@ struct FFillBuilder
 			if (bVar && P.Alts.Num() > 0) { const int32 k = FMath::Min(int32(AltRoll * (P.Alts.Num() + 1)), P.Alts.Num()); if (k > 0) KName = P.Alts[k - 1]; }
 			const FKind* K = KindOf(KName);
 			if (!K) { St.Skipped.FindOrAdd(TEXT("missing"))++; if (!P.bDrop && bAll) { if (OutWhy) *OutWhy = TEXT("missing ") + KName; return 0; } continue; }
+			// (Placement v2: wares for sale only at the market, a shop front or the square's market yard)
+			if (K->bGoods && !GoodsOk(Zone)) { St.Skipped.FindOrAdd(TEXT("goods"))++; if (!P.bDrop && bAll) { if (OutWhy) *OutWhy = TEXT("goods ") + KName; return 0; } if (OutWhy) *OutWhy += FString::Printf(TEXT("%s%s: goods"), OutWhy->IsEmpty() ? TEXT("") : TEXT(", "), *KName); continue; }
 			const float PYaw = Yaw + P.Yaw + (bVar ? TurnRoll * P.Turn : 0.f);
 			const FVector2D Pw = Fr.World(FVector2D(P.Pos.X, P.Pos.Y));
 			FTry T;
@@ -1172,6 +1227,7 @@ struct FFillBuilder
 			if (T.bGround)
 			{
 				EWhy W = Slope > K->Slope ? EWhy::Slope : Fits(T, Tries, !bAll);
+				if (W == EWhy::Ok && ClipPoly && !FootInPoly(T.Foot, *ClipPoly, 15.f)) W = EWhy::Plot;
 				if (W != EWhy::Ok)
 				{
 					St.Skipped.FindOrAdd(WhyName(W))++;
@@ -1191,7 +1247,7 @@ struct FFillBuilder
 	int32 NextGroup = 0;
 	void Commit(const FTry& T, int32 Zone, const FString& SetName, FStats& St, int32 Group)
 	{
-		const int32 Pi = Placed.Add({ T.Kind, T.Xf, T.Foot, T.bGround, T.bSolid, T.bWalkBlock, Zone, SetName, Group });
+		const int32 Pi = Placed.Add({ T.Kind, T.Xf, T.Foot, T.bGround, T.bSolid, T.bWalkBlock, Zone, SetName, Group, CurUse });
 		if (T.bGround)
 		{
 			Grid.Mark(T.Foot, F_PROP | (T.bWalkBlock ? F_PSOLID : 0));
@@ -1202,7 +1258,8 @@ struct FFillBuilder
 			// same box, or the round kinds' capsule, that BuildComponents makes), with a soft rim
 			if (T.bSolid && T.Kind->Col != ECol::Mesh)
 			{
-				const FShape Col = SolidFoot(*T.Kind, T.Foot, T.Xf.GetScale3D().X, T.Xf.Rotator().Yaw);
+				const FVector S3 = T.Xf.GetScale3D();
+				const FShape Col = FMath::IsNearlyEqual(S3.X, S3.Y, 0.001f) ? SolidFoot(*T.Kind, T.Foot, S3.X, T.Xf.Rotator().Yaw) : T.Foot;   // (a stretched run panel: its own box)
 				if (Col.Area() > 10000.f) AddCover(Col);
 			}
 		}
@@ -1211,6 +1268,7 @@ struct FFillBuilder
 		const uint32 Kc = FCrc::StrCrc32(*T.Kind->Name.ToLower());
 		H ^= Kc; H *= 16777619u;
 		HashIn(H, L.X); HashIn(H, L.Y); HashIn(H, L.Z); HashIn(H, T.Xf.Rotator().Yaw); HashIn(H, T.Xf.GetScale3D().X); HashIn(H, T.bSolid ? 1.f : 0.f);
+		if (!FMath::IsNearlyZero(T.Xf.Rotator().Pitch, 0.01f)) HashIn(H, T.Xf.Rotator().Pitch);
 		++St.Pieces; if (T.bSolid) ++St.Solid;
 		St.Kinds.Add(T.Kind->Name);
 	}
@@ -1408,6 +1466,680 @@ struct FFillBuilder
 		}
 	}
 
+	// ------------------------------------------------------------------ Placement v2: plots, boundary runs, uses (2026-11-16)
+	// Every plot belongs to a building or a place with a use (FillPlots.csv). Its edges get continuous fence or wall runs, post to post,
+	// panels fitted to the edge's length, one gate toward the road; then its use (FillUses.csv) places its sets against the building's
+	// walls, along the inside of its runs, in rows across it or in its middle. Goods only at the market and shop fronts.
+	const TArray<FVector2D>* ClipPoly = nullptr;   // (PlaceSet: every ground piece inside this plot)
+	FString CurUse;                                // (Commit: the use placing now, for the misplaced check)
+	bool GoodsOk(int32 Zone) const
+	{
+		if (!CurUse.IsEmpty()) return CurUse == TEXT("Market") || CurUse == TEXT("ShopFront");
+		return Zone == Z_OakPlaza || Zone == Z_MarketYard;
+	}
+	static bool InPoly(const TArray<FVector2D>& P, const FVector2D& Q)
+	{
+		bool In = false;
+		for (int32 i = 0, j = P.Num() - 1; i < P.Num(); j = i++)
+			if (((P[i].Y > Q.Y) != (P[j].Y > Q.Y)) && (Q.X < (P[j].X - P[i].X) * (Q.Y - P[i].Y) / (P[j].Y - P[i].Y) + P[i].X)) In = !In;
+		return In;
+	}
+	static float SegDist(const FVector2D& A, const FVector2D& B, const FVector2D& Q)
+	{
+		const FVector2D AB = B - A;
+		const float T = FMath::Clamp(FVector2D::DotProduct(Q - A, AB) / FMath::Max(AB.SizeSquared(), 1.f), 0.f, 1.f);
+		return float(FVector2D::Distance(Q, A + AB * T));
+	}
+	static float PolyEdgeDist(const TArray<FVector2D>& P, const FVector2D& Q)
+	{
+		float Best = 1.0e9f;
+		for (int32 i = 0; i < P.Num(); ++i) Best = FMath::Min(Best, SegDist(P[i], P[(i + 1) % P.Num()], Q));
+		return Best;
+	}
+	static bool FootInPoly(const FShape& F, const TArray<FVector2D>& P, float Inset)
+	{
+		TArray<FVector2D> Pts;
+		if (F.Type == 0) { Pts = { F.World(FVector2D(F.H.X, F.H.Y)), F.World(FVector2D(-F.H.X, F.H.Y)), F.World(FVector2D(F.H.X, -F.H.Y)), F.World(FVector2D(-F.H.X, -F.H.Y)) }; }
+		else { Pts = { F.C + FVector2D(F.R, 0.f), F.C - FVector2D(F.R, 0.f), F.C + FVector2D(0.f, F.R), F.C - FVector2D(0.f, F.R) }; }
+		for (const FVector2D& Q : Pts) if (!InPoly(P, Q) || PolyEdgeDist(P, Q) < Inset) return false;
+		return true;
+	}
+	static float YawOf(const FVector2D& Dir) { return FMath::RadiansToDegrees(FMath::Atan2(-Dir.X, Dir.Y)); }   // (R(yaw) * (0,1) = Dir)
+
+	struct FFamily { const TCHAR* Name; const TCHAR* Panel; const TCHAR* Post; const TCHAR* GatePost; float GateW; };
+	static const FFamily* FamilyOf(const FString& B)
+	{
+		static const FFamily Fs[] = {
+			{ TEXT("picket"), TEXT("FencePicket"), TEXT("FencePicketEnd"), TEXT("FencePicketEnd"), 160.f },
+			{ TEXT("stick"), TEXT("FenceStick"), TEXT("FenceStickPost"), TEXT("FenceStickPost"), 180.f },
+			{ TEXT("stone"), TEXT("WallStone"), TEXT("WallStoneEnd"), TEXT("WallPillarEnd"), 180.f },
+			{ TEXT("pillar"), TEXT("WallPillar"), TEXT("WallPillarEnd"), TEXT("WallPillarEnd"), 180.f },
+		};
+		for (const FFamily& F : Fs) if (B.Equals(F.Name, ESearchCase::IgnoreCase)) return &F;
+		return nullptr;
+	}
+	struct FAnchor { FVector2D P, N; uint8 Type; float Key; };   // (Type: EAnchor; Key: the seeded order)
+	struct FPlotB
+	{
+		const FPlotRow* Row = nullptr;
+		FString Name, Use;
+		TArray<FVector2D> Poly;            // game cm
+		TArray<uint8> Edge;                // per edge Poly[i] -> Poly[i+1]: 0 a run, 1 the building's own wall, 2 open
+		bool bBuilding = false;
+		FShape Own;                        // the building's walls (a box)
+		FVector2D Fwd = FVector2D(1.f, 0.f), Rt = FVector2D(0.f, 1.f);   // the plot's frame: Fwd toward the building's front (or along its first edge)
+		int32 GateEdge = -1; FVector2D Gate = FVector2D::ZeroVector, GateOut = FVector2D::ZeroVector; float GateW = 160.f;
+		int32 Group = -1, Zone = 0;
+		uint32 Seed = 0;
+		int32 Panels = 0, Posts = 0, Cuts = 0; float MaxGap = 0.f, RunLen = 0.f;
+		TArray<int32> RunPieces;           // Placed indices of its run pieces, in order along each edge
+	};
+	TArray<FPlotB> PlotsB;
+	FStats* PlotStats = nullptr;
+
+	// Grid bits within R of P, leaving out the plot's own building (and its foundation decor within SoftPad of it)
+	uint16 BitsNear(const FVector2D& P, float R, const FPlotB& Pl, float SoftPad = 150.f)
+	{
+		uint16 Or = 0;
+		for (int32 Gx = FGrid::G(P.X - R); Gx <= FGrid::G(P.X + R); ++Gx)
+			for (int32 Gy = FGrid::G(P.Y - R); Gy <= FGrid::G(P.Y + R); ++Gy)
+			{
+				const FVector2D C = FGrid::Centre(Gx, Gy);
+				if (FVector2D::DistSquared(C, P) > R * R) continue;
+				uint16 B = Grid.At(Gx, Gy);
+				if (Pl.bBuilding)
+				{
+					if (Pl.Own.Contains(C, 30.f)) B &= ~uint16(F_BUILD | F_SOFT | F_GAME);
+					else if (Pl.Own.Contains(C, SoftPad)) B &= ~uint16(F_SOFT);
+				}
+				Or |= B;
+			}
+		return Or;
+	}
+	FVector2D OakXY(const FVector2D& EN, bool bSquare) const { return bSquare ? FVector2D(EN.Y * 100.f, EN.X * 100.f) : FVector2D(JeebOakHill::PosX + EN.Y * 100.f, JeebOakHill::PosY + EN.X * 100.f); }
+	float RoadDistCm(const FVector2D& P) const
+	{
+		if (OakOn() && JeebOakHill::InBox(P.X, P.Y)) return JeebOakHill::RoadClearanceM(JeebOakHill::EastM(P.Y), JeebOakHill::NorthM(P.X)) * 100.f;
+		return JeebTerrain::PathClearance(P.X, P.Y);
+	}
+
+	// Is this outline clear? Its runs (every 20 cm) of roads, water, buildings, kept-clear ground, solids, tree spots and other props; its
+	// ground (a 50 cm lattice) of roads, water, other buildings and kept-clear ground; and 1 m from every earlier plot. The first spot
+	// that is not clear is returned (world cm)
+	bool PieceNear(const FVector2D& Q, float R) const
+	{
+		const FShape C = FShape::Circle(Q, R);
+		for (int32 Hx = FMath::FloorToInt((Q.X - R) / 400.f); Hx <= FMath::FloorToInt((Q.X + R) / 400.f); ++Hx)
+			for (int32 Hy = FMath::FloorToInt((Q.Y - R) / 400.f); Hy <= FMath::FloorToInt((Q.Y + R) / 400.f); ++Hy)
+				if (const TArray<int32>* L = PieceHash.Find(FIntPoint(Hx, Hy)))
+					for (int32 Pi : *L) if (Touch(C, Placed[Pi].Foot, 0.f)) return true;
+		return false;
+	}
+	bool OutlineClear(const FPlotB& Pl, FVector2D& Bad, FString& Why)
+	{
+		const uint16 LineMask = F_ROAD | F_WATER | F_KEEP | F_GAME | F_TREE | F_BUILD | F_PROP | F_SOFT;
+		const int32 N = Pl.Poly.Num();
+		for (int32 e = 0; e < N; ++e)
+		{
+			if (Pl.Edge[e] != 0) continue;
+			const FVector2D A = Pl.Poly[e], B = Pl.Poly[(e + 1) % N];
+			const float Len = float(FVector2D::Distance(A, B));
+			for (float t = 0.f; t <= Len; t += 20.f)
+			{
+				const FVector2D Q = A + (B - A) * (t / FMath::Max(Len, 1.f));
+				if ((BitsNear(Q, 40.f, Pl) & LineMask) || (BitsNear(Q, 60.f, Pl) & F_ROAD) || PieceNear(Q, 45.f)) { Bad = Q; Why = FString::Printf(TEXT("edge %d"), e); return false; }
+			}
+		}
+		FBox2D Bx(ForceInit); for (const FVector2D& Q : Pl.Poly) Bx += Q;
+		for (float x = Bx.Min.X + 25.f; x < Bx.Max.X; x += 50.f)
+			for (float y = Bx.Min.Y + 25.f; y < Bx.Max.Y; y += 50.f)
+			{
+				const FVector2D Q(x, y);
+				if (!InPoly(Pl.Poly, Q) || (Pl.bBuilding && Pl.Own.Contains(Q, 40.f))) continue;
+				if (Grid.At(FGrid::G(x), FGrid::G(y)) & (F_ROAD | F_WATER | F_BUILD | F_KEEP)) { Bad = Q; Why = TEXT("ground"); return false; }
+			}
+		for (const FPlotB& O : PlotsB)
+		{
+			if (O.Poly.Num() < 3 || &O == &Pl) continue;
+			for (int32 e = 0; e < N; ++e)
+			{
+				const FVector2D A = Pl.Poly[e], B = Pl.Poly[(e + 1) % N];
+				const float Len = float(FVector2D::Distance(A, B));
+				for (float t = 0.f; t <= Len; t += 25.f)
+				{
+					const FVector2D Q = A + (B - A) * (t / FMath::Max(Len, 1.f));
+					if (InPoly(O.Poly, Q) || PolyEdgeDist(O.Poly, Q) < 100.f) { Bad = Q; Why = TEXT("another plot ") + O.Name; return false; }
+				}
+			}
+			for (const FVector2D& Q : O.Poly) if (InPoly(Pl.Poly, Q)) { Bad = Q; Why = TEXT("another plot ") + O.Name; return false; }
+		}
+		return true;
+	}
+
+	// A building's yard: round its back and sides (Side and Depth the most it may reach), shrunk until clear. A side with no room beside
+	// the house becomes a yard behind it only (its run starts at the back wall's corner)
+	bool MakeYard(FPlotB& Pl, const FFamily* Fam, FString& Why)
+	{
+		using namespace JeebOakHill;
+		const TArray<FPlot>& Ps = Plots();
+		const int32 Bi = Pl.Row->Building;
+		if (!OakOn() || Bi < 0 || Bi >= Ps.Num() || Ps[Bi].Kind != EPlot::Building || !Ps[Bi].Model) { Why = TEXT("no such building"); return false; }
+		const FModel* M = FindModel(Ps[Bi].Model);
+		const FWallBox& W = WallBoxes()[Bi];
+		if (!M || !W.bWalls) { Why = TEXT("building has no walls"); return false; }
+		FShape Box = FShape::Box(W.Mid, W.Half, 0.f); Box.Cs = W.Cs; Box.Sn = W.Sn;
+		Pl.Own = Box; Pl.bBuilding = true;
+		const float Yaw = FMath::DegreesToRadians(BuildingYaw(Ps[Bi], M));
+		const FVector2D F(-FMath::Sin(Yaw), FMath::Cos(Yaw));   // (the door's way out, as OakKeeps)
+		const FVector2D Ax(Box.Cs, Box.Sn), Ay(-Box.Sn, Box.Cs);
+		const bool bYFront = FMath::Abs(FVector2D::DotProduct(F, Ay)) >= FMath::Abs(FVector2D::DotProduct(F, Ax));
+		const float Hy = bYFront ? W.Half.Y : W.Half.X, Hx = bYFront ? W.Half.X : W.Half.Y;
+		Pl.Fwd = F; Pl.Rt = FVector2D(F.Y, -F.X);
+		const FVector2D Mid = W.Mid;
+		auto ToW = [&](float x, float y) { return Mid + Pl.Rt * x + Pl.Fwd * y; };
+		auto Local = [&](const FVector2D& Q) { const FVector2D Dd = Q - Mid; return FVector2D(FVector2D::DotProduct(Dd, Pl.Rt), FVector2D::DotProduct(Dd, Pl.Fwd)); };
+		const FKind* PostK = Fam ? KindOf(Fam->Post) : nullptr;
+		const float Pw = PostK ? PostK->FootX : 30.f, Pd = PostK ? PostK->FootY : 30.f;
+		const float MinSide = 130.f, MinDepth = 250.f;
+		float SL = Pl.Row->Side * 100.f, SR = SL, Dp = Pl.Row->Depth * 100.f;
+		bool bBackL = false, bBackR = false;
+		const float X0 = Hx + 12.f + Pw * 0.5f;   // (a return's end post, 12 cm off the building's front corner)
+		const float Yb = -Hy - 12.f - Pw * 0.5f;  // (a behind-only side's first post, 12 cm off the back wall)
+		const float Xb = Hx - Pd * 0.5f;         // (... in line with the building's side)
+		for (int32 Iter = 0; Iter < 80; ++Iter)
+		{
+			SL = FMath::Max(SL, MinSide); SR = FMath::Max(SR, MinSide);
+			TArray<FVector2D> L;
+			if (bBackL) { L.Add(FVector2D(-Xb, Yb)); L.Add(FVector2D(-Xb, -Hy - Dp)); }
+			else { L.Add(FVector2D(-X0, Hy)); L.Add(FVector2D(FMath::Min(-Hx - SL, -X0 - 40.f), Hy)); L.Add(FVector2D(FMath::Min(-Hx - SL, -X0 - 40.f), -Hy - Dp)); }
+			if (bBackR) { L.Add(FVector2D(Xb, -Hy - Dp)); L.Add(FVector2D(Xb, Yb)); }
+			else { L.Add(FVector2D(FMath::Max(Hx + SR, X0 + 40.f), -Hy - Dp)); L.Add(FVector2D(FMath::Max(Hx + SR, X0 + 40.f), Hy)); L.Add(FVector2D(X0, Hy)); }
+			Pl.Poly.Reset(); for (const FVector2D& Q : L) Pl.Poly.Add(ToW(Q.X, Q.Y));
+			Pl.Edge.Init(0, Pl.Poly.Num()); Pl.Edge.Last() = 1;   // (the last edge closes along the building)
+			FVector2D BadW;
+			if (OutlineClear(Pl, BadW, Why)) { Why.Reset(); UE_LOG(LogTemp, Log, TEXT("JEEBFILL PLOT %s %s: yard %.1f m deep, %s and %s beside"), *Pl.Name, *Pl.Use, Dp / 100.f, bBackL ? TEXT("none") : *FString::Printf(TEXT("%.1f m"), SL / 100.f), bBackR ? TEXT("none") : *FString::Printf(TEXT("%.1f m"), SR / 100.f)); return true; }
+			const FVector2D Bq = Local(BadW);
+			const float x = Bq.X, y = Bq.Y;
+			// what to give up for that spot: depth if it is behind the house, else that side's width, then that side altogether
+			if (y < -Hy - 20.f && (-Hy - y) - 80.f >= MinDepth && (-Hy - y) - 80.f < Dp) { Dp = (-Hy - y) - 80.f; continue; }
+			if (x < -Hx + 30.f && !bBackL) { if (SL > MinSide) SL = FMath::Max(MinSide, FMath::Min(SL - 25.f, (-x - Hx) - 80.f)); else bBackL = true; continue; }
+			if (x > Hx - 30.f && !bBackR) { if (SR > MinSide) SR = FMath::Max(MinSide, FMath::Min(SR - 25.f, (x - Hx) - 80.f)); else bBackR = true; continue; }
+			if (Dp > MinDepth) { Dp = FMath::Max(MinDepth, Dp - 50.f); continue; }
+			return false;
+		}
+		Why = TEXT("did not settle");
+		return false;
+	}
+
+	// A plot drawn as a rectangle in FillPlots.csv: its sides move in, 50 cm at a time, until clear (no smaller than MinM a side)
+	bool FitRect(FPlotB& Pl, FString& Why, float MinCm = 400.f)
+	{
+		const FVector2D O = Pl.Poly[0];
+		Pl.Fwd = (Pl.Poly[1] - Pl.Poly[0]).GetSafeNormal(); Pl.Rt = FVector2D(Pl.Fwd.Y, -Pl.Fwd.X);
+		FBox2D Lb(ForceInit);
+		for (const FVector2D& Q : Pl.Poly) Lb += FVector2D(FVector2D::DotProduct(Q - O, Pl.Rt), FVector2D::DotProduct(Q - O, Pl.Fwd));
+		const uint8 Kind = Pl.Edge.Num() > 0 ? Pl.Edge[0] : 0;
+		for (int32 Iter = 0; Iter < 200; ++Iter)
+		{
+			auto ToW = [&](float x, float y) { return O + Pl.Rt * x + Pl.Fwd * y; };
+			Pl.Poly = { ToW(Lb.Min.X, Lb.Min.Y), ToW(Lb.Min.X, Lb.Max.Y), ToW(Lb.Max.X, Lb.Max.Y), ToW(Lb.Max.X, Lb.Min.Y) };
+			Pl.Edge.Init(Kind, 4);
+			FVector2D BadW;
+			if (OutlineClear(Pl, BadW, Why)) { Why.Reset(); UE_LOG(LogTemp, Log, TEXT("JEEBFILL PLOT %s %s: %.1f x %.1f m"), *Pl.Name, *Pl.Use, Lb.GetSize().X / 100.f, Lb.GetSize().Y / 100.f); return true; }
+			const FVector2D B(FVector2D::DotProduct(BadW - O, Pl.Rt), FVector2D::DotProduct(BadW - O, Pl.Fwd));
+			// one side moves in past the bad spot (at least 50 cm): the one that keeps the most ground and leaves both sides MinCm or more
+			FBox2D Opt[4] = { Lb, Lb, Lb, Lb };
+			Opt[0].Min.X = FMath::Max(Lb.Min.X + 50.f, B.X + 80.f); Opt[1].Max.X = FMath::Min(Lb.Max.X - 50.f, B.X - 80.f);
+			Opt[2].Min.Y = FMath::Max(Lb.Min.Y + 50.f, B.Y + 80.f); Opt[3].Max.Y = FMath::Min(Lb.Max.Y - 50.f, B.Y - 80.f);
+			int32 Best = -1; float BestA = 0.f;
+			for (int32 o = 0; o < 4; ++o)
+			{
+				const FVector2D Sz = Opt[o].Max - Opt[o].Min;
+				if (Sz.X < MinCm || Sz.Y < MinCm) continue;
+				const float Ar = Sz.X * Sz.Y * (Sz.X > 3.f * Sz.Y || Sz.Y > 3.f * Sz.X ? 0.5f : 1.f);   // (a long thin strip is worth less)
+				if (Ar > BestA) { BestA = Ar; Best = o; }
+			}
+			if (Best < 0) { Why += TEXT(" (too small)"); return false; }
+			Lb = Opt[Best];
+		}
+		Why = TEXT("did not settle");
+		return false;
+	}
+
+	// One straight span of panels between two posts' middles (the posts are placed by the caller)
+	void RunSpan(FPlotB& Pl, const FKind& Panel, const FVector2D& Pa, float Wa, const FVector2D& Pb, float Wb, TArray<FTry>& Out)
+	{
+		const FVector2D Dir = (Pb - Pa).GetSafeNormal();
+		const FVector2D S0 = Pa + Dir * (Wa * 0.5f - 1.f), S1 = Pb - Dir * (Wb * 0.5f - 1.f);   // (1 cm into each post: no seam)
+		const float S = float(FVector2D::DotProduct(S1 - S0, Dir));
+		if (S < 12.f) return;
+		const float L = Panel.FootX;
+		int32 n = FMath::Max(1, FMath::RoundToInt(S / L));
+		float Sx = S / (n * L);
+		while (Sx > 1.15f) { ++n; Sx = S / (n * L); }
+		while (Sx < 0.85f && n > 1) { --n; Sx = S / (n * L); }
+		const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
+		const float Len = S / n;
+		for (int32 i = 0; i < n; ++i)
+		{
+			const FVector2D A = S0 + Dir * (Len * i), B = S0 + Dir * (Len * (i + 1)), C = (A + B) * 0.5f;
+			const float Za = JeebTerrain::HeightAt(A.X, A.Y), Zb = JeebTerrain::HeightAt(B.X, B.Y);
+			const float Pitch = FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Zb - Za, Len)), -20.f, 20.f);
+			FTry T;
+			T.Kind = &Panel;
+			T.bGround = true; T.bSolid = Panel.Col != ECol::None; T.bWalkBlock = T.bSolid && Panel.Height > 45.f; T.bDrop = false;
+			T.Foot = FShape::Box(C, FVector2D(Len * 0.5f, Panel.FootY * 0.5f), Yaw);
+			T.Xf = FTransform(FRotator(Pitch, Yaw, 0.f), FVector(C.X, C.Y, (Za + Zb) * 0.5f - 2.f), FVector(Sx, 1.f, 1.f));
+			Out.Add(T);
+			Pl.MaxGap = FMath::Max(Pl.MaxGap, 0.f);
+		}
+	}
+	FTry PostAt(const FKind& Post, const FVector2D& At, float Yaw)
+	{
+		FTry T;
+		T.Kind = &Post; T.bGround = true; T.bSolid = Post.Col != ECol::None; T.bWalkBlock = T.bSolid && Post.Height > 45.f; T.bDrop = false;
+		T.Foot = FootOf(Post, At, Yaw, 1.f);
+		T.Xf = FTransform(FRotator(0.f, Yaw, 0.f), FVector(At.X, At.Y, JeebTerrain::HeightAt(At.X, At.Y) - 2.f), FVector(1.f));
+		return T;
+	}
+	// A run piece is clear of everything fixed (its own building excepted) and of other plots' pieces
+	bool RunFits(const FTry& T, const FPlotB& Pl, FString& Why)
+	{
+		const FBox2D B = T.Foot.Bounds(20.f);
+		for (int32 Gx = FGrid::G(B.Min.X); Gx <= FGrid::G(B.Max.X); ++Gx)
+			for (int32 Gy = FGrid::G(B.Min.Y); Gy <= FGrid::G(B.Max.Y); ++Gy)
+			{
+				const FVector2D C = FGrid::Centre(Gx, Gy);
+				uint16 Bits = Grid.At(Gx, Gy);
+				if (Pl.bBuilding && Pl.Own.Contains(C, 30.f)) Bits &= ~uint16(F_BUILD | F_SOFT | F_GAME);
+				if ((Bits & F_ROAD) && T.Foot.Contains(C, 20.f)) { Why = TEXT("road"); return false; }
+				if ((Bits & (F_BUILD | F_WATER | F_KEEP | F_GAME | F_TREE)) && T.Foot.Contains(C, 3.f))
+				{
+					Why = (Bits & F_BUILD) ? TEXT("building") : (Bits & F_WATER) ? TEXT("water") : (Bits & F_KEEP) ? TEXT("keepclear") : (Bits & F_TREE) ? TEXT("treespot") : TEXT("solid");
+					return false;
+				}
+			}
+		const FBox2D Pb = T.Foot.Bounds(10.f);
+		for (int32 Hx = FMath::FloorToInt(Pb.Min.X / 400.f); Hx <= FMath::FloorToInt(Pb.Max.X / 400.f); ++Hx)
+			for (int32 Hy = FMath::FloorToInt(Pb.Min.Y / 400.f); Hy <= FMath::FloorToInt(Pb.Max.Y / 400.f); ++Hy)
+				if (const TArray<int32>* L = PieceHash.Find(FIntPoint(Hx, Hy)))
+					for (int32 Pi : *L) if (Placed[Pi].Group != Pl.Group && Touch(T.Foot, Placed[Pi].Foot, 2.f)) { Why = TEXT("prop ") + Placed[Pi].Kind->Name; return false; }
+		return true;
+	}
+	// The gate: on a run edge, where the way out (1.5 m beyond it) is nearest a road and open
+	void PickGate(FPlotB& Pl, const FFamily& Fam)
+	{
+		if (Pl.Row->Gate == TEXT("none")) return;
+		const float Gw = Fam.GateW;
+		const float Pw = D.Kinds.Contains(Fam.GatePost) ? D.Kinds[Fam.GatePost].FootX : 30.f;
+		const FKind* CornerK = KindOf(Fam.Post); const FKind* PanelK = KindOf(Fam.Panel);
+		const float CornerW = CornerK ? FMath::Min(CornerK->FootX, CornerK->FootY) : 30.f, CornerWx = CornerK ? FMath::Max(CornerK->FootX, CornerK->FootY) : 30.f, PanelLen = PanelK ? PanelK->FootX : 200.f;
+		float Best = 1.0e9f;
+		for (int32 e = 0; e < Pl.Poly.Num(); ++e)
+		{
+			if (Pl.Edge[e] != 0) continue;
+			const FVector2D A = Pl.Poly[e], B = Pl.Poly[(e + 1) % Pl.Poly.Num()];
+			const float Len = float(FVector2D::Distance(A, B));
+			// (the gate's posts either meet the corner post, or leave room for a panel at least 0.85 of its length: never a stub)
+			const float Wc = CornerW, PanelL = PanelLen;
+			const float Margin = Gw * 0.5f + Pw + Wc * 0.5f - 2.f, Margin1 = Gw * 0.5f + Pw + CornerWx * 0.5f + 0.85f * PanelL;
+			if (Len < 2.f * Margin) continue;
+			const FVector2D Dir = (B - A) / Len;
+			FVector2D Nrm(Dir.Y, -Dir.X);
+			if (InPoly(Pl.Poly, (A + B) * 0.5f + Nrm * 40.f)) Nrm = -Nrm;   // (outward)
+			TArray<float> Ts;
+			for (float t = Margin; t <= Len - Margin + 0.5f; t += 25.f)
+			{
+				const float tb = Len - t;   // (the same rule at the far corner)
+				if ((t > Margin + 1.f && t < Margin1) || (tb > Margin + 1.f && tb < Margin1)) continue;
+				Ts.Add(t);
+			}
+			if (Len - Margin > Margin + 1.f) Ts.Add(Len - Margin);
+			for (const float t : Ts)
+			{
+				const FVector2D G = A + Dir * t, Out = G + Nrm * 150.f, In = G - Nrm * 150.f;
+				if (BitsNear(Out, 60.f, Pl) & (F_BUILD | F_WATER | F_PSOLID | F_GAME | F_TREE)) continue;
+				if (BitsNear(In, 50.f, Pl, 0.f) & (F_BUILD | F_WATER | F_GAME)) continue;
+				if (Pl.bBuilding && Pl.Own.Contains(In, 60.f)) continue;
+				bool bOther = false;
+				for (const FPlotB& O : PlotsB) if (&O != &Pl && O.Poly.Num() >= 3 && (InPoly(O.Poly, Out) || PolyEdgeDist(O.Poly, Out) < 80.f)) { bOther = true; break; }
+				if (bOther) continue;
+				const float Score = FMath::Max(0.f, RoadDistCm(Out)) + 0.01f * t;
+				if (Score < Best) { Best = Score; Pl.GateEdge = e; Pl.Gate = G; Pl.GateOut = Nrm; Pl.GateW = Gw; }
+			}
+		}
+	}
+	// The plot's runs: a post at every corner, at both sides of the gate and at a free end, panels fitted between; placed whole
+	void PlaceRuns(FPlotB& Pl, const FFamily& Fam)
+	{
+		const FKind* Panel = KindOf(Fam.Panel); const FKind* Post = KindOf(Fam.Post); const FKind* GPost = KindOf(Fam.GatePost);
+		if (!Panel || !Post || !GPost) { UE_LOG(LogTemp, Warning, TEXT("JEEBFILL PLOT %s: family %s has missing kinds"), *Pl.Name, Fam.Name); return; }
+		const int32 N = Pl.Poly.Num();
+		TArray<FTry> Tries;
+		TArray<int32> EdgeOf;
+		auto IsRun = [&](int32 e) { return Pl.Edge[(e + N) % N] == 0; };
+		// corner posts, square to the edge that leaves them (so the other edge's panels meet a flat face)
+		TArray<float> PostYaw; PostYaw.Init(0.f, N);
+		for (int32 v = 0; v < N; ++v)
+		{
+			const bool bIn = IsRun(v - 1), bOutE = IsRun(v);
+			if (!bIn && !bOutE) continue;
+			const FVector2D P = Pl.Poly[v];
+			const FVector2D Dn = (Pl.Poly[(v + 1) % N] - P).GetSafeNormal(), Dp = (P - Pl.Poly[(v - 1 + N) % N]).GetSafeNormal();
+			const FVector2D Along = bOutE ? Dn : Dp;
+			PostYaw[v] = FMath::RadiansToDegrees(FMath::Atan2(Along.Y, Along.X));
+			Tries.Add(PostAt(*Post, P, PostYaw[v])); EdgeOf.Add(v);
+			++Pl.Posts;
+		}
+		// a post's width along a direction (its footprint box turned by its yaw)
+		auto Ext = [](const FKind& K, float PYaw, const FVector2D& Dir)
+		{
+			const float Rad = FMath::DegreesToRadians(PYaw);
+			const FVector2D Ax(FMath::Cos(Rad), FMath::Sin(Rad));
+			const float C = FMath::Abs(FVector2D::DotProduct(Dir, Ax)), Sn = FMath::Abs(Dir.X * Ax.Y - Dir.Y * Ax.X);
+			return C * K.FootX + Sn * K.FootY;
+		};
+		for (int32 e = 0; e < N; ++e)
+		{
+			if (!IsRun(e)) continue;
+			const FVector2D A = Pl.Poly[e], B = Pl.Poly[(e + 1) % N];
+			const int32 Before = Tries.Num();
+			if (e == Pl.GateEdge)
+			{
+				const FVector2D Dir = (B - A).GetSafeNormal();
+				const FVector2D G1 = Pl.Gate - Dir * (Pl.GateW * 0.5f + GPost->FootX * 0.5f), G2 = Pl.Gate + Dir * (Pl.GateW * 0.5f + GPost->FootX * 0.5f);
+				const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
+				Tries.Add(PostAt(*GPost, G1, Yaw)); Tries.Add(PostAt(*GPost, G2, Yaw)); Pl.Posts += 2;
+				RunSpan(Pl, *Panel, A, Ext(*Post, PostYaw[e], Dir), G1, GPost->FootX, Tries);
+				RunSpan(Pl, *Panel, G2, GPost->FootX, B, Ext(*Post, PostYaw[(e + 1) % N], Dir), Tries);
+			}
+			else { const FVector2D Dir = (B - A).GetSafeNormal(); RunSpan(Pl, *Panel, A, Ext(*Post, PostYaw[e], Dir), B, Ext(*Post, PostYaw[(e + 1) % N], Dir), Tries); }
+			for (int32 k = Before; k < Tries.Num(); ++k) EdgeOf.Add(e);
+			Pl.RunLen += float(FVector2D::Distance(A, B));
+		}
+		// placed whole: each piece that cannot stand is logged where and why (the run is cut there, never silently)
+		FStats& St = *PlotStats;
+		for (int32 k = 0; k < Tries.Num(); ++k)
+		{
+			FString Why;
+			if (!RunFits(Tries[k], Pl, Why))
+			{
+				++Pl.Cuts; St.Skipped.FindOrAdd(TEXT("runcut"))++;
+				const FVector2D C = Tries[k].Foot.C;
+				UE_LOG(LogTemp, Warning, TEXT("JEEBFILL RUN %s edge %d cut by %s at E %.1f N %.1f (%s)"), *Pl.Name, EdgeOf[k], *Why, JeebOakHill::EastM(C.Y), JeebOakHill::NorthM(C.X), *Tries[k].Kind->Name);
+				continue;
+			}
+			if (Tries[k].Kind == Panel) ++Pl.Panels;
+			Pl.RunPieces.Add(Placed.Num());
+			Commit(Tries[k], Pl.Zone, Pl.Name + TEXT(" run"), St, Pl.Group);
+		}
+	}
+	// Anchors for the use's sets: against the building's walls, along the inside of its runs, near its corners and gate, rows, middle
+	void Anchors(const FPlotB& Pl, TArray<FAnchor>& Out)
+	{
+		const int32 N = Pl.Poly.Num();
+		FRandomStream R(int32(Pl.Seed & 0x7fffffff));
+		if (Pl.bBuilding)
+		{
+			const FShape& B = Pl.Own;
+			const FVector2D Ns[4] = { FVector2D(1.f, 0.f), FVector2D(-1.f, 0.f), FVector2D(0.f, 1.f), FVector2D(0.f, -1.f) };
+			for (const FVector2D& Nl : Ns)
+			{
+				const FVector2D Nw = B.World(Nl) - B.C;
+				if (FVector2D::DotProduct(Nw, Pl.Fwd) > 0.7f) continue;   // (not the front: the street side stays the street's)
+				const float Half = Nl.X != 0.f ? B.H.Y : B.H.X, Off = Nl.X != 0.f ? B.H.X : B.H.Y;
+				for (float s = -Half + 70.f; s <= Half - 70.f; s += 50.f)
+				{
+					const FVector2D L = Nl.X != 0.f ? FVector2D(Nl.X * Off, s) : FVector2D(s, Nl.Y * Off);
+					const FVector2D P = B.World(L);
+					if (!InPoly(Pl.Poly, P + Nw * 120.f)) continue;
+					Out.Add({ P, Nw, uint8(EAnchor::Wall), R.FRand() });
+				}
+			}
+		}
+		for (int32 e = 0; e < N; ++e)
+		{
+			if (Pl.Edge[e] != 0) continue;
+			const FVector2D A = Pl.Poly[e], B = Pl.Poly[(e + 1) % N];
+			const float Len = float(FVector2D::Distance(A, B));
+			if (Len < 1.f) continue;
+			const FVector2D Dir = (B - A) / Len;
+			FVector2D In(-Dir.Y, Dir.X);
+			if (!InPoly(Pl.Poly, (A + B) * 0.5f + In * 40.f)) In = -In;
+			for (float t = 80.f; t <= Len - 80.f; t += 50.f)
+			{
+				const FVector2D P = A + Dir * t;
+				const float ToGate = Pl.GateEdge >= 0 ? float(FVector2D::Distance(P, Pl.Gate)) : 1.0e6f;
+				if (ToGate < Pl.GateW * 0.5f + 90.f) continue;
+				float ToCorner = 1.0e6f;
+				for (int32 v = 0; v < N; ++v) ToCorner = FMath::Min(ToCorner, float(FVector2D::Distance(P, Pl.Poly[v])));
+				const uint8 Type = (e == Pl.GateEdge && ToGate < Pl.GateW * 0.5f + 260.f) ? uint8(EAnchor::Gate) : ToCorner < 230.f ? uint8(EAnchor::Corner) : uint8(EAnchor::Fence);
+				Out.Add({ P, In, Type, R.FRand() });
+				if (Type == uint8(EAnchor::Corner)) Out.Add({ P, In, uint8(EAnchor::Fence), R.FRand() });   // (a corner spot also serves as fence)
+			}
+		}
+		Out.Sort([](const FAnchor& A, const FAnchor& B) { return A.Key < B.Key; });
+	}
+	// The plot's own lattice: rows across it (beds, bales) or tree spots, in its frame, farthest from the gate first
+	void Lattice(const FPlotB& Pl, float Along, float Across, float FromEdge, float FromBuilding, TArray<FVector2D>& Out)
+	{
+		FBox2D Bx(ForceInit);
+		for (const FVector2D& Q : Pl.Poly) Bx += FVector2D(FVector2D::DotProduct(Q, Pl.Rt), FVector2D::DotProduct(Q, Pl.Fwd));
+		// (centred: the same margin at both ends)
+		const float Sy = FMath::Max(0.f, Bx.GetSize().Y - 2.f * FromEdge), Sx = FMath::Max(0.f, Bx.GetSize().X - 2.f * FromEdge);
+		const float Y0 = Bx.GetCenter().Y - FMath::FloorToFloat(Sy / Across) * Across * 0.5f, X0 = Bx.GetCenter().X - FMath::FloorToFloat(Sx / Along) * Along * 0.5f;
+		for (float y = Y0; y <= Bx.Max.Y - FromEdge + 1.f; y += Across)
+			for (float x = X0; x <= Bx.Max.X - FromEdge + 1.f; x += Along)
+			{
+				const FVector2D P = Pl.Rt * x + Pl.Fwd * y;
+				if (!InPoly(Pl.Poly, P) || PolyEdgeDist(Pl.Poly, P) < FromEdge) continue;
+				if (Pl.bBuilding && Pl.Own.Contains(P, FromBuilding)) continue;
+				Out.Add(P);
+			}
+		const FVector2D G = Pl.GateEdge >= 0 ? Pl.Gate : Pl.Poly[0];
+		Out.Sort([&](const FVector2D& A, const FVector2D& B) { return FVector2D::DistSquared(A, G) > FVector2D::DistSquared(B, G); });
+	}
+	void DressPlot(FPlotB& Pl)
+	{
+		const TArray<FUseRow>* Uses = D.Uses.Find(Pl.Use);
+		if (!Uses) return;
+		FStats& St = *PlotStats;
+		TArray<FAnchor> As;
+		Anchors(Pl, As);
+		TArray<uint8> Used; Used.SetNumZeroed(As.Num());
+		CurUse = Pl.Use; ClipPoly = &Pl.Poly;
+		const FFamily* Fam = FamilyOf(Pl.Row->Bound);
+		const FKind* PanelK = Fam ? KindOf(Fam->Panel) : nullptr;
+		const float PanelHalf = PanelK ? PanelK->FootY * 0.5f : 15.f;
+		FRandomStream R(int32(HashU(Pl.Seed ^ 0x51ed27u) & 0x7fffffff));
+		int32 Sets = 0;
+		for (int32 u = 0; u < Uses->Num(); ++u)
+		{
+			const FUseRow& U = (*Uses)[u];
+			const int32 Want = U.Min + FMath::Min(U.Max - U.Min, int32(R.FRand() * (U.Max - U.Min + 1)));
+			const uint32 VarSeed = HashU(Pl.Seed * 7919u + uint32(u) * 104729u);
+			int32 Got = 0;
+			TMap<FString, int32> Whys;
+			if (U.Anchor == EAnchor::Row || U.Anchor == EAnchor::Trees || U.Anchor == EAnchor::Open)
+			{
+				TArray<FVector2D> Pts;
+				if (U.Anchor == EAnchor::Row) Lattice(Pl, 260.f, 190.f, 110.f, 150.f, Pts);
+				else if (U.Anchor == EAnchor::Trees) Lattice(Pl, 420.f, 420.f, 200.f, 240.f, Pts);
+				else
+				{
+					FVector2D Sum(0.f, 0.f); int32 n = 0;
+					TArray<FVector2D> L; Lattice(Pl, 100.f, 100.f, 100.f, 150.f, L);
+					for (const FVector2D& Q : L) { Sum += Q; ++n; }
+					if (n > 0) Pts.Add(Sum / n);
+				}
+				const float RowYaw = YawOf(Pl.Fwd);   // (a bed's long side across the plot)
+				for (int32 k = 0; k < Pts.Num() && Got < Want; ++k)
+				{
+					if (U.Anchor == EAnchor::Trees)
+					{
+						const FShape Spot = FShape::Circle(Pts[k], 130.f);
+						if (Grid.Hits(Spot, 0.f, NoProp | F_ROAD | F_PROP) || PieceNear(Pts[k], 130.f)) { Whys.FindOrAdd(TEXT("treespot"))++; continue; }
+						Keep(Spot, TEXT("tree orchard ") + Pl.Name, F_TREE);
+						TreeSpots.Add({ Pts[k], 150.f, TEXT("orchard") });
+						++Got;
+						continue;
+					}
+					const float Yaw = U.Anchor == EAnchor::Open && Pl.GateEdge >= 0 ? YawOf((Pl.Gate - Pts[k]).GetSafeNormal()) : RowYaw;
+					// (an open set, a farmstead or a hayfield, is laid out like a hand row: each piece that fits is placed)
+					FString W;
+					if (PlaceSet(U.Set, Pts[k], Yaw, VarSeed + uint32(k), true, U.Anchor != EAnchor::Open, Pl.Zone, St, &W) > 0) { ++Got; ++Sets; }
+					else Whys.FindOrAdd(W)++;
+				}
+				if (Pts.Num() == 0) Whys.FindOrAdd(TEXT("no lattice spot"))++;
+			}
+			if (U.Anchor != EAnchor::Trees && U.Anchor != EAnchor::Open)
+			{
+				const float Back = SetBack(U.Set);
+				// against the plot's fences or the house: the asked kind of spot first; a gate, corner or row set that found too few
+				// then takes the fence spots, those nearest the gate first for a gate set
+				auto Try = [&](const TArray<int32>& Order)
+				{
+					for (int32 k : Order)
+					{
+						if (Got >= Want) break;
+						const FAnchor& A = As[k];
+						if (Used[k]) continue;
+						const float Off = A.Type == uint8(EAnchor::Wall) ? 50.f + Back : PanelHalf + 14.f + Back;
+						FString W;
+						if (PlaceSet(U.Set, A.P + A.N * Off, YawOf(A.N), VarSeed + uint32(k), true, true, Pl.Zone, St, &W) > 0)
+						{
+							++Got; ++Sets;
+							for (int32 j = 0; j < As.Num(); ++j) if (FVector2D::DistSquared(As[j].P, A.P) < 150.f * 150.f) Used[j] = 1;
+						}
+						else Whys.FindOrAdd(W)++;
+					}
+				};
+				TArray<int32> Order;
+				if (U.Anchor != EAnchor::Row) { for (int32 k = 0; k < As.Num(); ++k) if (As[k].Type == uint8(U.Anchor)) Order.Add(k); Try(Order); }
+				if (Got < U.Min && (U.Anchor == EAnchor::Gate || U.Anchor == EAnchor::Corner || U.Anchor == EAnchor::Row))
+				{
+					Order.Reset();
+					for (int32 k = 0; k < As.Num(); ++k) if (As[k].Type == uint8(EAnchor::Fence)) Order.Add(k);
+					if (U.Anchor == EAnchor::Gate && Pl.GateEdge >= 0)
+						Order.Sort([&](int32 a, int32 b) { return FVector2D::DistSquared(As[a].P, Pl.Gate) < FVector2D::DistSquared(As[b].P, Pl.Gate); });
+					Try(Order);
+				}
+			}
+			if (Got < U.Min)
+			{
+				FString Ws; for (const TPair<FString, int32>& P : Whys) Ws += FString::Printf(TEXT(" %s x%d"), *P.Key, P.Value);
+				UE_LOG(LogTemp, Log, TEXT("JEEBFILL PLOT %s %s: %s placed %d of at least %d (%d anchors;%s)"), *Pl.Name, *Pl.Use, *U.Set, Got, U.Min, As.Num(), *Ws);
+			}
+		}
+		CurUse.Reset(); ClipPoly = nullptr;
+	}
+
+	void PlacePlots()
+	{
+		if (D.Plots.Num() == 0 || !ZoneWanted(TEXT("Plots"))) return;
+		const double T0 = FPlatformTime::Seconds();
+		PlotStats = &Stats.FindOrAdd(TEXT("Plots"));
+		// 1. outlines (yards shrunk to fit), in file order: earlier rows win the ground
+		for (const FPlotRow& Row : D.Plots)
+		{
+			const bool bSq = Row.Site.StartsWith(TEXT("sq"), ESearchCase::IgnoreCase);
+			if (!bSq && !OakOn()) continue;
+			FPlotB Pl;
+			Pl.Row = &Row; Pl.Name = Row.Name; Pl.Use = Row.Use; Pl.Seed = HashU(uint32(Row.Seed) * 2654435761u + 911u);
+			Pl.Group = NextGroup++;
+			const FFamily* Fam = FamilyOf(Row.Bound);
+			FString Why;
+			bool bOk = true;
+			if (Row.Outline.Num() >= 3)
+			{
+				for (const FVector2D& EN : Row.Outline) Pl.Poly.Add(OakXY(EN, bSq));
+				Pl.Edge.Init(uint8(Fam ? 0 : 2), Pl.Poly.Num());
+				Pl.Fwd = (Pl.Poly[1] - Pl.Poly[0]).GetSafeNormal(); Pl.Rt = FVector2D(Pl.Fwd.Y, -Pl.Fwd.X);
+				if (Pl.Poly.Num() == 4) bOk = FitRect(Pl, Why, Row.Use == TEXT("Paddock") || Row.Use == TEXT("Farm") ? 600.f : 400.f);
+			}
+			else bOk = MakeYard(Pl, Fam, Why);
+			if (!bOk) { UE_LOG(LogTemp, Warning, TEXT("JEEBFILL PLOT %s (line %d) left out: %s"), *Row.Name, Row.Line, *Why); continue; }
+			if (!Fam) for (uint8& E : Pl.Edge) if (E == 0) E = 2;
+			FVector2D C(0.f, 0.f); for (const FVector2D& Q : Pl.Poly) C += Q; C /= Pl.Poly.Num();
+			Pl.Zone = ZoneAt(C.X, C.Y);
+			PlotsB.Add(MoveTemp(Pl));
+		}
+		// 2. gates and runs for every plot, before any clutter
+		for (FPlotB& Pl : PlotsB)
+		{
+			const FFamily* Fam = FamilyOf(Pl.Row->Bound);
+			if (!Fam) continue;
+			PickGate(Pl, *Fam);
+			if (Pl.GateEdge < 0 && Pl.Row->Gate != TEXT("none")) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL PLOT %s: no room for a gate"), *Pl.Name);
+			PlaceRuns(Pl, *Fam);
+		}
+		// 3. each gate's way in and out kept clear, and reached
+		for (FPlotB& Pl : PlotsB)
+		{
+			if (Pl.GateEdge < 0) continue;
+			Keep(FShape::Lane(Pl.Gate + Pl.GateOut * 130.f, Pl.Gate - Pl.GateOut * 260.f, 70.f), TEXT("gate ") + Pl.Name);
+			Target(TEXT("gate ") + Pl.Name + TEXT(" inside"), Pl.Gate - Pl.GateOut * 150.f, 0);
+			// the town's walk targets that now lie inside the plot (a house's back or side, from before the yards were fenced) are
+			// reached through its gate: the gate's own target stands for them, and the yard's middle stays open by its recipe
+			for (int32 t = Targets.Num() - 1; t >= 0; --t)
+			{
+				const FTarget& Tg = Targets[t];
+				if (Tg.Area != 0 || Tg.Name.StartsWith(TEXT("gate ")) || !InPoly(Pl.Poly, Tg.At)) continue;
+				UE_LOG(LogTemp, Log, TEXT("JEEBFILL PLOT %s: target %s is inside the plot, reached through its gate"), *Pl.Name, *Tg.Name);
+				Targets.RemoveAt(t);
+			}
+		}
+		// 4. what each use places
+		for (FPlotB& Pl : PlotsB) DressPlot(Pl);
+		PlotStats->Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+		PlotStats = nullptr;
+	}
+
+	// Checks: every run joined post to post, every fenced plot closed but for its gate, and no wares outside the market
+	void RunChecks()
+	{
+		int32 Open = 0, Gaps = 0;
+		for (const FPlotB& Pl : PlotsB)
+		{
+			// joins: along each run, every panel end within 2 cm of the next piece's footprint
+			int32 BadJoin = 0; float Worst = 0.f;
+			for (int32 Pi : Pl.RunPieces)
+			{
+				const FPlaced& P = Placed[Pi];
+				if (P.Xf.GetScale3D().X == P.Xf.GetScale3D().Y && P.Kind->FootX < 100.f) continue;   // (posts)
+				const FVector2D Ax(P.Foot.Cs, P.Foot.Sn);
+				for (int32 s = -1; s <= 1; s += 2)
+				{
+					const FVector2D End = P.Foot.C + Ax * (s * P.Foot.H.X);
+					float Best = 1.0e9f;
+					for (int32 Qi : Pl.RunPieces)
+					{
+						if (Qi == Pi) continue;
+						const FShape& Q = Placed[Qi].Foot;
+						const FVector2D L = Q.Local(End);
+						const float Dx = FMath::Max(0.f, FMath::Abs(L.X) - Q.H.X), Dy = FMath::Max(0.f, FMath::Abs(L.Y) - Q.H.Y);
+						Best = FMath::Min(Best, FMath::Sqrt(Dx * Dx + Dy * Dy));
+					}
+					if (Best > 2.f) { ++BadJoin; Worst = FMath::Max(Worst, FMath::Min(Best, 999.f)); }
+				}
+			}
+			const bool bFenced = FamilyOf(Pl.Row->Bound) != nullptr;
+			const bool bClosed = !bFenced || (Pl.Cuts == 0 && BadJoin == 0);
+			if (bFenced && !bClosed) ++Open;
+			Gaps += BadJoin;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFILL RUN %s %s %s panels %d posts %d length %.1f m joins over 2 cm %d (worst %.0f cm) cuts %d gate %s closed %d"),
+				*Pl.Name, *Pl.Use, *Pl.Row->Bound, Pl.Panels, Pl.Posts, Pl.RunLen / 100.f, BadJoin, Worst, Pl.Cuts, Pl.GateEdge >= 0 ? TEXT("yes") : TEXT("no"), bClosed ? 1 : 0);
+		}
+		int32 Mis = 0;
+		for (const FPlaced& P : Placed)
+		{
+			if (!P.Kind->bGoods) continue;
+			const bool bOk = !P.Use.IsEmpty() ? (P.Use == TEXT("Market") || P.Use == TEXT("ShopFront")) : (P.Zone == Z_OakPlaza || P.Zone == Z_MarketYard);
+			if (!bOk && Mis++ < 10) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL MISPLACED %s (%s) in %s at E %.1f N %.1f"), *P.Kind->Name, *P.Set, P.Use.IsEmpty() ? ZoneNames[P.Zone] : *P.Use, JeebOakHill::EastM(P.Foot.C.Y), JeebOakHill::NorthM(P.Foot.C.X));
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBFILL ENCLOSURE %d plots, %d fenced plots not closed, %d run joins over 2 cm; MISPLACED %d"), PlotsB.Num(), Open, Gaps, Mis);
+	}
+
 	// ------------------------------------------------------------------ checks
 	struct FArea { FString Name; FBox2D Box; FVector2D Start; };
 	TArray<FArea> Areas() const
@@ -1563,8 +2295,9 @@ struct FFillBuilder
 		{
 			if (!P.bGround) continue;
 			FShape In = P.Foot;
-			if (In.Type == 0) In.H -= FVector2D(5.f, 5.f); else In.R -= 5.f;
-			if (Grid.Hits(In, 0.f, F_BUILD | F_WATER)) ++OnBlock;
+			const float Sh = P.Set.EndsWith(TEXT(" run")) ? 13.f : 5.f;   // (a run's end post stands 12 cm off its house's wall: half a cell)
+			if (In.Type == 0) In.H -= FVector2D(Sh, Sh); else In.R -= Sh;
+			if (Grid.Hits(In, 0.f, F_BUILD | F_WATER) && OnBlock++ < 5) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL OVERLAP %s (%s) on a building or water at %.0f %.0f"), *P.Kind->Name, *P.Set, P.Foot.C.X, P.Foot.C.Y);
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL OVERLAP %d (pieces on pieces %d, on buildings or water %d)"), Pairs + OnBlock, Pairs, OnBlock);
 	}
@@ -1662,6 +2395,9 @@ struct FFillBuilder
 				Row(TEXT("plot"), P.Model ? P.Model : TEXT("empty"), FString::Printf(TEXT("%d %s"), i++, P.Name), S, TEXT(""));
 			}
 		}
+		for (const FPlotB& Pl : PlotsB)
+			for (int32 v = 0; v < Pl.Poly.Num(); ++v)
+				Row(TEXT("plotpt"), Pl.Use, Pl.Name, FShape::Circle(Pl.Poly[v], 0.f), FString::Printf(TEXT("%d edge %d gate %d"), v, Pl.Edge[v], Pl.GateEdge == v ? 1 : 0));
 		for (const FPlaced& P : Placed) Row(TEXT("piece"), P.Kind->Name, P.Set, P.Foot, FString::Printf(TEXT("%s z %.0f solid %d"), ZoneNames[P.Zone], P.Xf.GetLocation().Z, P.bSolid ? 1 : 0));
 		FFileHelper::SaveStringToFile(Csv, *(Dir / FString::Printf(TEXT("%s_shapes.csv"), Stage)));
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL dump %s written to %s"), Stage, *FPaths::ConvertRelativePathToFull(Dir));
@@ -1705,10 +2441,10 @@ struct FFillBuilder
 			}
 			if (!Cube) continue;
 			if (!Boxes) Boxes = MakeSolidSet(Cube);
-			const float S = P.Xf.GetScale3D().X;
+			const float S = P.Xf.GetScale3D().Y, Sx = P.Xf.GetScale3D().X;   // (a run panel is stretched along its X only, Placement v2)
 			const FVector2D Mid = P.Foot.C;
 			const float Yaw = P.Xf.Rotator().Yaw;
-			FVector Size = K.Shape == EShape::Circle || K.Col == ECol::Capsule ? FVector(K.FootX * 0.85f, K.FootX * 0.85f, K.Height) * S : FVector(K.FootX, K.FootY, K.Height) * S;
+			FVector Size = K.Shape == EShape::Circle || K.Col == ECol::Capsule ? FVector(K.FootX * 0.85f, K.FootX * 0.85f, K.Height) * S : FVector(K.FootX * Sx, K.FootY * S, K.Height * S);
 			if (K.Col == ECol::Capsule && K.Shape == EShape::Box) Size.X = Size.Y = FMath::Min(K.FootX, K.FootY) * 0.85f * S;
 			Boxes->AddInstance(FTransform(FRotator(0.f, Yaw, 0.f), FVector(Mid.X, Mid.Y, P.Xf.GetLocation().Z + Size.Z * 0.5f), Size / 100.f), true);
 			++BodyCount;
@@ -1865,7 +2601,8 @@ struct FFillBuilder
 		if (bDump) Dump(TEXT("blockers"), As);
 		const double TPl = FPlatformTime::Seconds();   // (placing starts after the dump)
 
-		PlaceOakHill();
+		PlaceOakHill();   // (the hand rows first: shop fronts, doorsteps, the plaza; the plots fit round them)
+		PlacePlots();
 		PlaceZones();
 		const double TP = FPlatformTime::Seconds();
 
@@ -1884,6 +2621,7 @@ struct FFillBuilder
 			Total ^= St.Hash; Total *= 16777619u;
 		}
 		OverlapCheck();
+		RunChecks();
 		TArray<TArray<uint8>> Reach; TArray<FIntPoint> ReachSize;
 		for (int32 a = 0; a < As.Num(); ++a)
 		{

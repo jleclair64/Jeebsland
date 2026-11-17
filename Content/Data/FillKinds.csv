@@ -1,5 +1,5 @@
 Kind,Mesh,Shape,FootX,FootY,FootCX,FootCY,Height,Collision,Shadow,Cull,Slope,Flags,Where,Render,Tris,LodTris,SizeX,SizeY,MinZ,TwoSided
-AwningStriped,/Game/TownDecor/SM_AwningStriped,box,2.86,2.11,0.00,0.00,0.54,none,yes,large,,hang,M,lods,9174,300,2.86,2.11,0.00,1
+AwningStriped,/Game/TownDecor/SM_AwningStriped,box,2.86,2.11,0.00,0.00,0.54,none,yes,large,,hang|goods,M,lods,9174,300,2.86,2.11,0.00,1
 BannerGriffin,/Game/TownDecor/SM_BannerGriffin,box,1.34,0.10,0.00,0.00,1.80,none,no,medium,,hang,C B,lods,1951,299,1.34,0.11,-1.80,1
 BannerKnot,/Game/TownDecor/SM_BannerKnot,box,1.18,0.02,0.00,-0.00,1.92,none,no,medium,,hang,C,lods,7999,300,1.18,0.04,-1.92,1
 BannerLion,/Game/TownDecor/SM_BannerLion,box,0.84,0.11,-0.06,-0.00,1.82,none,no,medium,,hang,C P,lods,1422,300,1.01,0.12,-1.86,1
@@ -89,12 +89,12 @@ ShrubLow,/Game/TownDecor/SM_ShrubLow,circle,0.96,0.96,-0.00,0.01,0.69,none,no,sm
 SignArrow,/Game/TownDecor/SM_SignArrow,circle,0.25,0.25,0.02,-0.04,2.40,capsule,yes,medium,,,R S,lods,6000,300,1.47,0.27,-0.00,0
 SignSkillIssue,/Game/TownDecor/SM_SignSkillIssue,circle,0.18,0.18,0.02,-0.08,2.16,capsule,yes,medium,,,P,lods,8000,300,0.96,0.35,0.00,0
 Signpost,/Game/TownDecor/SM_Signpost,circle,0.18,0.18,-0.00,-0.04,2.40,capsule,yes,medium,,,R S,lods,7999,300,1.22,0.25,0.00,0
-SpiceSacks,/Game/TownDecor/SM_SpiceSacks,box,2.10,0.50,0.00,0.00,0.66,none,no,medium,,,M,lods,16000,300,2.10,0.50,-0.00,0
+SpiceSacks,/Game/TownDecor/SM_SpiceSacks,box,2.10,0.50,0.00,0.00,0.66,none,no,medium,,goods,M,lods,16000,300,2.10,0.50,-0.00,0
 StairsStone,/Game/TownDecor/SM_StairsStone,box,1.64,2.50,-0.00,0.00,1.43,mesh,yes,medium,12,,Y C,lods,15924,300,1.64,2.50,-0.00,0
 StairsStoneShort,/Game/TownDecor/SM_StairsStoneShort,box,1.64,1.02,-0.00,0.00,0.79,mesh,yes,medium,12,,Y C,lods,7944,299,1.64,1.02,-0.00,0
 StairsWalled,/Game/TownDecor/SM_StairsWalled,box,2.74,2.72,-0.00,-0.00,1.64,mesh,yes,large,12,,Y C,lods,20000,300,2.74,2.72,-0.00,0
-StallGreen,/Game/TownDecor/SM_StallGreen,box,1.83,1.41,-0.00,-0.16,2.88,box,yes,large,12,,P M,lods,20000,300,1.91,1.73,0.00,1
-StallRedTent,/Game/TownDecor/SM_StallRedTent,box,4.01,2.38,0.00,-0.29,2.78,box,yes,large,12,,P M,lods,6306,299,4.15,3.12,0.09,1
+StallGreen,/Game/TownDecor/SM_StallGreen,box,1.83,1.41,-0.00,-0.16,2.88,box,yes,large,12,goods,P M,lods,20000,300,1.91,1.73,0.00,1
+StallRedTent,/Game/TownDecor/SM_StallRedTent,box,4.01,2.38,0.00,-0.29,2.78,box,yes,large,12,goods,P M,lods,6306,299,4.15,3.12,0.09,1
 Stump,/Game/TownDecor/SM_Stump,circle,1.49,1.49,-0.00,0.00,0.54,box,near,medium,,,Y E,lods,11999,300,1.32,1.28,-0.00,0
 StumpGrass,/Game/TownDecor/SM_StumpGrass,circle,1.65,1.65,0.00,-0.00,0.91,box,near,medium,,,Y E W,lods,11997,300,1.43,1.44,0.00,0
 StumpMushroom,/Game/TownDecor/SM_StumpMushroom,circle,1.89,1.89,-0.00,0.00,0.77,box,near,medium,,,Y E W,lods,15995,300,1.68,1.64,0.00,0
@@ -110,7 +110,7 @@ TorchWall,/Game/TownDecor/SM_TorchWall,box,0.18,0.42,-0.00,0.21,0.96,none,no,sma
 TorchWallFlame,/Game/TownDecor/SM_TorchWallFlame,circle,0.14,0.14,0.00,0.32,0.25,none,no,tiny,,part,,lods,2000,300,0.12,0.12,0.84,0
 TrestleTable,/Game/TownDecor/SM_TrestleTable,box,2.55,1.16,-0.00,0.00,0.94,box,near,large,12,,M K Y,lods,10000,300,2.55,1.16,0.00,0
 TulipBed,/Game/TownDecor/SM_TulipBed,box,2.16,0.69,0.00,-0.00,0.19,box,near,medium,12,,G Y,lods,19863,297,2.16,0.69,0.00,1
-VegCart,/Game/TownDecor/SM_VegCart,box,2.41,1.83,0.12,0.00,2.49,box,yes,large,12,,M G,lods,29982,298,2.64,1.83,0.00,0
+VegCart,/Game/TownDecor/SM_VegCart,box,2.41,1.83,0.12,0.00,2.49,box,yes,large,12,goods,M G,lods,29982,298,2.64,1.83,0.00,0
 WallPillar,/Game/TownDecor/SM_WallPillar,box,2.39,0.55,0.00,-0.00,1.44,box,yes,medium,12,,Y F V C R,lods,15997,300,2.39,0.55,-0.00,0
 WallPillarEnd,/Game/TownDecor/SM_WallPillarEnd,box,0.41,0.53,-0.00,-0.00,1.44,box,yes,medium,,,Y F V C R,lods,5999,300,0.41,0.53,0.00,0
 WallStone,/Game/TownDecor/SM_WallStone,box,2.27,0.75,0.00,-0.00,1.20,box,yes,medium,12,,Y F V C R,lods,12000,300,2.27,0.75,-0.00,0
