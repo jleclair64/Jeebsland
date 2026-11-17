@@ -702,7 +702,8 @@ struct FFillBuilder
 		// (the slow questions on a coarse lattice, read between its points: the square's paths every 1 m, the rivers every 2 m)
 		const bool bSquare = X0 < 16500.f && X0 + ChunkCm > -16500.f && Y0 < 16500.f && Y0 + ChunkCm > -16500.f;
 		float PathL[33][33], RiverL[17][17];
-		for (int32 i = 0; i <= 32; ++i) for (int32 j = 0; j <= 32; ++j) PathL[i][j] = bSquare ? JeebTerrain::PathClearance(X0 + i * 100.f, Y0 + j * 100.f) : 1.0e6f;
+		const bool bPaths = bSquare || JeebTerrain::ForestRoadNear(FBox2D(FVector2D(X0, Y0), FVector2D(X0 + ChunkCm, Y0 + ChunkCm)));   // (and the forest's roads out of Oak Hill, OakForest.cpp)
+		for (int32 i = 0; i <= 32; ++i) for (int32 j = 0; j <= 32; ++j) PathL[i][j] = bPaths ? JeebTerrain::PathClearance(X0 + i * 100.f, Y0 + j * 100.f) : 1.0e6f;
 		for (int32 i = 0; i <= 16; ++i) for (int32 j = 0; j <= 16; ++j) { float Half; RiverL[i][j] = JeebWorld::RiverDistance(X0 + i * 200.f, Y0 + j * 200.f, Half) - Half; }
 		auto Bi33 = [](const float (&L)[33][33], float U, float V) { const int32 I = FMath::Min(int32(U), 31), J = FMath::Min(int32(V), 31); const float Fu = U - I, Fv = V - J; return FMath::Lerp(FMath::Lerp(L[I][J], L[I][J + 1], Fv), FMath::Lerp(L[I + 1][J], L[I + 1][J + 1], Fv), Fu); };
 		auto Bi17 = [](const float (&L)[17][17], float U, float V) { const int32 I = FMath::Min(int32(U), 15), J = FMath::Min(int32(V), 15); const float Fu = U - I, Fv = V - J; return FMath::Lerp(FMath::Lerp(L[I][J], L[I][J + 1], Fv), FMath::Lerp(L[I + 1][J], L[I + 1][J + 1], Fv), Fu); };

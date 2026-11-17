@@ -26,7 +26,7 @@ void JeebGroves::Build(UWorld*, AForest*) {}
 // their west side facing the town. Everything is code-built at load and not solid (nothing here may stop a player the server doesn't see stop).
 namespace
 {
-	TAutoConsoleVariable<int32> CVarGroves(TEXT("jeeb.Test.Groves"), 1,
+	TAutoConsoleVariable<int32> CVarGroves(TEXT("jeeb.Test.Groves"), 0,
 		TEXT("TEMPORARY test setting: 1 plants the sample tree groves east of Oak Hill at the next load, 0 leaves them out."), ECVF_Default);
 
 	constexpr float GroveR = 1150.f;     // a grove's radius (23 m across)

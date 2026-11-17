@@ -22,8 +22,9 @@ void APaths::BeginPlay()
 	TArray<FVector2D> UV;
 	TArray<FLinearColor> Colors;
 	// Oak Hill's streets are cobbled (2026-11-12): red 1 on them (M_Dirt lays cobbles down the middle, fraying into packed earth at
-	// the sides and then into the grass); Blackrock's paths stay packed earth (red 0). They are the last roads in PathDefs.
-	const int32 FirstCobbled = Defs.Num() - JeebOakHill::Roads().Num();
+	// the sides and then into the grass); Blackrock's paths and the forest's roads stay packed earth (red 0).
+	int32 FirstCobbled = Defs.Num(), FirstForest = Defs.Num();   // (Oak Hill's streets, then the forest's roads round it: OakForest.cpp, 2026-11-16)
+	for (int32 d = Defs.Num() - 1; d >= 0; --d) { if (Defs[d].Kind == 1) FirstCobbled = d; if (Defs[d].Kind == 2) FirstForest = d; }
 
 	// Each road is resampled every 50 cm along its length and 5 points across, and every point takes its height from
 	// the ground mesh itself, so the road follows every fold of the ground instead of cutting through humps
@@ -34,8 +35,8 @@ void APaths::BeginPlay()
 		const JeebTerrain::FPathDef& Def = Defs[d];
 		const int32 N = Def.Pts.Num();
 		if (N < 2) continue;
-		if (d >= FirstCobbled && JeebTownLab::RealTown()) continue;   // (the rebuilt Oak Hill paints its own streets into its ground, 2026-11-14: no ribbons)
-		const float Lift = 1.5f + 0.12f * (d >= FirstCobbled ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
+		if (Def.Kind == 1 && JeebTownLab::RealTown()) continue;   // (the rebuilt Oak Hill paints its own streets into its ground, 2026-11-14: no ribbons)
+		const float Lift = Def.Kind == 2 ? 4.f + 0.12f * (d - FirstForest) : 1.5f + 0.12f * (Def.Kind == 1 ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
 
 		// Points along the centre line, with the road's half-width on each side
 		TArray<FVector2D> Line;
@@ -72,10 +73,10 @@ void APaths::BeginPlay()
 				const float S = float(c) / (Cols - 1) - 0.5f;   // -0.5 .. 0.5 across the road
 				const float Half = (S < 0.f ? HR[i] : HL[i]) * 1.4f;   // wider than the road: the material frays the edge back in over a broad band
 				const FVector2D P = Line[i] + Nrm * (2.f * Half * S);
-				Verts.Add(FVector(P.X, P.Y, JeebTerrain::GroundMeshHeight(P.X, P.Y) + Lift));
+				Verts.Add(FVector(P.X, P.Y, (Def.Kind == 2 ? JeebTerrain::DrawnHeight(P.X, P.Y) : JeebTerrain::GroundMeshHeight(P.X, P.Y)) + Lift));   // (the forest roads: on whichever ground is drawn there, mostly the world's 8 m mesh)
 				Normals.Add(FVector::UpVector);
 				UV.Add(FVector2D(S + 0.5f, Along / Def.Width));
-				Colors.Add(FLinearColor(d >= FirstCobbled ? 1.f : 0.f, 0.f, 0.f, 1.f));
+				Colors.Add(FLinearColor(Def.Kind == 1 ? 1.f : 0.f, 0.f, 0.f, 1.f));
 			}
 		}
 		const int32 Rows = Def.bClosed ? L : L - 1;
@@ -92,6 +93,7 @@ void APaths::BeginPlay()
 	}
 
 	TArray<FProcMeshTangent> Tangents;
+	UE_LOG(LogTemp, Log, TEXT("JEEBPATHS %d ribbons drawn: %d points, %d triangles (forest roads from def %d of %d)"), Defs.Num(), Verts.Num(), Tris.Num() / 3, FirstForest, Defs.Num());
 	Mesh->CreateMeshSection_LinearColor(0, Verts, Tris, Normals, UV, Colors, Tangents, false);
 	Mesh->CreateMeshSection_LinearColor(1, Verts, TrisBack, Normals, UV, Colors, Tangents, false);
 
