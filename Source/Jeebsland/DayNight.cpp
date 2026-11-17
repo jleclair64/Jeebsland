@@ -36,6 +36,9 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.6303f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
 	static TAutoConsoleVariable<float> AO(TEXT("jeeb.Look.AO"), 0.6f, TEXT("Ambient occlusion strength (where it is on: r.AmbientOcclusionLevels, set by ApplyGraphics)"));
 	static TAutoConsoleVariable<float> AORadius(TEXT("jeeb.Look.AORadius"), 100.f, TEXT("Ambient occlusion radius in cm"));
+	static TAutoConsoleVariable<float> ShadowFar(TEXT("jeeb.Shadow.Far"), 0.f, TEXT("How far the sun's one far shadow cascade reaches, metres (0 none). Only what casts far shadows draws into it: the forest's stand-in crowns (jeeb.Forest.FarShade), so far trees and the ground under them stay shaded. Set by the graphics setting (2026-11-16). Live; looks only."));
+	static TAutoConsoleVariable<float> SunStep(TEXT("jeeb.Sun.Step"), 0.f, TEXT("The sun's direction moves in steps of this many degrees (0: every frame), so cached sun shadows stay valid between steps. Live; looks only."));
+	static TAutoConsoleVariable<float> ShadowDF(TEXT("jeeb.Shadow.DF"), 0.f, TEXT("Distance field sun shadows past the ordinary ones out to this many metres (0 off). Needs mesh distance fields (r.GenerateMeshDistanceFields, off in this project). Live; looks only."));
 	static TAutoConsoleVariable<float> Contact(TEXT("jeeb.Look.Contact"), 0.f, TEXT("The sun's screen-space contact shadow length (share of the screen; 0 off: at 0.03 it cost 0.07 ms and barely showed, 2026-11-13)"));
 	static TAutoConsoleVariable<float> AerialStart(TEXT("jeeb.Look.AerialStart"), 0.3f, TEXT("Where the aerial perspective haze begins, in km (engine default 0.1)"));
 	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Look.Exposure"), 0.24f, TEXT("Exposure bias at noon, in stops (0.35 until 2026-11-13, owner: \"the whole game lower by 15%\": about -0.19 stops gives 15% less light on screen, through the tone curve)"));
@@ -111,6 +114,8 @@ void ADayNight::BeginPlay()
 			L->LightSourceAngle = 4.f;   // a bigger sun disc: shadow edges soften with distance from what casts them (branch shadows blur)
 			L->ForwardShadingPriority = 1;   // (the one for water, glass and fog, ahead of the armour's glint light below)
 			L->MarkRenderStateDirty();
+			UE_LOG(LogTemp, Log, TEXT("JEEBSHADOW sun: mobility %d, shadow distance %.0f m (times r.Shadow.DistanceScale), %d cascades, distribution %.2f, far cascades %d to %.0f m"),
+				int32(L->Mobility.GetValue()), L->DynamicShadowDistanceMovableLight / 100.f, L->DynamicShadowCascades, L->CascadeDistributionExponent, L->FarShadowCascadeCount, L->FarShadowDistance / 100.f);
 		}
 		break;
 	}
@@ -218,7 +223,30 @@ void ADayNight::Tick(float DeltaSeconds)
 	if (ADirectionalLight* S = Sun.Get())
 	{
 		UDirectionalLightComponent* L = Cast<UDirectionalLightComponent>(S->GetLightComponent());
-		S->SetActorRotation(FRotator(-E, Azimuth + 180.f, 0.f));
+		// (2026-11-16) one far shadow cascade past the ordinary ones, drawn only by what casts far shadows (the forest's stand-in crowns)
+		const float FarM = FMath::Max(0.f, JeebLook::ShadowFar.GetValueOnGameThread());
+		if (L && FarM != FarNow)
+		{
+			FarNow = FarM;
+			L->FarShadowCascadeCount = FarM > 0.f ? 1 : 0;
+			L->FarShadowDistance = FMath::Max(FarM, 1.f) * 100.f;
+			L->MarkRenderStateDirty();
+			UE_LOG(LogTemp, Log, TEXT("JEEBSHADOW far cascade %s, %.0f m"), FarM > 0.f ? TEXT("on") : TEXT("off"), FarM);
+		}
+		// (jeeb.Sun.Step, 2026-11-16: the sun's direction moves in small steps instead of every frame, so cached shadows (CSM caching,
+		// virtual shadow maps) stay valid between steps; its colour and the sky still change smoothly)
+		const float Step = FMath::Max(0.f, JeebLook::SunStep.GetValueOnGameThread());
+		const float Es = Step > 0.f ? FMath::GridSnap(E, Step) : E, As = Step > 0.f ? FMath::GridSnap(Azimuth, Step) : Azimuth;
+		if (Step <= 0.f || !S->GetActorRotation().Equals(FRotator(-Es, As + 180.f, 0.f), 0.001f)) S->SetActorRotation(FRotator(-Es, As + 180.f, 0.f));
+		const float DfM = FMath::Max(0.f, JeebLook::ShadowDF.GetValueOnGameThread());
+		if (L && DfM != DfNow)
+		{
+			DfNow = DfM;
+			L->bUseRayTracedDistanceFieldShadows = DfM > 0.f;
+			L->DistanceFieldShadowDistance = FMath::Max(DfM, 1.f) * 100.f;
+			L->MarkRenderStateDirty();
+			UE_LOG(LogTemp, Log, TEXT("JEEBSHADOW distance field shadows %s, %.0f m"), DfM > 0.f ? TEXT("on") : TEXT("off"), DfM);
+		}
 		const FLinearColor Ember(1.0f, 0.50f, 0.26f), Golden(1.0f, 0.62f, 0.34f), Noon(1.0f, 0.94f, 0.84f);
 		const FLinearColor Low = FMath::Lerp(Ember, Golden, FMath::SmoothStep(11.f, 20.f, E));   // a little redder right down by the horizon
 		L->SetIntensity(3.5f + 2.7f * High);   // 6.2 at noon: bright, but not glaring

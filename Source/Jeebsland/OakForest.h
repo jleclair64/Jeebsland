@@ -54,6 +54,16 @@ private:
 	TMap<FIntPoint, TArray<FIntPoint>> ShadowCells;              // (20 m cells: set and instance)
 	TArray<uint32> ShadowHash;                                   // (what each twin holds now)
 	FVector2D ShadowAt = FVector2D(1.0e9f, 1.0e9f);
+	// Past jeeb.Forest.ShadowReach (2026-11-16, owner: far trees and the ground under them looked too bright, then went dark as he came
+	// closer): a cheap hidden stand-in per tree (a plain crown and trunk, about a hundred triangles) casts its shadow out to
+	// jeeb.Forest.FarShadeReach, so the far forest is shaded like the near one at every time of day
+	UPROPERTY() TArray<UInstancedStaticMeshComponent*> ShadeSets;   // (one per tree kind)
+	TArray<int32> ShadeOfTwin;                                   // (each shadow twin's stand-in set)
+	TArray<int32> ShadeKind;                                     // (each stand-in set's tree kind)
+	TArray<FBox> ShadeBounds;                                    // (and that tree mesh's bounds at scale 1)
+	uint32 ShadeHash = 0u;
+	float ShadeSizeNow = -1.f;
+	void BuildShadeMeshes();
 	void UpdateShadows(bool bForce);
 	void ApplyReach();
 	friend struct FOakForestBuild;
