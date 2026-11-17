@@ -260,7 +260,19 @@ void AKnightCharacter::ApplyGraphics()
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.6"));   // (HIGH 0.7 until 2026-11-15: the owner approved a shorter shadow reach to pay for the realistic grass)
 	// the realistic grass reaches 50 m on HIGH, 26 m on LOW (Meadow.cpp regrows round you when it changes)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.PackFade 2600") : TEXT("jeeb.Grass.PackFade 5000"));
-	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.ShadowReach 20") : TEXT("jeeb.Forest.ShadowReach 40"));   // (how far from the camera the trees round Oak Hill cast shadows: OakForest.cpp; 2026-11-16)
+	// (2026-11-16, owner: far trees and ground looked too bright, then dark as he came closer) The trees round Oak Hill cast their real
+	// leafy shadows only within jeeb.Forest.ShadowReach of the camera (OakForest.cpp; was 40 m HIGH); past that a plain stand-in crown
+	// per tree casts a soft shade out to jeeb.Forest.FarShadeReach, and on HIGH the sun's one far cascade, drawn only by the stand-ins,
+	// carries it past the ordinary 120 m shadow range (DayNight.cpp). Measured in the forest (editor, solo, GPU): about the same cost
+	// as the old 40 m reach with nothing past it; doubling the real reach to 80 m cost +1.5 to +5 ms instead.
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.ShadowReach 15") : TEXT("jeeb.Forest.ShadowReach 20"));
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.FarShadeReach 100") : TEXT("jeeb.Forest.FarShadeReach 400"));
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Shadow.Far 0") : TEXT("jeeb.Shadow.Far 400"));
+	// (2026-11-16, owner: soft, less specific shadows are fine) HIGH's sun shadow map at 1024 instead of sg.ShadowQuality 3's 2048
+	// (LOW's level already has 1024), and Nanite draws a little coarser (2 pixels a triangle edge, not 1): together about 0.5-1.5 ms
+	// in the forest, with no visible change at play distance
+	if (!bLowest) Set(TEXT("r.Shadow.MaxCSMResolution"), 1024);
+	Set(TEXT("r.Nanite.MaxPixelsPerEdge"), 2);
 	// the town fill's tiny and small props draw half as far on LOW, as the grass does (Fill.cpp)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Fill.CullScale 0.5") : TEXT("jeeb.Fill.CullScale 1"));
 	Set(TEXT("r.ScreenPercentage"), FMath::RoundToInt(RenderScale * 100.f));

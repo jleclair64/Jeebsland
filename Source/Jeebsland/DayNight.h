@@ -54,6 +54,8 @@ private:
 	FLinearColor OldDirGlow = FLinearColor::Black;   // the map's own sun glow in the haze (for -OldLook)
 	float OldDirExponent = 4.f, OldDirStart = 10000.f, OldAerialStart = 0.1f;
 	float ContactNow = -1.f;   // the sun's contact shadow length last set (it is only re-sent when it changes)
+	float DfNow = -1.f;        // the sun's distance field shadow reach last set, m (jeeb.Shadow.DF)
+	float FarNow = -1.f;      // the sun's far shadow cascade reach last set, m (jeeb.Shadow.Far)
 	int32 ShaftsNow = -1;      // the sun's light shafts last set (jeeb.Look.Shafts)
 	void SetShafts(int32 On);
 

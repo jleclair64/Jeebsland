@@ -35,6 +35,7 @@ static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 
 static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.2983f, TEXT("How far the realistic blades are pulled toward grey (live)"));
 static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
 static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.4286f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
+static TAutoConsoleVariable<float> CVarGrassFarThin(TEXT("jeeb.Grass.FarThin"), 0.5f, TEXT("The far ring's clumps (past about 32 m) against before 2026-11-16 (1): 0.5 half as many, each a little wider so the ground stays covered (2026-11-16, for speed). Regrows round you. Near grass unchanged."));
 
 namespace
 {
@@ -466,8 +467,8 @@ void AMeadow::Tick(float Dt)
 		// the grass setting (jeeb.Grass.*): a change regrows everything round you; the first tick grows the start (the woods are
 		// planted by now, so grass can thin under them)
 		static FString Was;
-		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
-			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread());
+		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d %.2f"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
+			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread(), CVarGrassFarThin.GetValueOnGameThread());
 		bool bRegrow = !bPrewarmed || Now != Was;
 #if !UE_BUILD_SHIPPING
 		static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
@@ -594,7 +595,9 @@ void AMeadow::StepJob(double BudgetSeconds)
 	TArray<int32> Of[3]; TArray<float> OfW[3];   // (the pack's kinds by role: short, long, flower)
 	for (int32 k = 0; k < Kinds.Num(); ++k) { Of[Kinds[k].Role].Add(k); OfW[Kinds[k].Role].Add(Kinds[k].Weight); }
 	const float FlowerShare = CVarGrassFlowers.GetValueOnGameThread();
-	static const float TierChance[3] = { 1.f, 0.85f, 0.6f }, TierWide[3] = { 1.f, 1.1f, 1.3f };
+	// (jeeb.Grass.FarThin thins the far ring and widens what is left: half as many, about 1.4 times as wide, keeps the cover)
+	const float FarThin = FMath::Clamp(CVarGrassFarThin.GetValueOnGameThread(), 0.1f, 1.f);
+	const float TierChance[3] = { 1.f, 0.85f, 0.6f * FarThin }, TierWide[3] = { 1.f, 1.1f, 1.3f * FMath::Sqrt(1.f / FarThin) };
 	while (JobDone < JobCount)
 	{
 		if ((JobDone & 15) == 15 && FPlatformTime::Seconds() > End) return;   // (checked first, so a tuft skipped below never misses it; the next call picks up here)
