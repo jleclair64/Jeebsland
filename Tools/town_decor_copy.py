@@ -394,8 +394,11 @@ if not os.environ.get("DECOR_ONLY"):
     with open(CSV_PATH, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=COLS, lineterminator="\n")
         w.writeheader()
-        for r in sorted(rows, key=lambda r: r["Kind"]):
-            w.writerow(r)
+        # (2026-11-16: rows for meshes outside /Game/TownDecor, e.g. the forest ruin in /Game/WorldProps, belong to other tools: kept as they are)
+        mine = {r["Kind"] for r in rows}
+        keep = [r for k, r in authored.items() if k not in mine and not r.get("Mesh", "").startswith(DST + "/")]
+        for r in sorted(rows + keep, key=lambda r: r["Kind"]):
+            w.writerow({c: r.get(c, "") for c in COLS})
 
 for x in failures:
     unreal.log_error("DECORDIAG FAIL " + x)

@@ -118,3 +118,11 @@ The owner chose these from the library; all are free (CC0) downloads in `Art/Pro
 Lessons from this batch:
 - Finding a model the owner names: `https://www.meshy.ai/search/<words>?kind=model` works. Scroll the results page (a little script that scrolls loads more), then match the author's name in the card text.
 - A heavy reduction (to 1-2% of the model) shatters the picture into speckled shards, because the collapse runs across the model's many UV seams. `bake=True` in prop_clean.py welds the model, reduces it, gives it fresh UVs and bakes its pictures from the full model (Cycles, about 20-40 s each). Use it whenever a model is cut to a few percent.
+
+## Shields and the forest ruin (2026-11-16; the owner picked all four from community cards)
+- Kite shield, style 0 ("Shield", enricobarre, 445k to 6k, baked, repainted): https://www.meshy.ai/posts/shield-01a1ac81-5804-76ed-a09d-318142199ecc (`Art/Props/Originals/ShieldKite_Original.glb`)
+- Tower shield, style 2 ("Fantasy Tower Shield - Game Asset", joernpeba, 85k to 6k, baked, planks repainted rich brown): https://www.meshy.ai/posts/fantasy-tower-shield-game-asset-01a1cb14-580a-75a1-ad3f-b52d7fd62889 (`ShieldTower_Original.glb`)
+- Round shield, style 1 ("Warhammer fantasy primitive and rough Orc Round Shield...", terhunemary, 69k to 6k, baked): https://www.meshy.ai/posts/0195e711-f26b-778e-bd82-f96b8197b07e (`ShieldRound_Original.glb`)
+- Forest ruin ("Ruined Fortress", eromaxi, 820k to 40k, baked, dirt pile and roof slab cut away, stone repainted pale): https://www.meshy.ai/posts/0199d8d2-0c26-7cbe-9409-c5b748eca915 (`Art/WorldProps/Originals/Ruin_Original.glb`; `Tools/BuildWorldProps.ps1`)
+- Downloads: the card's "..." menu, then Download, GLB; open the menu only after the model viewer has loaded, or the click lands on nothing. All four CC0; 0 credits spent.
+- The tier colour on the shields is a per-pixel mask picture (`T_<Name>_Mask`, M_Prop's `MaskTex`), not vertex colour: on a 6k reduced model, per-face colour made jagged shards along the rim.

@@ -327,27 +327,32 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			DiscP(56.5f, 44, 3, 3, FLinearColor(0.9f, 0.2f, 0.15f));
 			break;
 		case K_Shield:
-			if (StyleOf(Id) == 1)   // round: rim, face, a boss in the middle and studs round the edge
+			// (2026-11-16, the library models: the tier's colour on the metal, the wood and the kite's dark face their own)
+			if (StyleOf(Id) == 1)   // round: brown planks in a metal rim, a red ring round the boss, studs
 			{
-				DiscP(32, 32, 27, 27, Tr);
-				DiscP(32, 32, 23, 23, Pl);
-				DiscP(32, 32, 7, 7, Ac);
-				for (int32 s = 0; s < 8; ++s) { const float A = s * PI / 4.f; DiscP(32 + 17.f * FMath::Cos(A), 32 + 17.f * FMath::Sin(A), 2.2f, 2.2f, Ac); }
+				DiscP(32, 32, 28, 28, Pl);
+				DiscP(32, 32, 24, 24, Wd);
+				Quad(25.5f, 9, 26.5f, 55, Lift(Wd, 0.75f)); Quad(37.5f, 9, 38.5f, 55, Lift(Wd, 0.75f));   // the planks' joins
+				DiscP(32, 32, 10, 10, FLinearColor(0.55f, 0.06f, 0.05f));
+				DiscP(32, 32, 6.5f, 6.5f, Pl);
+				for (int32 s = 0; s < 4; ++s) { const float A = s * PI / 2.f; DiscP(32 + 17.f * FMath::Cos(A), 32 + 17.f * FMath::Sin(A), 2.2f, 2.2f, Pl); }
 			}
-			else if (StyleOf(Id) == 2)   // tower: tall, with a band down the middle and two straps
+			else if (StyleOf(Id) == 2)   // tower: tall and rounded at the foot, a metal frame round brown planks, a cross of bands and a star boss
 			{
-				Poly({ P(14, 2), P(50, 2), P(52, 6), P(52, 58), P(48, 62), P(16, 62), P(12, 58), P(12, 6) }, Tr);
-				Poly({ P(16, 6), P(48, 6), P(48, 58), P(16, 58) }, Pl);
-				Quad(29, 6, 35, 58, Ac);
-				Quad(16, 16, 48, 19, Ac);
-				Quad(16, 46, 48, 49, Ac);
+				Poly({ P(14, 4), P(50, 4), P(53, 10), P(53, 40), P(45, 55), P(32, 62), P(19, 55), P(11, 40), P(11, 10) }, Pl);
+				Poly({ P(17, 9), P(47, 9), P(48, 39), P(42, 51), P(32, 56), P(22, 51), P(16, 39) }, Wd);
+				Quad(29, 5, 35, 60, Pl);
+				Poly({ P(16, 12), P(20, 10), P(48, 50), P(44, 52) }, Pl);
+				Poly({ P(44, 10), P(48, 12), P(20, 52), P(16, 50) }, Pl);
+				DiscP(32, 31, 10, 10, Pl);
+				DiscP(32, 31, 6, 6, Lift(Pl, 1.3f));
 			}
-			else   // kite, with its cross
+			else   // kite: a dark face in a metal rim, with a metal cross
 			{
-				Poly({ P(10, 6), P(54, 6), P(54, 28), P(32, 60), P(10, 28) }, Tr);
-				Poly({ P(14, 10), P(50, 10), P(50, 27), P(32, 54), P(14, 27) }, Pl);
-				Quad(29, 12, 35, 46, Ac);
-				Quad(19, 21, 45, 27, Ac);
+				Poly({ P(10, 6), P(54, 6), P(54, 28), P(32, 60), P(10, 28) }, Pl);
+				Poly({ P(14, 10), P(50, 10), P(50, 27), P(32, 54), P(14, 27) }, FLinearColor(0.035f, 0.04f, 0.05f));
+				Quad(29, 12, 35, 48, Pl);
+				Quad(19, 21, 45, 27, Pl);
 			}
 			break;
 		case K_Helmet:

@@ -294,7 +294,7 @@ void ALootDrop::BuildItemLook()
 	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
 	// (a model from /Game/Props: it floats the same way)
 	if (First && JeebItems::IsGear(First->Id))
-		if (UStaticMesh* Prop = JeebProps::MeshFor(JeebItems::KindOf(First->Id)))
+		if (UStaticMesh* Prop = JeebProps::MeshForItem(First->Id))
 		{
 			const FBox PB = Prop->GetBoundingBox();
 			const float PGrow = FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
@@ -305,7 +305,7 @@ void ALootDrop::BuildItemLook()
 			HoverZ = 30.f + 0.5f * (float)PB.GetSize().Z * PGrow;
 			Hover->SetRelativeLocation(FVector(0.f, 0.f, HoverZ));
 			ItemTop = HoverZ + 0.5f * (float)PB.GetSize().Z * PGrow + 16.f;
-			if (UStaticMeshComponent* S = JeebProps::Make(this, Hover, JeebItems::KindOf(First->Id), JeebItems::VariantOf(First->Id))) S->SetRelativeLocation(-PB.GetCenter());
+			if (UStaticMeshComponent* S = JeebProps::MakeItem(this, Hover, First->Id)) S->SetRelativeLocation(-PB.GetCenter());
 			return;
 		}
 	if (Parts.Num() == 0) { Body->SetVisibility(true); return; }   // nothing to show: keep the plain parcel

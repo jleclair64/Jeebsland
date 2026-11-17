@@ -63,8 +63,13 @@ void AKnightCharacter::BuildKnight()
 		P.Slot = D.Slot; P.Role = D.Role; P.MinTier = D.MinTier; P.MaxTier = D.MaxTier;
 		P.Fixed = D.Fixed; P.bFixedMetal = D.bFixedMetal; P.Shade = D.Shade; P.bBare = D.bBare;
 		P.Style = D.Style; P.bFixedColor = D.bFixedColor;
+		if (D.Role == EArmorRole::Plate) P.Model = JeebProps::AddShieldModel(this, P.Comp, D.Style, 0);   // (the library model of the style, 2026-11-16)
 		ArmorParts.Add(P);
 	}
+	// With its style's model there, that style's code-built parts no longer draw (they stay for the arrows)
+	for (FArmorPart& P : ArmorParts)
+		for (const FArmorPart& Q : ArmorParts)
+			if (Q.Model && Q.Slot == P.Slot && Q.Style == P.Style && P.Comp) { P.Comp->SetHiddenInGame(true); break; }
 }
 
 UProceduralMeshComponent* AKnightCharacter::MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& InMd)
@@ -365,6 +370,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 		if (P.Slot != Slot) continue;
 		const bool bVisible = bWorn && Var >= P.MinTier && Var <= P.MaxTier && P.Style == JeebItems::StyleOf(Id);   // only the worn shield style
 		P.Comp->SetVisibility(bVisible);
+		if (P.Model) { P.Model->SetVisibility(bVisible); if (bVisible) JeebProps::TintTier(P.Model, Var); }
 		if (!bVisible) continue;
 		FLinearColor Color = P.Fixed;
 		bool bMetal = false;

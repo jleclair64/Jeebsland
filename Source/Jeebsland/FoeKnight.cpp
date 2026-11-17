@@ -104,7 +104,10 @@ void AFoeKnight::BeginPlay()
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
 		if (D.bFixedColor) Col = D.Fixed;
 		Paint(C, Col, JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody));
+		if (D.Role == EArmorRole::Plate) JeebProps::AddShieldModel(this, C, 0, Tier);   // (the kite's library model, 2026-11-16)
 	}
+	// (with the model there, the code-built parts no longer draw: they stay for the arrows)
+	if (!IsNetMode(NM_DedicatedServer) && JeebProps::ShieldMesh(0)) for (UProceduralMeshComponent* S : ShieldMeshes) S->SetHiddenInGame(true);
 	// His sword, in the right hand, held the way the player holds one
 	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, JeebItems::K_Sword, Tier)) S->SetRelativeTransform(JeebProps::FistPlace());   // (the sword's model, 2026-11-12)
 	else

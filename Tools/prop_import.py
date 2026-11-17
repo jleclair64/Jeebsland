@@ -31,8 +31,13 @@ def pic(name, srgb, normal=False):
 def make_material(default_base, default_mr):
     # (a picture slot with no default picture doesn't compile, and the game then silently draws every prop in plain grey: check the log for "Failed to compile Material")
     path = folder + "/M_Prop"
-    if lib.does_asset_exist(path): lib.delete_asset(path)
-    m = tools.create_asset("M_Prop", folder, unreal.Material, unreal.MaterialFactoryNew())
+    # (2026-11-16: rebuilt in place, never deleted: every prop's instance points at it, and a delete with only some props re-imported could leave the
+    # others' parent gone)
+    if lib.does_asset_exist(path):
+        m = lib.load_asset(path)
+        mel.delete_all_material_expressions(m)
+    else:
+        m = tools.create_asset("M_Prop", folder, unreal.Material, unreal.MaterialFactoryNew())
     E = mel.create_material_expression
     def tex(name, x, y, kind):
         t = E(m, unreal.MaterialExpressionTextureSampleParameter2D, x, y)
@@ -47,6 +52,12 @@ def make_material(default_base, default_mr):
     flat = lib.load_asset("/Engine/EngineMaterials/FlatNormal")
     nrm.set_editor_property("texture", flat)
     vc = E(m, unreal.MaterialExpressionVertexColor, -1200, 1000)
+    # (2026-11-16, the shields) the tier's colour by pixel too: MaskTex's red (a plain sRGB picture, black or white), black by default, so every other
+    # prop goes by its vertex colour alone
+    mask = tex("MaskTex", -1200, 1300, unreal.MaterialSamplerType.SAMPLERTYPE_COLOR)
+    mask.set_editor_property("texture", lib.load_asset("/Engine/EngineResources/Black"))
+    tmask = E(m, unreal.MaterialExpressionMax, -1000, 1100)
+    mel.connect_material_expressions(vc, "R", tmask, "A"); mel.connect_material_expressions(mask, "R", tmask, "B")
     def vec(name, x, y, v):
         p = E(m, unreal.MaterialExpressionVectorParameter, x, y)
         p.set_editor_property("parameter_name", name); p.set_editor_property("default_value", unreal.LinearColor(*v))
@@ -70,7 +81,9 @@ def make_material(default_base, default_mr):
     mel.connect_material_expressions(add1, "", mul2, "A"); mel.connect_material_expressions(tint, "", mul2, "B")
     def lerp(a, an, b, bn, x, y, ch="R"):
         l = E(m, unreal.MaterialExpressionLinearInterpolate, x, y)
-        mel.connect_material_expressions(a, an, l, "A"); mel.connect_material_expressions(b, bn, l, "B"); mel.connect_material_expressions(vc, ch, l, "Alpha")
+        mel.connect_material_expressions(a, an, l, "A"); mel.connect_material_expressions(b, bn, l, "B")
+        if ch == "R": mel.connect_material_expressions(tmask, "", l, "Alpha")
+        else: mel.connect_material_expressions(vc, ch, l, "Alpha")
         return l
     lb1 = lerp(base, "RGB", mul2, "", -250, -200)
     # (2026-11-12) a second colour where the vertex colour's green says (an arrow's feathers): the same painted detail, in Tint2
@@ -105,6 +118,8 @@ for n in NAMES:
     if mr: mel.set_material_instance_texture_parameter_value(mi, "MRTex", mr)
     nm = pic("T_%s_Normal" % n, False, True)
     if nm: mel.set_material_instance_texture_parameter_value(mi, "NormalTex", nm)
+    mk = pic("T_%s_Mask" % n, True)   # (the shields' tier mask by pixel: prop_clean.py paint/tier)
+    if mk: mel.set_material_instance_texture_parameter_value(mi, "MaskTex", mk)
     lib.save_asset(mi_path)
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)
