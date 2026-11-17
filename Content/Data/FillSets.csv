@@ -14,22 +14,13 @@ WoodYard,FirewoodRack,0,0.35,0,0,1,
 WoodYard,ChoppingBlock,2.23,0.76,0,0,1,turn=180
 WoodYard,Firewood,-2.15,0.62,0,0,1,
 WoodYard,LogStackSmall,-1.03,1.61,0,0,1,drop|turn=180
-WoodYard,Stump,0.78,1.57,0,0,1,drop|alt=StumpPainted|turn=180
 # KitchenGarden: two raised beds behind a picket run with a cabbage crate and can
-KitchenGarden,FencePicket,-1.55,-0.95,0,0,1,
-KitchenGarden,FencePicket,1.55,-0.95,0,0,1,
-KitchenGarden,FencePicketEnd,-3.15,-0.95,0,0,1,
-KitchenGarden,FencePicketEnd,3.15,-0.95,0,0,1,
 KitchenGarden,RaisedBed,-1.35,0,0,0,1,
 KitchenGarden,TulipBed,1.35,0,0,0,1,alt=RaisedBed
 KitchenGarden,CabbageCrate,-0.9,1.2,0,0,1,
 KitchenGarden,WateringCan,0.45,1.1,0,30,1,
 KitchenGarden,Pail,1.13,1.16,0,0,1,drop|turn=180
 # ChickenYard: coop and nesting boxes behind a stick fence with feed and water
-ChickenYard,FenceStick,-1.2,-1.35,0,0,1,
-ChickenYard,FenceStick,0.75,-1.35,0,0,1,
-ChickenYard,FenceStickPost,1.85,-1.35,0,0,1,
-ChickenYard,FenceStickPost,-2.3,-1.35,0,0,1,
 ChickenYard,ChickenCoop,-1.25,0,0,0,1,
 ChickenYard,NestingBoxes,1.05,-0.55,0,0,1,
 ChickenYard,WoodTub,0.55,0.75,0,0,1,turn=180
@@ -261,7 +252,6 @@ GraveyardBench,Cypress,1.62,-0.38,0,0,1,turn=180
 GraveyardBench,PotVase,0.95,0.45,0,0,1,turn=180
 GraveyardBench,CandleCageShort,-0.95,0.45,0,0,1,
 # Garrison: fort plot: palisade crates barrels and a burning torch
-Garrison,FencePalisade,0,0,0,0,1,
 Garrison,Crate,-1.2,0.95,0,0,1,
 Garrison,CrateNoLid,-1.2,0.95,0.86,6,1,stack
 Garrison,Barrel,0.45,0.85,0,0,1,turn=180
@@ -305,13 +295,9 @@ Hayfield,Scarecrow,1.6,4.2,0,0,1,
 Farmstead,WellThatched,0,0,0,0,1,
 Farmstead,ChickenCoop,3.6,0.4,0,0,1,
 Farmstead,NestingBoxes,3.6,-1.6,0,0,1,
-Farmstead,VegCart,-3.9,0.6,0,0,1,
+Farmstead,HayBale,-3.9,0.4,0,0,1,
 Farmstead,HandCart,-3.9,-2,0,0,1,
 Farmstead,LogPile,0.3,-3.6,0,0,1,
-Farmstead,FenceStick,-1.6,3,0,0,1,
-Farmstead,FenceStick,0.4,3,0,0,1,
-Farmstead,FenceStickPost,1.45,3,0,0,1,
-Farmstead,FenceStickPost,-2.65,3,0,0,1,
 # FenceRun: a stick fence run with posts
 FenceRun,FenceStickPost,-2.95,0,0,0,1,
 FenceRun,FenceStick,-1.95,0,0,0,1,
@@ -448,3 +434,35 @@ GraveRow,CandleCageTall,2.55,0.15,0,0,1,drop
 GraveRow,WallPillarEnd,4,0,0,90,0.65,
 GraveRow,PlantClump,4,0.98,0,90,1,
 GraveRow,CandleCageShort,4.55,0.15,0,0,1,drop
+# --- Placement v2 (2026-11-16): small sets that plot uses place (FillUses.csv); fences now come only from the plots' runs
+# Bush1 (fence or corner): one bush of a seeded kind
+Bush1,BushRound,0,0.5,0,0,1,alt=BushLeafy/BushDome/BushBall/BushBerries/BushWhiteFlowers/BushYellowFlowers|turn=180
+# GardenBed (row): one raised bed, cabbages or tulips
+GardenBed,RaisedBed,0,0,0,0,1,alt=TulipBed
+# GardenTools (fence-backed, by the gate): watering can, basket and pail
+GardenTools,WateringCan,0,0.3,0,0,1,turn=40
+GardenTools,Basket,0.65,0.35,0,0,1,drop|turn=180
+GardenTools,Pail,-0.65,0.3,0,0,1,drop|turn=180
+# HenHouse (fence-backed): the coop and its nesting boxes along the back fence
+HenHouse,ChickenCoop,-1.05,0.9,0,0,1,
+HenHouse,NestingBoxes,1.2,0.5,0,0,1,
+# HenFeed (fence-backed, by the gate): water tub, pail and a feed sack
+HenFeed,WoodTub,0,0.4,0,0,1,turn=180
+HenFeed,Pail,0.75,0.3,0,0,1,drop|turn=180
+HenFeed,WheatSack,-0.8,0.4,0,0,1,drop|turn=30
+# OrchardBits (open, under the trees): picking baskets and an open crate
+OrchardBits,Basket,0,0,0,0,1,turn=180
+OrchardBits,CrateOpen,0.85,0.1,0,15,1,
+OrchardBits,Basket,-0.65,-0.3,0,0,1,drop|turn=180
+# --- Placement v2, round 1 (2026-11-16): fronts and verges
+# BushRow (outside a plot's fence, or along a wall): three bushes in a line
+BushRow,BushRound,-1.55,0.7,0,0,1,turn=180|alt=BushLeafy/BushDome/BushBall
+BushRow,BushRound,0,0.7,0,0,1,turn=180|alt=BushLeafy/BushDome/BushBall
+BushRow,BushRound,1.55,0.7,0,0,1,drop|turn=180|alt=BushLeafy/BushDome/BushBall
+# FrontPots (against a house's front wall, beside the door): pots and a plant
+FrontPots,PotAmphora,0,0.4,0,0,1,turn=180
+FrontPots,PotJug,0.55,0.3,0,0,1,drop|turn=180
+FrontPots,PlantClump,-0.95,0.45,0,0,1,drop|turn=180
+# FrontFlowers (against a house's front wall): a flower bush pair
+FrontFlowers,BushYellowFlowers,-0.7,0.65,0,0,1,turn=180|alt=BushWhiteFlowers
+FrontFlowers,ShrubLow,0.6,0.5,0,0,1,drop|turn=180

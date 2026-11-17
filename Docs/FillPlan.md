@@ -1,8 +1,101 @@
 # Fill plan: the filler props through the whole world, Oak Hill densest (2026-11-15)
 
+## Placement v2 (2026-11-16): plots first, props second
+
+Owner (2026-11-16): "It looks like a total yard sale with stuff scattered randomly about. Fences don't connect, stone walls don't connect, there's carts with melons sitting in the back yard, etc." Owner's goal: "realistic, natural, not cluttered, but still full ... make sense ... like other games." Status: built 2026-11-16 (branch `agent/townbuild2`). The first fill (sections 1-7 below) aimed at "no empty spaces": every open metre within 3 m of something. That goal produced the scatter. v2 replaces it: space is taken up by plots with a use (yards, gardens, paddocks, the market) whose edges are real fence and wall runs, and clutter gathers against walls inside them.
+
+### What went wrong (audit of the current fill, Oak Hill)
+
+From `-FillDump` before the change (1632 pieces in Oak Hill; `Saved/FillV2/before` in the townbuild2 copy):
+- **Fences and walls never formed an enclosure.** 237 boundary pieces made 60 separate runs, almost all a vignette's own 4-5 piece stub (6-9 m). Of their panel ends, 73 joined, 172 had a 2-30 cm gap (the sets spaced panels by eye: pickets 15 cm apart, the graveyard's pillars 8-19 cm) and 20 ended in the open. Nothing closed.
+- **Goods in back yards.** 77 pieces of wares stood outside the plaza: 14 veg-cart corners and 8 hand-cart corners in yards, 7 veg carts in yards, 3 on the fringe, and amphora rows on plain streets.
+- **Floating clutter.** Of 836 clutter pieces, 202 stood 4 m or more from any wall, fence or hedge and 352 were 2-4 m out; only 83 were within 1 m of something to lean on.
+- **Same density everywhere.** About 240 single bushes, shrubs and stumps (rows marked "filler") and about 100 "yard gap" sets were dropped into open ground to meet the old rule that no spot be over 3 m from something. Yards held 927 pieces against the plaza's 117.
+- No overlaps, nothing floating or unreachable: the scatter was a layout problem, not a collision problem.
+
+### Rules taken from real towns and good games
+
+1. **The town is a set of plots before it is a set of props.** Each building owns a plot reaching back from its street front; props belong to a plot and to its owner's trade (medieval burgage plots: long and narrow, short end on the street; Wikipedia "Burgage"; VCH "Reconstructing medieval towns").
+2. **A plot has three bands:** street front (door, shop display, a bench), yard behind or beside the house (work: firewood, water, tools, a coop), and the back (garden beds, fruit trees, pens, the privy and midden at the far edge) (Historic England, Medieval Settlements; Faxton excavation; Weald and Downland's Bayleaf farmstead; Ballenberg keeps the pig sty away from the house).
+3. **Boundaries are continuous lines along plot edges.** They change direction only at a corner, with a post or pillar there; two neighbours share one boundary, never two side by side (Wharram Percy toft and croft boundaries; open-air museum wattle fences).
+4. **One gate per plot, facing the lane or the yard's path;** a gate never opens onto nothing (Edinburgh closes reached the back of each plot).
+5. **Goods for sale only at the market or a shop front.** Market stalls stood only on market day in the market place; back yards hold working stores, never displays (British History Online on market boards; Brackley market place).
+6. **The market is the widened street or square round a landmark** (cross, well, pump), stalls in ranks along it with a clear lane through (Brackley, Hungerford, Great Yarmouth; Maidstone moved its cross as "an obstruction to traffic"). Whiterun's plains market is a handful of stalls round the well with the shops, inn and forge opening onto it.
+7. **A workshop's things stand in its own yard, against or beside its building** (Riverwood: Alvor's forge, grindstone and tanning rack to the side of his house; the mill's log pile and chopping block).
+8. **Clutter is grouped and backs onto walls, fences and corners, facing out;** a few tight clusters read as more real than an even spread (The Level Design Book, "env art": compose set dressing in clusters of related details).
+9. **Density falls off from the centre:** busy market and shop fronts, calmer lanes, sparse gardens, almost bare fringe; open ground stays open and the eye rests on it (Game Developer, "Composition in level design"; Level Design Book on illegible over-detailed levels; Hateno's open lawns between fenced gardens).
+10. **Repeated clutter is noticed before repeated buildings,** so vary the recipe per plot owner rather than stamping one vignette everywhere (Joel Burgess, Skyrim's modular level design, GDC 2013).
+11. **Every scene says who lives there:** a plot's use (smith, gardener, carter, widow with hens) picks its props (Smith and Worch, "What Happened Here? Environmental Storytelling", GDC 2010).
+12. **One hero piece per scene** (well, forge, coop, cart, scarecrow) with smaller pieces round it; never two heroes competing (Level Design Book).
+
+### The method
+
+**1. Plots (new `Content/Data/FillPlots.csv`).** One row per plot: `Plot, Site, Use, Building, Outline, Bound, Open, Gate, Density, Seed`.
+- `Outline`: the plot's corners in order, E N metres from the plaza (`E N; E N; ...`), or the square's world metres with Site Square.
+- `Use`: Market, ShopFront, SmithYard, HouseYard, Garden, Allotment, HenYard, Orchard, Paddock, Hayfield, WellGreen, Churchyard, Graveyard, Fort, Ruin, Green (kept open: lawn with at most a tree spot and a bench).
+- `Bound`: the boundary family: picket, stick, stone, pillar, hedge, palisade or none. `Open`: edges left without a run (an edge along the building's own wall, or a shop front onto the street). `Gate`: `edge:t:width` (which edge, where along it 0-1, width 1.6-2.2 m; the knight's capsule needs 1.2 m).
+- Made offline by a new layout tool (`Tools/FillPlots.py`, Unreal's own Python, no install) from `-FillDump`'s blocker map: Oak Hill's blocks between its radial roads are split between the buildings in them (each building gets the ground nearer to it than to its neighbours), cut back to a yard depth of 6-12 m behind and 2-4 m beside each house, kept 0.6 m off roads, door lanes and kept-clear shapes; then the tool checks shared edges (given to one plot only) and I adjust the outlines by hand on the map. The game only reads the CSV, so it stays deterministic and the owner can edit a plot.
+- Uses are spread so no two neighbours get the same one, and the town gets a mix: about a third house yards, a quarter kitchen gardens, a few hen yards, an orchard or two, the smith's yard, shop fronts round the plaza, paddocks and hayfields on the fringe, and some plain green left open.
+
+**2. Boundary runs (code: `PlaceRun` in Fill.cpp).** For every outline edge not listed in `Open`:
+- a corner post (FenceStickPost, FencePicketEnd, WallPillarEnd, WallStoneEnd, HedgeEnd) at every corner and at both sides of a gate and at a free end, turned to the corner's bisector;
+- between the posts' faces the span S is filled with n = round(S / L) panels (L the panel's real length from FillKinds.csv: FencePicket 2.95, FenceStick 1.87, WallStone 2.27, WallPillar 2.39, HedgeSegment 1.45, FencePalisade 3.71), each stretched along its length only by S / (n L), kept within 0.85-1.15 (else n+1 or n-1); a span shorter than 0.85 L gets one panel squashed down to 0.6, below that the two posts just meet. Panels butt with 1 cm of overlap, so a run's join gap is 0 by construction;
+- an edge that meets a building wall stops 3 cm off the wall with an end post;
+- fences follow the ground (each panel pitched between its ends' heights, up to 10 degrees); stone walls stay level and step at a pillar where the drop between panels is over 12 cm;
+- a run is placed whole, before any other prop. If something fixed is in the way (a door lane, a road, a choppable tree), the run is cut there with an end post on both sides and logged `JEEBFILL RUN <plot> edge <i> cut by <what> at E N`, never left with a silent hole;
+- runs need non-uniform scale: `FTry`/`FPlaced` get a length scale, `FootOf` and the solid box use it. The solids still come from the one place in `BuildComponents` (the mantle agent's tagging there merges cleanly).
+
+**3. Clutter by use (new `Content/Data/FillUses.csv`).** `Use, Set, Anchor, Min, Max, Per` (Per: sets per 10 m of anchor edge, or per 100 m^2 for `open`). Anchors are made from the plot itself:
+- `wall`: along the building's back or side wall inside the plot, every 0.5 m, facing out from the wall (today's wall-facing rule, now inside the plot);
+- `fence`: along the inside of a run, facing in;
+- `corner`: where two runs, or a run and a wall, meet;
+- `gate`: beside the gate, inside;
+- `row`: lines of beds, bales or tree spots across the plot, 1.2 m apart, parallel to its longest edge;
+- `open`: the plot's middle (only Green's bench, a well, a hero tree).
+Each plot places its hero set first (Min 1, Max 1), then the rest up to its density: dense (market, shop fronts) about 1 set per 3 m of anchor edge; medium (house yards, smith) 1 per 6 m; sparse (gardens, orchards) the rows plus 1-2 sets; bare (green, fringe) 0-1. Paths stay clear: a 1.2 m lane from the gate to the back door, the door aprons, and the middle of every yard (no clutter more than 2.5 m out from an anchor except `row` and `open` sets).
+- Draft recipes: **HouseYard** hero WoodYard (wall), then WashingCorner, StorageCorner, LogCorner (wall or corner), a bush in a far corner. **Garden** RaisedBed and TulipBed rows, WateringCan and Basket by the beds, a Scarecrow or a bench at one end, bushes along the fence. **HenYard** ChickenCoop and NestingBoxes against the back fence, WoodTub, Pail and WheatSack by the gate. **SmithYard** Cauldron, ChoppingBlock, LogStack, Barrels and the unlit torch against the smithy's side wall. **Orchard** tree spots in a grid (4-5 m), a Basket and Crate under two of them. **Paddock/Hayfield** stick fence round it, bales in rows, the HayWagon or HandCart just inside the gate. **ShopFront** a TrestleTable or crates and 1-3 barrels each side of the door, the awning above. **Market** the two stalls, the VegCart and HandCart beside them, crates and baskets behind the stalls, all round the lawn's edge facing the ring road. **WellGreen** benches facing the well, a bush pair. **Fort, Graveyard, Ruin** as now but their walls become runs.
+- The vignettes in FillSets.csv lose their built-in fence pieces (KitchenGarden, ChickenYard, PicketCorner, Farmstead, HedgeRun, FenceRun, GraveyardEnclosure): fences only come from runs.
+
+**4. Streets and doorsteps (FillOakHill.csv, hand rows, kept but cut down).** Kept: the plaza's banners, lamp posts, signposts, wall banners, one doorstep set per door (beside the door, against the wall), benches against walls. Removed: every free bush, flower clump, stump, barrel row and sack corner standing on its own in open ground (they move into plots or go). Bushes come back only at plot corners, along fences and at building corners.
+
+**5. Blackrock and the square.** The rule zones keep their cells, but sets may only stand at `wall` anchors (huts, the village wall) and goods kinds only in the MarketYard zone; densities halved. Blackrock's fountain yard and the market yard keep their hand rows. (Plots for Blackrock's huts can follow in a second pass if the owner wants it.)
+
+**6. What stays.** Fixed seeds and data only, the same on every machine (`JEEBFILL ... hash`); the server builds the hidden solids only; the 25 cm occupancy grid, keep-clear shapes, door aprons and lanes, counters, the flood fill from the spawn; the per-kind instanced sets, cull distances, shadow classes, covered-ground hook; no tick; no new meshes (no package change). There is no gate model: a gate is a gap between two end posts (a matching wooden gate and a stone gateway could be generated later).
+
+### Checks (log lines, then the offline audit)
+
+- `JEEBFILL RUN <plot> <family> pieces <n> length <m> maxgap <cm> closed <0|1> gates <n>`: every run's largest join gap 2 cm or less; `JEEBFILL RUNGAP` lines must be 0.
+- `JEEBFILL ENCLOSURE <plot> closed <yes|no>`: every edge of every fenced plot is a run, a building wall within 10 cm, or listed open; unclosed must be 0.
+- `JEEBFILL MISPLACED <kind> <plot or zone>`: goods kinds (stalls, VegCart, HandCart with produce, CabbageCrate, SpiceSacks, PotAmphora displays, AwningStriped, TrestleTable of goods) outside Market and ShopFront plots or the MarketYard zone: must be 0. FillKinds.csv gets a `goods` flag.
+- `JEEBFILL OVERLAP` 0 (a run's own joins excepted, 1 cm by design); `JEEBFILL UNREACHABLE` 0, now also every gate and every plot's inside.
+- `Tools/FillAudit.py` (Unreal's Python) on the dump: boundary pieces, separate runs, joins, open ends, overlaps, goods by zone, how far clutter stands from a wall, pieces by zone. Targets for Oak Hill: open ends 0 (except posts), gaps over 2 cm 0, goods outside market 0, clutter 4 m or more from any wall or fence under 5%.
+- Pictures: the whole-town air view, three closer oblique views and three street-level views, noon, the same eyes before and after.
+- Frame cost: one solo window, the fill's earlier spots, fill on against `-NoFill`: no worse than now (+0.73 ms worst, about +450 draws). Fewer clutter pieces and the same kinds should make it cheaper, not dearer.
+- Online: a dedicated server's `JEEBFILL total ... hash` equals a client's.
+
+### As built (2026-11-16, agent/townbuild2)
+
+Where the build differs from the method above:
+- **Plots.** `FillPlots.csv` columns are `Plot,Site,Use,Building,Outline,Bound,Depth,Side,Gate,Seed,Note`. A house yard has no outline: it is made round the building's back and sides (`Depth`/`Side` metres at most) and shrunk until clear (`MakeYard`); a side with no room becomes a yard behind the house only. A drawn rectangle moves its sides in until clear (`FitRect`, 4 m minimum, 6 m for paddocks and farms). The hand rows (shop fronts, doorsteps, plaza) are placed first and the plots fit round them. No offline layout tool: the code does the fitting, the same on every machine.
+- **Runs.** Corner posts are turned square to the edge leaving them (not the bisector), and each span stops at the post's real face, so joins are 0 cm. End posts stand 12 cm off their house's wall. Gate: picked on the run nearest a road, 1.6 m (picket) or 1.8 m, with a kept-clear lane through it and a reach target 1.5 m inside.
+- **Uses** (`FillUses.csv`: `Use,Set,Anchor,Min,Max`): anchors wall, fence, corner, gate, row, trees, open. Gate, corner and row sets that find too few spots fall back to fence spots (nearest the gate for a gate set). Recipes used today: HouseYard, Garden, HenYard, SmithYard, StoreYard, Churchyard, Graveyard, Allotment, Paddock, Farm. Orchard exists but no house uses it until the tree pick plants its tree spots (an orchard of reserved spots looks empty).
+- **No Market or ShopFront plot:** the plaza's stalls and shop fronts stay hand rows; goods kinds are allowed there and in the MarketYard zone only.
+- **Walk targets** from before the yards were fenced that now fall inside a plot (a house's back or side) are retired, logged `JEEBFILL PLOT <p>: target <t> is inside the plot, reached through its gate`; the gate's inside target stands for them.
+- Left out by the fitting (logged `left out`): the bank and store yards (their sides are taken by shop-front rows), houses 14, 17 and 19 (no clear ground or a neighbour's yard).
+- Round 1 (critic, 2026-11-16, "too empty, some places don't make sense"):
+  - a yard's side fence meets the side wall part way back (not the front corner), and its end post steps out until clear of a chimney or buttress;
+  - fences get a gate leaf: a panel cut to the opening, swung open into the plot (stone and pillar gateways stay open);
+  - a gate stands a full panel from a corner, against a corner post only when no run has room;
+  - new anchors `front` (the house's street wall beside the door: FrontPots, FrontFlowers, BenchNook) and `outside` (a verge along the outside of the runs: BushRow, Bush1), never in another plot;
+  - all houses picket, farms stone, the north paddock by the church gone;
+  - lamps and signposts snap to 0.7 m off the nearest path;
+  - plaza: benches face the path, the cart and sacks stand by the red stall, the lawn signpost is gone;
+  - the ruin's wall stub and the forts' lone palisade panels are gone, and the stump is out of the woodpile set.
+  The audit now counts each gate leaf's free end as an open end or a gap (17 leaves).
+
 Owner: "Can you fill the world up with all the items too... Like all the stuff we added in movelab." About Oak Hill: "populating it with tons of these items ... cozy and lively. I don't want there to be a lot of empty spaces around or between the houses ... filled in with these various items and trees. I trust you to pick which items would go in which places, and make sure they don't collide with each other."
 
-Status: plan only. Plan review by `performance-reviewer` (PLAN RISKS): its eight points are folded in (section 4, "Review points"). Start building after the English Oak import, the windows and church swap and the deletions are merged (CLAUDE.md, "Next big job").
+Status (first fill, sections 1-7): built 2026-11-15; superseded in Oak Hill by Placement v2 above. Plan review by `performance-reviewer` (PLAN RISKS): its eight points are folded in (section 4, "Review points").
 
 ## What the world is today (what this plan fills)
 

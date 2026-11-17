@@ -1,0 +1,89 @@
+# What each plot use places (Placement v2, 2026-11-16; Docs/FillPlan.md). Use,Set,Anchor,Min,Max: in order, each row places Min to Max
+# sets (seeded per plot). Anchors: wall (against the plot's own building's back or side walls, facing out), fence (against the inside of
+# its runs, facing in), corner (near a corner of its runs), gate (beside the gate, inside), row (lines across the plot: beds), trees
+# (orchard tree spots 5 m apart, Set unused), open (its middle). Goods (stalls, the veg cart, spice sacks, awnings) only at Market or
+# ShopFront uses: anything else that holds them is refused.
+Use,Set,Anchor,Min,Max
+# a house's back yard: the woodpile against the house, washing and stores, bushes in the corners, maybe a bed or two
+HouseYard,WoodYard,wall,1,1
+HouseYard,WashingCorner,wall,0,1
+HouseYard,StorageCorner,corner,0,1
+HouseYard,Bush1,corner,1,2
+HouseYard,GardenBed,row,1,2
+HouseYard,Bush1,fence,1,2
+# a kitchen garden: beds in rows, tools by the gate, bushes along the fence
+Garden,GardenBed,row,3,6
+Garden,GardenTools,gate,1,1
+Garden,Bush1,corner,1,2
+Garden,WoodYard,wall,0,1
+Garden,Bush1,fence,0,2
+# a hen yard: the coop on the back fence, feed and water by the gate
+HenYard,HenHouse,fence,1,1
+HenYard,HenFeed,gate,1,1
+HenYard,WoodYard,wall,0,1
+HenYard,Bush1,corner,1,2
+# an orchard: tree spots in a grid (planted by the trees job), baskets under them, the woodpile on the house
+Orchard,Trees,trees,2,5
+Orchard,OrchardBits,open,1,1
+Orchard,WoodYard,wall,1,1
+Orchard,Bush1,corner,0,2
+# the smith's yard
+SmithYard,SmithYard,wall,1,1
+SmithYard,LogCorner,wall,0,1
+SmithYard,BarrelRow,wall,0,1
+SmithYard,StorageCorner,corner,0,1
+# a shop's back yard: its stores (barrels, crates, sacks, the hand cart)
+StoreYard,StorageCorner,wall,1,1
+StoreYard,SackCorner,wall,0,1
+StoreYard,BarrelRow,corner,0,1
+StoreYard,CartCorner,fence,0,1
+StoreYard,Bush1,corner,0,1
+# the church's yard: cypresses in the corners, a bench, flowers
+Churchyard,CypressPair,corner,2,3
+Churchyard,GraveyardBench,fence,1,1
+Churchyard,FlowerClump,corner,0,2
+# the graveyard (its graves and cypresses are hand rows)
+Graveyard,Bush1,corner,0,2
+# the town allotment: many beds in rows, a scarecrow, tools by the gate
+Allotment,GardenBed,row,6,12
+Allotment,Scarecrow,open,0,1
+Allotment,GardenTools,gate,1,1
+Allotment,BenchNookStone,fence,0,1
+# fields and farms on the fringe
+Paddock,Hayfield,open,1,1
+Paddock,Bush1,corner,0,2
+Farm,Farmstead,open,1,1
+Farm,Bush1,corner,0,2
+# round 1 (2026-11-16): every house also gets its front (pots or flowers beside the door, maybe a bench) and a verge of bushes
+# outside its fence; farms, paddocks, the churchyard, graveyard and allotment get the verge
+HouseYard,FrontPots,front,1,1
+HouseYard,FrontFlowers,front,0,1
+HouseYard,BenchNook,front,0,1
+HouseYard,BushRow,outside,1,2
+HouseYard,Bush1,outside,0,2
+Garden,FrontPots,front,1,1
+Garden,FrontFlowers,front,0,1
+Garden,BenchNook,front,0,1
+Garden,BushRow,outside,1,2
+Garden,Bush1,outside,0,2
+HenYard,FrontPots,front,1,1
+HenYard,FrontFlowers,front,0,1
+HenYard,BenchNook,front,0,1
+HenYard,BushRow,outside,1,2
+HenYard,Bush1,outside,0,2
+Orchard,FrontPots,front,1,1
+Orchard,FrontFlowers,front,0,1
+Orchard,BenchNook,front,0,1
+Orchard,BushRow,outside,1,2
+Orchard,Bush1,outside,0,2
+SmithYard,LogCorner,front,0,1
+SmithYard,WoodYard,wall,0,1
+SmithYard,Bush1,outside,0,2
+Churchyard,BushRow,outside,1,2
+Churchyard,Bush1,outside,0,2
+Graveyard,BushRow,outside,1,2
+Graveyard,Bush1,outside,1,2
+Allotment,Bush1,outside,1,2
+Paddock,Bush1,outside,1,2
+Farm,Bush1,outside,1,3
+Farm,BushRow,outside,0,1

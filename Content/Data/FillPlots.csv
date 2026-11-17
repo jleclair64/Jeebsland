@@ -1,0 +1,32 @@
+# Plots (Placement v2, 2026-11-16; Docs/FillPlan.md): every yard, garden, field and churchyard, its use and its boundary. Earlier rows
+# win the ground. Building: JeebOakHill::Plots() index (-FillDump's blockers_shapes.csv plot rows); with no Outline the yard is made
+# round that building's back and sides, Depth and Side metres at most, shrunk until clear. Outline: E N corners (metres from the
+# plaza; Site Square: world metres, E = Y, N = X). Bound picket|stick|stone|pillar|none. Gate auto (on the run nearest a road) or none.
+Plot,Site,Use,Building,Outline,Bound,Depth,Side,Gate,Seed,Note
+Smith yard,OakHill,SmithYard,2,,stone,6,2.5,auto,8000,
+Bank yard,OakHill,StoreYard,1,,stone,5,2.5,auto,8001,
+Store yard,OakHill,StoreYard,5,,picket,5,2.5,auto,8002,
+Potion garden,OakHill,Garden,4,,picket,6,2.5,auto,8003,
+Churchyard,OakHill,Churchyard,8,,pillar,8,4,auto,8004,
+House 10,OakHill,HouseYard,10,,picket,8,3.5,auto,8005,
+House 11,OakHill,Garden,11,,picket,8,3.5,auto,8006,
+House 12,OakHill,HenYard,12,,picket,8,3.5,auto,8007,
+House 13,OakHill,HouseYard,13,,picket,8,3.5,auto,8008,
+House 14,OakHill,HouseYard,14,,picket,10,3.5,auto,8009,
+House 15,OakHill,HouseYard,15,,picket,8,3.5,auto,8010,
+House 16,OakHill,Garden,16,,picket,8,3.5,auto,8011,
+House 17,OakHill,HenYard,17,,picket,8,3.5,auto,8012,
+House 18,OakHill,Garden,18,,picket,10,3.5,auto,8013,
+House 19,OakHill,HouseYard,19,,picket,8,3.5,auto,8014,
+House 20,OakHill,Garden,20,,picket,8,3.5,auto,8015,
+House 21,OakHill,HouseYard,21,,picket,8,3.5,auto,8016,
+House 22,OakHill,HenYard,22,,picket,8,3.5,auto,8017,
+House 23,OakHill,HouseYard,23,,picket,10,3.5,auto,8018,
+House 24,OakHill,Garden,24,,picket,8,3.5,auto,8019,
+House 25,OakHill,HouseYard,25,,picket,8,3.5,auto,8020,
+Allotment,OakHill,Allotment,-1,38.5 -8.3;46.5 -8.3;46.5 3.8;38.5 3.8,picket,0,0,auto,8021,
+Graveyard,OakHill,Graveyard,-1,22.2 -53.4;38.0 -53.4;38.0 -37.6;22.2 -37.6,pillar,0,0,auto,8022,
+East paddock,OakHill,Paddock,-1,74 -47.9;88.2 -47.9;88.2 -37.1;74 -37.1,stick,0,0,auto,8023,
+South paddock,OakHill,Paddock,-1,-31 -76;-15 -76;-15 -63;-31 -63,stick,0,0,auto,8024,
+East farm,OakHill,Farm,-1,77.2 4.9;88 4.9;88 17.4;77.2 17.4,stone,0,0,auto,8026,
+South farm,OakHill,Farm,-1,5 -80;19 -80;19 -67;5 -67,stone,0,0,auto,8027,
