@@ -128,7 +128,11 @@ for n in NAMES:
     tools.import_asset_tasks([task])
     sm = lib.load_asset(folder + "/SM_" + n)
     if sm is None: raise RuntimeError("PROPDIAG " + n + " did not import")
-    sm.set_material(0, mi)
+    # (2026-11-16: the baked longbow came in with two material slots, its faces on the second, and only the first was given the prop's material: the whole bow drew
+    # in the engine's plain grey. Every slot gets it; the game tints every slot too, JeebProps::Tint)
+    slots = sm.get_editor_property("static_materials")
+    for i_ in range(len(slots)): sm.set_material(i_, mi)
+    unreal.log("PROPDIAG %s material slots %d: %s" % (n, len(slots), ", ".join(str(x.get_editor_property("material_slot_name")) for x in slots)))
     lib.save_asset(folder + "/SM_" + n)
     b = sm.get_bounding_box()
     unreal.log("PROPDIAG %s min %s max %s" % (n, b.min, b.max))
