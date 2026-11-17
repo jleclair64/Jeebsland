@@ -26,7 +26,8 @@ namespace
 		float DefaultOverride;            // for cvars whose own default is "use the material's": that value; else -1000
 		const TCHAR* Pal;                 // Scale items whose cvar is empty by default ("the palette's colour"): that palette entry
 	};
-	const TCHAR* Groups[6] = { TEXT("PICTURE"), TEXT("SKY + HAZE"), TEXT("CLOUDS"), TEXT("WATER"), TEXT("GRASS"), TEXT("GROUND") };
+	const TCHAR* Groups[] = { TEXT("PICTURE"), TEXT("SKY + HAZE"), TEXT("CLOUDS"), TEXT("WATER"), TEXT("GRASS"), TEXT("GROUND"), TEXT("TREES") };
+	constexpr int32 NumGroups = UE_ARRAY_COUNT(Groups);
 	const float NoDef = -1000.f;
 	const FLookItem Items[] = {
 		{ 0, TEXT("Colour strength (saturation)"), TEXT("jeeb.Look.Sat"), EK::Float, 0, 0.6f, 1.8f, false, NoDef },
@@ -87,6 +88,20 @@ namespace
 		{ 5, TEXT("Ground: low-sun light kept under grass"), TEXT("jeeb.Ground.UnderFill"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Sky: ground colour below the horizon"), TEXT("jeeb.Sky.Ground"), EK::Float, 0, 0.f, 3.f, false, NoDef },
 		{ 0, TEXT("Knight gravity x real (-1 Tuning.ini; reset)"), TEXT("jeeb.Knight.Gravity"), EK::Float, 0, 0.5f, 3.f, false, NoDef },
+
+		// TREES (2026-11-16): the four DZ test forests' leaf colours, "r g b" each (TreeGroves.cpp; live); every bar runs from 0 to twice its default
+		{ 6, TEXT("DZ green forest: red"), TEXT("jeeb.Trees.DzGreen"), EK::Comp, 0, 0.f, 0.4f, false, NoDef },
+		{ 6, TEXT("DZ green forest: green"), TEXT("jeeb.Trees.DzGreen"), EK::Comp, 1, 0.f, 0.72f, false, NoDef },
+		{ 6, TEXT("DZ green forest: blue"), TEXT("jeeb.Trees.DzGreen"), EK::Comp, 2, 0.f, 0.14f, false, NoDef },
+		{ 6, TEXT("DZ red forest: red"), TEXT("jeeb.Trees.DzRed"), EK::Comp, 0, 0.f, 1.f, false, NoDef },
+		{ 6, TEXT("DZ red forest: green"), TEXT("jeeb.Trees.DzRed"), EK::Comp, 1, 0.f, 0.14f, false, NoDef },
+		{ 6, TEXT("DZ red forest: blue"), TEXT("jeeb.Trees.DzRed"), EK::Comp, 2, 0.f, 0.07f, false, NoDef },
+		{ 6, TEXT("DZ orange forest: red"), TEXT("jeeb.Trees.DzOrange"), EK::Comp, 0, 0.f, 1.24f, false, NoDef },
+		{ 6, TEXT("DZ orange forest: green"), TEXT("jeeb.Trees.DzOrange"), EK::Comp, 1, 0.f, 0.44f, false, NoDef },
+		{ 6, TEXT("DZ orange forest: blue"), TEXT("jeeb.Trees.DzOrange"), EK::Comp, 2, 0.f, 0.08f, false, NoDef },
+		{ 6, TEXT("DZ yellow forest: red"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 0, 0.f, 1.4f, false, NoDef },
+		{ 6, TEXT("DZ yellow forest: green"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 1, 0.f, 0.9f, false, NoDef },
+		{ 6, TEXT("DZ yellow forest: blue"), TEXT("jeeb.Trees.DzYellow"), EK::Comp, 2, 0.f, 0.1f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)
@@ -264,8 +279,9 @@ void AKnightHUD::DrawLookTab(float PX, float PY, float PW, float PH)
 
 	// Group buttons across the top
 	const float GY = PY + 54.f;
-	for (int32 g = 0; g < 6; ++g)
-		if (Btn(PX + 20.f + g * 104.f, GY, 100.f, 28.f, Groups[g], true, LookGroup == g, 0.9f)) { LookGroup = g; Dragging = -1; }
+	// (seven groups since TREES, 2026-11-16: narrower buttons, still clear of the PRESETS heading)
+	for (int32 g = 0; g < NumGroups; ++g)
+		if (Btn(PX + 20.f + g * 92.f, GY, 88.f, 28.f, Groups[g], true, LookGroup == g, 0.85f)) { LookGroup = g; Dragging = -1; }
 
 	// Sliders, two columns
 	// (a tab with more than 12 sliders gets longer columns, rows closer together, instead of a third column over the presets)
