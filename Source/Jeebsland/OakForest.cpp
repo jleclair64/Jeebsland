@@ -386,7 +386,7 @@ const TArray<TArray<FVector2D>>& JeebOakForest::RoadLines()
 					const FVector2D Q = P + D * Step;
 					if (!Ok(Q) || !Ok(P + D * Step * 0.5f) || (bTown && (!Ok(P + D * Step * 0.25f) || !Ok(P + D * Step * 0.75f)))) continue;
 					const float Grade = FMath::Abs(JeebTerrain::HeightAt(Q.X, Q.Y, true, 1) - H0) / Step;
-					const float Cost = Grade * 14.f + FMath::Abs(a) * 0.06f + (1.f - FVector2D::DotProduct(D, G)) * 0.9f;
+					const float Cost = Grade * 6.f + FMath::Abs(a) * 0.06f + (1.f - FVector2D::DotProduct(D, G)) * 0.9f;   // (climb weighed 6, was 14: with the hills 14 sent the north road round them to the south-east; JeebHills levels each road to 5 degrees, cutting through the saddles)
 					if (Cost < Best) { Best = Cost; BestQ = Q; }
 				}
 				if (Best >= 1.0e9f) break;
@@ -557,7 +557,7 @@ struct FOakForestBuild
 				const FVector2D P(X, Y);
 				float Slope;
 				const float Z = Hs.At(X, Y, &Slope);
-				if (Slope > 0.5f) continue;   // (27 degrees: nothing on steep ground)
+				if (Slope > 0.72f) continue;   // (36 degrees: nothing on steeper ground; 0.5 before the hills, 2026-11-16, whose slopes reach 35 so they stay forested)
 				if (OnForestRoadBox(X, Y, 600.f) && JeebTerrain::PathClearance(X, Y) < 400.f) continue;
 				// glades: a slow noise opens clearings here and there; hollows (lower than the ground 30 m round) are thicker, rises thinner
 				const float Glade = JeebWorld::Smooth(-0.32f, -0.12f, Noise(P, 9000.f, 3.3f, 8.8f));
@@ -604,7 +604,7 @@ struct FOakForestBuild
 			const FVector2D P = C + FVector2D(Ox, Oy);
 			float Slope;
 			const float Z = Hs.At(P.X, P.Y, &Slope);
-			if (Slope > 0.6f || Edge(P.X, P.Y) <= 0.f) continue;
+			if (Slope > 0.75f || Edge(P.X, P.Y) <= 0.f) continue;
 			if (OnForestRoadBox(P.X, P.Y, 600.f) && JeebTerrain::PathClearance(P.X, P.Y) < 160.f) continue;
 			const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
 			const bool bConifer = ConiferField > 0.55f;
@@ -648,7 +648,7 @@ struct FOakForestBuild
 				if (Edge(P.X, P.Y) <= 0.f) continue;
 				float Slope;
 				const float Z = Hs.At(P.X, P.Y, &Slope);
-				if (Slope > 0.7f) continue;
+				if (Slope > 0.8f) continue;
 				if (OnForestRoadBox(P.X, P.Y, 800.f) && JeebTerrain::PathClearance(P.X, P.Y) < 250.f) continue;
 				const float Foot = Kinds[Kind].Crown * FMath::Max(Sx, Sy);
 				if (!Space.Clear(P, Foot, 0.15f, 40.f)) continue;
