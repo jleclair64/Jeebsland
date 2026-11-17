@@ -53,6 +53,8 @@ void ABatSwarm::BeginPlay()
 	TArray<FTransform> HiddenW;
 	for (int32 i = 0; i < NumBats * 2; ++i) HiddenW.Add(FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)));
 	Wing->AddInstances(HiddenW, false, false, false);
+	Body->SetHasPerInstancePrevTransforms(true);   // motion vectors for TAA: no ghost trails
+	Wing->SetHasPerInstancePrevTransforms(true);
 	Body->SetVisibility(false);
 	Wing->SetVisibility(false);
 }
@@ -125,6 +127,15 @@ void ABatSwarm::Tick(float DeltaSeconds)
 	if (T >= SwarmSeconds) { HideAll(); return; }
 	const float Fade = FMath::Clamp(FMath::Min(T / 1.2f, (SwarmSeconds - T) / 1.5f), 0.f, 1.f);
 
+	TArray<FTransform> BodyNew, BodyPrev, WingNew, WingPrev;
+	BodyNew.SetNum(Bats.Num()); BodyPrev.SetNum(Bats.Num());
+	WingNew.SetNum(Bats.Num() * 2); WingPrev.SetNum(Bats.Num() * 2);
+	auto PrevOf = [](UInstancedStaticMeshComponent* C, int32 Idx, const FTransform& New)
+	{
+		FTransform Old;
+		return (C->GetInstanceTransform(Idx, Old, true) && Old.GetLocation().Z > -4000.f) ? Old : New;   // parked instances jump: no streak
+	};
+
 	for (int32 i = 0; i < Bats.Num(); ++i)
 	{
 		const FBat& B = Bats[i];
@@ -133,10 +144,10 @@ void ABatSwarm::Tick(float DeltaSeconds)
 		if (Vel.SizeSquared() < 1e-4f) Vel = FVector(Dir.X, Dir.Y, 0.f);
 		const FQuat Q = FRotationMatrix::MakeFromX(Vel.GetSafeNormal()).ToQuat();
 		const float S = B.Size * Fade;
-		const bool bLast = (i == Bats.Num() - 1);
 
 		// body: a small dark oval
-		Body->UpdateInstanceTransform(i, FTransform(Q, Pos, FVector(0.34f, 0.16f, 0.14f) * S), true, bLast, true);
+		BodyNew[i] = FTransform(Q, Pos, FVector(0.34f, 0.16f, 0.14f) * S);
+		BodyPrev[i] = PrevOf(Body, i, BodyNew[i]);
 
 		// wings: flat panels that flap up and down about the body
 		const float Flap = FMath::Sin(T * B.Flap + B.Phase) * FMath::DegreesToRadians(55.f);
@@ -145,7 +156,13 @@ void ABatSwarm::Tick(float DeltaSeconds)
 			const float Sd = (w == 0) ? 1.f : -1.f;
 			const FQuat Rq(FVector::XAxisVector, Sd * Flap);
 			const FVector Centre = Pos + Q.RotateVector(Rq.RotateVector(FVector(0.f, Sd * 26.f * S, 0.f)) + FVector(0.f, Sd * 8.f * S, 0.f));
-			Wing->UpdateInstanceTransform(i * 2 + w, FTransform(Q * Rq, Centre, FVector(0.22f, 0.5f, 0.012f) * S), true, bLast && w == 1, true);
+			WingNew[i * 2 + w] = FTransform(Q * Rq, Centre, FVector(0.22f, 0.5f, 0.012f) * S);
+			WingPrev[i * 2 + w] = PrevOf(Wing, i * 2 + w, WingNew[i * 2 + w]);
 		}
+	}
+	if (BodyNew.Num() > 0)
+	{
+		Body->BatchUpdateInstancesTransforms(0, BodyNew, BodyPrev, true, false, true);
+		Wing->BatchUpdateInstancesTransforms(0, WingNew, WingPrev, true, false, true);
 	}
 }
