@@ -15,11 +15,11 @@
 Set,E,N,Yaw,Seed,Var,Plot,Note,Site
 MarketRed,-4.7,8.14,60,1,0,-1,plaza market stall on the lawn edge facing the oak
 MarketGreen,2.99,9.58,120,2,0,-1,plaza market stall on the lawn edge facing the oak
-BenchNook,0.84,5.86,100,3,0,-1,bench on the lawn facing the oak
-BenchNook,1.54,-7.1,-105,4,0,-1,bench on the lawn facing the oak
-BenchNook,-3.44,-5.29,-50,5,0,-1,bench on the lawn facing the oak
+BenchNook,0.84,5.86,-80.0,3,0,-1,bench on the lawn facing the plaza path (round 1: was facing the oak trunk)
+BenchNook,1.54,-7.1,75.0,4,0,-1,bench on the lawn facing the plaza path (round 1: was facing the oak trunk)
+BenchNook,-3.44,-5.29,130.0,5,0,-1,bench on the lawn facing the plaza path (round 1: was facing the oak trunk)
 VegCorner,9.76,-2.61,-165,6,0,-1,plaza: veg corner on the lawn edge
-CartCorner,-2.64,-9.85,-75,7,0,-1,plaza: cart corner on the lawn edge
+CartCorner,-7.6,4.6,60,7,0,-1,plaza: cart and sacks beside the red market stall (round 1)
 BenchNook,6.48,2.36,160,8,0,-1,plaza: bench nook on the lawn edge
 FlowerClump,4.37,6.19,32,9,0,-1,plaza: flower clump on the lawn edge
 FlowerClump,5.62,-8.99,-122,10,0,-1,plaza: flower clump on the lawn edge
@@ -86,7 +86,6 @@ LampPillar,11.07,33.63,99.48,143,0,-1,street lamp
 LampStone,21.68,24.62,-66.57,144,0,-1,street lamp
 LampGallows,36.48,22.33,123.74,145,0,-1,street lamp
 LampPillar,45.08,10.38,-59.04,146,0,-1,street lamp
-JunctionArrow,1.5,-11.4,86.76,147,0,-1,sign at a junction
 Junction,-2.3,-24.89,-40,148,0,-1,sign at a junction
 JunctionArrow,-5.92,-15.4,-64.37,149,0,-1,sign at a junction
 Junction,1.41,-27.4,-49.71,150,0,-1,sign at a junction
@@ -96,7 +95,6 @@ RingCorner,-2.48,-29.44,-42.97,153,1,26,boxing ring plot
 RingBanner,-4.48,-30.44,-129.89,154,1,26,boxing ring plot
 SpectatorBench,-3.48,-33.44,180,155,1,26,boxing ring plot
 RingCorner,-4.48,-33.44,180,156,1,26,boxing ring plot
-Ruin,-11.11,42.61,5.84,157,1,27,castle ruins plot
 GarrisonLion,-44.1,32.55,-50.75,179,1,30,north fort plot
 Garrison,-43.52,24.33,-100,180,1,30,north fort plot
 GarrisonTable,-43.63,29.42,-50.54,181,1,30,north fort plot

@@ -54,3 +54,36 @@ Paddock,Hayfield,open,1,1
 Paddock,Bush1,corner,0,2
 Farm,Farmstead,open,1,1
 Farm,Bush1,corner,0,2
+# round 1 (2026-11-16): every house also gets its front (pots or flowers beside the door, maybe a bench) and a verge of bushes
+# outside its fence; farms, paddocks, the churchyard, graveyard and allotment get the verge
+HouseYard,FrontPots,front,1,1
+HouseYard,FrontFlowers,front,0,1
+HouseYard,BenchNook,front,0,1
+HouseYard,BushRow,outside,1,2
+HouseYard,Bush1,outside,0,2
+Garden,FrontPots,front,1,1
+Garden,FrontFlowers,front,0,1
+Garden,BenchNook,front,0,1
+Garden,BushRow,outside,1,2
+Garden,Bush1,outside,0,2
+HenYard,FrontPots,front,1,1
+HenYard,FrontFlowers,front,0,1
+HenYard,BenchNook,front,0,1
+HenYard,BushRow,outside,1,2
+HenYard,Bush1,outside,0,2
+Orchard,FrontPots,front,1,1
+Orchard,FrontFlowers,front,0,1
+Orchard,BenchNook,front,0,1
+Orchard,BushRow,outside,1,2
+Orchard,Bush1,outside,0,2
+SmithYard,LogCorner,front,0,1
+SmithYard,WoodYard,wall,0,1
+SmithYard,Bush1,outside,0,2
+Churchyard,BushRow,outside,1,2
+Churchyard,Bush1,outside,0,2
+Graveyard,BushRow,outside,1,2
+Graveyard,Bush1,outside,1,2
+Allotment,Bush1,outside,1,2
+Paddock,Bush1,outside,1,2
+Farm,Bush1,outside,1,3
+Farm,BushRow,outside,0,1

@@ -82,6 +82,16 @@ Where the build differs from the method above:
 - **No Market or ShopFront plot:** the plaza's stalls and shop fronts stay hand rows; goods kinds are allowed there and in the MarketYard zone only.
 - **Walk targets** from before the yards were fenced that now fall inside a plot (a house's back or side) are retired, logged `JEEBFILL PLOT <p>: target <t> is inside the plot, reached through its gate`; the gate's inside target stands for them.
 - Left out by the fitting (logged `left out`): the bank and store yards (their sides are taken by shop-front rows), houses 14, 17 and 19 (no clear ground or a neighbour's yard).
+- Round 1 (critic, 2026-11-16, "too empty, some places don't make sense"):
+  - a yard's side fence meets the side wall part way back (not the front corner), and its end post steps out until clear of a chimney or buttress;
+  - fences get a gate leaf: a panel cut to the opening, swung open into the plot (stone and pillar gateways stay open);
+  - a gate stands a full panel from a corner, against a corner post only when no run has room;
+  - new anchors `front` (the house's street wall beside the door: FrontPots, FrontFlowers, BenchNook) and `outside` (a verge along the outside of the runs: BushRow, Bush1), never in another plot;
+  - all houses picket, farms stone, the north paddock by the church gone;
+  - lamps and signposts snap to 0.7 m off the nearest path;
+  - plaza: benches face the path, the cart and sacks stand by the red stall, the lawn signpost is gone;
+  - the ruin's wall stub and the forts' lone palisade panels are gone, and the stump is out of the woodpile set.
+  The audit now counts each gate leaf's free end as an open end or a gap (17 leaves).
 
 Owner: "Can you fill the world up with all the items too... Like all the stuff we added in movelab." About Oak Hill: "populating it with tons of these items ... cozy and lively. I don't want there to be a lot of empty spaces around or between the houses ... filled in with these various items and trees. I trust you to pick which items would go in which places, and make sure they don't collide with each other."
 

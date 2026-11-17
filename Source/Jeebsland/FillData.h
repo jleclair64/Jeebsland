@@ -59,7 +59,7 @@ namespace JeebFill
 	//                 walls), Bound (picket|stick|stone|pillar|none), Depth, Side (metres the yard may reach behind and beside the building:
 	//                 shrunk until clear), Gate (auto|none), Seed, Note.
 	//  FillUses.csv   Use, Set, Anchor (wall|fence|corner|gate|row|trees|open), Min, Max: what each use places, in order.
-	enum class EAnchor : uint8 { Wall, Fence, Corner, Gate, Row, Trees, Open };
+	enum class EAnchor : uint8 { Wall, Fence, Corner, Gate, Row, Trees, Open, Front, Outside };
 	struct FPlotRow { FString Name, Site, Use, Bound, Gate, Note; int32 Building = -1; TArray<FVector2D> Outline; float Depth = 8.f, Side = 3.f; int32 Seed = 0; int32 Line = 0; };
 	struct FUseRow { FString Set; EAnchor Anchor = EAnchor::Wall; int32 Min = 0, Max = 1; };
 
