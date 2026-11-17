@@ -79,7 +79,7 @@ CATALOG = {
     "BushBall": ("S Y G E W R", "none", "near", ""), "BushBerries": ("S Y G E W R", "none", "near", ""),
     "BushDome": ("S Y G E W R", "none", "near", ""), "BushLeafy": ("S Y G E W R", "none", "near", ""),
     "BushRound": ("S Y G E W R", "none", "near", ""), "BushSpiky": ("S Y G E W R", "none", "near", ""),
-    "BushWhiteFlowers": ("S Y G E W R", "none", "near", ""), "BushYellowFlowers": ("S Y G E W R", "none", "near", ""),
+    "BushWhiteFlowers": ("S Y G E W R", "none", "near", ""),
     "ShrubLow": ("S Y E W", "none", "no", ""), "PlantClump": ("S Y E W", "none", "no", ""),
     "HedgeBox": ("S Y G", "solid", "yes", ""), "HedgeSegment": ("S Y G", "solid", "yes", ""), "HedgeEnd": ("S Y G", "solid", "yes", ""),
     "Cypress": ("V G P", "thin", "yes", ""),
@@ -120,7 +120,7 @@ CATALOG = {
     "FlowerBoxIvy": ("S", "none", "no", ""), "FlowerBoxLong": ("S", "none", "no", ""), "WindowBoxRed": ("S", "none", "no", "hang"),
     "PlanterGilded": ("P", "solid", "near", ""),
     # rocks, fallen wood, stumps (the pond's far bank, the fringe, yards)
-    "BoulderMossy": ("W F", "solid", "yes", ""), "RockPale": ("W R", "solid", "yes", ""), "LogMossy": ("W E", "solid", "yes", ""),
+    "BoulderMossy": ("W F", "solid", "yes", ""), "LogMossy": ("W E", "solid", "yes", ""),
     "StumpGrass": ("Y E W", "solid", "near", ""), "StumpMushroom": ("Y E W", "solid", "near", ""),
     "StumpPainted": ("Y E W", "solid", "near", ""), "StumpRooty": ("Y E W", "solid", "near", ""), "StumpStones": ("Y E W", "solid", "near", ""),
 }

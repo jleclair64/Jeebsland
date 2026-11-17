@@ -251,7 +251,7 @@ def weeds(name):
     bm.normal_update()
     return new_obj(name, bm)
 export(weeds("TL_Weeds"), "TL_Weeds")
-export(blob("TL_Stones", 6, 13.0, 0.6, [(0.62, 0.58, 0.52), (0.55, 0.52, 0.48), (0.68, 0.63, 0.55), (0.50, 0.50, 0.47)], 11, 22.0), "TL_Stones", True)
+# (TL_Stones: deleted 2026-11-16)
 
 # ============================================================================================================================
 # 3. Where they go: planned on each finished model
@@ -297,7 +297,7 @@ BUILD_A_LANTERNS = {
 if ONLY: BUILD = {k: v for k, v in BUILD.items() if k in ONLY}
 # The filler props measured on their files (Art/Filler/Clean: bottom centre, front Blender -Y; sizes in cm as drawn at scale 1)
 FILLER = ["Crate", "CrateNoLid", "WheatSack", "Barrel", "Firewood", "LogStackSmall", "PotRound", "PotSmall", "PlantClump",
-          "WateringCan", "Pail", "LanternBlack", "LanternOil", "Basket", "ShrubLow", "BushYellowFlowers"]
+          "WateringCan", "Pail", "LanternBlack", "LanternOil", "Basket", "ShrubLow"]
 FILLER += ["HandCart", "RopeCoil", "SackStack", "SackPileOpen", "SpiceSacks", "CabbageCrate", "CrateOpen", "BarrelSmall", "ClayJug",   # (build-c's stalls)
            "PotJug", "PotAmphora", "Cauldron", "CandleCageShort", "WoodTub", "PotWide"]
 fsize = {}
@@ -547,7 +547,7 @@ for bname, B in BUILD.items():
             if sname == "front" and B["door"][0] - 60 < pl.x < B["door"][1] + 60: continue
             h = surface(pl, outv, 15.0)
             face = (h - pl).dot(outv) if h is not None else 0.0
-            if not B.get("stall"): add("stones", "TL_Stones", pl + outv * (face + 12.0), outv, rnd.uniform(0.7, 1.2), False)
+            # (no stones: owner 2026-11-16, "I don't like these groupings of stones anywhere"; TL_Stones deleted)
             if rnd.random() < 0.6:
                 add("weeds", "TL_Weeds", pl + outv * (face + 22.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.8, 1.2), False)
     plans[bname] = (items, bvh, sides, B, top, surface)

@@ -357,7 +357,7 @@ if os.path.isdir(decor) and not ONLY:
     m_fol = plain_material("M_TL_Foliage", foliage)
     m_vp = plain_material("M_TL_VertexPaint", vpaint)
     solid = {}
-    for mi_name, col in (("MI_TL_Moss", (0.085, 0.14, 0.025)), ("MI_TL_Stones", (0.30, 0.27, 0.22))):   # (linear colours: moss yellow-green, warm grey stone)
+    for mi_name, col in (("MI_TL_Moss", (0.085, 0.14, 0.025)),):   # (linear colour: moss yellow-green; the stones were deleted 2026-11-16)
         p = folder + "/" + mi_name
         if lib.does_asset_exist(p): lib.delete_asset(p)
         mi = tools.create_asset(mi_name, folder, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
@@ -366,7 +366,8 @@ if os.path.isdir(decor) and not ONLY:
         lib.save_asset(p); solid[mi_name] = mi
     for f in sorted(os.listdir(decor)):
         if not f.endswith(".fbx"): continue
-        n = f[:-4]; painted = n in ("TL_MossClump", "TL_Stones")
+        n = f[:-4]; painted = n == "TL_MossClump"
+        if n == "TL_Stones": continue   # (deleted 2026-11-16)
         ui = unreal.FbxImportUI()
         ui.set_editor_property("import_mesh", True); ui.set_editor_property("import_as_skeletal", False)
         ui.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
@@ -383,7 +384,7 @@ if os.path.isdir(decor) and not ONLY:
         tools.import_asset_tasks([task])
         sm = lib.load_asset(folder + "/SM_" + n)
         if sm is None: raise RuntimeError("BUILDDIAG " + n + " did not import")
-        sm.set_material(0, (solid["MI_TL_Moss"] if n == "TL_MossClump" else solid["MI_TL_Stones"]) if painted else m_fol)
+        sm.set_material(0, solid["MI_TL_Moss"] if painted else m_fol)
         unreal.log("BUILDDIAG decor %s vertex colours %s" % (n, has_colours(sm)))
         lib.save_asset(folder + "/SM_" + n)
         unreal.log("BUILDDIAG decor %s" % n)

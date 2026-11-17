@@ -19,7 +19,7 @@ BenchNook,0.84,5.86,-80.0,3,0,-1,bench on the lawn facing the plaza path (round 
 BenchNook,1.54,-7.1,75.0,4,0,-1,bench on the lawn facing the plaza path (round 1: was facing the oak trunk)
 BenchNook,-3.44,-5.29,130.0,5,0,-1,bench on the lawn facing the plaza path (round 1: was facing the oak trunk)
 VegCorner,9.76,-2.61,-165,6,0,-1,plaza: veg corner on the lawn edge
-CartCorner,-7.6,4.6,60,7,0,-1,plaza: cart and sacks beside the red market stall (round 1)
+StallStock,-2.6,7.0,60,7,0,-1,plaza: a barrel and crates at the red market stall's corner (townbuild2; the cart failed: spawn keep)
 BenchNook,6.48,2.36,160,8,0,-1,plaza: bench nook on the lawn edge
 FlowerClump,4.37,6.19,32,9,0,-1,plaza: flower clump on the lawn edge
 FlowerClump,5.62,-8.99,-122,10,0,-1,plaza: flower clump on the lawn edge
@@ -50,8 +50,8 @@ DoorstepPots,51.44,-39.25,-70,34,1,23,doorstep of house 23
 DoorstepIvy,-1.74,-48.43,-80,35,1,24,doorstep of house 24
 DoorstepPots,39.6,-24.56,120,36,1,25,doorstep of house 25
 DoorstepPots,35.03,-21.93,120,37,1,25,doorstep of house 25
-WallBannerLion,28.93,3.2,180,38,0,7,banner hung on the town hall front (check it sits on the wall)
-WallBannerLion,28.93,-3.6,180,39,0,7,banner hung on the town hall front (check it sits on the wall)
+WallBannerLionNarrow,28.93,0.97,180,38,0,7,banner on the town hall front between the door arch and the timber post (owner 2026-11-16)
+WallBannerLionNarrow,28.93,-1.82,180,39,0,7,banner on the town hall front between the door arch and the timber post (owner 2026-11-16)
 WallBannerSwordShield,4.04,16.45,114,40,0,1,banner hung on the bank front (check it sits on the wall)
 WallBannerSwordShield,9.52,14.01,114,41,0,1,banner hung on the bank front (check it sits on the wall)
 WallBannerSwords,-9.66,14.06,65,42,0,2,banner hung on the smith front (check it sits on the wall)
@@ -91,20 +91,18 @@ JunctionArrow,-5.92,-15.4,-64.37,149,0,-1,sign at a junction
 Junction,1.41,-27.4,-49.71,150,0,-1,sign at a junction
 StonePole,-40.54,-54.41,-141.66,151,0,-1,stone banner pole where a lane leaves town
 TrainingGround,2.52,-31.44,-51.74,152,1,26,boxing ring plot
-RingCorner,-2.48,-29.44,-42.97,153,1,26,boxing ring plot
-RingBanner,-4.48,-30.44,-129.89,154,1,26,boxing ring plot
-SpectatorBench,-3.48,-33.44,180,155,1,26,boxing ring plot
-RingCorner,-4.48,-33.44,180,156,1,26,boxing ring plot
+RingCorner,0.41,-29.27,-51.74,153,1,26,boxing ring plot: one tight group with the training ground (townbuild2: the bench and second corner gone)
+RingBanner,4.3,-32.5,128.26,154,1,26,boxing ring plot: the banner post across from the training ground
 GarrisonLion,-44.1,32.55,-50.75,179,1,30,north fort plot
 Garrison,-43.52,24.33,-100,180,1,30,north fort plot
 GarrisonTable,-43.63,29.42,-50.54,181,1,30,north fort plot
 Garrison,-48.96,22.24,170,182,1,30,north fort plot
 GarrisonLion,-40.68,28.9,-52.38,183,1,30,north fort plot
-GarrisonLion,-44.8,-25.98,0,184,1,31,south fort plot
+BannerLionPole,-44.8,-25.98,0,184,1,31,south fort plot (townbuild2: no log pile on the open lawn)
 Garrison,-46.8,-22.98,180,185,1,31,south fort plot
 GarrisonTable,-44.8,-29.98,180,186,1,31,south fort plot
 Garrison,-44.8,-33.98,90,187,1,31,south fort plot
-GarrisonLion,-47.8,-32.98,-90,188,1,31,south fort plot
+BannerLionPole,-47.8,-32.98,-90,188,1,31,south fort plot (townbuild2: no log pile on the open lawn)
 TowerYard,-13.8,29.4,-87.96,189,1,32,watchtower plot
 GarrisonLion,-16.8,33.4,-5.94,190,1,32,watchtower plot
 Garrison,-16.8,31.4,86.03,191,1,32,watchtower plot
@@ -147,3 +145,8 @@ BushClump,8.88,-39.13,15,6009,1,-1,fillfix: Blackrock fountain yard,Square
 Workbench,9.38,-32.88,270,6010,1,-1,fillfix: Blackrock fountain yard,Square
 WashingCorner,4.13,-23.38,45,6011,1,-1,fillfix: Blackrock fountain yard,Square
 BarrelRow,0.38,-36.88,90,6012,1,-1,fillfix: Blackrock fountain yard,Square
+PlazaBed,0.5,0.3,0,7001,0,-1,townbuild2: a low tulip bed where the plaza oak stood
+RiverRest,-48.5,-5,180,7002,1,-1,townbuild2: river lawn (south-west) by the bank
+BenchNook,-47,-15,180,7003,1,-1,townbuild2: river lawn (south-west) bench looking at the river
+BenchNook,21,-32.5,135,7004,1,-1,townbuild2: south-east lawn bench facing the road
+FlowerClump,27.5,-29.5,180,7005,1,-1,townbuild2: south-east lawn flowers at its edge

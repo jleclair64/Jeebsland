@@ -49,7 +49,8 @@ namespace JeebFill
 		bool bDrop = false, bStack = false, bHang = false;
 		TArray<FString> Alts;
 	};
-	struct FSet { FString Name; TArray<FPiece> Pieces; float Reach = 0.f; };
+	// bWall: named "(wall-backed" in the comment above its rows: its back (Y = 0) is pulled onto the real wall face behind it
+	struct FSet { FString Name; TArray<FPiece> Pieces; float Reach = 0.f; bool bWall = false; };
 	struct FOakRow { FString Set; float E = 0.f, N = 0.f, Yaw = 0.f; int32 Seed = 0; bool bVar = false; int32 Plot = -1; FString Note; int32 Line = 0; bool bSquare = false; };
 	struct FZone { FString Name; bool bOn = false; float Density = 0.f; TArray<TPair<FString, float>> Mix; int32 Seed = 0; EFacing Facing = EFacing::Random; float Trees = 0.f; };
 	struct FTreeRow { FString Site, Class, Note; float E = 0.f, N = 0.f, Radius = 150.f; };
