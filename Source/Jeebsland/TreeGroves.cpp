@@ -6,6 +6,7 @@ void JeebGroves::Build(UWorld*, AForest*) {}
 
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
 #include "Engine/SkeletalMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -160,6 +161,51 @@ namespace
 		OutRise = Hi - Lo;
 		if (OutRise > 600.f) ++Bad;
 		return Bad;
+	}
+
+	// ------------------------------------------------------------------ Spruce Forest LOD fix (2026-11-16, owner: "these two smaller pine trees never seem to want to load in")
+	// Some of the pack's lower LODs draw their needle cards with a bark or branch material (no opacity mask), so the needles show as flat tan cards:
+	// the saplings spruce_small_02-04 from LOD 1 (LOD 0 only shows when the tree fills the screen, so they stood as cards until the player was right on
+	// them), and LOD 3 (mid-distance) of the young spruces spruce_small_05-07 and of spruce_half_01/03/04. Such a LOD has no leaf or imposter material on
+	// any section. A tree with one holds LOD 1 when that is still whole, else LOD 0 (the saplings: 133-206 triangles; young spruces 1.3k-3.2k at LOD 1,
+	// half-grown 10k-14k). The real fix is in the pack (each such section's material slot set to the leaf slot); see ProjectNotes "Tree groves".
+	TAutoConsoleVariable<int32> CVarSpruceFix(TEXT("jeeb.Test.SpruceFix"), 1,
+		TEXT("TEMPORARY test setting: 1 holds a whole LOD on the Spruce Forest trees whose lower LODs draw the needles with the bark material; 0 leaves the pack's LODs as they are (live)."), ECVF_Default);
+	TArray<TPair<TWeakObjectPtr<UStaticMeshComponent>, int32>> GSpruceFixed;   // (tree, the LOD it holds)
+
+	// The first LOD (after 0) with no leaf or imposter material on any section, or -1
+	int32 FirstNeedlelessLod(const UStaticMeshComponent* C)
+	{
+		const UStaticMesh* Sm = C->GetStaticMesh();
+		const FStaticMeshRenderData* RD = Sm ? Sm->GetRenderData() : nullptr;
+		if (!RD) return -1;
+		for (int32 l = 1; l < RD->LODResources.Num(); ++l)
+		{
+			bool bNeedles = false;
+			for (const FStaticMeshSection& S : RD->LODResources[l].Sections)
+			{
+				const UMaterialInterface* M = C->GetMaterial(S.MaterialIndex);
+				const FString N = M ? M->GetName() : FString();
+				bNeedles |= N.Contains(TEXT("leaf")) || N.Contains(TEXT("imposter"));
+			}
+			if (!bNeedles) return l;
+		}
+		return -1;
+	}
+
+	void SpruceFix(UStaticMeshComponent* C)
+	{
+		static const bool bHook = []() { CVarSpruceFix->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*)
+			{ for (const auto& T : GSpruceFixed) if (T.Key.IsValid()) T.Key->SetForcedLodModel(CVarSpruceFix.GetValueOnGameThread() ? T.Value + 1 : 0); })); return true; }();
+		(void)bHook;
+		const int32 Bad = FirstNeedlelessLod(C);
+		if (Bad < 0) return;
+		const int32 Hold = Bad >= 2 ? 1 : 0;   // (LOD 1 is what a player mostly sees close up: LOD 0 starts at screen size 1)
+		GSpruceFixed.Add({ C, Hold });
+		C->SetForcedLodModel(CVarSpruceFix.GetValueOnGameThread() ? Hold + 1 : 0);   // (ForcedLodModel is the LOD + 1; 0 = automatic)
+		const FStaticMeshRenderData* RD = C->GetStaticMesh()->GetRenderData();
+		UE_LOG(LogTemp, Display, TEXT("JEEBSPRUCE %s at %.0f %.0f: LOD %d (from screen size %.2f) has no needle material, holding LOD %d (%d triangles)"), *C->GetStaticMesh()->GetName(),
+			C->GetComponentLocation().X, C->GetComponentLocation().Y, Bad, RD->ScreenSize[Bad].Default, Hold, RD->LODResources[Hold].GetNumTriangles());
 	}
 }
 
@@ -415,6 +461,7 @@ void JeebGroves::Build(UWorld* World, AForest* Forest)
 					Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 					Comp->RegisterComponent();
 					if (Pl.Autumn >= 0) Falls += ApplyFall(Comp, Pl.Autumn, Owner);
+					if (G.Seed == 31) if (UStaticMeshComponent* Sp = Cast<UStaticMeshComponent>(Comp)) SpruceFix(Sp);   // (the Spruce Forest: lower LODs without needles)
 				}
 			}
 			for (const FPlan& Pl : Plans) Names.FindOrAdd(FPaths::GetBaseFilename(Pl.K->Path)) += 1;
