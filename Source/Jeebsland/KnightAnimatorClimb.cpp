@@ -135,6 +135,14 @@ void FKnightAnimator::WallPlay(int32 Key, const FInput& In, FPose& B, float& Out
 	FVector Rel = B.Hip - S.H0;
 	const FQuat Q = FQuat(FVector::UpVector, S.AlignYaw);
 	if (S.AlignYaw != 0.f) { TurnInMesh(B, Hips, Q); Rel = Q.RotateVector(Rel); }
+	if (Key >= 90 && In.bMantleEdge)
+	{
+		// (2026-11-16, every solid from a 60 cm crate to a 1.45 m wall: the clips' own rise and fall were judged over MoveLab's 1 m fence (the vault) and
+		// 1.2 m block (onto), so their hip path is scaled up and down by the real top's height over his feet; at those heights it is exactly as approved)
+		const float Ref = Key == 90 ? 100.f : 120.f;
+		const float H = float(In.WallPoint.Z - WallActFeet.Z);
+		if (H > 20.f) Rel.Z *= FMath::Clamp(H / Ref, 0.5f, 1.3f);
+	}
 	const FVector Dw = CurFeet - WallActFeet;
 	const FVector Dl = (WallTilt.Inverse() * FQuat(FRotator(0.f, CurYaw + YawNow, 0.f)).Inverse()).RotateVector(Dw);
 	const FVector Dm(-Dl.Y, Dl.X, Dl.Z);   // (mesh: +Y ahead, -X his right)

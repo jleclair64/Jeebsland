@@ -748,6 +748,8 @@ public:
 	void JumpFromMove(float Dt);         // the ground jump, from inside a move (Space near a fence that turned out not to be a mantle)
 	void TickWallClimb(float Dt);
 	void TickClimbTests(float Dt);       // (test pictures: -ClimbKeys, -ClimbDo)
+	void TickMantleTests(float Dt);      // (tests in the real map: -MantleAt, online -NetMantle)
+	float NetMantleT = 0.f;
 	void FillWallInput(JeebAnim::FInput& In) const;
 	static float ClimbSeconds(int32 ClimbingLevel);   // a full climbing bar, climbing upward, at this Climbing level (Tuning.ini [Climb])
 	static float SwimSeconds(int32 SwimmingLevel);    // a full swimming bar, swimming normally, at this Swimming level (Tuning.ini [Swim])

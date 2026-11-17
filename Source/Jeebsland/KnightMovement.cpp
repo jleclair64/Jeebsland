@@ -5,6 +5,9 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
+#include "Engine/StaticMesh.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "GameFramework/Pawn.h"
 
 // Free climbing and the mantle: see KnightMovement.h. All of it runs inside a move, so the player's machine, the server and correction
 // replays do the same thing from the same inputs; every number is Tuning.ini [Climb].
@@ -135,6 +138,7 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	if (!CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy) return;   // others' machines only show what the server sends
 	const JeebTune::FValues& T = JeebTune::V();
 	if (!IsCustom(JeebClimb::Climb)) bJumpQueued = false;
+	bTouchMantle = false;   // (left over from a move the player's machine threw away or merged: never acted on)
 
 	// The water at his feet (JeebWater: the same answer on every machine). Deep enough, walking, falling or climbing down into it becomes the swim.
 	SenseWater();
@@ -158,7 +162,10 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	{
 		bJumpAsked = false;
 		if (!(IsMovingOnGround() && TryMantle(false)))
+		{
+			UE_LOG(LogTemp, Log, TEXT("JEEBMANTLE %s space: no mantle, a jump: %s"), CharacterOwner->HasAuthority() ? TEXT("server") : TEXT("client"), *MantleWhy);
 			if (AKnightCharacter* K = Knight()) K->JumpFromMove(Dt);
+		}
 	}
 
 	// Refill on the ground, after a short wait; an emptied bar has to fill right up before he can grab again
@@ -169,15 +176,23 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 		if (ClimbStamina >= 1.f) bClimbExhausted = false;
 	}
 
-	const bool bRock = bTouchRock, bFence = bTouchMantle;
-	bTouchRock = bTouchMantle = false;
+	const bool bRock = bTouchRock;
+	bTouchRock = bTouchMantle = false;   // (a mantle bump counts only within the move that made it: OnMovementUpdated)
 	if (MovementMode == MOVE_Custom) return;
-	// Walking or running into a fence or block marked for the mantle: over it or onto it by itself (owner 2026-11-13: automatic, no Space), unless
-	// Ctrl is held (crouched, he just stops at it). The last move ran into it (bFence), and he still pushes at it: the plan checks it is square on.
-	if (IsMovingOnGround() && bFence && !bWantsLetGo && Acceleration.SizeSquared2D() > 1.f && TryMantle(false)) return;
-	// In the air moving at a fence: the mantle catches it
-	if (IsFalling() && bFence && Acceleration.SizeSquared2D() > 1.f && MantleNearby() && TryMantle(true)) return;
 	if (IsMovingOnGround() || IsFalling()) { if (bRock) TryGrab(); }   // (only after running into rock: no probes for everyone else, every move)
+}
+
+// The end of each move: walking or running into something he may mantle, over it or onto it by itself (owner 2026-11-13: automatic, no Space), unless Ctrl
+// is held (crouched, he just stops at it); in the air moving at one, the mantle catches it. Decided in the same move as the bump (2026-11-16): a bump
+// carried over to the next move went wrong when the player's machine merged or replayed moves, and the server corrected him at every vault.
+void UKnightMovement::OnMovementUpdated(float Dt, const FVector& OldLocation, const FVector& OldVelocity)
+{
+	Super::OnMovementUpdated(Dt, OldLocation, OldVelocity);
+	const bool bFence = bTouchMantle;
+	bTouchMantle = false;
+	if (!bFence || !CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy || MovementMode == MOVE_Custom || Acceleration.SizeSquared2D() <= 1.f) return;
+	if (IsMovingOnGround() && JeebTune::V().MantleAuto > 0.5f && !bWantsLetGo) TryMantle(false);   // (MantleAuto 0 in Tuning.ini: only Space by one)
+	else if (IsFalling() && MantleNearby()) TryMantle(true);
 }
 
 bool UKnightMovement::TryGrab()
@@ -491,10 +506,40 @@ bool UKnightMovement::MantleNearby() const
 	const float R = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	TArray<FOverlapResult> Hits;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebMantleNear), false, CharacterOwner);
+	const float FeetZ = UpdatedComponent->GetComponentLocation().Z - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	GetWorld()->OverlapMultiByObjectType(Hits, UpdatedComponent->GetComponentLocation(), FQuat::Identity, WorldObjects(), FCollisionShape::MakeSphere(R + 70.f), Q);
 	for (const FOverlapResult& O : Hits)
-		if (O.GetComponent() && O.GetComponent()->ComponentHasTag(JeebClimb::MantleTag)) return true;
+		if (MantleCandidate(O.GetComponent(), O.ItemIndex, FeetZ, true)) return true;
 	return false;
+}
+
+// The general rule (2026-11-16): from the solid's own collision and size, the same on every machine (the world's solids are built the same
+// everywhere from fixed seeds and data). No traces here: PlanMantle measures the real top, depth and landing once he tries.
+bool UKnightMovement::MantleCandidate(const UPrimitiveComponent* C, int32 Item, float FeetZ, bool bFace) const
+{
+	if (!C || C->ComponentHasTag(JeebClimb::NoMantleTag) || C->ComponentHasTag(JeebClimb::ClimbTag)) return false;   // (opted out; climbable rock and hills climb instead)
+	const AActor* A = C->GetOwner();
+	// never people, animals or the horse, nor anything the server moves and sends (creatures, foes, dropped things): only the world every machine builds
+	// for itself from the same seeds, so the server and the player's machine always agree
+	if (A && (A->IsA<APawn>() || A->GetIsReplicated() || A->ActorHasTag(JeebClimb::NoMantleTag))) return false;
+	if (C->IsSimulatingPhysics() || C->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block) return false;   // nothing moving, nothing he walks through
+	if (C->ComponentHasTag(JeebClimb::MantleTag)) return true;   // marked by hand (MoveLab's test fences and block)
+	FBox B(ForceInit);
+	if (const UInstancedStaticMeshComponent* I = Cast<UInstancedStaticMeshComponent>(C))
+	{
+		// one instance of a set (the town fill's solids are thousands of boxes in one component): that instance's own box
+		FTransform X;
+		if (Item < 0 || !I->GetStaticMesh() || !I->GetInstanceTransform(Item, X, true)) return false;
+		B = I->GetStaticMesh()->GetBounds().GetBox().TransformBy(X);
+	}
+	else B = C->Bounds.GetBox();
+	const JeebTune::FValues& T = JeebTune::V();
+	const FVector S = B.GetSize();
+	const float Long = FMath::Max(S.X, S.Y);
+	if (Long < T.MantleMinWidth || Long > 2500.f) return false;   // a post, a pole or a sign; or the ground, a castle, a whole street
+	if (B.Max.Z > FeetZ + T.MantleMax + 30.f) return false;        // taller than he gets over: buildings, trees, palisades, lamp posts, wells with roofs
+	if (bFace && B.Min.Z > FeetZ + MaxStepHeight + 10.f) return false;   // the side he meets stands on his ground (not a beam, a deck or a balcony)
+	return true;
 }
 
 bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge) const
@@ -504,47 +549,83 @@ bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInA
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const float FeetZ = C.Z - HH;
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebMantle), true, CharacterOwner);
-	// its face: in front of him, knee to chest high
+	auto No = [this](const TCHAR* Why, const UPrimitiveComponent* What = nullptr, float H = 0.f)   // (why not, for the log when Space finds nothing)
+	{
+		MantleWhy = FString::Printf(TEXT("%s (%s%s%.0f cm)"), Why, What && What->GetOwner() ? *What->GetOwner()->GetName() : TEXT("-"), TEXT(" "), H);
+		return false;
+	};
+	auto Down = [&](const FVector& At, float From, float To, FHitResult& H)
+	{
+		return GetWorld()->LineTraceSingleByObjectType(H, FVector(At.X, At.Y, From), FVector(At.X, At.Y, To), WorldObjects(), Q) && !H.bStartPenetrating;
+	};
+	// its face: in front of him, knee to chest high. The first thing there decides: it must be something he may mantle
 	FHitResult F;
 	bool bFace = false;
 	for (const float H : { 40.f, 80.f, 120.f })
 	{
-		if (GetWorld()->LineTraceSingleByObjectType(F, FVector(C.X, C.Y, FeetZ + H), FVector(C.X, C.Y, FeetZ + H) + Fwd * (R + 50.f), WorldObjects(), Q)
-			&& !F.bStartPenetrating && F.GetComponent() && F.GetComponent()->ComponentHasTag(JeebClimb::MantleTag)) { bFace = true; break; }
+		if (!GetWorld()->LineTraceSingleByObjectType(F, FVector(C.X, C.Y, FeetZ + H), FVector(C.X, C.Y, FeetZ + H) + Fwd * (R + 50.f), WorldObjects(), Q)) continue;
+		if (F.bStartPenetrating || !MantleCandidate(F.GetComponent(), F.Item, FeetZ, true)) return No(TEXT("not mantleable"), F.GetComponent());
+		bFace = true;
+		break;
 	}
-	if (!bFace) return false;
+	if (!bFace) return No(TEXT("nothing ahead"));
 	OutFace = Flat(-F.ImpactNormal);
-	if (OutFace.IsNearlyZero() || FVector::DotProduct(OutFace, Fwd) < 0.6f) return false;   // square enough to it
-	// its top, just past the face
+	if (OutFace.IsNearlyZero() || FVector::DotProduct(OutFace, Fwd) < 0.6f || FMath::Abs(float(F.ImpactNormal.Z)) > 0.4f) return No(TEXT("not square on"), F.GetComponent());   // square enough to it, and a side, not a slope
+	// its top, just past the face: flat enough, and itself something he may mantle (a crate on a crate counts: the stack's top)
 	const FVector P = F.ImpactPoint + OutFace * 6.f;
 	FHitResult D;
-	if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, FeetZ + T.MantleMax + 40.f), FVector(P.X, P.Y, FeetZ), WorldObjects(), Q)
-		|| D.bStartPenetrating || !D.GetComponent() || !D.GetComponent()->ComponentHasTag(JeebClimb::MantleTag)) return false;
+	if (!Down(P, FeetZ + T.MantleMax + 40.f, FeetZ, D) || D.ImpactNormal.Z < 0.5f || !MantleCandidate(D.GetComponent(), D.Item, FeetZ, false)) return No(TEXT("no flat top"), D.GetComponent() ? D.GetComponent() : F.GetComponent());
 	OutTop = D.ImpactPoint.Z;
 	if (OutEdge) *OutEdge = FVector(F.ImpactPoint.X, F.ImpactPoint.Y, OutTop);
 	const float Height = OutTop - FeetZ;
-	if (Height > T.MantleMax || Height < (bInAir ? 10.f : T.MantleMin)) return false;
+	if (Height > T.MantleMax || Height < (bInAir ? 10.f : T.MantleMin)) return No(Height > T.MantleMax ? TEXT("too high") : TEXT("too low"), F.GetComponent(), Height);
+	if (bInAir)
+	{
+		// in the air the limit still counts from the ground at the obstacle's foot, so a jump can't carry him onto something taller than MantleMax
+		// (a 1.56 m round bale, a 1.6 m crate stack: 2026-11-16 test)
+		FHitResult Gr;
+		const FVector Foot = F.ImpactPoint - OutFace * (R + 5.f);
+		if (Down(Foot, FeetZ + 5.f, FeetZ - 400.f, Gr) && OutTop - Gr.ImpactPoint.Z > T.MantleMax) return No(TEXT("too high from the ground"), F.GetComponent(), OutTop - float(Gr.ImpactPoint.Z));
+	}
 	// nothing in the way above it (a roof, a beam)
 	FHitResult B;
-	if (GetWorld()->LineTraceSingleByObjectType(B, FVector(C.X, C.Y, OutTop + 60.f), FVector(P.X, P.Y, OutTop + 60.f) + OutFace * (R + 40.f), WorldObjects(), Q)) return false;
-	// deep enough to stand on (a crate, a low wall): onto it; else over it (a fence) to the ground beyond
-	const FVector Deep = P + OutFace * (2.f * R + 10.f);
-	FHitResult D2;
-	if (GetWorld()->LineTraceSingleByObjectType(D2, FVector(Deep.X, Deep.Y, OutTop + 40.f), FVector(Deep.X, Deep.Y, OutTop - 15.f), WorldObjects(), Q)
-		&& !D2.bStartPenetrating && D2.ImpactNormal.Z >= GetWalkableFloorZ() && FMath::Abs(D2.ImpactPoint.Z - OutTop) < 15.f)
+	if (GetWorld()->LineTraceSingleByObjectType(B, FVector(C.X, C.Y, OutTop + 60.f), FVector(P.X, P.Y, OutTop + 60.f) + OutFace * (R + 40.f), WorldObjects(), Q)) return No(TEXT("blocked above"), B.GetComponent());
+	// how far its top runs on: samples along it, until it drops away
+	const float Need = 2.f * R + 10.f;
+	float Depth = -1.f;   // (-1: deep enough to stand on)
+	for (float Dd = 15.f; Dd <= Need + 0.5f; Dd += 15.f)
+	{
+		FHitResult S;
+		if (!Down(P + OutFace * Dd, OutTop + 40.f, OutTop - 25.f, S) || FMath::Abs(float(S.ImpactPoint.Z) - OutTop) > 15.f || S.ImpactNormal.Z < GetWalkableFloorZ())
+		{
+			Depth = Dd - 8.f;
+			break;
+		}
+	}
+	// deep enough to stand on (a crate, a stack, a low wall's top, a fountain's rim): onto it
+	if (Depth < 0.f)
 	{
 		const FVector On = P + OutFace * (R + 10.f);
 		OutTo = FVector(On.X, On.Y, OutTop + HH + 3.f);
 		OutMode = JeebClimb::MantleOnto;
 		return RoomFor(OutTo);
 	}
-	const FVector Land = P + OutFace * (2.f * R + 30.f);
-	FHitResult G;
-	if (!GetWorld()->LineTraceSingleByObjectType(G, FVector(Land.X, Land.Y, OutTop + 40.f), FVector(Land.X, Land.Y, FeetZ - 150.f), WorldObjects(), Q)
-		|| G.bStartPenetrating || G.ImpactNormal.Z < GetWalkableFloorZ() || (G.GetComponent() && G.GetComponent()->ComponentHasTag(JeebClimb::MantleTag))) return false;
-	OutTo = FVector(Land.X, Land.Y, G.ImpactPoint.Z + HH + 3.f);
-	OutMode = JeebClimb::MantleOver;
-	return RoomFor(OutTo);
+	// else over it (a fence, a thin wall, a barrel) to the ground just past its far side; never as close as the old fixed spot, so the vault keeps its stride
+	for (const float Extra : { 12.f, 35.f, 60.f })
+	{
+		const FVector Land = P + OutFace * FMath::Max(Depth + R + Extra, 2.f * R + 30.f);
+		FHitResult G;
+		if (!Down(Land, OutTop + 40.f, FeetZ - 150.f, G) || G.ImpactNormal.Z < GetWalkableFloorZ()) continue;
+		if (G.ImpactPoint.Z > OutTop - 30.f) continue;   // (onto something nearly as high beyond: not a landing)
+		const FVector To(Land.X, Land.Y, G.ImpactPoint.Z + HH + 3.f);
+		if (!RoomFor(To)) continue;
+		// the way over, clear above the top to the landing (the vault moves without sweeping)
+		if (GetWorld()->LineTraceSingleByObjectType(B, FVector(C.X, C.Y, OutTop + 50.f), FVector(To.X, To.Y, OutTop + 50.f), WorldObjects(), Q)) return No(TEXT("way over blocked"), B.GetComponent());
+		OutTo = To;
+		OutMode = JeebClimb::MantleOver;
+		return true;
+	}
+	return No(TEXT("no landing"), F.GetComponent(), Height);
 }
 
 bool UKnightMovement::TryMantle(bool bInAir)
@@ -555,11 +636,18 @@ bool UKnightMovement::TryMantle(bool bInAir)
 	if (Fwd.IsNearlyZero()) { if (bInAir) return false; Fwd = Flat(UpdatedComponent->GetForwardVector()); }
 	uint8 Mode; FVector To, Face; float Top;
 	if (!PlanMantle(UpdatedComponent->GetComponentLocation(), Fwd, bInAir, Mode, To, Top, Face, &ActEdge)) return false;
-	const float Speed = FMath::Max(0.f, float(FVector::DotProduct(FVector(Velocity.X, Velocity.Y, 0.f), Face)));
+	// the speed he carries out of a vault: from his keys (how hard and how square he pushes at it, at his top speed), not his velocity, which the bump
+	// itself has just changed and which the two machines can see a hair apart (2026-11-16: the server corrected every online vault)
+	const float Push = FMath::Clamp(float(Acceleration.Size2D()) / FMath::Max(GetMaxAcceleration(), 1.f), 0.f, 1.f) * FMath::Max(0.f, float(FVector::DotProduct(Flat(Acceleration), Face)));
+	const float Speed = Push * 500.f;   // (his running speed; not GetMaxSpeed, which each machine eases frame by frame outside the moves)
 	const JeebTune::FValues& T = JeebTune::V();
 	StartScripted(Mode, To, Mode == JeebClimb::MantleOver ? T.MantleOverTime : T.MantleOntoTime + T.MantleStandTime, Top, Face);   // (onto a block he stands up on top before walking on: MantleStandTime)
 	ActCarry = Speed * T.MantleCarry;
 	LogClimb(Mode == JeebClimb::MantleOver ? TEXT("mantle over") : TEXT("mantle onto"));
+	UE_LOG(LogTemp, Log, TEXT("JEEBMANTLE %s plan %s: top %.0f cm over his feet, from (%.0f,%.0f,%.0f) to (%.0f,%.0f,%.0f), %.0f cm on, speed %.0f%s"),
+		CharacterOwner->HasAuthority() ? TEXT("server") : TEXT("client"), Mode == JeebClimb::MantleOver ? TEXT("over") : TEXT("onto"),
+		Top - (ActFrom.Z - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), ActFrom.X, ActFrom.Y, ActFrom.Z, To.X, To.Y, To.Z,
+		FVector::Dist2D(ActFrom, To), Speed, bInAir ? TEXT(" (in the air)") : TEXT(""));
 	return true;
 }
 
@@ -697,6 +785,8 @@ void UKnightMovement::ClientHandleMoveResponse(const FCharacterMoveResponseDataC
 {
 	Super::ClientHandleMoveResponse(MoveResponse);   // (may change the movement mode; the replay runs later, from what is set below)
 	if (!MoveResponse.IsCorrection()) return;
+	++NetFixes;
+	UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client correction %d mode %d at (%.0f,%.0f,%.0f)"), NetFixes, int32(ClimbMode()), MoveResponse.ClientAdjustment.NewLoc.X, MoveResponse.ClientAdjustment.NewLoc.Y, MoveResponse.ClientAdjustment.NewLoc.Z);
 	const FKnightMoveResponse& R = static_cast<const FKnightMoveResponse&>(MoveResponse);
 	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; WallNormal = R.WallNormal;
 	ActFrom = R.ActFrom; ActTo = R.ActTo; ActDir = R.ActDir; ActT = R.ActT; ActDur = R.ActDur; ActTop = R.ActTop; ActCarry = R.ActCarry; ActHold = R.ActHold;
@@ -750,6 +840,7 @@ void UKnightMovement::HandleImpact(const FHitResult& Hit, float TimeSlice, const
 	if (const UPrimitiveComponent* P = Hit.GetComponent())
 	{
 		if (P->ComponentHasTag(JeebClimb::ClimbTag)) bTouchRock = true;
-		if (P->ComponentHasTag(JeebClimb::MantleTag)) bTouchMantle = true;
+		else if (!bTouchMantle && CharacterOwner && UpdatedComponent
+			&& MantleCandidate(P, Hit.Item, UpdatedComponent->GetComponentLocation().Z - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), true)) bTouchMantle = true;   // (no traces: its own size)
 	}
 }
