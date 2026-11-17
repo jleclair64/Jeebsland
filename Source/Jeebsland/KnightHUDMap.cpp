@@ -13,6 +13,9 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "OakHill.h"
+#include "OakForest.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 // ---------------------------------------------------------------------------------------------------
 // The world map (top right of the Tab windows, and the Map tab of the Escape screen). Kept simple on purpose: the lie of the land, the woods, the paths,
@@ -24,6 +27,48 @@ namespace
 	constexpr int32 MapN = 512;   // texture size
 
 	FLinearColor Mix(const FLinearColor& A, const FLinearColor& B, float T) { return A + (B - A) * FMath::Clamp(T, 0.f, 1.f); }
+
+	// The forest round Oak Hill (AOakForest, 2026-11-16) as the map shows it: each drawn tree's spot, crown and colour, read from the
+	// forest's own instanced sets on this machine (built from fixed seeds, so the same on every machine). Broadleaves take a darker shade
+	// of their leaves' own colour (the live jeeb.Trees.Dz* tint on their leaf material: green, red, orange or yellow patches); spruces the
+	// map's usual dark pine green. Bushes, saplings, logs, stumps, rocks, the hidden shadow twins and the collision sets are left out.
+	struct FMapTree { FVector2D P; float R; FLinearColor Col; };
+	void GatherOakForest(UWorld* W, TArray<FMapTree>& Out)
+	{
+		const FLinearColor Pine(0.12f, 0.24f, 0.13f), Shade(0.10f, 0.17f, 0.09f);
+		for (TActorIterator<AOakForest> It(W); It; ++It)
+		{
+			TArray<UInstancedStaticMeshComponent*> Comps;
+			It->GetComponents(Comps);
+			for (UInstancedStaticMeshComponent* C : Comps)
+			{
+				if (!C || C->bHiddenInGame || !C->IsVisible() || !C->GetStaticMesh()) continue;
+				const FString Mesh = C->GetStaticMesh()->GetName();
+				const bool bSpruce = Mesh.StartsWith(TEXT("spruce_full")) || Mesh.StartsWith(TEXT("spruce_half"));
+				const bool bBroad = Mesh.Contains(TEXT("Cork_Oak")) || Mesh.Contains(TEXT("Aspen"));
+				if (!bSpruce && !bBroad) continue;
+				FLinearColor Col = Pine;
+				if (bBroad)
+				{
+					FLinearColor Tint(0.48f, 0.24f, 0.09f);
+					for (int32 m = 0; m < C->GetNumMaterials(); ++m)
+						if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(C->GetMaterial(m))) { Tint = D->K2_GetVectorParameterValue(TEXT("Fall Color Tint")); break; }
+					const float Top = FMath::Max3(Tint.R, Tint.G, Tint.B);
+					Col = Mix(Top > 0.001f ? Tint * (0.45f / Top) : FLinearColor(0.48f, 0.24f, 0.09f), Shade, 0.35f);
+					Col.A = 1.f;
+				}
+				const FVector Ext = C->GetStaticMesh()->GetBounds().BoxExtent;
+				const float Crown = float(FMath::Max(Ext.X, Ext.Y)) * (bSpruce ? 0.75f : 0.85f);
+				for (int32 i = 0; i < C->GetInstanceCount(); ++i)
+				{
+					FTransform T;
+					if (!C->GetInstanceTransform(i, T, true)) continue;
+					if (bSpruce && T.GetScale3D().X < 0.5f) continue;   // (the spruce seedlings in the undergrowth)
+					Out.Add({ FVector2D(T.GetLocation()), FMath::Clamp(Crown * float(T.GetScale3D().X), 150.f, 700.f), Col });
+				}
+			}
+		}
+	}
 }
 
 void AKnightHUD::FMapSamples::Start(const FVector2D& InMin, float InSize, int32 InN)
@@ -149,6 +194,14 @@ void AKnightHUD::BuildMapTex()
 	for (int32 i = 0; i < Broadleaf.Num(); ++i)
 		Stamp(Broadleaf[i], 260.f, (i % 3 == 0) ? FLinearColor(0.62f, 0.30f, 0.08f) : FLinearColor(0.48f, 0.24f, 0.09f), 0.75f);
 	for (const FVector2D& P : Conifer) Stamp(P, 200.f, FLinearColor(0.12f, 0.24f, 0.13f), 0.85f);
+	// the forest round Oak Hill: a soft wash of its patches' colours, then its dirt roads again on top (the trees stand 4 m off them,
+	// which at 4.5 m a pixel would swallow them)
+	TArray<FMapTree> OakTrees;
+	GatherOakForest(W, OakTrees);
+	for (const FMapTree& T : OakTrees) Stamp(T.P, T.R, T.Col, 0.6f);
+	for (const JeebTerrain::FPathDef& P : JeebTerrain::PathDefs())
+		if (P.Kind == 2)
+			for (int32 i = 0; i < P.Pts.Num(); ++i) Stamp(P.Pts[i], P.Width * 0.5f, PathCol, 0.9f);
 
 	// ---- Water: the sea, the rivers, the pond and the castle moat ----
 	const float WaterZ = JeebTerrain::PondWaterZ();
@@ -271,6 +324,14 @@ void AKnightHUD::BuildTownTex()
 	}
 	for (TActorIterator<AChoppableTree> It(W); It; ++It)
 		if (Box.IsInside(FVector2D(It->GetActorLocation()))) Stamp(FVector2D(It->GetActorLocation()), 300.f, FLinearColor(0.48f, 0.24f, 0.09f), 0.9f);
+	// the town's trees and the forest round it (AOakForest), each crown as it stands
+	{
+		TArray<FMapTree> OakTrees;
+		GatherOakForest(W, OakTrees);
+		for (const FMapTree& T : OakTrees)
+			if (Box.ExpandBy(T.R).IsInside(T.P)) Stamp(T.P, T.R, T.Col, 0.85f);
+		UE_LOG(LogTemp, Log, TEXT("JEEBMAP forest round Oak Hill: %d trees on the map"), OakTrees.Num());
+	}
 
 	TownTex = UTexture2D::CreateTransient(N, N, PF_B8G8R8A8);
 	if (!TownTex) return;

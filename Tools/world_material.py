@@ -269,7 +269,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     finish(mat, "M_Ground")
 
 
-def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
+def build_dirt(dirt_tex, cobble_tex, cobble_n, patches, grass_tex):
     # Packed earth laid in world space (no stretching along curves); a second, much larger sampling breaks up the tiling.
     # Oak Hill's streets (vertex red 1): cobbles down the middle, fraying into the earth toward the sides.
     mat = fresh_material("M_Dirt")
@@ -306,21 +306,38 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches):
     pick = g.mul(ctex, 1.0, "A")   # each stone's own number (0.04 to 1; 0 in the joints)
     cob = g.sat(g.mul(g.add(g.addn(pick, g.mul(band, 1.4)), -1.0), 7.0))   # (1.4: most stones stay until the band is well under half) a stone stays if its number beats what the band leaves
     stones = g.lerp(stones, earth, g.mul(g.one(unreal.MaterialExpressionOneMinus, band), 0.3))   # earth washed over the outer stones
-    g.out(palette.grade_world(mat, g.lerp(earth, stones, cob)), unreal.MaterialProperty.MP_BASE_COLOR)
+
+    # The packed-earth track (Blackrock's paths and the forest's roads, 2026-11-16). Until now its outline came from T_Dirt's red
+    # channel, a dark rust picture (about 0.07 on average once read as sRGB), while the sums assumed noise round 0.5: the "grit"
+    # term came out near -0.56, so the track's middle summed to about 0.44, under the 0.5 cut, and nearly all of the ribbon was
+    # cut away; only the cobbles (always solid) and a few specks showed. Now the outline uses T_Patches' noise, read back to its
+    # painted 0..1 (it is stored as sRGB: a sample is about the painted value squared, the square root undoes that).
+    def n01(scale, off):
+        return g.one(unreal.MaterialExpressionSquareRoot, g.mask(g.tex(patches, g.mul(g.add(xy, off), 1.0 / scale)), True, False))
+    wander = g.add(g.mul(g.addn(n01(700.0, 211.0), n01(1150.0, 5077.0)), 0.5), -0.5)   # about -0.5..0.5, a few metres long: the track widens and narrows
+    crumb = g.add(g.mul(g.addn(n01(90.0, 77.0), n01(140.0, 1931.0)), 0.5), -0.5)       # under a metre: small bites and tufts at the edge
+    reach = g.addn(g.addn(edge, g.mul(wander, 0.32)), g.mul(crumb, 0.16))   # how far into the track (0 the ribbon's side, 1 its middle; the road's own edge is near 0.29)
+    # a smoother, lighter worn middle where feet and wheels go; toward the edges the earth takes the meadow ground's own colour
+    # (T_GrassGround as M_Ground lays it) in patches, so the dithered edge melts into the grass instead of drawing tan specks on green
+    middle = g.sat(g.mul(g.add(reach, -0.6), 3.0))
+    calm = g.desat(g.lerp(earth, g.addn(g.mul(g.muln(g.c3(EARTH_PICTURE_AVERAGE), palette.colour(mat, "Earth")), 0.9), g.c3((0.024, 0.019, 0.013))), g.c(0.3)), 0.15)   # (the pebbles a little quieter and the earth a touch less orange: under the low sun it read rust-red)
+    trodden = g.muln(calm, g.lerpc(1.0, 1.1, middle))
+    meadow = g.muln(g.tex(grass_tex, g.mul(xy, 1.0 / 300.0)), palette.colour(mat, "GroundGrass"))
+    fringe = g.sat(g.mul(g.addn(g.mul(g.add(reach, -0.62), -3.2), g.mul(crumb, 0.8)), 1.0))   # 1 at the outer edge, 0 from about 0.6 in
+    track = g.lerp(trodden, g.lerp(meadow, earth, g.c(0.3)), g.mul(fringe, 0.8))
+    g.out(palette.grade_world(mat, g.lerp(track, stones, cob)), unreal.MaterialProperty.MP_BASE_COLOR)
     flat = g.c3((0.0, 0.0, 1.0))
     bumps = g.mask(g.tex(cobble_n, g.mul(xy, 1.0 / 250.0), normal=True), True, True, True)
     g.out(g.lerp(flat, bumps, cob), unreal.MaterialProperty.MP_NORMAL)
     g.out(g.lerp(g.c(0.92), g.c(0.78), cob), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.2), unreal.MaterialProperty.MP_SPECULAR)
-    # The edge: ragged in world space and dithered over a soft band, so the dirt frays into the grass instead of stopping at a line
-    # (each noise is two samplings at unrelated sizes averaged: one alone repeated its bites every few metres down the street)
-    rag = g.mul(g.addn(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 260.0)), True, False), g.mask(g.tex(dirt_tex, g.mul(g.add(xy, 1531.0), 1.0 / 410.0)), True, False)), 0.5)
-    noise = g.sat(g.mul(g.add(rag, -0.15), 3.5))
-    # (slow: the wander a metre or two long, made above, so the edge bulges and bites in)
-    alpha = g.sat(g.mul(g.addn(g.addn(g.add(edge, -0.12), g.mul(noise, -0.16)), g.mul(slow, -0.22)), 2.4))   # a broad, gentle band
-    # (speck, made above: fine grit breaks the soft band into scattered specks of dirt and grass)
-    grit = g.addn(g.mul(g.add(g.mul(speck, 3.5), -1.0), 0.40), g.mul(g.add(speck, -0.5), 0.6))   # (0.55 and 0.9 until the second review: the crumbs read pixel-noisy at 60% render scale)   # (the second, centred term since the review: the outline breaks into crumbs over a wider band, the edge's average place unchanged)
-    g.out(g.addn(g.addn(g.addn(alpha, grit), g.mul(cob, 2.0)), g.mul(band, 3.0)), unreal.MaterialProperty.MP_OPACITY_MASK)   # (stones and the street's own band are always solid: no holes to the ground below)
+    # The edge: the track's reach (above, ragged in world space: each noise two samplings at unrelated sizes, so no bite repeats)
+    # fades out over a soft band, broken by fine crumbs of earth and grass a few centimetres across (a world-space noise, so they
+    # stay put as the camera moves; Python can't make a DitherTemporalAA node) instead of cutting a line. Solid from about 0.45 in,
+    # gone by about 0.17 (the road's own edge, 0.29, is about half); the fringe's colour (above) is close to the ground's there.
+    soft = g.mul(g.add(reach, -0.17), 1.0 / 0.28)   # (not clamped: well inside it stays far over the cut, so the crumbs never hole the middle)
+    fine = g.add(g.mul(g.addn(n01(23.0, 4111.0), n01(37.0, 733.0)), 0.5), -0.5)
+    g.out(g.addn(g.addn(g.addn(soft, g.mul(fine, 1.1)), g.mul(cob, 2.0)), g.mul(band, 3.0)), unreal.MaterialProperty.MP_OPACITY_MASK)   # (stones and the street's own band are always solid: no holes to the ground below)
     finish(mat, "M_Dirt")
 
 
@@ -351,19 +368,27 @@ def build_stone(rock_tex, patches):
     finish(mat, "M_Stone")
 
 
-palette.ensure_mpc()
-grass_tex = import_texture(ground_textures.grass_ground(), "T_GrassGround")
-rock_tex = import_texture(ground_textures.rock(), "T_Rock")
-cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble", alpha=True)
-cobble_n = import_texture(ground_textures.cobble_normal(), "T_CobbleN", normal=True)
-dirt_tex = import_texture(gen_textures.dirt(), "T_Dirt")
-patches = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")
-if patches is None:
-    patches = import_texture(gen_textures.patches(), "T_Patches")
-build_ground(grass_tex, dirt_tex, rock_tex, patches)
-build_dirt(dirt_tex, cobble_tex, cobble_n, patches)
-build_stone(rock_tex, patches)
-for old in ("M_WorldGround", "T_Ground"):   # the old flat world material and the old ground picture: replaced
-    if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
-        unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
-unreal.log("WORLDDIAG world ground material built")
+if os.environ.get("JEEB_WORLD_ONLY") == "dirt":
+    # (2026-11-16: M_Dirt alone, from the textures already in /Game, leaving M_Ground, M_Stone and the pictures untouched:
+    # set JEEB_WORLD_ONLY=dirt before Tools\BuildWorldMaterial.ps1)
+    load = unreal.EditorAssetLibrary.load_asset
+    build_dirt(load("/Game/T_Dirt"), load("/Game/T_Cobble"), load("/Game/T_CobbleN"), load("/Game/T_Patches"), load("/Game/T_GrassGround"))
+    unreal.log("WORLDDIAG world ground material built")
+else:
+
+    palette.ensure_mpc()
+    grass_tex = import_texture(ground_textures.grass_ground(), "T_GrassGround")
+    rock_tex = import_texture(ground_textures.rock(), "T_Rock")
+    cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble", alpha=True)
+    cobble_n = import_texture(ground_textures.cobble_normal(), "T_CobbleN", normal=True)
+    dirt_tex = import_texture(gen_textures.dirt(), "T_Dirt")
+    patches = unreal.EditorAssetLibrary.load_asset("/Game/T_Patches")
+    if patches is None:
+        patches = import_texture(gen_textures.patches(), "T_Patches")
+    build_ground(grass_tex, dirt_tex, rock_tex, patches)
+    build_dirt(dirt_tex, cobble_tex, cobble_n, patches, grass_tex)
+    build_stone(rock_tex, patches)
+    for old in ("M_WorldGround", "T_Ground"):   # the old flat world material and the old ground picture: replaced
+        if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
+            unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
+    unreal.log("WORLDDIAG world ground material built")
