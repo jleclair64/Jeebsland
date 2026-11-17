@@ -9,6 +9,9 @@
 #     and 'slow' of the gentle shading; the hue keeps 15% of each pixel's own.
 #   hulls: (cell cm, lowest cm): the simple collision: the model cut into upright columns 'cell' wide, one convex hull (UCX_) per column round the
 #     vertices in it, columns lower than 'lowest' left out (rubble he steps over). A window or arch opening in a column is filled.
+#   cut_final: lambda (face centre in the game's frame, cm; normal) -> True to delete, after the cuts above (pieces the colour and 'thin' cuts miss).
+#   course: a band of a round wall rebuilt as a solid stone capping course (make_course: centre, wedge of angles, z from and to, lip, cell, voxel and
+#     drop, all cm or degrees in the game's frame), textured by the bake with the stone of the wall below it.
 import bpy, bmesh, os, sys, math
 from mathutils import Vector, Matrix
 
@@ -26,12 +29,14 @@ def _hsv(c):
     return h * 60.0, (mx - mn) / mx, mx
 
 WORLD = {
-    # "Ruined Fortress" by eromaxi (CC0): a curved stone wall with a window arch and fallen blocks. Cut: the dark earth mound under its right side and the
-    # dark roof slab on its left (owner: no dirt piles).
+    # "Ruined Fortress" by eromaxi (CC0): a round stone tower with a window arch and fallen blocks. Cut: the dark earth mound under its right side
+    # (owner: no dirt piles). The dark roof-like eave round its upper wall (what earlier rounds cut as the "roof slab", "thin" sheets and the "ledge")
+    # is rebuilt as a solid stone capping course ('course', 2026-11-17, "fix the ruin wall top"; see make_course). With the eave gone, the cut of the
+    # darkest faces (value under 0.10), 'thin' and cut_final were dropped: they only punched see-through pinholes into the stone joints and the doorway
+    # (the model is a closed solid, and the repaint turns its dark crevices to grey stone anyway).
     "Ruin": dict(file="Originals/Ruin_Original.glb", axes=("Y", "-X", "Z"), height=500.0, reduce=40000,
-                 thin=0.012, cut=lambda p, c, n: (_hsv(c)[2] < 0.10) or (p[2] < -0.50 and _hsv(c)[2] < 0.30 and _hsv(c)[1] > 0.35),
-                 cut_final=lambda p, n: (p.x < -215.0 and p.z > 290.0) or (p.x < -170.0 and 300.0 < p.z < 350.0 and abs(n.z) > 0.5),
-                 tuck=(lambda p: -200.0 < p.x < 100.0 and p.y < -130.0 and 295.0 < p.z < 370.0, 240.0, 300.0, 6.0),
+                 cut=lambda p, c, n: p[2] < -0.50 and _hsv(c)[2] < 0.30 and _hsv(c)[1] > 0.35,
+                 course=dict(centre=(10.0, 0.0), wedge=(158.0, -70.0), z=(302.0, 360.0), lip=4.0, lip_from=190.0, joint=70.0, cell=2.0, voxel=2.5, drop=62.0),
                  recalc=False, stone=(36.0, 0.13, 0.52, 0.55, 0.45), hulls=(70.0, 35.0)),
 }
 names = a[2:] or list(WORLD)
@@ -142,6 +147,201 @@ def restone(im, P):
 def save(im, path):
     im.filepath_raw = path; im.file_format = "PNG"; im.save()
 
+def to_game(o, P):
+    # into the game's frame: the axes, the size (cm), the origin at the middle of the foot (2026-11-17: now before the reduce, so the course
+    # and the cut_final work in cm on the full model)
+    me = o.data
+    M3 = axis_matrix(P["axes"])
+    for v in me.vertices: v.co = M3 @ v.co
+    if M3.determinant() < 0:
+        bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.reverse_faces(bm, faces=bm.faces); bm.to_mesh(me); bm.free()
+    xs = [v.co for v in me.vertices]
+    lo = Vector((min(c[i] for c in xs) for i in range(3))); hi_ = Vector((max(c[i] for c in xs) for i in range(3)))
+    S = P["height"] / (hi_.z - lo.z)
+    g = Vector(((lo.x + hi_.x) * 0.5, (lo.y + hi_.y) * 0.5, lo.z))
+    for v in me.vertices: v.co = (v.co - g) * S
+    me.update()
+
+def make_course(o, P, name):
+    # The ruin's tower (2026-11-17, owner: "Fix the ruin wall top"). Round its upper wall ran a dark, roof-like eave: a zero-thickness skirt from the
+    # lower wall's face (about 3.1 m) sloping up and in to the upper courses, which stand 40 cm further in (about 3.55 m), with a ragged lip out past
+    # the wall. It was the wall's only top there, so cutting it opened a see-through band, and pulling it in ('tuck', round 3) still left a ragged
+    # edge, a dark slit and a green line. Now, in the wedge of the tower it runs round (angles from 'centre', wedge[0] on round to wedge[1]):
+    #   1. every face between z[0] and z[1] is deleted, from the model and from the bake source alike;
+    #   2. the wall's own cross-section at z[0] (found by ray tests on a 'cell' cm grid) is stood up from just under z[0] to just over z[1] as one
+    #      closed block, 'lip' cm proud of the outer face (cells further than lip_from cm from the centre; 'cell' cm on the inner face), so it reads
+    #      as a solid capping course with a crisp shadow line under it; the upper courses sit back on its top, which makes a flat 40 cm stone ledge.
+    #      It overlaps the cut edges of the wall above, below and at the wedge's ends, so none of them can show;
+    #   3. the block is voxel-remeshed ('voxel' cm) into a smooth closed solid and joined to the model;
+    #   4. its faces are copied into the bake source, textured with the stone of the same wall 'drop' cm lower (each face's corners mapped onto the
+    #      wall face a level ray meets there; its underside and top unfolded down under its outer face), so the bake paints it like the row of
+    #      smaller stones just under it.
+    # (A voxel remesh of the whole model, to close every sheet, was tried first: the cuts leave thousands of open edges, the remesher's inside test
+    # leaks through them and most of the ruin vanished.) Returns the bake source (the full model without the eave, plus the textured course).
+    from mathutils.bvhtree import BVHTree
+    from mathutils import geometry
+    C = P["course"]
+    cx, cy = C["centre"]; w0, w1 = C["wedge"]; z0, z1 = C["z"]; cell = C["cell"]
+    def polar(x, y):
+        return math.degrees(math.atan2(y - cy, x - cx)), math.hypot(x - cx, y - cy)
+    def inwedge(x, y, wider=0.0):
+        th = polar(x, y)[0]
+        return th >= w0 - wider or th <= w1 + wider
+    WIDER = 1.5   # (degrees: the block reaches a little past the cut, about 6 cm at the wall)
+    me = o.data
+    bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
+    tree = BVHTree.FromBMesh(bm)
+    # (2) the wall's cross-section at z0: a cell is stone when level rays from it meet the inside of the wall first, in at least 2 of 3 ways
+    xs = [v.co.x for v in bm.verts]; ys = [v.co.y for v in bm.verts]
+    x_lo, y_lo = min(xs) - 4 * cell, min(ys) - 4 * cell
+    nx, ny = int((max(xs) - x_lo) / cell) + 8, int((max(ys) - y_lo) / cell) + 8
+    zc = z0 + 0.5
+    occ = set()
+    for i in range(nx):
+        for j in range(ny):
+            x, y = x_lo + (i + 0.5) * cell, y_lo + (j + 0.5) * cell
+            if not inwedge(x, y, WIDER): continue
+            th, r = polar(x, y)
+            if r < 60.0 or r > 330.0: continue
+            R = Vector(((x - cx) / r, (y - cy) / r, 0.0)); T = Vector((-R.y, R.x, 0.0))
+            p = Vector((x, y, zc)); ins = 0
+            for d in (R, -R, T):
+                h = tree.ray_cast(p, d, 600.0)
+                if h[0] is not None and h[1].dot(d) > 0.0: ins += 1
+            if ins >= 2: occ.add((i, j))
+    # the lip: the outer face pushed out 'lip' cm, the inner face one cell (cells next to the stone); the lip is left out at the joints between the
+    # course's stones (every 'joint' cm or so round the outer face, a groove one cell wide), so it reads as separate capping stones
+    def cr(c_): return polar(x_lo + (c_[0] + 0.5) * cell, y_lo + (c_[1] + 0.5) * cell)
+    joints, s_, k_ = [], 30.0, 0
+    while s_ < 1200.0:
+        joints.append(s_); k_ += 1; s_ += C["joint"] * (0.8 + 0.4 * ((k_ * 7919) % 13) / 12.0)
+    def at_joint(c_):
+        th, r = cr(c_)
+        arc = math.radians((th - w0) % 360.0) * r
+        return any(abs(arc - j_) < cell for j_ in joints)
+    for k_ in range(max(1, int(round(C["lip"] / cell)))):
+        add = set()
+        for (i, j) in occ:
+            for c_ in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+                if c_ in occ or c_ in add: continue
+                x, y = x_lo + (c_[0] + 0.5) * cell, y_lo + (c_[1] + 0.5) * cell
+                if not inwedge(x, y, WIDER): continue
+                outer = cr(c_)[1] > C["lip_from"]
+                if (outer and not at_joint(c_)) or (k_ == 0 and not outer): add.add(c_)
+        occ |= add
+    # the course's outer and inner radius by angle (whole degrees), for unfolding its top onto the wall
+    rout, rin = {}, {}
+    for c_ in occ:
+        th, r = cr(c_); k = int(math.floor(th))
+        rout[k] = max(rout.get(k, 0.0), r); rin[k] = min(rin.get(k, 1e9), r)
+    def ang_r(tab, th, far):
+        k = int(math.floor(th))
+        for d in (0, 1, -1, 2, -2, 3, -3):
+            if (k + d) in tab: return tab[k + d]
+        return far
+    # (1) the band goes
+    gone = [f for f in bm.faces if z0 < f.calc_center_median().z < z1 and inwedge(*f.calc_center_median().xy)]
+    bmesh.ops.delete(bm, geom=gone, context="FACES")
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+    bm.to_mesh(me); bm.free(); me.update()
+    hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
+    # (2) the block: cell columns from 3 cm under z0 to 3 cm over z1
+    cb = bmesh.new(); vk = {}
+    def V(i, j, lv):
+        k = (i, j, lv)
+        if k not in vk: vk[k] = cb.verts.new((x_lo + i * cell, y_lo + j * cell, (z0 - 3.0) if lv == 0 else (z1 + 3.0)))
+        return vk[k]
+    for (i, j) in occ:
+        cb.faces.new((V(i, j, 1), V(i + 1, j, 1), V(i + 1, j + 1, 1), V(i, j + 1, 1)))
+        cb.faces.new((V(i, j + 1, 0), V(i + 1, j + 1, 0), V(i + 1, j, 0), V(i, j, 0)))
+        if (i + 1, j) not in occ: cb.faces.new((V(i + 1, j, 0), V(i + 1, j + 1, 0), V(i + 1, j + 1, 1), V(i + 1, j, 1)))
+        if (i - 1, j) not in occ: cb.faces.new((V(i, j + 1, 0), V(i, j, 0), V(i, j, 1), V(i, j + 1, 1)))
+        if (i, j + 1) not in occ: cb.faces.new((V(i + 1, j + 1, 0), V(i, j + 1, 0), V(i, j + 1, 1), V(i + 1, j + 1, 1)))
+        if (i, j - 1) not in occ: cb.faces.new((V(i, j, 0), V(i + 1, j, 0), V(i + 1, j, 1), V(i, j, 1)))
+    cm = bpy.data.meshes.new(name + "_Course"); cb.to_mesh(cm); cb.free()
+    co = bpy.data.objects.new(cm.name, cm); bpy.context.scene.collection.objects.link(co)
+    print("WPROP", name, "course: band cut", len(gone), "faces, stone cells", len(occ))
+    # (3) closed, then smoothed across the ground only (the cells' 2 cm steps otherwise show as vertical flutes in a low sun)
+    remesh(co, C["voxel"], name)
+    bpy.ops.object.select_all(action="DESELECT"); bpy.context.view_layer.objects.active = co; co.select_set(True)
+    sm = co.modifiers.new("Sm", "SMOOTH"); sm.factor = 1.0; sm.iterations = 12; sm.use_x = True; sm.use_y = True; sm.use_z = False
+    bpy.ops.object.modifier_apply(modifier=sm.name)
+    # (4) the course's faces into the bake source, with the wall's stone 'drop' cm lower
+    hbm = bmesh.new(); hbm.from_mesh(hi.data); hbm.faces.ensure_lookup_table()
+    htree = BVHTree.FromBMesh(hbm)
+    uvl = hbm.loops.layers.uv.active
+    nh = len(hbm.faces)
+    src = [(f.verts[0].co.copy(), f.verts[1].co.copy(), f.verts[2].co.copy(),
+            f.loops[0][uvl].uv.copy(), f.loops[1][uvl].uv.copy(), f.loops[2][uvl].uv.copy()) for f in hbm.faces]
+    Z = Vector((0.0, 0.0, 1.0))
+    made = 0; missed = 0; last = None
+    for f in co.data.polygons:
+        c = f.center.copy()
+        th, r = polar(c.x, c.y)
+        if r < 1.0: continue
+        R = Vector(((c.x - cx) / r, (c.y - cy) / r, 0.0)); T = Vector((-R.y, R.x, 0.0))
+        ro, ri = ang_r(rout, th, r), ang_r(rin, th, r)
+        n = f.normal
+        inner = abs(n.z) < 0.6 and n.dot(R) < -0.3
+        def unf(q):   # the unfolded height of a point on the course (its underside and then its top folded down under its outer face)
+            if n.z > 0.6: return z0 - 2.0 * C["lip"] - (ro - math.hypot(q.x - cx, q.y - cy))
+            if n.z < -0.6: return z0 - (math.hypot(q.x - cx, q.y - cy) - (ro - C["lip"]))
+            return q.z
+        hit = None
+        for extra in (0.0, -40.0, 40.0, -80.0, 80.0):
+            zs = unf(c) - C["drop"] + extra
+            if inner: org, d = Vector((cx, cy, zs)) + R * 40.0, R
+            else: org, d = Vector((cx, cy, zs)) + R * 450.0, -R
+            h = htree.ray_cast(org, d, 600.0)
+            if h[0] is None or h[1].dot(d) > 0.0: continue
+            hr = math.hypot(h[0].x - cx, h[0].y - cy)
+            if (inner and hr < ri + 35.0) or (not inner and hr > ro - 35.0): hit = (h, T); break
+        if hit is None:
+            missed += 1
+            if last is None: continue
+            hit = last   # (the stone the face before it used)
+        last = hit
+        (h, Th) = hit
+        A, B, Cc, ua, ub, uc = src[h[2]]
+        vs = [hbm.verts.new(co.data.vertices[i].co) for i in f.vertices]
+        nf = hbm.faces.new(vs); nf.material_index = 0; nf.smooth = False
+        uc_ = unf(c)
+        for lp, vi in zip(nf.loops, f.vertices):
+            q = co.data.vertices[vi].co
+            s = h[0] + Th * (q - c).dot(T) + Z * (unf(q) - uc_)
+            uv = geometry.barycentric_transform(s, A, B, Cc, Vector((ua.x, ua.y, 0.0)), Vector((ub.x, ub.y, 0.0)), Vector((uc.x, uc.y, 0.0)))
+            lp[uvl].uv = (uv.x, uv.y)
+        made += 1
+    hbm.to_mesh(hi.data); hbm.free(); hi.data.update()
+    print("WPROP", name, "course: textured faces", made, "(", missed, "took their neighbour's stone ) in the bake source of", nh, "faces")
+    # the block joins the model (one mesh; not fused, it overlaps the cut edges)
+    bpy.ops.object.select_all(action="DESELECT")
+    co.select_set(True); o.select_set(True); bpy.context.view_layer.objects.active = o
+    bpy.ops.object.join()
+    o.select_set(False)
+    return hi
+
+def remesh(o, voxel, name):
+    # a closed block made smooth: Blender's voxel remesh at 'voxel' cm, then bits under 200 vertices dropped (dust the voxels leave)
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = o; o.select_set(True)
+    md = o.modifiers.new("Rem", "REMESH"); md.mode = "VOXEL"; md.voxel_size = voxel; md.use_smooth_shade = False
+    bpy.ops.object.modifier_apply(modifier=md.name)
+    bm = bmesh.new(); bm.from_mesh(o.data); bm.verts.ensure_lookup_table()
+    seen = set(); small = []
+    for v in bm.verts:
+        if v.index in seen: continue
+        st = [v]; seen.add(v.index); comp = []
+        while st:
+            x = st.pop(); comp.append(x)
+            for e in x.link_edges:
+                w = e.other_vert(x)
+                if w.index not in seen: seen.add(w.index); st.append(w)
+        if len(comp) < 200: small.extend(comp)
+    bmesh.ops.delete(bm, geom=small, context="VERTS")
+    bm.to_mesh(o.data); bm.free(); o.data.update()
+    print("WPROP", name, "remesh", voxel, "cm: tris", sum(len(p.vertices) - 2 for p in o.data.polygons), "(dropped", len(small), "dust vertices)")
+
 for name in names:
     P = WORLD[name]
     f = os.path.join(src, P["file"])
@@ -215,8 +415,23 @@ for name in names:
             stray += stray2
         bm.to_mesh(me); bm.free(); me.update()
         print("WPROP", name, "cut", len(gone), "faces, and", len(stray), "stray, and", nthin, "thin")
-    # reduce, with the full model kept for the bake
-    hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
+    # into the game's frame (cm) before the reduce (2026-11-17; it was after the bake)
+    to_game(o, P)
+    me = o.data
+    # cut_final: faces to delete in the game's frame (cm; centre, normal), for pieces the colour cut and 'thin' miss (the ruin used it for its roof
+    # slab, review round 2, until the course replaced the slab, 2026-11-17)
+    if "cut_final" in P:
+        bm = bmesh.new(); bm.from_mesh(me)
+        gone = [f for f in bm.faces if P["cut_final"](f.calc_center_median(), f.normal)]
+        bmesh.ops.delete(bm, geom=gone, context="FACES")
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
+        bm.to_mesh(me); bm.free(); me.update()
+        print("WPROP", name, "cut_final", len(gone), "faces")
+    # the full model is kept for the bake. (The old 'tuck', which pulled the eave's vertices back onto the wall, is gone: the course replaces it.)
+    if "course" in P: hi = make_course(o, P, name)
+    else: hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
+    me = o.data
+    # reduce
     bm = bmesh.new(); bm.from_mesh(me)
     ext = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=ext * 2e-5)
@@ -235,45 +450,6 @@ for name in names:
     me = o.data
     print("WPROP", name, "tris from", tris0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     if "stone" in P and "Base" in got: restone(got["Base"], P)
-    # into the game's frame: the axes, the size, the origin at the middle of the foot
-    M3 = axis_matrix(P["axes"])
-    for v in me.vertices: v.co = M3 @ v.co
-    xs = [v.co for v in me.vertices]
-    lo = Vector((min(c[i] for c in xs) for i in range(3))); hi_ = Vector((max(c[i] for c in xs) for i in range(3)))
-    S = P["height"] / (hi_.z - lo.z)
-    g = Vector(((lo.x + hi_.x) * 0.5, (lo.y + hi_.y) * 0.5, lo.z))
-    for v in me.vertices: v.co = (v.co - g) * S
-    me.update()
-    # cut_final: faces to delete in the game's frame (cm; centre, normal), after the bake (its pictures stay right): the roof slab, which is thick and
-    # the same grey as the stone, so neither the colour cut nor 'thin' found it (review round 2)
-    if "cut_final" in P:
-        bm = bmesh.new(); bm.from_mesh(me)
-        gone = [f for f in bm.faces if P["cut_final"](f.calc_center_median(), f.normal)]
-        bmesh.ops.delete(bm, geom=gone, context="FACES")
-        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
-        bm.to_mesh(me); bm.free(); me.update()
-        print("WPROP", name, "cut_final", len(gone), "faces")
-    # tuck (2026-11-17, review round 3): a thin ledge that juts out over a wall, pulled back onto it instead of cut (cutting the ruin's ledge left a
-    # see-through band: it is the wall's top). P["tuck"] = (ledge test on a point (cm), wall z from, wall z to, slack cm): every vertex of a flat-ish face
-    # (|normal z| > 0.5) that passes the test moves, across the ground only, onto the nearest vertex of the upright wall faces between those heights,
-    # when it is more than 'slack' from it
-    if "tuck" in P:
-        from mathutils import kdtree
-        inb, wz0, wz1, slack = P["tuck"]
-        wall = [v.co.copy() for f in me.polygons if abs(f.normal.z) < 0.4 and wz0 < f.center.z < wz1 for v in (me.vertices[i] for i in f.vertices)]
-        kd = kdtree.KDTree(len(wall))
-        for i, c in enumerate(wall): kd.insert(Vector((c.x, c.y, 0.0)), i)
-        kd.balance()
-        moved = set()
-        for f in me.polygons:
-            if abs(f.normal.z) <= 0.5 or not inb(f.center): continue
-            for vi in f.vertices:
-                if vi in moved: continue
-                v = me.vertices[vi]
-                q, j, d = kd.find(Vector((v.co.x, v.co.y, 0.0)))
-                if d > slack: v.co.x, v.co.y = q.x, q.y; moved.add(vi)
-        me.update()
-        print("WPROP", name, "tuck moved", len(moved), "ledge vertices onto the wall below (", len(wall), "wall vertices)")
     xs = [v.co.copy() for v in me.vertices]
     lo = Vector((min(c[i] for c in xs) for i in range(3))); hi_ = Vector((max(c[i] for c in xs) for i in range(3)))
     print("WPROP", name, "size cm", tuple(round(hi_[i] - lo[i]) for i in range(3)), "lo", tuple(round(x) for x in lo), "hi", tuple(round(x) for x in hi_))
