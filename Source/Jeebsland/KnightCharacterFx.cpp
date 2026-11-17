@@ -232,17 +232,24 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		{
 			// A fresh cut gets a fresh curve; never spline-connect the end of one swing to the start of the next.
 			if (!bTrailPrev) { TrailSamples.Reset(); TrailPeak = 0.f; bTrailDone = false; }
-			const float Speed = bTrailPrev ? (Tip - TrailPrevTip).Size() / FMath::Max(Dt, 0.0001f) / Slow : 0.f;   // cm/s at normal speed
+			const FVector Moved = bTrailPrev ? Tip - TrailPrevTip : FVector::ZeroVector;
+			const float Speed = Moved.Size() / FMath::Max(Dt, 0.0001f) / Slow;   // cm/s at normal speed
+			// (2026-11-16, owner: "the pickaxe appears in multiple places") The ribbon is a band along the blade, so it only has width where
+			// the tip sweeps ACROSS the blade. Where the tip runs along it (the arm thrusting the tool out, the pull-back) every band lies
+			// on the last one and the ribbon folds into a long thin pale line, a ghost of the haft that hung in the air for 0.09 s.
+			// Only the sideways part of the tip's speed counts.
+			const FVector Axis = (Tip - In).GetSafeNormal();
+			const float SideSpeed = (Moved - Axis * FVector::DotProduct(Moved, Axis)).Size() / FMath::Max(Dt, 0.0001f) / Slow;
 			TrailPrevTip = Tip; bTrailPrev = true;
 			// (owner 2026-11-05: it lasted past the swing. Whatever the clip does, the streak is over for good once the blade has dropped well below this cut's top speed.)
 			TrailPeak = FMath::Max(TrailPeak, Speed);
 			if (TrailPeak > 600.f && Speed < TrailPeak * (AttackDir == JabSecond || bSweep || bDash ? 0.45f : 0.3f)) bTrailDone = true;
 			if (!bTrailDone)
 			{
-				FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((Speed - 300.f) / 500.f, 0.f, 1.f);
+				FTrailSample S; S.In = In; S.Out = Tip; S.Time = Now; S.Strength = Window * FMath::Clamp((SideSpeed - 300.f) / 500.f, 0.f, 1.f) * FMath::SmoothStep(0.5f, 0.8f, SideSpeed / FMath::Max(Speed, 1.f));
 				TrailSamples.Add(S);
 			}
-			if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBTRAIL t %.3f u %.2f win %.2f speed %.0f peak %.0f done %d"), Now, T, Window, Speed, TrailPeak, bTrailDone ? 1 : 0);
+			if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBTRAIL t %.3f u %.2f win %.2f speed %.0f across %.0f peak %.0f done %d"), Now, T, Window, Speed, SideSpeed, TrailPeak, bTrailDone ? 1 : 0);
 		}
 		else bTrailPrev = false;
 	}
@@ -284,6 +291,26 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 			const float Alpha = FMath::Lerp(B.Strength, C.Strength, T) * FMath::Pow(1.f - Age, 1.5f);
 			V.Add(CR(A.In, B.In, C.In, D.In, T));   UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 			V.Add(CR(A.Out, B.Out, C.Out, D.Out, T)); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+		}
+	}
+	// (2026-11-16, owner: "the pickaxe appears in multiple places") Where the ribbon is seen edge-on (a chop in a plane running away
+	// from this machine's camera, e.g. an overhead swing seen from behind) it is no wisp but a thin bright line along the path, which
+	// read as a pale ghost of the haft hanging in the air. Each part fades as it turns edge-on to the camera. Local look only.
+	const APlayerController* ViewPC = GetWorld()->GetFirstPlayerController();
+	if (ViewPC && ViewPC->PlayerCameraManager)
+	{
+		const FVector Cam = ViewPC->PlayerCameraManager->GetCameraLocation();
+		const int32 Pairs = V.Num() / 2;
+		for (int32 p = 0; p < Pairs; ++p)
+		{
+			const int32 P0 = FMath::Max(p - 1, 0), P1 = FMath::Min(p + 1, Pairs - 1);
+			const FVector Across = V[2 * p + 1] - V[2 * p];
+			const FVector AlongPath = (V[2 * P1] + V[2 * P1 + 1]) - (V[2 * P0] + V[2 * P0 + 1]);
+			const FVector Nrm = FVector::CrossProduct(Across, AlongPath).GetSafeNormal();
+			const FVector Look = (0.5f * (V[2 * p] + V[2 * p + 1]) - Cam).GetSafeNormal();
+			const float Face = Nrm.IsNearlyZero() ? 0.f : FMath::Abs(FVector::DotProduct(Nrm, Look));
+			const float Keep = FMath::SmoothStep(0.15f, 0.45f, Face);
+			Col[2 * p].A *= Keep; Col[2 * p + 1].A *= Keep;
 		}
 	}
 	for (int32 k = 0; k + 3 < V.Num(); k += 2) Tri.Append({ k, k + 1, k + 3, k, k + 3, k + 2 });
