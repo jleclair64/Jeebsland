@@ -108,6 +108,9 @@ namespace
 		{ 6, TEXT("All autumn trees: colourfulness (1 = the sliders)"), TEXT("jeeb.Trees.Saturation"), EK::Float, 0, 0.f, 1.5f, false, NoDef },
 		{ 6, TEXT("Fallen leaves: brightness"), TEXT("jeeb.Leaves.Brightness"), EK::Float, 0, 0.1f, 1.5f, false, NoDef },
 		{ 6, TEXT("Lamps: glass glow"), TEXT("jeeb.Lamp.Glow"), EK::Float, 0, 0.f, 3.f, false, NoDef },
+		{ 5, TEXT("Ground past the grass: red"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 0, 0.3f, 1.2f, false, NoDef },
+		{ 5, TEXT("Ground past the grass: green"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 1, 0.3f, 1.2f, false, NoDef },
+		{ 5, TEXT("Ground past the grass: blue"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 2, 0.3f, 1.2f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)

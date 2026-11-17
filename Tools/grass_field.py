@@ -79,7 +79,11 @@ def under_grass_floor(g, col, beyond):
     """the grass ground's colour times Floor among the blades (1 at noon, jeeb.Ground.Floor at the low sun), unchanged past them"""
     k = g.node(unreal.MaterialExpressionLinearInterpolate, const_b=1.0)
     g.link(g.scalar("Floor", 1.0), k, "A"); g.link(beyond, k, "Alpha")
-    return g.muln(col, k)
+    col = g.muln(col, k)
+    # FarTint (2026-11-17, owner: the ground past the grass "looks brighter than the tree trunks and up close grass"): past the blades
+    # the flat ground is lit straight on while the blades shade each other, so it read as a bright yellow-green band. It is toned
+    # darker and less yellow there only (jeeb.Ground.FarTint, live; AWorldTerrain::SetUnderGrass).
+    return g.muln(col, g.lerp(g.c3((1.0, 1.0, 1.0)), g.mask(g.vector("FarTint", (0.68, 0.72, 0.62)), True, True, True), beyond))
 
 
 def under_grass_fill(g, fill, beyond):
