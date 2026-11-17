@@ -17,6 +17,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
+#include "Hills.h"
 #include "OakHillTown.h"
 #include "OakHillLife.h"
 #include "OakHill.h"
@@ -119,6 +120,8 @@ void AKnightGameState::BuildWorld()
 	JeebTownLab::SetActive(GetWorld()->GetMapName().Contains(TEXT("TownLab")));   // (the TownLab test map: the rebuilt Oak Hill beside the real one, TownLab.h; Field never)
 	UWorld* World = GetWorld();
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
+	JeebHills::Prepare();    // the forested hills round Oak Hill (Hills.h): worked out once, here on the game thread before anything asks for a height; logs JEEBHILLS
+	JeebHills::LogStats();
 
 	// Cosy autumn evening: low golden sun, cool dusky shadows, soft haze
 	for (TActorIterator<ADirectionalLight> It(World); It; ++It)

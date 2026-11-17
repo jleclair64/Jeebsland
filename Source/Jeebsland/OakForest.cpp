@@ -240,7 +240,7 @@ const TArray<TArray<FVector2D>>& JeebOakForest::RoadLines()
 				const float Step = bTown ? 600.f : 1500.f;
 				const FVector2D G = (Goal - P).GetSafeNormal();
 				const FVector2D Base = (Head * 0.55f + G * 0.45f).GetSafeNormal();
-				const float H0 = JeebTerrain::HeightAt(P.X, P.Y);
+				const float H0 = JeebTerrain::HeightAt(P.X, P.Y, true, 1);   // (the hills before the roads are levelled: Hills.h)
 				float Best = 1.0e9f; FVector2D BestQ = P;
 				const int32 Fan = (bTown && s < 4) ? 17 : 8;   // (leaving town: any way out, the road end may face a house)
 				for (int32 a = -Fan; a <= Fan; ++a)
@@ -248,7 +248,7 @@ const TArray<TArray<FVector2D>>& JeebOakForest::RoadLines()
 					const FVector2D D = Base.GetRotated(a * 10.f);
 					const FVector2D Q = P + D * Step;
 					if (!Ok(Q) || !Ok(P + D * Step * 0.5f) || (bTown && (!Ok(P + D * Step * 0.25f) || !Ok(P + D * Step * 0.75f)))) continue;
-					const float Grade = FMath::Abs(JeebTerrain::HeightAt(Q.X, Q.Y) - H0) / Step;
+					const float Grade = FMath::Abs(JeebTerrain::HeightAt(Q.X, Q.Y, true, 1) - H0) / Step;
 					const float Cost = Grade * 14.f + FMath::Abs(a) * 0.06f + (1.f - FVector2D::DotProduct(D, G)) * 0.9f;
 					if (Cost < Best) { Best = Cost; BestQ = Q; }
 				}
@@ -451,7 +451,7 @@ struct FOakForestBuild
 				const float Crown = Kinds[Kind].Crown * Scale;
 				if (!Space.Clear(P, Crown, 0.55f, 150.f)) { if (W > 0.3f) Open.Add(P); continue; }
 				Space.Add(P, Crown, true);
-				Puts.Add({ uint8(Kind), uint8(Col), FVector(X, Y, Z - 6.f), Yaw, FVector(Scale), false });
+				Puts.Add({ uint8(Kind), uint8(Col), FVector(X, Y, Z - 6.f - Slope * 45.f * Scale), Yaw, FVector(Scale), false });   // (on a slope the trunk sinks by its downhill side: the hills, 2026-11-16)
 				++Count[Kind]; if (Kinds[Kind].bTint) ++ColCount[Col];
 				++ForestTrees;
 			}
@@ -472,7 +472,7 @@ struct FOakForestBuild
 			const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
 			const bool bConifer = ConiferField > 0.55f;
 			int32 Kind; float Scale = 1.f;
-			if (Pick < 0.06f) { Kind = K_Log; Scale = FMath::Lerp(0.9f, 1.5f, Sc); }
+			if (Pick < 0.06f) { if (Slope > 0.2f) continue; Kind = K_Log; Scale = FMath::Lerp(0.9f, 1.5f, Sc); }   // (a long log lies only on gentle ground: on a hillside its ends would float)
 			else if (Pick < 0.11f) { const int32 St[4] = { K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass }; Kind = St[int32(Sc * 3.99f)]; Scale = FMath::Lerp(0.8f, 1.15f, Sc); }
 			else if (Pick < (bConifer ? 0.4f : 0.2f)) { Kind = K_Sapling; Scale = FMath::Lerp(1.6f, 3.2f, Sc); }
 			else if (Pick < (bConifer ? 0.47f : 0.25f)) { Kind = K_Full1 + int32(Sc * 2.99f); Scale = FMath::Lerp(0.18f, 0.3f, Sc); ++Seedlings; }   // a spruce seedling (in its kind's count below)
@@ -488,7 +488,7 @@ struct FOakForestBuild
 			// solids keep 60 cm clear of every trunk and solid; bushes may tuck in under the crowns but not into a trunk
 			if (!Space.Clear(P, bSolid ? Foot : 40.f, 0.12f, bSolid ? 60.f : 10.f)) continue;
 			if (bSolid) Space.Add(P, Foot, false);
-			Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (Kind == K_Log ? 8.f : 3.f)), Yaw, FVector(Scale), false });
+			Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (Kind == K_Log ? 8.f : 3.f) - Slope * 0.5f * FMath::Min(Foot, 100.f)), Yaw, FVector(Scale), false });
 			++Count[Kind]; ++Under;
 		}
 
@@ -516,7 +516,7 @@ struct FOakForestBuild
 				const float Foot = Kinds[Kind].Crown * FMath::Max(Sx, Sy);
 				if (!Space.Clear(P, Foot, 0.15f, 40.f)) continue;
 				Space.Add(P, Foot, false);
-				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f)), Yaw, FVector(Sx, Sy, Sz), false });
+				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f) - Slope * 0.5f * Foot), Yaw, FVector(Sx, Sy, Sz), false });
 				++Count[Kind]; ++Rocks;
 			}
 		}

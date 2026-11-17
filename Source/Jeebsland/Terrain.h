@@ -4,6 +4,7 @@
 #include "WorldMap.h"
 #include "OakHill.h"
 #include "TownLab.h"
+#include "Hills.h"
 
 // The forest's roads round Oak Hill (OakForest.cpp), made paths below
 namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
@@ -251,13 +252,17 @@ namespace JeebTerrain
 	// valleys and channels everywhere (the river runs down through the east side of the original square).
 	constexpr float GroundHalfForBlend = 16000.f;
 	// (bCap false: without the rivers' bank cap, for the bank scan's "what did the cap cut" only)
-	inline float HeightAt(float X, float Y, bool bCap = true)
+	// Hills: the forested hills round Oak Hill (Hills.h, 2026-11-16), added to the land before the rivers so their channels stay:
+	// 2 as built, 1 before the forest roads are levelled (what RoadLines routes on), 0 none (the roads' base)
+	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2)
 	{
 		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
 		float H;
 		if (Cheb < 12000.f) H = HomeHeight(X, Y);
 		else if (Cheb >= GroundHalfForBlend - 400.f) H = JeebWorld::LandHeight(X, Y);
 		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
+		if (Hills == 2) H += JeebHills::Offset(X, Y);
+		else if (Hills == 1) H += JeebHills::Raw(X, Y);
 		float RiverD = 1.0e9f, RiverHalf = 600.f;
 		H = JeebWorld::SeaAndRivers(X, Y, H, &RiverD, &RiverHalf);
 		// nothing steeper than a walk up from any river (2026-11-15, WorldMap.h UnderBankCap); in Oak Hill the cap trims its hills
