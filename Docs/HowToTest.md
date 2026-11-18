@@ -143,3 +143,19 @@ Field map, Play, Oak Hill. The owner's words: the lamps looked like harsh LEDs, 
 - `jeeb.Leaves.Brightness` (default 0.65) for the fallen and drifting leaves.
 - `jeeb.Lamp.Tint` ("r g b", default `1.0 0.38 0.06`, a deep amber oil flame; the lights use a paler version, about 2300 K) for the glass and light of every town lantern, lamp post and sconce; `jeeb.Lamp.Glow` (default 0.9; it was 5, which clipped the glass to white) for how hard the glass glows.
 - `jeeb.Trees.Spruce` now recolours the spruces of the forest and the town too (default `0.8 0.9 0.92`, a little darker and cooler than the pack's green; `1 1 1` is the pack's own).
+
+## The 2026-11-18 batch (built while the owner was at work)
+
+| I want to try... | Do this |
+|---|---|
+| Quests | Oak Hill's plaza has five quest givers with a gold ! or ? over their heads (Marta, Pell, Nan, Captain Corin, Wil). E to talk, click through and E to accept, Tab to decline. J or Escape > QUESTS for the log (TRACK picks the tracked quest); the tracked step shows top right and as a gold diamond on the world map. Order: Marta's Kindling (5 logs) > A Cold Forge (Pell, 6 tin) > Supper (Nan, 4 perch) > Sparring (Corin, beat the pen knight twice); Wil's ruin quest any time; Pell's Iron at Mining 10. Text, counts and rewards: `Content/Data/Quests.csv`, `QuestsSteps.csv`, `QuestsPeople.csv`. |
+| Bandits | Four camps in the forest round Oak Hill: Fernhollow about 260 m south (the easy one), Thornback about 290 m north, Ashgrove about 270 m east, Red Hal's Hold by a ruin about 430 m north-east. Captain Corin gives "Thieves on the Road", then "Red Hal". Numbers in `Content/Data/Foes.csv`, camps in `FoeCamps.csv` (restart after editing). `jeeb.Foes.Bandits 0` on the server before the world builds leaves them out. |
+| Emotes | Type /wave /bow /cheer /clap /dance /sit /point /salute in chat (/emotes lists them), or press B for the emote wheel and click one. /dance and /sit loop until you move or type them again. Moving, jumping, attacking, the bow or the shield ends any emote. Other players see it. |
+| Steele Creek (the smithing town) | Start with `-StartAtSteele` (or `[Jeebsland.Testing] StartAtSteeleCreek=True`), or type `jeeb.Test.GoSteele` in Play (test builds only). Store: Sir Dunmore; bank: Master Orrin Vale; smith: Grakka Steelhand; quarry up the mine track to the north-east. Or walk the road south from the fork near Oak Hill's south-west road. |
+| The stone bridge | From Oak Hill's plaza walk west along the straight road to the river. A new dirt road climbs from Blackrock's east gate over the ridge to its west end. The parapets can be vaulted. |
+| Oak Hill's war buildings | Two log forts on the river bank either side of the west road, the round watchtower north-west of the north fort, the castle ruins on the knoll north of the plaza. Walk through a fort gate and the ruins' arches. |
+| The new staff and wand | Take them from the gear wall (Field or MoveLab). Steel in the tier colour, brown wood, the hand closed on the leather grip. |
+| Spawning in Oak Hill | A new character, or any death, wakes on the plaza arc 10 m west of the big oak, facing it; two players arriving together get different spots. |
+| Chopping forest trees | Unchanged to play. Trees get their chop node only while a player is within 35 m (`jeeb.Forest.NodeReach`); `jeeb.Forest.LazyNodes 0` restores the old way. |
+
+Test switches from this batch (never in Shipping): `-JeebQuestTest`, `-JeebFoeTest`, `-EmoteTest=<name>_<askAt>_<walkAt>`, `-ShotMove=emoteall`, `-ShotEmoteWheel`, `-BridgeWalkTest`, `-BridgeProbe`, `-NoBridge`, `-NoWarBuildings`, `-JeebFastRegrow`, `-JeebWorldPort=<port>`, `-SteeleNetTest`, `-ShotMove=cast -ShotKind=7|8`.
