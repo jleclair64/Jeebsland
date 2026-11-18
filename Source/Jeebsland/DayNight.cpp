@@ -1,4 +1,4 @@
-﻿#include "DayNight.h"
+#include "DayNight.h"
 #include "Palette.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
