@@ -654,6 +654,60 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures
 
 
+# The forest's stand-in shadow casters (OakForest.cpp, jeeb.Forest.ShadowFade; owner 2026-11-17: the near trees' shadows "blink" as
+# they swap): near the camera a stand-in fades out over FadeIn..FadeIn+FadeWidth (flat distance from FadeCenter, the camera, to the
+# tree's foot) by dropping a growing share of its shadow-map texels (screen noise, so the sun's soft-shadow filter and TSR turn it
+# into a partial shade), and grows to GrowK times its built size at GrowFrom, back to 1 by GrowFrom+GrowWidth (about Anchor, the
+# crown's middle in the mesh's own frame), so it covers the real tree's leafy shadow while that one is swapped in or out.
+SHADE_FADE_HLSL = ("float n = frac(52.9829189 * frac(dot(Parameters.SvPosition.xy + float(View.StateFrameIndexMod8) * float2(2.083, 4.867), "
+                   "float2(0.06711056, 0.00583715))));\nreturn n < F ? 1.0 : 0.0;")
+
+
+def build_tree_shade():
+    mat = fresh_material("M_TreeShade")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
+    set_flags(mat, ("used_with_instanced_static_meshes",))
+    g = Graph(mat)
+    foot = g.node(unreal.MaterialExpressionObjectPositionWS)   # (an instance's own origin: the tree's foot)
+    d = g.node(unreal.MaterialExpressionDistance)
+    g.link(g.mask(foot, True, True), d, "A"); g.link(g.mask(g.vector("FadeCenter", (0.0, 0.0, 0.0)), True, True), d, "B")
+
+    def ramp(start, width):   # saturate((d - start) / width)
+        into = g.node(unreal.MaterialExpressionSubtract); g.link(d, into, "A"); g.link(start, into, "B")
+        over = g.node(unreal.MaterialExpressionDivide); g.link(into, over, "A"); g.link(width, over, "B")
+        return g.one(unreal.MaterialExpressionSaturate, over)
+    # the share of texels kept: none inside FadeIn, all past FadeIn + FadeWidth
+    c = g.node(unreal.MaterialExpressionCustom)
+    c.set_editor_property("code", SHADE_FADE_HLSL)
+    c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
+    c.set_editor_property("description", "ShadeFade")
+    ci = unreal.CustomInput()
+    ci.set_editor_property("input_name", "F")
+    c.set_editor_property("inputs", [ci])
+    # (worked out per vertex, where the instance's own origin is certain, and handed on to the pixels)
+    keep = ramp(g.scalar("FadeIn", 1000.0), g.scalar("FadeWidth", 600.0))
+    vi = g.node(unreal.MaterialExpressionVertexInterpolator)
+    if lib.connect_material_expressions(keep, "", vi, "VS"):
+        keep = vi
+    else:
+        unreal.log("MATDIAG tree shade: per-pixel fade (no vertex interpolator pin)")
+    g.link(keep, c, "F")
+    g.out(c, unreal.MaterialProperty.MP_OPACITY_MASK)
+    mat.set_editor_property("opacity_mask_clip_value", 0.5)
+    g.out(g.const3((0.2, 0.3, 0.15)), unreal.MaterialProperty.MP_BASE_COLOR)   # (never seen: it only casts)
+    # grow: offset = (local position - Anchor), turned into world space, x (k - 1); k = GrowK up to GrowFrom, easing to 1 by GrowFrom + GrowWidth
+    rel = g.node(unreal.MaterialExpressionSubtract)
+    g.link(g.node(unreal.MaterialExpressionPreSkinnedPosition), rel, "A"); g.link(g.vector("Anchor", (0.0, 0.0, 500.0)), rel, "B")
+    tw = g.node(unreal.MaterialExpressionTransform)
+    tw.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
+    tw.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
+    g.link(rel, tw, "")
+    extra = g.node(unreal.MaterialExpressionSubtract, const_b=1.0); g.link(g.scalar("GrowK", 1.0), extra, "A")
+    k1 = g.muln(extra, g.one(unreal.MaterialExpressionOneMinus, ramp(g.scalar("GrowFrom", 1600.0), g.scalar("GrowWidth", 1600.0))))
+    g.out(g.muln(tw, k1), unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
+    finish(mat, "M_TreeShade")
+
+
 class Graph:
     """Small helpers for wiring material nodes"""
 
@@ -1011,6 +1065,7 @@ def imported(png, name):
     return unreal.EditorAssetLibrary.load_asset("/Game/" + name)
 
 
+# ---- everything above only defines; the builds start here (a runner may exec the part above alone)
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
@@ -1063,4 +1118,5 @@ for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
 # build_dirt and build_ground above are the old versions, no longer run, so this script never puts the old ground back.)
 build_cloth()
 build_tree_far()   # far stand-ins for tree crowns (Forest.cpp); after M_TreeLeaf and M_PineNeedle
+build_tree_shade()   # the forest's stand-in shadows (OakForest.cpp), faded out near the camera
 unreal.log("MATDIAG all materials built")
