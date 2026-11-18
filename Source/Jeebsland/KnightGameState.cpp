@@ -82,6 +82,7 @@
 #include "OakForest.h"
 #include "SteeleCreekTown.h"
 #include "ForestRuins.h"
+#include "Bridge.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -294,6 +295,7 @@ void AKnightGameState::BuildWorld()
 	}
 	JeebGroves::Build(World, Forest);   // GROVES (TEMPORARY test setting, 2026-11-15): sample tree groves east of Oak Hill; non-Shipping, `jeeb.Test.Groves 0` leaves them out (TreeGroves.h)
 	World->SpawnActor<AOakForest>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's trees and the forest 500 m round it, with its roads, logs, stumps and boulders (OakForest.h; after AForest, which resets the canopy list; on every machine: the server builds the trunks' solids)
+	if (JeebBridge::Enabled()) World->SpawnActor<ABridge>(FVector::ZeroVector, FRotator::ZeroRotator);   // the stone bridge over the river between Blackrock and Oak Hill (Bridge.h; on every machine: the server builds its collision)
 	World->SpawnActor<AForestRuins>(FVector::ZeroVector, FRotator::ZeroRotator);   // about ten old stone ruins in that forest (ForestRuins.h; after AOakForest, whose solids they keep off; on every machine: the server builds their collision)
 	World->SpawnActor<ASteeleCreekTown>(FVector::ZeroVector, FRotator::ZeroRotator);   // Steele Creek, the smithing town in the southwest forest: buildings, its ring of trees, the quarry's rocks and its people (SteeleCreek.h; before the fill, which keeps off its solids; on every machine)
 
@@ -1189,7 +1191,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)

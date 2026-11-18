@@ -6,6 +6,7 @@
 #include "TownLab.h"
 #include "Hills.h"
 #include "SteeleCreek.h"
+#include "BridgeGround.h"   // the stone bridge over the river west of Oak Hill (2026-11-18): its embankments and the roads to it
 
 // The forest's roads round Oak Hill (OakForest.cpp), made paths below
 namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
@@ -272,6 +273,7 @@ namespace JeebTerrain
 		if (JeebOakHill::Covers(X, Y)) H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Oak Hill's own hills and level plots (2026-11-11)
 		else if (JeebSteele::Covers(X, Y)) H = JeebSteele::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Steele Creek's gentle tilt and level pads (2026-11-18)
 		else if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
+		if (JeebBridge::InBox(X, Y)) H = JeebBridge::ApplyGround(X, Y, H);   // the bridge's embankments and pier footings (Bridge.cpp)
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
 
@@ -488,6 +490,16 @@ namespace JeebTerrain
 					for (int32 i = s; i <= FMath::Min(s + 160, St.Pts.Num() - 1); ++i) { P.Pts.Add(Whole.Pts[i]); P.HalfL.Add(Whole.HalfL[i]); P.HalfR.Add(Whole.HalfR[i]); }
 					D.Add(P);
 				}
+			}
+			// The roads to the stone bridge (2026-11-18, Bridge.cpp; always last, so no older road's shape changes): Kind 3 the Blackrock approach, Kind 4 the span
+			for (const JeebBridge::FRoad& BR : JeebBridge::Roads())
+			{
+				FPathDef P;
+				P.Pts = SmoothPath(BR.Pts, false);
+				P.Width = BR.Width;
+				P.Kind = BR.Kind;
+				ShapeRoadEdges(P, D.Num());
+				D.Add(P);
 			}
 			for (FPathDef& P : D)
 			{

@@ -37,8 +37,9 @@ void APaths::BeginPlay()
 		const JeebTerrain::FPathDef& Def = Defs[d];
 		const int32 N = Def.Pts.Num();
 		if (N < 2) continue;
+		if (Def.Kind == 4) continue;   // (the road over the stone bridge: its deck is the road, 2026-11-18)
 		if (Def.Kind == 1 && JeebTownLab::RealTown()) continue;   // (the rebuilt Oak Hill paints its own streets into its ground, 2026-11-14: no ribbons)
-		const float Lift = Def.Kind == 2 ? 4.f + 0.12f * (d - FirstForest) : 1.5f + 0.12f * (Def.Kind == 1 ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
+		const float Lift = Def.Kind == 3 ? 2.5f : Def.Kind == 2 ? 4.f + 0.12f * (d - FirstForest) : 1.5f + 0.12f * (Def.Kind == 1 ? d - FirstCobbled : d);   // a hair above the ground he walks on (the ribbons have no collision); each road a touch higher so crossings never flicker
 
 		// Points along the centre line, with the road's half-width on each side
 		TArray<FVector2D> Line;
