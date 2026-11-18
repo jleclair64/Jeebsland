@@ -16,6 +16,7 @@ class UInputMappingContext;
 class UInputAction;
 class USkillComponent;
 class UQuestComponent;
+class UTravelComponent;
 class AResourceNode;
 class UInputModifierScalar;
 class UInstancedStaticMeshComponent;
@@ -251,6 +252,10 @@ public:
 	bool IsBlocking() const { return bBlocking; }
 	USkillComponent* GetSkills() const { return Skills; }
 	UQuestComponent* GetQuests() const { return Quests; }   // (this character's quests, QuestComponent.h)
+	UTravelComponent* GetTravel() const { return Travel; }   // (fast travel between visited towns, FastTravel.h)
+	float GetLastHurtTime() const { return LastHurtTime; }   // (world seconds of the last blow that reached him: the fast travel combat check)
+	FString TravelBlocker() const;                          // why he cannot start or keep a fast travel now, or empty (KnightCharacterTravel.cpp)
+	void TravelPlaced(const FVector& Dest, float Yaw);     // put him at Dest facing Yaw (every machine: the server on the jump, the player on ClientTravelArrived)
 	// Text for the "Press E ..." prompt, or false if nothing is in reach
 	bool GetInteractPrompt(FString& OutText) const;
 	// Where the floating E prompt hangs: just in front of and above the thing you can use. bOutE is false for things that are not an E action (a locked door you cannot pick, a place to fish).
@@ -488,6 +493,7 @@ private:
 	UPROPERTY() UInputAction* InteractAction = nullptr;
 	UPROPERTY() USkillComponent* Skills = nullptr;
 	UPROPERTY() UQuestComponent* Quests = nullptr;
+	UPROPERTY() UTravelComponent* Travel = nullptr;
 	UPROPERTY() UInputAction* SettingsAction = nullptr;
 	UPROPERTY() UInputAction* CrouchAction = nullptr;
 	UPROPERTY() UInputAction* BlockAction = nullptr;

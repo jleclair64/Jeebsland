@@ -1,4 +1,5 @@
 #include "HealthComponent.h"
+#include "FastTravel.h"
 #include "Combat.h"
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
@@ -57,6 +58,7 @@ bool UHealthComponent::ShowBar(float Now) const
 int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes, uint8 Zone, bool bHeadshot)
 {
 	if (Cur <= 0 || Amount <= 0 || !GetOwner() || !GetOwner()->HasAuthority()) return 0;   // (damage is the server's to deal)
+	UTravelComponent::NoteCombat(From);   // (a blow dealt: no fast travel for a while; FastTravel.h)
 	if (ModifyDamage && !bHitBoxes) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
 	if (ZoneTake && From) Amount = FMath::Max(1, FMath::RoundToInt(Amount * ZoneTake(Zone)));   // (his armour where it landed; hazards with no one behind them skip it)
 	const int32 Dealt = FMath::Min(Amount, Cur);

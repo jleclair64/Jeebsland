@@ -169,3 +169,8 @@ JEEB_TUNE(Swim, DrownSinkTime, 1.5f)
 JEEB_TUNE(Swim, DrownSinkSpeed, 60.f)
 JEEB_TUNE(Swim, SwimXPPerMetre, 1.f)
 JEEB_TUNE(Swim, SwimXPLump, 50.f)
+
+// [Travel]
+JEEB_TUNE(Travel, TravelChannel, 3.f)
+JEEB_TUNE(Travel, TravelCombat, 10.f)
+JEEB_TUNE(Travel, TravelCooldown, 30.f)

@@ -3,6 +3,7 @@
 #include "Inventory.h"
 #include "Lore.h"
 #include "QuestComponent.h"
+#include "FastTravel.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
@@ -79,6 +80,7 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->Explored = Skills->Explored;
 	S->LastGambleHour = Skills->LastGambleHour;
 	if (const UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Capture(S->QuestKeys, S->QuestSteps, S->QuestCounts, S->QuestDone);
+	if (const UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Capture(S->TownsVisited);
 	if (Body)
 	{
 		S->bHasPos = true;
@@ -130,6 +132,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->Explored = Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8 ? Explored : TArray<uint8>();
 	Skills->LastGambleHour = LastGambleHour;
 	if (UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Restore(QuestKeys, QuestSteps, QuestCounts, QuestDone);
+	if (UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Restore(TownsVisited, TownsVisited.Num() == 0);
 	return true;
 }
 

@@ -30,6 +30,7 @@ public:
 	bool IsChatOpen() const { return bChatOpen; }
 	void ShotOpenLook() { SettingsTab = 5; bSettingsWasOpen = true; }   // (test pictures: -ShotLookPanel)
 	void OpenQuestLog() { SettingsTab = 6; bSettingsWasOpen = true; }   // the Escape screen's QUESTS tab (call with the screen open)
+	void TestAskTravel(int32 Town) { SettingsTab = 0; TravelAsk = Town; }   // (test pictures and online tests only: FastTravelTest.cpp)
 
 	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
 	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
@@ -211,6 +212,14 @@ private:
 	// X, Y, S: where on screen. With the cursor over it the wheel zooms toward the cursor and a left drag pans (both the Tab
 	// screen's map and the Escape screen's share one view). Zoomed in, roads and Oak Hill's buildings are drawn on top.
 	void DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float S);
+	// Fast travel (KnightHUDTravel.cpp): the gold markers on visited towns, the "Travel to ...?" box, the count, the DISCOVERED title, the fade
+	int32 TravelMarkerAt(AKnightCharacter* Knight, float X, float Y, float S, const FVector2D& Mouse) const;
+	void DrawTravelMarkers(AKnightCharacter* Knight, float X, float Y, float S, bool bLive);
+	void DrawTravelConfirm(AKnightCharacter* Knight);
+	void DrawTravelHUD(AKnightCharacter* Knight, APlayerController* PC);
+	void DrawTravelFade(AKnightCharacter* Knight);
+	int32 TravelAsk = -1;            // the town the box asks about, or -1
+	uint64 TravelMapFrame = 0;       // the last frame the map was drawn (the box goes when the map does)
 	float MapZoom = 1.f;                                   // 1 = the whole world
 	FVector2D MapView = FVector2D::ZeroVector;             // the world point (cm) at the map's middle
 	bool bMapPanning = false;

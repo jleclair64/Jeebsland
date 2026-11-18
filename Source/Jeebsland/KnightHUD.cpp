@@ -353,6 +353,7 @@ void AKnightHUD::DrawHUD()
 	}
 
 	DrawQuestHUD(Knight, PC);   // (quest marks, the tracker and the J key: KnightHUDQuests.cpp)
+	DrawTravelHUD(Knight, PC);  // (fast travel: the count and the DISCOVERED title, KnightHUDTravel.cpp)
 
 	// Screens (only one at a time)
 	if (Knight->IsSettingsOpen() && !bSettingsWasOpen) SettingsTab = 0;   // it always opens on the map
@@ -370,6 +371,7 @@ void AKnightHUD::DrawHUD()
 	DrawDropBox(Knight);
 	DrawDragGhost();
 	DrawTip();
+	DrawTravelFade(Knight);   // (last: the black over everything round a fast travel)
 }
 
 // ---------------------------------------------------------------------------------------------------

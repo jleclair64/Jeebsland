@@ -19,6 +19,7 @@
 #include "EnhancedInputComponent.h"
 #include "SkillComponent.h"
 #include "QuestComponent.h"
+#include "FastTravel.h"
 #include "ResourceNode.h"
 #include "EngineUtils.h"
 #include "Engine/Engine.h"
@@ -54,6 +55,7 @@ AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
 
 	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
 	Quests = CreateDefaultSubobject<UQuestComponent>(TEXT("Quests"));
+	Travel = CreateDefaultSubobject<UTravelComponent>(TEXT("Travel"));
 
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
