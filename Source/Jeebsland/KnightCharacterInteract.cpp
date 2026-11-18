@@ -325,7 +325,7 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: Float(Horse->GetActorLocation(), 150.f); return true;
-	case EInteract::Npc:   Float(Npc->GetActorLocation(), 130.f); return true;
+	case EInteract::Npc:   Float(Npc->GetActorLocation(), Npc->HeadTopZ() + 15.f - Npc->GetActorLocation().Z); return true;   // (level with their name tag: the HUD sets it beside the name)
 	case EInteract::Bench:
 	{
 		const FVector2D P = JeebTerrain::Seats()[Idx].Pos;

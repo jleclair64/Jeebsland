@@ -35,18 +35,6 @@ void AKnightHUD::DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC)
 		else if (!Knight->IsUIOpen() || Knight->IsDialogueOpen()) { Knight->ToggleSettings(); if (Knight->IsSettingsOpen()) OpenQuestLog(); }
 	}
 
-	// "QUEST COMPLETE", for a few seconds after the server says so
-	{
-		const float Age = float(FPlatformTime::Seconds() - Qc->DoneTime);
-		if (Age >= 0.f && Age < 4.5f && !Qc->DoneTitle.IsEmpty())
-		{
-			const float A = FMath::Clamp(FMath::Min(Age / 0.5f, (4.5f - Age) / 1.2f), 0.f, 1.f);
-			const float H = FMath::Clamp(Canvas->ClipY * 0.042f, 26.f, 54.f);
-			TitleBanner(TEXT("QUEST COMPLETE"), Canvas->ClipY * 0.2f, H, A);
-			TitleTextAt(Qc->DoneTitle, -1.f, Canvas->ClipY * 0.2f + H * 1.55f, H * 0.55f, A * 0.9f);
-		}
-	}
-
 	if (Knight->IsUIOpen()) return;
 
 	// A mark over each quest giver within 30 m: "!" a quest to offer, "?" gold something to hand in, "?" grey one of theirs under way
@@ -58,10 +46,14 @@ void AKnightHUD::DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC)
 		const UQuestComponent::EMark M = Qc->MarkFor(It->GetPersonKey());
 		if (M == UQuestComponent::EMark::None) continue;
 		const float D = FVector::Dist2D(It->GetActorLocation(), Me);
-		const float A = FMath::Clamp((3000.f - D) / 600.f, 0.f, 1.f);
+		float A = FMath::Clamp((3000.f - D) / 600.f, 0.f, 1.f);
 		if (A <= 0.f) continue;
 		FVector2D SP;
-		if (!PC->ProjectWorldLocationToScreen(It->GetActorLocation() + FVector(0.f, 0.f, 175.f), SP)) continue;
+		// (45 cm over the top of the body shown, ANpc::HeadTopZ: it floated about a metre up, review 2026-11-18)
+		const FVector At = It->GetActorLocation();
+		if (!PC->ProjectWorldLocationToScreen(FVector(At.X, At.Y, It->HeadTopZ() + 45.f), SP)) continue;
+		A *= UnderTitle(SP.Y);   // (fades under "QUEST COMPLETE" and the other titles)
+		if (A <= 0.01f) continue;
 		const float S = FMath::Clamp(900.f / FMath::Max(D, 300.f), 0.75f, 2.2f);   // (smaller far away, never tiny)
 		const bool bDim = M == UQuestComponent::EMark::Busy;
 		const FString G = M == UQuestComponent::EMark::Offer ? TEXT("!") : TEXT("?");
@@ -89,6 +81,22 @@ void AKnightHUD::DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC)
 	WindowTitle(Q->Title, X + 14.f, Y + 8.f, 1.15f);
 	const float BH = Wrapped(Line, X + 14.f, Y + 42.f, W - 28.f, 1.0f, QIvory);
 	HDText(TEXT("J  quest log"), FLinearColor(0.7f, 0.72f, 0.78f, 0.85f), X + 14.f, Y + 46.f + BH, Font, 0.8f);
+}
+
+// "QUEST COMPLETE", for a few seconds after the server says so. Drawn after the world's marks, name tags and the E prompt (which
+// fade where it covers them, KnightHUD.h UnderTitle): their circles and letters sat on its subtitle (review 2026-11-18)
+void AKnightHUD::DrawQuestTitle(AKnightCharacter* Knight)
+{
+	UQuestComponent* Qc = Knight ? Knight->GetQuests() : nullptr;
+	if (!Qc) return;
+	const float Age = float(FPlatformTime::Seconds() - Qc->DoneTime);
+	if (Age >= 0.f && Age < 4.5f && !Qc->DoneTitle.IsEmpty())
+	{
+		const float A = FMath::Clamp(FMath::Min(Age / 0.5f, (4.5f - Age) / 1.2f), 0.f, 1.f);
+		const float H = FMath::Clamp(Canvas->ClipY * 0.042f, 26.f, 54.f);
+		TitleBanner(TEXT("QUEST COMPLETE"), Canvas->ClipY * 0.2f, H, A);
+		TitleTextAt(Qc->DoneTitle, -1.f, Canvas->ClipY * 0.2f + H * 1.55f, H * 0.55f, A * 0.9f);
+	}
 }
 
 void AKnightHUD::DrawQuestMapMark(AKnightCharacter* Knight, const FVector2D& C, float Size)

@@ -95,6 +95,14 @@ private:
 	UPROPERTY() UTexture2D* QuarterTex = nullptr;
 	UPROPERTY() UTexture2D* RingTex[2] = {};
 	void Outline(float X, float Y, float W, float H, float R, const FLinearColor& Col);
+	// (2026-11-18 review) Big titles (TitleBanner, centred TitleTextAt) note how strong and how low they reach this frame; the next
+	// frame fades the world's marks (name tags, quest marks, the E prompt, labels) that would sit under them. UnderTitle: the factor
+	// for a mark at screen height Y
+	float TitleCoverA = 0.f, TitleCoverBottom = 0.f, NextTitleA = 0.f, NextTitleBottom = 0.f;
+	void NoteTitle(float Bottom, float Alpha) { if (Alpha > 0.01f) { NextTitleA = FMath::Max(NextTitleA, Alpha); NextTitleBottom = FMath::Max(NextTitleBottom, Bottom); } }
+	float UnderTitle(float Y) const { return (TitleCoverA > 0.f && Y < TitleCoverBottom + 40.f) ? 1.f - TitleCoverA : 1.f; }
+	// The name tags drawn this frame (screen boxes): the E prompt steps beside a name instead of covering it
+	TArray<FBox2D> TagRects;
 	float PromptAlpha = 0.f;
 	FVector PromptAnchor = FVector::ZeroVector;
 	FString PromptText;
@@ -188,6 +196,7 @@ private:
 	// Quests (KnightHUDQuests.cpp): the marks over quest givers, the tracker under the frame rate, "QUEST COMPLETE", the J key,
 	// the QUESTS tab of the Escape screen (SettingsTab 6) and the map's marker for the tracked quest
 	void DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC);
+	void DrawQuestTitle(AKnightCharacter* Knight);   // ("QUEST COMPLETE": drawn after the world's marks and prompts, so on top of them)
 	void DrawQuestLog(AKnightCharacter* Knight, float PX, float PY, float PW, float PH);
 	void DrawQuestMapMark(AKnightCharacter* Knight, const FVector2D& Screen, float Size);
 	FName QuestSel;

@@ -70,7 +70,8 @@ void AKnightHUD::DrawEmoteWheel(AKnightCharacter* Knight, APlayerController* PC)
 
 	// one glass pane behind it all, so the labels read over a bright sky or wall, then the disc in the middle: what it is and how to close it
 	{
-		const float PW = 2.f * R + BW + 28.f * S, PH = 2.f * R * 0.86f + BH + 28.f * S;
+		// (a clear margin round the buttons: the top and bottom ones sat on the border, review 2026-11-18)
+		const float PW = 2.f * R + BW + 64.f * S, PH = 2.f * R * 0.86f + BH + 84.f * S;
 		Panel(Cx - PW * 0.5f, Cy - PH * 0.5f, PW, PH, 1.f);
 	}
 	Panel(Cx - Disc * 0.5f, Cy - Disc * 0.5f, Disc, Disc, 0.95f);

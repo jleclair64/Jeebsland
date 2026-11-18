@@ -56,6 +56,10 @@ void AKnightHUD::DrawHUD()
 
 	APlayerController* PC = GetOwningPlayerController();
 	bUIHaveMouse = PC && PC->GetMousePosition(UIMouseX, UIMouseY);
+	// (last frame's titles cover this frame's marks: KnightHUD.h UnderTitle)
+	TitleCoverA = NextTitleA; TitleCoverBottom = NextTitleBottom;
+	NextTitleA = 0.f; NextTitleBottom = 0.f;
+	TagRects.Reset();
 	const bool bDownNow = PC && PC->IsInputKeyDown(EKeys::LeftMouseButton);
 	bUIClick = bDownNow && !bUIWasDown;
 	bUIRelease = bUIWasDown && !bDownNow;
@@ -103,7 +107,7 @@ void AKnightHUD::DrawHUD()
 				if (Lines.Num() > 0 && Best->ShownCount() > 1) Lines[0] += FString::Printf(TEXT("  x%d"), Best->ShownCount());
 			}
 			else if (Best->GetIngots() > 0) Lines = { TEXT("Ingots"), FString::Printf(TEXT("%d ingots"), Best->GetIngots()) };
-			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f));   // fades in over the last metre
+			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f) * UnderTitle(SP.Y));   // fades in over the last metre
 		}
 	}
 
@@ -112,15 +116,19 @@ void AKnightHUD::DrawHUD()
 	{
 		for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
 		{
-			const FVector Head = It->GetActorLocation() + FVector(0.f, 0.f, 120.f);
+			// (just over the head of the body shown: 15 cm over its top, ANpc::HeadTopZ; it floated 30-45 cm up, review 2026-11-18)
+			const FVector Head(It->GetActorLocation().X, It->GetActorLocation().Y, It->HeadTopZ() + 15.f);
 			const float D = FVector::Dist2D(Head, Pawn->GetActorLocation());
-			const float A = FMath::Clamp((350.f - D) / 100.f, 0.f, 1.f);   // full at 2.5 m, gone past 3.5 m
+			float A = FMath::Clamp((350.f - D) / 100.f, 0.f, 1.f);   // full at 2.5 m, gone past 3.5 m
 			if (A <= 0.f) continue;
 			FVector2D SP;
 			if (!PC->ProjectWorldLocationToScreen(Head, SP)) continue;
+			A *= UnderTitle(SP.Y);
+			if (A <= 0.01f) continue;
 			const FString Nm = It->GetNpcName();
 			float TW = 0.f, TH = 0.f;
 			HDTextSize(Nm, TW, TH, Font, 2.f);
+			TagRects.Add(FBox2D(FVector2D(SP.X - TW * 0.5f, SP.Y - TH), FVector2D(SP.X + TW * 0.5f, SP.Y)));
 			HDText(Nm, FLinearColor(0.f, 0.f, 0.f, 0.8f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, 2.f);
 			HDText(Nm, FLinearColor(1.f, 0.85f, 0.45f, 0.95f * A), SP.X - TW * 0.5f, SP.Y - TH, Font, 2.f);
 		}
@@ -330,9 +338,20 @@ void AKnightHUD::DrawHUD()
 		if (PromptAlpha > 0.02f && PC && PC->ProjectWorldLocationToScreen(PromptAnchor, SP))
 		{
 			const float T = GetWorld()->GetTimeSeconds();
-			const float A = PromptAlpha;
+			const float A = PromptAlpha * UnderTitle(SP.Y);   // (under a big title it fades away)
 			const float S = 36.f;
-			const float X = SP.X - S * 0.5f, Y = SP.Y - S * 0.5f - 4.f * FMath::Sin(T * 2.2f) - (1.f - A) * 8.f;   // bobs gently, settles in as it appears
+			const float Bob = 4.f * FMath::Sin(T * 2.2f) + (1.f - PromptAlpha) * 8.f;   // bobs gently, settles in as it appears
+			float X = SP.X - S * 0.5f, Y = SP.Y - S * 0.5f - Bob;
+			// (2026-11-18 review: over a person it covered a letter of their name) where it would touch a name tag, it sits just to
+			// the right of the name instead, level with it
+			for (const FBox2D& R : TagRects)
+				if (X < R.Max.X + 6.f && X + S > R.Min.X - 6.f && Y < R.Max.Y + 6.f && Y + S > R.Min.Y - 6.f)
+				{
+					X = R.Max.X + 12.f;
+					Y = R.GetCenter().Y - S * 0.5f - Bob * 0.5f;
+					break;
+				}
+			SP.X = X + S * 0.5f;   // (its caption, if any, follows it)
 			if (bPromptE)
 			{
 				FillRR(X, Y, S, S, 9.f, [&](float) { return FLinearColor(0.f, 0.02f, 0.05f, 0.22f * A); });
@@ -354,6 +373,7 @@ void AKnightHUD::DrawHUD()
 
 	DrawQuestHUD(Knight, PC);   // (quest marks, the tracker and the J key: KnightHUDQuests.cpp)
 	DrawTravelHUD(Knight, PC);  // (fast travel: the count and the DISCOVERED title, KnightHUDTravel.cpp)
+	DrawQuestTitle(Knight);     // (over the marks and prompts above)
 
 	// Screens (only one at a time)
 	if (Knight->IsSettingsOpen() && !bSettingsWasOpen) SettingsTab = 0;   // it always opens on the map
@@ -704,23 +724,13 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	Marker(JeebTerrain::ShopPos(), 4.f, FLinearColor(1.f, 0.85f, 0.2f), false);
 	Marker(JeebTerrain::SmithyPos(), 4.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
 	Marker(JeebTerrain::BankPos(), 4.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
-	// Steele Creek's store, smithy and bank (SteeleCreek.h, 2026-11-18), and the town's name while it is on the map
+	// Steele Creek's store, smithy and bank (SteeleCreek.h, 2026-11-18)
 	if (JeebSteele::Enabled())
 	{
 		const TCHAR* ShopPlots[3] = { TEXT("Store"), TEXT("Smithy"), TEXT("Bank") };
 		const FLinearColor ShopCols[3] = { FLinearColor(1.f, 0.85f, 0.2f), FLinearColor(0.9f, 0.4f, 0.1f), FLinearColor(0.7f, 0.8f, 0.95f) };
 		for (int32 i = 0; i < 3; ++i) if (const JeebSteele::FPlot* P = JeebSteele::FindPlot(ShopPlots[i])) Marker(P->Centre, 4.f, ShopCols[i], false);
-		const FVector2D TC = JeebSteele::ToWorld(-5.f, 0.f);
-		float TX, TY;
-		const bool bSeen = !MapKnight || !MapKnight->GetSkills() || MapKnight->GetSkills()->IsExplored(TC.X, TC.Y);
-		if (bSeen && ToMap(TC, 40.f, false, TX, TY))
-		{
-			const FString T = TEXT("Steele Creek");
-			float TW = 0.f, TH = 0.f;
-			HDTextSize(T, TW, TH, Font, 1.1f);
-			HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.8f), TX - TW * 0.5f + 1.f, TY - 22.f + 1.f, Font, 1.1f);
-			HDText(T, FLinearColor(1.f, 0.92f, 0.7f, 0.95f), TX - TW * 0.5f, TY - 22.f, Font, 1.1f);
-		}
+		// (no town name here: it covered the arrow while you were in the town; names belong to the world map, review 2026-11-18)
 	}
 
 	// People
