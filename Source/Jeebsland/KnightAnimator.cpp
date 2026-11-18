@@ -20,6 +20,9 @@
 #include "Components/TextRenderComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Rendering/SkeletalMeshRenderData.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "StaticMeshResources.h"
 #include "JeebTuning.h"
 #include "Engine/SkeletalMesh.h"
 
@@ -2229,16 +2232,121 @@ FVector FClipLib::ToolContact(bool bChop, int32 Kind, float Share) const
 	return ToolStrike(G, Kind);
 }
 
-FTransform FKnightAnimator::ShieldWorld(float BlockAlpha) const
+// How far each shield model moves in toward the forearm (cm, along its face) so its back rests on the forearm plate: hanging, strapped on a raised
+// forearm, held up to guard. Measured on the real meshes (JEEBSHIELDGAP, -ShotShieldGap), not guessed: each model's back is at its own depth, the
+// kite and round dish away from the arm and the tower's handle stands off its back. Owner 2026-11-17: "make sure the shields are up against the
+// knight's arm and not floating slightly in front of it". Live: jeeb.Knight.ShieldSnug "kiteRest_kiteGuard_kiteBlock_round..._tower...".
+static const TArray<float>& CVarNumbers(const TAutoConsoleVariable<FString>& V, const TCHAR* Default, FString& Last, TArray<float>& Nums, int32 Want);   // (below)
+// Measured 2026-11-17 (Silver suit; the arm piece is one model for every armour style and tier): before, raised on the forearm the kite and round stood
+// 2.7 cm off the plate and the tower's handle sank 2 cm into it; held up to guard the kite stood 6.2 cm off, the round 3.2, the tower 4.7 (at -2.3).
+// Each now leaves about 0.3 cm. Hanging (forearm down) uses the raised numbers: the same strap, and the arm piece is round there.
+static const TCHAR* const ShieldSnugDefault = TEXT("2.4_2.4_5.9_2.35_2.35_2.9_-2.3_-2.3_2.05");
+static TAutoConsoleVariable<float> CVarShieldSnugSwing(TEXT("jeeb.Knight.ShieldSnugSwing"), 1.f, TEXT("While the shield swings up to guard or down again, how much of ShieldSnug is let go (1: all of it half way, the shield's old place; 0: none)."), ECVF_Default);
+static const TCHAR* const ShieldSwingOutDefault = TEXT("0_1.5_3");
+static TAutoConsoleVariable<FString> CVarShieldSwingOut(TEXT("jeeb.Knight.ShieldSwingOut"), ShieldSwingOutDefault, TEXT("cm each shield (kite_round_tower) stands further off the forearm half way through swinging up to guard or down, so the moving arm never passes into it."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarShieldSnug(TEXT("jeeb.Knight.ShieldSnug"), ShieldSnugDefault, TEXT("cm each shield model moves in toward the left forearm (kite, round, tower; each hanging_strapped_guarding): 9 numbers, measured so the back rests on the forearm plate."), ECVF_Default);
+
+static float ShieldUpOf(const FVector& ForeDir) { return 1.f - FMath::SmoothStep(0.45f, 0.85f, float(-ForeDir.Z)); }
+
+FTransform FKnightAnimator::ShieldWorld(float BlockAlpha, int32 Style) const
 {
 	// (at his side with the forearm hanging it hangs too, tip down; once the forearm comes up, as in every sword clip, it sits as strapped)
 	const FVector ForeDir = (BonePos(Final, LHand) - BonePos(Final, LFore)).GetSafeNormal();
-	const float Up = 1.f - FMath::SmoothStep(0.45f, 0.85f, float(-ForeDir.Z));
+	const float Up = ShieldUpOf(ForeDir);
 	FTransform Strap;
 	Strap.Blend(L.ShieldAtRest, L.ShieldAtGuard, Up);
 	if (BlockAlpha > 0.f) { const FTransform Open = Strap; Strap.Blend(Open, L.ShieldAtBlock, BlockAlpha); }
-	return Strap * BoneWorld(LFore);
+	// (in toward the arm along the shield's own face axis, by as much as this style's model stands off it in this pose)
+	static FString Last; static TArray<float> N;
+	const TArray<float>& S = CVarNumbers(CVarShieldSnug, ShieldSnugDefault, Last, N, 9);
+	const int32 B = FMath::Clamp(Style, 0, 2) * 3;
+	const float A = FMath::Clamp(BlockAlpha, 0.f, 1.f);
+	float In = FMath::Lerp(FMath::Lerp(S[B], S[B + 1], Up), S[B + 2], A);
+	// (while it swings up to guard or back down, the forearm moves through where the blend carries it: let the snug go, back to the old place half way)
+	// and the round and tower stand off a little more half way: measured, the forearm passes 1.2 cm (round) and 2.6 cm (tower) into where the blend carries them
+	if (A > 0.f && A < 1.f)
+	{
+		const float K = FMath::Sqrt(FMath::Sin(PI * A));
+		if (In > 0.f) In *= 1.f - FMath::Clamp(CVarShieldSnugSwing.GetValueOnAnyThread(), 0.f, 1.f) * K;
+		static FString LastOut; static TArray<float> NOut;
+		In -= CVarNumbers(CVarShieldSwingOut, ShieldSwingOutDefault, LastOut, NOut, 3)[FMath::Clamp(Style, 0, 2)] * K;
+	}
+	return FTransform(FVector(-In, 0.f, 0.f)) * Strap * BoneWorld(LFore);
 }
+
+#if !UE_BUILD_SHIPPING
+float FKnightAnimator::ShieldUpShare() const { return ShieldUpOf((BonePos(Final, LHand) - BonePos(Final, LFore)).GetSafeNormal()); }
+
+// (test pictures, 2026-11-17) The model's back as a height field: the least X (its face looks along +X) over its faces, in 1 cm cells of (Y, Z), kept
+// per mesh. The forearm's mesh as posed (the arm piece of the suit, or the mail body where the arms are off), within 16 cm of the elbow-to-hand line;
+// each of its points under the shield's outline gives back - x. The least is the gap.
+float FKnightAnimator::ShieldGap(const UStaticMeshComponent* Model, FVector& At, int32& Arm) const
+{
+	At = FVector::ZeroVector; Arm = 0;
+	const UStaticMesh* SM = Model ? Model->GetStaticMesh() : nullptr;
+	if (!Comp || !SM) return 1e4f;
+	static TMap<const UStaticMesh*, TMap<FIntPoint, float>> Backs;
+	TMap<FIntPoint, float>* Back = Backs.Find(SM);
+	if (!Back)
+	{
+		Back = &Backs.Add(SM);
+		const FStaticMeshRenderData* RD = SM->GetRenderData();
+		if (!RD || RD->LODResources.Num() == 0) return 1e4f;
+		const FStaticMeshLODResources& LOD = RD->LODResources[0];
+		const FPositionVertexBuffer& PB = LOD.VertexBuffers.PositionVertexBuffer;
+		const FIndexArrayView Idx = LOD.IndexBuffer.GetArrayView();
+		if (PB.GetNumVertices() == 0 || Idx.Num() == 0) { UE_LOG(LogTemp, Warning, TEXT("JEEBSHIELDGAP no CPU copy of %s"), *SM->GetName()); return 1e4f; }
+		for (int32 t = 0; t + 2 < Idx.Num(); t += 3)
+		{
+			const FVector3f A = PB.VertexPosition(Idx[t]), Bv = PB.VertexPosition(Idx[t + 1]), C = PB.VertexPosition(Idx[t + 2]);
+			const float Len = FMath::Max3((Bv - A).Size(), (C - A).Size(), (C - Bv).Size());
+			const int32 Steps = FMath::Clamp(FMath::CeilToInt(Len / 0.4f), 1, 300);
+			for (int32 i = 0; i <= Steps; ++i)
+				for (int32 j = 0; i + j <= Steps; ++j)
+				{
+					const FVector3f P = A + (Bv - A) * (float(i) / Steps) + (C - A) * (float(j) / Steps);
+					const FIntPoint Cell(FMath::FloorToInt(P.Y), FMath::FloorToInt(P.Z));
+					float& M = Back->FindOrAdd(Cell, 1e4f);
+					M = FMath::Min(M, P.X);
+				}
+		}
+	}
+	const FTransform ModelT = Model->GetComponentTransform();
+	const FVector E = BoneAt(LFore), H = BoneAt(LHand);
+	const FVector Hx = H + (H - E).GetSafeNormal() * 8.f;   // (the gauntlet's cuff and the back of the fist)
+	float Best = 1e4f;
+	auto Test = [&](USkinnedMeshComponent* M, int32 Mat)
+	{
+		if (!M || !M->GetSkinnedAsset() || !M->IsVisible()) return;
+		const FSkeletalMeshRenderData* R = M->GetSkinnedAsset()->GetResourceForRendering();
+		FSkinWeightVertexBuffer* W = M->GetSkinWeightBuffer(0);
+		if (!R || R->LODRenderData.Num() == 0 || !W) return;
+		const FSkeletalMeshLODRenderData& LD = R->LODRenderData[0];
+		TArray<FMatrix44f> RefToLocal;
+		M->CacheRefToLocalMatrices(RefToLocal);
+		TArray<FVector3f> Pos;
+		USkinnedMeshComponent::ComputeSkinnedPositions(M, Pos, RefToLocal, LD, *W);
+		const FTransform CT = M->GetComponentTransform();
+		for (const FSkelMeshRenderSection& Sec : LD.RenderSections)
+		{
+			if (Mat >= 0 && Sec.MaterialIndex != Mat) continue;
+			for (uint32 v = Sec.BaseVertexIndex; v < Sec.BaseVertexIndex + Sec.NumVertices && int32(v) < Pos.Num(); ++v)
+			{
+				const FVector Wp = CT.TransformPosition(FVector(Pos[v]));
+				if (FMath::PointDistToSegment(Wp, E, Hx) > 16.f) continue;
+				const FVector Lp = ModelT.InverseTransformPosition(Wp);
+				const float* Bk = Back->Find(FIntPoint(FMath::FloorToInt(Lp.Y), FMath::FloorToInt(Lp.Z)));
+				if (!Bk) continue;   // (not under the shield)
+				++Arm;
+				if (*Bk - Lp.X < Best) { Best = *Bk - Lp.X; At = Lp; }
+			}
+		}
+	};
+	if (!bBare[JeebAnim::Piece_Arms]) Test(Comp, PieceMat[JeebAnim::Piece_Arms]);
+	else Test(BareComp, -1);
+	return Best;
+}
+#endif
 
 // Where the bow rests in his fist, the quiver and the belt flask: live in Play (owner 2026-11-15: the quiver floated off his hip, the flask leant out,
 // the resting bow's string went through his hip). Quiver "X_Y_Z_Pitch_Yaw_Roll" and Flask "X_Y_Z_Pitch_Yaw_Roll_Scale" are cm and degrees in his

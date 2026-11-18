@@ -8,6 +8,7 @@
 #include "Inventory.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PoseableMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Misc/CommandLine.h"
@@ -176,9 +177,33 @@ void AKnightCharacter::PlaceGear()
 	if (bStowed) PullStowed(Anim->StowPull());   // (bent flat over a ledge: in toward his back)
 	if (!bShieldBack)
 	{
-		const FTransform At = Anim->ShieldWorld(BlockAlpha);
+		FTransform At[3];
+		for (int32 s = 0; s < 3; ++s) At[s] = Anim->ShieldWorld(BlockAlpha, s);   // (each style's model rests its own back on the forearm)
 		for (FArmorPart& P : ArmorParts)
-			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At);
+			if (P.Slot == KnightDesign::SlotShield && P.Comp) P.Comp->SetWorldTransform(At[FMath::Clamp(P.Style, 0, 2)]);
+#if !UE_BUILD_SHIPPING
+		// (test pictures, -ShotShieldGap: the least gap from the worn shield model's back to his left forearm's real mesh, the least over each half second; under 0 sinks in)
+		static const bool bGapLog = FParse::Param(FCommandLine::Get(), TEXT("ShotShieldGap"));
+		if (bGapLog && bShotFace && !IsNetMode(NM_DedicatedServer))
+			for (const FArmorPart& P : ArmorParts)
+				if (P.Model && P.Model->IsVisible())
+				{
+					static float GapMin = 1e4f, GapT = 0.f, UpMin = 2.f, UpMax = -1.f; static FVector GapAt; static int32 GapArm = 0;
+					FVector Where; int32 Arm = 0;
+					const float G = Anim->ShieldGap(P.Model, Where, Arm);
+					if (G < GapMin) { GapMin = G; GapAt = Where; GapArm = Arm; }
+					if (BlockAlpha > 0.f && BlockAlpha < 1.f)   // (swinging up or down: every frame)
+						UE_LOG(LogTemp, Display, TEXT("JEEBSHIELDSWING style %d block %.2f gap %.2f cm at (%.1f %.1f %.1f)"), P.Style, BlockAlpha, G, Where.X, Where.Y, Where.Z);
+					const float U = Anim->ShieldUpShare();
+					UpMin = FMath::Min(UpMin, U); UpMax = FMath::Max(UpMax, U);
+					if ((GapT += GetWorld()->GetDeltaSeconds()) >= 0.5f)
+					{
+						UE_LOG(LogTemp, Display, TEXT("JEEBSHIELDGAP t %.1f style %d up %.2f-%.2f block %.2f speed %.0f: gap %.2f cm at (%.1f %.1f %.1f) in the model, %d arm points under it"),
+							GetWorld()->GetTimeSeconds(), P.Style, UpMin, UpMax, BlockAlpha, GetVelocity().Size2D(), GapMin, GapAt.X, GapAt.Y, GapAt.Z, GapArm);
+						GapMin = 1e4f; GapT = 0.f; UpMin = 2.f; UpMax = -1.f;
+					}
+				}
+#endif
 	}
 	if (BowHold) BowHold->SetWorldTransform(SelectedKind() == JeebItems::K_Crossbow ? Anim->CrossWorld() : Anim->BowWorld(BowAimAlpha));
 	if (IsNetMode(NM_DedicatedServer)) return;
@@ -212,6 +237,7 @@ void AKnightCharacter::PlaceGear()
 #if !UE_BUILD_SHIPPING
 // (2026-11-15: set per -ShotEyes eye with -ShotEyesSet, so one run has him standing, walking and running)
 static TAutoConsoleVariable<float> CVarTestWalk(TEXT("jeeb.Test.Walk"), 0.f, TEXT("Test pictures only: he moves the way he faces at this share of full speed (1 runs), 2 sprints, 0 stands."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarTestBlock(TEXT("jeeb.Test.Block"), 0, TEXT("Test pictures only: 1 holds the shield up, 0 lowers it."), ECVF_Default);
 #endif
 void AKnightCharacter::TickSuitTests(float Dt)
 {
@@ -224,6 +250,10 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		if (W > 1.5f && !bTestSprint) { bTestSprint = true; StartSprint(); }
 		if (W <= 1.5f && bTestSprint) { bTestSprint = false; StopSprint(); }
 		if (W > 0.f) AddMovementInput(GetActorForwardVector(), FMath::Min(W, 1.f));
+		// (2026-11-17: jeeb.Test.Block 1 raises the shield, 0 lowers it again; set per eye with -ShotEyesSet)
+		static int32 TestBlockWas = 0;
+		const int32 Bl = CVarTestBlock.GetValueOnGameThread();
+		if (Bl != TestBlockWas) { TestBlockWas = Bl; if (Bl) StartBlock(); else StopBlock(); }
 	}
 #endif
 	{
