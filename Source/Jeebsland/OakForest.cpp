@@ -5,6 +5,8 @@
 #include "OakHill.h"
 #include "TownLab.h"
 #include "Canopy.h"
+#include "KnightGameState.h"
+#include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -49,6 +51,11 @@ namespace
 		TEXT("1: log every refill of the trees' shadow sets (JEEBFOREST refill: frame, camera, which sets changed), for tests; 2: the same, and leave the leafy twins out, to see the stand-ins alone."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarShadowFadeSize(TEXT("jeeb.Forest.ShadowFadeSize"), 1.1f,
 		TEXT("How big the stand-in shade is, against the real crown, where the leafy shadow is swapped in or out (it hides the swap; it shrinks back to jeeb.Forest.FarShadeSize over the next 12 m). Raise it if a ring of leaves still pops at the reach's edge. Live; looks only."), ECVF_Default);
+
+	TAutoConsoleVariable<int32> CVarLazyNodes(TEXT("jeeb.Forest.LazyNodes"), 1,
+		TEXT("1: a choppable tree's node actor exists only while a player is within jeeb.Forest.NodeReach of it (or it is felled, on the server); 0: all of them are spawned when the world is built (the old way, 0.4-1.2 s slower). Read when the world is built."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarNodeReach(TEXT("jeeb.Forest.NodeReach"), 35.f,
+		TEXT("How near a player must be (metres) for a choppable tree to get its node actor; it goes again past this plus 10 m. Live."), ECVF_Default);
 
 	TAutoConsoleVariable<int32> CVarShadowAll(TEXT("jeeb.Forest.ShadowAll"), 0,
 		TEXT("1: every drawn tree casts its own shadow (meant for virtual shadow maps, r.Shadow.Virtual.Enable 1; with ordinary shadow maps it cost about 7 ms); 0: only the near twins and the stand-ins. Live; looks only."), ECVF_Default);
@@ -896,22 +903,21 @@ struct FOakForestBuild
 			Self->ApplyReach();
 			if (Self->ShadowSets.Num()) Self->SetActorTickEnabled(true);
 		}
-		// every pack tree choppable (AOakTreeNode), on every machine and in the same order (nodes are matched online by where they stand)
-		int32 Nodes = 0;
+		// every pack tree choppable (AOakTreeNode). Lazily (2026-11-18): no node exists until a player is near its tree (AOakForest::UpdateNodes,
+		// every machine its own, as before); jeeb.Forest.LazyNodes 0 or -ForestEagerNodes builds them all here, the old way
 		for (int32 i = 0; i < Self->Fellable.Num(); ++i)
 		{
 			AOakForest::FFellable& F = Self->Fellable[i];
 			if (const int32* D = DrawnOfKey.Find(F.Key)) F.Drawn = *D;
 			if (const int32* S = ShadowOfKey.Find(F.Key)) F.Shadow = *S;
-			FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-			AOakTreeNode* N = World->SpawnActor<AOakTreeNode>(F.Tree.GetLocation(), FRotator::ZeroRotator, SP);
-			if (!N) continue;
-			N->Forest = Self; N->Index = i;
-			const float H = Kinds[FellKind[i]].TrunkH * F.Tree.GetScale3D().Z + 300.f;
-			N->Setup(IsSpruce(FellKind[i]) ? ETreeKind::Pine : ETreeKind::Oak, F.Radius, H);
-			++Nodes;
+			F.Kind = FellKind[i];
+			const FVector L = F.Tree.GetLocation();
+			Self->NodeCells.FindOrAdd(FIntPoint(FMath::FloorToInt(L.X / 2000.f), FMath::FloorToInt(L.Y / 2000.f))).Add(i);
 		}
-		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST choppable trees: %d"), Nodes);
+		Self->bLazyNodes = CVarLazyNodes.GetValueOnGameThread() != 0 && !FParse::Param(FCommandLine::Get(), TEXT("ForestEagerNodes"));
+		if (!Self->bLazyNodes) for (int32 i = 0; i < Self->Fellable.Num(); ++i) Self->SpawnNode(i);
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST choppable trees: %d (%s), %d node actors now"), Self->Fellable.Num(), Self->bLazyNodes ? TEXT("nodes spawned lazily near players") : TEXT("all spawned"), Self->Nodes.Num());
+		if (Self->bLazyNodes) Self->SetActorTickEnabled(true);
 		// the grass thins under every crown; the town's broadleaves also drop leaves in their own colour (AutumnDecor), the forest's none
 		// (hundreds of thousands of leaves), nor do conifers
 		for (const FPut& P : Puts)
@@ -1057,13 +1063,107 @@ void AOakForest::ApplyReach()
 	}
 	if (ShadowSets.Num() && HasActorBegunPlay()) UpdateShadows(true);
 }
-
 void AOakForest::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	UpdateShadows(false);
-	UpdateBandFade();
+	if (ShadowSets.Num())
+	{
+		UpdateShadows(false);
+		UpdateBandFade();
+	}
+	UpdateNodes();
 }
+
+AOakForest* AOakForest::Instance(UWorld* World)
+{
+	return GForest.IsValid() && GForest->GetWorld() == World ? GForest.Get() : nullptr;
+}
+
+// ------------------------------------------------------------------ the lazy nodes
+AOakTreeNode* AOakForest::SpawnNode(int32 Index)
+{
+	if (!Fellable.IsValidIndex(Index)) return nullptr;
+	if (const TWeakObjectPtr<AOakTreeNode>* Old = Nodes.Find(Index)) if (Old->IsValid()) return Old->Get();
+	const FFellable& F = Fellable[Index];
+	FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AOakTreeNode* N = GetWorld()->SpawnActor<AOakTreeNode>(F.Tree.GetLocation(), FRotator::ZeroRotator, SP);
+	if (!N) return nullptr;
+	N->Forest = this; N->Index = Index;
+	const float H = Kinds[F.Kind].TrunkH * F.Tree.GetScale3D().Z + 300.f;
+	N->Setup(IsSpruce(F.Kind) ? ETreeKind::Pine : ETreeKind::Oak, F.Radius, H);
+	Nodes.Add(Index, N);
+	++NodesSpawned;
+	return N;
+}
+
+// Every tick: the trees within jeeb.Forest.NodeReach of any player this machine knows (the server: all of them; a player's machine: its own)
+// get their node; the nodes past that plus 10 m go again, unless the tree is felled or being worked (the server's felled nodes hold the
+// regrow timer). A chop needs a node on both sides: the player's machine finds it to ask, the server finds it by place to decide; the
+// server's reach is the same as the player's (35 m against a swing of 4 m or so), so its node is there when the request comes.
+void AOakForest::UpdateNodes()
+{
+	if (!bLazyNodes) return;
+	UWorld* W = GetWorld();
+	if (!W) return;
+	const float R = FMath::Max(500.f, CVarNodeReach.GetValueOnGameThread() * 100.f), Out = R + 1000.f;
+	TArray<FVector2D> Pawns;
+	for (FConstPlayerControllerIterator It = W->GetPlayerControllerIterator(); It; ++It)
+		if (const APlayerController* PC = It->Get()) if (const APawn* P = PC->GetPawn()) Pawns.Add(FVector2D(P->GetActorLocation()));
+	for (const FVector2D& C : Pawns)
+	{
+		const int32 C0x = FMath::FloorToInt((C.X - R) / 2000.f), C1x = FMath::FloorToInt((C.X + R) / 2000.f);
+		const int32 C0y = FMath::FloorToInt((C.Y - R) / 2000.f), C1y = FMath::FloorToInt((C.Y + R) / 2000.f);
+		for (int32 cx = C0x; cx <= C1x; ++cx)
+			for (int32 cy = C0y; cy <= C1y; ++cy)
+				if (const TArray<int32>* L = NodeCells.Find(FIntPoint(cx, cy)))
+					for (int32 i : *L)
+						if (FVector2D::DistSquared(FVector2D(Fellable[i].Tree.GetLocation()), C) < R * R) SpawnNode(i);
+	}
+	for (TMap<int32, TWeakObjectPtr<AOakTreeNode>>::TIterator It(Nodes); It; ++It)
+	{
+		AOakTreeNode* N = It.Value().Get();
+		if (!N) { It.RemoveCurrent(); continue; }
+		if (!N->CanRemove()) continue;
+		const FVector2D At(Fellable[It.Key()].Tree.GetLocation());
+		bool bNear = false;
+		for (const FVector2D& C : Pawns) if (FVector2D::DistSquared(At, C) < Out * Out) { bNear = true; break; }
+		if (bNear) continue;
+		N->Destroy();
+		It.RemoveCurrent();
+		++NodesRemoved;
+	}
+	const double Now = FPlatformTime::Seconds();
+	if (Nodes.Num() != NodesLogged && Now - NodesLogAt > 2.0)
+	{
+		NodesLogged = Nodes.Num(); NodesLogAt = Now;
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST nodes: %d live of %d trees (%d spawned, %d removed so far), %d felled, %d players"), Nodes.Num(), Fellable.Num(), NodesSpawned, NodesRemoved, FelledSet.Num(), Pawns.Num());
+	}
+}
+
+// A player's machine: what the server says is felled
+void AOakForest::SyncNodeCharges(const TArray<FNodeCharge>& List)
+{
+	TSet<int32> Want;
+	for (const FNodeCharge& N : List)
+	{
+		if (N.Charges > 0) continue;
+		const FVector L = N.Loc;
+		const FIntPoint K(FMath::FloorToInt(L.X / 2000.f), FMath::FloorToInt(L.Y / 2000.f));
+		for (int32 dx = -1; dx <= 1; ++dx)
+			for (int32 dy = -1; dy <= 1; ++dy)
+				if (const TArray<int32>* Cell = NodeCells.Find(FIntPoint(K.X + dx, K.Y + dy)))
+					for (int32 i : *Cell)
+					{
+						const FVector T = Fellable[i].Tree.GetLocation();
+						if (FVector::DistSquared2D(T, L) < 9.f && FMath::Abs(T.Z - L.Z) < 3.f) Want.Add(i);
+					}
+	}
+	const int32 Before = FelledSet.Num();
+	for (int32 i : Want) SetFelled(i, true);
+	for (int32 i : TArray<int32>(FelledSet.Array())) if (!Want.Contains(i)) SetFelled(i, false);
+	if (Before != FelledSet.Num() || Want.Num()) UE_LOG(LogTemp, Log, TEXT("JEEBFOREST synced from the server's list: %d felled (was %d), %d node actors live"), FelledSet.Num(), Before, Nodes.Num());
+}
+
 
 // This player's camera (local visuals only)
 bool AOakForest::CameraNow(FVector& Out) const
@@ -1269,10 +1369,14 @@ void AOakForest::UpdateShadows(bool bForce)
 AOakTreeNode::AOakTreeNode(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.DoNotCreateDefaultSubobject(TEXT("TrunkCollision")))
 {
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("JeebFastRegrow"))) RespawnSeconds = 45.f;   // (tests: a felled tree grows back in 45 s, not 5 minutes)
+#endif
 }
 
 void AOakTreeNode::OnChargesChanged(int32 Remaining, int32 Max)
 {
+	bDepleted = Remaining <= 0;
 	if (AOakForest* F = Forest.Get()) F->SetFelled(Index, Remaining <= 0);
 }
 
@@ -1281,6 +1385,7 @@ void AOakForest::SetFelled(int32 Index, bool bFelled)
 	if (!Fellable.IsValidIndex(Index) || Fellable[Index].bFelled == bFelled) return;
 	FFellable& F = Fellable[Index];
 	F.bFelled = bFelled;
+	if (bFelled) FelledSet.Add(Index); else FelledSet.Remove(Index);
 	const FVector At = F.Tree.GetLocation();
 	UE_LOG(LogTemp, Log, TEXT("JEEBFOREST tree %d %s at %.0f %.0f %.0f"), Index, bFelled ? TEXT("felled") : TEXT("grown back"), At.X, At.Y, At.Z);
 	// the trunk solid: a stump's height (to 60 cm above the foot), or the whole trunk again

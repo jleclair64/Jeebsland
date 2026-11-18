@@ -31,6 +31,7 @@ namespace JeebOakForest
 }
 
 class AOakForest;
+struct FNodeCharge;
 
 // One of the forest's (and Oak Hill's) pack trees as a choppable node (owner, 2026-11-17: "Can we make the trees choppable?"). It is only
 // the gameplay part, like Blackrock's AChoppableTree but without its trunk capsule (the forest's hidden trunk solids block already): the
@@ -46,9 +47,12 @@ public:
 	AOakTreeNode(const FObjectInitializer& ObjectInitializer);
 	TWeakObjectPtr<AOakForest> Forest;
 	int32 Index = INDEX_NONE;
+	// Removable when nobody is working it and it is whole (a felled tree's node holds its regrow timer, so it stays)
+	bool CanRemove() const { return !bDepleted && !IsBeingGathered(); }
 
 protected:
 	virtual void OnChargesChanged(int32 Remaining, int32 Max) override;
+	bool bDepleted = false;
 };
 
 UCLASS()
@@ -106,6 +110,10 @@ public:
 	// A choppable tree chopped down (bFelled) or grown back: its drawn tree and shadow go, its trunk solid drops to a stump's height and a
 	// stump is drawn in its place, and back again. Every machine (the server: the solid only).
 	void SetFelled(int32 Index, bool bFelled);
+	// A player's machine: the server's list of felled and part-used nodes (AKnightGameState::OnRep_Nodes) puts every tree it names in its
+	// felled state and grows back the rest, with or without a node actor (they are lazy: a late joiner has none yet)
+	void SyncNodeCharges(const TArray<FNodeCharge>& List);
+	static AOakForest* Instance(UWorld* World);
 
 private:
 	struct FFellable
@@ -117,9 +125,20 @@ private:
 		float Radius = 20.f;
 		int32 Stump = -1;                  // (its instance in FelledStumps, once felled)
 		bool bFelled = false;
+		uint8 Kind = 0;                   // (its tree kind, for its node)
 	};
 	TArray<FFellable> Fellable;
 	UPROPERTY() UInstancedStaticMeshComponent* TrunkSolids = nullptr;
 	UPROPERTY() UInstancedStaticMeshComponent* FelledStumps = nullptr;
 	FBox StumpBounds = FBox(ForceInit);
+	// The choppable trees' nodes, lazily: a node actor exists only while a player is near its tree (UpdateNodes, every tick), or while it is
+	// felled (on the server: it holds the regrow timer; the clients keep the felled look in Fellable and FelledSet)
+	TMap<FIntPoint, TArray<int32>> NodeCells;                    // (20 m cells: Fellable indices)
+	TMap<int32, TWeakObjectPtr<AOakTreeNode>> Nodes;             // (the live ones)
+	TSet<int32> FelledSet;
+	bool bLazyNodes = false;
+	int32 NodesSpawned = 0, NodesRemoved = 0, NodesLogged = -1;
+	double NodesLogAt = 0.0;
+	AOakTreeNode* SpawnNode(int32 Index);
+	void UpdateNodes();
 };

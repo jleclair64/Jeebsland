@@ -729,6 +729,8 @@ void AKnightGameState::OnRep_Nodes()
 		for (const FNodeCharge& N : NodeCharges) if (FVector::DistSquared2D(N.Loc, L) < 9.f && FMath::Abs(N.Loc.Z - L.Z) < 3.f) { C = N.Charges; break; }
 		It->ApplyCharges(C);
 	}
+	// the forest's trees are lazy (no node actor until a player is near): they get their felled look from the list itself
+	if (AOakForest* Forest = AOakForest::Instance(GetWorld())) Forest->SyncNodeCharges(NodeCharges);
 }
 
 void JeebCombat::SendToAll(const UWorld* World, const FVector& Loc, int32 Amount, int32 Type)
