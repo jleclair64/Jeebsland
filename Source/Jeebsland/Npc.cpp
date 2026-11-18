@@ -4,9 +4,15 @@
 #include "Terrain.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "NpcBody.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
+#include "Engine/World.h"
+#include "Misc/CommandLine.h"
+#include "EngineUtils.h"
+#include "TimerManager.h"
 
 ANpc::ANpc()
 {
@@ -56,6 +62,119 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	VillagerIdx = FMath::Clamp(InVillagerIdx, 0, JeebLore::NumVillagers - 1);
 	HomeYaw = GetActorRotation().Yaw;
 
+	// Villagers' and quest givers' sizes (Tobin is a boy)
+	const bool bQuestP = (Role == ENpcRole::QuestGiver);
+	if (Role == ENpcRole::Villager || bQuestP)
+	{
+		const float Sc = bQuestP ? Look.Scale : (VillagerIdx == 1) ? 0.78f : (VillagerIdx == 5 ? 0.94f : 1.f);
+		if (Sc != 1.f)
+		{
+			SetActorScale3D(FVector(Sc));
+			HalfH = 92.f * Sc;
+			AddActorWorldOffset(FVector(0.f, 0.f, -92.f * (1.f - Sc)));
+		}
+	}
+	LastLoc = GetActorLocation();
+	BuildBody();
+}
+
+// The person's own garment colour: the old body's tunic (or robe), dyed onto a model's main garment too
+FLinearColor ANpc::OwnColour() const
+{
+	static const FLinearColor VTunic[JeebLore::NumVillagers] = {
+		{0.35f,0.20f,0.45f,1.f}, {0.25f,0.45f,0.30f,1.f}, {0.40f,0.10f,0.12f,1.f}, {0.40f,0.32f,0.20f,1.f}, {0.80f,0.72f,0.55f,1.f},
+		{0.18f,0.18f,0.20f,1.f}, {0.15f,0.35f,0.50f,1.f}, {0.45f,0.30f,0.15f,1.f}, {0.55f,0.18f,0.35f,1.f}, {0.50f,0.40f,0.28f,1.f} };
+	if (Role == ENpcRole::QuestGiver) return Look.Tunic;
+	if (Folk == 2) return Role == ENpcRole::Banker ? FLinearColor(0.10f, 0.12f, 0.36f) : FLinearColor(0.28f, 0.14f, 0.40f);
+	switch (Role)
+	{
+	case ENpcRole::Villager:   return VTunic[VillagerIdx];
+	case ENpcRole::Banker:     return FLinearColor(0.08f, 0.14f, 0.12f);
+	case ENpcRole::Blacksmith: return FLinearColor(0.30f, 0.30f, 0.33f);
+	case ENpcRole::GateKnight: return FLinearColor(0.60f, 0.62f, 0.68f);
+	default:                   return FLinearColor(0.50f, 0.22f, 0.12f);
+	}
+}
+
+void ANpc::BuildBody()
+{
+	BuiltSetting = JeebPeople::Setting();
+	if (JeebPeople::Enabled() && BuildModel()) return;
+	BuildShapes();
+}
+
+// Takes the body apart (jeeb.Npc.Models changed): every component under BodyRoot
+void ANpc::ClearBody()
+{
+	TArray<USceneComponent*> Kids;
+	BodyRoot->GetChildrenComponents(true, Kids);
+	for (USceneComponent* K : Kids) if (K) K->DestroyComponent();
+	HeadPivot = ArmRPivot = ArmLPivot = LegLPivot = LegRPivot = nullptr;
+	Body = nullptr;
+	ModelDef = nullptr;
+	BodyRoot->SetRelativeScale3D(FVector(1.f));
+	BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -92.f));
+}
+
+// A skinned Meshy body (NpcBody.h): which one and its colour from PeopleWho.csv; false keeps the old shapes
+bool ANpc::BuildModel()
+{
+	static const TCHAR* RoleKeys[] = { TEXT("shopkeeper"), TEXT("blacksmith"), TEXT("gateknight"), TEXT("villager"), TEXT("banker"), TEXT("questgiver") };
+	FString RoleKey = RoleKeys[FMath::Clamp(int32(Role), 0, 5)];
+	if (Role == ENpcRole::Villager) RoleKey += FString::FromInt(VillagerIdx);
+	const FString FolkKey = Folk == 1 ? TEXT("troll") : Folk == 2 ? TEXT("wizard") : TEXT("");
+	FString Short;
+	GetNpcName().Split(TEXT(","), &Short, nullptr);   // ("Sir Dunmore, the Trader": also "Sir Dunmore")
+	TArray<FString> Keys = { GetNpcName(), Short, PersonKey.IsNone() ? FString() : PersonKey.ToString() };
+	if (!FolkKey.IsEmpty()) { Keys.Add(FolkKey + TEXT(":") + RoleKey); Keys.Add(FolkKey); }
+	Keys.Add(RoleKey);
+	JeebPeople::FWho Who = JeebPeople::Find(Keys);
+	if (!TestModel.IsEmpty()) { Who.Model = TestModel; Who.bFound = true; }   // (test pictures: -PeopleLineup)
+	if (!Who.bFound)
+	{
+		// (no row: by role; a quest giver with light hair is one of the town's elders)
+		const bool bLightHair = Look.Hair.GetLuminance() > 0.55f;
+		Who.Model = Role == ENpcRole::Blacksmith ? TEXT("Smith") : Role == ENpcRole::Banker ? TEXT("Banker") : Role == ENpcRole::GateKnight ? TEXT("Guard")
+			: (Role == ENpcRole::QuestGiver && bLightHair) ? TEXT("Elder") : TEXT("Townsman");
+	}
+	if (Who.Model.IsEmpty() || Who.Model.Equals(TEXT("shapes"), ESearchCase::IgnoreCase)) return false;
+	const JeebPeople::FModel* M = JeebPeople::Model(Who.Model);
+	if (!M) return false;
+
+	USkeletalMeshComponent* S = NewObject<USkeletalMeshComponent>(this);
+	S->SetupAttachment(BodyRoot);
+	S->SetRelativeRotation(FRotator(0.f, M->Yaw, 0.f));
+	S->SetSkeletalMesh(M->Mesh);
+	S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	S->SetGenerateOverlapEvents(false);
+	S->SetCanEverAffectNavigation(false);
+	// cheap when far or unseen: no pose updates off screen, fewer updates at a distance, gone past 90 m
+	S->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+	S->bEnableUpdateRateOptimizations = true;
+	S->LDMaxDrawDistance = 9000.f;
+	S->CachedMaxDrawDistance = 9000.f;
+	S->SetAnimInstanceClass(UNpcAnimInstance::StaticClass());
+	S->RegisterComponent();
+	if (UMaterialInstanceDynamic* D = S->CreateDynamicMaterialInstance(0))
+	{
+		D->SetVectorParameterValue(TEXT("Tint"), Who.Tint.R >= 0.f ? Who.Tint : OwnColour());
+		D->SetScalarParameterValue(TEXT("GarmentLum"), M->GarmentLum);
+	}
+	if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(S->GetAnimInstance()))
+	{
+		// (each person starts their idle somewhere else, the same on every machine)
+		const float StartAt = float(GetTypeHash(GetNpcName()) % 1000u) * 0.0137f;
+		A->SetClips(M->Clips[0], M->Clips[1], M->Clips[2], StartAt);
+	}
+	Body = S;
+	ModelDef = M;
+	bShadowOn = true;
+	return true;
+}
+
+// The old body built from simple shapes (also every dedicated server's, and Steele Creek's trolls')
+void ANpc::BuildShapes()
+{
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -108,13 +227,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	if (bVill)
 	{
 		if (bQuest) Tunic = Look.Tunic; else if (!bWizard) Tunic = VTunic[VillagerIdx];
-		const float Sc = bQuest ? Look.Scale : (VillagerIdx == 1) ? 0.78f : (VillagerIdx == 5 ? 0.94f : 1.f);   // Tobin is a boy
-		if (Sc != 1.f)
-		{
-			SetActorScale3D(FVector(Sc));
-			HalfH = 92.f * Sc;
-			AddActorWorldOffset(FVector(0.f, 0.f, -92.f * (1.f - Sc)));
-		}
+		// (their size is set in Setup)
 	}
 
 	// Legs
@@ -310,6 +423,7 @@ void ANpc::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	AnimT += DeltaSeconds;
+	if (BuiltSetting != JeebPeople::Setting() && !IsRunningDedicatedServer()) { ClearBody(); BuildBody(); }   // (jeeb.Npc.Models changed)
 
 	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
 	const FVector Me = GetActorLocation();
@@ -363,6 +477,25 @@ void ANpc::Tick(float DeltaSeconds)
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : 70.f));
 	}
 
+	// A skinned body (NpcBody.h): idle, walk (its feet kept to the ground's speed) or talk, the head following you a little
+	if (Body)
+	{
+		const FVector Now = GetActorLocation();
+		const float Moved = DeltaSeconds > 0.f ? FVector::Dist2D(Now, LastLoc) / DeltaSeconds : 0.f;
+		LastLoc = Now;
+		MoveSpeed = FMath::FInterpTo(MoveSpeed, FMath::Min(Moved, 400.f), DeltaSeconds, 8.f);
+		const float Rel = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw);
+		const int32 State = bTalking ? 2 : (WalkBlend > 0.35f ? 1 : 0);
+		const float Rate = FMath::Clamp(MoveSpeed / (ModelDef->WalkSpeed * GetActorScale3D().X), 0.4f, 2.f);
+		if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(Body->GetAnimInstance()))
+			A->Drive(State, Rate, (bNear && State != 1) ? FMath::Clamp(Rel, -55.f, 55.f) : 0.f);
+		BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -92.f - ModelDef->WalkSink * WalkBlend));
+		// a shadow only within 30 m of the player (the far ones cost the most and show the least)
+		const bool bShadow = DistToPlayer < 3000.f;
+		if (bShadow != bShadowOn) { bShadowOn = bShadow; Body->SetCastShadow(bShadow); }
+		return;
+	}
+
 	// Head follows you a little
 	if (HeadPivot)
 	{
@@ -396,3 +529,72 @@ void ANpc::Tick(float DeltaSeconds)
 	if (ArmLPivot) ArmLPivot->SetRelativeRotation(FRotator(ArmL, 0.f, 0.f));
 	if (BodyRoot) BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -92.f + 1.2f * FMath::Sin(AnimT * 2.f)));
 }
+
+#if !UE_BUILD_SHIPPING
+// (test pictures, 2026-11-18: -PeopleLineup=<yaw> puts one of each body in a row 9 m in front of where the knight starts, facing <yaw>
+// (180 toward him); -PeopleWalk sends them back and forth 6 m toward -X; -PeopleTalk holds them in the talk; -PeopleModels=A,B,... picks the bodies)
+namespace
+{
+	struct FPeopleLineup
+	{
+		FPeopleLineup()
+		{
+			FWorldDelegates::OnPostWorldInitialization.AddLambda([](UWorld* W, const UWorld::InitializationValues)
+			{
+				if (!W || !W->IsGameWorld()) return;
+				// (-PeopleTalkAll: everyone in the talk from 3 s; -PeopleBeside=<quest key>: that person stands 2.2 m to the knight's right
+				// (+Y) where he starts, facing him, so his name tag and their quest mark show)
+				FString Beside;
+				const bool bTalkAll = FParse::Param(FCommandLine::Get(), TEXT("PeopleTalkAll"));
+				if (bTalkAll || FParse::Value(FCommandLine::Get(), TEXT("PeopleBeside="), Beside))
+					W->OnWorldBeginPlay.AddLambda([W, bTalkAll, Beside]()
+					{
+						FTimerHandle H;
+						W->GetTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([W, bTalkAll, Beside]()
+						{
+							const APawn* Me = UGameplayStatics::GetPlayerPawn(W, 0);
+							for (TActorIterator<ANpc> It(W); It; ++It)
+							{
+								if (bTalkAll) It->SetTalking(true);
+								if (Me && !Beside.IsEmpty() && It->GetPersonKey() == FName(*Beside))
+								{
+									const FVector At = Me->GetActorLocation() + FVector(0.f, 220.f, 0.f);
+									It->SetActorLocation(FVector(At.X, At.Y, It->GetActorLocation().Z));
+									It->SetActorRotation(FRotator(0.f, -90.f, 0.f));
+								}
+							}
+						}), 3.f, false);
+					});
+				float Yaw = 0.f;
+				if (!FParse::Value(FCommandLine::Get(), TEXT("PeopleLineup="), Yaw)) return;
+				W->OnWorldBeginPlay.AddLambda([W, Yaw]()
+				{
+					FString List = TEXT("Townsman,Townswoman,Elder,Smith,Banker,Guard");
+					FParse::Value(FCommandLine::Get(), TEXT("PeopleModels="), List, false);
+					TArray<FString> Names;
+					List.ParseIntoArray(Names, TEXT(","));
+					const bool bWalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleWalk")), bTalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleTalk"));
+					float X0 = 900.f, Y0 = 0.f;
+					FParse::Value(FCommandLine::Get(), TEXT("PeopleAtX="), X0);
+					FParse::Value(FCommandLine::Get(), TEXT("PeopleAtY="), Y0);
+					for (int32 i = 0; i < Names.Num(); ++i)
+					{
+						const float Y = Y0 + (i - (Names.Num() - 1) * 0.5f) * 170.f;
+						FActorSpawnParameters SP;
+						SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+						const float Gz = W->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(X0, Y);
+						ANpc* N = W->SpawnActor<ANpc>(FVector(X0, Y, Gz + 92.f), FRotator(0.f, Yaw, 0.f), SP);
+						if (!N) continue;
+						N->TestModel = Names[i];
+						FNpcLook L; L.Name = Names[i];
+						N->SetupPerson(FName(*(TEXT("Lineup") + Names[i])), L);
+						if (bWalk) N->SetPatrol({ FVector2D(X0, Y), FVector2D(X0 - 600.f, Y) });
+						if (bTalk) N->SetTalking(true);
+						UE_LOG(LogTemp, Log, TEXT("JEEBPEOPLE lineup %s at %.0f,%.0f"), *Names[i], X0, Y);
+					}
+				});
+			});
+		}
+	} GPeopleLineup;
+}
+#endif

@@ -1,0 +1,36 @@
+Who,Model,Tint
+# Who wears which body (People.csv) and the colour of their main garment (tunic, dress, robe, shirt or tabard), red green blue 0 to 1.
+# Who: a person's name as shown over their head (or its part before a comma), a quest giver's Key (QuestsPeople.csv), troll or wizard (Steele Creek's folk, also wizard:banker),
+# or a role: shopkeeper, blacksmith, banker, gateknight, villager0 to villager9 (the ten storytellers, Lore.h). The first match wins in that order.
+# Model "shapes": the old body built from simple shapes. Tint empty: the person's own colour from before (their tunic in the code, or QuestsPeople.csv Tunic).
+# No row at all: shopkeeper and villagers Townsman, blacksmith Smith, banker Banker, gate knights Guard, quest givers Townsman (Elder if their Hair is light).
+# Steele Creek's trolls keep the old shapes until a troll model exists (the roadmap's troll smiths).
+troll,shapes,
+# Blackrock: rich and cold
+shopkeeper,Townsman,0.12 0.30 0.16
+blacksmith,Smith,
+banker,Banker,0.07 0.10 0.16
+gateknight,Guard,0.42 0.05 0.05
+# the ten storytellers (Mabry, Tobin, Dame Orsolya, Garrick, Wren, Old Fenwick, Sable, Brother Ansel, Peregrine, Hettie)
+villager0,Elder,
+villager1,Townsman,
+villager2,Townswoman,
+villager3,Townsman,
+villager4,Townswoman,
+villager5,Townsman,
+villager6,Townswoman,
+villager7,Townsman,
+villager8,Townsman,
+villager9,Townswoman,
+# Oak Hill's quest givers (QuestsPeople.csv keys)
+Marta,Elder,
+Pell,Townsman,
+Nan,Elder,
+Corin,Guard,
+Wil,Townsman,
+# Steele Creek (SteeleCreekTown.cpp): wizards in the banker's robe, knights in the guard's mail and tabard
+wizard,Banker,
+Sir Dunmore,Guard,0.16 0.22 0.36
+Sir Kell of the Ridge,Guard,0.16 0.22 0.36
+Dame Rhosyn,Guard,0.16 0.22 0.36
+Sir Oswin,Guard,0.16 0.22 0.36
