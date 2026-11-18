@@ -9,9 +9,11 @@ tools = unreal.AssetToolsHelpers.get_asset_tools()
 lib = unreal.EditorAssetLibrary
 mel = unreal.MaterialEditingLibrary
 proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-work = os.path.join(proj, "Saved", "KnightBuild", "TownLab")
+work = os.environ.get("TL_WORK") or os.path.join(proj, "Saved", "KnightBuild", "TownLab")   # (TL_WORK: another bake folder, the war buildings' TownLabWar)
 col_work = os.path.join(proj, "Saved", "KnightBuild", "Buildings")
 folder = "/Game/TownLab/Buildings"   # (never /Game/Buildings: that folder belongs to the town pipeline)
+base_folder = folder   # (M_TL_Building and T_NoGlow live here)
+folder = os.environ.get("TL_FOLDER") or folder   # (TL_FOLDER, with TL_ONLY: the new meshes, pictures and instances go there, e.g. /Game/TownLab/War)
 NANITE = {"TL_House", "TL_Store"}
 NAMES = sorted(n[:-4] for n in os.listdir(work) if n.endswith(".fbx"))
 COL_FROM = {"TL_House": "OakHillHouse_300k", "TL_Store": "OakHillStore_300k"}
@@ -24,6 +26,9 @@ COL_FROM.update({"TL_Bank": "OakHillBank_300k", "TL_BankStall": "BankStall_300k"
 # build-c (2026-11-14): the market stall and the potion stall
 NANITE |= {"TL_MarketStall", "TL_PotionStall"}
 COL_FROM.update({"TL_MarketStall": "GeneralStore_300k", "TL_PotionStall": "PotionStall_300k"})
+# the war buildings (2026-11-18): the fort, the watchtower and the castle ruins, into /Game/TownLab/War (Tools/BuildWarBuildings.ps1)
+NANITE |= {"TL_Fort", "TL_Watchtower", "TL_Ruins"}
+COL_FROM.update({"TL_Fort": "OakHillFort_300k", "TL_Watchtower": "OakHillWatchtower_300k", "TL_Ruins": "OakHillRuins_300k"})
 # TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just those buildings onto the existing M_TL_Building, leaving it, the other
 # buildings and the shared decor untouched (several agents rebuild their own designs at once)
 ONLY = [n for n in os.environ.get("TL_ONLY", "").split(",") if n]
@@ -216,8 +221,8 @@ def has_colours(sm):
 
 first = NAMES[0]
 if ONLY:
-    no_glow = lib.load_asset(folder + "/T_NoGlow")
-    parent = lib.load_asset(folder + "/M_TL_Building")
+    no_glow = lib.load_asset(base_folder + "/T_NoGlow")
+    parent = lib.load_asset(base_folder + "/M_TL_Building")
     if parent is None or no_glow is None: raise RuntimeError("BUILDDIAG TL_ONLY needs the existing M_TL_Building and T_NoGlow")
 else:
     no_glow = pic("T_NoGlow", True)          # black: the default GlowTex, and the glow of any building without lit windows

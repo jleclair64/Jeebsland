@@ -141,6 +141,13 @@ namespace JeebOakHill
 			{ TEXT("GeneralStore"),       0.7f,  7.7f,   5.39f,  false, 90.f,  -533.0f, 526.0f, -374.8f, 376.8f },
 			{ TEXT("BankStall"),          0.7f,  7.7f,   6.62f,  false, 90.f,  -508.4f, 524.3f, -459.6f, 265.1f },
 			{ TEXT("PotionStall"),        0.8f,  8.8f,   5.96f,  false, 90.f,  -525.7f, 530.3f, -283.3f, 293.4f, 1.0f },
+			// The war buildings (2026-11-18, Meshy, Docs/TownBuildings.md): one fort model used twice, the round watchtower and the
+			// castle ruins, drawn at their own size (Scale 1: building_clean.py sized them). Their door (the fort's gate, the tower's door,
+			// the ruins' great arch) is on their +Y like the others. They stand on their plots without a level pad (FPlot bLevel false):
+			// ATownLabTown sets each on the lowest ground under its walls, its stone footing running into the slope
+			{ TEXT("OakHillFort"),        1.0f,  14.5f,  5.83f,  false, 90.f,  -709.6f, 709.8f, -286.4f, 282.8f },
+			{ TEXT("OakHillWatchtower"),  1.0f,  5.3f,   5.31f,  false, 90.f,  -235.8f, 236.0f, -234.3f, 234.2f },
+			{ TEXT("OakHillRuins"),       1.0f,  19.0f,  10.24f, false, 90.f,  -892.1f, 913.5f, -493.7f, 490.7f },
 		};
 		return M;
 	}
@@ -227,12 +234,16 @@ namespace JeebOakHill
 			// river bank (the river doesn't move with the town)
 			auto E = [&](const TCHAR* Name, float Px, float Py, float W, float H, float Rot, EPlot K, bool bLevel) { A.Add({ Name, nullptr, Px, Py, W, H, Rot, K, bLevel }); };
 			E(TEXT("Boxing Ring"), 255.f, 620.f, 64.f, 72.f, 0.f, EPlot::Empty, true);
-			E(TEXT("Castle Ruins"), 240.f, 95.f, 128.f, 64.f, 20.f, EPlot::Empty, false);
+			// The war buildings (2026-11-18), in the same order as the empty plots they were. The forts and the watchtower aren't
+			// levelled (bLevel false: they stand on the river bank and the ground stays as it was); the ruins are, as a house is (left
+			// as it was, the castle knoll's top rose through their nave to the window sills)
+			auto W = [&](const TCHAR* Name, const TCHAR* Model, float Px, float Py, float Wd, float Ht, float Rot) { B(Name, Model, Px, Py, Wd, Ht, Rot); A.Last().bLevel = false; };
+			B(TEXT("Castle Ruins"), TEXT("OakHillRuins"), 240.f, 95.f, 128.f, 64.f, 20.f);
 			E(TEXT("Garden"), 562.f, 440.f, 36.f, 152.f, 0.f, EPlot::Empty, false);
 			E(TEXT("Graveyard"), 470.f, 735.f, 120.f, 120.f, 0.f, EPlot::EmptyRound, false);
-			E(TEXT("North Fort"), -57.f, 205.f, 44.f, 104.f, 10.f, EPlot::Empty, false);
-			E(TEXT("South Fort"), -93.f, 615.f, 44.f, 104.f, 0.f, EPlot::Empty, false);
-			E(TEXT("Watchtower"), 155.f, 180.f, 40.f, 40.f, 0.f, EPlot::EmptyRound, false);
+			W(TEXT("North Fort"), TEXT("OakHillFort"), -57.f, 205.f, 44.f, 104.f, 10.f);
+			W(TEXT("South Fort"), TEXT("OakHillFort"), -60.f, 615.f, 44.f, 104.f, 0.f);   // (the plan's -93 put its west half on the bank's slope, 3 m from the water: 4.6 m further east)
+			W(TEXT("Watchtower"), TEXT("OakHillWatchtower"), -31.f, 103.f, 40.f, 40.f, 0.f);   // (northwest beyond the north fort, on the bank: the plan's 140,195 was pushed 13 m into the houses by the spacing pass and shoved a house 9 m)
 			E(TEXT("Bridge"), -191.f, 410.f, 179.f, 42.f, 0.f, EPlot::Empty, false);
 			E(TEXT("Oak Lawn"), 255.f, 410.f, 2.f * LawnR, 2.f * LawnR, 0.f, EPlot::Lawn, false);
 			// The real models are a little bigger than some plan boxes: a building that would stand on a road steps back from it

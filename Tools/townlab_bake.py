@@ -52,6 +52,8 @@ GRADE = {
     "OakHillBank_300k":        dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-3.0, 1.0, -3.0, 1.05), thatch=(-6.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
     "BankStall_300k":          dict(plaster=(5.0, 0.5, 3.0, 1.0), wood=(-2.0, 0.5, -1.5, 1.0), thatch=(-2.0, 0.5, -0.5, 1.0), stone=(5.0, 0.5, 3.0, 1.0)),   # (its arcade wall lifted: review read it as grey concrete)
     "OakHillSmith_300k":       dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-8.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 4.0, 1.0)),
+    # the castle ruins (war buildings 2026-11-18): pale old stone, no plaster; its pale stone must not turn to the houses' butter cream
+    "OakHillRuins_300k":       dict(plaster=(0.0, 0.5, 2.5, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-3.0, 0.0, 0.0, 1.0), stone=(1.0, 0.5, 3.0, 1.0)),
     "OakHillCornerHouse_300k": dict(plaster=(2.0, 1.5, 6.0, 1.0), wood=(-4.0, 1.0, -3.0, 1.05), thatch=(-9.0, 2.0, -2.0, 0.9), stone=(2.0, 1.0, 5.0, 1.0)),
     # build-c's stalls (2026-11-14): each keeps its own colours (the market stall's red-and-cream striped roof and goods, the potion
     # stall's dark timber), only nudged toward the town's rich brown wood and warm cream
@@ -99,6 +101,9 @@ AO_STRENGTH = 0.42          # how much of the occlusion darkens the colour
 # logs near black. Per design: (how much darkens the colour, how much of it reaches the material's AO channel) and the chroma gain.)
 AO_BY = {"GeneralStore_300k": (0.12, 0.4), "PotionStall_300k": (0.18, 0.5), "BankStall_300k": (0.18, 0.18 / AO_STRENGTH)}   # (build-a: the bank stall's open arcade sits under its roof, so full occlusion greyed its back wall)
 CHROMA_BY = {"GeneralStore_300k": 1.0, "PotionStall_300k": 1.08}
+# (war buildings 2026-11-18: the castle ruins are open walls with no roof, two faces and deep window reveals, and their occlusion bake came
+# out dark and blotchy (mean 0.17): at the town's 0.42 it painted brown-yellow blotches over the stone. Barely any of it here)
+AO_BY["OakHillRuins_300k"] = (0.08, 0.3)
 AO_TINT = np.array([0.55, 0.38, 0.30], np.float32)   # what deep occlusion tints toward (warm brown, never black)
 AO_BLUR = 2                 # texels at SMALL
 EDGE_GAIN = 0.10            # convex edges this much lighter
