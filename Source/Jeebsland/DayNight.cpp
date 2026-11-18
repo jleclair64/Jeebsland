@@ -27,7 +27,7 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> Sat(TEXT("jeeb.Look.Sat"), 1.2605f, TEXT("Overall colour saturation at noon (eases to 1.0 at the low sun, which is golden enough)"));
 	static TAutoConsoleVariable<float> Contrast(TEXT("jeeb.Look.Contrast"), 1.0176f, TEXT("Overall contrast (the old painterly grade had 0.9)"));
 	static TAutoConsoleVariable<float> Warm(TEXT("jeeb.Look.Warm"), 0.0941f, TEXT("Warmth in the highlights: red up and blue down by this much"));
-	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
+	static TAutoConsoleVariable<float> ShadowCool(TEXT("jeeb.Look.ShadowCool"), 0.f, TEXT("How much the shadows are lifted, a little blue (0.012 was the old lift)"));
 	static TAutoConsoleVariable<float> Bloom(TEXT("jeeb.Look.Bloom"), 0.9076f, TEXT("Bloom intensity (was 0.95 on every pixel)"));
 	static TAutoConsoleVariable<float> BloomThreshold(TEXT("jeeb.Look.BloomThreshold"), -1.f, TEXT("Bloom threshold: -1 every pixel blooms a little; above 0 only what is brighter blooms"));
 	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 18.3529f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
