@@ -16,6 +16,7 @@
 #include "KnightPlayerController.h"
 #include "SteeleCreek.h"
 #include "Terrain.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "UnrealClient.h"
 #include "Misc/Paths.h"
 #include "Engine/World.h"
@@ -69,8 +70,10 @@ struct FTravelTestDriver
 			C->TestStage = 2; Wait(3.f); return;
 		case 2:
 			Log(FString::Printf(TEXT("%s: after 3 s in Steele Creek, %s"), C->IsVisited(Steele) ? TEXT("PASS") : TEXT("FAIL"), *State(C)));
-			C->DoTravel(Oak);   // starts a channel
-			Log(FString::Printf(TEXT("%s: channel started (to Oak Hill)"), C->ChanTown == Oak ? TEXT("PASS") : TEXT("FAIL")));
+			C->TestStage = 20; Wait(0.5f); return;
+		case 20:   // (asks until he stands on the ground: the first seconds after the put-in he may still be settling)
+			if (C->ChanTown < 0 && C->TestClock < 40.f) { const UCharacterMovementComponent* M = K->GetCharacterMovement(); Log(FString::Printf(TEXT("not grounded yet: mode %d custom %d z %.0f vel %.0f %.0f %.0f"), int32(M->MovementMode.GetValue()), int32(M->CustomMovementMode), K->GetActorLocation().Z, M->Velocity.X, M->Velocity.Y, M->Velocity.Z)); C->DoTravel(Oak); Wait(1.f); return; }
+			Log(FString::Printf(TEXT("%s: channel started (to Oak Hill) at test clock %.1f"), C->ChanTown == Oak ? TEXT("PASS") : TEXT("FAIL"), C->TestClock));
 			C->TestStage = 3; Wait(1.2f); return;
 		case 3:
 			PutIn(K, Steele, 300.f);   // walked away (in the test: moved)
@@ -107,6 +110,8 @@ struct FTravelTestDriver
 				const bool bGround = K->GetWorld()->LineTraceSingleByChannel(Hit, P, P - FVector(0.f, 0.f, 400.f), ECC_Visibility);
 				Log(FString::Printf(TEXT("ground %.0f cm under the knight's middle (should be about 90-130)"), bGround ? P.Z - Hit.ImpactPoint.Z : -1.f));
 			}
+			C->TestStage = 91; Wait(3.f); return;
+		case 91:
 			C->DoTravel(Steele);   // refused: the cooldown
 			C->TestStage = 10; Wait(1.f); return;
 		case 10:
@@ -140,7 +145,7 @@ struct FTravelTestDriver
 		case 0:
 			if (C->TestClock < 8.f) return;
 			Log(FString::Printf(TEXT("client start: at %.0f %.0f, %s"), K->GetActorLocation().X, K->GetActorLocation().Y, *State(C)));
-			if (C->IsVisited(Steele)) { Log(TEXT("client RELOAD: the towns that reached this machine: ") + State(C)); C->TestStage = 60; Wait(2.f); return; }
+			if (FParse::Param(FCommandLine::Get(), TEXT("JeebTravelReload"))) { Log(TEXT("client RELOAD: the towns that reached this machine: ") + State(C)); C->TestStage = 60; Wait(2.f); return; }
 			C->TestStage = 1; return;
 		case 1:
 			if (!C->IsVisited(Steele)) { if (C->TestClock > 40.f) { Log(TEXT("FAIL: the client never learned Steele Creek")); C->TestStage = 60; } return; }
@@ -157,7 +162,13 @@ struct FTravelTestDriver
 			if (C->TestClock < DiscAt + 18.f) return;
 			Log(TEXT("client: asking to travel to Oak Hill (Ask -> ServerTravel)"));
 			C->Ask(Oak);
-			C->TestStage = 9; Wait(1.5f); return;
+			C->TestStage = 81; Wait(1.5f); return;
+		case 81:
+		{
+			int32 T0 = -1; float L0 = 0.f;
+			if (!C->Channelling(T0, L0) && C->TestClock < DiscAt + 60.f) { C->TestStage = 8; Wait(2.f); return; }   // (refused while the 10 s of combat run on: ask again)
+			C->TestStage = 9; return;
+		}
 		case 9:
 		{
 			int32 T = -1; float Left = 0.f;

@@ -26,7 +26,7 @@ int32 AKnightHUD::TravelMarkerAt(AKnightCharacter* Knight, float X, float Y, flo
 	const UTravelComponent* Tv = Knight ? Knight->GetTravel() : nullptr;
 	if (!Tv) return -1;
 	int32 Best = -1;
-	float BestD = 11.f;
+	float BestD = 13.f;
 	for (int32 i = 0; i < JeebTravel::Count(); ++i)
 	{
 		if (!Tv->IsVisited(i) || !JeebTravel::Towns()[i].bOpen) continue;
@@ -53,10 +53,10 @@ void AKnightHUD::DrawTravelMarkers(AKnightCharacter* Knight, float X, float Y, f
 		const FVector2D At = MapPoint(JeebTravel::Centre(i), MapView, MapSize, MapZoom, X, Y, S);
 		if (At.X < X + 4.f || At.X > X + S - 4.f || At.Y < Y + 4.f || At.Y > Y + S - 4.f) continue;
 		const bool bHot = i == Hot, bHere = i == Here;
-		const float R = bHot ? 9.5f : 7.5f;
+		const float R = bHot ? 12.f : 9.5f;
 		DrawCircle(At.X, At.Y, R + 1.5f, FLinearColor(0.f, 0.f, 0.f, 0.7f));
 		DrawAnnulus(At.X, At.Y, R, bHere ? FLinearColor(0.8f, 0.85f, 0.95f) : TGold);
-		DrawCircle(At.X, At.Y, bHot ? 4.5f : 3.f, bHere ? FLinearColor(0.8f, 0.85f, 0.95f) : TGold);
+		DrawCircle(At.X, At.Y, bHot ? 5.5f : 4.f, bHere ? FLinearColor(0.8f, 0.85f, 0.95f) : TGold);
 		if (bHot) SetTip({ FString(JeebTravel::Towns()[i].Name), bHere ? FString(TEXT("You are here")) : FString(TEXT("Click to fast travel")) });
 	}
 }
