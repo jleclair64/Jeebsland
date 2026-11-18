@@ -4,7 +4,7 @@
 namespace
 {
 	FSimpleMulticastDelegate GChanged;
-	TAutoConsoleVariable<float> CVarSaturation(TEXT("jeeb.Trees.Saturation"), 0.7f,
+	TAutoConsoleVariable<float> CVarSaturation(TEXT("jeeb.Trees.Saturation"), 0.6996f,
 		TEXT("How colourful the autumn tree leaves are (the DZ forests, the town's trees, the fallen leaves): 1 = the colours as the Dz sliders say, 0 = grey; default 0.7 (2026-11-16: toned back toward Skyrim's Rift and Hogwarts Legacy). Live; looks only."),
 		FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { GChanged.Broadcast(); }), ECVF_Default);
 }

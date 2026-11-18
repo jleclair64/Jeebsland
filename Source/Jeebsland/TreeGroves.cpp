@@ -40,11 +40,11 @@ namespace
 	// Leaf: the world's fallen-leaf colour under them (AutumnDecor.cpp: 0 orange, 1 red, 2 amber, 3 gold, 4 green holdout; -1 none: the green
 	// forest is summer, so it drops no leaves, as the conifers).
 	TAutoConsoleVariable<FString> CVarDzGreen(TEXT("jeeb.Trees.DzGreen"), TEXT("0.2017 0.2723 0.07"), TEXT("Leaf colour of the DZ GREEN test forest, \"r g b\" (live)"), ECVF_Default);
-	TAutoConsoleVariable<FString> CVarDzRed(TEXT("jeeb.Trees.DzRed"), TEXT("0.5 0.07 0.035"), TEXT("Leaf colour of the DZ RED test forest, \"r g b\" (live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarDzRed(TEXT("jeeb.Trees.DzRed"), TEXT("0.3418 0.0113 0.0347"), TEXT("Leaf colour of the DZ RED test forest, \"r g b\" (live)"), ECVF_Default);
 	TAutoConsoleVariable<FString> CVarDzOrange(TEXT("jeeb.Trees.DzOrange"), TEXT("0.6982 0.2459 0.0393"), TEXT("Leaf colour of the DZ ORANGE test forest, \"r g b\" (live)"), ECVF_Default);
 	// The Spruce Forest's needles (owner, 2026-11-16: "colour sliders for the spruce trees"): a tint, 1 1 1 = the pack's own colour. It goes on the pack's
 	// "Leaf Tint" (the _leaf materials), "Branch Tint" (the _branch materials: the needles on the twigs) and the imposters' "Tint" (the far ring); bark and moss stay.
-	TAutoConsoleVariable<FString> CVarSpruce(TEXT("jeeb.Trees.Spruce"), TEXT("0.084 0.7395 2"), TEXT("Needle colour multiplier of every spruce (the sample Spruce Forest, the town and the forest), \"r g b\" (1 1 1 = as the pack has it; the default is a little darker and cooler; live)"), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarSpruce(TEXT("jeeb.Trees.Spruce"), TEXT("0.5126 0.8403 0"), TEXT("Needle colour multiplier of every spruce (the sample Spruce Forest, the town and the forest), \"r g b\" (1 1 1 = as the pack has it; the default is a little darker and cooler; live)"), ECVF_Default);
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GSpruceMids;   // (one per distinct spruce material, shared by the trees)
 	TAutoConsoleVariable<FString> CVarDzYellow(TEXT("jeeb.Trees.DzYellow"), TEXT("0.7 0.45 0.0517"), TEXT("Leaf colour of the DZ YELLOW test forest, \"r g b\" (live)"), ECVF_Default);
 	struct FForest { const TCHAR* Title; TAutoConsoleVariable<FString>* Cvar; int32 Leaf; int32 Seed; };

@@ -25,11 +25,11 @@
 // git-ignored, set up by Tools/BuildGrassPacks.ps1). Changing any of these regrows the grass round you at once (a short hitch).
 static TAutoConsoleVariable<int32> CVarGrassPack(TEXT("jeeb.Grass.Pack"), 1,
 	TEXT("Meadow grass: 0 our painted cards, 1 Grass Library + Meadow Flowers (realistic, Fab), 2 Open World Foliage (realistic, cheaper, Fab)"));
-static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1"), 12.0f, TEXT("Grass Library clumps per square metre close by"));
+static TAutoConsoleVariable<float> CVarGrassDensity1(TEXT("jeeb.Grass.Density1"), 6.9412f, TEXT("Grass Library clumps per square metre close by"));
 static TAutoConsoleVariable<float> CVarGrassDensity2(TEXT("jeeb.Grass.Density2"), 11.0f, TEXT("Open World Foliage clumps per square metre close by"));
 static TAutoConsoleVariable<float> CVarGrassPackFade(TEXT("jeeb.Grass.PackFade"), 5000.f, TEXT("cm: the realistic grass has sunk into the ground by here (it starts 8 m nearer; 50 m since 2026-11-15, owner: twice as far)"));
 static TAutoConsoleVariable<int32> CVarGrassFarCards(TEXT("jeeb.Grass.FarCards"), 0, TEXT("1: our painted cards rise where the realistic grass sinks, carrying the meadow to 50 m; 0: painted ground only beyond it"));
-static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT("1.0101 0.8294 1"), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
+static TAutoConsoleVariable<FString> CVarGrassTint1(TEXT("jeeb.Grass.Tint1"), TEXT("0.9261 0.8294 1"), TEXT("Grass Library blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack1, Content/Data/Palette.ini)"));
 static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TEXT(""), TEXT("Open World Foliage blades' colour multiplier, \"r g b\" (live; empty: the palette's GrassPack2)"));
 static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
 static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.2983f, TEXT("How far the realistic blades are pulled toward grey (live)"));

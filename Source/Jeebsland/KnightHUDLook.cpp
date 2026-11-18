@@ -62,7 +62,7 @@ namespace
 		{ 3, TEXT("Water: roughness (blurry reflections)"), TEXT("jeeb.Water.Rough"), EK::Float, 0, 0.02f, 0.6f, false, 0.23f },
 		{ 3, TEXT("Water: shine (specular)"), TEXT("jeeb.Water.Spec"), EK::Float, 0, 0.f, 1.f, false, 0.25f },
 		{ 3, TEXT("Water: shore foam"), TEXT("jeeb.Water.Foam"), EK::Float, 0, 0.f, 0.4f, false, 0.08f },
-		{ 3, TEXT("Water: river flow speed"), TEXT("jeeb.Water.Flow"), EK::Float, 0, 0.f, 200.f, false, 55.f },
+		{ 3, TEXT("Water: river flow speed"), TEXT("jeeb.Water.Flow"), EK::Float, 0, 0.f, 200.f, false, 42.8571f },
 		{ 3, TEXT("Water: own glow at noon"), TEXT("jeeb.Water.Glow"), EK::Scale, 0, 0.f, 6.f, false, NoDef, TEXT("WaterGlow") },
 		{ 3, TEXT("Water: own glow at low sun"), TEXT("jeeb.Water.GlowDusk"), EK::Scale, 0, 0.f, 6.f, false, NoDef, TEXT("WaterGlowDusk") },
 

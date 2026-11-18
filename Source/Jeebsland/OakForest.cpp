@@ -122,7 +122,7 @@ namespace
 	// The four colours, shared with the sample groves (TreeGroves.cpp) and the LOOK tab's TREES sliders: found by name, or made here in a
 	// build without the groves (Shipping), with the groves' defaults
 	const TCHAR* const TintNames[4] = { TEXT("jeeb.Trees.DzGreen"), TEXT("jeeb.Trees.DzRed"), TEXT("jeeb.Trees.DzOrange"), TEXT("jeeb.Trees.DzYellow") };
-	const TCHAR* const TintDefaults[4] = { TEXT("0.2017 0.2723 0.07"), TEXT("0.5 0.07 0.035"), TEXT("0.6982 0.2459 0.0393"), TEXT("0.7 0.45 0.0517") };
+	const TCHAR* const TintDefaults[4] = { TEXT("0.2017 0.2723 0.07"), TEXT("0.3418 0.0113 0.0347"), TEXT("0.6982 0.2459 0.0393"), TEXT("0.7 0.45 0.0517") };
 	const int32 TintLeaf[4] = { -1, 1, 0, 3 };   // the fallen leaves under a town tree of that colour (AutumnDecor: 0 orange, 1 red, 3 gold; green drops none)
 	const TCHAR* const TintTitle[4] = { TEXT("green"), TEXT("red"), TEXT("orange"), TEXT("yellow") };
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GTintMids[4];
@@ -160,13 +160,13 @@ namespace
 	IConsoleVariable* SpruceVar()
 	{
 		IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Trees.Spruce"));
-		if (!V) V = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Trees.Spruce"), TEXT("0.084 0.7395 2"), TEXT("Needle colour multiplier of every spruce, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
+		if (!V) V = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Trees.Spruce"), TEXT("0.5126 0.8403 0"), TEXT("Needle colour multiplier of every spruce, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
 		return V;
 	}
 	FLinearColor SpruceTint()
 	{
 		IConsoleVariable* V = SpruceVar();
-		return JeebTreeLook::Saturate(JeebTreeLook::ParseRGB(V ? V->GetString() : FString(TEXT("0.084 0.7395 2")), FLinearColor(1.f, 1.f, 1.f, 0.f)));   // (the pack's tints have alpha 0)
+		return JeebTreeLook::Saturate(JeebTreeLook::ParseRGB(V ? V->GetString() : FString(TEXT("0.5126 0.8403 0")), FLinearColor(1.f, 1.f, 1.f, 0.f)));   // (the pack's tints have alpha 0)
 	}
 	const TCHAR* SpruceParam(const FString& MaterialName)
 	{

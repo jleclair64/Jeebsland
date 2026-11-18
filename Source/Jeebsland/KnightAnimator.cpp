@@ -691,9 +691,9 @@ static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behin
 // polish from Tiers.csv is overridden) and jeeb.Armour.Shine (brightness of the steel's base colour, 1 = as before; the metal itself is full metal).
 // (owner 2026-11-15, later: "the armor is too shiny, please change it back": Rough -1, Glint 0 and jeeb.Sky.Ground 0 are the defaults again; the sliders stay to try)
 static TAutoConsoleVariable<float> CVarArmourRough(TEXT("jeeb.Armour.Rough"), 0.1933f, TEXT("Roughness of metal plate armour (0 mirror, 0.3 satin); -1 gives the whole look before 2026-11-15 (every tier as Tiers.csv has it)."), ECVF_Default);
-static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 0.6891f, TEXT("Brightness of metal plate armour's base colour (1 = the old grey; 2.6 bright polished silver; owner's Save1 default 0.6891, 2026-11-16)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 0.6702f, TEXT("Brightness of metal plate armour's base colour (1 = the old grey; 2.6 bright polished silver; owner's Save1 default 0.6891, 2026-11-16)."), ECVF_Default);
 
-static TAutoConsoleVariable<float> CVarArmourMetal(TEXT("jeeb.Armour.Metal"), 1.f, TEXT("How much of metal plate is pure mirror (1); below 1 some plain lit grey stays where the mirror shows something dark."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarArmourMetal(TEXT("jeeb.Armour.Metal"), 0.9664f, TEXT("How much of metal plate is pure mirror (1); below 1 some plain lit grey stays where the mirror shows something dark."), ECVF_Default);
 
 static void ApplyPlateLook(UMaterialInstanceDynamic* M, int32 Tier)
 {

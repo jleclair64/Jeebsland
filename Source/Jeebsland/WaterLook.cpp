@@ -21,15 +21,15 @@ namespace
 	TAutoConsoleVariable<float> CVarRipple(TEXT("jeeb.Water.Ripple"), 1.f, TEXT("Ripple strength (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarRough(TEXT("jeeb.Water.Rough"), 0.02f, TEXT("Roughness near (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarRoughFar(TEXT("jeeb.Water.RoughFar"), -1.f, TEXT("Roughness far away (negative: M_Water's)"));
-	TAutoConsoleVariable<float> CVarSpec(TEXT("jeeb.Water.Spec"), 0.2395f, TEXT("Specular (negative: M_Water's)"));
-	TAutoConsoleVariable<float> CVarFlow(TEXT("jeeb.Water.Flow"), -1.f, TEXT("River flow speed, cm/s (negative: M_Water's)"));
-	TAutoConsoleVariable<float> CVarFoam(TEXT("jeeb.Water.Foam"), 0.0807f, TEXT("Shore foam strength (negative: M_Water's)"));
+	TAutoConsoleVariable<float> CVarSpec(TEXT("jeeb.Water.Spec"), 0.2521f, TEXT("Specular (negative: M_Water's)"));
+	TAutoConsoleVariable<float> CVarFlow(TEXT("jeeb.Water.Flow"), 42.8571f, TEXT("River flow speed, cm/s (negative: M_Water's, 55)"));
+	TAutoConsoleVariable<float> CVarFoam(TEXT("jeeb.Water.Foam"), 0.0689f, TEXT("Shore foam strength (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarFoamDepth(TEXT("jeeb.Water.FoamDepth"), -1.f, TEXT("Depth in cm under which the foam line runs (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarPhase(TEXT("jeeb.Water.PhaseG"), -2.f, TEXT("Scattering phase -1..1 (below -1: M_Water's)"));
-	TAutoConsoleVariable<float> CVarDuskScatter(TEXT("jeeb.Water.DuskScatter"), 0.0966f, TEXT("Share of the water's scattering left at the low sun (1: none taken away)"));
+	TAutoConsoleVariable<float> CVarDuskScatter(TEXT("jeeb.Water.DuskScatter"), 0.0756f, TEXT("Share of the water's scattering left at the low sun (1: none taken away)"));
 
 	TAutoConsoleVariable<FString> CVarGlow(TEXT("jeeb.Water.Glow"), TEXT("0 0 0"), TEXT("The water's own faint slate light at noon, linear R G B (emissive: no shadow stripes; empty: the palette's WaterGlow)"));
-	TAutoConsoleVariable<FString> CVarGlowDusk(TEXT("jeeb.Water.GlowDusk"), TEXT("0.0077 0.0125 0.0163"), TEXT("The same at the low sun, so the water stays a dim slate there and never goes black (empty: the palette's WaterGlowDusk)"));
+	TAutoConsoleVariable<FString> CVarGlowDusk(TEXT("jeeb.Water.GlowDusk"), TEXT("0 0 0"), TEXT("The same at the low sun, so the water stays a dim slate there and never goes black (empty: the palette's WaterGlowDusk)"));
 
 	TWeakObjectPtr<UMaterialInstanceDynamic> Shared;
 	FLinearColor BaseScatter(-1.f, -1.f, -1.f, 1.f);   // the scattering before the low sun takes its share (negative: not known yet)

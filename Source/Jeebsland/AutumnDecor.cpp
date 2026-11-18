@@ -41,7 +41,7 @@ namespace
 	}
 	// Fallen and flying leaves: the palette's leaf colour, pulled toward grey by jeeb.Trees.Saturation (so they follow the trees) and dimmed by
 	// jeeb.Leaves.Brightness (owner, 2026-11-16: "the leaves on the ground look too bright", they glowed in the trees' shade). Live.
-	TAutoConsoleVariable<float> CVarLeafBright(TEXT("jeeb.Leaves.Brightness"), 0.65f,
+	TAutoConsoleVariable<float> CVarLeafBright(TEXT("jeeb.Leaves.Brightness"), 0.3118f,
 		TEXT("Brightness of the fallen and drifting leaves, times their palette colour (1 = as before 2026-11-16, 0.65 default). Live; looks only."), ECVF_Default);
 	struct FLeafMid { TWeakObjectPtr<UMaterialInstanceDynamic> M; int32 Type; };
 	TArray<FLeafMid> GLeafMids;
