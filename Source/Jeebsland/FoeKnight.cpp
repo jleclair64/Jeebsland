@@ -8,6 +8,7 @@
 #include "Terrain.h"
 #include "Messages.h"
 #include "QuestComponent.h"
+#include "FoeData.h"
 #include "ProceduralMeshComponent.h"
 #include "KnightAnimator.h"
 #include "Components/PoseableMeshComponent.h"
@@ -81,7 +82,7 @@ void AFoeKnight::Paint(UProceduralMeshComponent* C, const FLinearColor& Color, b
 	if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, (bMetal && Metal) ? Metal : Base))
 	{
 		M->SetVectorParameterValue(TEXT("Color"), Color);
-		if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), JeebItems::TierRough(Tier)); }
+		if (bMetal && Metal) { M->SetScalarParameterValue(TEXT("Metallic"), 1.f); M->SetScalarParameterValue(TEXT("Roughness"), JeebItems::TierRough(FoeTier)); }
 	}
 }
 
@@ -89,28 +90,38 @@ void AFoeKnight::BeginPlay()
 {
 	Super::BeginPlay();
 	using namespace KnightDesign;
+	ApplyKind();   // (a bandit: his Foes.csv row; the pen knight keeps the numbers at the top of FoeKnight.h)
+	const int32 MyTier = FoeTier;   // (what follows dresses him in his own tier)
 	// The same knight as the player's, in his tier
 	Anim = MakeShared<FKnightAnimator>();
 	if (!IsNetMode(NM_DedicatedServer) && Anim->MakeMesh(this, GetRootComponent()))
-		for (int32 p = 0; p < JeebAnim::Piece_Count; ++p) Anim->Wear(p, Tier);
-	// He carries the kite shield (arrows stick in its parts, so the server has them too)
+	{
+		for (int32 p = 0; p < JeebAnim::Piece_Count; ++p) Anim->Wear(p, MyTier);
+		if (IsBandit())   // (bandits: a dark hood and a red tunic over the tier's colour, Foes.csv Helm / Body)
+		{
+			const JeebFoes::FFoeDef& D = JeebFoes::Foes()[FoeKind()];
+			Anim->SetShade(JeebAnim::Piece_Helmet, D.Helm);
+			Anim->SetShade(JeebAnim::Piece_Chest, D.Body);
+		}
+	}
+	// He carries the kite shield (arrows stick in its parts, so the server has them too); a bandit his own style, or none
 	TArray<FDef> Defs;
 	Build(Defs);
 	for (const FDef& D : Defs)
 	{
-		if (D.Slot != SlotShield || D.Mesh.V.Num() == 0 || D.bBare || D.Style != 0 || Tier < D.MinTier || Tier > D.MaxTier) continue;
+		if (D.Slot != SlotShield || D.Mesh.V.Num() == 0 || D.bBare || D.Style != FoeShield || MyTier < D.MinTier || MyTier > D.MaxTier) continue;
 		UProceduralMeshComponent* C = MakePart(GetRootComponent(), D.Pivot, D.Mesh);
 		ShieldMeshes.Add(C);
-		FLinearColor Col = JeebItems::Palette(Tier, static_cast<int32>(D.Role));
+		FLinearColor Col = JeebItems::Palette(MyTier, static_cast<int32>(D.Role));
 		Col.R *= D.Shade; Col.G *= D.Shade; Col.B *= D.Shade;
 		if (D.bFixedColor) Col = D.Fixed;
-		Paint(C, Col, JeebItems::TierIsMetal(Tier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody));
-		if (D.Role == EArmorRole::Plate) JeebProps::AddShieldModel(this, C, 0, Tier);   // (the kite's library model, 2026-11-16)
+		Paint(C, Col, JeebItems::TierIsMetal(MyTier) && !D.bFixedColor && (D.Role == EArmorRole::Plate || D.Role == EArmorRole::Trim || D.Role == EArmorRole::BootBody));
+		if (D.Role == EArmorRole::Plate) JeebProps::AddShieldModel(this, C, FoeShield, MyTier);   // (the kite's library model, 2026-11-16)
 	}
 	// (with the model there, the code-built parts no longer draw: they stay for the arrows)
-	if (!IsNetMode(NM_DedicatedServer) && JeebProps::ShieldMesh(0)) for (UProceduralMeshComponent* S : ShieldMeshes) S->SetHiddenInGame(true);
+	if (!IsNetMode(NM_DedicatedServer) && HasShieldArm() && JeebProps::ShieldMesh(FoeShield)) for (UProceduralMeshComponent* S : ShieldMeshes) S->SetHiddenInGame(true);
 	// His sword, in the right hand, held the way the player holds one
-	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, JeebItems::K_Sword, Tier)) S->SetRelativeTransform(JeebProps::FistPlace());   // (the sword's model, 2026-11-12)
+	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, JeebItems::K_Sword, MyTier)) S->SetRelativeTransform(JeebProps::FistPlace());   // (the sword's model, 2026-11-12)
 	else
 	{
 		TArray<WeaponDesign::FWPart> Parts;
@@ -119,8 +130,8 @@ void AFoeKnight::BeginPlay()
 		{
 			if (WP.Mesh.V.Num() == 0) continue;
 			UProceduralMeshComponent* C = MakePart(WristR, P_WristR, WP.Mesh);
-			const bool bMetal = JeebItems::TierIsMetal(Tier) && !WP.bFixed && (WP.Role == 0 || WP.Role == 2);
-			Paint(C, WP.bFixed ? WP.Fixed : JeebItems::Palette(Tier, WP.Role), bMetal);
+			const bool bMetal = JeebItems::TierIsMetal(MyTier) && !WP.bFixed && (WP.Role == 0 || WP.Role == 2);
+			Paint(C, WP.bFixed ? WP.Fixed : JeebItems::Palette(MyTier, WP.Role), bMetal);
 		}
 	}
 
@@ -146,14 +157,14 @@ void AFoeKnight::BeginPlay()
 		Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
 		return true;
 	};
-	GuardMax = GuardPool = JeebItems::ShieldHealth(JeebItems::ShieldId(0, Tier));   // (he carries a kite shield)
+	GuardMax = GuardPool = HasShieldArm() ? JeebItems::ShieldHealth(JeebItems::ShieldId(FoeShield, FoeTier)) : 0.f;   // (he carries a kite shield; a bandit his own, or none)
 	Hp->ShieldBlock = [this](int32 Amount, AActor* From) -> int32
 	{
 		TakeOnShield(Amount, From);
 		return 0;
 	};
 	Hp->KnockDown = [this](AActor* From) { KnockDown(From); };
-	Hp->ZoneTake = [](uint8 Zone) { return JeebItems::TierTake(Tier); };   // (his iron armour, the same everywhere)
+	Hp->ZoneTake = [this](uint8 Zone) { return FoeTakes >= 0.f ? FoeTakes : JeebItems::TierTake(FoeTier); };   // (his iron armour, the same everywhere; a bandit his own, Foes.csv Takes)
 	Hp->ShieldParts = [this](TArray<UPrimitiveComponent*>& Out) { for (UProceduralMeshComponent* C : ShieldMeshes) Out.Add(C); };
 	Hp->React = [this](AActor* From, const JeebHit::FReact& R) { OnReact(From, R); };
 	Hp->IsSwinging = [this]() { return KnockT < 0.f && DeathT <= 0.f && (Act == EAct::Windup || Act == EAct::Strike); };   // (a kick into his swing loses)
@@ -169,6 +180,7 @@ void AFoeKnight::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifeti
 	DOREPLIFETIME(AFoeKnight, bRepBlock);
 	DOREPLIFETIME(AFoeKnight, bRepDown);
 	DOREPLIFETIME(AFoeKnight, RepKnock);
+	DOREPLIFETIME_CONDITION(AFoeKnight, RepKind, COND_InitialOnly);   // (set once before he is spawned: it travels with the actor)
 }
 
 bool AFoeKnight::TakeOnShield(int32 Amount, AActor* From)
@@ -319,6 +331,12 @@ AKnightCharacter* AFoeKnight::FindTarget(float& OutDist) const
 
 FVector2D AFoeKnight::ClampToPen(const FVector2D& P) const
 {
+	if (IsBandit())   // (a bandit: a little past his leash round the camp; he turns for home at the leash itself)
+	{
+		const float R = JeebFoes::Foes()[FoeKind()].Leash + 300.f;
+		const FVector2D D = P - CampAt;
+		return D.SizeSquared() > R * R ? CampAt + D.GetSafeNormal() * R : P;
+	}
 	const FVector2D In = PenHalf - FVector2D(80.f, 80.f);   // stay clear of the fence
 	return FVector2D(FMath::Clamp(P.X, PenCenter.X - In.X, PenCenter.X + In.X), FMath::Clamp(P.Y, PenCenter.Y - In.Y, PenCenter.Y + In.Y));
 }
@@ -326,6 +344,7 @@ FVector2D AFoeKnight::ClampToPen(const FVector2D& P) const
 // Walk toward a point (inside the pen), feet on the ground; returns true once there
 bool AFoeKnight::MoveTowards(const FVector2D& To, float Speed, float Dt)
 {
+	if (IsBandit()) return BanditMove(ClampToPen(To), Speed, Dt);   // (over open ground: round trees, never into a town or deep water; FoeBandit.cpp)
 	const FVector Me = GetActorLocation();
 	const FVector2D Goal = ClampToPen(To);
 	const FVector2D D = Goal - FVector2D(Me.X, Me.Y);
@@ -351,6 +370,12 @@ void AFoeKnight::Rise()
 	SetActorLocation(FVector(P.X, P.Y, FloorZ(P.X, P.Y)));
 	SetActorHiddenInGame(false);
 	Capsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	if (IsBandit())   // (back at his spot by the fire, minding nobody)
+	{
+		Target = nullptr; LastAttacker = nullptr; DownFor = 0.f; LostT = 0.f; StuckT = 0.f;
+		SetActorRotation(FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(CampAt.Y - P.Y, CampAt.X - P.X)), 0.f));   // facing the fire
+		SetMind(EMind::Home, TEXT("stands at camp"));
+	}
 }
 
 void AFoeKnight::OnHurt(AActor* From)
@@ -369,10 +394,11 @@ void AFoeKnight::OnHurt(AActor* From)
 			if (bAir) { bAir = false; const FVector P = GetActorLocation(); SetActorLocation(FVector(P.X, P.Y, FloorZ(P.X, P.Y))); }   // (beaten in the air: down to the ground)
 			KnockT = -1.f;
 			bRepDown = true;
-			RespawnT = 20.f;
+			RespawnT = RespawnSecs;
 			Act = EAct::Idle;
 			BlockT = 0.f;
 			Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			if (IsBandit()) { BanditBeaten(From); return; }   // (his own loot, XP and quests: FoeBandit.cpp)
 			if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(GetActorLocation() - FVector(0.f, 0.f, 90.f), FRotator::ZeroRotator))
 				Drop->Setup(ELootLook::Item, TArray<FInvSlot>(), 12 + Rand.RandRange(0, 8));   // a small purse of ingots
 			if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
@@ -384,7 +410,8 @@ void AFoeKnight::OnHurt(AActor* From)
 	// Knocked back a step, and sometimes he gets his shield up for the next blows (never in the middle of his own swing)
 	const FVector Away = (GetActorLocation() - (From ? From->GetActorLocation() : GetActorLocation())).GetSafeNormal2D();
 	MoveTowards(FVector2D(GetActorLocation()) + FVector2D(Away.X, Away.Y) * 35.f, 1.0e5f, 1.f);
-	if (Act == EAct::Idle && BlockT <= 0.f && !bGuardBroken && KnockT < 0.f && Rand.FRand() < 0.4f) BlockT = Rand.FRandRange(0.9f, 1.6f);
+	if (Act == EAct::Idle && BlockT <= 0.f && !bGuardBroken && KnockT < 0.f && Rand.FRand() < BlockChance) BlockT = Rand.FRandRange(0.9f, 1.6f);
+	if (IsBandit()) BanditHurt(From);   // (whoever hit him is the one he fights)
 }
 
 void AFoeKnight::Tick(float DeltaSeconds)
@@ -399,12 +426,19 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	if (DeathT > 0.f)
 	{
 		if (DeathT < 1.f) DeathT = FMath::Min(1.f, DeathT + Dt * 1.6f);
-		if (HasAuthority())
+		if (HasAuthority() && IsBandit()) BanditDownTick(DeltaSeconds);   // (sinks away, stands at camp again after Foes.csv's Respawn; real time, even asleep)
+		else if (HasAuthority())
 		{
 			RespawnT -= Dt;
 			if (RespawnT < 14.f) SetActorHiddenInGame(true);
 			if (RespawnT <= 0.f) Rise();
 		}
+		return;
+	}
+	// A bandit with no player near his camp sleeps (AFoeCamps): at home, healed, nothing to think about
+	if (HasAuthority() && bSleeping && Mind == EMind::Home && !bAir && KnockT < 0.f)
+	{
+		if (Hp->Cur < Hp->Max) Hp->Reset();
 		return;
 	}
 
@@ -448,7 +482,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	{
 	if ((bGuardBroken || GuardPool < GuardMax) && Now - GuardHitTime > GuardBack) { GuardPool = GuardMax; bGuardBroken = false; }   // (his guard comes back after a pause)
 	float Dist = 1.0e9f;
-	AKnightCharacter* Knight = FindTarget(Dist);
+	AKnightCharacter* Knight = IsBandit() ? BanditTarget(Dist, Dt) : FindTarget(Dist);   // (a bandit: whom he noticed or who hit him; FoeBandit.cpp)
 	const FVector Me = GetActorLocation();
 	FVector2D ToP = FVector2D::ZeroVector;
 	if (Knight)
@@ -456,7 +490,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		ToP = FVector2D(Knight->GetActorLocation() - Me);
 		Dist = ToP.Size();
 	}
-	const bool bEngaged = Knight && Dist < 1100.f && Knight->GetHealth() > 0.f;
+	const bool bEngaged = Knight && (Dist < 1100.f || IsBandit()) && Knight->GetHealth() > 0.f;
 
 	// ---- Facing: toward you when engaged, otherwise the way he walks ----
 	float Yaw = GetActorRotation().Yaw;
@@ -477,7 +511,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		if (bEngaged)
 		{
 			const FVector2D Dir = ToP / FMath::Max(Dist, 1.f);
-			if (Dist > 190.f) MoveTowards(FVector2D(Me) + Dir * 200.f, BlockT > 0.f ? 160.f : 300.f, Dt);        // close in
+			if (Dist > 190.f) MoveTowards(FVector2D(Me) + Dir * 200.f, BlockT > 0.f ? 160.f : ChaseSpeed, Dt);        // close in (a bandit chases at Foes.csv Speed)
 			else if (Dist < 120.f) MoveTowards(FVector2D(Me) - Dir * 100.f, 150.f, Dt);                         // step back
 			else                                                                                                   // circle you
 			{
@@ -486,8 +520,9 @@ void AFoeKnight::Tick(float DeltaSeconds)
 				MoveTowards(FVector2D(Me) + FVector2D(-Dir.Y, Dir.X) * StrafeDir * 100.f, 90.f, Dt);
 			}
 			if (Dist < StrikeReach - 10.f && AttackCool <= 0.f && BlockT <= 0.f) { Act = EAct::Windup; ActT = 0.f; bStruck = false; }
-			else if (BlockT <= 0.f && AttackCool > 0.6f && Dist < 260.f && Rand.FRand() < 0.15f * Dt) BlockT = Rand.FRandRange(0.8f, 1.3f);   // now and then he guards
+			else if (HasShieldArm() && BlockT <= 0.f && AttackCool > 0.6f && Dist < 260.f && Rand.FRand() < 0.15f * Dt) BlockT = Rand.FRandRange(0.8f, 1.3f);   // now and then he guards
 		}
+		else if (IsBandit()) BanditRoam(Dt, Yaw);   // (strolls round his camp's fire, or walks home: FoeBandit.cpp)
 		else
 		{
 			// Pace the pen while nobody is around
@@ -506,7 +541,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		break;
 	case EAct::Windup:   // the telegraph: the sword rises high and holds for a moment
 		BlockT = 0.f;
-		if (ActT >= 0.65f) { Act = EAct::Strike; ActT = 0.f; }
+		if (ActT >= WindupT) { Act = EAct::Strike; ActT = 0.f; }
 		break;
 	case EAct::Strike:   // a quick downward cut with a short lunge
 		if (Knight && Dist > 120.f) MoveTowards(FVector2D(Me) + ToP / FMath::Max(Dist, 1.f) * 100.f, 260.f, Dt);
@@ -519,7 +554,9 @@ void AFoeKnight::Tick(float DeltaSeconds)
 				const float D2 = FVector2D(Knight->GetActorLocation() - GetActorLocation()).Size();
 				if (D2 < StrikeReach && FVector2D::DotProduct(Fwd, ToP / FMath::Max(Dist, 1.f)) > 0.45f)
 				{
-					Knight->Hurt(Rand.RandRange(HitMin, HitMax), this);   // (during a kick: knocked down, Hurt)
+					const int32 Raw = Rand.RandRange(FoeHitMin, FoeHitMax);
+					if (IsBandit()) UE_LOG(LogTemp, Log, TEXT("JEEBFOE %s cuts %s for %d raw"), *FoeName(), *Knight->GetName(), Raw);
+					Knight->Hurt(Raw, this);   // (during a kick: knocked down, Hurt)
 					JeebHit::FReact R; R.Stun = StrikeStun; R.Push = StrikePush;
 					Knight->TakeReact(this, R);
 				}
@@ -532,7 +569,7 @@ void AFoeKnight::Tick(float DeltaSeconds)
 		if (ActT >= StunDur) { Act = EAct::Idle; ActT = 0.f; AttackCool = FMath::Max(AttackCool, 0.4f); }
 		break;
 	case EAct::Recover:  // a moment open after the swing: your chance to hit back
-		if (ActT >= 0.55f) { Act = EAct::Idle; ActT = 0.f; AttackCool = Rand.FRandRange(1.6f, 2.6f); }
+		if (ActT >= 0.55f) { Act = EAct::Idle; ActT = 0.f; AttackCool = Rand.FRandRange(CoolMin, CoolMax); }
 		break;
 	}
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
@@ -563,7 +600,7 @@ void AFoeKnight::TickBody(float Dt)
 	In.Vel = SmVel;
 	In.Rot = GetActorRotation();
 	In.BlockAlpha = BlockAlpha;
-	In.bShieldArm = true;
+	In.bShieldArm = HasShieldArm();
 	In.Kind = JeebItems::K_Sword;
 	In.StunLeft = Act == EAct::Stun ? FMath::Max(StunDur - ActT, 0.05f) : HitFlash;
 	if (DeathT > 0.f) In.bKnockedDown = true;
@@ -574,17 +611,18 @@ void AFoeKnight::TickBody(float Dt)
 		else if (KnockT < KnockLie) In.bKnockedDown = true;
 		else if (KnockT < RollEnd) { In.bRolling = true; In.RollU = (KnockT - KnockLie) / KnockRoll; In.RollYaw = KnockOpt == 1 ? -90.f : 90.f; }
 	}
-	else if (Act == EAct::Windup) { In.Move = EMove::SmashCharge; In.SmashCharge = FMath::Clamp(ActT / 0.65f, 0.f, 1.f); }
+	else if (Act == EAct::Windup) { In.Move = EMove::SmashCharge; In.SmashCharge = FMath::Clamp(ActT / WindupT, 0.f, 1.f); }
 	else if (Act == EAct::Strike) { In.Move = EMove::SmashSwing; In.SmashSwingU = FMath::Clamp(ActT / 0.2f, 0.f, 1.f); }
 	else if (Act == EAct::Recover) { In.Move = EMove::SmashEnd; In.SmashEndU = FMath::Clamp(ActT / 0.55f, 0.f, 1.f); }
 	Anim->Update(AnimAccum, In, GetActorLocation() - FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight()), In.Rot.Yaw);
 	AnimAccum = 0.f;
 	WristR->SetWorldTransform(Anim->RightGripWorld());
-	const FTransform At = Anim->ShieldWorld(BlockAlpha);
+	const FTransform At = Anim->ShieldWorld(BlockAlpha, FMath::Max(FoeShield, 0));
 	for (UProceduralMeshComponent* C : ShieldMeshes) if (C) C->SetWorldTransform(At);
 }
 
 float AFoeKnight::FloorZ(float X, float Y) const
 {
+	if (IsBandit()) return JeebFoes::Ground(X, Y) + 98.f;   // (out in the forest: the ground as drawn, the 8 m mesh, not HeightAt, which it misses by up to a metre)
 	return bStill && StillZ != 0.f ? StillZ : JeebTerrain::HeightAt(X, Y) + 98.f;
 }

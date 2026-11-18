@@ -225,6 +225,17 @@ void AKnightHUD::DrawHUD()
 				DrawRect(FLinearColor(0.08f, 0.1f, 0.13f, 1.f), SP.X - BW * 0.5f, SY, BW, SH);
 				DrawRect(FLinearColor(0.55f, 0.65f, 0.78f), SP.X - BW * 0.5f, SY, BW * H->ShieldFraction(), SH);
 			}
+			if (const AFoeKnight* Foe = Cast<AFoeKnight>(H->GetOwner()))   // a bandit's name over his bar (Foes.csv Name)
+			{
+				const FString Name = Foe->FoeName();
+				if (!Name.IsEmpty())
+				{
+					float TW = 0.f, TH = 0.f;
+					HDTextSize(Name, TW, TH, Font, 0.85f);
+					HDText(Name, FLinearColor(0.f, 0.f, 0.f, 0.8f), SP.X - TW * 0.5f + 1.f, SP.Y - TH - 3.f, Font, 0.85f);
+					HDText(Name, FLinearColor(1.f, 0.62f, 0.5f), SP.X - TW * 0.5f, SP.Y - TH - 4.f, Font, 0.85f);
+				}
+			}
 		}
 		TArray<JeebCombat::FNumber>& Nums = JeebCombat::Numbers();
 		for (int32 i = Nums.Num() - 1; i >= 0; --i)

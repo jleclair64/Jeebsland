@@ -10,6 +10,7 @@ class FKnightAnimator;
 class UCapsuleComponent;
 class UProceduralMeshComponent;
 class UHealthComponent;
+class AKnightCharacter;
 
 // A sparring knight in iron, with a sword and a kite shield, who guards the old pig pen. Moderate-to-easy: he telegraphs
 // every swing (the sword goes up high for a moment before it comes down), raises his shield now and then after being hit,
@@ -27,6 +28,20 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	void Setup(const FVector2D& InPenCenter, const FVector2D& InPenHalf);
+
+	// A foe from Foes.csv (a bandit) instead of the pen knight (2026-11-18; FoeData.h, the brain in FoeBandit.cpp): the server sets it before
+	// FinishSpawning (AFoeCamps). Spot: where he stands at his camp; Centre: the camp's fire (his leash is measured from it).
+	// Online the kind travels in RepKind with the actor, so every machine dresses him the same way; everything else is the pen knight's.
+	void SetupFoe(int32 InKind, int32 InCamp, const FVector2D& Spot, const FVector2D& Centre, int32 Seed);
+	bool IsBandit() const { return RepKind != 255; }
+	int32 FoeKind() const { return RepKind == 255 ? INDEX_NONE : int32(RepKind); }
+	int32 GetCamp() const { return Camp; }
+	FString FoeName() const;           // what players see over his head ("" for the pen knight)
+	bool IsDown() const { return DeathT > 0.f; }
+	void SetSleeping(bool bSleep);     // (server, AFoeCamps) no player within reach: a slow tick, sparse updates
+	bool IsSleeping() const { return bSleeping; }
+	uint8 MindNow() const { return uint8(Mind); }   // (tests and logs) 0 at home, 1 fighting, 2 walking home
+	AActor* TargetNow() const;
 
 	// A still sparring knight (MoveLab): he stands where he was put, never fights back, walks or falls; his health fills
 	// again 3 s after the last blow (Smash's training mode). Set before FinishSpawning.
@@ -117,4 +132,32 @@ private:
 	void Rise();
 	bool MoveTowards(const FVector2D& To, float Speed, float Dt);
 	FVector2D ClampToPen(const FVector2D& P) const;
+
+	// What he is (the pen knight's numbers unless SetupFoe gave him a row of Foes.csv)
+	UPROPERTY(Replicated) uint8 RepKind = 255;   // Foes.csv row, 255 = the pen knight
+	int32 FoeTier = Tier, FoeShield = 0, FoeHitMin = HitMin, FoeHitMax = HitMax;
+	float FoeTakes = -1.f, ChaseSpeed = 300.f, WindupT = 0.65f, CoolMin = 1.6f, CoolMax = 2.6f, BlockChance = 0.4f, RespawnSecs = 20.f;
+	void ApplyKind();                  // the stats from his Foes.csv row (every machine)
+	bool HasShieldArm() const { return FoeShield >= 0; }
+
+	// The bandit's mind (server only; FoeBandit.cpp)
+	enum class EMind : uint8 { Home, Fight, Return };
+	EMind Mind = EMind::Home;
+	int32 Camp = -1;
+	FVector2D CampAt = FVector2D::ZeroVector;
+	TWeakObjectPtr<AKnightCharacter> Target, LastAttacker;
+	float LastAttackT = -100.f, LostT = 0.f, SenseT = 0.f, StuckT = 0.f, DownFor = 0.f, LastHurtT = -100.f;
+	float StepSide = 1.f;                  // the way he steps round something in his path, kept until it is clear
+	float RegenAcc = 0.f;              // (health coming back at camp, a point at a time)
+	bool bSleeping = false;
+	void SetMind(EMind M, const TCHAR* Why);
+	AKnightCharacter* BanditTarget(float& OutDist, float Dt);   // whom he fights now (null: nobody; he goes home or strolls)
+	void BanditRoam(float Dt, float& Yaw);                       // nobody to fight: strolls round the fire, or walks home
+	bool BanditMove(const FVector2D& To, float Speed, float Dt); // a step over the ground, round trees and rocks, never into a town or deep water
+	void BanditHurt(AActor* From);                               // (server) hit: whoever did it is the one he fights
+	void BanditBeaten(AActor* From);                             // (server) beaten: loot, XP, quests
+	void BanditDownTick(float Dt);                               // (server) lying beaten: sinks away, then stands at camp again
+	static class AKnightCharacter* Hitter(AActor* From);         // the player behind a blow (an arrow: whoever shot it)
+	friend struct FFoeTestDriver;   // (-JeebFoeTest, FoeCamps.cpp)
+	friend class AFoeCamps;
 };

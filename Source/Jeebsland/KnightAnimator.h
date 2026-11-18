@@ -199,6 +199,8 @@ public:
 
 	// A worn piece: Tier < 0 takes it off (the slot's plates vanish), else tinted for that tier
 	void Wear(int32 Piece, int32 Tier);
+	// A worn piece's colour x Mul over its tier's (foes from Foes.csv: a bandit's dark hood and red tunic; players never call it)
+	void SetShade(int32 Piece, const FLinearColor& Mul) { if (Piece < 0 || Piece >= JeebAnim::Piece_Count) return; PieceShade[Piece] = Mul; if (WornTiers[Piece] >= 0) Wear(Piece, WornTiers[Piece]); }
 
 	void Update(float Dt, const JeebAnim::FInput& In, const FVector& Feet, float ActorYaw);
 
@@ -295,6 +297,7 @@ private:
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};
 	int32 WornTiers[JeebAnim::Piece_Count] = { -1, -1, -1, -1, -1 };
+	FLinearColor PieceShade[JeebAnim::Piece_Count] = { FLinearColor::White, FLinearColor::White, FLinearColor::White, FLinearColor::White, FLinearColor::White };
 	void ShowBare(int32 Piece, bool bShow);
 	int32 PieceMat[JeebAnim::Piece_Count];
 	UMaterialInstanceDynamic* PieceMid[JeebAnim::Piece_Count];
