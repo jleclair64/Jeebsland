@@ -44,6 +44,8 @@ namespace
 		{ 1, TEXT("Blue haze (0 grey fog)"), TEXT("jeeb.Look.HazeBlue"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Haze starts at (cm)"), TEXT("jeeb.Look.HazeStart"), EK::Float, 0, 300.f, 8000.f, false, NoDef },
 		{ 1, TEXT("Warm glow toward the sun"), TEXT("jeeb.Look.SunGlow"), EK::Float, 0, 0.f, 4.f, false, NoDef },
+		{ 1, TEXT("Sunset haze dims with the light (0 old grey)"), TEXT("jeeb.Look.HazeFollow"), EK::Float, 0, 0.f, 1.f, false, NoDef },
+		{ 1, TEXT("Sunset haze takes the sun's colour"), TEXT("jeeb.Look.HazeSunTint"), EK::Float, 0, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Far hills fade to blue"), TEXT("jeeb.Look.Aerial"), EK::Float, 0, 1.f, 60.f, false, NoDef },
 		{ 1, TEXT("Hill fade starts at (km)"), TEXT("jeeb.Look.AerialStart"), EK::Float, 0, 0.05f, 1.f, false, NoDef },
 
@@ -113,7 +115,7 @@ namespace
 		{ 5, TEXT("Ground past the grass: blue"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 2, 0.3f, 1.2f, false, NoDef },
 
 		// NIGHT (2026-11-17, in SKY + HAZE): the moonlight and the night's lift (DayNight.cpp, JeebNight); try them at jeeb.Sun.Phase 0.5
-		{ 1, TEXT("Night: moonlight strength"), TEXT("jeeb.Night.Moon"), EK::Float, 0, 0.f, 3.f, false, NoDef },
+		{ 1, TEXT("Night: moonlight strength"),TEXT("jeeb.Night.Moon"), EK::Float, 0, 0.f, 3.f, false, NoDef },
 		{ 1, TEXT("Night: moonlight red"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 0, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Night: moonlight green"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 1, 0.f, 1.f, false, NoDef },
 		{ 1, TEXT("Night: moonlight blue"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 2, 0.f, 1.f, false, NoDef },
