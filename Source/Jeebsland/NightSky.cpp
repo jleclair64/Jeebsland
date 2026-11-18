@@ -194,8 +194,8 @@ void ANightSky::Tick(float DeltaSeconds)
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (PC && PC->PlayerCameraManager) SetActorLocation(PC->PlayerCameraManager->GetCameraLocation());
 
-	// Stars come out as the sun sinks toward the horizon
-	const float N = ADayNight::Dusk;
+	// Stars come out as the sun goes down (ADayNight::Night since 2026-11-17, when the sun began to set: with Dusk they showed in the golden low-sun sky)
+	const float N = ADayNight::Night;
 	for (UMaterialInstanceDynamic* M : StarMids) M->SetScalarParameterValue(TEXT("Night"), N);
 	Stars->SetVisibility(N > 0.01f);
 
@@ -208,9 +208,10 @@ void ANightSky::Tick(float DeltaSeconds)
 		const float Red = 1.f - FMath::SmoothStep(13.f, 24.f, E);   // red for most of the sun's low swing, deepest at the bottom
 		const FLinearColor Lit = FMath::Lerp(FMath::Lerp(FLinearColor(1.0f, 1.0f, 1.0f), FLinearColor(1.0f, 0.70f, 0.42f), Golden), FLinearColor(1.0f, 0.36f, 0.24f), Red);
 		const FLinearColor Shade = FMath::Lerp(FMath::Lerp(FLinearColor(0.70f, 0.76f, 0.88f), FLinearColor(0.62f, 0.50f, 0.58f), Golden), FLinearColor(0.50f, 0.22f, 0.32f), Red);
-		CloudMid->SetVectorParameterValue(TEXT("Lit"), Lit);
-		CloudMid->SetVectorParameterValue(TEXT("Shade"), Shade);
-		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.1f, 1.8f, Golden));
+		const float Nn = ADayNight::Night;   // (2026-11-17: a moonlit blue-grey at night, and dimmer, as the night exposure lifts everything)
+		CloudMid->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(Lit, FLinearColor(0.55f, 0.62f, 0.80f), Nn));
+		CloudMid->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(Shade, FLinearColor(0.22f, 0.26f, 0.38f), Nn));
+		CloudMid->SetScalarParameterValue(TEXT("Bright"), FMath::Lerp(2.1f, 1.8f, Golden) * FMath::Lerp(1.f, 0.2f, Nn));
 		CloudRoot->AddLocalRotation(FRotator(0.f, DeltaSeconds * 0.15f, 0.f));
 	}
 
