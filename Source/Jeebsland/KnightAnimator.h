@@ -207,7 +207,12 @@ public:
 	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
 	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
 	float StowPull() const;           // cm what is stowed on his back moves in toward him: bent flat over a ledge or onto a block the back is nearer than the chest frame says
-	FTransform ShieldWorld(float BlockAlpha) const;
+	FTransform ShieldWorld(float BlockAlpha, int32 Style = 0) const;   // Style: the shield's (0 kite, 1 round, 2 tower): each model's back sits at its own depth (ShieldSnug)
+#if !UE_BUILD_SHIPPING
+	// (test pictures: the least gap between the shield model's back and his left forearm's real mesh, cm, under 0 into it; At = where, in the model's frame; Arm = verts tested)
+	float ShieldGap(const class UStaticMeshComponent* Model, FVector& At, int32& Arm) const;
+	float ShieldUpShare() const;   // 0 hanging (ShieldAtRest) to 1 strapped on a raised forearm (ShieldAtGuard)
+#endif
 	FTransform BowWorld(float AimAlpha) const;
 	FTransform QuiverWorld() const;     // on his right hip (jeeb.Knight.Quiver, live)
 	FTransform BeltFlaskWorld() const;  // on his belt, back left (jeeb.Knight.Flask, live)

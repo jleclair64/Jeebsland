@@ -788,6 +788,19 @@ static void ShotEyesSet(APlayerController* PC, int32 EyeIdx)
 		FString Eye, Rest, Name, Val;
 		if (!Set.Split(TEXT(":"), &Eye, &Rest) || !Rest.Split(TEXT("="), &Name, &Val)) continue;
 		if (EyeIdx < 0 ? Eye != TEXT("*") : (Eye == TEXT("*") || FCString::Atoi(*Eye) != EyeIdx)) continue;
+		if (Name == TEXT("shield"))   // (2026-11-17: shield=<0 kite, 1 round, 2 tower> wears that style, keeping the worn tier)
+		{
+			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
+			if (USkillComponent* S = K ? K->GetSkills() : nullptr)
+			{
+				const int32 Sh = S->Worn[JeebItems::K_Shield];
+				const int32 Tier = JeebItems::IsGear(Sh) && JeebItems::KindOf(Sh) == JeebItems::K_Shield ? JeebItems::VariantOf(Sh) : 0;
+				S->Worn[JeebItems::K_Shield] = JeebItems::ShieldId(FMath::Clamp(FCString::Atoi(*Val), 0, 2), Tier);
+				S->OnGearChanged.Broadcast();
+				UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d shield style %s tier %d"), EyeIdx, *Val, Tier);
+			}
+			continue;
+		}
 		if (Name == TEXT("wear"))
 		{
 			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
