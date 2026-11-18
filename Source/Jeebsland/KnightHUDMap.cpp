@@ -141,7 +141,7 @@ void AKnightHUD::BuildMapTex()
 			}
 		}
 	}
-	for (TActorIterator<AChoppableTree> It(W); It; ++It) Broadleaf.Add(FVector2D(It->GetActorLocation()));
+	for (TActorIterator<AChoppableTree> It(W); It; ++It) if (!It->IsA<AOakTreeNode>()) Broadleaf.Add(FVector2D(It->GetActorLocation()));
 	// (the heights and river distances: sampled a few rows a frame since the knight appeared, TickMapSampling; whatever is left, now)
 	if (!WorldSamples.Started()) TickMapSampling();
 	WorldSamples.Step(1.0e9);
@@ -323,7 +323,7 @@ void AKnightHUD::BuildTownTex()
 		}
 	}
 	for (TActorIterator<AChoppableTree> It(W); It; ++It)
-		if (Box.IsInside(FVector2D(It->GetActorLocation()))) Stamp(FVector2D(It->GetActorLocation()), 300.f, FLinearColor(0.48f, 0.24f, 0.09f), 0.9f);
+		if (!It->IsA<AOakTreeNode>() && Box.IsInside(FVector2D(It->GetActorLocation()))) Stamp(FVector2D(It->GetActorLocation()), 300.f, FLinearColor(0.48f, 0.24f, 0.09f), 0.9f);
 	// the town's trees and the forest round it (AOakForest), each crown as it stands
 	{
 		TArray<FMapTree> OakTrees;

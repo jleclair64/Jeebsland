@@ -1,6 +1,7 @@
 ﻿#include "KnightCharacter.h"
 #include "ChoppableTree.h"
 #include "MiningRock.h"
+#include "Terrain.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "KnightAnimator.h"
@@ -244,7 +245,7 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		{
 			bLabAt = true;
 			FString S; TArray<FString> Pr;
-			if (FParse::Value(FCommandLine::Get(), TEXT("LabAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 2) SetActorLocation(FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), GetActorLocation().Z));
+			if (FParse::Value(FCommandLine::Get(), TEXT("LabAt="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 2) { const float LX = FCString::Atof(*Pr[0]), LY = FCString::Atof(*Pr[1]); SetActorLocation(FVector(LX, LY, FMath::Max(GetActorLocation().Z, JeebTerrain::HeightAt(LX, LY) + GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 5.f))); }
 		}
 	}
 	static FString Do;
@@ -307,8 +308,9 @@ void AKnightCharacter::TickSuitTests(float Dt)
 	{
 		const bool bTree = Do == TEXT("chopnode");
 		AActor* Best = nullptr;
+		static const bool bOakOnly = FParse::Param(FCommandLine::Get(), TEXT("ChopOak"));   // (-ChopOak: the nearest oak, not a pine that may need a higher level)
 		for (TActorIterator<AResourceNode> It(GetWorld()); It; ++It)
-			if ((bTree ? It->IsA<AChoppableTree>() : It->IsA<AMiningRock>()) && (!Best || FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < FVector::Dist2D(Best->GetActorLocation(), GetActorLocation()))) Best = *It;
+			if ((bTree ? (It->IsA<AChoppableTree>() && (!bOakOnly || Cast<AChoppableTree>(*It)->GetKind() == ETreeKind::Oak)) : It->IsA<AMiningRock>()) && (!Best || FVector::Dist2D(It->GetActorLocation(), GetActorLocation()) < FVector::Dist2D(Best->GetActorLocation(), GetActorLocation()))) Best = *It;
 		if (Best)
 		{
 			const FVector Dir = FRotator(0.f, ShotFaceYaw, 0.f).Vector();
@@ -316,8 +318,9 @@ void AKnightCharacter::TickSuitTests(float Dt)
 			FString GF; TArray<FString> GP;
 			if (FParse::Value(FCommandLine::Get(), TEXT("GatherFrom="), GF) && GF.ParseIntoArray(GP, TEXT("_")) == 2) { FromD = FCString::Atof(*GP[0]); FromS = FCString::Atof(*GP[1]); }
 			FVector At = Best->GetActorLocation() - Dir * FromD + FVector::CrossProduct(FVector::UpVector, Dir) * FromS;
-			At.Z = GetActorLocation().Z;
+			At.Z = FMath::Max(GetActorLocation().Z - 300.f, JeebTerrain::HeightAt(At.X, At.Y) + GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 1.f);   // (on the ground there: a slope must not leave him falling, which ends the work)
 			SetActorLocation(At);
+			GetCharacterMovement()->SetMovementMode(MOVE_Walking);
 			SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));
 			Interact();
 		}

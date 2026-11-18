@@ -9,6 +9,7 @@
 #include "DayNight.h"
 #include "ResourceNode.h"
 #include "ChoppableTree.h"
+#include "OakForest.h"
 #include "MiningRock.h"
 #include "Pond.h"
 #include "Cottage.h"
@@ -1064,6 +1065,7 @@ struct FFillBuilder
 	{
 		for (TActorIterator<AResourceNode> It(World); It; ++It)
 		{
+			if (It->IsA<AOakTreeNode>()) continue;   // (the forest's trees: the fill was laid out round them already)
 			const FVector2D P(It->GetActorLocation());
 			float R = 150.f;
 			if (const AChoppableTree* T = Cast<AChoppableTree>(*It)) R = T->SurfaceRadius(0.f) + 150.f;

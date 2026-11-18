@@ -26,7 +26,7 @@ class AChoppableTree : public AResourceNode
 	GENERATED_BODY()
 
 public:
-	AChoppableTree();
+	AChoppableTree(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	// Called by the forest right after spawning
 	void Setup(ETreeKind InKind, float Radius, float Height);

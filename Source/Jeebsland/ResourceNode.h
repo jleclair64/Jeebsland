@@ -14,7 +14,7 @@ class AResourceNode : public AActor
 	GENERATED_BODY()
 
 public:
-	AResourceNode();
+	AResourceNode(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 
 	// Returns true if the click was dealt with (started, or refused with a message), false if nothing happened
 	bool StartGathering(AActor* Gatherer);
