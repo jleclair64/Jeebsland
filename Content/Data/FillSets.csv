@@ -113,6 +113,9 @@ DoorstepCandles,PotVase,0.84,0.2,0,0,1,turn=180
 # LampStone: stone lamp post with a shrub at its foot
 LampStone,LampPostStone,0,0,0,0,1,
 LampStone,ShrubLow,0,-1.09,0,0,1,turn=180|drop
+# SteeleLamp: Steele Creek's street lamp, the LampStone set placed already turned to its street (Fill.cpp leaves it where the row puts it)
+SteeleLamp,LampPostStone,0,0,0,0,1,
+SteeleLamp,ShrubLow,0,-1.09,0,0,1,turn=180|drop
 # LampRope: rope lamp post with a bush
 LampRope,LampPostRope,0,0,0,0,1,
 LampRope,BushBall,0,-1.58,0,0,1,turn=180|drop|alt=BushDome

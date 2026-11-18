@@ -246,6 +246,7 @@ void JeebFill::LoadData(FData& D)
 				O.E = C.F(r, cE, 0.f); O.N = C.F(r, cN, 0.f); O.Yaw = C.F(r, cYaw, 0.f);
 				O.Seed = C.I(r, cSeed, r + 1); O.bVar = C.I(r, cVar, 0) != 0; O.Plot = C.I(r, cPlot, -1); O.Note = C.S(r, cNote); O.Line = C.Lines[r];
 				O.bSquare = C.S(r, cSite).StartsWith(TEXT("sq"), ESearchCase::IgnoreCase);
+				O.bSteele = C.S(r, cSite).StartsWith(TEXT("st"), ESearchCase::IgnoreCase);
 				D.Oak.Add(O);
 			}
 		}
@@ -1529,21 +1530,21 @@ struct FFillBuilder
 	// The hand-placed rows: Oak Hill's, then the square's (Site Square, stats "SquareRows"), before any rule zone
 	void PlaceOakHill()
 	{
-		for (int32 Pass = 0; Pass < 2; ++Pass)
+		for (int32 Pass = 0; Pass < 3; ++Pass)
 		{
-			const bool bSq = Pass == 1;
-			const TCHAR* Key = bSq ? TEXT("SquareRows") : TEXT("OakHill");
-			if ((!bSq && !OakOn()) || !ZoneWanted(Key)) continue;
+			const bool bSq = Pass == 1, bSteele = Pass == 2;   // (Pass 2: Steele Creek's rows, Site "Steele", 2026-11-18)
+			const TCHAR* Key = bSteele ? TEXT("SteeleRows") : bSq ? TEXT("SquareRows") : TEXT("OakHill");
+			if ((Pass == 0 && !OakOn()) || (bSteele && !JeebSteele::Enabled()) || !ZoneWanted(Key)) continue;
 			const double T0 = FPlatformTime::Seconds();
 			int32 Failed = 0, Rows = 0;
 			for (const FOakRow& R : D.Oak)
 			{
-				if (R.bSquare != bSq) continue;
+				if ((R.bSteele ? 2 : R.bSquare ? 1 : 0) != Pass) continue;
 				FStats& St = Stats.FindOrAdd(Key);
 				++Rows;
-				FVector2D At = bSq ? FVector2D(R.N * 100.f, R.E * 100.f) : FVector2D(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
+				FVector2D At = bSteele ? JeebSteele::ToWorld(R.E, R.N) : bSq ? FVector2D(R.N * 100.f, R.E * 100.f) : FVector2D(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
 				float RowYaw = R.Yaw;
-				if (!bSq && (R.Set.StartsWith(TEXT("Lamp")) || R.Set.StartsWith(TEXT("Junction"))))
+				if (Pass != 1 && (R.Set.StartsWith(TEXT("Lamp")) || R.Set.StartsWith(TEXT("Junction"))))
 				{
 					// (a lamp or a signpost stands at the path's edge, 0.7 m off it: the nearest road cell within 8 m)
 					FVector2D Best(0.f, 0.f); float BestD = 1.0e9f;
@@ -1569,7 +1570,7 @@ struct FFillBuilder
 				if (N == 0 || !Why.IsEmpty())
 				{
 					++Failed;
-					UE_LOG(LogTemp, Log, TEXT("JEEBFILL OAKROW line %d %s at %s E %.1f N %.1f: %d of its pieces placed%s%s"), R.Line, *R.Set, bSq ? TEXT("square") : TEXT("Oak Hill"), R.E, R.N, St.Pieces - Before, Why.IsEmpty() ? TEXT("") : TEXT("; skipped "), *Why);
+					UE_LOG(LogTemp, Log, TEXT("JEEBFILL OAKROW line %d %s at %s E %.1f N %.1f: %d of its pieces placed%s%s"), R.Line, *R.Set, bSteele ? TEXT("Steele Creek") : bSq ? TEXT("square") : TEXT("Oak Hill"), R.E, R.N, St.Pieces - Before, Why.IsEmpty() ? TEXT("") : TEXT("; skipped "), *Why);
 				}
 			}
 			if (FStats* St = Stats.Find(Key)) St->Ms = (FPlatformTime::Seconds() - T0) * 1000.0;

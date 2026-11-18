@@ -123,6 +123,7 @@ namespace JeebGround
 			const float Rocky = JeebWorld::RockMask(P) * JeebWorld::Smooth(0.45f, 0.75f, N1 * 0.7f + N2 * 0.3f) * 0.9f;
 			const float High = JeebWorld::Smooth(3400.f, 4800.f, Z + 700.f * (N1 - 0.5f)) * JeebWorld::Smooth(0.4f, 0.7f, N2) * JeebWorld::Smooth(0.96f, 0.86f, Up) * 0.8f;   // (only where the crest slopes too: never a blob on a flat top)
 			M.Rock = FMath::Clamp(FMath::Max3(Steep, Rocky, High), 0.f, 1.f);
+			M.Rock *= 1.f - JeebSteele::Settled(X, Y);   // (Steele Creek's streets and yards are trodden earth and grass, not the rocky southwest's patches)
 		}
 		// Mud: the river beds (under the water) and a wet, ragged strip along their banks; the pond's edge
 		{

@@ -45,6 +45,9 @@ public:
 	void SetupPerson(FName InKey, const FNpcLook& InLook) { PersonKey = InKey; Look = InLook; Setup(ENpcRole::QuestGiver); }
 	FName GetPersonKey() const { return PersonKey; }
 	bool IsQuestGiver() const { return Role == ENpcRole::QuestGiver; }
+	// Steele Creek's people (2026-11-18), set before Setup: Folk 0 townsfolk and knights as before, 1 a troll, 2 a wizard; a name
+	// and a first greeting of their own (empty: the role's)
+	void SetFolk(uint8 InFolk, const FString& InName, const FString& InHello) { Folk = InFolk; NameOverride = InName; FirstHello = InHello; }
 
 	ENpcRole GetRole() const { return Role; }
 	FString GetNpcName() const;
@@ -79,4 +82,6 @@ private:
 	float StuckT = 0.f;
 	FName PersonKey;          // (quest givers)
 	FNpcLook Look;
+	uint8 Folk = 0;
+	FString NameOverride, FirstHello;
 };

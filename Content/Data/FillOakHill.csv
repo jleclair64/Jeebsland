@@ -150,3 +150,52 @@ RiverRest,-48.5,-5,180,7002,1,-1,townbuild2: river lawn (south-west) by the bank
 BenchNook,-47,-15,180,7003,1,-1,townbuild2: river lawn (south-west) bench looking at the river
 BenchNook,21,-32.5,135,7004,1,-1,townbuild2: south-east lawn bench facing the road
 FlowerClump,27.5,-29.5,180,7005,1,-1,townbuild2: south-east lawn flowers at its edge
+# Steele Creek (townbuild2 2026-11-18; Site Steele: E, N are metres from the town centre, SteeleCreek.h): the forge yard, shop fronts, lamps, doorsteps, the quarry and the landing (made by Saved/Steele/genfill.py)
+SmithYard,13.80,-3.20,180,7000,1,-1,steele: forge yard - left of the smithy door,Steele
+WoodYard,14.60,7.40,180,7001,1,-1,steele: forge yard - fuel for the forge,Steele
+CartCorner,-1.50,-7.80,0,7002,1,-1,steele: forge yard - ore cart,Steele
+LogCorner,5.50,7.80,-90,7003,1,-1,steele: forge yard - quench cauldron,Steele
+BarrelRow,23.00,-5.80,90,7004,1,-1,steele: south of the smithy,Steele
+StorageCorner,25.50,9.60,-90,7005,1,-1,steele: north of the smithy,Steele
+Workbench,30.50,2.00,0,7006,1,-1,steele: behind the smithy,Steele
+ShopFront,-19.23,4.44,0,7007,1,-1,steele: store front,Steele
+BarrelRow,-19.43,-0.96,0,7008,1,-1,steele: store front,Steele
+PlanterPair,-0.99,15.73,90,7009,1,-1,steele: bank door,Steele
+SackCorner,-1.18,-14.78,-90,7010,1,-1,steele: ore market,Steele
+StorageCorner,5.22,-14.78,-90,7011,1,-1,steele: ore market,Steele
+WashingCorner,-17.50,-8.50,90,7012,1,-1,steele: by the well,Steele
+SteeleLamp,-20.89,18.82,121,7013,1,-1,steele: street lamp,Steele
+SteeleLamp,-40.79,30.98,121,7014,1,-1,steele: street lamp,Steele
+SteeleLamp,-61.09,42.66,119,7015,1,-1,steele: street lamp,Steele
+SteeleLamp,-83.34,56.05,122,7016,1,-1,steele: street lamp,Steele
+SteeleLamp,-7.30,7.83,138,7017,1,-1,steele: street lamp,Steele
+SteeleLamp,17.91,-14.73,146,7018,1,-1,steele: street lamp,Steele
+SteeleLamp,-17.28,-23.04,-143,7019,1,-1,steele: street lamp,Steele
+SteeleLamp,-38.64,-39.99,37,7020,1,-1,steele: street lamp,Steele
+SteeleLamp,21.75,26.93,41,7021,1,-1,steele: street lamp,Steele
+SteeleLamp,37.60,44.40,45,7022,1,-1,steele: street lamp,Steele
+SteeleLamp,15.63,-23.58,-34,7023,1,-1,steele: street lamp,Steele
+Junction,-13.22,2.90,0,7024,1,-1,steele: sign where the high street leaves the yard,Steele
+Junction,-95.08,70.65,0,7025,1,-1,steele: sign where the road turns north,Steele
+DoorstepBench,-33.89,29.21,122,7026,1,-1,steele: House1 doorstep,Steele
+FrontPots,-44.37,34.37,122,7027,1,-1,steele: House2 doorstep,Steele
+DoorstepPots,-60.97,47.10,122,7028,1,-1,steele: House3 doorstep,Steele
+DoorstepBox,-41.84,17.12,-58,7029,1,-1,steele: House4 doorstep,Steele
+DoorstepCandles,-52.04,26.11,-58,7030,1,-1,steele: House5 doorstep,Steele
+DoorstepBench,29.81,-23.07,135,7031,1,-1,steele: House6 doorstep,Steele
+FrontPots,18.71,-33.93,-45,7032,1,-1,steele: House7 doorstep,Steele
+DoorstepPots,38.03,-36.92,225,7033,1,-1,steele: House8 doorstep,Steele
+DoorstepBox,-26.92,-19.14,42,7034,1,-1,steele: House9 doorstep,Steele
+DoorstepCandles,-27.31,-35.68,222,7035,1,-1,steele: House10 doorstep,Steele
+DoorstepBench,11.01,29.83,70,7036,1,-1,steele: House11 doorstep,Steele
+WoodStack,-24.37,28.05,122,7037,1,-1,steele: House1 side yard,Steele
+GardenTools,-51.13,45.93,122,7038,1,-1,steele: House3 side yard,Steele
+WashingCorner,-60.65,25.43,-58,7039,1,-1,steele: House5 side yard,Steele
+LogCorner,9.87,-32.68,-45,7040,1,-1,steele: House7 side yard,Steele
+VegCorner,-24.12,-9.97,42,7041,1,-1,steele: House9 side yard,Steele
+StumpCorner,17.79,36.62,70,7042,1,-1,steele: House11 side yard,Steele
+CartCorner,50.00,57.00,225,7043,1,-1,steele: quarry - ore cart,Steele
+BarrelRow,47.00,63.00,135,7044,1,-1,steele: quarry,Steele
+RockGroup,90.00,62.00,0,7045,1,-1,steele: quarry face,Steele
+RockGroup,64.00,94.00,90,7046,1,-1,steele: quarry face,Steele
+RiverRest,-70.00,-81.00,250,7047,1,-1,steele: river landing,Steele

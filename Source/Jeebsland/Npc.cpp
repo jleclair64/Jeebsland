@@ -25,6 +25,7 @@ ANpc::ANpc()
 
 FString ANpc::GetNpcName() const
 {
+	if (!NameOverride.IsEmpty()) return NameOverride;   // (Steele Creek's people, SetFolk)
 	switch (Role)
 	{
 	case ENpcRole::Shopkeeper: return TEXT("Brindle, the Trader");
@@ -90,7 +91,8 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	const bool bSmith = (Role == ENpcRole::Blacksmith);
 	const bool bKnight = (Role == ENpcRole::GateKnight);
 	const bool bBanker = (Role == ENpcRole::Banker);
-	const FLinearColor Skin = bSmith ? FLinearColor(0.72f, 0.48f, 0.34f) : FLinearColor(0.82f, 0.60f, 0.45f);
+	const bool bTroll = Folk == 1, bWizard = Folk == 2;   // (Steele Creek's trolls and wizards, SetFolk: 2026-11-18)
+	const FLinearColor Skin = bTroll ? FLinearColor(0.38f, 0.47f, 0.36f) : bSmith ? FLinearColor(0.72f, 0.48f, 0.34f) : FLinearColor(0.82f, 0.60f, 0.45f);
 	FLinearColor Tunic = bBanker ? FLinearColor(0.08f, 0.14f, 0.12f) : bSmith ? FLinearColor(0.30f, 0.30f, 0.33f) : (bKnight ? FLinearColor(0.60f, 0.62f, 0.68f) : FLinearColor(0.50f, 0.22f, 0.12f));
 	const FLinearColor Pants = bKnight ? FLinearColor(0.40f, 0.42f, 0.48f) : FLinearColor(0.20f, 0.16f, 0.12f);
 	const bool bQuest = (Role == ENpcRole::QuestGiver);   // (a quest giver: a villager's body in their own colours, QuestsPeople.csv)
@@ -101,10 +103,11 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	static const FLinearColor VHair[JeebLore::NumVillagers] = {
 		{0.75f,0.75f,0.78f,1.f}, {0.55f,0.35f,0.12f,1.f}, {0.80f,0.80f,0.82f,1.f}, {0.12f,0.08f,0.05f,1.f}, {0.85f,0.65f,0.25f,1.f},
 		{0.70f,0.70f,0.72f,1.f}, {0.30f,0.15f,0.08f,1.f}, {0.20f,0.20f,0.22f,1.f}, {0.50f,0.20f,0.08f,1.f}, {0.40f,0.28f,0.15f,1.f} };
-	const float Bulk = bSmith ? 1.18f : 1.f;
+	const float Bulk = (bSmith ? 1.18f : 1.f) * (bTroll ? 1.22f : 1.f);
+	if (bWizard) Tunic = Role == ENpcRole::Banker ? FLinearColor(0.10f, 0.12f, 0.36f) : FLinearColor(0.28f, 0.14f, 0.40f);   // a robe
 	if (bVill)
 	{
-		Tunic = bQuest ? Look.Tunic : VTunic[VillagerIdx];
+		if (bQuest) Tunic = Look.Tunic; else if (!bWizard) Tunic = VTunic[VillagerIdx];
 		const float Sc = bQuest ? Look.Scale : (VillagerIdx == 1) ? 0.78f : (VillagerIdx == 5 ? 0.94f : 1.f);   // Tobin is a boy
 		if (Sc != 1.f)
 		{
@@ -170,6 +173,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	case ENpcRole::Banker:
 	{
 		Part(HeadPivot, Sphere, FVector(-3.f, 0.f, 20.f), FRotator::ZeroRotator, FVector(0.33f, 0.30f, 0.29f), FLinearColor(0.7f, 0.7f, 0.72f));   // grey hair
+		if (bWizard) break;   // (a wizard banker wears his own hat, below)
 		Part(HeadPivot, Cyl, FVector(0.f, 0.f, 28.f), FRotator::ZeroRotator, FVector(0.42f, 0.42f, 0.03f), FLinearColor(0.05f, 0.05f, 0.06f));      // top hat brim
 		Part(HeadPivot, Cyl, FVector(0.f, 0.f, 44.f), FRotator::ZeroRotator, FVector(0.26f, 0.26f, 0.32f), FLinearColor(0.05f, 0.05f, 0.06f));      // top hat
 		Part(HeadPivot, Cyl, FVector(0.f, 0.f, 33.f), FRotator::ZeroRotator, FVector(0.27f, 0.27f, 0.04f), FLinearColor(0.9f, 0.7f, 0.15f));        // gold band
@@ -182,7 +186,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	{
 		const FLinearColor Hair = bQuest ? Look.Hair : VHair[VillagerIdx];
 		Part(HeadPivot, Sphere, FVector(-3.f, 0.f, 20.f), FRotator::ZeroRotator, FVector(0.33f, 0.30f, 0.29f), Hair);   // hair
-		switch (bQuest ? Look.Hat : VillagerIdx)
+		if (bQuest || (!bWizard && !bTroll)) switch (bQuest ? Look.Hat : VillagerIdx)
 		{
 		case 0:   // Mabry: a crooked herbalist's hat
 			Part(HeadPivot, Cyl, FVector(0.f, 0.f, 28.f), FRotator::ZeroRotator, FVector(0.46f, 0.46f, 0.03f), FLinearColor(0.25f, 0.12f, 0.35f));
@@ -222,6 +226,27 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 		break;
 	}
 	}
+
+	// Steele Creek's folk (2026-11-18): a troll stands taller and broader, with tusks and a heavy brow; a wizard has a tall pointed
+	// hat, a long white beard and a robe to the ground
+	if (bTroll)
+	{
+		BodyRoot->SetRelativeScale3D(FVector(1.16f));
+		Part(HeadPivot, Cone, FVector(12.f, -6.f, 2.f), FRotator(0.f, 0.f, 0.f), FVector(0.035f, 0.035f, 0.09f), FLinearColor(0.92f, 0.88f, 0.76f));   // tusks
+		Part(HeadPivot, Cone, FVector(12.f, 6.f, 2.f), FRotator(0.f, 0.f, 0.f), FVector(0.035f, 0.035f, 0.09f), FLinearColor(0.92f, 0.88f, 0.76f));
+		Part(HeadPivot, Cube, FVector(11.f, 0.f, 23.f), FRotator(0.f, 0.f, 0.f), FVector(0.06f, 0.26f, 0.05f), Skin * 0.8f);                           // brow
+		Part(HeadPivot, Sphere, FVector(0.f, -15.f, 16.f), FRotator::ZeroRotator, FVector(0.05f, 0.1f, 0.12f), Skin);                                // ears
+		Part(HeadPivot, Sphere, FVector(0.f, 15.f, 16.f), FRotator::ZeroRotator, FVector(0.05f, 0.1f, 0.12f), Skin);
+	}
+	if (bWizard)
+	{
+		const FLinearColor Hat = Tunic * 0.85f, Star(0.95f, 0.80f, 0.30f);
+		Part(HeadPivot, Cyl, FVector(0.f, 0.f, 27.f), FRotator::ZeroRotator, FVector(0.50f, 0.50f, 0.03f), Hat);                       // brim
+		Part(HeadPivot, Cone, FVector(-2.f, 0.f, 52.f), FRotator(0.f, 0.f, -8.f), FVector(0.30f, 0.30f, 0.52f), Hat);                  // tall pointed crown
+		Part(HeadPivot, Cyl, FVector(0.f, 0.f, 30.f), FRotator::ZeroRotator, FVector(0.31f, 0.31f, 0.03f), Star);                       // band
+		Part(HeadPivot, Cone, FVector(10.f, 0.f, -4.f), FRotator(180.f, 0.f, 0.f), FVector(0.22f, 0.24f, 0.34f), FLinearColor(0.93f, 0.93f, 0.90f));   // beard
+		Part(BodyRoot, Cone, FVector(0.f, 0.f, 50.f), FRotator::ZeroRotator, FVector(0.62f, 0.52f, 1.0f), Tunic);                     // robe to the ground
+	}
 }
 
 TArray<FString> ANpc::MakeConversation(int32* OutLore)
@@ -250,6 +275,8 @@ TArray<FString> ANpc::MakeConversation(int32* OutLore)
 		break;
 	}
 	}
+
+	if (!FirstHello.IsEmpty() && bFirst && Lines.Num() > 0) Lines[0] = FirstHello;   // (Steele Creek's people greet in their own words, SetFolk)
 
 	// This visit's fragment of the lore; it goes into the Lore tab
 	const TArray<int32> Mine = JeebLore::BySpeaker(SpeakerIdx());
