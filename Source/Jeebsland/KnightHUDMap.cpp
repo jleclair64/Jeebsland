@@ -1,6 +1,7 @@
 #include "KnightHUD.h"
 #include "KnightCharacter.h"
 #include "SkillComponent.h"
+#include "QuestComponent.h"
 #include "Misc/Crc.h"
 #include "JeebGameInstance.h"
 #include "Terrain.h"
@@ -732,6 +733,20 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 		HDTextSize(Hint, TW, TH, Font, 0.85f);
 		Tile(X + (S - TW) * 0.5f - 8.f, Y + S - TH - 14.f, TW + 16.f, TH + 6.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.5f, false);
 		HDText(Hint, FLinearColor(0.95f, 0.95f, 0.95f), X + (S - TW) * 0.5f, Y + S - TH - 11.f, Font, 0.85f);
+	}
+
+	// ---- The tracked quest's next place (KnightHUDQuests.cpp); held to the map's edge when it is off the map ----
+	{
+		FVector2D QAt;
+		FString QWhat;
+		if (Knight->GetQuests() && Knight->GetQuests()->Objective(QAt, QWhat))
+		{
+			FVector2D Q = ToScreen(QAt);
+			const bool bQIn = Inside(Q, 14.f);
+			if (!bQIn) { Q.X = FMath::Clamp(Q.X, X + 14.f, X + S - 14.f); Q.Y = FMath::Clamp(Q.Y, Y + 14.f, Y + S - 14.f); }
+			DrawQuestMapMark(Knight, Q, bQIn ? 1.f : 0.75f);
+			if (bQIn && Over(Q.X - 14.f, Q.Y - 14.f, 28.f, 28.f)) SetTip({ QWhat });
+		}
 	}
 
 	// ---- You: an arrow pointing the way you face (only you: never other players). Off the map's edge, a smaller one at the edge ----

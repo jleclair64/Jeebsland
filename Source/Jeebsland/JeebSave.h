@@ -42,6 +42,11 @@ public:
 	UPROPERTY() TArray<int32> LoreFound;
 	UPROPERTY() TArray<uint8> Explored;   // map fog (USkillComponent::Explored)
 	UPROPERTY() int64 LastGambleHour = -1;
+	// Quests (UQuestComponent, 2026-11-18): one entry per quest started, by its key in Quests.csv. Older saves have none.
+	UPROPERTY() TArray<FString> QuestKeys;
+	UPROPERTY() TArray<int32> QuestSteps;
+	UPROPERTY() TArray<int32> QuestCounts;
+	UPROPERTY() TArray<uint8> QuestDone;
 
 	// Where the knight stood (online: you log back in where you logged out)
 	UPROPERTY() bool bHasPos = false;

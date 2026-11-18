@@ -31,6 +31,7 @@ FString ANpc::GetNpcName() const
 	case ENpcRole::Blacksmith: return TEXT("Hobb Ironhand");
 	case ENpcRole::Villager:   return JeebLore::SpeakerName(3 + VillagerIdx);
 	case ENpcRole::Banker:     return JeebLore::SpeakerName(JeebLore::BankerSpeaker);
+	case ENpcRole::QuestGiver: return Look.Name;
 	default:                   return TEXT("Sir Aldous, Gate Knight");
 	}
 }
@@ -43,6 +44,7 @@ int32 ANpc::SpeakerIdx() const
 	case ENpcRole::Blacksmith: return 1;
 	case ENpcRole::Villager:   return 3 + VillagerIdx;
 	case ENpcRole::Banker:     return JeebLore::BankerSpeaker;
+	case ENpcRole::QuestGiver: return -1;   // (no lore: they talk about their quests, QuestComponent.cpp)
 	default:                   return 2;
 	}
 }
@@ -91,7 +93,8 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	const FLinearColor Skin = bSmith ? FLinearColor(0.72f, 0.48f, 0.34f) : FLinearColor(0.82f, 0.60f, 0.45f);
 	FLinearColor Tunic = bBanker ? FLinearColor(0.08f, 0.14f, 0.12f) : bSmith ? FLinearColor(0.30f, 0.30f, 0.33f) : (bKnight ? FLinearColor(0.60f, 0.62f, 0.68f) : FLinearColor(0.50f, 0.22f, 0.12f));
 	const FLinearColor Pants = bKnight ? FLinearColor(0.40f, 0.42f, 0.48f) : FLinearColor(0.20f, 0.16f, 0.12f);
-	const bool bVill = (Role == ENpcRole::Villager);
+	const bool bQuest = (Role == ENpcRole::QuestGiver);   // (a quest giver: a villager's body in their own colours, QuestsPeople.csv)
+	const bool bVill = (Role == ENpcRole::Villager) || bQuest;
 	static const FLinearColor VTunic[JeebLore::NumVillagers] = {
 		{0.35f,0.20f,0.45f,1.f}, {0.25f,0.45f,0.30f,1.f}, {0.40f,0.10f,0.12f,1.f}, {0.40f,0.32f,0.20f,1.f}, {0.80f,0.72f,0.55f,1.f},
 		{0.18f,0.18f,0.20f,1.f}, {0.15f,0.35f,0.50f,1.f}, {0.45f,0.30f,0.15f,1.f}, {0.55f,0.18f,0.35f,1.f}, {0.50f,0.40f,0.28f,1.f} };
@@ -101,8 +104,8 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	const float Bulk = bSmith ? 1.18f : 1.f;
 	if (bVill)
 	{
-		Tunic = VTunic[VillagerIdx];
-		const float Sc = (VillagerIdx == 1) ? 0.78f : (VillagerIdx == 5 ? 0.94f : 1.f);   // Tobin is a boy
+		Tunic = bQuest ? Look.Tunic : VTunic[VillagerIdx];
+		const float Sc = bQuest ? Look.Scale : (VillagerIdx == 1) ? 0.78f : (VillagerIdx == 5 ? 0.94f : 1.f);   // Tobin is a boy
 		if (Sc != 1.f)
 		{
 			SetActorScale3D(FVector(Sc));
@@ -175,10 +178,11 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 		break;
 	}
 	case ENpcRole::Villager:
+	case ENpcRole::QuestGiver:
 	{
-		const FLinearColor Hair = VHair[VillagerIdx];
+		const FLinearColor Hair = bQuest ? Look.Hair : VHair[VillagerIdx];
 		Part(HeadPivot, Sphere, FVector(-3.f, 0.f, 20.f), FRotator::ZeroRotator, FVector(0.33f, 0.30f, 0.29f), Hair);   // hair
-		switch (VillagerIdx)
+		switch (bQuest ? Look.Hat : VillagerIdx)
 		{
 		case 0:   // Mabry: a crooked herbalist's hat
 			Part(HeadPivot, Cyl, FVector(0.f, 0.f, 28.f), FRotator::ZeroRotator, FVector(0.46f, 0.46f, 0.03f), FLinearColor(0.25f, 0.12f, 0.35f));
@@ -199,7 +203,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 			break;
 		default: break;
 		}
-		if (VillagerIdx == 5 || VillagerIdx == 9 || VillagerIdx == 2)   // aprons and shawls
+		if (bQuest ? Look.bApron : (VillagerIdx == 5 || VillagerIdx == 9 || VillagerIdx == 2))   // aprons and shawls
 			Part(BodyRoot, Cube, FVector(21.f, 0.f, 105.f), FRotator::ZeroRotator, FVector(0.05f, 0.4f, 0.5f), FLinearColor(0.82f, 0.78f, 0.68f));
 		break;
 	}

@@ -18,6 +18,7 @@
 #include "InputModifiers.h"
 #include "EnhancedInputComponent.h"
 #include "SkillComponent.h"
+#include "QuestComponent.h"
 #include "ResourceNode.h"
 #include "EngineUtils.h"
 #include "Engine/Engine.h"
@@ -52,6 +53,7 @@ AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
 	PrimaryActorTick.bCanEverTick = true;
 
 	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
+	Quests = CreateDefaultSubobject<UQuestComponent>(TEXT("Quests"));
 
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;

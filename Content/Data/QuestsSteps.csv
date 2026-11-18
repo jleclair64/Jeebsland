@@ -1,0 +1,23 @@
+Quest,Type,At,Target,Count,Radius,Mark,Log,Lines,Waiting
+# The steps of each quest in Quests.csv, in order (rows of one quest must stay in their order; quests may be in any order).
+# Saves remember which step a player is on by its number, so add new steps at the END of a quest that players already have.
+# Type: talk (talk to At), bring (take Count of the item Target to At: they are taken from the pack), kill (beat Count of Target: PenKnight),
+#   visit (go to Target: Ruin = any of the old stone ruins in the forest round Oak Hill, or "N E" = metres north and east of Oak Hill's plaza; within Radius metres).
+# At: the Key of a person in QuestsPeople.csv. Target for bring: an item name or key (Logs, TinOre, IronOre, Perch, Trout ...).
+# Mark: where the map points while this step is not ready: a person's Key, ruin, pen, pond, rocks, or "N E" (metres from Oak Hill's plaza). Empty: the map points at At,
+#   at the sparring knight for kill, at the nearest ruin for visit Ruin; a bring step with nothing marked points at At once you carry enough.
+# Log: the line in the quest log and the tracker. Lines: what At says when the step is done ("|" for a new line; for visit, the message when you get there).
+# Waiting: what At says when you come for a bring step without enough (empty: the Log line and how many you have).
+# The LAST step should happen at the giver (talk or bring At the giver): its Lines are followed by the quest's Done lines and the reward.
+Kindling,bring,Marta,Logs,5,,,Chop 5 logs from the oaks round town and bring them to Marta.,Five good logs! That'll keep the old hall warm a good few nights.,"Five logs is all I ask. Any oak round town will do, love."
+Hearth,talk,Pell,,,,,Look in on Pell by the smithy.,"Marta sent you? Course she did.|Truth is, I've no ore left. The town's tools are all cracked, and Blackrock won't sell us a pinch of tin.|There's tin in the grey rocks just east of Blackrock's walls, over the river. Bring me six lumps and I can mend the lot.",
+Hearth,bring,Pell,TinOre,6,,rocks,"Mine 6 tin ore from the grey rocks east of Blackrock's walls, over the river, and bring it to Pell.",Six good lumps! Listen to that forge roar.|Go and tell Marta the hoes and axes will be mended by morning.,"Tin's in the grey rocks east of Blackrock's walls. Six lumps, if you can."
+Hearth,talk,Marta,,,,,Tell Marta the forge is lit again.,"The forge is lit? Oh, that boy. He'll be grinning for a week.",
+Supper,bring,Nan,Perch,4,,pond,Catch 4 perch at the pond south of Blackrock and bring them to Nan.,Lovely fat ones! Give me a moment...|There. Still warm. Take it to Captain Corin for the watch. He'll pretend he isn't hungry.,"Four perch for the pie, dear. The pond south of Blackrock has plenty."
+Supper,talk,Corin,,,,,Take Nan's pie to Captain Corin.,"A pie? From Nan? Don't tell the lads, or there'll be none left for me.|Thank you, friend. Tell her the watch sends its thanks.",
+Supper,talk,Nan,,,,,Tell Nan the watch got their supper.,"Back already! Did he eat it all?",
+Sparring,kill,,PenKnight,2,,pen,Best the sparring knight in Blackrock's old pig pen twice.,,
+Sparring,talk,Corin,,,,,Tell Captain Corin how the sparring knight fights.,"Twice? Ha! He lifts his sword high before every cut, you say? That's worth knowing.",
+Ruins,visit,,Ruin,,14,,Find one of the old stone ruins in the forest round Oak Hill.,You've found one of the old ruins. Wil will want to hear about this.,
+Ruins,talk,Wil,,,,,Tell Wil what you found.,"They're real?! A round tower with a little window? I knew it!|I'm going to draw it. Don't tell Gran I want to go there, though. Not till I'm bigger.",
+Iron,bring,Pell,IronOre,5,,,Mine 5 iron ore from the dark rocks in the hills and bring it to Pell.,That's proper iron. These hinges will outlast us all.,"Five lumps of iron ore. The dark rocks, mind: the grey ones are tin."

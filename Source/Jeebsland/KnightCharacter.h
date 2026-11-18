@@ -15,6 +15,7 @@ class UStaticMeshComponent;
 class UInputMappingContext;
 class UInputAction;
 class USkillComponent;
+class UQuestComponent;
 class AResourceNode;
 class UInputModifierScalar;
 class UInstancedStaticMeshComponent;
@@ -249,6 +250,7 @@ public:
 	bool IsGuardBroken() const { return bGuardBroken; }
 	bool IsBlocking() const { return bBlocking; }
 	USkillComponent* GetSkills() const { return Skills; }
+	UQuestComponent* GetQuests() const { return Quests; }   // (this character's quests, QuestComponent.h)
 	// Text for the "Press E ..." prompt, or false if nothing is in reach
 	bool GetInteractPrompt(FString& OutText) const;
 	// Where the floating E prompt hangs: just in front of and above the thing you can use. bOutE is false for things that are not an E action (a locked door you cannot pick, a place to fish).
@@ -485,6 +487,7 @@ private:
 	UPROPERTY() UInputAction* SprintAction = nullptr;
 	UPROPERTY() UInputAction* InteractAction = nullptr;
 	UPROPERTY() USkillComponent* Skills = nullptr;
+	UPROPERTY() UQuestComponent* Quests = nullptr;
 	UPROPERTY() UInputAction* SettingsAction = nullptr;
 	UPROPERTY() UInputAction* CrouchAction = nullptr;
 	UPROPERTY() UInputAction* BlockAction = nullptr;

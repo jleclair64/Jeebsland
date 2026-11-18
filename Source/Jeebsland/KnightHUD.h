@@ -29,6 +29,7 @@ public:
 	void ChatChar(TCHAR C);
 	bool IsChatOpen() const { return bChatOpen; }
 	void ShotOpenLook() { SettingsTab = 5; bSettingsWasOpen = true; }   // (test pictures: -ShotLookPanel)
+	void OpenQuestLog() { SettingsTab = 6; bSettingsWasOpen = true; }   // the Escape screen's QUESTS tab (call with the screen open)
 
 	// The line at the bottom of the store / smithy screen ("Bought ...", "Your pack is full.")
 	void SetShopMsg(const FString& Text, float Seconds) { ShopMsg = Text; ShopMsgUntil = GetWorld() ? GetWorld()->GetTimeSeconds() + Seconds : 0.f; }
@@ -180,9 +181,15 @@ private:
 	float ShopMsgUntil = 0.f;
 
 	// Settings screen
-	int32 SettingsTab = 0;       // 0 = map, 1 = settings, 2 = controls, 3 = dictionary, 4 = lore, 5 = look (not in Shipping)
+	int32 SettingsTab = 0;       // 0 = map, 1 = settings, 2 = controls, 3 = dictionary, 4 = lore, 5 = look (not in Shipping), 6 = quests
 	// The LOOK tab (KnightHUDLook.cpp)
 	void DrawLookTab(float PX, float PY, float PW, float PH);
+	// Quests (KnightHUDQuests.cpp): the marks over quest givers, the tracker under the frame rate, "QUEST COMPLETE", the J key,
+	// the QUESTS tab of the Escape screen (SettingsTab 6) and the map's marker for the tracked quest
+	void DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC);
+	void DrawQuestLog(AKnightCharacter* Knight, float PX, float PY, float PW, float PH);
+	void DrawQuestMapMark(AKnightCharacter* Knight, const FVector2D& Screen, float Size);
+	FName QuestSel;
 	void LookTypeChar(TCHAR C);
 	void LookTypeKey(const FKey& Key);
 	int32 LookGroup = 0;

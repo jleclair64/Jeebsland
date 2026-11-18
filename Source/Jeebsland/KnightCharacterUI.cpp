@@ -15,6 +15,7 @@
 #include "InputModifiers.h"
 #include "EnhancedInputComponent.h"
 #include "SkillComponent.h"
+#include "QuestComponent.h"
 #include "ResourceNode.h"
 #include "EngineUtils.h"
 #include "Engine/Engine.h"
@@ -157,7 +158,9 @@ void AKnightCharacter::StartDialogue(ANpc* Npc)
 	if (!Npc || IsUIOpen()) return;
 	TradeNpc = Npc;
 	int32 Lore = -1;
-	DialogueLines = Npc->MakeConversation(&Lore);
+	// (Oak Hill's quest givers: what they say comes from this character's quests, QuestComponent.cpp)
+	if (Npc->IsQuestGiver() && Quests) DialogueLines = Quests->MakeTalk(Npc);
+	else DialogueLines = Npc->MakeConversation(&Lore);
 	if (Lore >= 0) Inv(EInvOp::Lore, Lore);
 	DialogueIdx = 0;
 	bDialogueOpen = true;
@@ -177,6 +180,7 @@ void AKnightCharacter::AdvanceDialogue()
 	++DialogueIdx;
 	if (DialogueIdx < DialogueLines.Num()) return;
 
+	if (Quests) Quests->EndTalk(true);   // (an offer clicked through to the end is accepted)
 	// The conversation is over: on to the trade screen if they have one
 	bDialogueOpen = false;
 	ANpc* Npc = TradeNpc.Get();
@@ -197,6 +201,7 @@ void AKnightCharacter::CloseDialogue()
 {
 	if (!bDialogueOpen) return;
 	bDialogueOpen = false;
+	if (Quests) Quests->EndTalk(false);
 	if (ANpc* N = TradeNpc.Get()) N->SetTalking(false);
 	RefreshUIMode();
 }
