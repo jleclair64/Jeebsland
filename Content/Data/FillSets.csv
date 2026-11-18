@@ -79,7 +79,6 @@ PicketCorner,WoodTub,0.9,0,0,0,1,drop|turn=180
 # StumpCorner: an old stump with a shrub and a plant clump
 StumpCorner,StumpRooty,0,0,0,0,1,turn=180|alt=StumpGrass/StumpMushroom
 StumpCorner,ShrubLow,1.66,0.31,0,0,1,turn=180
-StumpCorner,PlantClump,-0.44,1.55,0,15,1,drop
 # BushClump: three bushes
 BushClump,BushLeafy,0,0,0,0,1,turn=180|alt=BushRound/BushBall/BushSpiky
 BushClump,BushBerries,1.74,0.39,0,0,1,turn=180|alt=BushDome
@@ -122,7 +121,6 @@ LampPillar,LampPostPillar,0,0,0,0,1,
 LampPillar,ShrubLow,0,-0.85,0,0,1,turn=180|drop
 # LampGallows: gallows lamp post with a plant clump
 LampGallows,LampPostGallows,0,0,0,0,1,
-LampGallows,PlantClump,0,-1,0,0,1,drop
 # Junction: a signpost with a bush and a small mossy boulder
 Junction,Signpost,0,0,0,0,1,
 Junction,BushBall,-1.15,-0.55,0,0,1,turn=180|alt=BushRound
@@ -137,7 +135,6 @@ BenchNook,BushRound,-1.83,-0.1,0,0,1,turn=180|alt=BushBerries
 BenchNook,BushWhiteFlowers,1.74,-0.1,0,0,1,turn=180|alt=BushBerries
 # BenchNookStone: a stone bench with a plant clump and an amphora
 BenchNookStone,BenchStone,0,0,0,0,1,
-BenchNookStone,PlantClump,0,-0.85,0,0,1,
 BenchNookStone,PotAmphora,1.31,0,0,0,1,turn=180
 # ShopFront (wall-backed): a trestle table of goods with a crate and a small barrel
 ShopFront,TrestleTable,0,0.6,0,0,1,
@@ -228,7 +225,6 @@ RuinPillar,ShrubLow,1.75,1.1,0,0,1,turn=180
 # RuinWell: an old well with rubble
 RuinWell,WellOld,0,0,0,0,1,
 RuinWell,BoulderMossy,3.05,-0.3,0,0,0.6,turn=180
-RuinWell,PlantClump,-0.23,1.79,0,0,1,
 # RuinSteps: old walled steps going nowhere with a rooty stump
 RuinSteps,StairsWalled,0,0,0,0,1,alt=StairsStone/StairsStoneShort
 RuinSteps,StumpRooty,3.2,0.1,0,30,1,
@@ -342,7 +338,6 @@ RiverRest,BenchStone,1.6,2,0,180,1,drop
 ForestFloor,StumpGrass,0,0,0,0,1,turn=180|alt=StumpMushroom/StumpRooty
 ForestFloor,LogPine,2.87,0.43,0,0,1,alt=LogRoots
 ForestFloor,RocksForest,-2.48,0.62,0,0,1,turn=180|drop
-ForestFloor,PlantClump,0.2,1.6,0,0,1,
 ForestFloor,ShrubLow,-1.13,-1.25,0,0,1,turn=180
 # RockGroup: open-land rocks: a tall rock with a boulder
 RockGroup,RockTall,0,0,0,0,1,turn=180
@@ -420,19 +415,14 @@ GraveyardEnclosure,WallPillar,-3.636,-7.900,0,0,1,
 # GraveRow (fillfix 2026-11-16): five graves side by side along X, fronts +Y. No headstone model exists in TownDecor or Filler, so each
 # grave is a stone post (WallPillarEnd at 65%, turned to face front) at its head, a planted bed (PlantClump) in front and a grave candle.
 GraveRow,WallPillarEnd,-4,0,0,90,0.65,
-GraveRow,PlantClump,-4,0.98,0,90,1,
 GraveRow,CandleCageShort,-3.45,0.15,0,0,1,drop
 GraveRow,WallPillarEnd,-2,0,0,90,0.65,
-GraveRow,PlantClump,-2,0.98,0,90,1,
 GraveRow,CandleCageTall,-1.45,0.15,0,0,1,drop
 GraveRow,WallPillarEnd,0,0,0,90,0.65,
-GraveRow,PlantClump,0,0.98,0,90,1,
 GraveRow,CandleCageShort,0.55,0.15,0,0,1,drop
 GraveRow,WallPillarEnd,2,0,0,90,0.65,
-GraveRow,PlantClump,2,0.98,0,90,1,
 GraveRow,CandleCageTall,2.55,0.15,0,0,1,drop
 GraveRow,WallPillarEnd,4,0,0,90,0.65,
-GraveRow,PlantClump,4,0.98,0,90,1,
 GraveRow,CandleCageShort,4.55,0.15,0,0,1,drop
 # --- Placement v2 (2026-11-16): small sets that plot uses place (FillUses.csv); fences now come only from the plots' runs
 # Bush1 (fence or corner): one bush of a seeded kind
@@ -462,7 +452,6 @@ BushRow,BushRound,1.55,0.7,0,0,1,drop|turn=180|alt=BushLeafy/BushDome/BushBall
 # FrontPots (against a house's front wall, beside the door): pots and a plant
 FrontPots,PotAmphora,0,0.4,0,0,1,turn=180
 FrontPots,PotJug,0.55,0.3,0,0,1,drop|turn=180
-FrontPots,PlantClump,-0.95,0.45,0,0,1,drop|turn=180
 # FrontFlowers (against a house's front wall): a flower bush pair
 FrontFlowers,BushWhiteFlowers,-0.7,0.65,0,0,1,turn=180|alt=BushBerries
 FrontFlowers,ShrubLow,0.6,0.5,0,0,1,drop|turn=180

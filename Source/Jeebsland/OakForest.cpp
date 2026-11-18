@@ -624,7 +624,7 @@ struct FOakForestBuild
 			else if (Pick < (bConifer ? 0.47f : 0.25f)) { Kind = K_Full1 + int32(Sc * 2.99f); Scale = FMath::Lerp(0.18f, 0.3f, Sc); ++Seedlings; }   // a spruce seedling (in its kind's count below)
 			else
 			{
-				const int32 Bu[8] = { K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_Plant, K_ShrubLow, K_BushLeafy };
+				const int32 Bu[8] = { K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_BushDome, K_ShrubLow, K_BushLeafy };   // (K_Plant, the PlantClump, removed 2026-11-17: owner "Delete these bushes")
 				Kind = Bu[int32(Sc * 7.99f)];
 				if (JeebWorld::Smooth(-0.32f, -0.12f, Noise(P, 9000.f, 3.3f, 8.8f)) < 0.5f && Sc > 0.75f) Kind = Sc > 0.87f ? K_FlowersW : K_FlowersY;   // flowering bushes in the glades
 				Scale = FMath::Lerp(0.8f, 1.5f, U.FRand());
