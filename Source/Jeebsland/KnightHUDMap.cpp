@@ -458,7 +458,12 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 			MapView = FVector2D(Under.X + Off.X * Span1, Under.Y - Off.Y * Span1);
 			ClampView();
 		}
-		if (bUIClick) { bMapPanning = true; MapPanMouse = Mouse; MapPanView = MapView; bUIClick = false; }   // (a click on the map is the map's, nothing else's)
+		if (bUIClick && TravelAsk < 0)
+		{
+			const int32 Marker = TravelMarkerAt(Knight, X, Y, S, Mouse);   // (a click on a visited town's marker asks to travel there; anywhere else it pans)
+			if (Marker >= 0) { TravelAsk = Marker; bUIClick = false; }
+			else { bMapPanning = true; MapPanMouse = Mouse; MapPanView = MapView; bUIClick = false; }
+		}
 	}
 	if (bMapPanning)
 	{
@@ -751,6 +756,9 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 		HDText(Hint, FLinearColor(0.95f, 0.95f, 0.95f), X + (S - TW) * 0.5f, Y + S - TH - 11.f, Font, 0.85f);
 	}
 
+	// ---- Fast travel: a gold ring on each town this account has visited (KnightHUDTravel.cpp) ----
+	DrawTravelMarkers(Knight, X, Y, S, bOverMap);
+
 	// ---- The tracked quest's next place (KnightHUDQuests.cpp); held to the map's edge when it is off the map ----
 	{
 		FVector2D QAt;
@@ -780,4 +788,5 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 	const float Sz = bIn ? 1.f : 0.7f;
 	Arrow(13.f * Sz, FLinearColor(0.f, 0.f, 0.f, 0.8f));
 	Arrow(10.f * Sz, bIn ? FLinearColor(1.f, 0.85f, 0.25f) : FLinearColor(1.f, 0.85f, 0.25f, 0.7f));
+	DrawTravelConfirm(Knight);   // (the "Travel to ...?" box, on top of the map)
 }

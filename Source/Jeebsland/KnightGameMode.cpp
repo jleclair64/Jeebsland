@@ -1,4 +1,5 @@
 #include "KnightGameMode.h"
+#include "FastTravel.h"
 #include "KnightGameState.h"
 #include "KnightCharacter.h"
 #include "KnightPlayerController.h"
@@ -170,6 +171,7 @@ void AKnightGameMode::TryLogin(AKnightPlayerController* PC, const FString& Name,
 	if (AKnightCharacter* Knight = Cast<AKnightCharacter>(PC->GetPawn()))
 	{
 		if (PC->PendingSave && PC->PendingSave->ApplyTo(Knight->GetSkills())) Knight->RefreshEquipment();
+		if (Knight->GetTravel()) Knight->GetTravel()->LoadAccount(Key);   // (the towns this account has visited, shared by its characters: FastTravel.cpp)
 		// TESTING ONLY: accounts listed in DefaultGame.ini ([Jeebsland.Testing] +MaxLevelAccounts=name) get every skill at 99
 		// when they log in, to try all the gear. Remove the line there to turn it off.
 		TArray<FString> MaxLevelAccounts;
