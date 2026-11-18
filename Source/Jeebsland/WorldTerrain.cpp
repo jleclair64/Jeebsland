@@ -12,7 +12,7 @@
 namespace
 {
 	constexpr int32 ChunkCells = 40;   // cells per chunk side
-	TAutoConsoleVariable<float> SkyFillVar(TEXT("jeeb.Ground.SkyFill"), 0.1f, TEXT("Light added to flat ground (M_Ground's grass) at the low sun, times ADayNight::Dusk: the grass blades are lit through and stay bright, flat ground would go dark where they stop (TownLab's WorldFill, 2026-11-14)"));
+	TAutoConsoleVariable<float> SkyFillVar(TEXT("jeeb.Ground.SkyFill"), 0.f, TEXT("Light added to flat ground (M_Ground's grass) at the low sun, times ADayNight::Dusk: the grass blades are lit through and stay bright, flat ground would go dark where they stop (TownLab's WorldFill, 2026-11-14)"));
 	// (2026-11-15, owner: "when it's dark and there's shade, the bottom layer on the ground is brighter than the grass and seems to glow".
 	// The fill is emissive, which no shadow dims: among the blades it now gives way to a darker floor; Tools/grass_field.py)
 	TAutoConsoleVariable<float> UnderFillVar(TEXT("jeeb.Ground.UnderFill"), 0.f, TEXT("How much of the low sun's fill (jeeb.Ground.SkyFill) the ground keeps among the grass blades: 0 none (2026-11-15), 1 all of it (the old look, which glowed in shade at dusk)"));
@@ -20,7 +20,7 @@ namespace
 	TAutoConsoleVariable<float> FillFromVar(TEXT("jeeb.Ground.FillFrom"), 0.5f, TEXT("Share of the grass's reach (jeeb.Grass.PackFade) where the ground's low-sun fill and its usual brightness start to come back (all of it at the reach)"));
 	// (2026-11-17, owner: the ground past the grass "looks brighter than the tree trunks and up close grass". Its multiplier there only, M_Ground and
 	// M_TL_Ground's FarTint, grass_field.under_grass_floor; SkyFill's default also went 0.2 to 0.1, the low sun's glow on that same far ground)
-	TAutoConsoleVariable<FString> FarTintVar(TEXT("jeeb.Ground.FarTint"), TEXT("0.68 0.72 0.62"), TEXT("The flat ground's colour past the grass blades, \"r g b\" multiplier (live; 1 1 1 the old look)"));
+	TAutoConsoleVariable<FString> FarTintVar(TEXT("jeeb.Ground.FarTint"), TEXT("0.6857 0.7197 0.6214"), TEXT("The flat ground's colour past the grass blades, \"r g b\" multiplier (live; 1 1 1 the old look)"));
 	TWeakObjectPtr<UMaterialInstanceDynamic> GSharedGround;
 	TWeakObjectPtr<UWorld> GSharedWorld;
 	struct FUnderGrass { float Fill = -1.f, From = 0.f, To = 0.f, Under = 0.f, Floor = 0.f; FString Far; };
@@ -47,7 +47,7 @@ bool AWorldTerrain::SetUnderGrass(UMaterialInstanceDynamic* Mid, float Fill)
 	GUnderGrassSet.Add(Mid, FUnderGrass{ Fill, From, To, Under, Floor, FarS });
 	{
 		TArray<FString> P; FarS.ParseIntoArrayWS(P);
-		FLinearColor C(0.68f, 0.72f, 0.62f);
+		FLinearColor C(0.6857f, 0.7197f, 0.6214f);
 		if (P.Num() >= 3) C = FLinearColor(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2]));
 		Mid->SetVectorParameterValue(TEXT("FarTint"), C);
 	}

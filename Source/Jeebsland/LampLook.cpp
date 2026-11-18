@@ -12,7 +12,7 @@ namespace
 	TAutoConsoleVariable<FString> CVarTint(TEXT("jeeb.Lamp.Tint"), TEXT("1.0 0.38 0.06"),
 		TEXT("Colour of every town lantern, lamp and sconce (glass and light), \"r g b\" linear; default a deep amber oil flame. Live; looks only."),
 		FConsoleVariableDelegate::CreateStatic(&Reapply), ECVF_Default);
-	TAutoConsoleVariable<float> CVarGlow(TEXT("jeeb.Lamp.Glow"), 0.9f,
+	TAutoConsoleVariable<float> CVarGlow(TEXT("jeeb.Lamp.Glow"), 0.8319f,
 		TEXT("How hard the lamp glass glows (the glass picture times this; was 5, which clipped to white); default 0.9. Live; looks only."),
 		FConsoleVariableDelegate::CreateStatic(&Reapply), ECVF_Default);
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GMids;

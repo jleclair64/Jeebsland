@@ -122,7 +122,7 @@ namespace
 	// The four colours, shared with the sample groves (TreeGroves.cpp) and the LOOK tab's TREES sliders: found by name, or made here in a
 	// build without the groves (Shipping), with the groves' defaults
 	const TCHAR* const TintNames[4] = { TEXT("jeeb.Trees.DzGreen"), TEXT("jeeb.Trees.DzRed"), TEXT("jeeb.Trees.DzOrange"), TEXT("jeeb.Trees.DzYellow") };
-	const TCHAR* const TintDefaults[4] = { TEXT("0.1714 0.2315 0.0595"), TEXT("0.3613 0.0506 0.0253"), TEXT("0.5935 0.209 0.0334"), TEXT("0.595 0.3825 0.0439") };
+	const TCHAR* const TintDefaults[4] = { TEXT("0.2017 0.2723 0.07"), TEXT("0.5 0.07 0.035"), TEXT("0.6982 0.2459 0.0393"), TEXT("0.7 0.45 0.0517") };
 	const int32 TintLeaf[4] = { -1, 1, 0, 3 };   // the fallen leaves under a town tree of that colour (AutumnDecor: 0 orange, 1 red, 3 gold; green drops none)
 	const TCHAR* const TintTitle[4] = { TEXT("green"), TEXT("red"), TEXT("orange"), TEXT("yellow") };
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GTintMids[4];
@@ -160,13 +160,13 @@ namespace
 	IConsoleVariable* SpruceVar()
 	{
 		IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Trees.Spruce"));
-		if (!V) V = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Trees.Spruce"), TEXT("0.8 0.9 0.92"), TEXT("Needle colour multiplier of every spruce, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
+		if (!V) V = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Trees.Spruce"), TEXT("0.084 0.7395 2"), TEXT("Needle colour multiplier of every spruce, \"r g b\" (1 1 1 = as the pack has it; live)"), ECVF_Default);
 		return V;
 	}
 	FLinearColor SpruceTint()
 	{
 		IConsoleVariable* V = SpruceVar();
-		return JeebTreeLook::Saturate(JeebTreeLook::ParseRGB(V ? V->GetString() : FString(TEXT("0.8 0.9 0.92")), FLinearColor(1.f, 1.f, 1.f, 0.f)));   // (the pack's tints have alpha 0)
+		return JeebTreeLook::Saturate(JeebTreeLook::ParseRGB(V ? V->GetString() : FString(TEXT("0.084 0.7395 2")), FLinearColor(1.f, 1.f, 1.f, 0.f)));   // (the pack's tints have alpha 0)
 	}
 	const TCHAR* SpruceParam(const FString& MaterialName)
 	{
@@ -248,7 +248,9 @@ namespace
 	bool IsSpruce(int32 K) { return K >= K_Full1 && K <= K_Half2; }
 
 	// One thing placed: its kind, colour (DZ only), where (on the ground), turn and size
-	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; };
+	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; FVector Up = FVector::UpVector; };   // (Up: the ground's tilt it lies along: logs and stones, 2026-11-17)
+	// its turn: the yaw, then tipped from straight up to Up
+	FQuat PutRot(const FPut& P) { return FQuat::FindBetweenNormals(FVector::UpVector, P.Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw)); }
 
 	// The ground as the world's 8 m mesh draws it, read from a grid of heights worked out once (the forest stands only on that mesh)
 	struct FHeights
@@ -277,6 +279,13 @@ namespace
 			if (OutSlope) *OutSlope = FVector2D(0.5f * ((B - A) + (D - C)), 0.5f * ((C - A) + (D - B))).Size() / S;
 			if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;
 			return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
+		}
+		// the ground's up direction over about Span cm round a point, eased toward straight up by Share (0 upright, 1 the ground's full tilt)
+		FVector UpAt(float X, float Y, float Span, float Share) const
+		{
+			const float R = FMath::Max(Span * 0.5f, 50.f);
+			const FVector N = FVector(At(X - R, Y) - At(X + R, Y), At(X, Y - R) - At(X, Y + R), 2.f * R).GetSafeNormal();
+			return FMath::Lerp(FVector::UpVector, N, Share).GetSafeNormal();
 		}
 	};
 
@@ -625,7 +634,11 @@ struct FOakForestBuild
 			// solids keep 60 cm clear of every trunk and solid; bushes may tuck in under the crowns but not into a trunk
 			if (!Space.Clear(P, bSolid ? Foot : 40.f, 0.12f, bSolid ? 60.f : 10.f)) continue;
 			if (bSolid) Space.Add(P, Foot, false);
-			Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (Kind == K_Log ? 8.f : 3.f) - Slope * 0.5f * FMath::Min(Foot, 100.f)), Yaw, FVector(Scale), false });
+			// (2026-11-17, owner: logs and stones "have the ends getting out of the hills because they are placed perfectly up and down"; tilt them,
+			// but trees and stumps stand straight, the stumps sunk "a little further to hide the edges")
+			const bool bLog = Kind == K_Log, bStump = Kind >= K_Stump && Kind <= K_StumpGrass;
+			const float Sink = bLog ? 8.f + Slope * 0.15f * FMath::Min(Foot, 100.f) : bStump ? 10.f + Slope * FMath::Min(Foot, 100.f) : 3.f + Slope * 0.5f * FMath::Min(Foot, 100.f);
+			Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - Sink), Yaw, FVector(Scale), false, bLog ? Hs.UpAt(P.X, P.Y, 2.f * Foot, 1.f) : FVector::UpVector });
 			++Count[Kind]; ++Under;
 		}
 
@@ -653,7 +666,8 @@ struct FOakForestBuild
 				const float Foot = Kinds[Kind].Crown * FMath::Max(Sx, Sy);
 				if (!Space.Clear(P, Foot, 0.15f, 40.f)) continue;
 				Space.Add(P, Foot, false);
-				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f) - Slope * 0.5f * Foot), Yaw, FVector(Sx, Sy, Sz), false });
+				// (tipped with the ground, 2026-11-17: an upright stone on a hillside showed its flat underside downhill; so it sinks less by the slope)
+				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f) - Slope * 0.15f * Foot), Yaw, FVector(Sx, Sy, Sz), false, Hs.UpAt(P.X, P.Y, 2.f * Foot, 0.9f) });
 				++Count[Kind]; ++Rocks;
 			}
 		}
@@ -708,7 +722,7 @@ struct FOakForestBuild
 		{
 			const FKindDef& K = Kinds[P.Kind];
 			if (!Meshes[P.Kind]) continue;
-			const FTransform Xf(FRotator(0.f, P.Yaw, 0.f), P.At, P.Scale);
+			const FTransform Xf(PutRot(P), P.At, P.Scale);
 			Visual.FindOrAdd(P.Kind * 4 + P.Col).Add(Xf);
 			const FBox Bx = Meshes[P.Kind]->GetBoundingBox();
 			switch (K.Solid)
@@ -723,7 +737,7 @@ struct FOakForestBuild
 			case ESolid::Box:
 			{
 				const FVector Sz = Bx.GetSize() * P.Scale, Ctr = Xf.TransformPosition(Bx.GetCenter());
-				LogX.Add(FTransform(FRotator(0.f, P.Yaw, 0.f), Ctr, FVector(Sz.X * 0.92f, Sz.Y * 0.8f, Sz.Z * 0.85f) / 100.f));
+				LogX.Add(FTransform(PutRot(P), Ctr, FVector(Sz.X * 0.92f, Sz.Y * 0.8f, Sz.Z * 0.85f) / 100.f));
 				break;
 			}
 			case ESolid::Cyl:
@@ -736,7 +750,7 @@ struct FOakForestBuild
 			case ESolid::Own: OwnSolid[P.Kind].Add(Xf); break;
 			default: break;
 			}
-			if (K.Solid != ESolid::None) { HashIn(P.At.X); HashIn(P.At.Y); HashIn(P.At.Z); HashIn(P.Scale.X); }
+			if (K.Solid != ESolid::None) { HashIn(P.At.X); HashIn(P.At.Y); HashIn(P.At.Z); HashIn(P.Scale.X); HashIn(P.Up.X * 100.f); HashIn(P.Up.Y * 100.f); }
 		}
 		auto Fill = [](UInstancedStaticMeshComponent* C, const TArray<FTransform>& X) { if (!C) return; C->RegisterComponent(); if (X.Num()) C->AddInstances(X, false, true, false); };
 		Fill(Trunks, TrunkX); Fill(Logs, LogX); Fill(Cyls, CylX);
