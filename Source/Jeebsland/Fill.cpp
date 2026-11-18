@@ -1372,13 +1372,18 @@ struct FFillBuilder
 			}
 			if (P.bStack)
 			{
+				// (2026-11-17, owner: "this lantern is just floating here": a stacked piece rests on the top of the piece of its own set
+				// under it, 1 cm into it, not at its own ground height plus the row's Z, which on a slope or a sunk base left a gap)
 				const FVector Pz = T.Xf.GetLocation();
-				const bool bOn = Tries.ContainsByPredicate([&](const FTry& B)
+				float BestTop = 0.f, BestGap = 35.f;
+				bool bOn = false;
+				for (const FTry& B : Tries)
 				{
-					if (!B.bGround || !B.Foot.Contains(FVector2D(Pz.X, Pz.Y), 5.f)) return false;
+					if (!B.bGround || !B.Foot.Contains(FVector2D(Pz.X, Pz.Y), 5.f)) continue;
 					const float Top = B.Xf.GetLocation().Z + B.Kind->Height * B.Xf.GetScale3D().Z;
-					return FMath::Abs(Top - Pz.Z) < 35.f;
-				});
+					if (FMath::Abs(Top - Pz.Z) < BestGap) { BestGap = FMath::Abs(Top - Pz.Z); BestTop = Top; bOn = true; }
+				}
+				if (bOn) T.Xf.SetLocation(FVector(Pz.X, Pz.Y, BestTop - 1.f));
 				if (!bOn)
 				{
 					St.Skipped.FindOrAdd(TEXT("nobase"))++;
@@ -2541,10 +2546,18 @@ struct FFillBuilder
 			if (!P.Kind->Name.StartsWith(TEXT("Lantern")) || P.Kind->bHang) continue;
 			++Lanterns;
 			const FVector L = P.Xf.GetLocation();
-			bool bOn = false;
+			// (2026-11-17: each lantern is logged with what it stands on and the gap between its foot and that piece's top, cm)
+			const FPlaced* On = nullptr;
+			float Gap = 35.f;
 			for (const FPlaced& B : Placed)
-				if (&B != &P && B.bGround && B.Foot.Contains(FVector2D(L.X, L.Y), 5.f) && FMath::Abs(B.Xf.GetLocation().Z + B.Kind->Height * B.Xf.GetScale3D().Z - L.Z) < 35.f) { bOn = true; break; }
-			if (!bOn && Loose++ < 5) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL LANTERN %s (%s) on nothing at %.0f %.0f %.0f"), *P.Kind->Name, *P.Set, L.X, L.Y, L.Z);
+				if (&B != &P && B.bGround && B.Foot.Contains(FVector2D(L.X, L.Y), 5.f))
+				{
+					const float G = L.Z - (B.Xf.GetLocation().Z + B.Kind->Height * B.Xf.GetScale3D().Z);
+					if (FMath::Abs(G) < FMath::Abs(Gap)) { Gap = G; On = &B; }
+				}
+			const bool bOn = On && FMath::Abs(Gap) < 3.f;
+			if (!bOn) ++Loose;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFILL LANTERN %s (%s) at %.0f %.0f %.0f on %s gap %.1f cm%s"), *P.Kind->Name, *P.Set, L.X, L.Y, L.Z, On ? *On->Kind->Name : TEXT("nothing"), On ? Gap : 0.f, bOn ? TEXT("") : TEXT(" FLOATING"));
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL LANTERNS %d, on nothing %d; wall-backed sets pulled onto the wall %d (lines: scene %d, wall box %d, grid %d)"), Lanterns, Loose, SnugCount, SnugTrace, SnugBox, SnugCells);
 	}

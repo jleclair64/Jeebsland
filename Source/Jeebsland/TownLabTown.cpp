@@ -362,6 +362,8 @@ void ATownLabTown::BuildBuildings()
 							L->RegisterComponent();
 							LanternLights.Add(L);
 							++DecorLights;
+							const FVector Lw = PieceXf.GetLocation();
+							UE_LOG(LogTemp, Log, TEXT("%s LANTERN %s on %s at %.0f %.0f %.0f, %.0f cm above the ground there"), Tag(), *FPaths::GetBaseFilename(Pc.Mesh), *MeshName, Lw.X, Lw.Y, Lw.Z, Lw.Z - JeebTerrain::HeightAt(Lw.X, Lw.Y));
 						}
 					}
 			}

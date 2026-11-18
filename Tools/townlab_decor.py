@@ -583,12 +583,18 @@ for bname, B in BUILD.items():
         stall_props(bname, B, bvh, items)
     elif bname == "TL_Store":
         prop("left", 160, "Crate", 0.85, turn=8)
-        prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85, turn=-12)
+        # (dz in the building's own cm: the crate's real top over the store's Scale 0.75, 2026-11-17; it was the real top, so sunk 18 cm)
+        prop("left", 160, "CrateNoLid", 0.75, dz=fsize.get("Crate", np.array([0, 0, 72.0]))[2] * 0.85 / 0.75, turn=-12)
         prop("left", 330, "WheatSack", 0.8, turn=-15)
         prop("back", 200, "Barrel", 0.85); prop("back", 290, "Basket", 0.8, turn=40)
         prop("right", 260, "WateringCan", 0.8, turn=-40)
-        items.append(dict(kind="lantern", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -358.0, 183.0)), yaw=0.0, pitch=0.0, roll=0.0,
-                          scale=0.85, wb=True, light=True))
+        # (2026-11-17, owner: "this lantern is just floating here": its bracket went with building_clean.py's cut, so it hung in the
+        # air by the lean-to; it stands on a small barrel at the wall's foot instead, lit at dusk like the stalls' lanterns. Z in the
+        # building's own cm: the barrel's real top, 86.7 cm, over the store's Scale 0.75)
+        items.append(dict(kind="prop", mesh="/Game/Filler/SM_BarrelSmall", pos=to_ue((265.0, -400.0, 0.0)), yaw=0.0, pitch=0.0, roll=0.0,
+                          scale=0.85, wb=False, light=False))
+        items.append(dict(kind="prop", mesh="/Game/Filler/SM_LanternOil", pos=to_ue((265.0, -400.0, 115.6)), yaw=0.0, pitch=0.0, roll=0.0,
+                          scale=0.85, wb=False, light=True))
     # build-b (townbuild2, 2026-11-14): the town hall, church, well and potion shop
     # (build-b: only pieces already shipped in /Game/TownDecor, so the town needs no new copies)
     elif bname == "TL_TownHall":
