@@ -114,6 +114,12 @@ print("UNDER leg points pulled inside the leg plate: %d, by %.1f cm on average" 
 # The waist between the skirt's tassets and the top of the thigh plates is a real gap, filled by the suit's dark cloth under the skirt (knight_suit_mail.py's pelvis).
 # The owner saw bright mail there in the draw; the mail round the hips goes just inside that cloth, so the gap shows the dark cloth and the mail is still behind it.
 PELVIS_MARGIN = 0.008   # (m)
+# (owner 2026-11-18: mail spikes from his sides) The forearms hang at hip height in the rest pose, so their sleeves were tucked into the hips too and the mail
+# stretched from his arms to his waist. Arm points are never tucked, and only points just outside the cloth go in.
+PELVIS_REACH = 0.05     # (m)
+ARM_SHARE_OUT = 0.05
+ARM_BONES = ("LeftShoulder", "RightShoulder", "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand")
+arm_share = [sum(g.weight for g in v.groups if body_names[g.group] in ARM_BONES) / max(sum(g.weight for g in v.groups), 1e-6) for v in me.vertices]
 pel_objs = [x for x in new if x.type == "MESH" and any(m and m.name.startswith("Suit_Under") for m in x.data.materials)]
 pv, pf = [], []
 for o in pel_objs:
@@ -127,12 +133,12 @@ if pf:
     hip = bone_at["Hips"]
     for i, v in enumerate(me.vertices):
         p = pts_b[i]
-        if leg_share[i] > LEG_SHARE_IN or not (z_lo <= p.z <= z_hi): continue
+        if leg_share[i] > LEG_SHARE_IN or arm_share[i] > ARM_SHARE_OUT or not (z_lo <= p.z <= z_hi): continue
         c = Vector((hip.x, hip.y, p.z)); out_dir = p - c; r = out_dir.length
         if r < 1e-4: continue
         out_dir /= r
         hit, _, _, h = pel_bvh.ray_cast(c, out_dir, r + 0.05)
-        if hit is None or r <= h - PELVIS_MARGIN: continue
+        if hit is None or r <= h - PELVIS_MARGIN or r > h + PELVIS_REACH: continue
         pts_b[i] = c + out_dir * max(h - PELVIS_MARGIN, 0.3 * r); v.co = wbi @ pts_b[i]; tucked += 1
     me.update()
 print("UNDER hip points tucked inside the dark cloth under the skirt: %d (cloth z %.2f-%.2f)" % (tucked, z_lo if pf else 0, z_hi if pf else 0))
