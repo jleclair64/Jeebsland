@@ -5,6 +5,7 @@
 #include "OakHill.h"
 #include "TownLab.h"
 #include "Hills.h"
+#include "SteeleCreek.h"
 
 // The forest's roads round Oak Hill (OakForest.cpp), made paths below
 namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
@@ -163,6 +164,7 @@ namespace JeebTerrain
 				if (FVector2D::Distance(P, PondCenter()) < PondWaterR) return true;
 		if (JeebWorld::InWater(X, Y)) return true;   // the river (it runs through the east side of the square)
 		if (JeebOakHill::OnBuilding(X, Y)) return true;   // Oak Hill's buildings
+		if (JeebSteele::OnBuilding(X, Y)) return true;    // Steele Creek's (SteeleCreek.h)
 
 		return false;
 	}
@@ -268,6 +270,7 @@ namespace JeebTerrain
 		// nothing steeper than a walk up from any river (2026-11-15, WorldMap.h UnderBankCap); in Oak Hill the cap trims its hills
 		// before its level plots go on (OakHill.h Apply), so no building's ground is cut
 		if (JeebOakHill::Covers(X, Y)) H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Oak Hill's own hills and level plots (2026-11-11)
+		else if (JeebSteele::Covers(X, Y)) H = JeebSteele::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Steele Creek's gentle tilt and level pads (2026-11-18)
 		else if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
@@ -469,6 +472,23 @@ namespace JeebTerrain
 					D.Add(P);
 				}
 			}
+			// Steele Creek's dirt streets and its road north to the fork (2026-11-18, SteeleCreek.h; after the forest's roads, so theirs
+			// keep their shapes): forest roads too (Kind 2), cut into pieces of about 100 m the same way
+			for (const JeebSteele::FStreet& St : JeebSteele::Streets())
+			{
+				FPathDef Whole;
+				Whole.Pts = St.Pts;
+				Whole.Width = St.Width;
+				ShapeRoadEdges(Whole, D.Num());
+				for (int32 s = 0; s + 1 < St.Pts.Num(); s += 160)
+				{
+					FPathDef P;
+					P.Width = St.Width;
+					P.Kind = 2;
+					for (int32 i = s; i <= FMath::Min(s + 160, St.Pts.Num() - 1); ++i) { P.Pts.Add(Whole.Pts[i]); P.HalfL.Add(Whole.HalfL[i]); P.HalfR.Add(Whole.HalfR[i]); }
+					D.Add(P);
+				}
+			}
 			for (FPathDef& P : D)
 			{
 				P.Bounds = FBox2D(P.Pts);
@@ -658,6 +678,7 @@ namespace JeebTerrain
 		D = FMath::Min(D, RectSD(P, PenCenter(), PenHalf()));
 		for (const FFort& F : Forts()) D = FMath::Min(D, float(FVector2D::Distance(P, F.Tree)) - 400.f);
 		D = FMath::Min(D, JeebOakHill::BuildingDistance(X, Y));
+		D = FMath::Min(D, JeebSteele::BuildingDistance(X, Y));
 		return 1.f - FMath::SmoothStep(0.f, 700.f, D);
 	}
 }

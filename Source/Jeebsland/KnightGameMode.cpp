@@ -247,6 +247,16 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 	const bool bOak = !bLab && JeebOakHill::Enabled();
 	// TESTING (owner 2026-11-12): [Jeebsland.Testing] StartAtOakHill=True in DefaultGame.ini starts every login at Oak Hill, wherever it logged out
 	static const bool bAlwaysOak = []() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("StartAtOakHill"), v, GGameIni); return v; }();
+#if !UE_BUILD_SHIPPING
+	// TESTING (2026-11-18): -StartAtSteele on the command line, or [Jeebsland.Testing] StartAtSteeleCreek=True, starts every login in
+	// Steele Creek's forge yard (off by default; never in a shipped game)
+	static const bool bAlwaysSteele = []() { bool v = FParse::Param(FCommandLine::Get(), TEXT("StartAtSteele")); if (!v && GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("StartAtSteeleCreek"), v, GGameIni); return v; }();
+	if (!bLab && bAlwaysSteele && JeebSteele::Enabled())
+	{
+		const FVector2D S = JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN) + FVector2D(0.f, 200.f * (SpawnCount++ % 7));
+		return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), FVector(S.X, S.Y, JeebTerrain::HeightAt(S.X, S.Y) + 130.f), FRotator(0.f, JeebSteele::SpawnYaw, 0.f), Params);
+	}
+#endif
 	if (KPC && KPC->PendingSave && KPC->PendingSave->bHasPos && !(bOak && bAlwaysOak))
 	{
 		const FVector P = KPC->PendingSave->Pos;

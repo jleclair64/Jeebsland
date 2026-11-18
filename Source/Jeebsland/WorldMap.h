@@ -41,7 +41,7 @@ namespace JeebWorld
 			{ TEXT("Silver Point"),  FromSketch(835.f, 455.f),  3800.f, 8000.f },   // a level shelf among the northern peaks
 			{ TEXT("Anchorage"),     FromSketch(1110.f, 995.f), 3200.f, 6000.f },
 			{ TEXT("Birch Grove"),   FromSketch(760.f, 1280.f), 5000.f, 8000.f },   // the big walled troll town (in PvP 2)
-			{ TEXT("Steele Creek"),  FromSketch(380.f, 1580.f), 3500.f, 6500.f },
+			{ TEXT("Steele Creek"),  FromSketch(380.f, 1580.f), 0.f,    0.f, 1.f },     // the smithing town: its own gentle land, not a level disc (SteeleCreek.h, 2026-11-18)
 			{ TEXT("Palmer Square"), FromSketch(1125.f, 1550.f), 3200.f, 6000.f },
 		};
 		return T;

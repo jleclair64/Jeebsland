@@ -686,6 +686,24 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	Marker(JeebTerrain::ShopPos(), 4.f, FLinearColor(1.f, 0.85f, 0.2f), false);
 	Marker(JeebTerrain::SmithyPos(), 4.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
 	Marker(JeebTerrain::BankPos(), 4.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
+	// Steele Creek's store, smithy and bank (SteeleCreek.h, 2026-11-18), and the town's name while it is on the map
+	if (JeebSteele::Enabled())
+	{
+		const TCHAR* ShopPlots[3] = { TEXT("Store"), TEXT("Smithy"), TEXT("Bank") };
+		const FLinearColor ShopCols[3] = { FLinearColor(1.f, 0.85f, 0.2f), FLinearColor(0.9f, 0.4f, 0.1f), FLinearColor(0.7f, 0.8f, 0.95f) };
+		for (int32 i = 0; i < 3; ++i) if (const JeebSteele::FPlot* P = JeebSteele::FindPlot(ShopPlots[i])) Marker(P->Centre, 4.f, ShopCols[i], false);
+		const FVector2D TC = JeebSteele::ToWorld(-5.f, 0.f);
+		float TX, TY;
+		const bool bSeen = !MapKnight || !MapKnight->GetSkills() || MapKnight->GetSkills()->IsExplored(TC.X, TC.Y);
+		if (bSeen && ToMap(TC, 40.f, false, TX, TY))
+		{
+			const FString T = TEXT("Steele Creek");
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(T, TW, TH, Font, 1.1f);
+			HDText(T, FLinearColor(0.f, 0.f, 0.f, 0.8f), TX - TW * 0.5f + 1.f, TY - 22.f + 1.f, Font, 1.1f);
+			HDText(T, FLinearColor(1.f, 0.92f, 0.7f, 0.95f), TX - TW * 0.5f, TY - 22.f, Font, 1.1f);
+		}
+	}
 
 	// People
 	for (TActorIterator<ANpc> It(GetWorld()); It; ++It)

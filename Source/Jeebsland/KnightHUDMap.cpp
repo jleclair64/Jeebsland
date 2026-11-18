@@ -663,6 +663,22 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 				}
 		}
 	}
+	// ---- Steele Creek's buildings (2026-11-18, SteeleCreek.h): their walls' boxes, coloured like Oak Hill's ----
+	if (HouseA > 0.f && JeebSteele::Enabled())
+		for (const JeebSteele::FPlot& P : JeebSteele::Plots())
+		{
+			TArray<FVector2D> C;
+			for (const FVector2D& L : { FVector2D(-1.f, -1.f), FVector2D(1.f, -1.f), FVector2D(1.f, 1.f), FVector2D(-1.f, 1.f) })
+			{
+				const FVector2D Lo(L.X * P.Half.X, L.Y * P.Half.Y);
+				C.Add(ToScreen(P.Mid + FVector2D(Lo.X * P.Cs - Lo.Y * P.Sn, Lo.X * P.Sn + Lo.Y * P.Cs)));
+			}
+			const bool bHouse = FString(P.Def.Name).StartsWith(TEXT("House"));
+			const FLinearColor Roof = bHouse ? FLinearColor(0.66f, 0.38f, 0.24f) : P.bStall ? FLinearColor(0.78f, 0.62f, 0.38f) : FLinearColor(0.46f, 0.50f, 0.60f);
+			const TArray<FVector2D> In = ClipPoly(C, SLo, SHi);
+			if (In.Num() >= 3) Poly(In, FLinearColor(Roof.R, Roof.G, Roof.B, HouseA));
+			for (int32 i = 0; i < 4; ++i) { FVector2D A = C[i], B = C[(i + 1) % 4]; if (ClipSeg(A, B, SLo, SHi)) DrawLine(A.X, A.Y, B.X, B.Y, FLinearColor(0.12f, 0.09f, 0.07f, 0.8f * HouseA), 1.5f); }
+		}
 
 	// ---- Fog over the ground this character has not seen yet: soft grey cloud, repainted only when the explored grid changes ----
 	if (USkillComponent* Sk = bNoFog ? nullptr : Knight->GetSkills())

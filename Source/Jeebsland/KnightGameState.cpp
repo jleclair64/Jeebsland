@@ -79,6 +79,7 @@
 #include "Scarecrow.h"
 #include "FoeKnight.h"
 #include "OakForest.h"
+#include "SteeleCreekTown.h"
 #include "ForestRuins.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -293,6 +294,7 @@ void AKnightGameState::BuildWorld()
 	JeebGroves::Build(World, Forest);   // GROVES (TEMPORARY test setting, 2026-11-15): sample tree groves east of Oak Hill; non-Shipping, `jeeb.Test.Groves 0` leaves them out (TreeGroves.h)
 	World->SpawnActor<AOakForest>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's trees and the forest 500 m round it, with its roads, logs, stumps and boulders (OakForest.h; after AForest, which resets the canopy list; on every machine: the server builds the trunks' solids)
 	World->SpawnActor<AForestRuins>(FVector::ZeroVector, FRotator::ZeroRotator);   // about ten old stone ruins in that forest (ForestRuins.h; after AOakForest, whose solids they keep off; on every machine: the server builds their collision)
+	World->SpawnActor<ASteeleCreekTown>(FVector::ZeroVector, FRotator::ZeroRotator);   // Steele Creek, the smithing town in the southwest forest: buildings, its ring of trees, the quarry's rocks and its people (SteeleCreek.h; before the fill, which keeps off its solids; on every machine)
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);

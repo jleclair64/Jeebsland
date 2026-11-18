@@ -30,6 +30,9 @@ public:
 	// Called right after spawning: builds the body for this role. Patrol points (if any) are set separately.
 	void Setup(ENpcRole InRole, int32 InVillagerIdx = 0);
 	void SetPatrol(const TArray<FVector2D>& Points) { Patrol = Points; }
+	// Steele Creek's people (2026-11-18), set before Setup: Folk 0 townsfolk and knights as before, 1 a troll, 2 a wizard; a name
+	// and a first greeting of their own (empty: the role's)
+	void SetFolk(uint8 InFolk, const FString& InName, const FString& InHello) { Folk = InFolk; NameOverride = InName; FirstHello = InHello; }
 
 	ENpcRole GetRole() const { return Role; }
 	FString GetNpcName() const;
@@ -62,4 +65,6 @@ private:
 	int32 VillagerIdx = 0;
 	float HalfH = 92.f;       // capsule half height (smaller for the boy)
 	float StuckT = 0.f;
+	uint8 Folk = 0;
+	FString NameOverride, FirstHello;
 };
