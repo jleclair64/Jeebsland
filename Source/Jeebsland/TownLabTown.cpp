@@ -21,6 +21,7 @@
 #include "TownLabSwaps.h"
 #include "DayNight.h"
 #include "LampLook.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
@@ -120,6 +121,14 @@ void ATownLabTown::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float D = ADayNight::Dusk;
+#if !UE_BUILD_SHIPPING
+	{
+		// (test only, 2026-11-17: hides the town's own ground, so where it meets the world's shows as a hole; finding seams)
+		static TAutoConsoleVariable<int32> HideGround(TEXT("jeeb.Test.HideTownGround"), 0, TEXT("Test: 1 hides Oak Hill's own ground mesh (M_TL_Ground) to show where it meets the world's"));
+		const bool bHide = HideGround.GetValueOnGameThread() != 0;
+		if (Ground && Ground->IsVisible() == bHide) Ground->SetVisibility(!bHide);
+	}
+#endif
 	AWorldTerrain::SetUnderGrass(GroundMid, AWorldTerrain::LowSunFill());   // (every tick, before the early-out: a LOOK slider moved at a held sun must reach the town too; it sets only what changed)
 	if (FMath::Abs(D - LastDusk) < 0.005f) return;
 	LastDusk = D;
