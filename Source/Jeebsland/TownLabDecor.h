@@ -45,12 +45,13 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 546.7f, -516.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, false, false, false },   // weeds
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 609.3f, -223.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -680.3f, -383.5f, 0.0f, 82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), -670.9f, -383.5f, 73.3f, 102.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), -670.9f, -383.5f, 97.7f, 102.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), -554.2f, -213.5f, 0.0f, 105.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 361.2f, -621.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Basket.SM_Basket"), 271.2f, -549.5f, 0.0f, 140.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 593.2f, 323.1f, 0.0f, -50.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
-		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 265.0f, 358.0f, 183.0f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, true, true, true },   // lantern
+		{ TEXT("/Game/Filler/SM_BarrelSmall.SM_BarrelSmall"), 265.0f, 400.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
+		{ TEXT("/Game/Filler/SM_LanternOil.SM_LanternOil"), 265.0f, 400.0f, 115.6f, 0.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, true, true },   // prop
 	};
 	inline const FDecor MarketStallDecor[] = {
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), -598.3f, -241.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
