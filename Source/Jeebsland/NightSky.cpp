@@ -8,10 +8,15 @@
 #include "Camera/PlayerCameraManager.h"
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
 	const FLinearColor CometBlue(0.45f, 0.70f, 1.0f), CometRed(1.0f, 0.42f, 0.30f);
+#if !UE_BUILD_SHIPPING
+	// (2026-11-17, test pictures) hold the stars at this strength whatever the sun does, e.g. to check that clouds hide them
+	TAutoConsoleVariable<float> StarsHold(TEXT("jeeb.Sky.Stars"), -1.f, TEXT("Test: hold the stars at this strength (0-1); -1 follows the sun"));
+#endif
 }
 
 // A flat 100 x 100 card in XY (normal +Z), UVs 0..1 with U running along +X (or a window of the texture)
@@ -195,7 +200,10 @@ void ANightSky::Tick(float DeltaSeconds)
 	if (PC && PC->PlayerCameraManager) SetActorLocation(PC->PlayerCameraManager->GetCameraLocation());
 
 	// Stars come out as the sun goes down (ADayNight::Night since 2026-11-17, when the sun began to set: with Dusk they showed in the golden low-sun sky)
-	const float N = ADayNight::Night;
+	float N = ADayNight::Night;
+#if !UE_BUILD_SHIPPING
+	if (StarsHold.GetValueOnGameThread() >= 0.f) N = FMath::Min(StarsHold.GetValueOnGameThread(), 1.f);   // (jeeb.Sky.Stars: test pictures)
+#endif
 	for (UMaterialInstanceDynamic* M : StarMids) M->SetScalarParameterValue(TEXT("Night"), N);
 	Stars->SetVisibility(N > 0.01f);
 
