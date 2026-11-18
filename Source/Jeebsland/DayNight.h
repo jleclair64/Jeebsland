@@ -12,9 +12,11 @@ class UMaterialInstanceDynamic;
 
 namespace JeebLook { bool Old(); }   // true: the picture's look before 2026-11-12 (-OldLook or jeeb.Look 0, test pictures only)
 
-// A midnight sun, like June above the Arctic Circle: the sun circles the sky, high at noon and skimming the
-// horizon at the bottom of its loop (the golden dusk), and never sets. Drives the sun's height, colour and
-// strength, the sky light and the haze colour. Other actors (stars, moon, clouds) read the shared values below.
+// The day and night (2026-11-17): the sun circles the sky once a loop, 41 degrees up at noon and 25 below the horizon at
+// midnight (until 2026-11-17 a midnight sun that never set: 41 to 11). While it is down a cool moonlight (a second
+// directional light, the sky atmosphere's light 1) takes over, with the night's own lift in exposure, sky light and a
+// blue grade (the jeeb.Night.* console variables), so the night stays readable, never pitch black. Drives the sun's height,
+// colour and strength, the sky light and the haze colour. Other actors (stars, moon, clouds) read the shared values below.
 UCLASS()
 class ADayNight : public AActor
 {
@@ -30,11 +32,12 @@ public:
 
 	// Shared state, updated every frame
 	static float Phase;          // 0 = noon, 0.5 = the sun's lowest point
-	static float SunElevation;   // degrees above the horizon (11 to 41)
-	static float Dusk;           // 0 = broad day, 1 = the sun down by the horizon
+	static float SunElevation;   // degrees above the horizon (-25 at midnight to 41 at noon; jeeb.Sun.Low)
+	static float Dusk;           // 0 = broad day, 1 = the sun low by the horizon or below it (lamps, lit windows; 1 all night)
+	static float Night;          // 0 = the sun up, 1 = full night (the sun 10 degrees down or more): moonlight, the night grade, stars
 	static FVector SunDir;       // unit vector toward the sun
 	static FLinearColor TrailLight;   // how glowing things that make their own light (sword and arrow trails) should look right now: white at noon, dimmer and warmer as the sun sinks
-	static FVector MoonDir;      // unit vector toward the moon (it hangs low in the south-west)
+	static FVector MoonDir;      // unit vector toward the moon (30 degrees up in the south-south-west; the moonlight comes from there)
 	static float FixedPhase;     // >= 0 freezes the clock at that phase (used for test screenshots)
 	static constexpr float CloudWindSpeed = 1.f;   // how fast the clouds drift; raise it if they crawl, lower it if they race
 
@@ -46,6 +49,14 @@ private:
 	// The sun's glint on polished armour (2026-11-15): the world's sun gives no shine (no glare on the grass), so this second sun,
 	// shine only, no shadows, lights only lighting channel 1 (the knight's plate); jeeb.Armour.Glint is its strength
 	UPROPERTY() class UDirectionalLightComponent* Glint = nullptr;
+	// The moonlight (2026-11-17): a second directional light, the sky atmosphere's light 1 (so it lights the night sky and clouds a
+	// faint blue, and the sky light gathers that as the night's ambient), its disc hidden (the moon is AMoon's picture). It fades in
+	// only once the sun's light on the ground is out and takes over the shadows, so there is never more than one shadow caster.
+	UPROPERTY() class UDirectionalLightComponent* Moonlight = nullptr;
+	float SunBaseDiffuse = 1.f, SunBaseSpecular = 1.f;   // the map sun's own diffuse and specular scales
+	int32 SunShadowNow = -1, MoonShadowNow = -1;          // shadows last set on the sun and the moon (only re-sent when they change)
+	int32 SunShownNow = -1;                                // the sun light's visibility last set (hidden in deep night: no light pass)
+	void TickMoon(float MoonW);
 	TWeakObjectPtr<ADirectionalLight> Sun;
 	TWeakObjectPtr<ASkyLight> Sky;
 	TWeakObjectPtr<AExponentialHeightFog> Fog;

@@ -69,6 +69,10 @@ For working on attacks and movement: in the editor's Content Browser double-clic
 
 **Hitstun:** a clean sword hit stops whatever the knight was doing; he can't move, swing, block, roll or jump for a moment (0.45 s after jab hit 1, so hit 2 always follows; 0.32 s after hit 2, which pushes him clear; 0.5 to 0.8 s after a smash). Your attack beats his if it lands first. The pen knight's cut stuns you for 0.35 s, and he now reaches 2 m (was 2.4 m, further than your sword).
 
+## Night (2026-11-17)
+
+The sun now sets: 41 degrees up at noon, 25 below the horizon at midnight (the loop grew; noon is the same). In the 20-minute loop that is about 11.6 minutes of day and 8.4 of night. As it sets, its light fades out and a cool blue moonlight from the moon (now a little higher in the south-south-west) takes over with its own shadows, the shade fills in, the picture brightens and turns a gentle blue, and the stars come out (only at night now, not in the golden hour). To judge it: Field, Play, Escape, LOOK tab, SKY + HAZE: drag "Sun: 0 noon ..." (`jeeb.Sun.Phase`) to 0.5 for midnight, 0.29 sunset, 0.34 ten degrees down, 0.72 dawn; set it back with its reset to let the day run. The "Night:" sliders tune it live: moonlight strength (`jeeb.Night.Moon` 0.5) and colour (`jeeb.Night.MoonColor`), fill in the shade (`jeeb.Night.Ambient` 2), extra brightness (`jeeb.Night.Exposure` 0.5 stops), extra brightness right round sunset and sunrise (`jeeb.Night.Twilight` 0.6 stops), blue grade (`jeeb.Night.Tint` 0.5), blue lift in dark shadows (`jeeb.Night.ShadowLift` 0.012), sky brightness (`jeeb.Night.Sky` 0.5), and the lowest point (`jeeb.Sun.Low` -25). `jeeb.Night.MoonShadows 0` turns the moon's shadows off. Log: `JEEBNIGHT`. Test pictures: `-ShotEyes` with the 6th field the phase.
+
 ## Look board (2026-11-15)
 
 One command shows the whole look at a glance, always from the same 12 views (noon and low sun each) beside the reference pictures:

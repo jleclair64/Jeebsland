@@ -111,6 +111,19 @@ namespace
 		{ 5, TEXT("Ground past the grass: red"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 0, 0.3f, 1.2f, false, NoDef },
 		{ 5, TEXT("Ground past the grass: green"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 1, 0.3f, 1.2f, false, NoDef },
 		{ 5, TEXT("Ground past the grass: blue"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 2, 0.3f, 1.2f, false, NoDef },
+
+		// NIGHT (2026-11-17, in SKY + HAZE): the moonlight and the night's lift (DayNight.cpp, JeebNight); try them at jeeb.Sun.Phase 0.5
+		{ 1, TEXT("Night: moonlight strength"), TEXT("jeeb.Night.Moon"), EK::Float, 0, 0.f, 3.f, false, NoDef },
+		{ 1, TEXT("Night: moonlight red"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 0, 0.f, 1.f, false, NoDef },
+		{ 1, TEXT("Night: moonlight green"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 1, 0.f, 1.f, false, NoDef },
+		{ 1, TEXT("Night: moonlight blue"), TEXT("jeeb.Night.MoonColor"), EK::Comp, 2, 0.f, 1.f, false, NoDef },
+		{ 1, TEXT("Night: fill in the shade (x sky light)"), TEXT("jeeb.Night.Ambient"), EK::Float, 0, 0.f, 6.f, false, NoDef },
+		{ 1, TEXT("Night: extra brightness (stops)"), TEXT("jeeb.Night.Exposure"), EK::Float, 0, 0.f, 3.f, false, NoDef },
+		{ 1, TEXT("Night: blue grade"), TEXT("jeeb.Night.Tint"), EK::Float, 0, 0.f, 1.5f, false, NoDef },
+		{ 1, TEXT("Night: blue lift in dark shadows"), TEXT("jeeb.Night.ShadowLift"), EK::Float, 0, 0.f, 0.05f, false, NoDef },
+		{ 1, TEXT("Night: sky brightness"), TEXT("jeeb.Night.Sky"), EK::Float, 0, 0.f, 4.f, false, NoDef },
+		{ 1, TEXT("Night: extra brightness at sunset (stops)"), TEXT("jeeb.Night.Twilight"), EK::Float, 0, 0.f, 2.f, false, NoDef },
+		{ 1, TEXT("Sun: lowest point (degrees)"), TEXT("jeeb.Sun.Low"), EK::Float, 0, -45.f, 11.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)
