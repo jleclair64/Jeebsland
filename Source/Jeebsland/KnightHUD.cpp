@@ -338,6 +338,8 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
+	DrawQuestHUD(Knight, PC);   // (quest marks, the tracker and the J key: KnightHUDQuests.cpp)
+
 	// Screens (only one at a time)
 	if (Knight->IsSettingsOpen() && !bSettingsWasOpen) SettingsTab = 0;   // it always opens on the map
 	bSettingsWasOpen = Knight->IsSettingsOpen();

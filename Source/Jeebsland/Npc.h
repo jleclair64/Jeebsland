@@ -14,7 +14,18 @@ enum class ENpcRole : uint8
 	Blacksmith,   // the smithy
 	GateKnight,   // walks the road outside the village and chats
 	Villager,     // one of ten villagers who stroll about the village and tell their stories
-	Banker        // keeps the vault
+	Banker,       // keeps the vault
+	QuestGiver    // (2026-11-18) one of Oak Hill's people from Content/Data/QuestsPeople.csv: quests, else a greeting (QuestComponent.h)
+};
+
+// How a quest giver looks (QuestsPeople.csv): the villagers' body with these colours and hat
+struct FNpcLook
+{
+	FString Name;
+	FLinearColor Tunic = FLinearColor(0.4f, 0.3f, 0.2f), Hair = FLinearColor(0.3f, 0.2f, 0.1f);
+	int32 Hat = -1;        // a villager's hat: -1 none, 0 herbalist, 3 cap, 4 baker, 7 cowl, 8 feather
+	bool bApron = false;
+	float Scale = 1.f;
 };
 
 // A villager built from simple shapes. Talk to them with E: they greet you and tell a story about Jeebsland,
@@ -30,6 +41,10 @@ public:
 	// Called right after spawning: builds the body for this role. Patrol points (if any) are set separately.
 	void Setup(ENpcRole InRole, int32 InVillagerIdx = 0);
 	void SetPatrol(const TArray<FVector2D>& Points) { Patrol = Points; }
+	// A quest giver (QuestPeople.cpp): who they are in the quest data, and how they look
+	void SetupPerson(FName InKey, const FNpcLook& InLook) { PersonKey = InKey; Look = InLook; Setup(ENpcRole::QuestGiver); }
+	FName GetPersonKey() const { return PersonKey; }
+	bool IsQuestGiver() const { return Role == ENpcRole::QuestGiver; }
 
 	ENpcRole GetRole() const { return Role; }
 	FString GetNpcName() const;
@@ -62,4 +77,6 @@ private:
 	int32 VillagerIdx = 0;
 	float HalfH = 92.f;       // capsule half height (smaller for the boy)
 	float StuckT = 0.f;
+	FName PersonKey;          // (quest givers)
+	FNpcLook Look;
 };

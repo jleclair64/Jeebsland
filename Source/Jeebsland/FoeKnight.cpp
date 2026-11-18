@@ -7,6 +7,7 @@
 #include "Loot.h"
 #include "Terrain.h"
 #include "Messages.h"
+#include "QuestComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "KnightAnimator.h"
 #include "Components/PoseableMeshComponent.h"
@@ -376,6 +377,7 @@ void AFoeKnight::OnHurt(AActor* From)
 				Drop->Setup(ELootLook::Item, TArray<FInvSlot>(), 12 + Rand.RandRange(0, 8));   // a small purse of ingots
 			if (USkillComponent* Sk = From ? From->FindComponentByClass<USkillComponent>() : nullptr)
 				Sk->Say(4.f, FColor(255, 210, 120), TEXT("The pen knight yields! He will be ready for another bout soon."));
+			UQuestComponent::OnFoeBeaten(From, TEXT("PenKnight"));   // (quests that ask for him beaten, QuestComponent.cpp)
 		}
 		return;
 	}
