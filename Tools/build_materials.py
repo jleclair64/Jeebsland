@@ -725,6 +725,14 @@ def unlit(name, blend, two_sided=True):
     return mat, Graph(mat)
 
 
+def behind_clouds(mat):
+    # (2026-11-17) sky lights far beyond the clouds (stars, shooting stars, comets: NightSky draws them 52 km out) take the
+    # volumetric clouds' transmittance, so a cloud hides what is behind it instead of the light drawing over it
+    mat.set_editor_property("use_translucency_vertex_fog", True)
+    mat.set_editor_property("apply_cloud_fogging", True)
+    mat.set_editor_property("compute_fog_per_pixel", True)
+
+
 def finish(mat, name):
     lib.recompile_material(mat)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
@@ -753,6 +761,7 @@ def build_star():
     g.link(g.one(unreal.MaterialExpressionFrac, g.mul(rnd, 7.31)), hue, "Alpha")
     e = g.muln(g.muln(g.muln(hue, core), g.muln(bright, twinkle)), g.muln(g.scalar("Night", 1.0), g.scalar("Boost", 5.0)))
     g.out(g.muln(e, g.vector("Tint", (1.0, 1.0, 1.0))), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    behind_clouds(mat)
     finish(mat, "M_Star")
 
 
@@ -847,6 +856,7 @@ def build_streak():
     prof = g.power(g.one(unreal.MaterialExpressionSaturate, g.one(unreal.MaterialExpressionOneMinus, across)), 2.0)
     e = g.muln(g.muln(g.vector("Tint", (0.95, 0.93, 1.0)), g.muln(head, prof)), g.muln(g.scalar("Night", 1.0), g.scalar("Intensity", 4.0)))
     g.out(e, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    behind_clouds(mat)
     finish(mat, "M_Streak")
 
 

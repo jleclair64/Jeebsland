@@ -35,7 +35,10 @@ private:
 	UPROPERTY() UMaterialInstanceDynamic* CloudMid = nullptr;
 
 	static constexpr float Radius = 21000.f;   // beyond the moon (20000), so the moon sits in front of the stars (both before SkyScale)
-	static constexpr float SkyScale = 25.f;    // the actor is scaled up this much: the sky sits about 5 km out, behind the whole world
+	// The actor is scaled up this much: the stars sit about 52 km out, behind the whole world and past the volumetric clouds
+	// (traced to 40 km), so M_Star's and M_Streak's cloud fogging hides them behind the clouds (2026-11-17; was 25, 5 km out,
+	// in front of most of the cloud layer, so the stars drew over the clouds)
+	static constexpr float SkyScale = 250.f;
 	static constexpr float CloudRadius = 19000.f;
 	static constexpr int32 NumShooting = 3;
 

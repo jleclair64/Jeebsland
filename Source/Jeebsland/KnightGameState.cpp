@@ -1059,6 +1059,23 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				ShotIdx = EyeIdx;
 				FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d.png"), *ShotName, EyeIdx), true, false);
 			}
+			// (-ShotEyesFilm=N, cloud blinking 2026-11-17: N consecutive frames per eye, <ShotName>_<eye>_<nnn>.png, from the same settled
+			// moment as the still, for flicker that only shows from frame to frame; eye mask 2048 pans the eye at -ShotEyesPan= deg/s (20)
+			// from 1 s into its turn, so a film shows a turning camera as well as a still one)
+			static int32 FilmFrames = 0;
+			static const bool bFilm = FParse::Value(FCommandLine::Get(), TEXT("ShotEyesFilm="), FilmFrames) && FilmFrames > 0;
+			static float FilmPan = 20.f;
+			static const bool bFilmPanRead = FParse::Value(FCommandLine::Get(), TEXT("ShotEyesPan="), FilmPan);
+			(void)bFilmPanRead;
+			static int32 FilmEye = -1, FilmIdx = 0;
+			static bool bPanEye = false;
+			if (bFilm && EyeCam && EyeIdx >= 0 && EyeIdx < ShotEyes.Num())
+			{
+				if (bPanEye && InEye > 1.0f) EyeCam->AddActorWorldRotation(FRotator(0.f, FilmPan * DeltaSeconds, 0.f));
+				if (FilmEye != EyeIdx && InEye > 1.4f && GFrameCounter > EyeMovedFrame + 30) { FilmEye = EyeIdx; FilmIdx = 0; }
+				if (FilmEye == EyeIdx && FilmIdx < FilmFrames)
+					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d_%03d.png"), *ShotName, EyeIdx, FilmIdx++), false, false);
+			}
 			if (Want > EyeIdx)
 			{
 				EyeIdx = Want;
@@ -1081,6 +1098,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						for (const FString& Cmd : Cmds) { GEngine->Exec(GetWorld(), *Cmd); UE_LOG(LogTemp, Display, TEXT("JEEBEYECMD %d %s"), EyeIdx, *Cmd); }
 					}
 					JeebFoliageMask(GetWorld(), P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0);
+					bPanEye = P.Num() >= 7 && (FCString::Atoi(*P[6]) & 2048);
 					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
 					FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
