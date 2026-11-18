@@ -2,6 +2,7 @@
 #include "Inventory.h"
 #include "OakHill.h"
 #include "Terrain.h"
+#include "FoeData.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
@@ -267,7 +268,7 @@ namespace JeebQuests
 					S.bRuin = S.Target.Equals(TEXT("Ruin"), ESearchCase::IgnoreCase);
 					if (!S.bRuin && !PlaceFrom(S.Target, S.Place)) { Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: visit \"%s\" is neither Ruin nor \"north east\" metres"), r + 2, *S.Target)); bOk = false; }
 				}
-				if (S.Type == EStep::Kill && !S.Target.Equals(TEXT("PenKnight"), ESearchCase::IgnoreCase)) Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: kill \"%s\": only PenKnight can be beaten so far"), r + 2, *S.Target));
+				if (S.Type == EStep::Kill && !JeebFoes::IsFoeTarget(S.Target)) Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: kill \"%s\": not PenKnight, nor a Key or Group in Foes.csv"), r + 2, *S.Target));
 				if (bOk) Q->Steps.Add(S);
 				else Q->Steps.Add(FStepDef());   // (a broken step still holds its place, so the step numbers in saves keep their meaning; it reads as a talk to nobody)
 			}
@@ -333,6 +334,8 @@ namespace JeebQuests
 		for (const FInvSlot& I : Q.RewardItems) Parts.Add(I.Count > 1 ? FString::Printf(TEXT("%d %s"), I.Count, *JeebItems::ItemName(I.Id)) : JeebItems::ItemName(I.Id));
 		return FString::Join(Parts, TEXT(", "));
 	}
+
+	int32 ItemFromName(const FString& Name) { return ItemFrom(Name); }
 
 	bool MarkSpot(const FString& Mark, FVector2D& Out)
 	{

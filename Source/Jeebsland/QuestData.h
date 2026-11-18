@@ -78,4 +78,6 @@ namespace JeebQuests
 	bool MarkSpot(const FString& Mark, FVector2D& Out);
 	// How close to a quest giver the server lets a request count (cm; players talk from 2.3 m, the rest is lag)
 	constexpr float TalkReach = 650.f;
+	// An item by its name or key as the CSV files write it ("Healing Potion", "Iron Arrows", "TinOre", or a number); 0 empty, -1 unknown
+	int32 ItemFromName(const FString& Name);
 }

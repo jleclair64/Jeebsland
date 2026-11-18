@@ -2104,7 +2104,8 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 	{
 		// The tier's colour and shine (Tiers.csv). Meshy painted this steel dark, so it is greyed and lifted before the tint. MetalShare: at Tiers.csv's full metal it mirrors the dark surroundings and looks nearly black.
 		const FLinearColor Steel(0.90f, 0.97f, 1.0f), C = JeebItems::Palette(Tier, 0);
-		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FMath::Min(C.R / Steel.R, 2.f), FMath::Min(C.G / Steel.G, 2.f), FMath::Min(C.B / Steel.B, 2.f), 1.f));
+		const FLinearColor& Sh = PieceShade[Piece];   // (white, but for foes dressed apart: a bandit's dark hood, SetShade)
+		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FMath::Min(C.R / Steel.R, 2.f) * Sh.R, FMath::Min(C.G / Steel.G, 2.f) * Sh.G, FMath::Min(C.B / Steel.B, 2.f) * Sh.B, 1.f));
 		ApplyPlateLook(M, Tier);
 	}
 }

@@ -1,11 +1,11 @@
 Quest,Type,At,Target,Count,Radius,Mark,Log,Lines,Waiting
 # The steps of each quest in Quests.csv, in order (rows of one quest must stay in their order; quests may be in any order).
 # Saves remember which step a player is on by its number, so add new steps at the END of a quest that players already have.
-# Type: talk (talk to At), bring (take Count of the item Target to At: they are taken from the pack), kill (beat Count of Target: PenKnight),
+# Type: talk (talk to At), bring (take Count of the item Target to At: they are taken from the pack), kill (beat Count of Target: PenKnight, or a Key or Group from Foes.csv: Bandit = any bandit, RedHal = Red Hal),
 #   visit (go to Target: Ruin = any of the old stone ruins in the forest round Oak Hill, or "N E" = metres north and east of Oak Hill's plaza; within Radius metres).
 # At: the Key of a person in QuestsPeople.csv. Target for bring: an item name or key (Logs, TinOre, IronOre, Perch, Trout ...).
 # Mark: where the map points while this step is not ready: a person's Key, ruin, pen, pond, rocks, or "N E" (metres from Oak Hill's plaza). Empty: the map points at At,
-#   at the sparring knight for kill, at the nearest ruin for visit Ruin; a bring step with nothing marked points at At once you carry enough.
+#   at the sparring knight for kill PenKnight, at the nearest camp with such a foe for other kills (FoeCamps.csv), at the nearest ruin for visit Ruin; a bring step with nothing marked points at At once you carry enough.
 # Log: the line in the quest log and the tracker. Lines: what At says when the step is done ("|" for a new line; for visit, the message when you get there).
 # Waiting: what At says when you come for a bring step without enough (empty: the Log line and how many you have).
 # The LAST step should happen at the giver (talk or bring At the giver): its Lines are followed by the quest's Done lines and the reward.
@@ -21,3 +21,7 @@ Sparring,talk,Corin,,,,,Tell Captain Corin how the sparring knight fights.,"Twic
 Ruins,visit,,Ruin,,14,,Find one of the old stone ruins in the forest round Oak Hill.,You've found one of the old ruins. Wil will want to hear about this.,
 Ruins,talk,Wil,,,,,Tell Wil what you found.,"They're real?! A round tower with a little window? I knew it!|I'm going to draw it. Don't tell Gran I want to go there, though. Not till I'm bigger.",
 Iron,bring,Pell,IronOre,5,,,Mine 5 iron ore from the dark rocks in the hills and bring it to Pell.,That's proper iron. These hinges will outlast us all.,"Five lumps of iron ore. The dark rocks, mind: the grey ones are tin."
+Thieves,kill,,Bandit,4,,,Beat 4 bandits at their camps in the forest round Oak Hill.,,
+Thieves,talk,Corin,,,,,Tell Captain Corin the roads are a little safer.,"You're back in one piece! Good. I'd half a mind to come looking for you.",
+RedHal,kill,,RedHal,1,,,Beat Red Hal at his camp by an old ruin in the forest.,,
+RedHal,talk,Corin,,,,,Tell Captain Corin that Red Hal is beaten.,"Beaten, and you walked away? Ha! He'll think twice before he comes near Oak Hill again.",

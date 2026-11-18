@@ -4,6 +4,7 @@
 #include "Inventory.h"
 #include "Npc.h"
 #include "FoeKnight.h"
+#include "FoeCamps.h"
 #include "ForestRuins.h"
 #include "Terrain.h"
 #include "Net/UnrealNetwork.h"
@@ -153,10 +154,15 @@ bool UQuestComponent::Objective(FVector2D& OutAt, FString& OutWhat) const
 		if (S.Mark.Equals(TEXT("ruin"), ESearchCase::IgnoreCase)) {}   // (the nearest ruin, below)
 		else if (MarkSpot(S.Mark, OutAt)) { OutWhat = Q->Title; return true; }
 	}
+	if (S.Type == EStep::Kill && !S.Target.Equals(TEXT("PenKnight"), ESearchCase::IgnoreCase))   // (bandits and the like: the nearest camp that has one, FoeCamps.h)
+	{
+		const FVector2D From = GetOwner() ? FVector2D(GetOwner()->GetActorLocation()) : FVector2D::ZeroVector;
+		if (AFoeCamps::NearestCamp(W, S.Target, From, OutAt, OutWhat)) return true;
+	}
 	if (S.Type == EStep::Kill)
 	{
 		for (TActorIterator<AFoeKnight> It(W); It; ++It)
-			if (!It->bStill) { OutAt = FVector2D(It->GetActorLocation()); OutWhat = TEXT("Sparring knight"); return true; }
+			if (!It->bStill && !It->IsBandit()) { OutAt = FVector2D(It->GetActorLocation()); OutWhat = TEXT("Sparring knight"); return true; }
 		OutAt = JeebTerrain::PenCenter(); OutWhat = TEXT("Sparring knight");
 		return true;
 	}

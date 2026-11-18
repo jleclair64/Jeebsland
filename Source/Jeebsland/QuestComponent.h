@@ -99,4 +99,5 @@ private:
 	int32 TestStage = 0;
 #endif
 	friend struct FQuestTestDriver;
+	friend struct FFoeTestDriver;   // (-JeebFoeTest, FoeCamps.cpp)
 };

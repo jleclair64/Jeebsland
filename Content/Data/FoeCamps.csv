@@ -1,0 +1,12 @@
+Key,Name,Where,North,East,Foes,Props
+# The foes' camps (2026-11-18). One row per camp; the foes are in Foes.csv.
+# Where: plaza = the camp is near the spot North / East metres from Oak Hill's plaza (negative: south / west); ruin = at the old forest ruin nearest that spot.
+#   The game moves each camp to the nearest good ground within 60 m (dry, fairly flat, 20 m or more from any road, clear of trees and rocks, 60 m or more from any town) and logs where (JEEBFOE camp).
+#   Keep camps 100 m or more from Oak Hill's and Blackrock's edges: a foe chases up to his Leash (35 m) from camp and sees 14 m past it.
+# Foes: Keys from Foes.csv separated by ";", "x2" for two of a kind (at most 12 a camp). They stand round the fire and stroll near it.
+# Props: FillKinds.csv kinds separated by ";": the first is the campfire in the middle (a flame is added on it), the rest go round it.
+# Change the file, then restart the game and the world servers (every machine builds the camps from it; the server places the foes).
+North,Thornback Camp,plaza,290,-150,Cutpurse x2; Bruiser,Firewood; StallRedTent; Crate; Barrel; LogMossy; SackPileOpen
+South,Fernhollow Camp,plaza,-240,40,Cutpurse x3,Firewood; StallRedTent; CrateOpen; LogMossy; WoodTub; SackStack
+East,Ashgrove Camp,plaza,40,270,Cutpurse; Bruiser x2,Firewood; StallRedTent; Crate; BarrelSmall; LogMossy; Cauldron
+Ruin,Red Hal's Hold,ruin,150,250,RedHal; Bruiser x2; Cutpurse,Firewood; StallRedTent; Crate; CrateNoLid; Barrel; LogStackSmall; SackPileOpen
