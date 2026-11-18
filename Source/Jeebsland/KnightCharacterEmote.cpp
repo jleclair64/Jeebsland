@@ -61,6 +61,7 @@ bool AKnightCharacter::EmoteCancelled(FString& Why) const
 	else if (!M || M->IsFalling()) Why = TEXT("jumped or fell");
 	else if (bAttacking) Why = TEXT("attacked");
 	else if (StunLeft > 0.f || bKnockedDown) Why = TEXT("hit");
+	else if (GetWorld() && GetWorld()->GetTimeSeconds() - LastHurtTime < FMath::Min(EmoteT, 0.5f)) Why = TEXT("hit");   // (any blow since the emote began, not only one that stuns)
 	else if (bRolling || bSliding) Why = TEXT("rolled");
 	else if (InClimbMove() || bClimbing) Why = TEXT("climbing or swimming");
 	else if (bSitting || bMounted) Why = TEXT("seated");

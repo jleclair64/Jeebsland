@@ -1,5 +1,6 @@
 #include "QuestComponent.h"
 #include "QuestPeople.h"
+#include "KnightCharacter.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
 #include "Npc.h"
@@ -302,6 +303,7 @@ void UQuestComponent::DoQuest(EOp Op, FName Key)
 {
 	USkillComponent* Sk = Skills();
 	if (!HasAuth() || !Sk) return;
+	if (const AKnightCharacter* K = Cast<AKnightCharacter>(GetOwner())) if (K->GetHealth() <= 0.f) return;   // (the fallen neither accept nor hand in)
 	const FString Who = GetOwner()->GetName();
 	if (Op == EOp::Accept)
 	{

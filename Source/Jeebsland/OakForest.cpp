@@ -1091,6 +1091,7 @@ AOakTreeNode* AOakForest::SpawnNode(int32 Index)
 	N->Forest = this; N->Index = Index;
 	const float H = Kinds[F.Kind].TrunkH * F.Tree.GetScale3D().Z + 300.f;
 	N->Setup(IsSpruce(F.Kind) ? ETreeKind::Pine : ETreeKind::Oak, F.Radius, H);
+	if (!HasAuthority() && F.bFelled) N->ApplyCharges(0);   // (a player's machine: a node made beside an already felled tree starts felled, so its stump can't be "chopped")
 	Nodes.Add(Index, N);
 	++NodesSpawned;
 	return N;

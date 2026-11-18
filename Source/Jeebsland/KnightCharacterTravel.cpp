@@ -26,6 +26,7 @@ void AKnightCharacter::TravelPlaced(const FVector& Dest, float Yaw)
 {
 	EndGathering();
 	CloseLoot();
+	if (HasAuthority()) StopEmote(TEXT("travelled"));   // (a dance or sit doesn't come along)
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	TeleportTo(Dest, FRotator(0.f, Yaw, 0.f), false, true);
 	if (AController* C = GetController()) if (IsLocallyControlled() || HasAuthority()) C->SetControlRotation(FRotator(0.f, Yaw, 0.f));

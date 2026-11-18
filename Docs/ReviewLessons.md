@@ -383,3 +383,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - A flame, glow or light must be placed on its fuel or source, and its position checked side-on, not only that the light pool is on the ground.
 - A town said to be in a forest needs trees or bushes inside the street grid, not a distant ring; check from the aerial and the street. Keep wood colours to the rich-brown palette, not saturated orange, on every new prop.
 - Placeholder bodies (box trolls) next to real people read as broken; give every character in a scene the same body style or hide the old shapes.
+
+## Lessons from the 2026-11-18 daytime batch (online review)
+- Any static or global cache of UObject pointers must be rooted or weak-held, and any new asset-loading cache must be tested with a client that goes menu world -> server world, not only single player.
+- Anything created lazily from replicated state must be initialised from the current replicated state when it is created, not only when the state next changes.
+- When a state is meant to be interrupted by "any hit", hook the hit itself (`Hurt`), not a derived flag that only some hits set.
+- A reward-fits check must test the whole reward together, or the quest must not complete.
