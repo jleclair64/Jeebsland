@@ -33,6 +33,23 @@ When the owner says goodbye, goodnight or anything similar, don't just sign off:
 
 ## Current state
 
+**From CLAUDE.md, 2026-11-18 (history):**
+
+- **Overnight 2026-11-16/17 (owner asleep, free rein; all merged, built, pushed; owner to judge live):**
+  - Oak Hill's trees are DZ cork oaks and aspens (2:1) plus spruces, and a 500 m forest surrounds the town (`AOakForest`, OakForest.cpp). The plaza oak is deleted.
+  - Rolling forested hills ring the town (`Hills.cpp`, up to 45 m; `jeeb.Hills.Scale` in non-Shipping only).
+  - Three forest dirt roads; M_Dirt's mask was fixed, so Blackrock's paths show too.
+  - Forest on the Tab map.
+  - Far tree shadows from cheap stand-ins out to 400 m (`jeeb.Forest.FarShade`): forest about 6.5 ms GPU on HIGH (was 9-11).
+  - Warmer lamps (`jeeb.Lamp.*`), darker fallen leaves, muted tree colours with 40% green (`jeeb.Trees.Saturation` 0.7), spruce tint reaches the forest.
+  - Swing trail fades edge-on (it was the "weapon ghosting"); plate brightness default 0.6891.
+  - Pack textures capped at 2048 in packages (our building textures moved to Project01/02).
+  - New kite, round and tower shields (Meshy CC0; the tower retextured clean, 10 credits) and 10 forest ruins (`ForestRuins.cpp`; the ruin's wall top is now a solid stone capping course, 2026-11-17).
+  - Known: low-sun forest floor is nearly all shade; stars show in the low-sun sky; the road reads orange at low sun; town trees aren't choppable; grass darker roots not built (needs `BuildGrassPacks.ps1` from main).
+
+- **Trees (owner, 2026-11-16):** the plaza oak is deleted. Oak Hill's trees and a dense forest 500 m round it are the pack trees (`AOakForest`, OakForest.cpp; ProjectNotes "Oak Hill's trees and the forest"): DZ cork oaks and columnar aspens about 2:1 in four colour patches (the groves' `jeeb.Trees.Dz*`), spruces, bushes, logs, stumps, boulders and three dirt roads; solid trunks on every machine. Owner to judge live. Known: the roads' M_Dirt ribbons don't show (Blackrock's are as faint), the forest isn't on the Tab map, town trees aren't choppable, the spruce colour sliders don't reach the forest, forest views cost +3 to +5 ms on HIGH (tree shadows within 40 m, `jeeb.Forest.ShadowReach`). Our choppable trees stay Blackrock's woods. Before packaging: cap the pack textures at 2048 (the used tree folders are about 1.7 GB of source).
+
+
 Last updated 2026-11-14 (the owner's 25-item batch of 2026-11-13/14 merged, built and pushed at 836a7ad). Everything below is built and committed.
 
 **Oak Hill is the rebuilt TownLab town (2026-11-14; owner: "replace this new oak hill with the old oak hill"):** `ATownLabTown` with `bRealSite` builds it at the real plaza on every machine (`JeebTownLab::RealTown()`, TownLab.h; `FSite`, `RealSite()`): a painted 1 m ground with flagstone streets (no road ribbons, Paths.cpp skips them), riverbank cells in M_Ground, edges matched to the square's 2 m and the world's 8 m grids (GrassField cuts a hole there), the `SM_TL_*` buildings through `ModelSwaps` (TownLabTown.cpp; a swapped model keeps the old one's frame, Scale 0, so counters, footprints and chimneys still fit), instanced decor from `/Game/TownDecor` (copies of the Filler props, `Tools/CopyTownDecor.ps1`: run it again whenever TownLabDecor.h gains a Filler prop), lantern lights, foundation dressing, dense near grass. `AOakHillTown` now only logs its checks (JEEBOAK); `-OldOakHill` brings the old town back (never Shipping). Log JEEBOAK PLOT / built (hash, compare between machines). The lab's light is the game's look (`jeeb.Look.*` defaults, new `jeeb.Look.Shafts`); M_Ground has the lab's swathes, lift and a low-sun sky fill (`jeeb.Ground.SkyFill`, set by `AWorldTerrain`). The cheap shadows and clouds were not carried. Only `/Game/TownLab/Map` is never cooked. `-LabTour` in Field measures the town, open land and Blackrock (Docs/TownLab/FrameBudget.md).
