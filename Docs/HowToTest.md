@@ -92,7 +92,7 @@ Test pictures: `-ShotEyes` eyes take a 9th and 10th field, his turn from the eye
 
 ## Stars and the clouds (2026-11-17)
 
-The stars, shooting stars and comets now sit far beyond the clouds, so a cloud hides them instead of the stars drawing on top of it, and they come out only once the sun is 6 degrees below the horizon (full by 14 below), never while it is up. Until the sun's path dips below the horizon you won't see them in play; to look anyway: console `jeeb.Sky.Stars 1` (hold them on, -1 follows the sun; not in packages). Check: stars in clear sky, none showing through a cloud. Test films for flicker: `-ShotEyesFilm=40` takes 40 consecutive frames per `-ShotEyes` eye (`<name>_<eye>_<nnn>.png`); eye mask 2048 turns the eye at `-ShotEyesPan=` degrees a second (20); add `-benchmark -fps=60` for even steps.
+The stars, shooting stars and comets now sit far beyond the clouds, so a cloud hides them instead of the stars drawing on top of it, and they come out only once the sun is 6 degrees below the horizon (full by 14 below), never while it is up. Until the sun's path dips below the horizon you won't see them in play; to look anyway: console `jeeb.Sky.Stars 1` (hold them on, -1 follows the sun; not in packages). Check: stars in clear sky, none showing through a cloud. Test films for flicker: `-ShotEyesFrames=40` takes 40 consecutive frames per `-ShotEyes` eye (`<name>_<eye>_<nnn>.png`); eye mask 2048 turns the eye at `-ShotEyesPan=` degrees a second (20); add `-benchmark -fps=60` for even steps.
 
 ## Oak Hill's trees and the forest round it (2026-11-16)
 
