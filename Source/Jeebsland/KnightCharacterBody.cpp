@@ -552,7 +552,20 @@ void AKnightCharacter::RebuildHeld()
 		for (int32 i = First; i < HeldComps.Num(); ++i)
 			HeldComps[i]->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q);   // (clear of the model's back)
 		StowPullNow = 0.f;
-		if (UStaticMeshComponent* S = JeebProps::Make(this, UpperPivot, K, T)) { S->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q); HeldStatics.Add(S); }
+		if (UStaticMeshComponent* S = JeebProps::Make(this, UpperPivot, K, T))
+		{
+			if (K == JeebItems::K_Staff)
+			{
+				// (2026-11-18, visual review: hung from the grip at the shoulder the 1.4 m staff reached his knees and stood out behind him.
+				// Now it is turned end for end, the orb up past his right shoulder and the butt down by his left hip, and slid along
+				// itself so that its middle, not its grip, lies on the middle of his back.)
+				const FQuat QS = FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-40.f)) * FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f)) * FQuat(FVector::XAxisVector, PI);
+				const FVector OrbDir = QS.RotateVector(FVector(0.f, 0.f, -1.f));   // (the model's orb end is along -Z from the grip)
+				S->SetRelativeLocationAndRotation(FVector(StowBackX, 0.f, StowZ) - OrbDir * 60.f, QS);
+			}
+			else S->SetRelativeLocationAndRotation(FVector(StowBackX, 14.f, StowZ), Q);
+			HeldStatics.Add(S);
+		}
 		return;
 	}
 	// The bow is held in the LEFT fist, built at its own grip on BowHold, which the pose places in the fist: at ease lying forward and back through it,
@@ -613,7 +626,7 @@ void AKnightCharacter::PullStowed(float Cm)
 	for (UProceduralMeshComponent* C : HeldComps)
 		if (C && C->GetAttachParent() == UpperPivot) C->SetRelativeLocation(FVector(StowBackX + Cm, 14.f, StowZ));
 	for (UStaticMeshComponent* S : HeldStatics)
-		if (S && S->GetAttachParent() == UpperPivot) S->SetRelativeLocation(FVector(StowBackX + Cm, 14.f, StowZ));
+		if (S && S->GetAttachParent() == UpperPivot) { const FVector At = S->GetRelativeLocation(); S->SetRelativeLocation(FVector(StowBackX + Cm, At.Y, At.Z)); }   // (the staff lies lower and further over)
 }
 
 // The resting shield, and the left arm that holds it. The shield stays where it was placed (in the shoulder's frame, so it

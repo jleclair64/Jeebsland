@@ -1,5 +1,6 @@
 #include "KnightAnimator.h"
 #include "JeebEmotes.h"
+#include "HAL/IConsoleManager.h"
 
 using namespace JeebAnim;
 
@@ -26,5 +27,34 @@ void FKnightAnimator::EmotePlay(int32 Key, const FInput& In, FPose& B, float& Ou
 			if (const FClip* R = Get(TEXT("Rest"))) { Sample(*R, 0.f, Scratch, false); EmoteRestSole = FMath::Min(float(BonePos(Scratch, LFoot).Z), float(BonePos(Scratch, RFoot).Z)); }
 		if (EmoteRestSole >= 0.f) B.Hip.Z += EmoteRestSole - FMath::Min(float(BonePos(B, LFoot).Z), float(BonePos(B, RFoot).Z));
 	}
+	if (Key == 108) SaluteToVisor(B);
 	if (bRestart) StartBlend(B, M->Blend);
+}
+
+// The salute (2026-11-18, motion review): Mixamo's hand stops at his shoulder and neck, lower still in heavy armour where the pauldron
+// takes the arm. While the clip's hand is up, a two-bone reach lifts it to the visor's right edge; the hand keeps the clip's own turn.
+// Live: jeeb.Knight.SaluteLift (0 = the clip as it was).
+static TAutoConsoleVariable<float> CVarSaluteLift(TEXT("jeeb.Knight.SaluteLift"), 1.f, TEXT("The salute's hand lifted to the visor (1), or the clip's own height (0)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarSaluteAt(TEXT("jeeb.Knight.SaluteAt"), TEXT("-7,14,6"), TEXT("Where the salute's hand goes from the head bone (cm, mesh frame: -X his right, +Y ahead, +Z up)."), ECVF_Default);
+void FKnightAnimator::SaluteToVisor(FPose& B)
+{
+	const float Lift = FMath::Clamp(CVarSaluteLift.GetValueOnGameThread(), 0.f, 1.f);
+	if (Lift <= 0.f) return;
+	FVector Off(-7.f, 14.f, 6.f);
+	{
+		TArray<FString> P;
+		CVarSaluteAt.GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
+		if (P.Num() == 3) Off = FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2]));
+	}
+	FQuat HandWas;
+	const FVector Hand = BonePos(B, RHand, &HandWas);
+	const FVector Shoulder = BonePos(B, RArm);
+	// (how far the clip's hand is up: nothing while it hangs, all of it from about the chin)
+	const float W = Lift * FMath::SmoothStep(float(Shoulder.Z) - 25.f, float(Shoulder.Z) + 5.f, float(Hand.Z));
+	if (W <= 0.001f) return;
+	const FVector Want = FMath::Lerp(Hand, BonePos(B, Head) + Off, W);
+	L.ReachTo(B, RArm, RFore, RHand, Want, FVector(-1.f, 0.35f, -0.25f));   // (the elbow out to his right and a little forward, as a salute holds it)
+	FQuat HandNow;
+	BonePos(B, RHand, &HandNow);
+	TurnInMesh(B, RHand, HandWas * HandNow.Inverse());
 }
