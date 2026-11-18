@@ -162,6 +162,12 @@ def build(normal_tex, foam_tex):
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     mat.set_editor_property("tangent_space_normal", False)   # the sheets are flat and have no UVs: the normal is built in world space
     mat.set_editor_property("used_with_instanced_static_meshes", True)
+    # (2026-11-17, owner: the water "shows up multiple times in the same frame", like the leaves and bats did) The ripples and the
+    # foam move by Time in the material, which no motion vector describes (the sheets stand still). TSR (HIGH) took the drifting
+    # ripples for flicker and thin detail and kept blending older frames' ripples in, so each glint and reflection patch smeared into
+    # several faint copies along the flow and the camera's turn. "Has Pixel Animation" marks every water pixel in the velocity buffer
+    # so TSR treats it as moving: it turns off the anti-flicker and thin-geometry history keeping there and takes the new frame.
+    mat.set_editor_property("has_pixel_animation", True)
     g = Graph(mat)
 
     wp = g.node(unreal.MaterialExpressionWorldPosition)
