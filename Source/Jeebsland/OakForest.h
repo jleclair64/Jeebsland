@@ -85,6 +85,18 @@ private:
 	TArray<FBox> ShadeBounds;                                    // (and that tree mesh's bounds at scale 1)
 	uint32 ShadeHash = 0u;
 	float ShadeSizeNow = -1.f;
+	FVector2D ShadeAt = FVector2D(1.0e9f, 1.0e9f);
+	// The soft hand-over (2026-11-17, owner: the near shadows "blink"; jeeb.Forest.ShadowFade): near the reach's edge each tree's stand-in
+	// comes from these sets instead, in M_TreeShade, which grows it over the swap of the leafy twin and then fades it out inside the reach
+	UPROPERTY() TArray<UInstancedStaticMeshComponent*> BandSets; // (one per tree kind, as ShadeSets)
+	UPROPERTY() TArray<UMaterialInstanceDynamic*> BandMids;      // (one per tree kind: its crown's middle differs)
+	TArray<FVector> ShadeAnchor;                                 // (each kind's stand-in crown middle, in the mesh's own frame)
+	uint32 BandHash = 0u;
+	FVector CamNow = FVector::ZeroVector;
+	bool bBandOn = false;
+	float BandParams[5] = { -1.f, -1.f, -1.f, -1.f, -1.f };     // (what the band materials were last given)
+	bool CameraNow(FVector& Out) const;
+	void UpdateBandFade();
 	void BuildShadeMeshes();
 	void UpdateShadows(bool bForce);
 	void ApplyReach();

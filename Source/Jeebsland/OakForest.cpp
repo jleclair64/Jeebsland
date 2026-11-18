@@ -40,6 +40,15 @@ namespace
 		TEXT("How far from the camera the trees' stand-ins cast shadows, metres (set by the graphics setting). Past the sun's ordinary shadow range they need its far cascade, jeeb.Shadow.Far. Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarFarShadeSize(TEXT("jeeb.Forest.FarShadeSize"), 0.75f,
 		TEXT("The stand-in crown's size against the real crown (1 as wide and tall; smaller is a lighter, smaller shade). Live; looks only."), ECVF_Default);
+	// (2026-11-17, owner: the near trees' shadows "blink" as they swap; "make these phase in and out instead of all or none") Near the
+	// edge of jeeb.Forest.ShadowReach each tree's stand-in grows to cover its leafy shadow while that is swapped in or out, then fades
+	// out inside the reach over this many metres (M_TreeShade drops a growing share of its shadow-map texels), uncovering the leafy one
+	TAutoConsoleVariable<float> CVarShadowFade(TEXT("jeeb.Forest.ShadowFade"), 6.f,
+		TEXT("How many metres the near trees' shadows take to change from the plain stand-in shade to their own leafy shadow, inside jeeb.Forest.ShadowReach (0: the old hard swap, which blinks). Wider is softer, but less of the reach shows pure leafy shadows. Live; looks only."), ECVF_Default);
+	TAutoConsoleVariable<int32> CVarShadowLog(TEXT("jeeb.Forest.ShadowLog"), 0,
+		TEXT("1: log every refill of the trees' shadow sets (JEEBFOREST refill: frame, camera, which sets changed), for tests; 2: the same, and leave the leafy twins out, to see the stand-ins alone."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarShadowFadeSize(TEXT("jeeb.Forest.ShadowFadeSize"), 1.1f,
+		TEXT("How big the stand-in shade is, against the real crown, where the leafy shadow is swapped in or out (it hides the swap; it shrinks back to jeeb.Forest.FarShadeSize over the next 12 m). Raise it if a ring of leaves still pops at the reach's edge. Live; looks only."), ECVF_Default);
 
 	TAutoConsoleVariable<int32> CVarShadowAll(TEXT("jeeb.Forest.ShadowAll"), 0,
 		TEXT("1: every drawn tree casts its own shadow (meant for virtual shadow maps, r.Shadow.Virtual.Enable 1; with ordinary shadow maps it cost about 7 ms); 0: only the near twins and the stand-ins. Live; looks only."), ECVF_Default);
@@ -843,6 +852,19 @@ struct FOakForestBuild
 						P->bAffectDistanceFieldLighting = false;
 						P->bCastDynamicShadow = true;
 						Sh = Self->ShadeSets.Add(P);
+						// and its near twin for the soft hand-over (jeeb.Forest.ShadowFade): the same stand-in in M_TreeShade, on a 2 m step
+						UInstancedStaticMeshComponent* Bd = NewObject<UInstancedStaticMeshComponent>(Self);
+						Bd->SetupAttachment(Root);
+						Bd->SetMobility(EComponentMobility::Movable);
+						Bd->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+						Bd->SetCanEverAffectNavigation(false);
+						Bd->SetHiddenInGame(true);
+						Bd->bCastHiddenShadow = true;
+						Bd->SetCastShadow(true);
+						Bd->bCastFarShadow = false;
+						Bd->bAffectDistanceFieldLighting = false;
+						Bd->SetBoundsScale(2.f);   // (its material grows it, jeeb.Forest.ShadowFadeSize)
+						Self->BandSets.Add(Bd);
 						Self->ShadeKind.Add(Kd);
 						Self->ShadeBounds.Add(Meshes[Kd]->GetBoundingBox());
 					}
@@ -856,6 +878,7 @@ struct FOakForestBuild
 			}
 			Self->BuildShadeMeshes();
 			for (UInstancedStaticMeshComponent* P : Self->ShadeSets) P->RegisterComponent();
+			for (UInstancedStaticMeshComponent* P : Self->BandSets) P->RegisterComponent();
 			// the stumps of felled trees (filled as trees are chopped)
 			if (UStaticMesh* SM = Meshes[K_Stump])
 			{
@@ -951,7 +974,7 @@ void AOakForest::BeginPlay()
 		CVarReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadows->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadowReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->UpdateShadows(true); }));
-		for (IConsoleVariable* V : { CVarFarShade.AsVariable(), CVarFarShadeReach.AsVariable(), CVarFarShadeSize.AsVariable() })
+		for (IConsoleVariable* V : { CVarFarShade.AsVariable(), CVarFarShadeReach.AsVariable(), CVarFarShadeSize.AsVariable(), CVarShadowFade.AsVariable(), CVarShadowFadeSize.AsVariable() })
 			V->OnChangedDelegate().AddLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->UpdateShadows(true); });
 		for (IConsoleVariable* V : { CVarShadowAll.AsVariable(), CVarSway.AsVariable(), CVarSpruceLod.AsVariable(), CVarTwinLod.AsVariable() })
 			V->OnChangedDelegate().AddLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); });
@@ -1039,74 +1062,187 @@ void AOakForest::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateShadows(false);
+	UpdateBandFade();
 }
 
-// The trees' stand-in shadow casters (jeeb.Forest.FarShade), one mesh per kind, made again when jeeb.Forest.FarShadeSize changes
+// This player's camera (local visuals only)
+bool AOakForest::CameraNow(FVector& Out) const
+{
+	UWorld* W = GetWorld();
+	APlayerController* PC = W ? W->GetFirstPlayerController() : nullptr;
+	if (!PC || !PC->PlayerCameraManager) return false;
+	Out = PC->PlayerCameraManager->GetCameraLocation();
+	return true;
+}
+
+// The trees' stand-in shadow casters (jeeb.Forest.FarShade), one mesh per kind, made again when jeeb.Forest.FarShadeSize changes; the
+// near band's sets (jeeb.Forest.ShadowFade) share them, each kind in its own instance of M_TreeShade
 void AOakForest::BuildShadeMeshes()
 {
 	ShadeSizeNow = CVarFarShadeSize.GetValueOnGameThread();
 	const float Size = FMath::Clamp(ShadeSizeNow, 0.2f, 1.5f);
+	UMaterialInterface* Fade = BandMids.Num() ? nullptr : LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_TreeShade.M_TreeShade"), nullptr, LOAD_Quiet | LOAD_NoWarn);
+	if (!BandMids.Num() && !Fade) UE_LOG(LogTemp, Warning, TEXT("JEEBFOREST no /Game/M_TreeShade (Tools/BuildMaterials.ps1): the near shadows swap without a fade"));
+	ShadeAnchor.SetNum(ShadeSets.Num());
 	for (int32 i = 0; i < ShadeSets.Num(); ++i)
 	{
 		if (!ShadeSets[i]) continue;
 		const FKindDef& K = Kinds[ShadeKind[i]];
 		UStaticMesh* M = MakeShadeMesh(this, ShadeBounds[i], K.Crown, K.TrunkR, K.TrunkH, IsSpruce(ShadeKind[i]), Size);
 		ShadeSets[i]->SetStaticMesh(M);
+		const float Top = ShadeBounds[i].Max.Z, Zb = FMath::Clamp(K.TrunkH, 0.f, Top * 0.8f);
+		ShadeAnchor[i] = FVector(ShadeBounds[i].GetCenter().X, ShadeBounds[i].GetCenter().Y, 0.5f * (Zb + Top));   // (as MakeShadeMesh: the crown's middle)
+		if (BandSets.IsValidIndex(i) && BandSets[i])
+		{
+			BandSets[i]->SetStaticMesh(M);
+			if (Fade)
+			{
+				UMaterialInstanceDynamic* D = UMaterialInstanceDynamic::Create(Fade, this);
+				BandMids.Add(D);
+				BandSets[i]->SetMaterial(0, D);
+			}
+			if (BandMids.IsValidIndex(i) && BandMids[i]) BandMids[i]->SetVectorParameterValue(TEXT("Anchor"), FLinearColor(ShadeAnchor[i]));
+		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST stand-in shadow %d (kind %d): crown %.0f cm, trunk %.0f to %.0f cm, mesh %.0f x %.0f x %.0f cm, size %.2f, %d triangles"), i, ShadeKind[i], K.Crown, K.TrunkR, K.TrunkH,
 			ShadeBounds[i].GetSize().X, ShadeBounds[i].GetSize().Y, ShadeBounds[i].GetSize().Z, Size, M && M->GetRenderData() && M->GetRenderData()->LODResources.Num() ? M->GetRenderData()->LODResources[0].GetNumTriangles() : -1);
 	}
+	for (float& P : BandParams) P = -1.f;
+}
+
+// The soft hand-over's distances, cm (jeeb.Forest.ShadowFade; 2026-11-17). The leafy twins are refilled on a short step (NearStep) and
+// the far stand-ins on the old 8 m one (FarStep), so a tree's live distance can be off its last refill's by up to a step. With R the
+// reach: a tree without its twin is at least R - NearStep away live, so from there out (Hand) its stand-in is whole and grown; the
+// stand-in fades out from Hand down to Hand - fade (Lo); it stays grown to ShadowFadeSize until R + NearStep (past any swap of the
+// twin) and shrinks back to the far stand-ins' size by Join, where the far sets take over (a far stand-in, live from Join - 2 FarStep
+// = Hand on, sits inside a band one that is never smaller, so the two never show as two).
+namespace
+{
+	constexpr float NearStep = 200.f, FarStep = 800.f;
+	struct FBand { bool bOn; float Lo, Hand, GrowFrom, Join; };
+	FBand BandFor(float R, bool bStandIns, bool bMaterial)
+	{
+		FBand B;
+		const float Fade = FMath::Max(0.f, CVarShadowFade.GetValueOnGameThread()) * 100.f;
+		B.bOn = bStandIns && bMaterial && Fade > 0.f && R > 0.f;
+		B.Hand = R - NearStep;
+		B.Lo = FMath::Max(0.f, B.Hand - Fade);
+		B.GrowFrom = R + NearStep;
+		B.Join = R + 2.f * FarStep - NearStep;
+		return B;
+	}
+}
+
+// Every frame: the band materials follow the camera (their fade and growth are measured from it live, so they change smoothly)
+void AOakForest::UpdateBandFade()
+{
+	if (!bBandOn || !BandMids.Num()) return;
+	FVector Cam;
+	if (!CameraNow(Cam)) return;
+	const float R = FMath::Max(0.f, CVarShadowReach.GetValueOnGameThread()) * 100.f;
+	const FBand B = BandFor(R, true, true);
+	const float Grow = FMath::Clamp(CVarShadowFadeSize.GetValueOnGameThread() / FMath::Clamp(ShadeSizeNow, 0.2f, 1.5f), 0.5f, 2.f);
+	const float Want[5] = { B.Lo, FMath::Max(1.f, B.Hand - B.Lo), Grow, B.GrowFrom, FMath::Max(1.f, B.Join - B.GrowFrom) };
+	static const FName Names[5] = { TEXT("FadeIn"), TEXT("FadeWidth"), TEXT("GrowK"), TEXT("GrowFrom"), TEXT("GrowWidth") };
+	const bool bMoved = !Cam.Equals(CamNow, 1.f);
+	CamNow = Cam;
+	for (int32 p = 0; p < 5; ++p)
+	{
+		if (FMath::IsNearlyEqual(BandParams[p], Want[p])) continue;
+		BandParams[p] = Want[p];
+		for (UMaterialInstanceDynamic* D : BandMids) if (D) D->SetScalarParameterValue(Names[p], Want[p]);
+	}
+	if (bMoved) for (UMaterialInstanceDynamic* D : BandMids) if (D) D->SetVectorParameterValue(TEXT("FadeCenter"), FLinearColor(Cam));
 }
 
 // Refills the shadow twins with the trees within jeeb.Forest.ShadowReach of this player's camera (a local look only: each machine its own),
-// whenever the camera has moved 8 m; a twin is only touched when what it holds changes
+// and the stand-ins past it; a set is only touched when what it holds changes. The twins and the near band every 2 m of camera movement,
+// the far stand-ins every 8 m (with jeeb.Forest.ShadowFade 0: everything every 8 m and a hard swap at the reach, as before 2026-11-17)
 void AOakForest::UpdateShadows(bool bForce)
 {
-	UWorld* W = GetWorld();
-	APlayerController* PC = W ? W->GetFirstPlayerController() : nullptr;   // (local visuals only)
-	if (!PC || !PC->PlayerCameraManager) return;
-	const FVector2D Cam(PC->PlayerCameraManager->GetCameraLocation());
-	if (!bForce && FVector2D::DistSquared(Cam, ShadowAt) < 800.f * 800.f) return;
-	ShadowAt = Cam;
+	FVector Cam3;
+	if (!CameraNow(Cam3)) return;
+	const FVector2D Cam(Cam3);
 	const bool bOn = CVarShadows.GetValueOnGameThread() != 0 && CVarShadowAll.GetValueOnGameThread() == 0;   // (ShadowAll: the drawn trees cast)
 	const float R = FMath::Max(0.f, CVarShadowReach.GetValueOnGameThread()) * 100.f;
 	// the stand-ins: from the twins' reach out to jeeb.Forest.FarShadeReach
 	const float RF = (bOn && CVarFarShade.GetValueOnGameThread() != 0) ? FMath::Max(0.f, CVarFarShadeReach.GetValueOnGameThread()) * 100.f : 0.f;
+	const FBand B = BandFor(R, RF > 0.f, BandMids.Num() > 0);
+	const float Step = B.bOn ? NearStep : FarStep;
+	const bool bNear = bForce || FVector2D::DistSquared(Cam, ShadowAt) >= Step * Step;
+	const bool bFar = bForce || FVector2D::DistSquared(Cam, ShadeAt) >= FarStep * FarStep;
+	if (!bNear && !bFar) return;
+	if (bNear) ShadowAt = Cam;
+	if (bFar) ShadeAt = Cam;
+	if (B.bOn != bBandOn) { bBandOn = B.bOn; for (float& P : BandParams) P = -1.f; CamNow = FVector(1.0e9f); }
 	if (ShadeSets.Num() && !FMath::IsNearlyEqual(ShadeSizeNow, CVarFarShadeSize.GetValueOnGameThread())) BuildShadeMeshes();
-	TArray<TArray<int32>> Near;
-	Near.SetNum(ShadowSets.Num());
-	TArray<TArray<FTransform>> Far;
-	Far.SetNum(ShadeSets.Num());
-	uint32 FarH = 0u;
-	const float Scan = FMath::Max(R, RF);
-	if (bOn && Scan > 0.f)
+	const float FarFrom = B.bOn ? B.Join - FarStep : R;                 // (far stand-ins: from here out, by the far refill's position)
+	const float BandLo = B.Lo - NearStep, BandHi = B.Join + NearStep;   // (band stand-ins: this ring, by the near refill's position)
+	auto Cells = [this](const FVector2D& C, float Scan, TFunctionRef<void(const FIntPoint&, float)> Do)
 	{
-		const int32 C0x = FMath::FloorToInt((Cam.X - Scan) / 2000.f), C1x = FMath::FloorToInt((Cam.X + Scan) / 2000.f);
-		const int32 C0y = FMath::FloorToInt((Cam.Y - Scan) / 2000.f), C1y = FMath::FloorToInt((Cam.Y + Scan) / 2000.f);
+		const int32 C0x = FMath::FloorToInt((C.X - Scan) / 2000.f), C1x = FMath::FloorToInt((C.X + Scan) / 2000.f);
+		const int32 C0y = FMath::FloorToInt((C.Y - Scan) / 2000.f), C1y = FMath::FloorToInt((C.Y + Scan) / 2000.f);
 		for (int32 cx = C0x; cx <= C1x; ++cx)
 			for (int32 cy = C0y; cy <= C1y; ++cy)
 				if (const TArray<FIntPoint>* L = ShadowCells.Find(FIntPoint(cx, cy)))
-					for (const FIntPoint& E : *L)
-					{
-						const float D2 = FVector2D::DistSquared(FVector2D(ShadowAll[E.X][E.Y].GetLocation()), Cam);
-						if (D2 < R * R) Near[E.X].Add(E.Y);
-						else if (D2 < RF * RF && ShadeOfTwin.IsValidIndex(E.X))
-						{
-							Far[ShadeOfTwin[E.X]].Add(ShadowAll[E.X][E.Y]);
-							FarH += (uint32(E.X) * 2654435761u) ^ (uint32(E.Y) * 2246822519u + 0x9e3779b9u);   // (order does not matter)
-						}
-					}
-	}
-	FarH ^= uint32(Far.Num()) + (uint32(RF) << 8);
-	for (const TArray<FTransform>& F : Far) FarH = FarH * 31u + uint32(F.Num());
-	if (FarH != ShadeHash || bForce)
+					for (const FIntPoint& E : *L) Do(E, float(FVector2D::DistSquared(FVector2D(ShadowAll[E.X][E.Y].GetLocation()), C)));
+	};
+	auto HashOf = [](const FIntPoint& E) { return (uint32(E.X) * 2654435761u) ^ (uint32(E.Y) * 2246822519u + 0x9e3779b9u); };   // (summed: order does not matter)
+	auto Refill = [](const TArray<UInstancedStaticMeshComponent*>& Sets, const TArray<TArray<FTransform>>& X)
 	{
-		ShadeHash = FarH;
-		for (int32 s = 0; s < ShadeSets.Num(); ++s)
+		for (int32 s = 0; s < Sets.Num(); ++s)
 		{
-			if (!ShadeSets[s]) continue;
-			ShadeSets[s]->ClearInstances();
-			if (Far[s].Num()) ShadeSets[s]->AddInstances(Far[s], false, true, false);
+			if (!Sets[s]) continue;
+			Sets[s]->ClearInstances();
+			if (X.IsValidIndex(s) && X[s].Num()) Sets[s]->AddInstances(X[s], false, true, false);
 		}
+	};
+	if (bFar)
+	{
+		TArray<TArray<FTransform>> Far;
+		Far.SetNum(ShadeSets.Num());
+		uint32 FarH = 0u;
+		if (bOn && RF > 0.f)
+			Cells(Cam, RF, [&](const FIntPoint& E, float D2)
+			{
+				if (D2 >= FarFrom * FarFrom && D2 < RF * RF && ShadeOfTwin.IsValidIndex(E.X)) { Far[ShadeOfTwin[E.X]].Add(ShadowAll[E.X][E.Y]); FarH += HashOf(E); }
+			});
+		FarH ^= uint32(Far.Num()) + (uint32(RF) << 8) + (uint32(FarFrom) << 20);
+		for (const TArray<FTransform>& F : Far) FarH = FarH * 31u + uint32(F.Num());
+		if (FarH != ShadeHash || bForce)
+		{
+			ShadeHash = FarH; Refill(ShadeSets, Far);
+			if (CVarShadowLog.GetValueOnGameThread()) UE_LOG(LogTemp, Log, TEXT("JEEBFOREST refill frame %llu cam %.0f %.0f: far"), (unsigned long long)GFrameCounter, Cam.X, Cam.Y);
+		}
+	}
+	if (!bNear) return;
+	TArray<TArray<int32>> Near;
+	Near.SetNum(ShadowSets.Num());
+	TArray<TArray<FTransform>> Band;
+	Band.SetNum(BandSets.Num());
+	uint32 BandH = 0u;
+	if (bOn && R > 0.f)
+		Cells(Cam, B.bOn ? FMath::Max(R, BandHi) : R, [&](const FIntPoint& E, float D2)
+		{
+			if (D2 < R * R && CVarShadowLog.GetValueOnGameThread() != 2) Near[E.X].Add(E.Y);
+			if (B.bOn && D2 >= FMath::Square(FMath::Max(0.f, BandLo)) && D2 < BandHi * BandHi && ShadeOfTwin.IsValidIndex(E.X) && Band.IsValidIndex(ShadeOfTwin[E.X]))
+			{
+				Band[ShadeOfTwin[E.X]].Add(ShadowAll[E.X][E.Y]); BandH += HashOf(E);
+			}
+		});
+	for (const TArray<FTransform>& F : Band) BandH = BandH * 31u + uint32(F.Num());
+	if (BandH != BandHash || bForce)
+	{
+		BandHash = BandH; Refill(BandSets, Band);
+		if (CVarShadowLog.GetValueOnGameThread()) UE_LOG(LogTemp, Log, TEXT("JEEBFOREST refill frame %llu cam %.0f %.0f: band"), (unsigned long long)GFrameCounter, Cam.X, Cam.Y);
+	}
+	if (bForce)
+	{
+		int32 Nb = 0, Nn = 0, Nf = 0;
+		for (const TArray<FTransform>& F : Band) Nb += F.Num();
+		for (const TArray<int32>& F : Near) Nn += F.Num();
+		for (const UInstancedStaticMeshComponent* S : ShadeSets) if (S) Nf += S->GetInstanceCount();
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST shadows: %d leafy twins within %.0f m, %d far stand-ins, fade %s: %d band stand-ins %.0f-%.0f m (whole and grown from %.0f m, %d materials)"),
+			Nn, R / 100.f, Nf, B.bOn ? TEXT("on") : TEXT("off"), Nb, BandLo / 100.f, BandHi / 100.f, B.Hand / 100.f, BandMids.Num());
 	}
 	for (int32 s = 0; s < ShadowSets.Num(); ++s)
 	{
@@ -1117,6 +1253,7 @@ void AOakForest::UpdateShadows(bool bForce)
 		for (int32 n : Near[s]) H = (H ^ uint32(n)) * 16777619u;
 		if (H == ShadowHash[s]) continue;
 		ShadowHash[s] = H;
+		if (CVarShadowLog.GetValueOnGameThread()) UE_LOG(LogTemp, Log, TEXT("JEEBFOREST refill frame %llu cam %.0f %.0f: twins %d (%d trees)"), (unsigned long long)GFrameCounter, Cam.X, Cam.Y, s, Near[s].Num());
 		S->ClearInstances();
 		if (Near[s].Num())
 		{
@@ -1161,6 +1298,7 @@ void AOakForest::SetFelled(int32 Index, bool bFelled)
 		ShadowAll[F.Shadow][F.KeyIndex] = bFelled ? Gone : F.Tree;
 		ShadowHash[F.Shadow] = 0u;
 		ShadeHash = 0u;
+		BandHash = 0u;
 		UpdateShadows(true);
 	}
 	// a stump where it stood, about as wide as the trunk
