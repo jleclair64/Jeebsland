@@ -14,6 +14,7 @@
 #include "Horse.h"
 #include "MiningRock.h"
 #include "Terrain.h"
+#include "OakHill.h"
 #include "EngineUtils.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
@@ -126,13 +127,14 @@ void AKnightHUD::DrawHUD()
 	}
 
 	// Name of the town you appear in, fading in and out when the game starts
-	// (Blackrock for now; switch to the class's home town when Oak Hill and fast travel are built)
+	// (Oak Hill, where new players and the fallen appear; Blackrock if that is where a saved character logs in)
 	{
 		const float T = GetWorld()->GetTimeSeconds();
 		const float Alpha = FMath::Clamp(FMath::Min(T / 1.2f, (7.f - T) / 1.5f), 0.f, 1.f);
 		if (Alpha > 0.f)
 		{
-			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
+			const bool bAtOak = Pawn && JeebOakHill::Enabled() && JeebOakHill::InBox(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
+			TitleBanner(bAtOak ? TEXT("OAK HILL") : TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
 		}
 	}
 

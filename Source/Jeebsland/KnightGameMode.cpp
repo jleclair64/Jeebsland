@@ -17,6 +17,7 @@
 #include "GameFramework/GameSession.h"
 #include "TimerManager.h"
 #include "EngineUtils.h"
+#include "CollisionQueryParams.h"
 #include "TownLabDirector.h"
 #include "HttpServerModule.h"
 #include "IHttpRouter.h"
@@ -227,6 +228,41 @@ void AKnightGameMode::Logout(AController* Exiting)
 	Super::Logout(Exiting);
 }
 
+
+// ---- Oak Hill's wake-up spots (see the header)
+FVector AKnightGameMode::OakWakeSpot(UWorld* World, const AActor* Self, float& OutYaw)
+{
+	const FVector2D Oak(JeebOakHill::PosX, JeebOakHill::PosY);
+	const FVector2D Home(JeebOakHill::SpawnX, JeebOakHill::SpawnY);
+	auto YawTo = [&](const FVector2D& From) { const FVector2D D = Oak - From; return FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X)); };
+	auto Ground = [](const FVector2D& P) { return FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) + 130.f); };
+	if (!World) { OutYaw = JeebOakHill::SpawnYaw; return Ground(Home); }
+	// preference: the home spot, then alternately either side of it along each row (12 degrees apart, the second row 6 degrees off and 1 m further out)
+	TArray<FVector2D> Spots;
+	for (int32 Row = 0; Row < 2; ++Row)
+		for (int32 k = 0; k < 11; ++k)
+		{
+			const float Deg = (Row ? 6.f : 0.f) + 12.f * ((k + 1) / 2) * ((k & 1) ? 1.f : -1.f);
+			const float R = 1000.f + 100.f * Row, A = FMath::DegreesToRadians(Deg);
+			Spots.Add(Oak + FVector2D(R * FMath::Sin(A), -R * FMath::Cos(A)));   // (0 degrees: due west of the oak, the home spot; X is north, Y east)
+		}
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(OakWake), false, Self);
+	for (const FVector2D& S : Spots)
+	{
+		bool bFree = true;
+		for (TActorIterator<AKnightCharacter> It(World); It; ++It)
+			if (*It != Self && FVector2D::DistSquared(FVector2D(It->GetActorLocation()), S) < 150.f * 150.f) { bFree = false; break; }
+		if (!bFree) continue;
+		const FVector At = Ground(S);
+		// open ground: nothing solid (a prop, a wall, a trunk) where a knight would stand, a little above the ground
+		if (World->OverlapBlockingTestByChannel(At + FVector(0.f, 0.f, 20.f), FQuat::Identity, ECC_Pawn, FCollisionShape::MakeCapsule(45.f, 90.f), Q)) continue;
+		OutYaw = YawTo(S);
+		UE_LOG(LogTemp, Log, TEXT("JEEBSPAWN Oak Hill spot %d of %d at %.0f %.0f yaw %.0f (%s)"), int32(&S - Spots.GetData()), Spots.Num(), S.X, S.Y, OutYaw, Self ? *Self->GetName() : TEXT("a new character"));
+		return At;
+	}
+	OutYaw = JeebOakHill::SpawnYaw;
+	return Ground(Home);
+}
 APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
 {
 	FActorSpawnParameters Params;
@@ -258,7 +294,14 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 		}
 	}
 
-	// The first player stands at the starting point (Oak Hill's plaza; the old one in MoveLab); the next ones on a 2 m ring round it, 60 degrees apart
+	// Oak Hill (the real rule since 2026-11-18): the plaza by the big oak, facing it, the next free spot along its arc when others stand there.
+	// The old starting point in MoveLab: the next ones on a 2 m ring round it, 60 degrees apart
+	if (bOak)
+	{
+		float OakYaw = JeebOakHill::SpawnYaw;
+		const FVector OakAt = OakWakeSpot(GetWorld(), nullptr, OakYaw);
+		return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), OakAt, FRotator(0.f, OakYaw, 0.f), Params);
+	}
 	const FVector2D Base = bOak ? FVector2D(JeebOakHill::SpawnX, JeebOakHill::SpawnY) : FVector2D(0.f, 0.f);
 	FVector2D At = Base;
 	if (SpawnCount > 0)

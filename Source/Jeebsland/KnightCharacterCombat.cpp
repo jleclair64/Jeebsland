@@ -27,6 +27,7 @@
 #include "HealthComponent.h"
 #include "HitBoxes.h"
 #include "OakHill.h"
+#include "KnightGameMode.h"
 #include "ProceduralMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -406,9 +407,10 @@ void AKnightCharacter::Die()
 	// Oak Hill's plaza (owner 2026-11-12); Blackrock's east gate in MoveLab or a test run without the town
 	const bool bOak = JeebOakHill::Enabled() && !JeebHit::InMoveLab(GetWorld());
 	const FVector2D VC = JeebTerrain::VillageCenter();
-	const FVector2D Wake = bOak ? FVector2D(JeebOakHill::SpawnX, JeebOakHill::SpawnY) : FVector2D(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
-	const float WakeYaw = bOak ? JeebOakHill::SpawnYaw : 180.f;
-	const FVector WakeAt(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f);
+	const FVector2D Wake = FVector2D(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
+	float WakeYaw = 180.f;
+	FVector WakeAt(Wake.X, Wake.Y, JeebTerrain::HeightAt(Wake.X, Wake.Y) + 100.f);
+	if (bOak) WakeAt = AKnightGameMode::OakWakeSpot(GetWorld(), this, WakeYaw);   // (a free spot on the plaza, facing the big oak)
 	SetActorLocation(WakeAt);
 	SetActorRotation(FRotator(0.f, WakeYaw, 0.f));
 	MaxHealth = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3;

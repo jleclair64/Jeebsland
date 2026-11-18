@@ -23,6 +23,10 @@ public:
 	void TryLogin(AKnightPlayerController* PC, const FString& Name, const FString& Password, bool bCreate, bool bDev);
 	void SaveCharacter(AKnightPlayerController* PC);   // writes this player's character to the server's disk
 	int32 PlayersOnline() const;
+	// Where a new character, or one that has just died, appears in Oak Hill: on the plaza 10 m west of the big oak, facing it (OakHill.h's
+	// SpawnX/SpawnY), or if another knight stands there, the next free spot along the arc between the oak's lawn and the ring road (two
+	// rows, 22 spots), skipping any spot something solid stands in. Server only; Self (the dying knight) is not counted as in the way.
+	static FVector OakWakeSpot(UWorld* World, const AActor* Self, float& OutYaw);
 
 protected:
 	virtual void BeginPlay() override;
