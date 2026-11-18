@@ -1,0 +1,12 @@
+Model,WalkSpeed,WalkSink,GarmentLum,Yaw
+# The townspeople's bodies (2026-11-18): /Game/People/SK_<Model> with clips A_<Model>_Idle, _Walk, _Talk (Tools/ImportPeople.ps1 from Art/People).
+# WalkSpeed: cm/s the walk clip's planted foot travels at; the clip plays faster or slower to match how fast the person really walks, so feet don't slide.
+# WalkSink: cm the walk clip lifts the feet above the idle's; the body is lowered by this while walking. GarmentLum: the main garment's mean brightness in
+# the texture (linear), so the dye (PeopleWho.csv Tint) keeps the cloth's shading. Yaw: degrees that turn the model to face forward.
+# ImportPeople.ps1 prints WalkSpeed ("planted toe speed"), the toe heights and GarmentLum for each model.
+Townsman,73.1,3.4,0.0999,-90
+Townswoman,149.4,5.0,0.1220,-90
+Elder,143.3,3.7,0.0943,-90
+Smith,71.1,3.3,0.0432,-90
+Banker,79.5,3.6,0.0444,-90
+Guard,149.6,6.8,0.0654,-90

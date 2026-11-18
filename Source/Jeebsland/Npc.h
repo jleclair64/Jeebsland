@@ -6,6 +6,8 @@
 
 class UCapsuleComponent;
 class UStaticMeshComponent;
+class USkeletalMeshComponent;
+namespace JeebPeople { struct FModel; }
 
 UENUM()
 enum class ENpcRole : uint8
@@ -28,7 +30,7 @@ struct FNpcLook
 	float Scale = 1.f;
 };
 
-// A villager built from simple shapes. Talk to them with E: they greet you and tell a story about Jeebsland,
+// A townsperson (a skinned Meshy body since 2026-11-18, NpcBody.h; the old one built from simple shapes with jeeb.Npc.Models 0). Talk to them with E: they greet you and tell a story about Jeebsland,
 // and the shopkeeper and blacksmith then open their trading screens. Nobody replies to what you say.
 UCLASS()
 class ANpc : public AActor
@@ -45,6 +47,7 @@ public:
 	void SetupPerson(FName InKey, const FNpcLook& InLook) { PersonKey = InKey; Look = InLook; Setup(ENpcRole::QuestGiver); }
 	FName GetPersonKey() const { return PersonKey; }
 	bool IsQuestGiver() const { return Role == ENpcRole::QuestGiver; }
+	FString TestModel;   // (test pictures only, -PeopleLineup: this body whoever they are)
 	// Steele Creek's people (2026-11-18), set before Setup: Folk 0 townsfolk and knights as before, 1 a troll, 2 a wizard; a name
 	// and a first greeting of their own (empty: the role's)
 	void SetFolk(uint8 InFolk, const FString& InName, const FString& InHello) { Folk = InFolk; NameOverride = InName; FirstHello = InHello; }
@@ -84,4 +87,17 @@ private:
 	FNpcLook Look;
 	uint8 Folk = 0;
 	FString NameOverride, FirstHello;
+
+	// The body (2026-11-18): a skinned Meshy character (NpcBody.h) or the old shapes; jeeb.Npc.Models swaps them live
+	void BuildBody();
+	bool BuildModel();
+	void BuildShapes();
+	void ClearBody();
+	FLinearColor OwnColour() const;
+	UPROPERTY() USkeletalMeshComponent* Body = nullptr;
+	const JeebPeople::FModel* ModelDef = nullptr;
+	int32 BuiltSetting = -1;
+	FVector LastLoc = FVector::ZeroVector;
+	float MoveSpeed = 0.f;
+	bool bShadowOn = true;
 };
