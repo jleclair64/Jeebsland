@@ -1054,6 +1054,27 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			// which makes shadows look almost free in a test still)
 			if (EyeSunBase >= 0.f) { static uint32 Tick32 = 0; ADayNight::FixedPhase = EyeSunBase + 0.00004f * float(++Tick32 % 64); }
 			if (EyeCam && EyeFollowOn) if (const APawn* Me = PC->GetPawn()) EyeCam->SetActorLocation(Me->GetActorLocation() + EyeFollowOffset);   // (a close-up keeps up with him: jeeb.Test.Walk)
+			// (water ghost check, 2026-11-17: -ShotEyesMove=<yaw deg/s>_<sideways cm/s>_<forward cm/s> keeps every eye's camera turning and
+			// sliding, as a player's camera does, and -ShotEyesFilm=<from s>_<frames> films that many frames in a row from that time into
+			// each eye, <ShotName>_<eye>_<NNN>.png; with -benchmark -fps=N every frame moves the camera by the same step)
+			static FVector EyeMove = FVector::ZeroVector;
+			static const bool bEyeMove = []() { FString V; TArray<FString> P; if (!FParse::Value(FCommandLine::Get(), TEXT("ShotEyesMove="), V, false)) return false; V.ParseIntoArray(P, TEXT("_")); for (int32 i = 0; i < FMath::Min(P.Num(), 3); ++i) EyeMove[i] = FCString::Atof(*P[i]); return true; }();
+			if (bEyeMove && EyeCam && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && GFrameCounter > EyeMovedFrame)
+			{
+				FRotator R = EyeCam->GetActorRotation();
+				R.Yaw += EyeMove.X * DeltaSeconds;
+				const FVector Fw = FRotator(0.f, R.Yaw, 0.f).Vector(), Rt = FRotator(0.f, R.Yaw + 90.f, 0.f).Vector();
+				EyeCam->SetActorLocationAndRotation(EyeCam->GetActorLocation() + (Rt * EyeMove.Y + Fw * EyeMove.Z) * DeltaSeconds, R);
+			}
+			static float FilmFrom = -1.f; static int32 FilmFrames = 0;
+			static const bool bFilm = []() { FString V; TArray<FString> P; if (!FParse::Value(FCommandLine::Get(), TEXT("ShotEyesFilm="), V, false)) return false; V.ParseIntoArray(P, TEXT("_")); if (P.Num() < 2) return false; FilmFrom = FCString::Atof(*P[0]); FilmFrames = FCString::Atoi(*P[1]); return true; }();
+			static int32 FilmEye = -1, FilmIdx = 0;
+			if (bFilm && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotClock - EyeStart - EyeGap * EyeIdx > FilmFrom)
+			{
+				if (FilmEye != EyeIdx) { FilmEye = EyeIdx; FilmIdx = 0; }
+				if (FilmIdx < FilmFrames)
+					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d_%03d.png"), *ShotName, EyeIdx, FilmIdx++), false, false);
+			}
 			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f && GFrameCounter > EyeMovedFrame + 30)   // (1.4 s and 30 frames after the move: settled, even after a long frame regrowing the grass)
 			{
 				ShotIdx = EyeIdx;
