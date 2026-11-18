@@ -22,6 +22,11 @@
 #include "DayNight.h"
 #include "LampLook.h"
 #include "HAL/IConsoleManager.h"
+#include "TimerManager.h"
+#include "KnightMovement.h"
+#include "Containers/Ticker.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 
 namespace
 {
@@ -429,6 +434,88 @@ void ATownLabTown::BuildBuildings()
 		}
 		HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, Yaw); HashIn(Hash, Scale); HashIn(Hash, ScaleZ);
 		++Placed;
+#if !UE_BUILD_SHIPPING
+		// (-FortGateTest, 2026-11-18 review: a knight-sized capsule swept in through every half metre of each fort's four walls, a
+		// few seconds after the start; the log names every opening he fits through)
+		if (FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 && Mdl && FParse::Param(FCommandLine::Get(), TEXT("FortGateTest")))
+		{
+			const FString Nm = P.Name;
+			const FModel M = *Mdl;
+			FTimerHandle Th;
+			GetWorldTimerManager().SetTimer(Th, FTimerDelegate::CreateWeakLambda(this, [this, Xf, Nm, M]()
+			{
+				FCollisionQueryParams Qp(TEXT("FortGate"), false);
+				const FCollisionShape Cap = FCollisionShape::MakeCapsule(42.f, 96.f);
+				int32 Open = 0, Tries = 0;
+				FVector GateA = FVector::ZeroVector, GateB = FVector::ZeroVector;
+				for (int32 Side = 0; Side < 4; ++Side)
+				{
+					const bool bAlongX = Side < 2;
+					const float Lo = bAlongX ? M.WX0 : M.WY0, Hi = bAlongX ? M.WX1 : M.WY1;
+					for (float U = Lo + 50.f; U < Hi - 30.f; U += 50.f)
+					{
+						const float Out = (Side == 0 ? M.WY1 : Side == 1 ? M.WY0 : Side == 2 ? M.WX1 : M.WX0) + (Side == 0 || Side == 2 ? 200.f : -200.f);
+						const FVector LA = bAlongX ? FVector(U, Out, 0.f) : FVector(Out, U, 0.f);
+						const FVector LB = bAlongX ? FVector(U, 0.f, 0.f) : FVector(0.f, U, 0.f);
+						FVector A = Xf.TransformPosition(LA), B = Xf.TransformPosition(LB);
+						A.Z = FMath::Max(JeebTerrain::HeightAt(A.X, A.Y), JeebTerrain::HeightAt(B.X, B.Y)) + 110.f; B.Z = A.Z;
+						FHitResult Hit;
+						++Tries;
+						if (!GetWorld()->SweepSingleByChannel(Hit, A, B, FQuat::Identity, ECC_Pawn, Cap, Qp))
+						{
+							if (++Open == 1) { GateA = A; GateB = B; }
+							UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE %s side %d at %.0f cm along: OPEN (a knight walks in)"), *Nm, Side, U);
+						}
+						else if (FMath::Abs(U - (Lo + Hi) * 0.5f) < 26.f)   // (what stops him at the middle of each wall, where a gate would be)
+							UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE %s side %d middle: blocked by %s / %s %.0f cm in"), *Nm, Side, Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("?"),
+								Hit.GetComponent() ? *Hit.GetComponent()->GetName() : TEXT("?"), Hit.Distance);
+					}
+				}
+				UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE %s: %d of %d sweeps through the walls got in"), *Nm, Open, Tries);
+				// (-FortGateWalk, online: the server stands every knight 2 m outside the first opening at 10 s; the client walks him in
+				// from 13 s for 2 s and logs the server's corrections while walking)
+				static bool bWalkSet = false;
+				if (Open == 0 || bWalkSet || !FParse::Param(FCommandLine::Get(), TEXT("FortGateWalk"))) return;
+				bWalkSet = true;
+				UWorld* W = GetWorld();
+				FTimerHandle T2, T3;
+				if (W->GetNetMode() != NM_Client)
+					W->GetTimerManager().SetTimer(T2, FTimerDelegate::CreateWeakLambda(this, [W, GateA, GateB, Nm]()
+					{
+						for (FConstPlayerControllerIterator It = W->GetPlayerControllerIterator(); It; ++It)
+							if (APawn* Pn = It->Get() ? It->Get()->GetPawn() : nullptr)
+							{
+								Pn->TeleportTo(GateA, FRotator(0.f, (GateB - GateA).Rotation().Yaw, 0.f));
+								UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE walk: server put %s outside %s at (%.0f,%.0f,%.0f)"), *Pn->GetName(), *Nm, GateA.X, GateA.Y, GateA.Z);
+							}
+					}), 6.f, false);
+				if (W->GetNetMode() == NM_DedicatedServer) return;
+				W->GetTimerManager().SetTimer(T3, FTimerDelegate::CreateWeakLambda(this, [W, GateA, GateB]()
+				{
+					APlayerController* Pc = W->GetFirstPlayerController();
+					APawn* Pn = Pc ? Pc->GetPawn() : nullptr;
+					if (!Pn) return;
+					const UKnightMovement* KM = Cast<UKnightMovement>(Pn->GetMovementComponent());
+					const int32 Fix0 = KM ? KM->NetFixes : 0;
+					UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE walk: client starts at (%.0f,%.0f), %.0f cm from the outside spot, %d corrections so far"), Pn->GetActorLocation().X, Pn->GetActorLocation().Y, FVector::Dist2D(Pn->GetActorLocation(), GateA), Fix0);
+					const double T0 = FPlatformTime::Seconds();
+					TWeakObjectPtr<APawn> WP = Pn;
+					FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([WP, GateA, GateB, T0, Fix0](float) -> bool
+					{
+						APawn* P = WP.Get();
+						if (!P) return false;
+						const double T = FPlatformTime::Seconds() - T0;
+						if (T < 2.0) { P->AddMovementInput((GateB - GateA).GetSafeNormal2D(), 1.f); return true; }
+						if (T < 3.5) return true;
+						const UKnightMovement* K = Cast<UKnightMovement>(P->GetMovementComponent());
+						const float In = FVector::DotProduct(P->GetActorLocation() - GateA, (GateB - GateA).GetSafeNormal2D());
+						UE_LOG(LogTemp, Log, TEXT("JEEBFORTGATE walk: client ends %.0f cm in from the outside spot (the wall line is 200 cm in), %d corrections while walking"), In, K ? K->NetFixes - Fix0 : -1);
+						return false;
+					}));
+				}), 9.f, false);
+			}), 4.f, false);
+		}
+#endif
 		// (the stones and shrubs at the foundations, as the old town had them: not the open stalls or the well)
 		if (Mdl && Mdl->WX1 > Mdl->WX0 && !IsStall(P.Model) && FCString::Strcmp(P.Model, TEXT("OakHillWell")) != 0 && FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) != 0)   // (the round tower: no square of stones round it)
 		{

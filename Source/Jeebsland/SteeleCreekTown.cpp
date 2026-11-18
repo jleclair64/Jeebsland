@@ -23,6 +23,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
 
 namespace
 {
@@ -159,6 +161,65 @@ namespace
 		{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Aspen/SM_Columnar_Aspen_1.SM_Columnar_Aspen_1"), 16.f, 510.f, 235.f, 0.16f },
 		{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Cork_Oak/SM_Cork_Oak_1.SM_Cork_Oak_1"), 38.f, 370.f, 570.f, 0.12f },
 	};
+
+	// The townsfolk's beats (metres from the centre), in SpawnPeople's order: shared with the town's own trees, which keep off them
+	const TArray<TArray<FVector2D>>& Beats()
+	{
+		static const TArray<TArray<FVector2D>> B = {
+			{ FVector2D(-18.f, -8.f), FVector2D(-10.f, -11.f), FVector2D(-7.f, 3.f), FVector2D(-17.f, 6.f) },      // Thessaly
+			{ FVector2D(14.f, 12.f), FVector2D(30.f, 30.f), FVector2D(46.f, 48.f), FVector2D(54.f, 58.f) },       // Brug
+			{ FVector2D(-14.f, -12.f), FVector2D(-26.f, -28.f), FVector2D(-38.f, -44.f) },                        // Old Marg
+			{ FVector2D(4.f, -12.f), FVector2D(12.f, -13.f), FVector2D(21.f, -26.f), FVector2D(32.f, -40.f) },    // Hruk
+			{ FVector2D(-12.f, 7.f), FVector2D(-33.f, 21.f), FVector2D(-60.f, 38.f), FVector2D(-88.f, 54.f) },    // Sir Kell
+			{ FVector2D(-42.f, -50.f), FVector2D(-55.f, -69.f), FVector2D(-63.f, -84.f) },                        // Dame Rhosyn
+			{ FVector2D(4.f, 12.f), FVector2D(9.f, 27.f), FVector2D(-14.f, 31.f) },                               // Sir Oswin
+		};
+		return B;
+	}
+
+	// Steele Creek's own smithing props (PlaceProps), also kept clear by the town's trees
+	struct FProp { const TCHAR* Mesh; FVector2D At; float Yaw; float Scale; };
+	TArray<FProp> TownProps()
+	{
+		TArray<FProp> Props;
+		if (const JeebSteele::FPlot* S = JeebSteele::FindPlot(TEXT("Smithy")))
+		{
+			float Yaw = 0.f;
+			// (the anvil just in front of where the blacksmith stands, DoorSpot 3.8 m: he faces out of the door, toward it)
+			Props.Add({ TEXT("/Game/SteeleCreek/SM_Anvil"), JeebSteele::DoorSpot(*S, 500.f, &Yaw), Yaw + 90.f, 1.f });
+			Props.Add({ TEXT("/Game/SteeleCreek/SM_Anvil"), JeebSteele::ToWorld(7.5f, -2.5f), 200.f, 0.9f });
+		}
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(4.5f, -6.5f), 30.f, 1.f });     // ore come down from the quarry
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(53.f, 60.5f), 225.f, 1.f });    // at the quarry
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(60.f, 72.f), 160.f, 1.f });
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(10.5f, 8.8f), 250.f, 1.f });   // the smithy's finished bars
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(-1.5f, -14.6f), 10.f, 1.f });  // for sale at the ore market
+		Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(25.5f, -6.2f), 95.f, 0.9f });
+		return Props;
+	}
+
+	// Where the town fill puts its sets in Steele Creek (FillOakHill.csv rows whose Site is Steele), game cm: the town's trees keep off
+	TArray<FVector2D> FillSpots()
+	{
+		TArray<FVector2D> Out;
+		TArray<FString> Lines;
+		if (!FFileHelper::LoadFileToStringArray(Lines, *(FPaths::ProjectContentDir() / TEXT("Data/FillOakHill.csv")))) return Out;
+		for (const FString& L : Lines)
+		{
+			if (L.StartsWith(TEXT("#"))) continue;
+			TArray<FString> C;
+			L.ParseIntoArray(C, TEXT(","), false);
+			if (C.Num() < 9 || !C.Last().TrimStartAndEnd().StartsWith(TEXT("st"), ESearchCase::IgnoreCase)) continue;
+			Out.Add(JeebSteele::ToWorld(FCString::Atof(*C[1]), FCString::Atof(*C[2])));
+		}
+		return Out;
+	}
+	float SegDist(const FVector2D& P, const FVector2D& A, const FVector2D& B)
+	{
+		const FVector2D AB = B - A;
+		const float T = FMath::Clamp(FVector2D::DotProduct(P - A, AB) / FMath::Max(AB.SizeSquared(), 1.f), 0.f, 1.f);
+		return FVector2D::Distance(P, A + AB * T);
+	}
 }
 
 ASteeleCreekTown::ASteeleCreekTown()
@@ -242,6 +303,11 @@ void ASteeleCreekTown::BuildBuildings()
 				B->SetWorldTransform(Xf);
 				B->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 				B->SetCustomPrimitiveDataFloat(0, Hash01(uint32(FMath::RoundToInt(At.X * 0.1f)) * 83492791u ^ uint32(FMath::RoundToInt(At.Y * 0.1f)) * 2654435761u));
+				// (2026-11-18 review: the ore market's stall read saturated orange, walls and checkered roof) here it wears its own
+				// toned-down copy, MI_SteeleStall (Tools/fixlook_assets.py): rich brown wood and a muted roof; Oak Hill's stays as it was
+				if (FCString::Strcmp(P.Def.Name, TEXT("Stall")) == 0)
+					if (UMaterialInterface* Toned = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/SteeleCreek/MI_SteeleStall.MI_SteeleStall")))
+						for (int32 i = 0; i < B->GetNumMaterials(); ++i) B->SetMaterial(i, Toned);
 				for (int32 i = 0; i < B->GetNumMaterials(); ++i)
 					if (UMaterialInterface* M = B->GetMaterial(i))
 					{
@@ -383,6 +449,7 @@ void ASteeleCreekTown::BuildWoods()
 	const int32 N = FMath::CeilToInt(2.f * Reach / Cell);
 	FRandomStream R(51505);
 	int32 Count = 0, PerKind[NK] = {};
+	TArray<FVector4f> Planted;   // (X, Y, crown radius: the town's own trees keep off these)
 	for (int32 i = 0; i < N; ++i)
 		for (int32 j = 0; j < N; ++j)
 		{
@@ -433,8 +500,103 @@ void ASteeleCreekTown::BuildWoods()
 			}
 			HashIn(Hash, X); HashIn(Hash, Y);
 			++Count; ++PerKind[K];
+			Planted.Add(FVector4f(X, Y, CrownCm, 0.f));
 		}
 	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE woods: %d trees (spruce %d %d %d, half spruce %d, aspen %d, cork oak %d)"), Count, PerKind[0], PerKind[1], PerKind[2], PerKind[3], PerKind[4], PerKind[5]);
+
+	// The town's own trees (2026-11-18 review: "meadow with houses", the forest only a ring 60-100 m out): spruce, aspen and cork oak in the
+	// yards, behind the houses, at street corners and round the forge yard, the same packs and solid trunks as the ring. Candidates on a
+	// jittered 6 m lattice within 70 m of the forge yard, every random number drawn before any test; they are taken in the order of a
+	// random key (so the cap doesn't favour one corner) while each keeps clear of the streets, the forge yard, walls, doors, the quarry,
+	// the townsfolk's beats, the town's props and fill sets, the river and each other. The same on every machine (the JEEBSTEELE hash).
+	{
+		constexpr int32 MaxTown = 38;
+		const int32 TownKinds[5] = { 0, 1, 2, 4, 5 };   // (no half spruce: its 6 m bare trunk)
+		const float TownShare[5] = { 0.18f, 0.16f, 0.14f, 0.30f, 0.22f };
+		struct FCand { float Key, X, Y, Yaw, S; int32 K; };
+		TArray<FCand> Cands;
+		FRandomStream TR(51517);
+		const float TReach = 7000.f, TCell = 600.f;
+		const int32 TN = FMath::CeilToInt(2.f * TReach / TCell);
+		const FVector2D Yard = JeebSteele::ToWorld(-5.f, 0.f);
+		for (int32 i = 0; i < TN; ++i)
+			for (int32 j = 0; j < TN; ++j)
+			{
+				const float Jx = TR.FRand(), Jy = TR.FRand(), KindRoll = TR.FRand(), Key = TR.FRand(), Size = TR.FRand(), Yaw = TR.FRandRange(0.f, 360.f);
+				const float X = Yard.X - TReach + (i + 0.15f + 0.7f * Jx) * TCell, Y = Yard.Y - TReach + (j + 0.15f + 0.7f * Jy) * TCell;
+				if (FVector2D::Distance(FVector2D(X, Y), Yard) > TReach) continue;
+				int32 K = 4;
+				{
+					float Acc = 0.f;
+					for (int32 k = 0; k < 5; ++k) { Acc += TownShare[k]; if (KindRoll < Acc) { K = TownKinds[k]; break; } }
+				}
+				const float S = K == 5 ? FMath::Lerp(0.55f, 0.75f, Size) : K == 4 ? FMath::Lerp(0.8f, 1.05f, Size) : FMath::Lerp(0.7f, 0.95f, Size);
+				Cands.Add({ Key, X, Y, Yaw, S, K });
+			}
+		Cands.Sort([](const FCand& A, const FCand& B) { return A.Key < B.Key; });
+		const TArray<FProp> Props = TownProps();
+		const TArray<FVector2D> Fill = FillSpots();
+		TArray<FVector2D> Doors;
+		for (const JeebSteele::FPlot& P : JeebSteele::Plots()) if (!P.bWell) Doors.Add(JeebSteele::DoorSpot(P, 250.f));
+		const FVector2D Spawn = JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN);
+		int32 TownCount = 0, Why[8] = {};
+		for (const FCand& C : Cands)
+		{
+			if (TownCount >= MaxTown) break;
+			const FVector2D P(C.X, C.Y);
+			const float Crown = TreeKinds[C.K].Crown * C.S, Trunk = TreeKinds[C.K].TrunkR * C.S;
+			if (JeebWorld::NearRiver(C.X, C.Y, 600.f)) { ++Why[0]; continue; }
+			if (JeebTerrain::PathClearance(C.X, C.Y) < 220.f + Crown * 0.35f) { ++Why[1]; continue; }   // (streets and the forge yard's patch)
+			if (FVector2D::Distance(P, JeebSteele::ToWorld(1.f, 0.f)) < 1300.f || FVector2D::Distance(P, Spawn) < 600.f) { ++Why[1]; continue; }
+			if (JeebSteele::BuildingDistance(C.X, C.Y) < 150.f + Crown * 0.6f) { ++Why[2]; continue; }   // (crowns clear of the roofs)
+			bool bBad = false;
+			for (const FVector2D& D : Doors) if (FVector2D::Distance(P, D) < 450.f + Crown * 0.3f) { bBad = true; break; }
+			if (bBad) { ++Why[3]; continue; }
+			for (const JeebSteele::FRockDef& Rk : JeebSteele::RockDefs) if (FVector2D::Distance(JeebSteele::ToWorld(Rk.E, Rk.N), P) < 800.f) { bBad = true; break; }
+			if (bBad) { ++Why[4]; continue; }
+			for (const TArray<FVector2D>& B : Beats())
+			{
+				for (int32 s = 0; s + 1 < B.Num() && !bBad; ++s)
+					bBad = SegDist(P, JeebSteele::ToWorld(B[s].X, B[s].Y), JeebSteele::ToWorld(B[s + 1].X, B[s + 1].Y)) < 260.f + Trunk;
+				if (bBad) break;
+			}
+			if (bBad) { ++Why[5]; continue; }
+			for (const FProp& Pr : Props) if (FVector2D::Distance(P, Pr.At) < 350.f) { bBad = true; break; }
+			for (const FVector2D& F : Fill) if (!bBad && FVector2D::Distance(P, F) < 420.f) bBad = true;
+			if (bBad) { ++Why[6]; continue; }
+			for (const FVector4f& T : Planted) if (FVector2D::Distance(P, FVector2D(T.X, T.Y)) < FMath::Max(450.f, 0.55f * (Crown + T.Z))) { bBad = true; break; }
+			if (bBad) { ++Why[7]; continue; }
+			const float Z = JeebTerrain::HeightAt(C.X, C.Y);
+			if (!bServer && Meshes[C.K])
+			{
+				if (!Sets[C.K])
+				{
+					Sets[C.K] = NewObject<UInstancedStaticMeshComponent>(this);
+					Sets[C.K]->SetStaticMesh(Meshes[C.K]);
+					Sets[C.K]->SetupAttachment(GetRootComponent());
+					Sets[C.K]->SetMobility(EComponentMobility::Static);
+					Sets[C.K]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+					Sets[C.K]->SetCullDistances(0, 40000);
+					Sets[C.K]->SetCastShadow(CVarSteeleTreeShadows.GetValueOnGameThread() != 0);
+					Sets[C.K]->RegisterComponent();
+					TreeSets.Add(Sets[C.K]);
+					++DrawSets;
+				}
+				Sets[C.K]->AddInstance(FTransform(FRotator(0.f, C.Yaw, 0.f), FVector(C.X, C.Y, Z - 15.f * C.S), FVector(C.S)), true);
+			}
+			if (Trunks)
+			{
+				const float TH = TreeKinds[C.K].TrunkH * C.S;
+				Trunks->AddInstance(FTransform(FRotator::ZeroRotator, FVector(C.X, C.Y, Z + TH * 0.5f - 20.f), FVector(Trunk / 50.f, Trunk / 50.f, TH / 100.f)), true);
+			}
+			HashIn(Hash, C.X); HashIn(Hash, C.Y); HashIn(Hash, C.S);
+			Planted.Add(FVector4f(C.X, C.Y, Crown, 1.f));
+			++TownCount;
+			UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE town tree %d kind %d at E %.1f N %.1f scale %.2f"), TownCount, C.K, JeebSteele::EastM(C.Y), JeebSteele::NorthM(C.X), C.S);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE town trees: %d of %d candidates (skipped: river %d, street or yard %d, walls %d, doors %d, quarry %d, beats %d, props %d, other trees %d)"),
+			TownCount, Cands.Num(), Why[0], Why[1], Why[2], Why[3], Why[4], Why[5], Why[6], Why[7]);
+	}
 }
 
 // Steele Creek's own smithing props (Meshy, 2026-11-18: /Game/SteeleCreek, Saved/Steele/steele_prop_*.py): the anvil the blacksmith works
@@ -442,21 +604,7 @@ void ASteeleCreekTown::BuildWoods()
 void ASteeleCreekTown::PlaceProps()
 {
 	const bool bServer = IsNetMode(NM_DedicatedServer);
-	struct FProp { const TCHAR* Mesh; FVector2D At; float Yaw; float Scale; };
-	TArray<FProp> Props;
-	if (const JeebSteele::FPlot* S = JeebSteele::FindPlot(TEXT("Smithy")))
-	{
-		float Yaw = 0.f;
-		// (the anvil just in front of where the blacksmith stands, DoorSpot 3.8 m: he faces out of the door, toward it)
-		Props.Add({ TEXT("/Game/SteeleCreek/SM_Anvil"), JeebSteele::DoorSpot(*S, 500.f, &Yaw), Yaw + 90.f, 1.f });
-		Props.Add({ TEXT("/Game/SteeleCreek/SM_Anvil"), JeebSteele::ToWorld(7.5f, -2.5f), 200.f, 0.9f });
-	}
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(4.5f, -6.5f), 30.f, 1.f });     // ore come down from the quarry
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(53.f, 60.5f), 225.f, 1.f });    // at the quarry
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_MineCart"), JeebSteele::ToWorld(60.f, 72.f), 160.f, 1.f });
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(10.5f, 8.8f), 250.f, 1.f });   // the smithy's finished bars
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(-1.5f, -14.6f), 10.f, 1.f });  // for sale at the ore market
-	Props.Add({ TEXT("/Game/SteeleCreek/SM_IngotRack"), JeebSteele::ToWorld(25.5f, -6.2f), 95.f, 0.9f });
+	const TArray<FProp> Props = TownProps();
 	TMap<UStaticMesh*, UInstancedStaticMeshComponent*> Sets;
 	int32 Count = 0;
 	for (const FProp& P : Props)
@@ -537,12 +685,13 @@ void ASteeleCreekTown::SpawnPeople()
 	At = Door(TEXT("Store"), 220.f, Yaw);
 	Spawn(ENpcRole::Shopkeeper, 0, 0, TEXT("Sir Dunmore, the Trader"), TEXT("Well met! I hung up my sword for a shop counter. Ore, ingots, bread: Steele Creek's store has it."), At, Yaw, TArray<FVector2D>());
 	// villagers and knights on their beats (metres from the centre)
-	Spawn(ENpcRole::Villager, 0, 2, TEXT("Thessaly the Seer"), TEXT("Ah. I saw you coming, of course."), JeebSteele::ToWorld(-18.f, -8.f), 0.f, { FVector2D(-18.f, -8.f), FVector2D(-10.f, -11.f), FVector2D(-7.f, 3.f), FVector2D(-17.f, 6.f) });
-	Spawn(ENpcRole::Villager, 3, 1, TEXT("Brug the Miner"), TEXT("Up the track's the quarry. Silver, gold, the green stones. Mind your fingers."), JeebSteele::ToWorld(14.f, 12.f), 45.f, { FVector2D(14.f, 12.f), FVector2D(30.f, 30.f), FVector2D(46.f, 48.f), FVector2D(54.f, 58.f) });
-	Spawn(ENpcRole::Villager, 5, 1, TEXT("Old Marg"), TEXT("Hmph. Another one of you little folk. Mind the mud on the river lane."), JeebSteele::ToWorld(-14.f, -12.f), 220.f, { FVector2D(-14.f, -12.f), FVector2D(-26.f, -28.f), FVector2D(-38.f, -44.f) });
-	Spawn(ENpcRole::Villager, 7, 1, TEXT("Hruk"), TEXT("Ingots! Fresh ingots! Hah, not really. Grakka keeps the good ones."), JeebSteele::ToWorld(4.f, -12.f), 120.f, { FVector2D(4.f, -12.f), FVector2D(12.f, -13.f), FVector2D(21.f, -26.f), FVector2D(32.f, -40.f) });
-	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Sir Kell of the Ridge"), TEXT("Halt! Ah, a traveller. The road north follows the river all the way to Oak Hill."), JeebSteele::ToWorld(-12.f, 7.f), 300.f, { FVector2D(-12.f, 7.f), FVector2D(-33.f, 21.f), FVector2D(-60.f, 38.f), FVector2D(-88.f, 54.f) });
-	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Dame Rhosyn"), TEXT("Well met. I keep watch on the landing; the river's quiet, mostly."), JeebSteele::ToWorld(-42.f, -50.f), 220.f, { FVector2D(-42.f, -50.f), FVector2D(-55.f, -69.f), FVector2D(-63.f, -84.f) });
-	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Sir Oswin"), TEXT("Steele Creek's steel is the best there is. I'd know: I've broken plenty of the other kind."), JeebSteele::ToWorld(4.f, 12.f), 0.f, { FVector2D(4.f, 12.f), FVector2D(9.f, 27.f), FVector2D(-14.f, 31.f) });
+	const TArray<TArray<FVector2D>>& Bt = Beats();
+	Spawn(ENpcRole::Villager, 0, 2, TEXT("Thessaly the Seer"), TEXT("Ah. I saw you coming, of course."), JeebSteele::ToWorld(-18.f, -8.f), 0.f, Bt[0]);
+	Spawn(ENpcRole::Villager, 3, 1, TEXT("Brug the Miner"), TEXT("Up the track's the quarry. Silver, gold, the green stones. Mind your fingers."), JeebSteele::ToWorld(14.f, 12.f), 45.f, Bt[1]);
+	Spawn(ENpcRole::Villager, 5, 1, TEXT("Old Marg"), TEXT("Hmph. Another one of you little folk. Mind the mud on the river lane."), JeebSteele::ToWorld(-14.f, -12.f), 220.f, Bt[2]);
+	Spawn(ENpcRole::Villager, 7, 1, TEXT("Hruk"), TEXT("Ingots! Fresh ingots! Hah, not really. Grakka keeps the good ones."), JeebSteele::ToWorld(4.f, -12.f), 120.f, Bt[3]);
+	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Sir Kell of the Ridge"), TEXT("Halt! Ah, a traveller. The road north follows the river all the way to Oak Hill."), JeebSteele::ToWorld(-12.f, 7.f), 300.f, Bt[4]);
+	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Dame Rhosyn"), TEXT("Well met. I keep watch on the landing; the river's quiet, mostly."), JeebSteele::ToWorld(-42.f, -50.f), 220.f, Bt[5]);
+	Spawn(ENpcRole::GateKnight, 0, 0, TEXT("Sir Oswin"), TEXT("Steele Creek's steel is the best there is. I'd know: I've broken plenty of the other kind."), JeebSteele::ToWorld(4.f, 12.f), 0.f, Bt[6]);
 	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE people: %d"), Count);
 }
