@@ -1031,7 +1031,7 @@ void AOakForest::ApplyReach()
 		for (UInstancedStaticMeshComponent* C : Drawn)
 		{
 			UStaticMesh* M = C ? C->GetStaticMesh() : nullptr;
-			if (!M || M->IsNaniteEnabled() || !M->GetName().StartsWith(TEXT("spruce_")) || !M->GetRenderData()) continue;
+			if (!M || M->HasValidNaniteData() || !M->GetName().StartsWith(TEXT("spruce_")) || !M->GetRenderData()) continue;
 			if (!Done.Contains(M))
 			{
 				Done.Add(M);
@@ -1051,7 +1051,7 @@ void AOakForest::ApplyReach()
 		for (UInstancedStaticMeshComponent* S : ShadowSets)
 		{
 			UStaticMesh* M = S ? S->GetStaticMesh() : nullptr;
-			if (!M || M->IsNaniteEnabled()) continue;
+			if (!M || M->HasValidNaniteData()) continue;
 			S->SetForcedLodModel(TwinLod > 0 ? FMath::Min(TwinLod, M->GetNumLODs() - 1) + 1 : 0);
 		}
 	}
