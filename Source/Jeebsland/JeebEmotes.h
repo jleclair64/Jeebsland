@@ -15,7 +15,7 @@ namespace JeebEmotes
 		const TCHAR* Row;
 		const TCHAR* Label;    // on the wheel
 		int32 Loops;           // how many times the row's ClipStart..ClipEnd plays (0 = until something ends it)
-		bool bStow;            // the weapon and the shield go on his back meanwhile (both hands are busy)
+		bool bStow;            // the weapon and the shield go on his back meanwhile (both hands are busy), and stay there through the blend back to standing
 	};
 
 	inline const FDef* Defs(int32& OutNum)
@@ -23,7 +23,7 @@ namespace JeebEmotes
 		static const FDef D[] = {
 			{ nullptr, nullptr, nullptr, 0, false },                          // 0: none
 			{ TEXT("wave"),   TEXT("Emote_Wave"),   TEXT("Wave"),   4, true },
-			{ TEXT("bow"),    TEXT("Emote_Bow"),    TEXT("Bow"),    1, false },
+			{ TEXT("bow"),    TEXT("Emote_Bow"),    TEXT("Bow"),    1, true },    // (stowed since 2026-11-18: held, the sword lay across his thighs as he bent)
 			{ TEXT("cheer"),  TEXT("Emote_Cheer"),  TEXT("Cheer"),  1, true },
 			{ TEXT("clap"),   TEXT("Emote_Clap"),   TEXT("Clap"),   3, true },
 			{ TEXT("dance"),  TEXT("Emote_Dance"),  TEXT("Dance"),  0, true },

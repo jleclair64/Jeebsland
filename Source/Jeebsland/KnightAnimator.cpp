@@ -48,7 +48,8 @@ namespace
 		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold"), TEXT("SlashCombo"), TEXT("GreatCombo"),
 		TEXT("WallHang"), TEXT("WallUp"), TEXT("WallDown"), TEXT("ShimmyL"), TEXT("ShimmyR"), TEXT("HopUp"), TEXT("HopDown"), TEXT("HopL"), TEXT("HopR"), TEXT("LedgeUp"), TEXT("VaultOver"), TEXT("ClimbOnto"), TEXT("VaultTwo"),
 		TEXT("Swimming"), TEXT("TreadWater"),
-		TEXT("EmoteWave"), TEXT("EmoteBow"), TEXT("EmoteCheer"), TEXT("EmoteClap"), TEXT("EmoteDance"), TEXT("EmoteSit"), TEXT("EmotePoint"), TEXT("EmoteSalute") };   // (emotes, 2026-11-18: JeebEmotes.h)
+		TEXT("EmoteWave"), TEXT("EmoteBow"), TEXT("EmoteCheer"), TEXT("EmoteClap"), TEXT("EmoteDance"), TEXT("EmoteSit"), TEXT("EmotePoint"), TEXT("EmoteSalute"),   // (emotes, 2026-11-18: JeebEmotes.h)
+		TEXT("CastWand"), TEXT("CastPush"), TEXT("CastUp") };   // (the wand's and staff's casts, 2026-11-18: KnightAnimatorCast.cpp)
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -724,6 +725,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	if (Act == 0 && !bMoving && StateKey == 2 && !bOnGuard) BlendFor = 0.55f;   // (easing back to rest takes its time)
 	if (Act == 0 && StateKey >= 100 && StateKey < 130) BlendFor = StateKey == 106 ? 0.7f : bMoving ? 0.3f : 0.45f;   // (out of an emote: up off the ground slowly; walking off, quicker)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
+	StaffCarry(In, Base, Act, Dt);   // (the staff upright at his side, before the blend so every change of state eases: KnightAnimatorCast.cpp)
 
 	if (!ForcedClip.IsEmpty())
 	{
@@ -1742,7 +1744,10 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			PlayAt(TEXT("Drink"), FMath::Lerp(M->ClipStart, M->ClipEnd, FMath::Clamp(In.DrinkU, 0.f, 1.f)), Speed, B, &OutBlend);
 		}
 		break;
-	case 38: case 39:   // the spear's thrust and a wand's or staff's cast: the sword's lunge with the arms only
+	case 39:   // a wand's or staff's cast (2026-11-18: its own Mixamo clips, KnightAnimatorCast.cpp)
+		if (Moves.Contains(TEXT("Cast_Wand"))) { CastPose(In, B, OutBlend); break; }
+		[[fallthrough]];   // (no cast rows: the spear's lunge below)
+	case 38:   // the spear's thrust: the sword's lunge with the arms only
 		if (const FMove* M = Moves.Find(TEXT("Dash")))
 		{
 			PlayLower = 0.f;

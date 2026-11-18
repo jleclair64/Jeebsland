@@ -192,7 +192,8 @@ public:
 	void RequestEmote(int32 Id);           // (0 stops the one playing)
 	uint8 EmoteNow() const { return EmoteId; }
 	bool CanEmote(FString* Why = nullptr) const;
-	bool EmoteStows() const;               // weapon and shield on his back for this one
+	bool EmoteStows() const;               // weapon and shield on his back for this one (and through the blend back to standing after it)
+	float EmoteStowLeft = 0.f;             // (s) after a stowing emote ends, how long the gear stays on his back: the body's blend back to standing (KnightAnimator 0.45 s, 0.7 s up from the sit, 0.3 s walking off)
 	UFUNCTION(Server, Reliable) void ServerEmote(uint8 Id);
 	UPROPERTY(ReplicatedUsing = OnRep_Emote) uint16 RepEmote = 0;
 	UFUNCTION() void OnRep_Emote();

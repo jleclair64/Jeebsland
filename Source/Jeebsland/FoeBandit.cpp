@@ -22,6 +22,8 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 namespace
 {
@@ -211,18 +213,32 @@ void AFoeKnight::BanditRoam(float Dt, float& Yaw)
 	// Stroll round the fire: a few steps somewhere near it, a wait, now and then back to his own spot
 	WanderWait -= Dt;
 	if (WanderWait > 0.f) return;
+	// (2026-11-18, motion review: he stepped toward the new spot at once while his heading came round at 180 deg/s, a crab-walk on every
+	// change of way. On a stroll he turns on the spot first and steps once within 40 degrees of the way; the fight is not touched.)
+	const FVector2D W = ClampToPen(WanderTo) - At;
+	if (W.Size() > 8.f)
+	{
+		const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X));
+		Yaw = FMath::FixedTurn(Yaw, WantYaw, 180.f * Dt);
+		if (FMath::Abs(FMath::FindDeltaAngleDegrees(Yaw, WantYaw)) > 40.f) { StrollTurnT += Dt; return; }
+	}
+	const FVector2D Before = At;
 	if (MoveTowards(WanderTo, StrollSpeed, Dt) || StuckT > 3.f)
 	{
+#if !UE_BUILD_SHIPPING
+		static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("LogStroll"));
+		if (bLog) UE_LOG(LogTemp, Log, TEXT("JEEBSTROLL %s leg done: worst heading-vs-step %.0f deg, turned on the spot %.2f s%s"), *GetName(), StrollWorst, StrollTurnT, StuckT > 3.f ? TEXT(" (stuck)") : TEXT(""));
+#endif
+		StrollWorst = 0.f; StrollTurnT = 0.f;
 		StuckT = 0.f;
 		const float A = Rand.FRandRange(0.f, 2.f * PI), R = Rand.FRandRange(250.f, StrollR);
 		WanderTo = Rand.FRand() < 0.35f ? PenCenter : CampAt + FVector2D(FMath::Cos(A), FMath::Sin(A)) * R;
 		WanderWait = Rand.FRandRange(3.f, 8.f);
 		return;
 	}
-	const FVector2D Before = At;
-	const FVector2D W = WanderTo - At;
-	if (!W.IsNearlyZero()) Yaw = FMath::FixedTurn(Yaw, FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X)), 180.f * Dt);
-	StuckT = FVector2D::Distance(FVector2D(GetActorLocation()), Before) < StrollSpeed * Dt * 0.2f ? StuckT + Dt : 0.f;
+	const FVector2D Step = FVector2D(GetActorLocation()) - Before;
+	if (Step.Size() > 0.1f) StrollWorst = FMath::Max(StrollWorst, FMath::Abs(FMath::FindDeltaAngleDegrees(Yaw, FMath::RadiansToDegrees(FMath::Atan2(Step.Y, Step.X)))));
+	StuckT = Step.Size() < StrollSpeed * Dt * 0.2f ? StuckT + Dt : 0.f;
 	(void)D;
 }
 
@@ -244,8 +260,14 @@ bool AFoeKnight::BanditMove(const FVector2D& To, float Speed, float Dt)
 	const FCollisionShape Shape = FCollisionShape::MakeCapsule(30.f, 45.f);
 	const bool bInTown = JeebFoes::InTown(At.X, At.Y);
 	static const float Turns[] = { 0.f, 35.f, 70.f, 110.f };
+	// (the side he steps round things changes at most every 0.6 s: flipping it every frame jittered him left and right against a trunk)
+	constexpr double StepSideHold = 0.6;
+	const double NowT = GetWorld()->GetTimeSeconds();
+	const bool bSideHeld = NowT - StepSideAt < StepSideHold;
+	auto FlipSide = [&]() { if (NowT - StepSideAt >= StepSideHold) { StepSide = -StepSide; StepSideAt = NowT; } };
 	for (int32 i = 0; i < 7; ++i)
 	{
+		if (bSideHeld && i >= 2 && i % 2 == 0) continue;   // (just chose a side: not the other one yet)
 		const float Ang = (i == 0) ? 0.f : Turns[(i + 1) / 2] * ((i & 1) ? StepSide : -StepSide);
 		const FVector2D Dd = Dir.GetRotated(Ang);
 		const FVector2D N = At + Dd * StepLen;
@@ -254,11 +276,11 @@ bool AFoeKnight::BanditMove(const FVector2D& To, float Speed, float Dt)
 		const FVector From(At.X, At.Y, JeebFoes::Ground(At.X, At.Y) + 115.f), Dest(N.X, N.Y, JeebFoes::Ground(N.X, N.Y) + 115.f);
 		FHitResult Hit;
 		if (GetWorld()->SweepSingleByObjectType(Hit, From, Dest, FQuat::Identity, Obj, Shape, Q) && !Hit.bStartPenetrating) continue;
-		if (i >= 2 && i % 2 == 0) StepSide = -StepSide;   // (the other way round got him through: keep stepping that way)
+		if (i >= 2 && i % 2 == 0) FlipSide();   // (the other way round got him through: keep stepping that way)
 		SetActorLocation(FVector(N.X, N.Y, FloorZ(N.X, N.Y)));
 		return false;
 	}
-	StepSide = -StepSide;   // (walled in this way: try the other side next frame)
+	FlipSide();   // (walled in this way: try the other side, once the hold is up)
 	return false;
 }
 

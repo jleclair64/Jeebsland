@@ -181,7 +181,7 @@ namespace JeebAnim
 		bool bSwimUnder = false;    // his head under water
 		// an emote (2026-11-18, JeebEmotes.h): its id (0 none), seconds into it, and whether it puts the weapon and shield on his back
 		uint8 Emote = 0; float EmoteT = 0.f; bool bEmoteStow = false;
-		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0 || (Emote != 0 && bEmoteStow); }   // (weapon and shield on his back)
+		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0 || bEmoteStow; }   // (weapon and shield on his back; bEmoteStow lasts through the blend out of an emote)
 	};
 }
 
@@ -260,6 +260,10 @@ private:
 	// emotes (2026-11-18, KnightAnimatorEmote.cpp): keys 100 + the emote's id
 	void EmotePlay(int32 Key, const JeebAnim::FInput& In, FPose& B, float& OutBlend);
 	float EmotePrevT = 0.f, EmoteRestSole = -1.f;
+	void SaluteToVisor(FPose& B);   // the salute's hand up to the visor (jeeb.Knight.SaluteLift)
+	void CastPose(const JeebAnim::FInput& In, FPose& B, float& OutBlend);   // a wand's or staff's cast (KnightAnimatorCast.cpp, 2026-11-18)
+	void StaffCarry(const JeebAnim::FInput& In, FPose& B, int32 Act, float Dt);   // the staff held upright at his side, standing, walking and running (KnightAnimatorCast.cpp)
+	float StaffW = 0.f;
 	float PhaseTime(const FClip& C, float P) const { return L.PhaseTime(C, P); }
 	void Accum(const FPose& P, float W, FPose& Sum, float& SumW) const { L.Accum(P, W, Sum, SumW); }
 	void Finish(FPose& Sum, float SumW) const { L.Finish(Sum, SumW); }

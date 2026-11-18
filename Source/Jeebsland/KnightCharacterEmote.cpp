@@ -73,8 +73,12 @@ bool AKnightCharacter::EmoteCancelled(FString& Why) const
 
 bool AKnightCharacter::EmoteStows() const
 {
-	const JeebEmotes::FDef* D = JeebEmotes::Get(EmoteId);
-	return D && D->bStow;
+	if (const JeebEmotes::FDef* D = JeebEmotes::Get(EmoteId)) return D->bStow;
+	// (2026-11-18, motion review: the gear came back while his arms were still overhead, or across his knees as he rose from the sit.
+	// It stays on his back until the body has blended back to standing, unless his hands are wanted at once: a swing, the shield
+	// raised, the bow, a drink or a tool give it back on that frame, as climbing's end does.)
+	if (EmoteStowLeft <= 0.f) return false;
+	return !(bAttacking || bBlocking || bBlockHeld || Bow != EBow::None || bDrinking || bSwinging || bFishing || bClimbing || bMounted);
 }
 
 void AKnightCharacter::RequestEmote(int32 Id)
@@ -112,6 +116,7 @@ void AKnightCharacter::StartEmote(uint8 Id)
 	if (!D) return;
 	EmoteId = Id;
 	EmoteT = 0.f;
+	EmoteStowLeft = 0.f;
 	EmoteFor = EmoteLength(Id);
 	if (HasAuthority()) RepEmote = static_cast<uint16>(((((RepEmote >> 8) + 1) & 0xFF) << 8) | Id);
 	UE_LOG(LogTemp, Log, TEXT("JEEBEMOTE %s %s start %s (%s)"), RoleName(this), *GetName(), D->Name, EmoteFor > 0.f ? *FString::Printf(TEXT("%.2f s"), EmoteFor) : TEXT("until ended"));
@@ -122,6 +127,8 @@ void AKnightCharacter::StopEmote(const TCHAR* Why)
 	if (!EmoteId) return;
 	const JeebEmotes::FDef* D = JeebEmotes::Get(EmoteId);
 	UE_LOG(LogTemp, Log, TEXT("JEEBEMOTE %s %s stop %s after %.2f s: %s"), RoleName(this), *GetName(), D ? D->Name : TEXT("?"), EmoteT, Why);
+	// (the gear stays on his back for the animator's blend out of the emote: KnightAnimator::Update, keys 100+)
+	EmoteStowLeft = D && D->bStow ? (EmoteId == 6 ? 0.7f : GetVelocity().Size2D() > EmoteStillSpeed ? 0.3f : 0.45f) : 0.f;
 	EmoteId = 0;
 	EmoteT = 0.f;
 	if (HasAuthority()) RepEmote = static_cast<uint16>(((((RepEmote >> 8) + 1) & 0xFF) << 8));
@@ -138,7 +145,7 @@ void AKnightCharacter::OnRep_Emote()
 void AKnightCharacter::TickEmote(float Dt)
 {
 	TickEmoteTests(Dt);
-	if (!EmoteId) return;
+	if (!EmoteId) { EmoteStowLeft = FMath::Max(EmoteStowLeft - Dt, 0.f); return; }
 	EmoteT += Dt;
 	FString Why;
 	if (EmoteCancelled(Why)) StopEmote(*Why);
