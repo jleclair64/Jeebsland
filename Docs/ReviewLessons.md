@@ -375,3 +375,11 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Any walking brain (NPC patrol, bandit stroll) must turn to its new heading before it steps, or use a turn-in-place; stepping at full speed while the body is still rotating makes a crab-walk or moonwalk at every corner.
 - Head-look needs a limited, wrap-safe angle that fades out when the target is behind, not a clamp on a signed angle that flips from +55 to -55 when the target crosses behind.
 - A new test switch must work in the map the docs name and be framed within 5 m, with no other NPCs or smoke in view; otherwise the reviewer cannot see what is being judged.
+
+## Lessons from the 2026-11-18 daytime batch (visual review)
+- A static cache of UObject pointers loaded at world build (meshes, clips) must be kept alive with `TStrongObjectPtr` or a rooted holder, because the client's menu-to-game world change collects raw pointers. Test an online client join before calling any new asset-loading system done.
+- Anything drawn over a character (name tag, quest mark, interact prompt) takes its height from the model's measured head height, and no two HUD elements may share the same spot. Check them in a shot that draws the HUD, with the tag and prompt both visible.
+- A held two-handed prop (staff) needs a carried pose that works in doorways and when stowed, not a flat line sticking 1.4 m forward or behind; check from the side and from behind.
+- A flame, glow or light must be placed on its fuel or source, and its position checked side-on, not only that the light pool is on the ground.
+- A town said to be in a forest needs trees or bushes inside the street grid, not a distant ring; check from the aerial and the street. Keep wood colours to the rich-brown palette, not saturated orange, on every new prop.
+- Placeholder bodies (box trolls) next to real people read as broken; give every character in a scene the same body style or hide the old shapes.
