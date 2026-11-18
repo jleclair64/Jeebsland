@@ -159,11 +159,11 @@ void AKnightHUD::DrawHUD()
 
 	DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
-	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp)
 	DrawWeaponBar(Knight);
 	DrawReticle(Knight);
-	if (!Knight->IsUIOpen() && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);
+	if (!Knight->IsUIOpen() && !bEmoteWheel && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);   // (not under the emote wheel)
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
+	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp; on top)
 
 	// Game messages, newest at the bottom, fading out
 	{

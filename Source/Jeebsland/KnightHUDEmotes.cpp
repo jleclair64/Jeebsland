@@ -56,7 +56,7 @@ void AKnightHUD::DrawEmoteWheel(AKnightCharacter* Knight, APlayerController* PC)
 		}
 		return;
 	}
-	if (Knight->IsUIOpen() || bTyping || (PC->WasInputKeyJustPressed(EKeys::B)) || bUIRightClick || (bEmoteCursor && !Knight->IsPanelCursor()))
+	if (Knight->IsUIOpen() || bTyping || (PC->WasInputKeyJustPressed(EKeys::B)) || bUIRightClick || !Knight->IsPanelCursor())   // (Tab put the cursor away: the wheel goes with it)
 	{
 		CloseEmoteWheel(Knight);
 		return;
@@ -68,7 +68,11 @@ void AKnightHUD::DrawEmoteWheel(AKnightCharacter* Knight, APlayerController* PC)
 	const float R = 165.f * S, BW = 128.f * S, BH = 44.f * S, Disc = 118.f * S;
 	const int32 N = JeebEmotes::Num() - 1;
 
-	// the disc in the middle: what it is and how to close it
+	// one glass pane behind it all, so the labels read over a bright sky or wall, then the disc in the middle: what it is and how to close it
+	{
+		const float PW = 2.f * R + BW + 28.f * S, PH = 2.f * R * 0.86f + BH + 28.f * S;
+		Panel(Cx - PW * 0.5f, Cy - PH * 0.5f, PW, PH, 1.f);
+	}
 	Panel(Cx - Disc * 0.5f, Cy - Disc * 0.5f, Disc, Disc, 0.95f);
 	{
 		float W = 0.f, H = 0.f;
