@@ -126,6 +126,10 @@ namespace JeebPeople
 			static const TCHAR* Keys[3] = { TEXT("Idle"), TEXT("Walk"), TEXT("Talk") };
 			for (int32 i = 0; i < 3; ++i)
 				M->Clips[i] = LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("%sA_%s_%s.A_%s_%s"), *Base, *M->Name, Keys[i], *M->Name, Keys[i]));
+			// Kept alive for the whole run (2026-11-18): this cache outlives worlds, and the garbage collection between the menu
+			// world and the game world freed the meshes, so an online client crashed on joining
+			if (M->Mesh) M->Mesh->AddToRoot();
+			for (int32 i = 0; i < 3; ++i) if (M->Clips[i]) M->Clips[i]->AddToRoot();
 			UE_LOG(LogTemp, Log, TEXT("JEEBPEOPLE model %s: mesh %s, clips %d %d %d"), *M->Name, M->Mesh ? TEXT("ok") : TEXT("MISSING"),
 				M->Clips[0] != nullptr, M->Clips[1] != nullptr, M->Clips[2] != nullptr);
 		}
