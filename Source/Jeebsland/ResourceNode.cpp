@@ -18,7 +18,7 @@ static bool UnlimitedNodes()
 	return b;
 }
 
-AResourceNode::AResourceNode()
+AResourceNode::AResourceNode(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	PrimaryActorTick.bCanEverTick = false;
 }
@@ -119,6 +119,7 @@ void AResourceNode::FinishGathering()
 	WorkLeft -= EffectiveSeconds;
 	if (!Gatherer || FVector::Dist2D(Gatherer->GetActorLocation(), GetActorLocation()) > ReachRadius() + 150.f)
 	{
+		UE_LOG(LogTemp, Log, TEXT("JEEBGATHER wandered off: %.0f cm away, reach %.0f"), Gatherer ? FVector::Dist2D(Gatherer->GetActorLocation(), GetActorLocation()) : -1.f, ReachRadius() + 150.f);
 		if (Knight) Knight->EndGathering();
 		Tell(Gatherer, 2.f, FColor::Orange, TEXT("You wandered off and stopped."));
 		return;

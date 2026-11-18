@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "ChoppableTree.h"
 #include "OakForest.generated.h"
 
 class UInstancedStaticMeshComponent;
@@ -28,6 +29,27 @@ namespace JeebOakForest
 	// The forest roads' centrelines (every 60 cm), worked out once from the land; JeebTerrain::PathDefs makes them paths. Never calls PathDefs.
 	const TArray<TArray<FVector2D>>& RoadLines();
 }
+
+class AOakForest;
+
+// One of the forest's (and Oak Hill's) pack trees as a choppable node (owner, 2026-11-17: "Can we make the trees choppable?"). It is only
+// the gameplay part, like Blackrock's AChoppableTree but without its trunk capsule (the forest's hidden trunk solids block already): the
+// server runs the chop as for any tree; when its charges run out every machine fells it (AOakForest::SetFelled) and it grows back.
+// Cork oaks and aspens give oak logs, spruces pine logs. Spawned on every machine at the tree's foot, in the same order: nodes are matched
+// online by where they stand (AKnightGameState::NodeCharges).
+UCLASS()
+class AOakTreeNode : public AChoppableTree
+{
+	GENERATED_BODY()
+
+public:
+	AOakTreeNode(const FObjectInitializer& ObjectInitializer);
+	TWeakObjectPtr<AOakForest> Forest;
+	int32 Index = INDEX_NONE;
+
+protected:
+	virtual void OnChargesChanged(int32 Remaining, int32 Max) override;
+};
 
 UCLASS()
 class AOakForest : public AActor
@@ -67,4 +89,25 @@ private:
 	void UpdateShadows(bool bForce);
 	void ApplyReach();
 	friend struct FOakForestBuild;
+
+public:
+	// A choppable tree chopped down (bFelled) or grown back: its drawn tree and shadow go, its trunk solid drops to a stump's height and a
+	// stump is drawn in its place, and back again. Every machine (the server: the solid only).
+	void SetFelled(int32 Index, bool bFelled);
+
+private:
+	struct FFellable
+	{
+		int32 Key = -1, KeyIndex = -1;     // (its visual set's key, kind * 4 + colour, and its place in it, while building)
+		int32 Drawn = -1, Shadow = -1;     // (its drawn set and shadow twin; -1 on the server)
+		int32 Trunk = -1;                  // (its instance in the trunk solids)
+		FTransform Tree, TrunkSolid;
+		float Radius = 20.f;
+		int32 Stump = -1;                  // (its instance in FelledStumps, once felled)
+		bool bFelled = false;
+	};
+	TArray<FFellable> Fellable;
+	UPROPERTY() UInstancedStaticMeshComponent* TrunkSolids = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* FelledStumps = nullptr;
+	FBox StumpBounds = FBox(ForceInit);
 };

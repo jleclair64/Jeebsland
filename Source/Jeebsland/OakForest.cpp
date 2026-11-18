@@ -717,6 +717,8 @@ struct FOakForestBuild
 		uint32 Hash = 2166136261u;
 		auto HashIn = [&](float V) { const int32 Q = FMath::RoundToInt(V * 10.f); for (int32 b = 0; b < 4; ++b) { Hash ^= uint32((Q >> (8 * b)) & 0xFF); Hash *= 16777619u; } };
 		TMap<int32, TArray<FTransform>> Visual;   // (kind * 4 + colour)
+		TArray<uint8> FellKind;                   // (each choppable tree's kind)
+		TMap<int32, int32> DrawnOfKey, ShadowOfKey;
 		TArray<FTransform> OwnSolid[K_Num];
 		for (const FPut& P : Puts)
 		{
@@ -732,6 +734,14 @@ struct FOakForestBuild
 				const float Rad = K.TrunkR * P.Scale.X, H = FMath::Max(K.TrunkH * P.Scale.Z, 300.f) + 40.f;
 				if (Rad < 6.f) break;   // (a seedling: walked through)
 				TrunkX.Add(FTransform(FRotator::ZeroRotator, P.At + FVector(0.f, 0.f, H * 0.5f - 40.f), FVector(Rad / 50.f, Rad / 50.f, H / 100.f)));
+				if (IsTree(P.Kind))   // (a choppable tree, AOakTreeNode)
+				{
+					AOakForest::FFellable F;
+					F.Key = P.Kind * 4 + P.Col; F.KeyIndex = Visual[F.Key].Num() - 1;
+					F.Trunk = TrunkX.Num() - 1; F.Tree = Xf; F.TrunkSolid = TrunkX.Last(); F.Radius = Rad;
+					Self->Fellable.Add(F);
+					FellKind.Add(P.Kind);
+				}
 				break;
 			}
 			case ESolid::Box:
@@ -754,6 +764,7 @@ struct FOakForestBuild
 		}
 		auto Fill = [](UInstancedStaticMeshComponent* C, const TArray<FTransform>& X) { if (!C) return; C->RegisterComponent(); if (X.Num()) C->AddInstances(X, false, true, false); };
 		Fill(Trunks, TrunkX); Fill(Logs, LogX); Fill(Cyls, CylX);
+		Self->TrunkSolids = Trunks;
 		for (int32 k = 0; k < K_Num; ++k)   // (the boulder: its own collision; drawn on clients, hidden on the server)
 			if (OwnSolid[k].Num() && Meshes[k])
 			{
@@ -791,6 +802,7 @@ struct FOakForestBuild
 				C->SetWorldPositionOffsetDisableDistance(bTree ? 6000 : 3000);   // (the wind stops swaying them beyond 60 m)
 				if (K.bTint) Swapped += TintLeaves(C, Col);
 				if (IsSpruce(Kd) || Kd == K_Sapling) Swapped += TintSpruceSet(C, Self);
+				DrawnOfKey.Add(V.Key, Self->Drawn.Num());
 				Self->Drawn.Add(C); Self->DrawnReach.Add(K.Reach); Self->DrawnIsTree.Add(bTree); Self->DrawnShadow.Add(K.bShadow && !bTree);
 				C->RegisterComponent();
 				C->AddInstances(V.Value, false, true, false);
@@ -812,6 +824,7 @@ struct FOakForestBuild
 					if (IsSpruce(Kd) || Kd == K_Sapling) TintSpruceSet(S, Self);
 					S->RegisterComponent();
 					const int32 Si = Self->ShadowSets.Add(S);
+					ShadowOfKey.Add(V.Key, Si);
 					Self->ShadowAll.Add(V.Value);
 					Self->ShadowHash.Add(0u);
 					// and its kind's hidden stand-in set (one per kind, whatever the colour), filled past the twins' reach
@@ -843,9 +856,39 @@ struct FOakForestBuild
 			}
 			Self->BuildShadeMeshes();
 			for (UInstancedStaticMeshComponent* P : Self->ShadeSets) P->RegisterComponent();
+			// the stumps of felled trees (filled as trees are chopped)
+			if (UStaticMesh* SM = Meshes[K_Stump])
+			{
+				UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(Self, TEXT("FelledStumps"));
+				C->SetStaticMesh(SM);
+				C->SetupAttachment(Root);
+				C->SetMobility(EComponentMobility::Movable);
+				C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				C->SetCanEverAffectNavigation(false);
+				C->SetCullDistances(0, int32(Kinds[K_Stump].Reach));
+				C->RegisterComponent();
+				Self->FelledStumps = C;
+				Self->StumpBounds = SM->GetBoundingBox();
+			}
 			Self->ApplyReach();
 			if (Self->ShadowSets.Num()) Self->SetActorTickEnabled(true);
 		}
+		// every pack tree choppable (AOakTreeNode), on every machine and in the same order (nodes are matched online by where they stand)
+		int32 Nodes = 0;
+		for (int32 i = 0; i < Self->Fellable.Num(); ++i)
+		{
+			AOakForest::FFellable& F = Self->Fellable[i];
+			if (const int32* D = DrawnOfKey.Find(F.Key)) F.Drawn = *D;
+			if (const int32* S = ShadowOfKey.Find(F.Key)) F.Shadow = *S;
+			FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			AOakTreeNode* N = World->SpawnActor<AOakTreeNode>(F.Tree.GetLocation(), FRotator::ZeroRotator, SP);
+			if (!N) continue;
+			N->Forest = Self; N->Index = i;
+			const float H = Kinds[FellKind[i]].TrunkH * F.Tree.GetScale3D().Z + 300.f;
+			N->Setup(IsSpruce(FellKind[i]) ? ETreeKind::Pine : ETreeKind::Oak, F.Radius, H);
+			++Nodes;
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST choppable trees: %d"), Nodes);
 		// the grass thins under every crown; the town's broadleaves also drop leaves in their own colour (AutumnDecor), the forest's none
 		// (hundreds of thousands of leaves), nor do conifers
 		for (const FPut& P : Puts)
@@ -1082,5 +1125,52 @@ void AOakForest::UpdateShadows(bool bForce)
 			for (int32 n : Near[s]) X.Add(ShadowAll[s][n]);
 			S->AddInstances(X, false, true, false);
 		}
+	}
+}
+
+// ------------------------------------------------------------------ chopping (AOakTreeNode)
+AOakTreeNode::AOakTreeNode(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.DoNotCreateDefaultSubobject(TEXT("TrunkCollision")))
+{
+}
+
+void AOakTreeNode::OnChargesChanged(int32 Remaining, int32 Max)
+{
+	if (AOakForest* F = Forest.Get()) F->SetFelled(Index, Remaining <= 0);
+}
+
+void AOakForest::SetFelled(int32 Index, bool bFelled)
+{
+	if (!Fellable.IsValidIndex(Index) || Fellable[Index].bFelled == bFelled) return;
+	FFellable& F = Fellable[Index];
+	F.bFelled = bFelled;
+	const FVector At = F.Tree.GetLocation();
+	UE_LOG(LogTemp, Log, TEXT("JEEBFOREST tree %d %s at %.0f %.0f %.0f"), Index, bFelled ? TEXT("felled") : TEXT("grown back"), At.X, At.Y, At.Z);
+	// the trunk solid: a stump's height (to 60 cm above the foot), or the whole trunk again
+	if (TrunkSolids && F.Trunk >= 0)
+	{
+		FTransform T = F.TrunkSolid;
+		if (bFelled) { T.SetLocation(At + FVector(0.f, 0.f, 10.f)); T.SetScale3D(FVector(T.GetScale3D().X, T.GetScale3D().Y, 1.f)); }
+		TrunkSolids->UpdateInstanceTransform(F.Trunk, T, true, true, true);
+	}
+	// the drawn tree and its shadow (clients)
+	FTransform Gone = F.Tree; Gone.SetScale3D(FVector(0.001f));
+	if (Drawn.IsValidIndex(F.Drawn) && Drawn[F.Drawn]) Drawn[F.Drawn]->UpdateInstanceTransform(F.KeyIndex, bFelled ? Gone : F.Tree, true, true, true);
+	if (ShadowAll.IsValidIndex(F.Shadow) && ShadowAll[F.Shadow].IsValidIndex(F.KeyIndex))
+	{
+		ShadowAll[F.Shadow][F.KeyIndex] = bFelled ? Gone : F.Tree;
+		ShadowHash[F.Shadow] = 0u;
+		ShadeHash = 0u;
+		UpdateShadows(true);
+	}
+	// a stump where it stood, about as wide as the trunk
+	if (FelledStumps && StumpBounds.IsValid)
+	{
+		const FVector Sz = StumpBounds.GetSize();
+		const float S = FMath::Clamp(F.Radius * 2.6f / FMath::Max(1.f, FMath::Max(Sz.X, Sz.Y)), 0.35f, 2.5f);
+		const float Yaw = float((Index * 2654435761u) % 360u);
+		const FTransform T(FRotator(0.f, Yaw, 0.f), At - FVector(0.f, 0.f, 6.f), FVector(bFelled ? S : 0.001f));
+		if (F.Stump < 0) { if (bFelled) F.Stump = FelledStumps->AddInstance(T, true); }
+		else FelledStumps->UpdateInstanceTransform(F.Stump, T, true, true, true);
 	}
 }

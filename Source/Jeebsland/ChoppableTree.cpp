@@ -1,7 +1,7 @@
 #include "ChoppableTree.h"
 #include "Components/CapsuleComponent.h"
 
-AChoppableTree::AChoppableTree()
+AChoppableTree::AChoppableTree(const FObjectInitializer& ObjectInitializer) : Super(ObjectInitializer)
 {
 	Skill = ESkillType::Woodcutting;
 	GatherSeconds = 5.f;
@@ -18,12 +18,16 @@ AChoppableTree::AChoppableTree()
 	SetRootComponent(TreeRoot);
 
 	// Invisible trunk-sized collision so you cannot walk through the tree
-	Capsule = CreateDefaultSubobject<UCapsuleComponent>(TEXT("TrunkCollision"));
-	Capsule->SetupAttachment(TreeRoot);
-	Capsule->InitCapsuleSize(25.f, 110.f);
-	Capsule->SetCollisionProfileName(TEXT("BlockAll"));
-	Capsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore); // the camera slides past trunks
-	Capsule->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
+	// (AOakTreeNode leaves it out: the forest's trunks are solid already)
+	Capsule = CreateOptionalDefaultSubobject<UCapsuleComponent>(TEXT("TrunkCollision"));
+	if (Capsule)
+	{
+		Capsule->SetupAttachment(TreeRoot);
+		Capsule->InitCapsuleSize(25.f, 110.f);
+		Capsule->SetCollisionProfileName(TEXT("BlockAll"));
+		Capsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore); // the camera slides past trunks
+		Capsule->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
+	}
 }
 
 void AChoppableTree::Setup(ETreeKind InKind, float Radius, float Height)
@@ -33,8 +37,11 @@ void AChoppableTree::Setup(ETreeKind InKind, float Radius, float Height)
 	TrunkRadius = Radius;
 
 	const float HalfHeight = FMath::Max(FMath::Min(Height * 0.5f, 300.f), Radius + 1.f);
-	Capsule->SetCapsuleSize(Radius, HalfHeight);
-	Capsule->SetRelativeLocation(FVector(0.f, 0.f, HalfHeight));
+	if (Capsule)
+	{
+		Capsule->SetCapsuleSize(Radius, HalfHeight);
+		Capsule->SetRelativeLocation(FVector(0.f, 0.f, HalfHeight));
+	}
 
 	switch (Kind)
 	{
