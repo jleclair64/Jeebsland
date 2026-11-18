@@ -62,7 +62,7 @@ namespace WeaponDesign
 		case JeebItems::K_Axe: return 71.f;   // (the axe model's head, 2026-11-12)
 		case JeebItems::K_Pickaxe: return 76.f;   // (the pickaxe model's head reaches 78 cm)
 		case JeebItems::K_Rod: return 128.f;
-		case JeebItems::K_Staff: return 113.f;
+		case JeebItems::K_Staff: return 126.f;   // (the model's orb, 132 cm from the grip)
 		case JeebItems::K_Wand: return 43.f;
 		default: return 70.f;
 		}
@@ -146,24 +146,9 @@ namespace WeaponDesign
 			break;
 		}
 		case K_Wand:
-		{
-			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 9, 1.5, 8.5, 1.6, 0, 1.2, -30, 0.9, -42, 0, -43 }), 10, 1.0, 1.0, Pl);
-			{ FMD& M = Add(Trim);
-			  Torus(M, 1.8, 0.8, 12, 6, 1.0, 1.0, At(0, 0, -34));
-			  Blob(M, 1.8, 1.8, 1.8, At(0, 0, 10)); }
-			Blob(AddFixed(FLinearColor(0.7f, 0.5f, 1.0f), 2.2f), 3.4, 3.4, 3.8, At(0, 0, -47));
-			break;
-		}
 		case K_Staff:
 		{
-			Lathe(AddFixed(Wood), KnightDesign::Prof({ 0, 34, 2.2, 33, 2.3, 0, 2.3, -100, 2.0, -112, 0, -113 }), 12, 1.0, 1.0, Pl);
-			{ FMD& M = Add(Trim);
-			  Torus(M, 4.6, 1.1, 16, 6, 1.0, 1.0, At(0, 0, -112));
-			  Torus(M, 5.6, 1.0, 16, 6, 1.0, 1.0, At(0, 0, -127));
-			  Torus(M, 3.0, 1.0, 12, 6, 1.0, 1.0, At(0, 0, -62));
-			  Blob(M, 2.4, 2.4, 2.4, At(0, 0, 36)); }
-			Blob(AddFixed(FLinearColor(0.4f, 0.8f, 1.0f), 2.2f), 6.4, 6.4, 6.4, At(0, 0, -120));
-			break;
+			break;   // (models since 2026-11-18: JeebProps, Meshy's wizard staff and wand, grip at the origin, the orb end along -Z)
 		}
 		case K_Bow:   // (the stave is a model since 2026-11-12, JeebProps, its own string cut off; only the string is built here, last, between the model's string ends)
 		{
