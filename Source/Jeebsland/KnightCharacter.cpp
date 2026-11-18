@@ -210,6 +210,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
+	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
@@ -438,6 +439,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
 	TickDrink(Dt);
+	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
 	TickGear(Dt);
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)

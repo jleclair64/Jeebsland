@@ -56,6 +56,11 @@ private:
 	void SubmitChat();
 	void ChatNote(const FString& Text) { AddChatLine(FString(), Text, false, nullptr); }
 	void WrapChat(const FString& Text, float MaxW, float Scale, TArray<FString>& Out) const;
+	// Emotes (2026-11-18, KnightHUDEmotes.cpp): B opens the wheel; /wave etc. in chat
+	void DrawEmoteWheel(AKnightCharacter* Knight, APlayerController* PC);
+	void CloseEmoteWheel(AKnightCharacter* Knight);
+	bool EmoteChat(const FString& Cmd);   // (a chat command naming an emote: played, true)
+	bool bEmoteWheel = false, bEmoteCursor = false;
 	FString TypeName, TypePass, TypePass2, TypeAddr;
 	int32 TypeFocus = 0;              // 0 name, 1 password, 2 password again, 3 server address
 	bool bTypeInit = false, bTypeEnter = false, bCreateMode = false;

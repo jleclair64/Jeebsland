@@ -572,6 +572,7 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	if (bMounted) Dismount();
 	if (bClimbing) ExitClimb(false, false);
 	if (bSitting) StandUp();
+	if (EmoteId) StopEmote(TEXT("died"));
 	EndGathering();
 	CloseLoot();
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false; bRolling = false; bSliding = false;

@@ -184,6 +184,24 @@ public:
 	uint8 DrinkType = 0;
 	bool CanDrinkNow() const;
 	void TickDrink(float Dt);
+	// Emotes (2026-11-18, KnightCharacterEmote.cpp; JeebEmotes.h): RequestEmote asks the server (ServerEmote), which checks him and
+	// replicates the emote in RepEmote (id in the low byte, a count above it so the same emote again restarts it); every machine plays it
+	// and ends it itself the moment he moves, jumps, attacks or is hit, and the server's word ends it everywhere.
+	void RequestEmote(int32 Id);           // (0 stops the one playing)
+	uint8 EmoteNow() const { return EmoteId; }
+	bool CanEmote(FString* Why = nullptr) const;
+	bool EmoteStows() const;               // weapon and shield on his back for this one
+	UFUNCTION(Server, Reliable) void ServerEmote(uint8 Id);
+	UPROPERTY(ReplicatedUsing = OnRep_Emote) uint16 RepEmote = 0;
+	UFUNCTION() void OnRep_Emote();
+	uint8 EmoteId = 0;
+	float EmoteT = 0.f, EmoteFor = 0.f;   // seconds into it; how long it lasts (0 until ended)
+	double LastEmoteAsk = -10.0, LastServerEmote = -10.0;
+	void StartEmote(uint8 Id);
+	void StopEmote(const TCHAR* Why);
+	void TickEmote(float Dt);
+	bool EmoteCancelled(FString& Why) const;
+	void TickEmoteTests(float Dt);         // (test pictures and online tests: -ShotMove=emote<name>|emoteall, -EmoteTest=)
 	UPROPERTY(Transient) TObjectPtr<USceneComponent> DrinkGroup;         // the open hand round the bottle (the skeleton has no fingers: the fist folds away while he drinks)
 	UPROPERTY(Transient) TObjectPtr<UProceduralMeshComponent> DrinkHand;
 	float AimCamZ = 0.f; bool bAimCamZSet = false;                       // where the aiming camera's height has got to (TickBow)

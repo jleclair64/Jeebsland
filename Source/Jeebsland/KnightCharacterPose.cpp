@@ -48,6 +48,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bMounted = bMounted;
 	In.bSliding = bSliding;
 	In.bFishing = bFishing;
+	In.Emote = EmoteId; In.EmoteT = EmoteT; In.bEmoteStow = EmoteStows();   // (KnightCharacterEmote.cpp)
 	In.bDrinking = bDrinking;
 	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
 	In.bSwinging = bSwinging && GatherWalkLeft <= 0.f && In.Vel.Size2D() < 50.f;   // (walking into place or off with the tool: he walks, then swings. Other machines go by his speed.)

@@ -159,6 +159,7 @@ void AKnightHUD::DrawHUD()
 
 	DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
+	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp)
 	DrawWeaponBar(Knight);
 	DrawReticle(Knight);
 	if (!Knight->IsUIOpen() && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);

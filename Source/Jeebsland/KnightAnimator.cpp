@@ -47,7 +47,8 @@ namespace
 		TEXT("WeightedRun"), TEXT("ChestBlock"), TEXT("Drink"),
 		TEXT("HeavySwing"), TEXT("SlashWide"), TEXT("MinePick"), TEXT("CrossAim"), TEXT("CrossFire"), TEXT("CrossReload"), TEXT("CrossIdle"), TEXT("FishCast"), TEXT("FishIdle"), TEXT("Gather"), TEXT("PickUp"), TEXT("ClimbLadder"), TEXT("SitChair"), TEXT("SlideHold"), TEXT("SlashCombo"), TEXT("GreatCombo"),
 		TEXT("WallHang"), TEXT("WallUp"), TEXT("WallDown"), TEXT("ShimmyL"), TEXT("ShimmyR"), TEXT("HopUp"), TEXT("HopDown"), TEXT("HopL"), TEXT("HopR"), TEXT("LedgeUp"), TEXT("VaultOver"), TEXT("ClimbOnto"), TEXT("VaultTwo"),
-		TEXT("Swimming"), TEXT("TreadWater") };
+		TEXT("Swimming"), TEXT("TreadWater"),
+		TEXT("EmoteWave"), TEXT("EmoteBow"), TEXT("EmoteCheer"), TEXT("EmoteClap"), TEXT("EmoteDance"), TEXT("EmoteSit"), TEXT("EmotePoint"), TEXT("EmoteSalute") };   // (emotes, 2026-11-18: JeebEmotes.h)
 
 	FVector ToRotVec(const FQuat& Q0)
 	{
@@ -721,6 +722,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	const int32 Act = ChooseAction(Dt, In, Base, BlendFor);
 	if (Act == 0 && StateKey >= 10) BlendFor = StateKey == 72 ? 0.45f : StateKey == 34 ? 0.6f : StateKey == 30 || StateKey == 31 ? 0.5f : StateKey >= 30 && StateKey < 40 ? 0.36f : 0.3f;   // (out of any move, back to walking or standing: the body eases up out of it, never pops; a jab ends far from the guard)
 	if (Act == 0 && !bMoving && StateKey == 2 && !bOnGuard) BlendFor = 0.55f;   // (easing back to rest takes its time)
+	if (Act == 0 && StateKey >= 100 && StateKey < 130) BlendFor = StateKey == 106 ? 0.7f : bMoving ? 0.3f : 0.45f;   // (out of an emote: up off the ground slowly; walking off, quicker)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
 
 	if (!ForcedClip.IsEmpty())
@@ -766,7 +768,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	}
 	// (a part-way landing or a chest-only move can leave a boot sunk: the hips rise just enough. Floor clips lie lower.)
 	{
-		const float Sole = (StateKey >= 80 && StateKey <= 95) ? -100000.f : (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : 7.f;
+		const float Sole = (StateKey >= 80 && StateKey <= 95) ? -100000.f : (StateKey == 10 || StateKey == 11 || StateKey == 20 || StateKey == 71 || StateKey == 72) ? 1.f : StateKey == 106 ? 6.f : 7.f;   // (106: the emote sitting on the ground: its clip sinks the boots, and the seat with them)
 		const float Low = FMath::Min(float(BonePos(Final, LFoot).Z), float(BonePos(Final, RFoot).Z));
 		if (Low < Sole) Final.Hip.Z += Sole - Low;
 	}
@@ -1497,6 +1499,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	else if (In.bSliding) Key = 72;
 	else if (In.bSwinging) Key = In.bSideways ? 73 : 74;
 	else if (In.bFishing) Key = 75;
+	else if (In.Emote != 0 && !bAir) Key = 100 + In.Emote;   // (an emote: KnightAnimatorEmote.cpp)
 	else if (!bAir && bLandHard && LandT < LandFor && !bMoving && In.BowMode == 0) Key = 51;
 	if (Key != 11) RiseLeft = 0.f;
 	if ((Key >= 30 && Key < 40) || (Key >= 60 && Key < 70) || Key == 10 || Key == 11) CombatT = 4.f; else CombatT = FMath::Max(CombatT - Dt, 0.f);
@@ -1539,6 +1542,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	const auto& Tn = JeebTune::V();
 	if (Key >= 80 && Key <= 91) { WallPlay(Key, In, B, OutBlend); return Key; }
 	if (Key >= 92 && Key <= 95) { SwimPlay(Key, In, B, OutBlend); return Key; }
+	if (Key >= 100 && Key < 130) { EmotePlay(Key, In, B, OutBlend); return Key; }
 	switch (Key)
 	{
 	case 10:

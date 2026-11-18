@@ -372,6 +372,7 @@ void AKnightCharacter::Die()
 	if (bClimbing) ExitClimb(false, false);
 	DropFromWall(true);
 	if (bSitting) StandUp();
+	if (EmoteId) StopEmote(TEXT("died"));   // (the server's word reaches everyone: RepEmote)
 	if (AResourceNode* Node = ActiveNode.Get()) Node->CancelGathering();
 	if (bKnockedDown) MulticastKnock(false, 0);   // (he wakes standing)
 	bKnockedDown = false; KnockPhase = 0;
@@ -1431,7 +1432,7 @@ void AKnightCharacter::TickGear(float Dt)
 
 	// Climbing, riding or sitting: the shield and the weapon go on the back; they come back to the hands afterwards
 	{
-		const bool bWantStow = bClimbing || ClimbStowed() || bMounted || bSitting;
+		const bool bWantStow = bClimbing || ClimbStowed() || bMounted || bSitting || EmoteStows();
 		if (bWantStow != bStowed)
 		{
 			bStowed = bWantStow;

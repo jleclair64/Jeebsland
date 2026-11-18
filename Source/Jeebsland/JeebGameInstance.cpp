@@ -108,7 +108,11 @@ void UJeebGameInstance::JoinWorld(int32 Index)
 	MenuMessage.Reset();
 	RememberChoices();
 	APlayerController* PC = GetFirstLocalPlayerController();
-	if (PC) PC->ClientTravel(FString::Printf(TEXT("%s:%d"), *ServerAddress, Worlds[Index].Port), TRAVEL_Absolute);
+	int32 Port = Worlds[Index].Port;
+#if !UE_BUILD_SHIPPING
+	FParse::Value(FCommandLine::Get(), TEXT("JeebWorldPort="), Port);   // (tests: a test server on its own port, never a world friends play on)
+#endif
+	if (PC) PC->ClientTravel(FString::Printf(TEXT("%s:%d"), *ServerAddress, Port), TRAVEL_Absolute);
 }
 
 void UJeebGameInstance::ReturnToMenu(const FString& Why)
