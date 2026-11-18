@@ -71,7 +71,7 @@ namespace
 		return M;
 	}
 
-	struct FWhoRow { FString Key, Model; FLinearColor Tint; };
+	struct FWhoRow { FString Key, Model; FLinearColor Tint; float Scale = 1.f; FLinearColor Skin = FLinearColor(0.f, 0.f, 0.f, 0.f); };
 	const TArray<FWhoRow>& WhoRows()
 	{
 		static TArray<FWhoRow> W;
@@ -90,6 +90,12 @@ namespace
 					TArray<FString> P;
 					T.S(R, TEXT("Tint")).ParseIntoArrayWS(P);
 					if (P.Num() == 3) Row.Tint = FLinearColor(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2]));
+					// (2026-11-18) Scale and Skin, both optional
+					const FString Sc = T.S(R, TEXT("Scale"));
+					if (!Sc.IsEmpty()) Row.Scale = FMath::Clamp(FCString::Atof(*Sc), 0.5f, 2.f);
+					TArray<FString> Sk;
+					T.S(R, TEXT("Skin")).ParseIntoArrayWS(Sk);
+					if (Sk.Num() == 3) Row.Skin = FLinearColor(FCString::Atof(*Sk[0]), FCString::Atof(*Sk[1]), FCString::Atof(*Sk[2]), 1.f);
 					if (!Row.Key.IsEmpty()) W.Add(Row);
 				}
 		}
@@ -109,7 +115,7 @@ namespace JeebPeople
 		{
 			if (K.IsEmpty()) continue;
 			for (const FWhoRow& R : WhoRows())
-				if (R.Key.Equals(K, ESearchCase::IgnoreCase)) { Out.Model = R.Model; Out.Tint = R.Tint; Out.bFound = true; return Out; }
+				if (R.Key.Equals(K, ESearchCase::IgnoreCase)) { Out.Model = R.Model; Out.Tint = R.Tint; Out.Scale = R.Scale; Out.Skin = R.Skin; Out.bFound = true; return Out; }
 		}
 		return Out;
 	}

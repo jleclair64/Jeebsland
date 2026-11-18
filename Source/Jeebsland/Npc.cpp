@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "NpcBody.h"
+#include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
@@ -145,6 +146,7 @@ bool ANpc::BuildModel()
 	USkeletalMeshComponent* S = NewObject<USkeletalMeshComponent>(this);
 	S->SetupAttachment(BodyRoot);
 	S->SetRelativeRotation(FRotator(0.f, M->Yaw, 0.f));
+	if (Who.Scale > 0.f && Who.Scale != 1.f) S->SetRelativeScale3D(FVector(Who.Scale));   // (PeopleWho.csv Scale: the trolls are bigger)
 	S->SetSkeletalMesh(M->Mesh);
 	S->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	S->SetGenerateOverlapEvents(false);
@@ -160,6 +162,8 @@ bool ANpc::BuildModel()
 	{
 		D->SetVectorParameterValue(TEXT("Tint"), Who.Tint.R >= 0.f ? Who.Tint : OwnColour());
 		D->SetScalarParameterValue(TEXT("GarmentLum"), M->GarmentLum);
+		// (PeopleWho.csv Skin: the skin dyed too, where the model's material has a skin mask: the trolls' green-grey)
+		if (Who.Skin.A > 0.f) D->SetVectorParameterValue(TEXT("SkinTint"), FLinearColor(Who.Skin.R, Who.Skin.G, Who.Skin.B, 1.f));
 	}
 	if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(S->GetAnimInstance()))
 	{
@@ -650,3 +654,16 @@ namespace
 	} GPeopleLineup;
 }
 #endif
+
+// (2026-11-18 review: the name tag and quest mark floated over the new bodies) the top of the head of whatever body is shown
+float ANpc::HeadTopZ() const
+{
+	if (Body)
+		if (const USkeletalMesh* M = Body->GetSkeletalMeshAsset())
+		{
+			const FBoxSphereBounds B = M->GetImportedBounds();   // (the bind pose: arms out, so its top is the top of the head or hat)
+			return Body->GetComponentLocation().Z + (B.Origin.Z + B.BoxExtent.Z) * Body->GetComponentScale().Z;
+		}
+	const float Sz = GetActorScale3D().Z * (BodyRoot ? BodyRoot->GetRelativeScale3D().Z : 1.f);
+	return GetActorLocation().Z + 105.f * Sz;   // (the old shapes: where their name tag always sat, less its 15 cm)
+}

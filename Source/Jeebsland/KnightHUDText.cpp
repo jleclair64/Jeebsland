@@ -122,6 +122,7 @@ float AKnightHUD::TitleTextAt(const FString& TextIn, float X, float Y, float H, 
 	}
 	Total -= Spacing;
 	const float X0 = X >= 0.f ? X : (Canvas->ClipX - Total) * 0.5f;
+	if (X < 0.f) NoteTitle(Y + H * 1.3f, Alpha);   // (a screen title: the world's marks under it fade next frame)
 	const float Top = Y - Line * S * 0.185f;   // (the line's empty top)
 	const FLinearColor Ivory = H >= 24.f ? FLinearColor(0.98f, 0.93f, 0.80f, Alpha) : FLinearColor(1.f, 0.90f, 0.66f, Alpha);
 	const float Sh = FMath::Max(1.f, H * 0.045f);

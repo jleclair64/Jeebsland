@@ -1,6 +1,7 @@
 # Brings the stone bridge from Saved/KnightBuild/Bridge (made by bridge_clean.py) into /Game/Bridge (2026-11-18): the pictures, M_Bridge (a plain
 # painted-stone material, Nanite-ready), MI_Bridge and SM_Bridge (Nanite; no collision of its own: Bridge.cpp builds the walking surface).
 # Run by Tools\BuildBridge.ps1 in a windowless editor (this copy's editor closed).
+# (2026-11-18: run Tools/FixLookAssets.ps1 after this: it gives M_Bridge its warm Tint, set on MI_Bridge.)
 import os
 import unreal
 

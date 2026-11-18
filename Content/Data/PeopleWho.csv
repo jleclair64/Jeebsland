@@ -1,33 +1,36 @@
-Who,Model,Tint
+Who,Model,Tint,Scale,Skin
 # Who wears which body (People.csv) and the colour of their main garment (tunic, dress, robe, shirt or tabard), red green blue 0 to 1.
 # Who: a person's name as shown over their head (or its part before a comma), a quest giver's Key (QuestsPeople.csv), troll or wizard (Steele Creek's folk, also wizard:banker),
 # or a role: shopkeeper, blacksmith, banker, gateknight, villager0 to villager9 (the ten storytellers, Lore.h). The first match wins in that order.
-# Model "shapes": the old body built from simple shapes. Tint empty: the person's own colour from before (their tunic in the code, or QuestsPeople.csv Tunic).
+# Model "shapes": the old body built from simple shapes. Tint empty: the person's own colour from before (their tunic in the code, or QuestsPeople.csv Tint).
+# Tint is the garment's mean colour (linear, the shading kept): about 0.05-0.15 for a deep colour, 0.3-0.5 for a light one.
+# Scale (optional): the body's size, 1 as made. Skin (optional, red green blue like Tint): the skin dyed this colour, only on a model whose
+# material instance has a skin mask (MI_Smith so far, 2026-11-18): Steele Creek's trolls are the Smith body, bigger and green-grey.
 # No row at all: shopkeeper and villagers Townsman, blacksmith Smith, banker Banker, gate knights Guard, quest givers Townsman (Elder if their Hair is light).
-# Steele Creek's trolls keep the old shapes until a troll model exists (the roadmap's troll smiths).
-troll,shapes,
+troll,Smith,0.20 0.11 0.05,1.18,0.15 0.22 0.11
 # Blackrock: rich and cold
 shopkeeper,Townsman,0.12 0.30 0.16
 blacksmith,Smith,
 banker,Banker,0.07 0.10 0.16
 gateknight,Guard,0.42 0.05 0.05
-# the ten storytellers (Mabry, Tobin, Dame Orsolya, Garrick, Wren, Old Fenwick, Sable, Brother Ansel, Peregrine, Hettie)
-villager0,Elder,
-villager1,Townsman,
-villager2,Townswoman,
-villager3,Townsman,
-villager4,Townswoman,
-villager5,Townsman,
-villager6,Townswoman,
-villager7,Townsman,
-villager8,Townsman,
-villager9,Townswoman,
-# Oak Hill's quest givers (QuestsPeople.csv keys)
-Marta,Elder,
-Pell,Townsman,
-Nan,Elder,
+# the ten storytellers (Mabry, Tobin, Dame Orsolya, Garrick, Wren, Old Fenwick, Sable, Brother Ansel, Peregrine, Hettie): deep, cool town colours,
+# no two alike (2026-11-18 review: the beige ones read as clones)
+villager0,Elder,0.20 0.07 0.26
+villager1,Townsman,0.08 0.22 0.10
+villager2,Townswoman,0.32 0.05 0.08
+villager3,Townsman,0.08 0.12 0.26
+villager4,Townswoman,0.05 0.19 0.21
+villager5,Townsman,0.07 0.07 0.09
+villager6,Townswoman,0.06 0.09 0.30
+villager7,Townsman,0.36 0.22 0.06
+villager8,Townsman,0.33 0.07 0.20
+villager9,Townswoman,0.16 0.20 0.07
+# Oak Hill's quest givers (QuestsPeople.csv keys): poor and kind, warm earthy colours, each their own (2026-11-18)
+Marta,Elder,0.10 0.22 0.08
+Pell,Townsman,0.42 0.27 0.05
+Nan,Elder,0.36 0.08 0.07
 Corin,Guard,
-Wil,Townsman,
+Wil,Townsman,0.08 0.15 0.33
 # Steele Creek (SteeleCreekTown.cpp): wizards in the banker's robe, knights in the guard's mail and tabard
 wizard,Banker,
 Sir Dunmore,Guard,0.16 0.22 0.36

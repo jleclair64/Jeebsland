@@ -270,10 +270,13 @@ bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, b
 bool AKnightHUD::CloseBtn(float PX, float PY, float PW)
 {
 	UFont* Font = GEngine->GetMediumFont();
-	const float BX = PX + PW - 34.f, BY = PY + 6.f;
+	// well inside the panel's rounded corner (it sat half on the border before, review 2026-11-18)
+	const float BX = PX + PW - 44.f, BY = PY + 14.f;
 	const bool bOver = Over(BX, BY, 26.f, 26.f);
 	Tile(BX, BY, 26.f, 26.f, bOver ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.6f, 0.7f, 0.85f), bOver ? 0.6f : 0.26f);
-	HDText(TEXT("X"), FLinearColor::White, BX + 7.f, BY + 3.f, Font, 1.0f);
+	float TW = 0.f, TH = 0.f;
+	HDTextSize(TEXT("X"), TW, TH, Font, 1.0f);
+	HDText(TEXT("X"), FLinearColor::White, BX + (26.f - TW) * 0.5f, BY + (26.f - TH) * 0.5f, Font, 1.0f);
 	return bOver && bUIClick;
 }
 

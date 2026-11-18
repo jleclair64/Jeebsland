@@ -262,7 +262,15 @@ void AFoeCamps::Build()
 				UStaticMeshComponent* F = NewObject<UStaticMeshComponent>(this);
 				F->SetupAttachment(RootComponent);
 				F->SetStaticMesh(FlameMesh);
-				F->SetWorldTransform(FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + Size.Z * 0.55f), FVector(2.4f)));
+				// (review 2026-11-18: the flame floated 1.5-2 m over the logs) sit the flame's own bottom a little into the top of the
+				// wood, from both models' real bounds, and never taller than about 1.1 m
+				const FBox LogBox = Mesh->GetBoundingBox(), FlameBox = FlameMesh->GetBoundingBox();
+				const float FlameS = FMath::Min(2.4f, 110.f / FMath::Max(1.f, FlameBox.GetSize().Z));
+				const float WoodTop = Z + LogBox.Max.Z, WoodH = FMath::Max(1.f, LogBox.GetSize().Z);
+				const FVector FlameOff = FVector(FlameBox.GetCenter().X, FlameBox.GetCenter().Y, FlameBox.Min.Z) * FlameS;
+				const FVector LogMid = Xf.TransformPosition(FVector(LogBox.GetCenter().X, LogBox.GetCenter().Y, 0.f));
+				const FVector FlameTop(LogMid.X, LogMid.Y, WoodTop - 0.3f * WoodH);   // (where the flame's base sits)
+				F->SetWorldTransform(FTransform(FQuat::Identity, FlameTop - FlameOff, FVector(FlameS)));
 				F->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 				F->SetCastShadow(false);
 				F->SetCachedMaxDrawDistance(15000.f);
@@ -271,7 +279,9 @@ void AFoeCamps::Build()
 				Drawn.Add(F);
 				UPointLightComponent* L = NewObject<UPointLightComponent>(this);
 				L->SetupAttachment(RootComponent);
-				L->SetWorldLocation(FVector(P.X, P.Y, Z + 110.f));
+				L->SetWorldLocation(FlameTop + FVector(0.f, 0.f, 45.f));   // (just over the wood, in the flame)
+				UE_LOG(LogTemp, Log, TEXT("JEEBFOE camp %s fire: ground %.0f, wood top %.0f, flame base %.0f, flame scale %.2f (height %.0f cm)"),
+					*D.Key.ToString(), Z, WoodTop, FlameTop.Z, FlameS, FlameBox.GetSize().Z * FlameS);
 				L->SetIntensity(2600.f);
 				L->SetAttenuationRadius(800.f);
 				L->SetCastShadows(false);

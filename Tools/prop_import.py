@@ -1,5 +1,6 @@
 # Brings the props from Saved/KnightBuild/Props into /Game/Props (2026-11-05): one static mesh and one material instance each, on the shared M_Prop.
 # Run by Tools\BuildProps.ps1 in a windowless editor. M_Prop: the model's own pictures, except where the vertex colour's red says the tier's or the potion's colour goes (Tint).
+# (2026-11-18: re-importing the staff or wand puts MI_Staff / MI_Wand back on M_Prop: run Tools/FixLookAssets.ps1 after, for their glow.)
 import os
 import unreal
 

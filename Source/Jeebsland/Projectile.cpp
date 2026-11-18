@@ -118,7 +118,24 @@ void AProjectile::ApplyLaunch()
 		Head->SetRelativeLocation(FVector::ZeroVector);
 		Body->SetVisibility(false);
 		Fletch->SetVisibility(false);
-		Paint(Head, L.bPurple ? FLinearColor(2.6f, 0.5f, 3.f) : FLinearColor(0.6f, 1.5f, 3.2f));
+		// (2026-11-18 review: a flat pink disc) a glowing orb in the staff's and wand's gem colours: /Game/Props/M_GlowOrb, unlit and
+		// additive, white-hot at its heart and soft at its rim, with a small shadowless light; the old flat paint if it is missing
+		// (bPurple is the staff's bolt, named for its old paint: the staff's orb is cyan and the wand's crystal violet, so the bolts follow the gems)
+		const FLinearColor Gem = L.bPurple ? FLinearColor(0.22f, 0.82f, 1.f) : FLinearColor(0.62f, 0.22f, 1.f);
+		UMaterialInterface* OrbMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Props/M_GlowOrb.M_GlowOrb"));
+		if (OrbMat)
+		{
+			if (UMaterialInstanceDynamic* M = Head->CreateDynamicMaterialInstance(0, OrbMat)) M->SetVectorParameterValue(TEXT("Color"), Gem);
+			Head->SetCastShadow(false);
+		}
+		else Paint(Head, L.bPurple ? FLinearColor(2.6f, 0.5f, 3.f) : FLinearColor(0.6f, 1.5f, 3.2f));
+		Glow = NewObject<UPointLightComponent>(this);
+		Glow->SetupAttachment(Root);
+		Glow->SetLightColor(Gem);
+		Glow->SetIntensity(700.f);
+		Glow->SetAttenuationRadius(320.f);
+		Glow->SetCastShadows(false);
+		Glow->RegisterComponent();
 		return;
 	}
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);

@@ -28,7 +28,8 @@ namespace JeebPeople
 		UAnimSequence* Clips[3] = { nullptr, nullptr, nullptr };   // Idle, Walk, Talk
 	};
 	// Who wears what (PeopleWho.csv): Model (empty: the old shapes) and the garment's colour (a negative R: the role's own colour)
-	struct FWho { FString Model; FLinearColor Tint = FLinearColor(-1.f, 0.f, 0.f); bool bFound = false; };
+	// Scale: the body's size (1 as made); Skin: the skin's colour where the model has a skin mask (A 0: its own skin)
+	struct FWho { FString Model; FLinearColor Tint = FLinearColor(-1.f, 0.f, 0.f); float Scale = 1.f; FLinearColor Skin = FLinearColor(0.f, 0.f, 0.f, 0.f); bool bFound = false; };
 
 	bool Enabled();                          // jeeb.Npc.Models, and never on a dedicated server
 	int32 Setting();                         // the console variable's value (watched by every person to swap bodies live)

@@ -145,7 +145,9 @@ namespace JeebOakHill
 			// castle ruins, drawn at their own size (Scale 1: building_clean.py sized them). Their door (the fort's gate, the tower's door,
 			// the ruins' great arch) is on their +Y like the others. They stand on their plots without a level pad (FPlot bLevel false):
 			// ATownLabTown sets each on the lowest ground under its walls, its stone footing running into the slope
-			{ TEXT("OakHillFort"),        1.0f,  14.5f,  5.83f,  false, 90.f,  -709.6f, 709.8f, -286.4f, 282.8f },
+			// (the fort at 1.4x since the 2026-11-18 review: at 1.0 it read as a fenced pen beside the houses; now 20.3 x 8.2 m, its
+			// palisade about 4.6 m and its blockhouses 7.3 m. LenX/LenY are the drawn size, so the plan's spacing pass sees the real one)
+			{ TEXT("OakHillFort"),        1.4f,  20.3f,  8.16f,  false, 90.f,  -709.6f, 709.8f, -286.4f, 282.8f },
 			{ TEXT("OakHillWatchtower"),  1.0f,  5.3f,   5.31f,  false, 90.f,  -235.8f, 236.0f, -234.3f, 234.2f },
 			{ TEXT("OakHillRuins"),       1.0f,  19.0f,  10.24f, false, 90.f,  -892.1f, 913.5f, -493.7f, 490.7f },
 		};

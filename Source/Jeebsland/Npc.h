@@ -55,6 +55,9 @@ public:
 
 	ENpcRole GetRole() const { return Role; }
 	FString GetNpcName() const;
+	// World height (cm) of the top of the head of the body shown: a model's own height (its mesh bounds, at its scale), the old
+	// shapes' 105 cm over the actor (HUD only: name tags, quest marks and the E prompt sit a set distance above it)
+	float HeadTopZ() const;
 	bool OffersTrade() const { return Role == ENpcRole::Shopkeeper || Role == ENpcRole::Blacksmith || Role == ENpcRole::Banker; }
 	int32 SpeakerIdx() const;   // which storyteller this is (see Lore.h)
 	// What they say on this visit, one entry per click
