@@ -26,6 +26,10 @@ namespace JeebTownLab
 		{ TEXT("OakHillCornerHouse"), TEXT("/Game/TownLab/Buildings/SM_TL_CornerHouse"), 0.f, 0.f, 0.f },   // build-a: the corner house
 		{ TEXT("GeneralStore"), TEXT("/Game/TownLab/Buildings/SM_TL_MarketStall"), 0.f, 0.f, 0.f },   // build-c's rebuilt market stall
 		{ TEXT("PotionStall"), TEXT("/Game/TownLab/Buildings/SM_TL_PotionStall"), 0.f, 0.f, 0.f },    // build-c's rebuilt potion stall
+		// the war buildings (2026-11-18): only these models (no old /Game/Buildings one; the old town, -OldOakHill, gets their walls' box)
+		{ TEXT("OakHillFort"), TEXT("/Game/TownLab/War/SM_TL_Fort"), 0.f, 0.f, 0.f },
+		{ TEXT("OakHillWatchtower"), TEXT("/Game/TownLab/War/SM_TL_Watchtower"), 0.f, 0.f, 0.f },
+		{ TEXT("OakHillRuins"), TEXT("/Game/TownLab/War/SM_TL_Ruins"), 0.f, 0.f, 0.f },
 	};
 
 	// The rebuilt model's short name for an Oak Hill building model ("OakHillHouse" -> "TL_House", the name TownLabDecor.h files its

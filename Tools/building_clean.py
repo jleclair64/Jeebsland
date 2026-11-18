@@ -52,6 +52,12 @@ BUILDINGS = {
     # --hue 195,232 --sat 0.45,1 --val 0.3,0.95 --grow 6), repainted by building_palette.py "cottage", then its soft ramp of front steps
     # replaced by clean box steps (building_steps.py, owner: "the front stairs are weirdly smoothed over"). cm: 12.4 m tall as before.
     "StorybookCottage_300k":   dict(file="StorybookCottage_300k.glb",   cm=667.0, sink=15.0),
+    # Oak Hill's war buildings (2026-11-18, Meshy image-to-image then image-to-3D, Docs/TownBuildings.md), each its gate or door to -Y.
+    # The fort: 14.5 m long, so its gate is 2.3 m high and its palisade 3.3 m; the watchtower 5.3 m across its platform, 13 m to the
+    # roof's tip (door 2.3 m); the castle ruins 19 m long. Sunk deeper than the houses: they stand on unlevelled slopes (OakHill.h)
+    "OakHillFort_300k":        dict(file="OakHillFort_300k.glb",        length=1450.0, sink=40.0),
+    "OakHillWatchtower_300k":  dict(file="OakHillWatchtower_300k.glb",  length=530.0,  sink=35.0),
+    "OakHillRuins_300k":       dict(file="OakHillRuins_300k.glb",       length=1900.0, sink=60.0),
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them

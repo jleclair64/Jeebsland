@@ -165,7 +165,7 @@ void AOakHillTown::BuildBuildings()
 			M->RegisterComponent();
 		}
 		// Solid walls: a box over the model's footprint, a little inside its outline so porches, eaves and awnings can be walked under
-		FVector Lo, Hi;
+		FVector Lo(0.f, 0.f, 0.f), Hi(0.f, 0.f, 600.f);   // (a model missing here, the war buildings: TownLab only, a 6 m box over their walls)
 		if (Mesh) { const FBox Bx = Mesh->GetBoundingBox(); Lo = Bx.Min * Scale; Hi = Bx.Max * Scale; }
 		// (the walls follow the foundation measured at foot height, not the eaves, porches and chimney: the full bounds stay for the clutter)
 		FVector WLo = Lo * 0.86f, WHi = Hi * 0.86f;

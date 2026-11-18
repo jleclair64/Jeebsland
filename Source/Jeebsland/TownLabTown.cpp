@@ -274,13 +274,31 @@ void ATownLabTown::BuildBuildings()
 		if (bSwap && Pick.Scale > 0.f && bRealSite) UE_LOG(LogTemp, Warning, TEXT("JEEBOAK %s drawn at its own scale %.2f: its shop counter, grass footprint and chimney are measured on the old model's"), P.Model, Pick.Scale);
 		const FVector2D C = FromPx(P.Px, P.Py) + FVector2D(0.f, St.OffY);
 		const float Yaw = BuildingYaw(P, Mdl) + (bSwap ? Pick.YawAdd : 0.f);
-		const FVector At(C.X, C.Y, JeebTerrain::HeightAt(C.X, C.Y) + (bSwap ? Pick.Lift : 0.f));
+		float GroundZ = JeebTerrain::HeightAt(C.X, C.Y);
+		if (!P.bLevel && Mdl && Mdl->WX1 > Mdl->WX0)
+		{
+			// (the war buildings, 2026-11-18: no level pad under them, so each sits a quarter of the way up from the lowest ground under
+			// its walls to the highest; its stone footing (sunk 35-60 cm by building_clean.py) runs into the slope, no corner floats)
+			const float R0 = FMath::DegreesToRadians(BuildingYaw(P, Mdl)), Cs0 = FMath::Cos(R0), Sn0 = FMath::Sin(R0);
+			float Lo = 1.0e9f, Hi = -1.0e9f;
+			for (int32 a = 0; a <= 6; ++a) for (int32 b = 0; b <= 6; ++b)
+			{
+				const float Lx = FMath::Lerp(Mdl->WX0, Mdl->WX1, a / 6.f) * Mdl->Scale, Ly = FMath::Lerp(-Mdl->WY1, -Mdl->WY0, b / 6.f) * Mdl->Scale;
+				const float H = JeebTerrain::HeightAt(C.X + Lx * Cs0 - Ly * Sn0, C.Y + Lx * Sn0 + Ly * Cs0);
+				Lo = FMath::Min(Lo, H); Hi = FMath::Max(Hi, H);
+			}
+			GroundZ = Lo + 0.25f * (Hi - Lo);
+			UE_LOG(LogTemp, Log, TEXT("%s WAR %s ground under its walls %.0f to %.0f cm (%.0f cm of slope), set at %.0f"), Tag(), P.Name, Lo, Hi, Hi - Lo, GroundZ);
+		}
+		const FVector At(C.X, C.Y, GroundZ + (bSwap ? Pick.Lift : 0.f));
 		const FString Asset = AssetName(P.Model);
 		FString Path = FString::Printf(TEXT("/Game/Buildings/SM_%s"), *Asset), ColPath = Path + TEXT("_Col");
 		if (bSwap) { Path = Pick.Mesh; ColPath = LoadMesh(Pick.Mesh + TEXT("_Col")) ? Pick.Mesh + TEXT("_Col") : ColPath; ++Rebuilt; }
 		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw);
 		const FTransform Xf(FRotator(0.f, Yaw, 0.f), At, FVector(Scale, Scale, ScaleZ));
-		if (!bServer && !bNoMeshes)
+		static const bool bNoWar = TestOff(TEXT("NoWarBuildings"));   // (frame-cost runs only, -JeebShot: the war buildings' meshes left out, their walls kept)
+		const bool bWar = FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillRuins")) == 0;
+		if (!bServer && !bNoMeshes && !(bNoWar && bWar))
 			if (UStaticMesh* Mesh = LoadMesh(Path))
 			{
 				// One plain component per building: Nanite draws every Nanite mesh in one pass whatever the count, so instancing buys
@@ -412,7 +430,7 @@ void ATownLabTown::BuildBuildings()
 		HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, Yaw); HashIn(Hash, Scale); HashIn(Hash, ScaleZ);
 		++Placed;
 		// (the stones and shrubs at the foundations, as the old town had them: not the open stalls or the well)
-		if (Mdl && Mdl->WX1 > Mdl->WX0 && !IsStall(P.Model) && FCString::Strcmp(P.Model, TEXT("OakHillWell")) != 0)
+		if (Mdl && Mdl->WX1 > Mdl->WX0 && !IsStall(P.Model) && FCString::Strcmp(P.Model, TEXT("OakHillWell")) != 0 && FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) != 0)   // (the round tower: no square of stones round it)
 		{
 			FVector WLo = FVector(Mdl->WX0, -Mdl->WY1, 0.f) * Scale, WHi = FVector(Mdl->WX1, -Mdl->WY0, 0.f) * Scale;
 			// a swapped model: its own walls, from its solid shape (else the whole model), a little inside the eaves
