@@ -27,8 +27,16 @@ When the owner says goodbye or goodnight, first ask if they'd like you to commit
 
 ## Current state (2026-11-18)
 
+- **2026-11-18 daytime batch (built by agents on free rein while the owner was at work; all merged, built for editor and Shipping, pushed; the owner has seen none of it; details in ProjectNotes "The 2026-11-18 daytime batch", how to try each in HowToTest's last table):**
+  - Quests: five Oak Hill quest givers, eight quests in `Content/Data/Quests*.csv`, a log (J), tracker and map marker. A first draft to rewrite: the owner had wanted to plan the first quests together.
+  - Bandits: four forest camps round Oak Hill (Cutpurse, Bruiser, Red Hal), loot and XP, two quests from Captain Corin; numbers in `Foes.csv`. No archer.
+  - Steele Creek, the second town (southwest; `-StartAtSteele`, `jeeb.Test.GoSteele`); fast travel between visited towns from the map; the stone bridge on Oak Hill's west road with a road from Blackrock's east gate; Oak Hill's two forts, watchtower and castle ruins.
+  - Townsfolk are six animated Meshy characters (`jeeb.Npc.Models 0` = old boxes); eight emotes (chat commands, B wheel); new staff and wand models with proper casts; forest tree nodes spawn only near players; spawn spots spread on Oak Hill's plaza.
+  - Reviewed once by all five reviewers on the combined build (online with a server and two clients, performance, package, visual, motion); their fails were fixed, the fixes were NOT re-reviewed. Meshy: about 630 credits spent, about 990 left.
+  - Not done or not verified: the packaged game was never driven past its start screen; nothing tried on a second machine; bandits in a fight not frame-timed; walking east over the bridge from a standstill logged 3 position corrections online (unexplained); a quest reward of several item types can lose one to a full pack (none exists yet); Steele's trees can't be chopped; trolls have no model of their own.
+  - Stray folders agents made outside the project and could not remove: `C:\Saved\BridgeWork`, `C:\tiles` (owner to delete).
 - **2026-11-17/18 batch (all merged, built, pushed; owner to judge live):**
-  - The forest's and Oak Hill's pack trees are choppable (`AOakTreeNode`, OakForest.cpp): oaks/aspens give oak logs, spruces pine logs; a felled tree hides with its shadow, leaves a stump, grows back. Only falls with `UnlimitedNodes=False` (still True for testing). Cost: the forest build takes 0.4-1.2 s longer (5,610 node actors; lazy spawning would fix it).
+  - The forest's and Oak Hill's pack trees are choppable (`AOakTreeNode`, OakForest.cpp): oaks/aspens give oak logs, spruces pine logs; a felled tree hides with its shadow, leaves a stump, grows back. Only falls with `UnlimitedNodes=False` (still True for testing). Their nodes now spawn only near players (2026-11-18).
   - Shields sit on the forearm plate (`jeeb.Knight.ShieldSnug`); kite/round lie 25-30 degrees off the forearm's line seen from above (turn them in `ShieldAtGuard` if it still reads as floating).
   - Mail no longer through the thighs in the bow draw, and no grey mail spikes from his sides (`Tools/knight_under_export.py`).
   - Water no longer ghosts on HIGH (TSR motion vectors). Night: sun 41 degrees at noon to -25 at midnight, moonlight, `jeeb.Night.*` sliders. Stars behind clouds. Lantern fixed. Grass colour line fixed. PlantClump bushes removed. Many slider defaults from the owner's "Default Sliders" preset (Sun.Phase always skipped).
@@ -44,9 +52,9 @@ When the owner says goodbye or goodnight, first ask if they'd like you to commit
 - **Look tools the owner approved (2026-11-15), to settle the art style before adding lots of content:** (1) a look board: about 12 fixed views (meadow, forest edge, plaza, street, river, a building and an item close up; noon and low sun) rendered into one contact sheet beside the owner's reference pictures after every look change; (2) an in-game look panel in the Escape screen with sliders for the `jeeb.*` look settings and saved presets; (3) one shared palette file read by grass, ground, buildings, water, tree tints and sky. Not started.
 - **Oak Hill fill (merged 2026-11-16, owner to judge live):** `AWorldFill` (Fill.cpp; Docs/FillPlan.md) places 1949 TownDecor props from `Content/Data/Fill*.csv` in Oak Hill, Blackrock and the square. It's deterministic, with the same hash on server and clients, and passed its frame-cost, online and package reviews. FillTrees.csv's tree spots now hold the pack trees (AOakForest). The graveyard uses stone posts as headstones (no headstone model yet). Open world: off for now.
 - **Owner's direction (2026-11-15):** settle the art style first, then add content; play the real game more often, keep fewer pieces of work in flight, and weigh upcoming work toward gameplay (quests, PvP) alongside polish.
-- **Reminders each session until done:** Mixamo emotes; new models for staffs and wands; weekly copy of `Saved/Accounts` and `Saved/Characters` to the owner's Google Drive (dated folder).
+- **Reminders each session until done:** weekly copy of `Saved/Accounts` and `Saved/Characters` to the owner's Google Drive (dated folder).
 - **TEMPORARY test settings** to remove before real play (details in ProjectNotes): the Test kit, `StartAtOakHill`, `[Jeebsland.Testing]` level-99 accounts, `FillPracticePack()`, `UnlimitedNodes=True`, `UnlimitedArrows=True` (both ship in packages), potion cooldowns at 10 s, `ASmokeCloud`, the sample tree groves east of Oak Hill (`jeeb.Test.Groves`, off by default since 2026-11-16, `TreeGroves.cpp`; non-Shipping only), the test horse beside the Oak Hill start (`jeeb.Test.Horse`; single player, non-Shipping only).
-- **Known:** deaths and new players still go to Blackrock, not Oak Hill; nothing recent tested online with two machines or in a package.
+- **Known:** nothing recent tested online with two machines or played in a package.
 
 ## Working rules
 
