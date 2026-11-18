@@ -171,6 +171,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		}), 0.9f, false);
 	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
+	if (Move == TEXT("cast")) StartAttack(EAtkStyle::Cast, 1, 0.f);                           // the wand's or staff's cast (-ShotKind=7 wand, 8 staff)
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("kick")) StartAttack(EAtkStyle::Kick, 1, 0.f);                             // the kick (wheel up)
 	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down: shelved 2026-11-15, owner; the wheel rolls now)

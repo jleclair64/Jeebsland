@@ -87,6 +87,10 @@ PROPS = {
                                    or (_seg_d(p, (-0.378, -0.792), (0.065, 0.0)) < 0.03 and (abs(p[1]) > 0.13 or p[2] > 0.135)) or (0.0 < p[0] < 0.13 and abs(p[1]) <= 0.03 and p[2] > 0.15),
                      marks={"TipR": ((-0.46, 0.78, -0.3), (-0.36, 0.92, 0.3)), "TipL": ((-0.46, -0.92, -0.3), (-0.36, -0.78, 0.3)), "Nut": ((0.02, -0.03, 0.0), (0.12, 0.03, 0.3)),
                             "Stirrup": ((-0.96, -0.1, -0.3), (-0.85, 0.1, 0.3))}),
+    # Wizard staff and wand (2026-11-18, Meshy meshy-6 from a picture; Art/Props/Originals/*_Tilted.glb, stood upright by Tools/prop_upright.py): the orb
+    # (cyan, violet) is saturated so it keeps its own colour; the steel (ferrule, bands, crown, caps) takes the tier. The orb end is game -Z.
+    "Staff":    dict(file="Staff.glb", axes=("X", "-Y", "-Z"), length=165.0, grip=("Z", 0.78), girth=1.12, rg=lambda co, c: (1.0 if (_grey(c) and (co - Vector((0.0, 0.0, -117.3))).length > 8.5 and not -21.0 < co.z < 1.0) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=7000, bake=True),
+    "Wand":     dict(file="Wand.glb", axes=("X", "-Y", "-Z"), length=52.0, grip=("Z", 0.83), girth=1.3, rg=lambda co, c: (1.0 if (_grey(c) and co.z > -38.5 and not -2.2 < co.z < 5.5) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=5000, bake=True),
     "Sword":    dict(file="Sword.glb", axes=("Y", "X", "-Z"), length=92.0, grip=("Z", 0.890), mask="grey", clean=True, reduce=8000, stretch=("Z", 1.0, 6.0),
                      marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
     "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -58.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,
@@ -685,6 +689,10 @@ for name in names:
     for i, sh_ in enumerate(P.get("pivot", (None, None, None))):   # (shields: the origin at these shares of the box, 0 = low side, 1 = high side)
         if sh_ is not None: g[i] = lo[i] + (hi[i] - lo[i]) * sh_
     for v in me.vertices: v.co = (v.co - g) * S
+    if "girth" in P:   # (2026-11-18, staff and wand: a little bolder than life; x the width and depth about the long axis through the grip)
+        for v in me.vertices:
+            for i_ in range(3):
+                if i_ != li: v.co[i_] *= P["girth"]
     # one gentle arc along the long axis: take out the stave's own bends, tips toward +axis
     if "bend" in P:
         bi = IDX[P["bend"][0]]; depth = P["bend"][1]
