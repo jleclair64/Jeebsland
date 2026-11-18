@@ -389,3 +389,13 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Anything created lazily from replicated state must be initialised from the current replicated state when it is created, not only when the state next changes.
 - When a state is meant to be interrupted by "any hit", hook the hit itself (`Hurt`), not a derived flag that only some hits set.
 - A reward-fits check must test the whole reward together, or the quest must not complete.
+
+## Lessons from the 2026-11-18 daytime batch (second round)
+- A "N corrections on the deck" finding needs a flat-ground control run in the same test before it is blamed on the location, because a movement-start mismatch looks identical.
+- When a clip blends back to a procedural carry, check the hand-to-grip gap in the resting frames from the front, and make the first frame of the cast match the carry pose, otherwise the blend pops.
+- Any walking brain that detours around obstacles must derive its facing from the step it actually takes (or stop and turn when the detour exceeds a limit), not only from the wanted heading.
+- A glow made only of a white-hot core needs a cap on emissive strength, and must be checked at its smallest on-screen size, day and night. A colour that clips to white reads as "no colour".
+- A skin dye must be judged next to a human-skin character at close range; a saturated green on a human face reads as paint, not a creature.
+- When a placed building changes scale, re-run every clearing pass (trees, fill props, grass) against the new footprint, and verify it from above.
+- "Inside a forest town" needs a visible canopy from the aerial and the road in: count and size the trees, then look at the shot, not only the log count.
+- Test tools: `Tools/ShotViews.ps1` crops for 2560 px frames but off-screen runs render 1280; `-abslog` with a path containing spaces can silently write no log; `jeeb.Test.Walk` stops the knight after under a second in MoveLab. Fix these before the next motion or visual review.
