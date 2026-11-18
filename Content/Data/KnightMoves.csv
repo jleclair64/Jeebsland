@@ -50,3 +50,11 @@ ClimbOnto,LedgeUp,0.3,0,0,1.13,2,0.15,0,0
 SwimTread,TreadWater,0,0,0,3.0,2,0.5,0,0
 Swim,Swimming,0,320,0,2.25,2,0.5,0,0
 SwimFast,Swimming,0,513,0,2.25,2,0.5,0,0
+Emote_Wave,EmoteWave,0,0,0,0.533,2,0.3,0,0
+Emote_Bow,EmoteBow,0,0,0,2.733,2,0.3,0,0
+Emote_Cheer,EmoteCheer,0,0,0,2.9,2,0.3,0,0
+Emote_Clap,EmoteClap,0,0,0,1.167,2,0.3,0,0
+Emote_Dance,EmoteDance,0,0,0,5.433,2,0.35,0,0
+Emote_Sit,EmoteSit,0,0,0,10.867,2,0.8,0,0
+Emote_Point,EmotePoint,0,0,0,3.6,2,0.3,0,0
+Emote_Salute,EmoteSalute,0,0,0,2.833,2,0.3,0,0

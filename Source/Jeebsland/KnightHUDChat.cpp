@@ -122,7 +122,8 @@ void AKnightHUD::SubmitChat()
 			const TArray<FString> M = JeebChat::LocalMuteList();
 			ChatNote(M.Num() == 0 ? FString(TEXT("You have not muted anyone.")) : TEXT("Muted: ") + FString::Join(M, TEXT(", ")));
 		}
-		else ChatNote(TEXT("Chat: just type to talk to people nearby. /w message = tell the whole world. /mute Name, /unmute Name, /mutelist."));
+		else if (EmoteChat(Cmd)) {}   // (/wave, /sit ... and /emotes: KnightHUDEmotes.cpp)
+		else ChatNote(TEXT("Chat: just type to talk to people nearby. /w message = tell the whole world. /mute Name, /unmute Name, /mutelist. /emotes lists the emotes."));
 		return;
 	}
 	KPC->ServerChat(Said, false);

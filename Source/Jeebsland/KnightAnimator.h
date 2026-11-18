@@ -179,7 +179,9 @@ namespace JeebAnim
 		uint8 SwimMode = 0;
 		float SwimDepth = 0.f, SwimSpeed = 0.f, SwimVz = 0.f;
 		bool bSwimUnder = false;    // his head under water
-		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0; }   // (weapon and shield on his back)
+		// an emote (2026-11-18, JeebEmotes.h): its id (0 none), seconds into it, and whether it puts the weapon and shield on his back
+		uint8 Emote = 0; float EmoteT = 0.f; bool bEmoteStow = false;
+		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0 || (Emote != 0 && bEmoteStow); }   // (weapon and shield on his back)
 	};
 }
 
@@ -253,6 +255,9 @@ private:
 	const TMap<FString, JeebAnim::FMove>& Moves;
 	const FClip* Get(const TCHAR* Name) const { return L.Find(Name); }
 	void Sample(const FClip& C, float T, FPose& Out, bool bLoop) const { L.Sample(C, T, Out, bLoop); }
+	// emotes (2026-11-18, KnightAnimatorEmote.cpp): keys 100 + the emote's id
+	void EmotePlay(int32 Key, const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	float EmotePrevT = 0.f, EmoteRestSole = -1.f;
 	float PhaseTime(const FClip& C, float P) const { return L.PhaseTime(C, P); }
 	void Accum(const FPose& P, float W, FPose& Sum, float& SumW) const { L.Accum(P, W, Sum, SumW); }
 	void Finish(FPose& Sum, float SumW) const { L.Finish(Sum, SumW); }

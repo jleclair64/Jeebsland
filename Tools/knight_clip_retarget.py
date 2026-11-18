@@ -16,7 +16,7 @@ P = "mixamorig:"
 #   ground  feet on the floor: the hips' travel along the ground is removed, height kept, the lowest foot put on the floor
 #   air     the capsule carries him up and down: the hips' height stays at its first frame's as well (jump and fall clips)
 #   floor   the body goes down to the ground (knockdowns, get-ups, rolls): as ground, but no foot levelling
-MODE = {"JumpUp": "air", "FallIdle": "air", "Jump_SS": "air", "RunJump_SS": "air", "JumpUp2": "air", "ForwardJump": "air", "ClimbLadder": "air", "SlideHold": "floor", "SitChair": "floor",
+MODE = {"JumpUp": "air", "FallIdle": "air", "Jump_SS": "air", "RunJump_SS": "air", "JumpUp2": "air", "ForwardJump": "air", "ClimbLadder": "air", "SlideHold": "floor", "SitChair": "floor", "EmoteSit": "floor",
         "KnockBack": "floor", "SweepFall": "floor", "FallDown": "floor", "Stunned": "floor", "GetUpBack": "floor", "GetUpStomach": "floor", "GetUp": "floor",
         "KipUp": "floor", "StandBack": "floor", "StandRoll": "floor", "SprintRoll": "floor", "QuickRoll": "floor", "DeathBack": "floor", "DeathFwd": "floor",
         # (2026-11-12, free climbing) "wall": the hips' straight-line travel comes out in every direction (up the wall too), no foot put on the floor.
