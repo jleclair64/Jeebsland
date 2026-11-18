@@ -11,6 +11,7 @@
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
 
@@ -436,17 +437,31 @@ void ANpc::Tick(float DeltaSeconds)
 	}
 	const bool bNear = DistToPlayer < 650.f;
 	float Walk = 0.f;
+	bool bTurnOnSpot = false;   // (turning onto the next leg of the beat before walking it)
 
 	// Anyone with a beat (the gate knight, the villagers) walks it slowly and stops to talk
-	if (Patrol.Num() > 1 && !bTalking && DistToPlayer > (Role == ENpcRole::Villager ? 260.f : 650.f))
+	if (Patrol.Num() > 1 && !bTalking && DistToPlayer > (TestWalkNear >= 0.f ? TestWalkNear : Role == ENpcRole::Villager ? 260.f : 650.f))
 	{
-		if (PauseT > 0.f) PauseT -= DeltaSeconds;
+		const FVector2D P(Me.X, Me.Y);
+		const FVector2D Target = Patrol[PatrolIdx % Patrol.Num()];
+		const FVector2D To = Target - P;
+		const float LegYaw = FVector(To.X, To.Y, 0.f).Rotation().Yaw;
+		if (PauseT > 0.f)
+		{
+			// (2026-11-18, motion review: at a corner they used to set off at full speed while still turning, walking sideways or backwards
+			// for over a second. They turn toward the next leg during the pause, and walk only once facing within 30 degrees of it.)
+			PauseT -= DeltaSeconds;
+			if (!To.IsNearlyZero()) HomeYaw = LegYaw;
+		}
 		else
 		{
-			const FVector2D P(Me.X, Me.Y);
-			const FVector2D Target = Patrol[PatrolIdx % Patrol.Num()];
-			const FVector2D To = Target - P;
 			if (To.Size() < 60.f) { ++PatrolIdx; PauseT = (Role == ENpcRole::Villager) ? FMath::FRandRange(2.f, 7.f) : 4.f; StuckT = 0.f; }
+			else if (FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, LegYaw)) > 30.f)
+			{
+				SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, LegYaw, 0.f), DeltaSeconds, 120.f));
+				HomeYaw = LegYaw;
+				bTurnOnSpot = true;
+			}
 			else
 			{
 				const FVector2D Dir = To.GetSafeNormal();
@@ -472,10 +487,15 @@ void ANpc::Tick(float DeltaSeconds)
 
 	// Turn to face you when you are close, otherwise back to their own direction
 	const float WantYaw = bNear ? FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw : HomeYaw;
-	if (Walk < 0.5f)
+	if (Walk < 0.5f && !bTurnOnSpot)
 	{
 		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : 70.f));
 	}
+
+	// The head's turn toward you: up to 55 degrees, and back to straight ahead as you go round behind them (2026-11-18, motion review: the
+	// clamp on a signed angle flipped from +55 to -55 as you crossed behind, a 110-degree whip in 0.4 s). By the size of the angle, so it
+	// is the same either side and nothing wraps; NpcBody and the head below still ease it.
+	auto HeadWant = [](float Rel) { return FMath::Clamp(Rel, -55.f, 55.f) * (1.f - FMath::SmoothStep(95.f, 125.f, FMath::Abs(Rel))); };
 
 	// A skinned body (NpcBody.h): idle, walk (its feet kept to the ground's speed) or talk, the head following you a little
 	if (Body)
@@ -488,7 +508,17 @@ void ANpc::Tick(float DeltaSeconds)
 		const int32 State = bTalking ? 2 : (WalkBlend > 0.35f ? 1 : 0);
 		const float Rate = FMath::Clamp(MoveSpeed / (ModelDef->WalkSpeed * GetActorScale3D().X), 0.4f, 2.f);
 		if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(Body->GetAnimInstance()))
-			A->Drive(State, Rate, (bNear && State != 1) ? FMath::Clamp(Rel, -55.f, 55.f) : 0.f);
+			A->Drive(State, Rate, (bNear && State != 1) ? HeadWant(Rel) : 0.f);
+#if !UE_BUILD_SHIPPING
+		static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("PeopleLog"));   // (test: JEEBNPCMOVE ten times a second)
+		if (bLog && !TestModel.IsEmpty() && FMath::FloorToInt(AnimT * 10.f) != FMath::FloorToInt((AnimT - DeltaSeconds) * 10.f))
+		{
+			const FVector2D Leg = Patrol.Num() > 1 ? Patrol[PatrolIdx % Patrol.Num()] - FVector2D(Now.X, Now.Y) : FVector2D::ZeroVector;
+			const float LegOff = Leg.IsNearlyZero() ? 0.f : FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(Leg.X, Leg.Y, 0.f).Rotation().Yaw);
+			UE_LOG(LogTemp, Log, TEXT("JEEBNPCMOVE %s t %.1f yaw %.0f speed %.0f state %d legoff %.0f turnspot %d pause %.1f rel %.0f headwant %.0f dist %.0f"),
+				*TestModel, AnimT, GetActorRotation().Yaw, Moved, State, LegOff, bTurnOnSpot ? 1 : 0, PauseT, Rel, (bNear && State != 1) ? HeadWant(Rel) : 0.f, DistToPlayer);
+		}
+#endif
 		BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -92.f - ModelDef->WalkSink * WalkBlend));
 		// a shadow only within 30 m of the player (the far ones cost the most and show the least)
 		const bool bShadow = DistToPlayer < 3000.f;
@@ -500,7 +530,7 @@ void ANpc::Tick(float DeltaSeconds)
 	if (HeadPivot)
 	{
 		const float Rel = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw);
-		const float Yaw = bNear ? FMath::Clamp(Rel, -55.f, 55.f) : 0.f;
+		const float Yaw = bNear ? HeadWant(Rel) : 0.f;
 		HeadPivot->SetRelativeRotation(FMath::RInterpTo(HeadPivot->GetRelativeRotation(), FRotator(0.f, Yaw, 0.f), DeltaSeconds, 5.f));
 	}
 
@@ -531,8 +561,8 @@ void ANpc::Tick(float DeltaSeconds)
 }
 
 #if !UE_BUILD_SHIPPING
-// (test pictures, 2026-11-18: -PeopleLineup=<yaw> puts one of each body in a row 9 m in front of where the knight starts, facing <yaw>
-// (180 toward him); -PeopleWalk sends them back and forth 6 m toward -X; -PeopleTalk holds them in the talk; -PeopleModels=A,B,... picks the bodies)
+// (test pictures, 2026-11-18: -PeopleLineup=<yaw> puts one of each body in a row in front of the knight (-PeopleAtX, 450 cm), facing <yaw>
+// (180 toward him); -PeopleWalk sends them back and forth across his view (see below); -PeopleTalk holds them in the talk; -PeopleModels=A,B,... picks the bodies)
 namespace
 {
 	struct FPeopleLineup
@@ -567,31 +597,53 @@ namespace
 					});
 				float Yaw = 0.f;
 				if (!FParse::Value(FCommandLine::Get(), TEXT("PeopleLineup="), Yaw)) return;
+				// (2026-11-18, motion review: the row was placed at fixed world spots, so MoveLab showed nobody and the Field's people stood far
+				// off. Now it is placed from wherever the knight is, 1 s after play starts: PeopleAtX ahead of him (default 450 cm), PeopleAtY to
+				// his right, on the ground under each spot; Yaw is from the knight's own facing (180 faces him). -PeopleWalk sends each one back
+				// and forth across his view (-PeopleWalkLen=<cm>, 500), so every turn at the ends is a 180-degree corner, and they keep walking
+				// while the knight is further than -PeopleWalkNear=<cm> (100) away.)
 				W->OnWorldBeginPlay.AddLambda([W, Yaw]()
 				{
-					FString List = TEXT("Townsman,Townswoman,Elder,Smith,Banker,Guard");
-					FParse::Value(FCommandLine::Get(), TEXT("PeopleModels="), List, false);
-					TArray<FString> Names;
-					List.ParseIntoArray(Names, TEXT(","));
-					const bool bWalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleWalk")), bTalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleTalk"));
-					float X0 = 900.f, Y0 = 0.f;
-					FParse::Value(FCommandLine::Get(), TEXT("PeopleAtX="), X0);
-					FParse::Value(FCommandLine::Get(), TEXT("PeopleAtY="), Y0);
-					for (int32 i = 0; i < Names.Num(); ++i)
+					FTimerHandle H;
+					W->GetTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([W, Yaw]()
 					{
-						const float Y = Y0 + (i - (Names.Num() - 1) * 0.5f) * 170.f;
-						FActorSpawnParameters SP;
-						SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-						const float Gz = W->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(X0, Y);
-						ANpc* N = W->SpawnActor<ANpc>(FVector(X0, Y, Gz + 92.f), FRotator(0.f, Yaw, 0.f), SP);
-						if (!N) continue;
-						N->TestModel = Names[i];
-						FNpcLook L; L.Name = Names[i];
-						N->SetupPerson(FName(*(TEXT("Lineup") + Names[i])), L);
-						if (bWalk) N->SetPatrol({ FVector2D(X0, Y), FVector2D(X0 - 600.f, Y) });
-						if (bTalk) N->SetTalking(true);
-						UE_LOG(LogTemp, Log, TEXT("JEEBPEOPLE lineup %s at %.0f,%.0f"), *Names[i], X0, Y);
-					}
+						FString List = TEXT("Townsman,Townswoman,Elder,Smith,Banker,Guard");
+						FParse::Value(FCommandLine::Get(), TEXT("PeopleModels="), List, false);
+						TArray<FString> Names;
+						List.ParseIntoArray(Names, TEXT(","));
+						const bool bWalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleWalk")), bTalk = FParse::Param(FCommandLine::Get(), TEXT("PeopleTalk"));
+						float X0 = 450.f, Y0 = 0.f, WalkLen = 500.f, WalkNear = 100.f;
+						FParse::Value(FCommandLine::Get(), TEXT("PeopleAtX="), X0);
+						FParse::Value(FCommandLine::Get(), TEXT("PeopleAtY="), Y0);
+						FParse::Value(FCommandLine::Get(), TEXT("PeopleWalkLen="), WalkLen);
+						FParse::Value(FCommandLine::Get(), TEXT("PeopleWalkNear="), WalkNear);
+						const APawn* Me = UGameplayStatics::GetPlayerPawn(W, 0);
+						const FVector Base = Me ? Me->GetActorLocation() : FVector(0.f, 0.f, JeebTerrain::HeightAt(0.f, 0.f) + 92.f);
+						const FRotator Face(0.f, Me ? Me->GetActorRotation().Yaw : 0.f, 0.f);
+						const FVector Fwd = Face.Vector(), Right = FRotationMatrix(Face).GetUnitAxis(EAxis::Y);
+						for (int32 i = 0; i < Names.Num(); ++i)
+						{
+							const FVector Spot = Base + Fwd * X0 + Right * (Y0 + (i - (Names.Num() - 1) * 0.5f) * 170.f);
+							FHitResult Hit;
+							FCollisionQueryParams Q(SCENE_QUERY_STAT(PeopleLineup), false, Me);
+							const float Gz = W->LineTraceSingleByChannel(Hit, FVector(Spot.X, Spot.Y, Base.Z + 300.f), FVector(Spot.X, Spot.Y, Base.Z - 1500.f), ECC_Visibility, Q) ? float(Hit.ImpactPoint.Z) : float(Base.Z) - 90.f;
+							FActorSpawnParameters SP;
+							SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+							ANpc* N = W->SpawnActor<ANpc>(FVector(Spot.X, Spot.Y, Gz + 92.f), FRotator(0.f, Face.Yaw + Yaw, 0.f), SP);
+							if (!N) continue;
+							N->TestModel = Names[i];
+							FNpcLook L; L.Name = Names[i];
+							N->SetupPerson(FName(*(TEXT("Lineup") + Names[i])), L);
+							if (bWalk)
+							{
+								const FVector End = Spot - Right * WalkLen;
+								N->SetPatrol({ FVector2D(Spot.X, Spot.Y), FVector2D(End.X, End.Y) });
+								N->TestWalkNear = WalkNear;
+							}
+							if (bTalk) N->SetTalking(true);
+							UE_LOG(LogTemp, Log, TEXT("JEEBPEOPLE lineup %s at %.0f,%.0f,%.0f (knight at %.0f,%.0f facing %.0f)"), *Names[i], Spot.X, Spot.Y, Gz, Base.X, Base.Y, Face.Yaw);
+						}
+					}), 1.f, false);
 				});
 			});
 		}

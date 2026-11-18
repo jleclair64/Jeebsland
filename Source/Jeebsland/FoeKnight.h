@@ -148,6 +148,8 @@ private:
 	TWeakObjectPtr<AKnightCharacter> Target, LastAttacker;
 	float LastAttackT = -100.f, LostT = 0.f, SenseT = 0.f, StuckT = 0.f, DownFor = 0.f, LastHurtT = -100.f;
 	float StepSide = 1.f;                  // the way he steps round something in his path, kept until it is clear
+	double StepSideAt = -10.0;             // (when StepSide last changed: it holds for StepSideHold, 0.6 s, so he never jitters left-right against a trunk)
+	float StrollWorst = 0.f, StrollTurnT = 0.f;   // (test log -LogStroll: the worst heading-vs-step angle on this stroll leg, and how long he turned on the spot first)
 	float RegenAcc = 0.f;              // (health coming back at camp, a point at a time)
 	bool bSleeping = false;
 	void SetMind(EMind M, const TCHAR* Why);

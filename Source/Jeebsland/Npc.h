@@ -48,6 +48,7 @@ public:
 	FName GetPersonKey() const { return PersonKey; }
 	bool IsQuestGiver() const { return Role == ENpcRole::QuestGiver; }
 	FString TestModel;   // (test pictures only, -PeopleLineup: this body whoever they are)
+	float TestWalkNear = -1.f;   // (test pictures only, -PeopleWalk: they keep walking their beat while the knight is further than this, cm)
 	// Steele Creek's people (2026-11-18), set before Setup: Folk 0 townsfolk and knights as before, 1 a troll, 2 a wizard; a name
 	// and a first greeting of their own (empty: the role's)
 	void SetFolk(uint8 InFolk, const FString& InName, const FString& InHello) { Folk = InFolk; NameOverride = InName; FirstHello = InHello; }
