@@ -33,6 +33,12 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> Aerial(TEXT("jeeb.Look.Aerial"), 18.3529f, TEXT("Sky atmosphere aerial perspective distance scale: far hills fade toward the sky's blue (engine default 1)"));
 	static TAutoConsoleVariable<float> HazeBlue(TEXT("jeeb.Look.HazeBlue"), 0.85f, TEXT("0: the old warm grey height fog; 1: a soft blue-grey haze at noon, a warm peach-lilac at the low sun"));
 	static TAutoConsoleVariable<float> HazeStart(TEXT("jeeb.Look.HazeStart"), 1238.24f, TEXT("Height fog start distance in cm (was 600): the town around you stays clear"));
+	// (2026-11-17, owner: "why does the distant horizon glow grey at sunset?") The height fog's colour glows by itself: it was the
+	// same light at sunset as at noon, while the exposure lifts about 2.5 stops at sunset, so far hills and forest showed a pale
+	// grey-white haze ~6x brighter than noon's over a dark land. Now it dims with the light on the land (and with the exposure
+	// lift), and takes on the low sun's colour. Noon is unchanged.
+	static TAutoConsoleVariable<float> HazeFollow(TEXT("jeeb.Look.HazeFollow"), 1.f, TEXT("How far the haze's brightness follows the daylight at the low sun and sunset: 0 the old fixed glow (pale grey at sunset), 1 dims with the light on the land. Noon is the same either way"));
+	static TAutoConsoleVariable<float> HazeSunTint(TEXT("jeeb.Look.HazeSunTint"), 0.5f, TEXT("How much of the low sun's colour the haze takes near sunset (0 none, 1 all: deep orange)"));
 	static TAutoConsoleVariable<float> SunGlow(TEXT("jeeb.Look.SunGlow"), 1.6303f, TEXT("The warm glow in the haze toward the sun (directional inscattering), strongest at the low sun"));
 	static TAutoConsoleVariable<float> AO(TEXT("jeeb.Look.AO"), 0.6f, TEXT("Ambient occlusion strength (where it is on: r.AmbientOcclusionLevels, set by ApplyGraphics)"));
 	static TAutoConsoleVariable<float> AORadius(TEXT("jeeb.Look.AORadius"), 100.f, TEXT("Ambient occlusion radius in cm"));
@@ -393,15 +399,32 @@ void ADayNight::TickLook(float High)
 		// Noon: a light, only slightly cool grey leaning to the sky, so far hills fade toward the sky; the low sun: a warm peach-lilac that sits under the gold
 		static const FName HazeLowKey(TEXT("HazeLow")), HazeNoonKey(TEXT("HazeNoon"));
 		const FLinearColor NewHaze = FMath::Lerp(JeebPalette::Graded(HazeLowKey), JeebPalette::Graded(HazeNoonKey), High);   // (the world palette's, Palette.ini: 0.60, 0.46, 0.40 and 0.54, 0.58, 0.66)
-		const FLinearColor DayHaze = FMath::Lerp(OldHaze, NewHaze, FMath::Clamp(HazeBlue.GetValueOnGameThread(), 0.f, 1.f));
+		FLinearColor DayHaze = FMath::Lerp(OldHaze, NewHaze, FMath::Clamp(HazeBlue.GetValueOnGameThread(), 0.f, 1.f));
+		// (2026-11-17, jeeb.Look.HazeFollow) the haze dims with the light on the land (the sun's on the ground plus the sky's, as a
+		// share of noon's), as the land does, instead of glowing at noon's strength under the sunset's lifted exposure
+		FLinearColor SunNow = FLinearColor::White;
+		if (ADirectionalLight* SL = Sun.Get()) SunNow = SL->GetLightComponent()->GetLightColor();
+		{
+			auto LandLight = [](float El, float Hi)
+			{
+				const float SunTerm = (3.5f + 2.7f * Hi) * FMath::SmoothStep(-1.f, 4.f, El) * FMath::Sin(FMath::DegreesToRadians(FMath::Max(El, 0.f)));
+				const float SkyTerm = 0.6f * (1.7f + 0.5f * Hi) * FMath::Lerp(0.15f, 1.f, FMath::SmoothStep(-8.f, 10.f, El));
+				return SunTerm + SkyTerm;
+			};
+			const float Light = FMath::Clamp(LandLight(SunElevation, High) / LandLight(41.f, 1.f), 0.f, 1.f);
+			DayHaze *= FMath::Lerp(1.f, Light, FMath::Clamp(HazeFollow.GetValueOnGameThread(), 0.f, 1.f));
+			// near sunset it takes on the low sun's colour (the light reaching the far air is the sunset's)
+			const float Tw = Dusk * FMath::Clamp(HazeSunTint.GetValueOnGameThread(), 0.f, 1.f);
+			const float Mx = FMath::Max3(SunNow.R, SunNow.G, SunNow.B);
+			if (Mx > 1e-4f) DayHaze *= FMath::Lerp(FLinearColor::White, SunNow / Mx, Tw);
+		}
 		// (2026-11-17) the haze glows by itself, so at night it is a dim moonlit blue: the same on screen whatever the exposure (it is divided by it)
 		const float NightBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() + JeebNight::Exposure.GetValueOnGameThread();
 		const FLinearColor NightHaze = FLinearColor(0.16f, 0.21f, 0.34f) * FMath::Exp2(-NightBias);
 		FC->SetFogInscatteringColor(FMath::Lerp(DayHaze, NightHaze, Night * Night));   // (Night squared: the golden hour keeps its colours)
 		FC->SetStartDistance(HazeStart.GetValueOnGameThread());
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)
-		FLinearColor SunCol = FLinearColor::White;
-		if (ADirectionalLight* SL = Sun.Get()) SunCol = SL->GetLightComponent()->GetLightColor();
+		const FLinearColor SunCol = SunNow;
 		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High) * (1.f - Night * Night)));   // (none at night)
 		FC->SetDirectionalInscatteringExponent(6.f);
 		FC->SetDirectionalInscatteringStartDistance(4000.f);
