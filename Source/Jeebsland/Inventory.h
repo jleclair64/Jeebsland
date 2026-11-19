@@ -338,11 +338,11 @@ namespace JeebItems
 		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
 		const int32 T = VariantOf(Id);
 		// The playable troll (2026-11-19): only troll-class and "all" gear (Kinds.csv Class), and only common or troll tiers. Knights are not held to their class yet.
-		// TEMPORARY: the knight's sword too, until the troll's club exists (its Kinds.csv row will be Class troll and pass here by itself).
+		// (an old save's sword or other knight's gear stays where it is and can still be taken off: unequipping never asks here)
 		if (OwnerIsTroll(S))
 		{
 			const int32 Cls = KindClass(K);
-			if (Cls != 0 && Cls != 2 && K != K_Sword)
+			if (Cls != 0 && Cls != 2)
 			{
 				if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is made for %s. A troll can't use it."), *ItemName(Id), Cls == 3 ? TEXT("wizards") : TEXT("knights"));
 				return false;

@@ -418,3 +418,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - **Motion:** a strike ends with its arm easing back; a held full stretch reads as frozen. A jump that leaves a crouch needs a stretched take-off pose before the tuck.
 - **Online:** any move given its own test switch must be drivable on a client through the real RPCs (`-TrollNetDo=`), not only in single-player picture mode.
 - **Process:** `Tools/ShotViews.ps1` crops for 2560 px frames but off-screen runs give 1280x720; `-LabAt` pictures need about 8 frames for the camera to settle.
+
+## Troll polish (2026-11-19, agent troll)
+- When a two-handed or heavy weapon swing finishes, check that the follow-through stays at least a weapon's thickness outside the torso from both sides. A hand target that looks right from one angle often clips from the other. (The troll's club follow-through crosses his belly in the sword's swing.)
+- A thrust must point the weapon along the way he travels at full reach, not just move the hand forward. Check it on a side sheet. (The club's dash reads as a sweep from the front.)
+- Before sending review pictures, close the inventory and check that the close crop frames the part under review. `-ShotKind` takes the EKind number: K_Club is 23.

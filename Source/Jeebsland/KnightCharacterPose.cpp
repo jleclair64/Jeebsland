@@ -38,6 +38,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.LegYaw = LegYaw;
 	In.CrouchAlpha = FMath::Max(CrouchAlpha, LeapCrouch);   // (the troll crouches as he charges a jump)
 	In.BlockAlpha = BlockAlpha;
+	In.LeapFly = (bAirLaunch && LeapAt > 0.0 && LeapShare >= 0.f) ? LeapShare : -1.f;   // (a charged jump in flight, not a hop)
 	In.BowAimAlpha = BowAimAlpha;
 	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : Bow == EBow::Reload ? 3 : 0;
 	In.BowT = Bow == EBow::Reload ? JeebTune::V().CrossReload - CrossReloadLeft : BowT;
