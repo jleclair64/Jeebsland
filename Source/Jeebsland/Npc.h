@@ -5,6 +5,7 @@
 #include "Npc.generated.h"
 
 class UCapsuleComponent;
+namespace JeebLife { struct FRound; }
 class UStaticMeshComponent;
 class USkeletalMeshComponent;
 namespace JeebPeople { struct FModel; }
@@ -17,7 +18,8 @@ enum class ENpcRole : uint8
 	GateKnight,   // walks the road outside the village and chats
 	Villager,     // one of ten villagers who stroll about the village and tell their stories
 	Banker,       // keeps the vault
-	QuestGiver    // (2026-11-18) one of Oak Hill's people from Content/Data/QuestsPeople.csv: quests, else a greeting (QuestComponent.h)
+	QuestGiver,   // (2026-11-18) one of Oak Hill's people from Content/Data/QuestsPeople.csv: quests, else a greeting (QuestComponent.h)
+	Townsfolk     // (2026-11-18) an ordinary townsperson from Content/Data/Townsfolk.csv (NpcLife.h): a greeting of their own, no lore, no trade
 };
 
 // How a quest giver looks (QuestsPeople.csv): the villagers' body with these colours and hat
@@ -53,12 +55,26 @@ public:
 	// and a first greeting of their own (empty: the role's)
 	void SetFolk(uint8 InFolk, const FString& InName, const FString& InHello) { Folk = InFolk; NameOverride = InName; FirstHello = InHello; }
 
+	// Their day (NpcLife.h): where the clock has them; set by ATownLife on every machine (a beat set with SetPatrol becomes one too)
+	void SetRound(const TSharedPtr<JeebLife::FRound>& InRound);
+	const TSharedPtr<JeebLife::FRound>& GetRound() const { return Round; }
+	const TArray<FVector2D>& GetPatrol() const { return Patrol; }
+	// How much further than usual the server lets a quest request count, for someone this far from their post (their round's roam, cm)
+	float RoamSlack() const;
+	FVector2D RoamAnchor() const;
+	// Where and which way they were placed (Setup): the same on every machine, unlike where they face a moment later (they turn to you)
+	FVector2D PlacedAt = FVector2D::ZeroVector; float PlacedYaw = 0.f;
+	// A body and garment colour when PeopleWho.csv has no row for this person by name (Townsfolk.csv); RebuildBody applies it
+	void SetLookHint(const FString& InModel, const FLinearColor& InTint, float InScale = 1.f) { HintModel = InModel; HintTint = InTint; HintScale = InScale; }
+	void RebuildBody();
+
 	ENpcRole GetRole() const { return Role; }
 	FString GetNpcName() const;
 	// World height (cm) of the top of the head of the body shown: a model's own height (its mesh bounds, at its scale), the old
 	// shapes' 105 cm over the actor (HUD only: name tags, quest marks and the E prompt sit a set distance above it)
 	float HeadTopZ() const;
 	bool OffersTrade() const { return Role == ENpcRole::Shopkeeper || Role == ENpcRole::Blacksmith || Role == ENpcRole::Banker; }
+	bool IsTalking() const { return bTalking; }
 	int32 SpeakerIdx() const;   // which storyteller this is (see Lore.h)
 	// What they say on this visit, one entry per click
 	TArray<FString> MakeConversation(int32* OutLore = nullptr);   // OutLore: the fragment of lore told this time (or untouched)
@@ -104,4 +120,18 @@ private:
 	FVector LastLoc = FVector::ZeroVector;
 	float MoveSpeed = 0.f;
 	bool bShadowOn = true;
+
+	// (2026-11-18) the round (NpcLife.h) and how they stand on the ground
+	TSharedPtr<JeebLife::FRound> Round;
+	float Lag = 0.f;              // seconds behind the clock (looks only: held while you talk to them or block their way)
+	bool bPoseWalk = false;       // walking this frame (as shown)
+	FVector2D PrevAt = FVector2D::ZeroVector;
+	FString HintModel; FLinearColor HintTint = FLinearColor(-1.f, 0.f, 0.f); float HintScale = 1.f;
+	float FootZ = 0.f; bool bFootSet = false;   // the ground under them as shown (cm), eased
+	float TraceOff = 0.f;         // the last trace's height over the drawn ground (steps, bridges, floors), cm
+	FVector2D TraceAt = FVector2D(1.0e9f, 1.0e9f);
+	float TraceAge = 0.f;
+	float TickPlan = -1.f;        // the tick interval set last
+	void UpdateTickRate(float NearestPlayerCm);
+	float GroundUnder(const FVector2D& P, bool bTrace, float DeltaSeconds);
 };

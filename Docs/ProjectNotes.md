@@ -714,3 +714,27 @@ All five reviewers ran once on the combined build (package PASS, performance PAS
 - **HUD:** tags and quest marks sit at the head top (`ANpc::HeadTopZ`, reads body scale); the E prompt sits beside the name; marks fade under screen titles (NoteTitle/UnderTitle); the emote wheel is 20 px bigger; the minimap has no town label.
 - **World hashes after the fix round** (server and client equal): JEEBOAK a22861a9, JEEBSTEELE 086d3c58, JEEBFILL total ab089c55, JEEBFOREST 6d9e4e79, JEEBHILLS cc7adfbc, JEEBFOE camps f580f22b.
 - **Package:** the Shipping exe writes no log even with `-log`, so nothing confirms the world builds inside a package beyond the cooked contents and a clean 90 s run at the start screen.
+
+## Townsfolk lives, counter keepers and the shop camera (2026-11-18/19, agent `lantern`)
+
+The owner asked for four things. NPCs' feet were under the path. Villagers should walk round as if they owned a house, not stand in the square. Every shop and stall should be manned. Buying should zoom in, as in Hogwarts or Arc Raiders.
+- **Feet:** people stand on `JeebTerrain::DrawnHeight`, the ground as drawn: Oak Hill's 1 m mesh, the square's 2 m mesh, else the world's 8 m mesh. They used to stand on `HeightAt`, which lies under the 8 m mesh in Steele Creek. Near a player they also take a short WorldStatic trace, accepted 0.5 m below to 0.7 m above (steps, bridges), and ease to it. No `WalkSink` or NpcBody change was needed.
+- **Rounds (`NpcLife.h/.cpp`, `ATownLife`, spawned by KnightGameState after AQuestPeople):**
+  - Each person's day is a fixed timeline of stand, turn and walk steps that repeats. Every machine builds it from `Content/Data/Townsfolk.csv` and the town data. Where they are comes from the server's clock (`GetServerWorldTimeSeconds`), so a dedicated server and its clients agree with nothing replicated. `JEEBLIFE built ... hash` must match on every machine.
+  - Routes run on a 90 cm grid: buildings and water are blocked, a capsule test catches props, and streets are cheaper. The path is then pulled tight.
+  - Each round: the doorstep, a potter round the yard, two errands (a neighbour named in the CSV meets them at the first one and they chat, taking turns), linger, home.
+  - At night (day-loop phase 0.31 to 0.69) a round that starts then is spent on the doorstep. There is no lantern spot yet.
+  - Quest givers wander 2-3 m round their post and sometimes meet the nearest giver for a chat. The server's quest reach adds their roam (`QuestComponent::NearPerson`).
+  - The old patrol beats (gate knights, Blackrock villagers, Steele's people) became clock-driven beats too.
+  - Each machine may run a person a little behind the clock while you talk to them or stand in their way. They catch up during their next stand.
+- **Keepers:** Townsfolk.csv `Keeper` rows put a person at each counter, facing the customers' side:
+  - Oak Hill: store, market stall, potion shop, potion stall, bank, bank stall, smithy.
+  - Steele Creek: smithy, bank, store, and a new ore-stall troll, Grenna Oreheart.
+  - Blackrock keepers are the existing ones.
+  - Keepers step a little along the counter now and then. Oak Hill counters open with the nearest keeper of the matching role (`KnightCharacterInteract.cpp`).
+- **NPC capsules** no longer block players (WorldDynamic, ignores Pawn), so no player's movement depends on an NPC's position.
+- **Built half a second in:** `ATownLife` builds every round 0.5 s after it is spawned. Chaos only answers traces and overlaps for solids made the same frame a frame or more later. Built at once, the routes ignored every prop and the counter scan saw nothing. Rounds start from where each person was placed (`ANpc::PlacedAt/PlacedYaw`, set in Setup), never where they stand by then, since a client's people may already have turned to the knight.
+- **Counters:** a stall keeper's spot comes from vertical traces walking in from the front: past the counter's top, the first clear spot (market stall 2.45 m in, Steele's ore stall the same). The bank stall (one deep solid box) and the potion stall (shelves right behind its low table) have no clear spot, so they use 70 cm in. Log `JEEBLIFE counter`.
+- **Cost:** far NPCs tick at 1 s (client) or 2 s (server), or 0.25 s on a server with a player within 60 m. Traces run only near a player. Building every round takes about 0.5 s at world build (about 20,000 walk tests).
+- **Shop camera (`KnightShopCam.cpp`, from `CalcCamera`):** while a shop, bank or smithy is open with its keeper, the local view eases (0.5 s) to a close view of the keeper, off-centre, with your own knight hidden through `PlayerController::HiddenActors`. Looks only; trades are unchanged. Live `jeeb.ShopCam.*`.
+- Test switches (not in Shipping): `-LifeLog`, `-LifeShots=Name@feet|@front+...`, `-ShopCamTest=Name+...`; add `-JeebOffline` to go straight into the world.
