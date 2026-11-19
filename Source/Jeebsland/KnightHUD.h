@@ -165,6 +165,7 @@ private:
 	void DrawDialogue(AKnightCharacter* Knight);
 	void DrawWeaponBar(AKnightCharacter* Knight);
 	void DrawReticle(AKnightCharacter* Knight);   // the bow's aim, while drawing
+	void DrawCastReticle(AKnightCharacter* Knight);   // the wand's and staff's aim, up and right of the middle (KnightHUDReticle.cpp)
 	void DrawSkills(const USkillComponent* Skills);
 	void DrawSkillsScreen(AKnightCharacter* Knight);
 	void DrawSkillIcon(int32 SkillIdx, float X, float Y, float S);

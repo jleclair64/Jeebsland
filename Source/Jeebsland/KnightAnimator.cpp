@@ -468,7 +468,7 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 		IdleT += Dt;
 		// Just after a fight he stays on guard a moment, in the stance the sword clips start and end in, so one move runs into the next
 		// without his feet moving; then he eases back to rest
-		bOnGuard = CombatT > 0.f && !bBow;
+		bOnGuard = CombatT > 0.f && !bBow && Kind != JeebItems::K_Staff;   // (2026-11-18: the staff has no sword stance; after a cast he stands at rest, the staff upright, the left arm down)
 		if (bOnGuard)
 			if (const FClip* G = Get(TEXT("Idle_SS"))) { Sample(*G, IdleT, Out, true); return; }
 		// Standing: the rest pose the owner chose (hands almost at his hips), breathing on top
