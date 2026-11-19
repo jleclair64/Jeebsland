@@ -149,6 +149,27 @@ namespace JeebGround
 			M.Sand = JeebWorld::Smooth(JeebWorld::SeaLevel + 170.f + 80.f * N, JeebWorld::SeaLevel + 50.f, Z) * JeebWorld::Smooth(-4500.f, -800.f, Y - JeebWorld::CoastY(X));
 			M.Mud *= 1.f - M.Sand;
 		}
+		// Sand: a beach round the lake and its island, and the bars on the inside of the rivers' tight bends, from just under the water to
+		// about a metre over it (2026-11-18)
+		{
+			float S = 0.f;
+			const float Ls = JeebWorld::LakeSD(X, Y);
+			if (Ls < 2500.f)
+			{
+				const float N = Soft(X, Y, 500.f, 61.f);
+				// (narrow, and broken by grassy stretches where a slow noise says, so it reads as a natural shore, not a ring)
+				S = JeebWorld::Smooth(JeebWorld::RiverLevel + 45.f + 80.f * N, JeebWorld::RiverLevel + 15.f, Z) * JeebWorld::Smooth(1000.f + 600.f * N, 200.f, Ls)
+					* JeebWorld::Smooth(0.36f, 0.5f, Soft(X, Y, 2600.f, 17.f));
+			}
+			if (Z < JeebWorld::RiverLevel + 80.f && Z > JeebWorld::RiverLevel - 120.f)
+			{
+				const JeebWorld::FWaterNear* W = JeebWorld::NearWater(X, Y);
+				float Shoal = 0.f;
+				for (int32 r = 0; r < JeebWorld::MaxRivers; ++r) if (W[r].Dr < W[r].Half + 300.f) Shoal = FMath::Max(Shoal, W[r].Shoal);
+				S = FMath::Max(S, JeebWorld::Smooth(0.25f, 0.7f, Shoal) * JeebWorld::Smooth(JeebWorld::RiverLevel + 70.f, JeebWorld::RiverLevel + 20.f, Z));
+			}
+			if (S > M.Sand) { M.Sand = S; M.Mud *= 1.f - S; }
+		}
 		// Worn: beside the roads (1 on the edge, fading out over about 2.5 m, as the old ground had it), and round buildings
 		float Pc = 1.0e6f;
 		if (bRoads && NearRoads(X, Y))

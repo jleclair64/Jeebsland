@@ -552,9 +552,10 @@ struct FOakForestBuild
 		// over 18 m toward the river banks
 		auto Edge = [&](float X, float Y) -> float
 		{
+			if (const float Isle = JeebWorld::IslandWoods(X, Y); Isle > 0.f) return 1.6f * Isle;   // (the lake's island and the split's: thickly wooded, glades or not, 2026-11-18)
 			const float D = FVector2D::Distance(FVector2D(X, Y), Plaza);
 			if (D > JeebOakForest::Reach) return 0.f;
-			const float Sq = FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf;
+			const float Sq =FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf;
 			if (Sq < 1200.f) return 0.f;
 			const float Town = BoxGap(X, Y);
 			if (Town < 2500.f) return 0.f;

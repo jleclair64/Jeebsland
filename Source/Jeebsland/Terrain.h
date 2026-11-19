@@ -254,10 +254,225 @@ namespace JeebTerrain
 	// whole world's land (WorldMap.h: mountains, the rocky south-west, level town sites), then the sea, the coast and the river
 	// valleys and channels everywhere (the river runs down through the east side of the original square).
 	constexpr float GroundHalfForBlend = 16000.f;
+	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2, bool bPads = true);
+
+	// ------------------------------------------------------------------ building pads
+	// (2026-11-18, owner: "Houses or structures will be half hidden underground because they were placed on hills ... feel free to just
+	// change the terrain to make it flat where you want the house/structures to go", and "entrances that are underground".) Every
+	// building of Oak Hill (houses, shops, stalls, the well, the Town Hall, the church, the forts, the watchtower, the ruins) and of Steele
+	// Creek stands on a pad: its walls' box and PadFlat round it, plus an apron PadApron long in front of its door, all level at the
+	// building's own height, blending back into the land over PadBlendBy times the height step (at least PadBlendMin, at most
+	// PadBlendMax). Read from the towns' plot data when the world is first built, so a building moved or added there gets its pad by
+	// itself. The level: a levelled Oak Hill plot keeps its own pad's height (the ground at its middle), a Steele building its plan's
+	// Level, and an unlevelled one (the war buildings) the middle height of the ground under its walls and apron. Pads mix by weights that
+	// grow without end on a flat (w / (1 - w), as Oak Hill's own), so every flat stays exactly level; none reaches into the water.
+	constexpr float PadFlat = 200.f, PadApron = 400.f, PadBlendBy = 6.f, PadBlendMin = 400.f, PadBlendMax = 2000.f;
+	struct FBuildingPad
+	{
+		const TCHAR* Name = nullptr;
+		FVector2D Mid = FVector2D::ZeroVector, Half = FVector2D::ZeroVector;   // the walls' box (game cm; Half in its own frame)
+		float Cs = 1.f, Sn = 0.f;                                            // its turn
+		FVector2D ApronMid = FVector2D::ZeroVector, ApronHalf = FVector2D::ZeroVector;   // the doorstep (its own frame, the same turn)
+		float Level = 0.f;
+		float Reach = 0.f;   // cm from Mid past which it changes nothing
+		bool bSteele = false;
+	};
+	inline float BoxSD(float LX, float LY, const FVector2D& H)
+	{
+		const FVector2D Q(FMath::Abs(LX) - H.X, FMath::Abs(LY) - H.Y);
+		return FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
+	}
+	// Signed distance (cm) past a pad's flat: its walls' box + PadFlat, or the doorstep
+	inline float PadSD(const FBuildingPad& P, float X, float Y)
+	{
+		const float DX = X - P.Mid.X, DY = Y - P.Mid.Y;
+		const float LX = DX * P.Cs + DY * P.Sn, LY = -DX * P.Sn + DY * P.Cs;
+		return FMath::Min(BoxSD(LX, LY, P.Half) - PadFlat, BoxSD(LX - P.ApronMid.X, LY - P.ApronMid.Y, P.ApronHalf));
+	}
+	// A pad from a model's walls (its own frame, Blender's: WX0..WX1, WY0..WY1, cm before Scale), its centre, turn, scale and door yaw
+	inline FBuildingPad MakePad(const TCHAR* Name, const JeebOakHill::FModel& M, const FVector2D& Centre, float Yaw, float Scale)
+	{
+		FBuildingPad P; P.Name = Name;
+		P.Cs = FMath::Cos(FMath::DegreesToRadians(Yaw)); P.Sn = FMath::Sin(FMath::DegreesToRadians(Yaw));
+		// (Unreal mirrors Blender's Y: the walls run from (WX0, -WY1) to (WX1, -WY0) in the model's frame)
+		const FVector2D Lo(M.WX0 * Scale, -M.WY1 * Scale), Hi(M.WX1 * Scale, -M.WY0 * Scale);
+		const FVector2D Ml = (Lo + Hi) * 0.5f;
+		P.Mid = Centre + FVector2D(Ml.X * P.Cs - Ml.Y * P.Sn, Ml.X * P.Sn + Ml.Y * P.Cs);
+		P.Half = (Hi - Lo) * 0.5f;
+		// the door's side in the box's own frame (DoorYaw 90 is the model's +Y, every model so far), and the doorstep in front of it
+		const float Dy = FMath::DegreesToRadians(M.DoorYaw);
+		const FVector2D Dir(FMath::Cos(Dy), FMath::Sin(Dy));
+		if (FMath::Abs(Dir.Y) >= FMath::Abs(Dir.X))
+		{
+			const float S = FMath::Sign(Dir.Y);
+			P.ApronMid = FVector2D(0.f, S * (P.Half.Y + PadApron * 0.5f));
+			P.ApronHalf = FVector2D(FMath::Min(P.Half.X, 250.f) + 60.f, PadApron * 0.5f);
+		}
+		else
+		{
+			const float S = FMath::Sign(Dir.X);
+			P.ApronMid = FVector2D(S * (P.Half.X + PadApron * 0.5f), 0.f);
+			P.ApronHalf = FVector2D(PadApron * 0.5f, FMath::Min(P.Half.Y, 250.f) + 60.f);
+		}
+		P.Reach = P.Half.Size() + PadApron + PadFlat + PadBlendMax + 100.f;
+		return P;
+	}
+	// The middle height of the ground (before any pad) under a pad's walls and doorstep, never lower than 90 cm over the rivers
+	inline float PadGroundLevel(const FBuildingPad& P)
+	{
+		TArray<float> H;
+		for (int32 a = 0; a <= 6; ++a) for (int32 b = 0; b <= 6; ++b)
+		{
+			const FVector2D L(FMath::Lerp(-P.Half.X, P.Half.X, a / 6.f), FMath::Lerp(-P.Half.Y, P.Half.Y, b / 6.f));
+			const FVector2D W = P.Mid + FVector2D(L.X * P.Cs - L.Y * P.Sn, L.X * P.Sn + L.Y * P.Cs);
+			H.Add(HeightAt(W.X, W.Y, true, 2, false));
+		}
+		for (int32 a = 0; a <= 2; ++a)
+		{
+			const FVector2D L = P.ApronMid + FVector2D(FMath::Lerp(-P.ApronHalf.X, P.ApronHalf.X, a / 2.f), FMath::Lerp(-P.ApronHalf.Y, P.ApronHalf.Y, a / 2.f));
+			const FVector2D W = P.Mid + FVector2D(L.X * P.Cs - L.Y * P.Sn, L.X * P.Sn + L.Y * P.Cs);
+			H.Add(HeightAt(W.X, W.Y, true, 2, false));
+		}
+		H.Sort();
+		return FMath::Max(H[H.Num() / 2], JeebWorld::RiverLevel + 90.f);
+	}
+	inline const TArray<FBuildingPad>& BuildingPads()
+	{
+		static const TArray<FBuildingPad> All = []()
+		{
+			TArray<FBuildingPad> A;
+			if (JeebOakHill::Enabled())
+				for (const JeebOakHill::FPlot& Pl : JeebOakHill::Plots())
+				{
+					if (Pl.Kind != JeebOakHill::EPlot::Building || !Pl.Model) continue;
+					const JeebOakHill::FModel* M = JeebOakHill::FindModel(Pl.Model);
+					if (!M || !(M->WX1 > M->WX0)) continue;
+					// (where ATownLabTown and AOakHillTown put it: the plot's centre, its BuildingYaw, the model's own scale)
+					const FVector2D C = JeebOakHill::FromPx(Pl.Px, Pl.Py);
+					FBuildingPad P = MakePad(Pl.Name, *M, C, JeebOakHill::BuildingYaw(Pl, M), M->Scale);
+					P.Level = Pl.bLevel ? HeightAt(C.X, C.Y, true, 2, false) : PadGroundLevel(P);
+					A.Add(P);
+				}
+			if (JeebSteele::Enabled())
+				for (const JeebSteele::FPlot& Pl : JeebSteele::Plots())
+				{
+					if (!Pl.Model) continue;
+					FBuildingPad P = MakePad(Pl.Def.Name, *Pl.Model, Pl.Centre, Pl.Yaw, Pl.Scale);
+					P.Level = Pl.Level;   // (ASteeleCreekTown sets each building at its plan's Level)
+					P.bSteele = true;
+					A.Add(P);
+				}
+			return A;
+		}();
+		return All;
+	}
+	// The ground with every pad on it (H: the ground without them)
+	inline float ApplyPads(float X, float Y, float H)
+	{
+		const bool bOak = JeebOakHill::InBox(X, Y, PadBlendMax + 1000.f), bSteele = JeebSteele::InBox(X, Y, PadBlendMax + 1000.f);
+		if (!bOak && !bSteele) return H;
+		const TArray<FBuildingPad>& Ps = BuildingPads();
+		float Sum = H, Weight = 1.f;
+		bool bAny = false;
+		float Dry = -1.f;
+		for (const FBuildingPad& P : Ps)
+		{
+			if ((P.bSteele ? !bSteele : !bOak) || FVector2D::DistSquared(P.Mid, FVector2D(X, Y)) > FMath::Square(P.Reach)) continue;
+			const float Blend = FMath::Clamp(PadBlendBy * FMath::Abs(H - P.Level), PadBlendMin, PadBlendMax);
+			const float D = PadSD(P, X, Y);
+			if (D >= Blend) continue;
+			float W = 1.f - JeebWorld::Smooth(0.f, Blend, D);
+			// (never into the water: outside a building's own walls a pad gives way from 3 m past the waterline to the water's edge;
+			// under the walls it holds, so a building put on a bank (the forts) is never sunk into it)
+			{
+				const float DX = X - P.Mid.X, DY = Y - P.Mid.Y;
+				const float Wall = BoxSD(DX * P.Cs + DY * P.Sn, -DX * P.Sn + DY * P.Cs, P.Half);
+				if (Wall > 0.f)
+				{
+					if (Dry < 0.f) Dry = JeebWorld::Smooth(100.f, 400.f, JeebWorld::WaterEdge(X, Y));
+					W *= FMath::Max(Dry, 1.f - JeebWorld::Smooth(0.f, 150.f, Wall));
+				}
+			}
+			if (W <= 0.f) continue;
+			const float Odds = FMath::Min(W / FMath::Max(1.f - W, 1e-5f), 1.0e5f);
+			Sum += Odds * P.Level; Weight += Odds;
+			bAny = true;
+		}
+		return bAny ? Sum / Weight : H;
+	}
+
+	// ------------------------------------------------------------------ finer ground where the world's 8 m mesh is too coarse
+	// (2026-11-18) Steele Creek (its pads and doorsteps), the lake (its shore, beach and island) and the split north of Oak Hill are drawn
+	// on a 2 m grid (AWorldTerrain), each patch a box on the 8 m grid's lines; its edge points lie on the 8 m mesh's edges, so the two
+	// meshes meet without a crack.
+	constexpr float FineStep = 200.f;
+	struct FFinePatch { float X0, X1, Y0, Y1; };
+	inline const TArray<FFinePatch>& FinePatches()
+	{
+		static const TArray<FFinePatch> All = []()
+		{
+			TArray<FFinePatch> A;
+			const float S = JeebWorld::WorldStep;
+			auto Add = [&](float X0, float X1, float Y0, float Y1)
+			{
+				FFinePatch P;
+				P.X0 = JeebWorld::MinX + FMath::FloorToFloat((X0 - JeebWorld::MinX) / S) * S; P.X1 = JeebWorld::MinX + FMath::CeilToFloat((X1 - JeebWorld::MinX) / S) * S;
+				P.Y0 = JeebWorld::MinY + FMath::FloorToFloat((Y0 - JeebWorld::MinY) / S) * S; P.Y1 = JeebWorld::MinY + FMath::CeilToFloat((Y1 - JeebWorld::MinY) / S) * S;
+				A.Add(P);
+			};
+			if (JeebSteele::Enabled()) Add(JeebSteele::PosX - 11000.f, JeebSteele::PosX + 11000.f, JeebSteele::PosY - 11000.f, JeebSteele::PosY + 11000.f);
+			const FBox2D L = FBox2D(JeebWorld::Lake().Shore).ExpandBy(2400.f);
+			Add(L.Min.X, L.Max.X, L.Min.Y, L.Max.Y);
+			Add(16000.f, 32800.f, 3200.f, 14400.f);   // (the split's north part: the south part lies on the square's 2 m ground and Oak Hill's 1 m)
+			return A;
+		}();
+		return All;
+	}
+	inline const FFinePatch* FinePatchAt(float X, float Y)
+	{
+		for (const FFinePatch& P : FinePatches()) if (X >= P.X0 && X < P.X1 && Y >= P.Y0 && Y < P.Y1) return &P;
+		return nullptr;
+	}
+	inline bool InFineCell(float X0, float Y0, float Step)
+	{
+		for (const FFinePatch& P : FinePatches()) if (X0 >= P.X0 && X0 + Step <= P.X1 && Y0 >= P.Y0 && Y0 + Step <= P.Y1) return true;
+		return false;
+	}
+	// A fine patch's grid point (game cm) as drawn: the true height inside, along its edge the 8 m mesh's own straight edge
+	inline float FineVertexZ(const FFinePatch& P, float X, float Y)
+	{
+		const float S = JeebWorld::WorldStep;
+		const bool bEdgeX = FMath::IsNearlyEqual(X, P.X0, 1.f) || FMath::IsNearlyEqual(X, P.X1, 1.f);
+		const bool bEdgeY = FMath::IsNearlyEqual(Y, P.Y0, 1.f) || FMath::IsNearlyEqual(Y, P.Y1, 1.f);
+		if (bEdgeX && !bEdgeY)
+		{
+			const float V0 = JeebWorld::MinY + FMath::FloorToFloat((Y - JeebWorld::MinY) / S) * S, T = (Y - V0) / S;
+			if (T > 1.e-4f) return FMath::Lerp(HeightAt(X, V0), HeightAt(X, V0 + S), T);
+		}
+		if (bEdgeY && !bEdgeX)
+		{
+			const float V0 = JeebWorld::MinX + FMath::FloorToFloat((X - JeebWorld::MinX) / S) * S, T = (X - V0) / S;
+			if (T > 1.e-4f) return FMath::Lerp(HeightAt(V0, Y), HeightAt(V0 + S, Y), T);
+		}
+		return HeightAt(X, Y);
+	}
+	inline float FineMeshHeight(const FFinePatch& P, float X, float Y)
+	{
+		const float GX = (X - P.X0) / FineStep, GY = (Y - P.Y0) / FineStep;
+		const float I = FMath::FloorToFloat(GX), J = FMath::FloorToFloat(GY);
+		const float Fx = GX - I, Fy = GY - J;
+		const float X0 = P.X0 + I * FineStep, Y0 = P.Y0 + J * FineStep;
+		const float A = FineVertexZ(P, X0, Y0), B = FineVertexZ(P, X0 + FineStep, Y0), C = FineVertexZ(P, X0, Y0 + FineStep);
+		if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;
+		const float D = FineVertexZ(P, X0 + FineStep, Y0 + FineStep);
+		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
+	}
+
 	// (bCap false: without the rivers' bank cap, for the bank scan's "what did the cap cut" only)
 	// Hills: the forested hills round Oak Hill (Hills.h, 2026-11-16), added to the land before the rivers so their channels stay:
 	// 2 as built, 1 before the forest roads are levelled (what RoadLines routes on), 0 none (the roads' base)
-	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2)
+	// bPads: the building pads (ApplyPads) on top; only on the finished ground (Hills 2)
+	inline float HeightAt(float X, float Y, bool bCap, int32 Hills, bool bPads)
 	{
 		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
 		float H;
@@ -273,6 +488,7 @@ namespace JeebTerrain
 		if (JeebOakHill::Covers(X, Y)) H = JeebOakHill::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Oak Hill's own hills and level plots (2026-11-11)
 		else if (JeebSteele::Covers(X, Y)) H = JeebSteele::Apply(X, Y, H, RiverD, RiverHalf, bCap);   // Steele Creek's gentle tilt and level pads (2026-11-18)
 		else if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
+		if (bPads && Hills == 2) H = ApplyPads(X, Y, H);   // every building's level pad and doorstep (2026-11-18)
 		if (JeebBridge::InBox(X, Y)) H = JeebBridge::ApplyGround(X, Y, H);   // the bridge's embankments and pier footings (Bridge.cpp)
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
@@ -312,6 +528,7 @@ namespace JeebTerrain
 	{
 		if (JeebOakHill::Enabled() && JeebOakHill::InBox(X, Y)) return HeightAt(X, Y);
 		if (FMath::Max(FMath::Abs(X), FMath::Abs(Y)) < GroundHalf) return GroundMeshHeight(X, Y);
+		if (const FFinePatch* P = FinePatchAt(X, Y)) return FineMeshHeight(*P, X, Y);   // (Steele Creek, the lake, the split: 2 m)
 		return WorldMeshHeight(X, Y);
 	}
 
@@ -577,6 +794,7 @@ namespace JeebTerrain
 		{
 			if (FVector2D::Distance(P, S) < 650.f) return true;
 		}
+		if (JeebWorld::NearRiver(X, Y, 600.f)) return true;   // (2026-11-18: the split north of Oak Hill passes the square's east side)
 		return PathClearance(X, Y) < 280.f;
 	}
 
