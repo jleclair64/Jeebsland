@@ -29,7 +29,7 @@
 namespace
 {
 	TAutoConsoleVariable<float> CVarSteeleDensity(TEXT("jeeb.Steele.Density"), 1.f,
-		TEXT("How thick the forest round and in Steele Creek is (1 as built, about 800 trees; 0.5 half as many; 0 none). Read when the world is built: change it, then load the map again. Online, give the server and every player the same value (the trunks are solid)."), ECVF_Default);
+		TEXT("How thick the forest round and in Steele Creek is (1 as built, about 1,000 trees; 0.5 half as many; 0 none). Read when the world is built: change it, then load the map again. Online, give the server and every player the same value (the trunks are solid)."), ECVF_Default);
 
 #if !UE_BUILD_SHIPPING
 	// (test only: puts the local player's knight in Steele Creek's forge yard; single player or a listen server's own knight)
@@ -237,7 +237,7 @@ const TArray<JeebSteeleWoods::FSpot>& JeebSteeleWoods::Plan()
 	if (!JeebSteele::Enabled() || Density <= 0.f) return Spots;
 	const double T0 = FPlatformTime::Seconds();
 	const FVector2D Yard = JeebSteele::ToWorld(-5.f, 0.f), Arrival = JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN), Mid = JeebSteele::ToWorld(1.f, 0.f);
-	const float Reach = 20000.f, Cell = 650.f, GapWant = 0.30f;
+	const float Reach = 23000.f, Cell = 650.f, GapWant = 0.34f;
 	const TArray<FProp> Props = TownProps();
 	const TArray<FVector2D> Fill = FillSpots();
 	TArray<FVector2D> Doors;
@@ -262,21 +262,24 @@ const TArray<JeebSteeleWoods::FSpot>& JeebSteeleWoods::Plan()
 				for (const JeebSteele::FPlot& Pl : JeebSteele::Plots())
 				{
 					const FVector2D D = Pl.Centre - P;
-					if (D.SizeSquared() > 4500.f * 4500.f) continue;
+					if (D.SizeSquared() > 6500.f * 6500.f) continue;
 					if (FMath::Abs(D.X) >= FMath::Abs(D.Y)) bSide[D.X > 0.f ? 0 : 1] = true; else bSide[D.Y > 0.f ? 2 : 3] = true;
 				}
 				Sides = int32(bSide[0]) + int32(bSide[1]) + int32(bSide[2]) + int32(bSide[3]);
 			}
-			const float Fabric = FMath::Clamp((Sides - 2) * 0.5f, 0.f, 1.f);
+			const float Fabric = FMath::Clamp((Sides - 1) * 0.5f, 0.f, 1.f);
 			const float Dd = FMath::Min(JeebSteele::BuildingDistance(X, Y), 12000.f) / 100.f;   // metres off the nearest wall
-			const float Belt = FMath::Lerp(1.f, 0.14f, JeebWorld::Smooth(14.f, 85.f, Dd));
+			// (the belt's edge is broken into lobes: its reach is bent by a noise, 0-45 m either way, and a second noise opens clearings)
+			const float DdL = FMath::Max(0.f, Dd + 26.f * Noise(P, 4200.f, 17.3f, -5.1f) + 10.f * Noise(P, 1500.f, 2.2f, 9.9f));
+			const float Glade = JeebWorld::Smooth(-0.42f, -0.22f, Noise(P, 2600.f, -8.4f, 3.7f));
+			const float Belt = FMath::Lerp(1.f, 0.3f, JeebWorld::Smooth(18.f, 120.f, DdL)) * FMath::Lerp(0.3f, 1.f, Glade);
 			// a slow noise opens glades in the belt's thin outer part and thickens it in patches
 			const float Patch = FMath::Lerp(1.f, FMath::Lerp(0.55f, 1.25f, 0.5f + 0.5f * Noise(P, 9000.f, 3.3f, 8.8f)), JeebWorld::Smooth(30.f, 70.f, Dd));
 			const float Want = Density * FMath::Lerp(Belt * Patch, GapWant, Fabric);
 			if (Keep >= Want) continue;
 			// what grows here: spruce stands and aspen clumps by noise, more broadleaves in the town
 			const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
-			const float ConiferP = FMath::Clamp(FMath::Lerp(0.25f, 0.8f, JeebWorld::Smooth(0.35f, 0.7f, ConiferField)) - 0.25f * Fabric, 0.05f, 0.9f);
+			const float ConiferP = FMath::Clamp(FMath::Lerp(0.4f, 0.85f, JeebWorld::Smooth(0.35f, 0.7f, ConiferField)) - 0.25f * Fabric, 0.05f, 0.9f);
 			int32 K; float S;
 			if (Pick < ConiferP)
 			{
@@ -291,7 +294,7 @@ const TArray<JeebSteeleWoods::FSpot>& JeebSteeleWoods::Plan()
 				S = bAspen ? FMath::Lerp(0.9f, 1.2f, Size) : FMath::Lerp(0.8f, 1.15f, Size);
 			}
 			const float Crown = CrownOf[K] * S, Trunk = TrunkOf[K] * S;
-			if (JeebWorld::NearRiver(X, Y, 600.f + Crown * 0.3f)) continue;
+			if (JeebWorld::InWater(X, Y) || JeebWorld::NearRiver(X, Y, 600.f + Crown * 0.3f)) continue;
 			if (JeebTerrain::PathClearance(X, Y) < 300.f + Crown * 0.3f) continue;   // (streets, the road out, the forge yard's patch)
 			if (FVector2D::Distance(P, Mid) < 1500.f || FVector2D::Distance(P, Arrival) < 1500.f) continue;   // (the yard, where players start and land)
 			if (JeebSteele::BuildingDistance(X, Y) < 400.f + Crown * 0.6f) continue;   // (a few metres off the walls, the crown clear of the roofs)
@@ -310,7 +313,7 @@ const TArray<JeebSteeleWoods::FSpot>& JeebSteeleWoods::Plan()
 			for (const FProp& Pr : Props) if (FVector2D::Distance(P, Pr.At) < 400.f + Crown * 0.2f) { bBad = true; break; }
 			for (const FVector2D& F : Fill) if (!bBad && FVector2D::Distance(P, F) < 450.f + Crown * 0.2f) bBad = true;
 			if (bBad) continue;
-			for (const FVector4f& T : Planted) if (FVector2D::DistSquared(P, FVector2D(T.X, T.Y)) < FMath::Square(0.55f * (Crown + T.Z))) { bBad = true; break; }
+			for (const FVector4f& T : Planted) if (FVector2D::DistSquared(P, FVector2D(T.X, T.Y)) < FMath::Square(0.42f * (Crown + T.Z))) { bBad = true; break; }
 			if (bBad) continue;
 			Planted.Add(FVector4f(X, Y, Crown, 0.f));
 			Spots.Add({ uint8(K), X, Y, S, Yaw });
