@@ -376,15 +376,13 @@ namespace
 
 	// ---------------------------------------------------------------------------------------------- the towns' places
 	// A spot Out cm in front of an Oak Hill building's door (or a stall's open front), centred on its walls, and the yaw out of the door
-	// (the same sums as JeebOakHill::Counters: drawn from the town's plan, so it follows the buildings wherever the plan puts them)
+	// (JeebOakHill::DoorAt, as the counters use: drawn from the town's plan, so it follows the buildings wherever the plan puts them)
 	FVector2D OakFront(const JeebOakHill::FPlot& P, float Out, float& OutYaw)
 	{
-		const JeebOakHill::FModel* M = JeebOakHill::FindModel(P.Model);
-		if (!M) { OutYaw = 0.f; return JeebOakHill::FromPx(P.Px, P.Py); }
-		const float Yaw = JeebOakHill::BuildingYaw(P, M), Cs = FMath::Cos(FMath::DegreesToRadians(Yaw)), Sn = FMath::Sin(FMath::DegreesToRadians(Yaw));
-		const float LX = (M->WX0 + M->WX1) * 0.5f * M->Scale, LY = -M->WY0 * M->Scale + Out;
-		OutYaw = FRotator::NormalizeAxis(Yaw + M->DoorYaw);
-		return JeebOakHill::FromPx(P.Px, P.Py) + FVector2D(LX * Cs - LY * Sn, LX * Sn + LY * Cs);
+		float ToDoor = 180.f;
+		const FVector2D At = JeebOakHill::DoorAt(P, Out, &ToDoor);
+		OutYaw = FRotator::NormalizeAxis(ToDoor + 180.f);
+		return At;
 	}
 	// An empty plot (the garden, the graveyard, the boxing ring, the bridge's bank): the edge nearest the plaza, Out cm outside it,
 	// facing in
@@ -403,6 +401,9 @@ namespace
 	}
 	const JeebOakHill::FPlot* OakPlot(const FString& Name)
 	{
+		// (by its Id first, "House_SE1", "PotionStall", ...; Docs/TownLab/OakHillLayout_2026-11-18.md; else by its name, "Garden")
+		const int32 I = JeebOakHill::PlotIndexById(*Name.TrimStartAndEnd());
+		if (I != INDEX_NONE) return &JeebOakHill::Plots()[I];
 		const FString Want = Squash(Name);
 		for (const JeebOakHill::FPlot& P : JeebOakHill::Plots()) if (Squash(P.Name) == Want) return &P;
 		return nullptr;
@@ -549,7 +550,9 @@ namespace
 		const int32 Idx = FCString::Atoi(*Num);
 		if (Town == ETown::OakHill)
 		{
-			const JeebOakHill::FPlot* P = OakHouse(Idx);
+			// (a plot Id, "House_SE1"; or the old "house N", the Nth house from the plaza's oak)
+			const int32 ById = JeebOakHill::PlotIndexById(*Spec.TrimStartAndEnd());
+			const JeebOakHill::FPlot* P = ById != INDEX_NONE ? &JeebOakHill::Plots()[ById] : OakHouse(Idx);
 			if (!P) return false;
 			OutAt = OakFront(*P, 150.f, OutYaw);
 			return true;
@@ -677,19 +680,39 @@ void ATownLife::Build()
 			};
 			FString Prof;
 			bool bPast = false;
+			float FirstTop = 1.0e6f, LastTop = 1.0e6f; bool bTall = false;   // (where the counter starts and ends, cm from the front)
 			for (float O = 90.f; O >= -320.f; O -= 15.f)
 			{
 				const FPlace P = Front(Town, Place, O);
 				if (!P.bOk) break;
 				const float H = Top(P.At, Dir2(P.Yaw + 90.f));
 				Prof += FString::Printf(TEXT(" %.0f:%.0f"), O, H);
-				if (H > 0.f) bPast = true;
+				if (H > 0.f) { bPast = true; if (FirstTop > 1.0e5f) FirstTop = O; if (H >= 100.f) bTall = true; else if (!bTall) LastTop = O; }
 				else if (bPast && Top(Front(Town, Place, O - 20.f).At, Dir2(P.Yaw + 90.f)) < 0.f)
 				{
 					Out = Front(Town, Place, O - 20.f);
 					UE_LOG(LogTemp, Log, TEXT("JEEBLIFE counter %s: keeper %.0f cm in (tops%s)"), *Place, -(O - 20.f), *Prof);
 					return true;
 				}
+			}
+			// (none clear behind it, and the counter is a low table well inside the stall (the potion stall): beside the table, inside the
+			// stall, facing out the same way)
+			if (FirstTop < -60.f && FirstTop > -1.0e5f)
+			{
+				const float Mid = (FirstTop + (LastTop > 1.0e5f ? FirstTop : LastTop)) * 0.5f;
+				const FPlace C = Front(Town, Place, Mid);
+				const FVector2D Across = Dir2(C.Yaw + 90.f);
+				for (float D = 60.f; D <= 330.f; D += 30.f)
+					for (float Sd : { 1.f, -1.f })
+					{
+						const FVector2D At = C.At + Across * (D * Sd);
+						if (Top(At, Dir2(C.Yaw)) < 0.f && Map.SolidFree(At, 26.f))
+						{
+							Out = C; Out.At = At;
+							UE_LOG(LogTemp, Log, TEXT("JEEBLIFE counter %s: keeper beside the table, %.0f cm in, %.0f cm to the side (tops%s)"), *Place, -Mid, D * Sd, *Prof);
+							return true;
+						}
+					}
 			}
 			// (none clear behind it: the bank stall's counter is one deep solid box, the potion stall has shelves right behind its low
 			// table; 70 cm in reads right for both: behind the bank's counter, at the front of the potion table)
@@ -731,6 +754,19 @@ void ATownLife::Build()
 			{
 				FPlace K;
 				if (!KeeperSpot(Town, Place, K)) { UE_LOG(LogTemp, Warning, TEXT("JEEBLIFE Townsfolk.csv: no place %s for %s"), *Place, *Name); continue; }
+				// (never in someone already standing there: Pell, the quest giver at the smithy's counter; a step along the front, away from them)
+				for (TActorIterator<ANpc> It(W); It; ++It)
+				{
+					if (*It == N || It->GetRound().IsValid()) continue;
+					const FVector2D Off = K.At - It->PlacedAt;
+					if (Off.SizeSquared() > FMath::Square(150.f)) continue;
+					const FVector2D Along = Dir2(K.Yaw + 90.f);
+					const float S = FVector2D::DotProduct(Off, Along) >= 0.f ? 1.f : -1.f;
+					const FVector2D Moved = It->PlacedAt + Along * (S * 160.f) + Dir2(K.Yaw) * FVector2D::DotProduct(Off, Dir2(K.Yaw));
+					UE_LOG(LogTemp, Log, TEXT("JEEBLIFE keeper %s stands %.0f cm along the front, clear of %s"), *Name, FVector2D::Distance(Moved, K.At), *It->GetNpcName());
+					K.At = Moved;
+					break;
+				}
 				if (!N)
 				{
 					const ENpcRole KRole = K.Shop == uint8(JeebOakHill::EShop::Smith) ? ENpcRole::Blacksmith : K.Shop == uint8(JeebOakHill::EShop::Bank) ? ENpcRole::Banker : ENpcRole::Shopkeeper;
@@ -960,6 +996,33 @@ void ATownLife::Build()
 		Report += FString::Printf(TEXT("\n  beat %s round %.0f s, %d steps"), *R->Label, R->Period, R->Segs.Num());
 	}
 
+	// (a check: every walk, every 50 cm, against the towns' building walls; anyone whose path crosses one is named)
+	{
+		int32 Inside = 0;
+		for (ANpc* N : Done)
+		{
+			const TSharedPtr<FRound>& R = N->GetRound();
+			if (!R.IsValid()) continue;
+			for (const FSeg& S : R->Segs)
+			{
+				if (S.Kind != ESeg::Walk) continue;
+				auto In = [](const FVector2D& P) { return JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f); };
+				if (In(S.A) || In(S.B)) continue;   // (a keeper's step along the counter, inside their stall)
+				const int32 Steps = FMath::Max(1, FMath::CeilToInt(FVector2D::Distance(S.A, S.B) / 50.f));
+				for (int32 k = 0; k <= Steps; ++k)
+				{
+					const FVector2D P = FMath::Lerp(S.A, S.B, float(k) / Steps);
+					if (JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f))
+					{
+						++Inside;
+						UE_LOG(LogTemp, Warning, TEXT("JEEBLIFE walk inside a building: %s at %.0f,%.0f"), *N->GetNpcName(), P.X, P.Y);
+						break;
+					}
+				}
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBLIFE walks inside buildings: %d"), Inside);
+	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBLIFE built %d rounds in %.0f ms (%d walk tests), hash %08x:%s"), Done.Num(), (FPlatformTime::Seconds() - T0) * 1000.0, Map.Tests, Hash, *Report);
 #if !UE_BUILD_SHIPPING
 	if (FParse::Param(FCommandLine::Get(), TEXT("LifeLog")) || FCString::Strifind(FCommandLine::Get(), TEXT("LifeShots="))) SetActorTickEnabled(true);
