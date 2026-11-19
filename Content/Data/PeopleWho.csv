@@ -5,9 +5,9 @@ Who,Model,Tint,Scale,Skin
 # Model "shapes": the old body built from simple shapes. Tint empty: the person's own colour from before (their tunic in the code, or QuestsPeople.csv Tint).
 # Tint is the garment's mean colour (linear, the shading kept): about 0.05-0.15 for a deep colour, 0.3-0.5 for a light one.
 # Scale (optional): the body's size, 1 as made. Skin (optional, red green blue like Tint): the skin dyed this colour, only on a model whose
-# material instance has a skin mask (MI_Smith so far, 2026-11-18): Steele Creek's trolls are the Smith body, bigger and green-grey.
+# material instance has a skin mask (MI_Smith only). Steele Creek's trolls now have their own model, Troll (2.2 m tall as rigged, no dye, no skin row).
 # No row at all: shopkeeper and villagers Townsman, blacksmith Smith, banker Banker, gate knights Guard, quest givers Townsman (Elder if their Hair is light).
-troll,Smith,0.20 0.11 0.05,1.18,0.15 0.22 0.11
+troll,Troll,,1,
 # Blackrock: rich and cold
 shopkeeper,Townsman,0.12 0.30 0.16
 blacksmith,Smith,

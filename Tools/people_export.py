@@ -63,6 +63,7 @@ r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
 d = np.maximum(mx - mn, 1e-5)
 hue = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
 key = ((hue > 150) & (hue < 235) & (sat > 0.11) & (mx > 0.04)).astype(np.float32)
+if NAME == "Troll": key = key * 0.0   # (the troll wears no dyed cloth: his own skin and hide colours stay as painted)
 # close small holes (stains and dark folds the key missed): grow the key 6 px, then shrink it back
 def grow(a, op, n=6):
     for _ in range(n):

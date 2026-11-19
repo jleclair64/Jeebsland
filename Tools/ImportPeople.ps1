@@ -16,7 +16,8 @@ $people = @(
   @('Elder',      'clips:Idle_4', 'clips:Walking_Woman', 'clips:Talk_with_Right_Hand_Open'),
   @('Smith',      'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
   @('Banker',     'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
-  @('Guard',      'clips:Idle_3', 'clips:Quick_Walk',    'clips:Talk_with_Hands_Open')
+  @('Guard',      'clips:Idle_3', 'clips:Quick_Walk',    'clips:Talk_with_Hands_Open'),
+  @('Troll',      'idle:Idle_3',  'walk:Slow_Orc_Walk',  'talk:Talk_with_Hands_Open')   # (2026-11-18: one file per clip, Meshy actions 243, 119, 313; rigged at 2.2 m)
 )
 foreach ($p in $people) {
   $n = $p[0]; $dir = Join-Path $art $n
