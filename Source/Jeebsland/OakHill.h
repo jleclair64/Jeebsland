@@ -343,6 +343,15 @@ namespace JeebOakHill
 		const FVector2D Q(FMath::Abs(L.X) - P.W * 0.5f * Unit, FMath::Abs(L.Y) - P.H * 0.5f * Unit);
 		return FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
 	}
+	// True when (E, N) metres lies inside a fort's or the watchtower's plot (its real drawn footprint, sized from the FModel row) or
+	// within MarginM of it: the one test every "keep trees off the forts" rule uses (2026-11-18: FillTrees.csv's spots were marked on
+	// the forts' old empty plots and stood inside the walls once the 1.4x forts came)
+	inline bool InWarFootprint(float E, float N, float MarginM)
+	{
+		for (const FPlot& P : Plots())
+			if (P.Kind == EPlot::Building && P.Model && (FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0) && PlotSD(P, E, N) < MarginM) return true;
+		return false;
+	}
 
 	// Each building's plot is levelled to the hills' height at its middle: flat 1.5 m round the walls, easing back over at least
 	// 6 m, and over PadSpread times the step where the hill is higher or lower than the pad, so no blend is steeper than about

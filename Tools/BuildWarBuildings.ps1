@@ -11,7 +11,11 @@ $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLabWar'
 if (-not $ImportOnly) {
-    & $blender -b -P (Join-Path $PSScriptRoot 'building_clean.py') -- (Join-Path $proj 'Art\Buildings') $work OakHillFort_300k OakHillWatchtower_300k OakHillRuins_300k | Select-String -Pattern 'BUILD |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+    # 0. the fort's gate: Meshy's model has a closed plank door; Tools/fort_open_gate.py cuts it out and adds posts, a lintel and open leaves
+    $open = Join-Path $proj 'Saved\KnightBuild\FortOpen'; New-Item -ItemType Directory -Force $open | Out-Null
+    & $blender -b -P (Join-Path $PSScriptRoot 'fort_open_gate.py') -- (Join-Path $proj 'Art\Buildings\OakHillFort_300k.glb') (Join-Path $open 'OakHillFort_300k.glb') | Select-String -Pattern 'FORTGATE|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+    & $blender -b -P (Join-Path $PSScriptRoot 'building_clean.py') -- $open $work OakHillFort_300k | Select-String -Pattern 'BUILD |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
+    & $blender -b -P (Join-Path $PSScriptRoot 'building_clean.py') -- (Join-Path $proj 'Art\Buildings') $work OakHillWatchtower_300k OakHillRuins_300k | Select-String -Pattern 'BUILD |Traceback|Error' | ForEach-Object { Write-Host $_.Line }
     & $blender -b -P (Join-Path $PSScriptRoot 'building_flatten.py') -- $work OakHillFort_300k OakHillWatchtower_300k OakHillRuins_300k | Select-String -Pattern 'FLAT .*done|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
     foreach ($d in @(@('OakHillFort_300k', 'TL_Fort', 60000), @('OakHillWatchtower_300k', 'TL_Watchtower', 40000))) {
         & $blender -b -P (Join-Path $PSScriptRoot 'townlab_bake.py') -- $work $out $d[0] $d[1] $d[2] --size 2048 --preview | Select-String -Pattern 'TLBAKE (wrote|groups)|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
