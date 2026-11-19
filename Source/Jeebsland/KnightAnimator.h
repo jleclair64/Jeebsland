@@ -171,6 +171,7 @@ namespace JeebAnim
 		// free climbing and the mantle (2026-11-12, KnightMovement.h): 1 on the rock, 2 its jump, 3 the ledge climb-up, 4 a mantle over, 5 onto
 		uint8 WallMode = 0;
 		FVector WallN = FVector::BackwardVector, WallPoint = FVector::ZeroVector; bool bMantleEdge = false;   // the rock: its normal, and a point on it (world); a mantle: WallPoint is the top of the obstacle's near edge (bMantleEdge)
+		FVector MantleAlong = FVector::ZeroVector; float MantleFar = 0.f;   // a mantle: the way over (flat), and how far past WallPoint its top runs (his feet are kept clear of it, WallPlay)
 		FVector LimbP[4], LimbN[4]; bool bLimbHit[4] = { false, false, false, false };   // on the rock: the surface under each hand and foot (left hand, right hand, left foot, right foot), traced from last frame's pose
 		float WallUpV = 0.f, WallRightV = 0.f;   // his speed along it: up, and to his right
 		FVector2D WallJump = FVector2D(0.f, 1.f);   // the climb jump's way along it (x right, y up)
@@ -387,6 +388,7 @@ private:
 	TMap<FString, FVector2D> SwimHipStats;
 	int32 SwimMoveKey = 92;
 	float SwimSlowT = 0.f, SwimPhase = 0.f, SwimHipZ = -1.f, SwimPitch = 0.f, SwimDrownT = 0.f;
+	void MantleFeetClear(const JeebAnim::FInput& In, FPose& B) const;   // a mantle: lifts the body so no foot or toe is inside the obstacle's top (In.WallPoint, MantleFar)
 	void PlantHands(const JeebAnim::FInput& In, FPose& B) const;   // a vault: both hands pressed onto the top of the fence while he goes over (In.WallPoint)
 	void ClimbIK(const JeebAnim::FInput& In, float Dt);   // on the rock: each hand and boot rests on the surface (1.5 cm off), never in it: two-bone reaches, the body eased off the rock if the hands need it
 	float ClimbIKW = 0.f, WallIKLogT = 0.f;

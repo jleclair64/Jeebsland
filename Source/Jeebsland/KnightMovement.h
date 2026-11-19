@@ -39,6 +39,7 @@ struct FKnightMoveResponse : public FCharacterMoveResponseDataContainer
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f, ActHold = 0.f;
 	float SwimStamina = 1.f, Breath = 1.f, SwimRefillWait = 0.f, DrownT = 0.f;   // (swimming)
 	bool bHeadUnder = false;
+	FVector ActEdge = FVector::ZeroVector; float ActFar = 0.f;   // (the mantle's near top edge and far edge: the path over the top)
 	float StrafeSprint = 1.f, AirMul = 1.f;   // (the running speed's eased shares: UKnightMovement::MoveStrafeSprint, MoveAirMul)
 	virtual void ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment) override;
 	virtual bool Serialize(UCharacterMovementComponent& CharacterMovement, FArchive& Ar, UPackageMap* PackageMap) override;
@@ -103,8 +104,10 @@ public:
 	FVector ActFrom = FVector::ZeroVector, ActTo = FVector::ZeroVector, ActDir = FVector::ZeroVector;   // a scripted move (jump, climb-up, mantle)
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f;
 	float ActHold = 0.f;   // the stand at the end of this scripted move, taken from tuning as it starts (it travels in corrections, so a reloaded Tuning.ini can't split the machines)
-	FVector ActEdge = FVector::ZeroVector;   // a mantle: the top of the fence or block's near edge, where the hands go (the pose only; not part of the move)
-	bool FindMantleEdge(const FVector& Center, const FVector& Fwd, FVector& OutEdge) const;   // (others' machines: the same edge, found as the mantle starts)
+	FVector ActEdge = FVector::ZeroVector;   // a mantle: the top of the fence or block's near edge, where the hands go (and, since 2026-11-18 night, where his feet must clear; travels in corrections)
+	float ActFar = 0.f;                      // a vault: how far past ActFrom (along ActDir) the obstacle's far edge is: he stays up over the top until his feet are past it
+	bool FindMantleEdge(const FVector& Center, const FVector& Fwd, FVector& OutEdge, float* OutFar = nullptr, FVector* OutFace = nullptr) const;
+	static float MantleFarPast(const FVector& From, const FVector& Edge, const FVector& Face, uint8 Mode, float Far);   // (others' machines: the same edge, found as the mantle starts)
 
 	// ---- swimming (2026-11-13, KnightMovementSwim.cpp; numbers in Tuning.ini [Swim]) ----
 	// The water comes only from JeebWater::DepthAt (the drawn water has no collision). Deep water at his feet (SwimEnterDepth) turns walking or
@@ -170,7 +173,7 @@ private:
 	bool TryLedge();
 	bool PlanLedge(const FVector& Center, const FVector& N, FVector& OutTo, float& OutTop) const;
 	bool TryMantle(bool bInAir);
-	bool PlanMantle(const FVector& Center, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge = nullptr) const;
+	bool PlanMantle(const FVector& Center, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge = nullptr, float* OutFar = nullptr) const;
 	bool RoomFor(const FVector& Center) const;
 	void StartScripted(uint8 Mode, const FVector& To, float Dur, float Top, const FVector& Dir);
 	void PhysClimb(float Dt);

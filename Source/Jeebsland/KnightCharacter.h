@@ -778,6 +778,7 @@ public:
 	bool InClimbMove() const;            // on a rock face, its jump, the ledge climb-up or a mantle
 	bool ClimbStowed() const;            // on the rock, climbing up a ledge or mantling: shield and weapon on his back
 	mutable FVector MantleEdge = FVector::ZeroVector; mutable uint8 MantleEdgeMode = 0;   // (the pose: where the hands go on a fence, FillWallInput)
+	mutable FVector MantleAlong = FVector::ZeroVector; mutable float MantleFar = 0.f;     // (the pose: the way over and how deep the top is, so his feet clear it)
 	void DropFromWall(bool bAll = false);   // (server) a clean hit, a knockdown or death takes him off it
 	void JumpFromMove(float Dt);         // the ground jump, from inside a move (Space near a fence that turned out not to be a mantle)
 	void TickWallClimb(float Dt);
