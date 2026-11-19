@@ -120,6 +120,7 @@ void AKnightCharacter::BeginPlay()
 	// for single player only: in an online game the server will own every character (not built yet), so they start fresh.
 	if (Skills && !(UsesLocalSave() && UJeebSave::Restore(Skills)))
 	{
+		if (bIsTroll && HasAuthority()) Skills->ResetToStartingKit();   // (the troll's own kit: the club, no knight's gear)
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 	}

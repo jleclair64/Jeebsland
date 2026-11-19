@@ -68,6 +68,14 @@ void USkillComponent::ResetToStartingKit()
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
 		Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // (ArmourId gives the classic shoulders: Light has none of its own)
 	// (no cape: owner, 2026-11-05, until it looks better. Capes are still bought and worn like any item.)
+	// The playable troll (2026-11-19): the common club in hand in place of the sword, and nothing he can't use (the bow and the shield are
+	// knights'). (In the constructor his class isn't known yet: AKnightCharacter::BeginPlay calls this again for a troll with no save.)
+	if (JeebItems::OwnerIsTroll(this))
+	{
+		Hotbar[0] = JeebItems::GearId(JeebItems::K_Club, 0);
+		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] && !JeebItems::CanEquip(this, Hotbar[i])) Hotbar[i] = 0;
+		for (int32 i = 0; i < NumWornKinds; ++i) if (Worn[i] && !JeebItems::CanEquip(this, Worn[i])) Worn[i] = 0;
+	}
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots

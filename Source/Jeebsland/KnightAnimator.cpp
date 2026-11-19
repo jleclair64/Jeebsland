@@ -1528,7 +1528,8 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	FallShare = FMath::FInterpTo(FallShare, bAir ? FMath::SmoothStep(0.55f, 1.2f, AirT) : 0.f, Dt, bAir ? 5.f : 12.f);
 	if (Key == 0)
 	{
-		const float Knees = AirShare * 0.33f + (LandT < 0.34f ? FMath::Sin(LandT / 0.34f * PI) * 0.8f * LandStrength : 0.f);
+		const float Tuck = (bAir && In.LeapFly >= 0.f) ? TrollLeapAir(In, B) : -1.f;   // (the troll's charged jump: stretched off the ground, then tucked)
+		const float Knees = (Tuck >= 0.f ? Tuck : AirShare * 0.33f) + (LandT < 0.34f ? FMath::Sin(LandT / 0.34f * PI) * 0.8f * LandStrength : 0.f);
 		if (Knees > 0.005f)
 			if (const FClip* C = Get(TEXT("FallLand")))
 			{

@@ -164,6 +164,7 @@ namespace JeebAnim
 		float ReboundU = 0.f;
 		float LegYaw = 0.f;
 		float CrouchAlpha = 0.f, BlockAlpha = 0.f, BowAimAlpha = 0.f;
+		float LeapFly = -1.f;       // the troll's charged jump in flight: its charge (0..1); -1 none (KnightAnimatorTroll.cpp TrollLeapAir)
 		int32 BowMode = 0;          // 0 lowering, 1 drawing, 2 just loosed
 		float BowT = 0.f;
 		float BowDrawFor = 1.f;     // how long a full draw takes with what is in his hand
@@ -319,6 +320,7 @@ private:
 	void MakeTrollMesh(AActor* Owner);
 	void TrollPose();
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)
 	class USkeletalMeshComponent* UnderComp = nullptr;  // the mail always under the armour, so plate never looks hollow: follows Comp's bones
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};

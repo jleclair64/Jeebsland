@@ -240,6 +240,43 @@ void FKnightAnimator::TrollPose()
 	TrollComp->RefreshBoneTransforms();
 }
 
+// The troll's charged jump in the air (review 2026-11-19: he went straight from the crouch into the tuck). First a take-off stretch:
+// the legs pushed out straight under and a little behind him, the arms swung up and forward; then over about a quarter second the
+// stretch eases into the tuck (the knees drawn up, more for a bigger charge); the landing is the usual knee give. Returns the tuck share
+// for the FallLand overlay. (mesh space: +X his left, +Y ahead, +Z up)
+float FKnightAnimator::TrollLeapAir(const FInput& In, FPose& B)
+{
+	const float T = AirT;
+	const float S = FMath::SmoothStep(0.f, 0.06f, T) * (1.f - FMath::SmoothStep(0.16f, 0.38f, T));   // the stretch
+	const float Tuck = FMath::SmoothStep(0.16f, 0.42f, T) * (0.4f + 0.3f * FMath::Clamp(In.LeapFly, 0.f, 1.f));
+	if (S > 0.005f)
+	{
+		// legs: the feet straight down from the hips and back, the left a little further (the last to leave the ground)
+		const float Leg = float(RefPos[Bone[LLeg]].Size() + RefPos[Bone[LFoot]].Size());
+		auto Straight = [&](int32 Up, int32 Mid, int32 End, float Back)
+		{
+			const FVector Hip = BonePos(B, Up), Now = BonePos(B, End);
+			const FVector Want = Hip + FVector(0.f, -Back, -0.96f).GetSafeNormal() * Leg * 0.97f;
+			L.ReachTo(B, Up, Mid, End, FMath::Lerp(Now, Want, S), FVector(0.f, 1.f, 0.f));   // (the knee ahead)
+		};
+		Straight(LUp, LLeg, LFoot, 0.32f);
+		Straight(RUp, RLeg, RFoot, 0.12f);
+		// arms: swung up and forward from the shoulders, elbows out
+		const float Arm = float(RefPos[Bone[LFore]].Size() + RefPos[Bone[LHand]].Size());
+		auto Swing = [&](int32 Up, int32 Mid, int32 End, float Side)
+		{
+			const FVector Sh = BonePos(B, Up), Now = BonePos(B, End);
+			const FVector Want = Sh + FVector(0.3f * Side, 0.5f, 0.62f) * Arm;
+			L.ReachTo(B, Up, Mid, End, FMath::Lerp(Now, Want, S), FVector(Side, -0.3f, -0.4f));
+		};
+		Swing(LArm, LFore, LHand, 1.f);
+		Swing(RArm, RFore, RHand, -1.f);
+		// the chest lifts and opens a little
+		TurnInMesh(B, Spine2, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(6.f * S)));   // (about +X, his left: the chest's top goes back)
+	}
+	return Tuck;
+}
+
 // The troll's left punch, in the kick's place and on the kick's timing (Tuning.ini [Kick]): the sword's guard stance underneath, the
 // left fist pulled back a little through the wind-up, driven straight out ahead of the left shoulder over the hit frames with the chest
 // turning in behind it, held, then brought back to the guard. The hit boxes ride the left fist and forearm (TickHitboxes).
