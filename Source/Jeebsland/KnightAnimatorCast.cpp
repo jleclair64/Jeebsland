@@ -1,6 +1,7 @@
 #include "KnightAnimator.h"
 #include "Inventory.h"
 #include "WeaponDesign.h"
+#include "KnightDesign.h"
 #include "HAL/IConsoleManager.h"
 #include "Logging/LogMacros.h"
 
@@ -21,6 +22,9 @@ namespace
 
 	TAutoConsoleVariable<FString> CVarCastTiltStaff(TEXT("jeeb.Knight.CastTiltStaff"), TEXT("12,50,15"), TEXT("The staff through a cast: degrees from straight up at the start, the release and the end (its orb tips toward the target)."), ECVF_Default);
 	TAutoConsoleVariable<FString> CVarCastTiltWand(TEXT("jeeb.Knight.CastTiltWand"), TEXT("45,88,50"), TEXT("The wand through a cast: degrees from straight up at the start, the release and the end (90 points straight ahead)."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarCastSquare(TEXT("jeeb.Knight.CastSquare"), 1.f, TEXT("How much his chest turns square to the shot through a cast (0 = as the clip turns it, to his right)."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarCastPoint(TEXT("jeeb.Knight.CastPoint"), 1.f, TEXT("How much the wand's arm points along the bolt's path at the release (0 = the clip's own arm)."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarCastPitch(TEXT("jeeb.Knight.CastPitch"), 6.f, TEXT("Degrees the wand's arm points above his aim at the release: the reticle sits above the middle of the screen, so the bolt climbs a little (jeeb.Magic.Reticle)."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarCastAim(TEXT("jeeb.Knight.CastAim"), 1.f, TEXT("How much the staff or wand is turned onto its cast line (0 = the clip's own hand)."), ECVF_Default);
 
 	FVector Tilts(const TAutoConsoleVariable<FString>& V, const FVector& Def)
@@ -30,19 +34,17 @@ namespace
 		return P.Num() == 3 ? FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2])) : Def;
 	}
 
-	// The staff carried (2026-11-18, visual review: it was held like a rifle, flat at his hip, 1.4 m out in front and 0.8 m behind):
-	// the fist out beside his right hip, the elbow a little bent, and the staff upright through it, its butt by his foot and the orb
-	// above his shoulder, leaning a little forward and out. Live: jeeb.Knight.StaffHand (the fist from the shoulder, cm, mesh frame:
-	// -X his right, +Y ahead, +Z up) and jeeb.Knight.StaffLean (degrees forward, degrees out).
-	TAutoConsoleVariable<FString> CVarStaffHand(TEXT("jeeb.Knight.StaffHand"), TEXT("-20,18,-44"), TEXT("Where the fist holding the staff is, from his right shoulder (cm; -X his right, +Y ahead, +Z up)."), ECVF_Default);
-	TAutoConsoleVariable<FString> CVarStaffLean(TEXT("jeeb.Knight.StaffLean"), TEXT("8,6,0"), TEXT("The carried staff's lean from upright: degrees forward, degrees out to his right (third number unused)."), ECVF_Default);
-
-	FVector StaffUp()
-	{
-		const FVector Lean = Tilts(CVarStaffLean, FVector(8.f, 6.f, 0.f));
-		const float F = FMath::DegreesToRadians(Lean.X), O = FMath::DegreesToRadians(Lean.Y);
-		return FVector(-FMath::Sin(O), FMath::Sin(F), 1.f).GetSafeNormal();   // (mesh frame)
-	}
+	// The staff carried as a walking staff (owner 2026-11-18, picture 12: "the bottom of the staff is on the ground"; before, it was upright
+	// at his side with the butt at his knee). Its butt stands on the ground beside his right foot (jeeb.Knight.StaffButt, mesh frame from his
+	// feet: -X his right, +Y ahead, +Z up; 0 is the ground), it leans toward where the fist wants to be (jeeb.Knight.StaffHand, from his
+	// right shoulder), and the fist holds it jeeb.Knight.StaffHold cm up from the butt: the model slides through the fist to match
+	// (AKnightCharacter::PlaceStaffModel), so the hand is always on the shaft and the butt always where it is set. Walking, the butt lifts a
+	// little off the ground and swings with the stride like a walking stick (jeeb.Knight.StaffWalk: lift cm, swing cm; running lifts twice).
+	TAutoConsoleVariable<FString> CVarStaffHand(TEXT("jeeb.Knight.StaffHand"), TEXT("-22,20,-36"), TEXT("Where the fist holding the staff wants to be, from his right shoulder (cm; -X his right, +Y ahead, +Z up): the staff leans from its butt toward it."), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarStaffButt(TEXT("jeeb.Knight.StaffButt"), TEXT("-36,26,0"), TEXT("Where the carried staff's butt stands, from his feet (cm; -X his right, +Y ahead, Z 0 the ground)."), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarStaffWalk(TEXT("jeeb.Knight.StaffWalk"), TEXT("7,12,0"), TEXT("Walking with the staff: how far its butt lifts off the ground (cm; twice running) and swings ahead and back with the stride (cm)."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarStaffHold(TEXT("jeeb.Knight.StaffHold"), 110.f, TEXT("How far up the staff from its butt the fist holds it (cm; the model is 165 long; read by PlaceStaffModel too)."), ECVF_Default);
+	constexpr float StaffButtFromGrip = 36.3f;   // (the model as built: its grip 0.78 of its 165 cm from the orb end, Tools/prop_clean.py)
 
 	// (2026-11-18 second review: the staff snapped from the carry to overhead in the first 0.13 s of its cast, the clip's wind-up squeezed into
 	// 0.18 s under a 0.12 s blend.) Now the carry hands the arm over to the spell's raised pose over this share of the move (1.1 s for the staff),
@@ -98,14 +100,50 @@ void FKnightAnimator::StaffCarry(const FInput& In, FPose& B, int32 Act, float Dt
 	const int32 Chain[3] = { RArm, RFore, RHand };
 	FQuat Was[3];
 	for (int32 i = 0; i < 3; ++i) Was[i] = B.Rot[Bone[Chain[i]]];
-	const FVector Off = Tilts(CVarStaffHand, FVector(-20.f, 18.f, -44.f));
+	// where the butt goes and which way the staff leans (walking: lifted and swinging with the stride)
+	FVector Butt = Tilts(CVarStaffButt, FVector(-36.f, 26.f, 0.f));
+	if (bMoving)
+	{
+		const FVector Wk = Tilts(CVarStaffWalk, FVector(7.f, 12.f, 0.f));
+		const float Go = FMath::Clamp(SmSpeed / 150.f, 0.f, 1.f), Run = FMath::SmoothStep(230.f, 400.f, SmSpeed);
+		Butt.Z += Wk.X * Go * (1.f + Run);
+		Butt.Y += Wk.Y * Go * FMath::Sin(2.f * PI * Phase) + 10.f * Run;   // (running: carried a little further ahead)
+	}
+	const FVector HandSpot = BonePos(B, RArm) + Tilts(CVarStaffHand, FVector(-22.f, 20.f, -36.f));
+	FVector Up = HandSpot - Butt;
+	if (!Up.Normalize() || Up.Z < 0.5f) Up = FVector::UpVector;
+	const float Hold = FMath::Clamp(CVarStaffHold.GetValueOnGameThread(), StaffButtFromGrip, 160.f);
+	const FVector GripWant = Butt + Up * Hold;
+	// The fist's grip point is not the hand bone: reach, turn the staff onto its line, see where the grip is, and reach again by the miss
+	const FVector GripInHand = L.RightGrip.TransformPosition(KnightDesign::GripPos(false) - KnightDesign::PivotPos(KnightDesign::P_WristR));
 	FQuat HandWas;
-	BonePos(B, RHand, &HandWas);
-	L.ReachTo(B, RArm, RFore, RHand, BonePos(B, RArm) + Off, FVector(-0.6f, -1.f, -0.2f));   // (the elbow back and out)
-	FQuat HandNow;
-	BonePos(B, RHand, &HandNow);
-	TurnInMesh(B, RHand, HandWas * HandNow.Inverse());
-	TurnHeldTo(L, B, StaffUp(), 1.f);
+	FVector Target = BonePos(B, RHand, &HandWas);
+	float Miss = 0.f;
+	for (int32 It = 0; It < 3; ++It)
+	{
+		FQuat HR;
+		const FVector At = BonePos(B, RHand, &HR);
+		const FVector Off = GripWant - (At + HR.RotateVector(GripInHand));
+		Miss = Off.Size();
+		if (It > 0 && Miss < 0.3f) break;
+		Target = (It == 0 ? At : Target) + Off;
+		L.ReachTo(B, RArm, RFore, RHand, Target, FVector(-0.6f, -1.f, -0.2f));   // (the elbow back and out)
+		FQuat HandNow;
+		BonePos(B, RHand, &HandNow);
+		TurnInMesh(B, RHand, HandWas * HandNow.Inverse());
+		TurnHeldTo(L, B, Up, 1.f);
+	}
+	if (In.bShotLog)
+	{
+		FQuat HR;
+		const FVector At = BonePos(B, RHand, &HR);
+		const FVector Grip = At + HR.RotateVector(GripInHand);
+		const FVector Axis = HR.RotateVector(L.BladeInHand).GetSafeNormal();
+		const FVector ButtNow = Grip - Axis * Hold;
+		UE_LOG(LogTemp, Log, TEXT("JEEBSTAFF w %.2f act %d moving %d grip miss %.1f cm, butt at %.0f,%.0f,%.1f (want %.0f,%.0f,%.1f), lean %.0f deg"), W, Act, bMoving ? 1 : 0,
+			float(FVector::Dist(Grip, GripWant)), float(-ButtNow.X), float(ButtNow.Y), float(ButtNow.Z), float(-Butt.X), float(Butt.Y), float(Butt.Z),
+			FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(float(Axis.Z), -1.f, 1.f))));
+	}
 	if (W < 0.999f)
 		for (int32 i = 0; i < 3; ++i) B.Rot[Bone[Chain[i]]] = BlendRot(Was[i], B.Rot[Bone[Chain[i]]], W);
 
@@ -139,6 +177,35 @@ void FKnightAnimator::CastPose(const FInput& In, FPose& B, float& OutBlend)
 	if (!bStaff && In.bShieldArm) PlayKeepOffArm = 1.f;   // (the clip's off hand flings out; the shield stays on guard, a fixed pose under it)
 	PlayAt(Row, MoveClipTime(*M, U, CastPushFrom, CastRelease), 1000.f, B, &OutBlend);
 
+	// Facing the shot (owner 2026-11-18, picture 13: the wand's clip turned his chest and arm to his right while the bolt flew straight
+	// ahead). He already faces the aim point (AKnightCharacter::StartAttack); now his chest turns square to it over the push, spread up the
+	// spine, and the wand's arm points along the bolt's path, pitched with his aim. Eased in and out with the move. Every machine works this
+	// out from the same replicated facing and aim pitch, so other players see him point where the bolt goes.
+	const float FaceW = FMath::SmoothStep(0.f, CastPushFrom, U) * (1.f - FMath::SmoothStep(0.72f, 1.f, U));
+	{
+		const float Sq = FMath::Clamp(CVarCastSquare.GetValueOnGameThread(), 0.f, 1.f) * FaceW;
+		const FVector Across = BonePos(B, RArm) - BonePos(B, LArm);   // (left shoulder to right: -X when square)
+		const FVector Fwd = FVector::CrossProduct(Across, FVector::UpVector);
+		if (Sq > 0.001f && FVector2D(Fwd.X, Fwd.Y).Size() > 1.f)
+		{
+			const float Off = FMath::Atan2(-float(Fwd.X), float(Fwd.Y));   // (how far the chest is turned toward his right (-X), +)
+			TurnInMesh(B, Spine, FQuat(FVector::UpVector, -Off * 0.35f * Sq));
+			TurnInMesh(B, Spine1, FQuat(FVector::UpVector, -Off * 0.35f * Sq));
+			TurnInMesh(B, Spine2, FQuat(FVector::UpVector, -Off * 0.3f * Sq));
+			if (In.bShotLog) UE_LOG(LogTemp, Log, TEXT("JEEBCASTFACE u %.3f chest off %.0f deg, squared by %.2f"), U, FMath::RadiansToDegrees(Off), Sq);
+		}
+	}
+	if (!bStaff)
+	{
+		const float Pt = FMath::Clamp(CVarCastPoint.GetValueOnGameThread(), 0.f, 1.f) * FaceW;
+		const FVector Sh = BonePos(B, RArm), Hd = BonePos(B, RHand);
+		const FVector Now = (Hd - Sh).GetSafeNormal();
+		const float P = FMath::DegreesToRadians(FMath::Clamp(In.AimPitch + CVarCastPitch.GetValueOnGameThread(), -45.f, 45.f));
+		const FVector Want(0.f, FMath::Cos(P), FMath::Sin(P));
+		if (Pt > 0.001f && !Now.IsNearlyZero())
+			TurnInMesh(B, RArm, FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(Now, Want), Pt));
+	}
+
 	// the item on its line: in over the first frames, held through the release, out as the recovery ends (the blend to guard does the rest)
 	// (the staff is upright at his side before and after, StaffCarry, so it stays on its line the whole way: no ramp)
 	const float Aim = FMath::Clamp(CVarCastAim.GetValueOnGameThread(), 0.f, 1.f);
@@ -149,7 +216,7 @@ void FKnightAnimator::CastPose(const FInput& In, FPose& B, float& OutBlend)
 		const FVector T = Tilts(bStaff ? CVarCastTiltStaff : CVarCastTiltWand, bStaff ? FVector(12.f, 50.f, 15.f) : FVector(45.f, 88.f, 50.f));
 		const float Tilt = U < CastRelease ? FMath::Lerp(T.X, T.Y, FMath::SmoothStep(0.04f, CastRelease, U))
 		                                   : FMath::Lerp(T.Y, T.Z, FMath::SmoothStep(CastRelease + 0.1f, 1.f, U));
-		const float R = FMath::DegreesToRadians(Tilt);
+		const float R = FMath::DegreesToRadians(Tilt - (bStaff ? 0.f : FMath::Clamp(In.AimPitch + CVarCastPitch.GetValueOnGameThread(), -45.f, 45.f) * FaceW));   // (the wand along the bolt's path, up or down with his aim)
 		const FVector Want(0.f, FMath::Sin(R), FMath::Cos(R));   // (mesh frame: +Y ahead, +Z up)
 		Deg = TurnHeldTo(L, B, Want, W);
 	}

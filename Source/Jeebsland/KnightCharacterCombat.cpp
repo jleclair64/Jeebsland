@@ -108,11 +108,21 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	QueuedJabs = 0;   // (a new swing starts with an empty buffer: presses made before it began are used up)
 	Smash = ESmash::None; bSmashSwing = false; SmashT = 0.f; SmashCoilNow = 0.f;   //(the caller makes hit 1 a smash; online the player's next swing ends the server's end lag)
 	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBJAB start dir %d at %.3f, swing %.3f s, then a pause of %.3f s"), Dir, GetWorld()->GetTimeSeconds(), AttackDur, JabPause());
+	// A wand's or staff's cast: the player's machine takes what is under the reticle (KnightCharacterCastAim.cpp) and tells the server first
+	if (Style == EAtkStyle::Cast && IsLocallyControlled())
+	{
+		CastTarget = CastAimPoint();
+		CastTargetAt = GetWorld()->GetTimeSeconds();
+		if (!HasAuthority()) ServerCastAim(CastTarget);
+	}
 	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
-	// Face where you aim: always for shots (bow, wand, staff fly where the camera points); a melee swing or thrust only in
-	// strafe mode, otherwise it goes the way the knight already faces (owner, 2026-10-31)
+	// Face where you aim: always for shots (bow, wand, staff fly where the camera points; a cast faces the point under its reticle);
+	// a melee swing or thrust only in strafe mode, otherwise it goes the way the knight already faces (owner, 2026-10-31)
 	else if (AController* C = GetController())
-		if (Style == EAtkStyle::Cast || bStrafeMode) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));
+	{
+		if (Style == EAtkStyle::Cast) SetActorRotation(FRotator(0.f, CastFacingYaw(C->GetControlRotation().Yaw), 0.f));
+		else if (bStrafeMode) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));
+	}
 	AttackYaw = GetActorRotation().Yaw;   // (a sword hit keeps this heading: TickAttack)
 	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
 	if (GetNetMode() != NM_Standalone)
@@ -256,14 +266,25 @@ void AKnightCharacter::AttackLands()
 	{
 		FRotator Aim = GetActorRotation();
 		if (AController* C = GetController()) Aim = C->GetControlRotation();
-		const FVector Dir = Aim.Vector();
+		// (2026-11-18, owner: from the wand's tip or the staff's orb toward what was under the reticle, if the player's machine sent a
+		// fresh point ahead of where he looks; else from before his chest along his aim, as before)
+		const FVector Start = CastStartPoint(K);
+		FVector Dir = Aim.Vector();
+		const bool bFresh = GetWorld()->GetTimeSeconds() - CastTargetAt < 2.0;
+		if (bFresh)
+		{
+			const FVector ToT = CastTarget - Start;
+			if (ToT.Size() > 150.f && FVector::DotProduct(ToT.GetSafeNormal(), Aim.Vector()) > 0.5f) Dir = ToT.GetSafeNormal();
+		}
+		CastTargetAt = -100.0;   // (used once)
+		if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBCASTAIM fresh %d start %s (hand off the chest %.0f cm) dir %s target %s"), bFresh ? 1 : 0, *Start.ToCompactString(),
+			float(FVector::Dist(Start, GetActorLocation() + FVector(0.f, 0.f, 40.f))), *Dir.ToCompactString(), *CastTarget.ToCompactString());
 		const bool bBow = (K == JeebItems::K_Bow);
 		bool bCrit = false;
 		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit);
 		const float Range = JeebItems::WeaponBase(K).Range;
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		const FVector Start = GetActorLocation() + GetActorForwardVector() * 70.f + FVector(0.f, 0.f, 30.f);
 		if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), Start, Dir.Rotation(), SP))
 		{
 			P->Launch(this, Dir, bBow ? 3500.f : (K == JeebItems::K_Staff ? 1800.f : 2200.f), Range, Dmg, bCrit, Sk, !bBow,

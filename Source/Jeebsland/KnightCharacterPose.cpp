@@ -179,7 +179,8 @@ void AKnightCharacter::PlaceStaffModel()
 {
 	TArray<FString> P;
 	CVarStaffGrip.GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
-	const FVector Nudge = P.Num() == 3 ? FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2])) : FVector::ZeroVector;
+	FVector Nudge = P.Num() == 3 ? FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2])) : FVector::ZeroVector;
+	Nudge.Z += StaffSlide();   // (the walking-staff hold: the model slides through the fist, KnightAnimatorCast.cpp places the arm for it)
 	const float Glow = FMath::Max(0.f, CVarOrbGlow.GetValueOnGameThread()), Lock = FMath::Clamp(CVarOrbLock.GetValueOnGameThread(), 0.f, 1.f);
 	for (UStaticMeshComponent* S : HeldStatics)
 	{

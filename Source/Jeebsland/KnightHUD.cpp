@@ -171,6 +171,7 @@ void AKnightHUD::DrawHUD()
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
 	DrawWeaponBar(Knight);
 	DrawReticle(Knight);
+	DrawCastReticle(Knight);   // (the wand and staff: KnightHUDReticle.cpp)
 	if (!Knight->IsUIOpen() && !bEmoteWheel && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);   // (not under the emote wheel)
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp; on top)
