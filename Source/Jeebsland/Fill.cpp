@@ -1099,6 +1099,7 @@ struct FFillBuilder
 		for (const FTreeRow& T : D.Trees)
 		{
 			if (!T.Site.Equals(TEXT("OakHill"), ESearchCase::IgnoreCase) || !OakOn()) continue;
+			if (JeebOakHill::InWarFootprint(T.E, T.N, 2.f)) continue;   // (the same footprint rule as AOakForest: no tree spot inside a fort)
 			const FVector2D At(JeebOakHill::PosX + T.N * 100.f, JeebOakHill::PosY + T.E * 100.f);
 			Keep(FShape::Circle(At, T.Radius), TEXT("tree ") + T.Class, F_TREE);
 			TreeSpots.Add({ At, T.Radius, T.Class });

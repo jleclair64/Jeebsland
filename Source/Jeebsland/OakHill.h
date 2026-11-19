@@ -147,7 +147,7 @@ namespace JeebOakHill
 			// ATownLabTown sets each on the lowest ground under its walls, its stone footing running into the slope
 			// (the fort at 1.4x since the 2026-11-18 review: at 1.0 it read as a fenced pen beside the houses; now 20.3 x 8.2 m, its
 			// palisade about 4.6 m and its blockhouses 7.3 m. LenX/LenY are the drawn size, so the plan's spacing pass sees the real one)
-			{ TEXT("OakHillFort"),        1.4f,  20.3f,  8.16f,  false, 90.f,  -709.6f, 709.8f, -286.4f, 282.8f },
+			{ TEXT("OakHillFort"),        1.4f,  20.3f,  11.2f,  false, 90.f,  -709.6f, 709.8f, -281.5f, 287.8f },   // (LenY: the walls 8.2 m + a 1.5 m apron each side, so the plot, the tree clearing and the terrain flattening cover the gate's approach; the opened gate, 2026-11-18)
 			{ TEXT("OakHillWatchtower"),  1.0f,  5.3f,   5.31f,  false, 90.f,  -235.8f, 236.0f, -234.3f, 234.2f },
 			{ TEXT("OakHillRuins"),       1.0f,  19.0f,  10.24f, false, 90.f,  -892.1f, 913.5f, -493.7f, 490.7f },
 		};
@@ -342,6 +342,15 @@ namespace JeebOakHill
 		const FVector2D L(DE * P.Cs - DN * P.Sn, DE * P.Sn + DN * P.Cs);
 		const FVector2D Q(FMath::Abs(L.X) - P.W * 0.5f * Unit, FMath::Abs(L.Y) - P.H * 0.5f * Unit);
 		return FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
+	}
+	// True when (E, N) metres lies inside a fort's or the watchtower's plot (its real drawn footprint, sized from the FModel row) or
+	// within MarginM of it: the one test every "keep trees off the forts" rule uses (2026-11-18: FillTrees.csv's spots were marked on
+	// the forts' old empty plots and stood inside the walls once the 1.4x forts came)
+	inline bool InWarFootprint(float E, float N, float MarginM)
+	{
+		for (const FPlot& P : Plots())
+			if (P.Kind == EPlot::Building && P.Model && (FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0) && PlotSD(P, E, N) < MarginM) return true;
+		return false;
 	}
 
 	// Each building's plot is levelled to the hills' height at its middle: flat 1.5 m round the walls, easing back over at least

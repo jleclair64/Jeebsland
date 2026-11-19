@@ -490,6 +490,7 @@ struct FOakForestBuild
 				TArray<FString> C; L.ParseIntoArray(C, TEXT(","), false);
 				if (C.Num() < 4 || !C[0].TrimStartAndEnd().Equals(TEXT("OakHill"), ESearchCase::IgnoreCase)) continue;
 				const float E = FCString::Atof(*C[1]), N = FCString::Atof(*C[2]);
+				if (InWarFootprint(E, N, 2.f)) continue;   // (a spot marked on a fort's old empty plot would stand inside its walls)
 				const FString Class = C[3].TrimStartAndEnd().ToLower();
 				const FVector2D Plan(PosX + N * 100.f, PosY + E * 100.f);
 				const int32 Col = TownColour(Plan);
