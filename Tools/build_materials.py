@@ -659,8 +659,11 @@ import gen_textures
 # tree's foot) by dropping a growing share of its shadow-map texels (screen noise, so the sun's soft-shadow filter and TSR turn it
 # into a partial shade), and grows to GrowK times its built size at GrowFrom, back to 1 by GrowFrom+GrowWidth (about Anchor, the
 # crown's middle in the mesh's own frame), so it covers the real tree's leafy shadow while that one is swapped in or out.
+# (2026-11-18) D: the stand-in's density, a fixed noise in world-space cells of C cm on the stand-in itself, so it casts a see-through
+# shade about as dark as a real leafy crown's (a solid one was far darker) and keeps still; the far stand-ins use it too, unfaded
 SHADE_FADE_HLSL = ("float n = frac(52.9829189 * frac(dot(Parameters.SvPosition.xy + float(View.StateFrameIndexMod8) * float2(2.083, 4.867), "
-                   "float2(0.06711056, 0.00583715))));\nreturn n < F ? 1.0 : 0.0;")
+                   "float2(0.06711056, 0.00583715))));\nfloat3 c = floor(W / max(C, 1.0));\n"
+                   "float s = frac(sin(dot(c, float3(12.9898, 78.233, 37.719))) * 43758.5453);\nreturn (n < F && s < D) ? 1.0 : 0.0;")
 
 
 def build_tree_shade():
@@ -681,9 +684,18 @@ def build_tree_shade():
     c.set_editor_property("code", SHADE_FADE_HLSL)
     c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
     c.set_editor_property("description", "ShadeFade")
-    ci = unreal.CustomInput()
-    ci.set_editor_property("input_name", "F")
-    c.set_editor_property("inputs", [ci])
+    ins = []
+    for nm in ("F", "W", "C", "D"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", nm)
+        ins.append(ci)
+    c.set_editor_property("inputs", ins)
+    g.link(g.node(unreal.MaterialExpressionWorldPosition), c, "W")
+    g.link(g.scalar("Cell", 20.0), c, "C")
+    # the density, but the trunk (UV x 1, MakeShadeMesh) stays solid, as a real trunk's shadow is
+    dens = g.node(unreal.MaterialExpressionMax)
+    g.link(g.scalar("Density", 1.0), dens, "A"); g.link(g.mask(g.node(unreal.MaterialExpressionTextureCoordinate), True, False), dens, "B")
+    g.link(dens, c, "D")
     # (worked out per vertex, where the instance's own origin is certain, and handed on to the pixels)
     keep = ramp(g.scalar("FadeIn", 1000.0), g.scalar("FadeWidth", 600.0))
     vi = g.node(unreal.MaterialExpressionVertexInterpolator)

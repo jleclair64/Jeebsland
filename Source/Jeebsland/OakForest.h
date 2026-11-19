@@ -99,6 +99,14 @@ private:
 	FVector CamNow = FVector::ZeroVector;
 	bool bBandOn = false;
 	float BandParams[5] = { -1.f, -1.f, -1.f, -1.f, -1.f };     // (what the band materials were last given)
+	// (2026-11-18: the far stand-ins' material, see-through as the band's, jeeb.Forest.ShadeDensity; and each twin's trees inside the fade,
+	// kept last in the set with their own transforms, shrunk into their crowns as the camera moves away, jeeb.Forest.TwinShrink)
+	UPROPERTY() UMaterialInstanceDynamic* FarMid = nullptr;
+	float DensityNow = -1.f;
+	TArray<int32> TwinRingStart;
+	TArray<TArray<FTransform>> TwinRing;
+	FVector TwinShrunkAt = FVector(1.0e9f);
+	void ShrinkTwins(const FVector& Cam, float Lo, float Hand);
 	bool CameraNow(FVector& Out) const;
 	void UpdateBandFade();
 	void BuildShadeMeshes();
