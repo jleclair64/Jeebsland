@@ -299,7 +299,8 @@ void ATownLabTown::BuildBuildings()
 		const FString Asset = AssetName(P.Model);
 		FString Path = FString::Printf(TEXT("/Game/Buildings/SM_%s"), *Asset), ColPath = Path + TEXT("_Col");
 		if (bSwap) { Path = Pick.Mesh; ColPath = LoadMesh(Pick.Mesh + TEXT("_Col")) ? Pick.Mesh + TEXT("_Col") : ColPath; ++Rebuilt; }
-		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw);
+		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f id %s door %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw,
+			P.Id ? P.Id : TEXT("-"), P.DoorDir);
 		const FTransform Xf(FRotator(0.f, Yaw, 0.f), At, FVector(Scale, Scale, ScaleZ));
 		static const bool bNoWar = TestOff(TEXT("NoWarBuildings"));   // (frame-cost runs only, -JeebShot: the war buildings' meshes left out, their walls kept)
 		const bool bWar = FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillRuins")) == 0;
