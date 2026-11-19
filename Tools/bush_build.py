@@ -1,26 +1,29 @@
 # The new bushes (2026-11-18, owner: "too many bushes ... not colored correctly ... too cartoony and not fluffy ... Let's do an overhaul").
-# Each bush is a cluster of leaf-spray cards cut from the DZ tree packs' own leaf atlases (the columnar aspen's and the cork oak's sprays),
-# so the bushes wear the very leaves, colours and wind of the pack trees round Oak Hill. Cards start near the bush's heart and reach out
-# with a gentle droop; their normals point out from the bush's middle so it lights as one soft round mass (fluffy, not a heap of flat
-# cards). Vertex colour red/green carries the pack material's wind weight (0 at a card's base, more at its tip).
+# Each bush is a dense shell of many small leaf-spray cards cut from the DZ tree packs' own leaf atlases (the aspen's and the cork oak's
+# sprays), so the bushes wear the very leaves, colours and wind of the pack trees round Oak Hill. Second pass (same evening): the first
+# bushes used a hundred big cards and read as cabbages and agaves; now a 2 m bush is about 900 cards of 30-45 cm, each a twig of a dozen
+# or more leaves a few cm long, packed over a rounded shell that reaches the ground, with the tips poking past it for a soft broken edge,
+# and an inner layer so the middle can't be seen through. Normals point out from the bush's middle so it lights as one soft mass.
+# Vertex colour red/green carries the pack material's wind weight (0 at a card's base, more at its tip).
 #
 #   blender -b --factory-startup -P Tools/bush_build.py -- <folder with the atlas TGAs> <output folder>
 #
-# The atlases come from the packs (Saved/Scratch_bush/bush_export.py writes them as TGA); only their alpha is read here, to find each
-# spray's rectangle. Output: one FBX per kind and LOD (SM_Bush<Kind>.fbx, SM_Bush<Kind>_LOD1.fbx), imported by Tools/BuildBushes.ps1.
+# The atlases come from the packs (Tools/bush_atlas_export.py writes them as TGA); only their alpha is read here, to find each spray's
+# rectangle. Output: one FBX per kind and LOD (SM_Bush<Kind>.fbx, SM_Bush<Kind>_LOD1.fbx), imported by Tools/BuildBushes.ps1.
 import bpy, bmesh, sys, os, math, random
 import numpy as np
-from mathutils import Vector, Matrix
+from mathutils import Vector
 
 args = sys.argv[sys.argv.index('--') + 1:]
 TEX, OUT = args[0], args[1]
 os.makedirs(OUT, exist_ok=True)
 
-def sprays(name, cols, rows_scale, min_w):
-    """Rectangles (u0, v0, u1, v1 in Blender UV: v up) of the sprays in an atlas, from its alpha, split by empty columns."""
+def sprays(name, cols, min_w, stem_cut):
+    """Rectangles (u0, v0, u1, v1 in Blender UV: v up, pixel w, pixel h) of the sprays in an atlas, from its alpha, split by empty
+    columns. stem_cut drops that share of each spray's bottom (the bare stalk), so every card is leaves from base to tip."""
     im = bpy.data.images.load(os.path.join(TEX, name + '.tga'))
     W, H = im.size
-    w = cols; h = max(64, int(H * cols / W * rows_scale))
+    w = cols; h = max(64, int(H * cols / W))
     im.scale(w, h)
     a = np.empty(w * h * 4, dtype=np.float32); im.pixels.foreach_get(a)
     a = a.reshape(h, w, 4)[:, :, 3] > 0.5          # rows bottom-up
@@ -34,35 +37,30 @@ def sprays(name, cols, rows_scale, min_w):
         if x1 - x0 < min_w: continue
         rows = np.where(a[:, x0:x1].any(axis=1))[0]
         y0, y1 = rows.min(), rows.max() + 1
+        y0 = y0 + int((y1 - y0) * stem_cut)
         pad = 1
         out.append(((x0 - pad) / w, max(0, y0 - pad) / h, min(w, x1 + pad) / w, min(h, y1 + pad) / h, (x1 - x0) * W / w, (y1 - y0) * H / h))
     bpy.data.images.remove(im)
     print('BUSHB sprays %s: %d %s' % (name, len(out), ' '.join('[%.3f %.3f %.3f %.3f]' % r[:4] for r in out)))
     return out
 
-ASPEN = sprays('T_Aspen_Leaves_Diffuse', 1024, 1.0, 20)
-ASPEN_S = sprays('T_Aspen_Leaves_Small_Diffuse', 2048, 1.0, 20)
-OAK = sprays('T_Cork_Oak_Leaves_Diffuse', 1024, 1.0, 20)
+ASPEN = sprays('T_Aspen_Leaves_Diffuse', 1024, 20, 0.2)
+OAK = sprays('T_Cork_Oak_Leaves_Diffuse', 1024, 20, 0.15)
 
 def clear():
     for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
     for m in list(bpy.data.meshes): bpy.data.meshes.remove(m)
 
-def mat(name):
-    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
-    return m
-
 class Builder:
-    def __init__(self, slots):
+    def __init__(self):
         self.bm = bmesh.new()
         self.uv = self.bm.loops.layers.uv.new('UVMap')
         self.col = self.bm.loops.layers.color.new('Col')
-        self.slots = slots
         self.norms = []   # per loop custom normals, in face/loop order
         self.cards = 0
 
-    def card(self, slot, rect, base, d, side, length, droop, centre, roundness, wind, segs=3):
-        """One spray card: from base along d (unit), side is the card's width axis (unit, perpendicular to d)."""
+    def card(self, rect, base, d, side, length, droop, nrm_at, roundness, wind, wind0, segs):
+        """One spray card, one quad wide: from base along d (unit); side is the card's width axis (unit, perpendicular to d)."""
         u0, v0, u1, v1, pw, ph = rect
         width = length * pw / ph
         up = Vector((0, 0, 1))
@@ -70,34 +68,27 @@ class Builder:
         for s in range(segs + 1):
             t = s / segs
             p = base + d * (length * t) - up * (droop * length * t * t)
-            row = []
-            for k in (-0.5, 0.0, 0.5):
-                row.append((p + side * (width * k), (u0 + (u1 - u0) * (k + 0.5), v0 + (v1 - v0) * t), t))
-            rows.append(row)
+            rows.append([(p + side * (width * k), (u0 + (u1 - u0) * (k + 0.5), v0 + (v1 - v0) * t), t) for k in (-0.5, 0.5)])
         verts = [[self.bm.verts.new(q[0]) for q in row] for row in rows]
         fn = d.cross(side).normalized()
         for s in range(segs):
-            for k in range(2):
-                quad = [(s, k), (s, k + 1), (s + 1, k + 1), (s + 1, k)]
-                f = self.bm.faces.new([verts[a][b] for a, b in quad])
-                f.material_index = slot
-                for loop, (a, b) in zip(f.loops, quad):
-                    pos, uv, t = rows[a][b]
-                    loop[self.uv].uv = uv
-                    w = wind * t
-                    loop[self.col] = (w, w * 0.6, 0.0, 1.0)
-                    out = (Vector(pos) - centre)
-                    out = out.normalized() if out.length > 1e-3 else up
-                    nf = fn if fn.dot(out) >= 0 else -fn
-                    self.norms.append((out * roundness + nf * (1 - roundness)).normalized())
+            quad = [(s, 0), (s, 1), (s + 1, 1), (s + 1, 0)]
+            f = self.bm.faces.new([verts[a][b] for a, b in quad])
+            for loop, (a, b) in zip(f.loops, quad):
+                pos, uv, t = rows[a][b]
+                loop[self.uv].uv = uv
+                w = wind0 + (wind - wind0) * t
+                loop[self.col] = (w, w * 0.6, 0.0, 1.0)
+                out = nrm_at(Vector(pos))
+                nf = fn if fn.dot(out) >= 0 else -fn
+                self.norms.append((out * roundness + nf * (1 - roundness)).normalized())
         self.cards += 1
 
     def finish(self, name):
         me = bpy.data.meshes.new(name)
         self.bm.to_mesh(me)
         self.bm.free()
-        for s in self.slots: me.materials.append(mat(s))
-        # (custom normals: the loops come out in the order the faces were made)
+        me.materials.append(bpy.data.materials.get('Leaves') or bpy.data.materials.new('Leaves'))
         me.normals_split_custom_set([tuple(n) for n in self.norms])
         ob = bpy.data.objects.new(name, me)
         bpy.context.scene.collection.objects.link(ob)
@@ -112,81 +103,87 @@ def export(ob, path):
                              object_types={'MESH'}, mesh_smooth_type='OFF', use_mesh_modifiers=False, axis_forward='-Y', axis_up='Z',
                              colors_type='LINEAR', use_tspace=False, add_leaf_bones=False, bake_anim=False)
 
-def rand_unit_perp(d, r):
-    a = Vector((r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1)))
-    s = a - d * a.dot(d)
-    if s.length < 1e-3: s = d.orthogonal()
-    return s.normalized()
-
-def dome(name, seed, n, radius, height, rects, slot, inner_rects=None, inner_slot=1, inner_n=0, droop=0.18, wind=0.45, keep=1.0,
-         stretch=(1.0, 1.0), low=False, slots=('Leaves', 'LeavesSmall')):
-    """A round shrub: cards from inside an inner ellipsoid out to the shell. keep < 1 drops cards (the far LOD), the rest grow to cover."""
+def shell(name, seed, n, ax, ay, h, rects, length, m=2.0, keep=1.0, inner=0.25, droop=0.1, wind=0.5, lift=0.42, lumps=0.14):
+    """A bush: n spray cards over a rounded shell (a superellipsoid of half sizes ax x ay x (h/2+), exponent m: 2 round, 4 boxy for the
+    hedge) whose bottom is cut flat at the ground. Each card sits on the shell (or, for the 'inner' share, deeper in to close the middle),
+    lies roughly along the surface facing out and leans up and out, so its tip pokes past the shell. keep < 1 is the far LOD: fewer,
+    larger, single-segment cards."""
     r = random.Random(seed)
-    b = Builder(list(slots))
-    centre = Vector((0, 0, height * (0.18 if low else 0.38)))
+    b = Builder()
+    rl = random.Random(seed * 31 + 7)         # the same lumps for both LODs
+    lobes = [(Vector((rl.uniform(-1, 1), rl.uniform(-1, 1), rl.uniform(-0.5, 0.5))).normalized() * rl.uniform(2.0, 4.5), rl.uniform(0, 6.3)) for _ in range(5)]
+    def lump(v):                        # a natural, uneven outline: a few broad bulges and dips round the shell
+        return 1.0 + lumps * sum(math.sin(v.dot(k) + ph) for k, ph in lobes) / 2.2
+    cz = h * lift                       # the shell's middle
+    az = h - cz                         # half height above the middle; below it the shell is cut by the ground
+    A = Vector((ax, ay, az))
+    def surf(v):                        # superellipsoid level of point v (1 on the shell)
+        q = Vector((v.x / A.x, v.y / A.y, (v.z - cz) / A.z))
+        return (abs(q.x) ** m + abs(q.y) ** m + abs(q.z) ** m) ** (1.0 / m)
+    def nrm_at(p):                      # the shell's outward normal (rounded: from the gradient, softened toward the middle)
+        q = Vector((p.x / A.x, p.y / A.y, (p.z - cz) / A.z))
+        g = Vector((math.copysign(abs(q.x) ** (m - 1), q.x) / A.x, math.copysign(abs(q.y) ** (m - 1), q.y) / A.y,
+                    math.copysign(abs(q.z) ** (m - 1), q.z) / A.z))
+        g = g.normalized() if g.length > 1e-6 else Vector((0, 0, 1))
+        c = (p - Vector((0, 0, cz))); c = c.normalized() if c.length > 1e-4 else Vector((0, 0, 1))
+        return (g * 0.6 + c * 0.4 + Vector((0, 0, 0.25))).normalized()
+    # sample points on the shell roughly evenly by area: points on the bounding box's faces, weighted by face area, pulled to the shell
+    faces = [((0, ax), ay * az * 2), ((0, -ax), ay * az * 2), ((1, ay), ax * az * 2), ((1, -ay), ax * az * 2), ((2, az), ax * ay * 2.4)]
+    tot = sum(f[1] for f in faces)
+    count = int(n * keep)
     grow = 1.0 / math.sqrt(keep)
-    def one(rects_, slot_, length_k, base_k):
-        # direction: over the dome, more to the sides and up than down
-        while True:
-            z = r.uniform(-0.2, 1.0) if not low else r.uniform(0.45, 0.95)
-            phi = r.uniform(0, 2 * math.pi)
-            q = math.sqrt(max(0.0, 1 - z * z))
-            d = Vector((q * math.cos(phi) * stretch[0], q * math.sin(phi) * stretch[1], z * height / radius * (0.9 if not low else 1.0)))
-            if d.length > 1e-3: break
-        d.normalize()
-        base = Vector((r.uniform(-1, 1) * radius * base_k * stretch[0], r.uniform(-1, 1) * radius * base_k * stretch[1],
-                       r.uniform(0.05, 0.45) * height if not low else r.uniform(0.0, 0.08)))
-        # reach out to about the shell: an ellipsoid of radius x radius x height
-        ex = Vector((radius * stretch[0], radius * stretch[1], height))
-        tgt = centre + Vector((d.x * ex.x, d.y * ex.y, d.z * (height - centre.z if d.z > 0 else centre.z)))
-        L = max(0.15, (tgt - base).length * length_k * r.uniform(0.85, 1.1))
-        dd = (tgt - base).normalized()
-        if dd.z < -0.2: dd.z = -0.2; dd.normalize()
-        side = rand_unit_perp(dd, r)
-        rect = rects_[r.randrange(len(rects_))]
-        b.card(slot_, rect, base, dd, side, L * min(grow, 1.25), droop * r.uniform(0.6, 1.3), centre, 0.75, wind)
-    for i in range(int(n * keep)): one(rects, slot, 1.0, 0.3)
-    if inner_rects:
-        for i in range(int(inner_n * keep)): one(inner_rects, inner_slot, 0.75, 0.45)
-    return b.finish(name)
-
-def hedge(name, seed, n, length, depth, height, rects, slot, keep=1.0):
-    """A hedge: a long rounded box of fine-leaved sprays, ends rounded, top slightly domed."""
-    r = random.Random(seed)
-    b = Builder(['Leaves'])
-    grow = 1.0 / math.sqrt(keep)
-    for i in range(int(n * keep)):
-        x = r.uniform(-0.5, 0.5) * (length - depth * 0.6)
-        base = Vector((x, r.uniform(-0.15, 0.15) * depth, r.uniform(0.1, 0.75) * height))
-        # aim at a point on the shell: pick a face of the rounded box
-        f = r.random()
-        if f < 0.4:   tgt = Vector((x + r.uniform(-0.3, 0.3), depth * 0.5 * r.choice((-1, 1)), r.uniform(0.15, 0.95) * height))
-        elif f < 0.75: tgt = Vector((x + r.uniform(-0.3, 0.3), r.uniform(-0.45, 0.45) * depth, height * r.uniform(0.95, 1.05)))
-        elif f < 0.88: tgt = Vector((length * 0.5 * r.choice((-1, 1)), r.uniform(-0.4, 0.4) * depth, r.uniform(0.15, 0.95) * height))
-        else:          tgt = Vector((x, r.uniform(-0.45, 0.45) * depth, r.uniform(0.0, 0.15) * height)) + Vector((0, 0.5 * depth * r.choice((-1, 1)), 0))
-        dd = (tgt - base)
-        L = max(0.2, dd.length * r.uniform(0.75, 0.95))
-        dd.normalize()
-        side = rand_unit_perp(dd, r)
-        centre = Vector((x, 0, height * 0.45))
-        b.card(slot, rects[r.randrange(len(rects))], base, dd, side, L * min(grow, 1.2), 0.1 * r.uniform(0.5, 1.5), centre, 0.7, 0.3)
+    segs = 2 if keep >= 1.0 else 1
+    made = 0; tries = 0
+    while made < count and tries < count * 20:
+        tries += 1
+        k = r.random() * tot
+        for (axis, val), wgt in faces:
+            k -= wgt
+            if k <= 0: break
+        p = [r.uniform(-ax, ax), r.uniform(-ay, ay), cz + r.uniform(-az, az)]
+        p[axis] = val + (cz if axis == 2 else 0)
+        p = Vector(p)
+        if p.z < 0.0: continue
+        s = surf(p)
+        p = Vector((p.x / s, p.y / s, cz + (p.z - cz) / s))
+        off = Vector((p.x, p.y, p.z - cz)); f = lump(off.normalized() if off.length > 1e-4 else Vector((0, 0, 1)))
+        p = Vector((p.x * f, p.y * f, cz + (p.z - cz) * f))
+        depth = 1.0 if r.random() > inner else r.uniform(0.45, 0.85)
+        p = Vector((p.x * depth, p.y * depth, cz + (p.z - cz) * depth))
+        if p.z < 0.03: p.z = r.uniform(0.03, 0.12)          # the bottom rim sits on the ground
+        nrm = nrm_at(p)
+        # along the surface (random direction in the tangent plane), leaning out and up
+        t = Vector((r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1)))
+        t = (t - nrm * t.dot(nrm))
+        if t.length < 1e-3: continue
+        t.normalize()
+        d = (t * 0.75 + nrm * 0.55 + Vector((0, 0, 0.3))).normalized()
+        if p.z < 0.25 * h and d.z < 0.1: d = (d + Vector((0, 0, 0.3))).normalized()
+        side = d.cross(nrm)
+        side = side.normalized() if side.length > 1e-3 else d.orthogonal().normalized()
+        ang = r.uniform(-0.6, 0.6)                          # a little twist about the stem
+        side = (side * math.cos(ang) + d.cross(side) * math.sin(ang)).normalized()
+        stray = r.random() < 0.06          # a few longer twigs reach out past the rest
+        L = length * r.uniform(0.8, 1.2) * (1.5 if stray else 1.0) * (0.85 if depth < 1 else 1.0) * min(grow, 1.6)
+        base = p - d * (L * 0.5)
+        if base.z < 0.0: base.z = 0.0
+        w0 = 0.05 + 0.25 * min(1.0, p.z / h)               # sway grows toward the top and out to the tips
+        b.card(rects[r.randrange(len(rects))], base, d, side, L, droop * r.uniform(0.5, 1.5), nrm_at, 0.8, w0 + wind * 0.5, w0, segs)
+        made += 1
     return b.finish(name)
 
 KINDS = {
-    # name: (builder, kwargs); LOD1 keeps ~40% of the cards, each grown to cover
-    'BushFull':  (dome, dict(seed=11, n=90, radius=0.95, height=1.35, rects=ASPEN, slot=0, inner_rects=ASPEN_S, inner_n=60, droop=0.2)),
-    'BushSmall': (dome, dict(seed=23, n=40, radius=0.55, height=0.75, rects=ASPEN, slot=0, inner_rects=ASPEN_S, inner_n=30, droop=0.18)),
-    'BushFine':  (dome, dict(seed=37, n=110, radius=0.75, height=1.25, rects=OAK, slot=0, droop=0.14, slots=('Leaves',))),
-    'BushLow':   (dome, dict(seed=41, n=44, radius=0.7, height=0.65, rects=OAK, slot=0, droop=0.6, low=True, wind=0.6, slots=('Leaves',))),
+    # name: kwargs of shell(); LOD1 keeps 30% of the cards, each grown to cover
+    'BushFull':  dict(seed=11, n=900, ax=0.88, ay=0.8, h=1.5, rects=ASPEN, length=0.42),
+    'BushSmall': dict(seed=23, n=420, ax=0.62, ay=0.58, h=1.0, rects=ASPEN, length=0.32),
+    'BushFine':  dict(seed=37, n=760, ax=0.82, ay=0.78, h=1.45, rects=OAK, length=0.36),
+    'BushLow':   dict(seed=41, n=720, ax=1.1, ay=0.9, h=1.0, rects=ASPEN, length=0.32, lift=0.25, lumps=0.18),
+    'BushHedge': dict(seed=53, n=1000, ax=1.2, ay=0.42, h=1.2, rects=OAK, length=0.3, m=4.0, lift=0.45, wind=0.3, lumps=0.05),
 }
 clear()
-for name, (fn, kw) in KINDS.items():
-    for lod, keep in ((0, 1.0), (1, 0.4)):
-        ob = fn('SM_' + name + ('' if lod == 0 else '_LOD1'), keep=keep, **kw)
+for name, kw in KINDS.items():
+    for lod, keep in ((0, 1.0), (1, 0.3)):
+        ob = shell('SM_' + name + ('' if lod == 0 else '_LOD1'), keep=keep, **kw)
         export(ob, os.path.join(OUT, ob.name + '.fbx'))
         bpy.data.objects.remove(ob, do_unlink=True)
-for lod, keep in ((0, 1.0), (1, 0.4)):
-    ob = hedge('SM_BushHedge' + ('' if lod == 0 else '_LOD1'), 53, 200, 2.4, 0.85, 1.1, OAK, 0, keep=keep)
-    export(ob, os.path.join(OUT, ob.name + '.fbx'))
-    bpy.data.objects.remove(ob, do_unlink=True)
 print('BUSHB done')

@@ -10,14 +10,14 @@ sub = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
 work = os.environ.get('JEEB_BUSH_FBX', '').replace('\\', '/')
 DST = '/Game/Bushes'
 if not lib.does_directory_exist(DST): lib.make_directory(DST)
+if lib.does_asset_exist(DST + '/MI_BushAspenSmall'): lib.delete_asset(DST + '/MI_BushAspenSmall')   # (the first bushes' long narrow leaves, gone in the second pass)
 
 # (name, parent: the leaf twin the forest uses)
 MATS = [
     ('MI_BushAspen', '/Game/TreeGroves/MI_Fall_AspenLeavesBig'),
-    ('MI_BushAspenSmall', '/Game/TreeGroves/MI_Fall_AspenLeavesSmall'),
     ('MI_BushOak', '/Game/TreeGroves/MI_Fall_CorkOakLeaves'),
 ]
-GREEN = unreal.LinearColor(0.17, 0.24, 0.065, 1.0)   # (a touch darker than jeeb.Trees.DzGreen's default: bushes stand in the trees' shade; live in game)
+GREEN = unreal.LinearColor(0.2017, 0.2723, 0.07, 1.0)   # (jeeb.Trees.DzGreen's default: the same leaf colour as the forest's trees; set live in game)
 made = {}
 for name, parent in MATS:
     path = DST + '/' + name
@@ -32,10 +32,10 @@ for name, parent in MATS:
 
 # kind: the material of each slot, in the FBX's slot order
 KINDS = {
-    'BushFull':  ['MI_BushAspen', 'MI_BushAspenSmall'],
-    'BushSmall': ['MI_BushAspen', 'MI_BushAspenSmall'],
+    'BushFull':  ['MI_BushAspen'],
+    'BushSmall': ['MI_BushAspen'],
     'BushFine':  ['MI_BushOak'],
-    'BushLow':   ['MI_BushOak'],
+    'BushLow':   ['MI_BushAspen'],
     'BushHedge': ['MI_BushOak'],
 }
 unreal.SystemLibrary.execute_console_command(None, 'Interchange.FeatureFlags.Import.FBX False')

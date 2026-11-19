@@ -25,8 +25,8 @@ namespace
 		TEXT("How many of the wild bushes grow (forest edges, clearings, river banks and lake shores): 0 none, 1 as placed (2026-11-18), 2 twice as many. Rebuilds them live. The towns' bushes are the world fill's (FillUses.csv)."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarBushReach(TEXT("jeeb.Bush.Reach"), 1.f,
 		TEXT("Draw distance of the wild bushes, times their own (45-70 m). Live."), ECVF_Default);
-	TAutoConsoleVariable<float> CVarBushShade(TEXT("jeeb.Bush.Shade"), 0.85f,
-		TEXT("The bushes' leaf colour: the trees' green (jeeb.Trees.DzGreen) times this (they grow in the trees' shade). Reaches the fill's town bushes too. Live."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarBushShade(TEXT("jeeb.Bush.Shade"), 1.0f,
+		TEXT("The bushes' leaf colour: the trees' green (jeeb.Trees.DzGreen) times this (1 = exactly the trees' colour). Reaches the fill's town bushes too. Live."), ECVF_Default);
 	TAutoConsoleVariable<int32> CVarBushShadows(TEXT("jeeb.Bush.Shadows"), 0,
 		TEXT("Shadows from the wild bushes: 0 none (cheap, as the old bushes), 1 on. Live."), ECVF_Default);
 
@@ -175,7 +175,7 @@ void ABushes::Rebuild()
 			if (bFlowers)
 				for (int32 f = 0, Nf = 3 + int32(Sc * 2.99f); f < Nf; ++f)
 				{
-					const float A = Yaw + f * (360.f / Nf) + R.FRandRange(-25.f, 25.f), Dd = R.FRandRange(0.35f, 0.7f) * Foot;
+					const float A = Yaw + f * (360.f / Nf) + R.FRandRange(-25.f, 25.f), Dd = R.FRandRange(0.85f, 1.2f) * (Kind == B_Small ? 80.f : 110.f) * Scale;   // (round the leafy rim)
 					const FVector2D Fp = P + FVector2D(FMath::Cos(FMath::DegreesToRadians(A)), FMath::Sin(FMath::DegreesToRadians(A))) * Dd;
 					const int32 Fk = R.FRand() < 0.5f ? B_Flower1 : B_Flower2;
 					const float Fs = R.FRandRange(1.0f, 1.5f);
@@ -183,6 +183,34 @@ void ABushes::Rebuild()
 				}
 		}
 
+#if !UE_BUILD_SHIPPING
+	// (test pictures: -BushLineupX=X -BushLineupY=Y puts one of each kind in a row 6 m apart along +X from there, plus a hedge, for a close look)
+	float X0 = 0.f, Y0 = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("BushLineupX="), X0) && FParse::Value(FCommandLine::Get(), TEXT("BushLineupY="), Y0))
+	{
+		{
+			for (int32 k = 0; k < B_Flower1; ++k)
+			{
+				const float X = X0 + k * 600.f;
+				Xf[k].Add(FTransform(FRotator::ZeroRotator, FVector(X, Y0, JeebTerrain::DrawnHeight(X, Y0) - 4.f)));
+			}
+			if (UStaticMesh* H = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Bushes/SM_BushHedge.SM_BushHedge"), nullptr, LOAD_Quiet | LOAD_NoWarn))
+			{
+				UHierarchicalInstancedStaticMeshComponent* L = NewObject<UHierarchicalInstancedStaticMeshComponent>(this, TEXT("BushLineupHedge"));
+				L->SetStaticMesh(H);
+				L->SetupAttachment(GetRootComponent());
+				L->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				L->bAffectDistanceFieldLighting = false;
+				L->bAffectDynamicIndirectLighting = false;
+				L->RegisterComponent();
+				const float X = X0 + B_Flower1 * 600.f + 100.f;
+				L->AddInstance(FTransform(FRotator::ZeroRotator, FVector(X, Y0, JeebTerrain::DrawnHeight(X, Y0) - 4.f)));
+				Sets.Add(L); SetReach.Add(7000.f);
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBBUSH lineup at %.0f %.0f, ground %.0f"), X0, Y0, JeebTerrain::DrawnHeight(X0, Y0));
+		}
+	}
+#endif
 	int32 Total = 0;
 	FString List;
 	for (int32 k = 0; k < B_Num; ++k)

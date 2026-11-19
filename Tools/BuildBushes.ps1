@@ -17,6 +17,6 @@ $out | Select-String -Pattern 'BUSHATLAS|Traceback' | ForEach-Object { Write-Hos
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'
 & $blender -b --factory-startup -P (Join-Path $PSScriptRoot 'bush_build.py') -- $tex $fbx | Select-String -Pattern 'BUSHB|Traceback|Error' | ForEach-Object { Write-Host $_.Line }
 $env:JEEB_BUSH_FBX = $fbx
-$out = & $exe $uproj "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'bush_import.py').Replace([char]92,'/'))" -unattended -nosplash -Multiprocess -LiveCoding=false -stdout -FullStdOutLogOutput   # (the full editor, windowless: its StaticMeshEditorSubsystem imports the far LODs)
+$out = & $exe $uproj "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'bush_import.py').Replace([char]92,'/'))" -unattended -nosplash -RenderOffScreen -Multiprocess -LiveCoding=false -stdout -FullStdOutLogOutput   # (the full editor, windowless: its StaticMeshEditorSubsystem imports the far LODs)
 $out | Select-String -Pattern 'BUSHDIAG|Traceback' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'BUSHDIAG done') { Write-Host 'Bushes imported.'; exit 0 } else { Write-Host 'Bush import FAILED.'; exit 1 }
