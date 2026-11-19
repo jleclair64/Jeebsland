@@ -109,6 +109,7 @@ AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
 void AKnightCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	if (bIsTroll) ApplyTrollBody();   // (the playable troll: his size and camera, KnightCharacterTroll.cpp)
 
 	// Tick after the movement has moved us this frame: the cape (which lives in world space) is pinned to where the body
 	// really is, not where it was a frame ago. Otherwise in a fast jump it lags one frame behind on some frames and not others.
@@ -445,6 +446,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickDrink(Dt);
 	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
 	TickGear(Dt);
+	if (bIsTroll) TickTroll(Dt);   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);

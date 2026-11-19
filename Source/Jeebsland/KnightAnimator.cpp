@@ -148,6 +148,7 @@ void FClipLib::Finalize()
 		if (Bone[i] == INDEX_NONE) { UE_LOG(LogTemp, Error, TEXT("JEEBANIM no bone %s"), BoneNames[i]); return; }
 	}
 	for (int32 i = Spine; i <= RHand; ++i) UpperMask[Bone[i]] = 1;
+	ComputeRest();
 	// (his own walk rides high against the rest pose: this puts its planted foot on the floor)
 	if (FClip* const* W = Clips.Find(TEXT("Walking"))) for (FVector& H : (*W)->HipPos) H.Z -= 3.9f;
 	for (TUniquePtr<FClip>& C : ClipStore) Measure(*C);
@@ -811,6 +812,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 			Comp->MarkRefreshTransformDirty();
 			Comp->RefreshBoneTransforms();
 		}
+		if (TrollComp && (TrollComp->WasRecentlyRendered(0.25f) || In.bShotLog)) TrollPose();
 	}
 
 	// A check for the logs (test pictures only): the biggest jump of any bone between two frames: pops show here before they show in a picture
@@ -1672,6 +1674,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 		break;
 	}
 	case 33:
+		if (L.bTroll) { TrollPunch(In, B, OutBlend); break; }   // (the troll: a left punch in place of the kick, KnightAnimatorTroll.cpp)
 		if (const FMove* M = Moves.Find(TEXT("Kick")))
 			PlayAt(TEXT("Kick"), MoveClipTime(*M, In.MoveU, Tn.KickActiveFrom, Tn.KickActiveTo), 1000.f, B, &OutBlend);
 		break;
@@ -2035,8 +2038,8 @@ void FClipLib::SolveGear()
 	ChestRest = BindInGame(P, Spine2).GetRotation();
 }
 
-FKnightAnimator::FKnightAnimator()
-	: L(FClipLib::Get()), Bone(L.Bone), Parents(L.Parents), RefPos(L.RefPos), RefRot(L.RefRot), Moves(L.Moves)
+FKnightAnimator::FKnightAnimator(bool bTroll)
+	: L(bTroll ? FClipLib::GetTroll() : FClipLib::Get()), Bone(L.Bone), Parents(L.Parents), RefPos(L.RefPos), RefRot(L.RefRot), Moves(L.Moves)
 {
 	for (int32 i = 0; i < Piece_Count; ++i) { PieceMat[i] = INDEX_NONE; PieceMid[i] = nullptr; }
 	if (!L.bReady) return;
@@ -2061,6 +2064,7 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 	Comp->SetBoundsScale(2.5f);   // (a roll or a kick reaches well past the standing bounds)
 	Comp->SetLightingChannels(true, true, false);   // (channel 1: the sun's glint on polished plate, ADayNight's Glint light; the world's sun gives no shine, 2026-11-15)
 	Comp->RegisterComponent();
+	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
 	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
@@ -2120,6 +2124,7 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 // the plates that are still on cover their own part of it, and what is between them is filled.
 void FKnightAnimator::ShowBare(int32 Piece, bool bShow)
 {
+	if (L.bTroll) return;   // (the troll has no mail body: nothing to wear yet)
 	if (bBare[Piece] == bShow) return;
 	bBare[Piece] = bShow;
 	if (!BareComp)
@@ -2549,11 +2554,11 @@ void FKnightAnimator::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
 {
 	using namespace JeebHit;
 	uint8 Zone = Z_None;
-	auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R; C.Zone = Zone; Out.Add(C); };
+	auto Add = [&](const FVector& A, const FVector& B, float R) { FCapsule C; C.A = A; C.B = B; C.R = R * L.HurtScale; C.Zone = Zone; Out.Add(C); };
 	const FVector Hd = BoneAt(Head), Nk = BoneAt(Neck);
 	const FVector HeadUp = (Hd - Nk).GetSafeNormal();
 	Zone = Z_Head;
-	Add(Hd + HeadUp * HelmFrom, Hd + HeadUp * HelmTo, HelmR);
+	Add(Hd + HeadUp * HelmFrom * L.HurtScale, Hd + HeadUp * HelmTo * L.HurtScale, HelmR);
 	Zone = Z_Torso;
 	Add(BoneAt(Hips) + FVector(0.f, 0.f, -2.f), BoneAt(Spine2) + (Nk - BoneAt(Spine2)) * 0.5f, TorsoR);
 	const int32 Sides[2][7] = { { LArm, LFore, LHand, LUp, LLeg, LFoot, LToe }, { RArm, RFore, RHand, RUp, RLeg, RFoot, RToe } };
@@ -2574,7 +2579,7 @@ void FKnightAnimator::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
 float FKnightAnimator::HelmTopZ() const
 {
 	const FVector Hd = BoneAt(Head);
-	return float(Hd.Z) + FMath::Max(0.f, float((Hd - BoneAt(Neck)).GetSafeNormal().Z)) * HelmTo + HelmR;
+	return float(Hd.Z) + (FMath::Max(0.f, float((Hd - BoneAt(Neck)).GetSafeNormal().Z)) * HelmTo + HelmR) * L.HurtScale;
 }
 
 // His raised shield as hit boxes see it: the same band as ever, moved so that its middle lies where the raised shield really is (owner, 2026-11-05)

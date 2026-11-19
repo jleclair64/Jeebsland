@@ -50,7 +50,7 @@ static constexpr float ShieldBackX = -14.f, ShieldBackZ = -4.f;   // a stowed sh
 // ---------------- The knight's body parts ----------------
 void AKnightCharacter::BuildKnight()
 {
-	Anim = MakeShared<FKnightAnimator>();
+	Anim = MakeShared<FKnightAnimator>(bIsTroll);   // (the troll: the same animator with the troll's bones, KnightAnimatorTroll.cpp)
 	if (!IsNetMode(NM_DedicatedServer)) Anim->MakeMesh(this, GetRootComponent());
 	// The only parts still modelled in code: the shield (arrows stick in its parts, so the server has them too). The pose places them.
 	TArray<KnightDesign::FDef> Defs;

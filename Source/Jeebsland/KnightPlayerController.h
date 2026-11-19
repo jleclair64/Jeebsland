@@ -38,6 +38,10 @@ public:
 	UPROPERTY() UJeebSave* PendingSave = nullptr;   // the character being loaded into the knight about to appear
 	double ConnectTime = 0.0;
 	int32 LoginTries = 0;
+	// The playable troll (2026-11-19): which pawn this player gets (-1 not asked, 0 knight, 1 troll). The player's machine asks with -PlayAs=Troll
+	// (ServerChooseClass, sent just before the login); in single player the command line is read directly (AKnightGameMode::GetDefaultPawnClassForController).
+	int8 ClassChoice = -1;
+	UFUNCTION(Server, Reliable) void ServerChooseClass(bool bTroll);
 
 	// This machine: waiting for the server to say yes
 	bool IsLoggingIn() const { return bSentLogin && !bLoginDone; }
