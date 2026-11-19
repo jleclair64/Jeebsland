@@ -83,8 +83,60 @@ float UKnightMovement::GetMaxSpeed() const
 		if (InWater()) return T.SwimFastSpeed;
 		return FMath::Max3(T.ClimbUpSpeed, T.ClimbSideSpeed, T.ClimbDownSpeed);
 	}
-	const float S = Super::GetMaxSpeed();
+	const bool bRun = SpeedRule.bByMove && (MovementMode == MOVE_Falling || ((MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking) && !IsCrouching()));
+	const float S = bRun ? MoveCap(Acceleration) : Super::GetMaxSpeed();   // (this move's own push: KnightMovement.h, FSpeedRule)
 	return MovementMode == MOVE_Walking && WaterDepth > 30.f ? S * WadeMul(WaterDepth) : S;   // (wading: slower the deeper)
+}
+
+float UKnightMovement::MoveCap(const FVector& Dir) const
+{
+	const FSpeedRule& R = SpeedRule;
+	float StrafeMul = 1.f;   // strafe mode: full speed ahead, 90% sideways, 75% straight back (AKnightCharacter::TickGroundSpeed explains)
+	if (R.bStrafe && UpdatedComponent)
+	{
+		const FVector D = Dir.GetSafeNormal2D();
+		if (!D.IsNearlyZero())
+		{
+			const float Fw = FVector::DotProduct(D, UpdatedComponent->GetForwardVector().GetSafeNormal2D());
+			StrafeMul = Fw >= 0.f ? FMath::Lerp(0.9f, 1.f, Fw) : FMath::Lerp(0.9f, 0.75f, -Fw);
+		}
+	}
+	const float Run = (bWantsFast && R.bSprintOk) ? FMath::Lerp(R.Walk, R.Sprint, MoveStrafeSprint) : R.Walk;
+	return Run * StrafeMul * R.K * MoveAirMul;
+}
+
+// No wind-up starting to walk: on the ground (or on the rock) and below walking speed he gets there at once; above it (walk to sprint)
+// the usual acceleration keeps the sprint's ramp. From the velocity at the move's start, so the client's scaling of his push and the
+// server's check of it (MoveAutonomous) use the same number; the direction for strafe mode's shares is the way he is already going.
+float UKnightMovement::AccelRuleNow() const
+{
+	const JeebTune::FValues& T = JeebTune::V();
+	if (!SpeedRule.bAccelRule || IsFalling()) return T.SprintAccel;
+	const float Cap = SpeedRule.bByMove ? MoveCap(Velocity) : MaxWalkSpeed;
+	const float WalkCap = FMath::Min(Cap, SpeedRule.WalkCapBase * MoveAirMul);
+	return Velocity.Size2D() < WalkCap - 5.f ? T.WalkAccel : T.SprintAccel;
+}
+
+float UKnightMovement::GetMaxAcceleration() const
+{
+	return bAccelFrozen ? FrozenAccel : AccelRuleNow();
+}
+
+void UKnightMovement::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
+{
+	FrozenAccel = AccelRuleNow();
+	bAccelFrozen = true;   // (held through the move: a merged move is refused if its parts had different ones, FSavedMove_Knight::CanCombineWith)
+	Super::ControlledCharacterMove(InputVector, DeltaSeconds);
+	bAccelFrozen = false;
+}
+
+void UKnightMovement::MoveAutonomous(float ClientTimeStamp, float DeltaTime, uint8 CompressedFlags, const FVector& NewAccel)
+{
+	// (the server running a client's move, and the client replaying its moves after a correction)
+	FrozenAccel = AccelRuleNow();
+	bAccelFrozen = true;
+	Super::MoveAutonomous(ClientTimeStamp, DeltaTime, CompressedFlags, NewAccel);
+	bAccelFrozen = false;
 }
 
 void UKnightMovement::PhysicsRotation(float DeltaTime)
@@ -137,6 +189,16 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	Super::UpdateCharacterStateBeforeMovement(Dt);
 	if (!CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy) return;   // others' machines only show what the server sends
 	const JeebTune::FValues& T = JeebTune::V();
+	// The running speed's eased shares, per move (KnightMovement.h, FSpeedRule): the sprint fades in over a fraction of a second as he turns
+	// toward straight ahead (none at 60 degrees off, all of it within about 20), and after landing he speeds back up from the air's share.
+	{
+		float WantSprint = 1.f;
+		const FVector A = Acceleration.GetSafeNormal2D();
+		if (SpeedRule.bStrafe && UpdatedComponent && !A.IsNearlyZero())
+			WantSprint = FMath::SmoothStep(0.5f, 0.94f, float(FVector::DotProduct(A, UpdatedComponent->GetForwardVector().GetSafeNormal2D())));
+		MoveStrafeSprint = FMath::FInterpTo(MoveStrafeSprint, WantSprint, Dt, 5.f);
+		MoveAirMul = IsFalling() ? SpeedRule.AirMul : FMath::FInterpTo(MoveAirMul, 1.f, Dt, 6.f);
+	}
 	if (!IsCustom(JeebClimb::Climb)) bJumpQueued = false;
 	bTouchMantle = false;   // (left over from a move the player's machine threw away or merged: never acted on)
 
@@ -757,6 +819,7 @@ void FKnightMoveResponse::ServerFillResponseData(const UCharacterMovementCompone
 	Stamina = K.ClimbStamina; RefillWait = K.RefillWait; bExhausted = K.bClimbExhausted; bNoRegrab = K.bNoRegrab; WallNormal = K.WallNormal;
 	ActFrom = K.ActFrom; ActTo = K.ActTo; ActDir = K.ActDir; ActT = K.ActT; ActDur = K.ActDur; ActTop = K.ActTop; ActCarry = K.ActCarry; ActHold = K.ActHold;
 	SwimStamina = K.SwimStamina; Breath = K.Breath; SwimRefillWait = K.SwimRefillWait; DrownT = K.DrownT; bHeadUnder = K.bHeadUnder;
+	StrafeSprint = K.MoveStrafeSprint; AirMul = K.MoveAirMul;
 	if (K.MovementMode == MOVE_Custom) bHasRotation = true;   // on the wall his facing is part of the state
 }
 
@@ -776,6 +839,7 @@ bool FKnightMoveResponse::Serialize(UCharacterMovementComponent& CharacterMoveme
 		Ar << ActT << ActDur << ActTop << ActCarry << ActHold;
 		Ar << SwimStamina << Breath << SwimRefillWait << DrownT;
 		Ar.SerializeBits(&bHeadUnder, 1);
+		Ar << StrafeSprint << AirMul;
 		if (!bOk) return false;
 	}
 	return !Ar.IsError();
@@ -791,12 +855,27 @@ void UKnightMovement::ClientHandleMoveResponse(const FCharacterMoveResponseDataC
 	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; WallNormal = R.WallNormal;
 	ActFrom = R.ActFrom; ActTo = R.ActTo; ActDir = R.ActDir; ActT = R.ActT; ActDur = R.ActDur; ActTop = R.ActTop; ActCarry = R.ActCarry; ActHold = R.ActHold;
 	SwimStamina = R.SwimStamina; Breath = R.Breath; SwimRefillWait = R.SwimRefillWait; DrownT = R.DrownT; bHeadUnder = R.bHeadUnder;
+	MoveStrafeSprint = R.StrafeSprint; MoveAirMul = R.AirMul;
 }
 
 void FSavedMove_Knight::Clear()
 {
 	Super::Clear();
 	bSavedLetGo = false; SavedMode = 0; bSavedExhausted = false; bSavedRefilling = false; bSavedFast = false; bSavedRise = false;
+	SavedStrafeSprint = 1.f; SavedAirMul = 1.f; SavedAccel = 0.f;
+}
+
+// A merged move is run again on the client from the older move's start (the engine puts back where he was and how fast he went): the
+// eased speed shares go back with it, so the merged move advances them once over the whole time, exactly as the server will
+void FSavedMove_Knight::CombineWith(const FSavedMove_Character* OldMove, ACharacter* InCharacter, APlayerController* PC, const FVector& OldStartLocation)
+{
+	Super::CombineWith(OldMove, InCharacter, PC, OldStartLocation);
+	const FSavedMove_Knight* O = static_cast<const FSavedMove_Knight*>(OldMove);
+	if (UKnightMovement* K = Cast<UKnightMovement>(InCharacter->GetCharacterMovement()))
+	{
+		K->MoveStrafeSprint = O->SavedStrafeSprint;
+		K->MoveAirMul = O->SavedAirMul;
+	}
 }
 
 uint8 FSavedMove_Knight::GetCompressedFlags() const
@@ -809,6 +888,7 @@ bool FSavedMove_Knight::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter*
 {
 	const FSavedMove_Knight* O = static_cast<const FSavedMove_Knight*>(NewMove.Get());
 	if (O->bSavedFast != bSavedFast || O->bSavedRise != bSavedRise) return false;
+	if (!FMath::IsNearlyEqual(O->SavedAccel, SavedAccel)) return false;   // (the push was scaled with a different start-up rule: the server checks the merged move with the older one's)
 	if (O->bSavedLetGo != bSavedLetGo || O->SavedMode != SavedMode || O->bSavedExhausted != bSavedExhausted || SavedMode != 0 || bSavedRefilling || O->bSavedRefilling) return false;   // (the bar refilling on the ground runs per move: never merged)
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
@@ -824,6 +904,18 @@ void FSavedMove_Knight::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		bSavedRefilling = K->ClimbStamina < 1.f || K->RefillWait > 0.f || K->SwimStamina < 1.f || K->SwimRefillWait > 0.f || K->Breath < 1.f;
 		bSavedFast = K->bWantsFast;
 		bSavedRise = K->bWantsRise;
+		SavedAccel = K->GetMaxAcceleration();   // (frozen for this move: UKnightMovement::ControlledCharacterMove)
+	}
+}
+
+// (also after a merge, from the older move's start: the engine calls it again then)
+void FSavedMove_Knight::SetInitialPosition(ACharacter* C)
+{
+	Super::SetInitialPosition(C);
+	if (const UKnightMovement* K = Cast<UKnightMovement>(C->GetCharacterMovement()))
+	{
+		SavedStrafeSprint = K->MoveStrafeSprint;
+		SavedAirMul = K->MoveAirMul;
 	}
 }
 
