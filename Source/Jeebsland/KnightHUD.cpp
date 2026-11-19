@@ -83,6 +83,7 @@ void AKnightHUD::DrawHUD()
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
 	TickMapSampling();   // (the world map's pictures, a little each frame until done: KnightHUDMap.cpp)
 	TipLines.Reset();
+	ShotUISequence(Knight);   // (test pictures of every screen with -ShotUI; does nothing otherwise or in Shipping)
 
 	// A dropped thing close by says what it is (the same description you see in the inventory), floating above it
 	if (PC && !Knight->IsUIOpen())

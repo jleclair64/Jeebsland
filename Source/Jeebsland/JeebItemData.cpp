@@ -171,6 +171,8 @@ namespace JeebItems
 				Row.Mass = Tab.I(r, TEXT("Mass"), 0);
 				Row.SmithExtraLevel = Tab.I(r, TEXT("SmithExtraLevel"), 0);
 				Row.bTwoHanded = Tab.B(r, TEXT("TwoHanded"));
+				const FString Cls = Tab.S(r, TEXT("Class")).ToLower();
+				Row.Class = Cls == TEXT("knight") ? 1 : Cls == TEXT("troll") ? 2 : Cls == TEXT("wizard") ? 3 : 0;   // (all / everyone / blank: anyone)
 			}
 		}
 

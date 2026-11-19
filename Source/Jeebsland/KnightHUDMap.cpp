@@ -400,7 +400,7 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 	if (!MapTex) BuildMapTex();
 	if (!MapTex) return;
 	UFont* Font = GEngine->GetMediumFont();
-	Tile(X - 6.f, Y - 6.f, S + 12.f, S + 12.f, FLinearColor(0.8f, 0.7f, 0.5f), 0.3f);
+	MapFrame(X, Y, S);   // (KnightHUDStyle.cpp: framed like a chart, or the old glass)
 
 	// ---- The view: zoom (the wheel, toward the cursor) and pan (a left drag), only with the cursor over the map ----
 	constexpr float MaxZoom = 28.f;   // (about 80 m across: the town's streets and every building)
@@ -715,7 +715,7 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 				FogTex->UpdateResource();
 			}
 		}
-		if (FogTex) DrawTexture(FogTex, X, Y, S, S, U0, V0, 1.f / MapZoom, 1.f / MapZoom, FLinearColor::White, BLEND_Translucent);
+		if (FogTex) DrawTexture(FogTex, X, Y, S, S, U0, V0, 1.f / MapZoom, 1.f / MapZoom, MapFogTint(), BLEND_Translucent);   // (old paper under the new look)
 	}
 
 	// ---- Town names (every town, once you have seen it; Blackrock and Oak Hill stand close: their names sit outward) ----

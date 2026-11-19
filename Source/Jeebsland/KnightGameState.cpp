@@ -1193,7 +1193,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)

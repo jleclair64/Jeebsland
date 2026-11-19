@@ -56,6 +56,7 @@ namespace JeebItems
 		int32 Defence = 0, BuyPrice = 0, Mass = 0, SmithExtraLevel = 0;
 		float Weight = 0.f;   // an armour piece's weight in kg before its material (x the tier's WeightMult)
 		bool bTwoHanded = false;
+		int32 Class = 0;      // who may wield it (Kinds.csv Class): 0 all, 1 knights, 2 trolls, 3 wizards. Shown on the icon and tooltip only; nothing enforces it yet
 	};
 	enum EMaterialGroup : int32 { MG_Ore, MG_Gem, MG_Wood, MG_Fish, MG_Animal };
 	struct FMaterialRow
