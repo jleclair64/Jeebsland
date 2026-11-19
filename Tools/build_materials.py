@@ -1,4 +1,4 @@
-# Rebuilds the foliage and bark materials (M_Grass, M_Bush, M_TreeLeaf, M_BarkTint) from the textures already in /Game.
+# Rebuilds the foliage and bark materials (M_Grass, M_TreeLeaf, M_BarkTint; M_Bush went with the old bushes 2026-11-18) from the textures already in /Game.
 # Run with Tools\BuildMaterials.ps1 (the editor must be closed). The textures were painted by MakeGrassCards.bat.
 import os
 import sys
@@ -1066,7 +1066,6 @@ def imported(png, name):
 
 
 # ---- everything above only defines; the builds start here (a runner may exec the part above alone)
-import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_BushLeaves.png"), "T_BushLeaves")   # painted by BuildMaterials.ps1
 
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_LeafSingle.png"), "T_LeafSingle")   # painted by BuildMaterials.ps1
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_GrassTuft.png"), "T_GrassTuft")     # painted by BuildMaterials.ps1
@@ -1085,7 +1084,6 @@ build_grass_flower()   # the meadow flowers (Meadow.cpp)
 # against the painting's 53-62), then 0.62, 0.52, 0.27, then 0.64, 0.52, 0.25, then 0.60, 0.47, 0.21 (a little yellower and 8% darker in the sun), now 0.63, 0.44, 0.16 (third review: still a touch lime in the brightest sunlit blades; measured lit hue 70 against the painting's 53, and the lit blades a little too bright) with more grey (warmer, toward olive in sun and shade), glow 0.10,
 # all of its colour shining through. The glow is what lit the shade up at the low sun, when the exposure rises; the ground under
 # the grass follows in world_material.py, GRASS_TO_MEADOW.)
-build_foliage("M_Bush",     "T_BushLeaves",  (0.66, 0.66, 0.38, 0.0), 4.0,          True,      0.0, tint_key="Bush")   # (was 0.70, 0.78, 0.52 until 2026-11-14: the shrubs along the walls read lime beside the olive grass)
 build_foliage("M_TreeLeaf", "T_TreeLeaves",  (1.0, 1.0, 1.0, 0.0),    10.0,         False,     0.3, param=True, gain=0.88, crown_shade=True, tree_fade=True)
 # pine and redwood needles: boughs of fine needles, tinted per tree in the game, swaying gently, darker deep in the crown
 import_texture(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Saved", "T_PineNeedles.png"), "T_PineNeedles")   # painted by BuildMaterials.ps1

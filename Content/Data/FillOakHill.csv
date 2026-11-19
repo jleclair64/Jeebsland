@@ -25,8 +25,6 @@ BenchNook,-3.44,-5.29,130.0,5,0,-1,bench on the lawn facing the plaza path (roun
 VegCorner,9.76,-2.61,-165,6,0,-1,plaza: veg corner on the lawn edge
 StallStock,-2.6,7.0,60,7,0,-1,plaza: a barrel and crates at the red market stall's corner (townbuild2; the cart failed: spawn keep)
 BenchNook,6.48,2.36,160,8,0,-1,plaza: bench nook on the lawn edge
-FlowerClump,4.37,6.19,32,9,0,-1,plaza: flower clump on the lawn edge
-FlowerClump,5.62,-8.99,-122,10,0,-1,plaza: flower clump on the lawn edge
 LampStone,-0.57,11.3,-88,11,0,-1,lamp post on the plaza ring
 LampPillar,-9.46,6.62,-145,12,0,-1,lamp post on the plaza ring
 LampStone,-6.12,-9.46,125,13,0,-1,lamp post on the plaza ring
@@ -61,7 +59,6 @@ WallBannerSwordShield,3.00,5.09,0.0,41,0,1,banner hung on the bank front (check 
 WallBannerSwords,-2.60,3.52,0.0,42,0,2,banner hung on the smith front (check it sits on the wall),Plot
 WallBannerKnot,2.61,6.05,0.0,43,0,8,banner hung on the church front (check it sits on the wall),Plot
 BarrelRow,-4.20,-2.30,90.0,44,1,0,barrel row by bank stall 0,Plot
-HedgeBoxPair,-4.52,2.03,90.0,45,1,0,hedge box pair by bank stall 0,Plot
 BarrelRow,-1.84,-3.66,-180.0,46,1,0,barrel row by bank stall 0,Plot
 BarrelRow,5.98,-0.73,-90.0,47,1,1,barrel row by bank 1,Plot
 BarrelRow,-1.14,-6.10,-180.0,48,1,1,barrel row by bank 1,Plot
@@ -106,7 +103,7 @@ Cypress,-6.70,-1.10,0.0,708,0,29,graveyard plot: cypress at the way in,Plot
 BenchStone,0.90,5.90,90.0,709,0,29,graveyard plot: bench facing the graves,Plot
 PotVase,2.10,6.10,0.0,710,0,29,graveyard plot: flowers by the bench,Plot
 CandleCageTall,-0.30,6.10,0.0,711,0,29,graveyard plot: candle by the bench,Plot
-FlowerClump,-6.10,-4.10,90.0,712,1,29,graveyard plot: flowers in the west corner,Plot
+Bush1,-6.10,-4.10,90.0,712,1,29,graveyard plot: a bush in the west corner,Plot
 # fillfix 2026-11-16: the thinnest open grass round and between the houses (yards and lanes), cozier
 # fillfix 2026-11-16: Blackrock's fountain yard, inside the village walls (Site Square: E, N are metres from the world's origin)
 SackCorner,-8.13,-17.63,255,6000,1,-1,fillfix: Blackrock fountain yard,Square
@@ -118,7 +115,6 @@ CartCorner,12.38,-25.88,270,6005,1,-1,fillfix: Blackrock fountain yard,Square
 AmphoraRow,-11.88,-43.88,270,6006,1,-1,fillfix: Blackrock fountain yard,Square
 BarrelRow,9.13,-21.38,270,6007,1,-1,fillfix: Blackrock fountain yard,Square
 Workbench,-10.63,-24.63,195,6008,1,-1,fillfix: Blackrock fountain yard,Square
-BushClump,8.88,-39.13,15,6009,1,-1,fillfix: Blackrock fountain yard,Square
 Workbench,9.38,-32.88,270,6010,1,-1,fillfix: Blackrock fountain yard,Square
 WashingCorner,4.13,-23.38,45,6011,1,-1,fillfix: Blackrock fountain yard,Square
 BarrelRow,0.38,-36.88,90,6012,1,-1,fillfix: Blackrock fountain yard,Square
@@ -126,7 +122,6 @@ PlazaBed,0.5,0.3,0,7001,0,-1,townbuild2: a low tulip bed where the plaza oak sto
 RiverRest,-52.00,9.00,180,7002,1,-1,river lawn north of the bridge street: a rest by the bank,
 BenchNook,-51.50,14.00,180,7003,1,-1,river lawn north of the bridge street: a bench looking at the river,
 BenchNook,24.50,4.50,90,7004,1,-1,the church forecourt: a bench beside the door, facing across the street,
-FlowerClump,24.50,-4.50,180,7005,1,-1,the church forecourt: flowers on the other side of the door,
 # Steele Creek (townbuild2 2026-11-18; Site Steele: E, N are metres from the town centre, SteeleCreek.h): the forge yard, shop fronts, lamps, doorsteps, the quarry and the landing (made by Saved/Steele/genfill.py)
 SmithYard,13.80,-3.20,180,7000,1,-1,steele: forge yard - left of the smithy door,Steele
 WoodYard,14.60,7.40,180,7001,1,-1,steele: forge yard - fuel for the forge,Steele

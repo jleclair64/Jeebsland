@@ -56,6 +56,5 @@ namespace JeebFill
 	bool AnyCovered();
 }
 
-// (AutumnDecor.cpp: drop the fallen leaves and the meadow's card bushes on covered ground once the fill is built; clients only)
+// (AutumnDecor.cpp: drop the fallen leaves on covered ground once the fill is built; clients only)
 void JeebAutumnDropCovered(UWorld* World);
-void JeebMeadowDropCovered(UWorld* World);

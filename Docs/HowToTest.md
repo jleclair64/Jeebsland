@@ -154,6 +154,14 @@ Field map, Play, Oak Hill. The owner's words: the lamps looked like harsh LEDs, 
 - `jeeb.Lamp.Tint` ("r g b", default `1.0 0.38 0.06`, a deep amber oil flame; the lights use a paler version, about 2300 K) for the glass and light of every town lantern, lamp post and sconce; `jeeb.Lamp.Glow` (default 0.9; it was 5, which clipped the glass to white) for how hard the glass glows.
 - `jeeb.Trees.Spruce` now recolours the spruces of the forest and the town too (default `0.8 0.9 0.92`, a little darker and cooler than the pack's green; `1 1 1` is the pack's own).
 
+## Bushes (2026-11-18 overhaul)
+
+Every old bush is gone: the leaf-card domes in the meadow (the dark flat clumps by the foundations), the TownDecor bushes, shrubs, plant clump and hedges, and the forest's undergrowth bushes. The new ones are built from the pack trees' own leaf sprays (aspen and cork oak), so they wear the trees' leaves, colour and wind: **full** (aspen, about 2.2 m wide), **small** (aspen, about 1.6 m), **fine** (narrow cork-oak leaves, about 2 m), **low** (a wide aspen mound about 1.5 m high), **hedge** (2.9 m, only along garden fences); each is hundreds of small leafy twigs, dense and rounded to the ground, and a **flowering** bush (a small bush with the meadow's flowers through it, on the sunny side of forest edges). Far fewer than before.
+
+Where to look: walk out of Oak Hill to the forest edge (the bushes sit where the trees meet open ground and in clearings, a few under the trees), the river banks either side of the stone bridge, the house yards' back corners and garden fences (from the fill's plots), Blackrock's cottages and the pond. There should be none on roads, plazas, the market, doorsteps or in rows in the open meadow, and none at the town hall's wall.
+
+**Console (live):** `jeeb.Bush.Density` (1; 0 none, 2 twice as many wild bushes; rebuilds them), `jeeb.Bush.Shade` (1: the trees' green `jeeb.Trees.DzGreen` times this; also colours the town bushes), `jeeb.Bush.Reach` (1: draw distance scale), `jeeb.Bush.Shadows` (0; 1 turns their shadows on). Log: `JEEBBUSH` (counts by kind and place). Rebuild the models: `Tools\BuildBushes.ps1` (editor closed).
+
 ## The 2026-11-18 batch (built while the owner was at work)
 
 | I want to try... | Do this |

@@ -10,7 +10,7 @@ class UMaterialInstanceDynamic;
 
 // Storybook grass over the whole land (the whole world's grassy ground since 2026-11-12: none on rock, mud or sand, shorter where
 // trampled, GroundMask.h). Tufts grow in square cells around the player (denser close by, thinner further out)
-// and the cells are built and dropped as you walk. Bushes and flowers are placed once across the land.
+// and the cells are built and dropped as you walk. (Its leaf-card bushes went 2026-11-18: ABushes, Bushes.h.)
 UCLASS()
 class JEEBSLAND_API AMeadow : public AActor
 {
@@ -67,7 +67,6 @@ private:
 	void StepJob(double BudgetSeconds);
 	void FinishJob();
 	void DropCell(const FIntPoint& Id);
-	void PlaceBushesAndFlowers();
 	void Prewarm();
 	bool bPrewarmed = false;
 	// One way everywhere since 2026-11-14 (the rebuilt Oak Hill's, first tried in TownLab): dense grass only within 40 m, in 15 m squares (about
