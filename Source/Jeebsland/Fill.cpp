@@ -247,6 +247,7 @@ void JeebFill::LoadData(FData& D)
 				O.Seed = C.I(r, cSeed, r + 1); O.bVar = C.I(r, cVar, 0) != 0; O.Plot = C.I(r, cPlot, -1); O.Note = C.S(r, cNote); O.Line = C.Lines[r];
 				O.bSquare = C.S(r, cSite).StartsWith(TEXT("sq"), ESearchCase::IgnoreCase);
 				O.bSteele = C.S(r, cSite).StartsWith(TEXT("st"), ESearchCase::IgnoreCase);
+				O.bRel = C.S(r, cSite).StartsWith(TEXT("pl"), ESearchCase::IgnoreCase);
 				D.Oak.Add(O);
 			}
 		}
@@ -1260,7 +1261,9 @@ struct FFillBuilder
 						const FVector2D Q = P0 + Dir * T;
 						if (Grid.At(FGrid::G(Q.X), FGrid::G(Q.Y)) & F_BUILD) { DGrid = T; break; }
 					}
-					if (DBox > 0.f && (DGrid < 0.f || DGrid > DBox - 35.f)) { WallD = DBox - 8.f; ++SnugBox; }
+					// (a hung set ignores the grid: its building cells are the footprint at the ground, steps and porch floors, and a
+					// banner 2 m up stopped at the town hall's steps, a metre out from the wall: the owner's floating banners, 2026-11-18)
+					if (DBox > 0.f && (bHung || DGrid < 0.f || DGrid > DBox - 35.f)) { WallD = DBox - 8.f; ++SnugBox; }
 					else if (DGrid > 0.f) { WallD = DGrid - 5.f; ++SnugCells; }
 				}
 				if (WallD >= 0.f) { ++Hits; Gap = FMath::Min(Gap, WallD - 40.f - Back); }
@@ -1544,6 +1547,18 @@ struct FFillBuilder
 				++Rows;
 				FVector2D At = bSteele ? JeebSteele::ToWorld(R.E, R.N) : bSq ? FVector2D(R.N * 100.f, R.E * 100.f) : FVector2D(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
 				float RowYaw = R.Yaw;
+				if (R.bRel && Pass == 0)
+				{
+					// (Site "Plot", 2026-11-18: the row belongs to a building or an open plot and moves with it: E, N metres in its own
+					// frame, a building's model X, Y (its door on +Y), an open plot's centre unturned; Yaw relative to the building)
+					const TArray<JeebOakHill::FPlot>& Ps = JeebOakHill::Plots();
+					if (!Ps.IsValidIndex(R.Plot)) { ++Failed; UE_LOG(LogTemp, Warning, TEXT("JEEBFILL OAKROW line %d %s: no plot %d"), R.Line, *R.Set, R.Plot); continue; }
+					const JeebOakHill::FPlot& Pl = Ps[R.Plot];
+					const float By = Pl.Kind == JeebOakHill::EPlot::Building ? JeebOakHill::BuildingYaw(Pl, JeebOakHill::FindModel(Pl.Model)) : 0.f;
+					const float Cs = FMath::Cos(FMath::DegreesToRadians(By)), Sn = FMath::Sin(FMath::DegreesToRadians(By));
+					At = JeebOakHill::FromPx(Pl.Px, Pl.Py) + FVector2D(R.E * Cs - R.N * Sn, R.E * Sn + R.N * Cs) * 100.f;
+					RowYaw = FRotator::NormalizeAxis(R.Yaw + By);
+				}
 				if (Pass != 1 && (R.Set.StartsWith(TEXT("Lamp")) || R.Set.StartsWith(TEXT("Junction"))))
 				{
 					// (a lamp or a signpost stands at the path's edge, 0.7 m off it: the nearest road cell within 8 m)

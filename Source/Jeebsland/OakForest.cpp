@@ -386,7 +386,7 @@ const TArray<TArray<FVector2D>>& JeebOakForest::RoadLines()
 		const FPlan Plans[] = {
 			{ 395.f, 0.f, TEXT("Silver Point") },   // the north road's end, past the castle ruins: north-east
 			{ -1.f, 0.f, TEXT("Anchorage") },       // a fork off the north road 40 m past the town (the town has no east road end)
-			{ 600.f, 650.f, TEXT("Birch Grove") },  // the road behind the bank, south-east: to the river's east branch
+			{ 769.3f, 699.3f, TEXT("Birch Grove") },  // the southeast road's end past the allotments (2026-11-18 layout): to the river's east branch
 		};
 		TArray<FVector2D> First;   // (the north road's steps, for the fork)
 		for (const FPlan& Pl : Plans)
