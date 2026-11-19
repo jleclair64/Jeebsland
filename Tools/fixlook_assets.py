@@ -247,9 +247,9 @@ def dyed_by(lum_param, lum_default, tint_param, tint_default, y):
 
 dyed, _ = dyed_by("GarmentLum", 0.1, "Tint", (0.10, 0.10, 0.10, 1.0), 300)
 skin, skin_tint = dyed_by("SkinLum", 0.35, "SkinTint", (1.0, 1.0, 1.0, 0.0), 700)
-skin_amt = node(pm, unreal.MaterialExpressionMultiply, -550, 900); link(ts, "R", skin_amt, "A"); link(skin_tint, "A", skin_amt, "B")
+skin_amt = node(pm, unreal.MaterialExpressionMultiply, -550, 900); skin_on = sca(pm, "SkinOn", 0.0, -700, 1000); link(ts, "R", skin_amt, "A"); link(skin_on, "", skin_amt, "B")   # (2026-11-18: skin dye off for everyone, SkinOn 0: only trolls were ever dyed and they have their own model)
 mid = node(pm, unreal.MaterialExpressionLinearInterpolate, -350, 600)
-link(tb, "RGB", mid, "A"); link(skin, "", mid, "B"); link(skin_amt, "", mid, "Alpha")
+link(tb, "RGB", mid, "A"); link(skin, "", mid, "B"); link(skin_amt, "", mid, "Alpha")   # (skin dye kept in the graph but never on: SkinTint alpha stays 0; no one is given a Skin row since 2026-11-18, human skin is the picture's own)
 dye = sca(pm, "Dye", 1.0, -700, 500)
 amt = node(pm, unreal.MaterialExpressionMultiply, -550, 450); link(tm, "R", amt, "A"); link(dye, "", amt, "B")
 fin = node(pm, unreal.MaterialExpressionLinearInterpolate, -150, 300)

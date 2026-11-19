@@ -50,6 +50,11 @@ for o in meshes:
         if m and m.use_nodes:
             for n in m.node_tree.nodes:
                 if n.type == 'TEX_IMAGE' and n.image and img is None: img = n.image
+            # (2026-11-18: the Troll's first image node was a metallic/roughness map, so he came out black: prefer the node feeding Base Color)
+            for n in m.node_tree.nodes:
+                if n.type == 'BSDF_PRINCIPLED' and n.inputs['Base Color'].links:
+                    src = n.inputs['Base Color'].links[0].from_node
+                    if src.type == 'TEX_IMAGE' and src.image: img = src.image
         if m: m.name = "M_" + NAME
 if img is None: raise RuntimeError("PEOPLE no texture")
 w, h = img.size
@@ -63,6 +68,7 @@ r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
 d = np.maximum(mx - mn, 1e-5)
 hue = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60.0
 key = ((hue > 150) & (hue < 235) & (sat > 0.11) & (mx > 0.04)).astype(np.float32)
+if NAME == "Troll": key = key * 0.0   # (the troll wears no dyed cloth: his own skin and hide colours stay as painted)
 # close small holes (stains and dark folds the key missed): grow the key 6 px, then shrink it back
 def grow(a, op, n=6):
     for _ in range(n):

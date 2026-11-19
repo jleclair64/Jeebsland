@@ -16,7 +16,8 @@ $people = @(
   @('Elder',      'clips:Idle_4', 'clips:Walking_Woman', 'clips:Talk_with_Right_Hand_Open'),
   @('Smith',      'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
   @('Banker',     'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
-  @('Guard',      'clips:Idle_3', 'clips:Quick_Walk',    'clips:Talk_with_Hands_Open')
+  @('Guard',      'clips:Idle_3', 'clips:Quick_Walk',    'clips:Talk_with_Hands_Open'),
+  @('Troll',      'idle:Idle_3',  'walk:Slow_Orc_Walk',  'talk:Talk_with_Hands_Open')   # (2026-11-18: one file per clip, Meshy actions 243, 119, 313; rigged at 2.2 m)
 )
 foreach ($p in $people) {
   $n = $p[0]; $dir = Join-Path $art $n
@@ -28,6 +29,6 @@ foreach ($p in $people) {
 $content = Join-Path $proj 'Content\People'
 if (Test-Path $content) { Remove-Item -Recurse -Force $content }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'people_import.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
+$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'people_import.py').Replace([string][char]92, '/'))"   # (forward slashes: Unreal read "\townbuild2" in a copy's path as a tab) -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'PEOPLEDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'PEOPLEDIAG done') { Write-Host 'People imported.'; exit 0 } else { Write-Host 'People import FAILED.'; exit 1 }
