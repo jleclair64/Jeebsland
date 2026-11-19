@@ -107,7 +107,7 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 	else if (N == TEXT("icons"))
 	{
 		UFont* Font = GEngine->GetMediumFont();
-		const int32 Kinds[] = { K_Wand, K_Staff, K_Broadsword, K_Bow, K_Sword, K_Axe };
+		const int32 Kinds[] = { K_Wand, K_Staff, K_Broadsword, K_Bow, K_Sword, K_Axe, K_Club };
 		const float S = 60.f, Gap = 8.f, LabelW = 120.f;
 		const float W = 40.f + LabelW + NumTiers * (S + Gap) + 130.f, H = 40.f + UE_ARRAY_COUNT(Kinds) * (S + Gap) + 10.f;
 		const float X = 270.f, Y = 40.f;

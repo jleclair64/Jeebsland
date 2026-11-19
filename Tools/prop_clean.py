@@ -91,6 +91,9 @@ PROPS = {
     # (cyan, violet) is saturated so it keeps its own colour; the steel (ferrule, bands, crown, caps) takes the tier. The orb end is game -Z.
     "Staff":    dict(file="Staff.glb", axes=("X", "-Y", "-Z"), length=165.0, grip=("Z", 0.78), girth=1.12, rg=lambda co, c: (1.0 if (_grey(c) and (co - Vector((0.0, 0.0, -117.3))).length > 8.5 and not -21.0 < co.z < 1.0) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=7000, bake=True),
     "Wand":     dict(file="Wand.glb", axes=("X", "-Y", "-Z"), length=52.0, grip=("Z", 0.83), girth=1.3, rg=lambda co, c: (1.0 if (_grey(c) and co.z > -38.5 and not -2.2 < co.z < 5.5) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=5000, bake=True),
+    # The troll's club (2026-11-19, Meshy meshy-t2.5 from a picture; Art/Props/Originals/Club_Meshy.glb): head along game -Z, the troll's fist near the pommel end of the
+    # leather wrap; the steel bands, studded cap and pommel cap take the tier, the leather wrap (grey too) is left out of the mask.
+    "Club":     dict(file="Club.glb", axes=("X", "-Y", "-Z"), length=125.0, grip=("Z", 0.86), rg=lambda co, c: (1.0 if (_grey(c) and not -24.0 < co.z < 7.0) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=6000, bake=True),
     "Sword":    dict(file="Sword.glb", axes=("Y", "X", "-Z"), length=92.0, grip=("Z", 0.890), mask="grey", clean=True, reduce=8000, stretch=("Z", 1.0, 6.0),
                      marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
     "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -58.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,

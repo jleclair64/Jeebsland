@@ -27,3 +27,4 @@ Cape,Cape,1,2,200,1,0,0,0,0,0,no,all,"A cloak worn over the armour, in the colou
 Ring,Ring,1,2,200,1,0,0,0,0,0,no,all,"Rings shift damage and defence. Three miscellaneous slots hold any mix of rings and amulets. Every effect is on top of the weapon's own damage range."
 Amulet,Amulet,1,2,200,1,0,0,0,0,0,no,all,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."
 Crest,Helm Brush,1,2,200,1,0,0,0,0,0,no,all,
+Club,Troll Club,14,20,240,0.95,0,0,95,8,2,yes,troll,"A troll's heavy wooden club, banded with steel. Slow, crushing swings. Two-handed, no shield."

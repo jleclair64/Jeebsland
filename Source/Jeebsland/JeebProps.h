@@ -36,6 +36,7 @@ namespace JeebProps
 		case JeebItems::K_Crossbow: return TEXT("/Game/Props/SM_Crossbow.SM_Crossbow");
 		case JeebItems::K_Staff: return TEXT("/Game/Props/SM_Staff.SM_Staff");   // (2026-11-18: Meshy models; orb end along -Z)
 		case JeebItems::K_Wand: return TEXT("/Game/Props/SM_Wand.SM_Wand");
+		case JeebItems::K_Club: return TEXT("/Game/Props/SM_Club.SM_Club");   // (2026-11-19: Meshy, for the troll; head along -Z)
 		default: return nullptr;
 		}
 	}

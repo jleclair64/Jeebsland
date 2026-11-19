@@ -64,6 +64,7 @@ namespace WeaponDesign
 		case JeebItems::K_Rod: return 128.f;
 		case JeebItems::K_Staff: return 126.f;   // (the model's orb, 132 cm from the grip)
 		case JeebItems::K_Wand: return 43.f;
+		case JeebItems::K_Club: return 100.f;   // (the troll's club: its head ends about 100 cm from the grip, 2026-11-19)
 		default: return 70.f;
 		}
 	}

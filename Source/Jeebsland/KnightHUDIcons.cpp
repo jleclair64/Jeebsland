@@ -415,6 +415,16 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Poly({ P(8, 26), P(32, 36), P(56, 26), P(56, 28), P(32, 38), P(8, 28) }, Edge);
 			Quad(28, 8, 36, 14, Lt);
 			break;
+		case K_Club:   // (the troll's club: a leather grip and pommel cap, a shaft swelling into a banded head with a studded cap)
+			DiscP(32, 60, 4.5f, 3, Tr);
+			Quad(29, 44, 35, 58, Lt);
+			Poly({ P(29.5f, 44), P(28, 30), P(23, 20), P(23, 6), P(41, 6), P(41, 20), P(36, 30), P(34.5f, 44) }, Wd);
+			Quad(32, 9, 34, 40, Lift(Wd, 1.35f));
+			Quad(22, 21, 42, 25, Pl);
+			Quad(22, 13, 42, 17, Pl);
+			Quad(22, 3, 42, 7, Pl);
+			Quad(25, 0, 28, 3, Tr); Quad(30.5f, 0, 33.5f, 3, Tr); Quad(36, 0, 39, 3, Tr);
+			break;
 		case K_Rod:
 			Poly({ P(8, 58), P(12, 62), P(56, 8), P(52, 4) }, Wd);
 			DiscP(20, 48, 6, 6, Tr);
