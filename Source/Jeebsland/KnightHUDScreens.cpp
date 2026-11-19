@@ -163,6 +163,26 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		// Frame rate counter in the top right corner
 		CheckBox(BoxX, BoxY + 136.f, 26.f, bShowFps);
 		HDText(TEXT("Show the frame rate"), FLinearColor::White, BoxX + 38.f, BoxY + 138.f, Font, 1.1f);
+#if !UE_BUILD_SHIPPING
+		// TESTING ONLY (owner, 2026-11-19): swap between the knight and the troll in place. Single player, never in the packaged game.
+		{
+			const float CY = BoxY + 196.f;
+			const bool bSolo = GetNetMode() == NM_Standalone;
+			HDText(TEXT("Testing - play as:"), FLinearColor(1.f, 0.6f, 0.3f), BoxX, CY + 4.f, Font, 1.1f);
+			static const TCHAR* ClassNames[2] = { TEXT("KNIGHT"), TEXT("TROLL") };
+			for (int32 C = 0; C < 2; ++C)
+			{
+				const bool bOn = (C == 1) == Knight->IsTroll();
+				if (Btn(BoxX + 200.f + C * 140.f, CY, 130.f, 32.f, ClassNames[C], bSolo, bOn, 1.05f) && bSolo && !bOn)
+				{
+					Knight->ToggleSettings();
+					Knight->SwapClassForTest(C == 1);   // (destroys this pawn: nothing below may use Knight)
+					return;
+				}
+			}
+			HDText(bSolo ? TEXT("Saves, then swaps in the same spot.") : TEXT("Single player only."), FLinearColor(0.75f, 0.75f, 0.75f), BoxX + 200.f, CY + 42.f, Font, 1.0f);
+		}
+#endif
 
 	}
 	else if (SettingsTab == 2)
