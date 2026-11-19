@@ -83,6 +83,7 @@ void AKnightHUD::DrawHUD()
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
 	TickMapSampling();   // (the world map's pictures, a little each frame until done: KnightHUDMap.cpp)
 	TipLines.Reset();
+	ShotUISequence(Knight);   // (test pictures of every screen with -ShotUI; does nothing otherwise or in Shipping)
 
 	// A dropped thing close by says what it is (the same description you see in the inventory), floating above it
 	if (PC && !Knight->IsUIOpen())
@@ -171,6 +172,7 @@ void AKnightHUD::DrawHUD()
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
 	DrawWeaponBar(Knight);
 	DrawReticle(Knight);
+	DrawCastReticle(Knight);   // (the wand and staff: KnightHUDReticle.cpp)
 	if (!Knight->IsUIOpen() && !bEmoteWheel && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);   // (not under the emote wheel)
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp; on top)

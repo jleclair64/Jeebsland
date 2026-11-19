@@ -119,6 +119,12 @@ void AKnightHUD::Corner(UTexture2D* Tex, float X, float Y, float R, int32 C, con
 // whole pixels and nothing overlaps (an overlap of translucent pieces would show as a bright line).
 void AKnightHUD::FillRR(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt)
 {
+	if (UIStyle() != 0) R = FMath::Min(R, 5.f);   // (the walnut and midnight looks have nearly square corners: overlays follow them)
+	FillRRx(X, Y, W, H, R, ColorAt);
+}
+
+void AKnightHUD::FillRRx(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt)
+{
 	EnsureGlassTex();
 	X = FMath::RoundToFloat(X); Y = FMath::RoundToFloat(Y); W = FMath::RoundToFloat(W); H = FMath::RoundToFloat(H);
 	if (W < 1.f || H < 1.f) return;
@@ -171,6 +177,7 @@ void AKnightHUD::RimLight(float X, float Y, float W, float H, float R, float Alp
 // A plain outline round a rounded rectangle, the same light all the way round
 void AKnightHUD::Outline(float X, float Y, float W, float H, float R, const FLinearColor& Col)
 {
+	if (UIStyle() != 0) { KitFrame(X, Y, W, H, 2.f, Col, Col, Col); return; }   // (a square frame in the walnut and midnight looks)
 	EnsureGlassTex();
 	X = FMath::RoundToFloat(X); Y = FMath::RoundToFloat(Y); W = FMath::RoundToFloat(W); H = FMath::RoundToFloat(H);
 	R = FMath::RoundToFloat(FMath::Clamp(R, 0.f, FMath::Min(W, H) * 0.5f));
@@ -184,6 +191,7 @@ void AKnightHUD::Outline(float X, float Y, float W, float H, float R, const FLin
 
 void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGlow)
 {
+	if (UIStyle() != 0) { KitPanel(X, Y, W, H, Alpha, bGlow); return; }
 	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	const float R = FMath::Clamp(FMath::Min(W, H) * 0.22f, 8.f, 30.f);
 	const FLinearColor Warm(1.f, 0.82f, 0.45f, 1.f);
@@ -207,6 +215,7 @@ void AKnightHUD::Panel(float X, float Y, float W, float H, float Alpha, bool bGl
 // A small glass tile: buttons, slots, rows. Tint colours it (a hover or an active state); Alpha is its strength.
 void AKnightHUD::Tile(float X, float Y, float W, float H, const FLinearColor& Tint, float Alpha, bool bRim)
 {
+	if (UIStyle() != 0) { KitTile(X, Y, W, H, Tint, Alpha, bRim); return; }
 	const float R = FMath::Clamp(FMath::Min(W, H) * 0.24f, 4.f, 14.f);
 	FillRR(X, Y, W, H, R, [&](float t)
 	{
@@ -219,6 +228,7 @@ void AKnightHUD::Tile(float X, float Y, float W, float H, const FLinearColor& Ti
 // A glass gauge: a pill-shaped well, and a pill of lit colour inside it with a gloss on top and a slow sheen along it.
 void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse)
 {
+	if (UIStyle() != 0) { KitGauge(X, Y, W, H, F, Fill, bPulse); return; }
 	const float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
 	F = FMath::Clamp(F, 0.f, 1.f);
 	const float R = H * 0.5f;
@@ -253,6 +263,7 @@ void AKnightHUD::Gauge(float X, float Y, float W, float H, float F, const FLinea
 
 bool AKnightHUD::Btn(float X, float Y, float W, float H, const FString& Label, bool bEnabled, bool bActive, float Scale)
 {
+	if (UIStyle() != 0) return KitBtn(X, Y, W, H, Label, bEnabled, bActive, Scale);
 	UFont* Font = GEngine->GetMediumFont();
 	const bool bOver = bEnabled && Over(X, Y, W, H);
 	FLinearColor Fill = FLinearColor(0.18f, 0.18f, 0.18f);
@@ -272,6 +283,7 @@ bool AKnightHUD::CloseBtn(float PX, float PY, float PW)
 	UFont* Font = GEngine->GetMediumFont();
 	// well inside the panel's rounded corner (it sat half on the border before, review 2026-11-18)
 	const float BX = PX + PW - 44.f, BY = PY + 14.f;
+	if (UIStyle() != 0) return KitCloseBtn(BX, BY, 26.f);
 	const bool bOver = Over(BX, BY, 26.f, 26.f);
 	Tile(BX, BY, 26.f, 26.f, bOver ? FLinearColor(1.f, 0.35f, 0.3f) : FLinearColor(0.6f, 0.7f, 0.85f), bOver ? 0.6f : 0.26f);
 	float TW = 0.f, TH = 0.f;
@@ -292,7 +304,9 @@ void AKnightHUD::DrawTip()
 	{
 		if (IsBar(TipLines[i])) { W = FMath::Max(W, BarW); H += BarH + 8.f; continue; }
 		float TW = 0.f, TH = 0.f;
-		HDTextSize(TipLines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
+		FString Shown;
+		TipLineColor(TipLines[i], i == 0, Shown);
+		HDTextSize(Shown, TW, TH, Font, i == 0 ? 1.15f : 0.95f);
 		W = FMath::Max(W, TW); H += TH + 3.f;
 	}
 	float X = UIMouseX + 16.f, Y = UIMouseY + 12.f;
@@ -310,8 +324,10 @@ void AKnightHUD::DrawTip()
 		}
 		const float Sc = i == 0 ? 1.15f : 0.95f;
 		float TW = 0.f, TH = 0.f;
-		HDTextSize(TipLines[i], TW, TH, Font, Sc);
-		HDText(TipLines[i], i == 0 ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f), X + 2.f, Cy, Font, Sc);
+		FString Shown;
+		const FLinearColor Col = TipLineColor(TipLines[i], i == 0, Shown);
+		HDTextSize(Shown, TW, TH, Font, Sc);
+		HDText(Shown, Col, X + 2.f, Cy, Font, Sc);
 		Cy += TH + 3.f;
 	}
 }
@@ -354,6 +370,8 @@ void AKnightHUD::ItemTip(int32 Id)
 		FString Why;
 		L.Add(CanEquip(Sk, Id, &Why) ? FString::Printf(TEXT("Needs %s %d"), SkillNameOf(EquipSkill(K)), EquipLevel(V)) : Why);
 	}
+	if (const int32 Cls = KindClass(K))   // (Kinds.csv Class: a coloured line, like the icon's outline. Not enforced yet)
+		L.Add(FString::Printf(TEXT("%c%d%s"), TCHAR(2), Cls, Cls == 1 ? TEXT("Knight only") : Cls == 2 ? TEXT("Troll only") : TEXT("Wizard only")));
 	if (IsWeaponKind(K))
 	{
 		int32 A, B; WeaponDamage(K, V, A, B, V);

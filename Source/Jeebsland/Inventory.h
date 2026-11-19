@@ -122,6 +122,7 @@ namespace JeebItems
 	inline const FKindRow& KindRow(int32 K) { return Tables().Kinds[FMath::Clamp(K, 0, K_Count - 1)]; }
 	// Two-handed weapons cannot be used with a shield
 	inline bool AllowsShield(int32 K) { return !KindRow(K).bTwoHanded; }
+	inline int32 KindClass(int32 K) { return KindRow(K).Class; }   // 0 all, 1 knight, 2 troll, 3 wizard (Kinds.csv Class; looks only for now)
 
 	inline const FMaterialRow& MaterialRow(EItemType T) { const TArray<FMaterialRow>& M = Tables().Materials; return M[FMath::Clamp(static_cast<int32>(T), 0, M.Num() - 1)]; }
 	inline int32 StackSize(int32 Id)

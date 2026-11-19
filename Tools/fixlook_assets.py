@@ -4,7 +4,8 @@
 #  1. M_Bridge gets a Tint (multiplies the picture); MI_Bridge warms the cool blue-grey stone toward Oak Hill's beige (about 5%).
 #  2. M_PropGlow (/Game/Props): a copy of M_Prop with a soft glow inside an ellipsoid round a point of the model (GlowCentre, GlowRadii,
 #     model space, cm) on its untinted parts (vertex red 0: never the tier's steel): MI_Staff's orb (cyan) and MI_Wand's crystal (violet)
-#     move onto it. M_Prop itself is not touched.
+#     move onto it. M_Prop itself is not touched. GlowCore (a glass-ball rim) and ExposureLock (brightness on screen, same day and night)
+#     are on for the staff's orb only (second review: it read white and blew out at night); the wand is exactly as it passed.
 #  3. M_GlowOrb (/Game/Props): the magic bolt, unlit and additive, white at its heart and its gem colour toward the rim (Projectile.cpp).
 #  4. M_Person (/Game/People) rebuilt in place with an optional skin dye: SkinMask (the Smith's by default, off unless SkinTint's alpha is 1), SkinLum, SkinTint
 #     (alpha 0: off; ANpc sets it from PeopleWho.csv Skin). T_Smith_Skin (Art/People/Smith/T_Smith_Skin.png, Tools/people_skin_mask.py
@@ -50,6 +51,11 @@ def node(m, cls, x, y, **props):
 
 
 def link(a, ao, b, bi): mel.connect_material_expressions(a, ao, b, bi)
+
+
+def link_ok(a, ao, b, bi):   # (a wrong pin name returns False and leaves the input at 0: ReviewLessons, ground 2026-11-14)
+    if not mel.connect_material_expressions(a, ao, b, bi):
+        raise RuntimeError("FIXLOOK could not link %s.%s -> %s.%s" % (a.get_name(), ao, b.get_name(), bi))
 
 
 def input_of(m, prop):
@@ -103,9 +109,10 @@ if not lib.does_asset_exist(GLOW):
     div = node(g, unreal.MaterialExpressionDivide, -1550, 1600); link(sub, "", div, "A"); link(rad, "", div, "B")
     dot = node(g, unreal.MaterialExpressionDotProduct, -1400, 1600); link(div, "", dot, "A"); link(div, "", dot, "B")
     d = node(g, unreal.MaterialExpressionSquareRoot, -1250, 1600); link(dot, "", d, "")
-    # mask: 1 inside d 0.95, 0 past 1.15, and only where the vertex red is 0 (not the tier's steel)
-    edge = node(g, unreal.MaterialExpressionSubtract, -1100, 1600); link(const(g, 1.15, -1250, 1700), "", edge, "A"); link(d, "", edge, "B")
-    k = node(g, unreal.MaterialExpressionMultiply, -950, 1600); link(edge, "", k, "A"); link(const(g, 5.0, -1100, 1700), "", k, "B")
+    # mask: 1 inside d 0.95, 0 past 1.05 (was 1.15: the staff's claws round the orb glowed with it, one big white blob), and only where
+    # the vertex red is 0 (not the tier's steel)
+    edge = node(g, unreal.MaterialExpressionSubtract, -1100, 1600); link(const(g, 1.05, -1250, 1700), "", edge, "A"); link(d, "", edge, "B")
+    k = node(g, unreal.MaterialExpressionMultiply, -950, 1600); link(edge, "", k, "A"); link(const(g, 10.0, -1100, 1700), "", k, "B")
     sat = node(g, unreal.MaterialExpressionSaturate, -800, 1600); link(k, "", sat, "")
     vc = node(g, unreal.MaterialExpressionVertexColor, -1100, 1800)
     notsteel = node(g, unreal.MaterialExpressionOneMinus, -950, 1800); link(vc, "R", notsteel, "")
@@ -114,7 +121,31 @@ if not lib.does_asset_exist(GLOW):
     gs = sca(g, "GlowStrength", 0.0, -800, 2050)
     em1 = node(g, unreal.MaterialExpressionMultiply, -500, 1900); link(col, "RGB", em1, "A"); link(gs, "", em1, "B")
     em = node(g, unreal.MaterialExpressionMultiply, -350, 1800); link(em1, "", em, "A"); link(mask, "", em, "B")
-    mel.connect_material_property(em, "", MP.MP_EMISSIVE_COLOR)
+    # (2026-11-18 second review: the staff's orb read white, not cyan, and blew out at night: GlowStrength 3 on the scene's own scale went
+    # past white once the night exposure lifted it, and the tonemapper bleaches a clipped colour to white. Two knobs, both off on the wand,
+    # whose glow passed review, so its look is exactly as before.)
+    #  GlowCore: the orb's middle at this share of its rim (a glass ball lit through: the rim brightest, the core never the hottest spot).
+    #  ExposureLock: 1 divides the glow by the camera's exposure, so GlowStrength is its brightness on screen, the same by day and by
+    #  night, kept under white so the colour stays; 0 is the old glow in the scene's light.
+    core = sca(g, "GlowCore", 1.0, -650, 2150)
+    fr = node(g, unreal.MaterialExpressionFresnel, -650, 2250, exponent=2.5, base_reflect_fraction=0.0)
+    shape = node(g, unreal.MaterialExpressionLinearInterpolate, -500, 2200)
+    link_ok(fr, "", shape, "A"); link_ok(const(g, 1.0, -650, 2350), "", shape, "B"); link_ok(core, "", shape, "Alpha")
+    em2 = node(g, unreal.MaterialExpressionMultiply, -200, 1850); link_ok(em, "", em2, "A"); link_ok(shape, "", em2, "B")
+    out = em2
+    if hasattr(unreal, "MaterialExpressionEyeAdaptation"):
+        lock = sca(g, "ExposureLock", 0.0, -500, 2450)
+        ea = node(g, unreal.MaterialExpressionEyeAdaptation, -650, 2550)
+        inv = node(g, unreal.MaterialExpressionDivide, -500, 2550)
+        link_ok(const(g, 1.0, -650, 2650), "", inv, "A"); link_ok(ea, "", inv, "B")
+        by = node(g, unreal.MaterialExpressionLinearInterpolate, -350, 2500)
+        link_ok(const(g, 1.0, -500, 2650), "", by, "A"); link_ok(inv, "", by, "B"); link_ok(lock, "", by, "Alpha")
+        em3 = node(g, unreal.MaterialExpressionMultiply, -50, 1900); link_ok(em2, "", em3, "A"); link_ok(by, "", em3, "B")
+        out = em3
+        log("glow: exposure lock built")
+    else:
+        log("glow: WARNING no MaterialExpressionEyeAdaptation in this Python: no exposure lock; the staff's GlowStrength is then on the scene's scale")
+    if not mel.connect_material_property(out, "", MP.MP_EMISSIVE_COLOR): raise RuntimeError("FIXLOOK glow: emissive not connected")
     # the gem's own colour too (the bake left the orb brown): most of the way to a deeper copy of the glow colour
     deep = node(g, unreal.MaterialExpressionMultiply, -500, 1450); link(col, "RGB", deep, "A"); link(const(g, 0.45, -650, 1450), "", deep, "B")
     amt = node(g, unreal.MaterialExpressionMultiply, -500, 1550); link(mask, "", amt, "A"); link(const(g, 0.9, -650, 1550), "", amt, "B")
@@ -126,10 +157,13 @@ if not lib.does_asset_exist(GLOW):
     lib.save_asset(GLOW)
 g = lib.load_asset(GLOW)
 # (model space, cm: Saved/KnightBuild/Props/<name>.fbx; the staff's orb centred 117.3 cm down its axis, radius about 9.5 across and
-# 8.5 along; the wand's crystal from 38.5 to 43.2 cm down, about 2.5 cm across. The radii reach past the gem: only its surface shows)
-for name, centre, radii, colour, strength in (
-        ("MI_Staff", (0.0, 0.0, -117.3), (12.5, 12.5, 11.0), (0.20, 0.85, 1.0), 3.0),
-        ("MI_Wand", (0.0, 0.0, -40.9), (3.8, 3.8, 3.6), (0.62, 0.20, 1.0), 3.5)):
+# 8.5 along; the wand's crystal from 38.5 to 43.2 cm down, about 2.5 cm across. The radii reach just past the gem: only its surface shows)
+# The staff (2026-11-18 second review): a deeper, purer cyan (less red: it was the red that made it whiten first), the radii tightened
+# from 12.5/11 so the claws round the orb stay wood, GlowStrength 1.3 as brightness on screen (ExposureLock 1; jeeb.Magic.OrbGlow sets it
+# live on the held staff: keep the two equal), the core at 55% of the rim. The wand keeps its passed look: lock 0, core 1, as before.
+for name, centre, radii, colour, strength, core, lock in (
+        ("MI_Staff", (0.0, 0.0, -117.3), (10.5, 10.5, 9.5), (0.02, 0.72, 1.0), 1.3, 0.55, 1.0),
+        ("MI_Wand", (0.0, 0.0, -40.9), (3.8, 3.8, 3.6), (0.62, 0.20, 1.0), 3.5, 1.0, 0.0)):
     p = "/Game/Props/" + name
     mi = lib.load_asset(p)
     if mi is None: raise RuntimeError("FIXLOOK no " + p)
@@ -138,6 +172,8 @@ for name, centre, radii, colour, strength in (
     mel.set_material_instance_vector_parameter_value(mi, "GlowRadii", unreal.LinearColor(radii[0], radii[1], radii[2], 0.0))
     mel.set_material_instance_vector_parameter_value(mi, "GlowColor", unreal.LinearColor(colour[0], colour[1], colour[2], 1.0))
     mel.set_material_instance_scalar_parameter_value(mi, "GlowStrength", strength)
+    mel.set_material_instance_scalar_parameter_value(mi, "GlowCore", core)
+    if has_param(g, "ExposureLock"): mel.set_material_instance_scalar_parameter_value(mi, "ExposureLock", lock)
     mel.update_material_instance(mi)
     lib.save_asset(p)
     log("%s glows (parent %s)" % (name, mi.get_editor_property("parent").get_name()))
@@ -211,9 +247,9 @@ def dyed_by(lum_param, lum_default, tint_param, tint_default, y):
 
 dyed, _ = dyed_by("GarmentLum", 0.1, "Tint", (0.10, 0.10, 0.10, 1.0), 300)
 skin, skin_tint = dyed_by("SkinLum", 0.35, "SkinTint", (1.0, 1.0, 1.0, 0.0), 700)
-skin_amt = node(pm, unreal.MaterialExpressionMultiply, -550, 900); link(ts, "R", skin_amt, "A"); link(skin_tint, "A", skin_amt, "B")
+skin_amt = node(pm, unreal.MaterialExpressionMultiply, -550, 900); skin_on = sca(pm, "SkinOn", 0.0, -700, 1000); link(ts, "R", skin_amt, "A"); link(skin_on, "", skin_amt, "B")   # (2026-11-18: skin dye off for everyone, SkinOn 0: only trolls were ever dyed and they have their own model)
 mid = node(pm, unreal.MaterialExpressionLinearInterpolate, -350, 600)
-link(tb, "RGB", mid, "A"); link(skin, "", mid, "B"); link(skin_amt, "", mid, "Alpha")
+link(tb, "RGB", mid, "A"); link(skin, "", mid, "B"); link(skin_amt, "", mid, "Alpha")   # (skin dye kept in the graph but never on: SkinTint alpha stays 0; no one is given a Skin row since 2026-11-18, human skin is the picture's own)
 dye = sca(pm, "Dye", 1.0, -700, 500)
 amt = node(pm, unreal.MaterialExpressionMultiply, -550, 450); link(tm, "R", amt, "A"); link(dye, "", amt, "B")
 fin = node(pm, unreal.MaterialExpressionLinearInterpolate, -150, 300)

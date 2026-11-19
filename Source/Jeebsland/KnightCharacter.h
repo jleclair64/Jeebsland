@@ -297,6 +297,20 @@ public:
 	void CycleArrows();          // F: the next kind of arrows you carry
 	void PickArrows(int32 Id);   // (the swap popup on the bar, and F: the server is told, since others see what is in his quiver)
 
+	// ---------------- The wand's and staff's aim (2026-11-18, owner; KnightCharacterCastAim.cpp) ----------------
+	// A small reticle up and right of the middle of the screen, clear of the knight (jeeb.Magic.Reticle, as shares of the screen). A cast
+	// turns him toward what is under it, and the server fires the bolt from the wand's tip or the staff's orb toward that point: the player's
+	// machine sends the point (ServerCastAim) just before the cast; the server checks it lies ahead of where he looks, else uses his aim.
+	static FVector2D CastReticleAt();
+	static float StaffSlide();                 // (cm) how far the staff's model slides through the fist for the walking-staff hold (jeeb.Knight.StaffHold)
+	bool ShowsCastReticle() const;             // a wand or staff in hand, nothing in the way
+	FVector CastAimPoint() const;              // the player's machine: what is under the reticle (elsewhere: ahead along his aim)
+	FVector CastStartPoint(int32 Kind) const;  // the wand's tip or the staff's orb, as the pose has it (checked: near him, nothing solid between)
+	float CastFacingYaw(float Fallback) const; // the heading toward a fresh aim point, or Fallback
+	UFUNCTION(Server, Reliable) void ServerCastAim(FVector_NetQuantize Target);
+	FVector CastTarget = FVector::ZeroVector;  // the last aim point (the server: as the player's machine sent it)
+	double CastTargetAt = -100.0;              // when it came (world seconds); used once by AttackLands
+
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)
 	void SaveNow();
@@ -483,6 +497,7 @@ protected:
 	bool bSuitTestActed = false;
 	void FillAnimInput(JeebAnim::FInput& In) const;
 	void PlaceGear();
+	void PlaceStaffModel();         // the held staff's orb glow and its place in the fist, live (jeeb.Magic.OrbGlow, jeeb.Knight.StaffGrip)
 	void TickSuitTests(float Dt);   // test pictures (-SuitWalk, -SuitDo)
 	void RebuildHeld();   // the weapon(s) in your hands
 	UProceduralMeshComponent* MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);
@@ -787,6 +802,7 @@ public:
 	bool InClimbMove() const;            // on a rock face, its jump, the ledge climb-up or a mantle
 	bool ClimbStowed() const;            // on the rock, climbing up a ledge or mantling: shield and weapon on his back
 	mutable FVector MantleEdge = FVector::ZeroVector; mutable uint8 MantleEdgeMode = 0;   // (the pose: where the hands go on a fence, FillWallInput)
+	mutable FVector MantleAlong = FVector::ZeroVector; mutable float MantleFar = 0.f;     // (the pose: the way over and how deep the top is, so his feet clear it)
 	void DropFromWall(bool bAll = false);   // (server) a clean hit, a knockdown or death takes him off it
 	void JumpFromMove(float Dt);         // the ground jump, from inside a move (Space near a fence that turned out not to be a mantle)
 	void TickWallClimb(float Dt);

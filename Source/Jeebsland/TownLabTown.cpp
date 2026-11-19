@@ -299,7 +299,8 @@ void ATownLabTown::BuildBuildings()
 		const FString Asset = AssetName(P.Model);
 		FString Path = FString::Printf(TEXT("/Game/Buildings/SM_%s"), *Asset), ColPath = Path + TEXT("_Col");
 		if (bSwap) { Path = Pick.Mesh; ColPath = LoadMesh(Pick.Mesh + TEXT("_Col")) ? Pick.Mesh + TEXT("_Col") : ColPath; ++Rebuilt; }
-		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw);
+		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f id %s door %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw,
+			P.Id ? P.Id : TEXT("-"), P.DoorDir);
 		const FTransform Xf(FRotator(0.f, Yaw, 0.f), At, FVector(Scale, Scale, ScaleZ));
 		static const bool bNoWar = TestOff(TEXT("NoWarBuildings"));   // (frame-cost runs only, -JeebShot: the war buildings' meshes left out, their walls kept)
 		const bool bWar = FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillRuins")) == 0;
@@ -458,7 +459,7 @@ void ATownLabTown::BuildBuildings()
 						const FVector LA = bAlongX ? FVector(U, Out, 0.f) : FVector(Out, U, 0.f);
 						const FVector LB = bAlongX ? FVector(U, 0.f, 0.f) : FVector(0.f, U, 0.f);
 						FVector A = Xf.TransformPosition(LA), B = Xf.TransformPosition(LB);
-						A.Z = FMath::Max(JeebTerrain::HeightAt(A.X, A.Y), JeebTerrain::HeightAt(B.X, B.Y)) + 110.f; B.Z = A.Z;
+						A.Z = Xf.GetLocation().Z + 110.f; B.Z = A.Z;   /* (the model's floor, not the slope round it: the pad is flattened by the terrain pass) */
 						FHitResult Hit;
 						++Tries;
 						if (!GetWorld()->SweepSingleByChannel(Hit, A, B, FQuat::Identity, ECC_Pawn, Cap, Qp))

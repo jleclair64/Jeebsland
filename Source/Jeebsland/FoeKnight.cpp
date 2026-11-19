@@ -498,7 +498,11 @@ void AFoeKnight::Tick(float DeltaSeconds)
 	{
 		const float Want = FMath::RadiansToDegrees(FMath::Atan2(ToP.Y, ToP.X));
 		const float TurnRate = (Act == EAct::Strike) ? 60.f : 260.f;   // committed once the blade comes down
-		Yaw = FMath::FixedTurn(Yaw, Want, TurnRate * Dt);
+		// (2026-11-18 night: a bandit stepping round a tree or rock on his way to you faces the way he walks, not you, so he doesn't crab-walk;
+		// within striking range, or with the way clear, he faces you again. FoeBandit.cpp, NoteStep.)
+		const float FaceFoeWithin = FMath::Max(StrikeReach + 80.f, 260.f);
+		if (IsBandit() && Act == EAct::Idle && Dist > FaceFoeWithin && BanditDetouring()) Yaw = FMath::FixedTurn(Yaw, WalkYaw, 360.f * Dt);
+		else Yaw = FMath::FixedTurn(Yaw, Want, TurnRate * Dt);
 	}
 
 	// ---- What he does ----

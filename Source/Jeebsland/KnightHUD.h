@@ -115,6 +115,35 @@ private:
 	void Panel(float X, float Y, float W, float H, float Alpha = 1.f, bool bGlow = false);
 	void Gauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse = false);
 
+	// The menu look (KnightHUDStyle.cpp, 2026-11-18): jeeb.UI.Style 0 = the old liquid glass, 1 = walnut and brass (default),
+	// 2 = midnight blue and gold. Panel, Tile, Gauge, Btn, CloseBtn and the tooltip draw in it; FillRR and Outline keep their
+	// corners small under styles 1 and 2 so overlays match the square panels.
+	static int32 UIStyle();
+	void FillRRx(float X, float Y, float W, float H, float R, TFunctionRef<FLinearColor(float)> ColorAt);   // (FillRR without the corner cap)
+	void KitPanel(float X, float Y, float W, float H, float Alpha, bool bGlow);
+	void KitTile(float X, float Y, float W, float H, const FLinearColor& Tint, float Alpha, bool bRim);
+	void KitGauge(float X, float Y, float W, float H, float F, const FLinearColor& Fill, bool bPulse);
+	bool KitBtn(float X, float Y, float W, float H, const FString& Label, bool bEnabled, bool bActive, float Scale);
+	bool KitCloseBtn(float BX, float BY, float S);
+	void KitFrame(float X, float Y, float W, float H, float T, const FLinearColor& Top, const FLinearColor& Side, const FLinearColor& Bottom);
+	void KitFittings(float X, float Y, float W, float H, float S, const FLinearColor& Col);
+	void KitGrain(float X, float Y, float W, float H, float Alpha);
+	void EnsureKitTex();
+	UPROPERTY() UTexture2D* GrainTex = nullptr;
+	UPROPERTY() UTexture2D* FittingTex = nullptr;
+	void CheckBox(float X, float Y, float S, bool bOn);   // a tick box (its top left, its size)
+	void SliderBar(float X, float SY, float W, float T, const FLinearColor& Fill);   // the track at SY + 4 (8 tall), the knob over it
+	void MapFrame(float X, float Y, float S);   // the frame round the world map
+	FLinearColor MapFogTint() const;
+	FLinearColor TipLineColor(const FString& Line, bool bFirst, FString& OutText) const;   // a tooltip line's colour (a class line is coloured)
+	// Class outlines on item icons (Kinds.csv Class): a coloured edge round the picture
+	float IconRim = 0.f;
+	FLinearColor IconRimCol = FLinearColor::White;
+	static FLinearColor ClassColor(int32 Class);
+	void ShotUISequence(AKnightCharacter* Knight);   // (test pictures, not in Shipping: -JeebShot -ShotUI, every screen in turn; KnightHUDShotUI.cpp)
+	void ShotUIMenu();                               // (test pictures: -ShotUIMenu, the start screen in each style)
+	int32 ShotUIStage = -1; float ShotUIAt = 0.f; bool bShotUITaken = false;
+
 	// Screens
 	void DrawSettingsScreen(AKnightCharacter* Knight);
 	void DrawDictionary(float PX, float PY, float PW, float PH);
@@ -165,6 +194,7 @@ private:
 	void DrawDialogue(AKnightCharacter* Knight);
 	void DrawWeaponBar(AKnightCharacter* Knight);
 	void DrawReticle(AKnightCharacter* Knight);   // the bow's aim, while drawing
+	void DrawCastReticle(AKnightCharacter* Knight);   // the wand's and staff's aim, up and right of the middle (KnightHUDReticle.cpp)
 	void DrawSkills(const USkillComponent* Skills);
 	void DrawSkillsScreen(AKnightCharacter* Knight);
 	void DrawSkillIcon(int32 SkillIdx, float X, float Y, float S);

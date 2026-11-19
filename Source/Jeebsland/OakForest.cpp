@@ -4,6 +4,7 @@
 #include "WorldMap.h"
 #include "OakHill.h"
 #include "TownLab.h"
+#include "SteeleCreekTown.h"
 #include "Canopy.h"
 #include "KnightGameState.h"
 #include "GameFramework/Pawn.h"
@@ -218,8 +219,7 @@ namespace
 	// ------------------------------------------------------------------ the kinds
 	enum EKind : uint8
 	{
-		K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2, K_Sapling,
-		K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_Plant, K_FlowersW, K_FlowersY,
+		K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2, K_Sapling,   // (the bushes went, 2026-11-18: ABushes, Bushes.cpp)
 		K_Log, K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass, K_Boulder, K_RockMossy, K_RockPale,
 		K_Num
 	};
@@ -243,14 +243,6 @@ namespace
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_03.spruce_full_03"), false, false, ESolid::Trunk, 330.f, 22.f, 300.f, 0.f, true },
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_02.spruce_half_02"), false, false, ESolid::Trunk, 210.f, 20.f, 600.f, 0.f, true },
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_01.spruce_small_01"), false, false, ESolid::None, 26.f, 0.f, 0.f, 4500.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushLeafy.SM_BushLeafy"), false, false, ESolid::None, 72.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushRound.SM_BushRound"), false, false, ESolid::None, 73.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushBerries.SM_BushBerries"), false, false, ESolid::None, 70.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushDome.SM_BushDome"), false, false, ESolid::None, 60.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_ShrubLow.SM_ShrubLow"), false, false, ESolid::None, 44.f, 0.f, 0.f, 5000.f, false },
-		{ TEXT("/Game/TownDecor/SM_PlantClump.SM_PlantClump"), false, false, ESolid::None, 60.f, 0.f, 0.f, 4500.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushWhiteFlowers.SM_BushWhiteFlowers"), false, false, ESolid::None, 61.f, 0.f, 0.f, 5000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushBerries.SM_BushBerries"), false, false, ESolid::None, 61.f, 0.f, 0.f, 5000.f, false },   // was BushYellowFlowers (deleted 2026-11-16)
 		{ TEXT("/Game/TownDecor/SM_LogMossy.SM_LogMossy"), false, false, ESolid::Box, 145.f, 0.f, 0.f, 9000.f, true },
 		{ TEXT("/Game/TownDecor/SM_Stump.SM_Stump"), false, false, ESolid::Cyl, 66.f, 0.f, 0.f, 8000.f, true },
 		{ TEXT("/Game/TownDecor/SM_StumpRooty.SM_StumpRooty"), false, false, ESolid::Cyl, 99.f, 0.f, 0.f, 8000.f, true },
@@ -264,7 +256,7 @@ namespace
 	bool IsSpruce(int32 K) { return K >= K_Full1 && K <= K_Half2; }
 
 	// One thing placed: its kind, colour (DZ only), where (on the ground), turn and size
-	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; FVector Up = FVector::UpVector; };   // (Up: the ground's tilt it lies along: logs and stones, 2026-11-17)
+	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; FVector Up = FVector::UpVector; bool bNoChop = false; };   // (Up: the ground's tilt it lies along: logs and stones, 2026-11-17)
 	// its turn: the yaw, then tipped from straight up to Up
 	FQuat PutRot(const FPut& P) { return FQuat::FindBetweenNormals(FVector::UpVector, P.Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw)); }
 
@@ -386,7 +378,7 @@ const TArray<TArray<FVector2D>>& JeebOakForest::RoadLines()
 		const FPlan Plans[] = {
 			{ 395.f, 0.f, TEXT("Silver Point") },   // the north road's end, past the castle ruins: north-east
 			{ -1.f, 0.f, TEXT("Anchorage") },       // a fork off the north road 40 m past the town (the town has no east road end)
-			{ 600.f, 650.f, TEXT("Birch Grove") },  // the road behind the bank, south-east: to the river's east branch
+			{ 769.3f, 699.3f, TEXT("Birch Grove") },  // the southeast road's end past the allotments (2026-11-18 layout): to the river's east branch
 		};
 		TArray<FVector2D> First;   // (the north road's steps, for the fork)
 		for (const FPlan& Pl : Plans)
@@ -490,6 +482,7 @@ struct FOakForestBuild
 				TArray<FString> C; L.ParseIntoArray(C, TEXT(","), false);
 				if (C.Num() < 4 || !C[0].TrimStartAndEnd().Equals(TEXT("OakHill"), ESearchCase::IgnoreCase)) continue;
 				const float E = FCString::Atof(*C[1]), N = FCString::Atof(*C[2]);
+				if (InWarFootprint(E, N, 2.f)) continue;   // (a spot marked on a fort's old empty plot would stand inside its walls)
 				const FString Class = C[3].TrimStartAndEnd().ToLower();
 				const FVector2D Plan(PosX + N * 100.f, PosY + E * 100.f);
 				const int32 Col = TownColour(Plan);
@@ -552,9 +545,10 @@ struct FOakForestBuild
 		// over 18 m toward the river banks
 		auto Edge = [&](float X, float Y) -> float
 		{
+			if (const float Isle = JeebWorld::IslandWoods(X, Y); Isle > 0.f) return 1.6f * Isle;   // (the lake's island and the split's: thickly wooded, glades or not, 2026-11-18)
 			const float D = FVector2D::Distance(FVector2D(X, Y), Plaza);
 			if (D > JeebOakForest::Reach) return 0.f;
-			const float Sq = FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf;
+			const float Sq =FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf;
 			if (Sq < 1200.f) return 0.f;
 			const float Town = BoxGap(X, Y);
 			if (Town < 2500.f) return 0.f;
@@ -638,13 +632,7 @@ struct FOakForestBuild
 			else if (Pick < 0.11f) { const int32 St[4] = { K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass }; Kind = St[int32(Sc * 3.99f)]; Scale = FMath::Lerp(0.8f, 1.15f, Sc); }
 			else if (Pick < (bConifer ? 0.4f : 0.2f)) { Kind = K_Sapling; Scale = FMath::Lerp(1.6f, 3.2f, Sc); }
 			else if (Pick < (bConifer ? 0.47f : 0.25f)) { Kind = K_Full1 + int32(Sc * 2.99f); Scale = FMath::Lerp(0.18f, 0.3f, Sc); ++Seedlings; }   // a spruce seedling (in its kind's count below)
-			else
-			{
-				const int32 Bu[8] = { K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_BushDome, K_ShrubLow, K_BushLeafy };   // (K_Plant, the PlantClump, removed 2026-11-17: owner "Delete these bushes")
-				Kind = Bu[int32(Sc * 7.99f)];
-				if (JeebWorld::Smooth(-0.32f, -0.12f, Noise(P, 9000.f, 3.3f, 8.8f)) < 0.5f && Sc > 0.75f) Kind = Sc > 0.87f ? K_FlowersW : K_FlowersY;   // flowering bushes in the glades
-				Scale = FMath::Lerp(0.8f, 1.5f, U.FRand());
-			}
+			else { U.FRand(); continue; }   // (the bushes that grew here went, 2026-11-18: ABushes, Bushes.cpp, places the new ones; the draw stays so the logs and stumps keep their places)
 			const float Foot = Kinds[Kind].Crown * Scale;
 			const bool bSolid = Kinds[Kind].Solid != ESolid::None;
 			// solids keep 60 cm clear of every trunk and solid; bushes may tuck in under the crowns but not into a trunk
@@ -693,6 +681,35 @@ struct FOakForestBuild
 		const int32 Fat = Count[K_Oak], Thin = Count[K_Aspen];
 		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST forest: %d trees (%d cork oaks, %d aspens, %d spruces; fat:skinny %.2f:1; DZ colours green %d red %d orange %d yellow %d), %d undergrowth (%d of them spruce seedlings, counted with their kind below), %d stones, density %.2f, planned in %.0f ms:%s"),
 			ForestTrees, Fat, Thin, ForestTrees - Fat - Thin, Thin ? float(Fat) / Thin : 0.f, ColCount[0], ColCount[1], ColCount[2], ColCount[3], Under, Seedlings, Rocks, Density, (FPlatformTime::Seconds() - T0) * 1000.0, *List);
+	}
+
+	// ---------------------------------------------------------------- Steele Creek's forest (2026-11-18 round 3)
+	// The trees SteeleCreekTown.cpp plans in and round Steele Creek (JeebSteeleWoods::Plan, deterministic), put on the drawn ground like the
+	// forest's own, in the same four colour patches, with solid trunks and the same shadows; not choppable (bNoChop). The checksum below and
+	// JEEBSTEELE's both cover them (the solids' positions are in this actor's hash, the plan's in the town's).
+	void Steele()
+	{
+		const TArray<JeebSteeleWoods::FSpot>& Spots = JeebSteeleWoods::Plan();
+		if (!Spots.Num()) return;
+		FVector2D Lo(1.0e9f, 1.0e9f), Hi(-1.0e9f, -1.0e9f);
+		for (const JeebSteeleWoods::FSpot& S : Spots) { Lo.X = FMath::Min(Lo.X, S.X); Lo.Y = FMath::Min(Lo.Y, S.Y); Hi.X = FMath::Max(Hi.X, S.X); Hi.Y = FMath::Max(Hi.Y, S.Y); }
+		FHeights Hs;
+		Hs.Build(Lo - FVector2D(1600.f), Hi + FVector2D(1600.f));
+		FRandomStream R(51529);
+		static const uint8 Kind[6] = { K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2 };
+		int32 Placed = 0, Steep = 0;
+		for (const JeebSteeleWoods::FSpot& S : Spots)
+		{
+			const FVector2D P(S.X, S.Y);
+			const int32 Col = ColourAt(P, R);   // (drawn for every spot, so the stream stays in step)
+			float Slope;
+			const float Z = Hs.At(S.X, S.Y, &Slope);
+			if (Slope > 0.72f) { ++Steep; continue; }
+			const uint8 K = Kind[FMath::Min<int32>(S.Kind, 5)];
+			Puts.Add({ K, uint8(Kinds[K].bTint ? Col : 0), FVector(S.X, S.Y, Z - 6.f - Slope * 45.f * S.Scale), S.Yaw, FVector(S.Scale), false, FVector::UpVector, true });
+			++Placed;
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST Steele Creek: %d trees (%d planned, %d left out on steep ground), not choppable"), Placed, Spots.Num(), Steep);
 	}
 
 	// ---------------------------------------------------------------- make it
@@ -750,7 +767,7 @@ struct FOakForestBuild
 				const float Rad = K.TrunkR * P.Scale.X, H = FMath::Max(K.TrunkH * P.Scale.Z, 300.f) + 40.f;
 				if (Rad < 6.f) break;   // (a seedling: walked through)
 				TrunkX.Add(FTransform(FRotator::ZeroRotator, P.At + FVector(0.f, 0.f, H * 0.5f - 40.f), FVector(Rad / 50.f, Rad / 50.f, H / 100.f)));
-				if (IsTree(P.Kind))   // (a choppable tree, AOakTreeNode)
+				if (IsTree(P.Kind) && !P.bNoChop)   // (a choppable tree, AOakTreeNode; not Steele Creek's)
 				{
 					AOakForest::FFellable F;
 					F.Key = P.Kind * 4 + P.Col; F.KeyIndex = Visual[F.Key].Num() - 1;
@@ -1008,6 +1025,7 @@ void AOakForest::BeginPlay()
 	B.Town(0.f);
 	if (JeebTownLab::NewOn()) B.Town(JeebTownLab::OffY);   // (the TownLab map: its rebuilt town 300 m east gets the same trees)
 	B.Forest();
+	B.Steele();   // (Steele Creek's forest, planned by SteeleCreekTown.cpp)
 	B.Make();
 	UE_LOG(LogTemp, Log, TEXT("JEEBFOREST built in %.0f ms"), (FPlatformTime::Seconds() - T0) * 1000.0);
 }

@@ -40,5 +40,6 @@ private:
 	UPROPERTY() TArray<UProceduralMeshComponent*> Chunks;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Water;
 	void BuildLand();
+	void BuildFine();   // (the 2 m patches: Steele Creek, the lake, the split)
 	void BuildWater();
 };

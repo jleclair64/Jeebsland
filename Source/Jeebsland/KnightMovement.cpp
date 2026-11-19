@@ -8,6 +8,7 @@
 #include "Engine/StaticMesh.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
+#include "HAL/IConsoleManager.h"
 
 // Free climbing and the mantle: see KnightMovement.h. All of it runs inside a move, so the player's machine, the server and correction
 // replays do the same thing from the same inputs; every number is Tuning.ini [Climb].
@@ -75,6 +76,9 @@ float UKnightMovement::DrainPerSecond() const
 	return 1.f / FMath::Max(AKnightCharacter::ClimbSeconds(L), 0.5f);
 }
 
+// (test switch: 0 brings back the old per-frame speed and start-up push, set by the knight's Tick, to count corrections before and after; both machines)
+static TAutoConsoleVariable<int32> CVarSpeedInMove(TEXT("jeeb.Knight.SpeedInMove"), 1, TEXT("1: his speed and start-up push are worked out inside each move (client and server agree). 0: the old per-frame values, to compare. Set on the server and the client."), ECVF_Default);
+
 float UKnightMovement::GetMaxSpeed() const
 {
 	if (MovementMode == MOVE_Custom)
@@ -83,8 +87,61 @@ float UKnightMovement::GetMaxSpeed() const
 		if (InWater()) return T.SwimFastSpeed;
 		return FMath::Max3(T.ClimbUpSpeed, T.ClimbSideSpeed, T.ClimbDownSpeed);
 	}
-	const float S = Super::GetMaxSpeed();
+	const bool bRun = CVarSpeedInMove.GetValueOnGameThread() != 0 && SpeedRule.bByMove && (MovementMode == MOVE_Falling || ((MovementMode == MOVE_Walking || MovementMode == MOVE_NavWalking) && !IsCrouching()));
+	const float S = bRun ? MoveCap(Acceleration) : Super::GetMaxSpeed();   // (this move's own push: KnightMovement.h, FSpeedRule)
 	return MovementMode == MOVE_Walking && WaterDepth > 30.f ? S * WadeMul(WaterDepth) : S;   // (wading: slower the deeper)
+}
+
+float UKnightMovement::MoveCap(const FVector& Dir) const
+{
+	const FSpeedRule& R = SpeedRule;
+	float StrafeMul = 1.f;   // strafe mode: full speed ahead, 90% sideways, 75% straight back (AKnightCharacter::TickGroundSpeed explains)
+	if (R.bStrafe && UpdatedComponent)
+	{
+		const FVector D = Dir.GetSafeNormal2D();
+		if (!D.IsNearlyZero())
+		{
+			const float Fw = FVector::DotProduct(D, UpdatedComponent->GetForwardVector().GetSafeNormal2D());
+			StrafeMul = Fw >= 0.f ? FMath::Lerp(0.9f, 1.f, Fw) : FMath::Lerp(0.9f, 0.75f, -Fw);
+		}
+	}
+	const float Run = (bWantsFast && R.bSprintOk) ? FMath::Lerp(R.Walk, R.Sprint, MoveStrafeSprint) : R.Walk;
+	return Run * StrafeMul * R.K * MoveAirMul;
+}
+
+// No wind-up starting to walk: on the ground (or on the rock) and below walking speed he gets there at once; above it (walk to sprint)
+// the usual acceleration keeps the sprint's ramp. From the velocity at the move's start, so the client's scaling of his push and the
+// server's check of it (MoveAutonomous) use the same number; the direction for strafe mode's shares is the way he is already going.
+float UKnightMovement::AccelRuleNow() const
+{
+	const JeebTune::FValues& T = JeebTune::V();
+	if (!SpeedRule.bAccelRule || IsFalling()) return T.SprintAccel;
+	const float Cap = SpeedRule.bByMove ? MoveCap(Velocity) : MaxWalkSpeed;
+	const float WalkCap = FMath::Min(Cap, SpeedRule.WalkCapBase * MoveAirMul);
+	return Velocity.Size2D() < WalkCap - 5.f ? T.WalkAccel : T.SprintAccel;
+}
+
+float UKnightMovement::GetMaxAcceleration() const
+{
+	if (CVarSpeedInMove.GetValueOnGameThread() == 0) return Super::GetMaxAcceleration();   // (the old way, per frame: to compare)
+	return bAccelFrozen ? FrozenAccel : AccelRuleNow();
+}
+
+void UKnightMovement::ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds)
+{
+	FrozenAccel = AccelRuleNow();
+	bAccelFrozen = true;   // (held through the move: a merged move is refused if its parts had different ones, FSavedMove_Knight::CanCombineWith)
+	Super::ControlledCharacterMove(InputVector, DeltaSeconds);
+	bAccelFrozen = false;
+}
+
+void UKnightMovement::MoveAutonomous(float ClientTimeStamp, float DeltaTime, uint8 CompressedFlags, const FVector& NewAccel)
+{
+	// (the server running a client's move, and the client replaying its moves after a correction)
+	FrozenAccel = AccelRuleNow();
+	bAccelFrozen = true;
+	Super::MoveAutonomous(ClientTimeStamp, DeltaTime, CompressedFlags, NewAccel);
+	bAccelFrozen = false;
 }
 
 void UKnightMovement::PhysicsRotation(float DeltaTime)
@@ -137,6 +194,16 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 	Super::UpdateCharacterStateBeforeMovement(Dt);
 	if (!CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy) return;   // others' machines only show what the server sends
 	const JeebTune::FValues& T = JeebTune::V();
+	// The running speed's eased shares, per move (KnightMovement.h, FSpeedRule): the sprint fades in over a fraction of a second as he turns
+	// toward straight ahead (none at 60 degrees off, all of it within about 20), and after landing he speeds back up from the air's share.
+	{
+		float WantSprint = 1.f;
+		const FVector A = Acceleration.GetSafeNormal2D();
+		if (SpeedRule.bStrafe && UpdatedComponent && !A.IsNearlyZero())
+			WantSprint = FMath::SmoothStep(0.5f, 0.94f, float(FVector::DotProduct(A, UpdatedComponent->GetForwardVector().GetSafeNormal2D())));
+		MoveStrafeSprint = FMath::FInterpTo(MoveStrafeSprint, WantSprint, Dt, 5.f);
+		MoveAirMul = IsFalling() ? SpeedRule.AirMul : FMath::FInterpTo(MoveAirMul, 1.f, Dt, 6.f);
+	}
 	if (!IsCustom(JeebClimb::Climb)) bJumpQueued = false;
 	bTouchMantle = false;   // (left over from a move the player's machine threw away or merged: never acted on)
 
@@ -542,9 +609,10 @@ bool UKnightMovement::MantleCandidate(const UPrimitiveComponent* C, int32 Item, 
 	return true;
 }
 
-bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge) const
+bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge, float* OutFar) const
 {
 	const JeebTune::FValues& T = JeebTune::V();
+	if (OutFar) *OutFar = 0.f;
 	const float R = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const float FeetZ = C.Z - HH;
@@ -623,6 +691,7 @@ bool UKnightMovement::PlanMantle(const FVector& C, const FVector& Fwd, bool bInA
 		if (GetWorld()->LineTraceSingleByObjectType(B, FVector(C.X, C.Y, OutTop + 50.f), FVector(To.X, To.Y, OutTop + 50.f), WorldObjects(), Q)) return No(TEXT("way over blocked"), B.GetComponent());
 		OutTo = To;
 		OutMode = JeebClimb::MantleOver;
+		if (OutFar) *OutFar = float(FVector::DotProduct(FVector(P.X - C.X, P.Y - C.Y, 0.f), OutFace)) + Depth;   // (the far edge, from where he starts)
 		return true;
 	}
 	return No(TEXT("no landing"), F.GetComponent(), Height);
@@ -635,7 +704,9 @@ bool UKnightMovement::TryMantle(bool bInAir)
 	FVector Fwd = Flat(Acceleration);
 	if (Fwd.IsNearlyZero()) { if (bInAir) return false; Fwd = Flat(UpdatedComponent->GetForwardVector()); }
 	uint8 Mode; FVector To, Face; float Top;
-	if (!PlanMantle(UpdatedComponent->GetComponentLocation(), Fwd, bInAir, Mode, To, Top, Face, &ActEdge)) return false;
+	FVector Edge; float Far = 0.f;
+	if (!PlanMantle(UpdatedComponent->GetComponentLocation(), Fwd, bInAir, Mode, To, Top, Face, &Edge, &Far)) return false;
+	ActEdge = Edge; ActFar = Far;
 	// the speed he carries out of a vault: from his keys (how hard and how square he pushes at it, at his top speed), not his velocity, which the bump
 	// itself has just changed and which the two machines can see a hair apart (2026-11-16: the server corrected every online vault)
 	const float Push = FMath::Clamp(float(Acceleration.Size2D()) / FMath::Max(GetMaxAcceleration(), 1.f), 0.f, 1.f) * FMath::Max(0.f, float(FVector::DotProduct(Flat(Acceleration), Face)));
@@ -651,10 +722,20 @@ bool UKnightMovement::TryMantle(bool bInAir)
 	return true;
 }
 
-bool UKnightMovement::FindMantleEdge(const FVector& C, const FVector& Fwd, FVector& OutEdge) const
+bool UKnightMovement::FindMantleEdge(const FVector& C, const FVector& Fwd, FVector& OutEdge, float* OutFar, FVector* OutFace) const
 {
-	uint8 Mode; FVector To, Face; float Top;
-	return PlanMantle(C, Fwd, false, Mode, To, Top, Face, &OutEdge) || PlanMantle(C, Fwd, true, Mode, To, Top, Face, &OutEdge);
+	uint8 Mode; FVector To, Face; float Top, Far = 0.f;
+	const bool bOk = PlanMantle(C, Fwd, false, Mode, To, Top, Face, &OutEdge, &Far) || PlanMantle(C, Fwd, true, Mode, To, Top, Face, &OutEdge, &Far);
+	if (bOk && OutFar) *OutFar = MantleFarPast(C, OutEdge, Face, Mode, Far);
+	if (bOk && OutFace) *OutFace = Face;
+	return bOk;
+}
+
+// How far past the near top edge the top runs (a vault: to its far edge; climbing onto: as good as all the way)
+float UKnightMovement::MantleFarPast(const FVector& From, const FVector& Edge, const FVector& Face, uint8 Mode, float Far)
+{
+	if (Mode != JeebClimb::MantleOver) return 500.f;
+	return FMath::Max(0.f, Far - float(FVector::DotProduct(FVector(Edge.X - From.X, Edge.Y - From.Y, 0.f), Face)));
 }
 
 float UKnightMovement::ScriptedHold() const
@@ -679,12 +760,42 @@ void UKnightMovement::PhysScripted(float Dt)
 	ActT = FMath::Min(ActT + Dt, ActDur);
 	const float U = FMath::Min(ActT / FMath::Max(ActDur - ActHold, 0.05f), 1.f);   // (the path ends early; the rest of the time he stands up on the spot)
 	FVector P;
+	// (2026-11-18 night, owner: "it looks like he's stepping up slightly and moving through the object". The vault's arc peaked at half the
+	// height + 15 cm, so on a 70-80 cm bollard or parapet his feet passed 20-30 cm through its top, and the climb onto moved him over the edge
+	// before he was up. Now the path is laid out from the obstacle itself: he rises until his feet are MantleClear over its top by the time his
+	// leading foot (MantleFoot ahead of the capsule's middle) reaches its near edge, stays up there until his trailing foot is past its far edge,
+	// then drops to the landing. Every number comes from the plan both machines make (ActEdge, ActFar, ActTop), so it predicts and corrects as before.)
+	constexpr float MantleClear = 12.f, MantleFoot = 28.f;
+	const FVector Dir2(ActDir.X, ActDir.Y, 0.f);
+	const float D = float(FVector::DotProduct(FVector(ActTo.X - ActFrom.X, ActTo.Y - ActFrom.Y, 0.f), Dir2));   // (along the way he faces)
+	const FVector Side = FVector(ActTo.X - ActFrom.X, ActTo.Y - ActFrom.Y, 0.f) - Dir2 * D;                       // (any small sideways part, spread evenly)
+	const float NearX = FMath::Clamp(float(FVector::DotProduct(FVector(ActEdge.X - ActFrom.X, ActEdge.Y - ActFrom.Y, 0.f), Dir2)), 0.f, FMath::Max(D, 0.f));
+	const float Up = FMath::Max(0.f, float(ActTop - (ActFrom.Z - HH))) + MantleClear;   // capsule rise that puts his feet clear over the top
+	auto Place = [&](float X, float Z, float SideU) { return FVector(ActFrom.X, ActFrom.Y, ActFrom.Z) + Dir2 * X + Side * SideU + FVector(0.f, 0.f, Z); };
 	if (IsCustom(JeebClimb::MantleOver))
 	{
-		const float S = 0.5f * U + 0.5f * Ease(U);
-		P = FMath::Lerp(ActFrom, ActTo, S);
-		const float Lift = FMath::Max(0.f, float(ActTop - (ActFrom.Z - HH))) * 0.5f + 15.f;
-		P.Z += Lift * FMath::Sin(PI * U);
+		// rise (to U1), over the top (to U2), down to the landing
+		constexpr float U1 = 0.38f, U2 = 0.62f;
+		const float X1 = FMath::Max(NearX - MantleFoot, 0.f);
+		const float X2 = FMath::Clamp(ActFar + MantleFoot, X1, D);
+		const float LandZ = float(ActTo.Z - ActFrom.Z);
+		float X, Z;
+		if (U <= U1) { const float A = U / U1; X = X1 * A; Z = Up * Ease(A); }
+		else if (U <= U2) { const float A = (U - U1) / (U2 - U1); X = FMath::Lerp(X1, X2, A); Z = Up + 6.f * FMath::Sin(PI * A); }
+		else { const float A = (U - U2) / (1.f - U2); X = FMath::Lerp(X2, D, A); Z = FMath::Lerp(Up, LandZ, Ease(A)); }
+		P = Place(X, Z, D > 1.f ? X / D : U);
+	}
+	else if (IsCustom(JeebClimb::MantleOnto))
+	{
+		// up beside the edge first (hands planted on the top), then over onto it once his feet are clear, then settle to standing height
+		constexpr float U1 = 0.5f;
+		const float X1 = FMath::Max(NearX - MantleFoot, 0.f);
+		const float EndZ = float(ActTo.Z - ActFrom.Z);
+		const float Peak = FMath::Max(Up, EndZ);
+		float X, Z;
+		if (U <= U1) { const float A = U / U1; X = X1 * Ease(A); Z = Peak * Ease(A); }
+		else { const float A = (U - U1) / (1.f - U1); X = FMath::Lerp(X1, D, Ease(A)); Z = FMath::Lerp(Peak, EndZ, Ease(A)); }
+		P = Place(X, Z, D > 1.f ? X / D : U);
 	}
 	else
 	{
@@ -757,6 +868,7 @@ void FKnightMoveResponse::ServerFillResponseData(const UCharacterMovementCompone
 	Stamina = K.ClimbStamina; RefillWait = K.RefillWait; bExhausted = K.bClimbExhausted; bNoRegrab = K.bNoRegrab; WallNormal = K.WallNormal;
 	ActFrom = K.ActFrom; ActTo = K.ActTo; ActDir = K.ActDir; ActT = K.ActT; ActDur = K.ActDur; ActTop = K.ActTop; ActCarry = K.ActCarry; ActHold = K.ActHold;
 	SwimStamina = K.SwimStamina; Breath = K.Breath; SwimRefillWait = K.SwimRefillWait; DrownT = K.DrownT; bHeadUnder = K.bHeadUnder;
+	StrafeSprint = K.MoveStrafeSprint; AirMul = K.MoveAirMul; ActEdge = K.ActEdge; ActFar = K.ActFar;
 	if (K.MovementMode == MOVE_Custom) bHasRotation = true;   // on the wall his facing is part of the state
 }
 
@@ -776,6 +888,10 @@ bool FKnightMoveResponse::Serialize(UCharacterMovementComponent& CharacterMoveme
 		Ar << ActT << ActDur << ActTop << ActCarry << ActHold;
 		Ar << SwimStamina << Breath << SwimRefillWait << DrownT;
 		Ar.SerializeBits(&bHeadUnder, 1);
+		Ar << StrafeSprint << AirMul << ActFar;
+		FVector3f E(ActEdge);
+		Ar << E;
+		if (Ar.IsLoading()) ActEdge = FVector(E);
 		if (!bOk) return false;
 	}
 	return !Ar.IsError();
@@ -791,12 +907,27 @@ void UKnightMovement::ClientHandleMoveResponse(const FCharacterMoveResponseDataC
 	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; WallNormal = R.WallNormal;
 	ActFrom = R.ActFrom; ActTo = R.ActTo; ActDir = R.ActDir; ActT = R.ActT; ActDur = R.ActDur; ActTop = R.ActTop; ActCarry = R.ActCarry; ActHold = R.ActHold;
 	SwimStamina = R.SwimStamina; Breath = R.Breath; SwimRefillWait = R.SwimRefillWait; DrownT = R.DrownT; bHeadUnder = R.bHeadUnder;
+	MoveStrafeSprint = R.StrafeSprint; MoveAirMul = R.AirMul; ActEdge = R.ActEdge; ActFar = R.ActFar;
 }
 
 void FSavedMove_Knight::Clear()
 {
 	Super::Clear();
 	bSavedLetGo = false; SavedMode = 0; bSavedExhausted = false; bSavedRefilling = false; bSavedFast = false; bSavedRise = false;
+	SavedStrafeSprint = 1.f; SavedAirMul = 1.f; SavedAccel = 0.f;
+}
+
+// A merged move is run again on the client from the older move's start (the engine puts back where he was and how fast he went): the
+// eased speed shares go back with it, so the merged move advances them once over the whole time, exactly as the server will
+void FSavedMove_Knight::CombineWith(const FSavedMove_Character* OldMove, ACharacter* InCharacter, APlayerController* PC, const FVector& OldStartLocation)
+{
+	Super::CombineWith(OldMove, InCharacter, PC, OldStartLocation);
+	const FSavedMove_Knight* O = static_cast<const FSavedMove_Knight*>(OldMove);
+	if (UKnightMovement* K = Cast<UKnightMovement>(InCharacter->GetCharacterMovement()))
+	{
+		K->MoveStrafeSprint = O->SavedStrafeSprint;
+		K->MoveAirMul = O->SavedAirMul;
+	}
 }
 
 uint8 FSavedMove_Knight::GetCompressedFlags() const
@@ -809,6 +940,7 @@ bool FSavedMove_Knight::CanCombineWith(const FSavedMovePtr& NewMove, ACharacter*
 {
 	const FSavedMove_Knight* O = static_cast<const FSavedMove_Knight*>(NewMove.Get());
 	if (O->bSavedFast != bSavedFast || O->bSavedRise != bSavedRise) return false;
+	if (!FMath::IsNearlyEqual(O->SavedAccel, SavedAccel)) return false;   // (the push was scaled with a different start-up rule: the server checks the merged move with the older one's)
 	if (O->bSavedLetGo != bSavedLetGo || O->SavedMode != SavedMode || O->bSavedExhausted != bSavedExhausted || SavedMode != 0 || bSavedRefilling || O->bSavedRefilling) return false;   // (the bar refilling on the ground runs per move: never merged)
 	return Super::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
@@ -824,6 +956,18 @@ void FSavedMove_Knight::SetMoveFor(ACharacter* C, float InDeltaTime, FVector con
 		bSavedRefilling = K->ClimbStamina < 1.f || K->RefillWait > 0.f || K->SwimStamina < 1.f || K->SwimRefillWait > 0.f || K->Breath < 1.f;
 		bSavedFast = K->bWantsFast;
 		bSavedRise = K->bWantsRise;
+		SavedAccel = K->GetMaxAcceleration();   // (frozen for this move: UKnightMovement::ControlledCharacterMove)
+	}
+}
+
+// (also after a merge, from the older move's start: the engine calls it again then)
+void FSavedMove_Knight::SetInitialPosition(ACharacter* C)
+{
+	Super::SetInitialPosition(C);
+	if (const UKnightMovement* K = Cast<UKnightMovement>(C->GetCharacterMovement()))
+	{
+		SavedStrafeSprint = K->MoveStrafeSprint;
+		SavedAirMul = K->MoveAirMul;
 	}
 }
 

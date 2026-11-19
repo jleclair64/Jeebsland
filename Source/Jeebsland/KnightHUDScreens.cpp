@@ -135,12 +135,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			if (PC->IsInputKeyDown(EKeys::Left))  Knight->SetLookSensitivity(Knight->GetLookSensitivity() - 0.5f * Dt);
 		}
 
-		auto Slider = [&](float SY, float T, const FLinearColor& Fill)
-		{
-			DrawRect(FLinearColor(0.25f, 0.25f, 0.25f, 1.f), SX, SY + 4.f, SW, 8.f);
-			DrawRect(Fill, SX, SY + 4.f, SW * T, 8.f);
-			DrawRect(FLinearColor::White, SX + SW * T - 8.f, SY - 6.f, 16.f, 28.f);
-		};
+		auto Slider = [&](float SY, float T, const FLinearColor& Fill) { SliderBar(SX, SY, SW, T, Fill); };
 
 		const float Look = Knight->GetLookSensitivity();
 		HDText(FString::Printf(TEXT("Look sensitivity:  %d%%"), FMath::RoundToInt(Look * 100.f)), FLinearColor::White, PX + 40.f, PY + 96.f, Font, Scale);
@@ -163,14 +158,10 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 		}
 		HDText(LevelText[FMath::Clamp(Knight->GetGraphicsLevel(), 0, 1)], FLinearColor(0.75f, 0.75f, 0.75f), BoxX + 130.f, BoxY + 42.f, Font, 1.0f);
 		// Side panel: always on screen, or only while the cursor is out (Tab)
-		DrawRect(FLinearColor::White, BoxX, BoxY + 90.f, 26.f, 26.f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 92.f, 22.f, 22.f);
-		if (Knight->GetPanelAlways()) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 95.f, 16.f, 16.f);
+		CheckBox(BoxX, BoxY + 90.f, 26.f, Knight->GetPanelAlways());
 		HDText(TEXT("Show the inventory panel all the time (off: only while Tab is held open)"), FLinearColor::White, BoxX + 38.f, BoxY + 92.f, Font, 1.1f);
 		// Frame rate counter in the top right corner
-		DrawRect(FLinearColor::White, BoxX, BoxY + 136.f, 26.f, 26.f);
-		DrawRect(FLinearColor(0.f, 0.f, 0.f, 1.f), BoxX + 2.f, BoxY + 138.f, 22.f, 22.f);
-		if (bShowFps) DrawRect(FLinearColor(0.9f, 0.55f, 0.15f), BoxX + 5.f, BoxY + 141.f, 16.f, 16.f);
+		CheckBox(BoxX, BoxY + 136.f, 26.f, bShowFps);
 		HDText(TEXT("Show the frame rate"), FLinearColor::White, BoxX + 38.f, BoxY + 138.f, Font, 1.1f);
 
 	}

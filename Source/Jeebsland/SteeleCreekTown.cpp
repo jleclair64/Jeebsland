@@ -28,8 +28,8 @@
 
 namespace
 {
-	TAutoConsoleVariable<int32> CVarSteeleTreeShadows(TEXT("jeeb.Steele.TreeShadows"), 1,
-		TEXT("Steele Creek's ring of forest trees: 1 they cast shadows, 0 none (cheaper). Live; looks only."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarSteeleDensity(TEXT("jeeb.Steele.Density"), 1.f,
+		TEXT("How thick the forest round and in Steele Creek is (1 as built, about 1,000 trees; 0.5 half as many; 0 none). Read when the world is built: change it, then load the map again. Online, give the server and every player the same value (the trunks are solid)."), ECVF_Default);
 
 #if !UE_BUILD_SHIPPING
 	// (test only: puts the local player's knight in Steele Creek's forge yard; single player or a listen server's own knight)
@@ -151,16 +151,10 @@ namespace
 		return nullptr;
 	}
 
-	// The forest ring's trees (the packs AOakForest uses): mesh, the trunk's solid at scale 1 (radius, height), crown radius, share
-	struct FTreeKind { const TCHAR* Path; float TrunkR, TrunkH, Crown, Share; };
-	const FTreeKind TreeKinds[] = {
-		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_01.spruce_full_01"), 22.f, 300.f, 250.f, 0.22f },
-		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_02.spruce_full_02"), 22.f, 300.f, 340.f, 0.20f },
-		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_03.spruce_full_03"), 22.f, 300.f, 330.f, 0.20f },
-		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_02.spruce_half_02"), 20.f, 600.f, 210.f, 0.10f },
-		{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Aspen/SM_Columnar_Aspen_1.SM_Columnar_Aspen_1"), 16.f, 510.f, 235.f, 0.16f },
-		{ TEXT("/Game/DZ_Assets/DZ_Trees/Meshes/Cork_Oak/SM_Cork_Oak_1.SM_Cork_Oak_1"), 38.f, 370.f, 570.f, 0.12f },
-	};
+	// The kinds of tree the town's forest uses are AOakForest's (OakForest.cpp builds them): 0 cork oak, 1 aspen, 2-4 full spruces, 5 half
+	// spruce. Crown and trunk radius at scale 1 (cm), the same numbers as its kind table
+	constexpr float CrownOf[6] = { 570.f, 235.f, 250.f, 340.f, 330.f, 210.f };
+	constexpr float TrunkOf[6] = { 38.f, 16.f, 22.f, 22.f, 22.f, 20.f };
 
 	// The townsfolk's beats (metres from the centre), in SpawnPeople's order: shared with the town's own trees, which keep off them
 	const TArray<TArray<FVector2D>>& Beats()
@@ -222,6 +216,113 @@ namespace
 	}
 }
 
+// ------------------------------------------------------------------ the forest in and round the town (planned here, drawn by AOakForest)
+// A jittered 6.5 m lattice (the forest's own) out to 200 m from the forge yard. Every random number of a cell is drawn before any test, so
+// every machine plans the same trees (the server and the clients compare JEEBFOREST's and JEEBSTEELE's checksums). How many are kept:
+//  - inside the town (buildings on at least three sides within 45 m of the spot): GapWant, tall trees in the gaps between the plots and
+//    at street ends, oaks where the roofs leave room;
+//  - behind the outer buildings: a dense belt from a few metres off the walls, thinning from 14 m to 85 m out toward the land beyond, which
+//    keeps a thin patchy stand to 200 m.
+// Kept clear of: the streets (and so the road out), the forge yard and where players land, the river, walls, the space in front of every
+// door, the quarry's rocks, the townsfolk's walks, the town's props and fill sets, and each other. jeeb.Steele.Density scales every
+// share (read at world build).
+const TArray<JeebSteeleWoods::FSpot>& JeebSteeleWoods::Plan()
+{
+	static TArray<FSpot> Spots;
+	static float Built = -1.f;
+	const float Density = FMath::Clamp(CVarSteeleDensity.GetValueOnGameThread(), 0.f, 3.f);
+	if (Built == Density) return Spots;
+	Built = Density;
+	Spots.Reset();
+	if (!JeebSteele::Enabled() || Density <= 0.f) return Spots;
+	const double T0 = FPlatformTime::Seconds();
+	const FVector2D Yard = JeebSteele::ToWorld(-5.f, 0.f), Arrival = JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN), Mid = JeebSteele::ToWorld(1.f, 0.f);
+	const float Reach = 23000.f, Cell = 650.f, GapWant = 0.34f;
+	const TArray<FProp> Props = TownProps();
+	const TArray<FVector2D> Fill = FillSpots();
+	TArray<FVector2D> Doors;
+	for (const JeebSteele::FPlot& P : JeebSteele::Plots()) if (!P.bWell) { Doors.Add(JeebSteele::DoorSpot(P, 250.f)); Doors.Add(JeebSteele::DoorSpot(P, 700.f)); }
+	auto Noise = [](const FVector2D& P, float Scale, float Ox, float Oy) { return FMath::PerlinNoise2D(FVector2D(P.X / Scale + Ox, P.Y / Scale + Oy)); };
+	FRandomStream R(51523);
+	const int32 N = FMath::CeilToInt(2.f * Reach / Cell);
+	TArray<FVector4f> Planted;   // (X, Y, crown radius)
+	int32 Tried = 0, InTown = 0;
+	for (int32 i = 0; i < N; ++i)
+		for (int32 j = 0; j < N; ++j)
+		{
+			const float Jx = R.FRand(), Jy = R.FRand(), Keep = R.FRand(), Pick = R.FRand(), Pick2 = R.FRand(), Size = R.FRand(), Yaw = R.FRandRange(0.f, 360.f);
+			const float X = Yard.X - Reach + (i + Jx) * Cell, Y = Yard.Y - Reach + (j + Jy) * Cell;
+			const FVector2D P(X, Y);
+			if (FVector2D::Distance(P, Yard) > Reach) continue;
+			++Tried;
+			// how enclosed by buildings it is: how many of the four sides (east, west, north, south) have a plot centre within 45 m
+			int32 Sides = 0;
+			{
+				bool bSide[4] = {};
+				for (const JeebSteele::FPlot& Pl : JeebSteele::Plots())
+				{
+					const FVector2D D = Pl.Centre - P;
+					if (D.SizeSquared() > 6500.f * 6500.f) continue;
+					if (FMath::Abs(D.X) >= FMath::Abs(D.Y)) bSide[D.X > 0.f ? 0 : 1] = true; else bSide[D.Y > 0.f ? 2 : 3] = true;
+				}
+				Sides = int32(bSide[0]) + int32(bSide[1]) + int32(bSide[2]) + int32(bSide[3]);
+			}
+			const float Fabric = FMath::Clamp((Sides - 1) * 0.5f, 0.f, 1.f);
+			const float Dd = FMath::Min(JeebSteele::BuildingDistance(X, Y), 12000.f) / 100.f;   // metres off the nearest wall
+			// (the belt's edge is broken into lobes: its reach is bent by a noise, 0-45 m either way, and a second noise opens clearings)
+			const float DdL = FMath::Max(0.f, Dd + 26.f * Noise(P, 4200.f, 17.3f, -5.1f) + 10.f * Noise(P, 1500.f, 2.2f, 9.9f));
+			const float Glade = JeebWorld::Smooth(-0.42f, -0.22f, Noise(P, 2600.f, -8.4f, 3.7f));
+			const float Belt = FMath::Lerp(1.f, 0.3f, JeebWorld::Smooth(18.f, 120.f, DdL)) * FMath::Lerp(0.3f, 1.f, Glade);
+			// a slow noise opens glades in the belt's thin outer part and thickens it in patches
+			const float Patch = FMath::Lerp(1.f, FMath::Lerp(0.55f, 1.25f, 0.5f + 0.5f * Noise(P, 9000.f, 3.3f, 8.8f)), JeebWorld::Smooth(30.f, 70.f, Dd));
+			const float Want = Density * FMath::Lerp(Belt * Patch, GapWant, Fabric);
+			if (Keep >= Want) continue;
+			// what grows here: spruce stands and aspen clumps by noise, more broadleaves in the town
+			const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
+			const float ConiferP = FMath::Clamp(FMath::Lerp(0.4f, 0.85f, JeebWorld::Smooth(0.35f, 0.7f, ConiferField)) - 0.25f * Fabric, 0.05f, 0.9f);
+			int32 K; float S;
+			if (Pick < ConiferP)
+			{
+				if (Pick2 < 0.75f) { K = 2 + FMath::Min(int32(Pick2 / 0.25f), 2); S = FMath::Lerp(1.0f, 1.4f, Size); }
+				else { K = 5; S = FMath::Lerp(0.95f, 1.2f, Size); }
+			}
+			else
+			{
+				const float AspenField = 0.5f + 0.5f * Noise(P, 5000.f, 6.1f, -2.9f);
+				const bool bAspen = Pick2 < 0.2f + 0.6f * JeebWorld::Smooth(0.5f, 0.75f, AspenField);
+				K = bAspen ? 1 : 0;
+				S = bAspen ? FMath::Lerp(0.9f, 1.2f, Size) : FMath::Lerp(0.8f, 1.15f, Size);
+			}
+			const float Crown = CrownOf[K] * S, Trunk = TrunkOf[K] * S;
+			if (JeebWorld::InWater(X, Y) || JeebWorld::NearRiver(X, Y, 600.f + Crown * 0.3f)) continue;
+			if (JeebTerrain::PathClearance(X, Y) < 300.f + Crown * 0.3f) continue;   // (streets, the road out, the forge yard's patch)
+			if (FVector2D::Distance(P, Mid) < 1500.f || FVector2D::Distance(P, Arrival) < 1500.f) continue;   // (the yard, where players start and land)
+			if (JeebSteele::BuildingDistance(X, Y) < 400.f + Crown * 0.6f) continue;   // (a few metres off the walls, the crown clear of the roofs)
+			bool bBad = false;
+			for (const FVector2D& D : Doors) if (FVector2D::Distance(P, D) < 450.f + Crown * 0.3f) { bBad = true; break; }
+			if (bBad) continue;
+			for (const JeebSteele::FRockDef& Rk : JeebSteele::RockDefs) if (FVector2D::Distance(JeebSteele::ToWorld(Rk.E, Rk.N), P) < 1400.f + Crown * 0.2f) { bBad = true; break; }
+			if (bBad) continue;
+			for (const TArray<FVector2D>& B : Beats())
+			{
+				for (int32 s = 0; s + 1 < B.Num() && !bBad; ++s)
+					bBad = SegDist(P, JeebSteele::ToWorld(B[s].X, B[s].Y), JeebSteele::ToWorld(B[s + 1].X, B[s + 1].Y)) < 300.f + Crown * 0.25f + Trunk;
+				if (bBad) break;
+			}
+			if (bBad) continue;
+			for (const FProp& Pr : Props) if (FVector2D::Distance(P, Pr.At) < 400.f + Crown * 0.2f) { bBad = true; break; }
+			for (const FVector2D& F : Fill) if (!bBad && FVector2D::Distance(P, F) < 450.f + Crown * 0.2f) bBad = true;
+			if (bBad) continue;
+			for (const FVector4f& T : Planted) if (FVector2D::DistSquared(P, FVector2D(T.X, T.Y)) < FMath::Square(0.42f * (Crown + T.Z))) { bBad = true; break; }
+			if (bBad) continue;
+			Planted.Add(FVector4f(X, Y, Crown, 0.f));
+			Spots.Add({ uint8(K), X, Y, S, Yaw });
+			if (Fabric > 0.5f) ++InTown;
+		}
+	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE woods plan: %d trees from %d cells (%d in the town's own gaps), density %.2f, planned in %.0f ms"), Spots.Num(), Tried, InTown, Density, (FPlatformTime::Seconds() - T0) * 1000.0);
+	return Spots;
+}
+
 ASteeleCreekTown::ASteeleCreekTown()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -260,12 +361,6 @@ void ASteeleCreekTown::Tick(float DeltaSeconds)
 	if (NetTestOn()) NetTestStep(this, NetTestStage, NetTestT0);
 	if (IsNetMode(NM_DedicatedServer)) return;
 #endif
-	const int32 Sh = CVarSteeleTreeShadows.GetValueOnGameThread() != 0 ? 1 : 0;
-	if (Sh != LastTreeShadows)
-	{
-		LastTreeShadows = Sh;
-		for (UInstancedStaticMeshComponent* T : TreeSets) if (T) T->SetCastShadow(Sh != 0);
-	}
 	const float D = ADayNight::Dusk;
 	if (FMath::Abs(D - LastDusk) < 0.005f) return;
 	LastDusk = D;
@@ -420,183 +515,17 @@ void ASteeleCreekTown::BuildBuildings()
 	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE %d buildings, %d glow materials, decor %d pieces (%d missing), %d lantern lights"), Placed, GlowMids.Num(), DecorPieces, Missing, Lights);
 }
 
-// The forest round the town: a jittered 10 m lattice out to 250 m, thinned to a clearing round the town (none within about 70 m
-// of the forge yard, a few strays in its fringe), never on the streets, the quarry, a building's ground or the river's banks.
-// Every random number of a cell is drawn before any skip, so every machine places the same trees. Solid trunks on every machine.
+// The forest round and in the town is AOakForest's (2026-11-18 round 3: the 38 town trees and the sparse 250 m ring read as saplings in a
+// meadow). JeebSteeleWoods::Plan() above, planned here because it knows the town, is handed to AOakForest, which draws the trees with its
+// own colours, tinted leaves, shadow twins, near shadow fade, grass thinning and solid trunks. All this does is fold the plan into the
+// town's own checksum and log it.
 void ASteeleCreekTown::BuildWoods()
 {
-	const bool bServer = IsNetMode(NM_DedicatedServer);
-	constexpr int32 NK = UE_ARRAY_COUNT(TreeKinds);
-	UStaticMesh* Meshes[NK];
-	for (int32 k = 0; k < NK; ++k) Meshes[k] = LoadMesh(TreeKinds[k].Path);
-	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	UInstancedStaticMeshComponent* Sets[NK] = {};
-	UInstancedStaticMeshComponent* Trunks = nullptr;
-	if (Cyl)
-	{
-		Trunks = NewObject<UInstancedStaticMeshComponent>(this);
-		Trunks->SetStaticMesh(Cyl);
-		Trunks->SetupAttachment(GetRootComponent());
-		Trunks->SetMobility(EComponentMobility::Static);
-		Trunks->SetVisibility(false);
-		Trunks->SetHiddenInGame(true);
-		Trunks->SetCastShadow(false);
-		Trunks->SetCollisionProfileName(TEXT("BlockAll"));
-		Trunks->SetCanEverAffectNavigation(false);
-		Trunks->RegisterComponent();
-	}
-	const float Reach = 25000.f, Cell = 1000.f;
-	const int32 N = FMath::CeilToInt(2.f * Reach / Cell);
-	FRandomStream R(51505);
-	int32 Count = 0, PerKind[NK] = {};
-	TArray<FVector4f> Planted;   // (X, Y, crown radius: the town's own trees keep off these)
-	for (int32 i = 0; i < N; ++i)
-		for (int32 j = 0; j < N; ++j)
-		{
-			const float Jx = R.FRand(), Jy = R.FRand(), KindRoll = R.FRand(), Keep = R.FRand(), Size = R.FRand(), Yaw = R.FRandRange(0.f, 360.f);
-			const float X = JeebSteele::PosX - Reach + (i + Jx) * Cell, Y = JeebSteele::PosY - Reach + (j + Jy) * Cell;
-			const float E = JeebSteele::EastM(Y), Nn = JeebSteele::NorthM(X);
-			const float Rr = FMath::Sqrt(FMath::Square(E + 5.f) + FMath::Square(Nn));   // metres from the forge yard
-			if (Rr > Reach / 100.f) continue;
-			// how thick the woods are here: a clearing round the town, a few strays in its fringe, patchy beyond
-			const float Patch = 0.5f + 0.5f * FMath::PerlinNoise2D(FVector2D(X, Y) / 9000.f);
-			float Want = Rr < 45.f ? 0.f : Rr < 72.f ? 0.10f : FMath::Lerp(0.25f, 0.85f, JeebWorld::Smooth(72.f, 100.f, Rr)) * FMath::Lerp(0.55f, 1.15f, Patch);
-			if (Keep >= Want) continue;
-			int32 K = 0;
-			{
-				float Acc = 0.f;
-				for (int32 k = 0; k < NK; ++k) { Acc += TreeKinds[k].Share; if (KindRoll < Acc) { K = k; break; } K = k; }
-			}
-			const float S = FMath::Lerp(0.85f, 1.35f, Size);
-			const float CrownCm = TreeKinds[K].Crown * S;
-			if (JeebWorld::NearRiver(X, Y, 700.f)) continue;
-			if (JeebTerrain::PathClearance(X, Y) < 250.f + CrownCm * 0.4f) continue;
-			if (JeebSteele::BuildingDistance(X, Y) < 500.f + CrownCm * 0.6f) continue;
-			bool bQuarry = false;
-			for (const JeebSteele::FRockDef& Rk : JeebSteele::RockDefs) if (FVector2D::Distance(JeebSteele::ToWorld(Rk.E, Rk.N), FVector2D(X, Y)) < 900.f) { bQuarry = true; break; }
-			if (bQuarry) continue;
-			const float Z = JeebTerrain::HeightAt(X, Y);
-			if (!bServer && Meshes[K])
-			{
-				if (!Sets[K])
-				{
-					Sets[K] = NewObject<UInstancedStaticMeshComponent>(this);
-					Sets[K]->SetStaticMesh(Meshes[K]);
-					Sets[K]->SetupAttachment(GetRootComponent());
-					Sets[K]->SetMobility(EComponentMobility::Static);
-					Sets[K]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					Sets[K]->SetCullDistances(0, 40000);
-					Sets[K]->SetCastShadow(CVarSteeleTreeShadows.GetValueOnGameThread() != 0);
-					Sets[K]->RegisterComponent();
-					TreeSets.Add(Sets[K]);
-					++DrawSets;
-				}
-				Sets[K]->AddInstance(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, Z - 15.f * S), FVector(S)), true);
-			}
-			if (Trunks)
-			{
-				const float TR = TreeKinds[K].TrunkR * S, TH = TreeKinds[K].TrunkH * S;
-				Trunks->AddInstance(FTransform(FRotator::ZeroRotator, FVector(X, Y, Z + TH * 0.5f - 20.f), FVector(TR / 50.f, TR / 50.f, TH / 100.f)), true);
-			}
-			HashIn(Hash, X); HashIn(Hash, Y);
-			++Count; ++PerKind[K];
-			Planted.Add(FVector4f(X, Y, CrownCm, 0.f));
-		}
-	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE woods: %d trees (spruce %d %d %d, half spruce %d, aspen %d, cork oak %d)"), Count, PerKind[0], PerKind[1], PerKind[2], PerKind[3], PerKind[4], PerKind[5]);
-
-	// The town's own trees (2026-11-18 review: "meadow with houses", the forest only a ring 60-100 m out): spruce, aspen and cork oak in the
-	// yards, behind the houses, at street corners and round the forge yard, the same packs and solid trunks as the ring. Candidates on a
-	// jittered 6 m lattice within 70 m of the forge yard, every random number drawn before any test; they are taken in the order of a
-	// random key (so the cap doesn't favour one corner) while each keeps clear of the streets, the forge yard, walls, doors, the quarry,
-	// the townsfolk's beats, the town's props and fill sets, the river and each other. The same on every machine (the JEEBSTEELE hash).
-	{
-		constexpr int32 MaxTown = 38;
-		const int32 TownKinds[5] = { 0, 1, 2, 4, 5 };   // (no half spruce: its 6 m bare trunk)
-		const float TownShare[5] = { 0.18f, 0.16f, 0.14f, 0.30f, 0.22f };
-		struct FCand { float Key, X, Y, Yaw, S; int32 K; };
-		TArray<FCand> Cands;
-		FRandomStream TR(51517);
-		const float TReach = 7000.f, TCell = 600.f;
-		const int32 TN = FMath::CeilToInt(2.f * TReach / TCell);
-		const FVector2D Yard = JeebSteele::ToWorld(-5.f, 0.f);
-		for (int32 i = 0; i < TN; ++i)
-			for (int32 j = 0; j < TN; ++j)
-			{
-				const float Jx = TR.FRand(), Jy = TR.FRand(), KindRoll = TR.FRand(), Key = TR.FRand(), Size = TR.FRand(), Yaw = TR.FRandRange(0.f, 360.f);
-				const float X = Yard.X - TReach + (i + 0.15f + 0.7f * Jx) * TCell, Y = Yard.Y - TReach + (j + 0.15f + 0.7f * Jy) * TCell;
-				if (FVector2D::Distance(FVector2D(X, Y), Yard) > TReach) continue;
-				int32 K = 4;
-				{
-					float Acc = 0.f;
-					for (int32 k = 0; k < 5; ++k) { Acc += TownShare[k]; if (KindRoll < Acc) { K = TownKinds[k]; break; } }
-				}
-				const float S = K == 5 ? FMath::Lerp(0.55f, 0.75f, Size) : K == 4 ? FMath::Lerp(0.8f, 1.05f, Size) : FMath::Lerp(0.7f, 0.95f, Size);
-				Cands.Add({ Key, X, Y, Yaw, S, K });
-			}
-		Cands.Sort([](const FCand& A, const FCand& B) { return A.Key < B.Key; });
-		const TArray<FProp> Props = TownProps();
-		const TArray<FVector2D> Fill = FillSpots();
-		TArray<FVector2D> Doors;
-		for (const JeebSteele::FPlot& P : JeebSteele::Plots()) if (!P.bWell) Doors.Add(JeebSteele::DoorSpot(P, 250.f));
-		const FVector2D Spawn = JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN);
-		int32 TownCount = 0, Why[8] = {};
-		for (const FCand& C : Cands)
-		{
-			if (TownCount >= MaxTown) break;
-			const FVector2D P(C.X, C.Y);
-			const float Crown = TreeKinds[C.K].Crown * C.S, Trunk = TreeKinds[C.K].TrunkR * C.S;
-			if (JeebWorld::NearRiver(C.X, C.Y, 600.f)) { ++Why[0]; continue; }
-			if (JeebTerrain::PathClearance(C.X, C.Y) < 220.f + Crown * 0.35f) { ++Why[1]; continue; }   // (streets and the forge yard's patch)
-			if (FVector2D::Distance(P, JeebSteele::ToWorld(1.f, 0.f)) < 1300.f || FVector2D::Distance(P, Spawn) < 600.f) { ++Why[1]; continue; }
-			if (JeebSteele::BuildingDistance(C.X, C.Y) < 150.f + Crown * 0.6f) { ++Why[2]; continue; }   // (crowns clear of the roofs)
-			bool bBad = false;
-			for (const FVector2D& D : Doors) if (FVector2D::Distance(P, D) < 450.f + Crown * 0.3f) { bBad = true; break; }
-			if (bBad) { ++Why[3]; continue; }
-			for (const JeebSteele::FRockDef& Rk : JeebSteele::RockDefs) if (FVector2D::Distance(JeebSteele::ToWorld(Rk.E, Rk.N), P) < 800.f) { bBad = true; break; }
-			if (bBad) { ++Why[4]; continue; }
-			for (const TArray<FVector2D>& B : Beats())
-			{
-				for (int32 s = 0; s + 1 < B.Num() && !bBad; ++s)
-					bBad = SegDist(P, JeebSteele::ToWorld(B[s].X, B[s].Y), JeebSteele::ToWorld(B[s + 1].X, B[s + 1].Y)) < 260.f + Trunk;
-				if (bBad) break;
-			}
-			if (bBad) { ++Why[5]; continue; }
-			for (const FProp& Pr : Props) if (FVector2D::Distance(P, Pr.At) < 350.f) { bBad = true; break; }
-			for (const FVector2D& F : Fill) if (!bBad && FVector2D::Distance(P, F) < 420.f) bBad = true;
-			if (bBad) { ++Why[6]; continue; }
-			for (const FVector4f& T : Planted) if (FVector2D::Distance(P, FVector2D(T.X, T.Y)) < FMath::Max(450.f, 0.55f * (Crown + T.Z))) { bBad = true; break; }
-			if (bBad) { ++Why[7]; continue; }
-			const float Z = JeebTerrain::HeightAt(C.X, C.Y);
-			if (!bServer && Meshes[C.K])
-			{
-				if (!Sets[C.K])
-				{
-					Sets[C.K] = NewObject<UInstancedStaticMeshComponent>(this);
-					Sets[C.K]->SetStaticMesh(Meshes[C.K]);
-					Sets[C.K]->SetupAttachment(GetRootComponent());
-					Sets[C.K]->SetMobility(EComponentMobility::Static);
-					Sets[C.K]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-					Sets[C.K]->SetCullDistances(0, 40000);
-					Sets[C.K]->SetCastShadow(CVarSteeleTreeShadows.GetValueOnGameThread() != 0);
-					Sets[C.K]->RegisterComponent();
-					TreeSets.Add(Sets[C.K]);
-					++DrawSets;
-				}
-				Sets[C.K]->AddInstance(FTransform(FRotator(0.f, C.Yaw, 0.f), FVector(C.X, C.Y, Z - 15.f * C.S), FVector(C.S)), true);
-			}
-			if (Trunks)
-			{
-				const float TH = TreeKinds[C.K].TrunkH * C.S;
-				Trunks->AddInstance(FTransform(FRotator::ZeroRotator, FVector(C.X, C.Y, Z + TH * 0.5f - 20.f), FVector(Trunk / 50.f, Trunk / 50.f, TH / 100.f)), true);
-			}
-			HashIn(Hash, C.X); HashIn(Hash, C.Y); HashIn(Hash, C.S);
-			Planted.Add(FVector4f(C.X, C.Y, Crown, 1.f));
-			++TownCount;
-			UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE town tree %d kind %d at E %.1f N %.1f scale %.2f"), TownCount, C.K, JeebSteele::EastM(C.Y), JeebSteele::NorthM(C.X), C.S);
-		}
-		UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE town trees: %d of %d candidates (skipped: river %d, street or yard %d, walls %d, doors %d, quarry %d, beats %d, props %d, other trees %d)"),
-			TownCount, Cands.Num(), Why[0], Why[1], Why[2], Why[3], Why[4], Why[5], Why[6], Why[7]);
-	}
+	const TArray<JeebSteeleWoods::FSpot>& Spots = JeebSteeleWoods::Plan();
+	int32 PerKind[6] = {};
+	for (const JeebSteeleWoods::FSpot& S : Spots) { HashIn(Hash, S.X); HashIn(Hash, S.Y); HashIn(Hash, S.Scale); HashIn(Hash, float(S.Kind)); ++PerKind[FMath::Min<int32>(S.Kind, 5)]; }
+	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE woods: %d trees planned for AOakForest (cork oak %d, aspen %d, spruce %d %d %d, half spruce %d), density %.2f"),
+		Spots.Num(), PerKind[0], PerKind[1], PerKind[2], PerKind[3], PerKind[4], PerKind[5], CVarSteeleDensity.GetValueOnGameThread());
 }
 
 // Steele Creek's own smithing props (Meshy, 2026-11-18: /Game/SteeleCreek, Saved/Steele/steele_prop_*.py): the anvil the blacksmith works

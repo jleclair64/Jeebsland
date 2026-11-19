@@ -63,7 +63,9 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
 		float TW = 0.f, TH = 0.f;
-		HDTextSize(Lines[i], TW, TH, Font, i == 0 ? 1.15f : 0.95f);
+		FString Shown;
+		TipLineColor(Lines[i], i == 0, Shown);
+		HDTextSize(Shown, TW, TH, Font, i == 0 ? 1.15f : 0.95f);
 		W = FMath::Max(W, TW); H += TH + 3.f;
 	}
 	const float X = FMath::Clamp(CX - W * 0.5f, 12.f, Canvas->ClipX - W - 28.f), Y = FMath::Clamp(BottomY - H, 12.f, Canvas->ClipY - H - 20.f);
@@ -73,10 +75,11 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 	{
 		const float Sc = i == 0 ? 1.15f : 0.95f;
 		float TW = 0.f, TH = 0.f;
-		HDTextSize(Lines[i], TW, TH, Font, Sc);
-		FLinearColor C = i == 0 ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f);
+		FString Shown;
+		FLinearColor C = TipLineColor(Lines[i], i == 0, Shown);
+		HDTextSize(Shown, TW, TH, Font, Sc);
 		C.A = Alpha;
-		HDText(Lines[i], C, X + 2.f, Cy, Font, Sc);
+		HDText(Shown, C, X + 2.f, Cy, Font, Sc);
 		Cy += TH + 3.f;
 	}
 }

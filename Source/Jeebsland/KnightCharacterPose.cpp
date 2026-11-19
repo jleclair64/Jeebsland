@@ -14,6 +14,8 @@
 #include "ProceduralMeshComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "JeebProps.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 // The knight's pose, every frame (the last big part of Tick): no game rules here. The eased blends a few things read, what he is
 // doing as the animator sees it, then FKnightAnimator makes the pose (it picks and blends the clips) and his gear goes where the pose puts it.
@@ -167,6 +169,32 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	if (!IsNetMode(NM_DedicatedServer)) TickCape(Dt);
 }
 
+// The staff's orb glow and its place in the fist, live in Play (2026-11-18 second review: the orb read white and blew out at night; the
+// carried fist sat off the shaft). Players' machines only: nothing here changes what the game decides.
+static TAutoConsoleVariable<float> CVarOrbGlow(TEXT("jeeb.Magic.OrbGlow"), 1.3f, TEXT("The staff's orb: its glow's brightness on screen (M_PropGlow GlowStrength; with the exposure lock about 1 is white's edge; keep MI_Staff's default in Tools/fixlook_assets.py equal)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarOrbLock(TEXT("jeeb.Magic.OrbLock"), 1.f, TEXT("The staff's orb: 1 keeps its glow the same brightness on screen by day and night; 0 is a glow in the scene's light (it whitens at night)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarStaffGrip(TEXT("jeeb.Knight.StaffGrip"), TEXT("0,0,0"), TEXT("The staff moved in the fist, in its own frame (cm: X and Y across the shaft, Z along it, + toward the butt)."), ECVF_Default);
+
+void AKnightCharacter::PlaceStaffModel()
+{
+	TArray<FString> P;
+	CVarStaffGrip.GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
+	FVector Nudge = P.Num() == 3 ? FVector(FCString::Atof(*P[0]), FCString::Atof(*P[1]), FCString::Atof(*P[2])) : FVector::ZeroVector;
+	Nudge.Z += StaffSlide();   // (the walking-staff hold: the model slides through the fist, KnightAnimatorCast.cpp places the arm for it)
+	const float Glow = FMath::Max(0.f, CVarOrbGlow.GetValueOnGameThread()), Lock = FMath::Clamp(CVarOrbLock.GetValueOnGameThread(), 0.f, 1.f);
+	for (UStaticMeshComponent* S : HeldStatics)
+	{
+		if (!S) continue;
+		for (int32 i = 0; i < S->GetNumMaterials(); ++i)
+			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(S->GetMaterial(i)))   // (a MID ignores an unchanged value)
+			{
+				M->SetScalarParameterValue(TEXT("GlowStrength"), Glow);
+				M->SetScalarParameterValue(TEXT("ExposureLock"), Lock);
+			}
+		if (S->GetAttachParent() == WristR) S->SetRelativeTransform(FTransform(Nudge) * JeebProps::FistPlace());   // (in the hand; stowed it hangs on UpperPivot)
+	}
+}
+
 // Everything he carries goes where the pose puts it. WristR is the weapon's joint (the blade, its trail and its hit boxes), ElbowL the left hand's,
 // UpperPivot the chest: the cape and whatever is on his back
 void AKnightCharacter::PlaceGear()
@@ -225,6 +253,7 @@ void AKnightCharacter::PlaceGear()
 		const float Feet = GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 		UE_LOG(LogTemp, Log, TEXT("JEEBCONTACT swingT %.2f u %.2f head off the surface %.1f cm, head height %.0f, surface %.0f, from spot %.1f, kind %d"), SwingTime, FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f), FVector::Dist2D(Head, ActiveNode->GetActorLocation()) - ActiveNode->SurfaceAlong(-GetActorForwardVector(), Head.Z - ActiveNode->GetActorLocation().Z), Head.Z - Feet, ActiveNode->SurfaceAlong(-GetActorForwardVector(), Head.Z - ActiveNode->GetActorLocation().Z), FVector::Dist2D(GatherSpot, GetActorLocation()), SelectedKind());
 	}
+	if (SelectedKind() == JeebItems::K_Staff) PlaceStaffModel();
 	UpdateBowBits();
 	UpdateQuiver();
 	UpdateBeltFlask();

@@ -5,7 +5,7 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 | File | What it holds |
 |---|---|
 | `Tiers.csv` | The six ranks (Tin, Iron, Silver, Gold, Emerald, Diamond): level needed, damage and defence steps, price multiplier, smithing level/XP/materials, armour colours, shine (Metal 1 or 0, Rough 0 mirror to 1 dull), the cape colour (CapeColor), how much of a blow gets through armour of this tier (ArmourTakes), the health of a kite shield of this tier (ShieldHealth; a blow costs its damage, holding it up 25 a second), how heavy armour of this material is (WeightMult, x the piece's Weight in Kinds.csv), description |
-| `Kinds.csv` | Each kind of gear: tin damage, reach, swing speed, defence, armour weight in kg before the material (Weight), store price, smithing mass, two-handed, description |
+| `Kinds.csv` | Each kind of gear: tin damage, reach, swing speed, defence, armour weight in kg before the material (Weight), store price, smithing mass, two-handed, who may wield it (Class: wizard, troll, knight or all; shown as a purple, green or grey outline round the icon and a "Wizard only" line in the tooltip; looks only for now, nothing is enforced), description |
 | `Materials.csv` | Ores, gems, logs, fish, animal drops: name, stack size, sell price, colour, gathering level, fishing XP |
 | `Potions.csv` | Potions: effect (speed, heal, vigour, radar), strength, seconds, cooldown, price, colour, store line, description |
 | `Accessories.csv` | Rings, amulets and the helm brush: attack/defence multipliers, crits, damage floor/ceiling, wild, speed, health, icon colours |

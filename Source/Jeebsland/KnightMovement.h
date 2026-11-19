@@ -39,6 +39,8 @@ struct FKnightMoveResponse : public FCharacterMoveResponseDataContainer
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f, ActHold = 0.f;
 	float SwimStamina = 1.f, Breath = 1.f, SwimRefillWait = 0.f, DrownT = 0.f;   // (swimming)
 	bool bHeadUnder = false;
+	FVector ActEdge = FVector::ZeroVector; float ActFar = 0.f;   // (the mantle's near top edge and far edge: the path over the top)
+	float StrafeSprint = 1.f, AirMul = 1.f;   // (the running speed's eased shares: UKnightMovement::MoveStrafeSprint, MoveAirMul)
 	virtual void ServerFillResponseData(const UCharacterMovementComponent& CharacterMovement, const FClientAdjustment& PendingAdjustment) override;
 	virtual bool Serialize(UCharacterMovementComponent& CharacterMovement, FArchive& Ar, UPackageMap* PackageMap) override;
 };
@@ -102,8 +104,10 @@ public:
 	FVector ActFrom = FVector::ZeroVector, ActTo = FVector::ZeroVector, ActDir = FVector::ZeroVector;   // a scripted move (jump, climb-up, mantle)
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f;
 	float ActHold = 0.f;   // the stand at the end of this scripted move, taken from tuning as it starts (it travels in corrections, so a reloaded Tuning.ini can't split the machines)
-	FVector ActEdge = FVector::ZeroVector;   // a mantle: the top of the fence or block's near edge, where the hands go (the pose only; not part of the move)
-	bool FindMantleEdge(const FVector& Center, const FVector& Fwd, FVector& OutEdge) const;   // (others' machines: the same edge, found as the mantle starts)
+	FVector ActEdge = FVector::ZeroVector;   // a mantle: the top of the fence or block's near edge, where the hands go (and, since 2026-11-18 night, where his feet must clear; travels in corrections)
+	float ActFar = 0.f;                      // a vault: how far past ActFrom (along ActDir) the obstacle's far edge is: he stays up over the top until his feet are past it
+	bool FindMantleEdge(const FVector& Center, const FVector& Fwd, FVector& OutEdge, float* OutFar = nullptr, FVector* OutFace = nullptr) const;
+	static float MantleFarPast(const FVector& From, const FVector& Edge, const FVector& Face, uint8 Mode, float Far);   // (others' machines: the same edge, found as the mantle starts)
 
 	// ---- swimming (2026-11-13, KnightMovementSwim.cpp; numbers in Tuning.ini [Swim]) ----
 	// The water comes only from JeebWater::DepthAt (the drawn water has no collision). Deep water at his feet (SwimEnterDepth) turns walking or
@@ -125,7 +129,37 @@ public:
 	bool DrownedOut() const;          // drowned long enough: the server's cue for Die()
 	static float WadeMul(float Depth); // walking speed share in water this deep at his feet
 
+	// ---- his running speed and the push that starts him, worked out inside each move (2026-11-18 night) ----
+	// Online, a client starting to run from a standstill took small corrections. The cause: the knight's Tick set MaxAcceleration
+	// (WalkAccel below walking speed, SprintAccel above) and MaxWalkSpeed (strafe mode's sideways and backward shares, read from the LAST
+	// move's push) once per frame. The server runs several of a client's moves between two of its own frames, so its second move of a
+	// start-up still had WalkAccel (30000) where the client had already switched to SprintAccel (2048): the engine's analog share
+	// (push / MaxAcceleration) came out 0.07 on the server, so the server braked him and corrected the client. Now both are worked out
+	// here, from the move's own velocity, push, facing and Shift (FLAG_Custom_1), so the client and the server agree move by move. The
+	// knight's Tick only publishes the slow-changing parts (gear, potions, stances) in SpeedRule.
+	struct FSpeedRule
+	{
+		bool bByMove = false;      // the speed is the plain run / sprint (no roll, horse, stance, crouch, guard, smash, bow, drink): GetMaxSpeed works it out
+		bool bStrafe = false;      // facing the camera (strafe mode, no shield stance): sideways 90%, back 75%, the sprint only near straight ahead
+		bool bSprintOk = false;    // he may sprint if Shift is held (not riding, crouched, guarding or out of breath)
+		bool bAccelRule = false;   // on foot, not rolling or sliding: below walking speed he gets there at once (WalkAccel)
+		float Walk = 500.f, Sprint = 750.f;
+		float K = 1.f;             // potion x gear speed x armour weight
+		float WalkCapBase = 500.f; // walking speed x armour weight (the start-up rule's limit, before the air share)
+		float AirMul = 0.69f;      // the share of speed in the air
+	};
+	FSpeedRule SpeedRule;
+	float MoveStrafeSprint = 1.f;  // how much of the sprint applies (eases in as he turns toward straight ahead); advanced per move
+	float MoveAirMul = 1.f;        // AirMul in the air, easing back to 1 after landing; advanced per move
+	float MoveCap(const FVector& Dir) const;   // the run / sprint speed for a push along Dir (before wading)
+	float AccelRuleNow() const;                // WalkAccel or SprintAccel from the velocity now
+	virtual float GetMaxAcceleration() const override;
+	virtual void ControlledCharacterMove(const FVector& InputVector, float DeltaSeconds) override;
+	virtual void MoveAutonomous(float ClientTimeStamp, float DeltaTime, uint8 CompressedFlags, const FVector& NewAccel) override;
+
 private:
+	bool bAccelFrozen = false;     // (inside a move: the start-up rule is decided once, from the move's starting velocity)
+	float FrozenAccel = 0.f;
 	bool bJumpQueued = false, bJumpAsked = false;
 	bool bTouchRock = false, bTouchMantle = false;   // (the last move ran into climbable rock, or a fence: only then are the grab and the air mantle looked for)
 	float ClimbBestZ = 0.f, XPCarry = 0.f;   // (server) the highest he has got on this wall, and XP not yet given
@@ -139,7 +173,7 @@ private:
 	bool TryLedge();
 	bool PlanLedge(const FVector& Center, const FVector& N, FVector& OutTo, float& OutTop) const;
 	bool TryMantle(bool bInAir);
-	bool PlanMantle(const FVector& Center, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge = nullptr) const;
+	bool PlanMantle(const FVector& Center, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge = nullptr, float* OutFar = nullptr) const;
 	bool RoomFor(const FVector& Center) const;
 	void StartScripted(uint8 Mode, const FVector& To, float Dur, float Top, const FVector& Dir);
 	void PhysClimb(float Dt);
@@ -175,11 +209,15 @@ public:
 	uint8 SavedMode = 0;
 	bool bSavedExhausted = false;
 	bool bSavedRefilling = false;
-	bool bSavedFast = false, bSavedRise = false;   // (swimming: Shift and Space held)
+	bool bSavedFast = false, bSavedRise = false;   // (swimming: Shift and Space held; on foot Shift is the sprint)
+	float SavedStrafeSprint = 1.f, SavedAirMul = 1.f;   // (at the move's start: a merged move goes back to them)
+	float SavedAccel = 0.f;                              // (the start-up push this move was scaled with: moves with different ones are never merged)
 	virtual void Clear() override;
+	virtual void CombineWith(const FSavedMove_Character* OldMove, ACharacter* InCharacter, APlayerController* PC, const FVector& OldStartLocation) override;
 	virtual uint8 GetCompressedFlags() const override;
 	virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
 	virtual void SetMoveFor(ACharacter* C, float InDeltaTime, FVector const& NewAccel, class FNetworkPredictionData_Client_Character& ClientData) override;
+	virtual void SetInitialPosition(ACharacter* C) override;
 	virtual void PrepMoveFor(ACharacter* C) override;
 };
 

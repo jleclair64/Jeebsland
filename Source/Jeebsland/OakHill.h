@@ -147,7 +147,7 @@ namespace JeebOakHill
 			// ATownLabTown sets each on the lowest ground under its walls, its stone footing running into the slope
 			// (the fort at 1.4x since the 2026-11-18 review: at 1.0 it read as a fenced pen beside the houses; now 20.3 x 8.2 m, its
 			// palisade about 4.6 m and its blockhouses 7.3 m. LenX/LenY are the drawn size, so the plan's spacing pass sees the real one)
-			{ TEXT("OakHillFort"),        1.4f,  20.3f,  8.16f,  false, 90.f,  -709.6f, 709.8f, -286.4f, 282.8f },
+			{ TEXT("OakHillFort"),        1.4f,  20.3f,  11.2f,  false, 90.f,  -709.6f, 709.8f, -281.5f, 287.8f },   // (LenY: the walls 8.2 m + a 1.5 m apron each side, so the plot, the tree clearing and the terrain flattening cover the gate's approach; the opened gate, 2026-11-18)
 			{ TEXT("OakHillWatchtower"),  1.0f,  5.3f,   5.31f,  false, 90.f,  -235.8f, 236.0f, -234.3f, 234.2f },
 			{ TEXT("OakHillRuins"),       1.0f,  19.0f,  10.24f, false, 90.f,  -892.1f, 913.5f, -493.7f, 490.7f },
 		};
@@ -170,10 +170,17 @@ namespace JeebOakHill
 		// plot wider than tall); it used to be read from W >= H, which turned the nearly square models (bank, store, corner house)
 		// 90 degrees off their own box. bFacePlaza: the door faces the oak, not the nearest road (the shops round the plaza)
 		bool bAlongW = true, bFacePlaza = false;
+		// DoorDir: the way the building's door (or a stall's open front, the forts' gates) faces, a compass bearing in degrees (0 north,
+		// 90 east; Unreal's yaw). Set by hand for the 2026-11-18 layout; every other building gets it filled in from BuildingYaw at the
+		// end of Plots(), so it is always right (the terrain flattens an apron there; DoorAt gives the spot). -1 only on open plots.
+		// Id: a stable name for each building that NPC data and notes can tie to (houses "House_W1"..., "Bank", "Church"; Docs/TownLab/OakHillLayout_2026-11-18.md)
+		float DoorDir = -1.f;
+		const TCHAR* Id = nullptr;
 	};
 	// Distance (metres) from a point to the nearest road's edge
 	inline float RoadClearanceM(float E, float N, FVector2D* OutNearest = nullptr);
 	inline float PlotSD(const FPlot& P, float E, float N);
+	inline float BuildingYaw(const FPlot& P, const FModel* Mdl);
 	inline const TArray<FPlot>& Plots()
 	{
 		static const TArray<FPlot> P = []()
@@ -194,55 +201,79 @@ namespace JeebOakHill
 				A.Add(Pt);
 			};
 			// The shops round the plaza (owner, 2026-11-13: "The stores should sit around the square in the middle of the town, not
-			// off to the side"): each stands 0.8 m outside the ring road at its angle (degrees counter-clockwise from east, as on the
-			// map), its long side along the ring and its door or open front toward the oak. The four roads leave the ring at 0, 90,
-			// 180 and 270 degrees; each shop's angle keeps its corners at least 0.5 m off them. Each shop has its stall beside it,
-			// except the smith (the potion stall is across the west road from the potion shop); 245 degrees is left for the
-			// southwest road
-			auto Ring = [&](const TCHAR* Name, const TCHAR* Model, float Deg)
+			// off to the side"): each stands 0.8 m (plus Back) outside the ring road at its angle (degrees counter-clockwise from east,
+			// as on the map), its long side along the ring and its door or open front toward the oak, its corners at least 0.5 m off
+			// the roads leaving the ring
+			auto Ring = [&](const TCHAR* Name, const TCHAR* Id, const TCHAR* Model, float Deg, float Back = 0.f)
 			{
 				const FModel* M = FindModel(Model);
 				if (!M) return;
-				const float Out = (RingR * Unit + RoadWidth / 200.f + 0.8f + M->LenY * 0.5f) / Unit, R = FMath::DegreesToRadians(Deg);
+				const float Out = (RingR * Unit + RoadWidth / 200.f + 0.8f + Back + M->LenY * 0.5f) / Unit, R = FMath::DegreesToRadians(Deg);
 				FPlot Pt{ Name, Model, 255.f + Out * FMath::Cos(R), 410.f - Out * FMath::Sin(R), M->LenX / Unit, M->LenY / Unit, FRotator::NormalizeAxis(-Deg - 90.f), EPlot::Building, true };
-				Pt.bAlongW = true; Pt.bFacePlaza = true;
+				Pt.bAlongW = true; Pt.bFacePlaza = true; Pt.Id = Id;
 				A.Add(Pt);
 			};
-			Ring(TEXT("Bank Stall"), TEXT("BankStall"), 24.f);
-			Ring(TEXT("Bank"), TEXT("OakHillBank"), 66.f);
-			Ring(TEXT("Smith"), TEXT("OakHillSmith"), 115.f);
-			Ring(TEXT("Potion Stall"), TEXT("PotionStall"), 157.f);
-			Ring(TEXT("Potion Shop"), TEXT("OakHillPotionShop"), 205.f);
-			Ring(TEXT("Store"), TEXT("OakHillStore"), 295.f);
-			Ring(TEXT("Market Stall"), TEXT("GeneralStore"), 336.f);
-			// The Town Hall east of the plaza, its door onto the east road (the plan's 15 x 42 m; the model is about 10 x 18)
-			B(TEXT("Town Hall"), TEXT("OakHillTownHall"), 497.f, 410.f, 64.f, 112.f, 0.f);
-			B(TEXT("Church"), TEXT("OakHillChurch"), 536.5f, 96.5f, 72.f, 120.f, 15.f);
+			// A building placed by hand (the 2026-11-18 layout, Docs/TownLab/OakHillLayout_2026-11-18.md, laid out and checked with
+			// Saved/Scratch_layout/new.py in the townlab copy): its middle E, N metres from the plaza and the bearing its door faces;
+			// its long side runs along the street (the church's along its nave, its door on the short end)
+			auto D = [&](const TCHAR* Name, const TCHAR* Id, const TCHAR* Model, float E, float N, float Door)
+			{
+				const FModel* M = FindModel(Model);
+				if (!M) return;
+				FPlot Pt{ Name, Model, 255.f + E / Unit, 410.f - N / Unit, (M->bLongY ? M->LenY : M->LenX) / Unit, (M->bLongY ? M->LenX : M->LenY) / Unit,
+					FRotator::NormalizeAxis(M->bLongY ? Door - 90.f : Door), EPlot::Building, true };
+				Pt.bAlongW = true; Pt.DoorDir = FRotator::ClampAxis(Door); Pt.Id = Id;
+				A.Add(Pt);
+			};
+			// THE LAYOUT (owner, 2026-11-18: "Some of the layout of Oak Hill just doesn't make sense ... why is the entrance to the
+			// church tucked away behind a house"): a market town grown along its streets. West Street comes in over the bridge past
+			// the smithy and the bank, crosses the market place round the plaza and runs on as East Street to the church's door, so
+			// from the bridge (and from the spawn, which faces east) the church tower closes the view. The town hall fronts the market
+			// place from the north with open ground before its door; the shops and stalls face the plaza; houses line the lanes with
+			// their doors on the street and yards behind. Plot order is kept (FillPlots.csv, FillOakHill.csv and the logs use the indices).
+			Ring(TEXT("Bank Stall"), TEXT("BankStall"), TEXT("BankStall"), 24.f);
+			D(TEXT("Bank"), TEXT("Bank"), TEXT("OakHillBank"), -21.72f, 7.67f, 180.f);                // (on West Street's north side at the market's mouth)
+			D(TEXT("Smith"), TEXT("Smithy"), TEXT("OakHillSmith"), -45.22f, -6.16f, 0.f);              // (at the town's edge by the bridge, its yard toward the river)
+			Ring(TEXT("Potion Stall"), TEXT("PotionStall"), TEXT("PotionStall"), 246.f);
+			Ring(TEXT("Potion Shop"), TEXT("PotionShop"), TEXT("OakHillPotionShop"), 204.4f);
+			Ring(TEXT("Store"), TEXT("Store"), TEXT("OakHillStore"), 295.f);
+			Ring(TEXT("Market Stall"), TEXT("MarketStall"), TEXT("GeneralStore"), 336.f);
+			// The Town Hall on the market place's north side, its door to the oak, 2.8 m more open ground before it than a shop has
+			Ring(TEXT("Town Hall"), TEXT("TownHall"), TEXT("OakHillTownHall"), 90.f, 2.8f);
+			// The church at the end of East Street, its door (under the tower) facing west down the street to the plaza and the bridge
+			D(TEXT("Church"), TEXT("Church"), TEXT("OakHillChurch"), 32.5f, 0.f, 270.f);
 			// The well on the plaza lawn, beside the big oak
 			B(TEXT("Well"), TEXT("OakHillWell"), 290.5f, 443.f, 16.f, 16.f, 20.f);   // (6.8 m from the oak: clear of its roots, 5 m out, 2026-11-13)
-			// 16 houses (11.5 x 8.6 m): the first design, and the corner house where a house stands at a corner of the roads. Spots
-			// settled on the offline map for the 2026-11-13 layout (the shops took the ring; the two west of the plaza moved out; the
-			// two beyond the garden stand long side north-south: bAcross)
-			struct FH { float Px, Py, Rot; bool bCorner; bool bAcross = false; };
-			const FH Houses[] = {
-				{ 97.f, 93.f, -15.f, false }, { 428.f, 95.5f, 10.f, false }, { 628.f, 478.f, 0.f, false, true }, { 95.f, 245.f, 5.f, true },
-				{ 505.f, 193.f, 15.f, false }, { 602.f, 263.5f, -45.f, true }, { 650.f, 368.5f, 0.f, false, true },
-				{ 39.5f, 343.5f, 0.f, true },
-				{ 680.f, 215.f, -45.f, true }, { 40.f, 555.f, 5.f, false }, { 62.5f, 759.f, 0.f, false }, { 163.5f, 686.f, 0.f, false },
-				{ 326.f, 707.f, 5.f, true }, { 598.5f, 703.5f, 20.f, false }, { 250.f, 791.f, 10.f, true }, { 524.5f, 556.5f, 30.f, false },
-			};
-			for (const FH& H : Houses) B(TEXT("House"), H.bCorner ? TEXT("OakHillCornerHouse") : TEXT("OakHillHouse"), H.Px, H.Py, H.bAcross ? 36.f : 58.f, H.bAcross ? 58.f : 36.f, H.Rot);
+			A.Last().Id = TEXT("Well");
+			// 16 houses (11.5 x 8.6 m): the first design, and the corner house (9 x 9.8) at the corners of the lanes, each 0.7 m off its
+			// street with its door to it (plots 10..25; the corner houses keep plots 13, 15, 17, 18, 22 and 24)
+			D(TEXT("House"), TEXT("House_SE3"), TEXT("OakHillHouse"), 17.33f, -41.27f, 10.8f);          // 10: Southeast Road, south side
+			D(TEXT("House"), TEXT("House_NL1"), TEXT("OakHillHouse"), 24.42f, 47.73f, 281.8f);          // 11: North Lane, east side
+			D(TEXT("House"), TEXT("House_FL1"), TEXT("OakHillHouse"), -31.04f, 33.89f, 264.3f);         // 12: Fort Lane, by the watchtower
+			D(TEXT("House"), TEXT("House_CLS3"), TEXT("OakHillCornerHouse"), 59.83f, 12.08f, 21.2f);    // 13: Church Lane, south side
+			D(TEXT("House"), TEXT("House_CLN2"), TEXT("OakHillHouse"), 39.28f, 30.46f, 186.3f);         // 14: Church Lane, north side
+			D(TEXT("House"), TEXT("House_CLN1"), TEXT("OakHillCornerHouse"), 22.84f, 31.93f, 178.2f);   // 15: the corner of North Lane and Church Lane
+			D(TEXT("House"), TEXT("House_CLS1"), TEXT("OakHillHouse"), 31.17f, 17.66f, 3.4f);           // 16: Church Lane, south side, behind the church
+			D(TEXT("House"), TEXT("House_FL0"), TEXT("OakHillCornerHouse"), -29.57f, 20.33f, 268.2f);   // 17: Fort Lane, behind the bank
+			D(TEXT("House"), TEXT("House_CLN3"), TEXT("OakHillCornerHouse"), 54.77f, 28.78f, 190.9f);   // 18: Church Lane, north side
+			D(TEXT("House"), TEXT("House_CLS2"), TEXT("OakHillHouse"), 46.24f, 15.95f, 8.8f);           // 19: Church Lane, south side, above the graveyard
+			D(TEXT("House"), TEXT("House_SE1"), TEXT("OakHillHouse"), 25.39f, -28.91f, 187.4f);         // 20: Southeast Road, north side
+			D(TEXT("House"), TEXT("House_SE2"), TEXT("OakHillHouse"), 40.84f, -30.13f, 183.1f);         // 21: Southeast Road, north side
+			D(TEXT("House"), TEXT("House_WS1"), TEXT("OakHillCornerHouse"), -32.72f, -7.37f, 0.f);      // 22: West Street, south side, beside the smithy
+			D(TEXT("House"), TEXT("House_SE4"), TEXT("OakHillHouse"), 34.07f, -43.24f, 3.5f);           // 23: Southeast Road, south side
+			D(TEXT("House"), TEXT("House_SW1"), TEXT("OakHillCornerHouse"), -22.65f, -27.77f, 158.2f);  // 24: Southwest Road, north side
+			D(TEXT("House"), TEXT("House_SW2"), TEXT("OakHillHouse"), -23.39f, -44.54f, 330.f);         // 25: Southwest Road, south side
 			// Kept empty for what isn't made yet: grass grows there, but no trees. The bridge and the forts keep their spots on the
 			// river bank (the river doesn't move with the town)
 			auto E = [&](const TCHAR* Name, float Px, float Py, float W, float H, float Rot, EPlot K, bool bLevel) { A.Add({ Name, nullptr, Px, Py, W, H, Rot, K, bLevel }); };
-			E(TEXT("Boxing Ring"), 255.f, 620.f, 64.f, 72.f, 0.f, EPlot::Empty, true);
+			E(TEXT("Boxing Ring"), 255.f, 663.6f, 64.f, 72.f, 0.f, EPlot::Empty, true);   // (the training ground, between the southwest and southeast roads where they part)
 			// The war buildings (2026-11-18), in the same order as the empty plots they were. The forts and the watchtower aren't
 			// levelled (bLevel false: they stand on the river bank and the ground stays as it was); the ruins are, as a house is (left
 			// as it was, the castle knoll's top rose through their nave to the window sills)
 			auto W = [&](const TCHAR* Name, const TCHAR* Model, float Px, float Py, float Wd, float Ht, float Rot) { B(Name, Model, Px, Py, Wd, Ht, Rot); A.Last().bLevel = false; };
 			B(TEXT("Castle Ruins"), TEXT("OakHillRuins"), 240.f, 95.f, 128.f, 64.f, 20.f);
-			E(TEXT("Garden"), 562.f, 440.f, 36.f, 152.f, 0.f, EPlot::Empty, false);
-			E(TEXT("Graveyard"), 470.f, 735.f, 120.f, 120.f, 0.f, EPlot::EmptyRound, false);
+			E(TEXT("Garden"), 562.1f, 531.4f, 36.f, 152.f, 90.f, EPlot::Empty, false);   // (the allotments, south of the church behind the graveyard, along the southeast road)
+			E(TEXT("Graveyard"), 594.3f, 420.7f, 120.f, 120.f, 0.f, EPlot::EmptyRound, false);   // (the churchyard, round the church's east end, as a village churchyard is)
 			W(TEXT("North Fort"), TEXT("OakHillFort"), -57.f, 205.f, 44.f, 104.f, 10.f);
 			W(TEXT("South Fort"), TEXT("OakHillFort"), -60.f, 615.f, 44.f, 104.f, 0.f);   // (the plan's -93 put its west half on the bank's slope, 3 m from the water: 4.6 m further east)
 			W(TEXT("Watchtower"), TEXT("OakHillWatchtower"), -31.f, 103.f, 40.f, 40.f, 0.f);   // (northwest beyond the north fort, on the bank: the plan's 140,195 was pushed 13 m into the houses by the spacing pass and shoved a house 9 m)
@@ -310,8 +341,8 @@ namespace JeebOakHill
 						const FVector2D Lm(L.X * Pl.W * 0.5f * Unit, L.Y * Pl.H * 0.5f * Unit);
 						const FVector2D Q = C + FVector2D(Lm.X * Cs + Lm.Y * Sn, -Lm.X * Sn + Lm.Y * Cs);
 						FVector2D Nr;
-						const float D = RoadClearanceM(Q.X, Q.Y, &Nr);
-						if (D < Worst) { Worst = D; WorstAt = Q; Near = Nr; }
+						const float Gap = RoadClearanceM(Q.X, Q.Y, &Nr);
+						if (Gap < Worst) { Worst = Gap; WorstAt = Q; Near = Nr; }
 					}
 					if (Worst >= 0.5f) break;
 					const FVector2D Away = (WorstAt - Near).GetSafeNormal();
@@ -329,6 +360,14 @@ namespace JeebOakHill
 				Pl.Cs = FMath::Cos(FMath::DegreesToRadians(Pl.Rot)); Pl.Sn = FMath::Sin(FMath::DegreesToRadians(Pl.Rot));
 				Pl.Reach = 0.5f * Unit * FMath::Sqrt(Pl.W * Pl.W + Pl.H * Pl.H);
 			}
+			// every building's door bearing, the hand-set ones as they are (the shops round the plaza, the ruins, the forts and the
+			// watchtower get theirs from BuildingYaw)
+			for (FPlot& Pl : A)
+				if (Pl.Kind == EPlot::Building && Pl.DoorDir < 0.f)
+				{
+					const FModel* Mdl = FindModel(Pl.Model);
+					Pl.DoorDir = FRotator::ClampAxis(BuildingYaw(Pl, Mdl) + (Mdl ? Mdl->DoorYaw : 90.f));
+				}
 			return A;
 		}();
 		return P;
@@ -342,6 +381,15 @@ namespace JeebOakHill
 		const FVector2D L(DE * P.Cs - DN * P.Sn, DE * P.Sn + DN * P.Cs);
 		const FVector2D Q(FMath::Abs(L.X) - P.W * 0.5f * Unit, FMath::Abs(L.Y) - P.H * 0.5f * Unit);
 		return FVector2D(FMath::Max(Q.X, 0.f), FMath::Max(Q.Y, 0.f)).Size() + FMath::Min(FMath::Max(Q.X, Q.Y), 0.f);
+	}
+	// True when (E, N) metres lies inside a fort's or the watchtower's plot (its real drawn footprint, sized from the FModel row) or
+	// within MarginM of it: the one test every "keep trees off the forts" rule uses (2026-11-18: FillTrees.csv's spots were marked on
+	// the forts' old empty plots and stood inside the walls once the 1.4x forts came)
+	inline bool InWarFootprint(float E, float N, float MarginM)
+	{
+		for (const FPlot& P : Plots())
+			if (P.Kind == EPlot::Building && P.Model && (FCString::Strcmp(P.Model, TEXT("OakHillFort")) == 0 || FCString::Strcmp(P.Model, TEXT("OakHillWatchtower")) == 0) && PlotSD(P, E, N) < MarginM) return true;
+		return false;
 	}
 
 	// Each building's plot is levelled to the hills' height at its middle: flat 1.5 m round the walls, easing back over at least
@@ -500,17 +548,19 @@ namespace JeebOakHill
 				for (int32 i = 0; i < Pts; ++i) { const float A0 = 2.f * PI * i / Pts; Ring.Pts.Add(FromPx(255.f + RingR * FMath::Cos(A0), 410.f + RingR * FMath::Sin(A0))); }
 				A.Add(Ring);
 			}
+			// The streets of the 2026-11-18 layout (Docs/TownLab/OakHillLayout_2026-11-18.md); the river-bound ones are drawn on past
+			// the bank and cut where the water starts, since the river stays where it is while the town shrinks
 			const TCHAR* Paths[] = {
-				// (each starts on the ring's centreline, 255 +- RingR or 410 +- RingR; the river-bound ones are drawn on past the bank and
-				// cut where the water starts, since the river stays where it is while the town shrinks)
-				TEXT("M-200 410 L155 410"),   // west, toward the bridge (not built yet: the road stops at the bank)
-				TEXT("M355 410 L448 410"),   // east, to the Town Hall's door
-				TEXT("M252 310 C 250 270 262 240 295 190 C 330 135 365 80 395 0"),   // north, and its branch past the castle ruins
-				TEXT("M-150 40 L20 180 C 70 140 150 135 220 150 C 255 158 280 172 300 185 C 360 190 450 220 545 295 L590 322"),   // the north arc
-				TEXT("M424 196 C 432 250 436 300 436 340 L436 494 C 436 560 482 610 560 640 L600 650"),   // behind the bank and its stall, between them and the Town Hall, then southeast
-				TEXT("M255 510 L255 574"),   // south, to the boxing ring
-				TEXT("M252 520 C 215 570 150 620 20 700 L-165 930"),   // southwest, to the river fork (drawn on to the bank)
-				TEXT("M257 560 C 270 600 330 630 425 698"),   // southeast, to the graveyard
+				TEXT("M-200 410 L155 410"),   // West Street, from the bridge to the market place (the road stops at the bank: the bridge is a plot of its own)
+				TEXT("M355.0 410.0 L412.1 410.0"),   // East Street, from the market place to the church door
+				TEXT("M323.2 336.9 C 327.6 326.4 343.5 297.8 349.3 274.3 C 355.1 250.8 353.6 225.5 357.9 195.7 C 362.1 166.0 368.8 128.3 375.0 95.7 C 381.2 63.1 391.7 16.0 395.0 0.0"),   // North Lane, past the town hall's east side to the north (the forest road starts at its end)
+				TEXT("M352.1 238.6 C 366.9 237.9 409.3 233.8 440.7 234.3 C 472.1 234.8 505.0 237.1 540.7 241.4 C 576.4 245.7 624.0 252.9 655.0 260.0 C 686.0 267.1 704.4 276.5 726.4 284.3 C 748.5 292.0 777.0 302.7 787.1 306.4"),   // Church Lane, east from North Lane behind the church to the east farm
+				TEXT("M-9.3 410.0 C -9.0 393.3 -7.5 343.3 -7.9 310.0 C -8.2 276.7 -9.5 240.2 -11.4 210.0 C -13.3 179.8 -18.0 142.1 -19.3 128.6"),   // Fort Lane, north off West Street by the bridge to the north fort and the watchtower
+				TEXT("M255 510 L255 592.1"),   // South Road, to the fork by the training ground
+				TEXT("M255.0 592.1 C 248.5 596.3 233.2 608.7 215.7 617.1 C 198.2 625.6 172.0 633.9 150.0 642.9 C 128.0 651.8 105.2 658.8 83.6 670.7 C 61.9 682.6 46.1 689.9 20.0 714.3 C -6.1 738.7 -42.0 781.2 -72.9 817.1 C -103.7 853.1 -149.6 911.2 -165.0 930.0"),   // Southwest Road, to the river fork (drawn on to the bank)
+				TEXT("M255.0 592.1 C 261.5 596.9 277.6 611.1 294.3 620.7 C 311.0 630.4 328.2 642.3 355.0 650.0 C 381.8 657.7 416.9 662.9 455.0 667.1 C 493.1 671.4 544.3 672.6 583.6 675.7 C 622.9 678.8 659.8 681.8 690.7 685.7 C 721.7 689.6 756.2 697.0 769.3 699.3"),   // Southeast Road, past the houses and the allotments to the east paddock (Birch Grove's road starts at its end)
+				TEXT("M202.0 325.2 C 197.3 319.1 179.7 303.0 173.6 288.6 C 167.4 274.1 165.5 255.2 165.0 238.6 C 164.5 221.9 163.8 202.1 170.7 188.6 C 177.6 175.0 200.5 162.4 206.4 157.1"),   // Castle Path, from the market place between the bank and the town hall up to the ruins' great arch
+				TEXT("M69.3 678.6 C 62.1 672.6 40.2 653.5 26.4 642.9 C 12.6 632.3 -6.9 619.6 -13.6 615.0"),   // South Fort Path, off the southwest road to the south fort's gate
 			};
 			for (const TCHAR* S : Paths)
 			{
@@ -545,12 +595,32 @@ namespace JeebOakHill
 		const FVector2D C = FromPx(P.Px, P.Py);
 		const float Yaw0 = (P.bAlongW ? 90.f : 0.f) + P.Rot - (Mdl && Mdl->bLongY ? 90.f : 0.f);
 		float ToRoad = Yaw0 + DoorYaw, Best = 1.0e12f;
-		if (P.bFacePlaza) ToRoad = FMath::RadiansToDegrees(FMath::Atan2(PosY - C.Y, PosX - C.X));
+		if (P.DoorDir >= 0.f) ToRoad = P.DoorDir;   // (the 2026-11-18 layout sets each door by hand)
+		else if (P.bFacePlaza) ToRoad = FMath::RadiansToDegrees(FMath::Atan2(PosY - C.Y, PosX - C.X));
 		else
 			for (const FRoad& R : Roads())
 				for (const FVector2D& Q : R.Pts) { const float D = FVector2D::DistSquared(Q, C); if (D < Best) { Best = D; ToRoad = FMath::RadiansToDegrees(FMath::Atan2(Q.Y - C.Y, Q.X - C.X)); } }
 		auto Diff = [](float A, float B) { return FMath::Abs(FMath::FindDeltaAngleDegrees(A, B)); };
 		return Diff(Yaw0 + DoorYaw, ToRoad) <= Diff(Yaw0 + 180.f + DoorYaw, ToRoad) ? Yaw0 : Yaw0 + 180.f;
+	}
+	// A building's plot by its Id ("Church", "House_SE1", ...; Docs/TownLab/OakHillLayout_2026-11-18.md), or -1
+	inline int32 PlotIndexById(const TCHAR* Id)
+	{
+		const TArray<FPlot>& Ps = Plots();
+		for (int32 i = 0; i < Ps.Num(); ++i) if (Ps[i].Id && FCString::Stricmp(Ps[i].Id, Id) == 0) return i;
+		return INDEX_NONE;
+	}
+	// The spot OutCm in front of a building's door wall, in the middle of its front (game cm; the door wall is the foundation
+	// walls' front, as the shop counters use), and the yaw from there back to the door
+	inline FVector2D DoorAt(const FPlot& P, float OutCm, float* OutYawToDoor = nullptr)
+	{
+		const FModel* Mdl = FindModel(P.Model);
+		const FVector2D C = FromPx(P.Px, P.Py);
+		if (!Mdl) return C;
+		const float Yaw = BuildingYaw(P, Mdl), Cs = FMath::Cos(FMath::DegreesToRadians(Yaw)), Sn = FMath::Sin(FMath::DegreesToRadians(Yaw));
+		const float LX = (Mdl->WX0 + Mdl->WX1) * 0.5f * Mdl->Scale, LY = -Mdl->WY0 * Mdl->Scale + OutCm;
+		if (OutYawToDoor) *OutYawToDoor = FRotator::NormalizeAxis(Yaw + Mdl->DoorYaw + 180.f);
+		return C + FVector2D(LX * Cs - LY * Sn, LX * Sn + LY * Cs);
 	}
 	inline bool IsStall(const TCHAR* Model)
 	{

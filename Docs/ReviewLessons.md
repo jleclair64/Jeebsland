@@ -9,7 +9,7 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Warm colours (orange, red) on grey glass need high brightness and saturation, e.g. (1.0, 0.74, 0.3); muted ones read as brown-grey.
 - A tile meant to read as a cell needs about 0.2 alpha; less looks like a gap.
 - Centre text blocks vertically in their cell, and check the widest string still fits at the chosen scale.
-- Always liquid glass (`Panel`, `Tile`, `Gauge`), text only through `HDText` / `HDTextSize`, icons with `Poly`.
+- Always the shared kit (`Panel`, `Tile`, `Gauge`, `Btn`, `CheckBox`, `SliderBar`: walnut and brass by default, liquid glass at `jeeb.UI.Style 0`), text only through `HDText` / `HDTextSize`, icons with `Poly`.
 - Pictures of the Tab windows: `-JeebShot -ShotPanel` (add `-ShotWear=<tier>` for a full suit); crop the panel 2x for the reviewer.
 - (Tab map, 2026-11-13) Names over a map or other busy art sit on a dark pill at full opacity, beside (not on) what they name, with a gap from its marker; place them in order of importance and move or drop one that would cover another name, a box or the player's arrow. Test the final padded pill against every other name, every outline (the real rotated shape, not its bounds) and the arrow for every kind of name, keep fades short (a half-faded name on busy ground is unreadable), and check every zoom step.
 - (Climbing, 2026-11-12) A HUD bar never sits at the screen's middle where the camera keeps the knight: place it clear of him and make it plainly different (colour, thickness) from the other bars.

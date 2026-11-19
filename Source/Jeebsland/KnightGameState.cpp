@@ -85,6 +85,7 @@
 #include "ForestRuins.h"
 #include "Bridge.h"
 #include "FoeCamps.h"
+#include "Bushes.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -307,6 +308,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
 	World->SpawnActor<AFoeCamps>(FVector::ZeroVector, FRotator::ZeroRotator);   // the bandits' camps in the forest (FoeCamps.h, FoeCamps.csv / Foes.csv; after the forest and its ruins, which they keep off; on every machine: the server places the bandits)
+	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
 
 	// Three cats that roam near the town: an orange tabby, a black cat and a grey-and-white one
@@ -621,6 +623,10 @@ void AKnightGameState::BuildMoveLab()
 		UStaticMeshComponent* Block = Solid(FVector(1000.f, 1150.f, 60.f), FVector(200.f, 200.f, 120.f), true, FLinearColor(0.50f, 0.48f, 0.44f));
 		Block->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Block->ComponentTags.Add(FName(TEXT("JeebMantle")));
+		// A low stone post 75 cm tall and 60 cm across, between the block and the tower, to vault (2026-11-18 night: like the bridge's parapet ends, the owner's low mantle)
+		UStaticMeshComponent* Post = Solid(FVector(1000.f, 1380.f, 37.5f), FVector(60.f, 60.f, 75.f), true, FLinearColor(0.55f, 0.53f, 0.50f));
+		Post->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Post->ComponentTags.Add(FName(TEXT("JeebMantle")));
 	}
 	// Oak Hill's test house in three versions, side by side on a patch of grass past the floor's +Y edge (to the right of the start, clear of the gear wall's
 	// boards), doors toward the floor (owner, 2026-11-06: to compare them in the game; Tools\BuildBuildings.ps1). The models are 12 m long and drawn 1.2 times
@@ -1195,7 +1201,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)

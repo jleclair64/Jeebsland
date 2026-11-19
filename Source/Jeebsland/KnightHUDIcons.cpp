@@ -46,6 +46,29 @@ void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 			V = IconPivot + FVector2D(D.X * Cs - D.Y * Sn, D.X * Sn + D.Y * Cs);
 		}
 	}
+	FLinearColor DrawCol = C;
+	if (IconRim > 0.f)   // (a class outline pass, DrawIcon: the shape grown by IconRim pixels, all in one colour; see-through parts skipped)
+	{
+		if (C.A < 0.9f) return;
+		float Area = 0.f;
+		for (int32 i = 0; i < P.Num(); ++i) Area += P[i].X * P[(i + 1) % P.Num()].Y - P[(i + 1) % P.Num()].X * P[i].Y;
+		const float Out = Area >= 0.f ? 1.f : -1.f;   // which side of each edge is outside
+		TArray<FVector2D> G = P;
+		for (int32 i = 0; i < P.Num(); ++i)
+		{
+			const FVector2D A = P[(i + P.Num() - 1) % P.Num()], B = P[i], Cn = P[(i + 1) % P.Num()];
+			FVector2D E1 = (B - A).GetSafeNormal(), E2 = (Cn - B).GetSafeNormal();
+			if (E1.IsNearlyZero()) E1 = E2;
+			if (E2.IsNearlyZero()) E2 = E1;
+			const FVector2D N1(E1.Y * Out, -E1.X * Out), N2(E2.Y * Out, -E2.X * Out);
+			FVector2D M = (N1 + N2).GetSafeNormal();
+			if (M.IsNearlyZero()) M = N1;
+			const float Cosv = FMath::Max(0.45f, FVector2D::DotProduct(M, N1));   // (sharp points are mitred, not spiked)
+			G[i] = B + M * (IconRim / Cosv);
+		}
+		P = MoveTemp(G);
+		DrawCol = IconRimCol;
+	}
 	float MinY = P[0].Y, MaxY = P[0].Y;
 	for (const FVector2D& V : P) { MinY = FMath::Min(MinY, V.Y); MaxY = FMath::Max(MaxY, V.Y); }
 	constexpr int32 Subs = 3;
@@ -92,7 +115,7 @@ void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 				const float Cv = (Col < Col1) ? Cover(Col) : -1.f;
 				if (Col == Col1 || FMath::Abs(Cv - Cur) > 0.03f)
 				{
-					if (Cur > 0.02f) DrawRect(FLinearColor(C.R, C.G, C.B, C.A * FMath::Min(Cur, 1.f)), float(Start), float(Row), float(Col - Start), 1.f);
+					if (Cur > 0.02f) DrawRect(FLinearColor(DrawCol.R, DrawCol.G, DrawCol.B, DrawCol.A * FMath::Min(Cur, 1.f)), float(Start), float(Row), float(Col - Start), 1.f);
 					Start = Col; Cur = Cv;
 				}
 			}
@@ -104,7 +127,7 @@ void AKnightHUD::Poly(const TArray<FVector2D>& Src, const FLinearColor& C)
 			if (SR > SL)
 			{
 				if (SL > C0) Run(C0, SL);
-				DrawRect(C, float(SL), float(Row), float(SR - SL), 1.f);
+				DrawRect(DrawCol, float(SL), float(Row), float(SR - SL), 1.f);
 				if (C1 > SR) Run(SR, C1);
 				continue;
 			}
@@ -136,19 +159,60 @@ void AKnightHUD::DrawIngot(float X, float Y, float S)
 }
 
 // Every weapon icon leans the same way wherever it is drawn (pack, bar, drag): 35 degrees, the fishing rod a little less because
-// its picture already leans
+// its picture already leans. The wand is drawn corner to corner and the staff nearly upright (owner 2026-11-18: they looked alike).
+// Gear only one class may use (Kinds.csv Class) gets an outline in the class's colour: the picture is drawn grown by a couple of
+// pixels in that colour, then grown by a hair in dark (a crisp gap), then as usual on top.
+FLinearColor AKnightHUD::ClassColor(int32 Class)
+{
+	switch (Class)
+	{
+	case 1: return FLinearColor(0.62f, 0.66f, 0.72f);    // knight: steel grey
+	case 2: return FLinearColor(0.16f, 0.78f, 0.16f);    // troll: green
+	case 3: return FLinearColor(0.48f, 0.16f, 0.95f);    // wizard: purple
+	default: return FLinearColor::White;
+	}
+}
+
 void AKnightHUD::DrawIcon(int32 Id, float X, float Y, float S)
 {
 	const float SavedTilt = IconTiltDeg;
 	const FVector2D SavedPivot = IconPivot;
 	if (FMath::IsNearlyZero(SavedTilt) && IsGear(Id) && IsWeaponKind(KindOf(Id)))
 	{
-		IconTiltDeg = (KindOf(Id) == K_Rod) ? -9.f : 35.f;
+		const int32 K = KindOf(Id);
+		IconTiltDeg = K == K_Rod ? -9.f : K == K_Wand ? 0.f : K == K_Staff ? 12.f : 35.f;
 		IconPivot = FVector2D(X + S * 0.5f, Y + S * 0.5f);
+	}
+	const int32 Cls = IsGear(Id) ? KindClass(KindOf(Id)) : 0;
+	if (Cls != 0 && IconRim <= 0.f)
+	{
+		const FLinearColor Rim = ClassColor(Cls);
+		IconRimCol = Rim;
+		IconRim = FMath::Clamp(S * 0.045f, 1.6f, 4.f);
+		DrawIconBody(Id, X, Y, S);
+		IconRimCol = FLinearColor(0.03f, 0.02f, 0.01f, 1.f);
+		IconRim = FMath::Clamp(S * 0.012f, 0.6f, 1.2f);
+		DrawIconBody(Id, X, Y, S);
+		IconRim = 0.f;
 	}
 	DrawIconBody(Id, X, Y, S);
 	IconTiltDeg = SavedTilt;
 	IconPivot = SavedPivot;
+}
+
+// The crystal and orb colour of a wand or staff of each tier, chosen to tell the six apart at icon size (tin and silver's gem
+// colours are both near white, iron's near black): tin copper, iron blue, silver pearl, gold yellow, emerald green, diamond cyan
+static FLinearColor MagicColor(int32 Tier)
+{
+	switch (FMath::Clamp(Tier, 0, NumTiers - 1))
+	{
+	case 0: return FLinearColor(1.00f, 0.42f, 0.12f);
+	case 1: return FLinearColor(0.20f, 0.36f, 1.00f);
+	case 2: return FLinearColor(0.90f, 0.93f, 1.00f);
+	case 3: return FLinearColor(1.00f, 0.80f, 0.10f);
+	case 4: return FLinearColor(0.12f, 0.90f, 0.32f);
+	default: return FLinearColor(0.30f, 0.95f, 1.00f);
+	}
 }
 
 void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
@@ -293,17 +357,48 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Poly({ P(22, 46), P(27, 48), P(18, 62), P(13, 60) }, Lt);
 			break;
 		case K_Wand:
-			Poly({ P(12, 54), P(16, 58), P(44, 24), P(40, 20) }, Wd);
-			DiscP(46, 18, 8, 8, Gem);
-			DiscP(44, 16, 3, 3, Lift(Gem, 1.6f));
-			DiscP(36, 28, 4, 3, Tr);
+		{
+			// Short, slim and tapered, corner to corner (lower left handle, upper right tip), with a small faceted crystal at the tip.
+			// Along / Across: a point S along the wand from the pommel and T to its side.
+			const FLinearColor Mg = MagicColor(V);
+			const FVector2D Base(9.f, 57.f), D(0.7071f, -0.7071f), N(0.7071f, 0.7071f);
+			auto At = [&](float Sa, float Ta) { const FVector2D Q = Base + D * Sa + N * Ta; return P(Q.X, Q.Y); };
+			auto Seg = [&](float S0, float S1, float R0, float R1, const FLinearColor& C) { Poly({ At(S0, -R0), At(S1, -R1), At(S1, R1), At(S0, R0) }, C); };
+			const FLinearColor Grip = Lift(Lt, 0.8f), Wood(0.40f, 0.22f, 0.10f);
+			Seg(0.f, 3.5f, 3.6f, 3.6f, Tr);                    // the pommel cap
+			Seg(3.5f, 19.f, 3.3f, 3.0f, Grip);                 // the leather grip
+			for (int32 w = 0; w < 4; ++w) Seg(5.f + w * 3.7f, 6.2f + w * 3.7f, 3.4f, 3.3f, Lift(Grip, 0.6f));   // its wraps
+			Seg(19.f, 21.5f, 3.4f, 3.4f, Tr);                  // a band
+			Seg(21.5f, 47.f, 2.7f, 1.7f, Wood);                // the shaft, tapering
+			Seg(22.f, 46.f, 0.9f, 0.5f, Lift(Wood, 1.5f));     // its light edge
+			Seg(46.f, 49.5f, 2.6f, 2.9f, Tr);                  // the collar holding the crystal
+			Poly({ At(48.5f, 0.f), At(53.f, -4.4f), At(63.f, 0.f), At(53.f, 4.4f) }, Mg);                 // the crystal
+			Poly({ At(48.5f, 0.f), At(53.f, -4.4f), At(63.f, 0.f) }, Lift(Mg, 1.45f));                  // its lit facet
+			Poly({ At(52.f, -1.2f), At(55.f, -2.4f), At(60.f, -0.4f) }, FLinearColor(1.f, 1.f, 1.f, 0.85f));   // a glint
 			break;
+		}
 		case K_Staff:
-			Quad(30, 16, 34, 62, Wd);
-			DiscP(32, 11, 9, 9, Gem);
-			DiscP(29, 8, 3, 3, Lift(Gem, 1.6f));
-			Quad(21, 19, 43, 22, Tr);
+		{
+			// Tall and (nearly) upright: a long shaft up from the bottom of the frame, a clawed head holding a big orb that fills the top
+			const FLinearColor Mg = MagicColor(V);
+			const FLinearColor Wood(0.40f, 0.22f, 0.10f), Grip = Lift(Lt, 0.8f), Claw = Lift(Tr, 0.9f);
+			DiscP(32, 15, 16, 16, FLinearColor(Mg.R, Mg.G, Mg.B, 0.22f));    // a soft glow round the orb
+			Quad(30, 27, 34.5f, 64, Wood);                                   // the shaft
+			Quad(30.5f, 28, 31.6f, 63, Lift(Wood, 1.5f));                    // its light edge
+			Quad(29.5f, 38, 35, 48, Grip);                                   // the grip
+			for (int32 w = 0; w < 3; ++w) Quad(29.3f, 39.5f + w * 3.f, 35.2f, 40.5f + w * 3.f, Lift(Grip, 0.6f));
+			Quad(29, 55, 35.5f, 58, Tr);                                     // a band
+			Poly({ P(29, 62), P(35.5f, 62), P(34.5f, 64), P(30, 64) }, Tr);   // the foot
+			DiscP(32, 14, 12, 12, Lift(Mg, 0.62f));                          // the orb: shaded
+			DiscP(30.5f, 12.5f, 10, 10, Mg);                                 // lit
+			DiscP(28, 9, 3.6f, 3.0f, FLinearColor(1.f, 1.f, 1.f, 0.9f));    // a highlight
+			// the head: a collar and three claws gripping the orb
+			Poly({ P(26, 24), P(38, 24), P(36.5f, 29), P(27.5f, 29) }, Tr);
+			Poly({ P(27, 25), P(22, 23), P(18.5f, 17), P(18.5f, 10), P(21, 5), P(22.5f, 7.5f), P(21.5f, 12), P(22.5f, 18), P(28.5f, 23) }, Claw);   // left
+			Poly({ P(37, 25), P(42, 23), P(45.5f, 17), P(45.5f, 10), P(43, 5), P(41.5f, 7.5f), P(42.5f, 12), P(41.5f, 18), P(35.5f, 23) }, Claw);   // right
+			Poly({ P(30.5f, 25), P(33.5f, 25), P(33, 22), P(32, 20.5f), P(31, 22) }, Claw);   // front
 			break;
+		}
 		case K_Bow:
 			Poly({ P(44, 2), P(54, 16), P(57, 32), P(54, 48), P(44, 62), P(40, 59), P(49, 47), P(52, 32), P(49, 17), P(40, 5) }, Pl);
 			Quad(40.5f, 4, 42.5f, 60, Edge);
