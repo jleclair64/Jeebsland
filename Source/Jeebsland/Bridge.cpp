@@ -301,10 +301,13 @@ void ABridge::BuildCollision()
 // ---------------------------------------------------------------------------------------------------------------------------------
 void ABridge::BuildDecor()
 {
-	constexpr float PostL = 1008.f, PostW = 275.f, PostTop = 140.f;   // the squat round posts at the four ends: where, and how high over the deck
+	// The squat round posts at the four ends, as measured on the model (same as the posts' capsules above): centred at |L| 1000, 295 across,
+	// tops 443 cm over the pier bottoms (2026-11-19: was 140 over the deck, which sat the lantern 30 cm inside the post, a black nub).
+	constexpr float PostL = 1000.f, PostW = 295.f, PostTopAbs = 443.f, LanternH = 70.f;
 	constexpr float ParapetW = 287.f, ParapetTop = 72.f;                 // the parapet's middle line and top over the deck
 	auto Load = [](const TCHAR* Name) { return LoadObject<UStaticMesh>(nullptr, *(FString(TEXT("/Game/TownDecor/SM_")) + Name + TEXT(".SM_") + Name)); };
-	UStaticMesh* Lantern = Load(TEXT("LanternOil"));
+	UStaticMesh* Lantern = Load(TEXT("LanternBlack"));   // the square black lantern with glowing panes reads from 20 m; the oil lantern was a dark rusty nub
+	if (!Lantern) Lantern = Load(TEXT("LanternOil"));
 	UStaticMesh* Torch = Load(TEXT("TorchBlazing"));
 	UStaticMesh* Flame = Load(TEXT("TorchBlazingFlame"));
 	UStaticMesh* Box = Load(TEXT("FlowerBoxLong"));
@@ -329,13 +332,13 @@ void ABridge::BuildDecor()
 		JeebLamp::ApplyToMesh(C, this);
 		Decor.Add(C);
 	};
-	auto Light = [&](float L, float W, float Up)
+	auto Light = [&](float L, float W, float Up, float Lumens = 110.f)
 	{
 		UPointLightComponent* P = NewObject<UPointLightComponent>(this);
 		P->SetupAttachment(RootComponent);
 		P->SetRelativeLocation(FVector(L, W, DeckRel(L) + Up));
 		P->SetIntensityUnits(ELightUnits::Lumens);
-		P->SetIntensity(110.f);
+		P->SetIntensity(Lumens);
 		P->SetAttenuationRadius(500.f);
 		P->SetCastShadows(false);
 		P->MaxDrawDistance = 6000.f;
@@ -348,8 +351,9 @@ void ABridge::BuildDecor()
 	{
 		for (int32 End = -1; End <= 1; End += 2)   // the lanterns on the four end posts
 		{
-			Put(Lantern, Lantern, End * PostL, Sd * PostW, PostTop, 0.f, 0.f, 50.f);
-			Light(End * PostL, Sd * PostW, PostTop + 28.f);
+			const float OverDeck = PostTopAbs - DeckRel(End * PostL);   // Put and Light measure up from the deck
+			Put(Lantern, Lantern, End * PostL, Sd * PostW, OverDeck + 0.5f, 45.f, 0.f, LanternH);
+			Light(End * PostL, Sd * PostW, OverDeck + LanternH * 0.7f, 45.f);   // (up in the lantern's roof and dimmer: lower down it lit the post's top as a white disc)
 		}
 		Put(Torch, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);   // the torches at the middle, on the parapet
 		Put(Flame, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);

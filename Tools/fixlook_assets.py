@@ -179,27 +179,8 @@ for name, centre, radii, colour, strength, core, lock in (
     log("%s glows (parent %s)" % (name, mi.get_editor_property("parent").get_name()))
 
 # ---------------------------------------------------------------- 3. the magic bolt
-ORB = "/Game/Props/M_GlowOrb"
-if lib.does_asset_exist(ORB): lib.delete_asset(ORB)   # (rebuilt every run; Projectile.cpp loads it by name)
-if not lib.does_asset_exist(ORB):
-    o = tools.create_asset("M_GlowOrb", "/Game/Props", unreal.Material, unreal.MaterialFactoryNew())
-    o.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
-    o.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
-    fr = node(o, unreal.MaterialExpressionFresnel, -900, 0, exponent=1.6, base_reflect_fraction=0.0)
-    core = node(o, unreal.MaterialExpressionOneMinus, -750, 0); link(fr, "", core, "")
-    c2 = node(o, unreal.MaterialExpressionMultiply, -600, 0); link(core, "", c2, "A"); link(core, "", c2, "B")
-    c4 = node(o, unreal.MaterialExpressionMultiply, -450, 0); link(c2, "", c4, "A"); link(c2, "", c4, "B")
-    col = vec(o, "Color", (0.22, 0.82, 1.0, 1.0), -900, 200)
-    st = sca(o, "Strength", 4.0, -900, 350)
-    a = node(o, unreal.MaterialExpressionMultiply, -600, 200); link(col, "RGB", a, "A"); link(st, "", a, "B")
-    soft = node(o, unreal.MaterialExpressionMultiply, -450, 200); link(a, "", soft, "A"); link(core, "", soft, "B")   # (its colour, fading to the rim)
-    w = node(o, unreal.MaterialExpressionMultiply, -450, 350); link(c4, "", w, "A"); link(st, "", w, "B")             # (a white-hot heart)
-    w2 = node(o, unreal.MaterialExpressionMultiply, -300, 350); link(w, "", w2, "A"); link(const(o, 0.3, -450, 450), "", w2, "B")
-    add = node(o, unreal.MaterialExpressionAdd, -150, 250); link(soft, "", add, "A"); link(w2, "", add, "B")
-    mel.connect_material_property(add, "", MP.MP_EMISSIVE_COLOR)
-    mel.recompile_material(o)
-    lib.save_asset(ORB)
-log("bolt material ready")
+# (2026-11-19: moved to Tools/bolt_glow.py, which can be run on its own: saturated cyan, exposure-locked, no white-hot heart)
+exec(open(os.path.join(proj, "Tools", "bolt_glow.py"), encoding="utf-8").read(), {"__name__": "bolt_glow"})
 
 # ---------------------------------------------------------------- 4. the people's skin dye
 skin_png = os.path.join(proj, "Art", "People", "Smith", "T_Smith_Skin.png")   # (Tools/people_skin_mask.py)
