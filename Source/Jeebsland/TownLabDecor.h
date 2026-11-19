@@ -21,13 +21,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 546.4f, -344.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 547.3f, 238.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 552.4f, -69.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.63f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -549.4f, 32.1f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 120.4f, -419.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -548.7f, -335.8f, 0.0f, 90.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -617.2f, -7.8f, 0.0f, 90.0f, 0.0f, 0.0f, 1.06f, 1.06f, 1.06f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 582.0f, 237.3f, 0.0f, -90.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 581.6f, -378.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.01f, 1.01f, 1.01f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 579.7f, -93.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.03f, 1.03f, 1.03f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -582.2f, -279.0f, 0.0f, -0.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 423.0f, -447.3f, 0.0f, -150.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), 353.0f, -439.1f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
@@ -38,12 +31,6 @@ namespace JeebTownLabDecor
 	};
 	inline const FDecor StoreDecor[] = {
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyHang.SM_TL_IvyHang"), 335.7f, -459.2f, 80.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -589.4f, 570.0f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 50.1f, -525.9f, 0.0f, -180.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -574.8f, 116.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.17f, 1.17f, 1.17f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 263.1f, 528.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 546.7f, -516.0f, 0.0f, -90.0f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 609.3f, -223.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -680.3f, -383.5f, 0.0f, 82.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_CrateNoLid.SM_CrateNoLid"), -670.9f, -383.5f, 97.7f, 102.0f, 0.0f, 0.0f, 0.75f, 0.75f, 0.75f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), -554.2f, -213.5f, 0.0f, 105.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
@@ -83,14 +70,6 @@ namespace JeebTownLabDecor
 	};
 	inline const FDecor BankDecor[] = {
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -181.6f, -612.7f, 0.0f, -180.0f, 0.0f, 0.0f, 1.00f, 1.00f, 1.33f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -633.0f, 423.3f, 0.0f, -0.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 596.2f, 424.9f, 0.0f, -0.0f, 0.0f, 0.0f, 0.82f, 0.82f, 0.82f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 587.2f, -665.8f, 0.0f, -180.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -647.7f, -617.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.19f, 1.19f, 1.19f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -642.4f, 625.8f, 0.0f, 90.0f, 0.0f, 0.0f, 0.96f, 0.96f, 0.96f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -640.9f, 39.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.19f, 1.19f, 1.19f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 649.0f, -512.5f, 0.0f, -90.0f, 0.0f, 0.0f, 0.86f, 0.86f, 0.86f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 248.6f, 508.6f, 0.0f, -90.0f, 0.0f, 0.0f, 1.13f, 1.13f, 1.13f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), -689.9f, -439.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -705.9f, -349.0f, 0.0f, 80.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WheatSack.SM_WheatSack"), 291.5f, -689.3f, 0.0f, -165.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
@@ -99,21 +78,12 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), 249.6f, 384.4f, 250.0f, -0.0f, 0.0f, 0.0f, 1.28f, 1.28f, 1.28f, true, true, true },   // lantern
 	};
 	inline const FDecor BankStallDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -515.6f, -92.8f, 0.0f, -180.0f, 0.0f, 0.0f, 1.02f, 1.02f, 1.02f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -477.8f, -173.6f, 0.0f, 90.0f, 0.0f, 0.0f, 0.91f, 0.91f, 0.91f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -457.4f, 182.9f, 0.0f, 90.0f, 0.0f, 0.0f, 1.01f, 1.01f, 1.01f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 261.7f, 439.5f, 0.0f, -90.0f, 0.0f, 0.0f, 1.16f, 1.16f, 1.16f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 433.7f, -239.2f, 0.0f, -90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 433.4f, 165.2f, 0.0f, -90.0f, 0.0f, 0.0f, 1.05f, 1.05f, 1.05f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 377.5f, -349.6f, 0.0f, -180.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 287.5f, -360.7f, 0.0f, 170.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), -532.4f, -66.5f, 0.0f, 90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), 479.5f, -97.6f, 285.0f, -90.0f, 0.0f, 0.0f, 1.37f, 1.37f, 1.37f, true, true, true },   // lantern
 	};
 	inline const FDecor SmithDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 610.1f, -542.4f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -669.5f, -546.4f, 0.0f, -180.0f, 0.0f, 0.0f, 1.18f, 1.18f, 1.18f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -487.8f, 323.4f, 0.0f, 90.0f, 0.0f, 0.0f, 1.06f, 1.06f, 1.06f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -550.9f, -612.8f, 0.0f, -160.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -400.9f, -614.3f, 0.0f, 170.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), 783.8f, 237.6f, 0.0f, -90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
@@ -122,15 +92,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), 599.9f, 277.2f, 300.0f, -0.0f, 0.0f, 0.0f, 1.48f, 1.48f, 1.48f, true, true, true },   // lantern
 	};
 	inline const FDecor CornerHouseDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -303.1f, 377.7f, 0.0f, -0.0f, 0.0f, 0.0f, 0.92f, 0.92f, 0.92f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 241.0f, 118.6f, 0.0f, -0.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 320.2f, -431.0f, 0.0f, -180.0f, 0.0f, 0.0f, 0.83f, 0.83f, 0.83f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -373.7f, -458.5f, 0.0f, -180.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 72.2f, -454.3f, 0.0f, -180.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -429.4f, 110.3f, 0.0f, 90.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 29.9f, 366.3f, 0.0f, -90.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 359.6f, -355.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.99f, 0.99f, 0.99f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 180.7f, 195.1f, 0.0f, -90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), -465.9f, -282.8f, 0.0f, -0.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_WateringCan.SM_WateringCan"), 185.1f, -426.0f, 0.0f, -150.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), 105.1f, -457.8f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
@@ -141,13 +102,6 @@ namespace JeebTownLabDecor
 	inline const FDecor TownHallDecor[] = {
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 124.8f, -540.5f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -962.4f, -59.1f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -883.5f, 354.0f, 0.0f, -0.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -409.7f, 349.5f, 0.0f, -0.0f, 0.0f, 0.0f, 0.86f, 0.86f, 0.86f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 901.5f, -586.6f, 0.0f, -180.0f, 0.0f, 0.0f, 0.93f, 0.93f, 0.93f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -972.7f, -587.4f, 0.0f, -180.0f, 0.0f, 0.0f, 0.98f, 0.98f, 0.98f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -1003.6f, -347.4f, 0.0f, 90.0f, 0.0f, 0.0f, 0.81f, 0.81f, 0.81f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 1017.9f, -521.5f, 0.0f, -90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 1002.6f, 327.5f, 0.0f, -90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Barrel.SM_Barrel"), -1035.4f, -302.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), -1046.8f, -202.0f, 0.0f, 80.0f, 0.0f, 0.0f, 0.85f, 0.85f, 0.85f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Firewood.SM_Firewood"), 385.8f, -620.1f, 0.0f, 90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
@@ -159,16 +113,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 277.8f, -675.4f, 0.0f, -180.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -298.6f, -319.0f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 557.9f, 78.3f, 0.0f, -90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 0.85f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -571.2f, 731.2f, 0.0f, -0.0f, 0.0f, 0.0f, 1.17f, 1.17f, 1.17f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 558.8f, 480.9f, 0.0f, -0.0f, 0.0f, 0.0f, 0.84f, 0.84f, 0.84f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 508.5f, -569.2f, 0.0f, -180.0f, 0.0f, 0.0f, 1.04f, 1.04f, 1.04f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -599.0f, -745.0f, 0.0f, -180.0f, 0.0f, 0.0f, 1.20f, 1.20f, 1.20f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -369.0f, -622.5f, 0.0f, 90.0f, 0.0f, 0.0f, 1.04f, 1.04f, 1.04f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -357.5f, 660.4f, 0.0f, 90.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -357.3f, 111.1f, 0.0f, 90.0f, 0.0f, 0.0f, 1.19f, 1.19f, 1.19f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 232.1f, 671.9f, 0.0f, -90.0f, 0.0f, 0.0f, 0.98f, 0.98f, 0.98f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 465.5f, -712.1f, 0.0f, -90.0f, 0.0f, 0.0f, 0.84f, 0.84f, 0.84f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 592.3f, -368.3f, 0.0f, -90.0f, 0.0f, 0.0f, 1.12f, 1.12f, 1.12f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_PotWide.SM_PotWide"), -338.1f, -323.0f, 0.0f, 90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotAmphora.SM_PotAmphora"), 607.7f, -190.8f, 0.0f, -130.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotRound.SM_PotRound"), 273.5f, -710.9f, 0.0f, -180.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
@@ -176,9 +120,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/Filler/SM_LanternBlack.SM_LanternBlack"), -170.0f, 685.0f, 182.0f, 0.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, true, true, true },   // lantern
 	};
 	inline const FDecor WellDecor[] = {
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -94.0f, 79.5f, 0.0f, -0.0f, 0.0f, 0.0f, 0.87f, 0.87f, 0.87f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 99.9f, -123.5f, 0.0f, -180.0f, 0.0f, 0.0f, 1.12f, 1.12f, 1.12f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 126.9f, 80.3f, 0.0f, -90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_Pail.SM_Pail"), 141.4f, -1.4f, 0.0f, -115.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop
 	};
 	inline const FDecor PotionShopDecor[] = {
@@ -189,13 +130,6 @@ namespace JeebTownLabDecor
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -436.0f, -67.4f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), -435.6f, 133.1f, 0.0f, 90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
 		{ TEXT("/Game/TownLab/Buildings/SM_TL_IvyClimb.SM_TL_IvyClimb"), 497.7f, 31.3f, 0.0f, -90.0f, 0.0f, 0.0f, 1.27f, 1.00f, 1.00f, true, false, false },   // ivy
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -420.8f, 343.1f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 481.5f, 339.8f, 0.0f, -0.0f, 0.0f, 0.0f, 1.05f, 1.05f, 1.05f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 294.1f, 334.3f, 0.0f, -0.0f, 0.0f, 0.0f, 1.15f, 1.15f, 1.15f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 472.3f, -426.6f, 0.0f, -180.0f, 0.0f, 0.0f, 1.09f, 1.09f, 1.09f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -195.3f, 381.3f, 0.0f, 90.0f, 0.0f, 0.0f, 0.82f, 0.82f, 0.82f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), -482.2f, 89.4f, 0.0f, 90.0f, 0.0f, 0.0f, 1.03f, 1.03f, 1.03f, false, false, false },   // weeds
-		{ TEXT("/Game/TownLab/Buildings/SM_TL_Weeds.SM_TL_Weeds"), 550.1f, -378.4f, 0.0f, -90.0f, 0.0f, 0.0f, 1.12f, 1.12f, 1.12f, false, false, false },   // weeds
 		{ TEXT("/Game/Filler/SM_ClayJug.SM_ClayJug"), -482.4f, -204.3f, 0.0f, 90.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_PotSmall.SM_PotSmall"), -474.6f, -74.3f, 0.0f, 70.0f, 0.0f, 0.0f, 0.90f, 0.90f, 0.90f, false, false, true },   // prop
 		{ TEXT("/Game/Filler/SM_Crate.SM_Crate"), 276.7f, -467.5f, 0.0f, -170.0f, 0.0f, 0.0f, 0.80f, 0.80f, 0.80f, false, false, true },   // prop

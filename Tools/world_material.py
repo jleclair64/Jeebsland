@@ -238,7 +238,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
 
     # Sand: the beach, warm and pale, with the earth picture's grain in it
     sand_m = g.mul(vc, 1.0, "A")   # (the vertex colour's plain output is RGB only: alpha comes from its own pin)
-    s_amt = g.sat(g.mul(g.add(g.addn(g.mul(sand_m, 1.4), g.mul(g.add(rag, -0.5), 0.4)), -0.25), 2.6))
+    s_amt = g.sat(g.mul(g.add(g.addn(g.mul(sand_m, 1.4), g.mul(g.add(rag, -0.5), 0.4)), -0.25), 1.6))   # (2026-11-19: 1.6, was 2.6: a soft blend into the grass, not a hard edge)
     sand = g.muln(palette.colour(mat, "Sand"), g.lerpc(0.86, 1.08, g.mul(g.lum(soil), 7.5)))
     col = g.lerp(col, sand, s_amt)
 
@@ -261,7 +261,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # blades are lit through and stay bright at the low sun, flat ground goes near-black where they stop (from the air, and past the
     # town's 40 m of grass). A small warm light on the grass only: an emissive floor on bare earth went white by the paths at the
     # low sun, when the exposure rises (2026-11-12), so packed earth and mud take none of it.
-    bare = g.one(unreal.MaterialExpressionOneMinus, g.sat(g.addn(d_amt, m_amt)))
+    bare = g.one(unreal.MaterialExpressionOneMinus, g.sat(g.addn(g.addn(d_amt, m_amt), s_amt)))   # (2026-11-19: and sand, whose fill made the beaches glow at the low sun)
     # (2026-11-15: emissive ignores shadow, so among the blades it lit the ground under trees at dusk above the shaded blades, owner:
     # "seems to glow". Now it comes in only past the blades: grass_field.under_grass_fill.)
     fill = g.muln(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), bare)

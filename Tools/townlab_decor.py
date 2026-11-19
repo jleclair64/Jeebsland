@@ -548,8 +548,10 @@ for bname, B in BUILD.items():
             h = surface(pl, outv, 15.0)
             face = (h - pl).dot(outv) if h is not None else 0.0
             # (no stones: owner 2026-11-16, "I don't like these groupings of stones anywhere"; TL_Stones deleted)
+            # (no weeds either: owner 2026-11-18, every small bright-green leafy clump out of the game; the random draws are kept so
+            # everything after them lands where it did)
             if rnd.random() < 0.6:
-                add("weeds", "TL_Weeds", pl + outv * (face + 22.0) + along * rnd.uniform(-40, 40), outv, rnd.uniform(0.8, 1.2), False)
+                rnd.uniform(-40, 40); rnd.uniform(0.8, 1.2)
     plans[bname] = (items, bvh, sides, B, top, surface)
     log(bname, "ivy", n_ivy, "moss", n_moss, "items so far", len(items))
 

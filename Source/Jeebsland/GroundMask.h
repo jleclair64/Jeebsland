@@ -157,8 +157,14 @@ namespace JeebGround
 			if (Ls < 2500.f)
 			{
 				const float N = Soft(X, Y, 500.f, 61.f);
-				// (narrow, and broken by grassy stretches where a slow noise says, so it reads as a natural shore, not a ring)
-				S = JeebWorld::Smooth(JeebWorld::RiverLevel + 45.f + 80.f * N, JeebWorld::RiverLevel + 15.f, Z) * JeebWorld::Smooth(1000.f + 600.f * N, 200.f, Ls)
+				// (narrow, and broken by grassy stretches where a slow noise says, so it reads as a natural shore, not a ring.
+				// 2026-11-19, look review: the island's band was a wide cream ring; there it is about half as wide, and the edge into the
+				// grass is softer everywhere so it blends instead of ending on a line)
+				static const FBox2D IsleBox = FBox2D(JeebWorld::Lake().Isle).ExpandBy(1500.f);
+				const bool bIsle = IsleBox.IsInside(FVector2D(X, Y));
+				const float Reach = bIsle ? 380.f + 220.f * N : 900.f + 600.f * N;
+				const float ZTop = bIsle ? 30.f + 40.f * N : 45.f + 80.f * N;
+				S = JeebWorld::Smooth(JeebWorld::RiverLevel + ZTop, JeebWorld::RiverLevel + 5.f, Z) * JeebWorld::Smooth(Reach, 60.f, Ls)
 					* JeebWorld::Smooth(0.36f, 0.5f, Soft(X, Y, 2600.f, 17.f));
 			}
 			if (Z < JeebWorld::RiverLevel + 80.f && Z > JeebWorld::RiverLevel - 120.f)
