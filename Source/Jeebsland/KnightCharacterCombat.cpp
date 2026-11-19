@@ -1254,7 +1254,10 @@ void AKnightCharacter::TickHitboxes(float Dt)
 	const float To = bKick ? KickActiveTo : bSweep ? SweepActiveTo : bDash ? DashActiveTo / FMath::Max(AttackDur, 0.01f) : (AttackDir == JabSecond) ? Jab2To : Jab1To;
 	JeebHit::FHitSphere BladeSet[MaxBladeBoxes];
 	const int32 NumBlade = bSword ? BladeBoxes(HeldKind, (bSweep || bDash || bSmashSwing) ? SmashTipR : JabTipR, BladeSet) : 0;
-	const JeebHit::FHitSphere* Boxes = bKick ? KickBoxes : BladeSet;
+	// (the troll punches with his left instead: four balls on the fist and forearm, KnightCharacterTroll.cpp. Same timing, damage and rules as the kick)
+	const float FistR = JeebTune::V().TrollFistRadius;
+	const JeebHit::FHitSphere PunchBoxes[4] = { { 0, 0.f, FistR, 1.f }, { 1, 0.f, FistR * 0.85f, 1.f }, { 2, 0.f, FistR * 0.75f, 0.9f }, { 3, 0.f, FistR * 0.7f, 0.8f } };
+	const JeebHit::FHitSphere* Boxes = bKick ? (bIsTroll ? PunchBoxes : KickBoxes) : BladeSet;
 	const int32 NumBoxes = bKick ? UE_ARRAY_COUNT(KickBoxes) : NumBlade;
 	const float Power = bKick ? KickDamage : bSweep ? SweepDamage : bDash ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, DashCharge) : bSmashSwing ? SwordSmashDamage * FMath::Lerp(1.f, SwordSmashFullMul, SmashCharge) : SwordJabDamage;
 	// what a clean sword hit does to whoever it lands on
@@ -1275,8 +1278,16 @@ void AKnightCharacter::TickHitboxes(float Dt)
 			else
 			{
 				using namespace JeebAnim;
+				if (bIsTroll)   // (the knuckles, the fist, the middle of the forearm, near the elbow)
+				{
+					const FVector Hand = Anim->BoneAt(LHand), Fore = Anim->BoneAt(LFore);
+					const FVector Along = (Hand - Fore).GetSafeNormal();
+					Now = (i == 0) ? Hand + Along * (FistR * 1.1f) : (i == 1) ? Hand : (i == 2) ? (Hand + Fore) * 0.5f : Fore + (Hand - Fore) * 0.2f;
+				}
+				else {
 				const FVector Foot = Anim->BoneAt(RFoot), Toe = Anim->BoneAt(RToe), Knee = Anim->BoneAt(RLeg);
 				Now = (i == 0) ? Toe + (Toe - Foot).GetSafeNormal() * 5.f : (i == 1) ? (Foot + Toe) * 0.5f : (i == 2) ? (Foot + Knee) * 0.5f : Knee;
+				}
 			}
 			JeebHit::FCapsule C;
 			C.A = bHitPrevValid ? HitPrev[i] : Now; C.B = Now; C.R = S.Radius;

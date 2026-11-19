@@ -32,6 +32,11 @@ void AKnightPlayerController::SendLogin()
 {
 	if (bSentLogin) return;
 	bSentLogin = true;
+	// (the playable troll, 2026-11-19: -PlayAs=Troll asks for a troll before the login, so the pawn the login gives is one)
+	{
+		FString As;
+		if (FParse::Value(FCommandLine::Get(), TEXT("PlayAs="), As)) ServerChooseClass(As.Equals(TEXT("Troll"), ESearchCase::IgnoreCase));
+	}
 	UJeebGameInstance* GI = GetGameInstance<UJeebGameInstance>();
 	// Playing as a client in the editor (no starting screen): a test account per editor window, no password
 	if (GetWorld()->WorldType == EWorldType::PIE || !GI || GI->LoginName.IsEmpty())
@@ -41,6 +46,11 @@ void AKnightPlayerController::SendLogin()
 		return;
 	}
 	ServerLogin(GI->LoginName, GI->LoginPassword, GI->bCreateAccount, false);
+}
+
+void AKnightPlayerController::ServerChooseClass_Implementation(bool bTroll)
+{
+	if (!bLoggedIn) ClassChoice = bTroll ? 1 : 0;   // (chosen before the pawn comes; no changing after)
 }
 
 void AKnightPlayerController::ServerLogin_Implementation(const FString& Name, const FString& Password, bool bCreate, bool bDev)

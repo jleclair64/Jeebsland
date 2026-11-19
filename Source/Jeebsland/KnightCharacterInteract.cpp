@@ -104,7 +104,7 @@ void AKnightCharacter::Interact()
 		{
 			StartAttack(EAtkStyle::Cast, 1, 0.f);
 		}
-		else if (JeebItems::FightsLikeSword(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkSpeed * 1.15f
+		else if (JeebItems::FightsLikeSword(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkNow() * 1.15f
 			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
 		{
 			StartAttack(EAtkStyle::Dash, 1, 0.f);   // sprinting forward: the dash attack, a lunge
@@ -484,7 +484,7 @@ void AKnightCharacter::Mount(AHorse* H)
 	HorseEnergy = 100.f;
 	bHorseTired = false;
 	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed * 3.2f;   // (TickGroundSpeed sets the real riding speed from the next frame)
+	GetCharacterMovement()->MaxWalkSpeed = WalkNow() * 3.2f;   // (TickGroundSpeed sets the real riding speed from the next frame)
 	// The on-foot facing to come back to. Strafe mode (on by default), the bow's draw or the shield stance have already turned
 	// turning-to-movement off for themselves (bBackOrient, TickGroundSpeed), so the real on-foot value is the one they saved, not
 	// the live one, and they let go of it here. Before 2026-11-16 the live "off" was saved, TickGroundSpeed then handed the

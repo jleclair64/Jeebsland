@@ -327,6 +327,8 @@ namespace JeebItems
 		static const TCHAR* N[] = { TEXT("Mining"), TEXT("Woodcutting"), TEXT("Smithing"), TEXT("Fishing"), TEXT("Attack"), TEXT("Defence"), TEXT("Archery"), TEXT("Magic"), TEXT("Lockpicking"), TEXT("Climbing") };
 		return N[FMath::Clamp(static_cast<int32>(S), 0, int32(UE_ARRAY_COUNT(N)) - 1)];
 	}
+	// (2026-11-19) Is this pack a playable troll's? (KnightCharacterTroll.cpp)
+	bool OwnerIsTroll(const USkillComponent* S);
 	// Can this player wear or wield this item? If not, OutWhy says why. (Capes, rings, amulets and the brush have no gate.)
 	inline bool CanEquip(const USkillComponent* S, int32 Id, FString* OutWhy = nullptr)
 	{
@@ -334,7 +336,23 @@ namespace JeebItems
 		const int32 K = KindOf(Id);
 		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
 		const int32 T = VariantOf(Id);
-		if (!KnightCanUseTier(T))
+		// The playable troll (2026-11-19): only troll-class and "all" gear (Kinds.csv Class), and only common or troll tiers. Knights are not held to their class yet.
+		// TEMPORARY: the knight's sword too, until the troll's club exists (its Kinds.csv row will be Class troll and pass here by itself).
+		if (OwnerIsTroll(S))
+		{
+			const int32 Cls = KindClass(K);
+			if (Cls != 0 && Cls != 2 && K != K_Sword)
+			{
+				if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is made for %s. A troll can't use it."), *ItemName(Id), Cls == 3 ? TEXT("wizards") : TEXT("knights"));
+				return false;
+			}
+			if (TierClass(T) != 0 && TierClass(T) != 2)
+			{
+				if (OutWhy) *OutWhy = FString::Printf(TEXT("%s gear is made for %s. A troll can't use it."), TierName(T), TierClass(T) == 1 ? TEXT("knights") : TEXT("wizards"));
+				return false;
+			}
+		}
+		else if (!KnightCanUseTier(T))
 		{
 			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s gear is made for %s. A knight can't use it."), TierName(T), TierClass(T) == 2 ? TEXT("trolls") : TEXT("wizards"));
 			return false;

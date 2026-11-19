@@ -107,6 +107,21 @@ public:
 	using ACharacter::SetBase;
 	virtual void SetBase(FMovementBaseInterfaceData* Data, const FName BoneName = NAME_None, bool bNotifyActor = true) override;
 
+	// The playable troll (2026-11-19, KnightCharacterTroll.cpp): a class mode of the knight. ATrollCharacter sets it in its constructor,
+	// so every machine knows it from the class alone. Everything else is the knight's code, with the troll's changes inside it.
+	bool IsTroll() const { return bIsTroll; }
+	float WalkNow() const;     // WalkSpeed, or the troll's (Tuning.ini [Troll])
+	float SprintNow() const;
+	// The troll's charged jump: hold Space, let go. Client asks (ServerLeap), server checks and launches; the cooldown is the server's.
+	float LeapChargeShare() const;   // 0..1 while Space is held (this machine's own troll)
+	float LeapCooldownShare() const { return LeapCooldown > 0.f ? LeapCooldown / FMath::Max(0.1f, JeebTune::V().TrollLeapCooldown) : 0.f; }
+	bool IsLeapCharging() const { return LeapChargeFrom >= 0.0; }
+	UFUNCTION(Server, Reliable) void ServerLeapCharge(bool bStart);
+	UFUNCTION(Server, Reliable) void ServerLeap(float Charge, FVector_NetQuantizeNormal Dir);
+	UFUNCTION(Server, Reliable) void ServerHop(FVector_NetQuantizeNormal Dir);
+	UFUNCTION(Client, Reliable) void ClientLeapRefused(float CooldownLeft);
+	void SwapClassForTest(bool bTroll);   // (single player, test builds: jeeb.PlayAs troll|knight saves, then comes back as the other in the same spot)
+
 	// For the HUD
 	float GetStaminaFraction() const { return Stamina / MaxStamina; }
 	bool IsExhausted() const { return bExhausted; }
@@ -489,6 +504,26 @@ protected:
 	void NextWeapon() { CycleHotbar(1); }   // R: the next weapon on the bar, left to right (round to the first again)
 	void CycleHotbar(int32 Dir);
 	void ApplyArmorSlot(int32 Slot);
+	// The troll (KnightCharacterTroll.cpp)
+	bool bIsTroll = false;
+	double LeapChargeFrom = -1.0;     // when Space went down for a charged jump (this machine's clock; -1 none)
+	double ServerChargeFrom = -1.0;   // (server) when the client said it started charging
+	float LeapCooldown = 0.f;         // seconds before the next charged jump
+	float LeapCrouch = 0.f;           // the crouch as he charges (0..1, this machine)
+	bool bAirLaunch = false;          // a hop or a charged jump is flying: the air speed clamp leaves it alone until he lands
+	float ShotLeapCharge = -1.f;      // (test pictures: -SuitDo=chargejump<hundredths>)
+	FVector LeapFrom = FVector::ZeroVector; double LeapAt = 0.0; float LeapShare = 0.f;   // (log JEEBLEAP)
+	void ApplyTrollBody();            // capsule and camera from Tuning.ini [Troll]
+	void StartHop(const FVector& Dir);          // the troll's wheel-down: a quick hop the way he points
+	void DoHop(const FVector& Dir);
+	void ReleaseLeap();               // Space let go: the tap jump, or the charged one
+	void DoLeap(float Charge, const FVector& Dir);
+	FVector LeapVelocity(float Charge, const FVector& Dir) const;
+	void TickTroll(float Dt);
+	void FreeFlight(bool bOn);
+	bool bFreeFlight = false; float SavedFallBrake = 0.f, SavedFallFriction = 0.f;
+	bool TrollSuitTest(const FString& Do);   // (test pictures: -SuitDo=punch, hop<deg>, hopall, chargejump<hundredths>, leapsizes, leaptest)
+	virtual void Landed(const FHitResult& Hit) override;
 	void BuildKnight();   // his body (FKnightAnimator) and the shield's parts
 	TSharedPtr<FKnightAnimator> Anim;   // his body: on every machine, since the hit boxes and hurt boxes are read from its pose
 	float AnimAccum = 0.f;
@@ -904,4 +939,14 @@ private:
 	bool bSideways = false; // woodcutting sweeps the arm sideways instead of overhead
 
 	TArray<TPair<UStaticMeshComponent*, FLinearColor>> Parts;
+};
+
+// The playable troll (2026-11-19): the knight's pawn in troll mode (KnightCharacterTroll.cpp). AKnightGameMode gives one to a player who
+// asked for it (-PlayAs=Troll; AKnightPlayerController::ServerChooseClass).
+UCLASS()
+class ATrollCharacter : public AKnightCharacter
+{
+	GENERATED_BODY()
+public:
+	ATrollCharacter(const FObjectInitializer& ObjectInitializer);
 };

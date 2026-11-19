@@ -3,6 +3,8 @@
 #include "KnightGameState.h"
 #include "KnightCharacter.h"
 #include "KnightPlayerController.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "KnightHUD.h"
 #include "JeebAccounts.h"
 #include "JeebChat.h"
@@ -324,4 +326,17 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 	SpawnCount = (SpawnCount + 1) % 7;
 	const FVector Loc(At.X, At.Y, JeebTerrain::HeightAt(At.X, At.Y) + 130.f);
 	return GetWorld()->SpawnActor<APawn>(GetDefaultPawnClassForController(NewPlayer), Loc, FRotator(0.f, bOak ? JeebOakHill::SpawnYaw : 0.f, 0.f), Params);
+}
+
+UClass* AKnightGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+	const AKnightPlayerController* PC = Cast<AKnightPlayerController>(InController);
+	bool bTroll = false;
+	if (PC && PC->ClassChoice >= 0) bTroll = PC->ClassChoice == 1;
+	else if (InController && InController->IsLocalController())
+	{
+		FString As;
+		bTroll = FParse::Value(FCommandLine::Get(), TEXT("PlayAs="), As) && As.Equals(TEXT("Troll"), ESearchCase::IgnoreCase);
+	}
+	return bTroll ? ATrollCharacter::StaticClass() : Super::GetDefaultPawnClassForController_Implementation(InController);
 }

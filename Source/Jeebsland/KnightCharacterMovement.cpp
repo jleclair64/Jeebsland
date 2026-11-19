@@ -178,7 +178,7 @@ void AKnightCharacter::StartSlide()
 	const float Speed = GetVelocity().Size2D();
 	if (bSliding || bRolling || bSitting || bClimbing || InClimbMove() || bMounted || SlideCooldown > 0.f || Move->IsFalling()) return;
 	if (!bSprinting || Speed < 480.f || Stamina < 10.f) return; // slides start from a sprint
-	BeginSlide(GetVelocity().GetSafeNormal2D(), FMath::Max(Speed, 750.f) * 1.15f);
+	BeginSlide(GetVelocity().GetSafeNormal2D(), FMath::Max(Speed, bIsTroll ? JeebTune::V().TrollSlideFloor : 750.f) * 1.15f);
 	if (IsLocallyControlled() && !HasAuthority()) ServerSlide(SlideDir, SlideSpeed);   // online: the server slides us too
 }
 
@@ -206,6 +206,13 @@ void AKnightCharacter::StartRoll()
 	if (Smash == ESmash::Charging || MoveLocked()) return;   // (nor rolled out of, nor out of a kick; knocked down, A or D rolls: GetUp)
 	static const bool bShotMode = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
 	if (bShotMode && !bTestWheelRoll) return;   // (test pictures: a stray key as the window opens would roll him)
+	if (bIsTroll)   // (the troll hops instead: same keys, same cooldown, KnightCharacterTroll.cpp)
+	{
+		FVector HopDir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;
+		PendingRollDir = FVector::ZeroVector;
+		StartHop(HopDir.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : HopDir);
+		return;
+	}
 
 	// Roll the way the wheel-down call named (RollWheel), else the way you are steering, or straight ahead if you are standing still
 	FVector Dir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;
@@ -246,6 +253,13 @@ void AKnightCharacter::Jump()
 		bSliding = false;
 		GetCharacterMovement()->bOrientRotationToMovement = bSavedOrient;
 	}
+	// The troll: Space down on the ground starts a charge; letting go jumps (StopJumping, ReleaseLeap: KnightCharacterTroll.cpp)
+	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0)
+	{
+		LeapChargeFrom = GetWorld()->GetTimeSeconds();
+		if (!HasAuthority()) ServerLeapCharge(true); else ServerChargeFrom = LeapChargeFrom;
+		return;
+	}
 	Super::Jump();
 }
 
@@ -275,6 +289,7 @@ void AKnightCharacter::CheckJumpInput(float DeltaTime)
 void AKnightCharacter::StopJumping()
 {
 	if (UKnightMovement* KM = KnightMove()) KM->bWantsRise = false;
+	if (bIsTroll && LeapChargeFrom >= 0.0) { ReleaseLeap(); return; }   // (the troll: the jump comes as Space is let go; the engine clears its press after the move)
 	Super::StopJumping();
 }
 
@@ -475,6 +490,7 @@ static TAutoConsoleVariable<float> CVarKnightGravity(TEXT("jeeb.Knight.Gravity")
 // face the camera. Returns whether the knight faces the camera (strafe mode or the shield stance).
 bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, bool bSpecial, float SpecialSpeed, bool bWantSprint)
 {
+	const float Walk_ = WalkNow(), Sprint_ = SprintNow();   // (the knight's, or the troll's: Tuning.ini [Troll])
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	{
 		const float Over = CVarKnightGravity.GetValueOnGameThread();
@@ -505,11 +521,11 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// "make the horse twice as fast"; was 1.6 x the knight's walk and sprint, now 3.2 x). The build-up and the easing off are
 	// doubled too, so the gallop still comes in over about 1.7 s. (Backing up stays at half the knight's walk: bBackStep below.)
 	const float HorseMul = 3.2f;
-	float HorseTarget = HorseMul * (bHorseSprint ? SprintSpeed : WalkSpeed);
+	float HorseTarget = HorseMul * (bHorseSprint ? Sprint_ : Walk_);
 	if (!bMounted) HorseSpeedNow = 0.f;
 	else
 	{
-		if (HorseSpeedNow < 1.f) HorseSpeedNow = HorseMul * WalkSpeed;
+		if (HorseSpeedNow < 1.f) HorseSpeedNow = HorseMul * Walk_;
 		HorseSpeedNow = FMath::FInterpConstantTo(HorseSpeedNow, HorseTarget, Dt, HorseTarget > HorseSpeedNow ? 660.f : 1800.f);
 	}
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
@@ -566,12 +582,12 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	else StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
 	// Heavy armour slows him on foot (JeebItems::WeightSpeedMul; Worn reaches the owner's machine, so it predicts the same)
 	const float Burden = (!bMounted && Skills) ? JeebItems::WeightSpeedMul(Skills) : 1.f;
-	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
-	const float BaseSpeed = bBackStep ? 0.5f * WalkSpeed : bMounted ? HorseSpeedNow
-	                                 : (bStance ? WalkSpeed * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f)   // swiftness potion
+	const float RunSpeed = bWantSprint ? FMath::Lerp(Walk_, Sprint_, StrafeSprint) : Walk_;
+	const float BaseSpeed = bBackStep ? 0.5f * Walk_ : bMounted ? HorseSpeedNow
+	                                 : (bStance ? Walk_ * StanceFactor * ShieldMove : ((bCrouched || bBlocking) ? CrouchSpeed : RunSpeed * StrafeMul)) * ((!bMounted && GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f)   // swiftness potion
 	                                 * ((!bMounted && Skills) ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f)   // the Red Helm Brush
 	                                 * Burden;                                                                    // heavy armour
-	if (bFalling && !bSpecial)
+	if (bFalling && !bSpecial && !bAirLaunch)   // (not a troll's hop or charged jump: KnightCharacterTroll.cpp)
 	{
 		AirSpeedMul = AirMul;
 		const float AirCap = BaseSpeed * AirMul;
@@ -592,14 +608,14 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	if (KM) AirSpeedMul = KM->MoveAirMul;   // (advanced per move: see above)
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
-	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
-	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Recover || (Bow == EBow::Reload && !bWantSprint))) Move->MaxWalkSpeed = BowWalkShare() * WalkSpeed * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
-	else if (!bSpecial && !bMounted && bDrinking) Move->MaxWalkSpeed = JeebTune::V().DrinkWalk * WalkSpeed * Burden * AirSpeedMul;   // drinking: a slow walk
+	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * Walk_ * Burden * AirSpeedMul;
+	else if (!bSpecial && !bMounted && (Bow == EBow::Drawing || Bow == EBow::Recover || (Bow == EBow::Reload && !bWantSprint))) Move->MaxWalkSpeed = BowWalkShare() * Walk_ * Burden * AirSpeedMul;   // drawing a bow: half the walking speed
+	else if (!bSpecial && !bMounted && bDrinking) Move->MaxWalkSpeed = JeebTune::V().DrinkWalk * Walk_ * Burden * AirSpeedMul;   // drinking: a slow walk
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk
 	// to sprint) the usual acceleration keeps the sprint's ramp. Worked out from the velocity, so the server agrees.
 	// (2026-11-18 night: inside each move now, UKnightMovement::GetMaxAcceleration; the member below is only what this frame saw, for logs.)
-	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > WalkSpeed * Burden ? WalkSpeed * Burden * AirSpeedMul : Move->MaxWalkSpeed);
+	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > Walk_ * Burden ? Walk_ * Burden * AirSpeedMul : Move->MaxWalkSpeed);
 	Move->MaxAcceleration = (!bFalling && !bSpecial && !bMounted && Move->Velocity.Size2D() < WalkCap - 5.f) ? WalkAccel : SprintAccel;
 	// What the moves need to work out his speed and start-up push themselves (KnightMovement.h, FSpeedRule). The plain run / sprint is the
 	// only speed that changes from move to move (with the push's direction, Shift and the eased shares); every other case keeps the
@@ -612,10 +628,10 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 		R.bStrafe = bFaceCam && !bStance;
 		R.bSprintOk = !bMounted && !bCrouched && !bBlocking && !bExhausted;   // (Shift itself comes with each move: FLAG_Custom_1)
 		R.bAccelRule = !bSpecial && !bMounted;
-		R.Walk = WalkSpeed;
-		R.Sprint = SprintSpeed;
+		R.Walk = Walk_;
+		R.Sprint = Sprint_;
 		R.K = ((GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f) * (Skills ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f) * Burden;
-		R.WalkCapBase = WalkSpeed * Burden;
+		R.WalkCapBase = Walk_ * Burden;
 		R.AirMul = AirMul;
 	}
 	return bFaceCam;

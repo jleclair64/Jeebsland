@@ -37,6 +37,8 @@ protected:
 	// Every player starts on the meadow by the cottage, spread round a small ring so two never land on each other; a saved
 	// character appears where it logged out
 	virtual APawn* SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot) override;
+	// A knight, or the playable troll for a player who asked (AKnightPlayerController::ClassChoice; single player: -PlayAs=Troll)
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
 private:
 	int32 SpawnCount = 0;

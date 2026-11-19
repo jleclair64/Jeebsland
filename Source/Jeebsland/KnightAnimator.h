@@ -63,8 +63,16 @@ namespace JeebAnim
 	{
 		static const FClipLib& Get();
 		FClipLib();
+		// The playable troll (2026-11-19): the knight's bones, frames and clips with the troll's proportions (Content/Data/TrollRig.csv). The
+		// knight's clips play on it unchanged; FKnightAnimator copies the pose onto the troll's own mesh (SK_Troll) bone by bone.
+		static const FClipLib& GetTroll();
 
 		bool bReady = false;
+		bool bTroll = false;
+		float HurtScale = 1.f;                 // hurt boxes' thickness against the knight's
+		TArray<FVector> RestPos;               // each bone at the bind pose, in the mesh's space
+		TArray<FQuat> RestRot;                 // ... and its turn there
+		TArray<FString> TrollBone;             // (troll) the troll mesh's bone for each of ours, empty if none
 		int32 Bone[B_Count];
 		TArray<FString> BoneName;
 		TArray<int32> Parents;
@@ -117,6 +125,8 @@ namespace JeebAnim
 		FTransform BindInGame(const FPose& P, int32 B) const;   // where bone B sits in the game's frame (forward +X, right +Y, up +Z; origin between his feet)
 
 	private:
+		FClipLib(const FClipLib& Knight, bool bMakeTroll);
+		void ComputeRest();
 		bool LoadBaked();
 		void Finalize();
 		void Measure(FClip& C);
@@ -189,12 +199,13 @@ namespace JeebAnim
 class FKnightAnimator
 {
 public:
-	FKnightAnimator();
+	explicit FKnightAnimator(bool bTroll = false);
 	bool IsReady() const { return L.bReady; }
+	bool IsTroll() const { return L.bTroll; }
 
 	// The mesh, on players' machines only: its bones follow Update. Null if the suit is missing.
 	UPoseableMeshComponent* MakeMesh(AActor* Owner, USceneComponent* Parent);
-	UPoseableMeshComponent* Mesh() const { return Comp; }
+	UPoseableMeshComponent* Mesh() const { return TrollComp ? TrollComp : Comp; }   // (the one that is seen)
 	// Where he is now, between poses: when poses are throttled, the hurt and shield boxes read the last pose at his current place
 	void MoveTo(const FVector& Feet, float ActorYaw);
 
@@ -298,6 +309,16 @@ private:
 	bool PlayAt(const TCHAR* MoveName, float T, float Speed, FPose& InOut, float* OutBlend);
 
 	UPoseableMeshComponent* Comp = nullptr;
+	// The troll (2026-11-19): Comp is the knight's mesh, hidden, still carrying the pose; TrollComp is the troll's own mesh, under Comp,
+	// each bone turned by as much as ours has turned from the bind pose (TrollPose)
+	UPoseableMeshComponent* TrollComp = nullptr;
+	TArray<int32> TrollFrom;        // per troll mesh bone: our bone it follows (INDEX_NONE: rides on its parent)
+	TArray<FQuat> TrollRestK;       // per troll mesh bone: its bind turn, in our mesh's space
+	FQuat TrollQ = FQuat::Identity; // the troll mesh's space in ours
+	bool bTrollMirror = false;     // ... seen in a mirror (imported mirrored)
+	void MakeTrollMesh(AActor* Owner);
+	void TrollPose();
+	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
 	class USkeletalMeshComponent* UnderComp = nullptr;  // the mail always under the armour, so plate never looks hollow: follows Comp's bones
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};

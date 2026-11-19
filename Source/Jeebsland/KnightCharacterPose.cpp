@@ -36,7 +36,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.RollU = RollT / FMath::Max(RollDur, 0.01f);
 	In.RollYaw = FMath::FindDeltaAngleDegrees(In.Rot.Yaw, RollDir.Rotation().Yaw);
 	In.LegYaw = LegYaw;
-	In.CrouchAlpha = CrouchAlpha;
+	In.CrouchAlpha = FMath::Max(CrouchAlpha, LeapCrouch);   // (the troll crouches as he charges a jump)
 	In.BlockAlpha = BlockAlpha;
 	In.BowAimAlpha = BowAimAlpha;
 	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : Bow == EBow::Reload ? 3 : 0;
@@ -346,6 +346,7 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		return;
 	}
 	bSuitTestActed = true;
+	if (TrollSuitTest(Do)) return;   // (the troll's: punch, hop, chargejump, leapsizes, leaptest, hopall: KnightCharacterTroll.cpp)
 	if (Do.StartsWith(TEXT("roll")))
 	{
 		// (StartRoll refuses during test pictures, against stray keys: this is its body)
