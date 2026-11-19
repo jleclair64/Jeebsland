@@ -16,7 +16,7 @@ import palette   # noqa: E402
 EAL = unreal.EditorAssetLibrary
 lib = unreal.MaterialEditingLibrary
 
-STATS = ["/Game/M_Grass", "/Game/M_GrassFlower", "/Game/M_Bush", "/Game/M_TreeLeaf", "/Game/M_PineNeedle", "/Game/M_TreeFar",
+STATS = ["/Game/M_Grass", "/Game/M_GrassFlower", "/Game/M_TreeLeaf", "/Game/M_PineNeedle", "/Game/M_TreeFar",
          "/Game/M_LeafLitter", "/Game/M_FlyLeaf", "/Game/M_BarkTint", "/Game/M_Ground", "/Game/M_Dirt", "/Game/M_Stone",
          "/Game/TownLab/M_TL_Ground", "/Game/GrassReal/M_GrassLibrary", "/Game/GrassReal/M_MeadowFlowers", "/Game/GrassReal/M_OpenWorldFoliage"]
 

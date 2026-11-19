@@ -4,16 +4,16 @@
 # Trees: tree spots per 100 m^2 (logged as JEEBFILL TREESPOT; Oak Hill's are hand-placed in FillTrees.csv).
 Zone,On,Density,Mix,Seed,Facing,Trees
 # Oak Hill: hand-placed in FillOakHill.csv, so these rule rows stay Off (On 1 would scatter on top of the hand-placed sets).
-OakPlaza,0,0.6,FlowerClump:2 BushClump:1 PlanterPair:1,101,road,0
-OakStreet,0,0.5,BushClump:3 FlowerClump:2 HedgeRun:2 BenchNook:1 HedgeBoxPair:1,102,road,0
+OakPlaza,0,0.6,PlanterPair:1,101,road,0
+OakStreet,0,0.5,HedgeRun:2 BenchNook:1,102,road,0
 OakGarden,0,1,Allotment:3 AllotmentScarecrow:1 KitchenGarden:1 BenchNookStone:1 CypressPair:1,103,random,0
 OakBoxingRing,0,0.8,TrainingGround:1 RingCorner:2 RingBanner:1 SpectatorBench:1,104,random,0
 OakRuins,0,0.6,Ruin:2 RuinPillar:1 RuinWell:1 RuinSteps:1 RuinRubble:2,105,random,0
-OakGraveyard,0,0.8,GraveyardRow:2 GraveyardBench:1 CypressPair:1 FlowerClump:1,106,random,0
+OakGraveyard,0,0.8,GraveyardRow:2 GraveyardBench:1 CypressPair:1 BushClump:1,106,random,0
 OakForts,0,0.8,Garrison:2 GarrisonTable:1 GarrisonLion:1,107,random,0
 OakWatchtower,0,0.8,TowerYard:2 GarrisonLion:1,108,random,0
 OakBridge,0,0.5,Dock:2 RiverRest:1,109,road,0
-OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:2 FlowerClump:1,110,wall,0
+OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:3,110,wall,0
 OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,road,0.01
 # The original square (owner 2026-11-15: Blackrock and the square's medium places now). Density: sets per 100 m^2 of fillable ground
 # (a set is 3-6 pieces). Since fillfix (2026-11-16) spots are drawn only inside the zone's own open ground, so the yield in game is
@@ -21,13 +21,13 @@ OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,ro
 # hand-placed (FillOakHill.csv, Site Square) before this zone runs.
 # Placement v2 (2026-11-16): densities halved, and no wares (amphora rows, veg carts) or lone palisade pieces outside the market yard.
 Blackrock,1,1.1,Blackrock:4 StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1 BlackrockGate:1,201,wall,0.03
-MarketYard,1,10,ShopFront:2 BarrelRow:3 SackCorner:3 AmphoraRow:2 StorageCorner:1 VegCorner:1 FlowerClump:1,202,road,0
-Cottage,1,2.5,FlowerClump:3 BushClump:2 WashingCorner:1 KitchenGarden:1 LogCorner:1,203,wall,0
-HutYards,1,0.9,Blackrock:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:2 FlowerClump:1,204,wall,0.02
+MarketYard,1,10,ShopFront:2 BarrelRow:3 SackCorner:3 AmphoraRow:2 StorageCorner:1 VegCorner:1,202,road,0
+Cottage,1,2.5,BushClump:5 WashingCorner:1 KitchenGarden:1 LogCorner:1,203,wall,0
+HutYards,1,0.9,Blackrock:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:3,204,wall,0.02
 PigPen,1,3,PenSide:2 SackCorner:2 BarrelRow:1 BushClump:1,205,random,0
-Pond,1,2.25,RiverRest:1 BushClump:3 FlowerClump:2,206,random,0
+Pond,1,2.25,RiverRest:1 BushClump:5,206,random,0
 Castle,1,1.5,GarrisonTable:2 BarrelRow:2 SackCorner:2 GarrisonBanner:1 StorageCorner:1 Garrison:1,207,random,0
-Graveyard,1,1.75,GraveyardBench:1 CypressPair:1 DoorstepCandles:2 FlowerClump:2,208,random,0
+Graveyard,1,1.75,GraveyardBench:1 CypressPair:1 DoorstepCandles:2 BushClump:2,208,random,0
 # The world beyond (owner 2026-11-15: no open-world scatter or roadside sets yet). Coded, Off; mixes ready for later.
 Roadside,0,0.15,Junction:1 JunctionArrow:1 FenceRun:2 BushClump:2 Boulders:1 CartCorner:1,301,road,0.01
 RiverBank,0,0.15,RiverRest:3 Boulders:1 BushClump:1,302,random,0.02

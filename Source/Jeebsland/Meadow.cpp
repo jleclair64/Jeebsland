@@ -232,70 +232,6 @@ static UStaticMesh* MakeCardMesh(UObject* Outer, UMaterialInterface* Mat, float 
 	return SM;
 }
 
-// A bush as a dome of leafy cards (the leaf picture is painted on them by MakeGrassCards.bat)
-static UStaticMesh* MakeBushMesh(UObject* Outer, UMaterialInterface* Mat)
-{
-	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
-	SM->GetStaticMaterials().Add(FStaticMaterial(Mat, FName("Leaf")));
-
-	FMeshDescription MD;
-	FStaticMeshAttributes Attr(MD);
-	Attr.Register();
-	TVertexAttributesRef<FVector3f> Pos = Attr.GetVertexPositions();
-	TVertexInstanceAttributesRef<FVector3f> Nrm = Attr.GetVertexInstanceNormals();
-	TVertexInstanceAttributesRef<FVector3f> Tan = Attr.GetVertexInstanceTangents();
-	TVertexInstanceAttributesRef<float> Sign = Attr.GetVertexInstanceBinormalSigns();
-	TVertexInstanceAttributesRef<FVector2f> UVs = Attr.GetVertexInstanceUVs();
-	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
-	const FPolygonGroupID Group = MD.CreatePolygonGroup();
-	GroupSlot[Group] = FName("Leaf");
-
-	auto Tri = [&](const FVector& A, const FVector& B, const FVector& C, const FVector2D& UA, const FVector2D& UB, const FVector2D& UC, const FVector& N)
-	{
-		const FVector Pts[3] = { A, B, C };
-		const FVector2D Uv[3] = { UA, UB, UC };
-		TArray<FVertexInstanceID> Inst;
-		for (int32 k = 0; k < 3; ++k)
-		{
-			const FVertexID V = MD.CreateVertex();
-			Pos[V] = FVector3f(Pts[k]);
-			const FVertexInstanceID I = MD.CreateVertexInstance(V);
-			Nrm[I] = FVector3f(N);
-			Tan[I] = FVector3f(1.f, 0.f, 0.f);
-			Sign[I] = 1.f;
-			UVs[I] = FVector2f(float(Uv[k].X), float(Uv[k].Y));
-			Inst.Add(I);
-		}
-		MD.CreatePolygon(Group, Inst);
-	};
-
-	FRandomStream Rand(77);
-	const int32 Cards = 30;
-	for (int32 c = 0; c < Cards; ++c)
-	{
-		const float Yaw = (c + Rand.FRandRange(-0.4f, 0.4f)) / Cards * 2.f * PI * 2.f;      // wraps round twice, so cards fan out in all directions
-		const FVector D(FMath::Cos(Yaw), FMath::Sin(Yaw), 0.f);
-		const FVector Side(-D.Y, D.X, 0.f);
-		const float Lean = Rand.FRandRange(0.35f, 1.15f);                                      // radians from vertical
-		const FVector Up = (D * FMath::Sin(Lean) + FVector(0.f, 0.f, FMath::Cos(Lean))).GetSafeNormal();
-		const float Out = (c % 3 == 0) ? Rand.FRandRange(0.f, 12.f) : Rand.FRandRange(10.f, 42.f);
-		const FVector Base = D * Out + FVector(0.f, 0.f, Rand.FRandRange(0.f, 28.f));
-		const float W = Rand.FRandRange(85.f, 115.f), H = Rand.FRandRange(75.f, 105.f);
-		const FVector N = (D * 0.55f + FVector(0.f, 0.f, 1.f)).GetSafeNormal();
-		const FVector BL = Base - Side * (W * 0.5f), BR = Base + Side * (W * 0.5f);
-		Tri(BL, BR, BR + Up * H, FVector2D(0, 1), FVector2D(1, 1), FVector2D(1, 0), N);
-		Tri(BL, BR + Up * H, BL + Up * H, FVector2D(0, 1), FVector2D(1, 0), FVector2D(0, 0), N);
-	}
-
-	UStaticMesh::FBuildMeshDescriptionsParams Params;
-	Params.bBuildSimpleCollision = false;
-	Params.bFastBuild = true;
-	TArray<const FMeshDescription*> Descs;
-	Descs.Add(&MD);
-	SM->BuildFromMeshDescriptions(Descs, Params);
-	return SM;
-}
-
 void AMeadow::BeginPlay()
 {
 	Super::BeginPlay();
@@ -316,7 +252,6 @@ void AMeadow::BeginPlay()
 		FlowerMesh = MakeFlowerMesh(this, FlowerMat);
 	else
 		UE_LOG(LogTemp, Warning, TEXT("M_GrassFlower is missing: run Tools/BuildMaterials.ps1. No meadow flowers."));
-	PlaceBushesAndFlowers();
 	{
 		int32 P = -1;   // (-GrassPack=N: the grass for test runs and Play, as jeeb.Grass.Pack)
 		if (FParse::Value(FCommandLine::Get(), TEXT("GrassPack="), P) && P >= 0) CVarGrassPack->Set(P, ECVF_SetByCommandline);
@@ -762,42 +697,6 @@ void AMeadow::FinishJob()
 	JobXf.Reset(); JobTall.Reset(); JobFlowerXf.Reset(); JobFlowerCol.Reset();
 }
 
-void AMeadow::PlaceBushesAndFlowers()
-{
-	FRandomStream Rand(2024);
-	auto Spot = [&](float& X, float& Y)
-	{
-		const float A = Rand.FRandRange(0.f, 2.f * PI), D = FMath::Sqrt(Rand.FRand()) * FieldR;
-		X = FMath::Cos(A) * D; Y = FMath::Sin(A) * D;
-	};
-
-	// bushes: leafy cards in a dome, lit and swaying like the grass
-	UMaterialInterface* BushMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Bush.M_Bush"));
-	if (!BushMat) UE_LOG(LogTemp, Warning, TEXT("M_Bush is missing: run MakeGrassCards.bat once. No bushes will grow."));
-	UInstancedStaticMeshComponent* Bushes = nullptr;
-	if (BushMat)
-	{
-		Bushes = NewObject<UInstancedStaticMeshComponent>(this, TEXT("MeadowBushes"));   // (named: JeebMeadowDropCovered finds it)
-		Bushes->SetStaticMesh(MakeBushMesh(this, BushMat));
-		Bushes->SetupAttachment(RootComponent);
-		Bushes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Bushes->SetCastShadow(false);
-		Bushes->bAffectDynamicIndirectLighting = false;
-		Bushes->bAffectDistanceFieldLighting = false;
-		Bushes->SetCullDistances(0, 10000);
-		Bushes->RegisterComponent();
-	}
-	const int32 BushTries = 960;
-	for (int32 n = 0; n < BushTries && Bushes; ++n)
-	{
-		float X, Y; Spot(X, Y);
-		if (JeebTerrain::PathClearance(X, Y) < 140.f || JeebTerrain::NoGroundCover(X, Y) || JeebTerrain::TreeBlocked(X, Y)) continue;
-		const float Size = Rand.FRandRange(0.8f, 1.3f);
-		Bushes->AddInstance(FTransform(FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f), FVector(X, Y, JeebTerrain::HeightAt(X, Y) - 2.f), FVector(Size, Size, Size * Rand.FRandRange(0.85f, 1.15f))));
-	}
-
-}
-
 // (test only, -GrassLineup in MoveLab, 2026-11-15: every grass type of the Fab packs in rows a metre apart, for choosing which to grow.
 // X -400: Grass Library grass_01..12 (variant 03) then lowGrass_01..10 (variant 02); X -1000: Meadow Flowers 01..20 (the biggest
 // clump of each); X -1600: Open World Foliage grass 01_01..02_03 (variants 01 and 04) then flowers 01..06 (variant 02). Y from -1000.)
@@ -829,28 +728,4 @@ void JeebGrassLineup(UWorld* W)
 	Row(-400.f, A); Row(-1000.f, B); Row(-1600.f, C);
 	UE_LOG(LogTemp, Log, TEXT("JEEBGRASS lineup: %d + %d + %d meshes"), A.Num(), B.Num(), C.Num());
 #endif
-}
-
-// The world fill (Fill.h), once built on a client: the card bushes standing where a filler piece now covers the ground go
-void JeebMeadowDropCovered(UWorld* World)
-{
-	if (!World || !JeebFill::AnyCovered()) return;
-	int32 Dropped = 0;
-	for (TActorIterator<AMeadow> It(World); It; ++It)
-	{
-		TArray<UInstancedStaticMeshComponent*> Comps;
-		It->GetComponents(Comps);
-		for (UInstancedStaticMeshComponent* I : Comps)
-		{
-			if (!I || I->GetName() != TEXT("MeadowBushes")) continue;
-			TArray<int32> Gone;
-			for (int32 k = 0; k < I->GetInstanceCount(); ++k)
-			{
-				FTransform Xf; I->GetInstanceTransform(k, Xf, true);
-				if (JeebFill::Covered(Xf.GetLocation().X, Xf.GetLocation().Y)) Gone.Add(k);
-			}
-			if (Gone.Num() > 0) { I->RemoveInstances(Gone); Dropped += Gone.Num(); }
-		}
-	}
-	if (Dropped > 0) UE_LOG(LogTemp, Log, TEXT("JEEBFILL meadow bushes under fill pieces dropped: %d"), Dropped);
 }

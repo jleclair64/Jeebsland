@@ -2959,7 +2959,6 @@ void AWorldFill::BeginPlay()
 	if (!IsNetMode(NM_DedicatedServer))
 	{
 		JeebAutumnDropCovered(GetWorld());
-		JeebMeadowDropCovered(GetWorld());
 		if (Lights.Num() > 0) GetWorldTimerManager().SetTimer(LightTimer, this, &AWorldFill::UpdateLights, 1.f, true, 0.1f);
 	}
 #if !UE_BUILD_SHIPPING

@@ -218,8 +218,7 @@ namespace
 	// ------------------------------------------------------------------ the kinds
 	enum EKind : uint8
 	{
-		K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2, K_Sapling,
-		K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_Plant, K_FlowersW, K_FlowersY,
+		K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2, K_Sapling,   // (the bushes went, 2026-11-18: ABushes, Bushes.cpp)
 		K_Log, K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass, K_Boulder, K_RockMossy, K_RockPale,
 		K_Num
 	};
@@ -243,14 +242,6 @@ namespace
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/full/high/spruce_full_03.spruce_full_03"), false, false, ESolid::Trunk, 330.f, 22.f, 300.f, 0.f, true },
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/half/high/spruce_half_02.spruce_half_02"), false, false, ESolid::Trunk, 210.f, 20.f, 600.f, 0.f, true },
 		{ TEXT("/Game/PN_interactiveSpruceForest/Meshes/small/spruce_small_01.spruce_small_01"), false, false, ESolid::None, 26.f, 0.f, 0.f, 4500.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushLeafy.SM_BushLeafy"), false, false, ESolid::None, 72.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushRound.SM_BushRound"), false, false, ESolid::None, 73.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushBerries.SM_BushBerries"), false, false, ESolid::None, 70.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushDome.SM_BushDome"), false, false, ESolid::None, 60.f, 0.f, 0.f, 6000.f, false },
-		{ TEXT("/Game/TownDecor/SM_ShrubLow.SM_ShrubLow"), false, false, ESolid::None, 44.f, 0.f, 0.f, 5000.f, false },
-		{ TEXT("/Game/TownDecor/SM_PlantClump.SM_PlantClump"), false, false, ESolid::None, 60.f, 0.f, 0.f, 4500.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushWhiteFlowers.SM_BushWhiteFlowers"), false, false, ESolid::None, 61.f, 0.f, 0.f, 5000.f, false },
-		{ TEXT("/Game/TownDecor/SM_BushBerries.SM_BushBerries"), false, false, ESolid::None, 61.f, 0.f, 0.f, 5000.f, false },   // was BushYellowFlowers (deleted 2026-11-16)
 		{ TEXT("/Game/TownDecor/SM_LogMossy.SM_LogMossy"), false, false, ESolid::Box, 145.f, 0.f, 0.f, 9000.f, true },
 		{ TEXT("/Game/TownDecor/SM_Stump.SM_Stump"), false, false, ESolid::Cyl, 66.f, 0.f, 0.f, 8000.f, true },
 		{ TEXT("/Game/TownDecor/SM_StumpRooty.SM_StumpRooty"), false, false, ESolid::Cyl, 99.f, 0.f, 0.f, 8000.f, true },
@@ -638,13 +629,7 @@ struct FOakForestBuild
 			else if (Pick < 0.11f) { const int32 St[4] = { K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass }; Kind = St[int32(Sc * 3.99f)]; Scale = FMath::Lerp(0.8f, 1.15f, Sc); }
 			else if (Pick < (bConifer ? 0.4f : 0.2f)) { Kind = K_Sapling; Scale = FMath::Lerp(1.6f, 3.2f, Sc); }
 			else if (Pick < (bConifer ? 0.47f : 0.25f)) { Kind = K_Full1 + int32(Sc * 2.99f); Scale = FMath::Lerp(0.18f, 0.3f, Sc); ++Seedlings; }   // a spruce seedling (in its kind's count below)
-			else
-			{
-				const int32 Bu[8] = { K_BushLeafy, K_BushRound, K_BushBerries, K_BushDome, K_ShrubLow, K_BushDome, K_ShrubLow, K_BushLeafy };   // (K_Plant, the PlantClump, removed 2026-11-17: owner "Delete these bushes")
-				Kind = Bu[int32(Sc * 7.99f)];
-				if (JeebWorld::Smooth(-0.32f, -0.12f, Noise(P, 9000.f, 3.3f, 8.8f)) < 0.5f && Sc > 0.75f) Kind = Sc > 0.87f ? K_FlowersW : K_FlowersY;   // flowering bushes in the glades
-				Scale = FMath::Lerp(0.8f, 1.5f, U.FRand());
-			}
+			else { U.FRand(); continue; }   // (the bushes that grew here went, 2026-11-18: ABushes, Bushes.cpp, places the new ones; the draw stays so the logs and stumps keep their places)
 			const float Foot = Kinds[Kind].Crown * Scale;
 			const bool bSolid = Kinds[Kind].Solid != ESolid::None;
 			// solids keep 60 cm clear of every trunk and solid; bushes may tuck in under the crowns but not into a trunk

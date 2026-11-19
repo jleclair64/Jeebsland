@@ -36,7 +36,10 @@ MEL = unreal.MaterialEditingLibrary
 PML = unreal.ProceduralMeshLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
 
-BLOCKED = {"GrainSack", "Sword2", "Sword3", "SwordB", "SwordC"}   # deleted by the owner (2026-11-15): never copied again
+BLOCKED = {"GrainSack", "Sword2", "Sword3", "SwordB", "SwordC",   # deleted by the owner (2026-11-15): never copied again
+           # (2026-11-18, owner: "get rid of all the bushes we have"; the new ones are /Game/Bushes, Tools/BuildBushes.ps1)
+           "BushBall", "BushBerries", "BushDome", "BushLeafy", "BushRound", "BushSpiky", "BushWhiteFlowers", "ShrubLow", "PlantClump",
+           "HedgeBox", "HedgeSegment", "HedgeEnd"}
 
 # Nanite or generated LODs per size class (the drawn size: the longest side at scale 1.0). The A/B (2026-11-15, 586 pieces round Oak
 # Hill, moving sun, solo, editor -game 1920x1080 at 60%): all on LODs cost +0.03 to +0.32 ms GPU on HIGH and +0.10 to +0.27 on LOW
@@ -75,13 +78,7 @@ CATALOG = {
     "RaisedBed": ("G Y", "solid", "near", ""), "TulipBed": ("G Y", "solid", "near", ""), "CabbageCrate": ("G M", "none", "no", ""),
     "VegCart": ("M G", "solid", "yes", ""), "Scarecrow": ("G F", "thin", "yes", ""),
     "ButcherBlock": ("Y K", "solid", "near", ""), "ChoppingBlock": ("Y K", "solid", "near", ""), "Stump": ("Y E", "solid", "near", ""),
-    # bushes (walk-through, as in Breath of the Wild)
-    "BushBall": ("S Y G E W R", "none", "near", ""), "BushBerries": ("S Y G E W R", "none", "near", ""),
-    "BushDome": ("S Y G E W R", "none", "near", ""), "BushLeafy": ("S Y G E W R", "none", "near", ""),
-    "BushRound": ("S Y G E W R", "none", "near", ""), "BushSpiky": ("S Y G E W R", "none", "near", ""),
-    "BushWhiteFlowers": ("S Y G E W R", "none", "near", ""),
-    "ShrubLow": ("S Y E W", "none", "no", ""), "PlantClump": ("S Y E W", "none", "no", ""),
-    "HedgeBox": ("S Y G", "solid", "yes", ""), "HedgeSegment": ("S Y G", "solid", "yes", ""), "HedgeEnd": ("S Y G", "solid", "yes", ""),
+    # (the bushes, shrubs, plant clump and hedges went, 2026-11-18: the new bushes are /Game/Bushes, Tools/BuildBushes.ps1; BLOCKED)
     "Cypress": ("V G P", "thin", "yes", ""),
     # walls, fences, stairs
     "WallStone": ("Y F V C R", "solid", "yes", ""), "WallStoneEnd": ("Y F V C R", "solid", "yes", ""),
