@@ -252,8 +252,7 @@ void FKnightAnimator::TrollPunch(const FInput& In, FPose& B, float& OutBlend)
 	float Ext;   // -1 pulled back, 0 at the guard, 1 the arm out straight
 	if (U < From) Ext = -FMath::SmoothStep(0.f, From, U);
 	else if (U < Out) Ext = FMath::Lerp(-1.f, 1.f, FMath::SmoothStep(From, Out, U));
-	else if (U < To) Ext = 1.f;
-	else Ext = 1.f - FMath::SmoothStep(To, 1.f, U);
+	else { const float Hold = Out + 0.15f * (To - Out); Ext = U < Hold ? 1.f : 1.f - FMath::SmoothStep(Hold, 1.f, U); }   // (a moment at full stretch, then eased back: review 2026-11-19, it hung out too long)
 	// the chest turns the left shoulder forward with the blow (mesh: +X his left, +Y ahead), back a little in the wind-up
 	const float Twist = Ext >= 0.f ? Tn.TrollPunchTwist * Ext : -0.4f * Tn.TrollPunchTwist * -Ext;
 	const FQuat Half(FVector::UpVector, FMath::DegreesToRadians(0.5f * Twist));

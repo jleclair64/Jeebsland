@@ -111,6 +111,7 @@ FVector AKnightCharacter::LeapVelocity(float Charge, const FVector& Dir) const
 void AKnightCharacter::DoLeap(float Charge, const FVector& Dir)
 {
 	LeapCooldown = JeebTune::V().TrollLeapCooldown;
+	LeapCrouch = 0.f;   // (straight out of the crouch: no crouched frames into the flight)
 	bAirLaunch = true;
 	bCrouched = false;
 	bBlocking = false;
@@ -182,6 +183,15 @@ void AKnightCharacter::TickTroll(float Dt)
 		LeapChargeFrom = -1.0;
 		if (!HasAuthority()) ServerLeapCharge(false);
 	}
+	// (online tests: -TrollNetDo=<a -SuitDo name> runs it on a client's own troll 8 s after he appears, through the same RPCs as the keys; never in Shipping)
+#if !UE_BUILD_SHIPPING
+	if (IsLocallyControlled() && !HasAuthority() && !bNetDoDone && (NetDoT += Dt) > 8.f)
+	{
+		bNetDoDone = true;
+		FString NetDo;
+		if (FParse::Value(FCommandLine::Get(), TEXT("TrollNetDo="), NetDo)) { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP net test %s"), *NetDo); TrollSuitTest(NetDo); }
+	}
+#endif
 	// the crouch as it charges (this machine only)
 	if (IsLocallyControlled()) LeapCrouch = FMath::FInterpTo(LeapCrouch, IsLeapCharging() ? 0.25f + 0.75f * LeapChargeShare() : 0.f, Dt, 12.f);
 }
@@ -244,19 +254,19 @@ bool AKnightCharacter::TrollSuitTest(const FString& Do)
 	};
 	auto Hold = [this, &T, Later](float Share, float At)
 	{
-		Later(At, [this]() { LeapChargeFrom = ServerChargeFrom = GetWorld()->GetTimeSeconds(); UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space down")); });
+		Later(At, [this]() { LeapChargeFrom = ServerChargeFrom = GetWorld()->GetTimeSeconds(); if (!HasAuthority()) ServerLeapCharge(true); UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space down")); });
 		Later(At + T.TrollLeapTap + Share * T.TrollLeapChargeTime + 0.02f, [this]() { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space up, charge %.2f, cooldown %.1f"), LeapChargeShare(), LeapCooldown); ReleaseLeap(); });
 	};
 	if (Do == TEXT("punch")) { StartAttack(EAtkStyle::Kick, 1, 0.f); return true; }
 	if (Do == TEXT("hopall"))
 	{
 		for (int32 i = 0; i < 8; ++i)
-			Later(0.2f + 1.4f * i, [this, i]() { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: hop %d deg"), i * 45); DoHop(FRotator(0.f, GetActorRotation().Yaw + 45.f * i, 0.f).Vector()); });
+			Later(0.2f + 1.4f * i, [this, i]() { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: hop %d deg"), i * 45); StartHop(FRotator(0.f, GetActorRotation().Yaw + 45.f * i, 0.f).Vector()); });
 		return true;
 	}
 	if (Do == TEXT("hop") || (Do.StartsWith(TEXT("hop")) && Do.Len() > 3 && (FChar::IsDigit(Do[3]) || Do[3] == TEXT('-'))))
 	{
-		DoHop(FRotator(0.f, GetActorRotation().Yaw + FCString::Atof(*Do.Mid(3)), 0.f).Vector());
+		StartHop(FRotator(0.f, GetActorRotation().Yaw + FCString::Atof(*Do.Mid(3)), 0.f).Vector());
 		return true;
 	}
 	if (Do.StartsWith(TEXT("chargejump"))) { Hold(Do.Len() > 10 ? FCString::Atoi(*Do.Mid(10)) / 100.f : 1.f, 0.3f); return true; }

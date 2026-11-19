@@ -521,6 +521,7 @@ protected:
 	FVector LeapVelocity(float Charge, const FVector& Dir) const;
 	void TickTroll(float Dt);
 	void FreeFlight(bool bOn);
+	bool bNetDoDone = false; float NetDoT = 0.f;   // (-TrollNetDo)
 	bool bFreeFlight = false; float SavedFallBrake = 0.f, SavedFallFriction = 0.f;
 	bool TrollSuitTest(const FString& Do);   // (test pictures: -SuitDo=punch, hop<deg>, hopall, chargejump<hundredths>, leapsizes, leaptest)
 	virtual void Landed(const FHitResult& Hit) override;
