@@ -702,7 +702,7 @@ void ATownLife::Build()
 				const float Mid = (FirstTop + (LastTop > 1.0e5f ? FirstTop : LastTop)) * 0.5f;
 				const FPlace C = Front(Town, Place, Mid);
 				const FVector2D Across = Dir2(C.Yaw + 90.f);
-				for (float D = 60.f; D <= 330.f; D += 30.f)
+				for (float D = 60.f; D <= 520.f; D += 30.f)
 					for (float Sd : { 1.f, -1.f })
 					{
 						const FVector2D At = C.At + Across * (D * Sd);
