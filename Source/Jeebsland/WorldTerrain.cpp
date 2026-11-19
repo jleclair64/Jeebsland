@@ -152,6 +152,7 @@ void AWorldTerrain::BuildLand()
 				// and Oak Hill's own finer ground east of the square (AOakHillTown, 2026-11-11)
 				if (JeebOakHill::Enabled() && JeebOakHill::InPatchCell(X0, Y0, Step)) continue;   // (the rebuilt town covers the same cells and the square's part of its box: JeebTownLab::RealSite)
 				if (JeebTownLab::NewOn() && JeebTownLab::InPatchCell(X0, Y0, Step)) continue;   // (TownLab only: the rebuilt town's own 1 m ground)
+				if (JeebTerrain::InFineCell(X0, Y0, Step)) continue;   // (Steele Creek, the lake, the split: their own 2 m ground, BuildFine)
 					const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
 					Tri.Append({ A, C, B, B, C, D });
 				}
@@ -184,6 +185,138 @@ void AWorldTerrain::BuildLand()
 			else PM->SetVisibility(false);
 			Chunks.Add(PM);
 		}
+	BuildFine();
+}
+
+// The 2 m patches (JeebTerrain::FinePatches): the same ground, material and collision as the 8 m mesh, in chunks of 60 x 60 cells; each
+// patch's edge points lie on the 8 m mesh's edges (FineVertexZ), so the two meet without a crack
+void AWorldTerrain::BuildFine()
+{
+	const double T0 = FPlatformTime::Seconds();
+	UMaterialInterface* Mat = SharedGround(GetWorld());
+	const bool bServer = IsNetMode(NM_DedicatedServer);
+	const float S = JeebTerrain::FineStep;
+	int32 Cells = 0;
+	for (const JeebTerrain::FFinePatch& P : JeebTerrain::FinePatches())
+	{
+		const int32 NX = FMath::RoundToInt((P.X1 - P.X0) / S), NY = FMath::RoundToInt((P.Y1 - P.Y0) / S);
+		// every grid point once, with a ring beyond for the normals
+		const int32 GX = NX + 3, GY = NY + 3;
+		TArray<float> H; H.SetNumUninitialized(GX * GY);
+		for (int32 i = 0; i < GX; ++i)
+			for (int32 j = 0; j < GY; ++j)
+			{
+				const float X = P.X0 + (i - 1) * S, Y = P.Y0 + (j - 1) * S;
+				H[i * GY + j] = (i >= 1 && j >= 1 && i <= NX + 1 && j <= NY + 1) ? JeebTerrain::FineVertexZ(P, X, Y) : JeebTerrain::HeightAt(X, Y);
+			}
+		auto At = [&](int32 i, int32 j) { return H[(i + 1) * GY + (j + 1)]; };
+		constexpr int32 Chunk = 60;
+		for (int32 CI = 0; CI < NX; CI += Chunk)
+			for (int32 CJ = 0; CJ < NY; CJ += Chunk)
+			{
+				const int32 I1 = FMath::Min(CI + Chunk, NX), J1 = FMath::Min(CJ + Chunk, NY);
+				TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV; TArray<int32> Tri;
+				const int32 W = J1 - CJ + 1;
+				for (int32 i = CI; i <= I1; ++i)
+					for (int32 j = CJ; j <= J1; ++j)
+					{
+						const float X = P.X0 + i * S, Y = P.Y0 + j * S, Z = At(i, j);
+						V.Add(FVector(X, Y, Z));
+						N.Add(FVector(At(i - 1, j) - At(i + 1, j), At(i, j - 1) - At(i, j + 1), 2.f * S).GetSafeNormal());
+						UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
+						if (bServer) { Col.Add(FLinearColor::White); continue; }
+						// (the slope over 16 m, as the 8 m mesh measures it, so the two paint alike)
+						const float Up = JeebGround::Upness(JeebTerrain::HeightAt(X + 800.f, Y), JeebTerrain::HeightAt(X - 800.f, Y), JeebTerrain::HeightAt(X, Y + 800.f), JeebTerrain::HeightAt(X, Y - 800.f));
+						Col.Add(JeebGround::At(X, Y, Z, Up).Color());
+					}
+				for (int32 i = CI; i < I1; ++i)
+					for (int32 j = CJ; j < J1; ++j)
+					{
+						const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
+						Tri.Append({ A, C, B, B, C, D });
+						++Cells;
+					}
+				{
+					const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
+					if (Fn.Z > 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
+				}
+				UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
+				PM->SetupAttachment(GetRootComponent());
+				PM->bUseAsyncCooking = true;
+				PM->RegisterComponent();
+				PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, Col, TArray<FProcMeshTangent>(), true);
+				TArray<int32> Back;
+				for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
+				PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, Col, TArray<FProcMeshTangent>(), false);
+				PM->SetCollisionProfileName(TEXT("BlockAll"));
+				PM->ComponentTags.Add(FName(TEXT("JeebClimb")));
+				if (!bServer) { if (Mat) { PM->SetMaterial(0, Mat); PM->SetMaterial(1, Mat); } }
+				else PM->SetVisibility(false);
+				Chunks.Add(PM);
+			}
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m, built in %.0f ms"), JeebTerrain::FinePatches().Num(), Cells, (FPlatformTime::Seconds() - T0) * 1000.0);
+
+	// Checks (every machine: compare the hash lines between a server and a client)
+	{
+		uint32 Hash = 0;
+		for (const JeebWorld::FRiver& Rv : JeebWorld::Rivers())
+		{
+			Hash = FCrc::MemCrc32(Rv.Pts.GetData(), Rv.Pts.Num() * sizeof(FVector2D), Hash);
+			Hash = FCrc::MemCrc32(Rv.Halfs.GetData(), Rv.Halfs.Num() * sizeof(float), Hash);
+		}
+		const JeebWorld::FLake& L = JeebWorld::Lake();
+		Hash = FCrc::MemCrc32(L.SD.GetData(), L.SD.Num() * sizeof(float), Hash);
+		float LakeM2 = 0.f;
+		for (float D : L.SD) if (D < 100.f) LakeM2 += JeebWorld::LakeGridStep * JeebWorld::LakeGridStep / 10000.f;
+		float RoadDry = 1.0e9f; FVector2D RoadAt = FVector2D::ZeroVector;
+		for (const JeebSteele::FStreet& St : JeebSteele::Streets())
+			if (St.Pts.Num() > 800)
+				for (const FVector2D& Q : St.Pts) { const float E = JeebWorld::WaterEdge(Q.X, Q.Y) - 100.f - St.Width * 0.5f; if (E < RoadDry) { RoadDry = E; RoadAt = Q; } }
+		const FVector2D Isle = JeebWorld::IsleAt();
+		UE_LOG(LogTemp, Log, TEXT("JEEBWATER shape hash=%08x; rivers %d (split %d pts), lake about %.0f m2 of water, its island top %.1f m over the water; Steele Creek's road keeps %.1f m from the water at its nearest (%.0f %.0f)"),
+			Hash, JeebWorld::Rivers().Num(), JeebWorld::Rivers().Num() > 3 ? JeebWorld::Rivers()[3].Pts.Num() : 0, LakeM2, (JeebTerrain::HeightAt(Isle.X, Isle.Y) - JeebWorld::RiverLevel) / 100.f, RoadDry / 100.f, RoadAt.X, RoadAt.Y);
+		{
+			float Hw = 0.f; const float D = JeebWorld::RiverDistance(-3550.f, 12110.f, Hw);
+			UE_LOG(LogTemp, Log, TEXT("JEEBWATER bridge reach: %.0f cm from the line's middle, half width %.0f (was 700), ground there %.0f"), D, Hw, JeebTerrain::HeightAt(-3550.f, 12110.f));
+		}
+		// every building's pad: its level, the drawn ground under its walls and at its doorstep against it, the steepest ground round it
+		uint32 PadHash = 0; int32 Bad = 0;
+		for (const JeebTerrain::FBuildingPad& P : JeebTerrain::BuildingPads())
+		{
+			auto World = [&](const FVector2D& Lc) { return P.Mid + FVector2D(Lc.X * P.Cs - Lc.Y * P.Sn, Lc.X * P.Sn + Lc.Y * P.Cs); };
+			float Off = 0.f;
+			for (int32 a = 0; a <= 4; ++a) for (int32 b = 0; b <= 4; ++b)
+			{
+				const FVector2D W = World(FVector2D(FMath::Lerp(-P.Half.X, P.Half.X, a / 4.f), FMath::Lerp(-P.Half.Y, P.Half.Y, b / 4.f)));
+				Off = FMath::Max(Off, FMath::Abs(JeebTerrain::DrawnHeight(W.X, W.Y) - P.Level));
+			}
+			const FVector2D Door = World(P.ApronMid);
+			const float DoorOff = JeebTerrain::DrawnHeight(Door.X, Door.Y) - P.Level;
+			float Steep = 0.f, Was = 0.f, Wet = 1.0e9f;
+			for (int32 k = 0; k < 48; ++k)
+			{
+				const FVector2D Dir(FMath::Cos(2.f * PI * k / 48.f), FMath::Sin(2.f * PI * k / 48.f));
+				for (float R = P.Half.Size() + 300.f; R < P.Half.Size() + 2400.f; R += 200.f)
+				{
+					const FVector2D Q = P.Mid + Dir * R, Q2 = P.Mid + Dir * (R + 200.f);
+					if (JeebWorld::WaterEdge(Q.X, Q.Y) < 600.f) continue;
+					Steep = FMath::Max(Steep, FMath::Abs(JeebTerrain::HeightAt(Q2.X, Q2.Y) - JeebTerrain::HeightAt(Q.X, Q.Y)) / 200.f);
+					Was = FMath::Max(Was, FMath::Abs(JeebTerrain::HeightAt(Q2.X, Q2.Y, true, 2, false) - JeebTerrain::HeightAt(Q.X, Q.Y, true, 2, false)) / 200.f);
+				}
+			}
+			for (int32 a = 0; a <= 4; ++a) for (int32 b = 0; b <= 4; ++b)
+			{
+				const FVector2D W = World(FVector2D(FMath::Lerp(-P.Half.X, P.Half.X, a / 4.f), FMath::Lerp(-P.Half.Y, P.Half.Y, b / 4.f)));
+				Wet = FMath::Min(Wet, JeebWorld::WaterEdge(W.X, W.Y));
+			}
+			if (Off > 15.f || FMath::Abs(DoorOff) > 15.f || Steep > FMath::Max(0.6f, Was + 0.05f)) ++Bad;
+			PadHash = FCrc::MemCrc32(&P.Level, sizeof(float), PadHash);
+			UE_LOG(LogTemp, Log, TEXT("JEEBWATER pad %s%s at %.0f %.0f level %.0f: walls off by up to %.0f cm, doorstep %+.0f cm, steepest round it %.2f (without the pads %.2f), walls %.0f cm from the water"),
+				P.bSteele ? TEXT("Steele ") : TEXT(""), P.Name ? P.Name : TEXT("?"), P.Mid.X, P.Mid.Y, P.Level, Off, DoorOff, Steep, Was, Wet);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBWATER pads: %d buildings, %d with ground off by over 15 cm or a slope over 0.6 round them steeper than without the pads; hash=%08x"), JeebTerrain::BuildingPads().Num(), Bad, PadHash);
+	}
 }
 
 void AWorldTerrain::BuildWater()
@@ -215,36 +348,71 @@ void AWorldTerrain::BuildWater()
 		TArray<FLinearColor> White; White.Init(FLinearColor::White, 4);
 		Sheet({ FVector(X0, Y0, SeaLevel), FVector(X1, Y0, SeaLevel), FVector(X0, Y1, SeaLevel), FVector(X1, Y1, SeaLevel) }, { 0, 2, 1, 1, 2, 3 }, White);
 	}
-	// Where rivers meet (the fork south of Blackrock: the main river's end and both branches' starts), their sheets overlap at
-	// the same height; there the flow fades to still water on all of them, so the overlapping sheets draw exactly alike
-	TArray<FVector2D> Joins;
+	// The rivers, the split and the lake (2026-11-18): one sheet over a 4 m grid of every cell that holds water (within the drawn reach,
+	// half width + 250 cm, of a river's or the split's line, or of the lake's shore line: JeebWater::SurfaceAt asks the same), cut into
+	// chunks of 100 x 100 cells. Every shape the water takes is covered once, with no overlapping sheets where waters meet (the old
+	// ribbons overlapped at the fork). The edge cells reach past the water into the banks, which stand over them. The vertex colours
+	// carry each spot's downstream direction, fading to still water in the lake and where two channels meet (WorldMap.h FlowAt).
 	{
-		const TArray<FRiver>& Rs = Rivers();
-		for (int32 a = 0; a < Rs.Num(); ++a)
-			for (const FVector2D& E : { Rs[a].Pts[0], Rs[a].Pts.Last() })
-				for (int32 b = 0; b < Rs.Num(); ++b)
-					if (b != a && (FVector2D::Distance(E, Rs[b].Pts[0]) < 100.f || FVector2D::Distance(E, Rs[b].Pts.Last()) < 100.f)) { Joins.AddUnique(E); break; }
-	}
-	// The rivers: a ribbon along each, a little wider than its channel; the points run downstream (WorldMap.h: spring to fork,
-	// fork to the sea)
-	for (const FRiver& Rv : Rivers())
-	{
-		TArray<FVector> V; TArray<int32> T; TArray<FLinearColor> Col;
-		for (int32 i = 0; i < Rv.Pts.Num(); ++i)
+		constexpr float Cell = 400.f;
+		constexpr int32 ChunkN = 100;
+		const int32 NI = FMath::CeilToInt((MaxX - MinX) / Cell), NJ = FMath::CeilToInt((MaxY - MinY) / Cell);
+		TSet<int64> Wet;
+		auto Try = [&](int32 i, int32 j)
 		{
-			const FVector2D A = Rv.Pts[FMath::Max(i - 1, 0)], B = Rv.Pts[FMath::Min(i + 1, Rv.Pts.Num() - 1)];
-			const FVector2D Dir = (B - A).GetSafeNormal(), Side(-Dir.Y, Dir.X);
-			const float W = Rv.HalfWidth + 250.f;
-			const FVector2D L = Rv.Pts[i] + Side * W, R = Rv.Pts[i] - Side * W;
-			V.Add(FVector(L.X, L.Y, RiverLevel)); V.Add(FVector(R.X, R.Y, RiverLevel));
-			float NearJoin = 1.0e9f;
-			for (const FVector2D& J : Joins) NearJoin = FMath::Min(NearJoin, float(FVector2D::Distance(Rv.Pts[i], J)));
-			const float Flowing = FMath::SmoothStep(3500.f, 7000.f, NearJoin);
-			const FLinearColor F = JeebWaterLook::FlowColor(Dir);
-			const FLinearColor Here(FMath::Lerp(0.5f, F.R, Flowing), FMath::Lerp(0.5f, F.G, Flowing), 0.f, 1.f);
-			Col.Add(Here); Col.Add(Here);
-			if (i > 0) { const int32 k = (i - 1) * 2; T.Append({ k, k + 2, k + 1, k + 1, k + 2, k + 3 }); }
+			if (i < 0 || j < 0 || i >= NI || j >= NJ) return;
+			const int64 Key = int64(i) * NJ + j;
+			if (Wet.Contains(Key)) return;
+			const float Cx = MinX + (i + 0.5f) * Cell, Cy = MinY + (j + 0.5f) * Cell;
+			if (WaterEdge(Cx, Cy) < 250.f + Cell * 0.71f) Wet.Add(Key);
+		};
+		TSet<int64> Tried;
+		auto Visit = [&](int32 i, int32 j) { const int64 K = int64(i) * NJ + j; if (!Tried.Contains(K)) { Tried.Add(K); Try(i, j); } };
+		for (const FRiver& Rv : Rivers())
+			for (int32 s = 0; s + 1 < Rv.Pts.Num(); ++s)
+			{
+				const float Pad = FMath::Max(Rv.Halfs[s], Rv.Halfs[s + 1]) + 250.f + Cell;
+				const FVector2D A = Rv.Pts[s], B = Rv.Pts[s + 1];
+				const int32 I0 = FMath::FloorToInt((FMath::Min(A.X, B.X) - Pad - MinX) / Cell), I1 = FMath::FloorToInt((FMath::Max(A.X, B.X) + Pad - MinX) / Cell);
+				const int32 J0 = FMath::FloorToInt((FMath::Min(A.Y, B.Y) - Pad - MinY) / Cell), J1 = FMath::FloorToInt((FMath::Max(A.Y, B.Y) + Pad - MinY) / Cell);
+				for (int32 i = I0; i <= I1; ++i) for (int32 j = J0; j <= J1; ++j) Visit(i, j);
+			}
+		{
+			const FBox2D L = FBox2D(Lake().Shore).ExpandBy(250.f + Cell);
+			for (int32 i = FMath::FloorToInt((L.Min.X - MinX) / Cell); i <= FMath::FloorToInt((L.Max.X - MinX) / Cell); ++i)
+				for (int32 j = FMath::FloorToInt((L.Min.Y - MinY) / Cell); j <= FMath::FloorToInt((L.Max.Y - MinY) / Cell); ++j) Visit(i, j);
 		}
-		Sheet(V, T, Col);
+		// by chunk
+		TMap<int64, TArray<FIntPoint>> ByChunk;
+		for (const int64 K : Wet) { const int32 i = int32(K / NJ), j = int32(K % NJ); ByChunk.FindOrAdd(int64(i / ChunkN) * 100000 + j / ChunkN).Add(FIntPoint(i, j)); }
+		TArray<int64> Keys; ByChunk.GetKeys(Keys); Keys.Sort();   // (the same order every run)
+		int32 Cells = 0;
+		for (const int64 CK : Keys)
+		{
+			TArray<FIntPoint>& Cs = ByChunk[CK];
+			Cs.Sort([](const FIntPoint& A, const FIntPoint& B) { return A.X != B.X ? A.X < B.X : A.Y < B.Y; });
+			TMap<int64, int32> VertOf;
+			TArray<FVector> V; TArray<int32> T; TArray<FLinearColor> Col;
+			auto Vert = [&](int32 i, int32 j)
+			{
+				const int64 K = int64(i) * (NJ + 1) + j;
+				if (const int32* F = VertOf.Find(K)) return *F;
+				const float X = MinX + i * Cell, Y = MinY + j * Cell;
+				float Still = 0.f;
+				const FVector2D Dir = FlowAt(X, Y, Still);
+				const FLinearColor F = JeebWaterLook::FlowColor(Dir.IsNearlyZero() ? FVector2D(1.f, 0.f) : Dir);
+				Col.Add(FLinearColor(FMath::Lerp(F.R, 0.5f, Still), FMath::Lerp(F.G, 0.5f, Still), 0.f, 1.f));
+				V.Add(FVector(X, Y, RiverLevel));
+				return VertOf.Add(K, V.Num() - 1);
+			};
+			for (const FIntPoint& C : Cs)
+			{
+				const int32 A = Vert(C.X, C.Y), B = Vert(C.X + 1, C.Y), Cc = Vert(C.X, C.Y + 1), D = Vert(C.X + 1, C.Y + 1);
+				T.Append({ A, Cc, B, B, Cc, D });
+				++Cells;
+			}
+			Sheet(V, T, Col);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBWATER rivers and lake: %d cells of 4 m in %d sheets"), Cells, Keys.Num());
 	}
 }
