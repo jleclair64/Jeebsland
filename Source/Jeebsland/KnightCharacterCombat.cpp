@@ -171,7 +171,19 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		}), 0.9f, false);
 	}
 	if (Move == TEXT("jab")) { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }   // two hits (the buffer holds one press)
-	if (Move == TEXT("cast")) StartAttack(EAtkStyle::Cast, 1, 0.f);                           // the wand's or staff's cast (-ShotKind=7 wand, 8 staff)
+	if (Move == TEXT("cast"))   // the wand's or staff's cast (-ShotKind=7 wand, 8 staff)
+	{
+		// (2026-11-18: after -ShotKind the staff takes 0.2 s to come upright, and a cast at once started from the old flat hold: the film
+		// begins with the carry and casts -ShotCastDelay seconds in, 0.5 by default; 0 = at once, as before)
+		float Delay = 0.5f;
+		FParse::Value(FCommandLine::Get(), TEXT("ShotCastDelay="), Delay);
+		if (Delay <= 0.f) StartAttack(EAtkStyle::Cast, 1, 0.f);
+		else
+		{
+			FTimerHandle T;
+			GetWorldTimerManager().SetTimer(T, FTimerDelegate::CreateWeakLambda(this, [this]() { StartAttack(EAtkStyle::Cast, 1, 0.f); }), Delay, false);
+		}
+	}
 	if (Move == TEXT("jab1")) StartAttack(EAtkStyle::Slash, JabFirst, 0.f);                     // hit 1 alone
 	if (Move == TEXT("kick")) StartAttack(EAtkStyle::Kick, 1, 0.f);                             // the kick (wheel up)
 	if (Move == TEXT("sweep")) StartAttack(EAtkStyle::Sweep, 1, 0.f);                           // the low sweep (wheel down: shelved 2026-11-15, owner; the wheel rolls now)

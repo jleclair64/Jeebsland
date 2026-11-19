@@ -43,6 +43,21 @@ namespace
 		const float F = FMath::DegreesToRadians(Lean.X), O = FMath::DegreesToRadians(Lean.Y);
 		return FVector(-FMath::Sin(O), FMath::Sin(F), 1.f).GetSafeNormal();   // (mesh frame)
 	}
+
+	// (2026-11-18 second review: the staff snapped from the carry to overhead in the first 0.13 s of its cast, the clip's wind-up squeezed into
+	// 0.18 s under a 0.12 s blend.) Now the carry hands the arm over to the spell's raised pose over this share of the move (1.1 s for the staff),
+	// blended joint by joint, so the fist travels a curve up and out from his hip, the staff staying near upright, instead of a straight jump.
+	TAutoConsoleVariable<float> CVarCastLift(TEXT("jeeb.Knight.CastLift"), 0.24f, TEXT("The staff's cast: the share of the move over which the arm leaves the upright carry for the spell's raised pose (0.24 of 1.1 s; 0.02 is the old snap)."), ECVF_Default);
+	// (the same review: the empty left arm stood stiffly raised: the sword-and-shield clips hold it up for a shield the staff never has)
+	TAutoConsoleVariable<float> CVarStaffFreeArm(TEXT("jeeb.Knight.StaffFreeArm"), 1.f, TEXT("With the staff, how much the empty left arm hangs relaxed (his rest pose) where the sword-and-shield clips would hold it up for a shield, stepping sideways or back (0 = as the clips have it)."), ECVF_Default);
+
+	FQuat BlendRot(const FQuat& A, const FQuat& B, float W)
+	{
+		const float S = (A | B) < 0.f ? -1.f : 1.f;
+		FQuat Q(A.X + (B.X * S - A.X) * W, A.Y + (B.Y * S - A.Y) * W, A.Z + (B.Z * S - A.Z) * W, A.W + (B.W * S - A.W) * W);
+		Q.Normalize();
+		return Q;
+	}
 }
 
 // The item in the right fist turned so that it points along Want (mesh frame), by W; returns the degrees it had to turn
@@ -61,17 +76,56 @@ void FKnightAnimator::StaffCarry(const FInput& In, FPose& B, int32 Act, float Dt
 	// (not in the cast, which places the staff itself; nor rolling, knocked down, climbing or swimming; stowed it is on his back)
 	const bool bOn = In.Kind == JeebItems::K_Staff && !In.Stowed() && !In.bSitting && !In.bMounted && !In.bDrinking && !In.bClimbing
 		&& Act != 39 && Act != 20 && Act != 10 && Act != 11 && !(Act >= 70 && Act <= 99) && Act < 100;
-	StaffW = FMath::FInterpConstantTo(StaffW, bOn ? 1.f : 0.f, Dt, 1.f / 0.2f);
-	if (In.Kind != JeebItems::K_Staff || StaffW <= 0.001f) return;
-	const float W = FMath::SmoothStep(0.f, 1.f, StaffW);
+	float W;
+	if (Act == 39 && In.Kind == JeebItems::K_Staff)
+	{
+		// the cast: the carry lets go of the arm by how far the move has gone, not by time from its start (StaffW keeps what it had until then:
+		// after the lift it is 0, and the carry comes back over 0.2 s once the cast is over, under the 0.36 s blend out)
+		const float Lift = FMath::Clamp(CVarCastLift.GetValueOnGameThread(), 0.02f, 0.6f);
+		const float U = FMath::Clamp(In.MoveU, 0.f, 1.f);
+		W = FMath::SmoothStep(0.f, 1.f, StaffW) * (1.f - FMath::SmoothStep(0.f, Lift, U));
+		if (U >= Lift) StaffW = 0.f;
+	}
+	else
+	{
+		StaffW = FMath::FInterpConstantTo(StaffW, bOn ? 1.f : 0.f, Dt, 1.f / 0.2f);
+		W = FMath::SmoothStep(0.f, 1.f, StaffW);
+	}
+	if (In.Kind != JeebItems::K_Staff || W <= 0.001f) return;
+
+	// The whole carry is worked out on the arm, then the arm's own joints are blended toward it by W (they were: the hand's target moved
+	// in a straight line, and the elbow's solve flipped to the clip's at W 0). Joint by joint, the fist swings on a curve, as an arm does.
+	const int32 Chain[3] = { RArm, RFore, RHand };
+	FQuat Was[3];
+	for (int32 i = 0; i < 3; ++i) Was[i] = B.Rot[Bone[Chain[i]]];
 	const FVector Off = Tilts(CVarStaffHand, FVector(-20.f, 18.f, -44.f));
 	FQuat HandWas;
-	const FVector Hand = BonePos(B, RHand, &HandWas);
-	L.ReachTo(B, RArm, RFore, RHand, FMath::Lerp(Hand, BonePos(B, RArm) + Off, W), FVector(-0.6f, -1.f, -0.2f));   // (the elbow back and out)
+	BonePos(B, RHand, &HandWas);
+	L.ReachTo(B, RArm, RFore, RHand, BonePos(B, RArm) + Off, FVector(-0.6f, -1.f, -0.2f));   // (the elbow back and out)
 	FQuat HandNow;
 	BonePos(B, RHand, &HandNow);
 	TurnInMesh(B, RHand, HandWas * HandNow.Inverse());
-	TurnHeldTo(L, B, StaffUp(), W);
+	TurnHeldTo(L, B, StaffUp(), 1.f);
+	if (W < 0.999f)
+		for (int32 i = 0; i < 3; ++i) B.Rot[Bone[Chain[i]]] = BlendRot(Was[i], B.Rot[Bone[Chain[i]]], W);
+
+	// The empty left arm: not in a cast (the spell's push is two-handed). Standing he is in his rest pose already (no guard stance with
+	// the staff: Locomotion); walking ahead his own walk swings it; only the sword-and-shield clips for going sideways and backing up raise it.
+	if (Act != 0) return;
+	float Side = 1.f;
+	if (bMoving)
+	{
+		const float A = FMath::Atan2(DirR, DirF) - FMath::DegreesToRadians(In.LegYaw);
+		const float C = FMath::Cos(A), S = FMath::Sin(A);
+		Side = 1.f - FMath::Max(C, 0.f) / FMath::Max(FMath::Abs(C) + FMath::Abs(S), 0.01f);
+	}
+	const float FreeW = W * Side * FMath::Clamp(CVarStaffFreeArm.GetValueOnGameThread(), 0.f, 1.f);
+	if (FreeW > 0.001f)
+		if (const FClip* R = Get(TEXT("Rest")))
+		{
+			Sample(*R, 0.f, Scratch, false);
+			for (const int32 i : { LShoulder, LArm, LFore, LHand }) B.Rot[Bone[i]] = BlendRot(B.Rot[Bone[i]], Scratch.Rot[Bone[i]], FreeW);
+		}
 }
 
 void FKnightAnimator::CastPose(const FInput& In, FPose& B, float& OutBlend)

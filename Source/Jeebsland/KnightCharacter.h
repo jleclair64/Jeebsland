@@ -483,6 +483,7 @@ protected:
 	bool bSuitTestActed = false;
 	void FillAnimInput(JeebAnim::FInput& In) const;
 	void PlaceGear();
+	void PlaceStaffModel();         // the held staff's orb glow and its place in the fist, live (jeeb.Magic.OrbGlow, jeeb.Knight.StaffGrip)
 	void TickSuitTests(float Dt);   // test pictures (-SuitWalk, -SuitDo)
 	void RebuildHeld();   // the weapon(s) in your hands
 	UProceduralMeshComponent* MakeMeshComp(USceneComponent* Attach, int32 PivotId, const KM::FMD& Md);

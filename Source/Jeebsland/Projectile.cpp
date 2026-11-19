@@ -20,6 +20,13 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "HAL/IConsoleManager.h"
+
+// The magic bolt's look, live in Play (read as each bolt is cast). 2026-11-18 second review: its light lit a pool about 3 m wide at dusk
+// (700 out to 320 cm); now a tight glow round the bolt and the hand that cast it.
+static TAutoConsoleVariable<float> CVarBoltLight(TEXT("jeeb.Magic.BoltLight"), 150.f, TEXT("Brightness of the light a magic bolt carries (was 700; 0 = no light)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBoltLightRadius(TEXT("jeeb.Magic.BoltLightRadius"), 90.f, TEXT("How far (cm) a magic bolt's light reaches (was 320)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 4.f, TEXT("Glow strength of the magic bolt's orb itself (M_GlowOrb Strength; 4 as built)."), ECVF_Default);
 
 // (test pictures: say where each arrow ended up)
 static bool ArrowLog() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")); return b; }
@@ -125,17 +132,25 @@ void AProjectile::ApplyLaunch()
 		UMaterialInterface* OrbMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Props/M_GlowOrb.M_GlowOrb"));
 		if (OrbMat)
 		{
-			if (UMaterialInstanceDynamic* M = Head->CreateDynamicMaterialInstance(0, OrbMat)) M->SetVectorParameterValue(TEXT("Color"), Gem);
+			if (UMaterialInstanceDynamic* M = Head->CreateDynamicMaterialInstance(0, OrbMat))
+			{
+				M->SetVectorParameterValue(TEXT("Color"), Gem);
+				M->SetScalarParameterValue(TEXT("Strength"), FMath::Max(0.f, CVarBoltGlow.GetValueOnGameThread()));
+			}
 			Head->SetCastShadow(false);
 		}
 		else Paint(Head, L.bPurple ? FLinearColor(2.6f, 0.5f, 3.f) : FLinearColor(0.6f, 1.5f, 3.2f));
-		Glow = NewObject<UPointLightComponent>(this);
-		Glow->SetupAttachment(Root);
-		Glow->SetLightColor(Gem);
-		Glow->SetIntensity(700.f);
-		Glow->SetAttenuationRadius(320.f);
-		Glow->SetCastShadows(false);
-		Glow->RegisterComponent();
+		const float LightI = FMath::Max(0.f, CVarBoltLight.GetValueOnGameThread());
+		if (LightI > 0.f)
+		{
+			Glow = NewObject<UPointLightComponent>(this);
+			Glow->SetupAttachment(Root);
+			Glow->SetLightColor(Gem);
+			Glow->SetIntensity(LightI);
+			Glow->SetAttenuationRadius(FMath::Clamp(CVarBoltLightRadius.GetValueOnGameThread(), 10.f, 1000.f));
+			Glow->SetCastShadows(false);
+			Glow->RegisterComponent();
+		}
 		return;
 	}
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);
