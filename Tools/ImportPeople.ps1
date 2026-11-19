@@ -29,6 +29,6 @@ foreach ($p in $people) {
 $content = Join-Path $proj 'Content\People'
 if (Test-Path $content) { Remove-Item -Recurse -Force $content }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$(Join-Path $PSScriptRoot 'people_import.py')" -unattended -nosplash -stdout -FullStdOutLogOutput
+$out = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'people_import.py').Replace([string][char]92, '/'))"   # (forward slashes: Unreal read "\townbuild2" in a copy's path as a tab) -unattended -nosplash -stdout -FullStdOutLogOutput
 $out | Select-String -Pattern 'PEOPLEDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($out -match 'PEOPLEDIAG done') { Write-Host 'People imported.'; exit 0 } else { Write-Host 'People import FAILED.'; exit 1 }

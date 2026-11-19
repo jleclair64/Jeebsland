@@ -50,6 +50,11 @@ for o in meshes:
         if m and m.use_nodes:
             for n in m.node_tree.nodes:
                 if n.type == 'TEX_IMAGE' and n.image and img is None: img = n.image
+            # (2026-11-18: the Troll's first image node was a metallic/roughness map, so he came out black: prefer the node feeding Base Color)
+            for n in m.node_tree.nodes:
+                if n.type == 'BSDF_PRINCIPLED' and n.inputs['Base Color'].links:
+                    src = n.inputs['Base Color'].links[0].from_node
+                    if src.type == 'TEX_IMAGE' and src.image: img = src.image
         if m: m.name = "M_" + NAME
 if img is None: raise RuntimeError("PEOPLE no texture")
 w, h = img.size
