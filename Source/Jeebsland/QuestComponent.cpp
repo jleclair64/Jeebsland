@@ -283,7 +283,13 @@ bool UQuestComponent::NearPerson(FName Person) const
 	const AActor* Me = GetOwner();
 	if (!Me) return false;
 	FVector2D At;
-	if (const ANpc* N = AQuestPeople::Find(GetWorld(), Person)) At = FVector2D(N->GetActorLocation());   // (the server's own copy of the person)
+	if (const ANpc* N = AQuestPeople::Find(GetWorld(), Person))
+	{
+		At = FVector2D(N->GetActorLocation());   // (the server's own copy of the person)
+		// (2026-11-18) they walk a few steps round their post (NpcLife.h), and your screen holds them still while you talk: anywhere
+		// their round can take them counts too, measured from their post
+		if (FVector2D::Distance(N->RoamAnchor(), FVector2D(Me->GetActorLocation())) < TalkReach + N->RoamSlack()) return true;
+	}
 	else if (const FPersonDef* D = FindPerson(Person)) At = D->Pos;
 	else return false;
 	return FVector2D::Distance(At, FVector2D(Me->GetActorLocation())) < TalkReach;

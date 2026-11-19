@@ -6,10 +6,12 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "NpcBody.h"
+#include "NpcLife.h"
 #include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -24,6 +26,12 @@ ANpc::ANpc()
 	Capsule->InitCapsuleSize(36.f, 92.f);
 	Capsule->SetCollisionProfileName(TEXT("BlockAll"));
 	Capsule->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	// (2026-11-18) players pass through the townsfolk, as in RuneScape: each machine shows a person a moment behind or ahead of the
+	// server while they stop for whoever talks to them (NpcLife.h), so a person that blocked knights would make the server and the
+	// player disagree about where the knight can go. No overlap events either: they move every frame.
+	Capsule->SetCollisionObjectType(ECC_WorldDynamic);   // (a moving thing: the ground traces, which look at WorldStatic only, skip it)
+	Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	Capsule->SetGenerateOverlapEvents(false);
 	SetRootComponent(Capsule);
 
 	BodyRoot = CreateDefaultSubobject<USceneComponent>(TEXT("BodyRoot"));
@@ -54,6 +62,7 @@ int32 ANpc::SpeakerIdx() const
 	case ENpcRole::Villager:   return 3 + VillagerIdx;
 	case ENpcRole::Banker:     return JeebLore::BankerSpeaker;
 	case ENpcRole::QuestGiver: return -1;   // (no lore: they talk about their quests, QuestComponent.cpp)
+	case ENpcRole::Townsfolk:  return -1;   // (no lore: a greeting of their own, Townsfolk.csv)
 	default:                   return 2;
 	}
 }
@@ -63,6 +72,7 @@ void ANpc::Setup(ENpcRole InRole, int32 InVillagerIdx)
 	Role = InRole;
 	VillagerIdx = FMath::Clamp(InVillagerIdx, 0, JeebLore::NumVillagers - 1);
 	HomeYaw = GetActorRotation().Yaw;
+	PlacedAt = FVector2D(GetActorLocation()); PlacedYaw = HomeYaw;
 
 	// Villagers' and quest givers' sizes (Tobin is a boy)
 	const bool bQuestP = (Role == ENpcRole::QuestGiver);
@@ -121,16 +131,23 @@ void ANpc::ClearBody()
 // A skinned Meshy body (NpcBody.h): which one and its colour from PeopleWho.csv; false keeps the old shapes
 bool ANpc::BuildModel()
 {
-	static const TCHAR* RoleKeys[] = { TEXT("shopkeeper"), TEXT("blacksmith"), TEXT("gateknight"), TEXT("villager"), TEXT("banker"), TEXT("questgiver") };
-	FString RoleKey = RoleKeys[FMath::Clamp(int32(Role), 0, 5)];
+	static const TCHAR* RoleKeys[] = { TEXT("shopkeeper"), TEXT("blacksmith"), TEXT("gateknight"), TEXT("villager"), TEXT("banker"), TEXT("questgiver"), TEXT("townsfolk") };
+	FString RoleKey = RoleKeys[FMath::Clamp(int32(Role), 0, 6)];
 	if (Role == ENpcRole::Villager) RoleKey += FString::FromInt(VillagerIdx);
 	const FString FolkKey = Folk == 1 ? TEXT("troll") : Folk == 2 ? TEXT("wizard") : TEXT("");
 	FString Short;
 	GetNpcName().Split(TEXT(","), &Short, nullptr);   // ("Sir Dunmore, the Trader": also "Sir Dunmore")
 	TArray<FString> Keys = { GetNpcName(), Short, PersonKey.IsNone() ? FString() : PersonKey.ToString() };
 	if (!FolkKey.IsEmpty()) { Keys.Add(FolkKey + TEXT(":") + RoleKey); Keys.Add(FolkKey); }
+	// (2026-11-18, Townsfolk.csv: a person with a look of their own there wears it unless PeopleWho.csv names them, or their folk)
+	JeebPeople::FWho Who = HintModel.IsEmpty() ? JeebPeople::FWho() : JeebPeople::Find(Keys);
+	if (!HintModel.IsEmpty() && !Who.bFound)
+	{
+		Who.Model = HintModel; Who.bFound = true; Who.Scale = HintScale;
+		if (HintTint.R >= 0.f) Who.Tint = HintTint;
+	}
 	Keys.Add(RoleKey);
-	JeebPeople::FWho Who = JeebPeople::Find(Keys);
+	if (!Who.bFound) Who = JeebPeople::Find(Keys);
 	if (!TestModel.IsEmpty()) { Who.Model = TestModel; Who.bFound = true; }   // (test pictures: -PeopleLineup)
 	if (!Who.bFound)
 	{
@@ -386,6 +403,16 @@ TArray<FString> ANpc::MakeConversation(int32* OutLore)
 	case ENpcRole::Banker:
 		Lines.Add(bFirst ? TEXT("Welcome to the vault, traveller. Everything you leave here is perfectly safe. Mostly.") : TEXT("Ah, back to the vault. Mind the stairs."));
 		break;
+	case ENpcRole::Townsfolk:
+	{
+		// (Townsfolk.csv: one of their own lines each visit, then a goodbye; no lore)
+		TArray<FString> Mine;
+		FirstHello.ParseIntoArray(Mine, TEXT("|"), true);
+		Lines.Add(Mine.Num() > 0 ? Mine[V % Mine.Num()].TrimStartAndEnd() : FString(TEXT("Good day to you.")));
+		static const TCHAR* Bye[] = { TEXT("Well, I'd best be getting on."), TEXT("Mind how you go."), TEXT("Good day, traveller.") };
+		Lines.Add(Bye[V % UE_ARRAY_COUNT(Bye)]);
+		return Lines;
+	}
 	default:
 	{
 		static const TCHAR* Hello[] = { TEXT("Oh! Hello there."), TEXT("Well, well. Come to listen?"), TEXT("Sit a moment, if you like."), TEXT("You look like someone who asks questions."), TEXT("Mind how you go, traveller.") };
@@ -424,13 +451,75 @@ TArray<FString> ANpc::MakeConversation(int32* OutLore)
 	return Lines;
 }
 
+void ANpc::SetRound(const TSharedPtr<JeebLife::FRound>& InRound)
+{
+	Round = InRound;
+	Lag = 0.f;
+	if (!Round.IsValid() || Round->Segs.Num() == 0) return;
+	// (where the clock has them now, at once: nobody walks across town from where they were spawned)
+	const JeebLife::FPose P = JeebLife::Eval(*Round, JeebLife::Now(GetWorld()), false);
+	SetActorLocation(FVector(P.At.X, P.At.Y, JeebLife::DrawnGround(P.At.X, P.At.Y) + HalfH));
+	SetActorRotation(FRotator(0.f, P.Yaw, 0.f));
+	HomeYaw = P.Yaw;
+	bFootSet = false;
+	TraceAt = FVector2D(1.0e9f, 1.0e9f);
+	LastLoc = GetActorLocation();
+}
+
+float ANpc::RoamSlack() const { return Round.IsValid() ? Round->Roam : 0.f; }
+FVector2D ANpc::RoamAnchor() const { return Round.IsValid() ? Round->Anchor : FVector2D(GetActorLocation()); }
+
+void ANpc::RebuildBody()
+{
+	ClearBody();
+	BuildBody();
+}
+
+// Far from every player a person costs next to nothing (2026-11-18): every frame within 45 m of your knight, ten times a second to
+// 90 m (where the body stops being drawn), then once a second; on a dedicated server four times a second with a player within 60 m
+// (the server only needs them for its reach checks), else every 2 s
+void ANpc::UpdateTickRate(float NearestPlayerCm)
+{
+	const bool bDedi = GetNetMode() == NM_DedicatedServer;
+	const float Want = bDedi ? (NearestPlayerCm < 6000.f ? 0.25f : 2.f) : (NearestPlayerCm < 4500.f ? 0.f : NearestPlayerCm < 9000.f ? 0.1f : 1.f);
+	if (Want != TickPlan) { TickPlan = Want; SetActorTickInterval(Want); }
+}
+
+// (2026-11-18, owner: "The NPCs feet are under the path") the ground a person stands on: the ground AS DRAWN there (Steele Creek and
+// the open world are drawn by the world's 8 m mesh, whose flat triangles sit up to a few dozen cm off the exact height they were
+// placed by), and near your knight a short trace down onto whatever solid floor is there (steps, porches, the bridge's deck), only
+// when they have moved 35 cm or every 0.3 s while walking. The road ribbons have no collision and lie 2-5 cm over the drawn ground.
+float ANpc::GroundUnder(const FVector2D& P, bool bTrace, float DeltaSeconds)
+{
+	const float G = JeebLife::DrawnGround(P.X, P.Y);
+	if (!bTrace) { TraceOff = 0.f; TraceAt = FVector2D(1.0e9f, 1.0e9f); return G; }
+	TraceAge += DeltaSeconds;
+	if (FVector2D::DistSquared(P, TraceAt) > FMath::Square(35.f) || (bPoseWalk && TraceAge > 0.3f))
+	{
+		TraceAge = 0.f;
+		TraceAt = P;
+		TraceOff = 0.f;
+		FHitResult Hit;
+		FCollisionQueryParams Q(SCENE_QUERY_STAT(NpcGround), false, this);
+		if (GetWorld()->LineTraceSingleByObjectType(Hit, FVector(P.X, P.Y, G + 90.f), FVector(P.X, P.Y, G - 60.f), FCollisionObjectQueryParams(ECC_WorldStatic), Q))
+		{
+			const float Off = float(Hit.ImpactPoint.Z) - G;
+			if (Off > -50.f && Off < 35.f) TraceOff = Off;   // (a floor or a step, never a counter or a prop's top: those are 60 cm and more)
+		}
+	}
+	return G + TraceOff;
+}
+
 void ANpc::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	AnimT += DeltaSeconds;
 	if (BuiltSetting != JeebPeople::Setting() && !IsRunningDedicatedServer()) { ClearBody(); BuildBody(); }   // (jeeb.Npc.Models changed)
 
-	APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	const bool bDedi = GetNetMode() == NM_DedicatedServer;
+	// Your own knight (looks only: which way they face and when they wait for you; never used for gameplay), and on a dedicated
+	// server the nearest of all players (only to decide how often to tick)
+	APawn* Player = bDedi ? nullptr : UGameplayStatics::GetPlayerPawn(this, 0);
 	const FVector Me = GetActorLocation();
 	float DistToPlayer = 1e9f;
 	FVector ToPlayer = FVector::ForwardVector;
@@ -439,61 +528,68 @@ void ANpc::Tick(float DeltaSeconds)
 		ToPlayer = Player->GetActorLocation() - Me;
 		DistToPlayer = ToPlayer.Size2D();
 	}
-	const bool bNear = DistToPlayer < 650.f;
-	float Walk = 0.f;
-	bool bTurnOnSpot = false;   // (turning onto the next leg of the beat before walking it)
+	float Nearest = DistToPlayer;
+	if (bDedi)
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+			if (const APawn* P = It->Get() ? It->Get()->GetPawn() : nullptr) Nearest = FMath::Min(Nearest, float(FVector::Dist2D(P->GetActorLocation(), Me)));
+	UpdateTickRate(Nearest);
 
-	// Anyone with a beat (the gate knight, the villagers) walks it slowly and stops to talk
-	if (Patrol.Num() > 1 && !bTalking && DistToPlayer > (TestWalkNear >= 0.f ? TestWalkNear : Role == ENpcRole::Villager ? 260.f : 650.f))
+	// A beat set the old way (SetPatrol: the test lineups) becomes a round on the clock; the towns' people get theirs from ATownLife
+	if (!Round.IsValid() && Patrol.Num() > 1)
+		SetRound(JeebLife::MakeBeat(Patrol, 4.f, Role == ENpcRole::Villager || Role == ENpcRole::QuestGiver ? 95.f : 130.f, GetTypeHash(GetNpcName()), false));
+
+	// Keepers, knights and quest givers turn to you from further off; villagers only when you come up to them
+	const float FaceR = (OffersTrade() || Role == ENpcRole::GateKnight || Role == ENpcRole::QuestGiver) ? 650.f : 320.f;
+	const bool bNear = DistToPlayer < FaceR;
+	bool bWalkNow = false, bTurnNow = false, bChat = false, bChatTalk = false;
+	FVector2D ChatAt = FVector2D::ZeroVector;
+	FVector2D At(Me.X, Me.Y);
+
+	if (Round.IsValid() && Round->Segs.Num() > 0)
 	{
-		const FVector2D P(Me.X, Me.Y);
-		const FVector2D Target = Patrol[PatrolIdx % Patrol.Num()];
-		const FVector2D To = Target - P;
-		const float LegYaw = FVector(To.X, To.Y, 0.f).Rotation().Yaw;
-		if (PauseT > 0.f)
+		const double Clock = JeebLife::Now(GetWorld());
+		// Holding still (looks only, never on a dedicated server): while you talk to them, or when you stand right in their way.
+		// They catch up afterwards, mostly by cutting their next stays short, a little by walking faster.
+		bool bHold = !bDedi && bTalking;
+		if (!bDedi && !bHold && bPoseWalk && Player && DistToPlayer < 130.f)
+			bHold = FVector2D::DotProduct(FVector2D(ToPlayer.X, ToPlayer.Y).GetSafeNormal(), FVector2D(GetActorForwardVector().X, GetActorForwardVector().Y)) > 0.3f;
+		if (bHold) Lag = FMath::Min(Lag + DeltaSeconds, 600.f);
+		else if (Lag > 0.f) Lag = FMath::Max(0.f, Lag - DeltaSeconds * (bPoseWalk ? 0.35f : 1.5f));
+		const JeebLife::FPose P = JeebLife::Eval(*Round, Clock - Lag);
+		bWalkNow = P.bWalk && !bHold;
+		bTurnNow = P.bTurn && !bHold;
+		bChat = P.bChat;
+		ChatAt = P.ChatAt;
+		if (bChat)
 		{
-			// (2026-11-18, motion review: at a corner they used to set off at full speed while still turning, walking sideways or backwards
-			// for over a second. They turn toward the next leg during the pause, and walk only once facing within 30 degrees of it.)
-			PauseT -= DeltaSeconds;
-			if (!To.IsNearlyZero()) HomeYaw = LegYaw;
+			// (the two take turns, about five seconds each, so they don't both talk at once; who goes first by their names)
+			const TSharedPtr<JeebLife::FRound> Other = Round->Partner.Pin();
+			const bool bFirst = !Other.IsValid() || Round->Label < Other->Label;
+			bChatTalk = ((FMath::FloorToInt(float(Clock) / 5.f) & 1) == 0) == bFirst;
 		}
-		else
-		{
-			if (To.Size() < 60.f) { ++PatrolIdx; PauseT = (Role == ENpcRole::Villager) ? FMath::FRandRange(2.f, 7.f) : 4.f; StuckT = 0.f; }
-			else if (FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, LegYaw)) > 30.f)
-			{
-				SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, LegYaw, 0.f), DeltaSeconds, 120.f));
-				HomeYaw = LegYaw;
-				bTurnOnSpot = true;
-			}
-			else
-			{
-				const FVector2D Dir = To.GetSafeNormal();
-				const float Speed = (Role == ENpcRole::Villager) ? 95.f : 130.f;
-				FVector NewLoc(Me.X + Dir.X * Speed * DeltaSeconds, Me.Y + Dir.Y * Speed * DeltaSeconds, 0.f);
-				NewLoc.Z = JeebTerrain::HeightAt(NewLoc.X, NewLoc.Y) + HalfH;
-				SetActorLocation(NewLoc, true);
-				const FVector After = GetActorLocation();
-				if (FVector2D::Distance(FVector2D(After.X, After.Y), P) < Speed * DeltaSeconds * 0.3f)
-				{
-					StuckT += DeltaSeconds;
-					if (StuckT > 1.2f) { ++PatrolIdx; StuckT = 0.f; }   // blocked by something: head for the next point
-				}
-				else StuckT = 0.f;
-				const FRotator Want(0.f, FVector(Dir.X, Dir.Y, 0.f).Rotation().Yaw, 0.f);
-				SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), Want, DeltaSeconds, 120.f));
-				HomeYaw = GetActorRotation().Yaw;
-				Walk = 1.f;
-			}
-		}
+		At = P.At;
+		HomeYaw = P.Yaw;
+		if (bWalkNow || bTurnNow) SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.f, P.Yaw, 0.f), DeltaSeconds, 14.f));
 	}
-	WalkBlend = FMath::FInterpTo(WalkBlend, Walk, DeltaSeconds, 6.f);
+	bPoseWalk = bWalkNow;
 
-	// Turn to face you when you are close, otherwise back to their own direction
-	const float WantYaw = bNear ? FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw : HomeYaw;
-	if (Walk < 0.5f && !bTurnOnSpot)
+	// Standing on the ground as drawn (and on floors near you), eased so steps and bridge ends don't jolt
 	{
-		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : 70.f));
+		const float Ground = GroundUnder(At, !bDedi && DistToPlayer < 4500.f, DeltaSeconds);
+		if (!bFootSet || FMath::Abs(FootZ - Ground) > 150.f) { FootZ = Ground; bFootSet = true; }
+		else FootZ = FMath::FInterpTo(FootZ, Ground, DeltaSeconds, 12.f);
+		const FVector NewLoc(At.X, At.Y, FootZ + HalfH);
+		if (!NewLoc.Equals(Me, 0.1f)) SetActorLocation(NewLoc);
+	}
+	WalkBlend = FMath::FInterpTo(WalkBlend, bWalkNow ? 1.f : 0.f, DeltaSeconds, 6.f);
+
+	// Facing, when not walking: you when you are close or talking to them, their partner while they chat, else their round's way
+	if (!bWalkNow && !bTurnNow)
+	{
+		float WantYaw = HomeYaw;
+		if (bChat && !ChatAt.IsZero()) WantYaw = FVector(ChatAt.X - At.X, ChatAt.Y - At.Y, 0.f).Rotation().Yaw;
+		if (bTalking || (bNear && !(bChat && DistToPlayer > 220.f))) WantYaw = FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw;
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : 90.f));
 	}
 
 	// The head's turn toward you: up to 55 degrees, and back to straight ahead as you go round behind them (2026-11-18, motion review: the
@@ -509,7 +605,7 @@ void ANpc::Tick(float DeltaSeconds)
 		LastLoc = Now;
 		MoveSpeed = FMath::FInterpTo(MoveSpeed, FMath::Min(Moved, 400.f), DeltaSeconds, 8.f);
 		const float Rel = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw);
-		const int32 State = bTalking ? 2 : (WalkBlend > 0.35f ? 1 : 0);
+		const int32 State = (bTalking || bChatTalk) ? 2 : (WalkBlend > 0.35f ? 1 : 0);
 		const float Rate = FMath::Clamp(MoveSpeed / (ModelDef->WalkSpeed * GetActorScale3D().X), 0.4f, 2.f);
 		if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(Body->GetAnimInstance()))
 			A->Drive(State, Rate, (bNear && State != 1) ? HeadWant(Rel) : 0.f);
@@ -517,10 +613,8 @@ void ANpc::Tick(float DeltaSeconds)
 		static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("PeopleLog"));   // (test: JEEBNPCMOVE ten times a second)
 		if (bLog && !TestModel.IsEmpty() && FMath::FloorToInt(AnimT * 10.f) != FMath::FloorToInt((AnimT - DeltaSeconds) * 10.f))
 		{
-			const FVector2D Leg = Patrol.Num() > 1 ? Patrol[PatrolIdx % Patrol.Num()] - FVector2D(Now.X, Now.Y) : FVector2D::ZeroVector;
-			const float LegOff = Leg.IsNearlyZero() ? 0.f : FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(Leg.X, Leg.Y, 0.f).Rotation().Yaw);
-			UE_LOG(LogTemp, Log, TEXT("JEEBNPCMOVE %s t %.1f yaw %.0f speed %.0f state %d legoff %.0f turnspot %d pause %.1f rel %.0f headwant %.0f dist %.0f"),
-				*TestModel, AnimT, GetActorRotation().Yaw, Moved, State, LegOff, bTurnOnSpot ? 1 : 0, PauseT, Rel, (bNear && State != 1) ? HeadWant(Rel) : 0.f, DistToPlayer);
+			UE_LOG(LogTemp, Log, TEXT("JEEBNPCMOVE %s t %.1f yaw %.0f speed %.0f state %d turn %d lag %.1f rel %.0f headwant %.0f dist %.0f footz %.1f"),
+				*TestModel, AnimT, GetActorRotation().Yaw, Moved, State, bTurnNow ? 1 : 0, Lag, Rel, (bNear && State != 1) ? HeadWant(Rel) : 0.f, DistToPlayer, FootZ);
 		}
 #endif
 		BodyRoot->SetRelativeLocation(FVector(0.f, 0.f, -92.f - ModelDef->WalkSink * WalkBlend));
@@ -529,6 +623,7 @@ void ANpc::Tick(float DeltaSeconds)
 		if (bShadow != bShadowOn) { bShadowOn = bShadow; Body->SetCastShadow(bShadow); }
 		return;
 	}
+	if (bDedi) return;   // (a dedicated server's shapes are never seen)
 
 	// Head follows you a little
 	if (HeadPivot)

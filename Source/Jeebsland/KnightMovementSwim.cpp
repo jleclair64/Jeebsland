@@ -280,6 +280,7 @@ void AKnightCharacter::FillSwimInput(JeebAnim::FInput& In) const
 void AKnightCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
 {
 	Super::CalcCamera(DeltaTime, OutResult);
+	ShopCamView(DeltaTime, OutResult);   // (2026-11-18: the shop camera, KnightShopCam.cpp; nothing unless a shop is open or closing)
 	const FVector P = OutResult.Location;
 	const float Over = JeebTune::V().CamOverWater;
 	if (P.Z >= JeebWater::TopLevel() + Over) return;

@@ -600,6 +600,15 @@ private:
 	bool bSmithOpen = false;
 	bool bDialogueOpen = false;
 	TWeakObjectPtr<ANpc> TradeNpc;
+	// (2026-11-18) the shop camera (KnightShopCam.cpp): your view eases in to frame the keeper while a shop, the bank or the smithy is open
+	void ShopCamView(float DeltaTime, struct FMinimalViewInfo& View);
+	float ShopCamT = 0.f;
+	TWeakObjectPtr<ANpc> ShopCamNpc;
+	bool bShopCamHid = false;
+	TArray<TWeakObjectPtr<AActor>> ShopCamHidden;
+public:
+	void ShopCamTestOpen(bool bOpen);   // (test pictures, -ShopCamTest: opens or closes the nearest keeper's window; nothing in Shipping)
+private:
 	TArray<FString> DialogueLines;
 	int32 DialogueIdx = 0;
 	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop, Arrow, GearWall };

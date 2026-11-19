@@ -425,7 +425,18 @@ void AKnightCharacter::OnInteractKey()
 		// An Oak Hill shop's counter: straight to its window (the server checks the range on every trade, NearTrader)
 		if (const JeebOakHill::FCounter* C = CounterInReach(this))
 		{
-			TradeNpc = nullptr;   // (no shopkeeper: walking away is measured from the counter, KnightCharacter.cpp)
+			// (2026-11-18) the keeper behind this counter (NpcLife.h), if there is one within 4 m: they turn to you and talk, and the shop
+			// camera frames them (KnightShopCam.cpp); none: walking away is measured from the counter, KnightCharacter.cpp
+			TradeNpc = nullptr;
+			float KeeperD = 400.f;
+			const ENpcRole Keeps = C->Shop == JeebOakHill::EShop::Smith ? ENpcRole::Blacksmith : C->Shop == JeebOakHill::EShop::Bank ? ENpcRole::Banker : ENpcRole::Shopkeeper;
+			for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
+				if (It->GetRole() == Keeps)
+				{
+					const float D = FVector2D::Distance(FVector2D(It->GetActorLocation()), C->At);
+					if (D < KeeperD) { KeeperD = D; TradeNpc = *It; }
+				}
+			if (ANpc* K = TradeNpc.Get()) K->SetTalking(true);
 			bCrouched = false;
 			bBlocking = false;
 			SetActorRotation(FRotator(0.f, C->Facing, 0.f));

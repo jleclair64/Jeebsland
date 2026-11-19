@@ -34,6 +34,7 @@
 #include "AutumnDecor.h"
 #include "Fill.h"
 #include "QuestPeople.h"
+#include "NpcLife.h"
 #include "Paths.h"
 #include "Village.h"
 #include "PigPen.h"
@@ -305,6 +306,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
+	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
 	World->SpawnActor<AFoeCamps>(FVector::ZeroVector, FRotator::ZeroRotator);   // the bandits' camps in the forest (FoeCamps.h, FoeCamps.csv / Foes.csv; after the forest and its ruins, which they keep off; on every machine: the server places the bandits)
 	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
