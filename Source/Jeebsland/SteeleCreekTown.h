@@ -39,9 +39,17 @@ private:
 	UPROPERTY() TArray<UMaterialInstanceDynamic*> GlowMids;
 	TArray<float> GlowBase;
 	UPROPERTY() TArray<UPointLightComponent*> LanternLights;
-	UPROPERTY() TArray<UInstancedStaticMeshComponent*> TreeSets;   // (drawn trees: their shadows follow jeeb.Steele.TreeShadows)
 	float LastDusk = -1.f;
-	int32 LastTreeShadows = -1;
 	int32 NetTestStage = 0;      // (test only: -SteeleNetTest)
 	double NetTestT0 = 0.0;
 };
+
+// The forest in and round Steele Creek (2026-11-18 round 3): planned from the town's own layout (SteeleCreekTown.cpp, deterministic, the same
+// on every machine), drawn and made solid by AOakForest (OakForest.cpp) so the trees have the forest's colours, shadows and near fade.
+// jeeb.Steele.Density scales how many (read when the world is built).
+namespace JeebSteeleWoods
+{
+	// Kind in AOakForest's order: 0 cork oak, 1 aspen, 2-4 full spruces, 5 half spruce
+	struct FSpot { uint8 Kind; float X, Y, Scale, Yaw; };
+	const TArray<FSpot>& Plan();   // (game thread; empty when the town is off)
+}

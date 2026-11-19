@@ -4,6 +4,7 @@
 #include "WorldMap.h"
 #include "OakHill.h"
 #include "TownLab.h"
+#include "SteeleCreekTown.h"
 #include "Canopy.h"
 #include "KnightGameState.h"
 #include "GameFramework/Pawn.h"
@@ -264,7 +265,7 @@ namespace
 	bool IsSpruce(int32 K) { return K >= K_Full1 && K <= K_Half2; }
 
 	// One thing placed: its kind, colour (DZ only), where (on the ground), turn and size
-	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; FVector Up = FVector::UpVector; };   // (Up: the ground's tilt it lies along: logs and stones, 2026-11-17)
+	struct FPut { uint8 Kind; uint8 Col; FVector At; float Yaw; FVector Scale; bool bTown; FVector Up = FVector::UpVector; bool bNoChop = false; };   // (Up: the ground's tilt it lies along: logs and stones, 2026-11-17)
 	// its turn: the yaw, then tipped from straight up to Up
 	FQuat PutRot(const FPut& P) { return FQuat::FindBetweenNormals(FVector::UpVector, P.Up) * FQuat(FVector::UpVector, FMath::DegreesToRadians(P.Yaw)); }
 
@@ -695,6 +696,35 @@ struct FOakForestBuild
 			ForestTrees, Fat, Thin, ForestTrees - Fat - Thin, Thin ? float(Fat) / Thin : 0.f, ColCount[0], ColCount[1], ColCount[2], ColCount[3], Under, Seedlings, Rocks, Density, (FPlatformTime::Seconds() - T0) * 1000.0, *List);
 	}
 
+	// ---------------------------------------------------------------- Steele Creek's forest (2026-11-18 round 3)
+	// The trees SteeleCreekTown.cpp plans in and round Steele Creek (JeebSteeleWoods::Plan, deterministic), put on the drawn ground like the
+	// forest's own, in the same four colour patches, with solid trunks and the same shadows; not choppable (bNoChop). The checksum below and
+	// JEEBSTEELE's both cover them (the solids' positions are in this actor's hash, the plan's in the town's).
+	void Steele()
+	{
+		const TArray<JeebSteeleWoods::FSpot>& Spots = JeebSteeleWoods::Plan();
+		if (!Spots.Num()) return;
+		FVector2D Lo(1.0e9f, 1.0e9f), Hi(-1.0e9f, -1.0e9f);
+		for (const JeebSteeleWoods::FSpot& S : Spots) { Lo.X = FMath::Min(Lo.X, S.X); Lo.Y = FMath::Min(Lo.Y, S.Y); Hi.X = FMath::Max(Hi.X, S.X); Hi.Y = FMath::Max(Hi.Y, S.Y); }
+		FHeights Hs;
+		Hs.Build(Lo - FVector2D(1600.f), Hi + FVector2D(1600.f));
+		FRandomStream R(51529);
+		static const uint8 Kind[6] = { K_Oak, K_Aspen, K_Full1, K_Full2, K_Full3, K_Half2 };
+		int32 Placed = 0, Steep = 0;
+		for (const JeebSteeleWoods::FSpot& S : Spots)
+		{
+			const FVector2D P(S.X, S.Y);
+			const int32 Col = ColourAt(P, R);   // (drawn for every spot, so the stream stays in step)
+			float Slope;
+			const float Z = Hs.At(S.X, S.Y, &Slope);
+			if (Slope > 0.72f) { ++Steep; continue; }
+			const uint8 K = Kind[FMath::Min<int32>(S.Kind, 5)];
+			Puts.Add({ K, uint8(Kinds[K].bTint ? Col : 0), FVector(S.X, S.Y, Z - 6.f - Slope * 45.f * S.Scale), S.Yaw, FVector(S.Scale), false, FVector::UpVector, true });
+			++Placed;
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST Steele Creek: %d trees (%d planned, %d left out on steep ground), not choppable"), Placed, Spots.Num(), Steep);
+	}
+
 	// ---------------------------------------------------------------- make it
 	void Make()
 	{
@@ -750,7 +780,7 @@ struct FOakForestBuild
 				const float Rad = K.TrunkR * P.Scale.X, H = FMath::Max(K.TrunkH * P.Scale.Z, 300.f) + 40.f;
 				if (Rad < 6.f) break;   // (a seedling: walked through)
 				TrunkX.Add(FTransform(FRotator::ZeroRotator, P.At + FVector(0.f, 0.f, H * 0.5f - 40.f), FVector(Rad / 50.f, Rad / 50.f, H / 100.f)));
-				if (IsTree(P.Kind))   // (a choppable tree, AOakTreeNode)
+				if (IsTree(P.Kind) && !P.bNoChop)   // (a choppable tree, AOakTreeNode; not Steele Creek's)
 				{
 					AOakForest::FFellable F;
 					F.Key = P.Kind * 4 + P.Col; F.KeyIndex = Visual[F.Key].Num() - 1;
@@ -1008,6 +1038,7 @@ void AOakForest::BeginPlay()
 	B.Town(0.f);
 	if (JeebTownLab::NewOn()) B.Town(JeebTownLab::OffY);   // (the TownLab map: its rebuilt town 300 m east gets the same trees)
 	B.Forest();
+	B.Steele();   // (Steele Creek's forest, planned by SteeleCreekTown.cpp)
 	B.Make();
 	UE_LOG(LogTemp, Log, TEXT("JEEBFOREST built in %.0f ms"), (FPlatformTime::Seconds() - T0) * 1000.0);
 }
