@@ -399,3 +399,15 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - When a placed building changes scale, re-run every clearing pass (trees, fill props, grass) against the new footprint, and verify it from above.
 - "Inside a forest town" needs a visible canopy from the aerial and the road in: count and size the trees, then look at the shot, not only the log count.
 - Test tools: `Tools/ShotViews.ps1` crops for 2560 px frames but off-screen runs render 1280; `-abslog` with a path containing spaces can silently write no log; `jeeb.Test.Walk` stops the knight after under a second in MoveLab. Fix these before the next motion or visual review.
+
+## 2026-11-19 night batch (one round on the merged build)
+
+- **Look:** a fitting whose height or size was changed without a picture must get a close-up (the fitting filling a third of the frame, eye level) in the same change, never "raised, unseen" (the bridge's post lanterns came out as tiny nubs).
+- **Look:** a new colour band such as a beach is judged from the air and from the ground at noon against the grass and water beside it; match its brightness to the terrain's instead of using a plain sand colour.
+- **Look:** after removing a prop kind, grep every spawner (each town's own decor tables too) for the old mesh names and look for the kind in a ground-level picture of every town, not only the one named in the complaint.
+- **Look:** check a cast at noon on the real map with the HUD on and a frame list that includes the release frame; the test map at dusk hides the glow and the reticle.
+- **Look:** every window sits clear of the minimap and the hotbar, and a restyle covers every panel, the test panels too, in one pass.
+- **Online:** measure a movement fix with its switch on and off in the same run on a machine with free cores; clients at 5 frames a second produce corrections by themselves.
+- **Performance:** a new ring of hundreds of full-size meshes (trees, rocks) ships with a measured with/without result and a default density that keeps the town view within +0.3 ms, with the forest's shadow reach and stand-in limits applied before it goes in.
+- **Process:** traces and overlaps made during the world build see none of the solids created that frame; build anything that depends on them (NPC routes, counter spots) half a second later.
+- **Process:** two agents waiting for a solo timing window behind a reviewer that holds a slot across runs deadlock the queue; reviewers release between runs, and only one agent per batch asks for solo.
