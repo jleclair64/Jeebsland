@@ -9,6 +9,8 @@
 #include "GameFramework/PlayerController.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/PointLightComponent.h"
+#include "LampLook.h"
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 // The numbers. Measured on the model (Tools/bridge_profile.py, a ray cast along its middle) at the 1400 cm-per-unit scale it is imported at
@@ -148,6 +150,7 @@ void ABridge::BeginPlay()
 		else UE_LOG(LogTemp, Warning, TEXT("JEEBBRIDGE no model at /Game/Bridge/SM_Bridge (collision only)"));
 	}
 	BuildCollision();
+	if (!bServer) BuildDecor();
 	if (FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkLog")) || FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkNet")) || FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest"))) SetActorTickEnabled(true);
 
 #if !UE_BUILD_SHIPPING
@@ -269,6 +272,76 @@ void ABridge::BuildCollision()
 			Rails.Add(B);
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Decoration (2026-11-18, owner: "torches or flowers on this bridge"): separate TownDecor props sat on the model's parapets, never baked
+// into it. Everything here is a fixed list in the bridge's own frame (L along, W across, both sides), so it is the same on every machine.
+// Four oil lanterns on the end posts, two lit torches on the parapets at the middle, flower boxes along both parapets. Lights: six
+// shadowless points with a 5 m reach, out of sight past 60 m.
+// ---------------------------------------------------------------------------------------------------------------------------------
+void ABridge::BuildDecor()
+{
+	constexpr float PostL = 1008.f, PostW = 275.f, PostTop = 140.f;   // the squat round posts at the four ends: where, and how high over the deck
+	constexpr float ParapetW = 287.f, ParapetTop = 72.f;                 // the parapet's middle line and top over the deck
+	auto Load = [](const TCHAR* Name) { return LoadObject<UStaticMesh>(nullptr, *(FString(TEXT("/Game/TownDecor/SM_")) + Name + TEXT(".SM_") + Name)); };
+	UStaticMesh* Lantern = Load(TEXT("LanternOil"));
+	UStaticMesh* Torch = Load(TEXT("TorchBlazing"));
+	UStaticMesh* Flame = Load(TEXT("TorchBlazingFlame"));
+	UStaticMesh* Box = Load(TEXT("FlowerBoxLong"));
+	// Puts M with the bottom centre of Ref's bounds (Ref is M, or the torch for its flame, which is modelled in the torch's own space) on the
+	// spot (L, W, Up over the deck), turned by Yaw and Pitch, scaled so Ref is Target cm tall (0: as modelled)
+	auto Put = [&](UStaticMesh* M, UStaticMesh* Ref, float L, float W, float Up, float Yaw, float Pitch, float Target)
+	{
+		if (!M || !Ref) return;
+		const FBox B = Ref->GetBoundingBox();
+		const float S = Target > 0.f ? Target / FMath::Max(1.f, B.GetSize().Z) : 1.f;
+		UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+		C->SetStaticMesh(M);
+		C->SetupAttachment(RootComponent);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCanEverAffectNavigation(false);
+		C->SetCastShadow(false);
+		C->SetCachedMaxDrawDistance(7000.f);
+		const FVector Foot(B.GetCenter().X, B.GetCenter().Y, B.Min.Z);
+		const FQuat Q = FRotator(Pitch, Yaw, 0.f).Quaternion();
+		C->SetRelativeTransform(FTransform(Q, FVector(L, W, DeckRel(L) + Up) - Q.RotateVector(Foot * S), FVector(S)));
+		C->RegisterComponent();
+		JeebLamp::ApplyToMesh(C, this);
+		Decor.Add(C);
+	};
+	auto Light = [&](float L, float W, float Up)
+	{
+		UPointLightComponent* P = NewObject<UPointLightComponent>(this);
+		P->SetupAttachment(RootComponent);
+		P->SetRelativeLocation(FVector(L, W, DeckRel(L) + Up));
+		P->SetIntensityUnits(ELightUnits::Lumens);
+		P->SetIntensity(110.f);
+		P->SetAttenuationRadius(500.f);
+		P->SetCastShadows(false);
+		P->MaxDrawDistance = 6000.f;
+		P->MaxDistanceFadeRange = 1500.f;
+		P->RegisterComponent();
+		JeebLamp::TrackLight(P);
+		Decor.Add(P);
+	};
+	for (int32 Sd = -1; Sd <= 1; Sd += 2)
+	{
+		for (int32 End = -1; End <= 1; End += 2)   // the lanterns on the four end posts
+		{
+			Put(Lantern, Lantern, End * PostL, Sd * PostW, PostTop, 0.f, 0.f, 50.f);
+			Light(End * PostL, Sd * PostW, PostTop + 28.f);
+		}
+		Put(Torch, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);   // the torches at the middle, on the parapet
+		Put(Flame, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);
+		Light(0.f, Sd * ParapetW, ParapetTop + 95.f);
+		for (float L : { -850.f, -600.f, -330.f, 330.f, 600.f, 850.f })   // the flower boxes between them, laid along the parapet's slope
+		{
+			const float Slope = FMath::RadiansToDegrees(FMath::Atan2(DeckRel(L + 60.f) - DeckRel(L - 60.f), 120.f));
+			Put(Box, Box, L, Sd * ParapetW, ParapetTop, 0.f, Slope, 0.f);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBBRIDGE decor: %d pieces (lantern %s, torch %s, flame %s, flower box %s)"), Decor.Num(), Lantern ? TEXT("yes") : TEXT("NO"), Torch ? TEXT("yes") : TEXT("NO"), Flame ? TEXT("yes") : TEXT("NO"), Box ? TEXT("yes") : TEXT("NO"));
 }
 
 void ABridge::Tick(float Dt)

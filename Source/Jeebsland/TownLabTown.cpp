@@ -458,7 +458,7 @@ void ATownLabTown::BuildBuildings()
 						const FVector LA = bAlongX ? FVector(U, Out, 0.f) : FVector(Out, U, 0.f);
 						const FVector LB = bAlongX ? FVector(U, 0.f, 0.f) : FVector(0.f, U, 0.f);
 						FVector A = Xf.TransformPosition(LA), B = Xf.TransformPosition(LB);
-						A.Z = FMath::Max(JeebTerrain::HeightAt(A.X, A.Y), JeebTerrain::HeightAt(B.X, B.Y)) + 110.f; B.Z = A.Z;
+						A.Z = Xf.GetLocation().Z + 110.f; B.Z = A.Z;   /* (the model's floor, not the slope round it: the pad is flattened by the terrain pass) */
 						FHitResult Hit;
 						++Tries;
 						if (!GetWorld()->SweepSingleByChannel(Hit, A, B, FQuat::Identity, ECC_Pawn, Cap, Qp))

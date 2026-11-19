@@ -29,10 +29,12 @@ protected:
 
 private:
 	void BuildCollision();
+	void BuildDecor();   // lanterns on the end posts, torches and flower boxes on the parapets (2026-11-18, owner); client only, same spots everywhere
 
 	UPROPERTY() UStaticMeshComponent* Visual = nullptr;
 	UPROPERTY() UProceduralMeshComponent* Slab = nullptr;
 	UPROPERTY() TArray<UBoxComponent*> Rails;
+	UPROPERTY() TArray<UActorComponent*> Decor;
 };
 
 namespace JeebBridge

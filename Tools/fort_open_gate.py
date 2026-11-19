@@ -58,7 +58,6 @@ box(-0.166, 0.224, -0.392, -0.296, 0.04, 0.07)                # lower lintel (un
 box(-0.180, 0.238, -0.400, -0.290, 0.07, 0.095)               # upper lintel, a little proud
 box(-0.158, -0.142, -0.300, -0.140, FLOOR, -0.09)             # gate leaf, swung back inside (left)
 box(0.200, 0.216, -0.300, -0.140, FLOOR, -0.09)               # gate leaf (right)
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 bm.to_mesh(me); bm.free()
 bpy.ops.object.select_all(action='DESELECT')
 ob.select_set(True)
