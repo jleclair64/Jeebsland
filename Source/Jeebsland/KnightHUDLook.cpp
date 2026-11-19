@@ -334,10 +334,18 @@ void AKnightHUD::DrawLookTab(float PX, float PY, float PW, float PH)
 		float TW = 0.f, TH = 0.f; HDTextSize(VT, TW, TH, Font, 0.95f);
 		HDText(VT, bChanged ? FLinearColor(1.f, 0.8f, 0.4f) : FLinearColor(0.7f, 0.75f, 0.8f), X + BarW - TW, Y, Font, 0.95f);
 		const float BY = Y + 30.f;
-		DrawRect(FLinearColor(0.25f, 0.25f, 0.25f, 1.f), X, BY + 4.f, BarW, 8.f);
-		DrawRect(FLinearColor(0.9f, 0.55f, 0.15f, 1.f), X, BY + 4.f, BarW * TT, 8.f);
-		DrawRect(FLinearColor(0.6f, 0.75f, 0.9f, 1.f), X + BarW * TD - 1.f, BY, 2.f, 16.f);   // where the default sits
-		DrawRect(FLinearColor::White, X + BarW * TT - 6.f, BY - 3.f, 12.f, 22.f);
+		if (UIStyle() == 0)
+		{
+			DrawRect(FLinearColor(0.25f, 0.25f, 0.25f, 1.f), X, BY + 4.f, BarW, 8.f);
+			DrawRect(FLinearColor(0.9f, 0.55f, 0.15f, 1.f), X, BY + 4.f, BarW * TT, 8.f);
+			DrawRect(FLinearColor(0.6f, 0.75f, 0.9f, 1.f), X + BarW * TD - 1.f, BY, 2.f, 16.f);   // where the default sits
+			DrawRect(FLinearColor::White, X + BarW * TT - 6.f, BY - 3.f, 12.f, 22.f);
+		}
+		else
+		{
+			SliderBar(X, BY, BarW, TT, FLinearColor(0.9f, 0.55f, 0.15f));
+			DrawRect(FLinearColor(0.6f, 0.75f, 0.9f, 1.f), X + BarW * TD - 1.f, BY, 2.f, 16.f);   // where the default sits
+		}
 		if (bUIClick && bUIHaveMouse && UIMouseX >= X - 8.f && UIMouseX <= X + BarW + 8.f && UIMouseY >= BY - 8.f && UIMouseY <= BY + 24.f) Dragging = i;
 		if (Btn(X + BarW + 8.f, BY - 6.f, 44.f, 26.f, TEXT("reset"), bChanged, false, 0.75f)) { ResetItem(i); Dragging = -1; }
 	}

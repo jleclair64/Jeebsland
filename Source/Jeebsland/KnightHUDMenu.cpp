@@ -234,6 +234,7 @@ void AKnightHUD::DrawStartScreen()
 	}
 	bTypeEnter = false;
 	DrawTip();
+	ShotUIMenu();   // (test pictures with -ShotUIMenu; nothing otherwise)
 }
 
 // Checks what can be checked here (the server checks it all again), then sets off for the chosen world
