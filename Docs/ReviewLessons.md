@@ -412,3 +412,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - **Performance:** a new ring of hundreds of full-size meshes (trees, rocks) ships with a measured with/without result and a default density that keeps the town view within +0.3 ms, with the forest's shadow reach and stand-in limits applied before it goes in.
 - **Process:** traces and overlaps made during the world build see none of the solids created that frame; build anything that depends on them (NPC routes, counter spots) half a second later.
 - **Process:** two agents waiting for a solo timing window behind a reviewer that holds a slot across runs deadlock the queue; reviewers release between runs, and only one agent per batch asks for solo.
+
+## Playable troll (2026-11-19)
+
+- **Motion:** a strike ends with its arm easing back; a held full stretch reads as frozen. A jump that leaves a crouch needs a stretched take-off pose before the tuck.
+- **Online:** any move given its own test switch must be drivable on a client through the real RPCs (`-TrollNetDo=`), not only in single-player picture mode.
+- **Process:** `Tools/ShotViews.ps1` crops for 2560 px frames but off-screen runs give 1280x720; `-LabAt` pictures need about 8 frames for the camera to settle.
