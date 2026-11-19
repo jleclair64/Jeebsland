@@ -40,7 +40,7 @@ fr = node(o, unreal.MaterialExpressionFresnel, -900, 0, exponent=1.6, base_refle
 core = node(o, unreal.MaterialExpressionOneMinus, -750, 0); link(fr, "", core, "")
 c2 = node(o, unreal.MaterialExpressionMultiply, -600, 0); link(core, "", c2, "A"); link(core, "", c2, "B")
 col = node(o, unreal.MaterialExpressionVectorParameter, -900, 200, parameter_name="Color", default_value=unreal.LinearColor(0.02, 0.72, 1.0, 1.0))
-st = node(o, unreal.MaterialExpressionScalarParameter, -900, 350, parameter_name="Strength", default_value=1.6)
+st = node(o, unreal.MaterialExpressionScalarParameter, -900, 350, parameter_name="Strength", default_value=0.9)
 a = node(o, unreal.MaterialExpressionMultiply, -600, 200); link(col, "RGB", a, "A"); link(st, "", a, "B")
 soft = node(o, unreal.MaterialExpressionMultiply, -450, 200); link(a, "", soft, "A"); link(core, "", soft, "B")   # its colour, fading to the rim
 # a slightly lighter heart: the same colour lifted a quarter toward white, never white itself

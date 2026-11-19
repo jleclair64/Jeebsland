@@ -332,13 +332,13 @@ void ABridge::BuildDecor()
 		JeebLamp::ApplyToMesh(C, this);
 		Decor.Add(C);
 	};
-	auto Light = [&](float L, float W, float Up)
+	auto Light = [&](float L, float W, float Up, float Lumens = 110.f)
 	{
 		UPointLightComponent* P = NewObject<UPointLightComponent>(this);
 		P->SetupAttachment(RootComponent);
 		P->SetRelativeLocation(FVector(L, W, DeckRel(L) + Up));
 		P->SetIntensityUnits(ELightUnits::Lumens);
-		P->SetIntensity(110.f);
+		P->SetIntensity(Lumens);
 		P->SetAttenuationRadius(500.f);
 		P->SetCastShadows(false);
 		P->MaxDrawDistance = 6000.f;
@@ -353,7 +353,7 @@ void ABridge::BuildDecor()
 		{
 			const float OverDeck = PostTopAbs - DeckRel(End * PostL);   // Put and Light measure up from the deck
 			Put(Lantern, Lantern, End * PostL, Sd * PostW, OverDeck + 0.5f, 45.f, 0.f, LanternH);
-			Light(End * PostL, Sd * PostW, OverDeck + LanternH * 0.4f);
+			Light(End * PostL, Sd * PostW, OverDeck + LanternH * 0.7f, 45.f);   // (up in the lantern's roof and dimmer: lower down it lit the post's top as a white disc)
 		}
 		Put(Torch, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);   // the torches at the middle, on the parapet
 		Put(Flame, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);

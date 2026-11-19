@@ -26,7 +26,7 @@
 // (700 out to 320 cm); now a tight glow round the bolt and the hand that cast it.
 static TAutoConsoleVariable<float> CVarBoltLight(TEXT("jeeb.Magic.BoltLight"), 150.f, TEXT("Brightness of the light a magic bolt carries (was 700; 0 = no light)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBoltLightRadius(TEXT("jeeb.Magic.BoltLightRadius"), 90.f, TEXT("How far (cm) a magic bolt's light reaches (was 320)."), ECVF_Default);
-static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 1.6f, TEXT("Brightness on screen of the magic bolt's orb (M_GlowOrb Strength, exposure-locked since 2026-11-19: the same by day and at dusk; was 4 on the scene's scale, a white blob)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 0.9f, TEXT("Brightness on screen of the magic bolt's orb (M_GlowOrb Strength, exposure-locked since 2026-11-19: the same by day and at dusk; was 4 on the scene's scale, a white blob)."), ECVF_Default);
 
 // (test pictures: say where each arrow ended up)
 static bool ArrowLog() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")); return b; }
