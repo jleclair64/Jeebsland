@@ -150,7 +150,11 @@ void FKnightAnimator::WallPlay(int32 Key, const FInput& In, FPose& B, float& Out
 	if (Key <= 88) A0 = A1 = FVector(S.H0.X, 0.f, 100.f);                                         // a climb jump: on the rock before and after
 	else if (Key == 89) { A0 = FVector(S.H0.X, 0.f, 100.f); A1 = FVector(S.H1.X, S.End1Y, S.End1Z); }   // the ledge: from the rock to standing on top
 	else { A0 = FVector(0.f, S.Start0Y, S.Start0Z); A1 = FVector(0.f, S.End1Y, S.End1Z); }          // a mantle: standing to standing
-	B.Hip = FMath::Lerp(A0, A1, E) + (Rel - Dm) * (1.f - E);
+	FVector Off = Rel - Dm;
+	// (2026-11-18 night, owner: he looked to step up and pass through the top.) The capsule now rises clear of the top before it goes over
+	// (PhysScripted), higher than the clip's own hips: never let the clip's lower hips hang his legs below the capsule's feet, into the top
+	if (Key >= 90 && In.bMantleEdge) Off.Z = FMath::Max(Off.Z, 0.f);
+	B.Hip = FMath::Lerp(A0, A1, E) + Off * (1.f - E);
 	if (Key == 90)
 	{
 		// The clip sits back with its legs out in front as the hips pass the rail: tip the whole body forward about the hips from there to the landing,
@@ -195,12 +199,15 @@ void FKnightAnimator::PlantHands(const FInput& In, FPose& B) const
 
 // (2026-11-18 night, owner: "it looks like he's stepping up slightly and moving through the object he's mantling".) Whatever the clip and the capsule's
 // path do, no sole or toe may be inside the obstacle's top: every frame of a vault or a climb onto, each boot that is over the top (from its near edge,
-// In.WallPoint, to MantleFar past it, faded in and out over 20 cm so nothing pops) is checked, and the whole body is lifted by the worst shortfall plus
+// In.WallPoint, to MantleFar past it) is checked, and the whole body is lifted by the worst shortfall plus
 // MantleSoleClear. Mesh frame: +Y ahead, -X his right, Z up from his feet. The capsule itself rises clear too (UKnightMovement::PhysScripted), so this is
 // usually a few centimetres; the log says how much.
-void FKnightAnimator::MantleFeetClear(const FInput& In, FPose& B) const
+void FKnightAnimator::MantleFeetClear(const FInput& In, FPose& B)
 {
-	constexpr float SoleBelow = 9.f, ToeAhead = 14.f, HeelBack = 10.f, MantleSoleClear = 6.f, Fade = 20.f;
+	// (only boots reaching past the near edge count: one still in front of the face is not inside it, and counting it lifted him a metre at the
+	// take-off. The lift eases, fast up and slower down, so a boot coming over the edge never pops the body)
+	constexpr float SoleBelow = 9.f, ToeAhead = 14.f, HeelBack = 10.f, MantleSoleClear = 6.f, Fade = 8.f;
+	if (ActionT <= 0.f) MantleLift = 0.f;
 	const FQuat Yaw(FRotator(0.f, CurYaw + YawNow, 0.f));
 	const FVector G = Yaw.UnrotateVector(In.WallPoint - CurFeet);   // the near top edge: (ahead, right, up)
 	FVector Along = Yaw.UnrotateVector(In.MantleAlong);
@@ -214,16 +221,18 @@ void FKnightAnimator::MantleFeetClear(const FInput& In, FPose& B) const
 		const FVector P = BonePos(B, Foot);
 		const float Ahead = P.Y;
 		const float Front = Ahead + (Foot == LToe || Foot == RToe ? 4.f : ToeAhead), Back = Ahead - HeelBack;
-		const float W = FMath::SmoothStep(Near - Fade, Near, Front) * (1.f - FMath::SmoothStep(Far, Far + Fade, Back));
+		const float W = FMath::SmoothStep(Near, Near + Fade, Front) * (1.f - FMath::SmoothStep(Far, Far + Fade, Back));
 		if (W <= 0.f) continue;
 		const float Sole = float(P.Z) - (Foot == LToe || Foot == RToe ? 3.f : SoleBelow);
+		if (Sole < TopZ - 30.f) continue;   // (a boot still on the ground at the face's foot before the take-off or after the landing: beside it, not in its top; counting it lifted him half a metre)
 		Worst = FMath::Min(Worst, Sole - TopZ);
 		Lift = FMath::Max(Lift, (TopZ + MantleSoleClear - Sole) * W);
 	}
-	if (Lift > 0.f) B.Hip.Z += Lift;
+	MantleLift = FMath::FInterpTo(MantleLift, Lift, PlayDt, Lift > MantleLift ? 30.f : 10.f);
+	if (MantleLift > 0.f) B.Hip.Z += MantleLift;
 	if (In.bShotLog)
-		UE_LOG(LogTemp, Log, TEXT("JEEBMANTLEFEET t %.2f top %.0f cm over his feet now, near %.0f far %.0f ahead; lowest boot over it %s cm over the top before the lift; lift %.1f"),
-			ActionT, TopZ, Near, Far, Worst < 1.0e8f ? *FString::Printf(TEXT("%.0f"), Worst) : TEXT("-"), Lift);
+		UE_LOG(LogTemp, Log, TEXT("JEEBMANTLEFEET t %.2f top %.0f cm over his feet now, near %.0f far %.0f ahead; lowest boot over it %s cm over the top before the lift; lift %.1f (wants %.1f)"),
+			ActionT, TopZ, Near, Far, Worst < 1.0e8f ? *FString::Printf(TEXT("%.0f"), Worst) : TEXT("-"), MantleLift, Lift);
 }
 
 // The frame the pose is drawn in: on the rock tilted about the hips to lie along it, and moved so the hands are on it

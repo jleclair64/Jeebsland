@@ -388,7 +388,7 @@ private:
 	TMap<FString, FVector2D> SwimHipStats;
 	int32 SwimMoveKey = 92;
 	float SwimSlowT = 0.f, SwimPhase = 0.f, SwimHipZ = -1.f, SwimPitch = 0.f, SwimDrownT = 0.f;
-	void MantleFeetClear(const JeebAnim::FInput& In, FPose& B) const;   // a mantle: lifts the body so no foot or toe is inside the obstacle's top (In.WallPoint, MantleFar)
+	void MantleFeetClear(const JeebAnim::FInput& In, FPose& B);   // a mantle: lifts the body so no foot or toe is inside the obstacle's top (In.WallPoint, MantleFar)
 	void PlantHands(const JeebAnim::FInput& In, FPose& B) const;   // a vault: both hands pressed onto the top of the fence while he goes over (In.WallPoint)
 	void ClimbIK(const JeebAnim::FInput& In, float Dt);   // on the rock: each hand and boot rests on the surface (1.5 cm off), never in it: two-bone reaches, the body eased off the rock if the hands need it
 	float ClimbIKW = 0.f, WallIKLogT = 0.f;
@@ -396,7 +396,7 @@ private:
 	FTransform WallFrame(const JeebAnim::FInput& In, const FTransform& Frame, float Dt);
 	void WallLog(const JeebAnim::FInput& In, float Dt);
 	FVector CurFeet = FVector::ZeroVector, WallActFeet = FVector::ZeroVector, WallOff = FVector::ZeroVector;
-	float CurYaw = 0.f, WallPhase = 0.f, WallGrabT = 0.f, WallLogT = 0.f;
+	float CurYaw = 0.f, WallPhase = 0.f, WallGrabT = 0.f, WallLogT = 0.f, MantleLift = 0.f;
 	int32 WallMoveKey = 81;
 	FQuat WallTilt = FQuat::Identity;
 	FTransform WallRel = FTransform::Identity;
