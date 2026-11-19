@@ -150,6 +150,14 @@ private:
 	float StepSide = 1.f;                  // the way he steps round something in his path, kept until it is clear
 	double StepSideAt = -10.0;             // (when StepSide last changed: it holds for StepSideHold, 0.6 s, so he never jitters left-right against a trunk)
 	float StrollWorst = 0.f, StrollTurnT = 0.f;   // (test log -LogStroll: the worst heading-vs-step angle on this stroll leg, and how long he turned on the spot first)
+	// (2026-11-18 night: stepping round something he faces the way he walks, not his foe, so he never crab-walks; FoeBandit.cpp BanditMove)
+	float WalkYaw = 0.f;                   // the way his recent steps went, eased (degrees)
+	double DetourAt = -10.0, LastStepAt = -10.0;   // (when he last stepped off the straight line round something, and last stepped at all)
+	float DetourWorst = 0.f;               // (test log -LogDetour: the worst facing-vs-step angle while detouring, logged twice a second)
+	double DetourLogAt = -10.0;
+	int32 DetourSteps = 0, DetourCrab = 0;
+	bool BanditDetouring() const;          // stepping round something just now: face WalkYaw
+	void NoteStep(const FVector2D& StepDir, float OffAng, float Dt);   // (BanditMove: a step was taken, OffAng degrees off the straight line)
 	float RegenAcc = 0.f;              // (health coming back at camp, a point at a time)
 	bool bSleeping = false;
 	void SetMind(EMind M, const TCHAR* Why);

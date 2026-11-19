@@ -559,7 +559,11 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 			StrafeMul = Fw >= 0.f ? FMath::Lerp(0.9f, 1.f, Fw) : FMath::Lerp(0.9f, 0.75f, -Fw);
 		}
 	}
-	StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
+	UKnightMovement* KM = KnightMove();
+	// (2026-11-18 night: the eased shares are advanced inside each move now, UKnightMovement::UpdateCharacterStateBeforeMovement, so the
+	// client and the server agree move by move; this frame reads them. Without the knight's own movement component, as before.)
+	if (KM) StrafeSprint = KM->MoveStrafeSprint;
+	else StrafeSprint = FMath::FInterpTo(StrafeSprint, WantSprintFrac, Dt, 5.f);
 	// Heavy armour slows him on foot (JeebItems::WeightSpeedMul; Worn reaches the owner's machine, so it predicts the same)
 	const float Burden = (!bMounted && Skills) ? JeebItems::WeightSpeedMul(Skills) : 1.f;
 	const float RunSpeed = bWantSprint ? FMath::Lerp(WalkSpeed, SprintSpeed, StrafeSprint) : WalkSpeed;
@@ -585,6 +589,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	{
 		AirSpeedMul = FMath::FInterpTo(AirSpeedMul, 1.f, Dt, 6.f); // speeding back up after landing, as before
 	}
+	if (KM) AirSpeedMul = KM->MoveAirMul;   // (advanced per move: see above)
 	Move->MaxWalkSpeed = bSpecial ? SpecialSpeed : BaseSpeed * AirSpeedMul;
 	// The sword's smash attack: charging walks at half the walking speed (never sprinting); the swipe and the end lag don't move
 	if (!bSpecial && !bMounted && Smash == ESmash::Charging) Move->MaxWalkSpeed = 0.5f * WalkSpeed * Burden * AirSpeedMul;
@@ -593,7 +598,25 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	else if (!bSpecial && !bMounted && Smash == ESmash::EndLag) Move->MaxWalkSpeed = 0.f;
 	// No wind-up when starting to walk: on the ground and below walking speed the knight gets there at once; above it (walk
 	// to sprint) the usual acceleration keeps the sprint's ramp. Worked out from the velocity, so the server agrees.
+	// (2026-11-18 night: inside each move now, UKnightMovement::GetMaxAcceleration; the member below is only what this frame saw, for logs.)
 	const float WalkCap = FMath::Min(Move->MaxWalkSpeed, BaseSpeed > WalkSpeed * Burden ? WalkSpeed * Burden * AirSpeedMul : Move->MaxWalkSpeed);
 	Move->MaxAcceleration = (!bFalling && !bSpecial && !bMounted && Move->Velocity.Size2D() < WalkCap - 5.f) ? WalkAccel : SprintAccel;
+	// What the moves need to work out his speed and start-up push themselves (KnightMovement.h, FSpeedRule). The plain run / sprint is the
+	// only speed that changes from move to move (with the push's direction, Shift and the eased shares); every other case keeps the
+	// MaxWalkSpeed set above, which follows states the server already decides.
+	if (KM)
+	{
+		const bool bOverride = Smash == ESmash::Charging || Smash == ESmash::EndLag || Bow == EBow::Drawing || Bow == EBow::Recover || (Bow == EBow::Reload && !bWantSprint) || bDrinking;
+		UKnightMovement::FSpeedRule& R = KM->SpeedRule;
+		R.bByMove = !bSpecial && !bMounted && !bBackStep && !bStance && !bCrouched && !bBlocking && !bOverride;
+		R.bStrafe = bFaceCam && !bStance;
+		R.bSprintOk = !bMounted && !bCrouched && !bBlocking && !bExhausted;   // (Shift itself comes with each move: FLAG_Custom_1)
+		R.bAccelRule = !bSpecial && !bMounted;
+		R.Walk = WalkSpeed;
+		R.Sprint = SprintSpeed;
+		R.K = ((GetWorld()->GetTimeSeconds() < SpeedUntil) ? SpeedPotionMul : 1.f) * (Skills ? JeebItems::CombinedMods(Skills).SpeedMul : 1.f) * Burden;
+		R.WalkCapBase = WalkSpeed * Burden;
+		R.AirMul = AirMul;
+	}
 	return bFaceCam;
 }

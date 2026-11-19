@@ -238,10 +238,21 @@ void AKnightCharacter::FillWallInput(JeebAnim::FInput& In) const
 	if (In.WallMode == JeebClimb::MantleOver || In.WallMode == JeebClimb::MantleOnto)
 	{
 		// (the fence's top edge, where the hands go: the moving machines kept it from the move's plan, others find it once as the mantle starts)
-		if (GetLocalRole() != ROLE_SimulatedProxy) MantleEdge = KM->ActEdge;
-		else if (MantleEdgeMode != In.WallMode && !KM->FindMantleEdge(C, GetActorForwardVector(), MantleEdge)) MantleEdge = FVector::ZeroVector;
+		if (GetLocalRole() != ROLE_SimulatedProxy)
+		{
+			MantleEdge = KM->ActEdge;
+			MantleAlong = FVector(KM->ActDir.X, KM->ActDir.Y, 0.f).GetSafeNormal();
+			MantleFar = UKnightMovement::MantleFarPast(KM->ActFrom, KM->ActEdge, MantleAlong, In.WallMode, KM->ActFar);
+		}
+		else if (MantleEdgeMode != In.WallMode)
+		{
+			MantleAlong = GetActorForwardVector().GetSafeNormal2D();
+			if (!KM->FindMantleEdge(C, GetActorForwardVector(), MantleEdge, &MantleFar, &MantleAlong)) MantleEdge = FVector::ZeroVector;
+		}
 		In.WallPoint = MantleEdge;
 		In.bMantleEdge = !MantleEdge.IsZero();
+		In.MantleAlong = MantleAlong;
+		In.MantleFar = MantleFar;
 	}
 	MantleEdgeMode = In.WallMode;
 	// the surface under each hand and boot (not on a dedicated server: there the rock's plane does)

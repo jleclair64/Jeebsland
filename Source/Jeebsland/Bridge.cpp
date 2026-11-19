@@ -269,6 +269,25 @@ void ABridge::BuildCollision()
 			Rails.Add(B);
 		}
 	}
+	// ---- the four round posts where the parapets start (2026-11-18 night, owner: he mantled onto the 80 cm parapet box straight through one).
+	// Measured on the model (Blender ray casts of Saved/KnightBuild/Bridge/Bridge.fbx): centred at |L| 1000 and 295 across, about 55 cm round,
+	// tops 443 cm over the pier bottoms (about 1.7 m over the deck: too tall to mantle). Each is a solid upright capsule, tagged so it is never mantled,
+	// and the mantle onto the parapet beside one finds it in the way (PlanMantle's face trace, or no room on top).
+	for (int32 End = -1; End <= 1; End += 2)
+		for (int32 Side = -1; Side <= 1; Side += 2)
+		{
+			constexpr float PostL = 1000.f, PostW = 295.f, PostR = 56.f, PostTop = 443.f;
+			const float Bottom = DeckRel(End * PostL) - 30.f;
+			UCapsuleComponent* C = NewObject<UCapsuleComponent>(this);
+			C->SetupAttachment(RootComponent);
+			C->SetCapsuleSize(PostR, FMath::Max((PostTop - Bottom) * 0.5f, PostR));
+			C->SetRelativeLocation(FVector(End * PostL, Side * PostW, (PostTop + Bottom) * 0.5f));
+			C->SetCollisionProfileName(TEXT("BlockAll"));
+			C->SetCanEverAffectNavigation(false);
+			C->SetHiddenInGame(true);
+			C->ComponentTags.Add(FName(TEXT("JeebNoMantle")));
+			C->RegisterComponent();
+		}
 }
 
 void ABridge::Tick(float Dt)

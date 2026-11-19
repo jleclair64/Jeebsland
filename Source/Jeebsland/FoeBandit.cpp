@@ -24,6 +24,7 @@
 #include "CollisionQueryParams.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
@@ -199,7 +200,8 @@ void AFoeKnight::BanditRoam(float Dt, float& Yaw)
 		const float After = FVector2D::Distance(FVector2D(GetActorLocation()), Home);
 		StuckT = (Before - After < ChaseSpeed * HomeSpeedMul * Dt * 0.2f) ? StuckT + Dt : FMath::Max(0.f, StuckT - Dt);
 		const FVector2D W = Home - At;
-		if (!W.IsNearlyZero()) Yaw = FMath::FixedTurn(Yaw, FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X)), 360.f * Dt);
+		if (BanditDetouring()) Yaw = FMath::FixedTurn(Yaw, WalkYaw, 360.f * Dt);   // (round a tree: the way he steps, BanditMove)
+		else if (!W.IsNearlyZero()) Yaw = FMath::FixedTurn(Yaw, FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X)), 360.f * Dt);
 		return;
 	}
 	// At home: his health comes back after a quiet while
@@ -218,7 +220,7 @@ void AFoeKnight::BanditRoam(float Dt, float& Yaw)
 	const FVector2D W = ClampToPen(WanderTo) - At;
 	if (W.Size() > 8.f)
 	{
-		const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X));
+		const float WantYaw = BanditDetouring() ? WalkYaw : FMath::RadiansToDegrees(FMath::Atan2(W.Y, W.X));   // (round something: the way he steps)
 		Yaw = FMath::FixedTurn(Yaw, WantYaw, 180.f * Dt);
 		if (FMath::Abs(FMath::FindDeltaAngleDegrees(Yaw, WantYaw)) > 40.f) { StrollTurnT += Dt; return; }
 	}
@@ -240,6 +242,58 @@ void AFoeKnight::BanditRoam(float Dt, float& Yaw)
 	if (Step.Size() > 0.1f) StrollWorst = FMath::Max(StrollWorst, FMath::Abs(FMath::FindDeltaAngleDegrees(Yaw, FMath::RadiansToDegrees(FMath::Atan2(Step.Y, Step.X)))));
 	StuckT = Step.Size() < StrollSpeed * Dt * 0.2f ? StuckT + Dt : 0.f;
 	(void)D;
+}
+
+// (2026-11-18 night, open review item: a bandit stepping round a tree or rock kept facing his foe while stepping 70 to 110 degrees off, a
+// crab-walk.) Each step he takes is noted here: the way it went, eased into WalkYaw, and whether it left the straight line. While he is
+// detouring (a step off the line within the last DetourHold s, and still stepping), the fight, the walk home and the stroll face WalkYaw
+// at a smooth turn rate instead of the foe or the goal; within striking range (FaceFoeWithin) he faces his foe as before, so a little
+// sidestep while he circles you stays. Nothing new is traced: the step's own sweep already decided the way.
+namespace
+{
+	constexpr double DetourHold = 0.6;     // s after his last step off the line that he still faces the way he walks
+	constexpr float WalkYawEase = 540.f;   // deg/s: how fast WalkYaw follows his steps (the body then turns at the callers' rates)
+	constexpr double StillAfter = 0.5;     // s without a step: he has stopped (turning on the spot on a stroll, or walled in)
+}
+
+static TAutoConsoleVariable<int32> CVarFoeFaceWalk(TEXT("jeeb.Foes.FaceWalk"), 1, TEXT("Bandits stepping round something face the way they walk (1), or keep facing their foe or goal as before (0, the crab-walk). Server."), ECVF_Default);
+
+bool AFoeKnight::BanditDetouring() const
+{
+	if (CVarFoeFaceWalk.GetValueOnGameThread() == 0) return false;
+	const double Now = GetWorld()->GetTimeSeconds();
+	return Now - DetourAt < DetourHold && Now - LastStepAt < StillAfter;
+}
+
+void AFoeKnight::NoteStep(const FVector2D& StepDir, float OffAng, float Dt)
+{
+	const bool bOffLine = OffAng != 0.f;
+	const double Now = GetWorld()->GetTimeSeconds();
+	const float StepYaw = FMath::RadiansToDegrees(FMath::Atan2(StepDir.Y, StepDir.X));
+	const bool bWasWalking = Now - LastStepAt < StillAfter;
+	WalkYaw = bWasWalking ? FMath::FixedTurn(WalkYaw, StepYaw, WalkYawEase * Dt) : StepYaw;
+	LastStepAt = Now;
+	if (bOffLine) DetourAt = Now;
+#if !UE_BUILD_SHIPPING
+	// -LogDetour: twice a second while detouring, the worst angle between his facing and his steps (before this fix: 70 to 110 degrees)
+	static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("LogDetour"));
+	if (bLog && Now - DetourAt < DetourHold)   // (logged with jeeb.Foes.FaceWalk 0 too, to compare)
+	{
+		const float Off = FMath::Abs(FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, StepYaw));
+		DetourWorst = FMath::Max(DetourWorst, Off);
+		++DetourSteps;
+		if (Off > 45.f) ++DetourCrab;
+		if (Now - DetourLogAt > 0.5)
+		{
+			// (the worst includes the first steps of a detour, while he is still turning into it; the crab share is the steps more than 45 degrees off his facing)
+			UE_LOG(LogTemp, Log, TEXT("JEEBDETOUR %s (%s) %s: worst facing-vs-step %.0f deg, crab %d of %d steps, this step %.0f deg off the line, %.0f m from his foe"), *FoeName(), *GetName(),
+				Mind == EMind::Fight ? TEXT("fight") : Mind == EMind::Return ? TEXT("return") : TEXT("home"), DetourWorst, DetourCrab, DetourSteps, OffAng,
+				Target.IsValid() ? FVector::Dist2D(Target->GetActorLocation(), GetActorLocation()) / 100.f : -1.f);
+			DetourLogAt = Now;
+			DetourWorst = 0.f; DetourSteps = 0; DetourCrab = 0;
+		}
+	}
+#endif
 }
 
 bool AFoeKnight::BanditMove(const FVector2D& To, float Speed, float Dt)
@@ -278,6 +332,7 @@ bool AFoeKnight::BanditMove(const FVector2D& To, float Speed, float Dt)
 		if (GetWorld()->SweepSingleByObjectType(Hit, From, Dest, FQuat::Identity, Obj, Shape, Q) && !Hit.bStartPenetrating) continue;
 		if (i >= 2 && i % 2 == 0) FlipSide();   // (the other way round got him through: keep stepping that way)
 		SetActorLocation(FVector(N.X, N.Y, FloorZ(N.X, N.Y)));
+		if (Dt < 0.2f) NoteStep(Dd, Ang, Dt);   // (not the knock-back shoves, which come through here with Dt 1)
 		return false;
 	}
 	FlipSide();   // (walled in this way: try the other side, once the hold is up)

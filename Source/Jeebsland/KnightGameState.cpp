@@ -619,6 +619,10 @@ void AKnightGameState::BuildMoveLab()
 		UStaticMeshComponent* Block = Solid(FVector(1000.f, 1150.f, 60.f), FVector(200.f, 200.f, 120.f), true, FLinearColor(0.50f, 0.48f, 0.44f));
 		Block->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 		Block->ComponentTags.Add(FName(TEXT("JeebMantle")));
+		// A low stone post 75 cm tall and 60 cm across, between the block and the tower, to vault (2026-11-18 night: like the bridge's parapet ends, the owner's low mantle)
+		UStaticMeshComponent* Post = Solid(FVector(1000.f, 1380.f, 37.5f), FVector(60.f, 60.f, 75.f), true, FLinearColor(0.55f, 0.53f, 0.50f));
+		Post->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		Post->ComponentTags.Add(FName(TEXT("JeebMantle")));
 	}
 	// Oak Hill's test house in three versions, side by side on a patch of grass past the floor's +Y edge (to the right of the start, clear of the gear wall's
 	// boards), doors toward the floor (owner, 2026-11-06: to compare them in the game; Tools\BuildBuildings.ps1). The models are 12 m long and drawn 1.2 times
