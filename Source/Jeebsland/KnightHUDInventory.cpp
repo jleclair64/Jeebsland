@@ -419,6 +419,29 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			}
 		}
 
+#if !UE_BUILD_SHIPPING
+	// TESTING ONLY (owner 2026-11-20): KNIGHT / TROLL toggle beside the Test kit button (the Escape screen's has the same swap). Single player only.
+	if (!bTestKitOpen)
+	{
+		const bool bSolo = GetNetMode() == NM_Standalone;
+		const float TW = 78.f, TH = 30.f, TY = MapTop - Frame;
+		for (int32 C = 0; C < 2; ++C)
+		{
+			const float TX = MX - Frame - 12.f - 120.f - 10.f - (2 - C) * (TW + 6.f) + 6.f;
+			const bool bOn = (C == 1) == Knight->IsTroll();
+			AddRect(TX, TY, TW, TH);
+			if (Btn(TX, TY, TW, TH, C == 0 ? TEXT("KNIGHT") : TEXT("TROLL"), bSolo, bOn, 0.9f) && bSolo && !bOn)
+			{
+				Knight->SetPanelCursor(false);
+				Knight->SwapClassForTest(C == 1);   // (destroys this pawn: nothing below may use Knight)
+				bGreyGlass = false;
+				return;
+			}
+			if (Over(TX, TY, TW, TH)) SetTip({ TEXT("Play as the knight or the troll"), bSolo ? TEXT("Saves, then swaps in the same spot") : TEXT("Single player only"), TEXT("Testing only: not in the real game") });
+		}
+	}
+#endif
+
 	if (Knight->GetLootTarget()) DrawLootWindows(Knight, IX, IY, PW);   // an open sack, to the left of your windows
 	bGreyGlass = false;
 }

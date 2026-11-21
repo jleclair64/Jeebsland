@@ -187,7 +187,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 {
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const float PW = 1500.f, PH = 690.f;
+	const float PW = 1320.f, PH = 690.f;   // (narrower so the keeper stands clear on the left, owner 2026-11-20)
 	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
