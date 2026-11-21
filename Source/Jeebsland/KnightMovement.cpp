@@ -434,6 +434,19 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	// Going up, the rock has to reach his hands (about 90 cm over the capsule's middle in the climbing clip): once it ends below them, he climbs up
 	// over the edge, or with no room up there he stops. (Owner 2026-11-13: he used to climb on until the rock ended below his waist and then
 	// his knees, hands and head over thin air, "an invisible wall past the ledge". The ledge clip expects the top about 90 cm up, too.)
+	// A bank that lies back with no ledge found over its top (2026-11-20, online review: he hung under a rounded crest until the bar ran out):
+	// a short scramble up and forward over the crest, as a jump from the move (the same on both machines); no regrab until he lands.
+	auto CrestHop = [&]() -> bool
+	{
+		if (WallNormal.Z < 0.3f || InUp <= 0.3f) return false;
+		const FVector Fwd = Flat(-WallNormal);
+		if (Fwd.IsNearlyZero() || !RoomFor(UpdatedComponent->GetComponentLocation() + FVector(0.f, 0.f, 70.f) + Fwd * 30.f)) return false;
+		Velocity = Fwd * 180.f + FVector(0.f, 0.f, 330.f);
+		bNoRegrab = true;
+		SetMovementMode(MOVE_Falling);
+		LogClimb(TEXT("crest hop"));
+		return true;
+	};
 	if (InUp > 0.3f)
 	{
 		constexpr float HandUp = 105.f;   // (the probe's 20 cm ball misses once the top is under about 85 cm up: right at his reaching hands, measured in pictures)
@@ -442,7 +455,7 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 		const bool bRockEnds = !bHit || (!Hand.bStartPenetrating && JeebClimb::IsClimbGround(Hand.GetComponent()) && Hand.ImpactNormal.Z >= GetWalkableFloorZ());   // (or it lies back to ground he can stand on)
 		if (bRockEnds)
 		{
-			if (TryLedge()) return false;
+			if (TryLedge() || CrestHop()) return false;
 			// no room over the top: no further up (along the wall and down still work)
 			FHitResult Back;
 			SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
@@ -454,7 +467,7 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	if (!bOk && InUp <= 0.3f) bOk = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, H) && Climbable(H);   // (never going up: that climbed thin air)
 	if (!bOk)
 	{
-		if (InUp > 0.3f && TryLedge()) return false;
+		if (InUp > 0.3f && (TryLedge() || CrestHop())) return false;
 		FHitResult W;
 		if (ProbeWall(C, Dir, R + 40.f, W) && !W.bStartPenetrating && JeebClimb::IsClimbGround(W.GetComponent())
 			&& W.ImpactNormal.Z >= GetWalkableFloorZ())
