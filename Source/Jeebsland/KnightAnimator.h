@@ -210,10 +210,11 @@ public:
 	// Where he is now, between poses: when poses are throttled, the hurt and shield boxes read the last pose at his current place
 	void MoveTo(const FVector& Feet, float ActorYaw);
 
-	// A worn piece: Tier < 0 takes it off (the slot's plates vanish), else tinted for that tier
-	void Wear(int32 Piece, int32 Tier);
+	// A worn piece: Tier < 0 takes it off (the slot's plates vanish), else tinted for that tier. Style: the armour style (JeebItems::EArmourStyle);
+	// only Dark Plate (3) has a model of its own (/Game/DarkPlate, drawn by DarkComp in one colour), the others are the suit's own plates.
+	void Wear(int32 Piece, int32 Tier, int32 Style = 0);
 	// A worn piece's colour x Mul over its tier's (foes from Foes.csv: a bandit's dark hood and red tunic; players never call it)
-	void SetShade(int32 Piece, const FLinearColor& Mul) { if (Piece < 0 || Piece >= JeebAnim::Piece_Count) return; PieceShade[Piece] = Mul; if (WornTiers[Piece] >= 0) Wear(Piece, WornTiers[Piece]); }
+	void SetShade(int32 Piece, const FLinearColor& Mul) { if (Piece < 0 || Piece >= JeebAnim::Piece_Count) return; PieceShade[Piece] = Mul; if (WornTiers[Piece] >= 0) Wear(Piece, WornTiers[Piece], WornStyles[Piece]); }
 
 	void Update(float Dt, const JeebAnim::FInput& In, const FVector& Feet, float ActorYaw);
 
@@ -327,6 +328,12 @@ private:
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};
 	int32 WornTiers[JeebAnim::Piece_Count] = { -1, -1, -1, -1, -1 };
+	int32 WornStyles[JeebAnim::Piece_Count] = {};
+	class USkeletalMeshComponent* DarkComp = nullptr;   // the Dark Plate set (2026-11-21): follows Comp's bones, made when a piece of it is first worn
+	int32 DarkMat[JeebAnim::Piece_Count] = { INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE };
+	UMaterialInstanceDynamic* DarkMid[JeebAnim::Piece_Count] = {};
+	void ShowDark(int32 Piece, bool bShow);
+	static void ShowDarkSection(class USkeletalMeshComponent* C, int32 Mat, bool bShow);
 	FLinearColor PieceShade[JeebAnim::Piece_Count] = { FLinearColor::White, FLinearColor::White, FLinearColor::White, FLinearColor::White, FLinearColor::White };
 	void ShowBare(int32 Piece, bool bShow);
 	int32 PieceMat[JeebAnim::Piece_Count];

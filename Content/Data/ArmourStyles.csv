@@ -5,3 +5,4 @@ Name,StopMul,WeightMul,PriceMul,Note
 Classic,1,1,1,"Classic plate: the all-rounder"
 Light,0.75,0.55,0.8,"Light: stops a quarter less, but weighs about half as much"
 Heavy,1.2,1.45,1.3,"Heavy plate: stops a fifth more, but weighs half as much again"
+Dark Plate,1.1,1.3,1.5,"Dark Plate: blackened steel, one look at every tier; stops a tenth more, weighs a third more"

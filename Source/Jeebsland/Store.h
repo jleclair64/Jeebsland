@@ -94,7 +94,7 @@ namespace JeebStore
 			if (IsGear(W.Id) && IsArmorKind(KindOf(W.Id)))
 			{
 				const float Mul = float(W.Price) / FMath::Max(1, BuyPrice(KindOf(W.Id), VariantOf(W.Id)));   // (keeps a ware's own mark-up)
-				W.Id = ArmourId(KindOf(W.Id), R.RandRange(0, NumArmourStyles - 1), VariantOf(W.Id));
+				W.Id = ArmourId(KindOf(W.Id), R.RandRange(0, NumRolledArmourStyles - 1), VariantOf(W.Id));
 				W.Price = FMath::Max(1, FMath::RoundToInt(BuyPrice(KindOf(W.Id), FullVariant(W.Id)) * Mul));
 			}
 		return Out;
@@ -157,7 +157,7 @@ namespace JeebStore
 		case 7: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Silver); break;
 		default: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Gold); break;
 		}
-		if (IsGear(OutId) && IsArmorKind(KindOf(OutId))) OutId = ArmourId(KindOf(OutId), R.RandRange(0, NumArmourStyles - 1), VariantOf(OutId));   // (armour in any style, 2026-11-03)
+		if (IsGear(OutId) && IsArmorKind(KindOf(OutId))) OutId = ArmourId(KindOf(OutId), R.RandRange(0, NumRolledArmourStyles - 1), VariantOf(OutId));   // (armour in any style, 2026-11-03)
 		return Row;
 	}
 }

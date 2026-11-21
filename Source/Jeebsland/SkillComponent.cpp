@@ -608,7 +608,7 @@ void USkillComponent::FillPracticePack()
 	{
 		if (Slots[i].Id != 0) continue;
 		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
-		Slots[i].Id = IsArmorKind(K) ? ArmourId(K, R.RandRange(0, NumArmourStyles - 1), R.RandRange(T_Tin, T_Diamond)) : GearId(K, R.RandRange(T_Tin, T_Diamond));   // (some will need higher levels to use: the level gates; armour in any style)
+		Slots[i].Id = IsArmorKind(K) ? ArmourId(K, R.RandRange(0, NumRolledArmourStyles - 1), R.RandRange(T_Tin, T_Diamond)) : GearId(K, R.RandRange(T_Tin, T_Diamond));   // (some will need higher levels to use: the level gates; armour in any style)
 		Slots[i].Count = 1;
 	}
 }

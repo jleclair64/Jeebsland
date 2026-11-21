@@ -701,6 +701,7 @@ static TAutoConsoleVariable<float> CVarArmourShine(TEXT("jeeb.Armour.Shine"), 0.
 
 static TAutoConsoleVariable<float> CVarArmourMetal(TEXT("jeeb.Armour.Metal"), 0.9664f, TEXT("How much of metal plate is pure mirror (1); below 1 some plain lit grey stays where the mirror shows something dark."), ECVF_Default);
 
+static void ApplyDarkLook(UMaterialInstanceDynamic* M, const FLinearColor& Shade);   // (Dark Plate, below at Wear)
 static void ApplyPlateLook(UMaterialInstanceDynamic* M, int32 Tier)
 {
 	const float R = CVarArmourRough.GetValueOnGameThread(), S = CVarArmourShine.GetValueOnGameThread();
@@ -716,7 +717,12 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 {
 	if (!L.bReady) return;
 	CurFeet = Feet; CurYaw = ActorYaw;   // (the climb's scripted moves measure the capsule's travel)
-	for (int32 p = 0; p < JeebAnim::Piece_Count; ++p) if (WornTiers[p] >= 0 && PieceMid[p]) ApplyPlateLook(PieceMid[p], WornTiers[p]);   // (live tuning; a MID ignores an unchanged value)
+	for (int32 p = 0; p < JeebAnim::Piece_Count; ++p)
+		if (WornTiers[p] >= 0)
+		{
+			if (WornStyles[p] == JeebItems::AS_Dark && DarkMid[p]) ApplyDarkLook(DarkMid[p], PieceShade[p]);
+			else if (PieceMid[p]) ApplyPlateLook(PieceMid[p], WornTiers[p]);   // (live tuning; a MID ignores an unchanged value)
+		}
 	Time += Dt;
 	Locomotion(Dt, In, Base);
 	Overlays(Dt, In, Base);
@@ -1194,6 +1200,8 @@ void FKnightAnimator::SetFists(const FInput& In, float Dt)
 	// the mail body under empty slots follows Comp's bones and applies its own morph weights each tick (USkeletalMeshComponent::UpdateFollowerComponent)
 	if (BareComp)
 		for (int32 h = 0; h < 2; ++h) BareComp->SetMorphTarget(FistName[h], W[h]);
+	if (DarkComp)   // (the Dark Plate gauntlets close the same way)
+		for (int32 h = 0; h < 2; ++h) DarkComp->SetMorphTarget(FistName[h], W[h]);
 }
 
 float FClipLib::ToolPose(FPose& P, float W, int32 Kind) const
@@ -2097,20 +2105,23 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 	return Comp;
 }
 
-void FKnightAnimator::Wear(int32 Piece, int32 Tier)
+void FKnightAnimator::Wear(int32 Piece, int32 Tier, int32 Style)
 {
 	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
 	const int32 Mat = PieceMat[Piece];
+	WornTiers[Piece] = Tier;
+	WornStyles[Piece] = Style;
+	ShowDark(Piece, Tier >= 0 && Style == JeebItems::AS_Dark);
+	const bool bDark = Tier >= 0 && Style == JeebItems::AS_Dark && DarkComp && DarkMat[Piece] != INDEX_NONE;   // (no Dark Plate model: the suit's own plate instead)
 	if (const FSkeletalMeshRenderData* R = Comp->GetSkinnedAsset() ? Comp->GetSkinnedAsset()->GetResourceForRendering() : nullptr)
 		if (R->LODRenderData.Num() > 0)
 		{
 			const TArray<FSkelMeshRenderSection>& Secs = R->LODRenderData[0].RenderSections;
 			for (int32 i = 0; i < Secs.Num(); ++i)
-				if (Secs[i].MaterialIndex == Mat) Comp->ShowMaterialSection(Mat, i, Tier >= 0, 0);
+				if (Secs[i].MaterialIndex == Mat) Comp->ShowMaterialSection(Mat, i, Tier >= 0 && !bDark, 0);
 		}
-	WornTiers[Piece] = Tier;
 	ShowBare(Piece, Tier < 0);
-	if (Tier < 0) return;
+	if (Tier < 0 || bDark) return;
 	if (!PieceMid[Piece]) PieceMid[Piece] = Comp->CreateDynamicMaterialInstance(Mat, Comp->GetMaterial(Mat));
 	if (UMaterialInstanceDynamic* M = PieceMid[Piece])
 	{
@@ -2120,6 +2131,70 @@ void FKnightAnimator::Wear(int32 Piece, int32 Tier)
 		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(FMath::Min(C.R / Steel.R, 2.f) * Sh.R, FMath::Min(C.G / Steel.G, 2.f) * Sh.G, FMath::Min(C.B / Steel.B, 2.f) * Sh.B, 1.f));
 		ApplyPlateLook(M, Tier);
 	}
+}
+
+// The Dark Plate set (2026-11-21, Tools/BuildDarkPlate.ps1 and ImportDarkPlate.ps1): its own skinned mesh on the suit's skeleton, one material slot per piece named as the suit's.
+// It follows Comp's bones like the mail; each worn piece shows its section in one colour, whatever the tier (the tier still sets its numbers).
+static TAutoConsoleVariable<float> CVarDarkLift(TEXT("jeeb.Armour.DarkLift"), 0.55f, TEXT("Dark Plate armour: how much its own dark paint is lifted, x the plate armour's (1 = as bright as the other armour, lower is blacker)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarDarkTint(TEXT("jeeb.Armour.DarkTint"), TEXT("0.82_0.86_0.98"), TEXT("Dark Plate armour's tint, R_G_B (a touch of cold blue steel)."), ECVF_Default);
+
+static void ApplyDarkLook(UMaterialInstanceDynamic* M, const FLinearColor& Shade)
+{
+	TArray<FString> P; CVarDarkTint.GetValueOnGameThread().ParseIntoArray(P, TEXT("_"));
+	const FLinearColor T(P.Num() > 0 ? FCString::Atof(*P[0]) : 1.f, P.Num() > 1 ? FCString::Atof(*P[1]) : 1.f, P.Num() > 2 ? FCString::Atof(*P[2]) : 1.f, 1.f);
+	M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(T.R * Shade.R, T.G * Shade.G, T.B * Shade.B, 1.f));
+	ApplyPlateLook(M, JeebItems::T_Iron);   // (steel's shine, from the plate armour's own sliders)
+	M->SetScalarParameterValue(TEXT("DesatGain"), 2.3f * CVarArmourShine.GetValueOnGameThread() * CVarDarkLift.GetValueOnGameThread());
+}
+
+void FKnightAnimator::ShowDarkSection(USkeletalMeshComponent* C, int32 Mat, bool bShow)
+{
+	if (const FSkeletalMeshRenderData* R = C->GetSkinnedAsset() ? C->GetSkinnedAsset()->GetResourceForRendering() : nullptr)
+		if (R->LODRenderData.Num() > 0)
+		{
+			const TArray<FSkelMeshRenderSection>& Secs = R->LODRenderData[0].RenderSections;
+			for (int32 i = 0; i < Secs.Num(); ++i)
+				if (Secs[i].MaterialIndex == Mat) C->ShowMaterialSection(Mat, i, bShow, 0);
+		}
+}
+
+void FKnightAnimator::ShowDark(int32 Piece, bool bShow)
+{
+	if (L.bTroll || !Comp) return;
+	if (!DarkComp)
+	{
+		if (!bShow) return;
+		USkeletalMesh* Asset = LoadObject<USkeletalMesh>(nullptr, TEXT("/Game/DarkPlate/SK_DarkPlate.SK_DarkPlate"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		if (!Asset) { UE_LOG(LogTemp, Warning, TEXT("JEEBANIM no Dark Plate mesh: the suit's own plate is worn instead")); return; }
+		DarkComp = NewObject<USkeletalMeshComponent>(Comp->GetOwner());
+		DarkComp->SetupAttachment(Comp);
+		DarkComp->SetSkinnedAssetAndUpdate(Asset);
+		DarkComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		DarkComp->SetBoundsScale(2.5f);
+		DarkComp->SetLightingChannels(true, true, false);   // (as the suit: the sun's glint, channel 1)
+		DarkComp->RegisterComponent();
+		DarkComp->SetLeaderPoseComponent(Comp);
+		static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
+		const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
+		for (int32 m = 0; m < Slots.Num(); ++m)
+			for (int32 i = 0; i < Piece_Count; ++i)
+				if (Slots[m].MaterialSlotName.ToString().Contains(SlotNames[i])) DarkMat[i] = m;
+		for (int32 i = 0; i < Piece_Count; ++i) if (DarkMat[i] != INDEX_NONE) ShowDarkSection(DarkComp, DarkMat[i], false);
+		UE_LOG(LogTemp, Log, TEXT("JEEBANIM Dark Plate mesh: %d slots"), Slots.Num());
+	}
+	const int32 Mat = DarkMat[Piece];
+	if (Mat != INDEX_NONE)
+	{
+		ShowDarkSection(DarkComp, Mat, bShow);
+		if (bShow)
+		{
+			if (!DarkMid[Piece]) DarkMid[Piece] = DarkComp->CreateDynamicMaterialInstance(Mat, DarkComp->GetMaterial(Mat));
+			if (DarkMid[Piece]) ApplyDarkLook(DarkMid[Piece], PieceShade[Piece]);
+		}
+	}
+	bool bAny = false;
+	for (int32 i = 0; i < Piece_Count; ++i) bAny |= WornTiers[i] >= 0 && WornStyles[i] == JeebItems::AS_Dark;
+	DarkComp->SetVisibility(bAny);
 }
 
 // An empty slot shows the mail body underneath. It is a whole mesh of its own, since the suit has no mail under its plate (it never shows through); it is drawn only while some slot is empty.

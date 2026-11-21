@@ -358,7 +358,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 	// The suit: each slot is one piece of it, tinted for the tier, gone when the slot is empty. Light, Classic and Heavy are the same model, they differ in the numbers (ArmourStyles.csv).
 	const int32 Piece = Slot == KnightDesign::SlotHelmet ? JeebAnim::Piece_Helmet : Slot == KnightDesign::SlotBody ? JeebAnim::Piece_Chest : Slot == KnightDesign::SlotShoulders ? JeebAnim::Piece_Shoulders
 		: Slot == KnightDesign::SlotGauntlets ? JeebAnim::Piece_Arms : Slot == KnightDesign::SlotBoots ? JeebAnim::Piece_Legs : -1;
-	if (Piece >= 0) { if (Anim) Anim->Wear(Piece, bWorn ? Var : -1); return; }
+	if (Piece >= 0) { if (Anim) Anim->Wear(Piece, bWorn ? Var : -1, bWorn ? JeebItems::StyleOf(Id) : 0); return; }   // (Dark Plate has its own model; the other styles are the suit's plates)
 	if (Slot == KnightDesign::SlotCape)
 	{
 		if (CapeCloth) CapeCloth->SetVisibility(bWorn);
