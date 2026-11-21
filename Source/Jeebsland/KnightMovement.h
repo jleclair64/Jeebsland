@@ -26,6 +26,17 @@ namespace JeebClimb
 	static const FName MantleTag(TEXT("JeebMantle"));
 	static const FName NoMantleTag(TEXT("JeebNoMantle"));
 	constexpr float WallGap = 4.f;   // cm between the capsule and the rock while on it
+	// Climbable ground (2026-11-20, owner: "trigger the climbing ... near terrain like this riverbank that's too steep to walk up"): the tag, or the
+	// town grounds that carry the river's banks (ATownLabTown's TownGround, AOakHillTown's OakHillGround; built alike on every machine, by name so
+	// the world-building files stay untouched). Buildings, pads' stones, walls and props are separate components and never count.
+	inline bool IsClimbGround(const UPrimitiveComponent* C)
+	{
+		if (!C) return false;
+		if (C->ComponentHasTag(ClimbTag)) return true;
+		static const FName TownGround(TEXT("TownGround")), OakGround(TEXT("OakHillGround"));
+		return C->GetFName() == TownGround || C->GetFName() == OakGround;
+	}
+	constexpr float GrabMinRise = 60.f;   // the steep ground ahead has to rise at least this far over his feet (MantleMin): no grabbing small banks and pad edges
 }
 
 // The server's climbing state, sent back inside a movement correction so the player's machine replays from the server's numbers, not its own

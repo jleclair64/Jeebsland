@@ -93,6 +93,8 @@ private:
 
 	ENpcRole Role = ENpcRole::Shopkeeper;
 	bool bTalking = false;
+	float TalkT = 0.f;        // seconds since the talk (or the shop menu) opened; keepers gesture at its start and now and then after (KeeperGestures)
+	bool KeeperGestures() const;
 	int32 Visits = 0;
 	float HomeYaw = 0.f;
 	float AnimT = 0.f;

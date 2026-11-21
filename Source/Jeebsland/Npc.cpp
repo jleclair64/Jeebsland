@@ -8,6 +8,7 @@
 #include "NpcBody.h"
 #include "NpcLife.h"
 #include "Engine/SkeletalMesh.h"
+#include "Animation/AnimSequence.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
@@ -510,10 +511,28 @@ float ANpc::GroundUnder(const FVector2D& P, bool bTrace, float DeltaSeconds)
 	return G + TraceOff;
 }
 
+// While you shop (owner 2026-11-20: "they move their arms too much ... the same open hand animation keeps playing over and over"): a keeper
+// greets you with the talk gesture once as the menu opens, then stands in the calm idle, with one more gesture every 13 to 19 s (each keeper
+// its own spacing, from the name). Anyone else who talks (stories, quests) keeps the talk for the whole conversation, as before. Looks only.
+bool ANpc::KeeperGestures() const
+{
+	if (!bTalking) return false;
+	if (!OffersTrade()) return true;
+	float Len = 2.5f;
+	if (ModelDef && ModelDef->Clips[2]) Len = ModelDef->Clips[2]->GetPlayLength();
+	const float G = FMath::Clamp(Len, 1.5f, 3.5f) - 0.15f;   // once through the clip (the cross-fade adds 0.3 s each way)
+	if (TalkT < G) return true;
+	const uint32 Seed = GetTypeHash(GetNpcName());
+	const float Every = 13.f + float(Seed % 7u);
+	const float Since = FMath::Fmod(TalkT - G, Every);
+	return Since > Every - G;
+}
+
 void ANpc::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	AnimT += DeltaSeconds;
+	TalkT = bTalking ? TalkT + DeltaSeconds : 0.f;
 	if (BuiltSetting != JeebPeople::Setting() && !IsRunningDedicatedServer()) { ClearBody(); BuildBody(); }   // (jeeb.Npc.Models changed)
 
 	const bool bDedi = GetNetMode() == NM_DedicatedServer;
@@ -605,7 +624,15 @@ void ANpc::Tick(float DeltaSeconds)
 		LastLoc = Now;
 		MoveSpeed = FMath::FInterpTo(MoveSpeed, FMath::Min(Moved, 400.f), DeltaSeconds, 8.f);
 		const float Rel = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw);
-		const int32 State = (bTalking || bChatTalk) ? 2 : (WalkBlend > 0.35f ? 1 : 0);
+		const int32 State = (KeeperGestures() || bChatTalk) ? 2 : (WalkBlend > 0.35f ? 1 : 0);   // (a keeper mostly idles while you shop: KeeperGestures)
+#if !UE_BUILD_SHIPPING
+		if (bTalking && OffersTrade())
+		{
+			static TMap<FString, int32> Last;
+			int32& L = Last.FindOrAdd(GetNpcName(), -1);
+			if (L != State) { L = State; UE_LOG(LogTemp, Log, TEXT("JEEBKEEPER %s %s at %.1f s into the talk"), *GetNpcName(), State == 2 ? TEXT("gesture") : TEXT("idle"), TalkT); }
+		}
+#endif
 		const float Rate = FMath::Clamp(MoveSpeed / (ModelDef->WalkSpeed * GetActorScale3D().X), 0.4f, 2.f);
 		if (UNpcAnimInstance* A = Cast<UNpcAnimInstance>(Body->GetAnimInstance()))
 			A->Drive(State, Rate, (bNear && State != 1) ? HeadWant(Rel) : 0.f);
@@ -652,7 +679,7 @@ void ANpc::Tick(float DeltaSeconds)
 	else if (Role == ENpcRole::Shopkeeper)
 	{
 		ArmR = 0.f; ArmL = 0.f;
-		if (bTalking) ArmR = 35.f + 12.f * FMath::Sin(AnimT * 3.f);   // a gesture while he talks
+		if (KeeperGestures()) ArmR = 35.f + 12.f * FMath::Sin(AnimT * 3.f);   // a gesture as he greets you, then now and then
 	}
 	if (ArmRPivot) ArmRPivot->SetRelativeRotation(FRotator(ArmR, 0.f, 0.f));
 	if (ArmLPivot) ArmLPivot->SetRelativeRotation(FRotator(ArmL, 0.f, 0.f));
