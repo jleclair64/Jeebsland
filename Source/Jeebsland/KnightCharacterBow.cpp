@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "HouseInterior.h"
 #include "JeebProps.h"
 #include "KnightDesign.h"
 #include "WeaponDesign.h"
@@ -347,7 +348,10 @@ void AKnightCharacter::TickBow(float Dt)
 			// Aiming: the camera keeps up with him (its lag made arrows seem to curve as he moved). The engine's lag only steps by a frame's share, and around a lag speed of 80 that share
 			// swings with the frame time, so at jump speed he shook a few cm on screen from frame to frame: past that speed there is simply no lag sideways.
 			Boom->CameraLagSpeed = FMath::Lerp(8.f, 300.f, A * A);
-			Boom->TargetArmLength = FMath::Lerp(540.f, BowCamLength, A);
+			// (the walk-in house, 2026-11-21: a shorter arm while he stands inside, eased in and out; HouseInterior.h)
+			static float RoomCam = 1.f;
+			RoomCam = FMath::FInterpTo(RoomCam, AHouseInterior::CamScaleAt(GetWorld(), GetActorLocation()), Dt, 3.f);
+			Boom->TargetArmLength = FMath::Lerp(540.f * RoomCam, FMath::Min(BowCamLength, 540.f * RoomCam), A);
 			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
 			// A jump leaves the ground at full speed, and a camera nailed to him whips the whole world up and down with it: its height follows softly instead, the same whatever the frame rate.
 			const float Z = GetActorLocation().Z;

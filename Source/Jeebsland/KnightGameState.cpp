@@ -852,7 +852,8 @@ void AKnightGameState::Tick(float DeltaSeconds)
 	{
 		ShotClock += DeltaSeconds;
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
-		if (PC) PC->SetControlRotation(ShotRot);
+		static const bool bHouseWalk = FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk"));   // (the open house's walk test steers its own camera: HouseInterior.cpp)
+		if (PC && !bHouseWalk) PC->SetControlRotation(ShotRot);
 		{ static bool bStarSets = false; if (!bStarSets && ShotClock > 1.f) { bStarSets = true; ShotEyesSet(PC, -1); } }   // (-ShotEyesSet's '*' entries)
 		// (-FortLadderTest=N with -SuitClimbUp, single player: at 5 s he stands at the foot of Oak Hill fort ladder N, walks into it,
 		// climbs and steps off; JEEBFORTLADDER lines log the climb, where he ends and whether he stands on the walk, 2026-11-20)
@@ -1238,7 +1239,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)
