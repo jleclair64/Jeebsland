@@ -111,43 +111,67 @@ def paint_grass_ground():
     return N, N, px
 
 
-# ------------------------------------------------------------------ rock: painted stone (slopes and loose stones)
+# ------------------------------------------------------------------ rock: layered natural stone (slopes and loose stones)
+# 2026-11-21 (owner: the old rock read as flat beige "crazy paving" plates with dark outlines): now sedimentary strata, the
+# way Breath of the Wild's cliffs look: wavy horizontal ledges of slightly different grey and warm browns, broken into blocks
+# by occasional vertical cracks, soft painted tone, a little moss. The ledges run along the picture's rows, which the
+# material's side projection turns into level bands up a slope (v is world height there).
 def paint_rock():
+    import bisect
     N = 512
-    big = Voronoi(4401, 5, 0.95)
-    small = Voronoi(4402, 13, 0.95)
-    warp = [Noise(4451 + i, 4 << i) for i in range(3)]
-    warp2 = [Noise(4461 + i, 4 << i) for i in range(3)]
-    moss = [Noise(4501 + i, 3 << i) for i in range(4)]
-    tone = [Noise(4601 + i, 4 << i) for i in range(4)]
-    fade = [Noise(4651 + i, 6 << i) for i in range(2)]
-    rnd = random.Random(4700)
-    plate = [(rnd.uniform(0.36, 0.46), rnd.uniform(-1, 1), rnd.uniform(0, 2 * math.pi)) for _ in range(big.n * big.n)]
-    chip = [rnd.uniform(-0.035, 0.035) for _ in range(small.n * small.n)]
+    rnd = random.Random(4801)
+    warp = [Noise(4851 + i, 3 << i) for i in range(3)]
+    warp2 = [Noise(4861 + i, 4 << i) for i in range(3)]
+    tone = [Noise(4901 + i, 3 << i) for i in range(4)]
+    grain = [Noise(4951 + i, 28 << i) for i in range(4)]
+    moss = [Noise(5001 + i, 3 << i) for i in range(4)]
+    fade = [Noise(5051 + i, 5 << i) for i in range(2)]
+    B = 17   # layers: thicknesses summing to 1 (so the picture tiles), each its own tone and warmth
+    th = [rnd.uniform(0.5, 1.6) for _ in range(B)]
+    tot = sum(th)
+    bounds = []
+    acc = 0.0
+    for t in th:
+        bounds.append(acc)
+        acc += t / tot
+    bounds.append(1.0)
+    layer = [(rnd.uniform(0.43, 0.53), rnd.uniform(-0.4, 1)) for _ in range(B)]
+    joints = []
+    for _ in range(B):
+        n = rnd.randint(3, 5)
+        base = rnd.random()
+        joints.append(sorted(((base + (i + rnd.uniform(0.1, 0.9)) / n) % 1.0) for i in range(n)))
+    blk = [[rnd.uniform(-0.05, 0.05) for _ in range(8)] for _ in range(B)]
     px = bytearray(N * N * 4)
     for j in range(N):
         for i in range(N):
             u, v = i / N, j / N
-            # wobbly, natural edges: the plates are drawn through a soft warp of the picture (it still tiles)
-            wu = u + 0.06 * (fbm(warp, u, v) - 0.5)
-            wv = v + 0.06 * (fbm(warp2, u, v) - 0.5)
-            f1, f2, k, bx, by = big.at(wu % 1.0, wv % 1.0)
-            s1, s2, sk, _, _ = small.at(wu % 1.0, wv % 1.0)
-            lum, warm, ga = plate[k]
-            lum += 0.035 * (math.cos(ga) * bx + math.sin(ga) * by) + chip[sk]
-            lum *= 0.86 + 0.28 * fbm(tone, u, v)                                 # soft painted tone across the stone
-            show = clamp01((fbm(fade, u, v) - 0.3) * 2.5)                       # some cracks fade out: not a tiled paving
-            crack = clamp01(1.0 - (f2 - f1) * big.n / 0.22) * (0.35 + 0.65 * show)
-            small_crack = clamp01(1.0 - (s2 - s1) * small.n / 0.16) * 0.22 * show
-            lum *= 1.0 - 0.38 * crack - 0.14 * small_crack
-            # warm grey-brown stone with cooler plates here and there
-            r = lum * (1.04 + 0.05 * warm)
-            g = lum * (1.00 + 0.01 * warm)
-            b = lum * (0.92 - 0.06 * warm)
-            m = clamp01((fbm(moss, u, v) - 0.58) * 3.5) * (1.0 - crack)        # a little moss here and there
-            r = r * (1 - 0.5 * m) + 0.26 * 0.5 * m
-            g = g * (1 - 0.5 * m) + 0.36 * 0.5 * m
-            b = b * (1 - 0.5 * m) + 0.15 * 0.5 * m
+            wv = (v + 0.15 * (fbm(warp, u, v) - 0.5)) % 1.0              # ledges wander, they are not ruled lines
+            wu = (u + 0.10 * (fbm(warp2, u, v) - 0.5)) % 1.0
+            k = min(bisect.bisect_right(bounds, wv) - 1, B - 1)
+            lo, hi = bounds[k], bounds[k + 1]
+            dv = min(wv - lo, hi - wv) / max(hi - lo, 1e-4)             # 0 at a ledge line, 0.5 mid-layer
+            js = joints[k]
+            m = bisect.bisect_right(js, wu) % len(js)
+            ju, ju2 = js[m - 1], js[m]
+            span = (ju2 - ju) % 1.0 or 1.0
+            du = min((wu - ju) % 1.0, (ju2 - wu) % 1.0)
+            lum, warm = layer[k]
+            lum += blk[k][m % 8]                                          # each block its own small shade
+            lum *= 0.62 + 0.36 * fbm(tone, u, v)                          # soft painted tone across the stone
+            show = clamp01((fbm(fade, u, v) - 0.30) * 2.4)                # some vertical cracks fade out
+            ledge = clamp01(1.0 - dv * (hi - lo) * N / 4.0)               # a thin dark shadow line at each ledge
+            vcrack = clamp01(1.0 - du * N / 3.0) * show
+            lum *= 1.0 - 0.36 * ledge - 0.28 * vcrack
+            lum *= 1.0 + 0.10 * (dv - 0.25)                               # each layer a touch lighter toward the middle
+            lum *= 0.88 + 0.24 * fbm(grain, u, v)
+            r = lum * (1.0 + 0.04 * warm)                                # neutral grey to warm brown-grey: no beige or olive
+            g = lum * 0.99
+            b = lum * (0.95 - 0.02 * warm)
+            mm = clamp01((fbm(moss, u, v) - 0.64) * 4.0) * (1.0 - 0.7 * ledge) * 0.6   # a little moss
+            r = r * (1 - mm) + 0.20 * mm
+            g = g * (1 - mm) + 0.30 * mm
+            b = b * (1 - mm) + 0.12 * mm
             o = (j * N + i) * 4
             px[o], px[o + 1], px[o + 2], px[o + 3] = to8(r), to8(g), to8(b), 255
     return N, N, px
@@ -228,7 +252,7 @@ def grass_ground():
 
 
 def rock():
-    return cached("T_Rock", 1, paint_rock)
+    return cached("T_Rock", 3, paint_rock)
 
 
 def cobble():
