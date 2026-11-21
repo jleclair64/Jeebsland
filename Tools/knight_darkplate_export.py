@@ -41,6 +41,11 @@ for fn, tag in PIECES:
     save_pics(ob, tag); plates.append(ob)
 bpy.context.view_layer.update()
 
+# the back-of-hand blades (knight_handtrim.py: the "sixth finger", 2026-11-21)
+if os.environ.get("DP_NOTRIM") != "1":
+    import knight_handtrim
+    knight_handtrim.trim(next(p for p in plates if p.name == "gauntlets"), log=lambda s: print("DPX " + s))
+
 # the upper-arm plates, copied from the vambraces (knight_rerebrace.py; the mail sleeve showed between pauldron and elbow, 2026-11-21)
 if os.environ.get("DP_NORRB") != "1":
     import knight_rerebrace
