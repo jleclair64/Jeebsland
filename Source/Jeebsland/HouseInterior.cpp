@@ -148,7 +148,7 @@ void AHouseInterior::Build()
 			L->SetIntensity(0.f);
 			L->SetAttenuationRadius(Rad);
 			// (2026-11-21 evening, owner: "reads very orange": still warm, nearer candle-white; were 1 0.55 0.25 and 1 0.72 0.42)
-			L->SetLightColor(Mesh == TEXT("FIRE") ? FLinearColor(1.f, 0.66f, 0.40f) : FLinearColor(1.f, 0.82f, 0.62f));
+			L->SetLightColor(Mesh == TEXT("FIRE") ? FLinearColor(1.f, 0.74f, 0.52f) : FLinearColor(1.f, 0.9f, 0.78f));
 			L->SetCastShadows(bShadow);
 			L->SetSourceRadius(Mesh == TEXT("FIRE") ? 25.f : 3.f);
 			L->SetVisibility(false);

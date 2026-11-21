@@ -37,11 +37,11 @@ ROOM,-455,-315,0,,,,495,230,270
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,-305,0,0,0,0,1,1,0.9,0,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-445,220,0,0,0,0,1,1,0.9,0,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,220,0,0,0,0,1,1,0.9,0,0
-# --- the hearth (west end, under the chimney): a stone back and two stone cheeks (TownDecor wall stone; the cheeks are its end pillar, textured all round: the wall stone cut short stretched its end into zigzags), a timber mantle, logs and fire
+# --- the hearth (west end, under the chimney): a stone back (TownDecor wall stone), two timber jambs (the tavern beam: every stone piece cut short stretched its ends into zigzags), a timber mantle, logs and fire
 /Game/TownDecor/SM_WallStone,-436,-50,0,90,0,0,1,0.5,1.05,1,0
 /Game/TownDecor/SM_WallStone,-445,-50,124,90,0,0,0.75,0.35,1.25,0,0
-/Game/TownDecor/SM_WallStoneEnd,-380,-130,0,90,0,0,0.7,1,1,1,0
-/Game/TownDecor/SM_WallStoneEnd,-380,30,0,90,0,0,0.7,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,-130,0,0,0,0,3.5,2,0.42,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,30,0,0,0,0,3.5,2,0.42,1,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,-350,-150,126,90,-90,0,1.3,1.3,1,0,0
 /Game/TownDecor/SM_Firewood,-385,-50,0,90,0,0,0.7,0.7,0.7,0,0
 /Game/TownDecor/SM_TorchBlazingFlame,-385,-50,-40,0,0,0,0.75,0.75,0.75,0,0

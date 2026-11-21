@@ -22,7 +22,7 @@ for p in ["/Game/Interior/Trestle/SM_Int_Trestle", "/Game/Interior/Barstool/SM_I
 
 pl = "/Game/Medieval_Tavern/Materials/Material_Instance/MI_Plaster_Wall_001"
 src = lib.load_asset(pl)
-MEL.set_material_instance_vector_parameter_value(src, "ZL - Tint", unreal.LinearColor(0.70, 0.70, 0.72, 1.0))   # (was 0.80 0.76 0.76)
+MEL.set_material_instance_vector_parameter_value(src, "ZL - Tint", unreal.LinearColor(0.60, 0.60, 0.70, 1.0))   # (was 0.80 0.76 0.76: its picture is yellow, so blue is kept higher)
 MEL.update_material_instance(src)
 lib.save_asset(pl)
 print("INTFIX plaster tint", MEL.get_material_instance_vector_parameter_value(src, "ZL - Tint"))
