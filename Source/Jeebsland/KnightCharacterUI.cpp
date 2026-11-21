@@ -241,7 +241,10 @@ void AKnightCharacter::ApplyGraphics()
 	Set(TEXT("sg.ShadowQuality"), bLowest ? 2 : 3);   // (1 made the shadows flicker: too coarse, with no softening, for the swaying leaves and the moving sun)
 	// Soft shadows that blur with distance from the caster (the sun's size sets how much): high branches leave soft dapples
 	// on the ground instead of a sharp dark web
-	Set(TEXT("r.Shadow.FilterMethod"), 1);
+	// (2026-11-21, owner: LOW's ground and grass "like an old tv that can't find a station") LOW uses the plain filter (0, PCF):
+	// the soft filter's per-pixel sample scatter needs TSR's history to smooth it, and LOW's TAA (plus its 1.2 sharpening) left it
+	// as moving speckle in every tree shadow. PCF is cheaper and still soft at the shadow's edge; HIGH keeps the soft filter.
+	Set(TEXT("r.Shadow.FilterMethod"), bLowest ? 0 : 1);
 	// (2026-11-15, owner: "glitchy looking shadows near my feet") The soft shadows search round each pixel for what casts them with
 	// a per-pixel scatter of samples that only the anti-aliasing's history smooths; wherever a shadow moves (the knight's own, swaying
 	// grass) that history is thrown away and the scatter showed as a speckled dither. The engine's search reached 40 shadow-map texels
