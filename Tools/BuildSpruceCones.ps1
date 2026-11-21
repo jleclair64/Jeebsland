@@ -156,11 +156,11 @@ public static class JeebCones
 # hue from, hue to, softness (degrees: 0 red, 30 orange, 60 yellow, 120 green); saturation from, full by; cone colour (sRGB 0-255); a typical cone texel's brightest channel
 $HueLo = 8; $HueHi = 38; $HueSoft = 7; $SatLo = 0.56; $SatHi = 0.74; $Cone = 84, 68, 50; $VRef = 190
 # far cards only: the yellow cone tips repainted from this brightness up (0-255); box blur radius in texels of the 4096 sheet (0: none)
-# (2026-11-21 evening: no blur; the owner found the soft card "blurry")
-$FarLo = 110; $FarBlur = 0
+# (2026-11-21 evening: blur off in round 2, back on and stronger in round 3: the owner found the card "too HD")
+$FarLo = 110; $FarBlur = 6
 # far cards' see-through gaps: cut opacity where the colour is below this share of its surroundings (soft from Lo to Hi), over this
 # radius in texels of the 4096 sheet, by this much (0 none, 1 fully)
-$AirLo = 0.82; $AirHi = 0.97; $AirRadius = 60; $AirStrength = 1.0
+$AirLo = 0.82; $AirHi = 0.97; $AirRadius = 60; $AirStrength = 0   # (round 3: 0, the owner saw the gaps as holes showing the background; the masks are still copied unchanged)
 $n = 0
 Get-ChildItem $dir -Filter '*_imposter_O.png' | ForEach-Object {
     $alb = Get-ChildItem $dir -Filter ($_.BaseName.Replace('_imposter_O', '_imposter_A') + '*.png') | Where-Object { $_.BaseName -notlike '*_Cones' } | Select-Object -First 1

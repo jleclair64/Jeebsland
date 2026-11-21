@@ -201,7 +201,7 @@ namespace
 	}
 	// (2026-11-21, owner: the far card "showed up in HD with too much detail and bright orange pinecones", then in the evening "too yellow-green", the near one darker; make it match the near spruce
 	// so the faster jeeb.Forest.SpruceLod can be used) the far cards' own Brightness, Saturation and SS Strength (MA_Imposter), times these
-	TAutoConsoleVariable<FString> CVarSpruceFar(TEXT("jeeb.Forest.SpruceFar"), TEXT("0.9 0.8 0.8"),
+	TAutoConsoleVariable<FString> CVarSpruceFar(TEXT("jeeb.Forest.SpruceFar"), TEXT("1.05 0.85 0.8"),
 		TEXT("The spruces' far cards against the near models: \"brightness saturation glow\", each times the pack's own (1 1 1 = as the pack made them). Live; looks only."), ECVF_Default);
 	void ApplySpruceFar(UMaterialInstanceDynamic* M)
 	{
@@ -1066,6 +1066,7 @@ void AOakForest::ApplyReach()
 					FString S;
 					for (int32 l = 0; l < RD->LODResources.Num() && l < MAX_STATIC_MESH_LODS; ++l) { O.Add(RD->ScreenSize[l].Default); S += FString::Printf(TEXT(" %.3f/%d"), O.Last(), RD->LODResources[l].GetNumTriangles()); for (const FStaticMeshSection& Sec : RD->LODResources[l].Sections) { const TArray<FStaticMaterial>& SM = M->GetStaticMaterials(); S += FString::Printf(TEXT(",%s"), SM.IsValidIndex(Sec.MaterialIndex) && SM[Sec.MaterialIndex].MaterialInterface ? *SM[Sec.MaterialIndex].MaterialInterface->GetName() : TEXT("?")); } }
 					UE_LOG(LogTemp, Log, TEXT("JEEBFOREST %s LODs (screen size/triangles):%s"), *M->GetName(), *S);
+					FTransform T0; if (C->GetInstanceCount() > 0 && C->GetInstanceTransform(C->GetInstanceCount() / 2, T0, true)) UE_LOG(LogTemp, Log, TEXT("JEEBFOREST %s one at %s yaw %.0f scale %.2f"), *M->GetName(), *T0.GetLocation().ToString(), T0.Rotator().Yaw, T0.GetScale3D().Z);   // (a known tree for test pictures)
 				}
 				for (int32 l = 1; l < O.Num(); ++l) RD->ScreenSize[l].Default = FMath::Min(O[l] * LodK, l > 0 ? RD->ScreenSize[l - 1].Default * 0.99f : 1.f);
 			}
