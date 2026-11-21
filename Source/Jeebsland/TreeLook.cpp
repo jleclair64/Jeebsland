@@ -1,5 +1,8 @@
 #include "TreeLook.h"
 #include "HAL/IConsoleManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture.h"
+#include "Materials/MaterialInterface.h"
 
 namespace
 {
@@ -29,3 +32,46 @@ FLinearColor JeebTreeLook::ParseRGB(const FString& In, const FLinearColor& Def)
 }
 
 FSimpleMulticastDelegate& JeebTreeLook::OnChanged() { return GChanged; }
+
+int32 JeebTreeLook::DarkCones(UMaterialInstanceDynamic* D)
+{
+	if (!D) return 0;
+	static TMap<FName, TWeakObjectPtr<UTexture>> Copies;   // (pack texture name -> its copy; null when there is none)
+	static bool bWarned = false;
+	TArray<FMaterialParameterInfo> Infos; TArray<FGuid> Ids;
+	D->GetAllTextureParameterInfo(Infos, Ids);
+	int32 Done = 0;
+	for (const FMaterialParameterInfo& Info : Infos)
+	{
+		UTexture* T = nullptr;
+		if (!D->GetTextureParameterValue(Info, T) || !T || !T->GetPathName().StartsWith(TEXT("/Game/PN_interactiveSpruceForest/"))) continue;
+		const FString Name = T->GetName();
+		if (!Name.StartsWith(TEXT("Leaf_A")) && !Name.Contains(TEXT("_imposter_A"))) continue;   // (the colour textures: the only ones with cones in)
+		TWeakObjectPtr<UTexture>* Found = Copies.Find(T->GetFName());
+		if (!Found || (!Found->IsValid() && !Found->IsExplicitlyNull()))
+		{
+			UTexture* Copy = LoadObject<UTexture>(nullptr, *FString::Printf(TEXT("/Game/TreeGroves/SpruceCones/%s_Cones.%s_Cones"), *Name, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
+			if (!Copy && !bWarned) { bWarned = true; UE_LOG(LogTemp, Warning, TEXT("JEEBSPRUCE no /Game/TreeGroves/SpruceCones/%s_Cones (run Tools/BuildSpruceCones.ps1 once on this machine): the spruces keep the pack's orange cones"), *Name); }
+			Found = &Copies.Add(T->GetFName(), Copy);
+		}
+		if (UTexture* Copy = Found->Get()) { D->SetTextureParameterValueByInfo(Info, Copy); ++Done; }
+	}
+	return Done;
+}
+
+UMaterialInterface* JeebTreeLook::ConeLeaf(UMaterialInterface* M)
+{
+	if (!M || !M->GetName().EndsWith(TEXT("_leaf")) || !M->GetPathName().StartsWith(TEXT("/Game/PN_interactiveSpruceForest/"))) return M;
+	static TMap<FName, TWeakObjectPtr<UMaterialInterface>> Copies;   // (pack material name -> its copy; null when there is none)
+	static bool bWarned = false;
+	TWeakObjectPtr<UMaterialInterface>* Found = Copies.Find(M->GetFName());
+	if (!Found || (!Found->IsValid() && !Found->IsExplicitlyNull()))
+	{
+		const FString Name = M->GetName();
+		UMaterialInterface* Copy = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/TreeGroves/SpruceCones/%s_Cones.%s_Cones"), *Name, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
+		if (!Copy && !bWarned) { bWarned = true; UE_LOG(LogTemp, Warning, TEXT("JEEBSPRUCE no /Game/TreeGroves/SpruceCones/%s_Cones (run Tools/BuildSpruceCones.ps1 once on this machine): the spruces keep the pack's orange cones"), *Name); }
+		Found = &Copies.Add(M->GetFName(), Copy);
+	}
+	UMaterialInterface* Copy = Found->Get();
+	return Copy ? Copy : M;
+}
