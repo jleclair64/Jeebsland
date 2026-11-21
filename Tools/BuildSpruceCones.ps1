@@ -1,4 +1,4 @@
-# The spruces' cones, repainted dark brown-green (owner, 2026-11-21: "less orange and more dark brown/green"). Run once per machine,
+﻿# The spruces' cones, repainted dark brown-green (owner, 2026-11-21: "less orange and more dark brown/green"). Run once per machine,
 # with the Unreal editor closed for this project folder (like Tools/BuildGrassPacks.ps1): the Spruce Forest pack is not in git, and
 # neither are the copies this makes (Content/TreeGroves/SpruceCones, git-ignored).
 #   powershell -ExecutionPolicy Bypass -File Tools\BuildSpruceCones.ps1
@@ -113,14 +113,62 @@ public static class JeebCones
             return changed / (bmp.Width * bmp.Height);
         }
     }
+    // (2026-11-21 evening, owner: the far card read as "a blurry solid cone" next to the near model's "airy drooping fronds with sky
+    // showing through") the far card's opacity (the Masks sheet's red channel) is cut where its colour picture is darker than its
+    // surroundings (the shaded gaps between the fronds), so sky shows through between the branches; returns the share of opacity removed
+    public static double Airy(string mask, string albedo, string dst, int radius, double lo, double hi, double strength)
+    {
+        using (Bitmap mB = new Bitmap(mask)) using (Bitmap aB = new Bitmap(albedo))
+        using (Bitmap m = mB.Clone(new Rectangle(0, 0, mB.Width, mB.Height), PixelFormat.Format32bppArgb))
+        using (Bitmap aS = new Bitmap(aB, mB.Width, mB.Height)) using (Bitmap a = aS.Clone(new Rectangle(0, 0, aS.Width, aS.Height), PixelFormat.Format32bppArgb))
+        {
+            if (m.Width != a.Width || m.Height != a.Height) return -1;
+            BitmapData dm = m.LockBits(new Rectangle(0, 0, m.Width, m.Height), ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
+            BitmapData da = a.LockBits(new Rectangle(0, 0, a.Width, a.Height), ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+            int n = dm.Stride * dm.Height;
+            byte[] pm = new byte[n], pa = new byte[n];
+            Marshal.Copy(dm.Scan0, pm, 0, n); Marshal.Copy(da.Scan0, pa, 0, n);
+            a.UnlockBits(da);
+            // the albedo's brightness, in all three channels, then its local mean
+            byte[] lum = new byte[n], mean = new byte[n];
+            for (int i = 0; i + 3 < n; i += 4) { byte v = (byte)Math.Round(0.3 * pa[i + 2] + 0.59 * pa[i + 1] + 0.11 * pa[i]); lum[i] = lum[i + 1] = lum[i + 2] = v; }
+            Blur(lum, m.Width, m.Height, dm.Stride, Math.Max(1, radius / 6), true); Blur(lum, m.Width, m.Height, dm.Stride, Math.Max(1, radius / 6), false);   // (gaps a frond wide, not single needles)
+            Array.Copy(lum, mean, n);
+            Blur(mean, m.Width, m.Height, dm.Stride, radius, true); Blur(mean, m.Width, m.Height, dm.Stride, radius, false);
+            double before = 0, after = 0;
+            for (int i = 0; i + 3 < n; i += 4)
+            {
+                double op = pm[i + 2];
+                if (op < 1) continue;
+                double ratio = lum[i] / Math.Max(4.0, (double)mean[i]);
+                double keep = 1.0 - strength * (1.0 - Smooth(lo, hi, ratio));
+                before += op; after += op * keep;
+                pm[i + 2] = (byte)Math.Round(op * keep);
+            }
+            Marshal.Copy(pm, 0, dm.Scan0, n);
+            m.UnlockBits(dm);
+            m.Save(dst, ImageFormat.Png);
+            return before > 0 ? 1.0 - after / before : 0;
+        }
+    }
 }
 '@
 # hue from, hue to, softness (degrees: 0 red, 30 orange, 60 yellow, 120 green); saturation from, full by; cone colour (sRGB 0-255); a typical cone texel's brightest channel
 $HueLo = 8; $HueHi = 38; $HueSoft = 7; $SatLo = 0.56; $SatHi = 0.74; $Cone = 84, 68, 50; $VRef = 190
 # far cards only: the yellow cone tips repainted from this brightness up (0-255); box blur radius in texels of the 4096 sheet (0: none)
-$FarLo = 110; $FarBlur = 3
+# (2026-11-21 evening: no blur; the owner found the soft card "blurry")
+$FarLo = 110; $FarBlur = 0
+# far cards' see-through gaps: cut opacity where the colour is below this share of its surroundings (soft from Lo to Hi), over this
+# radius in texels of the 4096 sheet, by this much (0 none, 1 fully)
+$AirLo = 0.82; $AirHi = 0.97; $AirRadius = 60; $AirStrength = 1.0
 $n = 0
-Get-ChildItem $dir -Filter '*.png' | Where-Object { $_.BaseName -notlike '*_Cones' } | ForEach-Object {
+Get-ChildItem $dir -Filter '*_imposter_O.png' | ForEach-Object {
+    $alb = Get-ChildItem $dir -Filter ($_.BaseName.Replace('_imposter_O', '_imposter_A') + '*.png') | Where-Object { $_.BaseName -notlike '*_Cones' } | Select-Object -First 1
+    if (-not $alb) { Write-Host "CONES no colour sheet for $($_.BaseName)"; return }
+    $share = [JeebCones]::Airy($_.FullName, $alb.FullName, (Join-Path $dir ($_.BaseName + '_Cones.png')), $AirRadius, $AirLo, $AirHi, $AirStrength)
+    Write-Host ('CONES opened {0}: {1:P1} of its opacity removed' -f $_.BaseName, $share)
+}
+Get-ChildItem $dir -Filter '*.png' | Where-Object { $_.BaseName -notlike '*_Cones' -and $_.BaseName -notlike '*_imposter_O' } | ForEach-Object {
     $share = [JeebCones]::Paint($_.FullName, (Join-Path $dir ($_.BaseName + '_Cones.png')), $HueLo, $HueHi, $HueSoft, $SatLo, $SatHi, $Cone[0], $Cone[1], $Cone[2], $VRef, ($_.BaseName -like '*imposter*'), $FarLo, $FarBlur)
     Write-Host ('CONES painted {0}: {1:P2} of its texels' -f $_.BaseName, $share)
     $n++

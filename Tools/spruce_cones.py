@@ -60,10 +60,14 @@ def survey():
                 continue
             name = mi.get_name()
             if "imposter" in name:
-                t = mel.get_material_instance_texture_parameter_value(mi, "Albedo")
-                if t and t.get_path_name().startswith(PACK):
-                    textures[t.get_name()] = t
-            elif name.endswith("_leaf"):
+                # (2026-11-21 evening: the opacity sheet "Masks" too, cut more see-through like the near model's fronds)
+                for p in ("Albedo", "Masks"):
+                    t = mel.get_material_instance_texture_parameter_value(mi, p)
+                    if t and t.get_path_name().startswith(PACK):
+                        textures[t.get_name()] = t
+            elif name.endswith("_leaf") or name.endswith("_branch") or name.endswith("_trunk"):
+                # (2026-11-21 evening: branch and trunk get copies too, so every near material sits on the copied master, which
+                # crossfades with dithering into the far card instead of popping)
                 chain, cur = [], mi.get_editor_property("parent")
                 while cur is not None and isinstance(cur, unreal.MaterialInstance):
                     chain.append(cur)
@@ -139,6 +143,7 @@ else:
                 if t.get_name() in made:
                     s.set_editor_property("texture", made[t.get_name()])
                     swapped += 1
+            copy.set_editor_property("dithered_lod_transition", True)   # (the far card's MA_Imposter already has it)
             mel.recompile_material(copy)
             eal.save_asset(DEST + "/" + mname + "_Cones", False)
             masters[mname] = copy

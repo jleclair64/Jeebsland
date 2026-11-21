@@ -46,7 +46,7 @@ int32 JeebTreeLook::DarkCones(UMaterialInstanceDynamic* D)
 		UTexture* T = nullptr;
 		if (!D->GetTextureParameterValue(Info, T) || !T || !T->GetPathName().StartsWith(TEXT("/Game/PN_interactiveSpruceForest/"))) continue;
 		const FString Name = T->GetName();
-		if (!Name.StartsWith(TEXT("Leaf_A")) && !Name.Contains(TEXT("_imposter_A"))) continue;   // (the colour textures: the only ones with cones in)
+		if (!Name.StartsWith(TEXT("Leaf_A")) && !Name.Contains(TEXT("_imposter_A")) && !Name.Contains(TEXT("_imposter_O"))) continue;   // (the colour textures, the only ones with cones in, and the far cards' opacity, opened up 2026-11-21 evening)
 		TWeakObjectPtr<UTexture>* Found = Copies.Find(T->GetFName());
 		if (!Found || (!Found->IsValid() && !Found->IsExplicitlyNull()))
 		{
@@ -61,7 +61,8 @@ int32 JeebTreeLook::DarkCones(UMaterialInstanceDynamic* D)
 
 UMaterialInterface* JeebTreeLook::ConeLeaf(UMaterialInterface* M)
 {
-	if (!M || !M->GetName().EndsWith(TEXT("_leaf")) || !M->GetPathName().StartsWith(TEXT("/Game/PN_interactiveSpruceForest/"))) return M;
+	if (!M || !(M->GetName().EndsWith(TEXT("_leaf")) || M->GetName().EndsWith(TEXT("_branch")) || M->GetName().EndsWith(TEXT("_trunk")))   // (branch and trunk since 2026-11-21 evening: all on the dithered master copy)
+		|| !M->GetPathName().StartsWith(TEXT("/Game/PN_interactiveSpruceForest/"))) return M;
 	static TMap<FName, TWeakObjectPtr<UMaterialInterface>> Copies;   // (pack material name -> its copy; null when there is none)
 	static bool bWarned = false;
 	TWeakObjectPtr<UMaterialInterface>* Found = Copies.Find(M->GetFName());
