@@ -425,3 +425,4 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - Before sending review pictures, close the inventory and check that the close crop frames the part under review. `-ShotKind` takes the EKind number: K_Club is 23.
 - **Look:** when adding hardware (a bracket) to carry an item, spawn and check the item and its mount together from a clean angle where both show; never an empty or unclear bracket.
 - **Online:** a climb or mantle test asserts that the knight reaches the top, not only that server and client agree.
+- **Movement:** a one-shot exit (hop, mantle, dismount) out of a climb goes wrong online; find the walkable top along the slope and use the normal ledge move, and assert the final position with exactly one grab.
