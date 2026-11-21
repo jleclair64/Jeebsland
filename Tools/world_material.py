@@ -245,7 +245,17 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     rock = g.lerp(top, side, g.ramp(g.addn(g.one(unreal.MaterialExpressionOneMinus, nz), g.mul(rag, 0.1)), 0.42, 0.58))
     rock = g.lerp(rock, palette.colour(mat, "RockFar"), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
-    r_amt = g.sat(g.mul(g.add(g.addn(g.mul(rock_m, 1.5), g.mul(med, 0.5)), -0.5), 2.6))
+    # Where stone shows (2026-11-21, owner: the slopes' stone patches repeated as the same blobs): the 10 m noise alone used to
+    # cut them; now three samplings at unrelated sizes, one turned 37 degrees, plus 45 m patches (patch sizes vary), a little of
+    # the ragged 1.5 m noise for natural edges, and more stone the steeper the slope.
+    xu = g.mask(xy, True, False); xv = g.mask(xy, False, True)
+    rot = g.append(g.subn(g.mul(xu, 0.8), g.mul(xv, 0.6)), g.addn(g.mul(xu, 0.6), g.mul(xv, 0.8)))
+    med3 = g.mask(g.tex(patches, g.mul(g.add(rot, 2711.0), 1.0 / 2300.0)), True, False)
+    mix = g.addn(g.addn(g.mul(med, 0.35), g.mul(fn["med2"], 0.3)), g.mul(med3, 0.35))
+    mix = g.addn(mix, g.mul(g.add(fn["patchy"], -0.5), 0.45))
+    mix = g.addn(mix, g.mul(g.add(rag, -0.5), 0.18))
+    steep = g.ramp(g.one(unreal.MaterialExpressionOneMinus, nz), 0.12, 0.45)
+    r_amt = g.sat(g.mul(g.add(g.addn(g.addn(g.mul(rock_m, 1.5), g.mul(mix, 0.55)), g.mul(steep, 0.3)), -0.68), 2.4))
     far_rock = g.ramp(depth, 30000.0, 90000.0)   # (hills a kilometre off: less stone, no earth halo, so no pasted-on blobs)
     r_amt = g.muln(r_amt, g.lerpc(1.0, 0.55, far_rock))
     fringe = g.mul(g.sat(g.mul(g.add(g.addn(g.mul(rock_m, 1.6), g.mul(g.add(rag, -0.5), 0.5)), -0.3), 2.0)), 0.25)   # a little earth between grass and stone
