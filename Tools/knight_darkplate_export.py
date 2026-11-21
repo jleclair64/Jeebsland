@@ -41,6 +41,11 @@ for fn, tag in PIECES:
     save_pics(ob, tag); plates.append(ob)
 bpy.context.view_layer.update()
 
+# the upper-arm plates, copied from the vambraces (knight_rerebrace.py; the mail sleeve showed between pauldron and elbow, 2026-11-21)
+if os.environ.get("DP_NORRB") != "1":
+    import knight_rerebrace
+    knight_rerebrace.add(next(p for p in plates if p.name == "gauntlets"), arm, body, log=lambda s: print("DPX " + s))
+
 # the fists, as on the Classic gauntlets (knight_fist.py: FistR / FistL morph targets, set per hand by FKnightAnimator)
 if os.environ.get("DP_NOFIST") != "1":
     import knight_fist

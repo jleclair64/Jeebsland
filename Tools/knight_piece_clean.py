@@ -285,6 +285,8 @@ if ARM_FIT:
     if "ascale" in opts: A_SCALE = float(opts["ascale"])
     if "aroll" in opts: A_HAND_ROLL = float(opts["aroll"])
     if "ablunt" in opts: A_BLUNT_ROUNDS = int(opts["ablunt"])
+    if "atop" in opts: A_TUBE_FROM, A_TOP = [float(v) for v in opts["atop"].split(",")]   # (where the upper tube starts only stretching, and how high its top reaches: Dark Plate's upper arm, 2026-11-21)
+    if "ahand" in opts:A_HAND_LEN, A_HAND_R = [float(v) for v in opts["ahand"].split(",")]   # (the hand's length and width; Dark Plate's first hand came out 60% of the Classic fist, 2026-11-21)
     def unit_(v):
         v = np.array(v, dtype=float); return v / np.linalg.norm(v)
     def frame_(a, h):
