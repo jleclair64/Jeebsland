@@ -1,4 +1,6 @@
 #include "KnightMovement.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "KnightCharacter.h"
 #include "SkillComponent.h"
 #include "JeebTuning.h"
@@ -282,18 +284,25 @@ bool UKnightMovement::TryGrab()
 		if (IsMovingOnGround())
 		{
 			const float Feet = float(C.Z) - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
-			const FVector Ahead = FVector(H.ImpactPoint.X, H.ImpactPoint.Y, 0.f) + Dir * 25.f;
+			const FVector Ahead = FVector(C.X, C.Y, 0.f) + Dir * (R + 100.f);   // (a metre past his front: the bank, not the bit his knee touched)
 			FHitResult G;
 			FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebGrabRise), true, CharacterOwner);
 			const bool bG = GetWorld()->LineTraceSingleByObjectType(G, FVector(Ahead.X, Ahead.Y, Feet + 400.f), FVector(Ahead.X, Ahead.Y, Feet - 20.f), WorldObjects(), Q);
 			if (bG && !G.bStartPenetrating && float(G.ImpactPoint.Z) - Feet < JeebClimb::GrabMinRise)
 			{
-				UE_LOG(LogTemp, Verbose, TEXT("JEEBCLIMB no grab: the bank rises only %.0f cm"), float(G.ImpactPoint.Z) - Feet);
+				UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB no grab: the bank rises only %.0f cm"), float(G.ImpactPoint.Z) - Feet);
 				continue;
 			}
 		}
 		StartClimb(H.ImpactNormal);
 		return true;
+	}
+	{
+		static double LastLog = 0.0;   // (tests: why a bump into climbable ground did not grab, once a second)
+		const double Now = FPlatformTime::Seconds();
+		static const bool bTest = FParse::Param(FCommandLine::Get(), TEXT("BankClimb")) || FParse::Param(FCommandLine::Get(), TEXT("BankClimbNet"));
+		if (bTest && Now - LastLog > 1.0) { LastLog = Now; FHitResult H1, H2; const bool b1 = ProbeWall(C + FVector(0.f, 0.f, 25.f), Dir, R + 15.f, H1), b2 = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 15.f, H2);
+			UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB no grab: chest %d nz %.2f, knee %d nz %.2f"), b1 ? 1 : 0, b1 ? float(H1.ImpactNormal.Z) : 0.f, b2 ? 1 : 0, b2 ? float(H2.ImpactNormal.Z) : 0.f); }
 	}
 	return false;
 }
@@ -304,6 +313,7 @@ void UKnightMovement::StartClimb(const FVector& N)
 	Velocity = FVector::ZeroVector;
 	SetBase(static_cast<FMovementBaseInterfaceData*>(nullptr));
 	SetMovementMode(MOVE_Custom, JeebClimb::Climb);
+	++Grabs;
 	LogClimb(TEXT("grab"));
 }
 
@@ -434,19 +444,6 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	// Going up, the rock has to reach his hands (about 90 cm over the capsule's middle in the climbing clip): once it ends below them, he climbs up
 	// over the edge, or with no room up there he stops. (Owner 2026-11-13: he used to climb on until the rock ended below his waist and then
 	// his knees, hands and head over thin air, "an invisible wall past the ledge". The ledge clip expects the top about 90 cm up, too.)
-	// A bank that lies back with no ledge found over its top (2026-11-20, online review: he hung under a rounded crest until the bar ran out):
-	// a short scramble up and forward over the crest, as a jump from the move (the same on both machines); no regrab until he lands.
-	auto CrestHop = [&]() -> bool
-	{
-		if (WallNormal.Z < 0.3f || InUp <= 0.3f) return false;
-		const FVector Fwd = Flat(-WallNormal);
-		if (Fwd.IsNearlyZero() || !RoomFor(UpdatedComponent->GetComponentLocation() + FVector(0.f, 0.f, 70.f) + Fwd * 30.f)) return false;
-		Velocity = Fwd * 180.f + FVector(0.f, 0.f, 330.f);
-		bNoRegrab = true;
-		SetMovementMode(MOVE_Falling);
-		LogClimb(TEXT("crest hop"));
-		return true;
-	};
 	if (InUp > 0.3f)
 	{
 		constexpr float HandUp = 105.f;   // (the probe's 20 cm ball misses once the top is under about 85 cm up: right at his reaching hands, measured in pictures)
@@ -455,7 +452,7 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 		const bool bRockEnds = !bHit || (!Hand.bStartPenetrating && JeebClimb::IsClimbGround(Hand.GetComponent()) && Hand.ImpactNormal.Z >= GetWalkableFloorZ());   // (or it lies back to ground he can stand on)
 		if (bRockEnds)
 		{
-			if (TryLedge() || CrestHop()) return false;
+			if (TryLedge()) return false;
 			// no room over the top: no further up (along the wall and down still work)
 			FHitResult Back;
 			SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
@@ -467,13 +464,14 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	if (!bOk && InUp <= 0.3f) bOk = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, H) && Climbable(H);   // (never going up: that climbed thin air)
 	if (!bOk)
 	{
-		if (InUp > 0.3f && (TryLedge() || CrestHop())) return false;
+		if (InUp > 0.3f && TryLedge()) return false;
 		FHitResult W;
 		if (ProbeWall(C, Dir, R + 40.f, W) && !W.bStartPenetrating && JeebClimb::IsClimbGround(W.GetComponent())
 			&& W.ImpactNormal.Z >= GetWalkableFloorZ())
 		{
 			// the slope lies back enough to walk on: step off onto it
 			Velocity = Dir * 50.f;
+			bNoRegrab = true;   // (no grabbing the bank again until he has landed on ground he can walk on, 2026-11-20)
 			SetMovementMode(MOVE_Falling);
 			LogClimb(TEXT("onto walkable"));
 			return false;
@@ -564,12 +562,14 @@ bool UKnightMovement::PlanLedge(const FVector& C, const FVector& N, FVector& Out
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebLedge), true, CharacterOwner);
 	// a few spots past the edge, and a little higher over a top that slopes up (a capsule set 3 cm over a sloping top touches the slope behind)
-	// (a bank that lies back, 2026-11-20: its flat top starts further in, so look further ahead and from higher)
+	// (a bank that lies back, 2026-11-20: its walkable top can start well in from where his hands are, so the search follows the slope up,
+	// every 30 cm out to 3 m, to the first ground he can stand on; the normal ledge climb-up then lifts him onto it)
 	const bool bBank = N.Z > 0.3f;
-	const float Reach = bBank ? 160.f : 70.f;
-	for (const float Ahead : { R + 35.f, R + 20.f, R + 55.f, R + 85.f, R + 120.f })
+	const float Reach = bBank ? 300.f : 70.f;
+	TArray<float, TInlineAllocator<12>> Aheads = { R + 35.f, R + 20.f, R + 55.f };
+	if (bBank) for (float A = R + 80.f; A <= R + 300.f; A += 30.f) Aheads.Add(A);
+	for (const float Ahead : Aheads)
 	{
-		if (Ahead > R + 55.f && !bBank) break;
 		const FVector P = C + Fwd * Ahead;
 		FHitResult D;
 		if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, C.Z + HH + Reach), FVector(P.X, P.Y, C.Z - HH + 10.f), WorldObjects(), Q) || D.bStartPenetrating) continue;
@@ -1016,7 +1016,7 @@ void UKnightMovement::HandleImpact(const FHitResult& Hit, float TimeSlice, const
 	Super::HandleImpact(Hit, TimeSlice, MoveDelta);
 	if (const UPrimitiveComponent* P = Hit.GetComponent())
 	{
-		if (JeebClimb::IsClimbGround(P)) { if (Hit.ImpactNormal.Z < GetWalkableFloorZ()) bTouchRock = true; }
+		if (JeebClimb::IsClimbGround(P)) bTouchRock = true;   // (any touch: where the capsule meets a crease its hit normal can read walkable; TryGrab probes the real face)
 		else if (!bTouchMantle && CharacterOwner && UpdatedComponent
 			&& MantleCandidate(P, Hit.Item, UpdatedComponent->GetComponentLocation().Z - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), true)) bTouchMantle = true;   // (no traces: its own size)
 	}

@@ -26,6 +26,7 @@ void AKnightCharacter::TickMantleTests(float Dt)
 	static const bool bBankNet = FParse::Param(FCommandLine::Get(), TEXT("BankClimbNet"));
 	static const bool bBank = bBankNet || FParse::Param(FCommandLine::Get(), TEXT("BankClimb"));
 	static bool bBankDone = false;
+	static float BankTopZ = 0.f;   // (the ground 3.5 m up the slope from its foot: he has to end standing at least about this high)
 	if (bBank && !bBankDone)
 	{
 		bBankDone = true;
@@ -48,7 +49,13 @@ void AKnightCharacter::TickMantleTests(float Dt)
 					if (JeebWater::DepthAt(FVector(X, Y, Z0 + 1.f), S) > 0.f || JeebWater::DepthAt(FVector(X - D.X * 150.f, Y - D.Y * 150.f, Zb + 1.f), S) > 40.f) continue;   // (wading at most, not swimming)
 					const float Score = (Z3 - Z0) - FVector2D::Distance(FVector2D(X, Y), Plaza) * 0.02f;
 					if (Score > Best - 60.f) UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB bank candidate %.0f,%.0f yaw %.0f rise %.0f score %.0f"), X, Y, a * 22.5f, Z3 - Z0, Score);
-					if (Score > Best) { Best = Score; Spot = FString::Printf(TEXT("%.0f_%.0f_%.0f_150_100_-750_160"), F.X, F.Y, a * 22.5f); }
+					if (Score > Best)
+					{
+						// (straight up the slope, from the ground's own gradient where he meets it, not the 22.5-degree step the search used)
+						const FVector2D Gr(JeebTerrain::HeightAt(F.X + 50.f, F.Y) - JeebTerrain::HeightAt(F.X - 50.f, F.Y), JeebTerrain::HeightAt(F.X, F.Y + 50.f) - JeebTerrain::HeightAt(F.X, F.Y - 50.f));
+						const float UpYaw = Gr.IsNearlyZero() ? a * 22.5f : FMath::RadiansToDegrees(FMath::Atan2(Gr.Y, Gr.X));
+						Best = Score; BankTopZ = Z3; Spot = FString::Printf(TEXT("%.0f_%.0f_%.0f_150_100_-750_160"), F.X, F.Y, UpYaw);
+					}
 				}
 		UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB bank test spot: %s (score %.0f; steepest rise %.0f cm per m, %d steep, %d tall)"), Spot.IsEmpty() ? TEXT("none") : *Spot, Best, MaxRise, NSteep, NTall);
 		(bBankNet ? NetS : AtS) = Spot;
@@ -56,6 +63,17 @@ void AKnightCharacter::TickMantleTests(float Dt)
 	static const bool bAt = bBank ? (!bBankNet && !AtS.IsEmpty()) : FParse::Value(FCommandLine::Get(), TEXT("MantleAt="), AtS);
 	static const bool bNet = bBank ? (bBankNet && !NetS.IsEmpty()) : FParse::Value(FCommandLine::Get(), TEXT("NetMantle="), NetS);
 	const float WalkFor = bBank ? 9.f : 3.f;
+	// (the bank test's verdict, 2026-11-20: standing on walkable ground on top of the bank, and only the one grab, no regrab)
+	auto BankVerdict = [&](const TCHAR* Who)
+	{
+		const UKnightMovement* M = KnightMove();
+		if (!M) return;
+		const float Feet = float(GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		const bool bFloor = M->IsMovingOnGround() && M->CurrentFloor.IsWalkableFloor();
+		const bool bPass = bFloor && Feet >= BankTopZ - 60.f && M->Grabs == 1;
+		UE_LOG(LogTemp, Log, TEXT("JEEBBANKTEST %s %s: feet %.0f vs top %.0f, on walkable ground %d, grabs %d, mode %d at (%.0f,%.0f)"), Who, bPass ? TEXT("PASS") : TEXT("FAIL"), Feet, BankTopZ, bFloor ? 1 : 0, M->Grabs, int32(M->MovementMode), GetActorLocation().X, GetActorLocation().Y);
+	};
+	const bool bUpTop = bBank && KnightMove() && KnightMove()->Grabs > 0 && KnightMove()->IsMovingOnGround();   // (over the top: stop pushing)
 	if (!bAt && !bNet) return;
 	// (-MantleAt takes several, joined by 'x': one every 5 s, each filmed by a still camera side-on to it, <side> cm off (a 6th field, default 450;
 	// negative: from the other side). The pictures' frame k*75 is where the k-th starts, at 15 pictures a second)
@@ -95,7 +113,8 @@ void AKnightCharacter::TickMantleTests(float Dt)
 			const float Up = P.Num() >= 7 ? FCString::Atof(*P[6]) : 150.f;   // (a 7th field: the camera's height over his ground)
 			const float G = float(GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
 			const FVector Look(Spot.X, Spot.Y, G + (bBank ? 170.f : 80.f));   // (the bank: halfway up it)
-			const FVector Eye = FVector(Spot.X, Spot.Y, G + Up) - FVector(Dir) * 40.f + FRotator(0.f, Yaw + 90.f, 0.f).Vector() * Side;
+			const FVector Eye = bBank ? FVector(Spot.X, Spot.Y, G + 260.f) - FVector(Dir) * 700.f + FRotator(0.f, Yaw + 90.f, 0.f).Vector() * 350.f   // (the bank: from the river, a little to one side)
+				: FVector(Spot.X, Spot.Y, G + Up) - FVector(Dir) * 40.f + FRotator(0.f, Yaw + 90.f, 0.f).Vector() * Side;
 			if (APlayerController* PC = Cast<APlayerController>(Controller))
 				if (ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Eye, (Look - Eye).Rotation()))
 				{
@@ -107,7 +126,8 @@ void AKnightCharacter::TickMantleTests(float Dt)
 		}
 		const float T = AtT - Seg * 5.f;
 		AtT += Dt;
-		if (T > 0.6f && T < 0.6f + WalkFor) AddMovementInput(bBank && KnightMove() && KnightMove()->OnWall() ? UKnightMovement::WallUp(KnightMove()->WallNormal) : Dir, Share);   // (on the bank: straight up it, as W does)
+		if (bBank && T >= 1.f + WalkFor && T - Dt < 1.f + WalkFor) BankVerdict(TEXT("standalone"));
+		if (T > 0.6f && T < 0.6f + WalkFor && !bUpTop) AddMovementInput(bBank && KnightMove() && KnightMove()->OnWall() ? UKnightMovement::WallUp(KnightMove()->WallNormal) : Dir, Share);   // (on the bank: straight up it, as W does)
 		return;
 	}
 	if (!Controller || !Controller->IsA<APlayerController>()) return;
@@ -116,6 +136,12 @@ void AKnightCharacter::TickMantleTests(float Dt)
 	if (HasAuthority() && !IsLocallyControlled())
 	{
 		if (NetMantleT >= 4.f && NetMantleT - Dt < 4.f) Place();
+		{
+			// (the server: once he is back on the ground after a grab, 1 s settled, or at 60 s; its clock starts well before the client walks)
+			static bool bSaid = false; static float OnGround = 0.f;
+			OnGround = (KM && KM->Grabs > 0 && KM->IsMovingOnGround()) ? OnGround + Dt : 0.f;
+			if (bBank && !bSaid && (OnGround > 1.f || NetMantleT > 60.f)) { bSaid = true; BankVerdict(TEXT("server")); }
+		}
 	}
 	else if (IsLocallyControlled() && GetNetMode() == NM_Client && KM)
 	{
@@ -125,9 +151,12 @@ void AKnightCharacter::TickMantleTests(float Dt)
 			FixesAtStart = KM->NetFixes;
 			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client walks from (%.0f,%.0f,%.0f), %d corrections so far"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes);
 		}
-		if (NetMantleT >= 8.f && NetMantleT < 8.f + WalkFor) AddMovementInput(bBank && KM->OnWall() ? UKnightMovement::WallUp(KM->WallNormal) : Dir, Share);
+		if (NetMantleT >= 8.f && NetMantleT < 8.f + WalkFor && !bUpTop) AddMovementInput(bBank && KM->OnWall() ? UKnightMovement::WallUp(KM->WallNormal) : Dir, Share);
 		if (NetMantleT >= 9.f + WalkFor && NetMantleT - Dt < 9.f + WalkFor)
+		{
+			if (bBank) BankVerdict(TEXT("client"));
 			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client done at (%.0f,%.0f,%.0f): %d corrections while walking and mantling"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes - FixesAtStart);
+		}
 	}
 #endif
 }

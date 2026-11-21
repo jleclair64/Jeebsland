@@ -88,6 +88,7 @@ public:
 	// Whether this solid (an instanced one: its instance Item) is something he may mantle, judged from its own collision and size, no traces (cheap
 	// enough for every impact). bFace: the side he runs into, which must also stand on the ground at his feet (not a beam or a deck).
 	bool MantleCandidate(const UPrimitiveComponent* C, int32 Item, float FeetZ, bool bFace) const;
+	int32 Grabs = 0;      // (tests: grabs this machine has made, -BankClimb checks no regrab)
 	int32 NetFixes = 0;   // (tests: corrections this machine has taken from the server, log JEEBNETFIX)
 	mutable FString MantleWhy;   // (the log: why the last plan found no mantle)
 	// The server drops him off the wall (a clean hit, a knockdown, death); the correction carries it to his machine
