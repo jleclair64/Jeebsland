@@ -168,7 +168,7 @@ def shell(name, seed, n, ax, ay, h, rects, length, m=2.0, keep=1.0, inner=0.25, 
         base = p - d * (L * 0.5)
         if base.z < 0.0: base.z = 0.0
         w0 = 0.05 + 0.25 * min(1.0, p.z / h)               # sway grows toward the top and out to the tips
-        WS = 0.4                                            # (owner 2026-11-21: bushes swayed too much; 60% less wind)
+        WS = 0.04                                           # (owner 2026-11-21: bushes swayed too much; 60% less, then near zero)
         b.card(rects[r.randrange(len(rects))], base, d, side, L, droop * r.uniform(0.5, 1.5), nrm_at, 0.8, WS * (w0 + wind * 0.5), WS * w0, segs)
         made += 1
     return b.finish(name)

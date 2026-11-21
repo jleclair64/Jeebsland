@@ -79,6 +79,20 @@ def rock_picture(g, rock_tex, uv):
     return g.muln(g.desat(c, 0.8), g.c3(ROCK_PHOTO_GAIN))
 
 
+def rock_untiled(g, rock_tex, pos2, patches, size):
+    """The photo rock without a visible repeat (2026-11-21, owner: the slopes' stone looked like a repeated pattern): one sampling
+    at `size` cm and a second turned 37 degrees, 1.43x larger and offset, swapped by a broad soft noise (about 25 m), then lighter
+    and darker in 50 m patches. Two texture reads plus two of the small T_Patches: still cheap."""
+    a = rock_picture(g, rock_tex, g.mul(pos2, 1.0 / size))
+    u = g.mask(pos2, True, False); v = g.mask(pos2, False, True)
+    ru = g.subn(g.mul(u, 0.8), g.mul(v, 0.6)); rv = g.addn(g.mul(u, 0.6), g.mul(v, 0.8))
+    b = rock_picture(g, rock_tex, g.mul(g.add(g.append(ru, rv), 913.0), 1.0 / (size * 1.43)))
+    swap = g.mask(g.tex(patches, g.mul(pos2, 1.0 / (size * 5.5))), True, False)
+    col = g.lerp(a, b, g.ramp(swap, 0.38, 0.62))
+    macro = g.mask(g.tex(patches, g.mul(g.add(pos2, 3171.0), 1.0 / (size * 11.0))), True, False)
+    return g.muln(col, g.lerpc(0.8, 1.15, macro))
+
+
 class Graph:
     """Small helpers for wiring material nodes (as build_materials.py's)"""
 
@@ -221,13 +235,13 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
 
     # Rock: painted stone from above, and from the side where the ground is steeper than about 55 degrees (cliffs, later)
     rock_m = g.mask(vc, False, True)
-    top = rock_picture(g, rock_tex, g.mul(xy, 1.0 / 450.0))
+    top = rock_untiled(g, rock_tex, xy, patches, 450.0)
     nx = g.one(unreal.MaterialExpressionAbs, g.mask(nrm, True, False))
     ny = g.one(unreal.MaterialExpressionAbs, g.mask(g.mask(nrm, False, True), True, False))
     nz = g.mask(g.mask(nrm, False, False, True), True, False)
     wz = g.mask(g.mask(wp, False, False, True), True, False)
     side_uv = g.lerp(g.append(g.mask(wp, True, False), wz), g.append(g.mask(g.mask(wp, False, True), True, False), wz), g.ramp(g.subn(nx, ny), -0.05, 0.05))
-    side = rock_picture(g, rock_tex, g.mul(side_uv, 1.0 / 450.0))
+    side = rock_untiled(g, rock_tex, side_uv, patches, 450.0)
     rock = g.lerp(top, side, g.ramp(g.addn(g.one(unreal.MaterialExpressionOneMinus, nz), g.mul(rag, 0.1)), 0.42, 0.58))
     rock = g.lerp(rock, palette.colour(mat, "RockFar"), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
@@ -376,6 +390,108 @@ def build_stone(rock_tex, patches):
     finish(mat, "M_Stone")
 
 
+def mesh_textures(mi_path):
+    mi = unreal.EditorAssetLibrary.load_asset(mi_path)
+    MEL = unreal.MaterialEditingLibrary
+    out = {}
+    for p in MEL.get_texture_parameter_names(mi):
+        out[str(p)] = MEL.get_material_instance_texture_parameter_value(mi, p)
+    unreal.log("WORLDDIAG %s pictures %s" % (mi_path, sorted(out.keys())))
+    return out
+
+
+def pick(texs, *keys):
+    for k, t in texs.items():
+        if t is not None and any(x.lower() in k.lower() for x in keys):
+            return t
+    return None
+
+
+def build_boulder(rock_tex, patches):
+    # The forest's boulders (2026-11-21, owner: "make the rocks look less cartoony", as the bushes were): the photo rock laid on them
+    # in world space from three sides (no stretched UVs), the model's own painted shading kept only as light and dark, its normal
+    # map for the shape, and a soft, darker, broken moss on the tops instead of the flat lime cap.
+    texs = mesh_textures("/Game/TownDecor/MI_BoulderMossy")
+    base_t, nrm_t = pick(texs, "base", "color", "albedo"), pick(texs, "normal")
+    mat = fresh_material("M_Boulder")
+    mat.set_editor_property("used_with_instanced_static_meshes", True)
+    g = Graph(mat)
+    wp = g.node(unreal.MaterialExpressionWorldPosition)
+    nrm = g.node(unreal.MaterialExpressionVertexNormalWS)
+    uv = g.node(unreal.MaterialExpressionTextureCoordinate)
+    nx = g.one(unreal.MaterialExpressionAbs, g.mask(nrm, True, False))
+    ny = g.one(unreal.MaterialExpressionAbs, g.mask(g.mask(nrm, False, True), True, False))
+    nz = g.mask(g.mask(nrm, False, False, True), True, False)
+    wz = g.mask(g.mask(wp, False, False, True), True, False)
+    S = 150.0
+    top = rock_picture(g, rock_tex, g.mul(g.mask(wp, True, True), 1.0 / S))
+    sx = rock_picture(g, rock_tex, g.mul(g.append(g.mask(g.mask(wp, False, True), True, False), wz), 1.0 / S))
+    sy = rock_picture(g, rock_tex, g.mul(g.append(g.mask(wp, True, False), wz), 1.0 / S))
+    col = g.lerp(sy, sx, g.ramp(g.subn(nx, ny), -0.2, 0.2))
+    col = g.lerp(col, top, g.ramp(g.one(unreal.MaterialExpressionAbs, nz), 0.5, 0.8))
+    if base_t is not None:   # the painted model's light and dark (cracks, hollows), not its colours
+        shade = g.lum(g.tex(base_t, uv))
+        col = g.muln(col, g.lerpc(0.55, 1.25, g.ramp(shade, 0.08, 0.6)))
+    col = g.muln(col, g.vector("Tint", (0.88, 0.88, 0.88)))
+    n1 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 70.0)), True, False)
+    n2 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 23.0)), True, False)
+    moss_a = g.sat(g.mul(g.add(g.addn(g.mul(nz, 1.4), g.addn(g.mul(n1, 0.7), g.mul(n2, 0.35))), -1.45), 3.0))
+    moss_c = g.lerp(g.c3((0.07, 0.085, 0.045)), g.c3((0.13, 0.15, 0.07)), n2)   # dark olive moss with lighter tufts
+    col = g.lerp(col, palette.grade_plant_extra(mat, moss_c), g.mul(moss_a, 0.75))
+    g.out(palette.grade_world(mat, col), unreal.MaterialProperty.MP_BASE_COLOR)
+    if nrm_t is not None:
+        g.out(g.tex(nrm_t, uv, normal=True), unreal.MaterialProperty.MP_NORMAL)
+    g.out(g.lerpc(0.82, 0.95, moss_a), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.c(0.3), unreal.MaterialProperty.MP_SPECULAR)
+    finish(mat, "M_Boulder")
+    sm = unreal.EditorAssetLibrary.load_asset("/Game/TownDecor/SM_BoulderMossy")
+    sm.set_material(0, mat)
+    unreal.EditorAssetLibrary.save_asset("/Game/TownDecor/SM_BoulderMossy")
+
+
+STUMP_TINT = (0.42, 0.37, 0.33)   # the pack trees' grey-brown bark (owner 2026-11-21: the stump read orange-tan beside them)
+
+
+def build_stumps():
+    # One plain parent (picture, normal, roughness from the MR picture's green) with the colour desaturated and tinted to the bark,
+    # then one instance per stump kind, set on each stump model's slots that used the old instance.
+    mat = fresh_material("M_StumpBark")
+    mat.set_editor_property("used_with_instanced_static_meshes", True)
+    g = Graph(mat)
+    base = g.node(unreal.MaterialExpressionTextureSampleParameter2D, parameter_name="Base")
+    nrm = g.node(unreal.MaterialExpressionTextureSampleParameter2D, parameter_name="Normal", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+    mr = g.node(unreal.MaterialExpressionTextureSampleParameter2D, parameter_name="MR", sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    c = g.mask(base, True, True, True)
+    lum = g.lum(c)
+    col = g.lerp(g.muln(c, g.c3((0.75, 0.75, 0.75))), g.muln(g.mul(lum, 1.6), g.vector("Tint", STUMP_TINT)), g.scalar("Recolour", 0.85))
+    g.out(palette.grade_world(mat, col), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(nrm, unreal.MaterialProperty.MP_NORMAL)
+    g.out(g.lerpc(0.75, 1.0, g.mask(mr, False, True)), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.c(0.25), unreal.MaterialProperty.MP_SPECULAR)
+    finish(mat, "M_StumpBark")
+    MEL = unreal.MaterialEditingLibrary
+    tools = unreal.AssetToolsHelpers.get_asset_tools()
+    for kind in ("Stump", "StumpRooty", "StumpMushroom", "StumpGrass"):
+        texs = mesh_textures("/Game/TownDecor/MI_" + kind)
+        path = "/Game/TownDecor/MI_%sBark" % kind
+        if unreal.EditorAssetLibrary.does_asset_exist(path):
+            mi = unreal.EditorAssetLibrary.load_asset(path)
+        else:
+            mi = tools.create_asset("MI_%sBark" % kind, "/Game/TownDecor", unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        MEL.set_material_instance_parent(mi, mat)
+        for pn, keys in (("Base", ("base", "color", "albedo")), ("Normal", ("normal",)), ("MR", ("mr", "rough", "metal"))):
+            t = pick(texs, *keys)
+            if t is not None:
+                MEL.set_material_instance_texture_parameter_value(mi, pn, t)
+        unreal.EditorAssetLibrary.save_asset(path)
+        sm = unreal.EditorAssetLibrary.load_asset("/Game/TownDecor/SM_" + kind)
+        for i, sl in enumerate(sm.static_materials):
+            if sl.material_interface and sl.material_interface.get_name() in ("MI_" + kind, "MI_%sBark" % kind):
+                sm.set_material(i, mi)
+        unreal.EditorAssetLibrary.save_asset("/Game/TownDecor/SM_" + kind)
+        unreal.log("WORLDDIAG stump %s recoloured" % kind)
+
+
 if os.environ.get("JEEB_WORLD_ONLY") == "dirt":
     # (2026-11-16: M_Dirt alone, from the textures already in /Game, leaving M_Ground, M_Stone and the pictures untouched:
     # set JEEB_WORLD_ONLY=dirt before Tools\BuildWorldMaterial.ps1)
@@ -396,6 +512,8 @@ else:
     build_ground(grass_tex, dirt_tex, rock_tex, patches)
     build_dirt(dirt_tex, cobble_tex, cobble_n, patches, grass_tex)
     build_stone(rock_tex, patches)
+    build_boulder(rock_tex, patches)
+    build_stumps()
     for old in ("M_WorldGround", "T_Ground"):   # the old flat world material and the old ground picture: replaced
         if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
             unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
