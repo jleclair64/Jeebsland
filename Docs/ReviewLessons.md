@@ -424,3 +424,4 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - A thrust must point the weapon along the way he travels at full reach, not just move the hand forward. Check it on a side sheet. (The club's dash reads as a sweep from the front.)
 - Before sending review pictures, close the inventory and check that the close crop frames the part under review. `-ShotKind` takes the EKind number: K_Club is 23.
 - **Look:** when adding hardware (a bracket) to carry an item, spawn and check the item and its mount together from a clean angle where both show; never an empty or unclear bracket.
+- **Online:** a climb or mantle test asserts that the knight reaches the top, not only that server and client agree.
