@@ -13,6 +13,7 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Components/PoseableMeshComponent.h"
+#include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Engine/SkeletalMesh.h"
@@ -229,6 +230,13 @@ void FKnightAnimator::MakeTrollMesh(AActor* Owner)
 	Comp->SetVisibility(false, false);   // (the knight's mesh keeps the pose for whatever reads it; only the troll is drawn)
 }
 
+// The troll's own shadow on himself (2026-11-21, owner: his body "isn't crisp"): the soft-shadow filter (PCSS) scatters its samples per
+// pixel and leans on TSR history; on his big matte body the wide penumbra of his head and arms on his shoulders and back showed as a moving
+// stipple whenever he moved. A per-object (inset) shadow map is drawn at a much finer resolution, so the same kernel covers a far narrower
+// penumbra on him. 0 = the plain whole-scene shadow as before. Live; looks only.
+static TAutoConsoleVariable<int32> CVarTrollInset(TEXT("jeeb.Troll.InsetShadow"), 1,
+	TEXT("1: the troll casts a per-object (inset) shadow, finer on himself, so no soft-shadow stipple on his body; 0: the whole-scene shadow as before."), ECVF_Default);
+
 void FKnightAnimator::TrollPose()
 {
 	const USkinnedAsset* Asset = TrollComp->GetSkinnedAsset();
@@ -260,6 +268,8 @@ void FKnightAnimator::TrollPose()
 	}
 	TrollComp->MarkRefreshTransformDirty();
 	TrollComp->RefreshBoneTransforms();
+	const bool bInset = CVarTrollInset.GetValueOnGameThread() != 0;
+	if (TrollComp->bCastInsetShadow != bInset) TrollComp->SetCastInsetShadow(bInset);
 }
 
 // The troll's charged jump in the air (review 2026-11-19: he went straight from the crouch into the tuck). First a take-off stretch:
