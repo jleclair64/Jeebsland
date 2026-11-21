@@ -73,6 +73,8 @@ private:
 	void Poly(const TArray<FVector2D>& P, const FLinearColor& C);
 	void Disc(float Cx, float Cy, float Rx, float Ry, const FLinearColor& C);
 	void DrawIcon(int32 Id, float X, float Y, float S);
+	void DrawIconIn(int32 Id, float X, float Y, float S, float CX, float CY, float CW, float CH);   // the icon plus the class frame round its cell
+	void ClassFrame(int32 Id, float X, float Y, float W, float H);
 	void DrawIconBody(int32 Id, float X, float Y, float S);
 	void DrawIngot(float X, float Y, float S);
 	float Wrapped(const FString& Text, float X, float Y, float MaxW, float Scale, const FLinearColor& Col);   // returns the height used
@@ -89,7 +91,7 @@ private:
 	// A window title in that lettering, sized to stand in for HDText at Scale with the medium font (top-left at X, Y)
 	float WindowTitle(const FString& Text, float X, float Y, float Scale) { return TitleTextAt(Text, X, Y + 3.f * Scale, 12.f * Scale); }
 	UPROPERTY() UFont* TitleFonts[3] = {};   // rasters big enough for titles (HDFonts stop at 40)
-	void DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha);   // a tooltip-style panel centred over a point (dropped things)
+	void DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha, int32 IconId = 0);   // a tooltip-style panel centred over a point (dropped things)
 	static FLinearColor Lift(const FLinearColor& C, float F);
 	// Liquid-glass drawing: rounded translucent panels, tiles and gauges with a sheen and a rim of light
 	UPROPERTY() UTexture2D* QuarterTex = nullptr;

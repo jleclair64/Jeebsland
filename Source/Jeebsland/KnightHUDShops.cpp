@@ -36,7 +36,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1190.f, PH = 690.f;
-	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
+	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
 	WindowTitle(TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
@@ -78,7 +78,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		const bool bOver = Over(X, Y, 58.f, 58.f);
 		Tile(X, Y, 58.f, 58.f, bOver && bSellable ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver && bSellable ? 0.38f : 0.2f);
 		if (S.Id == 0) continue;
-		DrawIcon(S.Id, X + 5.f, Y + 3.f, 48.f);
+		DrawIconIn(S.Id, X + 5.f, Y + 3.f, 48.f, X, Y, 58.f, 58.f);
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + 36.f, Y + 38.f, Font, 0.85f);
 		if (bOver && bSellable)
 		{
@@ -115,7 +115,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			const bool bOver = !bSoldOut && Over(CX, CY, CW, CH);
 			Tile(CX, CY, CW, CH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.34f : 0.18f);
 			if (i >= 8) DrawRect(FLinearColor(0.75f, 0.55f, 0.15f, 0.9f), CX, CY, CW, 3.f);       // the valuable row gets a gold edge
-			DrawIcon(W.Id, CX + 6.f, CY + 6.f, 58.f);
+			DrawIconIn(W.Id, CX + 6.f, CY + 6.f, 58.f, CX, CY, CW, CH);
 			FString Name = W.Count > 1 ? FString::Printf(TEXT("%d %s"), W.Count, *ItemName(W.Id)) : ItemName(W.Id);
 			Wrapped(Name, CX + 70.f, CY + 8.f, CW - 76.f, 0.85f, bSoldOut ? FLinearColor(0.45f, 0.45f, 0.45f) : FLinearColor::White);
 			FString Stat;
@@ -188,7 +188,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	USkillComponent* Skills = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1500.f, PH = 690.f;
-	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
+	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
 	WindowTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
@@ -312,7 +312,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 	USkillComponent* Sk = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
 	const float PW = 1090.f, PH = 640.f;
-	const float PX = (Canvas->ClipX - PW) * 0.5f, PY = (Canvas->ClipY - PH) * 0.5f;
+	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	Panel(PX, PY, PW, PH);
 	WindowTitle(TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
@@ -333,7 +333,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		SlotBox(X, Y, SS, bOver);
 		const FInvSlot S = Sk->Slots[i];
 		if (S.Id == 0) continue;
-		DrawIcon(S.Id, X + 8.f, Y + 6.f, SS - 16.f);
+		DrawIconIn(S.Id, X + 8.f, Y + 6.f, SS - 16.f, X, Y, SS, SS);
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 28.f, Y + SS - 22.f, Font, 1.0f);
 		if (bOver)
 		{
@@ -366,7 +366,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (!Sk->Bank.IsValidIndex(Idx)) continue;
 		const FInvSlot S = Sk->Bank[Idx];
 		if (S.Id == 0) continue;
-		DrawIcon(S.Id, X + 6.f, Y + 4.f, BS - 12.f);
+		DrawIconIn(S.Id, X + 6.f, Y + 4.f, BS - 12.f, X, Y, BS, BS);
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + BS - 26.f, Y + BS - 20.f, Font, 0.85f);
 		if (bOver)
 		{

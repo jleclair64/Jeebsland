@@ -66,7 +66,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		const FInvSlot S = Skills->Slots[i];
 		SlotBox(SX, SY, SS, bOver, false);
 		if (S.Id == 0) continue;
-		DrawIcon(S.Id, SX + 10.f, SY + 8.f, SS - 20.f);
+		DrawIconIn(S.Id, SX + 10.f, SY + 8.f, SS - 20.f, SX, SY, SS, SS);
 		if (StackSize(S.Id) > 1)
 			HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, SX + SS - 30.f, SY + SS - 24.f, Font, 1.1f);
 		if (bOver)
@@ -88,7 +88,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		HDText(FString::Printf(TEXT("%d"), h + 1), FLinearColor(0.7f, 0.7f, 0.7f), X + 4.f, Y + 2.f, Font, 0.9f);
 		const int32 Id = Skills->Hotbar[h];
 		if (Id == 0) continue;
-		DrawIcon(Id, X + 7.f, Y + 5.f, HS - 14.f);
+		DrawIconIn(Id, X + 7.f, Y + 5.f, HS - 14.f, X, Y, HS, HS);
 		int32 A, B;
 		if (HotbarDamage(Skills, h, A, B))
 			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.55f, 0.45f), X + HS - 44.f, Y + HS - 20.f, Font, 0.9f);
@@ -114,7 +114,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 		HDText(Worn[w].Label, FLinearColor(0.7f, 0.7f, 0.7f), X + 2.f, Y + HS + 4.f, Font, 0.85f);
 		const int32 Id = Worn[w].bSecond ? Skills->RingB : Skills->Worn[Worn[w].Kind];
 		if (Id == 0) continue;
-		DrawIcon(Id, X + 7.f, Y + 5.f, HS - 14.f);
+		DrawIconIn(Id, X + 7.f, Y + 5.f, HS - 14.f, X, Y, HS, HS);
 		if (bOver)
 		{
 			ItemTip(Id);
@@ -255,7 +255,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			const FInvSlot S = Skills->Slots[i];
 			SlotTile(X, Y, SS, SS, bOver);
 			if (S.Id == 0) continue;
-			if (!(DragKind == 1 && bDragging && DragIdx == i)) DrawIcon(S.Id, X + 4.f, Y + 3.f, SS - 8.f);   // the picked-up item leaves its cell
+			if (!(DragKind == 1 && bDragging && DragIdx == i)) DrawIconIn(S.Id, X + 4.f, Y + 3.f, SS - 8.f, X, Y, SS, SS);   // the picked-up item leaves its cell
 			if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
 			ItemBadges(S.Id, X, Y, SS);
 			if (bOver) ItemTip(S.Id);
@@ -289,7 +289,7 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			SlotTile(X, Y, WS, WS, bOver);
 			const int32 Id = Ws.bSecond ? Skills->RingB : Skills->Worn[Ws.Kind];
 			if (Id == 0) continue;
-			if (!(DragKind == 4 && bDragging && DragIdx == WornCellCount - 1)) DrawIcon(Id, X + 4.f, Y + 3.f, WS - 8.f);   // a piece being dragged leaves its slot
+			if (!(DragKind == 4 && bDragging && DragIdx == WornCellCount - 1)) DrawIconIn(Id, X + 4.f, Y + 3.f, WS - 8.f, X, Y, WS, WS);   // a piece being dragged leaves its slot
 			ItemBadges(Id, X, Y, WS);
 			if (bOver) ItemTip(Id);
 		}
@@ -633,7 +633,7 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 			if (bOver) SetTip({ TEXT("Take your shield off"), TEXT("It goes back in your pack") });
 			continue;
 		}
-		DrawIcon(E.Id, Cx + 2.f, Cy + 2.f, S - 4.f);
+		DrawIconIn(E.Id, Cx + 2.f, Cy + 2.f, S - 4.f, Cx, Cy, S, S);
 		if (E.Count > 1)
 		{
 			const FString Txt = FString::FromInt(E.Count);
@@ -764,7 +764,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 		}
 		const FInvSlot& It = Items[Idx];
 		if (It.Id == 0) return;
-		if (!bLifted) DrawIcon(It.Id, X + 4.f, Y + 3.f, S - 8.f);
+		if (!bLifted) DrawIconIn(It.Id, X + 4.f, Y + 3.f, S - 8.f, X, Y, S, S);
 		if (StackSize(It.Id) > 1 || It.Count > 1) HDText(FString::FromInt(It.Count), FLinearColor::White, X + S - 22.f, Y + 2.f, Font, 0.75f);
 		ItemBadges(It.Id, X, Y, S);
 		if (bOver) ItemTip(It.Id);

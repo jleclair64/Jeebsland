@@ -55,7 +55,7 @@ void AKnightHUD::HDTextSize(const FString& Text, float& OutW, float& OutH, UFont
 
 
 // A tooltip-style panel centred above a point on screen (the description over a dropped thing)
-void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha)
+void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float BottomY, float Alpha, int32 IconId)
 {
 	if (Lines.Num() == 0 || Alpha <= 0.01f) return;
 	UFont* Font = GEngine->GetMediumFont();
@@ -68,9 +68,18 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 		HDTextSize(Shown, TW, TH, Font, i == 0 ? 1.15f : 0.95f);
 		W = FMath::Max(W, TW); H += TH + 3.f;
 	}
-	const float X = FMath::Clamp(CX - W * 0.5f, 12.f, Canvas->ClipX - W - 28.f), Y = FMath::Clamp(BottomY - H, 12.f, Canvas->ClipY - H - 20.f);
-	Panel(X - 8.f, Y - 8.f, W + 24.f, H + 16.f, Alpha);
+	// (owner 2026-11-20: the item's icon in a cell joined to the left of the words, as tall as the text)
+	const float IS = IconId ? FMath::Max(H, 44.f) : 0.f, IW = IconId ? IS + 10.f : 0.f;
+	H = FMath::Max(H, IS);
+	const float X = FMath::Clamp(CX - (W + IW) * 0.5f, 12.f, Canvas->ClipX - W - IW - 28.f), Y = FMath::Clamp(BottomY - H, 12.f, Canvas->ClipY - H - 20.f);
+	Panel(X - 8.f, Y - 8.f, W + IW + 24.f, H + 16.f, Alpha);
+	if (IconId && Alpha > 0.4f)
+	{
+		SlotBox(X, Y, IS, false);
+		DrawIconIn(IconId, X + 4.f, Y + 3.f, IS - 8.f, X, Y, IS, IS);
+	}
 	float Cy = Y;
+	const float TX = X + IW;
 	for (int32 i = 0; i < Lines.Num(); ++i)
 	{
 		const float Sc = i == 0 ? 1.15f : 0.95f;
@@ -79,7 +88,7 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 		FLinearColor C = TipLineColor(Lines[i], i == 0, Shown);
 		HDTextSize(Shown, TW, TH, Font, Sc);
 		C.A = Alpha;
-		HDText(Shown, C, X + 2.f, Cy, Font, Sc);
+		HDText(Shown, C, TX + 2.f, Cy, Font, Sc);
 		Cy += TH + 3.f;
 	}
 }
