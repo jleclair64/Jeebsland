@@ -11,7 +11,7 @@ src, out = a[0], a[1]
 os.makedirs(out, exist_ok=True)
 ONLY = [s for s in os.environ.get("INTERIOR_ONLY", "").split(",") if s]
 PROPS = [
-    ("Bookshelf",    "bookshelves/OldBookshelf.glb",        16000, 195, 'h'),
+    ("Bookshelf",    "bookshelves/OldBookshelf.glb",        80000, 195, 'h'),
     ("BraidedRug",   "rugs/BraidedRug.glb",                  3000, 190, 'l'),
     ("Tapestry",     "tapestries/ValeTapestry.glb",          6000, 150, 'h'),
     ("WallMap",      "maps-scrolls/TreasureMap.glb",         3000,  90, 'l'),
@@ -20,7 +20,7 @@ PROPS = [
     ("Chest",        "chest/TreasureChest.glb",              8000,  95, 'l'),
     ("PotionCrate",  "chest/PotionCollectionChest.glb",     10000,  60, 'l'),
     ("Cauldron",     "alchemy/MedievalCauldron.glb",         8000,  70, 'l'),
-    ("Bottles",      "alchemy/EightAlchemyBottles.glb",     12000,  75, 'l'),
+    ("Bottles",      "alchemy/EightAlchemyBottles.glb",     60000,  75, 'l'),
     ("FlowerPot",    "plants/BlossomsInPot.glb",             8000,  50, 'h'),
     ("Candlesticks", "candles/CandlestickPair.glb",          4000,  30, 'l'),
     ("Candelabra",   "candles/EternalIllumination.glb",      6000,  48, 'h'),
@@ -48,6 +48,12 @@ for name, rel, keep, size, how in PROPS:
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     tris0 = sum(len(p.vertices) - 2 for p in ob.data.polygons)
     if tris0 > keep:
+        # (2026-11-21 fix: weld the GLB's split seams first, or the collapse pulls each UV island apart: cracked books, shattered bottles)
+        import bmesh
+        bm = bmesh.new(); bm.from_mesh(ob.data)
+        span = max((max(v.co[i] for v in bm.verts) - min(v.co[i] for v in bm.verts)) for i in range(3))
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=span * 1e-5)
+        bm.to_mesh(ob.data); bm.free()
         m = ob.modifiers.new("dec", 'DECIMATE'); m.ratio = keep / tris0; m.use_collapse_triangulate = True
         bpy.ops.object.modifier_apply(modifier="dec")
     vs = [v.co for v in ob.data.vertices]

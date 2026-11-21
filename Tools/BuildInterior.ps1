@@ -25,4 +25,8 @@ if (-not $ImportOnly) {
 $env:INTERIOR_IMPORT = $Only
 $out = RunUnreal 'interior_import.py'
 $out | Select-String 'INTIMPORT|INTBOUNDS|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
-if ($out -match 'INTIMPORT done') { Write-Host 'Interior imported.'; exit 0 } else { Write-Host 'Interior import FAILED.'; exit 1 }
+if (-not ($out -match 'INTIMPORT done')) { Write-Host 'Interior import FAILED.'; exit 1 }
+# (2026-11-21: the UpDraft pieces' feet to their origin, the calmer plaster: Tools/interior_fix.py)
+$fix = RunUnreal 'interior_fix.py'
+$fix | Select-String 'INTFIX|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
+if ($fix -match 'INTFIX done') { Write-Host 'Interior imported.'; exit 0 } else { Write-Host 'Interior fix FAILED.'; exit 1 }
