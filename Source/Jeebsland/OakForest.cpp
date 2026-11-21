@@ -35,6 +35,11 @@ namespace
 		TEXT("Shadows from the forest and the town's trees: 1 on (trees within jeeb.Forest.ShadowReach of the camera, logs, stumps and rocks; never bushes), 0 none. Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarShadowReach(TEXT("jeeb.Forest.ShadowReach"), 20.f,
 		TEXT("How far from the camera the trees cast shadows, metres (set by the graphics setting: 20 HIGH, 15 LOW since 2026-11-16, was 40 and 20; past it the stand-ins, jeeb.Forest.FarShade; 2026-11-16: every tree casting cost 7 ms in the forest, 60 m 5 ms, 40 m 3.5, 25 m 1.9). Live; looks only."), ECVF_Default);
+	// (2026-11-20, owner: "the expensive close-up shadows, can we add a toggle ... to test with them off") 0 leaves the leafy twins out
+	// altogether: every tree's shadow is its see-through stand-in, from the camera out (the LOOK tab's TREES checkbox)
+	TAutoConsoleVariable<float> CVarNearShadows(TEXT("jeeb.Forest.NearShadows"), 1.f,
+		TEXT("1 (0.5 or more): trees within jeeb.Forest.ShadowReach cast their own leafy shadows (the close-up, costly ones); 0: none, the plain see-through stand-in shade reaches right up to the camera. Live; looks only."), ECVF_Default);
+	float ReachCm() { return CVarNearShadows.GetValueOnGameThread() >= 0.5f ? FMath::Max(0.f, CVarShadowReach.GetValueOnGameThread()) * 100.f : 0.f; }
 	// Past that reach, plain stand-in crowns cast the far trees' shadows (2026-11-16, owner: "far away ... looks too bright then when I
 	// get closer it turns dark"): real shadows, so they follow the sun at every time of day, at a small share of a real tree's cost
 	TAutoConsoleVariable<int32> CVarFarShade(TEXT("jeeb.Forest.FarShade"), 1,
@@ -69,12 +74,14 @@ namespace
 
 	TAutoConsoleVariable<int32> CVarShadowAll(TEXT("jeeb.Forest.ShadowAll"), 0,
 		TEXT("1: every drawn tree casts its own shadow (meant for virtual shadow maps, r.Shadow.Virtual.Enable 1; with ordinary shadow maps it cost about 7 ms); 0: only the near twins and the stand-ins. Live; looks only."), ECVF_Default);
-	TAutoConsoleVariable<float> CVarSpruceLod(TEXT("jeeb.Forest.SpruceLod"), 2.f,
-		TEXT("How soon the spruces drop to their simpler models: 1 as the pack made them, 2 at twice the size on screen (so at about half the distance). Live; looks only."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarSpruceLod(TEXT("jeeb.Forest.SpruceLod"), 1.f,
+		TEXT("How soon the spruces drop to their simpler models: 1 as the pack made them (since 2026-11-20: the simpler ones read sharp and spiky beside the soft near ones), 2 at twice the size on screen (so at about half the distance; 2026-11-16 to -19, for speed). Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<int32> CVarTwinLod(TEXT("jeeb.Forest.TwinLod"), 1,
 		TEXT("The spruces' near shadows come from this simpler model (0 the same model as drawn, 1 the next simpler, and so on). Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarSway(TEXT("jeeb.Forest.Sway"), 60.f,
 		TEXT("How far from the camera the trees sway in the wind, metres (past it they stand still, which also keeps cached shadows valid). Live; looks only."), ECVF_Default);
+	TAutoConsoleVariable<int32> CVarSpruceFace(TEXT("jeeb.Forest.SpruceFace"), 1,
+		TEXT("1: the drawn spruces keep their world position offset at every distance, so their far card keeps turning to face you; 0: it stops past jeeb.Forest.Sway (before 2026-11-20: a thin edge-on spike). Live; looks only."), ECVF_Default);
 
 	// A stand-in for one tree kind at scale 1, in the tree mesh's own frame: an egg-shaped crown (a cone for the spruces) from where the
 	// trunk ends to the top, and a six-sided trunk; flat-shaded, about 110 triangles, the engine's plain material (it is only ever a shadow)
@@ -956,6 +963,15 @@ struct FOakForestBuild
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST made in %.0f ms: %d drawn sets (%d instances, %d coloured leaf slots), solids %d trunks, %d logs, %d stumps and rocks, %d boulders; hash=%08x%s"),
 			(FPlatformTime::Seconds() - T0) * 1000.0, Sets, Instances, Swapped, TrunkX.Num(), LogX.Num(), CylX.Num(), OwnSolid[K_Boulder].Num(), Hash, bServer ? TEXT(" (server: solids only)") : TEXT(""));
+#if !UE_BUILD_SHIPPING
+		// (test pictures, 2026-11-20: -ShotSpruces logs grown spruces of the forest, to aim cameras at)
+		if (FParse::Param(FCommandLine::Get(), TEXT("ShotSpruces")))
+		{
+			int32 Logged = 0;
+			for (const FPut& P : Puts)
+				if (IsSpruce(P.Kind) && !P.bTown && P.Scale.X > 0.8f && Logged < 60) { ++Logged; UE_LOG(LogTemp, Log, TEXT("JEEBSPRUCE kind %d at %.0f %.0f %.0f scale %.2f"), P.Kind, P.At.X, P.At.Y, P.At.Z, P.Scale.X); }
+		}
+#endif
 	}
 
 	// The DZ leaf materials' one-colour twins (/Game/TreeGroves, Tools/grove_materials.py), one dynamic copy per leaf kind per colour, shared
@@ -1008,9 +1024,9 @@ void AOakForest::BeginPlay()
 		CVarReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadows->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadowReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->UpdateShadows(true); }));
-		for (IConsoleVariable* V : { CVarFarShade.AsVariable(), CVarFarShadeReach.AsVariable(), CVarFarShadeSize.AsVariable(), CVarShadowFade.AsVariable(), CVarShadowFadeSize.AsVariable(), CVarTwinShrink.AsVariable() })
+		for (IConsoleVariable* V : { CVarNearShadows.AsVariable(), CVarFarShade.AsVariable(), CVarFarShadeReach.AsVariable(), CVarFarShadeSize.AsVariable(), CVarShadowFade.AsVariable(), CVarShadowFadeSize.AsVariable(), CVarTwinShrink.AsVariable() })
 			V->OnChangedDelegate().AddLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->UpdateShadows(true); });
-		for (IConsoleVariable* V : { CVarShadowAll.AsVariable(), CVarSway.AsVariable(), CVarSpruceLod.AsVariable(), CVarTwinLod.AsVariable() })
+		for (IConsoleVariable* V : { CVarShadowAll.AsVariable(), CVarSway.AsVariable(), CVarSpruceFace.AsVariable(), CVarSpruceLod.AsVariable(), CVarTwinLod.AsVariable() })
 			V->OnChangedDelegate().AddLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); });
 	}
 	// -NoOakTrees (test pictures only): no town trees and no forest, to measure what they cost (the roads stay)
@@ -1053,7 +1069,12 @@ void AOakForest::ApplyReach()
 		// (jeeb.Forest.ShadowAll: the drawn trees cast their own shadows, for virtual shadow maps, and the twins and stand-ins stay empty)
 		const bool bShadow = (DrawnIsTree[i] ? CVarShadowAll.GetValueOnGameThread() != 0 : DrawnShadow[i]) && CVarShadows.GetValueOnGameThread() != 0;
 		if (Drawn[i]->CastShadow != bShadow) Drawn[i]->SetCastShadow(bShadow);
-		if (DrawnIsTree[i]) Drawn[i]->SetWorldPositionOffsetDisableDistance(int32(FMath::Max(0.f, CVarSway.GetValueOnGameThread()) * 100.f));
+		// (2026-11-20, owner: "what's up with this really thin tree?") a spruce's last, simplest model is a camera-facing card (the pack's
+		// MA_Imposter turns it by world position offset); with that switched off past the sway reach the card stood still, edge-on from most
+		// sides: a thin spike that came and went as you walked. Spruces keep it at every distance (jeeb.Forest.SpruceFace 0: the old way)
+		const bool bSpruce = Drawn[i]->GetStaticMesh() && Drawn[i]->GetStaticMesh()->GetName().StartsWith(TEXT("spruce_"));
+		const bool bFace = bSpruce && CVarSpruceFace.GetValueOnGameThread() != 0;
+		if (DrawnIsTree[i]) Drawn[i]->SetWorldPositionOffsetDisableDistance(bFace ? 0 : int32(FMath::Max(0.f, CVarSway.GetValueOnGameThread()) * 100.f));
 	}
 	for (UInstancedStaticMeshComponent* S : ShadowSets) if (S) S->SetWorldPositionOffsetDisableDistance(int32(FMath::Max(0.f, CVarSway.GetValueOnGameThread()) * 100.f));
 	// (2026-11-16, for speed) the spruces drop to their simpler models sooner (jeeb.Forest.SpruceLod: their switch-over sizes on screen
@@ -1075,7 +1096,7 @@ void AOakForest::ApplyReach()
 				if (O.Num() == 0)
 				{
 					FString S;
-					for (int32 l = 0; l < RD->LODResources.Num() && l < MAX_STATIC_MESH_LODS; ++l) { O.Add(RD->ScreenSize[l].Default); S += FString::Printf(TEXT(" %.3f/%d"), O.Last(), RD->LODResources[l].GetNumTriangles()); }
+					for (int32 l = 0; l < RD->LODResources.Num() && l < MAX_STATIC_MESH_LODS; ++l) { O.Add(RD->ScreenSize[l].Default); S += FString::Printf(TEXT(" %.3f/%d"), O.Last(), RD->LODResources[l].GetNumTriangles()); for (const FStaticMeshSection& Sec : RD->LODResources[l].Sections) { const TArray<FStaticMaterial>& SM = M->GetStaticMaterials(); S += FString::Printf(TEXT(",%s"), SM.IsValidIndex(Sec.MaterialIndex) && SM[Sec.MaterialIndex].MaterialInterface ? *SM[Sec.MaterialIndex].MaterialInterface->GetName() : TEXT("?")); } }
 					UE_LOG(LogTemp, Log, TEXT("JEEBFOREST %s LODs (screen size/triangles):%s"), *M->GetName(), *S);
 				}
 				for (int32 l = 1; l < O.Num(); ++l) RD->ScreenSize[l].Default = FMath::Min(O[l] * LodK, l > 0 ? RD->ScreenSize[l - 1].Default * 0.99f : 1.f);
@@ -1279,7 +1300,7 @@ void AOakForest::UpdateBandFade()
 	if (!bBandOn || !BandMids.Num()) return;
 	FVector Cam;
 	if (!CameraNow(Cam)) return;
-	const float R = FMath::Max(0.f, CVarShadowReach.GetValueOnGameThread()) * 100.f;
+	const float R = ReachCm();
 	const FBand B = BandFor(R, true, true);
 	ShrinkTwins(Cam, B.Lo, B.Hand);
 	const float FadeSize = CVarShadowFadeSize.GetValueOnGameThread();
@@ -1306,7 +1327,7 @@ void AOakForest::UpdateShadows(bool bForce)
 	if (!CameraNow(Cam3)) return;
 	const FVector2D Cam(Cam3);
 	const bool bOn = CVarShadows.GetValueOnGameThread() != 0 && CVarShadowAll.GetValueOnGameThread() == 0;   // (ShadowAll: the drawn trees cast)
-	const float R = FMath::Max(0.f, CVarShadowReach.GetValueOnGameThread()) * 100.f;
+	const float R = ReachCm();
 	// the stand-ins: from the twins' reach out to jeeb.Forest.FarShadeReach
 	const float RF = (bOn && CVarFarShade.GetValueOnGameThread() != 0) ? FMath::Max(0.f, CVarFarShadeReach.GetValueOnGameThread()) * 100.f : 0.f;
 	const FBand B = BandFor(R, RF > 0.f, BandMids.Num() > 0);

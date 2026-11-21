@@ -48,6 +48,10 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> Contact(TEXT("jeeb.Look.Contact"), 0.f, TEXT("The sun's screen-space contact shadow length (share of the screen; 0 off: at 0.03 it cost 0.07 ms and barely showed, 2026-11-13)"));
 	static TAutoConsoleVariable<float> AerialStart(TEXT("jeeb.Look.AerialStart"), 0.3f, TEXT("Where the aerial perspective haze begins, in km (engine default 0.1)"));
 	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Look.Exposure"), 0.1f, TEXT("Exposure bias at noon, in stops (0.35 until 2026-11-13, owner: \"the whole game lower by 15%\": about -0.19 stops gives 15% less light on screen, through the tone curve)"));
+	// (2026-11-20, owner: "why does the game look so much lighter on the low setting?") Measured on one forest-edge view, LOW's land was
+	// about 14% brighter than HIGH's at noon and 27% at the low sun: no far tree shadows (now given a shorter far cascade in ApplyGraphics),
+	// one coarse cascade, no ambient occlusion, a coarser shadow filter and no cloud cover in the sky light. This trims LOW's exposure to match.
+	static TAutoConsoleVariable<float> LowTrim(TEXT("jeeb.Look.LowTrim"), -0.25f, TEXT("Exposure change in stops on the LOW graphics setting only (it lacks HIGH's ambient occlusion, cloud cover and finer shadows, so it read lighter); 0 the old LOW"));
 	static TAutoConsoleVariable<float> LowLift(TEXT("jeeb.Look.LowLift"), 1.563f, TEXT("Extra exposure at the low sun, in stops, so the golden hour glows instead of going murky"));
 	static TAutoConsoleVariable<float> Vignette(TEXT("jeeb.Look.Vignette"), 0.3496f, TEXT("Darkening toward the picture's corners (engine default 0.4)"));
 	// (2026-11-14, the owner approved TownLab's new look: golden haze, stronger aerial perspective, lifted shadows, a warmer, softer
@@ -108,6 +112,30 @@ namespace JeebNight
 	static TAutoConsoleVariable<float> Tint(TEXT("jeeb.Night.Tint"), 0.5f, TEXT("The night's blue grade: 0 none, 1 strong (blue up, red down, colours a little paler: the eye's night vision)"));
 	static TAutoConsoleVariable<float> ShadowLift(TEXT("jeeb.Night.ShadowLift"), 0.012f, TEXT("A blue lift in the darkest shadows at full night (added to jeeb.Look.ShadowCool's)"));
 	static TAutoConsoleVariable<float> Twilight(TEXT("jeeb.Night.Twilight"), 0.6f, TEXT("Extra exposure in stops right round sunset and sunrise (most with the sun on the horizon, none 7 degrees either side): the short handover, when neither the sun nor the moon lights the ground much, never sinks into a murky dip"));
+	// (2026-11-20, owner: "the sun goes from normal, to almost set and it gets bright, then to just past set and it gets really dark, and
+	// then to night time") Measured (a meadow and forest edge, HIGH and LOW, the sun from +12 to -25 degrees): the land's brightness fell
+	// to under half between 0 and 3 degrees down, where the sun's light on the ground has gone (by 1 down) and the moonlight has barely
+	// started (full by 8 down), then rose again into the moonlit night. Twilight's bump (none 7 degrees either side, a little below) could
+	// not fill it. DuskLift is extra exposure over just that stretch, shaped by DuskShape to the measured shortfall, so the brightness runs
+	// smoothly from the golden hour into the night at every sun angle
+	static TAutoConsoleVariable<float> DuskLift(TEXT("jeeb.Night.DuskLift"), 2.0f, TEXT("Extra exposure in stops through the dark stretch just after sunset (and before sunrise), from the sun on the horizon until the moonlight takes over (most about 1-2 degrees down, shaped by jeeb.Night.DuskShape); 0: the dark dip before 2026-11-20"));
+	static TAutoConsoleVariable<FString> DuskShape(TEXT("jeeb.Night.DuskShape"), TEXT("3:0,2:0.045,1:0.175,0:0.465,-1:1,-2:0.85,-3:0.36,-4:0.13,-5:0.03,-6:0"), TEXT("Where jeeb.Night.DuskLift applies: \"degrees:share,...\" (the sun's height, highest first, and the share of DuskLift there; straight lines between, 0 outside)"));
+	float DuskShapeAt(float E)
+	{
+		static FString Cached; static TArray<FVector2f> Pts;
+		const FString S = DuskShape.GetValueOnGameThread();
+		if (S != Cached)
+		{
+			Cached = S; Pts.Reset();
+			TArray<FString> Items; S.ParseIntoArray(Items, TEXT(","));
+			for (const FString& It : Items) { FString A, B; if (It.Split(TEXT(":"), &A, &B)) Pts.Add(FVector2f(FCString::Atof(*A), FCString::Atof(*B))); }
+			Pts.Sort([](const FVector2f& X, const FVector2f& Y) { return X.X > Y.X; });
+		}
+		if (Pts.Num() == 0 || E >= Pts[0].X || E <= Pts.Last().X) return 0.f;
+		for (int32 i = 1; i < Pts.Num(); ++i)
+			if (E >= Pts[i].X) return FMath::Lerp(Pts[i].Y, Pts[i - 1].Y, (E - Pts[i].X) / FMath::Max(Pts[i - 1].X - Pts[i].X, 1e-3f));
+		return 0.f;
+	}
 	static TAutoConsoleVariable<float> Sky(TEXT("jeeb.Night.Sky"), 0.5f, TEXT("The night sky's brightness (the sky atmosphere lit by the moon) times this at full night (1: as the moonlight lights it, a dim day-blue; lower is a deeper night blue where the stars show)"));
 
 	FLinearColor Rgb(const FString& S, const FLinearColor& Def)
@@ -463,7 +491,12 @@ void ADayNight::TickLook(float High)
 		S.AmbientOcclusionIntensity = AO.GetValueOnGameThread();
 		S.AmbientOcclusionRadius = AORadius.GetValueOnGameThread();
 		S.AutoExposureBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() * (1.f - High) + JeebNight::Exposure.GetValueOnGameThread() * Night
-			+ JeebNight::Twilight.GetValueOnGameThread() * (1.f - FMath::SmoothStep(0.f, 7.f, FMath::Abs(SunElevation)));
+			+ JeebNight::Twilight.GetValueOnGameThread() * (1.f - FMath::SmoothStep(0.f, 7.f, FMath::Abs(SunElevation)))
+			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation);
+		{   // (LOW is the level without volumetric clouds, set by ApplyGraphics)
+			static IConsoleVariable* VC = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricCloud"));
+			if (VC && VC->GetInt() == 0) S.AutoExposureBias += LowTrim.GetValueOnGameThread();
+		}
 		S.bOverride_VignetteIntensity = true;
 		S.VignetteIntensity = Vignette.GetValueOnGameThread();
 	}

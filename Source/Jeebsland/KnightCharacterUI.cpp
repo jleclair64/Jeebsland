@@ -271,8 +271,10 @@ void AKnightCharacter::ApplyGraphics()
 	// carries it past the ordinary 120 m shadow range (DayNight.cpp). Measured in the forest (editor, solo, GPU): about the same cost
 	// as the old 40 m reach with nothing past it; doubling the real reach to 80 m cost +1.5 to +5 ms instead.
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.ShadowReach 15") : TEXT("jeeb.Forest.ShadowReach 20"));
-	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.FarShadeReach 100") : TEXT("jeeb.Forest.FarShadeReach 400"));
-	GEngine->Exec(W, bLowest ? TEXT("jeeb.Shadow.Far 0") : TEXT("jeeb.Shadow.Far 400"));
+	// (2026-11-20, owner: LOW looked much lighter than HIGH) LOW's far trees cast their stand-in shade too, to 200 m: without it a low
+	// sun lit whole far hillsides of forest that are in shade on HIGH (DayNight's jeeb.Look.LowTrim takes care of the rest)
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.FarShadeReach 200") : TEXT("jeeb.Forest.FarShadeReach 400"));
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Shadow.Far 200") : TEXT("jeeb.Shadow.Far 400"));
 	// (2026-11-16, owner: soft, less specific shadows are fine) HIGH's sun shadow map at 1024 instead of sg.ShadowQuality 3's 2048
 	// (LOW's level already has 1024), and Nanite draws a little coarser (2 pixels a triangle edge, not 1): together about 0.5-1.5 ms
 	// in the forest, with no visible change at play distance
