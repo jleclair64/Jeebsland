@@ -13,6 +13,9 @@
 #include "KnightPlayerController.h"
 #include "GameFramework/GameModeBase.h"
 #include "HAL/IConsoleManager.h"
+#include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
+#include "Engine/LocalPlayer.h"
 
 ATrollCharacter::ATrollCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -223,9 +226,45 @@ void AKnightCharacter::SwapClassForTest(bool bTroll)
 	if (UsesLocalSave()) Autosave();
 	PC->ClassChoice = bTroll ? 1 : 0;
 	const FTransform At(GetActorRotation(), GetActorLocation() + FVector(0.f, 0.f, bTroll ? 30.f : 0.f));
+	// (2026-11-21, owner: knight -> troll -> knight left him frozen: no walking, looking or Tab.) Undo everything this pawn put on the
+	// player before it goes: its input mapping context (the subsystem holds it strongly, so a dead pawn's context stayed applied with
+	// the same keys and ate them), the open screen's mouse cursor, look-ignore and UI input mode.
+	bSettingsOpen = bSkillsOpen = bBankOpen = bInventoryOpen = bShopOpen = bSmithOpen = false;
+	bPanelCursor = false;
+	if (ULocalPlayer* LP = PC->GetLocalPlayer())
+		if (UEnhancedInputLocalPlayerSubsystem* Sub = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			if (KnightContext) Sub->RemoveMappingContext(KnightContext);
+			Sub->ClearAllMappings();
+		}
+	PC->SetShowMouseCursor(false);
+	PC->ResetIgnoreLookInput();
+	PC->ResetIgnoreMoveInput();
+	PC->SetInputMode(FInputModeGameOnly());
 	PC->UnPossess();
 	Destroy();
 	GM->RestartPlayerAtTransform(PC, At);
+	AKnightCharacter* NewK = Cast<AKnightCharacter>(PC->GetPawn());
+	UE_LOG(LogTemp, Log, TEXT("JEEBSWAP now %s: possessed %s, look ignored %d, move ignored %d, cursor %d"), bTroll ? TEXT("troll") : TEXT("knight"),
+		NewK ? *NewK->GetName() : TEXT("NOTHING"), PC->IsLookInputIgnored() ? 1 : 0, PC->IsMoveInputIgnored() ? 1 : 0, PC->ShouldShowMouseCursor() ? 1 : 0);
+	// (-SwapTest: swap back and forth four times, 4 s apart; each new pawn logs whether it has input and its context)
+	static int32 SwapsLeft = FParse::Param(FCommandLine::Get(), TEXT("SwapTest")) ? 3 : 0;
+	if (NewK)
+	{
+		TWeakObjectPtr<AKnightCharacter> W(NewK);
+		FTimerHandle H;
+		NewK->GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([W]()
+		{
+			AKnightCharacter* K = W.Get();
+			if (!K) return;
+			APlayerController* P = Cast<APlayerController>(K->GetController());
+			const UEnhancedInputLocalPlayerSubsystem* S = P && P->GetLocalPlayer() ? P->GetLocalPlayer()->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+			UE_LOG(LogTemp, Log, TEXT("JEEBSWAP check %s: controller %s, input component %d, its context applied %d, look ignored %d, move ignored %d"),
+				K->IsTroll() ? TEXT("troll") : TEXT("knight"), P ? *P->GetName() : TEXT("NONE"), K->InputComponent ? 1 : 0,
+				S && K->KnightContext ? (S->HasMappingContext(K->KnightContext) ? 1 : 0) : 0, P && P->IsLookInputIgnored() ? 1 : 0, P && P->IsMoveInputIgnored() ? 1 : 0);
+			if (SwapsLeft > 0) { --SwapsLeft; K->SwapClassForTest(!K->IsTroll()); }
+		}), 4.f, false);
+	}
 #endif
 }
 

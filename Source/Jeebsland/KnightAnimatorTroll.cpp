@@ -13,6 +13,8 @@
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Components/PoseableMeshComponent.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Engine/SkeletalMesh.h"
 #include "ReferenceSkeleton.h"
 
@@ -171,31 +173,51 @@ void FKnightAnimator::MakeTrollMesh(AActor* Owner)
 		const int32 p = R.GetParentIndex(m);
 		CS[m] = p >= 0 ? R.GetRefBonePose()[m] * CS[p] : R.GetRefBonePose()[m];
 	}
-	TrollFrom.Init(INDEX_NONE, M);
-	TArray<FVector> A, B;
-	for (int32 b = 0; b < L.TrollBone.Num(); ++b)
+	// The mesh's own space (as it was imported) laid on ours: a turn of the axes, a scale and an offset. (2026-11-21, owner: "the troll
+	// is facing the wrong direction", "his hand behind his back".) Meshy rigged him back to front: his toe bones and head-front marker
+	// point out of his back. Fitted with them, the joints matched only mirrored front to back (a -1 Y scale), which showed his skin
+	// back to front: we saw his back as he walked at us, and an arm swung forward looked like it was behind him. Now those three markers
+	// are left out of the fit: a plain turn (no mirror, 13 cm mean miss from his own slightly different build) puts his face ahead.
+	// (-TrollOldMirror: the old fit, for before and after pictures.)
+	auto Build = [&](bool bSwap, TArray<FVector>& OutA, TArray<FVector>& OutB, TArray<int32>& OutFrom)
 	{
-		if (L.TrollBone[b].IsEmpty()) continue;
-		const int32 m = R.FindBoneIndex(FName(*L.TrollBone[b]));
-		if (m == INDEX_NONE) continue;
-		TrollFrom[m] = b;
-		A.Add(CS[m].GetLocation());
-		B.Add(L.RestPos[b]);
-	}
-	// The mesh's own space (as it was imported) laid on ours: a turn of the axes, a scale and an offset
+		OutA.Reset(); OutB.Reset(); OutFrom.Init(INDEX_NONE, M);
+		for (int32 b = 0; b < L.TrollBone.Num(); ++b)
+		{
+			if (L.TrollBone[b].IsEmpty()) continue;
+			FString Name = L.TrollBone[b];
+			if (bSwap)
+			{
+				if (Name.Contains(TEXT("Left"))) Name = Name.Replace(TEXT("Left"), TEXT("Right"));
+				else if (Name.Contains(TEXT("Right"))) Name = Name.Replace(TEXT("Right"), TEXT("Left"));
+			}
+			const int32 m = R.FindBoneIndex(FName(*Name));
+			if (m == INDEX_NONE) continue;
+			OutFrom[m] = b;
+			if (Name.Contains(TEXT("Toe")) || Name.Contains(TEXT("front")) || Name.Contains(TEXT("_end"))) continue;   // (his rig points these backwards: see above)
+			OutA.Add(CS[m].GetLocation());
+			OutB.Add(L.RestPos[b]);
+		}
+	};
+	TArray<FVector> A, B; TArray<int32> From;
+	Build(false, A, B, From);
 	FQuat Q = FQuat::Identity; float S = 1.f; FVector T = FVector::ZeroVector;
 	float Miss = FitAxes(A, B, true, Q, S, T);
-	// (the troll was imported mirrored front to back against the knight: try his points mirrored too, and keep whichever fits)
-	TArray<FVector> AM = A;
-	for (FVector& P : AM) P = MirP(P);
-	FQuat QM; float SM; FVector TM;
-	const float MissM = FitAxes(AM, B, true, QM, SM, TM);
-	bTrollMirror = MissM < Miss;
-	if (bTrollMirror) { Miss = MissM; Q = QM; S = SM; T = TM; }
+	bTrollMirror = false;
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("TrollOldMirror")))   // (test pictures only: the old mirrored fit, before and after)
+	{
+		for (FVector& P : A) P = MirP(P);
+		Miss = FitAxes(A, B, true, Q, S, T);
+		bTrollMirror = true;
+	}
+#endif
+	const bool bSwapped = false;
+	TrollFrom = From;
 	TrollQ = Q;
 	TrollRestK.SetNum(M);
 	for (int32 m = 0; m < M; ++m) TrollRestK[m] = Q * (bTrollMirror ? MirQ(CS[m].GetRotation()) : CS[m].GetRotation());
-	UE_LOG(LogTemp, Log, TEXT("JEEBTROLL mesh: %d bones, %d follow ours; fits our bind pose to %.2f cm at scale %.3f, mirrored %d, turn %s"), M, A.Num(), Miss, S, bTrollMirror ? 1 : 0, *Q.Rotator().ToCompactString());
+	UE_LOG(LogTemp, Log, TEXT("JEEBTROLL mesh: %d bones, %d follow ours; fits our bind pose to %.2f cm at scale %.3f, sides swapped %d, mirrored %d, turn %s"), M, A.Num(), Miss, S, bSwapped ? 1 : 0, bTrollMirror ? 1 : 0, *Q.Rotator().ToCompactString());
 
 	TrollComp = NewObject<UPoseableMeshComponent>(Owner);
 	TrollComp->SetupAttachment(Comp);
