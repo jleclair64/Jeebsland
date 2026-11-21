@@ -75,7 +75,7 @@ void AKnightHUD::DrawLinesAt(const TArray<FString>& Lines, float CX, float Botto
 	Panel(X - 8.f, Y - 8.f, W + IW + 24.f, H + 16.f, Alpha);
 	if (IconId && Alpha > 0.4f)
 	{
-		SlotBox(X, Y, IS, false);
+		Tile(X, Y, IS, IS, FLinearColor(0.6f, 0.72f, 0.88f), 0.2f);
 		DrawIconIn(IconId, X + 4.f, Y + 3.f, IS - 8.f, X, Y, IS, IS);
 	}
 	float Cy = Y;
