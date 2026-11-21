@@ -1,4 +1,5 @@
 #include "WorldTerrain.h"
+namespace JeebRoadSlope { void Report(); }
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "GroundMask.h"
@@ -186,6 +187,7 @@ void AWorldTerrain::BuildLand()
 			Chunks.Add(PM);
 		}
 	BuildFine();
+	JeebRoadSlope::Report();   // (-RoadSlope: the steepest ground on every road, 2026-11-20)
 }
 
 // The 2 m patches (JeebTerrain::FinePatches): the same ground, material and collision as the 8 m mesh, in chunks of 60 x 60 cells; each
@@ -232,10 +234,20 @@ void AWorldTerrain::BuildFine()
 				for (int32 i = CI; i < I1; ++i)
 					for (int32 j = CJ; j < J1; ++j)
 					{
+						// (a cell an earlier patch already draws, or the square's own ground: drawn once, 2026-11-20)
+						const float Cx = P.X0 + i * S, Cy = P.Y0 + j * S;
+						bool bTaken = FMath::Abs(Cx + S * 0.5f) < JeebTerrain::GroundHalf && FMath::Abs(Cy + S * 0.5f) < JeebTerrain::GroundHalf;
+						for (const JeebTerrain::FFinePatch& Q : JeebTerrain::FinePatches())
+						{
+							if (&Q == &P) break;
+							if (Cx >= Q.X0 - 1.f && Cx + S <= Q.X1 + 1.f && Cy >= Q.Y0 - 1.f && Cy + S <= Q.Y1 + 1.f) { bTaken = true; break; }
+						}
+						if (bTaken) continue;
 						const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
 						Tri.Append({ A, C, B, B, C, D });
 						++Cells;
 					}
+				if (Tri.Num() == 0) continue;
 				{
 					const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
 					if (Fn.Z > 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
@@ -255,6 +267,7 @@ void AWorldTerrain::BuildFine()
 				Chunks.Add(PM);
 			}
 	}
+	for (const JeebTerrain::FFinePatch& Fp : JeebTerrain::FinePatches()) UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine patch X %.0f..%.0f Y %.0f..%.0f"), Fp.X0, Fp.X1, Fp.Y0, Fp.Y1);
 	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m, built in %.0f ms"), JeebTerrain::FinePatches().Num(), Cells, (FPlatformTime::Seconds() - T0) * 1000.0);
 
 	// Checks (every machine: compare the hash lines between a server and a client)

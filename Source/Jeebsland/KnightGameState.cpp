@@ -17,6 +17,9 @@
 #include "Engine/SkeletalMesh.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
+#include "WarFortLadders.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Hills.h"
 #include "OakHillTown.h"
 #include "OakHillLife.h"
@@ -851,6 +854,40 @@ void AKnightGameState::Tick(float DeltaSeconds)
 		APlayerController* PC = GetWorld()->GetFirstPlayerController();
 		if (PC) PC->SetControlRotation(ShotRot);
 		{ static bool bStarSets = false; if (!bStarSets && ShotClock > 1.f) { bStarSets = true; ShotEyesSet(PC, -1); } }   // (-ShotEyesSet's '*' entries)
+		// (-FortLadderTest=N with -SuitClimbUp, single player: at 5 s he stands at the foot of Oak Hill fort ladder N, walks into it,
+		// climbs and steps off; JEEBFORTLADDER lines log the climb, where he ends and whether he stands on the walk, 2026-11-20)
+		{
+			static int32 LadderN = -1;
+			static const bool bLadder = FParse::Value(FCommandLine::Get(), TEXT("FortLadderTest="), LadderN) && JeebWarFort::Ladders().IsValidIndex(LadderN);
+			static int32 Stage = 0; static float StageT = 0.f;
+			ACharacter* Ch = PC ? Cast<ACharacter>(PC->GetPawn()) : nullptr;
+			if (bLadder && Ch && GetNetMode() == NM_Standalone)
+			{
+				const JeebTerrain::FLadder& L = JeebWarFort::Ladders()[LadderN];
+				UCharacterMovementComponent* Cm = Ch->GetCharacterMovement();
+				if (Stage == 0 && ShotClock > 5.f)
+				{
+					const FVector2D F = L.Pos + L.Out * 110.f;
+					Ch->SetActorLocation(FVector(F.X, F.Y, L.Bottom + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
+					Stage = 1; StageT = ShotClock;
+					UE_LOG(LogTemp, Display, TEXT("JEEBFORTLADDER %d: at its foot %.0f %.0f, bottom %.0f, walk %.0f"), LadderN, F.X, F.Y, L.Bottom, L.Top);
+				}
+				else if (Stage == 1)
+				{
+					Ch->AddMovementInput(FVector(-L.Out.X, -L.Out.Y, 0.f), 1.f);
+					if (Cm->MovementMode == MOVE_None) { Stage = 2; UE_LOG(LogTemp, Display, TEXT("JEEBFORTLADDER %d: on the ladder after %.1f s at z %.0f"), LadderN, ShotClock - StageT, Ch->GetActorLocation().Z); }
+					else if (ShotClock - StageT > 4.f) { Stage = 9; UE_LOG(LogTemp, Display, TEXT("JEEBFORTLADDER %d: FAIL never got on (at %s)"), LadderN, *Ch->GetActorLocation().ToCompactString()); }
+				}
+				else if (Stage == 2 && Cm->MovementMode != MOVE_None) { Stage = 3; StageT = ShotClock; UE_LOG(LogTemp, Display, TEXT("JEEBFORTLADDER %d: off the ladder at %s"), LadderN, *Ch->GetActorLocation().ToCompactString()); }
+				else if (Stage == 3 && ShotClock - StageT > 1.5f)
+				{
+					Stage = 4;
+					const float Feet = Ch->GetActorLocation().Z - Ch->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+					const bool bOk = Cm->IsMovingOnGround() && FMath::Abs(Feet - L.Top) < 30.f;
+					UE_LOG(LogTemp, Display, TEXT("JEEBFORTLADDER %d: %s, feet at %.0f against the walk's %.0f, %s"), LadderN, bOk ? TEXT("PASS standing on the walk") : TEXT("FAIL"), Feet, L.Top, Cm->IsMovingOnGround() ? TEXT("on ground") : TEXT("falling"));
+				}
+			}
+		}
 		// (test pictures, where -ShotPos doesn't move him: -ShotAt=X,Y stands him there once the world has settled, on the ground, or on the floor's height in MoveLab)
 		static bool bShotAtDone = false;
 		FString ShotAt, ShotAtX, ShotAtY;

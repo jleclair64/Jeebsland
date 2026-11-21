@@ -358,10 +358,38 @@ void ABridge::BuildDecor()
 		Put(Torch, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);   // the torches at the middle, on the parapet
 		Put(Flame, Torch, 0.f, Sd * ParapetW, ParapetTop, 0.f, 0.f, 95.f);
 		Light(0.f, Sd * ParapetW, ParapetTop + 95.f);
-		for (float L : { -850.f, -600.f, -330.f, 330.f, 600.f, 850.f })   // the flower boxes between them, laid along the parapet's slope
+		// the flower boxes between them, laid along the parapet's slope. 2026-11-20 (owner: "fix these flower boxes so they are sitting
+		// inside of the bridge wall"): as modelled the box was wider than the parapet's top and hung over its outer edge, and the ones at
+		// |L| 850 ran down onto the end ramps' bend. Now each is scaled so it is no wider than BoxMaxW (the parapet's flat top is about
+		// 50 cm), its long side turned along the wall, its slope taken over its own length, sunk BoxSink into the top so its whole
+		// bottom rests on stone, and the outer pair moved in to |L| 780, clear of the bend before the lantern posts.
+		if (Box)
 		{
-			const float Slope = FMath::RadiansToDegrees(FMath::Atan2(DeckRel(L + 60.f) - DeckRel(L - 60.f), 120.f));
-			Put(Box, Box, L, Sd * ParapetW, ParapetTop, 0.f, Slope, 0.f);
+			constexpr float BoxMaxW = 40.f, BoxMaxLen = 100.f, BoxSink = 3.f;
+			const FBox B = Box->GetBoundingBox();
+			const bool bLongY = B.GetSize().Y > B.GetSize().X;
+			const float Wd = bLongY ? B.GetSize().X : B.GetSize().Y, Ln = bLongY ? B.GetSize().Y : B.GetSize().X;
+			const float S = FMath::Min3(1.f, BoxMaxW / FMath::Max(Wd, 1.f), BoxMaxLen / FMath::Max(Ln, 1.f));
+			for (float L : { -780.f, -560.f, -330.f, 330.f, 560.f, 780.f })
+			{
+				const float Half = Ln * S * 0.5f;
+				const float Slope = FMath::RadiansToDegrees(FMath::Atan2(DeckRel(L + Half) - DeckRel(L - Half), 2.f * Half));
+				UStaticMeshComponent* C = NewObject<UStaticMeshComponent>(this);
+				C->SetStaticMesh(Box);
+				C->SetupAttachment(RootComponent);
+				C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				C->SetCanEverAffectNavigation(false);
+				C->SetCastShadow(false);
+				C->SetCachedMaxDrawDistance(7000.f);
+				const FVector Foot(B.GetCenter().X, B.GetCenter().Y, B.Min.Z);
+				const FQuat Q = FRotator(Slope, 0.f, 0.f).Quaternion() * FRotator(0.f, bLongY ? 90.f : 0.f, 0.f).Quaternion();
+				const float Under = DeckRel(L);   // (the parapet top follows the deck: the box's middle sits on it, tilted with it)
+				C->SetRelativeTransform(FTransform(Q, FVector(L, Sd * ParapetW, Under + ParapetTop - BoxSink) - Q.RotateVector(Foot * S), FVector(S)));
+				C->RegisterComponent();
+				JeebLamp::ApplyToMesh(C, this);
+				Decor.Add(C);
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBBRIDGE flower boxes: model %.0f x %.0f cm, drawn at %.2f: %.0f long, %.0f wide on the parapet"), Ln, Wd, S, Ln * S, Wd * S);
 		}
 	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBBRIDGE decor: %d pieces (lantern %s, torch %s, flame %s, flower box %s)"), Decor.Num(), Lantern ? TEXT("yes") : TEXT("NO"), Torch ? TEXT("yes") : TEXT("NO"), Flame ? TEXT("yes") : TEXT("NO"), Box ? TEXT("yes") : TEXT("NO"));
