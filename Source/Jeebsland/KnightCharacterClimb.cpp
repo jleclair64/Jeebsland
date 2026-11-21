@@ -5,6 +5,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Terrain.h"
+#include "JeebWater.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
@@ -20,8 +21,41 @@ void AKnightCharacter::TickMantleTests(float Dt)
 {
 #if !UE_BUILD_SHIPPING
 	static FString AtS, NetS;
-	static const bool bAt = FParse::Value(FCommandLine::Get(), TEXT("MantleAt="), AtS);
-	static const bool bNet = FParse::Value(FCommandLine::Get(), TEXT("NetMantle="), NetS);
+	// -BankClimb (standalone pictures) / -BankClimbNet (server and client), 2026-11-20: finds a steep, tall bank near Oak Hill's plaza (dry at its
+	// foot) from the ground's own heights, the same on every machine, and runs the -MantleAt / -NetMantle test there, pushing uphill for 9 s.
+	static const bool bBankNet = FParse::Param(FCommandLine::Get(), TEXT("BankClimbNet"));
+	static const bool bBank = bBankNet || FParse::Param(FCommandLine::Get(), TEXT("BankClimb"));
+	static bool bBankDone = false;
+	if (bBank && !bBankDone)
+	{
+		bBankDone = true;
+		float Best = 0.f; FString Spot; float MaxRise = 0.f; int32 NSteep = 0, NTall = 0;
+		const FVector2D Plaza(-3550.f, 18290.f);
+		for (float X = Plaza.X - 15000.f; X <= Plaza.X + 15000.f; X += 150.f)
+			for (float Y = Plaza.Y - 15000.f; Y <= Plaza.Y + 15000.f; Y += 150.f)
+				for (int32 a = 0; a < 16; ++a)
+				{
+					const FVector2D D = FVector2D(FRotator(0.f, a * 22.5f, 0.f).Vector());
+					const float Z0 = JeebTerrain::HeightAt(X, Y);
+					const FVector2D F = FVector2D(X, Y) + D * 100.f;
+					const float Z1 = JeebTerrain::HeightAt(F.X, F.Y);
+					MaxRise = FMath::Max(MaxRise, Z1 - Z0); if (Z1 - Z0 < 108.f) continue;   // steep: over 47 degrees (walkable stops at about 45)
+					++NSteep;
+					const float Z3 = JeebTerrain::HeightAt(X + D.X * 350.f, Y + D.Y * 350.f);
+					const float Zb = JeebTerrain::HeightAt(X - D.X * 200.f, Y - D.Y * 200.f);
+					if (Z3 - Z0 < 160.f || Zb - Z0 > 40.f || FVector2D::Distance(FVector2D(X, Y), FVector2D(-4450.f, 13040.f)) < 2500.f) continue;   // tall ahead, not in a dip (and not the stone bridge's abutment)
+					++NTall; float S;
+					if (JeebWater::DepthAt(FVector(X, Y, Z0 + 1.f), S) > 0.f || JeebWater::DepthAt(FVector(X - D.X * 150.f, Y - D.Y * 150.f, Zb + 1.f), S) > 40.f) continue;   // (wading at most, not swimming)
+					const float Score = (Z3 - Z0) - FVector2D::Distance(FVector2D(X, Y), Plaza) * 0.02f;
+					if (Score > Best - 60.f) UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB bank candidate %.0f,%.0f yaw %.0f rise %.0f score %.0f"), X, Y, a * 22.5f, Z3 - Z0, Score);
+					if (Score > Best) { Best = Score; Spot = FString::Printf(TEXT("%.0f_%.0f_%.0f_150_100_-750_160"), F.X, F.Y, a * 22.5f); }
+				}
+		UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB bank test spot: %s (score %.0f; steepest rise %.0f cm per m, %d steep, %d tall)"), Spot.IsEmpty() ? TEXT("none") : *Spot, Best, MaxRise, NSteep, NTall);
+		(bBankNet ? NetS : AtS) = Spot;
+	}
+	static const bool bAt = bBank ? (!bBankNet && !AtS.IsEmpty()) : FParse::Value(FCommandLine::Get(), TEXT("MantleAt="), AtS);
+	static const bool bNet = bBank ? (bBankNet && !NetS.IsEmpty()) : FParse::Value(FCommandLine::Get(), TEXT("NetMantle="), NetS);
+	const float WalkFor = bBank ? 9.f : 3.f;
 	if (!bAt && !bNet) return;
 	// (-MantleAt takes several, joined by 'x': one every 5 s, each filmed by a still camera side-on to it, <side> cm off (a 6th field, default 450;
 	// negative: from the other side). The pictures' frame k*75 is where the k-th starts, at 15 pictures a second)
@@ -60,7 +94,7 @@ void AKnightCharacter::TickMantleTests(float Dt)
 			const float Side = P.Num() >= 6 ? FCString::Atof(*P[5]) : 550.f;
 			const float Up = P.Num() >= 7 ? FCString::Atof(*P[6]) : 150.f;   // (a 7th field: the camera's height over his ground)
 			const float G = float(GetActorLocation().Z - GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
-			const FVector Look(Spot.X, Spot.Y, G + 80.f);
+			const FVector Look(Spot.X, Spot.Y, G + (bBank ? 170.f : 80.f));   // (the bank: halfway up it)
 			const FVector Eye = FVector(Spot.X, Spot.Y, G + Up) - FVector(Dir) * 40.f + FRotator(0.f, Yaw + 90.f, 0.f).Vector() * Side;
 			if (APlayerController* PC = Cast<APlayerController>(Controller))
 				if (ACameraActor* Cam = GetWorld()->SpawnActor<ACameraActor>(Eye, (Look - Eye).Rotation()))
@@ -73,7 +107,7 @@ void AKnightCharacter::TickMantleTests(float Dt)
 		}
 		const float T = AtT - Seg * 5.f;
 		AtT += Dt;
-		if (T > 0.6f && T < 3.6f) AddMovementInput(Dir, Share);
+		if (T > 0.6f && T < 0.6f + WalkFor) AddMovementInput(bBank && KnightMove() && KnightMove()->OnWall() ? UKnightMovement::WallUp(KnightMove()->WallNormal) : Dir, Share);   // (on the bank: straight up it, as W does)
 		return;
 	}
 	if (!Controller || !Controller->IsA<APlayerController>()) return;
@@ -91,8 +125,8 @@ void AKnightCharacter::TickMantleTests(float Dt)
 			FixesAtStart = KM->NetFixes;
 			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client walks from (%.0f,%.0f,%.0f), %d corrections so far"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes);
 		}
-		if (NetMantleT >= 8.f && NetMantleT < 11.f) AddMovementInput(Dir, Share);
-		if (NetMantleT >= 12.f && NetMantleT - Dt < 12.f)
+		if (NetMantleT >= 8.f && NetMantleT < 8.f + WalkFor) AddMovementInput(bBank && KM->OnWall() ? UKnightMovement::WallUp(KM->WallNormal) : Dir, Share);
+		if (NetMantleT >= 9.f + WalkFor && NetMantleT - Dt < 9.f + WalkFor)
 			UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client done at (%.0f,%.0f,%.0f): %d corrections while walking and mantling"), GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, KM->NetFixes - FixesAtStart);
 	}
 #endif

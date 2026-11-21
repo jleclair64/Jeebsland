@@ -59,7 +59,7 @@ bool UKnightMovement::Climbable(const FHitResult& H) const
 {
 	if (!H.bBlockingHit || H.bStartPenetrating) return false;
 	const UPrimitiveComponent* C = H.GetComponent();
-	if (!C || !C->ComponentHasTag(JeebClimb::ClimbTag)) return false;
+	if (!JeebClimb::IsClimbGround(C)) return false;
 	return H.ImpactNormal.Z < GetWalkableFloorZ() && H.ImpactNormal.Z >= -0.26f;   // too steep to walk, and no more than 15 degrees overhanging
 }
 
@@ -243,10 +243,7 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 		if (ClimbStamina >= 1.f) bClimbExhausted = false;
 	}
 
-	const bool bRock = bTouchRock;
-	bTouchRock = bTouchMantle = false;   // (a mantle bump counts only within the move that made it: OnMovementUpdated)
-	if (MovementMode == MOVE_Custom) return;
-	if (IsMovingOnGround() || IsFalling()) { if (bRock) TryGrab(); }   // (only after running into rock: no probes for everyone else, every move)
+	bTouchRock = bTouchMantle = false;   // (a bump counts only within the move that made it: OnMovementUpdated grabs or mantles there)
 }
 
 // The end of each move: walking or running into something he may mantle, over it or onto it by itself (owner 2026-11-13: automatic, no Space), unless Ctrl
@@ -255,8 +252,11 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 void UKnightMovement::OnMovementUpdated(float Dt, const FVector& OldLocation, const FVector& OldVelocity)
 {
 	Super::OnMovementUpdated(Dt, OldLocation, OldVelocity);
-	const bool bFence = bTouchMantle;
-	bTouchMantle = false;
+	const bool bFence = bTouchMantle, bRock = bTouchRock;
+	bTouchMantle = bTouchRock = false;
+	// The grab, in the same move as the bump into steep rock or ground (2026-11-20: it used to wait for the next move, which a merged or replayed
+	// move could change; now server and client decide it from the same move, like the mantle). Only after running into it: no probes for anyone else.
+	if (bRock && CharacterOwner && CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy && MovementMode != MOVE_Custom && (IsMovingOnGround() || IsFalling()) && TryGrab()) return;
 	if (!bFence || !CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy || MovementMode == MOVE_Custom || Acceleration.SizeSquared2D() <= 1.f) return;
 	if (IsMovingOnGround() && JeebTune::V().MantleAuto > 0.5f && !bWantsLetGo) TryMantle(false);   // (MantleAuto 0 in Tuning.ini: only Space by one)
 	else if (IsFalling() && MantleNearby()) TryMantle(true);
@@ -278,6 +278,20 @@ bool UKnightMovement::TryGrab()
 		if (!ProbeWall(C + FVector(0.f, 0.f, Up), Dir, R + 15.f, H) || !Climbable(H)) continue;
 		const FVector NF = Flat(H.ImpactNormal);
 		if (NF.IsNearlyZero() || FVector::DotProduct(-NF, Dir) < 0.643f) continue;   // pushing at it, within 50 degrees
+		// a bank too low to be worth a climb (a pad's edge, a small rise): the ground just past where he touched must stand GrabMinRise over his feet
+		if (IsMovingOnGround())
+		{
+			const float Feet = float(C.Z) - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+			const FVector Ahead = FVector(H.ImpactPoint.X, H.ImpactPoint.Y, 0.f) + Dir * 25.f;
+			FHitResult G;
+			FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebGrabRise), true, CharacterOwner);
+			const bool bG = GetWorld()->LineTraceSingleByObjectType(G, FVector(Ahead.X, Ahead.Y, Feet + 400.f), FVector(Ahead.X, Ahead.Y, Feet - 20.f), WorldObjects(), Q);
+			if (bG && !G.bStartPenetrating && float(G.ImpactPoint.Z) - Feet < JeebClimb::GrabMinRise)
+			{
+				UE_LOG(LogTemp, Verbose, TEXT("JEEBCLIMB no grab: the bank rises only %.0f cm"), float(G.ImpactPoint.Z) - Feet);
+				continue;
+			}
+		}
 		StartClimb(H.ImpactNormal);
 		return true;
 	}
@@ -371,14 +385,16 @@ void UKnightMovement::PhysClimb(float Dt)
 
 	// The speed: by the clips' own pace (Tuning.ini), slower in the last fifth of the bar (tired), eased in over about 0.1 s
 	const float Tired = ClimbStamina < 0.2f ? FMath::Lerp(0.7f, 1.f, ClimbStamina / 0.2f) : 1.f;
-	const FVector Want = (Up * InUp * (InUp > 0.f ? T.ClimbUpSpeed : T.ClimbDownSpeed) + Right * InRight * T.ClimbSideSpeed) * Tired;
+	// A bank that lies back (2026-11-20, steep ground such as a riverbank: 45 to 60 degrees) is a scramble: up to 1.6x as fast and 0.4x the drain at 45, none of it from 70 degrees up
+	const float Lean = FMath::SmoothStep(0.34f, 0.70f, float(N.Z));
+	const FVector Want = (Up * InUp * (InUp > 0.f ? T.ClimbUpSpeed : T.ClimbDownSpeed) + Right * InRight * T.ClimbSideSpeed) * Tired * (1.f + 0.6f * Lean);
 	const FVector VW = FVector::VectorPlaneProject(Velocity, N);
 	Velocity = VW + (Want - VW) * FMath::Min(1.f, Dt / 0.1f);
 
 	// The bar (owner): hanging still drains a fifth as fast as climbing up, sideways 2/3, down ClimbDownShare; a diagonal mixes its parts
 	const float U = FMath::Max(InUp, 0.f), D = FMath::Max(-InUp, 0.f), S = FMath::Abs(InRight), Sum = U + D + S;
 	const float DirShare = Sum > KINDA_SMALL_NUMBER ? (U + S * T.ClimbSideShare + D * T.ClimbDownShare) / Sum : T.ClimbHangShare;
-	ClimbStamina = FMath::Max(0.f, ClimbStamina - FMath::Lerp(T.ClimbHangShare, DirShare, M) * DrainPerSecond() * Dt);
+	ClimbStamina = FMath::Max(0.f, ClimbStamina - FMath::Lerp(T.ClimbHangShare, DirShare, M) * DrainPerSecond() * (1.f - 0.6f * Lean) * Dt);
 
 	const FVector OldLoc = UpdatedComponent->GetComponentLocation();
 	const FVector Delta = Velocity * Dt;
@@ -418,15 +434,28 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	// Going up, the rock has to reach his hands (about 90 cm over the capsule's middle in the climbing clip): once it ends below them, he climbs up
 	// over the edge, or with no room up there he stops. (Owner 2026-11-13: he used to climb on until the rock ended below his waist and then
 	// his knees, hands and head over thin air, "an invisible wall past the ledge". The ledge clip expects the top about 90 cm up, too.)
+	// A bank that lies back with no ledge found over its top (2026-11-20, online review: he hung under a rounded crest until the bar ran out):
+	// a short scramble up and forward over the crest, as a jump from the move (the same on both machines); no regrab until he lands.
+	auto CrestHop = [&]() -> bool
+	{
+		if (WallNormal.Z < 0.3f || InUp <= 0.3f) return false;
+		const FVector Fwd = Flat(-WallNormal);
+		if (Fwd.IsNearlyZero() || !RoomFor(UpdatedComponent->GetComponentLocation() + FVector(0.f, 0.f, 70.f) + Fwd * 30.f)) return false;
+		Velocity = Fwd * 180.f + FVector(0.f, 0.f, 330.f);
+		bNoRegrab = true;
+		SetMovementMode(MOVE_Falling);
+		LogClimb(TEXT("crest hop"));
+		return true;
+	};
 	if (InUp > 0.3f)
 	{
 		constexpr float HandUp = 105.f;   // (the probe's 20 cm ball misses once the top is under about 85 cm up: right at his reaching hands, measured in pictures)
 		FHitResult Hand;
 		const bool bHit = ProbeWall(C + FVector(0.f, 0.f, HandUp), Dir, R + 60.f + HandUp * FMath::Max(0.f, float(WallNormal.Z)), Hand);   // (starting inside rock, under an overhang, counts as rock)
-		const bool bRockEnds = !bHit || (!Hand.bStartPenetrating && Hand.GetComponent() && Hand.GetComponent()->ComponentHasTag(JeebClimb::ClimbTag) && Hand.ImpactNormal.Z >= GetWalkableFloorZ());   // (or it lies back to ground he can stand on)
+		const bool bRockEnds = !bHit || (!Hand.bStartPenetrating && JeebClimb::IsClimbGround(Hand.GetComponent()) && Hand.ImpactNormal.Z >= GetWalkableFloorZ());   // (or it lies back to ground he can stand on)
 		if (bRockEnds)
 		{
-			if (TryLedge()) return false;
+			if (TryLedge() || CrestHop()) return false;
 			// no room over the top: no further up (along the wall and down still work)
 			FHitResult Back;
 			SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
@@ -438,9 +467,9 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 	if (!bOk && InUp <= 0.3f) bOk = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, H) && Climbable(H);   // (never going up: that climbed thin air)
 	if (!bOk)
 	{
-		if (InUp > 0.3f && TryLedge()) return false;
+		if (InUp > 0.3f && (TryLedge() || CrestHop())) return false;
 		FHitResult W;
-		if (ProbeWall(C, Dir, R + 40.f, W) && !W.bStartPenetrating && W.GetComponent() && W.GetComponent()->ComponentHasTag(JeebClimb::ClimbTag)
+		if (ProbeWall(C, Dir, R + 40.f, W) && !W.bStartPenetrating && JeebClimb::IsClimbGround(W.GetComponent())
 			&& W.ImpactNormal.Z >= GetWalkableFloorZ())
 		{
 			// the slope lies back enough to walk on: step off onto it
@@ -535,11 +564,15 @@ bool UKnightMovement::PlanLedge(const FVector& C, const FVector& N, FVector& Out
 	const float HH = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebLedge), true, CharacterOwner);
 	// a few spots past the edge, and a little higher over a top that slopes up (a capsule set 3 cm over a sloping top touches the slope behind)
-	for (const float Ahead : { R + 35.f, R + 20.f, R + 55.f })
+	// (a bank that lies back, 2026-11-20: its flat top starts further in, so look further ahead and from higher)
+	const bool bBank = N.Z > 0.3f;
+	const float Reach = bBank ? 160.f : 70.f;
+	for (const float Ahead : { R + 35.f, R + 20.f, R + 55.f, R + 85.f, R + 120.f })
 	{
+		if (Ahead > R + 55.f && !bBank) break;
 		const FVector P = C + Fwd * Ahead;
 		FHitResult D;
-		if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, C.Z + HH + 70.f), FVector(P.X, P.Y, C.Z - HH + 10.f), WorldObjects(), Q) || D.bStartPenetrating) continue;
+		if (!GetWorld()->LineTraceSingleByObjectType(D, FVector(P.X, P.Y, C.Z + HH + Reach), FVector(P.X, P.Y, C.Z - HH + 10.f), WorldObjects(), Q) || D.bStartPenetrating) continue;
 		if (D.ImpactNormal.Z < GetWalkableFloorZ()) continue;   // the top must be ground he can stand on
 		for (const float Lift : { 3.f, 20.f, 40.f })
 		{
@@ -983,7 +1016,7 @@ void UKnightMovement::HandleImpact(const FHitResult& Hit, float TimeSlice, const
 	Super::HandleImpact(Hit, TimeSlice, MoveDelta);
 	if (const UPrimitiveComponent* P = Hit.GetComponent())
 	{
-		if (P->ComponentHasTag(JeebClimb::ClimbTag)) bTouchRock = true;
+		if (JeebClimb::IsClimbGround(P)) { if (Hit.ImpactNormal.Z < GetWalkableFloorZ()) bTouchRock = true; }
 		else if (!bTouchMantle && CharacterOwner && UpdatedComponent
 			&& MantleCandidate(P, Hit.Item, UpdatedComponent->GetComponentLocation().Z - CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight(), true)) bTouchMantle = true;   // (no traces: its own size)
 	}

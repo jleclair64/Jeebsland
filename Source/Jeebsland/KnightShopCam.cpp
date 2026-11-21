@@ -1,4 +1,4 @@
-// The shop camera (2026-11-18, owner: "when we go to buy something, zoom in like they do in Hogwarts or Arc Raiders when you're buying
+﻿// The shop camera (2026-11-18, owner: "when we go to buy something, zoom in like they do in Hogwarts or Arc Raiders when you're buying
 // something"). While a shop, the bank or the smithy is open with its keeper (TradeNpc), your view eases over about half a second to a
 // close view of the keeper at the counter, a little off-centre so the trading window sits beside them, and eases back when you close it.
 // Your own knight is hidden from your view meanwhile (he stands between the camera and the counter). Looks only, on your own machine:
@@ -6,6 +6,7 @@
 // Live: jeeb.ShopCam.On, .Dist, .Height, .Side, .Time, .Fov.
 #include "KnightCharacter.h"
 #include "Npc.h"
+#include "GameFramework/HUD.h"
 #include "Camera/CameraTypes.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
@@ -104,6 +105,40 @@ namespace
 				if (Names.Num() == 0) List.ParseIntoArray(Names, TEXT("+"));
 				const float T = W->GetTimeSeconds() - 10.f;
 				if (T < 0.f) return;
+				// (-ShopCamHold=<s>, 2026-11-20: the menu stays open that long, a picture every second, to film the keeper's idle and gestures)
+				static float Hold = 0.f;
+				static const bool bHold = FParse::Value(FCommandLine::Get(), TEXT("ShopCamHold="), Hold) && Hold > 0.f;
+				if (bHold)
+				{
+					const float Per = Hold + 2.f;
+					const int32 Idx = FMath::FloorToInt(T / Per);
+					const float In = T - Idx * Per;
+					static int32 Done = -1;
+					if (Idx >= Names.Num())
+					{
+						static bool bQuit = false; if (!bQuit) { bQuit = true; UE_LOG(LogTemp, Log, TEXT("JEEBSHOPCAM done")); FPlatformMisc::RequestExit(false); }
+						return;
+					}
+					const int32 Key = Idx * 1000 + (In < 0.3f ? 0 : In < 0.6f ? 1 : In >= 0.6f + Hold ? 999 : 2 + FMath::FloorToInt(In - 0.6f));
+					if (Key == Done) return;
+					Done = Key;
+					const int32 Step = Key % 1000;
+					if (Step == 0)
+					{
+						ANpc* K = nullptr;
+						for (TActorIterator<ANpc> It(W); It; ++It) if (It->GetNpcName().StartsWith(Names[Idx])) { K = *It; break; }
+						if (!K) { UE_LOG(LogTemp, Warning, TEXT("JEEBSHOPCAM no keeper %s"), *Names[Idx]); return; }
+						const FVector F = K->GetActorForwardVector();
+						Me->SetActorLocation(K->GetActorLocation() + FVector(F.X, F.Y, 0.f) * 170.f + FVector(0.f, 0.f, 30.f), false, nullptr, ETeleportType::TeleportPhysics);
+						Me->SetActorRotation(FRotator(0.f, K->GetActorRotation().Yaw + 180.f, 0.f));
+						PC->SetControlRotation(FRotator(-12.f, K->GetActorRotation().Yaw + 180.f, 0.f));
+						UE_LOG(LogTemp, Log, TEXT("JEEBSHOPCAM hold %s"), *K->GetNpcName());
+					}
+					else if (Step == 1) { Me->ShopCamTestOpen(true); if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = false; }   // (pictures of the keeper without the menu over him)
+					else if (Step == 999) { Me->ShopCamTestOpen(false); if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = true; }
+					else FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("keeper_%d_%02d.png"), Idx, Step - 2), false, false);   // (without the menu: the keeper behind it)
+					return;
+				}
 				const int32 Idx = FMath::FloorToInt(T / 6.f);
 				const float In = T - Idx * 6.f;
 				static int32 Stage = -1, Done = -1;
