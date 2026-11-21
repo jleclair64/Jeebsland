@@ -37,6 +37,11 @@ os.makedirs(out, exist_ok=True)
 # Added 2026-11-12 for the community-library models (Docs/MeshyCommunityLibrary.md lists their pages):
 #  reduce: triangles to keep (Blender's collapse decimation, before anything else; the library models come at 3k to 1M).
 #  bake: the reduced model is welded, gets fresh UVs and its pictures baked from the full one (a heavy reduction otherwise shatters the picture into shards).
+#    ON BY DEFAULT whenever "reduce" cuts triangles (2026-11-21, the owner's "shattered" models): a collapse across the library models' hundreds of UV islands
+#    drags each kept corner's UV onto a neighbouring island, so faces sample the wrong part of the picture: dark cracks, white flecks, mirror-metal shards
+#    (the crossbow's limbs, the pickaxe head). bake=False only for a model whose picture is one flat colour per part.
+#  unfleck: with wood, low-saturation (grey or blue-grey) specks inside the wood, where more than this share of the pixels round them is wood, become
+#    wood at the brightness round them (the longbow's painted metal flecks read as white chips in the sun, 2026-11-21).
 #  fill: with bake, holes left open by 'cut' are closed once the model is welded (the longbow's tips, where its string was tied on).
 #  swatch: with bake, a steel-grey square is painted into an empty corner of the pictures, for added bands to take their colour from (a model with no steel of its own).
 #  cull: before a bake, delete faces no ray from them can leave the model by (inner walls). Off unless asked: it ate a crystal face and frayed a medallion.
@@ -77,7 +82,7 @@ _SB = [None]   # (the paint step sets it: the saturation blurred over a few pixe
 SHIELD_H = (66.0, 42.0, 78.0)   # kite, round, tower: the longest side in cm (JeebProps::ShieldSize says the same)
 PROPS = {
     "Pickaxe":  dict(file="Pickaxe2.glb", axes=("Y", "X", "-Z"),  length=92.0, grip=("Z", 0.85), mask="grey", below=("Z", -60.0), wood=(25.0, 0.74, 0.30, 60.0), clean=True, reduce=6000),
-    "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=5000, bake=True, swatch=True, fill=True,   # (2026-11-16: baked to fresh UVs. Reduced to 3000 without a bake, the stave's picture and normal map shattered into scaly shards with dark pits: the owner's "holes")
+    "Longbow":  dict(file="Longbow2.glb", axes=("Z", "-Y", "X"),  length=156.0, grip=("X", 0.50), mask="none", far=12.0, widen=("Y", 1.5), wood=(25.0, 0.74, 0.28, 60.0), reduce=5000, bake=True, swatch=True, fill=True, unfleck=0.6,   # (2026-11-16: baked to fresh UVs. Reduced to 3000 without a bake, the stave's picture and normal map shattered into scaly shards with dark pits: the owner's "holes")
                      cut=lambda p: p[0] > 0.136 and -0.925 < p[2] < 0.905,
                      marks={"TipTop": ((0.10, -0.05, 0.86), (0.16, 0.05, 0.97)), "TipLow": ((0.10, -0.05, -0.98), (0.16, 0.05, -0.88))},
                      clean=True, plain=[[("|X|", 15.0, 68.0)]], bands=[("|X|", 9.5, 22.0), ("|X|", 41.0, 45.0), ("|X|", 64.0, 80.0)]),
@@ -312,7 +317,7 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
     bpy.ops.object.select_all(action="DESELECT")
     bpy.context.view_layer.objects.active = o; o.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.004)
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.01)   # (2026-11-21: 0.004 left 4 px between islands at 1024, 0 px by the 256 mip: neighbours bled in as cracks)
     bpy.ops.object.mode_set(mode="OBJECT")
     hmat = hi.data.materials[0]
     tb = _tex_node(hmat, "Base Color"); tn = _tex_node(hmat, "Normal"); tm = _tex_node(hmat, "Metallic") or _tex_node(hmat, "Roughness")
@@ -327,7 +332,7 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
     pts = [v.co for v in me.vertices]
     diag = (Vector([max(p[i] for p in pts) for i in range(3)]) - Vector([min(p[i] for p in pts) for i in range(3)])).length
     hi.select_set(True); o.select_set(True); bpy.context.view_layer.objects.active = o
-    kw = dict(use_selected_to_active=True, cage_extrusion=0.01 * diag, max_ray_distance=0.03 * diag, margin=16, use_clear=True)
+    kw = dict(use_selected_to_active=True, cage_extrusion=0.01 * diag, max_ray_distance=0.03 * diag, margin=32, margin_type="EXTEND", use_clear=True)   # (2026-11-21: EXTEND fills round each island with its own edge colour, not black, so mips and texture filtering never pull black or a neighbour's colour into a seam)
     got = {}
     if tn:
         im = img("Normal", size // 2, True); tgt.image = im; ln.active = tgt
@@ -622,7 +627,7 @@ for name in names:
         tris_now = sum(len(p.vertices) - 2 for p in me.polygons)
         if tris_now > P["reduce"]:
             hi = None
-            if P.get("bake"):
+            if P.get("bake", True):
                 # (the full model stays for the bake; the copy that is reduced is welded first, since its old UV seams no longer matter and split edges stop the collapse)
                 hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
                 if P.get("cull"): cull_hidden(me, name)   # (off by default: welding and baking alone came out cleaner on the library models)
@@ -767,6 +772,7 @@ for name in names:
         S = C / np.maximum(V, 1e-4)
         Hu = np.degrees(np.arctan2(np.sqrt(3.0) * (g_c - b_), 2.0 * r_ - g_c - b_)) % 360.0   # (near enough for browns)
         wood = (S > 0.35) & (V > 0.015) & ((Hu < hue_max) | (Hu > 340.0))
+        fleck = None
         def blur(a_, rad):
             for ax in (0, 1):
                 c = np.cumsum(a_, axis=ax, dtype=np.float64)
@@ -781,6 +787,11 @@ for name in names:
         wt = blur(wood.astype(np.float64), rad)
         slow = blur(V * wood, rad) / np.maximum(wt, 1.0)   # (brightness in the wood nearby, not counting what is not wood)
         fine = np.where(wood, V / np.maximum(slow, 0.02), 1.0)
+        if P.get("unfleck"):
+            share = wt / np.maximum(blur(np.ones_like(V, dtype=np.float64), rad), 1.0)
+            fleck = (~wood) & (V > 0.015) & (S <= 0.35) & (share > P["unfleck"])
+            wood = wood | fleck; fine = np.where(fleck, 1.0, fine)
+            print("PROP", name, "unfleck: %.2f%% of the picture made wood" % (100.0 * fleck.mean()))
         mean_ = max(float(V[wood].mean()) if wood.any() else 0.4, 0.02)
         Vn = val_ * (1.0 + 0.6 * (fine - 1.0)) * np.power(np.maximum(slow, 0.02) / mean_, 0.25)
         dh = ((Hu + 180.0) % 360.0 - 180.0) - hue_
