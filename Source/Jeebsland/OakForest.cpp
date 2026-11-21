@@ -65,8 +65,8 @@ namespace
 	TAutoConsoleVariable<int32> CVarShadowAll(TEXT("jeeb.Forest.ShadowAll"), 0,
 		TEXT("1: every drawn tree casts its own shadow (meant for virtual shadow maps, r.Shadow.Virtual.Enable 1; with ordinary shadow maps it cost about 7 ms); 0: only the stand-ins. Live; looks only."), ECVF_Default);
 	// (2026-11-21, owner: "set both of these as default settings and remove the sliders") 0.5, the left end of the LOOK slider it had
-	TAutoConsoleVariable<float> CVarSpruceLod(TEXT("jeeb.Forest.SpruceLod"), 0.5f,
-		TEXT("How soon the spruces drop to their simpler models: their switch-over sizes on screen times this. 0.5 (since 2026-11-21, the owner's pick): the fuller models out to about twice the pack's distances; 1 as the pack made them; 2 at about half the distance (2026-11-16 to -19, for speed; the simpler ones read sharp and spiky). Live; looks only."), ECVF_Default);
+	TAutoConsoleVariable<float> CVarSpruceLod(TEXT("jeeb.Forest.SpruceLod"), 2.f,
+		TEXT("How soon the spruces drop to their simpler models: their switch-over sizes on screen times this. 2 (default again since 2026-11-21 evening, once the far cards were softened and matched to the near models); 0.5 (the owner's earlier pick): the fuller models out to about twice the pack's distances; 1 as the pack made them; 2 at about half the distance (2026-11-16 to -19, for speed; the simpler ones read sharp and spiky). Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<float> CVarSway(TEXT("jeeb.Forest.Sway"), 60.f,
 		TEXT("How far from the camera the trees sway in the wind, metres (past it they stand still, which also keeps cached shadows valid). Live; looks only."), ECVF_Default);
 	TAutoConsoleVariable<int32> CVarSpruceFace(TEXT("jeeb.Forest.SpruceFace"), 1,
@@ -199,11 +199,23 @@ namespace
 		if (MaterialName.Contains(TEXT("_branch"))) return TEXT("Branch Tint");
 		return nullptr;   // (trunk: bark and moss keep the pack's colour)
 	}
+	// (2026-11-21, owner: the far card "showed up in HD with too much detail and bright orange pinecones"; make it match the near spruce
+	// so the faster jeeb.Forest.SpruceLod can be used) the far cards' own Brightness, Saturation and SS Strength (MA_Imposter), times these
+	TAutoConsoleVariable<FString> CVarSpruceFar(TEXT("jeeb.Forest.SpruceFar"), TEXT("1.2 0.9 1"),
+		TEXT("The spruces' far cards against the near models: \"brightness saturation glow\", each times the pack's own (1 1 1 = as the pack made them). Live; looks only."), ECVF_Default);
+	void ApplySpruceFar(UMaterialInstanceDynamic* M)
+	{
+		if (!M || !M->Parent || !M->Parent->GetName().Contains(TEXT("imposter"))) return;
+		const FLinearColor K = JeebTreeLook::ParseRGB(CVarSpruceFar.GetValueOnGameThread(), FLinearColor(1.f, 1.f, 1.f));
+		const TCHAR* Names[3] = { TEXT("Brightness"), TEXT("Saturation"), TEXT("SS Strength") };
+		const float Ks[3] = { K.R, K.G, K.B };
+		for (int32 i = 0; i < 3; ++i) { float V0 = 0.f; if (M->Parent->GetScalarParameterValue(FName(Names[i]), V0)) M->SetScalarParameterValue(Names[i], V0 * Ks[i]); }
+	}
 	void ApplySpruce(IConsoleVariable* = nullptr)
 	{
 		const FLinearColor Sp = SpruceTint();
 		for (const TWeakObjectPtr<UMaterialInstanceDynamic>& M : GSpruceMids)
-			if (M.IsValid() && M->Parent) if (const TCHAR* Param = SpruceParam(M->Parent->GetName())) M->SetVectorParameterValue(Param, Sp);
+			if (M.IsValid() && M->Parent) if (const TCHAR* Param = SpruceParam(M->Parent->GetName())) { M->SetVectorParameterValue(Param, Sp); ApplySpruceFar(M.Get()); }
 	}
 	// every needle slot of a spruce set gets the shared dynamic instance of its material, in the spruce tint
 	int32 TintSpruceSet(UMeshComponent* C, UObject* Outer)
@@ -217,7 +229,7 @@ namespace
 			if (!Param) continue;
 			UMaterialInstanceDynamic* D = nullptr;
 			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GSpruceMids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
-			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); GSpruceMids.Add(D); }
+			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); ApplySpruceFar(D); GSpruceMids.Add(D); }
 			C->SetMaterial(i, D);
 			++Done;
 		}
@@ -978,6 +990,7 @@ void AOakForest::BeginPlay()
 		bHooked = true;
 		for (int32 F = 0; F < 4; ++F) if (IConsoleVariable* V = TintVar(F)) V->OnChangedDelegate().AddStatic(&ApplyTints);
 		if (IConsoleVariable* V = SpruceVar()) V->OnChangedDelegate().AddStatic(&ApplySpruce);
+		CVarSpruceFar.AsVariable()->OnChangedDelegate().AddStatic(&ApplySpruce);
 		JeebTreeLook::OnChanged().AddLambda([]() { ApplyTints(); ApplySpruce(); });
 		CVarReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadows->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
