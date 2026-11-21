@@ -428,3 +428,5 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - **Movement:** a one-shot exit (hop, mantle, dismount) out of a climb goes wrong online; find the walkable top along the slope and use the normal ledge move, and assert the final position with exactly one grab.
 
 - Package online test (2026-11-21): the Shipping client writes no log, so hashes, corrections and missing-asset warnings cannot be checked on it. Compare hashes with an editor -game client, or build a test package with bUseLoggingInShipping.
+
+- Smearing (owner, 2026-11-21, recurring): film every new moving thing on HIGH at 120 fps with the camera and object moving, and look for ghost copies before showing it. Usual cause is missing motion vectors for TSR.
