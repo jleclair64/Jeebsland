@@ -249,12 +249,21 @@ void AKnightCharacter::ApplyGraphics()
 	// a per-pixel scatter of samples that only the anti-aliasing's history smooths; wherever a shadow moves (the knight's own, swaying
 	// grass) that history is thrown away and the scatter showed as a speckled dither. The engine's search reached 40 shadow-map texels
 	// (most of a metre): 12 on HIGH (and 6 on LOW, whose single cascade has coarser texels) keeps branch shadows soft and the speckle gone.
-	Set(TEXT("r.Shadow.MaxSoftKernelSize"), bLowest ? 6 : 12);
+	// (2026-11-21, owner: boulder shadows "like static", the knight's shadow a checkerboard) 12 -> 8 on HIGH: a smaller search scatters
+	// fewer samples per pixel, so less grain for TSR to settle; still soft
+	Set(TEXT("r.Shadow.MaxSoftKernelSize"), bLowest ? 6 : 8);
 	// Speed pass (2026-10-29, owner wants high frame rates): plain temporal smoothing (TAA) on both levels instead of TSR
 	// (about 2 ms less on the graphics card), cheaper post-processing, cached sun shadows with fewer cascades and a shorter reach
 	// (2026-11-01, owner wanted a sharper knight: HIGH uses TSR again, which rebuilds fine detail from the 60% render far
 	// better than TAA for about 1-2 ms; LOW keeps TAA)
 	Set(TEXT("r.AntiAliasingMethod"), bLowest ? 2 : 4);
+	// (2026-11-21, owner: trees "smearing" away from the knight, a ghost of the shield behind him) TSR's default history rejection keeps old
+	// frames wherever it judges a pixel "flickery" or hard to match: thin leaves against sky, fast edges. Films at 120 fps with a turning
+	// camera showed streaked halos on crown edges; the responsive mode, no flicker-ghosting and tighter velocity clamping cut them
+	// (ReviewLessons). Engine defaults: Mode 1, Flickering 1, WeightClampingSampleCount 4. (TSR only: LOW's TAA ignores them)
+	Set(TEXT("r.TSR.ShadingRejection.Mode"), 0);
+	Set(TEXT("r.TSR.ShadingRejection.Flickering"), 0);
+	Set(TEXT("r.TSR.Velocity.WeightClampingSampleCount"), 1);
 	for (TActorIterator<AForest> It(W); It; ++It) It->SetLeafShadows(!bLowest);   // Lowest: no swaying leaf shadows (they blinked)
 	Set(TEXT("sg.PostProcessQuality"), bLowest ? 0 : 1);
 	// (2026-11-12, the picture's look) Ambient occlusion is back on HIGH in its cheapest form, one level of screen-space AO
