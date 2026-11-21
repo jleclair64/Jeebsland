@@ -199,9 +199,9 @@ namespace
 		if (MaterialName.Contains(TEXT("_branch"))) return TEXT("Branch Tint");
 		return nullptr;   // (trunk: bark and moss keep the pack's colour)
 	}
-	// (2026-11-21, owner: the far card "showed up in HD with too much detail and bright orange pinecones"; make it match the near spruce
+	// (2026-11-21, owner: the far card "showed up in HD with too much detail and bright orange pinecones", then in the evening "too yellow-green", the near one darker; make it match the near spruce
 	// so the faster jeeb.Forest.SpruceLod can be used) the far cards' own Brightness, Saturation and SS Strength (MA_Imposter), times these
-	TAutoConsoleVariable<FString> CVarSpruceFar(TEXT("jeeb.Forest.SpruceFar"), TEXT("1.2 0.9 1"),
+	TAutoConsoleVariable<FString> CVarSpruceFar(TEXT("jeeb.Forest.SpruceFar"), TEXT("0.9 0.8 0.8"),
 		TEXT("The spruces' far cards against the near models: \"brightness saturation glow\", each times the pack's own (1 1 1 = as the pack made them). Live; looks only."), ECVF_Default);
 	void ApplySpruceFar(UMaterialInstanceDynamic* M)
 	{
@@ -226,7 +226,7 @@ namespace
 		{
 			UMaterialInterface* M = JeebTreeLook::ConeLeaf(C->GetMaterial(i));   // (a needle material: its copy with the dark cones)
 			const TCHAR* Param = M ? SpruceParam(M->GetName()) : nullptr;
-			if (!Param) continue;
+			if (!Param) { if (M && M != C->GetMaterial(i)) C->SetMaterial(i, M); continue; }   // (the trunk: its copy on the dithered master, no tint)
 			UMaterialInstanceDynamic* D = nullptr;
 			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GSpruceMids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
 			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); ApplySpruceFar(D); GSpruceMids.Add(D); }
