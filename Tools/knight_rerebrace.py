@@ -9,9 +9,10 @@ from mathutils.bvhtree import BVHTree
 
 # (m, along the forearm from the elbow joint) the band of vambrace copied; (m, up the upper arm from the elbow joint) where it goes
 SRC_T0, SRC_T1 = 0.03, 0.20
-DST_S0, DST_S1 = -0.03, 0.19
+DST_S0, DST_S1 = 0.0, 0.19
+ELBOW_BLEND = 0.05   # (m) half the length of the blend from the upper arm bone to the forearm bone, centred on the elbow joint
 SPIN = 180.0      # (degrees) the copy turned about the upper arm, so the vambrace's outer plates face out
-OFF_MIN, OFF_MAX = 0.006, 0.03   # (m) how far over his mail each point of the copy stands, at least and at most (the elbow cop's points stood out as spikes)
+OFF_MIN, OFF_MAX = 0.006, 0.02   # (m) how far over his mail each point of the copy stands, at least and at most (the elbow cop's points stood out as spikes)
 
 
 def _bone(arm, n):
@@ -98,7 +99,11 @@ def add(gaunt, arm, body, log=print):
         nn = cn[sel].reshape(-1, 3) @ Rn.T
         m2.normals_split_custom_set(nn.tolist()); m2.update()
         ob = bpy.data.objects.new("rrb_" + sd, m2); bpy.context.scene.collection.objects.link(ob)
-        vg = ob.vertex_groups.new(name="mixamorig:" + sd + "Arm"); vg.add(list(range(len(vi))), 1.0, "REPLACE")
+        vg = ob.vertex_groups.new(name="mixamorig:" + sd + "Arm"); vf = ob.vertex_groups.new(name="mixamorig:" + sd + "ForeArm")
+        for j in range(len(vi)):   # (2026-11-21 owner: the plate popped out of the arm: its low end sat 3 cm below the elbow joint on the upper arm bone alone, so a bent elbow drove it out through the forearm; now the last 5 cm above the joint blend to the forearm bone, half at the joint)
+            wf = min(max((ELBOW_BLEND - sd_[j]) / (2 * ELBOW_BLEND), 0.0), 1.0)
+            vg.add([j], 1.0 - wf, "REPLACE")
+            if wf > 0.001: vf.add([j], wf, "REPLACE")
         new_objs.append(ob)
         log("RRB %s: %d triangles copied, stretched %.2f, mail arm radius %.3f / forearm %.3f" % (sd, len(sel), k, ru or 0, rf or 0))
     if not new_objs: return
