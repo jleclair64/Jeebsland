@@ -1,4 +1,4 @@
-# Thatched house interior: plan (2026-11-21, scouting only, nothing built)
+# Thatched house interior: plan and what was built (2026-11-21; built, see "Built" at the end)
 
 Owner's request: let the knight go inside the house with the hay roof; walk-in preferred over a teleport; dress it with free props (Meshy community library, Fab free); inspiration `Saved/Review/Interior/41-47`; if a good paid Fab pack would help, say so and wait until the materials are settled.
 
@@ -72,3 +72,16 @@ Categories still thin in the free set: bookshelves with books, alchemy shelves, 
 - Meshy library searched through the owner's Chrome: approved.
 - Open House_CLS1 (behind the church) only.
 - Open doorway for now. Later: a real door that opens and shuts with E (server decides, replicated).
+
+## Built (2026-11-21, agent `interior`)
+- **One house only: House_CLS1** (behind the church). It draws `SM_TL_HouseOpen` (+`_Col`) instead of `SM_TL_House`; the other ten keep the closed model. `-NoOpenHouse` puts it back.
+- **Walk-in, no teleport.** `Tools/interior_house_open.py` (Blender) cuts the painted doorway (about 1.45 x 2.25 m) through the shell and its collision and lines the cut with jambs, a head and a threshold. Source: the TownLab bake's 60k `TL_House.fbx` (the exported Unreal mesh is only the 8k Nanite fallback).
+- **Room:** `AHouseInterior` (`HouseInterior.h/.cpp`), spawned by `ATownLabTown` at the house's transform. Every piece is a row in `Content/Data/InteriorHouse.csv` (no build to move things). Room inside X -455..495, Y -315..230, 2.7 m high; Stylized Medieval Tavern floor, ceiling, walls (Wall_001, plaster over wainscot) and beams; a stone hearth under the chimney.
+- **Same on every machine:** the solid pieces are box collisions from the mesh bounds on server and clients (JEEBINT hash in the log); meshes and lights exist only on clients. The room is kept free of grass and leaves (`JeebOakHill::OpenRooms`).
+- **Lights:** one flickering fire (1000 lm, no shadow), a chandelier and four candles or lamps, all shadowless, on only while the camera is within 4 m of the room (`jeeb.Interior.LightReach`). Props cast no shadows; only floor, ceiling and walls do.
+- **Camera:** the arm shortens to half inside (`jeeb.Interior.Cam`), so it stays within the walls; the ceiling is solid.
+- **Props (all free):** tavern pack (chairs, tables, carpets, shelf, barrel, bag, lamps, props); TownDecor (wall stone, firewood, flame, pots, basket, oil lantern); UpDraft sampler (trestle desk, barstool, tankard, bottle); Meshy CC0 community models reduced in Blender (`Tools/interior_props.py`): bookshelf, bed, chest, potion crate, cauldron, bottles, flower pot, candlesticks, candelabra, book stack, books row, wall map. Imported but unused: Scroll, BraidedRug (read as rubble), Tapestry (its picture read as a window frame).
+- **Frame cost** (editor, solo, GPU median; eye just outside the door, room lit, against `-NoOpenHouse`): HIGH +0.37 ms (6.41 vs 6.04), LOW +0.21 ms (4.68 vs 4.47). The first version, with a shadowed fire, shadowed props and lights on from 25 m, cost +3.6 ms on HIGH.
+- **Pictures:** `Saved/Review/Interior/Final/` (main folder): eight views each on HIGH and LOW (outside the door, four inside at noon, three at night) and a walk-in film (`walk_film`, every 4th frame at 30 fps; no smearing seen).
+- **Not done:** no windows from inside (the shell's painted windows aren't cut); the shell's own faces are one-sided, so the room's walls must stay inside them; Rosalind stays at the door outside and doesn't walk in; the door that opens with E is a later task; the knight's armour looks pale inside (auto exposure adapting to the bright room); the hearth's stone glows bright in the firelight.
+- Rebuild the assets: `Tools/BuildInterior.ps1` (editor closed). The tavern pack must be in `Content/Medieval_Tavern` (committed on this branch).

@@ -29,6 +29,7 @@
 #include "GameFramework/Pawn.h"
 #include "LanternBrackets.h"
 #include "WarFortLadders.h"
+#include "HouseInterior.h"
 
 namespace
 {
@@ -302,6 +303,12 @@ void ATownLabTown::BuildBuildings()
 		const FString Asset = AssetName(P.Model);
 		FString Path = FString::Printf(TEXT("/Game/Buildings/SM_%s"), *Asset), ColPath = Path + TEXT("_Col");
 		if (bSwap) { Path = Pick.Mesh; ColPath = LoadMesh(Pick.Mesh + TEXT("_Col")) ? Pick.Mesh + TEXT("_Col") : ColPath; ++Rebuilt; }
+		// (the walk-in house, 2026-11-21: House_CLS1 alone gets the shell with its doorway cut, SM_TL_HouseOpen, and a room inside;
+		// the other thatched houses keep SM_TL_House. HouseInterior.h; -NoOpenHouse: closed like the rest)
+		static const bool bNoOpen = FParse::Param(FCommandLine::Get(), TEXT("NoOpenHouse"));
+		const bool bOpenHouse = bRealSite && !bNoOpen && bSwap && P.Id && FCString::Stricmp(P.Id, AHouseInterior::OpenPlotId()) == 0 && Path.EndsWith(TEXT("SM_TL_House"))
+			&& LoadMesh(Path + TEXT("Open")) && LoadMesh(Path + TEXT("Open_Col"));
+		if (bOpenHouse) { Path += TEXT("Open"); ColPath = Path + TEXT("_Col"); }
 		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f id %s door %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw,
 			P.Id ? P.Id : TEXT("-"), P.DoorDir);
 		const FTransform Xf(FRotator(0.f, Yaw, 0.f), At, FVector(Scale, Scale, ScaleZ));
@@ -339,7 +346,8 @@ void ATownLabTown::BuildBuildings()
 				// The rebuilt models' own decorations (townbuild: ivy, moss, stones, lanterns), one instanced set per kind for the town
 				// (any rebuilt model SM_TL_<Name> finds its decor under "TL_<Name>"; build-c 2026-11-14: not only the house and store)
 				const FString MeshName = FPaths::GetBaseFilename(Path);
-				const FString Kind = MeshName.StartsWith(TEXT("SM_TL_")) ? MeshName.Mid(3) : FString();
+				FString Kind = MeshName.StartsWith(TEXT("SM_TL_")) ? MeshName.Mid(3) : FString();
+				Kind.RemoveFromEnd(TEXT("Open"));   // (the open house keeps the house's own decor)
 				if (const JeebTownLabDecor::FBuildingDecor* D = Kind.IsEmpty() ? nullptr : JeebTownLabDecor::For(*Kind))
 					for (int32 i = 0; i < D->Num; ++i)
 					{
@@ -439,6 +447,13 @@ void ATownLabTown::BuildBuildings()
 		}
 		HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, Yaw); HashIn(Hash, Scale); HashIn(Hash, ScaleZ);
 		++Placed;
+		if (bOpenHouse)
+			if (AHouseInterior* Room = GetWorld()->SpawnActorDeferred<AHouseInterior>(AHouseInterior::StaticClass(), FTransform(FRotator(0.f, Yaw, 0.f), At), this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+			{
+				Room->FinishSpawning(FTransform(FRotator(0.f, Yaw, 0.f), At));
+				HashIn(Hash, float(Room->Hash % 100000u));
+				UE_LOG(LogTemp, Log, TEXT("%s OPEN HOUSE %s: walk-in room at %.0f %.0f %.0f yaw %.0f"), Tag(), P.Id, At.X, At.Y, At.Z, Yaw);
+			}
 #if !UE_BUILD_SHIPPING
 		// (-FortGateTest, 2026-11-18 review: a knight-sized capsule swept in through every half metre of each fort's four walls, a
 		// few seconds after the start; the log names every opening he fits through)

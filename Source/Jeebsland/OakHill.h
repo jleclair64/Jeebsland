@@ -736,9 +736,22 @@ namespace JeebOakHill
 	// On a building's real footprint (no grass, no leaves): its walls, steps and porch floors from OakHillFootprints.h, else its
 	// foundation walls' box; with a margin in metres, the walls' box. Porch corners and the ground under eaves keep their grass
 	// (owner's ground pass, 2026-11-13: the whole model's bounds left bare corners with no building on them)
+	// The walk-in houses' rooms (HouseInterior.cpp adds each as it is built): their floor is a room, never grass or leaves
+	struct FOpenRoom { const void* Owner; FVector2D At; float Cs, Sn; FVector2D Lo, Hi; };
+	inline TArray<FOpenRoom>& OpenRooms() { static TArray<FOpenRoom> R; return R; }
+	inline bool InOpenRoom(float X, float Y)
+	{
+		for (const FOpenRoom& R : OpenRooms())
+		{
+			const float DX = X - R.At.X, DY = Y - R.At.Y, LX = DX * R.Cs + DY * R.Sn, LY = -DX * R.Sn + DY * R.Cs;
+			if (LX > R.Lo.X && LX < R.Hi.X && LY > R.Lo.Y && LY < R.Hi.Y) return true;
+		}
+		return false;
+	}
 	inline bool OnBuilding(float X, float Y, float MarginM = 0.f)
 	{
 		if (!InBox(X, Y) || !Enabled()) return false;
+		if (InOpenRoom(X, Y)) return true;
 		const float E = EastM(Y), N = NorthM(X);
 		const TArray<FPlot>& Ps = Plots();
 		const TArray<FWallBox>& Ws = WallBoxes();
