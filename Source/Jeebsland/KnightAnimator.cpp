@@ -1200,8 +1200,16 @@ void FKnightAnimator::SetFists(const FInput& In, float Dt)
 	// the mail body under empty slots follows Comp's bones and applies its own morph weights each tick (USkeletalMeshComponent::UpdateFollowerComponent)
 	if (BareComp)
 		for (int32 h = 0; h < 2; ++h) BareComp->SetMorphTarget(FistName[h], W[h]);
-	if (DarkComp)   // (the Dark Plate gauntlets close the same way)
-		for (int32 h = 0; h < 2; ++h) DarkComp->SetMorphTarget(FistName[h], W[h]);
+	if (DarkComp)   // (the Dark Plate gauntlets close the same way, set on the component itself as the suit's own are above (2026-11-21: SetMorphTarget alone left this follower's weights at 0, so its hand stayed open beside the grip))
+		if (const USkeletalMesh* DM = Cast<USkeletalMesh>(DarkComp->GetSkinnedAsset()))
+		{
+			TMap<FName, float> DCurves;
+			for (int32 h = 0; h < 2; ++h) if (W[h] > 0.001f) DCurves.Add(FistName[h], W[h]);
+			DarkComp->ActiveMorphTargets.Reset();
+			DarkComp->MorphTargetWeights.SetNumZeroed(DM->GetMorphTargets().Num());
+			for (float& V : DarkComp->MorphTargetWeights) V = 0.f;
+			if (DCurves.Num()) FAnimationRuntime::AppendActiveMorphTargets(DM, DCurves, DarkComp->ActiveMorphTargets, DarkComp->MorphTargetWeights);
+		}
 }
 
 float FClipLib::ToolPose(FPose& P, float W, int32 Kind) const
