@@ -4,6 +4,7 @@
 #include "TreeLook.h"
 #include "HAL/IConsoleManager.h"
 #include "Scarecrow.h"
+#include "DayNight.h"
 #include "Cottage.h"
 #include "ChoppableTree.h"
 #include "Canopy.h"
@@ -45,9 +46,16 @@ namespace
 		TEXT("Brightness of the fallen and drifting leaves, times their palette colour (1 = as before 2026-11-16, 0.65 default). Live; looks only."), ECVF_Default);
 	struct FLeafMid { TWeakObjectPtr<UMaterialInstanceDynamic> M; int32 Type; };
 	TArray<FLeafMid> GLeafMids;
+	// Daytime lift (owner, 2026-11-21: "brighter in the daytime but the same brightness in the night time"): times this in broad day,
+	// easing to 1 (unchanged) as ADayNight::Dusk reaches 1.
+	TAutoConsoleVariable<float> CVarLeafDay(TEXT("jeeb.Leaves.DayBright"), 2.0f,
+		TEXT("Fallen and drifting leaves in daylight: times jeeb.Leaves.Brightness in broad day, 1 at dusk and night. Live; looks only."), ECVF_Default);
+	float GLeafDusk = -1.f;
 	void ApplyLeafTints()
 	{
-		const float B = FMath::Clamp(CVarLeafBright.GetValueOnGameThread(), 0.f, 3.f);
+		GLeafDusk = ADayNight::Dusk;
+		const float B = FMath::Clamp(CVarLeafBright.GetValueOnGameThread(), 0.f, 3.f)
+			* FMath::Lerp(FMath::Clamp(CVarLeafDay.GetValueOnGameThread(), 0.f, 5.f), 1.f, FMath::Clamp(GLeafDusk, 0.f, 1.f));
 		GLeafMids.RemoveAll([](const FLeafMid& L) { return !L.M.IsValid(); });
 		for (const FLeafMid& L : GLeafMids)
 		{
@@ -63,6 +71,7 @@ namespace
 		{
 			bHooked = true;
 			CVarLeafBright->OnChangedDelegate().AddLambda([](IConsoleVariable*) { ApplyLeafTints(); });
+			CVarLeafDay->OnChangedDelegate().AddLambda([](IConsoleVariable*) { ApplyLeafTints(); });
 			JeebTreeLook::OnChanged().AddLambda([]() { ApplyLeafTints(); });
 			JeebPalette::OnChanged().AddLambda([]() { ApplyLeafTints(); });
 		}
@@ -808,6 +817,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	Time += DeltaSeconds;
+	if (FMath::Abs(ADayNight::Dusk - GLeafDusk) > 0.01f) ApplyLeafTints();   // leaves brighten by day, unchanged at night
 
 	// Lamp, candle and torch lights flicker
 	for (int32 i = 0; i < FlickerLights.Num(); ++i)
