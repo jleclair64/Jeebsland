@@ -55,6 +55,10 @@
 bool AKnightCharacter::ShieldActive() const
 {
 	if (!Skills || Skills->Worn[JeebItems::K_Shield] == 0) return false;
+	// (owner 2026-11-21: the troll's "hand is stuck to his head". A shield is knights' gear, but a save from before the troll or a class swap
+	// can still have one worn: the knight's fixed shield-arm pose then put the troll's big forearm against his head. A troll never holds a
+	// shield: not drawn, no guard bonus, his left arm swings free. bIsTroll is the same on every machine, so the server agrees.)
+	if (bIsTroll) return false;
 	const int32 K = SelectedKind();
 	return K < 0 || JeebItems::AllowsShield(K);
 }
