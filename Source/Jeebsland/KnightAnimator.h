@@ -318,6 +318,7 @@ private:
 	TArray<FQuat> TrollRestK;       // per troll mesh bone: its bind turn, in our mesh's space
 	FQuat TrollQ = FQuat::Identity; // the troll mesh's space in ours
 	bool bTrollMirror = false;     // ... seen in a mirror (imported mirrored)
+	FTransform TrollRel;           // the troll mesh's place on the knight's (unseen) mesh
 	void MakeTrollMesh(AActor* Owner);
 	void TrollPose();
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);

@@ -316,13 +316,14 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
-	// The troll's charged jump (2026-11-19): a gold bar filling while Space is held (full: it throbs), then a grey one filling back up through the 8 s cooldown
+	// The troll's charged jump: one bar (owner 2026-11-21, "change the cooldown bar to be the charge bar"). Through the 8 s cooldown the
+	// charge bar itself refills, a dim gold (Space is a plain jump then); ready, it hides; held, it fills bright gold with the charge (full: it throbs).
 	if (Knight->IsTroll())
 	{
 		const float CW = 220.f, CH = 8.f;
 		const float LX = (Canvas->ClipX - CW) * 0.5f, LY = Canvas->ClipY * 0.8f + 40.f;
 		if (Knight->IsLeapCharging()) Gauge(LX, LY, CW, CH, FMath::Max(0.03f, Knight->LeapChargeShare()), FLinearColor(1.f, 0.78f, 0.2f), Knight->LeapChargeShare() >= 1.f);
-		else if (Knight->LeapCooldownShare() > 0.f) Gauge(LX, LY, CW, CH, 1.f - Knight->LeapCooldownShare(), FLinearColor(0.5f, 0.52f, 0.58f), false);
+		else if (Knight->LeapCooldownShare() > 0.f) Gauge(LX, LY, CW, CH, 1.f - Knight->LeapCooldownShare(), FLinearColor(0.55f, 0.43f, 0.11f), false);
 	}
 
 	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)

@@ -256,7 +256,9 @@ void AKnightCharacter::Jump()
 		GetCharacterMovement()->bOrientRotationToMovement = bSavedOrient;
 	}
 	// The troll: Space down on the ground starts a charge; letting go jumps (StopJumping, ReleaseLeap: KnightCharacterTroll.cpp)
-	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0)
+	// (owner 2026-11-21: no charging while the charged jump cools down; Space is then the plain jump at once. The server's own
+	// LeapCooldown still refuses any early leap, ServerLeap.)
+	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0 && LeapCooldown <= 0.f)
 	{
 		LeapChargeFrom = GetWorld()->GetTimeSeconds();
 		if (!HasAuthority()) ServerLeapCharge(true); else ServerChargeFrom = LeapChargeFrom;

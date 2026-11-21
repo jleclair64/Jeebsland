@@ -18,6 +18,7 @@
 #include "Misc/Parse.h"
 #include "Engine/SkeletalMesh.h"
 #include "ReferenceSkeleton.h"
+#include "GameFramework/Actor.h"
 
 using namespace JeebAnim;
 
@@ -222,12 +223,25 @@ void FKnightAnimator::MakeTrollMesh(AActor* Owner)
 
 	TrollComp = NewObject<UPoseableMeshComponent>(Owner);
 	TrollComp->SetupAttachment(Comp);
-	TrollComp->SetRelativeTransform(FTransform(Q, T, FVector(S, bTrollMirror ? -S : S, S)));
+	TrollRel = FTransform(Q, T, FVector(S, bTrollMirror ? -S : S, S));
+	TrollComp->SetRelativeTransform(TrollRel);
 	TrollComp->SetSkinnedAssetAndUpdate(Asset);
 	TrollComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	TrollComp->SetBoundsScale(2.5f);
 	TrollComp->RegisterComponent();
 	Comp->SetVisibility(false, false);   // (the knight's mesh keeps the pose for whatever reads it; only the troll is drawn)
+	// (2026-11-21, owner: "a lot of weird smearing in the troll when he moves and swings".) A poseable mesh also rebuilds its bones in
+	// its own tick whenever it was seen lately. The troll's mesh ticked after the pawn: TrollPose built this frame's pose, then the
+	// mesh's own tick built the same pose a second time, which overwrote the remembered last-frame pose. His bones then wrote no
+	// motion (the velocity buffer showed his limbs still while they swung; the club, a separate mesh, was fine), so TSR blended old
+	// frames of his body in as ghosts. The pawn now always ticks after his mesh: the mesh's own rebuild comes first, from last frame's
+	// pose, and ours is the last word, so the last-frame pose survives for the motion vectors. (The knight's mesh happened to tick
+	// first already.) -TrollOldTick (test builds) leaves the old order for before/after films.
+	bool bOldTick = false;
+#if !UE_BUILD_SHIPPING
+	bOldTick = FParse::Param(FCommandLine::Get(), TEXT("TrollOldTick"));
+#endif
+	if (!bOldTick) Owner->AddTickPrerequisiteComponent(TrollComp);
 }
 
 // The troll's own shadow on himself (2026-11-21, owner: his body "isn't crisp"): the soft-shadow filter (PCSS) scatters its samples per
@@ -249,7 +263,7 @@ void FKnightAnimator::TrollPose()
 	W.SetNum(N);
 	for (int32 b = 0; b < N; ++b) W[b] = Parents[b] >= 0 ? W[Parents[b]] * Final.Rot[b] : Final.Rot[b];
 	const FQuat QInv = TrollQ.Inverse();
-	const FTransform Rel = TrollComp->GetRelativeTransform();
+	const FTransform& Rel = TrollRel;
 	auto MirIf = [this](const FQuat& Q) { return bTrollMirror ? MirQ(Q) : Q; };
 	TArray<FTransform, TInlineAllocator<64>> CT;
 	CT.SetNum(M);
