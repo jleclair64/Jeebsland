@@ -428,3 +428,4 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - **Movement:** a one-shot exit (hop, mantle, dismount) out of a climb goes wrong online; find the walkable top along the slope and use the normal ledge move, and assert the final position with exactly one grab.
 
 - Package online test (2026-11-21): the Shipping client writes no log, so hashes, corrections and missing-asset warnings cannot be checked on it. Compare hashes with an editor -game client, or build a test package with bUseLoggingInShipping.
+- LESSON: (2026-11-21, troll facing) when fitting one rig onto another by joint places, leave out marker bones (toe ends, head-front, `_end`): a rig made back to front fits perfectly only mirrored, and the mirror shows the skin back to front. Check a new body from the front (`-ShotFacing=180`) beside the knight before trusting a 0.00 cm fit.
