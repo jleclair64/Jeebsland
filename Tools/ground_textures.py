@@ -111,72 +111,6 @@ def paint_grass_ground():
     return N, N, px
 
 
-# ------------------------------------------------------------------ rock: layered natural stone (slopes and loose stones)
-# 2026-11-21 (owner: the old rock read as flat beige "crazy paving" plates with dark outlines): now sedimentary strata, the
-# way Breath of the Wild's cliffs look: wavy horizontal ledges of slightly different grey and warm browns, broken into blocks
-# by occasional vertical cracks, soft painted tone, a little moss. The ledges run along the picture's rows, which the
-# material's side projection turns into level bands up a slope (v is world height there).
-def paint_rock():
-    import bisect
-    N = 512
-    rnd = random.Random(4801)
-    warp = [Noise(4851 + i, 3 << i) for i in range(3)]
-    warp2 = [Noise(4861 + i, 4 << i) for i in range(3)]
-    tone = [Noise(4901 + i, 3 << i) for i in range(4)]
-    grain = [Noise(4951 + i, 28 << i) for i in range(4)]
-    moss = [Noise(5001 + i, 3 << i) for i in range(4)]
-    fade = [Noise(5051 + i, 5 << i) for i in range(2)]
-    B = 17   # layers: thicknesses summing to 1 (so the picture tiles), each its own tone and warmth
-    th = [rnd.uniform(0.5, 1.6) for _ in range(B)]
-    tot = sum(th)
-    bounds = []
-    acc = 0.0
-    for t in th:
-        bounds.append(acc)
-        acc += t / tot
-    bounds.append(1.0)
-    layer = [(rnd.uniform(0.43, 0.53), rnd.uniform(-0.4, 1)) for _ in range(B)]
-    joints = []
-    for _ in range(B):
-        n = rnd.randint(3, 5)
-        base = rnd.random()
-        joints.append(sorted(((base + (i + rnd.uniform(0.1, 0.9)) / n) % 1.0) for i in range(n)))
-    blk = [[rnd.uniform(-0.05, 0.05) for _ in range(8)] for _ in range(B)]
-    px = bytearray(N * N * 4)
-    for j in range(N):
-        for i in range(N):
-            u, v = i / N, j / N
-            wv = (v + 0.15 * (fbm(warp, u, v) - 0.5)) % 1.0              # ledges wander, they are not ruled lines
-            wu = (u + 0.10 * (fbm(warp2, u, v) - 0.5)) % 1.0
-            k = min(bisect.bisect_right(bounds, wv) - 1, B - 1)
-            lo, hi = bounds[k], bounds[k + 1]
-            dv = min(wv - lo, hi - wv) / max(hi - lo, 1e-4)             # 0 at a ledge line, 0.5 mid-layer
-            js = joints[k]
-            m = bisect.bisect_right(js, wu) % len(js)
-            ju, ju2 = js[m - 1], js[m]
-            span = (ju2 - ju) % 1.0 or 1.0
-            du = min((wu - ju) % 1.0, (ju2 - wu) % 1.0)
-            lum, warm = layer[k]
-            lum += blk[k][m % 8]                                          # each block its own small shade
-            lum *= 0.62 + 0.36 * fbm(tone, u, v)                          # soft painted tone across the stone
-            show = clamp01((fbm(fade, u, v) - 0.30) * 2.4)                # some vertical cracks fade out
-            ledge = clamp01(1.0 - dv * (hi - lo) * N / 4.0)               # a thin dark shadow line at each ledge
-            vcrack = clamp01(1.0 - du * N / 3.0) * show
-            lum *= 1.0 - 0.36 * ledge - 0.28 * vcrack
-            lum *= 1.0 + 0.10 * (dv - 0.25)                               # each layer a touch lighter toward the middle
-            lum *= 0.88 + 0.24 * fbm(grain, u, v)
-            r = lum * (1.0 + 0.04 * warm)                                # neutral grey to warm brown-grey: no beige or olive
-            g = lum * 0.99
-            b = lum * (0.95 - 0.02 * warm)
-            mm = clamp01((fbm(moss, u, v) - 0.64) * 4.0) * (1.0 - 0.7 * ledge) * 0.6   # a little moss
-            r = r * (1 - mm) + 0.20 * mm
-            g = g * (1 - mm) + 0.30 * mm
-            b = b * (1 - mm) + 0.12 * mm
-            o = (j * N + i) * 4
-            px[o], px[o + 1], px[o + 2], px[o + 3] = to8(r), to8(g), to8(b), 255
-    return N, N, px
-
-
 # ------------------------------------------------------------------ cobbles: rounded stones set in packed earth (colour + height)
 _COBBLE = {}
 
@@ -251,10 +185,6 @@ def grass_ground():
     return cached("T_GrassGround", 2, paint_grass_ground)
 
 
-def rock():
-    return cached("T_Rock", 3, paint_rock)
-
-
 def cobble():
     return cached("T_Cobble", 2, paint_cobble)   # (2: the per-stone number in alpha, 2026-11-14)
 
@@ -265,7 +195,7 @@ def cobble_normal():
 
 if __name__ == "__main__":
     out = sys.argv[1] if len(sys.argv) > 1 else "."
-    for name, painter in (("T_GrassGround", paint_grass_ground), ("T_Rock", paint_rock), ("T_Cobble", paint_cobble), ("T_CobbleN", paint_cobble_normal)):
+    for name, painter in (("T_GrassGround", paint_grass_ground), ("T_Cobble", paint_cobble), ("T_CobbleN", paint_cobble_normal)):
         w, h, px = painter()
         write_png(os.path.join(out, name + ".png"), w, h, px)
         print("painted", name)

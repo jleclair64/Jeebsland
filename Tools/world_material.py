@@ -29,6 +29,7 @@ GRASS_TO_MEADOW = palette.rgb("GroundGrass")   # T_GrassGround times this reads 
 GRASS_AVERAGE = (0.0705, 0.0916, 0.0083)   # T_GrassGround v2's average (linear) after GRASS_TO_MEADOW: what it fades to far away
 ROCK_AVERAGE = palette.rgb("RockFar")   # what the stone fades to far away: a darker neutral grey (lighter averages, with the haze over
                                        # them, read lavender or pink-beige against the green hills)
+ROCK_PHOTO_GAIN = (2.2, 2.1, 2.0)   # (rock_face is dark rust: desaturated 70% then brightened to about the old stone's level)
 ROCK_TINT = (1.0, 1.0, 1.0)   # the RockTint parameter's default
 EARTH_BALANCE = palette.rgb("Earth")   # T_Dirt (average linear 0.069, 0.036, 0.016: dark rust) times this averages a light packed tan
                                      # (0.14, 0.10, 0.062): roads and worn ground never read as dark stains beside cobbles and grass
@@ -69,6 +70,13 @@ def import_texture(png, name, normal=False, alpha=False):
         tex.set_editor_property("srgb", True)
     unreal.EditorAssetLibrary.save_asset("/Game/" + name)
     return tex
+
+
+def rock_picture(g, rock_tex, uv):
+    """The photo rock (Poly Haven rock_face, CC0, Art/WorldRock): a rusty brown picture pulled toward a natural grey-brown and
+    brightened to the old painted stone's level (2026-11-21, owner: wanted the path's photo detail)"""
+    c = g.mask(g.tex(rock_tex, uv), True, True, True)
+    return g.muln(g.desat(c, 0.8), g.c3(ROCK_PHOTO_GAIN))
 
 
 class Graph:
@@ -213,13 +221,13 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
 
     # Rock: painted stone from above, and from the side where the ground is steeper than about 55 degrees (cliffs, later)
     rock_m = g.mask(vc, False, True)
-    top = g.mask(g.tex(rock_tex, g.mul(xy, 1.0 / 450.0)), True, True, True)
+    top = rock_picture(g, rock_tex, g.mul(xy, 1.0 / 450.0))
     nx = g.one(unreal.MaterialExpressionAbs, g.mask(nrm, True, False))
     ny = g.one(unreal.MaterialExpressionAbs, g.mask(g.mask(nrm, False, True), True, False))
     nz = g.mask(g.mask(nrm, False, False, True), True, False)
     wz = g.mask(g.mask(wp, False, False, True), True, False)
     side_uv = g.lerp(g.append(g.mask(wp, True, False), wz), g.append(g.mask(g.mask(wp, False, True), True, False), wz), g.ramp(g.subn(nx, ny), -0.05, 0.05))
-    side = g.mask(g.tex(rock_tex, g.mul(side_uv, 1.0 / 450.0)), True, True, True)
+    side = rock_picture(g, rock_tex, g.mul(side_uv, 1.0 / 450.0))
     rock = g.lerp(top, side, g.ramp(g.addn(g.one(unreal.MaterialExpressionOneMinus, nz), g.mul(rag, 0.1)), 0.42, 0.58))
     rock = g.lerp(rock, palette.colour(mat, "RockFar"), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
@@ -354,9 +362,9 @@ def build_stone(rock_tex, patches):
     ny = g.one(unreal.MaterialExpressionAbs, g.mask(g.mask(nrm, False, True), True, False))
     nz = g.mask(g.mask(nrm, False, False, True), True, False)
     wz = g.mask(g.mask(wp, False, False, True), True, False)
-    top = g.mask(g.tex(rock_tex, g.mul(g.mask(wp, True, True), 1.0 / 160.0)), True, True, True)
-    sx = g.mask(g.tex(rock_tex, g.mul(g.append(g.mask(g.mask(wp, False, True), True, False), wz), 1.0 / 160.0)), True, True, True)
-    sy = g.mask(g.tex(rock_tex, g.mul(g.append(g.mask(wp, True, False), wz), 1.0 / 160.0)), True, True, True)
+    top = rock_picture(g, rock_tex, g.mul(g.mask(wp, True, True), 1.0 / 160.0))
+    sx = rock_picture(g, rock_tex, g.mul(g.append(g.mask(g.mask(wp, False, True), True, False), wz), 1.0 / 160.0))
+    sy = rock_picture(g, rock_tex, g.mul(g.append(g.mask(wp, True, False), wz), 1.0 / 160.0))
     side = g.lerp(sy, sx, g.ramp(g.subn(nx, ny), -0.15, 0.15))
     col = g.lerp(side, top, g.ramp(nz, 0.45, 0.75))
     col = g.muln(col, g.vector("Tint", (1.0, 1.0, 1.0)))
@@ -378,7 +386,7 @@ else:
 
     palette.ensure_mpc()
     grass_tex = import_texture(ground_textures.grass_ground(), "T_GrassGround")
-    rock_tex = import_texture(ground_textures.rock(), "T_Rock")
+    rock_tex = import_texture(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Art", "WorldRock", "rock_face_diff_2k.jpg"), "T_Rock")
     cobble_tex = import_texture(ground_textures.cobble(), "T_Cobble", alpha=True)
     cobble_n = import_texture(ground_textures.cobble_normal(), "T_CobbleN", normal=True)
     dirt_tex = import_texture(gen_textures.dirt(), "T_Dirt")
