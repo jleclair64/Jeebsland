@@ -27,6 +27,8 @@
 #include "Containers/Ticker.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "LanternBrackets.h"
+#include "WarFortLadders.h"
 
 namespace
 {
@@ -267,6 +269,7 @@ void ATownLabTown::BuildBuildings()
 	TArray<JeebDecor::FFootprint> Foundations;
 	int32 Placed = 0, Rebuilt = 0;
 	int32 PlotIndex = -1;
+	TArray<JeebLanternBrackets::FHook> LanternHooks;
 	for (const FPlot& P : Plots())
 	{
 		++PlotIndex;
@@ -395,6 +398,7 @@ void ATownLabTown::BuildBuildings()
 							L->RegisterComponent();
 							LanternLights.Add(L);
 							++DecorLights;
+							LanternHooks.Add(JeebLanternBrackets::HookOf(PM, PieceXf));   // (its hook, for the brackets below)
 							const FVector Lw = PieceXf.GetLocation();
 							UE_LOG(LogTemp, Log, TEXT("%s LANTERN %s on %s at %.0f %.0f %.0f, %.0f cm above the ground there"), Tag(), *FPaths::GetBaseFilename(Pc.Mesh), *MeshName, Lw.X, Lw.Y, Lw.Z, Lw.Z - JeebTerrain::HeightAt(Lw.X, Lw.Y));
 						}
@@ -543,6 +547,39 @@ void ATownLabTown::BuildBuildings()
 		TArray<UInstancedStaticMeshComponent*> After; GetComponents(After);
 		DrawSets += After.Num() - Before.Num();
 	}
+	// The ladders up to the forts' fighting walks (2026-11-20, owner; WarFortLadders.h has the spots, the climb code uses the same list):
+	// two rails and rungs of brown timber, the rails running 70 cm past the walk as a handhold
+	if (!bServer && !bNoMeshes && bRealSite && JeebWarFort::Ladders().Num())
+		if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+		{
+			UInstancedStaticMeshComponent* Wood = NewObject<UInstancedStaticMeshComponent>(this);
+			Wood->SetStaticMesh(Cube);
+			Wood->SetupAttachment(GetRootComponent());
+			Wood->SetMobility(EComponentMobility::Static);
+			Wood->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Wood->SetCullDistances(0, 12000);
+			if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))
+				if (UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Base, this)) { M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.13f, 0.065f, 0.03f)); Wood->SetMaterial(0, M); }
+			Wood->RegisterComponent();
+			++DrawSets;
+			for (const JeebTerrain::FLadder& L : JeebWarFort::Ladders())
+			{
+				const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(L.Out.Y, L.Out.X));
+				const FQuat Lq = FRotator(0.f, Yaw, 0.f).Quaternion();
+				const FVector2D Side(-L.Out.Y, L.Out.X);
+				const FVector2D At2 = L.Pos + L.Out * 6.f;   // (just proud of the walk's front edge)
+				const float Z0 = L.Bottom - 15.f, Z1 = L.Top + 70.f;
+				for (int32 Sd = -1; Sd <= 1; Sd += 2)
+				{
+					const FVector2D Rp = At2 + Side * (Sd * 26.f);
+					Wood->AddInstance(FTransform(Lq, FVector(Rp.X, Rp.Y, (Z0 + Z1) * 0.5f), FVector(0.07f, 0.07f, (Z1 - Z0) / 100.f)), true);
+				}
+				for (float Z = L.Bottom + 30.f; Z < L.Top - 5.f; Z += 32.f)
+					Wood->AddInstance(FTransform(Lq, FVector(At2.X, At2.Y, Z), FVector(0.05f, 0.58f, 0.05f)), true);
+				UE_LOG(LogTemp, Log, TEXT("%s FORT LADDER at %.0f %.0f from %.0f up to the walk at %.0f (%.0f cm), facing %.0f"), Tag(), L.Pos.X, L.Pos.Y, L.Bottom, L.Top, L.Top - L.Bottom, Yaw);
+			}
+		}
+	if (!bServer && !bNoMeshes) JeebLanternBrackets::Build(this, LanternHooks, Tag());   // (every hanging lantern on a wall arm or its own lamp post, 2026-11-20)
 	UE_LOG(LogTemp, Log, TEXT("%s new town: %d buildings of %d models (%d rebuilt models), %d glow materials, decor %d pieces in %d sets plus %d single (materials not flagged for instancing), %d missing, %d lantern lights"),
 		Tag(), Placed, Sets.Num(), Rebuilt, GlowMids.Num(), DecorPieces, DecorSets.Num(), DecorPlain, DecorMissing, DecorLights);
 }

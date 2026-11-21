@@ -2,6 +2,7 @@
 #include "SteeleCreek.h"
 #include "Terrain.h"
 #include "TownLabDecor.h"
+#include "LanternBrackets.h"
 #include "TownLabSwaps.h"
 #include "DayNight.h"
 #include "LampLook.h"
@@ -380,6 +381,7 @@ void ASteeleCreekTown::BuildBuildings()
 	TMap<FString, UInstancedStaticMeshComponent*> Solids, DecorSets;
 	TMap<UMaterialInterface*, int32> GlowOf;
 	int32 Placed = 0, DecorPieces = 0, Lights = 0, Missing = 0;
+	TArray<JeebLanternBrackets::FHook> LanternHooks;
 	for (const JeebSteele::FPlot& P : JeebSteele::Plots())
 	{
 		const TCHAR* MeshPath = RebuiltMesh(P.Def.Model);
@@ -476,6 +478,7 @@ void ASteeleCreekTown::BuildBuildings()
 							L->RegisterComponent();
 							LanternLights.Add(L);
 							++Lights;
+							LanternHooks.Add(JeebLanternBrackets::HookOf(PM, PieceXf));
 						}
 					}
 			}
@@ -512,6 +515,7 @@ void ASteeleCreekTown::BuildBuildings()
 		HashIn(Hash, At.X); HashIn(Hash, At.Y); HashIn(Hash, At.Z); HashIn(Hash, P.Yaw); HashIn(Hash, P.Scale);
 		++Placed;
 	}
+	if (!bServer) JeebLanternBrackets::Build(this, LanternHooks, TEXT("JEEBSTEELE"));   // (every hanging lantern on a wall arm or its own lamp post, 2026-11-20)
 	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE %d buildings, %d glow materials, decor %d pieces (%d missing), %d lantern lights"), Placed, GlowMids.Num(), DecorPieces, Missing, Lights);
 }
 

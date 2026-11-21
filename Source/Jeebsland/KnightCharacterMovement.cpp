@@ -23,6 +23,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Terrain.h"
+#include "WarFortLadders.h"
 #include "GrassField.h"
 #include "Canopy.h"
 #include "Pig.h"
@@ -83,6 +84,7 @@ void AKnightCharacter::TryStartClimb()
 		AllLadders.Append(JeebTerrain::Ladders());
 		AllLadders.Append(JeebTerrain::FortLadders());   // rope ladders up to the redwood forts
 		AllLadders.Append(JeebTerrain::CastleLadders());   // and up the castle wall
+		AllLadders.Append(JeebWarFort::Ladders());   // and up to the walks inside Oak Hill's forts (2026-11-20)
 	}
 	for (int32 Pass = 0; Pass < 2; ++Pass)   // (the world's ladders, kept for good; then this map's own, MoveLab's, read fresh so they never outlive it)
 	for (const JeebTerrain::FLadder& L : Pass == 0 ? AllLadders : JeebTerrain::ExtraLadders())

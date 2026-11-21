@@ -1,5 +1,7 @@
 #include "GrassField.h"
 #include "Terrain.h"
+#include "TownLab.h"
+#include "OakHill.h"
 #include "GroundMask.h"
 #include "GroundDecor.h"
 #include "WorldTerrain.h"
@@ -66,7 +68,16 @@ void AGrassField::BuildTerrain()
 		{
 			const float X = -Half + i * Step;
 			const float Y = -Half + j * Step;
-			const float H = JeebTerrain::HeightAt(X, Y);
+			// (its rim follows the 8 m mesh's straight edges where the world's 8 m ground lies beyond, 2026-11-20: no slits on the river banks)
+			const bool bRim = i == 0 || j == 0 || i == N || j == N;
+			const float H = bRim ? JeebTerrain::EdgeVertexZ(X, Y, [Half](float X0, float Y0)
+			{
+				if (X0 >= -Half && X0 + 200.f <= Half && Y0 >= -Half && Y0 + 200.f <= Half) return false;
+				if (JeebTerrain::FineCovers(X0, Y0)) return false;
+				if (JeebOakHill::Enabled() && JeebOakHill::InPatchCell(X0, Y0, 200.f)) return false;
+				if (JeebTownLab::NewOn() && JeebTownLab::InPatchCell(X0, Y0, 200.f)) return false;
+				return true;
+			}) : JeebTerrain::HeightAt(X, Y);
 
 			// Smooth shading: the slope comes from the height function itself
 			const float DHdX = (JeebTerrain::HeightAt(X + Step, Y) - JeebTerrain::HeightAt(X - Step, Y)) / (2.f * Step);

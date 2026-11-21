@@ -255,6 +255,7 @@ namespace JeebTerrain
 	// valleys and channels everywhere (the river runs down through the east side of the original square).
 	constexpr float GroundHalfForBlend = 16000.f;
 	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2, bool bPads = true);
+	float RoadEaseDelta(float X, float Y);   // (RoadSlope.cpp: Oak Hill's roads eased to a walk, 2026-11-20)
 
 	// ------------------------------------------------------------------ building pads
 	// (2026-11-18, owner: "Houses or structures will be half hidden underground because they were placed on hills ... feel free to just
@@ -438,23 +439,46 @@ namespace JeebTerrain
 		for (const FFinePatch& P : FinePatches()) if (X0 >= P.X0 && X0 + Step <= P.X1 && Y0 >= P.Y0 && Y0 + Step <= P.Y1) return true;
 		return false;
 	}
-	// A fine patch's grid point (game cm) as drawn: the true height inside, along its edge the 8 m mesh's own straight edge
-	inline float FineVertexZ(const FFinePatch& P, float X, float Y)
+	// Is the 2 m cell with its low corner at (X0, Y0) drawn by a fine patch?
+	inline bool FineCovers(float X0, float Y0)
 	{
-		const float S = JeebWorld::WorldStep;
-		const bool bEdgeX = FMath::IsNearlyEqual(X, P.X0, 1.f) || FMath::IsNearlyEqual(X, P.X1, 1.f);
-		const bool bEdgeY = FMath::IsNearlyEqual(Y, P.Y0, 1.f) || FMath::IsNearlyEqual(Y, P.Y1, 1.f);
-		if (bEdgeX && !bEdgeY)
+		for (const FFinePatch& Q : FinePatches()) if (X0 >= Q.X0 - 1.f && X0 + FineStep <= Q.X1 + 1.f && Y0 >= Q.Y0 - 1.f && Y0 + FineStep <= Q.Y1 + 1.f) return true;
+		return false;
+	}
+	// Is the 2 m cell at (X0, Y0) the world's 8 m ground, as a fine patch sees it (not the square's own 2 m ground, not a fine patch)?
+	inline bool CoarseBesideFine(float X0, float Y0)
+	{
+		const float Hh = 16000.f;   // (GroundHalf: the original square)
+		if (X0 >= -Hh && X0 + FineStep <= Hh && Y0 >= -Hh && Y0 + FineStep <= Hh) return false;
+		return !FineCovers(X0, Y0);
+	}
+	// A 2 m grid point that may border the world's 8 m mesh (fine patches, the square's ground): its height as drawn. Where any of the
+	// four 2 m cells round it is 8 m ground (bCoarse says which) it takes the 8 m mesh's own straight edge, so the two meet without a
+	// crack; everywhere else (inside, and where two 2 m grounds meet) the true height, the same on both sides. (2026-11-20, owner's river
+	// bank slits: a patch's edge followed the 8 m line even where it met the square's 2 m ground or another patch, which drew the true
+	// bank there, and the two pulled apart into dark slits across the banks.)
+	template <typename FCoarse> inline float EdgeVertexZ(float X, float Y, FCoarse bCoarse)
+	{
+		const float S = JeebWorld::WorldStep, F = FineStep;
+		if (!(bCoarse(X - F, Y - F) || bCoarse(X, Y - F) || bCoarse(X - F, Y) || bCoarse(X, Y))) return HeightAt(X, Y);
+		const float Tx = (X - JeebWorld::MinX) / S, Ty = (Y - JeebWorld::MinY) / S;
+		const bool bOnX = FMath::Abs(Tx - FMath::RoundToFloat(Tx)) * S < 1.f, bOnY = FMath::Abs(Ty - FMath::RoundToFloat(Ty)) * S < 1.f;
+		if (bOnX && !bOnY)
 		{
-			const float V0 = JeebWorld::MinY + FMath::FloorToFloat((Y - JeebWorld::MinY) / S) * S, T = (Y - V0) / S;
-			if (T > 1.e-4f) return FMath::Lerp(HeightAt(X, V0), HeightAt(X, V0 + S), T);
+			const float V0 = JeebWorld::MinY + FMath::FloorToFloat(Ty) * S;
+			return FMath::Lerp(HeightAt(X, V0), HeightAt(X, V0 + S), (Y - V0) / S);
 		}
-		if (bEdgeY && !bEdgeX)
+		if (bOnY && !bOnX)
 		{
-			const float V0 = JeebWorld::MinX + FMath::FloorToFloat((X - JeebWorld::MinX) / S) * S, T = (X - V0) / S;
-			if (T > 1.e-4f) return FMath::Lerp(HeightAt(V0, Y), HeightAt(V0 + S, Y), T);
+			const float V0 = JeebWorld::MinX + FMath::FloorToFloat(Tx) * S;
+			return FMath::Lerp(HeightAt(V0, Y), HeightAt(V0 + S, Y), (X - V0) / S);
 		}
 		return HeightAt(X, Y);
+	}
+	// A fine patch's grid point (game cm) as drawn: the true height inside, along an edge on the 8 m mesh that mesh's own straight edge
+	inline float FineVertexZ(const FFinePatch& P, float X, float Y)
+	{
+		return EdgeVertexZ(X, Y, CoarseBesideFine);
 	}
 	inline float FineMeshHeight(const FFinePatch& P, float X, float Y)
 	{
@@ -490,6 +514,7 @@ namespace JeebTerrain
 		else if (bCap) H = JeebWorld::UnderBankCap(X, Y, H, RiverD);
 		if (bPads && Hills == 2) H = ApplyPads(X, Y, H);   // every building's level pad and doorstep (2026-11-18)
 		if (JeebBridge::InBox(X, Y)) H = JeebBridge::ApplyGround(X, Y, H);   // the bridge's embankments and pier footings (Bridge.cpp)
+		if (bCap && bPads && Hills == 2 && JeebOakHill::Covers(X, Y)) H += RoadEaseDelta(X, Y);   // no road in Oak Hill steeper than a walk (RoadSlope.cpp, 2026-11-20)
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
 

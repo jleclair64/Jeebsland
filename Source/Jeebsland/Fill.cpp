@@ -5,6 +5,7 @@
 #include "TownLabDecor.h"
 #include "TownLabSwaps.h"
 #include "Terrain.h"
+#include "WarFortLadders.h"
 #include "WorldMap.h"
 #include "DayNight.h"
 #include "ResourceNode.h"
@@ -1055,6 +1056,7 @@ struct FFillBuilder
 			Target(TEXT("castle bridge"), C + FVector2D(-(CastleMoatOut + 300.f), 0.f), 1);
 		}
 		for (const FLadder& L : FortLadders()) if (L.Bottom < 0.f) { Keep(FShape::Lane(L.Pos, L.Pos + L.Out * 220.f, 80.f), TEXT("fort ladder")); Target(TEXT("fort ladder"), L.Pos + L.Out * 120.f, 1); }
+		for (const FLadder& L : JeebWarFort::Ladders()) { Keep(FShape::Lane(L.Pos, L.Pos + L.Out * 220.f, 80.f), TEXT("Oak Hill fort ladder")); Target(TEXT("Oak Hill fort ladder"), L.Pos + L.Out * 120.f, 1); }   // (2026-11-20)
 		// the fightable scarecrows (AutumnDecor.cpp; replicated, so a client may not have them yet: their fixed spots)
 		Keep(FShape::Circle(FVector2D(1250.f, 1500.f), 150.f), TEXT("scarecrow"), F_GAME);
 		Keep(FShape::Circle(FVector2D(-1350.f, -1000.f), 150.f), TEXT("scarecrow"), F_GAME);
