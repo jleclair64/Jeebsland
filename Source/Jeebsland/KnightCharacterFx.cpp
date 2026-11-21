@@ -210,7 +210,7 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.92f, 0.95f, 1.0f) * ADayNight::TrailLight);
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
-	const float Life = (bTrailDone ? 0.06f : 0.09f) / Slow;   // how long a bit of the trail lasts (longer in slow motion, shorter once the cut is over)
+	const float Life = (bTrailDone ? 0.03f : 0.045f) / Slow;   // how long a bit of the trail lasts (longer in slow motion, shorter once the cut is over)
 	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
 	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
 	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR && Smash != ESmash::Rebound)
