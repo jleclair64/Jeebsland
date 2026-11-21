@@ -100,8 +100,11 @@ namespace JeebItems
 	// Armour comes in three styles too (2026-11-03), packed the same way (variant = style x 10 + tier): 0 classic (the gold
 	// armour model; every armour id before the styles is classic), 1 light (the crusader tunic: lighter, stops less), 2 heavy
 	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
-	constexpr int32 NumArmourStyles = 3;
-	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy };
+	// 3 Dark Plate (2026-11-21): its own model (/Game/DarkPlate, Tools/BuildDarkPlate.ps1), one colour whatever the tier; the tier still sets its numbers.
+	// Only the Test kit hands it out for now: stores, loot and new characters roll among the first NumRolledArmourStyles.
+	constexpr int32 NumArmourStyles = 4;
+	constexpr int32 NumRolledArmourStyles = 3;
+	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy, AS_Dark };
 	// Light (the tunic) has no shoulder piece (owner, 2026-11-03: its sleeves are part of the chest): a style that has no piece
 	// for a slot is never made; asked for anyway (an old save, a random roll), the Classic piece is made instead.
 	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light); }

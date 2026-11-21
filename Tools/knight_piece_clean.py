@@ -63,7 +63,21 @@ me = o.data; me.transform(wm); o.matrix_world.identity()
 for x in list(bpy.data.objects):
     if x is not o: bpy.data.objects.remove(x)
 bpy.ops.object.select_all(action="DESELECT")
-piece_images = [n.image for n in o.material_slots[0].material.node_tree.nodes if n.type == "TEX_IMAGE" and n.image]
+_nt = o.material_slots[0].material.node_tree
+for _n in _nt.nodes:   # (newer Meshy models name their pictures Image_0, Image_1 and normal: named here as the older ones are, by what each feeds)
+    if _n.type == "TEX_IMAGE" and _n.image and not _n.image.name.startswith("texture_0"):
+        _to = {l.to_node.type for l in _n.outputs[0].links}
+        _n.image.name = "texture_0_metallic_roughness" if "SEPARATE_COLOR" in _to or "SEPARATE_RGB" in _to else "texture_0_normal" if "NORMAL_MAP" in _to else "texture_0"
+piece_images = [n.image for n in _nt.nodes if n.type == "TEX_IMAGE" and n.image]
+if "pre" in opts:
+    # pre=sx,sy,sz[,dx,dy,dz] (2026-11-21, the Dark Plate set): scales and moves a new Meshy piece onto the old piece's frame first, so every later number
+    # (cuts, fits, knee and skirt heights) that was measured on the Classic piece still lands on the same part of the new one.
+    PR = [float(v) for v in opts["pre"].split(",")] + [0.0, 0.0, 0.0]
+    n_pre = np.array([c.vector[:] for c in me.corner_normals])
+    for v in me.vertices: v.co = Vector((v.co.x * PR[0] + PR[3], v.co.y * PR[1] + PR[4], v.co.z * PR[2] + PR[5]))
+    n_pre = n_pre / np.array(PR[:3]); n_pre /= np.maximum(np.linalg.norm(n_pre, axis=1), 1e-12)[:, None]
+    me.update(); me.normals_split_custom_set(n_pre.tolist()); me.update()
+    print("PCL pre: %s" % PR[:6])
 if opts.get("cut") == "helmetloop":
     # The thin loop under the helmet's chin is one mesh with the collar, so it is cut by where it sits, seen from the side:
     # under a line forward of the neck plate (the loop itself), and under a soft curve that takes the collar's front corner off,
@@ -253,6 +267,9 @@ if ARM_FIT:
     RT, RE, RW = np.array([0.327, 0.1, 0.84]), np.array([0.6, 0.06, 0.37]), np.array([0.48, -0.045, -0.34])   # on the piece: the upper tube's top, the elbow, the wrist (the cuff's lower rim)
     KS, KE, KW = np.array([0.244, 0.036, 1.409]), np.array([0.326, 0.057, 1.156]), np.array([0.419, -0.013, 0.935])   # on the knight: shoulder, elbow, wrist joints
     RH = np.array([-0.2, -0.15, -0.97])   # on the piece: the hand's line, from the wrist down
+    if "armpts" in opts:   # (another arm piece: RT, RE, RW, RH and the elbow dome's centre, 15 numbers, on that piece; the Dark Plate set, 2026-11-21)
+        AP = [float(v) for v in opts["armpts"].split(",")]
+        RT, RE, RW, RH = np.array(AP[0:3]), np.array(AP[3:6]), np.array(AP[6:9]), np.array(AP[9:12])
     DISC_C, DISC_IN, DISC_OUT = np.array([0.658, 0.02, 0.356]), 0.17, 0.22   # on the piece: the elbow plate's dome, on a line straight out (+X) through this point; solid out to the first radius, blending by the second. The collar below it is the forearm's: caught in this, it twisted into claws at a full bend
     A_DISC_SHARE = 0.6    # how much of the dome follows the forearm, the rest the upper arm (the point of a real elbow belongs to the forearm)
     A_SCALE = 0.35        # the size of it all, picked against the pictures: the forearm and the elbow plate
@@ -264,6 +281,10 @@ if ARM_FIT:
     A_HAND_ROLL = 40.0    # (degrees) turns the hand on its own line to hang like the knight's: palm to the hip, thumb forward
     A_ELBOW_BLEND, A_WRIST_BLEND = 0.06, 0.06   # (on the piece) over how far the upper arm becomes the forearm, either side of the elbow; and the forearm the hand, below the wrist
     A_BLUNT_R, A_BLUNT_ANGLE, A_BLUNT_OFF, A_BLUNT_ROUNDS = 0.45, 285.0, 0.012, 8   # (on the piece) how far round the elbow points are blunted; what counts as sharp: degrees all round it, how far off its neighbours; at most this many passes
+    if "armpts" in opts: DISC_C = np.array(AP[12:15])
+    if "ascale" in opts: A_SCALE = float(opts["ascale"])
+    if "aroll" in opts: A_HAND_ROLL = float(opts["aroll"])
+    if "ablunt" in opts: A_BLUNT_ROUNDS = int(opts["ablunt"])
     def unit_(v):
         v = np.array(v, dtype=float); return v / np.linalg.norm(v)
     def frame_(a, h):
