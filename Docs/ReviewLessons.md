@@ -426,3 +426,5 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - **Look:** when adding hardware (a bracket) to carry an item, spawn and check the item and its mount together from a clean angle where both show; never an empty or unclear bracket.
 - **Online:** a climb or mantle test asserts that the knight reaches the top, not only that server and client agree.
 - **Movement:** a one-shot exit (hop, mantle, dismount) out of a climb goes wrong online; find the walkable top along the slope and use the normal ledge move, and assert the final position with exactly one grab.
+
+- Package online test (2026-11-21): the Shipping client writes no log, so hashes, corrections and missing-asset warnings cannot be checked on it. Compare hashes with an editor -game client, or build a test package with bUseLoggingInShipping.

@@ -1,32 +1,29 @@
+Add a bridge
+
+Make the tree colors autumn
+
+Redo the shields/wand/staff/broadsword in meshy 
+
+Add a big holland windmill thing from meshy
+
+Need to add a get up attack option so the attacking knight can't just keep swinging on the defending knight 
+
+Wild animals - kill to upgrade attack/archery/etc. Drops food to use for cooking potions. Add a cooking skill. 
+
+For the bosses maybe give them a ton of health but not super hard to kill. How does RuneScape do this?
+
+
+
+Orchestral music that's copyright free
+Sound effects
 
 
 
 
 
-
-
-
-
-Combat
-Make this operate like a fighting game in 3d with low sweep strikes, high or low shield option, slash that we already have, overhead strike. Need to find a fix for the strafing. I think shield always up makes sense but I want the character to move faster while in strafe mode. Can you make the shield health bar glow red once it's been reduces to 0. Maybe make upscroll an overhead attack that can be block by a high shield, down scroll a low sweeping blow that hits under shield but has little range, and if the scroll is pressed down then it's used a potion. Change the weapon switch to "R"
-Run + jump + attack does like a stabbing animation with a little cool down where the knight is vulnerable afterwards
-Run + attack is a stab, let this be able to charge up too
-Be able to charge up a strong attack
-Be able to throw your weapons like spears and swords?
-Add parries from perfect blocks
-
-Do this GitHub account setup to backup and also backup the Accounts and Characters folders in my google drive from time to time
-
-Each class can only use certain weapons, some are shared. Vary their speeds, health, damage output, jump height, climb walls ability? Ninja double jump and can hit crits? Make certain skills increase faster aka the viking gets 20% increase xp for sailing and fishing skill, give them different abilities like the ninja can hit crits and double jump, the wizard can float for a while, etc. Keep the users skills and inventory the same as they change classes, give them the options to switch at the beginning of the game. At the beginning of the game the user can choose where to spawn in at select points on the map, they start with one and have to explore to unlock more. 
-
-Knight (trolls are the enemies) - strong shield sword/spear/bow
-Troll (attacking the knights) - weak wood shield - battle axe/battle hammer/bow
-Wizard (mysterious faction) - defensive crystal ball held in left hand (bubble that follows the character, Winston type of bubble, stand a long flat shield, flat shield that follows the wizard around, etc for a blue shield - wands/staffs
-
-
-Viking
-Pirate
-Ninja
+'-----------------------------------------------------------------
+Tin, Iron, Silver, Gold, Emerald, Diamond
+'-----------------------------------------------------------------
 
 '------------------------------------
  - Game -
@@ -37,13 +34,19 @@ Pass: 64Jeebsland!64
 User: jeebsland@gmail.com
 Pass: 64Jeebsland!64
 
-
+- Meshy API Key-
+msy_9LVPmgfQCHp5TyM7lgXzWQfpmWGFZqtE4pDU
 '------------------------------------
 
 
 
 rewrite the lore to invoke lord of the flies, red rising, count of monte cristo, harry potter, lord of the rings, game of thrones themes/vibes. I want a plot line that can be played and invokes the same sense of injustice, and rage that I got from red rising. For future reference, I want this game to be online, so we'll have to find a way to add a main storyline in while allowing everyone to play it at different points. Take this lightly, just an idea, but maybe like how destiny or no mans sky did it. 
 
+
+tree with a face on it
+Viking
+Pirate (add climbing? Mantling?)
+Ninja
 friendly army
 Enemy army
 battles
@@ -65,6 +68,7 @@ wands
 mountains
 NPS
 Lore
+Ships
 Dark lore
 Graphics updates
 Dungeins
