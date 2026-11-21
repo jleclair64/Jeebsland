@@ -108,7 +108,7 @@ void AKnightHUD::DrawHUD()
 				if (Lines.Num() > 0 && Best->ShownCount() > 1) Lines[0] += FString::Printf(TEXT("  x%d"), Best->ShownCount());
 			}
 			else if (Best->GetIngots() > 0) Lines = { TEXT("Ingots"), FString::Printf(TEXT("%d ingots"), Best->GetIngots()) };
-			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f) * UnderTitle(SP.Y));   // fades in over the last metre
+			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f) * UnderTitle(SP.Y), Best->ShownId());   // fades in over the last metre
 		}
 	}
 
@@ -518,7 +518,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		HDText(FString::Printf(TEXT("%d"), i + 1), bSel ? FLinearColor(1.f, 0.9f, 0.5f) : FLinearColor(0.88f, 0.88f, 0.88f), Sx + 4.f, Sy + 1.f, Font, bSel ? 1.05f : 0.9f);   // (the key that takes it in hand)
 		if (Id == 0) { if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.25f); }); continue; }
 		// (every weapon icon leans the same way everywhere: see DrawIcon)
-		DrawIcon(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f);
+		DrawIconIn(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f, X, Y0, SS, SS);
 		if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.30f); });   // dim the ones not in hand
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
@@ -575,7 +575,7 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const bool bNoShield = HandId != 0 && IsGear(HandId) && !AllowsShield(KindOf(HandId));
 		if (ShieldId != 0)
 		{
-			if (!(DragKind == 7 && bDragging)) DrawIcon(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f);
+			if (!(DragKind == 7 && bDragging)) DrawIconIn(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f, X, Y0, SS, SS);
 			if (bNoShield) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.10f, 0.10f, 0.12f, 0.62f); });   // (the icon shows through at about 40%, drained of colour)
 		}
 		else

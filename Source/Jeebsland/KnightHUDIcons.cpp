@@ -183,21 +183,27 @@ void AKnightHUD::DrawIcon(int32 Id, float X, float Y, float S)
 		IconTiltDeg = K == K_Rod ? -9.f : K == K_Wand ? 0.f : K == K_Staff ? 12.f : 35.f;
 		IconPivot = FVector2D(X + S * 0.5f, Y + S * 0.5f);
 	}
-	const int32 Cls = IsGear(Id) ? KindClass(KindOf(Id)) : 0;
-	if (Cls != 0 && IconRim <= 0.f)
-	{
-		const FLinearColor Rim = ClassColor(Cls);
-		IconRimCol = Rim;
-		IconRim = FMath::Clamp(S * 0.045f, 1.6f, 4.f);
-		DrawIconBody(Id, X, Y, S);
-		IconRimCol = FLinearColor(0.03f, 0.02f, 0.01f, 1.f);
-		IconRim = FMath::Clamp(S * 0.012f, 0.6f, 1.2f);
-		DrawIconBody(Id, X, Y, S);
-		IconRim = 0.f;
-	}
 	DrawIconBody(Id, X, Y, S);
 	IconTiltDeg = SavedTilt;
 	IconPivot = SavedPivot;
+}
+
+// (owner 2026-11-20: the class colour goes round the outside of the slot, not round the item) A square frame, three pixels, in
+// the class colour of a piece of class gear, round the cell X,Y,W,H.
+void AKnightHUD::ClassFrame(int32 Id, float X, float Y, float W, float H)
+{
+	const int32 Cls = IsGear(Id) ? KindClass(KindOf(Id)) : 0;
+	if (Cls == 0) return;
+	const FLinearColor C = ClassColor(Cls);
+	const float T = 3.f;
+	DrawRect(C, X, Y, W, T); DrawRect(C, X, Y + H - T, W, T);
+	DrawRect(C, X, Y + T, T, H - 2.f * T); DrawRect(C, X + W - T, Y + T, T, H - 2.f * T);
+}
+
+void AKnightHUD::DrawIconIn(int32 Id, float X, float Y, float S, float CX, float CY, float CW, float CH)
+{
+	DrawIcon(Id, X, Y, S);
+	ClassFrame(Id, CX, CY, CW, CH);
 }
 
 // The crystal and orb colour of a wand or staff of each tier, chosen to tell the six apart at icon size (tin and silver's gem

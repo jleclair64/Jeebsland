@@ -19,7 +19,7 @@
 static TAutoConsoleVariable<int32> CVarShopCamOn(TEXT("jeeb.ShopCam.On"), 1, TEXT("The shop camera: 1 your view eases in to the keeper while you trade, 0 off."));
 static TAutoConsoleVariable<float> CVarShopCamDist(TEXT("jeeb.ShopCam.Dist"), 260.f, TEXT("Shop camera: how far from the keeper's face (cm)."));
 static TAutoConsoleVariable<float> CVarShopCamHeight(TEXT("jeeb.ShopCam.Height"), 8.f, TEXT("Shop camera: how far above the keeper's eyes (cm; negative looks up at them)."));
-static TAutoConsoleVariable<float> CVarShopCamSide(TEXT("jeeb.ShopCam.Side"), -60.f, TEXT("Shop camera: how far right of the picture's middle the keeper stands (cm at their distance; negative: left)."));
+static TAutoConsoleVariable<float> CVarShopCamSide(TEXT("jeeb.ShopCam.Side"), -90.f, TEXT("Shop camera: how far right of the picture's middle the keeper stands (cm at their distance; negative: left)."));
 static TAutoConsoleVariable<float> CVarShopCamTime(TEXT("jeeb.ShopCam.Time"), 0.5f, TEXT("Shop camera: seconds to ease in, and out again."));
 static TAutoConsoleVariable<float> CVarShopCamFov(TEXT("jeeb.ShopCam.Fov"), 55.f, TEXT("Shop camera: the field of view while framing the keeper (degrees)."));
 

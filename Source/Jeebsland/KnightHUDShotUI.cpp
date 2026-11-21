@@ -139,6 +139,8 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 		UIMouseX = 860.f; UIMouseY = 120.f;
 		ItemTip(GearId(K_Bow, 1)); DrawTip();
 		TipLines.Reset();
+		DrawLinesAt({ TEXT("Iron Arrows  x7"), TEXT("Fired from a bow. Bow damage with these: 10-12") }, 1100.f, 330.f, 1.f, ArrowId(1));   // (the ground label with its icon)
+		DrawLinesAt({ TEXT("Wizard Staff") }, 1100.f, 560.f, 1.f, GearId(K_Staff, 3));
 		bUIHaveMouse = bHad; UIMouseX = MX; UIMouseY = MY;
 	}
 	if (!bShotUITaken && Now - First - ShotUIStage * Each > Snap)
