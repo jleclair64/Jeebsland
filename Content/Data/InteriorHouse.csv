@@ -8,12 +8,12 @@ ROOM,-455,-315,0,,,,495,230,270
 /Game/Medieval_Tavern/Meshes/Modular/SM_Floor_002,-455,230,-7,0,0,0,0.95,0.545,1,1,1
 /Game/Medieval_Tavern/Meshes/Modular/SM_Floor_002,-455,-315,280,0,0,180,0.95,0.545,1,1,1
 # --- walls: plaster over a timber wainscot, the painted side into the room; 270 high
-# front (door side): left of the door, right of the door, over the door
+# front (door side): left of the door, right of the door, over the door (the lintel 1 cm in front of the walls beside it and 4 cm down over the doorway lining and wider: no flicker where they met)
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-455,242.5,0,0,0,0,1.015,0.5,0.9,1,1
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-252,242.5,0,0,0,0,1.015,0.5,0.9,1,1
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,103,242.5,0,0,0,0,0.98,0.5,0.9,1,1
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,299,242.5,0,0,0,0,0.98,0.5,0.9,1,1
-/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-49,242.5,226,0,0,0,0.76,0.5,0.147,0,1
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-53,241.5,222,0,0,0,0.79,0.5,0.16,0,1
 # back
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,495,-327.5,0,180,0,0,0.95,0.5,0.9,1,1
 /Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,305,-327.5,0,180,0,0,0.95,0.5,0.9,1,1
@@ -37,11 +37,11 @@ ROOM,-455,-315,0,,,,495,230,270
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,-305,0,0,0,0,1,1,0.9,0,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-445,220,0,0,0,0,1,1,0.9,0,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,220,0,0,0,0,1,1,0.9,0,0
-# --- the hearth (west end, under the chimney): a stone back and two stone cheeks (TownDecor wall stone), a timber mantle, logs and fire
+# --- the hearth (west end, under the chimney): a stone back (TownDecor wall stone), two timber jambs (the tavern beam: every stone piece cut short stretched its ends into zigzags), a timber mantle, logs and fire
 /Game/TownDecor/SM_WallStone,-436,-50,0,90,0,0,1,0.5,1.05,1,0
 /Game/TownDecor/SM_WallStone,-445,-50,124,90,0,0,0.75,0.35,1.25,0,0
-/Game/TownDecor/SM_WallStone,-398,-130,0,0,0,0,0.5,0.5,1,1,0
-/Game/TownDecor/SM_WallStone,-398,30,0,0,0,0,0.5,0.5,1,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,-130,0,0,0,0,3.5,2,0.42,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,30,0,0,0,0,3.5,2,0.42,1,0
 /Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,-350,-150,126,90,-90,0,1.3,1.3,1,0,0
 /Game/TownDecor/SM_Firewood,-385,-50,0,90,0,0,0.7,0.7,0.7,0,0
 /Game/TownDecor/SM_TorchBlazingFlame,-385,-50,-40,0,0,0,0.75,0.75,0.75,0,0

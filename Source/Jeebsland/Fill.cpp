@@ -2790,10 +2790,15 @@ struct FFillBuilder
 				++Count;
 				UPointLightComponent* L = NewObject<UPointLightComponent>(Owner);
 				L->SetupAttachment(Root);
-				L->SetWorldLocation(P.Xf.GetLocation() + FVector(0.f, 0.f, P.Kind->Height * P.Xf.GetScale3D().Z - 35.f));
+				// (the village well, 2026-11-21 owner: "the whole well lights up": its light hung under the roof's middle, shadowless, and lit
+				// the roof, posts and stones all round. Now it sits in the lantern on the post (SM_WellVillage's Glow faces, about -125 0 180
+				// in its own frame), dimmer and shorter, so only the lantern and the post beside it glow)
+				const bool bWell = P.Kind->Name == TEXT("WellVillage");
+				L->SetWorldLocation(bWell ? P.Xf.TransformPosition(FVector(-128.f, 0.f, 182.f)) : P.Xf.GetLocation() + FVector(0.f, 0.f, P.Kind->Height * P.Xf.GetScale3D().Z - 35.f));
 				L->SetIntensityUnits(ELightUnits::Lumens);
-				L->SetIntensity(100.f);
-				L->SetAttenuationRadius(380.f);
+				L->SetIntensity(bWell ? 40.f : 100.f);
+				L->SetAttenuationRadius(bWell ? 200.f : 380.f);
+				if (bWell) UE_LOG(LogTemp, Log, TEXT("JEEBFILL well %s at %s yaw %.0f, its lantern light at %s"), *P.Kind->Name, *P.Xf.GetLocation().ToCompactString(), P.Xf.Rotator().Yaw, *L->GetComponentLocation().ToCompactString());
 				JeebLamp::TrackLight(L);
 				L->SetCastShadows(false);
 				L->MaxDrawDistance = 4000.f;
@@ -3010,5 +3015,5 @@ void AWorldFill::UpdateLights()
 	const float Dk = ADayNight::Dusk;
 	if (FMath::Abs(Dk - LastDusk) < 0.01f) return;
 	LastDusk = Dk;
-	for (UPointLightComponent* L : Lights) if (L) L->SetIntensity(100.f * FMath::Lerp(0.15f, 1.f, Dk));
+	for (UPointLightComponent* L : Lights) if (L) L->SetIntensity((L->AttenuationRadius < 300.f ? 40.f : 100.f) * FMath::Lerp(0.15f, 1.f, Dk));   // (the well's lantern: 40, short reach)
 }
