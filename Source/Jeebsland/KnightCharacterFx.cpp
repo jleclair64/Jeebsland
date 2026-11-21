@@ -192,6 +192,16 @@ void AKnightCharacter::TickDust(float Dt, bool bFalling, bool bSpecial, float S,
 // The wind trail behind a sword cut (BotW style). Every frame of a sword slash the blade's middle and tip are noted; the last
 // moments of that path are drawn as a soft ribbon (material M_SwordTrail), smoothed between frames, fading with age and only
 // where the blade was really moving (a slow wind-up leaves no smear). Purely visual: each machine draws its own.
+// (2026-11-21 overhaul, owner: "the white sword trail can be seen completely in one swing"; Zelda BotW / Skyward Sword look.)
+// Films at 120 fps showed the ring is real ribbon, not TSR smear (same with r.AntiAliasingMethod 0): the tip moves up to 76 m/s,
+// so even 0.045 s of path is ~3 m, most of a circle. The trail is now cut by the tip's PATH LENGTH (a short arc hugging the
+// blade), tapers thick at the blade to a point at its tail, and each bit also dies by age. Live settings below.
+static TAutoConsoleVariable<float> CVarTrailLength(TEXT("jeeb.Trail.Length"), 110.f, TEXT("Sword trail: longest arc of the tip's path shown, cm (about a quarter swing at 110)."));
+static TAutoConsoleVariable<float> CVarTrailFade(TEXT("jeeb.Trail.Fade"), 0.12f, TEXT("Sword trail: seconds a bit of the trail lasts before it is gone (fades from the tail)."));
+static TAutoConsoleVariable<float> CVarTrailWidth(TEXT("jeeb.Trail.Width"), 16.f, TEXT("Sword trail: width at the blade, cm (tapers to nothing at the tail)."));
+static TAutoConsoleVariable<float> CVarTrailBright(TEXT("jeeb.Trail.Bright"), 1.1f, TEXT("Sword trail: brightness (0.5 = the old soft wisp; above 1 a slight glow)."));
+static TAutoConsoleVariable<float> CVarTrailOpacity(TEXT("jeeb.Trail.Opacity"), 0.85f, TEXT("Sword trail: opacity in its core (0.55 = the old wisp)."));
+
 void AKnightCharacter::TickSwordTrail(float Dt)
 {
 	if (IsNetMode(NM_DedicatedServer)) return;
@@ -207,10 +217,16 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		if (UMaterialInterface* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SwordTrail.M_SwordTrail"))) SwordTrail->CreateDynamicMaterialInstance(0, M);
 	}
 	if (UMaterialInstanceDynamic* D = Cast<UMaterialInstanceDynamic>(SwordTrail->GetMaterial(0)))   // (dimmer and warmer in the low sun)
-		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.92f, 0.95f, 1.0f) * ADayNight::TrailLight);
+	{
+		D->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.96f, 0.98f, 1.0f) * ADayNight::TrailLight);
+		D->SetScalarParameterValue(TEXT("Bright"), CVarTrailBright.GetValueOnGameThread());
+		D->SetScalarParameterValue(TEXT("Opacity"), CVarTrailOpacity.GetValueOnGameThread());
+	}
 	const float Now = GetWorld()->GetTimeSeconds();
 	const float Slow = SwingSpeedScale();
-	const float Life = (bTrailDone ? 0.03f : 0.045f) / Slow;   // how long a bit of the trail lasts (longer in slow motion, shorter once the cut is over)
+	const float Life = FMath::Max(CVarTrailFade.GetValueOnGameThread(), 0.01f) / Slow;   // how long a bit of the trail lasts (longer in slow motion)
+	const float MaxLen = FMath::Max(CVarTrailLength.GetValueOnGameThread(), 5.f);
+	const float Wide = FMath::Max(CVarTrailWidth.GetValueOnGameThread(), 1.f);
 	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
 	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
 	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR && Smash != ESmash::Rebound)
@@ -255,6 +271,12 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 	}
 	else bTrailPrev = false;
 	TrailSamples.RemoveAll([&](const FTrailSample& S) { return Now - S.Time > Life; });
+	// Keep only the newest MaxLen of tip path (plus one sample past it, cut off smoothly below)
+	{
+		float L = 0.f; int32 Keep = 0;
+		for (int32 i = TrailSamples.Num() - 1; i > 0; --i) { L += FVector::Dist(TrailSamples[i].Out, TrailSamples[i - 1].Out); if (L > MaxLen) { Keep = i - 1; break; } }
+		if (Keep > 0) TrailSamples.RemoveAt(0, Keep);
+	}
 	if (TrailSamples.Num() < 2) { if (SwordTrail->GetNumSections() > 0) SwordTrail->ClearAllMeshSections(); return; }
 
 	// Centripetal Catmull-Rom keeps the wisp smooth without overshooting at sharp turns or doubled end points.
@@ -288,9 +310,25 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 		{
 			const float T = float(s) / Steps;
 			const float Age = FMath::Clamp((Now - FMath::Lerp(B.Time, C.Time, T)) / Life, 0.f, 1.f);
-			const float Alpha = FMath::Lerp(B.Strength, C.Strength, T) * FMath::Pow(1.f - Age, 1.5f);
+			const float Alpha = FMath::Lerp(B.Strength, C.Strength, T) * FMath::Pow(1.f - Age, 1.2f);
 			V.Add(CR(A.In, B.In, C.In, D.In, T));   UV.Add(FVector2D(Age, 0.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
 			V.Add(CR(A.Out, B.Out, C.Out, D.Out, T)); UV.Add(FVector2D(Age, 1.f)); Col.Add(FLinearColor(1.f, 1.f, 1.f, Alpha));
+		}
+	}
+	// Taper (Zelda style): full width and strength at the blade, narrowing to a point and fading out at the tail, the far end cut at
+	// MaxLen of tip path. Width is laid inward from the tip's own path so the arc hugs the blade's tip.
+	{
+		const int32 Pairs = V.Num() / 2;
+		float L = 0.f;
+		for (int32 p = Pairs - 1; p >= 0; --p)
+		{
+			if (p < Pairs - 1) L += FVector::Dist(V[2 * p + 1], V[2 * p + 3]);
+			const float U = FMath::Clamp(L / MaxLen, 0.f, 1.f);   // 0 at the blade, 1 at the tail
+			const float W = Wide * FMath::Pow(1.f - U, 0.8f);
+			const FVector Tip = V[2 * p + 1];
+			V[2 * p] = Tip + (V[2 * p] - Tip).GetSafeNormal() * W;
+			const float K = 1.f - FMath::SmoothStep(0.45f, 1.f, U);
+			Col[2 * p].A *= K; Col[2 * p + 1].A *= K;
 		}
 	}
 	// (2026-11-16, owner: "the pickaxe appears in multiple places") Where the ribbon is seen edge-on (a chop in a plane running away
