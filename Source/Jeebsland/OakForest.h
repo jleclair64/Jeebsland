@@ -73,42 +73,22 @@ private:
 	TArray<bool> DrawnIsTree;
 	TArray<bool> DrawnShadow;                                    // (whether that set casts its own shadow, before jeeb.Forest.Shadows: not the trees)
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> Solids;   // (hidden collision: trunks, logs, stumps, rocks)
-	// The trees' shadows (2026-11-16: thousands of leafy trees in every shadow cascade cost 7 ms): the drawn trees cast none; each tree set
-	// has a hidden twin that casts the shadows of just the trees within jeeb.Forest.ShadowReach of the camera, refilled as the camera moves
-	UPROPERTY() TArray<UInstancedStaticMeshComponent*> ShadowSets;
+	// The trees' shadows (2026-11-16: thousands of leafy trees in every shadow cascade cost 7 ms): the drawn trees cast none. A cheap hidden
+	// stand-in per tree (a plain see-through crown and a trunk, about a hundred triangles, in M_TreeShade) casts its shadow instead, for
+	// the trees within jeeb.Forest.FarShadeReach of the camera, refilled as the camera moves. (Until 2026-11-21 the trees within 20 m
+	// cast their own leafy shadows from hidden twins, with a faded hand-over to the stand-ins; the owner had them taken out)
 	TArray<TArray<FTransform>> ShadowAll;                        // (each tree set's instances)
-	TMap<FIntPoint, TArray<FIntPoint>> ShadowCells;              // (20 m cells: set and instance)
-	TArray<uint32> ShadowHash;                                   // (what each twin holds now)
-	FVector2D ShadowAt = FVector2D(1.0e9f, 1.0e9f);
-	// Past jeeb.Forest.ShadowReach (2026-11-16, owner: far trees and the ground under them looked too bright, then went dark as he came
-	// closer): a cheap hidden stand-in per tree (a plain crown and trunk, about a hundred triangles) casts its shadow out to
-	// jeeb.Forest.FarShadeReach, so the far forest is shaded like the near one at every time of day
+	TMap<FIntPoint, TArray<FIntPoint>> ShadowCells;              // (20 m cells: tree set and instance)
 	UPROPERTY() TArray<UInstancedStaticMeshComponent*> ShadeSets;   // (one per tree kind)
-	TArray<int32> ShadeOfTwin;                                   // (each shadow twin's stand-in set)
+	TArray<int32> ShadeOfTwin;                                   // (each tree set's stand-in set)
 	TArray<int32> ShadeKind;                                     // (each stand-in set's tree kind)
 	TArray<FBox> ShadeBounds;                                    // (and that tree mesh's bounds at scale 1)
 	uint32 ShadeHash = 0u;
 	float ShadeSizeNow = -1.f;
 	FVector2D ShadeAt = FVector2D(1.0e9f, 1.0e9f);
-	// The soft hand-over (2026-11-17, owner: the near shadows "blink"; jeeb.Forest.ShadowFade): near the reach's edge each tree's stand-in
-	// comes from these sets instead, in M_TreeShade, which grows it over the swap of the leafy twin and then fades it out inside the reach
-	UPROPERTY() TArray<UInstancedStaticMeshComponent*> BandSets; // (one per tree kind, as ShadeSets)
-	UPROPERTY() TArray<UMaterialInstanceDynamic*> BandMids;      // (one per tree kind: its crown's middle differs)
-	TArray<FVector> ShadeAnchor;                                 // (each kind's stand-in crown middle, in the mesh's own frame)
-	uint32 BandHash = 0u;
-	FVector CamNow = FVector::ZeroVector;
-	bool bBandOn = false;
-	float BandParams[5] = { -1.f, -1.f, -1.f, -1.f, -1.f };     // (what the band materials were last given)
-	// (2026-11-18: the far stand-ins' material, see-through as the band's, jeeb.Forest.ShadeDensity; and each twin's trees inside the fade,
-	// kept last in the set with their own transforms, shrunk into their crowns as the camera moves away, jeeb.Forest.TwinShrink)
-	UPROPERTY() UMaterialInstanceDynamic* FarMid = nullptr;
-	float DensityNow = -1.f;
-	TArray<int32> TwinRingStart;
-	TArray<TArray<FTransform>> TwinRing;
-	FVector TwinShrunkAt = FVector(1.0e9f);
-	void ShrinkTwins(const FVector& Cam, float Lo, float Hand);
+	UPROPERTY() UMaterialInstanceDynamic* ShadeMid = nullptr;    // (the stand-ins' material: jeeb.Forest.ShadeDensity, jeeb.Forest.Dapple)
+	float DensityNow = -1.f, DappleNow = -1.f;
 	bool CameraNow(FVector& Out) const;
-	void UpdateBandFade();
 	void BuildShadeMeshes();
 	void UpdateShadows(bool bForce);
 	void ApplyReach();
@@ -127,7 +107,7 @@ private:
 	struct FFellable
 	{
 		int32 Key = -1, KeyIndex = -1;     // (its visual set's key, kind * 4 + colour, and its place in it, while building)
-		int32 Drawn = -1, Shadow = -1;     // (its drawn set and shadow twin; -1 on the server)
+		int32 Drawn = -1, Shadow = -1;     // (its drawn set and its place in ShadowAll; -1 on the server)
 		int32 Trunk = -1;                  // (its instance in the trunk solids)
 		FTransform Tree, TrunkSolid;
 		float Radius = 20.f;

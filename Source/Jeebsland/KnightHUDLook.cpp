@@ -110,8 +110,6 @@ namespace
 		{ 6, TEXT("All autumn trees: colourfulness (1 = the sliders)"), TEXT("jeeb.Trees.Saturation"), EK::Float, 0, 0.f, 1.5f, false, NoDef },
 		{ 6, TEXT("Fallen leaves: brightness"), TEXT("jeeb.Leaves.Brightness"), EK::Float, 0, 0.1f, 1.5f, false, NoDef },
 		{ 6, TEXT("Lamps: glass glow"), TEXT("jeeb.Lamp.Glow"), EK::Float, 0, 0.f, 3.f, false, NoDef },
-		{ 6, TEXT("Close-up leafy tree shadows (right on, left off)"), TEXT("jeeb.Forest.NearShadows"), EK::Float, 0, 0.f, 1.f, false, NoDef },
-		{ 6, TEXT("Spruces: simpler models sooner (1 pack, 2 faster)"), TEXT("jeeb.Forest.SpruceLod"), EK::Float, 0, 0.5f, 3.f, false, NoDef },
 		{ 0, TEXT("LOW setting: brightness change (stops)"), TEXT("jeeb.Look.LowTrim"), EK::Float, 0, -1.f, 0.5f, false, NoDef },
 		{ 5, TEXT("Ground past the grass: red"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 0, 0.3f, 1.2f, false, NoDef },
 		{ 5, TEXT("Ground past the grass: green"), TEXT("jeeb.Ground.FarTint"), EK::Comp, 1, 0.3f, 1.2f, false, NoDef },

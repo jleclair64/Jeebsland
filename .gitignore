@@ -50,6 +50,8 @@ Content/PN_OpenWorldFoliage/
 Content/PN_interactiveSpruceForest/
 Content/DZ_Assets/
 Content/Megaplant_Library/
+# the Spruce Forest pack's colour textures with the cones repainted (2026-11-21): made on each machine by Tools/BuildSpruceCones.ps1
+Content/TreeGroves/SpruceCones/
 
 # Meshy library originals of the shields and world props (2026-11-16; links in Art/Props/Sources.md, Art/WorldProps/Sources.md)
 Art/Props/Originals/

@@ -228,12 +228,12 @@ namespace
 		const FLinearColor Sp = SpruceTint();
 		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
 		{
-			UMaterialInterface* M = C->GetMaterial(i);
+			UMaterialInterface* M = JeebTreeLook::ConeLeaf(C->GetMaterial(i));   // (a needle material: its copy with the dark cones)
 			const TCHAR* Param = M ? SpruceParam(M->GetName()) : nullptr;
 			if (!Param) continue;
 			UMaterialInstanceDynamic* D = nullptr;
 			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GSpruceMids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
-			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); GSpruceMids.Add(D); }
+			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); GSpruceMids.Add(D); }
 			C->SetMaterial(i, D);
 			++Done;
 		}

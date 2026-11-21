@@ -654,16 +654,42 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_textures
 
 
-# The forest's stand-in shadow casters (OakForest.cpp, jeeb.Forest.ShadowFade; owner 2026-11-17: the near trees' shadows "blink" as
-# they swap): near the camera a stand-in fades out over FadeIn..FadeIn+FadeWidth (flat distance from FadeCenter, the camera, to the
-# tree's foot) by dropping a growing share of its shadow-map texels (screen noise, so the sun's soft-shadow filter and TSR turn it
-# into a partial shade), and grows to GrowK times its built size at GrowFrom, back to 1 by GrowFrom+GrowWidth (about Anchor, the
-# crown's middle in the mesh's own frame), so it covers the real tree's leafy shadow while that one is swapped in or out.
-# (2026-11-18) D: the stand-in's density, a fixed noise in world-space cells of C cm on the stand-in itself, so it casts a see-through
-# shade about as dark as a real leafy crown's (a solid one was far darker) and keeps still; the far stand-ins use it too, unfaded
-SHADE_FADE_HLSL = ("float n = frac(52.9829189 * frac(dot(Parameters.SvPosition.xy + float(View.StateFrameIndexMod8) * float2(2.083, 4.867), "
-                   "float2(0.06711056, 0.00583715))));\nfloat3 c = floor(W / max(C, 1.0));\n"
-                   "float s = frac(sin(dot(c, float3(12.9898, 78.233, 37.719))) * 43758.5453);\nreturn (n < F && s < D) ? 1.0 : 0.0;")
+# The forest's stand-in shadow casters (OakForest.cpp): a hidden egg (or cone) and trunk per tree that only ever casts a shadow.
+# D: its density, the share of its surface that is kept, so it casts a see-through shade about as dark as a real leafy crown's (a solid
+# one was far darker; 2026-11-18). The holes are fixed in the world, on the stand-in itself, so the shade keeps still.
+# (2026-11-21, owner: the leafy close-up shadows and their hand-over went; "any cheap way to imitate the good shadow look") S: the holes
+# are soft blobs about S cm wide with smaller ones mixed in (three octaves of value noise, cut at the level that keeps the share D), so the sun comes through in
+# flecks and the shade's edge is ragged, most of all near the rim, where a ray crosses the shell twice at nearly the same place. The same
+# at every distance: nothing is handed over. S 0: the fine even 20 cm grain used until then (a flat grey shade).
+# (Until 2026-11-21 it also faded out by distance from the camera, through screen noise, and grew by world position offset, for the
+# hand-over to the leafy shadows: FadeIn, FadeWidth, FadeCenter, GrowK, GrowFrom, GrowWidth, Anchor. All gone.)
+SHADE_HLSL = """if (D >= 0.999) return 1.0;
+if (S < 1.0)
+{
+    float3 c = floor(W / 20.0);
+    return frac(sin(dot(c, float3(12.9898, 78.233, 37.719))) * 43758.5453) < D ? 1.0 : 0.0;
+}
+float3 p = W / S;
+float acc = 0.0, amp = 1.0;
+for (int oct = 0; oct < 3; oct++)
+{
+    float3 i = floor(p), f = frac(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float v = 0.0;
+    for (int k = 0; k < 8; k++)
+    {
+        float3 o = float3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        float3 q = frac((i + o) * float3(0.1031, 0.1030, 0.0973));
+        q += dot(q, q.yxz + 33.33);
+        float3 w = lerp(1.0 - f, f, o);
+        v += frac((q.x + q.y) * q.z) * w.x * w.y * w.z;
+    }
+    acc += v * amp;
+    amp *= 0.55;
+    p = p * 2.43 + 17.3;
+}
+float t = 0.5 + 0.124 * log(max(D, 0.001) / max(1.0 - D, 0.001)) / 1.702;
+return (acc / 1.8525) < t ? 1.0 : 0.0;"""
 
 
 def build_tree_shade():
@@ -671,52 +697,25 @@ def build_tree_shade():
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_MASKED)
     set_flags(mat, ("used_with_instanced_static_meshes",))
     g = Graph(mat)
-    foot = g.node(unreal.MaterialExpressionObjectPositionWS)   # (an instance's own origin: the tree's foot)
-    d = g.node(unreal.MaterialExpressionDistance)
-    g.link(g.mask(foot, True, True), d, "A"); g.link(g.mask(g.vector("FadeCenter", (0.0, 0.0, 0.0)), True, True), d, "B")
-
-    def ramp(start, width):   # saturate((d - start) / width)
-        into = g.node(unreal.MaterialExpressionSubtract); g.link(d, into, "A"); g.link(start, into, "B")
-        over = g.node(unreal.MaterialExpressionDivide); g.link(into, over, "A"); g.link(width, over, "B")
-        return g.one(unreal.MaterialExpressionSaturate, over)
-    # the share of texels kept: none inside FadeIn, all past FadeIn + FadeWidth
     c = g.node(unreal.MaterialExpressionCustom)
-    c.set_editor_property("code", SHADE_FADE_HLSL)
+    c.set_editor_property("code", SHADE_HLSL)
     c.set_editor_property("output_type", unreal.CustomMaterialOutputType.CMOT_FLOAT1)
-    c.set_editor_property("description", "ShadeFade")
+    c.set_editor_property("description", "ShadeHoles")
     ins = []
-    for nm in ("F", "W", "C", "D"):
+    for nm in ("W", "D", "S"):
         ci = unreal.CustomInput()
         ci.set_editor_property("input_name", nm)
         ins.append(ci)
     c.set_editor_property("inputs", ins)
     g.link(g.node(unreal.MaterialExpressionWorldPosition), c, "W")
-    g.link(g.scalar("Cell", 20.0), c, "C")
     # the density, but the trunk (UV x 1, MakeShadeMesh) stays solid, as a real trunk's shadow is
     dens = g.node(unreal.MaterialExpressionMax)
-    g.link(g.scalar("Density", 1.0), dens, "A"); g.link(g.mask(g.node(unreal.MaterialExpressionTextureCoordinate), True, False), dens, "B")
+    g.link(g.scalar("Density", 0.6), dens, "A"); g.link(g.mask(g.node(unreal.MaterialExpressionTextureCoordinate), True, False), dens, "B")
     g.link(dens, c, "D")
-    # (worked out per vertex, where the instance's own origin is certain, and handed on to the pixels)
-    keep = ramp(g.scalar("FadeIn", 1000.0), g.scalar("FadeWidth", 600.0))
-    vi = g.node(unreal.MaterialExpressionVertexInterpolator)
-    if lib.connect_material_expressions(keep, "", vi, "VS"):
-        keep = vi
-    else:
-        unreal.log("MATDIAG tree shade: per-pixel fade (no vertex interpolator pin)")
-    g.link(keep, c, "F")
+    g.link(g.scalar("Dapple", 70.0), c, "S")
     g.out(c, unreal.MaterialProperty.MP_OPACITY_MASK)
     mat.set_editor_property("opacity_mask_clip_value", 0.5)
     g.out(g.const3((0.2, 0.3, 0.15)), unreal.MaterialProperty.MP_BASE_COLOR)   # (never seen: it only casts)
-    # grow: offset = (local position - Anchor), turned into world space, x (k - 1); k = GrowK up to GrowFrom, easing to 1 by GrowFrom + GrowWidth
-    rel = g.node(unreal.MaterialExpressionSubtract)
-    g.link(g.node(unreal.MaterialExpressionPreSkinnedPosition), rel, "A"); g.link(g.vector("Anchor", (0.0, 0.0, 500.0)), rel, "B")
-    tw = g.node(unreal.MaterialExpressionTransform)
-    tw.set_editor_property("transform_source_type", unreal.MaterialVectorCoordTransformSource.TRANSFORMSOURCE_LOCAL)
-    tw.set_editor_property("transform_type", unreal.MaterialVectorCoordTransform.TRANSFORM_WORLD)
-    g.link(rel, tw, "")
-    extra = g.node(unreal.MaterialExpressionSubtract, const_b=1.0); g.link(g.scalar("GrowK", 1.0), extra, "A")
-    k1 = g.muln(extra, g.one(unreal.MaterialExpressionOneMinus, ramp(g.scalar("GrowFrom", 1600.0), g.scalar("GrowWidth", 1600.0))))
-    g.out(g.muln(tw, k1), unreal.MaterialProperty.MP_WORLD_POSITION_OFFSET)
     finish(mat, "M_TreeShade")
 
 
@@ -1128,5 +1127,5 @@ for old in ("M_MilkyWay", "T_MilkyWay", "M_Cirrus", "T_Cirrus"):   # taken out
 # build_dirt and build_ground above are the old versions, no longer run, so this script never puts the old ground back.)
 build_cloth()
 build_tree_far()   # far stand-ins for tree crowns (Forest.cpp); after M_TreeLeaf and M_PineNeedle
-build_tree_shade()   # the forest's stand-in shadows (OakForest.cpp), faded out near the camera
+build_tree_shade()   # the forest's stand-in shadows (OakForest.cpp): see-through, in sun flecks
 unreal.log("MATDIAG all materials built")

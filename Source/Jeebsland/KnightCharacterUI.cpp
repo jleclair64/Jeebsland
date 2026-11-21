@@ -265,12 +265,10 @@ void AKnightCharacter::ApplyGraphics()
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.6"));   // (HIGH 0.7 until 2026-11-15: the owner approved a shorter shadow reach to pay for the realistic grass)
 	// the realistic grass reaches 50 m on HIGH, 26 m on LOW (Meadow.cpp regrows round you when it changes)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.PackFade 2600") : TEXT("jeeb.Grass.PackFade 5000"));
-	// (2026-11-16, owner: far trees and ground looked too bright, then dark as he came closer) The trees round Oak Hill cast their real
-	// leafy shadows only within jeeb.Forest.ShadowReach of the camera (OakForest.cpp; was 40 m HIGH); past that a plain stand-in crown
-	// per tree casts a soft shade out to jeeb.Forest.FarShadeReach, and on HIGH the sun's one far cascade, drawn only by the stand-ins,
-	// carries it past the ordinary 120 m shadow range (DayNight.cpp). Measured in the forest (editor, solo, GPU): about the same cost
-	// as the old 40 m reach with nothing past it; doubling the real reach to 80 m cost +1.5 to +5 ms instead.
-	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.ShadowReach 15") : TEXT("jeeb.Forest.ShadowReach 20"));
+	// The trees round Oak Hill cast no shadows themselves (OakForest.cpp): a plain see-through stand-in crown per tree casts its shade out
+	// to jeeb.Forest.FarShadeReach, and on HIGH the sun's one far cascade, drawn only by the stand-ins, carries it past the ordinary 120 m
+	// shadow range (DayNight.cpp). (Until 2026-11-21 the trees within jeeb.Forest.ShadowReach, 20 m HIGH / 15 LOW, cast real leafy shadows;
+	// the owner had them taken out: the change from one kind of shadow to the other never looked right)
 	// (2026-11-20, owner: LOW looked much lighter than HIGH) LOW's far trees cast their stand-in shade too, to 200 m: without it a low
 	// sun lit whole far hillsides of forest that are in shade on HIGH (DayNight's jeeb.Look.LowTrim takes care of the rest)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Forest.FarShadeReach 200") : TEXT("jeeb.Forest.FarShadeReach 400"));
