@@ -304,3 +304,60 @@ void FKnightAnimator::TrollPunch(const FInput& In, FPose& B, float& OutBlend)
 	L.ReachTo(B, LArm, LFore, LHand, Target, FVector(0.6f, -0.3f, -1.f));   // (the elbow out and down)
 	OutBlend = 0.08f;
 }
+
+// The troll's club blows (owner 2026-11-21: in the sword's swing the club's follow-through crossed his belly). Made from the club's own
+// poses instead of the sword's clips, in the same place and on the same timing (Jab1 / Jab2 rows of Tuning.ini: From..To are the hit
+// frames, past 1 the still moment after), so the server's hit boxes (they ride the blade bone) and every other machine read the same
+// MoveU. Swing 1: an overhead blow from over the right shoulder, down and forward, the club ending low and out beside the right hip.
+// Swing 2: a flat sweep from the right side across the front, at arm's length ahead, ending out on the left. Both hands hold the haft:
+// the right on the grip, the left a hand's breadth up it. The hand sits at least a little way ahead of or outside his middle through the
+// whole blow, so the haft (125 cm) never lies through his belly. Mesh space: +X his left, +Y ahead, +Z up. Hand places are in arm lengths
+// from the right shoulder, club directions are unit vectors; Twist is the chest's turn in degrees (+ to the right, right shoulder back).
+namespace
+{
+	struct FClubKey { FVector Hand; FVector Dir; float Twist; };
+	static FClubKey LerpKey(const FClubKey& A, const FClubKey& B, float W)
+	{
+		return { FMath::Lerp(A.Hand, B.Hand, W), FQuat::Slerp(FQuat::FindBetweenNormals(FVector::ForwardVector, A.Dir.GetSafeNormal()), FQuat::FindBetweenNormals(FVector::ForwardVector, B.Dir.GetSafeNormal()), W).RotateVector(FVector::ForwardVector), FMath::Lerp(A.Twist, B.Twist, W) };
+	}
+}
+
+float FKnightAnimator::TrollClubSwing(const FInput& In, FPose& B, float& OutBlend, bool b2)
+{
+	const auto& Tn = JeebTune::V();
+	if (const FClip* G = Get(TEXT("Idle_SS"))) { Sample(*G, IdleT, Over, true); Overlay(B, Over, 1.f, 1.f); }
+	const float U = In.MoveU;
+	const float From = b2 ? Tn.Jab2From : Tn.Jab1From, To = b2 ? Tn.Jab2To : Tn.Jab1To;
+	const float UEnd = 1.f + (b2 ? Tn.Jab2Pause : Tn.Jab1Pause) / FMath::Max(b2 ? Tn.Jab2Share : Tn.Jab1Share, 0.05f);
+	static const FClubKey Rest   = { FVector(-0.25f, 0.45f, -0.05f), FVector(-0.1f, 0.35f, 0.93f), 0.f };
+	static const FClubKey Wind1  = { FVector(-0.35f, -0.05f, 0.80f), FVector(-0.2f, -0.75f, 0.62f), 28.f };    // over the right shoulder, the head tipped back
+	static const FClubKey Hit1   = { FVector(-0.45f, 0.80f, -0.10f), FVector(-0.2f, 0.80f, -0.58f), -22.f };   // the head down in front, right of centre
+	static const FClubKey End1   = { FVector(-1.00f, 0.45f, -0.45f), FVector(-0.80f, 0.45f, -0.40f), -34.f };  // out beside the right hip, head ahead and low, away from him
+	static const FClubKey Wind2  = { FVector(-0.95f, 0.50f, 0.10f), FVector(-0.95f, -0.25f, 0.15f), 36.f };    // flat out on his right, the head behind
+	static const FClubKey Hit2   = { FVector(-0.05f, 0.90f, 0.05f), FVector(0.90f, 0.40f, -0.05f), -14.f };    // the club across in front of him at arm's length
+	static const FClubKey End2   = { FVector(0.70f, 0.60f, 0.05f), FVector(0.95f, 0.15f, -0.20f), -38.f };     // out on his left, ahead of the hip
+	const FClubKey& K0 = b2 ? Wind2 : Wind1, &K1 = b2 ? Hit2 : Hit1, &K2 = b2 ? End2 : End1;
+	FClubKey Now;
+	if (U < From) { const float S = FMath::SmoothStep(0.f, From, U); Now = LerpKey(b2 ? End1 : Rest, K0, S); }
+	else if (U < To) { const float F = (U - From) / FMath::Max(To - From, 0.01f); Now = LerpKey(K0, K1, FMath::Pow(F, 1.6f)); }   // (a heavy blow: slow to start, fastest at the hit)
+	else { const float S = FMath::Clamp((U - To) / FMath::Max((UEnd - To) * 0.7f, 0.01f), 0.f, 1.f); Now = LerpKey(K1, K2, 1.f - FMath::Square(1.f - S)); }   // (it runs on and stops)
+	// the chest
+	const FQuat Half(FVector::UpVector, FMath::DegreesToRadians(0.5f * Now.Twist));
+	TurnInMesh(B, Spine1, Half);
+	TurnInMesh(B, Spine2, Half);
+	// the right hand on the grip, then the club turned onto its line, then the left hand up the haft
+	const FVector Sh = BonePos(B, RArm);
+	const float Arm = float(RefPos[Bone[RFore]].Size() + RefPos[Bone[RHand]].Size());
+	L.ReachTo(B, RArm, RFore, RHand, Sh + Now.Hand * Arm, FVector(-0.8f, -0.3f, -0.6f));
+	FQuat HandRot;
+	BonePos(B, RHand, &HandRot);
+	const FVector Cur = HandRot.RotateVector(L.BladeInHand).GetSafeNormal();
+	TurnInMesh(B, RHand, FQuat::FindBetweenNormals(Cur, Now.Dir.GetSafeNormal()));
+	FQuat Turned;
+	const FVector RHandAt = BonePos(B, RHand, &Turned);
+	const FVector Haft = Turned.RotateVector(L.BladeInHand).GetSafeNormal();
+	L.ReachTo(B, LArm, LFore, LHand, RHandAt + Haft * (0.12f * Arm + 12.f) + FVector(0.f, 0.f, 0.f), FVector(0.8f, -0.3f, -0.6f));
+	OutBlend = 0.12f;
+	bTrollHaft = true;   // (both hands on the haft: the left fist closes)
+	return 1.f;
+}

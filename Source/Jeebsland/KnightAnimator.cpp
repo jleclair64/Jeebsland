@@ -1174,7 +1174,8 @@ void FKnightAnimator::SetFists(const FInput& In, float Dt)
 	const float WantR = bWeapon && (!JeebItems::IsDrawnBow(In.Kind) || In.BowMode == 1) ? 1.f : 0.f;
 	// the left: round the shield's grip, the bow, the katana's second blade, or the grip, haft or stock it has moved onto (eased already)
 	const bool bLeftHolds = !bStowed && (In.bShieldArm || JeebItems::IsDrawnBow(In.Kind) || In.Kind == JeebItems::K_Katana);
-	const float WantL = FMath::Max(bLeftHolds ? 1.f : 0.f, FMath::Max3(CrossW, GreatW, TwoHandW));
+	TrollHaftW = FMath::FInterpConstantTo(TrollHaftW, bTrollHaft ? 1.f : 0.f, Dt, 1.f / 0.1f); bTrollHaft = false;
+	const float WantL = FMath::Max(bLeftHolds ? 1.f : 0.f, FMath::Max(FMath::Max3(CrossW, GreatW, TwoHandW), TrollHaftW));
 	FistW[0] = FMath::FInterpConstantTo(FistW[0], WantR, Dt, 1.f / 0.15f);   // (about 0.15 s to close or open)
 	FistW[1] = FMath::FInterpConstantTo(FistW[1], WantL, Dt, 1.f / 0.15f);
 	if (!Comp) return;
@@ -1593,6 +1594,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 30: case 31:
 	{
 		const bool b2 = Key == 31;
+		if (L.bTroll && In.Kind == JeebItems::K_Club) { TrollClubSwing(In, B, OutBlend, b2); break; }   // (the troll's club blows: KnightAnimatorTroll.cpp)
 		const bool bGreat = In.Kind == JeebItems::K_Broadsword;   // (the big sword has its own two-handed rows; it has no shield to keep still)
 		const TCHAR* Nm = b2 ? (bGreat ? TEXT("Great_Jab2") : TEXT("Jab2")) : (bGreat ? TEXT("Great_Jab1") : TEXT("Jab1"));
 		if (const FMove* M = Moves.Find(Nm))
