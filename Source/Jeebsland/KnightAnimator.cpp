@@ -964,6 +964,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
+				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)
 			}
 	// (the crossbow is two-handed even at ease: held low across him, whatever his legs do)
 	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting;

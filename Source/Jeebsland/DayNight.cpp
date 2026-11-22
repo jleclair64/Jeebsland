@@ -103,15 +103,15 @@ namespace JeebLook
 // sky light, more exposure and a gentle blue, less colourful grade, all eased in with ADayNight::Night. Live; looks only.
 namespace JeebNight
 {
-	static TAutoConsoleVariable<float> SunLow(TEXT("jeeb.Sun.Low"), -25.f, TEXT("The sun's height at midnight, degrees (negative: below the horizon). Noon stays 41; the loop grows, it is not shifted (11 until 2026-11-17: it never set)"));
+	static TAutoConsoleVariable<float> SunLow(TEXT("jeeb.Sun.Low"), -7.5882f, TEXT("The sun's height at midnight, degrees (negative: below the horizon). Noon stays 41; the loop grows, it is not shifted (11 until 2026-11-17: it never set)"));
 	static TAutoConsoleVariable<float> Moon(TEXT("jeeb.Night.Moon"), 0.5f, TEXT("The moonlight's strength at full night (the sun is 6.2 at noon). It also lights the night sky and clouds"));
-	static TAutoConsoleVariable<FString> MoonColor(TEXT("jeeb.Night.MoonColor"), TEXT("0.60 0.72 1.00"), TEXT("The moonlight's colour, \"r g b\" (a cool blue)"));
+	static TAutoConsoleVariable<FString> MoonColor(TEXT("jeeb.Night.MoonColor"), TEXT("0.5924 0.72 1"), TEXT("The moonlight's colour, \"r g b\" (a cool blue)"));
 	static TAutoConsoleVariable<int32> MoonShadows(TEXT("jeeb.Night.MoonShadows"), 1, TEXT("1: the moonlight casts shadows (it takes over the sun's, never both at once); 0 none"));
-	static TAutoConsoleVariable<float> Ambient(TEXT("jeeb.Night.Ambient"), 2.f, TEXT("The sky light (the soft fill in the shade) times this at full night: lifts the night's floor so nothing goes black"));
-	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Night.Exposure"), 0.5f, TEXT("Extra exposure at full night, in stops, on top of jeeb.Look.Exposure and LowLift (the eye adapting to the dark)"));
-	static TAutoConsoleVariable<float> Tint(TEXT("jeeb.Night.Tint"), 0.5f, TEXT("The night's blue grade: 0 none, 1 strong (blue up, red down, colours a little paler: the eye's night vision)"));
-	static TAutoConsoleVariable<float> ShadowLift(TEXT("jeeb.Night.ShadowLift"), 0.012f, TEXT("A blue lift in the darkest shadows at full night (added to jeeb.Look.ShadowCool's)"));
-	static TAutoConsoleVariable<float> Twilight(TEXT("jeeb.Night.Twilight"), 0.6f, TEXT("Extra exposure in stops right round sunset and sunrise (most with the sun on the horizon, none 7 degrees either side): the short handover, when neither the sun nor the moon lights the ground much, never sinks into a murky dip"));
+	static TAutoConsoleVariable<float> Ambient(TEXT("jeeb.Night.Ambient"), 1.9664f, TEXT("The sky light (the soft fill in the shade) times this at full night: lifts the night's floor so nothing goes black"));
+	static TAutoConsoleVariable<float> Exposure(TEXT("jeeb.Night.Exposure"), 0.479f, TEXT("Extra exposure at full night, in stops, on top of jeeb.Look.Exposure and LowLift (the eye adapting to the dark)"));
+	static TAutoConsoleVariable<float> Tint(TEXT("jeeb.Night.Tint"), 0.4979f, TEXT("The night's blue grade: 0 none, 1 strong (blue up, red down, colours a little paler: the eye's night vision)"));
+	static TAutoConsoleVariable<float> ShadowLift(TEXT("jeeb.Night.ShadowLift"), 0.0113f, TEXT("A blue lift in the darkest shadows at full night (added to jeeb.Look.ShadowCool's)"));
+	static TAutoConsoleVariable<float> Twilight(TEXT("jeeb.Night.Twilight"), 0.605f, TEXT("Extra exposure in stops right round sunset and sunrise (most with the sun on the horizon, none 7 degrees either side): the short handover, when neither the sun nor the moon lights the ground much, never sinks into a murky dip"));
 	// (2026-11-20, owner: "the sun goes from normal, to almost set and it gets bright, then to just past set and it gets really dark, and
 	// then to night time") Measured (a meadow and forest edge, HIGH and LOW, the sun from +12 to -25 degrees): the land's brightness fell
 	// to under half between 0 and 3 degrees down, where the sun's light on the ground has gone (by 1 down) and the moonlight has barely
@@ -136,7 +136,7 @@ namespace JeebNight
 			if (E >= Pts[i].X) return FMath::Lerp(Pts[i].Y, Pts[i - 1].Y, (E - Pts[i].X) / FMath::Max(Pts[i - 1].X - Pts[i].X, 1e-3f));
 		return 0.f;
 	}
-	static TAutoConsoleVariable<float> Sky(TEXT("jeeb.Night.Sky"), 0.5f, TEXT("The night sky's brightness (the sky atmosphere lit by the moon) times this at full night (1: as the moonlight lights it, a dim day-blue; lower is a deeper night blue where the stars show)"));
+	static TAutoConsoleVariable<float> Sky(TEXT("jeeb.Night.Sky"), 0.3025f, TEXT("The night sky's brightness (the sky atmosphere lit by the moon) times this at full night (1: as the moonlight lights it, a dim day-blue; lower is a deeper night blue where the stars show)"));
 
 	FLinearColor Rgb(const FString& S, const FLinearColor& Def)
 	{

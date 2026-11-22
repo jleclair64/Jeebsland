@@ -357,7 +357,11 @@ void AWorldTerrain::BuildWater()
 	{
 		float WestMost = 1.0e9f;
 		for (float X = MinX; X <= MaxX; X += 2000.f) WestMost = FMath::Min(WestMost, CoastY(X));
-		const float Y0 = WestMost - 3000.f, Y1 = MaxY + 60000.f, X0 = MinX - 60000.f, X1 = MaxX + 60000.f;
+		// (2026-11-21, owner: "black line on the horizon") the sheet ended 600 m past the world's edge, and past it the sky atmosphere's
+		// nearly black planet ground showed as a dark band between the sea and the sky. It now runs 100 km out: from any height in the
+		// game its far edge sits a small fraction of a pixel under the true horizon, and the haze covers the far water anyway
+		constexpr float Far = 10000000.f;
+		const float Y0 = WestMost - 3000.f, Y1 = MaxY + Far, X0 = MinX - Far, X1 = MaxX + Far;
 		TArray<FLinearColor> White; White.Init(FLinearColor::White, 4);
 		Sheet({ FVector(X0, Y0, SeaLevel), FVector(X1, Y0, SeaLevel), FVector(X0, Y1, SeaLevel), FVector(X1, Y1, SeaLevel) }, { 0, 2, 1, 1, 2, 3 }, White);
 	}
