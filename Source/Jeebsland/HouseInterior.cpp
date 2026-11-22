@@ -3,6 +3,7 @@
 #include "Terrain.h"
 #include "KnightCharacter.h"
 #include "KnightGameState.h"
+#include "DayNight.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -23,7 +24,7 @@
 #include "Camera/PlayerCameraManager.h"
 
 static TAutoConsoleVariable<float> CVarIntCam(TEXT("jeeb.Interior.Cam"), 0.5f, TEXT("The open house: the camera arm's share of its usual length while he stands inside (1 = as outside)."));
-static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), -0.9f, TEXT("The open house: exposure bias inside (EV; the land's own is about 0.35). Higher = brighter room."));
+static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), -1.4f, TEXT("The open house: stops of exposure added while the camera is inside (negative = darker room; 2026-11-22, owner: still too bright)."));
 static TAutoConsoleVariable<float> CVarIntReach(TEXT("jeeb.Interior.LightReach"), 400.f, TEXT("The open house: its lights are on only while the camera is within this many cm of the room (inside it, or just outside the door)."));
 static TAutoConsoleVariable<float> CVarIntLight(TEXT("jeeb.Interior.Light"), 0.5f, TEXT("The open house: every light inside times this."));
 // (2026-11-22, owner: "still too bright ... much warmer ... focused on the candle, chandelier, oil lamp and fireplace", "each candle light
@@ -39,6 +40,7 @@ static TAutoConsoleVariable<float> CVarDoorSpeed(TEXT("jeeb.Interior.DoorSpeed")
 namespace
 {
 	TArray<TWeakObjectPtr<AHouseInterior>> GRooms;
+	TWeakObjectPtr<AHouseInterior> GBiasBy;   // (the house whose room darkens the exposure now: ADayNight::IndoorBias)
 	void HashIn(uint32& H, float V) { const int32 I = FMath::RoundToInt(V * 10.f); H = (H ^ uint32(I)) * 16777619u; }
 	float F(const TArray<FString>& C, int32 i, float Def = 0.f) { return C.IsValidIndex(i) && !C[i].TrimStartAndEnd().IsEmpty() ? FCString::Atof(*C[i]) : Def; }
 
@@ -87,6 +89,7 @@ void AHouseInterior::BeginPlay()
 void AHouseInterior::EndPlay(const EEndPlayReason::Type Why)
 {
 	GRooms.RemoveAll([this](const TWeakObjectPtr<AHouseInterior>& R) { return !R.IsValid() || R.Get() == this; });
+	if (GBiasBy.Get() == this || !GBiasBy.IsValid()) { ADayNight::IndoorBias = 0.f; GBiasBy = nullptr; }
 	JeebOakHill::OpenRooms().RemoveAll([this](const JeebOakHill::FOpenRoom& R) { return R.Owner == this; });
 	Super::EndPlay(Why);
 }
@@ -384,8 +387,7 @@ void AHouseInterior::LoadRoom()
 			Post->BlendWeight = 0.f;
 			Post->Priority = 20.f;
 			if (UPrimitiveComponent* Pc = Cast<UPrimitiveComponent>(Post->GetRootComponent())) Pc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Post->Settings.bOverride_AutoExposureBias = true;
-			Post->Settings.AutoExposureBias = CVarIntExposure.GetValueOnGameThread();
+			Post->Settings.bOverride_AutoExposureBias = false;
 		}
 	}
 	bLoaded = true;
@@ -401,6 +403,7 @@ void AHouseInterior::UnloadRoom()
 	if (FlameCones) { FlameCones->DestroyComponent(); FlameCones = nullptr; }
 	if (FlameHalos) { FlameHalos->DestroyComponent(); FlameHalos = nullptr; }
 	if (Post) { Post->Destroy(); Post = nullptr; }
+	if (GBiasBy.Get() == this) { ADayNight::IndoorBias = 0.f; GBiasBy = nullptr; }
 	bLoaded = bLit = false;
 	LitAlpha = 0.f;
 	UE_LOG(LogTemp, Log, TEXT("JEEBINT room %s unloaded"), *PlotId);
@@ -442,7 +445,11 @@ void AHouseInterior::Tick(float Dt)
 		// (the exposure lift: full with the camera inside the room, none 1.5 m outside its walls)
 		const float Out = FVector::Dist(RoomLocal.GetClosestPointTo(EyeL), EyeL);
 		Post->BlendWeight = FMath::FInterpTo(Post->BlendWeight, 1.f - FMath::Clamp(Out / 150.f, 0.f, 1.f), Dt, 4.f);
-		Post->Settings.AutoExposureBias = CVarIntExposure.GetValueOnGameThread();
+		// (2026-11-22: this volume's own bias never took: ADayNight's grade sets the bias each frame. The room's darkening goes
+		// through ADayNight::IndoorBias instead, from whichever house the camera is in)
+
+		if (Post->BlendWeight > 0.001f) { ADayNight::IndoorBias = Post->BlendWeight * CVarIntExposure.GetValueOnGameThread(); GBiasBy = this; }
+		else if (GBiasBy.Get() == this) { ADayNight::IndoorBias = 0.f; GBiasBy = nullptr; }
 	}
 	if (!bOn && !bLit) return;
 	bLit = bOn;
@@ -494,7 +501,9 @@ namespace
 
 void AHouseInterior::AddFlames(const FRow& R, int32 LightIndex)
 {
-	const TArray<FVector4f>* Wicks = R.bMesh ? FlameTable().Find(R.Mesh) : nullptr;
+	// (the hearth, a FIRE row: its flames sit round its light's spot, in the house's frame; others in their mesh's frame)
+	const TArray<FVector4f>* Wicks = R.bFire ? FlameTable().Find(TEXT("FIRE")) : R.bMesh ? FlameTable().Find(R.Mesh) : nullptr;
+	const FTransform At = R.bFire ? FTransform(GetActorQuat(), GetActorTransform().TransformPosition(R.LightAt)) : R.Xf;
 	if (!Wicks || Wicks->Num() == 0) return;
 	if (!FlameCones)
 	{
@@ -518,15 +527,15 @@ void AHouseInterior::AddFlames(const FRow& R, int32 LightIndex)
 		};
 		FlameCones = Make(Cone);
 		FlameHalos = Make(Ball);
-		if (ColorMat) if (UMaterialInstanceDynamic* M = FlameCones->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(9.f, 3.6f, 0.7f));
+		if (ColorMat) if (UMaterialInstanceDynamic* M = FlameCones->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(5.f, 1.6f, 0.25f));
 		if (HaloMat) if (UMaterialInstanceDynamic* M = FlameHalos->CreateDynamicMaterialInstance(0, HaloMat)) { M->SetScalarParameterValue(TEXT("Intensity"), 0.35f); M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1.f, 0.45f, 0.12f)); }
 	}
-	const FVector S = R.Xf.GetScale3D();
+	const FVector S = At.GetScale3D();
 	FVector Sum = FVector::ZeroVector;
 	for (const FVector4f& W : *Wicks)
 	{
 		FFlame Fl;
-		Fl.At = R.Xf.TransformPosition(FVector(W.X, W.Y, W.Z));
+		Fl.At = At.TransformPosition(FVector(W.X, W.Y, W.Z));
 		Fl.Size = W.W * FMath::Abs(S.Z);
 		// (a phase from where it is, so it is the same every visit; each flame its own)
 		Fl.Phase = FMath::Frac(FMath::Sin(Fl.At.X * 0.0137f + Fl.At.Y * 0.0291f + Fl.At.Z * 0.0517f) * 43758.5453f) * 6.2832f;
@@ -537,7 +546,7 @@ void AHouseInterior::AddFlames(const FRow& R, int32 LightIndex)
 		FlameHalos->AddInstance(FTransform(FQuat::Identity, Fl.At, FVector::ZeroVector), true);
 	}
 	// the fixture's real light sits among its flames (a little above, so the candles' own cups don't swallow it)
-	if (Lights.IsValidIndex(LightIndex) && Lights[LightIndex]) Lights[LightIndex]->SetWorldLocation(Sum / Wicks->Num() + FVector(0.f, 0.f, 3.f));
+	if (!R.bFire && Lights.IsValidIndex(LightIndex) && Lights[LightIndex]) Lights[LightIndex]->SetWorldLocation(Sum / Wicks->Num() + FVector(0.f, 0.f, 3.f));
 }
 
 void AHouseInterior::TickFlames(bool bOn, float Alpha)
@@ -554,7 +563,7 @@ void AHouseInterior::TickFlames(bool bOn, float Alpha)
 		// (Engine cone: 100 cm tall, its tip up, its base at the middle's -50; sphere: 100 cm across)
 		const float H = Fl.Size * (0.75f + 0.25f * B) * Show, Wd = Fl.Size * 0.38f * Show;
 		if (FlameCones) FlameCones->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Fl.At + FVector(0.f, 0.f, H * 0.5f), FVector(Wd, Wd, H) * 0.01f), true, false, true);
-		if (FlameHalos) FlameHalos->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Fl.At + FVector(0.f, 0.f, Fl.Size * 0.5f), FVector(Fl.Size * 3.2f * (0.7f + 0.3f * B) * Show * 0.01f)), true, false, true);
+		if (FlameHalos) FlameHalos->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Fl.At + FVector(0.f, 0.f, Fl.Size * 0.5f), FVector(FMath::Min(Fl.Size * 3.2f, 70.f) * (0.7f + 0.3f * B) * Show * 0.01f)), true, false, true);
 	}
 	if (FlameCones) FlameCones->MarkRenderStateDirty();
 	if (FlameHalos) FlameHalos->MarkRenderStateDirty();

@@ -1,2 +1,23 @@
 Mesh,X,Y,Z,Size
 # Each fixture mesh's wicks, in the mesh's own frame (cm, before its row's scale), and the flame height in cm (times the row's height scale). AHouseInterior (HouseInterior.cpp, FlameTable).
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,90.5,0.0,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,73.2,53.2,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,28.0,86.1,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,-28.0,86.1,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,-73.2,53.2,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,-90.5,0.0,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,-73.2,-53.2,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,-28.0,-86.1,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,28.0,-86.1,-28,9
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,73.2,-53.2,-28,9
+/Game/Interior/Candelabra/SM_Int_Candelabra,0,0,48,5
+/Game/Interior/Candelabra/SM_Int_Candelabra,-10.5,0,39.9,5
+/Game/Interior/Candelabra/SM_Int_Candelabra,0,10.5,39.4,5
+/Game/Interior/Candelabra/SM_Int_Candelabra,0,-10.5,39.3,5
+/Game/Interior/Candelabra/SM_Int_Candelabra,10.5,0,36.7,5
+/Game/Interior/Candlesticks/SM_Int_Candlesticks,-10.5,0,23.1,4.5
+/Game/Interior/Candlesticks/SM_Int_Candlesticks,9,0,23.1,4.5
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_002,0,9,-2,5
+/Game/TownDecor/SM_LanternOil,0,0,20,5
+/Game/TownDecor/SM_LanternBlack,0,0,24,5
+/Game/TownDecor/SM_CandleCageShort,0,0,19,5

@@ -35,7 +35,7 @@ def shell(R, plaster="", fire=320):
     R.raw(TM + "Beam_001,-385,30,0,0,0,0,3.5,2,0.42,1,0")
     R.raw(TM + "Beam_002,-350,-150,126,90,-90,0,1.3,1.3,1,0,0")
     R.raw(D + "Firewood,-385,-50,0,90,0,0,0.7,0.7,0.7,0,0")
-    R.raw(D + "TorchBlazingFlame,-385,-50,-40,0,0,0,0.75,0.75,0.75,0,0")
+    R.raw(D + "TorchBlazingFlame,-385,-50,-22,0,0,0,1,1,1,0,0")
     R.light(-300, -50, 85, fire, 800, fire=True)   # (out in front of the stone, so the hearth's back doesn't glare white)
 
 def face(x, y, tx, ty): return math.degrees(math.atan2(ty - y, tx - x)) - 90.0   # (a chair's front is its +Y)
