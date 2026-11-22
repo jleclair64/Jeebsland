@@ -120,7 +120,9 @@ namespace JeebItems
 	inline bool FightsLikeSword(int32 K) { return K == K_Sword || K == K_Broadsword || K == K_Katana || K == K_BattleAxe || K == K_Spear || K == K_Axe || K == K_Pickaxe || K == K_Rod || K == K_Club; }
 	// Which weapon bar slot a weapon or tool goes in: the bow slot (1) for bows, the hand slot (0) for everything else
 	inline int32 BarSlotFor(int32 K) { return IsShooter(K) ? 1 : 0; }
-	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && BarSlotFor(KindOf(Id)) == H); }
+	// (2026-11-22, owner: bows are taken from knights and wizards. Both bar slots now take any weapon or tool: a knight's two weapons, a
+	// wizard's staff and wand. A bow still only fits slot 1, for the troll's own rules.)
+	inline bool FitsBarSlot(int32 H, int32 Id) { return Id == 0 || (IsGear(Id) && IsWeaponKind(KindOf(Id)) && (!IsShooter(KindOf(Id)) || H == 1)); }
 	inline bool IsArmorKind(int32 K) { return K >= K_Helmet && K <= K_Boots; }
 	inline bool IsAccessoryKind(int32 K) { return K == K_Ring || K == K_Amulet || K == K_Crest; }
 
@@ -353,6 +355,11 @@ namespace JeebItems
 		if (bWizard && !bWizardGear && (IsArmorKind(K) || K == K_Shield || (IsWeaponKind(K) && KindClass(K) != 0 && KindClass(K) != 3)))
 		{
 			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is not made for wizards."), *ItemName(Id));
+			return false;
+		}
+		if (IsShooter(K) && !OwnerIsTroll(S))   // (owner 2026-11-22: "take away the bow as an option for the wizard and knight")
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("Bows are put away for now: %s can't be used."), *ItemName(Id));
 			return false;
 		}
 		if (K == K_Book) return true;

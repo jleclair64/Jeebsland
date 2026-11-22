@@ -217,6 +217,8 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
+	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
+	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
@@ -442,6 +444,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const bool bSpecial = TickRollSlide(Dt, bFalling, SpecialSpeed);
 	TickAttack(Dt);
 	TickBow(Dt);
+	TickCastCharge(Dt);   // (the wand's and staff's charged shot: KnightCharacterCastAim.cpp)
 	TickKnock(Dt);
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);

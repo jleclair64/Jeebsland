@@ -236,6 +236,13 @@ void AKnightHUD::DrawHUD()
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);   // throbs when nearly dead
+		// (2026-11-22, owner: the wizard's magic, "start at full, then go down with every spell ... then charge back up"): a blue bar just
+		// under his health, the server's number (Tuning.ini [Wizard] Magic*). Empty it throbs; spells still go, weaker (AttackLands).
+		if (Knight->IsWizard())
+		{
+			const float M = Knight->GetMagicFraction();
+			Gauge(BarX, BY + BarH + 4.f, BarW, BarH - 1.f, M, FLinearColor(0.22f, 0.45f, 0.95f), M < 0.05f);
+		}
 	}
 
 	// Enemy health bars (15 s after a hit, or under half health) and floating damage numbers
@@ -523,11 +530,14 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	// the potion. R swaps the hand and the bow.
 	const float SS = 46.f, Step = SS + 12.f;   // small slots, low on the screen
 	const float BarGap = 18.f;   // (owner 2026-11-06: the same gap before the bow as before the potion; every other place reads BarCellX)
-	const float TotalW = 4.f * Step + 2.f * BarGap + SS;
+	// (owner 2026-11-22: a wizard has no arrow slot: staff, book, wand, then the potion)
+	const bool bNoArrows = Knight->IsWizard();
+	const float TotalW = (bNoArrows ? 3.f : 4.f) * Step + 2.f * BarGap + SS;
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f;
-	auto SlotX = [&](int32 Pos) { return X0 + Pos * Step + (Pos >= 2 ? BarGap : 0.f) + (Pos >= 4 ? BarGap : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
+	auto SlotX = [&](int32 Pos) { const int32 P = (bNoArrows && Pos == 4) ? 3 : Pos; return X0 + P * Step + (P >= 2 ? BarGap : 0.f) + (Pos >= 4 ? BarGap : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 	for (int32 p = 0; p < 5; ++p) BarCellX[p] = SlotX(p);
+	if (bNoArrows) BarCellX[3] = -100000.f;   // (no arrow cell to click)
 	BarCellY = Y0;
 
 	for (int32 i = 0; i < NumHotbar; ++i)
@@ -599,10 +609,12 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		const int32 Def = TotalDefense(Skills, Knight->ShieldActive());
 		// this is the shield slot: drag a shield here to hold it, drag it off to put it away
 		DefCellX = X; DefCellY = Y0; bDefCell = true;
-		const int32 ShieldId = Skills->Worn[K_Shield];
+		// (owner 2026-11-22: a wizard's spell book sits in this spot)
+		const bool bWiz = Knight->IsWizard();
+		const int32 ShieldId = Skills->Worn[bWiz ? K_Book : K_Shield];
 		// (owner 2026-11-06: greyed out while the weapon in hand takes no shield, Kinds.csv TwoHanded. The slot still takes drags and clicks)
 		const int32 HandId = Skills->Hotbar[Skills->Selected];
-		const bool bNoShield = HandId != 0 && IsGear(HandId) && !AllowsShield(KindOf(HandId));
+		const bool bNoShield = !bWiz && HandId != 0 && IsGear(HandId) && !AllowsShield(KindOf(HandId));
 		if (ShieldId != 0)
 		{
 			if (!(DragKind == 7 && bDragging)) DrawIconIn(ShieldId, X - 1.f, Y0 - 1.f, SS + 2.f, X, Y0, SS, SS);
@@ -611,8 +623,9 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		else
 		{
 			float LW = 0.f, LH = 0.f;
-			HDTextSize(TEXT("Shield"), LW, LH, Font, 0.7f);
-			HDText(TEXT("Shield"), FLinearColor(0.6f, 0.6f, 0.62f), X + (SS - LW) * 0.5f, Y0 + (SS - LH) * 0.5f, Font, 0.7f);
+			const TCHAR* Empty = bWiz ? TEXT("Book") : TEXT("Shield");
+			HDTextSize(Empty, LW, LH, Font, 0.7f);
+			HDText(Empty, FLinearColor(0.6f, 0.6f, 0.62f), X + (SS - LW) * 0.5f, Y0 + (SS - LH) * 0.5f, Font, 0.7f);
 		}
 		const FString Txt = FString::FromInt(Def);
 		float TW = 0.f, TH = 0.f;
@@ -622,12 +635,14 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS))
 		{
 			if (ShieldId != 0) ItemTip(ShieldId);
+			else if (bWiz) SetTip({ TEXT("Book slot"), TEXT("Click to pick a spell book from your pack") });
 			else SetTip({ TEXT("Shield slot"), FString::Printf(TEXT("Click to pick a shield from your pack. Your armour stops %d%% of a blow on average, every bonus counted"), Def) });
 		}
 	}
 
 	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F picks the next kind you
 	// carry; a click with the cursor out lists them (DrawSwapPopup).
+	if (!bNoArrows)
 	{
 		const float X = SlotX(3);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);

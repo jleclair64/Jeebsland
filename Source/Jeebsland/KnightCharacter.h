@@ -352,9 +352,35 @@ public:
 	FVector CastAimPoint() const;              // the player's machine: what is under the reticle (elsewhere: ahead along his aim)
 	FVector CastStartPoint(int32 Kind) const;  // the wand's tip or the staff's orb, as the pose has it (checked: near him, nothing solid between)
 	float CastFacingYaw(float Fallback) const; // the heading toward a fresh aim point, or Fallback
-	UFUNCTION(Server, Reliable) void ServerCastAim(FVector_NetQuantize Target);
+	UFUNCTION(Server, Reliable) void ServerCastAim(FVector_NetQuantize Target, FVector_NetQuantize10 From);
 	FVector CastTarget = FVector::ZeroVector;  // the last aim point (the server: as the player's machine sent it)
+	FVector CastFrom = FVector::ZeroVector;    // (2026-11-22) where the bolt leaves: on the camera's line abreast of him, as the bow's arrow (checked on the server)
 	double CastTargetAt = -100.0;              // when it came (world seconds); used once by AttackLands
+	FVector CastLineStart(int32 Kind) const;   // the player's machine: the point on the camera's line abreast of the wand's tip or staff's orb
+	FVector CheckCastStart(const FVector& Asked, int32 Kind) const;   // the server: Asked if it is near his hand with nothing solid between, else the hand
+
+	// ---------------- The wand's and staff's charged shot (2026-11-22, owner: "up to 2.5x damage at full charge") ----------------
+	// Hold the left button to charge (Tuning.ini [Wizard] CastChargeTime), let go to cast. The server times the hold itself (ServerCastCharge)
+	// and never believes more charge than it has seen; damage is x1 to x CastChargeMax. Others see the tip's glow grow (bCastChargingRep).
+	bool IsChargingCast() const { return bCastCharging; }
+	float CastChargeFrac() const;
+	void BeginCastCharge();
+	void ReleaseCastCharge();
+	void CancelCastCharge();
+	UFUNCTION(Server, Reliable) void ServerCastCharge(bool bOn);
+	bool bCastCharging = false;                // this machine: the player holding the button (or, on the server, as he told us)
+	double CastChargeStart = 0.0;              // world seconds it began (each machine its own clock)
+	float CastChargeHeldSrv = 0.f;             // (server) how long the last hold lasted as it saw it: the most charge it believes (used once)
+	float ServerCastChargeLimit();
+	UPROPERTY(ReplicatedUsing = OnRep_CastCharging) bool bCastChargingRep = false;   // the server's word, for everyone else's glow
+	UFUNCTION() void OnRep_CastCharging();
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> CastChargeGlow;   // the growing ball at the wand's tip or the staff's orb
+	void TickCastCharge(float Dt);
+	// (2026-11-22, owner) the wizard's magic: full at the start, each cast spends some (a charged one more), it fills again after a pause. Casting is
+	// never refused: with less than the cost the spell goes at that share of its power and the bar empties. The server owns it.
+	UPROPERTY(Replicated) float Magic = 100.f;
+	double MagicUsedAt = -100.0;
+	float GetMagicFraction() const;
 
 	// The Escape screen (map, settings ...): Escape or O
 	// Save now (the button on the map): online the server writes it (at most every few seconds)

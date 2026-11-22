@@ -1,4 +1,5 @@
 #include "Projectile.h"
+#include "SpellFx.h"
 #include "JeebProps.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
@@ -24,6 +25,7 @@
 
 // The magic bolt's look, live in Play (read as each bolt is cast). 2026-11-18 second review: its light lit a pool about 3 m wide at dusk
 // (700 out to 320 cm); now a tight glow round the bolt and the hand that cast it.
+static const FLinearColor BoltGem(0.1f, 0.45f, 1.f);   // (2026-11-22: one blue spell for the staff and the wand)
 static TAutoConsoleVariable<float> CVarBoltLight(TEXT("jeeb.Magic.BoltLight"), 150.f, TEXT("Brightness of the light a magic bolt carries (was 700; 0 = no light)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBoltLightRadius(TEXT("jeeb.Magic.BoltLightRadius"), 90.f, TEXT("How far (cm) a magic bolt's light reaches (was 320)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 0.9f, TEXT("Brightness on screen of the magic bolt's orb (M_GlowOrb Strength, exposure-locked since 2026-11-19: the same by day and at dusk; was 4 on the scene's scale, a white blob)."), ECVF_Default);
@@ -121,25 +123,38 @@ void AProjectile::ApplyLaunch()
 	{
 		Head->SetStaticMesh(BallMesh);
 		Head->SetRelativeRotation(FRotator::ZeroRotator);
-		Head->SetRelativeScale3D(FVector(0.2f));   // (2026-11-19: 0.2, was 0.28: a modest bolt, not a blob)
+		Head->SetRelativeScale3D(FVector(0.11f));   // (2026-11-22: the hot core; the halo and streak round it)
 		Head->SetRelativeLocation(FVector::ZeroVector);
-		Body->SetVisibility(false);
-		Fletch->SetVisibility(false);
-		// (2026-11-18 review: a flat pink disc) a glowing orb in the staff's and wand's gem colours: /Game/Props/M_GlowOrb, unlit and
-		// additive, white-hot at its heart and soft at its rim, with a small shadowless light; the old flat paint if it is missing
-		// (bPurple is the staff's bolt, named for its old paint: the staff's orb is cyan and the wand's crystal violet, so the bolts follow the gems)
-		const FLinearColor Gem = L.bPurple ? FLinearColor(0.02f, 0.72f, 1.f) : FLinearColor(0.62f, 0.22f, 1.f);
+		// (2026-11-22, owner: "more like the projectiles in the Hogwarts game ... one simple blue spell for now": both the staff's and the wand's)
+		// a white-hot core, a soft blue halo round it (Fletch) and a streak of light trailing behind (Body, a ball stretched along the flight,
+		// growing with the distance flown so it never pokes back through the caster: TickBoltLook), a flash as it leaves and a burst where it
+		// lands (SpellFx.cpp). /Game/Props/M_GlowOrb, unlit and additive; the old flat paint if it is missing.
+		const FLinearColor Gem = BoltGem;
 		UMaterialInterface* OrbMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Props/M_GlowOrb.M_GlowOrb"));
 		if (OrbMat)
 		{
-			if (UMaterialInstanceDynamic* M = Head->CreateDynamicMaterialInstance(0, OrbMat))
+			const float G = FMath::Max(0.f, CVarBoltGlow.GetValueOnGameThread());
+			auto Glowing = [&](UStaticMeshComponent* C, const FLinearColor& Col, float Strength)
 			{
-				M->SetVectorParameterValue(TEXT("Color"), Gem);
-				M->SetScalarParameterValue(TEXT("Strength"), FMath::Max(0.f, CVarBoltGlow.GetValueOnGameThread()));
-			}
-			Head->SetCastShadow(false);
+				C->SetStaticMesh(BallMesh);
+				C->SetVisibility(true);
+				C->SetCastShadow(false);
+				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, OrbMat))
+				{
+					M->SetVectorParameterValue(TEXT("Color"), Col);
+					M->SetScalarParameterValue(TEXT("Strength"), Strength);
+				}
+			};
+			Glowing(Head, FMath::Lerp(Gem, FLinearColor::White, 0.6f), G * 1.6f);
+			Glowing(Fletch, Gem, G * 0.55f);
+			Fletch->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+			Fletch->SetRelativeScale3D(FVector(0.24f));
+			Glowing(Body, Gem, G * 0.7f);
+			Body->SetRelativeRotation(FRotator::ZeroRotator);
+			Body->SetRelativeScale3D(FVector(0.001f));
+			ASpellFx::Play(GetWorld(), ESpellFx::Muzzle, GetActorLocation(), FVector(L.Dir), Gem);
 		}
-		else Paint(Head, L.bPurple ? FLinearColor(2.6f, 0.5f, 3.f) : FLinearColor(0.6f, 1.5f, 3.2f));
+		else { Body->SetVisibility(false); Fletch->SetVisibility(false); Paint(Head, FLinearColor(0.6f, 1.5f, 3.2f)); }
 		const float LightI = FMath::Max(0.f, CVarBoltLight.GetValueOnGameThread());
 		if (LightI > 0.f)
 		{
@@ -196,6 +211,7 @@ void AProjectile::Tick(float DeltaSeconds)
 	// (a player's copy just stops and waits: the server says where it ended up, or relaunches it off a shield)
 	auto Wait = [this]() { bFlying = false; SetActorHiddenInGame(true); };
 	const FVector Dir = Velocity.GetSafeNormal();
+	auto BoltBurst = [&](const FVector& P) { if (L.bBolt && !IsNetMode(NM_DedicatedServer)) ASpellFx::Play(GetWorld(), ESpellFx::Burst, P, Dir, BoltGem); };   // (2026-11-22: a burst where a spell lands)
 
 	// Anything with hit boxes along the way (HitBoxes.h): a raised shield's wedge first, then the body. Whatever the tip meets first.
 	if (!bSpent)
@@ -252,6 +268,7 @@ void AProjectile::Tick(float DeltaSeconds)
 					if (FMath::LineExtentBoxIntersection(Local, Xf.InverseTransformPosition(S0), Xf.InverseTransformPosition(S1), FVector(1.5f), HitL, Normal, Time) && Time < HitT)
 					{ HitT = Time; HitPart = i; HitAt = Xf.TransformPosition(HitL); }
 				}
+				BoltBurst(At);
 				if (!bAuth) { if (HitPart >= 0) { SetActorLocation(HitAt); Wait(); return; } bSpent = true; Wait(); return; }
 				// Arrows and bolts do no shield damage (owner 2026-11-12): a raised shield simply stops them, its guard untouched
 				if (!BestK && !BestH->ShieldBlock && Shooter) Shooter->DealDamage(BestH, Damage, bCrit, Skill, true);
@@ -259,7 +276,7 @@ void AProjectile::Tick(float DeltaSeconds)
 				else Deflect(At, (At - BestWedge.Apex).GetSafeNormal2D());
 				return;
 			}
-			if (!bAuth) { SetActorLocation(At); Wait(); return; }
+			if (!bAuth) { BoltBurst(At); SetActorLocation(At); Wait(); return; }
 			// A headshot (owner, 2026-11-02): arrows and bolts to the head do 1.5x, before the helmet takes its share
 			const bool bHead = BestZone == JeebHit::Z_Head;
 			const int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul()) : Damage;
@@ -278,7 +295,7 @@ void AProjectile::Tick(float DeltaSeconds)
 				if (D < JointD) { JointD = D; Joint = C; }
 			}
 			if (!Joint) Joint = Target->GetRootComponent();
-			if (L.bBolt) { Destroy(); return; }
+			if (L.bBolt) { BoltBurst(At); Destroy(); return; }
 			StickAt(At, Target, Joint, Joint ? Joint->GetFName() : NAME_None, 0, false);
 			return;
 		}
@@ -293,7 +310,7 @@ void AProjectile::Tick(float DeltaSeconds)
 	if (!bHit && To.Z < Ground) { bHit = true; Land = FVector(To.X, To.Y, Ground); Blocked = FHitResult(); }   // (the ground itself, where it has no collision)
 	if (bHit)
 	{
-		if (L.bBolt) { if (bAuth) Destroy(); else Wait(); return; }
+		if (L.bBolt) { BoltBurst(Land); if (bAuth) Destroy(); else Wait(); return; }
 		if (!bAuth) { SetActorLocation(Land); Wait(); return; }
 		StickAt(Land, nullptr, nullptr, NAME_None, 0, !bSpent);   // (the ground, trees and walls stay put: it stays where it is)
 		return;
@@ -301,6 +318,13 @@ void AProjectile::Tick(float DeltaSeconds)
 	SetActorLocation(To);
 	SetActorRotation(Velocity.Rotation());
 	Travelled += (To - From).Size();
+	if (L.bBolt && !IsNetMode(NM_DedicatedServer) && Body && Body->IsVisible())   // (2026-11-22: the streak behind the spell, up to 90 cm, and the halo's shimmer)
+	{
+		const float Len = FMath::Min(Travelled, 90.f);
+		Body->SetRelativeLocation(FVector(-Len * 0.5f, 0.f, 0.f));
+		Body->SetRelativeScale3D(FVector(FMath::Max(Len, 1.f) / 100.f, 0.075f, 0.075f));
+		if (Fletch) Fletch->SetRelativeScale3D(FVector(0.24f * (1.f + 0.12f * FMath::Sin(Travelled * 0.05f))));
+	}
 	if (L.bBolt && Travelled > L.Range) { if (bAuth) Destroy(); else Wait(); }   // (bolts fade out at their range; arrows fly on until they land)
 }
 
