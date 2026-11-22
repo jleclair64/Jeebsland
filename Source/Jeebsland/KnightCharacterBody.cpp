@@ -394,7 +394,7 @@ void AKnightCharacter::RefreshEquipment()
 // to the pendant on his chest (Meshy's models, JeebProps::AmuletMesh). In the chest bone's frame (UpperPivot: X forward, Y his right, Z up), measured from
 // his neck bone; rebuilt only when the amulet changes. The first amulet among the three misc slots is the one shown.
 static float ChainBackX = -7.5f, ChainSideY = 10.5f, ChainUp = 3.f;    // round the neck: behind it, either side, how far above the neck bone
-static float ChainFrontX = 21.f, ChainDrop = 17.f;                      // where the pendant hangs: in front of the neck bone (on the chest plate), and below it
+static float ChainFrontX = 21.f, ChainDrop = 6.f;                      // where the pendant hangs: in front of the neck bone (on the chest plate), and below it
 static float ChainBareIn = 5.f;                                          // with no chest plate it lies this much nearer, on the mail
 static float PendantPitch = 8.f;                                         // the pendant leans out at the bottom, lying on the chest plate
 static float PendantScale = 3.9f;   // (2026-11-21, owner: three times larger: the models are 6 cm tall, so 23 cm now)
@@ -487,7 +487,8 @@ void AKnightCharacter::UpdateAmulet()
 // The worn rings (2026-11-21, owner: "make sure the rings can be seen on the fingers"; they were never drawn since the old knight went): a band with its stone on
 // the back of a finger, on the hand bone's own frame (the gauntlet's fingers move with it; a fist turns them only a little), the first on his right hand, the second
 // on the left, a third beside the first. Every hand, open or fist, in every armour style and bare.
-static float RingAlong = 11.f, RingPalm = -1.f, RingAcross = 0.f, RingRad = 2.6f, RingThick = 0.8f;   // along the fingers from the wrist bone, off the hand's middle toward the palm, across the hand (cm); the band's radius and tube
+static float RingFistAlong = 8.8f, RingFistPalm = -0.5f;   // (the closed hand's place, see UpdateRings)
+static float RingAlong = 9.5f, RingPalm = 0.f, RingAcross = 0.f, RingRad = 2.4f, RingThick = 0.7f;  // along the fingers from the wrist bone, off the hand's middle toward the palm, across the hand (cm); the band's radius and tube
 void AKnightCharacter::UpdateRings()
 {
 	if (!Skills || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
@@ -499,13 +500,14 @@ void AKnightCharacter::UpdateRings()
 	{
 		RingShownKey = Key;
 		for (USceneComponent* C : RingParts) if (C) C->DestroyComponent();
-		RingParts.Reset();
+		RingParts.Reset(); RingSlots.Reset();
 #if !UE_BUILD_SHIPPING
 		{   // (test pictures: -RingTune=<along>_<palm>_<across>_<radius>_<tube>, cm in tenths)
 			FString T; TArray<FString> V;
 			if (FParse::Value(FCommandLine::Get(), TEXT("RingTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
 			{ RingAlong = FCString::Atof(*V[0]) / 10.f; RingPalm = FCString::Atof(*V[1]) / 10.f; RingAcross = FCString::Atof(*V[2]) / 10.f; RingRad = FCString::Atof(*V[3]) / 10.f; RingThick = FCString::Atof(*V[4]) / 10.f; }
 		}
+		FString TF; TArray<FString> VF; if (FParse::Value(FCommandLine::Get(), TEXT("RingFist="), TF) && TF.ParseIntoArray(VF, TEXT("_")) == 2) { RingFistAlong = FCString::Atof(*VF[0]) / 10.f; RingFistPalm = FCString::Atof(*VF[1]) / 10.f; }
 #endif
 		UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
 		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
@@ -546,17 +548,32 @@ void AKnightCharacter::UpdateRings()
 			const int32 Var = JeebItems::VariantOf(Rings[i]);
 			const JeebItems::FAccessoryRow& Row = JeebItems::AccessoryRow(JeebItems::K_Ring, Var);
 			const float Across = RingAcross + (i == 2 ? 2.4f : 0.f);
-			const FQuat Q = FRotationMatrix::MakeFromZX(A, -N).ToQuat();
-			const FVector Pos = A * RingAlong + N * RingPalm + Cx * Across;
 			KM::FMD Band, Stone;
 			KM::Torus(Band, RingRad, RingThick, 16, 8, 1.f, 1.f, KM::Xf(FVector::ZeroVector));
 			KM::Ellipsoid(Stone, RingThick * 1.5, RingThick * 1.3, RingThick * 1.2, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 0.9, 0.f, 0.f)));
 			UProceduralMeshComponent* B = Proc(RingHand[Side], Band, Row.Band, 0.3f);
 			UProceduralMeshComponent* S = Proc(RingHand[Side], Stone, Row.Gem, 0.1f);
-			B->SetRelativeLocationAndRotation(Pos, Q);
-			S->SetRelativeLocationAndRotation(Pos, Q);
+			FRingSlot Slot; Slot.Band = B; Slot.Stone = S; Slot.Side = Side; Slot.Across = Across; RingSlots.Add(Slot);
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBRING %d rings drawn"), Rings.Num());
+	}
+	for (const FRingSlot& Slot : RingSlots)
+	{
+		FVector A, N;
+		if (!Slot.Band.IsValid() || !Anim->HandFrame(Slot.Side, A, N)) continue;
+		// The open hand: the band round a finger, along the hand's line. The fist (the fingers wrap round the grip line, 12.5 cm along and 6 toward the palm,
+		// 2.8 cm out; the gauntlet's own bend moves the hand 2.8 toward the palm): the band sits on the outside of the wrap where the finger leaves the knuckle,
+		// its axis the finger's way there. Blended by how closed the hand is.
+		const float W = Anim->FistAmount(Slot.Side);
+		const FVector Cx = FVector::CrossProduct(A, N).GetSafeNormal() * (Slot.Side == 0 ? 1.f : -1.f);
+		const FVector U = -N;   // (measured on pictures 2026-11-22: the closed gauntlet's knuckles lie on the hand's own line, so the band keeps the open hand's turn)
+		const FVector T = A;
+		const FVector POpen = A * RingAlong + N * RingPalm, PFist = A * RingFistAlong + N * RingFistPalm;
+		const FVector Axis = FMath::Lerp(A, T, W).GetSafeNormal(), Out = FMath::Lerp(-N, U, W).GetSafeNormal();
+		const FQuat Q = FRotationMatrix::MakeFromZX(Axis, Out).ToQuat();
+		const FVector Pos = FMath::Lerp(POpen, PFist, W) + Cx * Slot.Across;
+		Slot.Band->SetRelativeLocationAndRotation(Pos, Q);
+		Slot.Stone->SetRelativeLocationAndRotation(Pos, Q);
 	}
 	if (Rings.Num() > 0)
 	{

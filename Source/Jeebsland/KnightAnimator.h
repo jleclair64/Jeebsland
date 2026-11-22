@@ -222,6 +222,7 @@ public:
 	FTransform BoneWorld(int32 B) const;
 	FVector BoneAt(int32 B) const { return BoneWorld(B).GetLocation(); }
 	FTransform RightGripWorld() const;   // WristR: the weapon's joint
+	float FistAmount(int32 Side) const { return FMath::SmoothStep(0.f, 1.f, FistW[Side]); }   // how closed a hand is (0 right, 1 left)
 	bool HandFrame(int32 Side, FVector& OutAlong, FVector& OutPalm) const;   // (rings, 2026-11-21) in a hand bone's frame (cm): the way the fingers lead, and toward the palm; Side 0 right, 1 left
 	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
 	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
