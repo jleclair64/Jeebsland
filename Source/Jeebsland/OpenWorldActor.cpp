@@ -27,11 +27,11 @@ namespace
 	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.6f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
 	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.3 to 2.8 cm)"));
 
-	TAutoConsoleVariable<float> CVarCandles(TEXT("jeeb.Candles"), 1.f, TEXT("The floating candles over Silver Point: 0 hides them, 1 as built (48; a looks-only switch)."));
+	TAutoConsoleVariable<float> CVarCandles(TEXT("jeeb.Candles"), 1.f, TEXT("The floating candles over Silver Point: 0 hides them, 1 as built (60; a looks-only switch)."));
 	TAutoConsoleVariable<float> CVarCandleLight(TEXT("jeeb.Candles.Light"), 1.f, TEXT("The floating candles: strength of the few real lights on the candles nearest you (0 none)."));
 	TAutoConsoleVariable<float> CVarCandleGlow(TEXT("jeeb.Candles.Glow"), 1.f, TEXT("The floating candles: brightness of the flames and halos (0 hides them)."));
-	TAutoConsoleVariable<float> CVarCandleBy(TEXT("jeeb.Candles.Day"), 0.35f, TEXT("The floating candles: how bright the flames are in full daylight, against 1 at night."));
-	constexpr int32 NumCandles = 48;
+	TAutoConsoleVariable<float> CVarCandleBy(TEXT("jeeb.Candles.Day"), 0.5f, TEXT("The floating candles: how bright the flames are in full daylight, against 1 at night."));
+	constexpr int32 NumCandles = 60;
 	constexpr int32 NumCandleLights = 6;
 	constexpr float CandleSeeReach = 25000.f;   // (cm from the site's middle past which the candles are put away)
 
@@ -179,7 +179,7 @@ void AOpenWorld::BuildCandles()
 	const JeebOpen::FSite& S = Sites[0];
 	CandleSite = S.Pos;
 	FRandomStream R(51515);
-	const float Reach = S.Radius + 600.f;
+	const float Reach = S.Radius * 0.7f + 300.f;   // (over the middle and the green round it; the edge stays open)
 	int32 Tries = 0;
 	while (Candle.Num() < NumCandles && Tries++ < 2000)
 	{
@@ -224,7 +224,7 @@ void AOpenWorld::BuildCandles()
 		if (UMaterialInstanceDynamic* M = CandleBody->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.85f, 0.74f, 0.52f));
 		if (UMaterialInstanceDynamic* M = CandleFlame->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(5.f, 1.9f, 0.3f));
 	}
-	if (HaloMat) if (UMaterialInstanceDynamic* M = CandleHalo->CreateDynamicMaterialInstance(0, HaloMat)) { M->SetScalarParameterValue(TEXT("Intensity"), 0.4f); M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1.f, 0.5f, 0.14f)); }
+	if (HaloMat) if (UMaterialInstanceDynamic* M = CandleHalo->CreateDynamicMaterialInstance(0, HaloMat)) { M->SetScalarParameterValue(TEXT("Intensity"), 0.3f); M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1.f, 0.5f, 0.14f)); }
 	TArray<FTransform> X;
 	for (int32 i = 0; i < Candle.Num(); ++i) X.Add(FTransform(FQuat::Identity, Candle[i].Home, FVector(0.001f)));
 	UInstancedStaticMeshComponent* Parts[3] = { CandleBody, CandleFlame, CandleHalo };
@@ -280,14 +280,14 @@ void AOpenWorld::TickCandles(float Dt, const FVector& Cam)
 		const float Gust = FMath::Clamp((FMath::PerlinNoise1D(T * 0.55f + C.Phase * 13.f) - 0.25f) * 4.f, 0.f, 1.f);
 		const float B = FMath::Max(0.45f, 0.97f + Waver - 0.3f * Gust);
 		const FQuat Q = FRotator(C.Lean * FMath::Sin(T * 0.6f + C.Phase), 0.f, C.Lean * FMath::Cos(T * 0.5f + C.Phase)).Quaternion();
-		const float BodyH = 20.f, BodyR = 2.4f;
+		const float BodyH = 34.f, BodyR = 3.4f;
 		// (cylinder: 100 cm tall and across, centred; cone: 100 tall, tip up, centred; sphere 100 across)
 		const FVector Top = P + Q.RotateVector(FVector(0.f, 0.f, BodyH * 0.5f));
 		const float Show = FMath::Min(Lit, 1.f);
-		const float FlameH = 6.5f * B * Show, FlameW = 2.0f * Show * (0.9f + 0.1f * B);
+		const float FlameH = 11.f * B * Show, FlameW = 3.4f * Show * (0.9f + 0.1f * B);
 		CandleNow[0][i] = FTransform(Q, P, FVector(BodyR * 2.f, BodyR * 2.f, BodyH) * 0.01f);
 		CandleNow[1][i] = FTransform(Q, Top + Q.RotateVector(FVector(0.f, 0.f, FlameH * 0.5f + 0.5f)), FVector(FMath::Max(FlameW, 0.001f), FMath::Max(FlameW, 0.001f), FMath::Max(FlameH, 0.001f)) * 0.01f);
-		CandleNow[2][i] = FTransform(Q, Top + Q.RotateVector(FVector(0.f, 0.f, 3.f)), FVector(FMath::Max(FMath::Min(60.f * (0.7f + 0.3f * B), 90.f) * Show, 0.01f)) * 0.01f);
+		CandleNow[2][i] = FTransform(Q, Top + Q.RotateVector(FVector(0.f, 0.f, 4.f)), FVector(FMath::Max(FMath::Min(40.f * (0.7f + 0.3f * B), 80.f) * Show, 0.01f)) * 0.01f);
 		Near.Emplace(float(FVector::DistSquared(Top, Cam)), i);
 	}
 	if (!bCandleSeen) { for (int32 k = 0; k < 3; ++k) CandlePrev[k] = CandleNow[k]; bCandleSeen = true; }
