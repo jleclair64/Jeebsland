@@ -33,7 +33,7 @@ namespace
 
 	TWeakObjectPtr<ABushes> GBushes;
 
-	enum EBush : uint8 { B_Full, B_Small, B_Fine, B_Low, B_Flower1, B_Flower2, B_Reed1, B_Reed2, B_Pad, B_Num };
+	enum EBush : uint8 { B_Full, B_Small, B_Fine, B_Low, B_Flower1, B_Flower2, B_Reed1, B_Reed2, B_Pad, B_PadFlower, B_PadTwin, B_Num };
 	struct FBushDef { const TCHAR* Path; float Reach; float Foot; const TCHAR* Title; };
 	const FBushDef Defs[B_Num] = {
 		{ TEXT("/Game/Bushes/SM_BushFull.SM_BushFull"), 7000.f, 100.f, TEXT("full") },
@@ -47,8 +47,11 @@ namespace
 		// 1.4-1.9 times as tall in the shallows and the wet edge of the rivers, lakes and the sea's inlets; their own wind, as the meadow's grass
 		{ TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/grass_03_01_mesh.grass_03_01_mesh"), 4500.f, 0.f, TEXT("reed a") },
 		{ TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/grass_12_11_mesh.grass_12_11_mesh"), 4500.f, 0.f, TEXT("reed b") },
-		// lily pads on the calmer, deeper water near the banks: a flat disc in the pond's colours (Pond.cpp has the same), no flowers here
-		{ TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), 3500.f, 0.f, TEXT("lily pad") },
+		// lily pads on the calmer, deeper water near the banks (2026-11-22, owner: real ones, from Meshy; Tools/BuildLilyPads.ps1): a notched pad, a pad with a
+		// pink and white flower, and two pads with a bud. Each 100 cm across, its underside at the origin.
+		{ TEXT("/Game/LilyPads/SM_LilyPad.SM_LilyPad"), 4500.f, 0.f, TEXT("lily pad") },
+		{ TEXT("/Game/LilyPads/SM_LilyFlower.SM_LilyFlower"), 4500.f, 0.f, TEXT("lily pad flower") },
+		{ TEXT("/Game/LilyPads/SM_LilyTwin.SM_LilyTwin"), 4500.f, 0.f, TEXT("lily pads twin") },
 	};
 
 	// Where to look: round Oak Hill's forest, Blackrock's woods round the square, Steele Creek, and the land between Oak Hill and Steele
@@ -243,8 +246,11 @@ void ABushes::Rebuild()
 					for (int32 n = 0, Nn = 2 + R.RandRange(0, 2); n < Nn; ++n)
 					{
 						const FVector2D Qp = P + FVector2D(R.FRandRange(-160.f, 160.f), R.FRandRange(-160.f, 160.f));
-						const float Sz = R.FRandRange(0.30f, 0.55f);
-						Xf[B_Pad].Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f), FVector(Qp.X, Qp.Y, S + 0.8f), FVector(Sz, Sz, 0.012f)));
+						// (deterministic: the cell's own stream, the same on the server and every client) which of the three, and its own size and yaw
+						const float Pick = R.FRand();
+						const int32 Kind = Pick < 0.5f ? B_Pad : (Pick < 0.8f ? B_PadFlower : B_PadTwin);
+						const float Sz = Kind == B_PadTwin ? R.FRandRange(0.28f, 0.45f) : R.FRandRange(0.32f, 0.6f);
+						Xf[Kind].Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f), FVector(Qp.X, Qp.Y, S - 1.f), FVector(Sz)));
 						++NPad;
 					}
 				}
@@ -293,9 +299,7 @@ void ABushes::Rebuild()
 		C->bAffectDistanceFieldLighting = false;
 		C->bAffectDynamicIndirectLighting = false;
 		C->RegisterComponent();
-		if (k == B_Pad)
-			if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"), nullptr, LOAD_Quiet | LOAD_NoWarn))
-				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.035f, 0.075f, 0.02f));
+		if (k >= B_Pad) C->SetCastShadow(false);   // (flat on the water: no shadows)
 		C->AddInstances(Xf[k], false, true, false);
 		Sets.Add(C); SetReach.Add(Defs[k].Reach);
 		Total += Xf[k].Num();
@@ -307,7 +311,7 @@ void ABushes::Rebuild()
 	UE_LOG(LogTemp, Log, TEXT("JEEBREED reeds %d, lily pads %d"), NReed, NPad);
 #if !UE_BUILD_SHIPPING
 	if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot")))
-		for (int32 k : { (int32)B_Reed1, (int32)B_Pad })
+		for (int32 k : { (int32)B_Reed1, (int32)B_Pad, (int32)B_PadFlower, (int32)B_PadTwin })
 			for (int32 n = 0; n < FMath::Min(6, Xf[k].Num()); ++n)
 			{
 				const FVector L = Xf[k][(n * 7919 + 13) % Xf[k].Num()].GetLocation();
