@@ -20,10 +20,12 @@ namespace JeebGround
 	struct FMask
 	{
 		float Worn = 0.f, Rock = 0.f, Mud = 0.f, Sand = 0.f;
+		float Snow = 0.f;   // (2026-11-21: for the grass only. M_Ground paints its snow from the height itself, so it is not in the colour)
 		FLinearColor Color() const { return FLinearColor(Worn, Rock, Mud, Sand); }
 		static FMask Lerp(const FMask& A, const FMask& B, float T)
 		{
 			FMask M; M.Worn = FMath::Lerp(A.Worn, B.Worn, T); M.Rock = FMath::Lerp(A.Rock, B.Rock, T); M.Mud = FMath::Lerp(A.Mud, B.Mud, T); M.Sand = FMath::Lerp(A.Sand, B.Sand, T);
+			M.Snow = FMath::Lerp(A.Snow, B.Snow, T);
 			return M;
 		}
 	};
@@ -185,6 +187,7 @@ namespace JeebGround
 		}
 		M.Worn = FMath::Max(M.Worn, BuildingWear(X, Y, Pc));
 		M.Rock *= 1.f - M.Worn;   // (a doorway or road on a steep spot stays earth)
+		M.Snow = JeebOpen::Snow(X, Y, Z, Up);   // (the northern range, from about 45 m up)
 		return M;
 	}
 	inline FMask At(float X, float Y, bool bRoads = true) { return At(X, Y, JeebTerrain::HeightAt(X, Y), Upness(X, Y), bRoads); }
@@ -193,6 +196,7 @@ namespace JeebGround
 	// How much grass grows (0 none .. 1 full) from a mask: none on rock, mud or sand, fading in softly round them
 	inline float GrassAmount(const FMask& M)
 	{
-		return (1.f - JeebWorld::Smooth(0.25f, 0.65f, M.Rock)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Mud)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Sand));
+		return (1.f - JeebWorld::Smooth(0.25f, 0.65f, M.Rock)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Mud)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Sand))
+			* (1.f - JeebWorld::Smooth(0.2f, 0.75f, M.Snow));   // (tufts thin out through the patchy snow and stop where it lies solid)
 	}
 }

@@ -167,6 +167,35 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
+	// The other towns' names, the same way (2026-11-21, owner: "add the name so it shows up when you walk into the town area"): Oak Hill,
+	// Steele Creek and the sites of the towns still to be built (JeebOpen::Sites: a placeholder house each)
+	{
+		const FVector2D At(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
+		int32 Now = -1; FString Name;
+		auto Within = [&](int32 Idx, const FVector2D& Mid, float Radius, const TCHAR* Nm)
+		{
+			if (Now >= 0 || FVector2D::Distance(At, Mid) > Radius + (AreaIn == Idx ? 1000.f : 0.f)) return;   // (10 m of slack on the way out, so the edge can't flicker)
+			Now = Idx; Name = FString(Nm).ToUpper();
+		};
+		if (JeebOakHill::Enabled()) Within(0, FVector2D(JeebOakHill::PosX, JeebOakHill::PosY), 7500.f, TEXT("Oak Hill"));
+		if (JeebSteele::Enabled()) Within(1, FVector2D(JeebSteele::PosX, JeebSteele::PosY), 7000.f, TEXT("Steele Creek"));
+		const TArray<JeebOpen::FSite>& Sites = JeebOpen::Sites();
+		for (int32 s = 0; s < Sites.Num(); ++s) Within(2 + s, Sites[s].Pos, Sites[s].Radius, Sites[s].Name);
+		const float T = GetWorld()->GetTimeSeconds();
+		if (Now != AreaIn)
+		{
+			if (Now >= 0 && T > 8.f) { AreaBannerT = T; AreaName = Name; }
+			AreaIn = Now;
+		}
+		static const bool bShotArea = FParse::Param(FCommandLine::Get(), TEXT("ShotBanner"));
+		const float Age = T - AreaBannerT;
+		if (AreaBannerT > 0.f && Age < 4.5f && !bShotArea)
+		{
+			const float A = FMath::Clamp(FMath::Min(Age / 0.8f, (4.5f - Age) / 1.2f), 0.f, 1.f);
+			TitleBanner(AreaName, Canvas->ClipY * 0.15f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), A);
+		}
+	}
+
 
 	DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)

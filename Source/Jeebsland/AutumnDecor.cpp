@@ -77,6 +77,8 @@ namespace
 		}
 		ApplyLeafTints();
 	}
+	// (2026-11-21, owner: "replace the falling leave animation with a falling snow animation") leaves no longer drift or gust through the air: AOpenWorld snows instead
+	TAutoConsoleVariable<int32> CVarLeavesFall(TEXT("jeeb.Leaves.Fall"), 0, TEXT("1: the old drifting leaves and leaf gusts round the player as well as the snow (read when the world is built). 0: none (2026-11-21)"));
 	constexpr int32 NumFallingLeaves = 15;
 	constexpr int32 NumGustLeaves = 42;
 	constexpr float GustDuration = 5.2f;   // about twice as long, so leaves carry much further before they fade
@@ -773,6 +775,9 @@ void AAutumnDecor::BeginPlay()
 		}
 	}
 	// ---------------- Leaves drifting down around the player ----------------
+	// (2026-11-21, owner: "replace the falling leave animation with a falling snow animation": the drifting leaves and the gusts are off,
+	// AOpenWorld snows instead; the fallen leaves on the ground stay)
+	if (CVarLeavesFall.GetValueOnGameThread() != 0)
 	{
 		TArray<TArray<FTransform>> PerType;
 		PerType.SetNum(NumLeafTypes);
@@ -792,6 +797,7 @@ void AAutumnDecor::BeginPlay()
 	}
 
 	// ---------------- Gust leaves (hidden until a gust blows through) ----------------
+	if (CVarLeavesFall.GetValueOnGameThread() != 0)
 	{
 		TArray<TArray<FTransform>> PerType;
 		PerType.SetNum(NumLeafTypes);
@@ -871,6 +877,7 @@ void AAutumnDecor::Tick(float DeltaSeconds)
 			TorchCore->UpdateInstanceTransform(i, FTransform(Lean, F - FVector(0.f, 0.f, 5.f), FVector(0.09f * Wd, 0.09f * Wd, 0.22f * H)), true, false, true);
 		}
 	}
+	if (Falling.Num() == 0) return;   // (no drifting leaves or gusts: it snows instead, AOpenWorld)
 	// ---- Gust of wind: every few seconds a flurry of leaves whips past in an open part of the map ----
 	{
 		APlayerController* GPC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;

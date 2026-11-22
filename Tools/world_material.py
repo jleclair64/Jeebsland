@@ -304,12 +304,14 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     sand = g.muln(palette.colour(mat, "Sand"), g.lerpc(0.86, 1.08, g.mul(g.lum(soil), 7.5)))
     col = g.lerp(col, sand, s_amt)
 
-    # Snow by height on gentle ground, off until the mountains are built (SnowFrom 60 m: nothing is that high yet)
-    snow_from, snow_to = g.scalar("SnowFrom", 6000.0), g.scalar("SnowTo", 6800.0)
-    up = g.subn(wz, snow_from)
-    span = g.subn(snow_to, snow_from)
-    div = g.node(unreal.MaterialExpressionDivide); g.link(up, div, "A"); g.link(span, div, "B")
-    snow_amt = g.muln(g.sat(g.addn(div, g.mul(g.add(rag, -0.5), 0.4))), g.ramp(nz, 0.55, 0.75))
+    # snow ... more snow the higher up you go"): how much lies at each point of the world's ground comes in the second UV (JeebOpen::Snow in
+    # OpenWorld.cpp: patchy from 45 m, solid by 75 m, less on steep rock, broken by real noise at 90 m and 23 m; AWorldTerrain writes it).
+    # A first try with the tiled noise pictures here showed a repeating weave along the snow's edge. The stone patches' mix of noises (low gain) and a little of the ragged 1.5 m
+    # noise are added, to roughen the edge. Grounds that give no second UV (the square, the towns) read 0: no snow.
+    # ragged 1.5 m noise, so it never follows a contour or repeats. JeebOpen::Snow (OpenWorld.cpp) tells the grass the same.
+    uv1 = g.node(unreal.MaterialExpressionTextureCoordinate)
+    uv1.set_editor_property("coordinate_index", 1)
+    snow_amt = g.sat(g.mul(g.addn(g.addn(g.add(g.mask(uv1, True, False), -1.0), g.mul(g.add(mix, -0.5), 0.35)), g.mul(g.add(rag, -0.5), 0.1)), 1.3))   # (the UV holds the amount + 1: a ground with no second UV reads 0, so -1, no snow)
     col = g.lerp(col, palette.colour(mat, "Snow"), snow_amt)
 
     # (2026-11-14: the swathes are now in grass_field.before_grey, on the grass only, the same as the blades and the town's lawn; flat ground is a little brighter than the blades, which are lit through)

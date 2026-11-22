@@ -6,6 +6,7 @@
 #include "TownLab.h"
 #include "Hills.h"
 #include "SteeleCreek.h"
+#include "OpenWorld.h"      // the open world outside Oak Hill's hills (2026-11-21): the tall northern range, rolling country, the roads between the towns
 #include "BridgeGround.h"   // the stone bridge over the river west of Oak Hill (2026-11-18): its embankments and the roads to it
 
 // The forest's roads round Oak Hill (OakForest.cpp), made paths below
@@ -254,7 +255,7 @@ namespace JeebTerrain
 	// whole world's land (WorldMap.h: mountains, the rocky south-west, level town sites), then the sea, the coast and the river
 	// valleys and channels everywhere (the river runs down through the east side of the original square).
 	constexpr float GroundHalfForBlend = 16000.f;
-	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2, bool bPads = true);
+	inline float HeightAt(float X, float Y, bool bCap = true, int32 Hills = 2, bool bPads = true, bool bOpen = true);
 	float RoadEaseDelta(float X, float Y);   // (RoadSlope.cpp: Oak Hill's roads eased to a walk, 2026-11-20)
 
 	// ------------------------------------------------------------------ building pads
@@ -497,14 +498,27 @@ namespace JeebTerrain
 	// Hills: the forested hills round Oak Hill (Hills.h, 2026-11-16), added to the land before the rivers so their channels stay:
 	// 2 as built, 1 before the forest roads are levelled (what RoadLines routes on), 0 none (the roads' base)
 	// bPads: the building pads (ApplyPads) on top; only on the finished ground (Hills 2)
-	inline float HeightAt(float X, float Y, bool bCap, int32 Hills, bool bPads)
+	// The land before the open world's grid, the sea and the rivers: the original square blending into the world's land, with Oak Hill's
+	// hills as built (JeebOpen's grid is worked out on this)
+	inline float LandBeforeWater(float X, float Y)
 	{
 		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
 		float H;
 		if (Cheb < 12000.f) H = HomeHeight(X, Y);
 		else if (Cheb >= GroundHalfForBlend - 400.f) H = JeebWorld::LandHeight(X, Y);
 		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
-		if (Hills == 2) H += JeebHills::Offset(X, Y);
+		return H + JeebHills::Offset(X, Y);
+	}
+	// (bOpen false: without JeebOpen's grid, which only the full land takes, Hills == 2. Oak Hill's hills and roads are worked out
+	// without it, so they stay exactly as they were)
+	inline float HeightAt(float X, float Y, bool bCap, int32 Hills, bool bPads, bool bOpen)
+	{
+		const float Cheb = FMath::Max(FMath::Abs(X), FMath::Abs(Y));
+		float H;
+		if (Cheb < 12000.f) H = HomeHeight(X, Y);
+		else if (Cheb >= GroundHalfForBlend - 400.f) H = JeebWorld::LandHeight(X, Y);
+		else H = FMath::Lerp(HomeHeight(X, Y), JeebWorld::LandHeight(X, Y), FMath::SmoothStep(12000.f, GroundHalfForBlend - 400.f, Cheb));
+		if (Hills == 2) { H += JeebHills::Offset(X, Y); if (bOpen) H += JeebOpen::Offset(X, Y); }
 		else if (Hills == 1) H += JeebHills::Raw(X, Y);
 		float RiverD = 1.0e9f, RiverHalf = 600.f;
 		H = JeebWorld::SeaAndRivers(X, Y, H, &RiverD, &RiverHalf);
@@ -764,6 +778,23 @@ namespace JeebTerrain
 				P.Kind = BR.Kind;
 				ShapeRoadEdges(P, D.Num());
 				D.Add(P);
+			}
+			// The open world's roads between the towns (2026-11-21, OpenWorld.cpp; always last, so no older road's shape changes): forest
+			// roads (Kind 2), cut into pieces of about 100 m the same way
+			for (const TArray<FVector2D>& Line : JeebOpen::RoadLines())
+			{
+				FPathDef Whole;
+				Whole.Pts = Line;
+				Whole.Width = 300.f;
+				ShapeRoadEdges(Whole, D.Num());
+				for (int32 s = 0; s + 1 < Line.Num(); s += 160)
+				{
+					FPathDef P;
+					P.Width = 300.f;
+					P.Kind = 2;
+					for (int32 i = s; i <= FMath::Min(s + 160, Line.Num() - 1); ++i) { P.Pts.Add(Whole.Pts[i]); P.HalfL.Add(Whole.HalfL[i]); P.HalfR.Add(Whole.HalfR[i]); }
+					D.Add(P);
+				}
 			}
 			for (FPathDef& P : D)
 			{

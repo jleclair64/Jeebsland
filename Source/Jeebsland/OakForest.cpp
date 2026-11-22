@@ -731,6 +731,186 @@ struct FOakForestBuild
 		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST Steele Creek: %d trees (%d planned, %d left out on steep ground), not choppable"), Placed, Spots.Num(), Steep);
 	}
 
+	// ---------------------------------------------------------------- the rest of the map (2026-11-21)
+	// Owner: "add roads and trees to the rest of the map ... For tree dispersion, I want some areas to be heavily wooded, but others to be
+	// more grass plains or intermittent wooded areas. I want less trees the higher you go on the mountains, and more pines the higher you
+	// go." (Docs/OpenWorldPlan.md: how Skyrim, Hogwarts Legacy and Breath of the Wild do it.) Everywhere outside the forest round Oak
+	// Hill, Steele Creek's woods, the original square, the town sites, the water and the beach, on the same 6.5 m lattice as the forest:
+	//  - JeebOpen::Woods says how wooded a neighbourhood is: deep forest (with the forest's own glades), intermittent copses, or open
+	//    plain with a lone, larger tree here and there;
+	//  - with height (a share of JeebOpen::PeakTop) the trees thin from about 28%, shrink from 40% and stop at a ragged treeline about
+	//    64%, a little above where the snow starts; spruces take over from 16% and are all there is by 50%;
+	//  - what grows low down is the forest's mix (conifer stands, aspen clumps, cork oaks), with more spruce to the north, mostly aspens
+	//    round Birch Grove and few spruces toward the tropics; thinner on slopes over 30 degrees, none over 36.
+	// Then a little undergrowth in the woods and boulder clumps, more of them up the mountains (above the treeline too).
+	void Wilds()
+	{
+		using namespace JeebOakHill;
+		if (!Enabled()) return;
+		if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot")) && FParse::Param(FCommandLine::Get(), TEXT("NoWilds"))) { UE_LOG(LogTemp, Log, TEXT("JEEBFOREST wilds left out (-NoWilds)")); return; }
+		const float Density = FMath::Clamp(CVarDensity.GetValueOnGameThread(), 0.f, 3.f);
+		const FVector2D Plaza(PosX, PosY), SteeleC(JeebSteele::PosX, JeebSteele::PosY);
+		const double T0 = FPlatformTime::Seconds();
+		FHeights Hs;
+		Hs.Build(FVector2D(JeebWorld::MinX, JeebWorld::MinY), FVector2D(JeebWorld::MaxX - 1600.f, JeebWorld::MaxY - 1600.f));
+		FVector2D Birch = FVector2D::ZeroVector;
+		for (const JeebWorld::FTown& T : JeebWorld::Towns()) if (FCString::Strcmp(T.Name, TEXT("Birch Grove")) == 0) Birch = T.Pos;
+		const bool bLab = JeebTownLab::Active();
+
+		auto Edge = [&](float X, float Y) -> float
+		{
+			if (X < JeebWorld::MinX + 2500.f || Y < JeebWorld::MinY + 2500.f || X > JeebWorld::MaxX - 2500.f) return 0.f;
+			const FVector2D P(X, Y);
+			const float D = FVector2D::Distance(P, Plaza);
+			if (D < JeebOakForest::Reach - 4000.f) return 0.f;
+			const float Sq = FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf;
+			if (Sq < 1200.f) return 0.f;
+			const float Ds = FVector2D::Distance(P, SteeleC);
+			if (Ds < 21000.f) return 0.f;
+			const float Shore = JeebWorld::CoastY(X) - Y;
+			if (Shore < 3000.f) return 0.f;
+			const float Rd = JeebWorld::WaterEdge(X, Y);
+			if (Rd < 1200.f) return 0.f;
+			if (bLab && JeebTownLab::InSite(JeebTownLab::LabSite(), X, Y, 2500.f)) return 0.f;
+			float K = JeebWorld::Smooth(JeebOakForest::Reach - 4000.f, JeebOakForest::Reach, D) * JeebWorld::Smooth(1200.f, 5200.f, Sq) * JeebWorld::Smooth(21000.f, 24000.f, Ds)
+				* JeebWorld::Smooth(1200.f, 3000.f, Rd) * JeebWorld::Smooth(3000.f, 7000.f, Shore);
+			for (const JeebOpen::FSite& S : JeebOpen::Sites())   // (the land round a town is cleared, then turns wild)
+			{
+				const float Dt = FVector2D::Distance(P, S.Pos);
+				if (Dt < S.Radius) return 0.f;
+				K *= JeebWorld::Smooth(S.Radius, S.Radius + 5000.f, Dt);
+			}
+			return K;
+		};
+
+		FRandomStream R(9393);
+		const float Cell = 650.f;
+		const int32 NX = FMath::CeilToInt((JeebWorld::MaxX - JeebWorld::MinX) / Cell), NY = FMath::CeilToInt((JeebWorld::MaxY - JeebWorld::MinY) / Cell);
+		int32 Count[K_Num] = {}, Trees = 0, Lone = 0, High = 0, Deep = 0;
+		TArray<FVector2D> Open;
+		for (int32 i = 0; i < NX; ++i)
+			for (int32 j = 0; j < NY; ++j)
+			{
+				const float X = JeebWorld::MinX + (i + R.FRand()) * Cell, Y = JeebWorld::MinY + (j + R.FRand()) * Cell;
+				const float Keep = R.FRand(), Pick = R.FRand(), Pick2 = R.FRand(), Sc = R.FRand(), Yaw = R.FRandRange(0.f, 360.f);   // (every number drawn before any skip)
+				const float W = Edge(X, Y);
+				if (W <= 0.f) continue;
+				const FVector2D P(X, Y);
+				float Slope;
+				const float Z = Hs.At(X, Y, &Slope);
+				if (Slope > 0.72f) continue;
+				// height: thinner, then none above the ragged treeline
+				const float A = Z / JeebOpen::PeakTop;
+				const float Rag = 0.07f * Noise(P, 7000.f, 5.5f, -9.1f);
+				const float HighKeep = (1.f - JeebWorld::Smooth(0.44f + Rag, JeebOpen::Treeline + Rag, A)) * FMath::Lerp(1.f, 0.65f, JeebWorld::Smooth(0.28f, 0.46f, A));
+				if (HighKeep <= 0.f) continue;
+				if (OnForestRoadBox(X, Y, 600.f) && JeebTerrain::PathClearance(X, Y) < 400.f) continue;
+				const float Wd = JeebOpen::Woods(X, Y);
+				const bool bLone = Wd < 0.1f;
+				const float Glade = JeebWorld::Smooth(-0.32f, -0.12f, Noise(P, 9000.f, 3.3f, 8.8f));   // (the forest's own glade noise: the two meet without a seam)
+				const float Around = 0.25f * (Hs.At(X + 3000.f, Y) + Hs.At(X - 3000.f, Y) + Hs.At(X, Y + 3000.f) + Hs.At(X, Y - 3000.f));
+				const float Hollow = FMath::Clamp((Around - Z) / 200.f, -1.f, 1.f);
+				const float RoadSide = OnForestRoadBox(X, Y, 1500.f) ? JeebWorld::Smooth(400.f, 1500.f, JeebTerrain::PathClearance(X, Y)) : 1.f;
+				const float Stand = bLone ? Wd : Wd * FMath::Lerp(0.05f, 1.f, Glade) * (0.78f + 0.2f * Hollow);
+				const float Want = Density * W * HighKeep * Stand * (1.f - 0.6f * JeebWorld::Smooth(0.58f, 0.72f, Slope)) * FMath::Lerp(0.55f, 1.f, RoadSide);
+				if (Keep > Want) { if (W > 0.3f && Wd > 0.45f && A < 0.4f) Open.Add(P); continue; }
+				// what grows here
+				const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
+				const float BirchLand = JeebWorld::Smooth(30000.f, 12000.f, float(FVector2D::Distance(P, Birch)));
+				float ConiferP = FMath::Clamp(0.08f + 0.85f * JeebWorld::Smooth(0.42f, 0.72f, ConiferField) - 0.15f * Hollow, 0.03f, 0.92f);
+				ConiferP += 0.25f * JeebWorld::Smooth(30000.f, 70000.f, X);                                                                  // more spruce to the north
+				ConiferP *= (1.f - 0.85f * BirchLand) * (1.f - 0.8f * JeebWorld::Smooth(-45000.f, -75000.f, X) * JeebWorld::Smooth(55000.f, 75000.f, Y));   // Birch Grove's aspens; few toward the tropics
+				ConiferP = FMath::Clamp(FMath::Max(ConiferP, JeebWorld::Smooth(0.16f, 0.5f, A)), 0.02f, 1.f);                                // and with height
+				const float HighScale = FMath::Lerp(1.f, 0.58f, JeebWorld::Smooth(0.4f, JeebOpen::Treeline, A));
+				int32 Kind; float Scale; int32 Col = 0;
+				if (Pick < ConiferP)
+				{
+					if (Pick2 < 0.6f) { Kind = K_Full1 + FMath::Min(int32(Pick2 / 0.2f), 2); Scale = FMath::Lerp(0.9f, 1.35f, Sc); }
+					else if (Pick2 < 0.8f) { Kind = K_Half2; Scale = FMath::Lerp(0.9f, 1.2f, Sc); }
+					else { Kind = K_Full1 + int32((Pick2 - 0.8f) / 0.0667f) % 3; Scale = FMath::Lerp(0.4f, 0.65f, Sc); }
+				}
+				else
+				{
+					const float AspenField = 0.5f + 0.5f * Noise(P, 5000.f, 6.1f, -2.9f);
+					const bool bAspen = Pick2 < 0.15f + 0.6f * JeebWorld::Smooth(0.5f, 0.75f, AspenField) + 0.6f * BirchLand;
+					Kind = bAspen ? K_Aspen : K_Oak;
+					Scale = bAspen ? FMath::Lerp(0.75f, 1.1f, Sc) : FMath::Lerp(0.72f, 1.12f, Sc);
+					Col = ColourAt(P, R);
+				}
+				Scale *= HighScale;
+				if (bLone) Scale = FMath::Min(Scale * 1.3f, 1.5f);   // (a lone tree on open land: a landmark, larger than usual)
+				const float Crown = Kinds[Kind].Crown * Scale;
+				if (!Space.Clear(P, Crown, 0.55f, 150.f)) { if (W > 0.3f && Wd > 0.45f && A < 0.4f) Open.Add(P); continue; }
+				Space.Add(P, Crown, true);
+				Puts.Add({ uint8(Kind), uint8(Col), FVector(X, Y, Z - 6.f - Slope * 45.f * Scale), Yaw, FVector(Scale), false });
+				++Count[Kind]; ++Trees; Lone += bLone; High += A > 0.4f; Deep += Wd > 0.9f;
+			}
+
+		// ---- a little undergrowth in the woods' open cells: saplings, seedlings, the odd log and stump
+		FRandomStream U(9494);
+		int32 Under = 0;
+		for (const FVector2D& C : Open)
+		{
+			const float Roll = U.FRand(), Pick = U.FRand(), Sc = U.FRand(), Yaw = U.FRandRange(0.f, 360.f), Ox = U.FRandRange(-250.f, 250.f), Oy = U.FRandRange(-250.f, 250.f);
+			if (Roll > 0.16f * FMath::Min(Density, 1.5f)) continue;
+			const FVector2D P = C + FVector2D(Ox, Oy);
+			float Slope;
+			const float Z = Hs.At(P.X, P.Y, &Slope);
+			if (Slope > 0.7f || Edge(P.X, P.Y) <= 0.f) continue;
+			if (OnForestRoadBox(P.X, P.Y, 600.f) && JeebTerrain::PathClearance(P.X, P.Y) < 160.f) continue;
+			int32 Kind; float Scale;
+			if (Pick < 0.15f) { if (Slope > 0.2f) continue; Kind = K_Log; Scale = FMath::Lerp(0.9f, 1.5f, Sc); }
+			else if (Pick < 0.3f) { const int32 St[4] = { K_Stump, K_StumpRooty, K_StumpMush, K_StumpGrass }; Kind = St[int32(Sc * 3.99f)]; Scale = FMath::Lerp(0.8f, 1.15f, Sc); }
+			else if (Pick < 0.75f) { Kind = K_Sapling; Scale = FMath::Lerp(1.6f, 3.2f, Sc); }
+			else { Kind = K_Full1 + int32(Sc * 2.99f); Scale = FMath::Lerp(0.18f, 0.3f, Sc); }
+			const float Foot = Kinds[Kind].Crown * Scale;
+			const bool bSolid = Kinds[Kind].Solid != ESolid::None;
+			if (!Space.Clear(P, bSolid ? Foot : 40.f, 0.12f, bSolid ? 60.f : 10.f)) continue;
+			if (bSolid) Space.Add(P, Foot, false);
+			const bool bLog = Kind == K_Log, bStump = Kind >= K_Stump && Kind <= K_StumpGrass;
+			const float Sink = bLog ? 8.f + Slope * 0.15f * FMath::Min(Foot, 100.f) : bStump ? 10.f + Slope * FMath::Min(Foot, 100.f) : 3.f + Slope * 0.5f * FMath::Min(Foot, 100.f);
+			Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - Sink), Yaw, FVector(Scale), false, bLog ? Hs.UpAt(P.X, P.Y, 2.f * Foot, 1.f) : FVector::UpVector });
+			++Count[Kind]; ++Under;
+		}
+
+		// ---- boulders: clumps of one to four big stones with smaller rocks round them, more of them up the mountains
+		FRandomStream B(9595);
+		int32 Rocks = 0;
+		const int32 Clumps = FMath::RoundToInt(900 * FMath::Min(Density, 1.5f));
+		for (int32 c = 0; c < Clumps; ++c)
+		{
+			const FVector2D Ctr(B.FRandRange(JeebWorld::MinX + 3000.f, JeebWorld::MaxX - 3000.f), B.FRandRange(JeebWorld::MinY + 3000.f, JeebWorld::MaxY - 3000.f));
+			const int32 Big = B.RandRange(1, 4), Small = B.RandRange(1, 4);
+			const float Chance = B.FRand();
+			const float Ac = Hs.At(Ctr.X, Ctr.Y) / JeebOpen::PeakTop;
+			const bool bHere = Edge(Ctr.X, Ctr.Y) > 0.f && Chance < 0.3f + 0.7f * JeebWorld::Smooth(0.12f, 0.4f, Ac);
+			for (int32 k = 0; k < Big + Small; ++k)
+			{
+				const bool bBig = k < Big;
+				const FVector2D P = Ctr + FVector2D(B.FRandRange(-1.f, 1.f), B.FRandRange(-1.f, 1.f)) * (bBig ? 380.f : 650.f);
+				const float S = bBig ? B.FRandRange(0.9f, 2.4f) * (k == 0 ? 1.25f : 0.85f) : B.FRandRange(0.5f, 1.0f);
+				const float Sx = S * B.FRandRange(0.9f, 1.35f), Sy = S * B.FRandRange(0.8f, 1.2f), Sz = S * B.FRandRange(0.55f, 0.8f), Yaw = B.FRandRange(0.f, 360.f);
+				const int32 Kind = bBig ? K_Boulder : (B.FRand() < 0.5f ? K_RockMossy : K_RockPale);
+				if (!bHere || Edge(P.X, P.Y) <= 0.f) continue;
+				float Slope;
+				const float Z = Hs.At(P.X, P.Y, &Slope);
+				if (Slope > 0.8f) continue;
+				if (OnForestRoadBox(P.X, P.Y, 800.f) && JeebTerrain::PathClearance(P.X, P.Y) < 250.f) continue;
+				const float Foot = Kinds[Kind].Crown * FMath::Max(Sx, Sy);
+				if (!Space.Clear(P, Foot, 0.15f, 40.f)) continue;
+				Space.Add(P, Foot, false);
+				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f) - Slope * 0.15f * Foot), Yaw, FVector(Sx, Sy, Sz), false, Hs.UpAt(P.X, P.Y, 2.f * Foot, 0.9f) });
+				++Count[Kind]; ++Rocks;
+			}
+		}
+		ForestTrees += Trees;
+		FString List;
+		for (int32 k = 0; k < K_Num; ++k) if (Count[k]) List += FString::Printf(TEXT(" %s x%d"), *FPaths::GetBaseFilename(Kinds[k].Path), Count[k]);
+		const int32 Fat = Count[K_Oak], Thin = Count[K_Aspen];
+		UE_LOG(LogTemp, Log, TEXT("JEEBFOREST wilds: %d trees over the rest of the map (%d cork oaks, %d aspens, %d spruces; %d in deep forest, %d lone trees on open land, %d above 40%% of the peaks' height), %d undergrowth, %d stones, planned in %.0f ms:%s"),
+			Trees, Fat, Thin, Trees - Fat - Thin, Deep, Lone, High, Under, Rocks, (FPlatformTime::Seconds() - T0) * 1000.0, *List);
+	}
+
 	// ---------------------------------------------------------------- make it
 	void Make()
 	{
@@ -1023,6 +1203,7 @@ void AOakForest::BeginPlay()
 	if (JeebTownLab::NewOn()) B.Town(JeebTownLab::OffY);   // (the TownLab map: its rebuilt town 300 m east gets the same trees)
 	B.Forest();
 	B.Steele();   // (Steele Creek's forest, planned by SteeleCreekTown.cpp)
+	B.Wilds();    // (the rest of the map, 2026-11-21: woods, copses and lone trees by JeebOpen::Woods, thinning to spruces and a treeline up the northern range)
 	B.Make();
 	UE_LOG(LogTemp, Log, TEXT("JEEBFOREST built in %.0f ms"), (FPlatformTime::Seconds() - T0) * 1000.0);
 }

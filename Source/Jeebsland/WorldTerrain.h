@@ -42,4 +42,5 @@ private:
 	void BuildLand();
 	void BuildFine();   // (the 2 m patches: Steele Creek, the lake, the split)
 	void BuildWater();
+	void BuildBeyond(UMaterialInterface* Mat);   // (the land drawn past the map's north, west and south edges, so nobody looks out into nothing; players only)
 };

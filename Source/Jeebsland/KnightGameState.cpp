@@ -37,6 +37,7 @@
 #include "ChoppableTree.h"
 #include "Forest.h"
 #include "AutumnDecor.h"
+#include "OpenWorldActor.h"
 #include "Fill.h"
 #include "QuestPeople.h"
 #include "NpcLife.h"
@@ -133,8 +134,10 @@ void AKnightGameState::BuildWorld()
 	UWorld* World = GetWorld();
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 	JeebHills::Prepare();    // the forested hills round Oak Hill (Hills.h): worked out once, here on the game thread before anything asks for a height; logs JEEBHILLS
+	JeebOpen::Prepare();     // the open world outside those hills (OpenWorld.h): the tall northern range, rolling country, the roads between the towns; logs JEEBOPEN
 #if !UE_BUILD_SHIPPING
 	JeebHills::LogStats();   // (about 30 ms of checks: slopes, heights, the finished ground's hash)
+	JeebOpen::LogStats();
 #endif
 
 	// Cosy autumn evening: low golden sun, cool dusky shadows, soft haze
@@ -310,6 +313,7 @@ void AKnightGameState::BuildWorld()
 
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<AOpenWorld>(FVector::ZeroVector, FRotator::ZeroRotator);   // the placeholder houses of the towns still to be built (every machine: they are solid) and the snowfall (players only); OpenWorldActor.h
 	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
