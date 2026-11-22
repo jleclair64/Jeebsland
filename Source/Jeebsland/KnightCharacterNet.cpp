@@ -12,6 +12,7 @@
 #include "Terrain.h"
 #include "OakHill.h"
 #include "Cottage.h"
+#include "HouseInterior.h"
 #include "ResourceNode.h"
 #include "KnightHUD.h"
 #include "KnightGameState.h"
@@ -152,7 +153,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// On a rock face, in a mantle or in the water (2026-11-13): his hands are busy, so no taking a weapon in hand and nothing done to the world
 	// (the client refuses these too; this is the server's own check)
 	if (InClimbMove() && (Op == EInvOp::Select || Op == EInvOp::Gather || Op == EInvOp::PickArrow || Op == EInvOp::PickLock
-		|| Op == EInvOp::HutLoot || Op == EInvOp::ToggleDoor || Op == EInvOp::TakeFromWall)) return;
+		|| Op == EInvOp::HutLoot || Op == EInvOp::ToggleDoor || Op == EInvOp::HouseDoor || Op == EInvOp::TakeFromWall)) return;
 
 	switch (Op)
 	{
@@ -375,6 +376,16 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 			Hut->ToggleDoor();
 			if (AKnightGameState* GS = GetWorld()->GetGameState<AKnightGameState>()) GS->SyncDoor(Hut);
 		}
+		break;
+	case EInvOp::HouseDoor:
+		// an open house's door: the server's copy is the real one; it must be within 4 m of him (his E reach is 2 m from the doorway)
+		for (TActorIterator<AHouseInterior> It(GetWorld()); It; ++It)
+			if (FVector::Dist2D(It->DoorKey(), At) < 5.f)
+			{
+				if (FVector::Dist2D(It->DoorHandle(), GetActorLocation()) < 400.f && FMath::Abs(It->DoorHandle().Z - GetActorLocation().Z) < 300.f && It->ToggleDoor())
+					if (AKnightGameState* GS = GetWorld()->GetGameState<AKnightGameState>()) GS->SyncDoor(*It);
+				break;
+			}
 		break;
 	case EInvOp::HutLoot:
 		if (ACottage* Hut = FindCottage())

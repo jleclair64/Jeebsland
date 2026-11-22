@@ -28,6 +28,7 @@
 #include "Npc.h"
 #include "Horse.h"
 #include "Cottage.h"
+#include "HouseInterior.h"
 #include "Loot.h"
 #include "Pond.h"
 #include "HealthComponent.h"
@@ -248,6 +249,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
+	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door"); return true; }
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: OutText = TEXT("Press E to mount the horse"); return true;
@@ -283,6 +285,12 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 		return true;
 	}
 	default: break;
+	}
+	// At an open house's door
+	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this))
+	{
+		OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door");
+		return true;
 	}
 	// At an Oak Hill shop's counter
 	if (const JeebOakHill::FCounter* C = CounterInReach(this))
@@ -322,6 +330,7 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
+	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { Float(H->DoorHandle(), 0.f); return true; }
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: Float(Horse->GetActorLocation(), 150.f); return true;
@@ -354,6 +363,7 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	}
 	default: break;
 	}
+	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this)) { Float(H->DoorHandle(), 0.f); return true; }
 	if (const JeebOakHill::FCounter* C = CounterInReach(this))
 	{
 		// at the shop's front, not out at the counter spot (owner 2026-11-16: "move the E prompt closer to the store"), the same height
@@ -391,6 +401,8 @@ void AKnightCharacter::OnInteractKey()
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
+	// Facing an open house's door: the door first, even with its villager on the doorstep
+	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { Inv(EInvOp::HouseDoor, 0, 0, 0, nullptr, H->DoorKey()); return; }
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: Mount(Horse); break;
@@ -422,6 +434,8 @@ void AKnightCharacter::OnInteractKey()
 		}
 		break;
 	default:
+		// An open house's door: the server opens or shuts it, and everyone's copy swings (HouseInterior.h)
+		if (const AHouseInterior* H = AHouseInterior::DoorInReach(this)) { Inv(EInvOp::HouseDoor, 0, 0, 0, nullptr, H->DoorKey()); break; }
 		// An Oak Hill shop's counter: straight to its window (the server checks the range on every trade, NearTrader)
 		if (const JeebOakHill::FCounter* C = CounterInReach(this))
 		{
