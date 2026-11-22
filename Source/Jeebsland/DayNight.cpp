@@ -69,7 +69,7 @@ namespace JeebLook
 	static TAutoConsoleVariable<float> ArmourGlint(TEXT("jeeb.Armour.Glint"), 0.1345f, TEXT("The sun's glint on the knights' plate armour (shine only, lighting channel 1): 0 none, 1 as bright as the sun"));
 
 	// The HIGH volumetric clouds (2026-11-13, owner: "clouds like this without taking up too much processing power")
-	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 0.6f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier"));
+	static TAutoConsoleVariable<float> CloudSamples(TEXT("jeeb.Cloud.Samples"), 1.f, TEXT("Volumetric cloud ray-march samples (ViewSampleCountScale, engine default 1): lower is cheaper and noisier. (2026-11-21, owner: thin cloud 'static/fuzzy') 0.6 left too few steps through thin cloud, a grain the cloud's own temporal pass can't hide; 120 fps films: 1 cuts the grain 15% still, 21% panning. TSR's rejection settings made no difference"));
 	static TAutoConsoleVariable<float> CloudShadowSamples(TEXT("jeeb.Cloud.ShadowSamples"), 0.5f, TEXT("Samples toward the sun inside the clouds (ShadowViewSampleCountScale, engine default 1)"));
 	static TAutoConsoleVariable<float> CloudTrace(TEXT("jeeb.Cloud.Trace"), 40.f, TEXT("How far the clouds are traced, km (was 60; 2026-11-15 the owner approved the cheaper clouds: Samples 0.6, ShadowSamples 0.5, Trace 40, were 1, 1, 60)"));
 	static TAutoConsoleVariable<float> CloudBottom(TEXT("jeeb.Cloud.Bottom"), 2.9538f, TEXT("The cloud layer's bottom, km"));
