@@ -56,6 +56,8 @@ link(mask(mr, False, True, False), rough, "Alpha")
 MEL.connect_material_property(rough, "", MP.MP_ROUGHNESS)
 spec = node(unreal.MaterialExpressionConstant, r=0.25)
 MEL.connect_material_property(spec, "", MP.MP_SPECULAR)
+for nd, tn in ((base, "Base"), (nrm, "Normal"), (mr, "MR")):
+    nd.set_editor_property("texture", EAL.load_asset("/Game/TownDecor/T_LogMossy_" + tn))   # (a parent with no default picture failed to compile and drew grey)
 MEL.recompile_material(mat)
 EAL.save_asset(path)
 
