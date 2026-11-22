@@ -21,9 +21,9 @@
 #include "Camera/PlayerCameraManager.h"
 
 static TAutoConsoleVariable<float> CVarIntCam(TEXT("jeeb.Interior.Cam"), 0.5f, TEXT("The open house: the camera arm's share of its usual length while he stands inside (1 = as outside)."));
-static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), 0.f, TEXT("The open house: exposure bias inside (EV; the land's own is about 0.35). Higher = brighter room."));
+static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), -0.5f, TEXT("The open house: exposure bias inside (EV; the land's own is about 0.35). Higher = brighter room."));
 static TAutoConsoleVariable<float> CVarIntReach(TEXT("jeeb.Interior.LightReach"), 400.f, TEXT("The open house: its lights are on only while the camera is within this many cm of the room (inside it, or just outside the door)."));
-static TAutoConsoleVariable<float> CVarIntLight(TEXT("jeeb.Interior.Light"), 1.f, TEXT("The open house: every light inside times this."));
+static TAutoConsoleVariable<float> CVarIntLight(TEXT("jeeb.Interior.Light"), 0.7f, TEXT("The open house: every light inside times this."));
 static TAutoConsoleVariable<float> CVarIntLoad(TEXT("jeeb.Interior.LoadReach"), 600.f, TEXT("The open house: its room (furniture, lights) is built on your machine once your knight or camera is within this many cm of its door, or inside."));
 static TAutoConsoleVariable<float> CVarIntUnload(TEXT("jeeb.Interior.UnloadReach"), 1000.f, TEXT("The open house: its room is taken down again once you are further than this many cm from its door."));
 static TAutoConsoleVariable<float> CVarDoorClose(TEXT("jeeb.Interior.DoorClose"), 2.f, TEXT("The open house's door (server): it shuts by itself this many seconds after the doorway is clear (0: never)."));
@@ -371,7 +371,7 @@ void AHouseInterior::LoadRoom()
 			L->SetIntensity(0.f);
 			L->SetAttenuationRadius(R.Rad);
 			// (2026-11-21 evening, owner: "reads very orange": still warm, nearer candle-white; were 1 0.55 0.25 and 1 0.72 0.42)
-			L->SetLightColor(R.bFire ? FLinearColor(1.f, 0.74f, 0.52f) : FLinearColor(1.f, 0.9f, 0.78f));
+			L->SetLightColor(R.bFire ? FLinearColor(1.f, 0.62f, 0.36f) : FLinearColor(1.f, 0.78f, 0.56f));   // warmer (owner, 2026-11-21: "about 50% dimmer and a warmer light"; dimming is Light 0.7 x Exposure -0.5)
 			L->SetCastShadows(R.bShadow);
 			L->SetSourceRadius(R.bFire ? 25.f : 3.f);
 			L->SetVisibility(false);
