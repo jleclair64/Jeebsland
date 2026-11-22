@@ -60,6 +60,26 @@ namespace
 	// The highest the land and the hills may stand together (cm, world Z): eased in over TopSoft below it
 	constexpr float TopZ = 5750.f, TopSoft = 600.f;
 
+	// Fourth pass (2026-11-21): spurs and gullies (cm), and rock bands. A band rises CliffStep * 0.75 over the last CliffRiser share of
+	// each step, so on a 0.45 hillside the riser is about 7 m across for 11 m of rise (about 55-60 degrees on the world's 8 m mesh); the
+	// ledges between keep a quarter of the slope. Only in patches (CliffMask), away from the towns and the roads, where the slope cap is
+	// eased to CliffSlope (63 degrees)
+	constexpr float Spurs = 600.f, Gullies = 700.f;
+	constexpr float CliffStep = 1800.f, CliffRiser = 0.25f, CliffShift = 500.f, CliffSlope = 2.0f;
+	FVector2D Warp(const FVector2D& P)
+	{
+		const FVector2D A(Perlin(P, 21000.f, 0.7f, 2.3f), Perlin(P, 21000.f, 5.9f, -4.1f));
+		const FVector2D Q = P + 5500.f * A;
+		return Q + 2200.f * FVector2D(Perlin(Q, 8500.f, -2.2f, 1.4f), Perlin(Q, 8500.f, 3.8f, 7.2f));
+	}
+	float Terrace(float H)
+	{
+		const float U = H / CliffStep, Fl = FMath::FloorToFloat(U), F = U - Fl;
+		const float R = FMath::Clamp((F - (1.f - CliffRiser)) / CliffRiser, 0.f, 1.f);
+		return CliffStep * (Fl + 0.25f * FMath::Min(F / (1.f - CliffRiser), 1.f) + 0.75f * R * R * (3.f - 2.f * R));
+	}
+	float CliffMask(float X, float Y);
+
 	// ------------------------------------------------------------------ the forest roads' profiles
 	struct FRoadProfile
 	{
@@ -80,6 +100,16 @@ namespace
 		int32 Capped = 0;
 		int32 Sloped = 0;
 	};
+
+	// 0 .. 1: where rock bands stand (patches a few hundred metres apart, kept 25-55 m from Oak Hill's box and 120 m from Steele Creek).
+	// Never reads the roads (the forest roads are routed on Raw, which reads this): near the roads the grid's slope cap stays at 35 degrees
+	// (BuildGrid, RoadClear), so the levelled corridors and their banks wear any band there down to a walkable slope
+	float CliffMask(float X, float Y)
+	{
+		const FVector2D P(X, Y);
+		return Smooth(0.0f, 0.3f, Perlin(P, 16000.f, 9.1f, 1.3f)) * Smooth(2500.f, 5500.f, BoxGap(X, Y)) * Smooth(12000.f, 18000.f, FVector2D::Distance(P, SteeleC));
+	}
+	constexpr float RoadClearIn = 3500.f, RoadClearOut = 6500.f;   // (cm from a road's middle: no steep rock within, full steepness allowed past)
 
 	FGrid BuildGrid()
 	{
@@ -186,14 +216,24 @@ namespace
 		// The land under the hills, then no slope over MaxSlope: the ground (land + hills) is cut down to the lowest cone of that slope
 		// standing on any point (two sweeps each way of an 8-neighbour chamfer), the hills keeping only what is left over the land
 		const int32 N = G.N, NI = G.NI;
-		TArray<float> Base, T;
-		Base.SetNumUninitialized(NI * N); T.SetNumUninitialized(NI * N);
+		TArray<float> Base, T, Allow;
+		Base.SetNumUninitialized(NI * N); T.SetNumUninitialized(NI * N); Allow.SetNumUninitialized(NI * N);
 		for (int32 i = 0; i < NI; ++i)
 			for (int32 j = 0; j < N; ++j)
 			{
 				const int32 k = i * N + j;
 				Base[k] = JeebTerrain::HeightAt(X0 + i * JeebHills::GridStep, Y0 + j * JeebHills::GridStep, true, 0);
 				T[k] = Base[k] + G.V[k];
+				// (rock bands: steeper allowed, but not near a road)
+				const FVector2D P(X0 + i * JeebHills::GridStep, Y0 + j * JeebHills::GridStep);
+				float M = CliffMask(P.X, P.Y);
+				if (M > 0.f)
+					for (const FRoadProfile& R : Roads)
+					{
+						if (!R.Bounds.ExpandBy(RoadClearOut).IsInside(P)) continue;
+						for (int32 s = 0; s + 1 < R.Pts.Num() && M > 0.f; ++s) M *= Smooth(RoadClearIn, RoadClearOut, SegDist(P, R.Pts[s], R.Pts[s + 1]));
+					}
+				Allow[k] = FMath::Lerp(1.f, CliffSlope / MaxSlope, M);
 			}
 		{
 			const float S1 = MaxSlope * JeebHills::GridStep, S2 = S1 * 1.41421356f;
@@ -203,15 +243,15 @@ namespace
 					for (int32 j = 0; j < N; ++j)
 					{
 						float& Here = T[i * N + j];
-						if (i > 0) { Here = FMath::Min(Here, T[(i - 1) * N + j] + S1); if (j > 0) Here = FMath::Min(Here, T[(i - 1) * N + j - 1] + S2); if (j + 1 < N) Here = FMath::Min(Here, T[(i - 1) * N + j + 1] + S2); }
-						if (j > 0) Here = FMath::Min(Here, T[i * N + j - 1] + S1);
+						if (i > 0) { Here = FMath::Min(Here, T[(i - 1) * N + j] + S1 * Allow[i * N + j]); if (j > 0) Here = FMath::Min(Here, T[(i - 1) * N + j - 1] + S2 * Allow[i * N + j]); if (j + 1 < N) Here = FMath::Min(Here, T[(i - 1) * N + j + 1] + S2 * Allow[i * N + j]); }
+						if (j > 0) Here = FMath::Min(Here, T[i * N + j - 1] + S1 * Allow[i * N + j]);
 					}
 				for (int32 i = NI - 1; i >= 0; --i)
 					for (int32 j = N - 1; j >= 0; --j)
 					{
 						float& Here = T[i * N + j];
-						if (i + 1 < NI) { Here = FMath::Min(Here, T[(i + 1) * N + j] + S1); if (j + 1 < N) Here = FMath::Min(Here, T[(i + 1) * N + j + 1] + S2); if (j > 0) Here = FMath::Min(Here, T[(i + 1) * N + j - 1] + S2); }
-						if (j + 1 < N) Here = FMath::Min(Here, T[i * N + j + 1] + S1);
+						if (i + 1 < NI) { Here = FMath::Min(Here, T[(i + 1) * N + j] + S1 * Allow[i * N + j]); if (j + 1 < N) Here = FMath::Min(Here, T[(i + 1) * N + j + 1] + S2 * Allow[i * N + j]); if (j > 0) Here = FMath::Min(Here, T[(i + 1) * N + j - 1] + S2 * Allow[i * N + j]); }
+						if (j + 1 < N) Here = FMath::Min(Here, T[i * N + j + 1] + S1 * Allow[i * N + j]);
 					}
 			}
 		}
@@ -229,7 +269,7 @@ namespace
 				{
 					float Sum = 0.f;
 					for (int32 a = -1; a <= 1; ++a) for (int32 b = -1; b <= 1; ++b) Sum += Cut[(i + a) * N + j + b];
-					V = Sum / 9.f;
+					V = FMath::Lerp(Sum / 9.f, V, FMath::Clamp((Allow[k] - 1.f) / (CliffSlope / MaxSlope - 1.f), 0.f, 1.f));   // (no blur over the rock bands: it would round their risers off)
 				}
 				if (V > 0.f)
 				{
@@ -286,20 +326,36 @@ float JeebHills::Raw(float X, float Y)
 {
 	const float Sc = Scale();
 	if (Sc <= 0.f) return 0.f;
-	const FVector2D P(X, Y);
-	const float D = FVector2D::Distance(P, Plaza);
+	const FVector2D P0(X, Y);
+	const float D = FVector2D::Distance(P0, Plaza);
 	if (X < GridX0 + 6000.f || X > GridX1 - 6000.f || Y < GridY0 + 6000.f || Y > GridY1 - 6000.f) return 0.f;
 	const float K = KeepOut(X, Y);
 	if (K <= 0.f) return 0.f;
 	// rising away from each town (the lower of the two wins, so each town sits in its own bowl of hills)
-	const float Ring = FMath::Min(Smooth(RingFrom, RingTo, D), Smooth(SteeleFrom, SteeleTo + 6000.f, FVector2D::Distance(P, SteeleC)));
+	const float Ring = FMath::Min(Smooth(RingFrom, RingTo, D), Smooth(SteeleFrom, SteeleTo + 6000.f, FVector2D::Distance(P0, SteeleC)));
+	// Fourth pass (2026-11-21, owner: "the hill is too linear up and down and left and right ... break it up to look more natural"): every
+	// noise is read through a two-level domain warp, so the hills' outlines bend and fold instead of running in straight even swells
+	const FVector2D P = Warp(P0);
 	const float Broad = 0.7f * Perlin(P, 26000.f, 3.1f, 7.7f) + 0.3f * Perlin(P, 15000.f, -1.9f, 4.4f);
-	const float Big = Smooth(-0.5f, 0.55f, Broad);   // 0 in the valleys and saddles, 1 on the tops
-	const float Small = 0.5f + 0.5f * Perlin(P, 11000.f, -5.3f, 2.2f);
+	// tops and shoulders: where a second noise says so the rise is steeper mid-slope with a flatter top (a shoulder)
+	const float Shoulder = Smooth(-0.3f, 0.4f, Perlin(P, 19000.f, 4.6f, -8.3f));
+	const float Big = FMath::Lerp(Smooth(-0.5f, 0.55f, Broad), Smooth(-0.2f, 0.25f, Broad), 0.6f * Shoulder);   // 0 in the valleys and saddles, 1 on the tops
+	const float Small = 0.5f + 0.5f * (0.65f * Perlin(P, 11000.f, -5.3f, 2.2f) + 0.35f * Perlin(P, 4700.f, 1.7f, 9.9f));
 	// ridges and single hills: where a ridged noise crests (its zero line), sharpened, and patchy so some stand alone
 	const float Crest = FMath::Square(FMath::Max(0.f, 1.f - 1.6f * FMath::Abs(Perlin(P, 17000.f, 8.2f, -3.6f))));
 	const float Ridge = Crest * Smooth(-0.25f, 0.35f, Perlin(P, 23000.f, -2.7f, 6.1f));
-	return Sc * K * (Ring * (RingBase + RingTop * Big + Ridges * Ridge) + Bumps * Small * (0.5f + 0.5f * Ring));
+	// spurs: a finer ridged noise, strongest on the slopes and tops, so hillsides have spurs and rounded noses
+	const float Spur = FMath::Square(FMath::Max(0.f, 1.f - 2.2f * FMath::Abs(Perlin(P, 7300.f, -6.4f, 3.3f))));
+	float H = Ring * (RingBase + RingTop * Big + Ridges * Ridge) + Spurs * Spur * FMath::Max(Ring, 0.6f) * (0.3f + Big) + Bumps * Small * (0.5f + 0.5f * Ring);
+	// gullies: narrow furrows down the hillsides where a third ridged noise crests, half-warped so they wind
+	const float GullyLine = FMath::Max(0.f, 1.f - 3.5f * FMath::Abs(Perlin(P0 + 0.35f * (P - P0), 5200.f, 2.9f, -7.1f)));
+	H -= Gullies * GullyLine * GullyLine * FMath::Max(Ring, 0.6f) * Smooth(0.15f, 0.6f, Big + 0.5f * Ridge) * Smooth(-0.2f, 0.3f, Perlin(P, 13000.f, 5.5f, 5.5f));
+	H = FMath::Max(H, 0.f);
+	// rock bands (cliffs): in patches the height is stepped into sloping ledges with short risers, steeper than the knight can walk, so
+	// the world ground's climbing takes over (KnightMovement.h, JeebClimb::IsClimbGround); never an overhang (a heightfield)
+	const float Mask = CliffMask(X, Y);
+	if (Mask > 0.f) H = FMath::Lerp(H, FMath::Max(0.f, Terrace(H + CliffShift * Perlin(P, 9000.f, -3.3f, -1.1f)) - CliffShift * Perlin(P, 9000.f, -3.3f, -1.1f)), Mask);
+	return Sc * K * H;
 }
 
 float JeebHills::Offset(float X, float Y)
@@ -307,12 +363,27 @@ float JeebHills::Offset(float X, float Y)
 	const float Lx = X - GridX0, Ly = Y - GridY0;
 	if (Lx < 0.f || Ly < 0.f || X >= GridX1 || Y >= GridY1) return 0.f;
 	const FGrid& G = Grid();
-	const float Gx = Lx / GridStep, Gy = Ly / GridStep;
-	const int32 i = FMath::Min(FMath::FloorToInt(Gx), G.NI - 2), j = FMath::Min(FMath::FloorToInt(Gy), G.N - 2);
-	const float Fx = Gx - i, Fy = Gy - j;
-	const float* V = G.V.GetData();
-	const float A = V[i * G.N + j], B = V[(i + 1) * G.N + j], C = V[i * G.N + j + 1], Dd = V[(i + 1) * G.N + j + 1];
-	float H = FMath::Lerp(FMath::Lerp(A, B, Fx), FMath::Lerp(C, Dd, Fx), Fy);
+	auto GridAt = [&G](float Px, float Py)
+	{
+		const float Gx = FMath::Clamp((Px - GridX0) / GridStep, 0.f, float(G.NI - 1)), Gy = FMath::Clamp((Py - GridY0) / GridStep, 0.f, float(G.N - 1));
+		const int32 i = FMath::Min(FMath::FloorToInt(Gx), G.NI - 2), j = FMath::Min(FMath::FloorToInt(Gy), G.N - 2);
+		const float Fx = Gx - i, Fy = Gy - j;
+		const float* V = G.V.GetData();
+		const float A = V[i * G.N + j], B = V[(i + 1) * G.N + j], C = V[i * G.N + j + 1], Dd = V[(i + 1) * G.N + j + 1];
+		return FMath::Lerp(FMath::Lerp(A, B, Fx), FMath::Lerp(C, Dd, Fx), Fy);
+	};
+	// (2026-11-21, with the rock bands: the hills are read on the world's 8 m mesh points and laid flat across each of its triangles, split
+	// along the same B-C diagonal as AWorldTerrain, so the hills add nothing the 8 m ground can't draw: a riser or gully finer than a cell
+	// would otherwise leave HeightAt metres off the drawn ground, and grass, props and spawns placed by HeightAt would float or sink)
+	const float Ws = JeebWorld::WorldStep;
+	const float WX = (X - JeebWorld::MinX) / Ws, WY = (Y - JeebWorld::MinY) / Ws;
+	const float WI = FMath::FloorToFloat(WX), WJ = FMath::FloorToFloat(WY);
+	const float Fx = WX - WI, Fy = WY - WJ;
+	const float X0c = JeebWorld::MinX + WI * Ws, Y0c = JeebWorld::MinY + WJ * Ws;
+	const float A = GridAt(X0c, Y0c), B = GridAt(X0c + Ws, Y0c), C = GridAt(X0c, Y0c + Ws);
+	float H;
+	if (Fx + Fy <= 1.f) H = A + (B - A) * Fx + (C - A) * Fy;
+	else { const float Dd = GridAt(X0c + Ws, Y0c + Ws); H = Dd + (C - Dd) * (1.f - Fx) + (B - Dd) * (1.f - Fy); }
 	if (H != 0.f && JeebTownLab::Active())   // (the TownLab map: its lab town 300 m east stands on its own ground)
 	{
 		const JeebTownLab::FSite& S = JeebTownLab::LabSite();
@@ -380,4 +451,26 @@ void JeebHills::LogStats()
 	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS stats: %d hill cells (8 m) within %.0f m; finished ground hash=%08x (%d heights, rivers and towns applied); highest ground %.1f m (world) at %.0f %.0f; slope over 0.5 (27 deg) %.1f%%, over 0.7 (35 deg) %.2f%%, over 1 (45 deg, not walkable) %d; steepest %.2f (%.0f deg) at %.0f %.0f; ground over the plaza (m) 250-500 m out by direction:%s; mesh sag up to %.0f cm at %.0f %.0f (over 20 cm at %.1f%% of %d spots; without the hills up to %.0f cm, over 20 cm at %.1f%%); %.0f ms"),
 		Cells, JeebOakForest::Reach / 100.f, FCrc::MemCrc32(H.GetData(), H.Num() * sizeof(float)), H.Num(), Peak / 100.f, PeakAt.X, PeakAt.Y, Cells ? 100.f * Over50 / Cells : 0.f, Cells ? 100.f * Over70 / Cells : 0.f, Over100, Steepest, FMath::RadiansToDegrees(FMath::Atan(Steepest)),
 		SteepAt.X, SteepAt.Y, *Dirs, Sag, SagAt.X, SagAt.Y, SagN ? 100.f * Sag20 / SagN : 0.f, SagN, Sag0, SagN ? 100.f * Sag0_20 / SagN : 0.f, (FPlatformTime::Seconds() - T0) * 1000.0);
+#if !UE_BUILD_SHIPPING
+	// The rock bands (2026-11-21): how many 8 m cells are rock, and the nearest tall band to the plaza as a ready -MantleAt climb test
+	// (he stands 1.5 m short of its foot facing up it and pushes uphill; the climbing takes over on ground too steep to walk)
+	int32 Rock = 0; float BestD = 1.0e18f; FString Spot;
+	for (float X = Plaza.X - 30000.f; X <= Plaza.X + 30000.f; X += 400.f)
+		for (float Y = Plaza.Y - 30000.f; Y <= Plaza.Y + 30000.f; Y += 400.f)
+		{
+			if (CliffMask(X, Y) < 0.6f || Offset(X, Y) < 300.f) continue;
+			const float Gx = JeebTerrain::HeightAt(X + 100.f, Y) - JeebTerrain::HeightAt(X - 100.f, Y), Gy = JeebTerrain::HeightAt(X, Y + 100.f) - JeebTerrain::HeightAt(X, Y - 100.f);
+			const FVector2D Up = FVector2D(Gx, Gy).GetSafeNormal();
+			if (FVector2D(Gx, Gy).Size() / 200.f < 1.2f || Up.IsNearlyZero()) continue;
+			++Rock;
+			// walk down to the foot (where it eases under 0.5), then check the face rises at least 6 m within 9 m
+			FVector2D Foot(X, Y);
+			for (int32 s = 0; s < 20; ++s) { const FVector2D Q = Foot - Up * 100.f; if (JeebTerrain::HeightAt(Foot.X, Foot.Y) - JeebTerrain::HeightAt(Q.X, Q.Y) < 50.f) break; Foot = Q; }
+			const float Z0 = JeebTerrain::HeightAt(Foot.X, Foot.Y), Z9 = JeebTerrain::HeightAt(Foot.X + Up.X * 900.f, Foot.Y + Up.Y * 900.f);
+			if (Z9 - Z0 < 600.f || JeebTerrain::HeightAt(Foot.X - Up.X * 250.f, Foot.Y - Up.Y * 250.f) - Z0 > 60.f) continue;
+			const float D = FVector2D::Distance(Foot, Plaza);
+			if (D < BestD) { BestD = D; Spot = FString::Printf(TEXT("%.0f_%.0f_%.0f_150_100_-900_250 (face %.1f m over 9 m)"), Foot.X + Up.X * 60.f, Foot.Y + Up.Y * 60.f, FMath::RadiansToDegrees(FMath::Atan2(Up.Y, Up.X)), (Z9 - Z0) / 100.f); }
+		}
+	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS rock bands: %d steep spots (4 m samples over 50 deg) within 300 m; nearest tall face to the plaza %.0f m out: -MantleAt=%s"), Rock, BestD < 1.0e17f ? BestD / 100.f : -1.f, Spot.IsEmpty() ? TEXT("none") : *Spot);
+#endif
 }
