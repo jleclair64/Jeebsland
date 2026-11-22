@@ -579,6 +579,8 @@ else:
     build_stone(rock_tex, patches)
     build_boulder(rock_tex, patches)
     build_stumps()
+    # (2026-11-22: a fresh M_StumpBark has no default pictures and fails to compile, drawing every stump flat grey; give it a stump's)
+    exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "stump_fix.py")).read())
     for old in ("M_WorldGround", "T_Ground"):   # the old flat world material and the old ground picture: replaced
         if unreal.EditorAssetLibrary.does_asset_exist("/Game/" + old):
             unreal.EditorAssetLibrary.delete_asset("/Game/" + old)
