@@ -66,6 +66,7 @@ void AKnightCharacter::StopCrouch()
 
 void AKnightCharacter::TryStartClimb()
 {
+	if (bIsTroll) return;   // (owner 2026-11-21: trolls don't climb; ServerClimb and TryGrab refuse too)
 	if (InClimbMove()) return;   // (not from a rock face or a mantle)
 	if (bSitting || bRolling || bSliding || bMounted || IsUIOpen()) return;
 	UCharacterMovementComponent* Move = GetCharacterMovement();
