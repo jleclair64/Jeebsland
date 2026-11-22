@@ -23,16 +23,16 @@ New-Item -ItemType Directory -Force $Out | Out-Null
 
 # Name, X, Y, eye height above the ground (cm), yaw (0 = north +X, 90 = east +Y), pitch, mask (1024 = the knight stands 3.5 m ahead in view). One field of view (80) for the whole run.
 $Views = @(
-	@{ N = 'Meadow, river valley';   X = -5550; Y = 13690; Z = 170; Yaw = 180; Pitch = -4;  Mask = 0 },
+	@{ N = 'Meadow, river valley';   X = -3000; Y = 8000;  Z = 170; Yaw = 90;  Pitch = -4;  Mask = 0 },
 	@{ N = 'Meadow to forest edge';  X = -3000; Y = 5000;  Z = 170; Yaw = 180; Pitch = -3;  Mask = 0 },
 	@{ N = 'Oak Hill plaza and oak'; X = -3550; Y = 17490; Z = 170; Yaw = 90;  Pitch = 8;   Mask = 0 },
 	@{ N = 'Oak Hill street';        X = -2600; Y = 18000; Z = 170; Yaw = 60;  Pitch = -2;  Mask = 0 },
 	@{ N = 'River and bank';         X = -2000; Y = 10600; Z = 250; Yaw = 90;  Pitch = -5;  Mask = 0 },
 	@{ N = 'Building close-up';      X = -2500; Y = 17000; Z = 170; Yaw = 28;  Pitch = 3;   Mask = 0 },
-	@{ N = 'Knight, third person';   X = -5550; Y = 13690; Z = 190; Yaw = 180; Pitch = -6;  Mask = 1024 },
+	@{ N = 'Knight, third person';   X = -3000; Y = 8000;  Z = 190; Yaw = 90;  Pitch = -6;  Mask = 1024 },
 	@{ N = 'Far hills';              X = 800;   Y = 22200; Z = 1800; Yaw = 0;  Pitch = -4;   Mask = 0 },
 	@{ N = 'Blackrock';              X = -3500; Y = 0;     Z = 170; Yaw = 0;   Pitch = 4;   Mask = 0 },
-	@{ N = 'Sky and clouds';         X = -5550; Y = 13690; Z = 170; Yaw = 180; Pitch = 28;  Mask = 0 },
+	@{ N = 'Sky and clouds';         X = -3000; Y = 8000;  Z = 170; Yaw = 90;  Pitch = 28;  Mask = 0 },
 	@{ N = 'Water close';            X = -2000; Y = 11300; Z = 170; Yaw = 90;  Pitch = -22; Mask = 0 },
 	@{ N = 'Oak Hill from the air';  X = -3550; Y = 15500; Z = 3000; Yaw = 90; Pitch = -32; Mask = 0 }
 )
@@ -104,7 +104,7 @@ $Stamp = Get-Date -Format 'yyyy-MM-dd_HHmm'
 if (-not $NoRun) {
 	$Eyes = @()
 	foreach ($v in $Views) {
-		foreach ($phase in '0', '0.5') {
+		foreach ($phase in '0', '0.26') {   # (2026-11-22: since the 2026-11-17 day loop, 0.5 is midnight; 0.26 is the sunset glow)
 			$Eyes += ('{0}_{1}_{2}_{3}_{4}_{5}_{6}' -f $v.X, $v.Y, $v.Z, $v.Yaw, $v.Pitch, $phase, $v.Mask)
 		}
 	}
@@ -114,7 +114,7 @@ if (-not $NoRun) {
 	$Log = Join-Path $Project 'Saved\Logs\lookboard.log'
 	$Exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor.exe'
 	$Bash = 'C:\Program Files\Git\bin\bash.exe'
-	$ArgList = @("`"$Uproject`"", '/Game/Field', '-game', '-JeebShot', '-ShotName=lookboard', ('-ShotEyes=' + ($Eyes -join '+')), '-ShotEyesStart=9', '-ShotEyesGap=3.5',
+	$ArgList = @("`"$Uproject`"", '/Game/Field', '-game', '-JeebShot', '-ShotName=lookboard', ('-ShotEyes=' + ($Eyes -join '+')), '-ShotEyesStart=9', '-ShotEyesGap=6',
 		'-ShotFov=80', '-RenderOffScreen', '-Multiprocess', '-LiveCoding=false', '-unattended', '-nosound', '-ResX=1280', '-ResY=720', "-abslog=`"$Log`"")
 	$t0 = Get-Date
 	& $Bash -c ("cd '" + ($Project -replace '\\', '/') + "' && bash Tools/uqueue.sh run lookboard")   # waits for a slot
