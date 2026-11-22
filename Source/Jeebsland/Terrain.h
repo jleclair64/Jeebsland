@@ -457,24 +457,25 @@ namespace JeebTerrain
 	// crack; everywhere else (inside, and where two 2 m grounds meet) the true height, the same on both sides. (2026-11-20, owner's river
 	// bank slits: a patch's edge followed the 8 m line even where it met the square's 2 m ground or another patch, which drew the true
 	// bank there, and the two pulled apart into dark slits across the banks.)
-	template <typename FCoarse> inline float EdgeVertexZ(float X, float Y, FCoarse bCoarse)
+	template <typename FCoarse, typename FHt> inline float EdgeVertexZWith(float X, float Y, FCoarse bCoarse, FHt Ht)
 	{
 		const float S = JeebWorld::WorldStep, F = FineStep;
-		if (!(bCoarse(X - F, Y - F) || bCoarse(X, Y - F) || bCoarse(X - F, Y) || bCoarse(X, Y))) return HeightAt(X, Y);
+		if (!(bCoarse(X - F, Y - F) || bCoarse(X, Y - F) || bCoarse(X - F, Y) || bCoarse(X, Y))) return Ht(X, Y);
 		const float Tx = (X - JeebWorld::MinX) / S, Ty = (Y - JeebWorld::MinY) / S;
 		const bool bOnX = FMath::Abs(Tx - FMath::RoundToFloat(Tx)) * S < 1.f, bOnY = FMath::Abs(Ty - FMath::RoundToFloat(Ty)) * S < 1.f;
 		if (bOnX && !bOnY)
 		{
 			const float V0 = JeebWorld::MinY + FMath::FloorToFloat(Ty) * S;
-			return FMath::Lerp(HeightAt(X, V0), HeightAt(X, V0 + S), (Y - V0) / S);
+			return FMath::Lerp(Ht(X, V0), Ht(X, V0 + S), (Y - V0) / S);
 		}
 		if (bOnY && !bOnX)
 		{
 			const float V0 = JeebWorld::MinX + FMath::FloorToFloat(Tx) * S;
-			return FMath::Lerp(HeightAt(V0, Y), HeightAt(V0 + S, Y), (X - V0) / S);
+			return FMath::Lerp(Ht(V0, Y), Ht(V0 + S, Y), (X - V0) / S);
 		}
-		return HeightAt(X, Y);
+		return Ht(X, Y);
 	}
+	template <typename FCoarse> inline float EdgeVertexZ(float X, float Y, FCoarse bCoarse) { return EdgeVertexZWith(X, Y, bCoarse, [](float A, float B) { return HeightAt(A, B); }); }
 	// A fine patch's grid point (game cm) as drawn: the true height inside, along an edge on the 8 m mesh that mesh's own straight edge
 	inline float FineVertexZ(const FFinePatch& P, float X, float Y)
 	{
@@ -555,6 +556,27 @@ namespace JeebTerrain
 		if (FMath::Max(FMath::Abs(X), FMath::Abs(Y)) < GroundHalf) return GroundMeshHeight(X, Y);
 		if (const FFinePatch* P = FinePatchAt(X, Y)) return FineMeshHeight(*P, X, Y);   // (Steele Creek, the lake, the split: 2 m)
 		return WorldMeshHeight(X, Y);
+	}
+
+	// (2026-11-21) DrawnHeight with the meshes' grid-point heights read through Ht (the grass caches them per square). The world's
+	// 8 m mesh sits far off HeightAt on cut roads and river banks; grass put at HeightAt floated over it (owner's picture by the river).
+	template <typename FHt> inline float DrawnHeightWith(float X, float Y, FHt Ht)
+	{
+		if (JeebOakHill::Enabled() && JeebOakHill::InBox(X, Y)) return Ht(X, Y);
+		float OX, OY, S;
+		const FFinePatch* P = nullptr;
+		if (FMath::Max(FMath::Abs(X), FMath::Abs(Y)) < GroundHalf) { OX = OY = -GroundHalf; S = GroundStep; }
+		else if ((P = FinePatchAt(X, Y)) != nullptr) { OX = P->X0; OY = P->Y0; S = FineStep; }
+		else { OX = JeebWorld::MinX; OY = JeebWorld::MinY; S = JeebWorld::WorldStep; }
+		auto V = [&](float A, float B) { return P ? EdgeVertexZWith(A, B, CoarseBesideFine, Ht) : Ht(A, B); };
+		const float GX = (X - OX) / S, GY = (Y - OY) / S;
+		const float I = FMath::FloorToFloat(GX), J = FMath::FloorToFloat(GY);
+		const float Fx = GX - I, Fy = GY - J;
+		const float X0 = OX + I * S, Y0 = OY + J * S;
+		const float B = V(X0 + S, Y0), C = V(X0, Y0 + S);
+		if (Fx + Fy <= 1.f) { const float A = V(X0, Y0); return A + (B - A) * Fx + (C - A) * Fy; }
+		const float D = V(X0 + S, Y0 + S);
+		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
 	}
 
 	// 0..1 map of where the woods are. Low values are open valleys and meadows.
