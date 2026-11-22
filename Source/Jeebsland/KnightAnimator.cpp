@@ -2105,7 +2105,9 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 		static IConsoleVariable* Inset = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Knight.InsetShadow"));
 		if (!Inset) Inset = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Knight.InsetShadow"), 1, TEXT("1: the knight casts his own fine per-object shadow (read when his mesh is made)"), ECVF_Default);
 	}
-	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
+	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }
+	if (bWizard) { MakeWizardMesh(Owner); return Comp; }   // (the wizard: his own body on these bones; no plate, no mail)
+	//   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
 	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
@@ -2137,6 +2139,7 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 
 void FKnightAnimator::Wear(int32 Piece, int32 Tier, int32 Style)
 {
+	if (bWizard) { if (Piece >= 0 && Piece < Piece_Count) { bWizWorn[Piece] = Tier >= 0; WornTiers[Piece] = Tier; WornStyles[Piece] = Style; RefreshWizard(); } return; }
 	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
 	const int32 Mat = PieceMat[Piece];
 	WornTiers[Piece] = Tier;

@@ -281,8 +281,15 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		Panel(AX, AY, PW, AH, 1.f, false);
 		AddRect(AX, AY, PW, AH);
 		const float GX = AX + Pad, GY = AY + Pad;
-		for (const FWornSlot& Ws : Worn)
+		for (const FWornSlot& Ws0 : Worn)
 		{
+			// (the wizard, 2026-11-21, owner's marked screenshot: his spell book where a knight's gauntlets go, and no shoulder slot)
+			FWornSlot Ws = Ws0;
+			if (Knight->IsWizard())
+			{
+				if (Ws.Kind == K_Shoulders) continue;
+				if (Ws.Kind == K_Gauntlets) Ws.Kind = K_Book;
+			}
 			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
 			WornCellX[WornCellCount] = X; WornCellY[WornCellCount] = Y; WornCellS = WS; WornKind[WornCellCount] = Ws.Kind; WornSecond[WornCellCount] = Ws.bSecond; ++WornCellCount;
 			const bool bOver = Hot(X, Y, WS, WS);

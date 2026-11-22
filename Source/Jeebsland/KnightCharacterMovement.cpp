@@ -216,6 +216,13 @@ void AKnightCharacter::StartRoll()
 		StartHop(HopDir.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : HopDir);
 		return;
 	}
+	if (bIsWizard)   // (the wizard teleports a few feet instead: same keys, same cooldown, KnightCharacterWizard.cpp)
+	{
+		FVector BlinkDir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;
+		PendingRollDir = FVector::ZeroVector;
+		StartBlink(BlinkDir.IsNearlyZero() ? GetActorForwardVector().GetSafeNormal2D() : BlinkDir);
+		return;
+	}
 
 	// Roll the way the wheel-down call named (RollWheel), else the way you are steering, or straight ahead if you are standing still
 	FVector Dir = PendingRollDir.IsNearlyZero() ? Move->GetCurrentAcceleration().GetSafeNormal2D() : PendingRollDir;

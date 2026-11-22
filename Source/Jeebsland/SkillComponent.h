@@ -46,7 +46,7 @@ enum class EItemType : uint8
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
 constexpr int32 JeebNumSkills = 11;
-constexpr int32 JeebNumWornKinds = 24;
+constexpr int32 JeebNumWornKinds = 25;
 
 // One inventory slot: what is in it (see Inventory.h for ids) and how many
 USTRUCT()

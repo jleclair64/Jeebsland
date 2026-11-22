@@ -58,11 +58,12 @@
 // same on every machine, so the server agrees.
 bool AKnightCharacter::GuardActive() const
 {
-	return bIsTroll || ShieldActive();
+	return bIsTroll || bIsWizard || ShieldActive();   // (the wizard, 2026-11-21: his orb, all round him, whatever he holds)
 }
 
 bool AKnightCharacter::ShieldActive() const
 {
+	if (bIsWizard) return false;   // (a wizard holds no shield: his guard is the orb, GuardActive)
 	if (!Skills || Skills->Worn[JeebItems::K_Shield] == 0) return false;
 	// (owner 2026-11-21: the troll's "hand is stuck to his head". A shield is knights' gear, but a save from before the troll or a class swap
 	// can still have one worn: the knight's fixed shield-arm pose then put the troll's big forearm against his head. A troll never holds a
@@ -103,7 +104,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 		if ((IsLocallyControlled() || HasAuthority()) && !GetCharacterMovement()->IsFalling())
 			LaunchCharacter(GetActorForwardVector().GetSafeNormal2D() * 160.f, true, false);   // a small step in as the knee comes up
 	}
-	if ((Style == EAtkStyle::Slash || Style == EAtkStyle::Sweep || Style == EAtkStyle::Dash) && JeebItems::FightsLikeSword(K))
+	if ((Style == EAtkStyle::Slash || Style == EAtkStyle::Sweep || Style == EAtkStyle::Dash) && (JeebItems::FightsLikeSword(K) || (Style == EAtkStyle::Dash && WizardDashKind(K))))
 	{
 		// The sword's jab: two quick swings that alternate, each with a small step forward (the low sweep and the dash attack:
 		// one each, keyed the same way)
@@ -351,6 +352,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 		// (the shield's wedge: 45 degrees either side of straight ahead, HitBoxes.h)
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
 		bFront = FVector::DotProduct(GetActorForwardVector().GetSafeNormal2D(), To) >= FMath::Cos(FMath::DegreesToRadians(JeebHit::FShieldWedge().HalfAngle));
+		if (bIsWizard) bFront = true;   // (the wizard's orb is all round him)
 	}
 	// The shield takes the blow (owner, 2026-10-31): a blow on a raised shield never hurts the knight; its health takes it, one for one (owner, 2026-11-06).
 	// The blow that empties it breaks it: the shield drops and can't be raised until it has healed to full.
@@ -1211,7 +1213,9 @@ bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
 {
 	if (!bBlocking || !GuardActive() || Health <= 0.f) return false;
 	if (!Anim || !Anim->IsReady()) return false;
-	Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
+	Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());
+	if (bIsWizard) { Out.HalfAngle = 180.f; Out.Inner = 0.f; Out.Radius = 125.f; }   // (the wizard's orb: all round him)
+	//   // (up to the top of his helm, and where the raised shield is)
 	return true;
 }
 
@@ -1258,7 +1262,7 @@ void AKnightCharacter::TickHitboxes(float Dt)
 {
 	HitLive.Reset();
 	const int32 HeldKind = SelectedKind();
-	const bool bSword = bAttacking && (AtkStyle == EAtkStyle::Slash || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) && JeebItems::FightsLikeSword(HeldKind) && WristR;
+	const bool bSword = bAttacking && (AtkStyle == EAtkStyle::Slash || AtkStyle == EAtkStyle::Sweep || AtkStyle == EAtkStyle::Dash) && (JeebItems::FightsLikeSword(HeldKind) || (AtkStyle == EAtkStyle::Dash && WizardDashKind(HeldKind))) && WristR;
 	const bool bSweep = bSword && AtkStyle == EAtkStyle::Sweep;
 	const bool bDash = bSword && AtkStyle == EAtkStyle::Dash;   // (hits like a smash attack charged DashCharge)
 	const bool bKick = bAttacking && AtkStyle == EAtkStyle::Kick && Anim && Anim->IsReady();
@@ -1512,7 +1516,7 @@ void AKnightCharacter::TickGear(float Dt)
 		}
 		// The shield's health (owner, 2026-11-06). GuardMax follows what is worn, whatever is in the hand. This is the one place that answers a change of shield, by whatever path it came:
 		// the share that was left carries over, so no swap ever refills it, and a broken guard stays broken.
-		const int32 ShieldId = Skills ? Skills->Worn[JeebItems::K_Shield] : 0;
+		const int32 ShieldId = !Skills ? 0 : bIsWizard ? WizardGuardItem() : Skills->Worn[JeebItems::K_Shield];   // (the wizard's orb: as a kite shield of his spell book's tier)
 		const float NewMax = (bIsTroll && !ShieldId) ? JeebTune::V().TrollArmGuard : JeebItems::ShieldHealth(ShieldId);   // (a troll guards with his bare arm: its own health, TrollArmGuard)
 		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 6.25f;
 		if (!FMath::IsNearlyEqual(NewMax, GuardMax))

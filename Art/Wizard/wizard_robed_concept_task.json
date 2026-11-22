@@ -1,0 +1,16 @@
+{
+ "id": "01a20172-51a4-716c-8276-c31035b28025",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "The same old wizard, same face, same thick long white beard, exactly the same pose, body proportions, height and framing, front view, full body, plain light grey background. Now he is dressed in his wizard's outfit: a long rich royal-blue wizard robe reaching down to mid-shin, close-fitting on the body (not billowing), with long sleeves that end at the wrists with a modest flare, gold embroidered trim along the collar, down the front opening, round the cuffs and round the hem, and a brown leather belt with a round gold buckle. Tall sturdy dark-brown leather wizard boots with a gold buckle strap and slightly pointed toes, clearly visible below the robe's hem. Bare head: NO hat, no hood. Bare hands, no gloves, nothing held, no staff, no book, no cloak or cape. Stylised 3D game character, Breath of the Wild meets Overwatch. Slightly stylised, not quite realistic and a tiny bit cartoonish: sleek natural proportions, crisp bevels, hand-painted textures, rich clean colours, no rust, no dirt.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795320600197,
+ "started_at": 1795320600208,
+ "finished_at": 1795320620202,
+ "expires_at": 1795579820202,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a20172-51a4-716c-8276-c31035b28025_0.png?Expires=1795579820&Signature=SyhhdNee0zgYiOeJuzm4-cnLZt1lrOmAGml7-A1rDR~1UqZmXktu7Cq-kicrJ~MZ7780jgKytVDlmzAaXLUnZxUcy0JD2Bra8E0gnUUMW6jFw8IH1VzsssyYUYOwLfrQ~5QiHMDaMHR3caJU3ikj5iM0yH8cSPeM2P537vIIcN~IvjSndRO8A-JRO4xwp5kq0nPiSFjGYLkfIfeS6asW0c-ZLbquGbe7HHDD3XwggsZtJMg~vvY8vKBgG2WtFY1FA8uqm77OW3-PtbX~CmjkN18pq8g7x8~XQrVvxBg-UqTZZsulrSZwKkKk3wQfZOrtLQRoPAwEurxRPbJ2NXy6xw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}
