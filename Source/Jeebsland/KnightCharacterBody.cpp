@@ -557,6 +557,18 @@ void AKnightCharacter::UpdateRings()
 			UProceduralMeshComponent* B = Proc(RingHand[Side], Band, Row.Band, 0.3f);
 			UProceduralMeshComponent* S = Proc(RingHand[Side], Stone, Row.Gem, 0.1f);
 			FRingSlot Slot; Slot.Band = B; Slot.Stone = S; Slot.Side = Side; Slot.Across = Across; RingSlots.Add(Slot);
+#if !UE_BUILD_SHIPPING
+			if (i == 0 && FParse::Param(FCommandLine::Get(), TEXT("RingSpray")))   // (test pictures: a row of bands along the right hand, hue by place, to see where the fingers are)
+				for (int32 k = -4; k <= 3; ++k)
+				{
+					KM::FMD B2, S2;
+					KM::Torus(B2, RingRad, RingThick, 16, 8, 1.f, 1.f, KM::Xf(FVector::ZeroVector));
+					KM::Ellipsoid(S2, RingThick * 1.5, RingThick * 1.3, RingThick * 1.2, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 0.9, 0.f, 0.f)));
+					UProceduralMeshComponent* Bb = Proc(RingHand[Side], B2, Row.Band, 0.3f);
+					UProceduralMeshComponent* Sb = Proc(RingHand[Side], S2, FLinearColor::MakeFromHSV8(uint8((k + 4) * 32), 255, 255), 0.1f);
+					FRingSlot Sl; Sl.Band = Bb; Sl.Stone = Sb; Sl.Side = Side; Sl.Across = Across; Sl.AlongAdd = float(k); RingSlots.Add(Sl);
+				}
+#endif
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBRING %d rings drawn"), Rings.Num());
 	}
@@ -571,7 +583,7 @@ void AKnightCharacter::UpdateRings()
 		const FVector Cx = FVector::CrossProduct(A, N).GetSafeNormal() * (Slot.Side == 0 ? 1.f : -1.f);
 		const FVector U = -N;   // (measured on pictures 2026-11-22: the closed gauntlet's knuckles lie on the hand's own line, so the band keeps the open hand's turn)
 		const FVector T = A;
-		const FVector POpen = A * RingAlong + N * RingPalm, PFist = A * RingFistAlong + N * RingFistPalm;
+		const FVector POpen = A * (RingAlong + Slot.AlongAdd) + N * RingPalm, PFist = A * (RingFistAlong + Slot.AlongAdd) + N * RingFistPalm;
 		const FVector Axis = FMath::Lerp(A, T, W).GetSafeNormal(), Out = FMath::Lerp(-N, U, W).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromZX(Axis, Out).ToQuat();
 		const FVector Pos = FMath::Lerp(POpen, PFist, W) + Cx * Slot.Across;
