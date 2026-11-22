@@ -60,6 +60,11 @@ struct FTravelTestDriver
 		case 0:
 			if (C->TestClock < 4.f) return;
 			Log(FString::Printf(TEXT("server start: at %.0f %.0f, %s"), K->GetActorLocation().X, K->GetActorLocation().Y, *State(C)));
+			for (int32 i = 0; i < JeebTravel::Count(); ++i)   // (2026-11-22: every town listed, open, known, and where he would land)
+			{
+				float Yw = 0.f; const FVector D = JeebTravel::ArrivalSpot(C->GetWorld(), i, K, Yw);
+				Log(FString::Printf(TEXT("TOWN %d %s: open %d known %d, arrival %.0f %.0f %.0f yaw %.0f, centre %.0f %.0f"), i, JeebTravel::Towns()[i].Name, JeebTravel::Towns()[i].bOpen, C->IsVisited(i), D.X, D.Y, D.Z, Yw, JeebTravel::Centre(i).X, JeebTravel::Centre(i).Y));
+			}
 			if (C->IsVisited(Steele)) { Log(TEXT("RELOAD: this account came back knowing Steele Creek (PASS if expected)")); C->TestStage = 1000; return; }
 			C->DoTravel(Steele);   // refused: never been
 			C->DoTravel(Oak);      // refused: already here
