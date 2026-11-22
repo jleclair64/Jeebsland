@@ -121,6 +121,13 @@ PROPS = {
                      rg=lambda co, c: (1.0 if (c[1] > 1.25 * c[0] and c[1] > 1.1 * c[2] and _hue(c)[1] > 0.25) else 0.0, 0.0)),   # (the liquid takes the potion's colour: swiftness, radar)
     # The wizard's spell book (2026-11-22, Meshy meshy-t2.5 from a picture, 19 credits): held by its spine in his left fist. Spine along game Z, the covers open toward -X, gem cover +Y.
     "SpellBook": dict(file="SpellBook.glb", axes=("Z", "-X", "-Y"), length=24.0, grip=("Z", 0.5), mask="none"),
+    # The wizard's off-hand items (2026-11-22, agent wizlook; owner: "change the book to be open and held upright in his left hand", "a glowing crystal ball that floats
+    # above his open left hand", "a wizard pipe"). Meshy meshy-t2.5 from pictures (book, pipe); the ball is a sphere with Meshy's picture on it (Saved/WizLook/ball.py
+    # in the wizlook copy) and its glow from M_PropGlow (fixlook_assets.py). All in their own frame: the long side along X, the middle at the origin; placed in the
+    # hand by AKnightCharacter::UpdateWizardBook.
+    "OpenBook":    dict(file="OpenBook.glb", axes=("X", "Y", "Z"), length=30.0, grip=("X", 0.5), mask="none", reduce=5000),
+    "Pipe":        dict(file="Pipe.glb", axes=("X", "Y", "Z"), length=28.0, grip=("X", 0.5), mask="none", reduce=5000),
+    "CrystalBall": dict(file="CrystalBall.glb", axes=("X", "Y", "Z"), length=11.0, grip=("Z", 0.5), mask="none"),
     "AmuletRune":       dict(AMULET, file="AmuletRune.glb",       axes=("-Y", "X", "Z")),
     "AmuletEmberHeart": dict(AMULET, file="AmuletEmberHeart.glb", axes=("-Y", "X", "Z")),
     "AmuletScarab":     dict(AMULET, file="AmuletScarab.glb",     axes=("Y", "-X", "Z")),

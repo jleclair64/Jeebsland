@@ -60,6 +60,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
 	In.bSwinging = bSwinging && GatherWalkLeft <= 0.f && In.Vel.Size2D() < 50.f;   // (walking into place or off with the tool: he walks, then swings. Other machines go by his speed.)
 	In.bShieldArm = !bIsWizard && ShieldActive() && !bShieldBack && !bStowed;
+	In.bWizHold = bIsWizard && WizardBookHeld && !bStowed && !bSwinging && !bFishing && !bDrinking;   // (2026-11-22: his book, ball or pipe held out on his left palm)
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
 	In.bShotLog = bShotFace;
@@ -208,6 +209,7 @@ void AKnightCharacter::PlaceGear()
 {
 	if (WristR) WristR->SetWorldTransform(Anim->RightGripWorld());
 	if (ElbowL) ElbowL->SetWorldTransform(Anim->LeftGripWorld());
+	PlaceWizardOffHand();
 	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
 	const bool bWantBack = bStowed || ((bSwinging || bFishing) && !bBlocking);   // (both hands on a tool, or fishing: the shield goes on his back, unless he raises it)
 	if (bWantBack != bShieldBack) { bShieldBack = bWantBack; PlaceShield(bShieldBack); }

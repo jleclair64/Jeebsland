@@ -174,7 +174,7 @@ void FKnightAnimator::CastPose(const FInput& In, FPose& B, float& OutBlend)
 	if (!M) return;
 	const float U = FMath::Clamp(In.MoveU, 0.f, 1.f);
 	PlayLower = 0.f;   // (his own stance: the clips step out)
-	if (!bStaff && In.bShieldArm) PlayKeepOffArm = 1.f;   // (the clip's off hand flings out; the shield stays on guard, a fixed pose under it)
+	if (!bStaff && (In.bShieldArm || In.bWizHold)) PlayKeepOffArm = 1.f;   // (the clip's off hand flings out; the shield, or the wizard's book, ball or pipe, stays held, a fixed pose under it)
 	PlayAt(Row, MoveClipTime(*M, U, CastPushFrom, CastRelease), 1000.f, B, &OutBlend);
 
 	// Facing the shot (owner 2026-11-18, picture 13: the wand's clip turned his chest and arm to his right while the bolt flew straight

@@ -127,6 +127,9 @@ public:
 	UPROPERTY() class UStaticMeshComponent* WizardOrb = nullptr;
 	UPROPERTY() class UStaticMeshComponent* WizardBookHeld = nullptr;   // the spell book in his left fist (UpdateWizardBook)
 	void UpdateWizardBook();
+	void PlaceWizardOffHand();     // (every frame: the off-hand book, ball or pipe on his palm, KnightCharacterBody.cpp)
+	int32 WizardOffStyle = -1;     // which one WizardBookHeld is (JeebItems::EWizOff)
+	UPROPERTY() class UInstancedStaticMeshComponent* WizardPipeSmoke = nullptr;   // the pipe's puffs (this machine only)
 	UPROPERTY() class UMaterialInstanceDynamic* WizardOrbMid = nullptr;
 	struct FBlinkPuff { TWeakObjectPtr<class UStaticMeshComponent> Comp; TWeakObjectPtr<class UMaterialInstanceDynamic> Mid; float T = 0.f; bool bIn = false; };
 	TArray<FBlinkPuff> BlinkPuffs;
