@@ -101,6 +101,11 @@ void AKnightCharacter::Interact()
 		{
 			// (a bow only shoots while drawn: the right button, RightDown)
 		}
+		else if (WizardDashKind(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkNow() * 1.15f
+			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
+		{
+			StartAttack(EAtkStyle::Dash, 1, 0.f);   // (the wizard, 2026-11-21: sprinting forward with his staff or wand, the knight's dash attack, a melee lunge)
+		}
 		else if (K == JeebItems::K_Wand || K == JeebItems::K_Staff)
 		{
 			StartAttack(EAtkStyle::Cast, 1, 0.f);

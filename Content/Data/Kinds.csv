@@ -28,3 +28,4 @@ Ring,Ring,1,2,200,1,0,0,0,0,0,no,all,"Rings shift damage and defence. Three misc
 Amulet,Amulet,1,2,200,1,0,0,0,0,0,no,all,"Wears in one of your three miscellaneous slots. Some change the damage rules in strange ways."
 Crest,Helm Brush,1,2,200,1,0,0,0,0,0,no,all,
 Club,Troll Club,14,20,240,0.95,0,0,95,8,2,yes,troll,"A troll's heavy wooden club, banded with steel. Slow, crushing swings. Two-handed, no shield."
+Book,Spell Book,1,2,200,1,0,1,80,3,1,no,wizard,"A wizard's spell book, worn on the belt where a knight wears gauntlets. The orb a wizard guards with is as strong as his book: a better book, a stronger orb."

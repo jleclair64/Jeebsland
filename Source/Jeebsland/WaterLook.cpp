@@ -23,7 +23,7 @@ namespace
 	TAutoConsoleVariable<float> CVarRoughFar(TEXT("jeeb.Water.RoughFar"), -1.f, TEXT("Roughness far away (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarSpec(TEXT("jeeb.Water.Spec"), 0.2521f, TEXT("Specular (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarFlow(TEXT("jeeb.Water.Flow"), 42.8571f, TEXT("River flow speed, cm/s (negative: M_Water's, 55)"));
-	TAutoConsoleVariable<float> CVarFoam(TEXT("jeeb.Water.Foam"), 0.0689f, TEXT("Shore foam strength (negative: M_Water's)"));
+	TAutoConsoleVariable<float> CVarFoam(TEXT("jeeb.Water.Foam"), 0.f, TEXT("Shore foam strength (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarFoamDepth(TEXT("jeeb.Water.FoamDepth"), -1.f, TEXT("Depth in cm under which the foam line runs (negative: M_Water's)"));
 	TAutoConsoleVariable<float> CVarPhase(TEXT("jeeb.Water.PhaseG"), -2.f, TEXT("Scattering phase -1..1 (below -1: M_Water's)"));
 	TAutoConsoleVariable<float> CVarDuskScatter(TEXT("jeeb.Water.DuskScatter"), 0.0756f, TEXT("Share of the water's scattering left at the low sun (1: none taken away)"));

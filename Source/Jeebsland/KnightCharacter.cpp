@@ -120,7 +120,7 @@ void AKnightCharacter::BeginPlay()
 	// for single player only: in an online game the server will own every character (not built yet), so they start fresh.
 	if (Skills && !(UsesLocalSave() && UJeebSave::Restore(Skills)))
 	{
-		if (bIsTroll && HasAuthority()) Skills->ResetToStartingKit();   // (the troll's own kit: the club, no knight's gear)
+		if ((bIsTroll || bIsWizard) && HasAuthority()) Skills->ResetToStartingKit();   // (the troll's own kit: the club, no knight's gear)
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 	}
@@ -447,7 +447,9 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickDrink(Dt);
 	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
 	TickGear(Dt);
-	if (bIsTroll) TickTroll(Dt);   // (the charged jump and the hop: KnightCharacterTroll.cpp)
+	if (bIsTroll) TickTroll(Dt);
+	if (bIsWizard) TickWizard(Dt);   // (the orb and the teleport's puffs: KnightCharacterWizard.cpp)
+	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
 	TickPose(Dt, Vel, Speed, bFalling, bFaceCam, S, C);

@@ -42,6 +42,7 @@ namespace JeebItems
 		K_Crest,          // a brush along the helm's crest: worn in a miscellaneous slot like a ring or amulet
 		K_Longbow, K_Crossbow,   // (weapons, at the end so that no saved item's number moves)
 		K_Club,           // the troll's club (2026-11-19; Class troll in Kinds.csv; fights like the sword)
+		K_Book,           // the wizard's spell book (2026-11-21; Class wizard in Kinds.csv): worn in the slot where a knight wears gauntlets
 		K_Count
 	};
 
@@ -102,12 +103,12 @@ namespace JeebItems
 	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
 	// 3 Dark Plate (2026-11-21): its own model (/Game/DarkPlate, Tools/BuildDarkPlate.ps1), one colour whatever the tier; the tier still sets its numbers.
 	// Only the Test kit hands it out for now: stores, loot and new characters roll among the first NumRolledArmourStyles.
-	constexpr int32 NumArmourStyles = 4;
+	constexpr int32 NumArmourStyles = 5;
 	constexpr int32 NumRolledArmourStyles = 3;
-	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy, AS_Dark };
+	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy, AS_Dark, AS_Wizard };   // (AS_Wizard, 2026-11-21: the wizard's hat, robe and boots; no gauntlets or shoulders; only wizards wear it and wizards wear nothing else)
 	// Light (the tunic) has no shoulder piece (owner, 2026-11-03: its sleeves are part of the chest): a style that has no piece
 	// for a slot is never made; asked for anyway (an old save, a random roll), the Classic piece is made instead.
-	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light); }
+	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light) && !(Style == AS_Wizard && (Kind == K_Shoulders || Kind == K_Gauntlets)); }
 	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { Style = FMath::Clamp(Style, 0, NumArmourStyles - 1); if (!StyleHasPiece(Kind, Style)) Style = AS_Classic; return IdGearBase + Kind * 100 + Style * 10 + Tier; }
 	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
@@ -176,6 +177,7 @@ namespace JeebItems
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), TierName(V));
 		if (K == K_Shield) return FString::Printf(TEXT("%s %s"), TierName(V), ShieldStyleName(StyleOf(Id)));
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
+		if (IsArmorKind(K) && StyleOf(Id) == AS_Wizard) return FString::Printf(TEXT("%s Wizard %s"), TierName(V), K == K_Helmet ? TEXT("Hat") : K == K_Chest ? TEXT("Robe") : TEXT("Boots"));
 		if (IsArmorKind(K) && StyleOf(Id) != AS_Classic) return FString::Printf(TEXT("%s %s %s"), TierName(V), *ArmourStyleRow(StyleOf(Id)).Name, KindName(K));   // "Iron Light Helmet"
 		return FString::Printf(TEXT("%s %s"), TierName(V), KindName(K));
 	}
@@ -333,11 +335,27 @@ namespace JeebItems
 	}
 	// (2026-11-19) Is this pack a playable troll's? (KnightCharacterTroll.cpp)
 	bool OwnerIsTroll(const USkillComponent* S);
+	bool OwnerIsWizard(const USkillComponent* S);   // (2026-11-21, KnightCharacterWizard.cpp)
 	// Can this player wear or wield this item? If not, OutWhy says why. (Capes, rings, amulets and the brush have no gate.)
 	inline bool CanEquip(const USkillComponent* S, int32 Id, FString* OutWhy = nullptr)
 	{
 		if (!IsGear(Id)) return true;
 		const int32 K = KindOf(Id);
+		// The wizard (2026-11-21): the spell book and the wizard's hat, robe and boots are his alone; he wears no other armour and no shield
+		// (his guard is the orb), and wields wizards' and everyone's weapons. Unequipping never asks here.
+		const bool bWizard = OwnerIsWizard(S);
+		const bool bWizardGear = K == K_Book || (IsArmorKind(K) && StyleOf(Id) == AS_Wizard);
+		if (bWizardGear && !bWizard)
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is made for wizards."), *ItemName(Id));
+			return false;
+		}
+		if (bWizard && !bWizardGear && (IsArmorKind(K) || K == K_Shield || (IsWeaponKind(K) && KindClass(K) != 0 && KindClass(K) != 3)))
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is not made for wizards."), *ItemName(Id));
+			return false;
+		}
+		if (K == K_Book) return true;
 		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
 		const int32 T = VariantOf(Id);
 		// The playable troll (2026-11-19): only troll-class and "all" gear (Kinds.csv Class), and only common or troll tiers. Knights are not held to their class yet.

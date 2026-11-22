@@ -1080,6 +1080,9 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotShield="), ShotShield) && ShotShield >= 0) S->Worn[JeebItems::K_Shield] = JeebItems::ShieldId(ShotShield, FMath::Max(ShotWear, 0));
 				int32 ShotAmulet = -1;   // (-ShotAmulet=<row among the amulets in Accessories.csv>: wears it, on its chain)
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotAmulet="), ShotAmulet) && ShotAmulet >= 0) S->Worn[JeebItems::K_Amulet] = JeebItems::GearId(JeebItems::K_Amulet, ShotAmulet);
+				int32 ShotRing = -1, ShotRingB = -1;   // (-ShotRing=<row among the rings in Accessories.csv> wears it on his right hand, -ShotRingB= another on the left)
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotRing="), ShotRing) && ShotRing >= 0) S->Worn[JeebItems::K_Ring] = JeebItems::GearId(JeebItems::K_Ring, ShotRing);
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotRingB="), ShotRingB) && ShotRingB >= 0) S->RingB = JeebItems::GearId(JeebItems::K_Ring, ShotRingB);
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));

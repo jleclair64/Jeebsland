@@ -1,0 +1,16 @@
+{
+ "id": "01a20170-ede4-7605-8a26-055b991de6e1",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw this game character as an old wizard in his plain everyday clothes, with NO armour. Keep exactly the same pose (standing straight, arms hanging a little away from the body, legs slightly apart), the same body proportions, the same height, shoulder width, arm length and leg length, and the same framing, front view, full body, on a plain light grey background. He has a kind weathered face, bushy white eyebrows, swept-back white hair and a very thick, full, long white beard reaching his chest. He wears a cream-white linen shirt with the sleeves rolled up to the elbows showing bare forearms, a dark charcoal-navy buttoned waistcoat vest, dark grey-brown plaid tartan knee-length trousers (breeches) buttoned below the knee, dark wool socks and sturdy plain brown leather ankle boots. Bare hands, no gloves, relaxed open hands. No scarf, no tie, no hat, no cloak, no staff, nothing held. Stylised 3D game character, Breath of the Wild meets Overwatch. Slightly stylised, not quite realistic and a tiny bit cartoonish: sleek natural proportions, crisp bevels, hand-painted textures, rich clean colours, no rust, no dirt.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795320508756,
+ "started_at": 1795320508772,
+ "finished_at": 1795320573500,
+ "expires_at": 1795579773500,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a20170-ede4-7605-8a26-055b991de6e1_0.png?Expires=1795579773&Signature=SNQzNed4BKz4aFjG-Zmeo0Yn0rtLw7AZoKHTXOuI8pPuJewPXIZA7YmzTrkealLcDWgpX9SesJza-4COt1uckSqu7cBaIMbdOYqiM1kJ~H9fGmRPWl-xXJ3pOFG-CwSkPk42i0-prD8ccp2D~5qynE61W-ciEWcT0e-Re8QnHNGzKW0nA8-f2p1pqT3ZkuYLc~Nxk1~w~SM9DZ2PoWAYhj9YXoXn7Hj73DiJDmIstzaDvSxpMJo--Vhe6X7taUMMpV1NSPpVzwX6OaGIQ5NJ6EdZ9zWuvHNkGDhWThU9X2OT6zYl6aUWDGR6cGIwrMnGNK~hCQxWzPs0ZmaZ5XRR9A__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

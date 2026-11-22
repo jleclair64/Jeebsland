@@ -331,12 +331,14 @@ APawn* AKnightGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlaye
 UClass* AKnightGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
 {
 	const AKnightPlayerController* PC = Cast<AKnightPlayerController>(InController);
-	bool bTroll = false;
-	if (PC && PC->ClassChoice >= 0) bTroll = PC->ClassChoice == 1;
+	bool bTroll = false, bWizard = false;
+	if (PC && PC->ClassChoice >= 0) { bTroll = PC->ClassChoice == 1; bWizard = PC->ClassChoice == 2; }
 	else if (InController && InController->IsLocalController())
 	{
 		FString As;
 		bTroll = FParse::Value(FCommandLine::Get(), TEXT("PlayAs="), As) && As.Equals(TEXT("Troll"), ESearchCase::IgnoreCase);
+		bWizard = As.Equals(TEXT("Wizard"), ESearchCase::IgnoreCase);
 	}
+	if (bWizard) return AWizardCharacter::StaticClass();   // (the playable wizard, 2026-11-21)
 	return bTroll ? ATrollCharacter::StaticClass() : Super::GetDefaultPawnClassForController_Implementation(InController);
 }

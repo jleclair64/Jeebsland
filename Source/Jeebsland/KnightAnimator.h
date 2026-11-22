@@ -222,6 +222,8 @@ public:
 	FTransform BoneWorld(int32 B) const;
 	FVector BoneAt(int32 B) const { return BoneWorld(B).GetLocation(); }
 	FTransform RightGripWorld() const;   // WristR: the weapon's joint
+	float FistAmount(int32 Side) const { return FMath::SmoothStep(0.f, 1.f, FistW[Side]); }   // how closed a hand is (0 right, 1 left)
+	bool HandFrame(int32 Side, FVector& OutAlong, FVector& OutPalm) const;   // (rings, 2026-11-21) in a hand bone's frame (cm): the way the fingers lead, and toward the palm; Side 0 right, 1 left
 	FTransform LeftGripWorld() const { return L.LeftGrip * BoneWorld(JeebAnim::LHand); }
 	FTransform ChestWorld() const;     // at the chest bone; its axes are the actor's when he stands at rest
 	float StowPull() const;           // cm what is stowed on his back moves in toward him: bent flat over a ledge or onto a block the back is nearer than the chest frame says
@@ -320,8 +322,22 @@ private:
 	bool bTrollMirror = false;     // ... seen in a mirror (imported mirrored)
 	FTransform TrollRel;           // the troll mesh's place on the knight's (unseen) mesh
 	void MakeTrollMesh(AActor* Owner);
+	// The wizard (2026-11-21, KnightAnimatorWizard.cpp): the knight's bones and clips as they are. Comp carries the pose with every section hidden;
+	// WizComp (/Game/Wizard/SK_Wizard, on the suit's skeleton) follows it and shows the slots of what he wears (Tools/wizard_export.py).
+	bool bWizard = false, bWizBook = false;
+	bool bWizWorn[JeebAnim::Piece_Count] = {};
+	class USkeletalMeshComponent* WizComp = nullptr;
+	void MakeWizardMesh(AActor* Owner);
+	void RefreshWizard();
+public:
+	void SetWizard() { bWizard = true; }
+	bool IsWizard() const { return bWizard; }
+	void SetWizardBook(bool bOn) { if (bWizBook != bOn) { bWizBook = bOn; RefreshWizard(); } }
+	class USkeletalMeshComponent* WizardMesh() const { return WizComp; }
+private:
 	void TrollPose();
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	void TrollBareGuard(const JeebAnim::FInput& In, FPose& B);   // block with the bare left forearm raised (no shield)
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)

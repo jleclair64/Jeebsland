@@ -485,6 +485,13 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Quad(16, 42, 48, 48, Lt);
 			Quad(29, 41, 35, 49, Tr);
 			break;
+		case K_Book:   // (the wizard's spell book: a closed cover, its spine, a clasp and a round emblem)
+			Quad(14, 9, 50, 55, Pl);
+			Quad(14, 9, 21, 55, Dk);
+			Quad(40, 28, 50, 36, Tr);
+			DiscP(33, 32, 8, 8, Lt);
+			DiscP(33, 32, 4, 4, Tr);
+			break;
 		case K_Shoulders:
 			DiscP(19, 36, 16, 13, Pl);
 			DiscP(45, 36, 16, 13, Pl);

@@ -964,6 +964,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
+				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)
 			}
 	// (the crossbow is two-handed even at ease: held low across him, whatever his legs do)
 	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting;
@@ -2104,7 +2105,9 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 		static IConsoleVariable* Inset = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Knight.InsetShadow"));
 		if (!Inset) Inset = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Knight.InsetShadow"), 1, TEXT("1: the knight casts his own fine per-object shadow (read when his mesh is made)"), ECVF_Default);
 	}
-	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
+	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }
+	if (bWizard) { MakeWizardMesh(Owner); return Comp; }   // (the wizard: his own body on these bones; no plate, no mail)
+	//   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
 	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
@@ -2136,6 +2139,7 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 
 void FKnightAnimator::Wear(int32 Piece, int32 Tier, int32 Style)
 {
+	if (bWizard) { if (Piece >= 0 && Piece < Piece_Count) { bWizWorn[Piece] = Tier >= 0; WornTiers[Piece] = Tier; WornStyles[Piece] = Style; RefreshWizard(); } return; }
 	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
 	const int32 Mat = PieceMat[Piece];
 	WornTiers[Piece] = Tier;
@@ -2284,6 +2288,24 @@ void FKnightAnimator::MoveTo(const FVector& Feet, float ActorYaw)
 {
 	ToWorld = WallRel * FTransform(FRotator(0.f, ActorYaw + YawNow, 0.f), Feet);
 	ToWorld.AddToTranslation(WallOff);
+}
+
+// (rings, 2026-11-21) The hand bone's own axes: along the fingers (forearm bone to hand bone) and toward the palm (where the grip line lies off that), measured once per side.
+bool FKnightAnimator::HandFrame(int32 Side, FVector& OutAlong, FVector& OutPalm) const
+{
+	static FVector A[2], N[2]; static bool bGot[2] = { false, false };
+	if (!bGot[Side])
+	{
+		const FTransform H = BoneWorld(Side == 0 ? JeebAnim::RHand : JeebAnim::LHand), E = BoneWorld(Side == 0 ? JeebAnim::RFore : JeebAnim::LFore);
+		const FVector Al = H.InverseTransformVectorNoScale((H.GetLocation() - E.GetLocation()).GetSafeNormal());
+		const FVector G = Side == 0 ? GripInRightHand(L.RightGrip) : GripInLeftHand(L.LeftGrip);
+		const FVector Pl = (G - Al * FVector::DotProduct(G, Al)).GetSafeNormal();
+		if (Al.IsNearlyZero() || Pl.IsNearlyZero()) return false;
+		A[Side] = Al; N[Side] = Pl; bGot[Side] = true;
+		UE_LOG(LogTemp, Log, TEXT("JEEBRING hand %d frame: along %s palm %s grip %s"), Side, *Al.ToString(), *Pl.ToString(), *G.ToString());
+	}
+	OutAlong = A[Side]; OutPalm = N[Side];
+	return true;
 }
 
 FTransform FKnightAnimator::BoneWorld(int32 B) const

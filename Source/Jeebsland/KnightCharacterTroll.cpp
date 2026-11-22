@@ -279,7 +279,7 @@ static FAutoConsoleCommandWithWorldAndArgs CmdPlayAs(TEXT("jeeb.PlayAs"), TEXT("
 #endif
 
 // Test pictures (-JeebShot, single player): -SuitDo=punch (the left punch), hop<deg> (a hop that way from where he faces: hop90 his right),
-// hopall (eight hops, every 45 degrees, 1.4 s apart), chargejump<hundredths> (Space held for that share of a full charge, then let go),
+// block (the bare-arm guard, held), hopall (eight hops, every 45 degrees, 1.4 s apart), chargejump<hundredths> (Space held for that share of a full charge, then let go),
 // leapsizes (least, half and full charge, 3 s apart, past the cooldown), leaptest (a full charge; again at 4 s: the cooldown turns it into
 // a tap jump; again at 10 s at half charge: it leaps). Logs JEEBLEAP.
 bool AKnightCharacter::TrollSuitTest(const FString& Do)
@@ -297,6 +297,7 @@ bool AKnightCharacter::TrollSuitTest(const FString& Do)
 		Later(At + T.TrollLeapTap + Share * T.TrollLeapChargeTime + 0.02f, [this]() { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space up, charge %.2f, cooldown %.1f"), LeapChargeShare(), LeapCooldown); ReleaseLeap(); });
 	};
 	if (Do == TEXT("punch")) { StartAttack(EAtkStyle::Kick, 1, 0.f); return true; }
+	if (Do == TEXT("block")) { Later(0.3f, [this]() { StartBlock(); UE_LOG(LogTemp, Log, TEXT("JEEBTROLLBLOCK raised: blocking %d guard %.0f of %.0f"), bBlocking ? 1 : 0, GuardPool, GuardMax); }); return true; }   // (the bare-arm guard, held)
 	if (Do == TEXT("hopall"))
 	{
 		for (int32 i = 0; i < 8; ++i)

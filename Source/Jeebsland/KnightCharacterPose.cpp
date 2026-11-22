@@ -55,7 +55,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bDrinking = bDrinking;
 	In.DrinkU = DrinkT / FMath::Max(JeebTune::V().DrinkTime, 0.1f);
 	In.bSwinging = bSwinging && GatherWalkLeft <= 0.f && In.Vel.Size2D() < 50.f;   // (walking into place or off with the tool: he walks, then swings. Other machines go by his speed.)
-	In.bShieldArm = ShieldActive() && !bShieldBack && !bStowed;
+	In.bShieldArm = !bIsWizard && ShieldActive() && !bShieldBack && !bStowed;
 	In.bSideways = bSideways;
 	In.SwingU = FMath::Fmod(SwingTime, FMath::Max(SwingPeriod, 0.1f)) / FMath::Max(SwingPeriod, 0.1f);
 	In.bShotLog = bShotFace;
@@ -260,6 +260,7 @@ void AKnightCharacter::PlaceGear()
 	UpdateBeltFlask();
 	if (QuiverParts.Num() > 0 && QuiverParts[0])
 		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());
+	UpdateRings();
 	UpdateAmulet();   // (the chain is measured from his neck, so once the pose has been placed)
 }
 
