@@ -80,7 +80,6 @@ private:
 	UPROPERTY() USceneComponent* DoorPivot = nullptr;
 	UPROPERTY() UStaticMeshComponent* DoorMesh = nullptr;
 	UPROPERTY() UBoxComponent* DoorSolid = nullptr;
-	UPROPERTY() UStaticMeshComponent* Backdrop = nullptr;
 	bool bDoorOpen = false;
 	float DoorAngle = 0.f;
 	float DoorOpenFor = 0.f, DoorClearFor = 0.f;

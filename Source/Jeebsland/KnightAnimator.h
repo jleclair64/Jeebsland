@@ -320,8 +320,22 @@ private:
 	bool bTrollMirror = false;     // ... seen in a mirror (imported mirrored)
 	FTransform TrollRel;           // the troll mesh's place on the knight's (unseen) mesh
 	void MakeTrollMesh(AActor* Owner);
+	// The wizard (2026-11-21, KnightAnimatorWizard.cpp): the knight's bones and clips as they are. Comp carries the pose with every section hidden;
+	// WizComp (/Game/Wizard/SK_Wizard, on the suit's skeleton) follows it and shows the slots of what he wears (Tools/wizard_export.py).
+	bool bWizard = false, bWizBook = false;
+	bool bWizWorn[JeebAnim::Piece_Count] = {};
+	class USkeletalMeshComponent* WizComp = nullptr;
+	void MakeWizardMesh(AActor* Owner);
+	void RefreshWizard();
+public:
+	void SetWizard() { bWizard = true; }
+	bool IsWizard() const { return bWizard; }
+	void SetWizardBook(bool bOn) { if (bWizBook != bOn) { bWizBook = bOn; RefreshWizard(); } }
+	class USkeletalMeshComponent* WizardMesh() const { return WizComp; }
+private:
 	void TrollPose();
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	void TrollBareGuard(const JeebAnim::FInput& In, FPose& B);   // block with the bare left forearm raised (no shield)
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)

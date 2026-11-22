@@ -36,6 +36,7 @@ void AKnightPlayerController::SendLogin()
 	{
 		FString As;
 		if (FParse::Value(FCommandLine::Get(), TEXT("PlayAs="), As)) ServerChooseClass(As.Equals(TEXT("Troll"), ESearchCase::IgnoreCase));
+		if (As.Equals(TEXT("Wizard"), ESearchCase::IgnoreCase)) ServerChooseWizard();
 	}
 	UJeebGameInstance* GI = GetGameInstance<UJeebGameInstance>();
 	// Playing as a client in the editor (no starting screen): a test account per editor window, no password
@@ -51,6 +52,11 @@ void AKnightPlayerController::SendLogin()
 void AKnightPlayerController::ServerChooseClass_Implementation(bool bTroll)
 {
 	if (!bLoggedIn) ClassChoice = bTroll ? 1 : 0;   // (chosen before the pawn comes; no changing after)
+}
+
+void AKnightPlayerController::ServerChooseWizard_Implementation()
+{
+	if (!bLoggedIn) ClassChoice = 2;   // (chosen before the pawn comes; no changing after)
 }
 
 void AKnightPlayerController::ServerLogin_Implementation(const FString& Name, const FString& Password, bool bCreate, bool bDev)
