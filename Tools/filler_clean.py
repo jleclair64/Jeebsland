@@ -83,7 +83,8 @@ PIECES = {
                           zones=[(("box", (0.15, 0.0, 0.07), (0.78, 0.55, 0.6)), ["burlap"])], sharp=45),
     "BarrelSmall":   dict(src="CartSacks_eromaxi", fam="storage", take=[("comp", 1)], size=("Z", 0.85), tris=10000, mats=WOOD_IRON, sharp=60),
     "ClayJug":       dict(src="CartSacks_eromaxi", fam="pots", take=[("comp", 2)], size=("Z", 0.4), tris=6000, mats=["clay"], sharp=80, keepL=0.5, keepC=0.2, edge=30.0, even=0.7),   # (its painted stripes melted away: one clay)
-    "SackPileOpen":  dict(src="CartSacks_eromaxi", fam="storage", take=[("box", (-0.5, -0.8, -0.6), (0.2, -0.12, 0.0))], drop=[("comp", 1, 2)], fill=40, speck=0.03, two_sided=True,
+    "SackPileOpen":  dict(src="CartSacks_eromaxi", fam="storage", take=[("box", (-0.5, -0.8, -0.6), (0.2, -0.12, 0.0))], drop=[("comp", 1, 2)], fill=3000, fill_flat=True, speck=0.03,   # (2026-11-21: fill 40 left the front sack's side open where the cart's barrel was fused to it: the owner's "side missing")
+                          two_sided=True,
                           size=("L", 1.45), tris=16000, mats=["burlap", "grain"], sharp=80),
     "WheatSack":     dict(src="WheatSack_VetRo5o3", fam="storage", size=("Z", 0.85), tris=6000, mats=["burlap"], sharp=80, plain=["all"], plain_mat="burlap"),   # (its AI lettering and wheat print cleared)
     "SpiceSacks":    dict(src="SpiceSacks_gtarcan", fam="storage", size=("Z", 0.55), tris=16000, mats=["burlap"], sharp=80, zones=SPICE_ZONES),
@@ -617,8 +618,10 @@ def keep_faces(o, keep):
     bmesh.ops.delete(bm, geom=loose, context="VERTS")
     bm.to_mesh(o.data); bm.free(); o.data.update()
 
-def fill_holes(o, sides):
-    # close the openings a box cut left; the new faces borrow the UVs of their corners' old neighbours (a smear of the edge's colour)
+def fill_holes(o, sides, flat=False):
+    # close the openings a box cut left; the new faces borrow the UVs of their corners' old neighbours (a smear of the edge's colour).
+    # flat (2026-11-21, the grain sacks' torn side): every new face takes ONE neighbour's UV for all its corners, so a big patch is one calm colour,
+    # not a striped smear across the picture.
     bm = bmesh.new(); bm.from_mesh(o.data)
     uvl = bm.loops.layers.uv.active
     edges = [e for e in bm.edges if e.is_boundary]
@@ -628,6 +631,9 @@ def fill_holes(o, sides):
         for l in f.loops:
             for l2 in l.vert.link_loops:
                 if l2.face not in new: l[uvl].uv = l2[uvl].uv.copy(); break
+        if flat:
+            u0 = f.loops[0][uvl].uv.copy()
+            for l in f.loops: l[uvl].uv = u0
     bm.to_mesh(o.data); bm.free(); o.data.update()
     print("FILLER holes filled", len(new))
 
@@ -1125,7 +1131,7 @@ def build_source(src, names):
             fv = np.array([p.vertices[0] for p in hi.data.polygons])
             keep_faces(hi, ~small[c2[fv]])
             print("FILLER %s specks dropped: %d parts, %d verts" % (name, int(small.sum()), int(cnt[small].sum())))
-        if P["fill"]: fill_holes(hi, P["fill"])
+        if P["fill"]: fill_holes(hi, P["fill"], bool(P.get("fill_flat")))
         # turn, size, onto the ground
         Rm = np.array(Euler([math.radians(x) for x in P["rot"]], "XYZ").to_matrix())
         hi.rotation_mode = "XYZ"      # (the glTF importer leaves objects in quaternion mode, where rotation_euler does nothing)
@@ -1236,10 +1242,34 @@ def build_source(src, names):
             gm = make_material(name + "_Glow", rgb, nrm, rough, metal, emissive=True); gm.name = "Glow"
             me_lo.materials.append(gm)
             uvd = me_lo.uv_layers.active.data
-            for p in me_lo.polygons:
-                u = np.mean([uvd[li].uv[:] for li in p.loop_indices], 0)
+            # (2026-11-21, the gallows lamp's "jagged dark triangles" across its panes: one pixel at each face's UV centre decided glow or not,
+            # so faces across the glass came out mixed, a lit pane with dark triangles in it. Now the centre and the corners pulled a quarter in
+            # vote, then two passes of a vote among each face's edge neighbours settle the strays)
+            def _g(u):
                 x = min(size - 1, max(0, int(u[0] * size))); y = min(size - 1, max(0, int(u[1] * size)))
-                if glow[y, x] > 0.5: p.material_index = 1
+                return glow[y, x]
+            share = np.zeros(len(me_lo.polygons))
+            for p in me_lo.polygons:
+                uv = [np.array(uvd[li].uv[:]) for li in p.loop_indices]; c = np.mean(uv, 0)
+                share[p.index] = np.mean([_g(c)] + [_g(c + 0.75 * (q - c)) for q in uv])
+            g_on = share > 0.5
+            ef = {}
+            for p in me_lo.polygons:
+                for ek in p.edge_keys: ef.setdefault(ek, []).append(p.index)
+            nb = [[] for _ in me_lo.polygons]
+            for fl in ef.values():
+                for i_ in fl:
+                    nb[i_].extend(j_ for j_ in fl if j_ != i_)
+            for _pass in range(2):
+                g2 = g_on.copy()
+                for i_, n_ in enumerate(nb):
+                    if len(n_) >= 2:
+                        v_ = sum(1 for j_ in n_ if g_on[j_]) / float(len(n_))
+                        if v_ >= 0.67: g2[i_] = True
+                        elif v_ <= 0.33: g2[i_] = False
+                g_on = g2
+            for p in me_lo.polygons:
+                if g_on[p.index]: p.material_index = 1
         if P.get("cloth"):
             # opt-in "cloth": [material, ...] or "all": those faces go to their own two-sided slot named Cloth (the game's wind cloth)
             Wm = DEBUG_MATS.get(name, {})
