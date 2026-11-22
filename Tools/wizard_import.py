@@ -61,12 +61,12 @@ def const(v, x, y):
 def op(cls, a, b, x, y):
     e = mel.create_material_expression(orb, cls, x, y)
     mel.connect_material_expressions(a, "", e, "A"); mel.connect_material_expressions(b, "", e, "B"); return e
-# glow = Color * (0.35 + 2.2 * fresnel)
-rim = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionMultiply, fre, const(2.2, -500, 520), -450, 450), const(0.35, -500, 600), -300, 450)
+# glow = Color * (0.10 + 0.8 * fresnel)
+rim = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionMultiply, fre, const(0.8, -500, 520), -450, 450), const(0.10, -500, 600), -300, 450)
 glow = op(unreal.MaterialExpressionMultiply, col, rim, -150, 100)
 mel.connect_material_property(glow, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
-# opacity = Opacity * (0.10 + 0.55 * fresnel), never past 0.9
-body = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionMultiply, fre, const(0.55, -500, 720), -450, 700), const(0.10, -500, 800), -300, 700)
+# opacity = Opacity * (0.04 + 0.45 * fresnel), never past 0.9
+body = op(unreal.MaterialExpressionAdd, op(unreal.MaterialExpressionMultiply, fre, const(0.45, -500, 720), -450, 700), const(0.04, -500, 800), -300, 700)
 alpha = op(unreal.MaterialExpressionMultiply, opa, body, -150, 400)
 sat = mel.create_material_expression(orb, unreal.MaterialExpressionMin, 0, 400)
 mel.connect_material_expressions(alpha, "", sat, "A"); mel.connect_material_expressions(const(0.9, -150, 600), "", sat, "B")
