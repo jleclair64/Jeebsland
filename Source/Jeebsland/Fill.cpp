@@ -1512,21 +1512,6 @@ struct FFillBuilder
 			if (OakOn())
 				for (const JeebOakHill::FWallBox& W : JeebOakHill::WallBoxes()) if (W.bWalls) { FShape Bx = FShape::Box(W.Mid, W.Half, 0.f); Bx.Cs = W.Cs; Bx.Sn = W.Sn; TryBox(Bx); }
 			for (TActorIterator<ACottage> It(World); It; ++It) TryBox(FShape::Box(FVector2D(It->GetActorLocation()), FVector2D(360.f, 260.f) * It->GetActorScale3D().X, It->GetActorRotation().Yaw));
-			{
-				const FVector2D VC = JeebTerrain::VillageCenter();
-				const float Hh = JeebTerrain::VillageHalf() - 320.f;   // (inside the walkway's posts)
-				const FVector2D L = At - VC;
-				if (FMath::Abs(L.X) < Hh && FMath::Abs(L.Y) < Hh)
-				{
-					const float Dx = Hh - FMath::Abs(L.X), Dy = Hh - FMath::Abs(L.Y);
-					if (FMath::Min(Dx, Dy) < Best)
-					{
-						Best = FMath::Min(Dx, Dy);
-						if (Dx < Dy) { BestPt = VC + FVector2D(FMath::Sign(L.X) * Hh, L.Y); BestOut = FVector2D(-FMath::Sign(L.X), 0.f); }
-						else { BestPt = VC + FVector2D(L.X, FMath::Sign(L.Y) * Hh); BestOut = FVector2D(0.f, -FMath::Sign(L.Y)); }
-					}
-				}
-			}
 			if (Best >= 800.f) return false;
 			At = BestPt + BestOut * (35.f + Back);   // (its back 35 cm off the wall: clear of the 30 cm rule margin)
 			Yaw = YawFor(BestOut);

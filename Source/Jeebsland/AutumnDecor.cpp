@@ -415,11 +415,6 @@ void AAutumnDecor::BeginPlay()
 		const FVector2D Sd(-Fwd.Y, Fwd.X);
 		Patch(Site + Fwd * 520.f + Sd * 300.f, 3, 90.f, 0.9f, true);
 	}
-	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		Patch(VC + FVector2D(-1000.f, 520.f), 5, 130.f, 1.0f, true);
-		Patch(VC + FVector2D(1000.f, 0.f), 4, 110.f, 0.9f, true);
-	}
 
 	// ---------------- Hay bales ----------------
 	auto Bale = [&](const FVector& Pos, float YawDeg)
@@ -487,18 +482,6 @@ void AAutumnDecor::BeginPlay()
 		LampSpots.Add(FVector(CottageXY.X + ToStart.X * 520.f + Side.X * 230.f, CottageXY.Y + ToStart.Y * 520.f + Side.Y * 230.f, 0.f));
 		LampSpots.Add(FVector(CottageXY.X + ToStart.X * 520.f - Side.X * 230.f, CottageXY.Y + ToStart.Y * 520.f - Side.Y * 230.f, 0.f));
 	}
-	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		for (int32 sx = -1; sx <= 1; sx += 2)
-		{
-			for (int32 sy = -1; sy <= 1; sy += 2)
-			{
-				LampSpots.Add(FVector(VC.X + sx * 270.f, VC.Y + sy * 270.f, 0.f)); // plaza corners
-			}
-		}
-		LampSpots.Add(FVector(VC.X + JeebTerrain::VillageHalf() + 110.f, VC.Y + 260.f, 0.f)); // outside the gate
-		LampSpots.Add(FVector(VC.X + JeebTerrain::VillageHalf() + 110.f, VC.Y - 260.f, 0.f));
-	}
 	for (const FVector& Spot : LampSpots)
 	{
 		const float Z = Ground(Spot.X, Spot.Y);
@@ -509,31 +492,8 @@ void AAutumnDecor::BeginPlay()
 		AddFlickerLight(FVector(Spot.X, Spot.Y, Z + 250.f), 2400.f, 950.f, FLinearColor(1.0f, 0.68f, 0.32f), 0.07f);
 	}
 
-	// ---------------- Torches: on the village palisade and round the castle ----------------
+	// ---------------- Torches round the castle (the village palisade's went with Blackrock, 2026-11-22) ----------------
 	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		const float VH = JeebTerrain::VillageHalf();
-		struct FWall { FVector2D C; FVector2D Along; FVector2D Out; bool bGate; };
-		const FWall Walls[4] = {
-			{ VC + FVector2D(VH, 0.f),  FVector2D(0, 1), FVector2D(1, 0),  true },    // east, gate toward the start
-			{ VC + FVector2D(0.f, VH),  FVector2D(1, 0), FVector2D(0, 1),  true },    // north, gate toward the graveyard
-			{ VC + FVector2D(-VH, 0.f), FVector2D(0, 1), FVector2D(-1, 0), false },
-			{ VC + FVector2D(0.f, -VH), FVector2D(1, 0), FVector2D(0, -1), false },
-		};
-		for (const FWall& W : Walls)
-		{
-			for (float U : { -1400.f, -700.f, 700.f, 1400.f }) WallTorch(W.C + W.Along * U, W.Out, 28.f, 215.f);
-			if (W.bGate)
-			{
-				// both sides of the gate, outside and in
-				for (float U : { -235.f, 235.f })
-				{
-					WallTorch(W.C + W.Along * U, W.Out, 52.f, 235.f);
-					WallTorch(W.C + W.Along * U, -W.Out, 52.f, 235.f);
-				}
-			}
-		}
-
 		const FVector2D CP = JeebTerrain::CastlePos();
 		const float Face = JeebTerrain::CastleWall + JeebTerrain::CastleWallT;
 		const float Gate = JeebTerrain::CastleGateHalf;
@@ -738,36 +698,8 @@ void AAutumnDecor::BeginPlay()
 			if (bLight && Len > 300.f) AddFlickerLight(At(0.5f) - FVector(0.f, 0.f, 60.f), 1500.f, 560.f, FLinearColor(1.0f, 0.66f, 0.30f), 0.12f);
 		};
 
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		const float VHalf = JeebTerrain::VillageHalf();
-
-		// Ring of poles round the fountain plaza, joined to one another
-		TArray<FVector> RingTops;
-		for (int32 k = 0; k < 8; ++k)
-		{
-			const float A = (k + 0.5f) * PI * 0.25f;
-			RingTops.Add(Pole(VC.X + 820.f * FMath::Cos(A), VC.Y + 820.f * FMath::Sin(A), 380.f));
-		}
-		for (int32 k = 0; k < 8; ++k) Swag(RingTops[k], RingTops[(k + 1) % 8], true);
-
-		// At each hut inside the walls: from the front roof corners to a pole either side of the doorway, then on to the ring
-		for (TActorIterator<ACottage> It(GetWorld()); It; ++It)
-		{
-			const FTransform HT = It->GetActorTransform();
-			const FVector HP = HT.GetLocation();
-			if (JeebTerrain::RectSD(FVector2D(HP.X, HP.Y), VC, FVector2D(VHalf, VHalf)) > -150.f) continue;   // only the huts inside the village
-			for (int32 Sd = -1; Sd <= 1; Sd += 2)
-			{
-				const FVector Eave = HT.TransformPosition(FVector(385.f, Sd * 300.f, 262.f));
-				const FVector PoleXY = HT.TransformPosition(FVector(560.f, Sd * 330.f, 0.f));
-				const FVector Top = Pole(PoleXY.X, PoleXY.Y, 330.f);
-				Swag(Eave, Top, false);
-				int32 Near = 0;
-				for (int32 r = 1; r < 8; ++r)
-					if (FVector2D::DistSquared(FVector2D(Top), FVector2D(RingTops[r])) < FVector2D::DistSquared(FVector2D(Top), FVector2D(RingTops[Near]))) Near = r;
-				Swag(Top, RingTops[Near], true);
-			}
-		}
+		// (the candle strings round the fountain plaza and the huts inside the walls went with Blackrock, 2026-11-22; kept for the next town)
+		(void)Swag; (void)Pole;
 
 		for (TPair<UInstancedStaticMeshComponent*, TArray<FTransform>>& Pair : Strings)
 		{
