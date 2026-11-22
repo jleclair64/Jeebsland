@@ -57,6 +57,7 @@ void AKnightCharacter::Interact()
 	if (IsUIOpen() || bPanelCursor || bSitting || bRolling || bSliding || bClimbing || InClimbMove() || StunLeft > 0.f || bDrinking) return; // (nor in hitstun, nor with a bottle in that hand) clicks belong to the open screen (or the side panel); no attacks mid-move
 	// Bows (owner 2026-11-06): either button brings it up or draws it while held, and letting go of the last one shoots (InteractReleased, RightUp). A crossbow has no draw: it goes at once, at full power.
 	// The crossbow (owner 2026-11-12, like a sniper rifle in Battlefield): only the right button brings it up; a left click while it is up shoots (a click while it is still coming up shoots as soon as it is).
+	if (InRockMode()) { RockPress(); return; }   // (the troll's rocks in hand: either button winds up, KnightCharacterRock.cpp)
 	if (SelectedKind() == JeebItems::K_Crossbow)
 	{
 		if (Bow == EBow::Drawing && bAimHeld) ReleaseDraw();
@@ -136,6 +137,7 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
+	if (InRockMode()) { if (!bAimHeld) { if (IsUIOpen() || bPanelCursor) { if (Rock == ERock::Charging) { SetRockPhase(ERock::None); if (!HasAuthority()) ServerRockCancel(); } } else RockRelease(); } return; }   // (the last button let go throws)
 	if (SelectedKind() == JeebItems::K_Crossbow) return;   // (letting go of the left button does nothing with the crossbow: the click shot)
 	if (Bow == EBow::Drawing && !bAimHeld)
 	{
@@ -263,7 +265,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 		return true;
 	case EInteract::Bench: OutText = TEXT("Press E to sit"); return true;
 		case EInteract::Loot:  OutText = TEXT("Press E to take the ingots"); return true;
-	case EInteract::Arrow: OutText = TEXT("Press E to pick up the arrow"); return true;
+	case EInteract::Arrow: OutText = FoundArrow.IsValid() && JeebItems::IsRock(FoundArrow->GetArrowId()) ? TEXT("Press E to pick up the rock") : TEXT("Press E to pick up the arrow"); return true;
 	case EInteract::GearWall:
 		if (const AGearWall* W = FoundWall.Get(); W && W->GetPegs().IsValidIndex(FoundPeg))
 		{

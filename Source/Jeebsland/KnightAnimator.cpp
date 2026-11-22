@@ -794,6 +794,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	CrossW = FMath::FInterpConstantTo(CrossW, In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting && !In.bDrinking ? 1.f : 0.f, Dt, 4.f);
 	if (CrossW > 0.005f) L.CrossLeftHand(Final, FMath::SmoothStep(0.f, 1.f, CrossW));
 	if (GreatW > 0.005f) L.BothHandsOnGrip(Final, FMath::SmoothStep(0.f, 1.f, GreatW), GreatLeftBelow);
+	if (L.bTroll) TrollThrow(In, Final, Dt);   // (the troll's sack of rocks and his throw: KnightAnimatorTrollThrow.cpp)
 	SetFists(In, Dt);
 	bHavePrev = true;
 
@@ -2140,7 +2141,8 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 void FKnightAnimator::Wear(int32 Piece, int32 Tier, int32 Style)
 {
 	if (bWizard) { if (Piece >= 0 && Piece < Piece_Count) { bWizWorn[Piece] = Tier >= 0; WornTiers[Piece] = Tier; WornStyles[Piece] = Style; RefreshWizard(); } return; }
-	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
+	if (L.bTroll) { if (Piece >= 0 && Piece < Piece_Count) { WornTiers[Piece] = Tier; WornStyles[Piece] = Style; WearTroll(Piece, Style == JeebItems::AS_Troll ? Tier : -1); } return; }   // (his own armour: KnightAnimatorTrollThrow.cpp)
+	if (!Comp|| Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
 	const int32 Mat = PieceMat[Piece];
 	WornTiers[Piece] = Tier;
 	WornStyles[Piece] = Style;

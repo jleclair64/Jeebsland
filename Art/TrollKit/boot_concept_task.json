@@ -1,0 +1,16 @@
+{
+ "id": "01a204f9-b9a5-7724-af41-7ef1de840600",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "One single right troll boot and shin guard: a dark iron greave covering the shin and knee with a rounded knee cop, over wrapped leather and fur at the top, ending in a heavy leather and iron boot for a huge wide bare-toed troll foot (open toes like a sandal-boot). Only one, the right one. Stylised 3D fantasy game armour piece, HD RuneScape feel, a tiny bit cartoonish but natural proportions a little bolder than life, crisp bevels, hand-painted textures, rich clean colours: dark blackened iron plates with riveted bands, rich brown polished leather straps and buckles, thick grey-brown fur trim. Sized for a huge 2.2 metre troll like the green troll in the first picture (big, broad, heavy), in the mood of the second picture. Chunky but sleek, no rust, no dirt, no blood. One single object shown on its own on a plain white background, whole object in frame, front three-quarter view, no troll, no body, no mannequin, no stand, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379805527,
+ "started_at": 1795379805540,
+ "finished_at": 1795379835786,
+ "expires_at": 1795639035786,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204f9-b9a5-7724-af41-7ef1de840600_0.png?Expires=1795639035&Signature=Jwy5nW5l10BaceNhAoM~Y2Fn57laHXSLFstb3Jg-QlKqTo6eYG4cHS2E1xY5ijV0HPKPcbkiBoN3x8yFXKaOaXr2C4RSPOQP-w46-iUGaARE7ymGDVmsCUkh78-fgv5HGYuBIBhGJuI2D2uX0XekEQ6kwte7uLv3hSn5N3R6rLVRAUz6ThuYiHwArX9oMUA2yIN0f6i0Oy8B8dM0qnP~mpP0G2ixg1hmxzH7TobN~~fqk1F4RJF9Dv4SwZhAjK9ga91sU4YiZOslNGngYKgOcTOStTt2VKb7yBoM5u4pb2r6tXalwlOG-ZVxS-J2fqkc5gl-XH4zVi8Av6L9DXoerQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

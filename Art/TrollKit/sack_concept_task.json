@@ -1,0 +1,16 @@
+{
+ "id": "01a204fa-781f-7463-8215-fccc91a058e6",
+ "type": "text-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Stylised 3D fantasy game prop, HD RuneScape feel, a tiny bit cartoonish, crisp shapes, hand-painted textures, rich clean colours, no dirt. A big rough rich-brown burlap and leather sack, cinched at the top with a thick rope drawstring, with a few round grey river rocks peeking out of its open mouth, bulging with rocks inside, a short leather carrying strap loop at the top to hold it by. One single object on a plain white background, whole object in frame, front three-quarter view, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379853551,
+ "started_at": 1795379853559,
+ "finished_at": 1795379882167,
+ "expires_at": 1795639082167,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204fa-781f-7463-8215-fccc91a058e6_0.png?Expires=1795639082&Signature=OTvAtrioMZ~FHMbTad0VY-dgXwATxQ1prnElBRYhIsmicYRvjaNPF9zbUvvvA9b0kC5qzsjB8QdezX~ViJaNcuCeGMHE0VM58ml4o8eAryhqohIBoR5DMkUP2aYDfp0jqMdkkOprDAABK3XpYJbVGBdyUXRa2RwKKj9Oq~l9JmvTr3i5UXtWzqAU-2s0Z6AkvxsGrbvVV98yADxdtmyitSa3OWtAiDCVDj4ximW17Y5biRgCEWUMvQyCyxxWFZm-ix1FRcFRjsq05tCM8j0OtYSqcuWrQKT4a80LfyHlS9cheFphXSuzudH~lxy3YEEcFW9ldYGHULW2Twj9ymDBaQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

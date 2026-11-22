@@ -1,0 +1,16 @@
+{
+ "id": "01a204f9-b9d1-7057-8681-84e06e9a6d3c",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "One single right troll shoulder pauldron: a big layered dark iron shoulder guard of three overlapping curved plates over a fur mantle, with two large curved horns (pale bone-coloured) rising from the top plate pointing up and outward, riveted leather strap underneath. Only one, the right one. Stylised 3D fantasy game armour piece, HD RuneScape feel, a tiny bit cartoonish but natural proportions a little bolder than life, crisp bevels, hand-painted textures, rich clean colours: dark blackened iron plates with riveted bands, rich brown polished leather straps and buckles, thick grey-brown fur trim. Sized for a huge 2.2 metre troll like the green troll in the first picture (big, broad, heavy), in the mood of the second picture. Chunky but sleek, no rust, no dirt, no blood. One single object shown on its own on a plain white background, whole object in frame, front three-quarter view, no troll, no body, no mannequin, no stand, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379805606,
+ "started_at": 1795379805618,
+ "finished_at": 1795379822287,
+ "expires_at": 1795639022287,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204f9-b9d1-7057-8681-84e06e9a6d3c_0.png?Expires=1795639022&Signature=McXVrnSVrLk54xmo1syQRF3R1-XTwieSS6jP3wy4B4zuY1X2cW9rr8tf13H34C~7Ey7uDRYWlLK48ZFpBIXkJEppGC3VrbceKiiAn2g1QDBcforh7jZ6AwqkdmC420T~m8RsR6JsdzY5JgwvCr9xufiGr~yZc6-KW-ZNujq~UglKTK2Hd0j~UkqM59fvxWM4EcX5ZbzPlvNZ3CTUJaq0U4jd7YnIAejP4f53QsMSj~mYj4mWEv6t6NtimuHSFzIqSL6j0mQsLhLT5Rx-1in1-djLgqGvp1s7Y~1k7X6QRN4~705EiR8BHkEdTjqiskis4zeVuGoprSyRAOlgk6VpSQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -241,6 +241,15 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		DiscP(25, 36, 4, 6, FLinearColor(1.f, 1.f, 1.f, 0.55f));           // a highlight on the glass
 		return;
 	}
+	// ---------------- throwing rocks: a little heap of three grey stones ----------------
+	if (IsRock(Id))
+	{
+		const FLinearColor Dark(0.27f, 0.27f, 0.29f), Mid(0.46f, 0.46f, 0.48f), Hi(0.66f, 0.66f, 0.68f);
+		DiscP(21, 42, 14, 11, Dark); DiscP(20, 40, 12.5f, 9.5f, Mid); DiscP(16, 36, 4.5f, 3, Hi);
+		DiscP(43, 43, 13, 10.5f, Dark); DiscP(42, 41, 11.5f, 9, Mid); DiscP(38, 37, 4, 2.6f, Hi);
+		DiscP(32, 25, 14, 11.5f, Dark); DiscP(31, 23, 12.5f, 10, Mid); DiscP(27, 19, 4.5f, 3, Hi);
+		return;
+	}
 	// ---------------- arrows: a bundle of three ----------------
 	if (IsArrow(Id))
 	{

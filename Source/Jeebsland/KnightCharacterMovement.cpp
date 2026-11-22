@@ -544,7 +544,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;
-	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
+	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover || Rock != ERock::None) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)
 	if (bFaceCam && HasAuthority() && !IsLocallyControlled() && GetController())
 	{
 		// (the server doesn't get the player's keys: it reads the stance step from the way the knight is being pushed)

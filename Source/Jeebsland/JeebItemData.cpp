@@ -275,11 +275,11 @@ namespace JeebItems
 		void LoadArmourStyles(FItemTables& T)
 		{
 			T.ArmourStyles.SetNum(NumArmourStyles);
-			const TCHAR* Names[NumArmourStyles] = { TEXT("Classic"), TEXT("Light"), TEXT("Heavy"), TEXT("Dark Plate"), TEXT("Wizard") };
+			const TCHAR* Names[NumArmourStyles] = { TEXT("Classic"), TEXT("Light"), TEXT("Heavy"), TEXT("Dark Plate"), TEXT("Wizard"), TEXT("Troll") };
 			for (int32 s = 0; s < NumArmourStyles; ++s) T.ArmourStyles[s].Name = Names[s];
 			FTable Tab;
 			if (!Tab.Load(TEXT("ArmourStyles.csv"))) return;
-			if (Tab.Rows.Num() < NumArmourStyles) Problem(TEXT("ArmourStyles.csv needs five rows: classic, light, heavy, dark plate, wizard"));
+			if (Tab.Rows.Num() < NumArmourStyles) Problem(TEXT("ArmourStyles.csv needs six rows: classic, light, heavy, dark plate, wizard, troll"));
 			for (int32 s = 0; s < NumArmourStyles && s < Tab.Rows.Num(); ++s)
 			{
 				FArmourStyleRow& Row = T.ArmourStyles[s];

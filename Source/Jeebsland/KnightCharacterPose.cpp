@@ -47,7 +47,11 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.BowMode = Bow == EBow::Drawing ? 1 : Bow == EBow::Recover ? 2 : Bow == EBow::Reload ? 3 : 0;
 	In.BowT = Bow == EBow::Reload ? JeebTune::V().CrossReload - CrossReloadLeft : BowT;
 	In.BowDrawFor = DrawTimeNow();
-	In.Kind = SelectedKind();
+	In.Kind = InRockMode() ? -1 : SelectedKind();   // (the troll with rocks in hand: the club is put away)
+	In.RockMode = !bIsTroll ? 0 : Rock == ERock::Charging ? 1 : Rock == ERock::Throw ? 2 : 0;   // (KnightAnimatorTrollThrow.cpp)
+	In.RockU = Rock == ERock::Charging ? RockCharge : RockThrowCharge;
+	In.RockT = RockT;
+	In.bRockSack = InRockMode() && !bStowed;
 	In.AimPitch = FMath::UnwindDegrees(GetBaseAimRotation().Pitch);
 	In.bClimbing = bClimbing;
 	In.ClimbPhase = ClimbPhase;
@@ -263,6 +267,7 @@ void AKnightCharacter::PlaceGear()
 	if (SelectedKind() == JeebItems::K_Staff) PlaceStaffModel();
 	UpdateBowBits();
 	UpdateQuiver();
+	UpdateRockSack();   // (the troll's sack of rocks: KnightCharacterRock.cpp)
 	UpdateBeltFlask();
 	if (QuiverParts.Num() > 0 && QuiverParts[0])
 		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());

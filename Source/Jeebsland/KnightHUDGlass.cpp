@@ -352,6 +352,14 @@ void AKnightHUD::ItemTip(int32 Id)
 		SetTip(L);
 		return;
 	}
+	if (IsRock(Id))
+	{
+		L.Add(ItemName(Id));
+		L.Add(TEXT("A troll's throwing rocks, from the sack in his left hand. Press 2, hold a mouse button to wind up (the longer, the further and harder) and let go to throw"));
+		L.Add(TEXT("Pick up the ones you threw (E)"));
+		SetTip(L);
+		return;
+	}
 	if (IsArrow(Id))
 	{
 		L.Add(ItemName(Id));

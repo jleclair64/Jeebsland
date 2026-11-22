@@ -69,6 +69,7 @@ namespace JeebTestKit
 			if (Potions.Ids.Num()) O.Rows.Add(Potions);
 			FRow Arrows{ TEXT("Arrows") }; for (int32 i = 0; i < NumArrowKinds(); ++i) Arrows.Ids.Add(ArrowKindId(i));
 			O.Rows.Add(Arrows);
+			O.Rows.Add({ TEXT("Throwing rocks"), { IdRocks } });   // (the troll's ammunition, 2026-11-22)
 		}
 		return P;
 	}
@@ -78,5 +79,5 @@ namespace JeebTestKit
 		return false;
 	}
 	// How many one click gives: a full stack of arrows or potions, one of anything else
-	inline int32 GiveCount(int32 Id) { return (JeebItems::IsArrow(Id) || JeebItems::IsPotion(Id)) ? JeebItems::StackSize(Id) : 1; }
+	inline int32 GiveCount(int32 Id) { return (JeebItems::IsArrow(Id) || JeebItems::IsRock(Id) || JeebItems::IsPotion(Id)) ? JeebItems::StackSize(Id) : 1; }
 }

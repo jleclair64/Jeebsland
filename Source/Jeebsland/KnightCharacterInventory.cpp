@@ -44,13 +44,19 @@ void AKnightCharacter::UnequipWorn(int32 Kind, bool bSecondRing) { Inv(EInvOp::U
 void AKnightCharacter::CycleHotbar(int32 Dir)
 {
 	if (!Skills || IsUIOpen() || bClimbing || InClimbMove()) return;
+	if (bIsTroll) { SetRockMode(!bRockMode); return; }   // (the troll: the club and the rocks, KnightCharacterRock.cpp)
 	const int32 Other = Skills->Selected == 0 ? 1 : 0;
 	if (Skills->Hotbar[Other] != 0) SelectHotbar(Other);
 }
 
 void AKnightCharacter::SelectHotbar(int32 H)
 {
-	if (!Skills || H < 0 || H >= JeebItems::NumHotbar || Skills->Selected == H || Skills->Hotbar[H] == 0) return;   // (an empty slot is never taken in hand: the server refuses it too)
+	// The troll (2026-11-22): no bow slot; key 2 takes the throwing rocks in hand, key 1 the club again (KnightCharacterRock.cpp)
+	if (bIsTroll && (H == 0 || H == 1))
+	{
+		if (H == 1 || bRockMode) { SetRockMode(H == 1); return; }
+	}
+	if (!Skills|| H < 0 || H >= JeebItems::NumHotbar || Skills->Selected == H || Skills->Hotbar[H] == 0) return;   // (an empty slot is never taken in hand: the server refuses it too)
 	// The hand changes here straight away; online the server is told and follows
 	if (HasAuthority()) Skills->SetSelected(H);
 	else

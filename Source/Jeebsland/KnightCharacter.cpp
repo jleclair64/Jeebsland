@@ -219,6 +219,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
+	DOREPLIFETIME(AKnightCharacter, bRockMode);   // (the troll's rocks in hand: KnightCharacterRock.cpp)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardMax, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bGuardBroken, COND_OwnerOnly);
@@ -442,6 +443,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	const bool bSpecial = TickRollSlide(Dt, bFalling, SpecialSpeed);
 	TickAttack(Dt);
 	TickBow(Dt);
+	TickRock(Dt);   // (the troll's throwing rocks: KnightCharacterRock.cpp)
 	TickKnock(Dt);
 	TickHealth(Dt);
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);

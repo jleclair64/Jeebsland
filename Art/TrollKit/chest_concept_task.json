@@ -1,0 +1,16 @@
+{
+ "id": "01a204f9-b958-733f-99ce-9756cc528321",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "A troll's chest armour as one piece seen from the front: a broad dark iron breastplate shaped to a huge muscular chest and belly, layered with riveted iron bands, leather side straps and buckles, fur trim round the neck hole, and the matching back plate behind (a full cuirass, open arm holes, no sleeves, no shoulder pads). Stylised 3D fantasy game armour piece, HD RuneScape feel, a tiny bit cartoonish but natural proportions a little bolder than life, crisp bevels, hand-painted textures, rich clean colours: dark blackened iron plates with riveted bands, rich brown polished leather straps and buckles, thick grey-brown fur trim. Sized for a huge 2.2 metre troll like the green troll in the first picture (big, broad, heavy), in the mood of the second picture. Chunky but sleek, no rust, no dirt, no blood. One single object shown on its own on a plain white background, whole object in frame, front three-quarter view, no troll, no body, no mannequin, no stand, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379805214,
+ "started_at": 1795379805232,
+ "finished_at": 1795379823522,
+ "expires_at": 1795639023522,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204f9-b958-733f-99ce-9756cc528321_0.png?Expires=1795639023&Signature=TI2crwsrsZTyz4cnp-TZMiH9ZY-OoIICxppMKrh5CyPbZlkIKM9C5ChX4MoH5T2DfHC5-XRZjbRXEIcvkX1BjbMUxFi-4odLkL59hpRYIMVksiftlXO1-CZGdeLl5cbr1WaWx5r6zDDlLGmxSrlmPlW8IUdFyXuTNvZvm2gUyZT9y~GRGeYqZh6y4oq38FSN0CZSjewAp-s07o2-BLI88m8gtogjRf12KYhQxKcb09pLAZD5MJ0vxZbtQ5kXgExoP4w2ew-UMc6425gsw3Noc9HcR4dlgHt6cBwp~QsHDZrf~C9erXyYp91NE6g-oYlomvC8TSYTDb6uYDEMwEKjqw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

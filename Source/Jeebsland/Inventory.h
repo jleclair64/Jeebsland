@@ -65,6 +65,10 @@ namespace JeebItems
 	// Every kind of arrow, in the order the arrow slot steps through them (F)
 	inline int32 NumArrowKinds() { return NumTiers + 1; }
 	inline int32 ArrowKindId(int32 i) { return i < NumTiers ? ArrowId(i) : IdFireArrow; }
+	// Throwing rocks (2026-11-22, owner): the troll's ammunition in place of the bow and arrows, thrown from the sack in his left hand
+	// (KnightCharacterRock.cpp). One kind, stacks to 99 like arrows.
+	constexpr int32 IdRocks = 940;
+	inline bool IsRock(int32 Id) { return Id == IdRocks; }
 	// Potions: 950 + the row in Potions.csv. The first four rows are swiftness, healing, vigour and radar (the starting pack
 	// and the practice pack name them by these numbers).
 	constexpr int32 IdPotionBase = 950;
@@ -103,9 +107,10 @@ namespace JeebItems
 	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
 	// 3 Dark Plate (2026-11-21): its own model (/Game/DarkPlate, Tools/BuildDarkPlate.ps1), one colour whatever the tier; the tier still sets its numbers.
 	// Only the Test kit hands it out for now: stores, loot and new characters roll among the first NumRolledArmourStyles.
-	constexpr int32 NumArmourStyles = 5;
+	constexpr int32 NumArmourStyles = 6;
 	constexpr int32 NumRolledArmourStyles = 3;
-	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy, AS_Dark, AS_Wizard };   // (AS_Wizard, 2026-11-21: the wizard's hat, robe and boots; no gauntlets or shoulders; only wizards wear it and wizards wear nothing else)
+	enum EArmourStyle : int32 { AS_Classic, AS_Light, AS_Heavy, AS_Dark, AS_Wizard, AS_Troll };   // (AS_Troll, 2026-11-22: the troll's own iron, leather and fur set, his model only; only trolls wear it and trolls wear nothing else)
+	// (AS_Wizard below)   // (AS_Wizard, 2026-11-21: the wizard's hat, robe and boots; no gauntlets or shoulders; only wizards wear it and wizards wear nothing else)
 	// Light (the tunic) has no shoulder piece (owner, 2026-11-03: its sleeves are part of the chest): a style that has no piece
 	// for a slot is never made; asked for anyway (an old save, a random roll), the Classic piece is made instead.
 	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light) && !(Style == AS_Wizard && (Kind == K_Shoulders || Kind == K_Gauntlets)); }
@@ -132,7 +137,7 @@ namespace JeebItems
 	inline const FMaterialRow& MaterialRow(EItemType T) { const TArray<FMaterialRow>& M = Tables().Materials; return M[FMath::Clamp(static_cast<int32>(T), 0, M.Num() - 1)]; }
 	inline int32 StackSize(int32 Id)
 	{
-		if (IsArrow(Id)) return 99;   // (owner, 2026-11-01; was 30)
+		if (IsArrow(Id) || IsRock(Id)) return 99;   // (owner, 2026-11-01; was 30)
 		if (IsPotionRange(Id)) return IsPotion(Id) ? PotionRow(PotionType(Id)).StackSize : 10;
 		if (!IsMaterial(Id)) return 1;
 		return MaterialRow(MaterialType(Id)).StackSize;
@@ -169,6 +174,7 @@ namespace JeebItems
 	inline FString ItemName(int32 Id)
 	{
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
+		if (IsRock(Id)) return TEXT("Throwing Rocks");
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (IsMaterial(Id) && Tables().Materials.IsValidIndex(Id - 1)) return MaterialName(MaterialType(Id));   // (the wall's prompt names ores and fish too)
@@ -356,6 +362,12 @@ namespace JeebItems
 			return false;
 		}
 		if (K == K_Book) return true;
+		// The troll's own armour (2026-11-22): his model alone wears it, and he wears no other armour (the knight's plates don't fit him)
+		if (IsArmorKind(K) && (StyleOf(Id) == AS_Troll) != OwnerIsTroll(S))
+		{
+			if (OutWhy) *OutWhy = StyleOf(Id) == AS_Troll ? FString::Printf(TEXT("%s is made for trolls."), *ItemName(Id)) : FString::Printf(TEXT("%s doesn't fit a troll. Trolls wear troll armour."), *ItemName(Id));
+			return false;
+		}
 		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
 		const int32 T = VariantOf(Id);
 		// The playable troll (2026-11-19): only troll-class and "all" gear (Kinds.csv Class), and only common or troll tiers. Knights are not held to their class yet.
@@ -391,7 +403,7 @@ namespace JeebItems
 	// ---------------------------------------------------------------- selling gear back
 	inline int32 GearSellPrice(int32 Id)
 	{
-		if (IsArrow(Id)) return 1;
+		if (IsArrow(Id) || IsRock(Id)) return 1;
 		if (!IsGear(Id)) return 0;
 		return FMath::Max(1, BuyPrice(KindOf(Id), IsArmorKind(KindOf(Id)) ? FullVariant(Id) : VariantOf(Id)) / 2);
 	}

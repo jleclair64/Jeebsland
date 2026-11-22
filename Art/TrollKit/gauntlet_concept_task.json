@@ -1,0 +1,16 @@
+{
+ "id": "01a204f9-b99c-708e-bb26-b74448b6eb9d",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "One single right-hand troll gauntlet and forearm guard: a long dark iron vambrace over the whole forearm from wrist to elbow with leather lacing and fur at the elbow end, and an armoured leather glove with iron knuckle plates on a huge hand, fingers slightly curled. Only one, the right one. Stylised 3D fantasy game armour piece, HD RuneScape feel, a tiny bit cartoonish but natural proportions a little bolder than life, crisp bevels, hand-painted textures, rich clean colours: dark blackened iron plates with riveted bands, rich brown polished leather straps and buckles, thick grey-brown fur trim. Sized for a huge 2.2 metre troll like the green troll in the first picture (big, broad, heavy), in the mood of the second picture. Chunky but sleek, no rust, no dirt, no blood. One single object shown on its own on a plain white background, whole object in frame, front three-quarter view, no troll, no body, no mannequin, no stand, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379805336,
+ "started_at": 1795379805351,
+ "finished_at": 1795379825413,
+ "expires_at": 1795639025413,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204f9-b99c-708e-bb26-b74448b6eb9d_0.png?Expires=1795639025&Signature=INEz8eocdnl522u96f8GngpLDG2w6XrGh4-Hh5reentFlQxRjuNz5mzF2aaurDpyufh5~hmsGWBYM2qkZbwOclfQLToE4f7qWlh-scAa4E7kJQBo8~nd6ZIhpUJ2aMm00fmGjy7mUyHSOas2X0yWCZVQjfLjY0-KYKdV2CL9MdSsgTyltn~x93zxqt02HQW00kTaDjS1-F3ghhR8a9FA5LVhSAkHtmCW8~QsqLAUoWnwiO6E43NTLh6PYNRGdcK9ODPUMxGjqj2vsDpnW42jsBBEXvmfLQ1Zx2htAzoRmmhiQgVNdZtQ6ihPGd8deUc4altoAzvjVOqun~gXxD0XNQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -1,0 +1,16 @@
+{
+ "id": "01a204f9-b956-713e-8778-81033cc62527",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "A troll's helmet: a heavy rounded dark iron skull cap with a raised centre ridge and a riveted brow band, short cheek guards, an open face (no visor), a fur-lined leather rim at the back of the neck. No horns on the helmet. Stylised 3D fantasy game armour piece, HD RuneScape feel, a tiny bit cartoonish but natural proportions a little bolder than life, crisp bevels, hand-painted textures, rich clean colours: dark blackened iron plates with riveted bands, rich brown polished leather straps and buckles, thick grey-brown fur trim. Sized for a huge 2.2 metre troll like the green troll in the first picture (big, broad, heavy), in the mood of the second picture. Chunky but sleek, no rust, no dirt, no blood. One single object shown on its own on a plain white background, whole object in frame, front three-quarter view, no troll, no body, no mannequin, no stand, nothing else.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795379805558,
+ "started_at": 1795379805573,
+ "finished_at": 1795379838772,
+ "expires_at": 1795639038772,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a204f9-b956-713e-8778-81033cc62527_0.png?Expires=1795639038&Signature=l5GUjw4-fGmZzaGXKvychgc-NMxjzq5W0Pbik5KBF67Y0zKTRskej~kueN-utaE2eqEF0LL10EZQklQEL16v1HNF9mAeWjj0bjhGMus8y4M1tDHr0xdV5BYvGB4P-NQTC-tJOYf~e1k7uAodE3pk6OxhaLgYHWO2pslR2wPCbPGfZ8dpdTjBDQRlcnYRQ-Tlpzvet-hi157b3OWSN4J6EMFifpCSxp2yzKNjVYfmTzeJf7GedMfet3N-EQHCVAYUY17sDGPdc9~OCgrKfjndQcfohUA-hR0fGpWqDGhI~G2Q6yIGpEgMLZl2VnENnqL3LdTQdyhAhgznTFxrTqr8Pg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

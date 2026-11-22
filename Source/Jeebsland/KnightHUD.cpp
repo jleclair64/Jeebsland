@@ -534,8 +534,10 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	{
 		const float X = SlotX(i == 0 ? 0 : 2);
 		HotCellX[i] = X; HotCellY[i] = Y0; HotCellS = SS; bHotCells = true;
-		const bool bSel = (Skills->Selected == i);
-		const int32 Id = Skills->Hotbar[i];
+		// (the troll, 2026-11-22: no bow slot; the second slot is his throwing rocks, key 2, with how many he carries)
+		const bool bTrollRocks = Knight->IsTroll() && i == 1;
+		const bool bSel = Knight->IsTroll() ? (i == 1) == Knight->InRockMode() : (Skills->Selected == i);
+		const int32 Id = bTrollRocks ? (Skills->CountItem(IdRocks) > 0 ? IdRocks : 0) : Skills->Hotbar[i];
 		// The chosen slot stands out: it is lifted and bigger, tinted gold with a bright gold outline, while the others are dimmed
 		const float Sx = bSel ? X - 4.f : X, Sy = bSel ? Y0 - 13.f : Y0, Ss = bSel ? SS + 8.f : SS;
 		Panel(Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f, 1.f, bSel);
@@ -550,6 +552,16 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 		// (every weapon icon leans the same way everywhere: see DrawIcon)
 		DrawIconIn(Id, Sx - 4.f, Sy - 4.f, Ss + 8.f, Sx - 3.f, Sy - 3.f, Ss + 6.f, Ss + 6.f);   // the class frame on the slot's own (lifted) border
 		if (!bSel) FillRR(X, Y0, SS, SS, 11.f, [&](float) { return FLinearColor(0.f, 0.f, 0.03f, 0.30f); });   // dim the ones not in hand
+		if (bTrollRocks)
+		{
+			const FString Txt = FString::FromInt(Skills->CountItem(IdRocks));
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(Txt, TW, TH, Font, 1.15f);
+			Tile(Sx + Ss - TW - 9.f, Sy + Ss - TH - 5.f, TW + 8.f, TH + 3.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+			HDText(Txt, FLinearColor(1.f, 0.92f, 0.7f), Sx + Ss - TW - 5.f, Sy + Ss - TH - 3.f, Font, 1.15f);
+			if (Knight->IsPanelCursor() && Over(X, Y0, SS, SS)) ItemTip(IdRocks);
+			continue;
+		}
 		int32 A, B;
 		if (HotbarDamage(Skills, i, A, B))
 		{
@@ -627,7 +639,8 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	}
 
 	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F picks the next kind you
-	// carry; a click with the cursor out lists them (DrawSwapPopup).
+	// carry; a click with the cursor out lists them (DrawSwapPopup). (Not for the troll: he has no bow, 2026-11-22.)
+	if (!Knight->IsTroll())
 	{
 		const float X = SlotX(3);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
@@ -661,10 +674,11 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 // fills, with a dot where the arrow goes
 void AKnightHUD::DrawReticle(AKnightCharacter* Knight)
 {
-	if (!Knight->IsAimingBow() || Knight->BowAimAmount() < 0.3f) return;
+	const bool bRock = Knight->InRockMode();   // (the troll's rock wind-up shows the same reticle, closing in as the charge fills)
+	if (bRock ? (!Knight->IsAimingRock() || Knight->RockAimAmount() < 0.3f) : (!Knight->IsAimingBow() || Knight->BowAimAmount() < 0.3f)) return;
 	const float Cx = Canvas->ClipX * 0.5f, Cy = Canvas->ClipY * 0.5f;
-	const float F = Knight->IsDrawingBow() ? Knight->BowDrawFrac() : 0.f;   // (between shots the ring is wide open)
-	const float A = FMath::Clamp((Knight->BowAimAmount() - 0.3f) / 0.5f, 0.f, 1.f);
+	const float F = bRock ? (Knight->IsChargingRock() ? Knight->RockChargeFrac() : 0.f) : Knight->IsDrawingBow() ? Knight->BowDrawFrac() : 0.f;   // (between shots the ring is wide open)
+	const float A = FMath::Clamp(((bRock ? Knight->RockAimAmount() : Knight->BowAimAmount()) - 0.3f) / 0.5f, 0.f, 1.f);
 	const FLinearColor Col = F >= 1.f ? FLinearColor(1.f, 0.85f, 0.4f, 0.9f * A) : FLinearColor(1.f, 1.f, 1.f, 0.8f * A);
 	const float R = FMath::Lerp(30.f, 11.f, F);
 	for (int32 q = 0; q < 4; ++q)   // four short arcs of a ring (each drawn as small four-sided pieces: Poly fills convex shapes)

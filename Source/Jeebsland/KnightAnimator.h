@@ -193,6 +193,8 @@ namespace JeebAnim
 		bool bSwimUnder = false;    // his head under water
 		// an emote (2026-11-18, JeebEmotes.h): its id (0 none), seconds into it, and whether it puts the weapon and shield on his back
 		uint8 Emote = 0; float EmoteT = 0.f; bool bEmoteStow = false;
+		// the troll's throwing rocks (2026-11-22, KnightAnimatorTrollThrow.cpp): 0 none, 1 winding up (RockU the charge 0..1), 2 the throw (RockT seconds into it, RockU its charge)
+		uint8 RockMode = 0; float RockU = 0.f, RockT = 0.f; bool bRockSack = false;
 		bool Stowed() const { return bClimbing || (WallMode >= 1 && WallMode <= 5) || SwimMode != 0 || bEmoteStow; }   // (weapon and shield on his back; bEmoteStow lasts through the blend out of an emote)
 	};
 }
@@ -341,6 +343,19 @@ private:
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)
+	// The troll's throwing rocks and his own armour (2026-11-22, KnightAnimatorTrollThrow.cpp)
+	void TrollThrow(const JeebAnim::FInput& In, FPose& B, float Dt);   // the wind-up and the overarm throw, laid over whatever he is doing
+	void TrollSackHand(const JeebAnim::FInput& In, FPose& B);          // the left fist held a little out and forward, round the sack's neck
+	float TrollThrowW = 0.f;   // how far the throw's pose is on (eased)
+	void WearTroll(int32 Piece, int32 Tier);
+	class USkeletalMeshComponent* TrollArmourComp = nullptr;   // /Game/TrollKit/SK_TrollArmour: follows TrollComp's bones, one section per piece
+	int32 TrollArmourMat[JeebAnim::Piece_Count] = { INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE };   // each piece's iron slot
+	int32 TrollSoftMat[JeebAnim::Piece_Count] = { INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE };    // ... and its leather and fur slot
+	UMaterialInstanceDynamic* TrollArmourMid[JeebAnim::Piece_Count] = {};
+public:
+	FTransform TrollLeftFistWorld() const;   // the troll's left fist (for the sack), from his own mesh
+	FTransform TrollRightFistWorld() const;  // ... his right fist (the rock in hand)
+private:
 	class USkeletalMeshComponent* UnderComp = nullptr;  // the mail always under the armour, so plate never looks hollow: follows Comp's bones
 	class USkeletalMeshComponent* BareComp = nullptr;   // the mail body under empty slots: follows Comp's bones (made when a slot is first empty)
 	bool bBare[JeebAnim::Piece_Count] = {};

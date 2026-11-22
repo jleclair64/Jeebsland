@@ -167,6 +167,7 @@ void AKnightCharacter::RightDown()
 {
 	if (IsUIOpen() || bPanelCursor) return;   // (owner 2026-11-06: with the cursor out, a click on the HUD never aims, draws or blocks)
 	bAimHeld = true;
+	if (InRockMode()) { RockPress(); return; }   // (the troll's rocks in hand: the right button winds up too, KnightCharacterRock.cpp)
 	StartBlock();
 	if (JeebItems::IsShooter(SelectedKind()) && !IsUIOpen() && !bPanelCursor) StartDraw();
 }
@@ -174,6 +175,7 @@ void AKnightCharacter::RightDown()
 void AKnightCharacter::RightUp()
 {
 	bAimHeld = false;
+	if (InRockMode()) { if (!bAttackDown) RockRelease(); return; }   // (the last button let go throws)
 	StopBlock();
 	if (Bow == EBow::Drawing)
 	{
@@ -340,7 +342,7 @@ void AKnightCharacter::TickBow(float Dt)
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		const bool bAimCam = Bow == EBow::Drawing || (bAimButton && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor);   // (it stays in for as long as the button is down, and pulls back out when it is let go)
+		const bool bAimCam = Bow == EBow::Drawing || (bAimButton && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor) || IsAimingRock();   // (IsAimingRock: the troll winding up a rock)   // (it stays in for as long as the button is down, and pulls back out when it is let go)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{

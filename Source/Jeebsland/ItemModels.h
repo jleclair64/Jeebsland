@@ -219,6 +219,15 @@ namespace JeebItemModel
 			return;
 		}
 
+		// ---------------- throwing rocks: three rounded stones ----------------
+		if (IsRock(Id))
+		{
+			static const FVector At[3] = { V3(0, -4.5, 0), V3(1, 4.5, 0), V3(0, 0, 5) };
+			for (int32 k = 0; k < 3; ++k)
+				Lathe(NewPart(Out, FLinearColor(0.42f, 0.42f, 0.44f)).Mesh, Prof({ 0, 3.4, 3.2, 2.6, 4.4, 0, 3.6, -2.6, 0, -3.2 }), 9, 1.0, 1.0, Xf(At[k], V3(10.0 * k, 35.0 * k, 0)), false, true);
+			Settle(Out);
+			return;
+		}
 		// ---------------- arrows: a bundle of three ----------------
 		if (IsArrow(Id))
 		{

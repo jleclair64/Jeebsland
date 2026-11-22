@@ -338,8 +338,14 @@ public:
 	bool IsAimingBow() const { return Bow == EBow::Drawing || (bAimHeld && JeebItems::IsShooter(SelectedKind())); }   // (the reticle stays up between shots while the button is held)
 	float BowDrawFrac() const { return BowCharge; }
 	float BowAimAmount() const { return BowAimAlpha; }
+	// The troll's throwing rocks (KnightCharacterRock.cpp): the rocks in hand (key 2), the wind-up and its charge, for the bar and the reticle
+	bool InRockMode() const { return bIsTroll && bRockMode; }
+	bool IsChargingRock() const { return Rock == ERock::Charging; }
+	bool IsAimingRock() const { return InRockMode() && (Rock == ERock::Charging || bAimHeld); }
+	float RockChargeFrac() const { return RockCharge; }
+	float RockAimAmount() const { return RockAimAlpha; }
 	int32 ArrowSlotId() const;   // the arrows the next shot uses (0: none left)
-	void CycleArrows();          // F: the next kind of arrows you carry
+	void CycleArrows();         // F: the next kind of arrows you carry
 	void PickArrows(int32 Id);   // (the swap popup on the bar, and F: the server is told, since others see what is in his quiver)
 
 	// ---------------- The wand's and staff's aim (2026-11-18, owner; KnightCharacterCastAim.cpp) ----------------
@@ -936,6 +942,40 @@ private:
 	bool bNockModel = false;                                     // (the nocked arrow is the arrows' model, JeebProps)
 	int32 NockArrowId = -1;                                      // which arrows it is coloured for
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> QuiverBody;   // the quiver's model (2026-11-12)
+	// ---- The troll's throwing rocks (2026-11-22, owner: "remove the bow and arrow slots from the troll ... give him rocks to throw";
+	// KnightCharacterRock.cpp). Key 2 (the bow's slot) takes the rocks in hand: the club goes on his back and the sack of rocks stays in his
+	// left hand. A mouse button held winds up (the longer, the further and harder, up to a full charge), letting go throws toward the reticle.
+	// The player's machine decides the throw from the button and tells the server, which checks the charge against its own clock and throws.
+	enum class ERock : uint8 { None, Charging, Throw };
+	ERock Rock = ERock::None;
+	float RockT = 0.f;              // seconds in this phase
+	float RockCharge = 0.f;         // 0..1 the wind-up (this machine)
+	float RockThrowCharge = 0.f;    // the charge the last throw went with (its follow-through is bigger)
+	float RockAimAlpha = 0.f;       // the aiming camera, eased
+	float RockCooldown = 0.f;       // seconds before the next wind-up may start
+	UPROPERTY(ReplicatedUsing = OnRep_RockMode) bool bRockMode = false;   // the rocks in hand (key 2), the server's word
+	UFUNCTION() void OnRep_RockMode();
+	void SetRockMode(bool bOn);
+	void RockPress();
+	void RockRelease();
+	void SetRockPhase(ERock P);
+	void TickRock(float Dt);
+	void ThrowRock(const FVector& Dir, float Charge, const FVector& From);   // (server)
+	FVector RockStart() const;      // where a rock leaves from (the same on every machine): high over his right shoulder
+	FVector RockAimDir(float Charge, FVector* OutTarget = nullptr) const;   // the player's machine: the launch to land on what is under the reticle, as far as the charge reaches
+	void UpdateRockSack();          // the sack in his left fist and the rock in his right while he winds up (players' machines)
+	bool TrollRockTest(const FString& Do);   // (test pictures and online tests: -SuitDo=rock<hundredths> / -TrollNetDo=rock<hundredths>)
+	float RockSpeedFor(float Charge) const;
+	float RockSagFor(float Charge) const;
+	UFUNCTION(Server, Reliable) void ServerRockMode(bool bOn);
+	UFUNCTION(Server, Reliable) void ServerRockCharge();
+	UFUNCTION(Server, Reliable) void ServerRockThrow(FVector_NetQuantizeNormal Dir, float Charge, FVector_NetQuantize10 From);
+	UFUNCTION(Server, Reliable) void ServerRockCancel();
+	UFUNCTION(NetMulticast, Reliable) void MulticastRock(uint8 Phase, float Charge);
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> RockSack;     // the sack of rocks in his left fist
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> RockInHand;   // the rock in his right fist while he winds up
+	bool bRockSackTried = false;
+	bool bRockClubHidden = false;   // (the club's parts are hidden while the rocks are in hand)
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> AmuletParts;       // the worn amulet on its chain round his neck (UpdateAmulet)
 	int32 AmuletShownId = -1;
 	void UpdateAmulet();

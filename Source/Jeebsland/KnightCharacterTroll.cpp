@@ -341,6 +341,7 @@ bool AKnightCharacter::TrollSuitTest(const FString& Do)
 		Later(At, [this]() { LeapChargeFrom = ServerChargeFrom = GetWorld()->GetTimeSeconds(); if (!HasAuthority()) ServerLeapCharge(true); UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space down")); });
 		Later(At + T.TrollLeapTap + Share * T.TrollLeapChargeTime + 0.02f, [this]() { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP test: Space up, charge %.2f, cooldown %.1f"), LeapChargeShare(), LeapCooldown); ReleaseLeap(); });
 	};
+	if (TrollRockTest(Do)) return true;   // (rock<hundredths>, rockpair: KnightCharacterRock.cpp)
 	if (Do == TEXT("punch")) { StartAttack(EAtkStyle::Kick, 1, 0.f); return true; }
 	if (Do == TEXT("block")) { Later(0.3f, [this]() { StartBlock(); UE_LOG(LogTemp, Log, TEXT("JEEBTROLLBLOCK raised: blocking %d guard %.0f of %.0f"), bBlocking ? 1 : 0, GuardPool, GuardMax); }); return true; }   // (the bare-arm guard, held)
 	if (Do == TEXT("hopall"))

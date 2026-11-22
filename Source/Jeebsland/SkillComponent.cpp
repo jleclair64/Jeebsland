@@ -75,6 +75,10 @@ void USkillComponent::ResetToStartingKit()
 		Hotbar[0] = JeebItems::GearId(JeebItems::K_Club, 0);
 		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] && !JeebItems::CanEquip(this, Hotbar[i])) Hotbar[i] = 0;
 		for (int32 i = 0; i < NumWornKinds; ++i) if (Worn[i] && !JeebItems::CanEquip(this, Worn[i])) Worn[i] = 0;
+		// (2026-11-22, owner: no bow or arrows for the troll; a sack of throwing rocks instead, and his own tin armour)
+		for (FInvSlot& S : Slots) if (JeebItems::IsArrow(S.Id)) { S.Id = 0; S.Count = 0; }
+		AddInvItem(JeebItems::IdRocks, StartRocks);
+		for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Troll, JeebItems::T_Tin);
 	}
 	// The wizard (2026-11-21): his staff, his tin hat, robe and boots, and a spell book; no bow, no shield (his guard is the orb)
 	if (JeebItems::OwnerIsWizard(this))

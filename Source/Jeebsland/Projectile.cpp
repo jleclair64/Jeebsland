@@ -110,8 +110,23 @@ void AProjectile::ApplyLaunch()
 	Velocity = FVector(L.Dir) * L.Speed;
 	SetActorRotation(Velocity.Rotation());
 	if (L.Seq > 0) bSpent = true;   // (relaunched: it glanced off a shield)
-	if (!L.bBolt) SetActorScale3D(FVector(FlyScale));
+	const bool bRock = JeebItems::IsRock(L.ArrowId);   // (the troll's thrown rock, 2026-11-22: KnightCharacterRock.cpp)
+	if (!L.bBolt) SetActorScale3D(FVector(bRock ? 1.15f : FlyScale));
 	if (!bFirst || IsNetMode(NM_DedicatedServer)) return;
+	if (bRock)
+	{
+		// the rock's model (its middle at the actor's place); a grey ball if it is missing
+		UStaticMesh* RockModel = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/TrollKit/SM_TrollRock.SM_TrollRock"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+		Body->SetStaticMesh(RockModel ? RockModel : BallMesh);
+		Body->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
+		Body->SetRelativeScale3D(RockModel ? FVector(1.f) : FVector(0.16f));
+		Body->SetCastShadow(true);
+		if (!RockModel)
+			if (UMaterialInstanceDynamic* M = Body->CreateDynamicMaterialInstance(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.42f, 0.42f, 0.44f));
+		Head->SetVisibility(false);
+		Fletch->SetVisibility(false);
+		return;
+	}
 	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
 	auto Paint = [&](UStaticMeshComponent* C, const FLinearColor& Col)
 	{
@@ -187,7 +202,8 @@ void AProjectile::ApplyLaunch()
 void AProjectile::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (!IsNetMode(NM_DedicatedServer) && !L.bBolt) TickTrail();
+	const bool bRock = JeebItems::IsRock(L.ArrowId);   // (a thrown rock: no streak, it tumbles, it bounces off what it hits)
+	if (!IsNetMode(NM_DedicatedServer) && !L.bBolt && !bRock) TickTrail();
 	if (!bFlying || IsHidden()) return;
 	if (Travelled >= L.Straight) Velocity.Z -= L.Sag * DeltaSeconds;   // (a full draw: none at all for its first L.Straight)
 	const FVector From = GetActorLocation();   // (the tip)
@@ -201,7 +217,7 @@ void AProjectile::Tick(float DeltaSeconds)
 	if (!bSpent)
 	{
 		JeebHit::FCapsule Seg;
-		Seg.A = From; Seg.B = To; Seg.R = L.bBolt ? 8.f : 2.5f;
+		Seg.A = From; Seg.B = To; Seg.R = L.bBolt ? 8.f : bRock ? 7.f : 2.5f;
 		float Best = 2.f;
 		UHealthComponent* BestH = nullptr;
 		AKnightCharacter* BestK = nullptr;
@@ -234,6 +250,12 @@ void AProjectile::Tick(float DeltaSeconds)
 			AActor* Target = BestK ? static_cast<AActor*>(BestK) : BestH->GetOwner();
 			if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW hit %s shield %d"), *Target->GetName(), bOnShield ? 1 : 0);
 			const FVector At = From + (To - From) * Best;
+			if (bOnShield && bRock)   // (a rock off a raised shield: no damage, the guard untouched; it bounces away)
+			{
+				if (!bAuth) { SetActorLocation(At); Wait(); return; }
+				Deflect(At, (At - BestWedge.Apex).GetSafeNormal2D());
+				return;
+			}
 			if (bOnShield)
 			{
 				// The shield itself (its parts' boxes, a little past the wedge's band): the arrow sticks in it. Only the wedge's edge:
@@ -266,6 +288,7 @@ void AProjectile::Tick(float DeltaSeconds)
 			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead);
 			else if (Shooter) Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead);
 			if (JeebItems::IsFireArrow(L.ArrowId)) Burn(Target);
+			if (bRock) { Deflect(At, -Dir.GetSafeNormal2D()); return; }   // (a rock never sticks in anyone: it drops off him, spent)
 			// stuck in him at the joint nearest the tip (his armour: spent)
 			USceneComponent* Joint = nullptr;
 			float JointD = 1.0e9f;
@@ -299,8 +322,9 @@ void AProjectile::Tick(float DeltaSeconds)
 		return;
 	}
 	SetActorLocation(To);
-	SetActorRotation(Velocity.Rotation());
 	Travelled += (To - From).Size();
+	if (bRock) SetActorRotation((Velocity.Rotation().Quaternion() * FQuat(FVector::YAxisVector, -Travelled * 0.011f)).Rotator());   // (it tumbles end over end as it flies)
+	else SetActorRotation(Velocity.Rotation());
 	if (L.bBolt && Travelled > L.Range) { if (bAuth) Destroy(); else Wait(); }   // (bolts fade out at their range; arrows fly on until they land)
 }
 
@@ -308,7 +332,9 @@ void AProjectile::Tick(float DeltaSeconds)
 void AProjectile::StickAt(const FVector& Tip, AActor* On, USceneComponent* Comp, FName CompName, uint8 Index, bool bPickable)
 {
 	const FVector Dir = Velocity.IsNearlyZero() ? GetActorForwardVector() : Velocity.GetSafeNormal();
-	const FTransform W(Dir.Rotation(), Tip + Dir * 7.f);   // (sunk 7 cm in)
+	FTransform W(Dir.Rotation(), Tip + Dir * 7.f);   // (sunk 7 cm in)
+	if (JeebItems::IsRock(L.ArrowId))   // (a rock lies on what it landed on, a random way round, a little sunk)
+		W = FTransform(FRotator(FMath::FRandRange(-25.f, 25.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-25.f, 25.f)), Tip + FVector(0.f, 0.f, 3.f));
 	if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW stuck at %s on %s / %s (dmg %d)"), *Tip.ToCompactString(), On ? *On->GetName() : TEXT("-"), *CompName.ToString(), Damage);
 	Stuck.bStuck = true;
 	Stuck.On = Comp ? On : nullptr;
