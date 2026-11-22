@@ -27,6 +27,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/SpotLightComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "Materials/Material.h"
@@ -1373,9 +1374,9 @@ struct FFillBuilder
 			const float Sink = K->Height * P.Scale < 60.f ? 2.f : 0.f;
 			T.Xf = FTransform(FRotator(0.f, PYaw, 0.f), FVector(Pw.X, Pw.Y, Gz - Sink + P.Pos.Z), FVector(P.Scale));
 			// (2026-11-21, owner: "fix these underground flower pots": a low, long piece on a slope (raised beds, tulip beds, flower
-			// boxes) stood at its lowest corner, so its uphill end was buried. A low ground piece (under 80 cm) a metre or more long
+			// boxes) stood at its lowest corner, so its uphill end was buried. A ground piece under 220 cm (the hand cart with its sacks is 209, the log pile 125), not a lamp, a metre or more long
 			// now leans with the ground instead: the ground's plane across its footprint, from the drawn ground at its four edge middles)
-			if (T.bGround && !P.bStack && T.Foot.Type == 0 && K->Height * P.Scale <= 80.f && FMath::Max(T.Foot.H.X, T.Foot.H.Y) >= 50.f && Slope > 1.f
+			if (T.bGround && !P.bStack && T.Foot.Type == 0 && K->Height * P.Scale <= 220.f && !K->bLight && FMath::Max(T.Foot.H.X, T.Foot.H.Y) >= 50.f && Slope > 1.f
 #if !UE_BUILD_SHIPPING
 				&& !FParse::Param(FCommandLine::Get(), TEXT("FillNoLean"))   // (the old way, for comparing; never on a server)
 #endif
@@ -2816,7 +2817,11 @@ struct FFillBuilder
 				int32& Count = IsOak(P.Zone) ? OakLights : OtherLights;
 				if (Count >= (IsOak(P.Zone) ? 19 : 12)) continue;
 				++Count;
-				UPointLightComponent* L = NewObject<UPointLightComponent>(Owner);
+				// (2026-11-22: a lamp post's light is a spot pointing down from inside its lantern, 40 degrees each way: it lights the ground under
+				// the lamp and never the crossbar over it or the post beside it near the lantern, which a shadowless point light lit bright)
+				const bool bPost = P.Kind->Name.StartsWith(TEXT("LampPost")) && P.Kind->Name != TEXT("LampPostRope");
+				UPointLightComponent* L = bPost ? NewObject<USpotLightComponent>(Owner) : NewObject<UPointLightComponent>(Owner);
+				if (bPost) { USpotLightComponent* Sp = static_cast<USpotLightComponent*>(L); Sp->SetOuterConeAngle(40.f); Sp->SetInnerConeAngle(15.f); Sp->SetWorldRotation(FRotator(-90.f, 0.f, 0.f)); }
 				L->SetupAttachment(Root);
 				// (the village well, 2026-11-21 owner: "the whole well lights up": its light hung under the roof's middle, shadowless, and lit
 				// the roof, posts and stones all round. Now it sits in the lantern on the post (SM_WellVillage's Glow faces, about -125 0 180

@@ -117,6 +117,13 @@ Field map, Play. The big plaza oak is gone for good. Oak Hill's trees are now th
 
 **Filling in:** walking toward a patch of grass, it used to be swapped twice for a new, different crop (at about 20 and 37 m from you, the far one five times as dense as before). Now it fills in over six smaller steps, and each step only adds clumps among the ones already there (and widens them a little), so no clump jumps or disappears. To judge it: Field, Play, run across open meadow (north of Oak Hill) and watch 20-45 m ahead. `jeeb.Grass.OldSteps 1` in the console brings the old way back to compare (it regrows round you). Test switch: `-GrassStepLog` (log `JEEBGRASS step`: each patch that changes, from and to which step and how far off).
 
+**Farther grass (2026-11-22):** on HIGH the grass now reaches 75 m instead of 50 m, thinning out in steps toward the far edge. Try `jeeb.Grass.Stretch 2` (100 m, about 0.4 ms more) or `1` (the old 50 m) in Play; LOW stays at 26 m.
+
+**Flower beds, carts and log piles on slopes:** they lean with the ground instead of sinking at one end (Oak Hill's gardens, the farmsteads).
+
+**Lamp posts at night:** only the lantern glows and lights the ground under it; the post and crossbar no longer light up from inside.
+
+
 ## Hills round Oak Hill (2026-11-16)
 
 Field map, Play. The forest round Oak Hill now grows on **rolling hills** that close off the horizon: they start rising about 10 m past the town's edge and stand about 20-45 m high from 100-150 m out, with ridges, valleys and saddles between them (the river valleys stay open), and fade back to the open land past the forest's edge (500-620 m from the plaza). They keep off the town's own ground, Blackrock's square, and the rivers and their banks (they start 30 m from the water). Things to check: from the plaza and the town's edges look out in every direction (the hills and their trees should hide the far meadows); walk up a hill (he should walk everywhere: nothing is steeper than he can climb); the three forest roads stay gentle (about 6 degrees at most, cut through rises and banked over dips); trees, bushes, logs, stumps and rocks sit on the slopes, none floating; the river and its banks are as before.

@@ -277,8 +277,8 @@ void AKnightCharacter::ApplyGraphics()
 	GEngine->Exec(W, bLowest ? TEXT("r.Shadow.DistanceScale 0.5") : TEXT("r.Shadow.DistanceScale 0.6"));   // (HIGH 0.7 until 2026-11-15: the owner approved a shorter shadow reach to pay for the realistic grass)
 	// the realistic grass reaches 50 m on HIGH, 26 m on LOW (Meadow.cpp regrows round you when it changes)
 	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.PackFade 2600") : TEXT("jeeb.Grass.PackFade 5000"));
-	// (2026-11-21, owner: the grass steps reach about twice as far on HIGH, the outer ones very sparse; Meadow.cpp's jeeb.Grass.Stretch)
-	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.Stretch 1") : TEXT("jeeb.Grass.Stretch 2"));
+	// (2026-11-22, owner: the grass steps reach about twice as far on HIGH, the outer ones very sparse; Meadow.cpp's jeeb.Grass.Stretch. Measured solo, open land, walking, GPU: 1 is 8.4 ms, 1.5 (75 m) 8.9, 2 (100 m) 9.3; 1.5 chosen, 2 is one setting away)
+	GEngine->Exec(W, bLowest ? TEXT("jeeb.Grass.Stretch 1") : TEXT("jeeb.Grass.Stretch 1.5"));
 	// The trees round Oak Hill cast no shadows themselves (OakForest.cpp): a plain see-through stand-in crown per tree casts its shade out
 	// to jeeb.Forest.FarShadeReach, and on HIGH the sun's one far cascade, drawn only by the stand-ins, carries it past the ordinary 120 m
 	// shadow range (DayNight.cpp). (Until 2026-11-21 the trees within jeeb.Forest.ShadowReach, 20 m HIGH / 15 LOW, cast real leafy shadows;
