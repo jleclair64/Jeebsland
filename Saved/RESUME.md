@@ -6,3 +6,8 @@ Findings so far (no Unreal run yet):
 - Log: Tools/log_bark.py written (not run): builds /Game/M_LogBark (M_StumpBark recipe, moss kept) and MI_LogMossyBark, assigns to SM_LogMossy. Run in editor/commandlet in this copy, check it (log beside a tree trunk).
 Next: 1) build (bash Tools/uqueue.sh build grey, then Build.bat via PowerShell with -NoHotReloadFromIDE; slots were full so build never started), 2) run grey_diag.py and log_bark.py with UnrealEditor-Cmd -ExecutePythonScript, 3) pictures of fixed props and log, no shattering, delete shots, 4) commit, report.
 Disk note: C: was 97% full (~26 GB free); consider removing old copies.
+
+## Update (resumed run)
+- C++ build of this copy SUCCEEDED (Bushes.cpp wind change compiled). Build via PowerShell Build.bat ... -NoHotReloadFromIDE took ~14 min.
+- Diag run is queued: Saved/run_diag.sh <script in Tools> (runs via uqueue, windowless flags, log Saved/Logs/grey.log ends with RUNEND). A first direct run with -nullrhi hung at startup (killed). Start it with: Start-Process bash.exe Saved/run_diag.sh grey_diag.py (PowerShell), then read GREYDIAG lines.
+- Then: apply the TwoSided GlowMaskTex fix (+ other affected MIs), run Tools/log_bark.py the same way, pictures, commit.
