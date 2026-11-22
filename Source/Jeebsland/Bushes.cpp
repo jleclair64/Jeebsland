@@ -298,6 +298,7 @@ void ABushes::Rebuild()
 		C->SetCanEverAffectNavigation(false);
 		C->bAffectDistanceFieldLighting = false;
 		C->bAffectDynamicIndirectLighting = false;
+		if (k < B_Pad) C->bEvaluateWorldPositionOffset = false;   // (owner 2026-11-22: bushes stand still, near zero movement in wind; the lily pads keep theirs)
 		C->RegisterComponent();
 		if (k >= B_Pad) C->SetCastShadow(false);   // (flat on the water: no shadows)
 		C->AddInstances(Xf[k], false, true, false);
