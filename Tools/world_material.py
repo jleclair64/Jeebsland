@@ -311,7 +311,7 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # ragged 1.5 m noise, so it never follows a contour or repeats. JeebOpen::Snow (OpenWorld.cpp) tells the grass the same.
     uv1 = g.node(unreal.MaterialExpressionTextureCoordinate)
     uv1.set_editor_property("coordinate_index", 1)
-    snow_amt = g.sat(g.mul(g.addn(g.addn(g.mask(uv1, True, False), g.mul(g.add(mix, -0.5), 0.6)), g.mul(g.add(rag, -0.5), 0.1)), 1.3))
+    snow_amt = g.sat(g.mul(g.addn(g.addn(g.add(g.mask(uv1, True, False), -1.0), g.mul(g.add(mix, -0.5), 0.35)), g.mul(g.add(rag, -0.5), 0.1)), 1.3))   # (the UV holds the amount + 1: a ground with no second UV reads 0, so -1, no snow)
     col = g.lerp(col, palette.colour(mat, "Snow"), snow_amt)
 
     # (2026-11-14: the swathes are now in grass_field.before_grey, on the grass only, the same as the blades and the town's lawn; flat ground is a little brighter than the blades, which are lit through)

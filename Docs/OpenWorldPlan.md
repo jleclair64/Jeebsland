@@ -79,3 +79,16 @@ Grove; thinner groves toward the tropics), clearings, feathered edges, lone tree
 existing draw distances; if they cost more than about 0.7 ms at a forest edge the far woods get thinner or a shorter reach.
 
 **Checks**: pictures near, mid, far and from the air; server and client hashes; a snow film on HIGH; a frame-time number.
+
+## As built (2026-11-22)
+
+Where the build differs from the plan above:
+- **Snow on the ground** is not worked out in the material from height. C++ gives each point of the world's ground its snow amount in
+  the mesh's second UV (`JeebOpen::SnowRaw`), because the material's tiled noise pictures showed a repeating weave along the snow's
+  edge. Snow lies only on the northern range (none south of about 350-550 m north of the origin).
+- **The range** has a fixed second mass east of the river as well as the noise-placed summits, and its valley is narrower than first
+  planned (about 150 m each side, not 220 m), or the middle third of the range was flat.
+- **Land is drawn beyond the map's north, west and south edges** (not planned): from the new peaks the player looked out into nothing.
+- **Roads** may climb 6.3 degrees (the forest roads round Oak Hill keep to 5), and each is clamped to arrive on the ground at both ends.
+- **Anchorage's site** is 40 m north-east of the town's spot on the map sketch, which lies on the river's bank.
+- Details, numbers and the list of what is still open: `Docs/ProjectNotes.md`, "The open world".

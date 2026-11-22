@@ -648,7 +648,9 @@ float JeebOpen::SnowRaw(float X, float Y, float Z, float Up)
 	const FVector2D P(X, Y);
 	const float Nz = 0.7f * Perlin(P, 9000.f, 4.9f, -6.3f) + 0.4f * Perlin(P, 2300.f, -2.2f, 7.5f);
 	// (steep ground holds less: a 40 degree face stays bare rock about 24 m higher than a gentle one, so rock bands show through)
-	return (Z - SnowFrom) / (SnowTo - SnowFrom) + 0.4f * Nz - 0.8f * Smooth(0.9f, 0.72f, Up);
+	// (only the northern range: further south the snow line climbs out of reach, so the lower ranges by the map's west edge and in the
+	// north-east stay green)
+	return (Z - SnowFrom) / (SnowTo - SnowFrom) + 0.5f * Nz - 0.8f * Smooth(0.9f, 0.72f, Up) - 1.5f * Smooth(55000.f, 35000.f, X);
 }
 
 float JeebOpen::Snow(float X, float Y, float Z, float Up) { return FMath::Clamp(SnowRaw(X, Y, Z, Up) * 1.3f, 0.f, 1.f); }

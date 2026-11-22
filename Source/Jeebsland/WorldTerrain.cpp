@@ -146,7 +146,7 @@ void AWorldTerrain::BuildLand()
 					Col.Add(Mask.Color());
 					// (2026-11-22: how much snow lies here goes in the second UV's U, from real noise worked out per point, JeebOpen::Snow: the
 					// material's own tiled noise pictures showed as a repeating weave along the snow's edge. Other grounds leave it 0: no snow)
-					UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up), 0.f));
+					UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up) + 1.f, 0.f));   // (+ 1: a ground that gives no second UV reads 0, which must mean no snow at all)
 				}
 			for (int32 i = CI; i < I1; ++i)
 				for (int32 j = CJ; j < J1; ++j)
@@ -501,7 +501,7 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 			N.Add(Nrm);
 			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
 			Col.Add(FLinearColor(0.f, 0.f, 0.f, 0.f));
-			UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Nrm.Z), 0.f));
+			UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Nrm.Z) + 1.f, 0.f));
 		}
 	for (int32 i = 0; i + 1 < NXv; ++i)
 		for (int32 j = 0; j + 1 < NYv; ++j)

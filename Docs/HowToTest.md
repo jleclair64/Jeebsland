@@ -14,6 +14,16 @@ for the map / settings screen there. For full screen with a working Escape, pick
 it plays offline straight away. To change the editor's Stop key: Editor
 Preferences > Keyboard Shortcuts > search "Stop" > set it to Shift+Escape.
 
+## The open world: mountains, snow, roads, trees, town sites (2026-11-22)
+
+Field map, Play (single player). Console commands (test builds only):
+- `jeeb.Test.GoPeak` puts you on the highest ground of the northern range, looking south over the map. The range is about 100 m tall now (it was 48 m), in two masses either side of the river's valley, with snow from about 45 m up and bare rock on its steep faces. Walk down toward the river: the trees come back at about 64 m, spruces first, smaller near the top.
+- `jeeb.Test.GoTown 1` (Silver Point), `2` (Anchorage), `3` (Birch Grove), `4` (Palmer Square) puts you just outside a town site still to be built. Walk in: the town's name fades in like Blackrock's. Each site has one placeholder house. Oak Hill and Steele Creek show their names the same way when you walk in.
+- `jeeb.Snow.Force 1` makes it snow now on your machine (`0` never, `-1` back to the shared weather). Left alone, the weather is clear or snowing for 3.5 minutes at a time, the same for every player: clear for the first 3.5 minutes after the world starts, then snow, then as it falls (snow a little under half the time). More falls the higher you stand. `jeeb.Snow.Amount` (1 as built, up to 1.4) and `jeeb.Snow.Size` change the flakes; `jeeb.Leaves.Fall 1` before the map loads brings the old drifting leaves back as well.
+- Roads: follow Oak Hill's north road past the forest's edge and it carries on to Silver Point; its east road goes on to Anchorage. Steele Creek's long road north has a fork to Birch Grove, and from Birch Grove one road runs south-east to Palmer Square and one north to the river's east branch. There is no bridge or ford there yet: Oak Hill's south-east road ends on the other bank.
+- Trees: thick woods, open plains with the odd large lone tree, and bands of small copses between. Mostly aspens round Birch Grove, more spruces to the north, open grassland in the north-east.
+- From a peak, look north, west or south past the map's edge: land carries on to the horizon (drawn only; the invisible walls still stop you at the edge).
+
 ## Oak Hill (2026-11-11)
 
 Field map, Play. Oak Hill is about 185 m east of the start, across the river (there is no bridge yet, so wade across where its west road stops at the bank). The world map (O) shows its name and its streets. Head for them and look for the big oak on the plaza.
