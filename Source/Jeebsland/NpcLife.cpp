@@ -420,20 +420,19 @@ namespace
 		return H.IsValidIndex(N - 1) ? H[N - 1] : nullptr;
 	}
 
-	enum class ETown : uint8 { None, OakHill, Steele, Blackrock };
+	enum class ETown : uint8 { None, OakHill, Steele };
 	ETown TownOf(const FString& S)
 	{
 		const FString T = Squash(S);
 		if (T == TEXT("oakhill")) return ETown::OakHill;
 		if (T == TEXT("steelecreek") || T == TEXT("steele")) return ETown::Steele;
-		if (T == TEXT("blackrock")) return ETown::Blackrock;
 		return ETown::None;
 	}
 	bool TownOn(ETown T)
 	{
 		if (T == ETown::OakHill) return JeebTownLab::RealTown();
 		if (T == ETown::Steele) return JeebSteele::Enabled();
-		return T == ETown::Blackrock;
+		return false;   // (Blackrock was taken out of the game, 2026-11-22: its rows in Townsfolk.csv went with it)
 	}
 
 	// A building's front for a keeper (Shop: what it sells) or an errand: where, facing out of it
@@ -519,26 +518,6 @@ namespace
 			R.Yaw += 180.f;
 			return R;
 		}
-		if (Town == ETown::Blackrock)
-		{
-			const FVector2D VC = JeebTerrain::VillageCenter();
-			if (N == TEXT("fountain"))
-			{
-				// in front of a bench round the fountain, facing it
-				const TArray<JeebTerrain::FSeat>& Seats = JeebTerrain::Seats();
-				const JeebTerrain::FSeat& S = Seats[Seed % uint32(Seats.Num())];
-				R.At = S.Pos + Dir2(S.Yaw) * 110.f; R.Yaw = S.Yaw; R.bOk = true;
-				return R;
-			}
-			if (N == TEXT("market")) { R.At = JeebTerrain::MarketCenter() + FVector2D(0.f, (Seed & 1) ? 300.f : -300.f) + FVector2D(450.f, 0.f); R.Yaw = 180.f; R.bOk = true; return R; }
-			if (N == TEXT("shop") || N == TEXT("smith") || N == TEXT("bank"))
-			{
-				const FVector2D K = N == TEXT("shop") ? JeebTerrain::ShopNpcPos() : N == TEXT("smith") ? JeebTerrain::SmithNpcPos() : JeebTerrain::BankNpcPos();
-				R.At = K + FVector2D(0.f, 330.f) + FVector2D((Seed & 1) ? 160.f : -160.f, 0.f); R.Yaw = -90.f; R.bOk = true;
-				return R;
-			}
-			if (N == TEXT("gate")) { R.At = VC + FVector2D(-JeebTerrain::VillageHalf() + 350.f, 0.f); R.Yaw = 180.f; R.bOk = true; return R; }
-		}
 		return R;
 	}
 
@@ -562,22 +541,6 @@ namespace
 			const JeebSteele::FPlot* P = JeebSteele::FindPlot(*FString::Printf(TEXT("House%d"), Idx));
 			if (!P) return false;
 			OutAt = JeebSteele::DoorSpot(*P, 150.f, &OutYaw);
-			return true;
-		}
-		if (Town == ETown::Blackrock)
-		{
-			const TArray<JeebTerrain::FHutDef>& Huts = JeebTerrain::VillageHuts();
-			if (!Huts.IsValidIndex(Idx - 1)) return false;
-			// the hut there (its door is on its +X, ACottage), 1.3 m out from the doorway
-			const ACottage* Best = nullptr; float BestD = 600.f * 600.f;
-			for (TActorIterator<ACottage> It(W); It; ++It)
-			{
-				const float D = FVector2D::DistSquared(FVector2D(It->GetActorLocation()), Huts[Idx - 1].Pos);
-				if (D < BestD) { BestD = D; Best = *It; }
-			}
-			if (!Best) return false;
-			OutYaw = Best->GetActorRotation().Yaw;
-			OutAt = FVector2D(Best->DoorPos()) + Dir2(OutYaw) * 130.f;
 			return true;
 		}
 		return false;

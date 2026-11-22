@@ -20,7 +20,7 @@
 
 // ---------------------------------------------------------------------------------------------------
 // The world map (top right of the Tab windows, and the Map tab of the Escape screen). Kept simple on purpose: the lie of the land, the woods, the paths,
-// the water, Blackrock and the castle, and an arrow for YOU. No villagers, shops or other players.
+// the water and the castle, and an arrow for YOU. No villagers, shops or other players.
 // It is painted once, from this machine's own copy of the world, into a texture.
 // ---------------------------------------------------------------------------------------------------
 namespace
@@ -123,7 +123,7 @@ void AKnightHUD::BuildMapTex()
 	const double MapT0 = FPlatformTime::Seconds();
 
 	// What the map covers: the whole world (WorldMap.h), as a square
-	const FVector2D VC = JeebTerrain::VillageCenter(), CP = JeebTerrain::CastlePos();
+	const FVector2D CP = JeebTerrain::CastlePos();
 	TArray<FVector2D> Broadleaf, Conifer;
 	for (TActorIterator<AForest> It(W); It; ++It)
 	{
@@ -220,7 +220,7 @@ void AKnightHUD::BuildMapTex()
 			else if (bSea) Px[V * MapN + U] = Mix(WaterCol, FLinearColor(0.10f, 0.22f, 0.42f), JeebWorld::Smooth(JeebWorld::SeaLevel, JeebWorld::SeaLevel - 1500.f, H[V * MapN + U]));
 		}
 
-	// ---- Blackrock (a walled square) and the castle (a walled square inside its moat) ----
+	// ---- The castle (a walled square inside its moat) ----
 	auto Walls = [&](const FVector2D& C, float Half, float Thick, const FLinearColor& Fill, const FLinearColor& Wall)
 	{
 		for (int32 V = 0; V < MapN; ++V)
@@ -233,7 +233,6 @@ void AKnightHUD::BuildMapTex()
 				O = (M > Half - Thick) ? Wall : Mix(O, Fill, 0.55f);
 			}
 	};
-	Walls(VC, JeebTerrain::VillageHalf(), 60.f, FLinearColor(0.62f, 0.55f, 0.44f), FLinearColor(0.30f, 0.29f, 0.28f));
 	Walls(CP, JeebTerrain::CastleWall, JeebTerrain::CastleWallT + 20.f, FLinearColor(0.58f, 0.56f, 0.52f), FLinearColor(0.32f, 0.31f, 0.30f));
 
 	// ---- Into a texture ----
@@ -718,7 +717,7 @@ void AKnightHUD::DrawWorldMap(AKnightCharacter* Knight, float X, float Y, float 
 		if (FogTex) DrawTexture(FogTex, X, Y, S, S, U0, V0, 1.f / MapZoom, 1.f / MapZoom, MapFogTint(), BLEND_Translucent);   // (old paper under the new look)
 	}
 
-	// ---- Town names (every town, once you have seen it; Blackrock and Oak Hill stand close: their names sit outward) ----
+	// ---- Town names (every town, once you have seen it; a name can sit beside its spot: LabelSide) ----
 	const float TownNameA = 1.f - FMath::Clamp((MapZoom - 6.f) / 2.f, 0.f, 1.f);   // (close in, the buildings' own names take over)
 	if (TownNameA > 0.f)
 	{

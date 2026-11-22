@@ -10,8 +10,8 @@
 # and plot reachable, no fillable spot 3 m or more from something.
 # Rows by zone (filllayout): OakPlaza 43 OakStreet 129 OakYard 277 OakGarden 10 OakBoxingRing 8 OakRuins 11 OakGraveyard 16 OakForts 15 OakWatchtower 4 OakBridge 8 OakFringe 11.
 # fillfix 2026-11-16: the graveyard plot (29) is now a walled GraveyardEnclosure with three GraveRows, cypresses and a bench (seeds 700-712);
-# 18 yard rows into open grass (seeds 5000-5017); Site "Square" rows place on the original square, E,N from the world origin (Blackrock's
-# fountain yard, seeds 6000-6012).
+# 18 yard rows into open grass (seeds 5000-5017); Site "Square" rows place on the original square, E,N from the world origin (none since
+# 2026-11-22: the old village's fountain yard rows, seeds 6000-6012, went with the village).
 # war buildings 2026-11-18: the forts, watchtower and castle ruins stand on their plots now (plots 27, 30-32 are buildings), so the 13 stand-in garrison rows on them went.
 # the 2026-11-18 layout (Docs/TownLab/OakHillLayout_2026-11-18.md): rows with Site "Plot" belong to plot Plot and move with it: E, N are metres in
 # its own frame (a building's model X, Y, its door on +Y; an open plot's centre, unturned) and Yaw is relative to the building's yaw. The street lamps
@@ -105,19 +105,6 @@ PotVase,2.10,6.10,0.0,710,0,29,graveyard plot: flowers by the bench,Plot
 CandleCageTall,-0.30,6.10,0.0,711,0,29,graveyard plot: candle by the bench,Plot
 Bush1,-6.10,-4.10,90.0,712,1,29,graveyard plot: a bush in the west corner,Plot
 # fillfix 2026-11-16: the thinnest open grass round and between the houses (yards and lanes), cozier
-# fillfix 2026-11-16: Blackrock's fountain yard, inside the village walls (Site Square: E, N are metres from the world's origin)
-SackCorner,-8.13,-17.63,255,6000,1,-1,fillfix: Blackrock fountain yard,Square
-BarrelRow,2.63,-18.38,240,6001,1,-1,fillfix: Blackrock fountain yard,Square
-StorageCorner,8.38,-25.88,285,6002,1,-1,fillfix: Blackrock fountain yard,Square
-Blackrock,-9.13,-38.38,30,6003,1,-1,fillfix: Blackrock fountain yard,Square
-Workbench,-14.13,-31.88,330,6004,1,-1,fillfix: Blackrock fountain yard,Square
-CartCorner,12.38,-25.88,270,6005,1,-1,fillfix: Blackrock fountain yard,Square
-AmphoraRow,-11.88,-43.88,270,6006,1,-1,fillfix: Blackrock fountain yard,Square
-BarrelRow,9.13,-21.38,270,6007,1,-1,fillfix: Blackrock fountain yard,Square
-Workbench,-10.63,-24.63,195,6008,1,-1,fillfix: Blackrock fountain yard,Square
-Workbench,9.38,-32.88,270,6010,1,-1,fillfix: Blackrock fountain yard,Square
-WashingCorner,4.13,-23.38,45,6011,1,-1,fillfix: Blackrock fountain yard,Square
-BarrelRow,0.38,-36.88,90,6012,1,-1,fillfix: Blackrock fountain yard,Square
 PlazaBed,0.5,0.3,0,7001,0,-1,townbuild2: a low tulip bed where the plaza oak stood
 RiverRest,-52.00,9.00,180,7002,1,-1,river lawn north of the bridge street: a rest by the bank,
 BenchNook,-51.50,14.00,180,7003,1,-1,river lawn north of the bridge street: a bench looking at the river,

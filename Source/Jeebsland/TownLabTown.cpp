@@ -639,7 +639,7 @@ void ATownLabTown::PlaceBoulders(AActor* Owner, float PlazaX, float PlazaY, cons
 			if (Site)
 			{
 				// (only inside the town's own ground, never on its streets, plots or the river's banks: at the real town the ring's west
-				// side is the river and Blackrock's side of it)
+				// side is the river and the old village site's side of it)
 				if (!JeebTownLab::InSite(*Site, X, Y, -800.f) || JeebTownLab::RoadClearance(*Site, X, Y) < 300.f) continue;
 				const FVector2D O = JeebTownLab::ToPlan(*Site, X, Y);
 				const float Pe = JeebOakHill::EastM(O.Y), Pn = JeebOakHill::NorthM(O.X);

@@ -66,7 +66,7 @@ namespace JeebTune
 				if (Idx == INDEX_NONE) { UE_LOG(LogJeebTune, Error, TEXT("Jeebsland tuning: line %d, [%s] %s is not a tuning number (a typo?)"), n + 1, *Section, *Key); continue; }
 				if (!Val.IsNumeric()) { UE_LOG(LogJeebTune, Error, TEXT("Jeebsland tuning: line %d, %s = \"%s\" is not a number (keeps %g)"), n + 1, *Key, *Val, E[Idx].Default); Found.Add(Idx); continue; }
 				float Num = FCString::Atof(*Val);
-				if (Num < 0.001f)   // (no tuning number is negative, and several are divided by: 0 would break them)
+				if (Num < 0.001f && E[Idx].Default >= 0.f)   // (several are divided by: 0 would break them; a number made to go below zero, like TrollGuardUp, has a negative default)
 				{
 					UE_LOG(LogJeebTune, Error, TEXT("Jeebsland tuning: line %d, %s = %s is too small (uses 0.001)"), n + 1, *Key, *Val);
 					Num = 0.001f;

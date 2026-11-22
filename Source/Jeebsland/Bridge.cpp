@@ -94,7 +94,7 @@ float JeebBridge::ApplyGround(float X, float Y, float H)
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
-// The roads: Blackrock's east gate to the bridge's west end, and the span itself (no ribbon: the deck is the road)
+// The roads: the old village site's east side to the bridge's west end, and the span itself (no ribbon: the deck is the road)
 // ---------------------------------------------------------------------------------------------------------------------------------
 const TArray<JeebBridge::FRoad>& JeebBridge::Roads()
 {
@@ -170,7 +170,7 @@ void ABridge::BeginPlay()
 			for (float L = -2400.f; L <= 2400.f; L += 150.f) S += FString::Printf(TEXT(" %.0f"), JeebTerrain::HeightAt(CentreX + W, CentreY + L));
 			UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE natural ground at W=%.0f, L -2400..2400 step 150:%s"), W, *S);
 		}
-		// the Blackrock road: its steepest grade, on the natural ground and with the bridge's
+		// the old village road: its steepest grade, on the natural ground and with the bridge's
 		for (int32 Pass = 0; Pass < 2; ++Pass)
 		{
 			bGroundOff = Pass == 0;
@@ -185,8 +185,8 @@ void ABridge::BeginPlay()
 				const float Deg = FMath::RadiansToDegrees(FMath::Atan2(FMath::Abs(Dz), Dl));
 				if (Deg > Worst) { Worst = Deg; WorstAt = Len; }
 			}
-			if (Pass == 0) UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE Blackrock road heights every 5 m:%s"), *Hs);
-			UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE Blackrock road %s: %.0f m long, steepest %.1f degrees at %.0f m"), Pass == 0 ? TEXT("natural") : TEXT("with the bridge's ground"), Len / 100.f, Worst, WorstAt / 100.f);
+			if (Pass == 0) UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE old village road heights every 5 m:%s"), *Hs);
+			UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE old village road %s: %.0f m long, steepest %.1f degrees at %.0f m"), Pass == 0 ? TEXT("natural") : TEXT("with the bridge's ground"), Len / 100.f, Worst, WorstAt / 100.f);
 		}
 		bGroundOff = true;
 		for (float Gx = -6500.f; Gx <= -1500.f; Gx += 500.f) { FString Row; for (float Gy = 500.f; Gy <= 11500.f; Gy += 500.f) Row += FString::Printf(TEXT(" %.0f"), JeebTerrain::HeightAt(Gx, Gy)); UE_LOG(LogTemp, Display, TEXT("JEEBBRIDGE grid X %.0f, Y 500..11500 step 500:%s"), Gx, *Row); }

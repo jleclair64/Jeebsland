@@ -172,14 +172,14 @@ void ATownLab::BuildTour()
 	const TCHAR* PhaseNames[2] = { TEXT("noon"), TEXT("low") };
 	// (in Field, for -LabTour: the real town only, which is the rebuilt one, or the old one with -OldOakHill; in whatever look the
 	// console variables say, so a "before" run passes -ExecCmds="jeeb.TownLab.NewLook 0"; plus open land, the town's west side
-	// looking over the river at Blackrock, and Blackrock itself, to see what the world-wide look and ground cost there)
+	// looking over the river at the old village site, and the old village site itself, to see what the world-wide look and ground cost there)
 	const bool bField = !JeebTownLab::Active();
 	struct FSpot { const TCHAR* Name; float X, Y, Up, Yaw, Pitch; };
 	const FSpot FieldSpots[] = {
-		{ TEXT("west"), JeebOakHill::PosX + 300.f, JeebOakHill::PosY - 5200.f, 220.f, 180.f, -3.f },   // the west road at the river, looking at Blackrock
+		{ TEXT("west"), JeebOakHill::PosX + 300.f, JeebOakHill::PosY - 5200.f, 220.f, 180.f, -3.f },   // the west road at the river, looking at the old village site
 		{ TEXT("open"), JeebOakHill::PosX, JeebOakHill::PosY + 30000.f, 170.f, 20.f, -3.f },             // open rolling land 300 m east
 		{ TEXT("openair"), JeebOakHill::PosX + 10000.f, JeebOakHill::PosY + 38200.f, 3500.f, -140.7f, -14.f },
-		{ TEXT("blackrock"), JeebTerrain::VillageCenter().X - 4200.f, JeebTerrain::VillageCenter().Y, 900.f, 0.f, -10.f },   // from above the south gate, over its roofs
+		{ TEXT("oldvillage"), JeebTerrain::VillageCenter().X - 4200.f, JeebTerrain::VillageCenter().Y, 900.f, 0.f, -10.f },   // the empty old village site from above its south side
 	};
 	const int32 FieldLook = -1;   // (-1: StartStation leaves the look and shadow settings as they are; -ExecCmds runs after BeginPlay)
 	if (bField)

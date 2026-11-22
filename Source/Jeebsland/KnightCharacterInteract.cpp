@@ -41,7 +41,7 @@
 #include "OakHill.h"
 
 // Oak Hill's shop counters (no shopkeepers yet, owner 2026-11-13: "We'll add NPCs to the shops later"): standing within this of a
-// counter, E opens that shop's window. The server checks its own range (NearTrader, 800 cm, like Blackrock's traders)
+// counter, E opens that shop's window. The server checks its own range (NearTrader, 800 cm, like the market's traders)
 static constexpr float CounterReach = 250.f;
 static const JeebOakHill::FCounter* CounterInReach(const AActor* Me)
 {
@@ -109,7 +109,7 @@ void AKnightCharacter::Interact()
 		}
 		else if (K == JeebItems::K_Wand || K == JeebItems::K_Staff)
 		{
-			StartAttack(EAtkStyle::Cast, 1, 0.f);
+			BeginCastCharge();   // (2026-11-22: hold to charge, let go to cast: ReleaseCastCharge)
 		}
 		else if (JeebItems::FightsLikeSword(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkNow() * 1.15f
 			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
@@ -138,6 +138,7 @@ void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
 	if (InRockMode()) { if (!bAimHeld) { if (IsUIOpen() || bPanelCursor) { if (Rock == ERock::Charging) { SetRockPhase(ERock::None); if (!HasAuthority()) ServerRockCancel(); } } else RockRelease(); } return; }   // (the last button let go throws)
+	if (bCastCharging) { ReleaseCastCharge(); return; }   // (the wand's and staff's charged shot)
 	if (SelectedKind() == JeebItems::K_Crossbow) return;   // (letting go of the left button does nothing with the crossbow: the click shot)
 	if (Bow == EBow::Drawing && !bAimHeld)
 	{
@@ -533,6 +534,7 @@ void AKnightCharacter::Dismount()
 
 void AKnightCharacter::SitOnSeat(int32 SeatIdx)
 {
+	if (!JeebTerrain::Seats().IsValidIndex(SeatIdx)) return;   // (no benches at all since Blackrock went, 2026-11-22)
 	const JeebTerrain::FSeat* Best = &JeebTerrain::Seats()[SeatIdx];
 
 	UCharacterMovementComponent* Move = GetCharacterMovement();

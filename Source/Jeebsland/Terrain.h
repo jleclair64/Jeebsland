@@ -16,6 +16,8 @@ namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
 namespace JeebTerrain
 {
 	// ------------------------------------------------------------------ places
+	// The old village site (Blackrock until 2026-11-22, when it was taken out of the game): a level, empty square kept free
+	// for the town that will replace it (its pad, the roads to its gates and the tree-free ground stay; no walls, huts or props)
 	inline FVector2D VillageCenter() { return FVector2D(-2900.f, -300.f); }
 
 	// A little graveyard in the meadow
@@ -72,11 +74,11 @@ namespace JeebTerrain
 		const FVector2D D(FMath::Abs(P.X - C.X) - H.X, FMath::Abs(P.Y - C.Y) - H.Y);
 		return FVector2D(FMath::Max(D.X, 0.f), FMath::Max(D.Y, 0.f)).Size() + FMath::Min(FMath::Max(D.X, D.Y), 0.f);
 	}
-	// True if a prop of this radius would touch the village wall, a corner tower, or the pig pen and its fence
+	// True if a prop of this radius would touch the pig pen and its fence, the market, the pond or the castle
 	inline bool PropBlocked(float X, float Y, float Radius)
 	{
 		const FVector2D P(X, Y);
-		if (FMath::Abs(RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf()))) < Radius + 170.f) return true;
+		// (the village wall it once kept props off went with Blackrock, 2026-11-22)
 		if (RectSD(P, PenCenter(), PenHalf()) < Radius + 130.f) return true;
 		if (RectSD(P, MarketCenter(), MarketHalf()) < Radius + 40.f) return true;
 		if (FVector2D::Distance(P, PondCenter()) < PondBowl + Radius) return true;
@@ -91,17 +93,7 @@ namespace JeebTerrain
 	struct FHutDef { FVector2D Pos; float Yaw; };
 	inline const TArray<FHutDef>& VillageHuts()
 	{
-		static const TArray<FHutDef> All = []()
-		{
-			TArray<FHutDef> A;
-			const FVector2D VC = VillageCenter();
-			A.Add(FHutDef{ VC + FVector2D(-900.f,  1400.f), -90.f });
-			A.Add(FHutDef{ VC + FVector2D( 900.f,  1400.f), -90.f });
-			A.Add(FHutDef{ VC + FVector2D(-900.f, -1400.f),  90.f });
-			A.Add(FHutDef{ VC + FVector2D( 900.f, -1400.f),  90.f });
-			A.Add(FHutDef{ VC + FVector2D(-1300.f,    0.f),   0.f });
-			return A;
-		}();
+		static const TArray<FHutDef> All;   // (none: the five huts inside Blackrock's walls went with it, 2026-11-22)
 		return All;
 	}
 
@@ -111,18 +103,7 @@ namespace JeebTerrain
 	inline TArray<FLadder>& ExtraLadders() { static TArray<FLadder> All; return All; }
 	inline const TArray<FLadder>& Ladders()
 	{
-		static const TArray<FLadder> All = []()
-		{
-			TArray<FLadder> A;
-			const FVector2D VC = VillageCenter();
-			const float H = VillageHalf();
-			const float In = 205.f; // the ladder stands just inside the walkway's edge
-			A.Add(FLadder{ VC + FVector2D(H - In, 1000.f),  FVector2D(-1.f, 0.f) }); // east wall
-			A.Add(FLadder{ VC + FVector2D(1550.f, H - In),  FVector2D(0.f, -1.f) }); // north wall
-			A.Add(FLadder{ VC + FVector2D(-(H - In), -1000.f), FVector2D(1.f, 0.f) }); // west wall
-			A.Add(FLadder{ VC + FVector2D(1550.f, -(H - In)), FVector2D(0.f, 1.f) }); // south wall
-			return A;
-		}();
+		static const TArray<FLadder> All;   // (none: the four ladders up Blackrock's wall walk went with it, 2026-11-22)
 		return All;
 	}
 
@@ -130,16 +111,7 @@ namespace JeebTerrain
 	struct FSeat { FVector2D Pos; float Yaw; };
 	inline const TArray<FSeat>& Seats()
 	{
-		static const TArray<FSeat> All = []()
-		{
-			TArray<FSeat> A;
-			const FVector2D VC = VillageCenter();
-			A.Add(FSeat{ VC + FVector2D(0.f, 440.f), -90.f });
-			A.Add(FSeat{ VC + FVector2D(0.f, -440.f), 90.f });
-			A.Add(FSeat{ VC + FVector2D(440.f, 0.f), 180.f });
-			A.Add(FSeat{ VC + FVector2D(-440.f, 0.f), 0.f });
-			return A;
-		}();
+		static const TArray<FSeat> All;   // (none: the four benches round the fountain went with Blackrock, 2026-11-22)
 		return All;
 	}
 
@@ -227,7 +199,7 @@ namespace JeebTerrain
 	inline float PondRim() { static const float Rim = HeightNoPond(PondCenter().X, PondCenter().Y); return Rim; }
 	inline float PondWaterZ() { return PondRim() - PondWaterDrop; }
 
-	// The original square round the start (the meadow, Blackrock, the castle, the pond), exactly as it was built
+	// The original square round the start (the meadow, the old village site, the castle, the pond), exactly as it was built
 	inline float HomeHeight(float X, float Y)
 	{
 		float H = HeightNoPond(X, Y);
@@ -620,7 +592,7 @@ namespace JeebTerrain
 		// Where it lies and its widest half: a point further than this from the box can skip the road (2026-11-11, PathClearance)
 		FBox2D Bounds = FBox2D(ForceInit);
 		float MaxHalf = 0.f;
-		uint8 Kind = 0;   // 0 Blackrock's packed earth, 1 Oak Hill's cobbled streets, 2 the forest's dirt roads round Oak Hill (OakForest.h)
+		uint8 Kind = 0;   // 0 the original square's packed earth, 1 Oak Hill's cobbled streets, 2 the forest's dirt roads round Oak Hill (OakForest.h)
 	};
 
 	// Fills HalfL / HalfR from the distance along the road (Seed makes each road different)
@@ -769,7 +741,7 @@ namespace JeebTerrain
 					D.Add(P);
 				}
 			}
-			// The roads to the stone bridge (2026-11-18, Bridge.cpp; always last, so no older road's shape changes): Kind 3 the Blackrock approach, Kind 4 the span
+			// The roads to the stone bridge (2026-11-18, Bridge.cpp; always last, so no older road's shape changes): Kind 3 the approach from the old village site, Kind 4 the span
 			for (const JeebBridge::FRoad& BR : JeebBridge::Roads())
 			{
 				FPathDef P;

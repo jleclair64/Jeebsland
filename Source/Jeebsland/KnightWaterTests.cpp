@@ -146,9 +146,9 @@ namespace
 				for (float dy = -500.f; dy <= 500.f; dy += 100.f)
 				{
 					const float C = Cut(S.X + dx, S.Y + dy);
-					if (C > WorstCut) { WorstCut = C; WorstWhat = FString::Printf(TEXT("Blackrock building at (%.0f, %.0f)"), S.X, S.Y); }
+					if (C > WorstCut) { WorstCut = C; WorstWhat = FString::Printf(TEXT("original square building at (%.0f, %.0f)"), S.X, S.Y); }
 				}
-		UE_LOG(LogTemp, Log, TEXT("JEEBBANK buildings: %d Oak Hill plots and %d Blackrock spots checked; the most the bank cap lowered any building's ground: %.1f cm (%s)"), Checked, Spots.Num(), WorstCut, *WorstWhat);
+		UE_LOG(LogTemp, Log, TEXT("JEEBBANK buildings: %d Oak Hill plots and %d original square spots checked; the most the bank cap lowered any building's ground: %.1f cm (%s)"), Checked, Spots.Num(), WorstCut, *WorstWhat);
 		const FVector2D Pc = JeebTerrain::PondCenter();
 		UE_LOG(LogTemp, Log, TEXT("JEEBBANK pond: water %.0f, ground in the middle %.0f (%.0f cm deep); moat water %.0f, ground at the ring's middle %.0f"), JeebTerrain::PondWaterZ(), JeebTerrain::HeightAt(Pc.X, Pc.Y),
 			JeebTerrain::PondWaterZ() - JeebTerrain::HeightAt(Pc.X, Pc.Y), JeebWater::MoatZ(), JeebTerrain::HeightAt(JeebTerrain::CastlePos().X - 1625.f, JeebTerrain::CastlePos().Y));

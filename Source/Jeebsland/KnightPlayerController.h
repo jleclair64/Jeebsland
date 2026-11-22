@@ -9,7 +9,7 @@ class ACameraActor;
 
 // One per player. Online it carries the login: once connected, the player's machine sends the name and password it was given on
 // the starting screen (ServerLogin); the server checks them (AKnightGameMode::TryLogin) and only then gives the player a knight,
-// loaded from their saved character. On the starting screen (no server) it flies a slow camera round Blackrock.
+// loaded from their saved character. On the starting screen (no server) it flies a slow camera round the old village site.
 UCLASS()
 class AKnightPlayerController : public APlayerController
 {

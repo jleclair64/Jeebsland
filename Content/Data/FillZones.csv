@@ -15,15 +15,15 @@ OakWatchtower,0,0.8,TowerYard:2 GarrisonLion:1,108,random,0
 OakBridge,0,0.5,Dock:2 RiverRest:1,109,road,0
 OakYard,0,1.2,WoodYard:2 StorageCorner:2 WashingCorner:1 KitchenGarden:2 ChickenYard:1 BarrelRow:1 SackCorner:1 LogCorner:1 Workbench:1 HedgeRun:2 PicketCorner:1 StumpCorner:1 BushClump:3,110,wall,0
 OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,road,0.01
-# The original square (owner 2026-11-15: Blackrock and the square's medium places now). Density: sets per 100 m^2 of fillable ground
-# (a set is 3-6 pieces). Since fillfix (2026-11-16) spots are drawn only inside the zone's own open ground, so the yield in game is
-# close to Density x area (JEEBFILL zone lines); the densities were lowered to keep the piece count. Blackrock's fountain yard is
-# hand-placed (FillOakHill.csv, Site Square) before this zone runs.
+# The original square (owner 2026-11-15: the square's medium places). Density: sets per 100 m^2 of fillable ground (a set is 3-6
+# pieces). Since fillfix (2026-11-16) spots are drawn only inside the zone's own open ground, so the yield in game is close to
+# Density x area (JEEBFILL zone lines); the densities were lowered to keep the piece count. OldVillage: the empty site of the walled
+# village taken out of the game on 2026-11-22, off (0) and kept free for the town that will replace it.
 # Placement v2 (2026-11-16): densities halved, and no wares (amphora rows, veg carts) or lone palisade pieces outside the market yard.
-Blackrock,1,1.1,Blackrock:4 StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1 BlackrockGate:1,201,wall,0.03
+OldVillage,0,1.1,StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1,201,wall,0.03
 MarketYard,1,10,ShopFront:2 BarrelRow:3 SackCorner:3 AmphoraRow:2 StorageCorner:1 VegCorner:1,202,road,0
 Cottage,1,2.5,BushClump:5 WashingCorner:1 KitchenGarden:1 LogCorner:1,203,wall,0
-HutYards,1,0.9,Blackrock:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:3,204,wall,0.02
+HutYards,1,0.9,HutSide:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:3,204,wall,0.02
 PigPen,1,3,PenSide:2 SackCorner:2 BarrelRow:1 BushClump:1,205,random,0
 Pond,1,2.25,RiverRest:1 BushClump:5,206,random,0
 Castle,1,1.5,GarrisonTable:2 BarrelRow:2 SackCorner:2 GarrisonBanner:1 StorageCorner:1 Garrison:1,207,random,0

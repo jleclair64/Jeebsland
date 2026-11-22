@@ -29,6 +29,9 @@
 
 using namespace JeebItems;
 
+// The bar's shield spot holds a wizard's spell book (owner 2026-11-22: "I also want the book to be in the shield spot")
+static int32 GuardKindOf(const AKnightCharacter* K) { return K && K->IsWizard() ? int32(K_Book) : int32(K_Shield); }
+
 // ===================================================================================================
 // Inventory screen (Tab)
 // ===================================================================================================
@@ -287,8 +290,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			FWornSlot Ws = Ws0;
 			if (Knight->IsWizard())
 			{
-				if (Ws.Kind == K_Shoulders) continue;
-				if (Ws.Kind == K_Gauntlets) Ws.Kind = K_Book;
+				// (owner 2026-11-22: "the book in the shield spot": it moved to the weapon bar's shield slot, so no gauntlet cell either)
+				if (Ws.Kind == K_Shoulders || Ws.Kind == K_Gauntlets) continue;
 			}
 			const float X = GX + Ws.Col * (WS + WG) + (Ws.Col == 3 ? 0.f : -2.f), Y = GY + Ws.Row * RowH;
 			WornCellX[WornCellCount] = X; WornCellY[WornCellCount] = Y; WornCellS = WS; WornKind[WornCellCount] = Ws.Kind; WornSecond[WornCellCount] = Ws.bSecond; ++WornCellCount;
@@ -333,7 +336,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 		const int32 Guard = (Skills->Worn[K_Shield] && Knight->ShieldActive()) ? ShieldGuard(Skills->Worn[K_Shield]) : 0;
 		const int32 Held = Skills->SelectedItem();
 		const int32 OffIcon = (Held && IsGear(Held)) ? Held : GearId(K_Sword, 1);
-		const int32 DefIcon = Skills->Worn[K_Shield] ? Skills->Worn[K_Shield] : GearId(K_Shield, 1);
+		const int32 GK = GuardKindOf(Knight);
+		const int32 DefIcon = Skills->Worn[GK] ? Skills->Worn[GK] : GearId(GK, 1);
 		auto Total = [&](float BX, int32 Icon, const FString& Num, const FLinearColor& Col, const FLinearColor& Tint)
 		{
 			const float BW = Half - 3.f;
@@ -526,21 +530,21 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 			else if (DragKind == 5 && Knight->GetLootTarget()) Knight->Inv(EInvOp::LootTakeOne, DragIdx, 0, 0, Knight->GetLootTarget());   // a click takes it
 			else if (DragKind == 2) SwapSlot = DragIdx == 0 ? 0 : 2;   // a click on a weapon bar slot lists what could go there (1, 2 and R take it in hand)
 			else if (DragKind == 6) SwapSlot = 4;                      // and on the potion slot (Q drinks)
-			else if (DragKind == 7) Knight->UnequipWorn(K_Shield);   // a click on the shield slot puts the shield away
+			else if (DragKind == 7) Knight->UnequipWorn(GuardKindOf(Knight));   // a click on the shield slot puts the shield away
 		}
 		else
 		{
 			int32 ToInv = -1, ToHot = -1, ToWorn = -1;
 			for (int32 i = 0; i < InvCellCount; ++i) if (OverCell(InvCellX[i], InvCellY[i], InvCellS)) ToInv = i;
 			if (bHotCells) for (int32 h = 0; h < NumHotbar; ++h) if (OverCell(HotCellX[h], HotCellY[h], HotCellS)) ToHot = h;
-			if (ToHot >= 0 && IsGear(DragId) && IsWeaponKind(KindOf(DragId))) ToHot = BarSlotFor(KindOf(DragId));   // (dropped anywhere on the bar, it goes to its own slot: a bow to the bow slot, anything else to the hand)
+			if (ToHot >= 0 && IsGear(DragId) && IsShooter(KindOf(DragId))) ToHot = 1;   // (a bow only to slot 2; since 2026-11-22 any other weapon or tool goes in the slot it is dropped on)
 			for (int32 w = 0; w < WornCellCount; ++w) if (OverCell(WornCellX[w], WornCellY[w], WornCellS)) ToWorn = w;
 			const bool bOnDef = bDefCell && OverCell(DefCellX, DefCellY, HotCellS);
 			if (DragKind == 1)
 			{
 				const bool bOnPotion = bPotionCell && OverCell(PotionCellX, PotionCellY, HotCellS);
 				if (bOnPotion) Knight->Inv(EInvOp::SwapInvPotion, DragIdx);   // onto the potion slot (potions only)
-				else if (bOnDef) Knight->Inv(EInvOp::SwapInvWorn, DragIdx, K_Shield, 0);   // onto the shield slot (shields only)
+				else if (bOnDef) Knight->Inv(EInvOp::SwapInvWorn, DragIdx, GuardKindOf(Knight), 0);   // onto the shield slot (shields only)
 				else if (ToWorn >= 0) Knight->Inv(EInvOp::SwapInvWorn, DragIdx, WornKind[ToWorn], WornSecond[ToWorn] ? 1 : 0);   // onto a worn slot: swap
 				else if (ToHot >= 0) Knight->Inv(EInvOp::SwapInvHot, DragIdx, ToHot);
 				else if (ToInv >= 0) Knight->Inv(EInvOp::SwapInv, DragIdx, ToInv);
@@ -583,7 +587,7 @@ void AKnightHUD::ProcessDrag(AKnightCharacter* Knight)
 				ALootDrop* Sack = Knight->GetLootTarget();
 				int32 EqHot = -1, EqKind = -1;
 				if (ToHot >= 0) EqHot = ToHot;
-				else if (bOnDef) EqKind = K_Shield;
+				else if (bOnDef) EqKind = GuardKindOf(Knight);
 				else if (ToWorn >= 0) EqKind = WornKind[ToWorn] + (WornSecond[ToWorn] ? 100 : 0);
 				if (Sack && DragIdx >= 0 && (EqHot >= 0 || EqKind >= 0) && ALootDrop::Fits(DragId, EqHot, EqKind % 100))
 				{
@@ -613,7 +617,7 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 
 	struct FEntry { int32 Id; int32 Count; int32 Pack; };   // Pack: the pack slot, or -1 for arrows, or -2 for "take it off"
 	TArray<FEntry> List;
-	const int32 Kind = SwapSlot == 1 ? int32(K_Shield) : -1;
+	const int32 Kind = SwapSlot == 1 ? GuardKindOf(Knight) : -1;
 	if (SwapSlot == 3)
 	{
 		for (int32 i = 0; i < NumArrowKinds(); ++i)
@@ -631,16 +635,17 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 			const bool bFits = SwapSlot == 4 ? IsPotion(S.Id)
 				: !IsGear(S.Id) ? false
 				: SwapSlot == 1 ? KindOf(S.Id) == Kind
-				: IsWeaponKind(KindOf(S.Id)) && BarSlotFor(KindOf(S.Id)) == (SwapSlot == 2 ? 1 : 0);
+				: FitsBarSlot(SwapSlot == 2 ? 1 : 0, S.Id) && !IsShooter(KindOf(S.Id));   // (2026-11-22: either slot takes any weapon or tool but a bow)
 			if (bFits) List.Add({ S.Id, S.Count, i });
 		}
-		if (SwapSlot == 1 && Sk->Worn[K_Shield] != 0) List.Add({ 0, 0, -2 });
+		if (SwapSlot == 1 && Sk->Worn[Kind] != 0) List.Add({ 0, 0, -2 });
 	}
 
 	UFont* Font = GEngine->GetMediumFont();
-	static const TCHAR* const Titles[5] = { TEXT("Swap your weapon"), TEXT("Swap your shield"), TEXT("Swap your bow"), TEXT("Pick your arrows"), TEXT("Swap your potion") };
-	static const TCHAR* const None[5] = { TEXT("No other weapons in your pack"), TEXT("No other shields in your pack"), TEXT("No other bows in your pack"), TEXT("No other arrows"), TEXT("No other potions in your pack") };
-	const FString Title = List.Num() > 0 ? Titles[SwapSlot] : None[SwapSlot];
+	static const TCHAR* const Titles[5] = { TEXT("Swap your weapon"), TEXT("Swap your shield"), TEXT("Swap your weapon"), TEXT("Pick your arrows"), TEXT("Swap your potion") };
+	static const TCHAR* const None[5] = { TEXT("No other weapons in your pack"), TEXT("No other shields in your pack"), TEXT("No other weapons in your pack"), TEXT("No other arrows"), TEXT("No other potions in your pack") };
+	const bool bBook = SwapSlot == 1 && Kind == K_Book;
+	const FString Title = bBook ? FString(List.Num() > 0 ? TEXT("Swap your spell book") : TEXT("No other spell books in your pack")) : FString(List.Num() > 0 ? Titles[SwapSlot] : None[SwapSlot]);
 	float TW = 0.f, TH = 0.f;
 	HDTextSize(Title, TW, TH, Font, 0.85f);
 	const float S = 54.f, Gap = 6.f, Pad = 10.f;
@@ -667,7 +672,7 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 			float OW = 0.f, OH = 0.f;
 			HDTextSize(TEXT("Off"), OW, OH, Font, 0.85f);
 			HDText(TEXT("Off"), FLinearColor(0.8f, 0.8f, 0.82f), Cx + (S - OW) * 0.5f, Cy + (S - OH) * 0.5f, Font, 0.85f);
-			if (bOver) SetTip({ TEXT("Take your shield off"), TEXT("It goes back in your pack") });
+			if (bOver) SetTip({ bBook ? TEXT("Take your spell book off") : TEXT("Take your shield off"), TEXT("It goes back in your pack") });
 			continue;
 		}
 		DrawIconIn(E.Id, Cx + 2.f, Cy + 2.f, S - 4.f, Cx, Cy, S, S);
@@ -687,9 +692,9 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 	{
 		const FEntry& E = List[Hit];
 		if (E.Pack == -1) Knight->PickArrows(E.Id);
-		else if (E.Pack == -2) Knight->UnequipWorn(K_Shield);
+		else if (E.Pack == -2) Knight->UnequipWorn(GuardKindOf(Knight));
 		else if (SwapSlot == 4) Knight->Inv(EInvOp::SwapInvPotion, E.Pack);
-		else if (SwapSlot == 1) Knight->Inv(EInvOp::SwapInvWorn, E.Pack, K_Shield, 0);
+		else if (SwapSlot == 1) Knight->Inv(EInvOp::SwapInvWorn, E.Pack, GuardKindOf(Knight), 0);
 		else Knight->Inv(EInvOp::SwapInvHot, E.Pack, SwapSlot == 2 ? 1 : 0);
 		SwapSlot = -1;
 		bUIClick = false;

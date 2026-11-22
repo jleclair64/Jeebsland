@@ -65,7 +65,7 @@ namespace JeebFoes
 	// The server's roll of a beaten foe's loot (ingots, and items with their counts)
 	void RollLoot(const FFoeDef& D, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots);
 
-	// Places a foe never goes (towns): Oak Hill's box, the original square round Blackrock, every other town on the world map. Margin: cm
+	// Places a foe never goes (towns): Oak Hill's box, the original square round the start, every other town on the world map. Margin: cm
 	// added round each. To keep foes out of a new place, add it here (or to JeebWorld::Towns(), which this reads).
 	bool InTown(float X, float Y, float Margin = 0.f);
 	// Water deeper than wading (the bed more than about half a metre under the surface)

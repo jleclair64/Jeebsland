@@ -126,8 +126,9 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	if (Style == EAtkStyle::Cast && IsLocallyControlled())
 	{
 		CastTarget = CastAimPoint();
+		CastFrom = CastLineStart(K);   // (2026-11-22: from the camera's line, as the arrow)
 		CastTargetAt = GetWorld()->GetTimeSeconds();
-		if (!HasAuthority()) ServerCastAim(CastTarget);
+		if (!HasAuthority()) ServerCastAim(CastTarget, CastFrom);
 	}
 	if (bShotFace) SetActorRotation(FRotator(0.f, ShotFaceYaw, 0.f));   // (test pictures: side-on to the camera)
 	// Face where you aim: always for shots (bow, wand, staff fly where the camera points; a cast faces the point under its reticle);
@@ -282,9 +283,11 @@ void AKnightCharacter::AttackLands()
 		if (AController* C = GetController()) Aim = C->GetControlRotation();
 		// (2026-11-18, owner: from the wand's tip or the staff's orb toward what was under the reticle, if the player's machine sent a
 		// fresh point ahead of where he looks; else from before his chest along his aim, as before)
-		const FVector Start = CastStartPoint(K);
-		FVector Dir = Aim.Vector();
+		// (2026-11-22, owner: "in line with where the camera is looking": the start the player's machine sent, on the camera's line abreast of
+		// the tip, if it lies near his hand with nothing solid between: CheckCastStart; else the tip itself)
 		const bool bFresh = GetWorld()->GetTimeSeconds() - CastTargetAt < 2.0;
+		const FVector Start = bFresh ? CheckCastStart(CastFrom, K) : CastStartPoint(K);
+		FVector Dir = Aim.Vector();
 		if (bFresh)
 		{
 			const FVector ToT = CastTarget - Start;
@@ -295,13 +298,24 @@ void AKnightCharacter::AttackLands()
 			float(FVector::Dist(Start, GetActorLocation() + FVector(0.f, 0.f, 40.f))), *Dir.ToCompactString(), *CastTarget.ToCompactString());
 		const bool bBow = (K == JeebItems::K_Bow);
 		bool bCrit = false;
-		const int32 Dmg = JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit);
+		// (2026-11-22, owner: the charged shot, "up to 2.5x damage at full charge"; AtkCharge is the server's own, held to what it timed: ServerAttack)
+		const float ChargeMul = bBow ? 1.f : FMath::Lerp(1.f, FMath::Max(1.f, JeebTune::V().CastChargeMax), FMath::Clamp(AtkCharge, 0.f, 1.f));
+		// (2026-11-22, owner: the magic bar) the cast spends magic by its charge; with less than the cost it still goes, at that share of its power
+		const auto& TW = JeebTune::V();
+		const float Cost = FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f));
+		const float Power = bBow || Cost <= 0.f ? 1.f : FMath::Clamp(Magic / Cost, FMath::Clamp(TW.MagicMinPower, 0.f, 1.f), 1.f);
+		if (!bBow) { Magic = FMath::Max(0.f, Magic - Cost); MagicUsedAt = GetWorld()->GetTimeSeconds(); }
+		const int32 Dmg = FMath::Max(1, JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit, ChargeMul * Power));
 		const float Range = JeebItems::WeaponBase(K).Range;
+		// (2026-11-22, owner: "200% faster": Tuning.ini [Wizard] StaffBoltSpeed / WandBoltSpeed, 3x the old 1800 / 2200)
+		const float BoltSpeed = K == JeebItems::K_Staff ? JeebTune::V().StaffBoltSpeed : JeebTune::V().WandBoltSpeed;
+		UE_LOG(LogTemp, Log, TEXT("JEEBCAST kind %d charge %.2f x%.2f power %.2f magic left %.0f dmg %d speed %.0f start %s dir %s target %s fresh %d"), K, AtkCharge, ChargeMul, Power, Magic, Dmg, BoltSpeed,
+			*Start.ToCompactString(), *Dir.ToCompactString(), *CastTarget.ToCompactString(), bFresh ? 1 : 0);
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), Start, Dir.Rotation(), SP))
 		{
-			P->Launch(this, Dir, bBow ? 3500.f : (K == JeebItems::K_Staff ? 1800.f : 2200.f), Range, Dmg, bCrit, Sk, !bBow,
+			P->Launch(this, Dir, bBow ? 3500.f : BoltSpeed, Range, Dmg, bCrit, Sk, !bBow,
 				bBow ? PendingArrowTier : (K == JeebItems::K_Staff ? 100 : 0));
 		}
 		return;
@@ -387,7 +401,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
 	if (!bEnvironmental && ShieldStop > 0) Skills->AddXP(ESkillType::Defense, 2 + ShieldStop / 2);
 	if (bDrinking && !bEnvironmental) MulticastDrink(DrinkType, false);   // (any blow stops a drink, stun or not: he keeps the potion)
-	if (Health <= 0.f) { Die(); return; }   // any death: the sack, and a fresh start in Blackrock
+	if (Health <= 0.f) { Die(); return; }   // any death: the sack, and a fresh start in the old village site
 	// Attack beats kick (owner, 2026-10-31): a blow that lands while you are kicking throws you to the ground
 	if (!bEnvironmental && ShieldStop == 0 && IsKicking()) KnockDownBy(From);
 }
@@ -395,7 +409,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 void AKnightCharacter::StartBlock()
 {
 	bBlockHeld = true;
-	if (bSitting || bRolling || bClimbing || InClimbMove() || bDrinking || IsUIOpen() || !GuardActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
+	if (bSitting || bRolling || bClimbing || InClimbMove() || bDrinking || IsUIOpen() || !GuardActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f || JeebItems::IsShooter(SelectedKind())) return;   // (2026-11-22, owner: no wizard orb while a bow is drawn with the right button)   // no blocking mid-swing, lying down, in hitstun or with the guard broken
 	bBlocking = true;
 }
 
@@ -454,7 +468,7 @@ void AKnightCharacter::Die()
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
-	// Oak Hill's plaza (owner 2026-11-12); Blackrock's east gate in MoveLab or a test run without the town
+	// Oak Hill's plaza (owner 2026-11-12); the old village site's east side in MoveLab or a test run without the town
 	const bool bOak = JeebOakHill::Enabled() && !JeebHit::InMoveLab(GetWorld());
 	const FVector2D VC = JeebTerrain::VillageCenter();
 	const FVector2D Wake = FVector2D(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);
@@ -1557,6 +1571,6 @@ void AKnightCharacter::TickGear(float Dt)
 	}
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
-	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f || bDrinking) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
+	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f || bDrinking || JeebItems::IsShooter(SelectedKind())) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
 	else if (bBlockHeld && !bBlocking && GuardActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !InClimbMove() && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 }

@@ -146,7 +146,7 @@ void AGrassField::BeginPlay()
 	else Tint(Terrain, FLinearColor(0.085f, 0.13f, 0.035f));
 	Tint(Grass,   FLinearColor(0.30f, 0.34f, 0.06f));
 
-	// Stones and shrubs at Blackrock's cottages' foundations (GroundDecor.h; the cottages' walls are about 7 x 5 m, the door in
+	// Stones and shrubs at the old village site's cottages' foundations (GroundDecor.h; the cottages' walls are about 7 x 5 m, the door in
 	// the middle of their +X end, turned as Village.cpp turns them)
 	{
 		TArray<JeebDecor::FFootprint> Huts;

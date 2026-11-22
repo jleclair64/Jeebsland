@@ -344,7 +344,7 @@ namespace JeebQuests
 		if (const FPersonDef* P = FindPerson(FName(*Mark.TrimStartAndEnd()))) { Out = P->Pos; return true; }
 		if (M == TEXT("pen")) { Out = JeebTerrain::PenCenter(); return true; }
 		if (M == TEXT("pond")) { Out = JeebTerrain::PondCenter(); return true; }
-		if (M == TEXT("rocks")) { Out = FVector2D(900.f, -100.f); return true; }   // (the tin rocks by the old starting point, east of Blackrock: KnightGameState.cpp)
+		if (M == TEXT("rocks")) { Out = FVector2D(900.f, -100.f); return true; }   // (the tin rocks by the old starting point, east of the old village site: KnightGameState.cpp)
 		return PlaceFrom(Mark, Out);
 	}
 }

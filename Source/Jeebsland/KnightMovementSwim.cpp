@@ -5,6 +5,8 @@
 #include "Inventory.h"
 #include "JeebTuning.h"
 #include "JeebWater.h"
+#include "Terrain.h"
+#include "HouseInterior.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
@@ -281,6 +283,17 @@ void AKnightCharacter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
 {
 	Super::CalcCamera(DeltaTime, OutResult);
 	ShopCamView(DeltaTime, OutResult);   // (2026-11-18: the shop camera, KnightShopCam.cpp; nothing unless a shop is open or closing)
+	// The camera stays above the grass (owner 2026-11-22): looking up from low down used to put it among the blades. Its height is held
+	// CamOverGrass over the drawn ground under it (a plain max, so it is smooth), but not inside a walk-in house or under the ground.
+	{
+		const float Clear = JeebTune::V().CamOverGrass;
+		if (Clear > 0.f && AHouseInterior::CamScaleAt(GetWorld(), OutResult.Location) >= 0.999f)
+		{
+			const float G = JeebTerrain::DrawnHeight(float(OutResult.Location.X), float(OutResult.Location.Y));
+			if (OutResult.Location.Z < G + Clear && OutResult.Location.Z > G - 20.f)
+				OutResult.Location.Z = G + Clear;
+		}
+	}
 	const FVector P = OutResult.Location;
 	const float Over = JeebTune::V().CamOverWater;
 	if (P.Z >= JeebWater::TopLevel() + Over) return;

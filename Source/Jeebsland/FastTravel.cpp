@@ -7,6 +7,7 @@
 #include "JeebWater.h"
 #include "Terrain.h"
 #include "OakHill.h"
+#include "OpenWorld.h"
 #include "SteeleCreek.h"
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h"
@@ -23,18 +24,23 @@ const TArray<JeebTravel::FTown>& JeebTravel::Towns()
 {
 	static const TArray<FTown> T = []()
 	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		const float VH = JeebTerrain::VillageHalf();
 		TArray<FTown> A;
 		//          name               radius  home   open   arrival anchor (cm)                                                          yaw
-		A.Add({ TEXT("Blackrock"),     3200.f, false, true,  FVector2D(VC.X + VH - 450.f, VC.Y),                                          180.f });   // the east gate, just inside, facing the town
 		A.Add({ TEXT("Oak Hill"),      6500.f, true,  true,  FVector2D::ZeroVector,                                                       0.f });     // (AKnightGameMode::OakWakeSpot: the plaza's arc)
 		A.Add({ TEXT("Steele Creek"),  8000.f, false, true,  JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN),                 JeebSteele::SpawnYaw });   // the forge yard, facing the smithy
-		// The four towns still to come: when one is built, set bOpen to true and give it an anchor and a way to face. Nothing else changes.
-		A.Add({ TEXT("Silver Point"),  6000.f, false, false, FVector2D::ZeroVector, 0.f });
-		A.Add({ TEXT("Anchorage"),     6000.f, false, false, FVector2D::ZeroVector, 0.f });
-		A.Add({ TEXT("Birch Grove"),   8000.f, false, false, FVector2D::ZeroVector, 0.f });   // (fast travel into it is allowed, though it lies in PvP 2: its walls are safe)
-		A.Add({ TEXT("Palmer Square"), 6000.f, false, false, FVector2D::ZeroVector, 0.f });
+		// The four open-world sites (2026-11-22): open for fast travel on their placeholder site (JeebOpen::Sites: the middle; arrival there, facing the placeholder house). When a town is built on one, only its row may need a better anchor.
+		for (const TCHAR* N : { TEXT("Silver Point"), TEXT("Anchorage"), TEXT("Birch Grove"), TEXT("Palmer Square") })
+		{
+			FVector2D Anchor = FVector2D::ZeroVector; float Yaw = 0.f;
+			for (const JeebOpen::FSite& S : JeebOpen::Sites())
+				if (FCString::Strcmp(S.Name, N) == 0)
+				{
+					const FVector2D ToHouse = (S.House - S.Pos).GetSafeNormal();   // (a few metres short of the middle, looking at the house)
+					Anchor = S.Pos - ToHouse * 500.f; Yaw = FMath::RadiansToDegrees(FMath::Atan2(ToHouse.Y, ToHouse.X));
+				}
+			const bool bBirch = FCString::Strcmp(N, TEXT("Birch Grove")) == 0;   // (fast travel into it is allowed, though it lies in PvP 2: its walls are safe)
+			A.Add({ N, bBirch ? 8000.f : 6000.f, false, !Anchor.IsZero(), Anchor, Yaw });
+		}
 		return A;
 	}();
 	return T;
@@ -52,9 +58,9 @@ FVector2D JeebTravel::Centre(int32 Index)
 {
 	if (Index < 0 || Index >= Count()) return FVector2D::ZeroVector;
 	const FString N = Towns()[Index].Name;
-	if (N == TEXT("Blackrock")) return JeebTerrain::VillageCenter();
 	if (N == TEXT("Oak Hill")) return FVector2D(JeebOakHill::PosX, JeebOakHill::PosY);
 	if (N == TEXT("Steele Creek")) return FVector2D(JeebSteele::PosX, JeebSteele::PosY);
+	for (const JeebOpen::FSite& S : JeebOpen::Sites()) if (N == S.Name) return S.Pos;
 	for (const JeebWorld::FTown& W : JeebWorld::Towns()) if (N == W.Name) return W.Pos;
 	return FVector2D::ZeroVector;
 }

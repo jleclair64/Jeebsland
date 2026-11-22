@@ -53,13 +53,18 @@ struct FTravelTestDriver
 		float& Next = NextAt.FindOrAdd(C);
 		if (C->TestClock < Next) return;
 		auto Wait = [&](float S) { Next = C->TestClock + S; };
-		const int32 Oak = JeebTravel::IndexOf(TEXT("Oak Hill")), Steele = JeebTravel::IndexOf(TEXT("Steele Creek")), Black = JeebTravel::IndexOf(TEXT("Blackrock"));
+		const int32 Oak = JeebTravel::IndexOf(TEXT("Oak Hill")), Steele = JeebTravel::IndexOf(TEXT("Steele Creek"));
 		auto InOak = [&]() { return JeebTravel::TownAt(FVector2D(K->GetActorLocation())) == Oak; };
 		switch (C->TestStage)
 		{
 		case 0:
 			if (C->TestClock < 4.f) return;
 			Log(FString::Printf(TEXT("server start: at %.0f %.0f, %s"), K->GetActorLocation().X, K->GetActorLocation().Y, *State(C)));
+			for (int32 i = 0; i < JeebTravel::Count(); ++i)   // (2026-11-22: every town listed, open, known, and where he would land)
+			{
+				float Yw = 0.f; const FVector D = JeebTravel::ArrivalSpot(C->GetWorld(), i, K, Yw);
+				Log(FString::Printf(TEXT("TOWN %d %s: open %d known %d, arrival %.0f %.0f %.0f yaw %.0f, centre %.0f %.0f"), i, JeebTravel::Towns()[i].Name, JeebTravel::Towns()[i].bOpen, C->IsVisited(i), D.X, D.Y, D.Z, Yw, JeebTravel::Centre(i).X, JeebTravel::Centre(i).Y));
+			}
 			if (C->IsVisited(Steele)) { Log(TEXT("RELOAD: this account came back knowing Steele Creek (PASS if expected)")); C->TestStage = 1000; return; }
 			C->DoTravel(Steele);   // refused: never been
 			C->DoTravel(Oak);      // refused: already here
@@ -119,7 +124,7 @@ struct FTravelTestDriver
 			APawn* Pawn = Cast<APawn>(C->GetOwner());
 			AKnightPlayerController* PC = Pawn ? Cast<AKnightPlayerController>(Pawn->GetController()) : nullptr;
 			if (AKnightGameMode* GM = C->GetWorld()->GetAuthGameMode<AKnightGameMode>()) GM->SaveCharacter(PC);
-			Log(FString::Printf(TEXT("saved; %s; Blackrock known: %d"), *State(C), C->IsVisited(Black) ? 1 : 0));
+			Log(FString::Printf(TEXT("saved; %s"), *State(C)));
 			C->TestStage = 11; Wait(4.f); return;
 		}
 		case 11:

@@ -629,7 +629,7 @@ namespace JeebOakHill
 	// ------------------------------------------------------------------ shop counters (owner, 2026-11-13: "rig the stores so to have
 	// popups with things to buy/trade. We'll add NPCs to the shops later")
 	// Each shop round the plaza has a counter spot just outside its door or open front: E there opens the shop's window, like
-	// talking to Blackrock's traders. The server checks the same spots (KnightCharacterNet.cpp NearTrader), so they are worked out
+	// talking to the market's traders. The server checks the same spots (KnightCharacterNet.cpp NearTrader), so they are worked out
 	// the same way on every machine, from the plots alone. Smith: the smithy; bank and bank stall: the bank; the store, market
 	// stall, potion shop and potion stall: the store (it sells potions too)
 	enum class EShop : uint8 { Store, Smith, Bank };

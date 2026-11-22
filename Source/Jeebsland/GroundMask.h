@@ -47,7 +47,7 @@ namespace JeebGround
 	inline float Soft(float X, float Y, float Scale, float Off) { return 0.5f + 0.5f * FMath::PerlinNoise2D(FVector2D(X + Off, Y - Off * 0.7f) / Scale); }
 
 	// ------------------------------------------------------------------ wear round buildings
-	// Blackrock's cottages (ACottage: walls about 7 x 5 m, the door in the middle of its +X end), with their turn
+	// The original square's cottages (ACottage: walls about 7 x 5 m, the door in the middle of its +X end), with their turn
 	struct FHutSpot { FVector2D Pos; float Yaw; };
 	inline const TArray<FHutSpot>& HutSpots()
 	{
@@ -92,7 +92,7 @@ namespace JeebGround
 				W = FMath::Max(W, FMath::Max(Drip, Apron));
 			}
 		}
-		// Blackrock's cottages: the drip line round the walls and a trampled patch out of the door
+		// The square's cottages: the drip line round the walls and a trampled patch out of the door
 		if (FMath::Abs(X) < 9000.f && FMath::Abs(Y) < 9000.f)
 			for (const FHutSpot& H : HutSpots())
 			{

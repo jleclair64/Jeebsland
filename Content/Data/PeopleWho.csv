@@ -8,12 +8,12 @@ Who,Model,Tint,Scale,Skin
 # material instance has a skin mask (MI_Smith only). Steele Creek's trolls now have their own model, Troll (2.2 m tall as rigged, no dye, no skin row).
 # No row at all: shopkeeper and villagers Townsman, blacksmith Smith, banker Banker, gate knights Guard, quest givers Townsman (Elder if their Hair is light).
 troll,Troll,,1,
-# Blackrock: rich and cold
+# The original square's market traders and gate knight: rich and cold
 shopkeeper,Townsman,0.12 0.30 0.16
 blacksmith,Smith,
 banker,Banker,0.07 0.10 0.16
 gateknight,Guard,0.42 0.05 0.05
-# the ten storytellers (Mabry, Tobin, Dame Orsolya, Garrick, Wren, Old Fenwick, Sable, Brother Ansel, Peregrine, Hettie): deep, cool town colours,
+# the storytellers (Tobin, Garrick, Wren, Old Fenwick, Sable, Peregrine, Hettie; Mabry, Dame Orsolya and Brother Ansel left with the old village, 2026-11-22): deep, cool town colours,
 # no two alike (2026-11-18 review: the beige ones read as clones)
 villager0,Elder,0.20 0.07 0.26
 villager1,Townsman,0.08 0.22 0.10

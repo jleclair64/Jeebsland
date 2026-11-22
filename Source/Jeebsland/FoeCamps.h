@@ -8,7 +8,7 @@ class AFoeKnight;
 class UStaticMeshComponent;
 class UBoxComponent;
 
-// The bandits' camps in the forest round Oak Hill and Blackrock (2026-11-18; FoeCamps.csv, the foes in Foes.csv: FoeData.h).
+// The bandits' camps in the forest round Oak Hill and the old village site (2026-11-18; FoeCamps.csv, the foes in Foes.csv: FoeData.h).
 //  - Every machine builds the camps the same way from the data and fixed rules: each camp settles on the nearest good ground to its spot
 //    (dry, fairly flat, clear of roads, towns, the forest's trunks and rocks; a Where=ruin camp beside the forest ruin nearest its spot),
 //    and gets its props (FillKinds.csv kinds: a campfire with a flame in the middle, a tent, crates ...). Players' machines draw them; every

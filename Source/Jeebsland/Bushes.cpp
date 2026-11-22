@@ -54,7 +54,7 @@ namespace
 		{ TEXT("/Game/LilyPads/SM_LilyTwin.SM_LilyTwin"), 4500.f, 0.f, TEXT("lily pads twin") },
 	};
 
-	// Where to look: round Oak Hill's forest, Blackrock's woods round the square, Steele Creek, and the land between Oak Hill and Steele
+	// Where to look: round Oak Hill's forest, the old village site's woods round the square, Steele Creek, and the land between Oak Hill and Steele
 	// Creek (its lake). Cheap tests only.
 	bool InRegion(const FVector2D& P)
 	{

@@ -326,18 +326,11 @@ RockGroup,BushLow,-2.55,1.21,0,0,1,turn=180|drop
 FallenTree,LogRoots,0,0,0,0,1,
 FallenTree,TreeSnag,3.6,0.2,0,0,1,drop
 FallenTree,BushLow,-2.53,0.66,0,0,1,turn=180|drop
-# Blackrock (wall-backed): Blackrock hut side: sack wall crate barrel and a griffin banner pole
-Blackrock,SackWall,-1,0.7,0,0,1,
-Blackrock,Crate,1.09,0.49,0,0,1,
-Blackrock,Barrel,2.47,0.63,0,0,1,turn=180
-Blackrock,BannerPoleGriffin,0.6,1.75,0,0,1,drop
-# BlackrockPalisade: palisade repair with a log stack and torch
-BlackrockPalisade,FencePalisade,0,0,0,0,1,
-BlackrockPalisade,LogStack,-0.6,1.15,0,0,1,
-BlackrockPalisade,TorchBlazing,1.5,0.5,0,0,1,
-# BlackrockGate: Blackrock banners: griffin pole and banner post
-BlackrockGate,BannerPoleGriffin,0,0,0,0,1,
-BlackrockGate,Sconce,0,0.24,1.2,0,1,hang|drop
+# HutSide (wall-backed): a hut side: sack wall crate barrel and a griffin banner pole (was "Blackrock" until 2026-11-22)
+HutSide,SackWall,-1,0.7,0,0,1,
+HutSide,Crate,1.09,0.49,0,0,1,
+HutSide,Barrel,2.47,0.63,0,0,1,turn=180
+HutSide,BannerPoleGriffin,0.6,1.75,0,0,1,drop
 # PenSide: pig pen: tub pail hay bale and an open sack pile
 PenSide,WoodTub,0,0,0,0,1,turn=180
 PenSide,Pail,0.7,0.1,0,0,1,turn=180
@@ -351,7 +344,7 @@ WallBannerSwordShield,BannerSwordShield,0,0.15,3,0,1,hang
 WallBannerSwords,BannerSwords,0,0.09,3,0,1,hang
 # WallBannerKnot (wall-backed) (hung on a building wall: Z up the wall): knot banner hung on a wall
 WallBannerKnot,BannerKnot,0,0.04,3.2,0,1,hang
-# WallBannerGriffin (wall-backed) (hung on a building wall: Z up the wall): Blackrock griffin banner hung on a wall
+# WallBannerGriffin (wall-backed) (hung on a building wall: Z up the wall): a griffin banner hung on a wall
 WallBannerGriffin,BannerGriffin,0,0.06,3,0,1,hang
 # WallAwning (wall-backed) (hung on a building wall: Z up the wall): a striped awning over a wall (with ShopFront below)
 WallAwning,AwningStriped,0,1.05,2.35,0,1,hang

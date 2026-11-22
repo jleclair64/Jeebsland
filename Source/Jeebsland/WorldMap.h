@@ -4,13 +4,13 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
-// The whole world (2026-10-30), traced from the owner's hand-drawn map (Docs/MapSketch.jpg, with Blackrock and Oak Hill
-// swapped: Blackrock WEST of the river, Oak Hill east of it). Blank for now: the land's shape only (mountains, the river and
+// The whole world (2026-10-30), traced from the owner's hand-drawn map (Docs/MapSketch.jpg, with the old village (Blackrock until 2026-11-22) and Oak Hill
+// swapped: the village WEST of the river, Oak Hill east of it). Blank for now: the land's shape only (mountains, the river and
 // its two branches, the east coast and ocean, the islands, the rocky south-west, level ground for each town); no trees or
 // grass outside the original square round the start, which stays exactly as it was (JeebTerrain blends the two).
 //
-// Scale: one pixel of the sketch is 1.3 m, which puts Blackrock about a 4 minute walk from Anchorage, as decided. North is +X,
-// east is +Y (the sketch's up and right). Blackrock's sketch spot is the existing village.
+// Scale: one pixel of the sketch is 1.3 m, which puts the old village site about a 4 minute walk from Anchorage, as decided. North is +X,
+// east is +Y (the sketch's up and right). The sketch's (400, 870) is the old village site (JeebTerrain::VillageCenter), kept empty for a new town.
 namespace JeebWorld
 {
 	// A smooth 0 .. 1 ramp from A to B that works either way round (A > B ramps down). Unreal's Smooth only works with
@@ -36,8 +36,7 @@ namespace JeebWorld
 	inline const TArray<FTown>& Towns()
 	{
 		static const TArray<FTown> T = {
-			{ TEXT("Blackrock"),     FromSketch(400.f, 870.f),  0.f,    0.f, -1.f },      // the existing village (its own ground)
-			{ TEXT("Oak Hill"),      FromSketch(543.f, 875.f),  0.f,    0.f, 1.f },      // moved 100 m west (owner, 2026-11-06): its west edge is the river, its forts and bridge face Blackrock (Docs/OakHillSketch.webp). Its own hills, not a level disc: OakHill.h (2026-11-11)
+			{ TEXT("Oak Hill"),      FromSketch(543.f, 875.f),  0.f,    0.f, 1.f },      // moved 100 m west (owner, 2026-11-06): its west edge is the river, its forts and bridge face west over it (Docs/OakHillSketch.webp). Its own hills, not a level disc: OakHill.h (2026-11-11)
 			{ TEXT("Silver Point"),  FromSketch(835.f, 455.f),  3800.f, 8000.f },   // a level shelf among the northern peaks
 			{ TEXT("Anchorage"),     FromSketch(1110.f, 995.f), 3200.f, 6000.f },
 			{ TEXT("Birch Grove"),   FromSketch(760.f, 1280.f), 5000.f, 8000.f },   // the big walled troll town (in PvP 2)
@@ -97,7 +96,7 @@ namespace JeebWorld
 	}
 
 	// ------------------------------------------------------------------ the river
-	// Starts in the northern mountains, winds south past Blackrock's east side and forks just south of the town: one branch
+	// Starts in the northern mountains, winds south past the old village site's east side and forks just south of it: one branch
 	// east through the woods to Anchorage on the coast, the other far round the south-west past Steele Creek and back east
 	// to the sea by Palmer Square.
 	//
@@ -190,7 +189,7 @@ namespace JeebWorld
 				}
 				A.Add(Rv);
 			};
-			// the main river, from its spring in the mountains to the fork south of Blackrock and Oak Hill
+			// the main river, from its spring in the mountains to the fork south of the old village site and Oak Hill
 			Add({ {625,95},{640,140},{700,180},{745,230},{745,280},{700,320},{620,355},{560,395},{525,450},{510,520},{505,600},{500,690},{495,780},{495,870},{505,940} }, 700.f,
 				0, 3200.f, 26000.f, 9500.f, 0.6f, 2.2f, 0.f);
 			// the east branch, through the woods to Anchorage and out to sea

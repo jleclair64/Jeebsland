@@ -1,14 +1,14 @@
 Kind,Town,Name,Place,Errands,Model,Tint,Folk,Greeting
 # The townsfolk's homes, errands and counters (2026-11-18; NpcLife.h). Read on every machine when the world is built: change it and restart.
 # Kind: keeper (stands behind a counter or in a shop's doorway, facing the customers) or folk (lives in a house and goes on errands).
-# Town: Oak Hill, Steele Creek or Blackrock. Name: as shown over their head. Someone who already exists (Steele Creek's and Blackrock's people,
+# Town: Oak Hill or Steele Creek. Name: as shown over their head. Someone who already exists (Steele Creek's people,
 # matched by name) only gets their place here; anyone else is made new (a keeper sells what their shop sells; folk just talk).
 # Place: for a keeper, the building (Oak Hill, by plot Id: Store, MarketStall, PotionShop, PotionStall, Bank, BankStall, Smithy; Steele Creek: Store,
-# Stall, Bank, Smithy). For folk, their home: Oak Hill a house plot Id (House_SE1..SE4, House_NL1, House_FL0, House_FL1, House_CLS1..3, House_CLN1..3, House_WS1, House_SW1, House_SW2; Docs/TownLab/OakHillLayout_2026-11-18.md; "house 3", the third from the oak, still works); Steele Creek "house 3" (its House3); or "hut 2"
-# (Blackrock: the huts inside the walls, 1 to 5).
+# Stall, Bank, Smithy). For folk, their home: Oak Hill a house plot Id (House_SE1..SE4, House_NL1, House_FL0, House_FL1, House_CLS1..3, House_CLN1..3, House_WS1, House_SW1, House_SW2; Docs/TownLab/OakHillLayout_2026-11-18.md; "house 3", the third from the oak, still works); Steele Creek "house 3" (its House3)
+# (Blackrock's rows and its "hut N" homes went with the town, 2026-11-22.)
 # Errands: one or two places they walk to from home and back, in order. Oak Hill: well, market, potions, store, bank, smith, church, townhall,
-# garden, graveyard, ring, bridge, oak, ruins, fort. Steele Creek: well, stall, store, bank, smithy, landing, quarry. Blackrock: fountain,
-# market, shop, smith, bank, gate. Two folk of one town with the same FIRST errand meet there at the same time and chat.
+# garden, graveyard, ring, bridge, oak, ruins, fort. Steele Creek: well, stall, store, bank, smithy, landing, quarry.
+# Two folk of one town with the same FIRST errand meet there at the same time and chat.
 # Model (optional): Townsman, Townswoman, Elder, Smith, Banker or Guard (a PeopleWho.csv row for the name wins). Tint: their garment's colour,
 # red green blue 0 to 1 (about 0.05-0.15 deep, 0.3-0.5 light). Folk: troll or wizard (Steele Creek), else empty.
 # Greeting: a keeper's first words; for folk, what they say, one line picked each visit ("|" between the choices).
@@ -18,21 +18,18 @@ keeper,Oak Hill,"Elspeth Moss, Apothecary",PotionShop,,Townswoman,0.18 0.06 0.24
 keeper,Oak Hill,"Rook Varley, Potion Seller",PotionStall,,Townsman,0.05 0.16 0.13,,"Potions! Fresh this morning. Well, this week."
 keeper,Oak Hill,"Ada Penny, Banker",Bank,,Banker,,,"Welcome to the Oak Hill bank. Small, but nothing has ever gone missing. Nothing important."
 keeper,Oak Hill,"Cobb Penny, Bank Clerk",BankStall,,Townsman,0.07 0.10 0.18,,"Deposits on the left, withdrawals on the right. Or the other way round. I'm new."
-keeper,Oak Hill,"Dorran Ashby, Smith",Smithy,,Smith,,,"Hobb went off to Blackrock's coin. The forge stayed. So did I."
+keeper,Oak Hill,"Dorran Ashby, Smith",Smithy,,Smith,,,"Hobb went off after better coin. The forge stayed. So did I."
 keeper,Steele Creek,Grakka Steelhand,Smithy,,,,,
 keeper,Steele Creek,Master Orrin Vale,Bank,,,,,
 keeper,Steele Creek,"Sir Dunmore, the Trader",Store,,,,,
 keeper,Steele Creek,"Grenna Oreheart, Ore Trader",Stall,,,,troll,"Ore, ingots, a good rock for the garden. Grenna has it all, small one."
-folk,Oak Hill,Edda Pike,House_SE1,well market,Townswoman,0.30 0.12 0.05,,"Lovely day for it, whatever it is.|The well's sweeter since the Steward had it cleaned.|My hens have stopped laying. I blame Blackrock."
+folk,Oak Hill,Edda Pike,House_SE1,well market,Townswoman,0.30 0.12 0.05,,"Lovely day for it, whatever it is.|The well's sweeter since the Steward had it cleaned.|My hens have stopped laying. I blame the weather."
 folk,Oak Hill,Old Tam Hollis,House_NL1,well church,Elder,0.12 0.18 0.10,,"Seventy winters in this town and I still get lost in the fog.|Mind the oak's roots. They've tripped better than you.|Back in my day the road ran the other way."
 folk,Oak Hill,Rosalind Fern,House_CLS1,potions garden,Townswoman,0.08 0.14 0.30,,"I've a cough no potion can shift. I keep buying them anyway.|The garden's coming on, if the crows let it.|Have you met Rook? Don't believe a word he says."
 folk,Oak Hill,Jory Bell,House_WS1,potions bridge,Townsman,0.25 0.18 0.06,,"I'm off to watch the river. Someone has to.|The bridge is new. Well, newer than me.|Fish are biting downstream, they say."
-folk,Oak Hill,Mother Agnes,House_CLN1,church graveyard,Elder,0.26 0.06 0.10,,"Light a candle for the ones who went to Blackrock and never wrote.|The bell needs a new rope. And a ringer with better knees.|Bless you, child."
+folk,Oak Hill,Mother Agnes,House_CLN1,church graveyard,Elder,0.26 0.06 0.10,,"Light a candle for the ones who went away and never wrote.|The bell needs a new rope. And a ringer with better knees.|Bless you, child."
 folk,Oak Hill,Fenn Cotter,House_SW1,church townhall,Townsman,0.06 0.20 0.16,,"The Town Hall wants another form filled. Again.|I mend roofs. Yours looks fine. For now.|Agnes says I should come to church more. I come for the bread."
 folk,Steele Creek,Thessaly the Seer,house 9,well stall,,,,
 folk,Steele Creek,Old Marg,house 10,well landing,,,,
 folk,Steele Creek,Brug the Miner,house 11,smithy quarry,,,,
 folk,Steele Creek,Hruk,house 6,smithy stall,,,,
-folk,Blackrock,Mabry Thistlewick,hut 1,fountain market,,,,
-folk,Blackrock,Dame Orsolya Vane,hut 2,fountain bank,,,,
-folk,Blackrock,Brother Ansel,hut 5,market shop,,,,
