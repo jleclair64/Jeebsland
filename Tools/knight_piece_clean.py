@@ -326,6 +326,28 @@ if ARM_FIT:
     flip = np.array([1.0, 0.0, 0.0]); side = np.where(Pp[:, 0] >= 0, 1.0, -1.0)[:, None]
     def mirror(p_, k_): return p_ * (1 - 2 * flip * (k_ < 0))
     Pq = mirror(Pp, side)
+    if "afin" in opts:
+        # (Dark Plate, 2026-11-22, owner: "sharp elbow fins ... still apparent" from behind.) The plates round the elbow fan out in thin blades.
+        # Everything within ZONE of the elbow point is pulled in toward the arm's line (the upper arm's above the elbow, the forearm's below)
+        # so nothing stands further out than RMAX, eased over SOFT; the elbow dome keeps its shape, the blades fold down onto it.
+        FIN_R, FIN_ZONE, FIN_SOFT = [float(v) for v in opts["afin"].split(",")]
+        qq = Pq - RE
+        au_ = qq @ -Ur; bf_ = qq @ Fr
+        ru_ = qq + Ur * au_[:, None]; rf_ = qq - Fr * bf_[:, None]
+        up_ = au_ > 0
+        radial = np.where(up_[:, None], ru_, rf_); rl = np.linalg.norm(radial, axis=1)
+        along = np.where(up_, au_, np.maximum(bf_, 0))
+        zone_ = smooth_((FIN_ZONE - np.linalg.norm(qq, axis=1)) / 0.03)
+        pct = np.percentile(rl[np.linalg.norm(qq, axis=1) < FIN_ZONE], [50, 80, 90, 95, 99, 100]) if (np.linalg.norm(qq, axis=1) < FIN_ZONE).any() else []
+        print("PCL arm fin: radial from the arm line within %.2f of the elbow, percentiles 50/80/90/95/99/max: %s" % (FIN_ZONE, np.round(pct, 3)))
+        over = rl - FIN_R
+        newr = np.where(over > 0, FIN_R + FIN_SOFT * np.tanh(over / max(FIN_SOFT, 1e-6)), rl)
+        k_ = 1 - zone_ * (1 - newr / np.maximum(rl, 1e-9))
+        moved = (np.abs(k_ - 1) > 1e-4)
+        Pq = Pq - radial * (1 - k_)[:, None]
+        print("PCL arm fin: %d points pulled in, the furthest by %.3f on the piece" % (moved.sum(), (rl * (1 - k_)).max()))
+        Pp = mirror(Pq, side)
+        BLUNTED = BLUNTED | moved
     q = Pq - RE
     # who follows what
     be = unit_(Ur + Fr); we = smooth_((q @ be) / (2 * A_ELBOW_BLEND) + 0.5)

@@ -370,6 +370,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 			if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
 			{
 				Subsystem->AddMappingContext(KnightContext, 0);
+				SwapTestStep();
 			}
 		}
 	}

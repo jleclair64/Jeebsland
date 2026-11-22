@@ -52,7 +52,8 @@ public:
 	UPROPERTY(Replicated) bool bTestKit = false;
 	UFUNCTION(Server, Reliable) void ServerTestGive(int32 Id, bool bWear);   // a full stack into the pack; bWear also wears or holds it
 	UFUNCTION(Server, Reliable) void ServerTestLevels(int32 Level);          // every skill to this level (1 to 99)
-	UFUNCTION(Server, Reliable) void ServerTestEmptyPack();                  // clears the 24 pack slots (not the ingots, worn gear or the bar)
+	UFUNCTION(Server, Reliable) void ServerTestSwapClass(int32 Class);       // (2026-11-22) play as 0 knight, 1 troll, 2 wizard: saves, then the new pawn in the same spot (online too)
+	UFUNCTION(Server, Reliable) void ServerTestEmptyPack();                 // clears the 24 pack slots (not the ingots, worn gear or the bar)
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:

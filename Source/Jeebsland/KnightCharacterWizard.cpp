@@ -217,30 +217,8 @@ void AKnightCharacter::TickWizard(float Dt)
 void AKnightCharacter::SwapWizardForTest(bool bWizard)
 {
 #if !UE_BUILD_SHIPPING
-	if (GetNetMode() != NM_Standalone || bWizard == bIsWizard) return;
-	AKnightPlayerController* PC = Cast<AKnightPlayerController>(GetController());
-	AGameModeBase* GM = GetWorld()->GetAuthGameMode();
-	if (!PC || !GM) return;
-	if (UsesLocalSave()) Autosave();
-	PC->ClassChoice = bWizard ? 2 : 0;
-	const FTransform At(GetActorRotation(), GetActorLocation());
-	// (as the troll's swap: undo everything this pawn put on the player before it goes, or the new one has no input)
-	bSettingsOpen = bSkillsOpen = bBankOpen = bInventoryOpen = bShopOpen = bSmithOpen = false;
-	bPanelCursor = false;
-	if (ULocalPlayer* LP = PC->GetLocalPlayer())
-		if (UEnhancedInputLocalPlayerSubsystem* Sub = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-		{
-			if (KnightContext) Sub->RemoveMappingContext(KnightContext);
-			Sub->ClearAllMappings();
-		}
-	PC->SetShowMouseCursor(false);
-	PC->ResetIgnoreLookInput();
-	PC->ResetIgnoreMoveInput();
-	PC->SetInputMode(FInputModeGameOnly());
-	PC->UnPossess();
-	Destroy();
-	GM->RestartPlayerAtTransform(PC, At);
-	UE_LOG(LogTemp, Log, TEXT("JEEBSWAP now %s"), bWizard ? TEXT("wizard") : TEXT("knight"));
+	if (GetNetMode() != NM_Standalone) return;
+	SwapToClass(bWizard ? 2 : 0);   // (KnightCharacterTroll.cpp)
 #endif
 }
 

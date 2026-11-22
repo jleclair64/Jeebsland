@@ -426,28 +426,35 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			}
 		}
 
+	// TESTING ONLY (owner 2026-11-20, wizard added 2026-11-22): KNIGHT / TROLL / WIZARD beside the Test kit button. Online too: the
+	// server checks the test-kit gate and swaps the pawn (AKnightPlayerController::ServerTestSwapClass).
+	bool bMaySwap = false;
+	if (const AKnightPlayerController* KPC = Cast<AKnightPlayerController>(GetOwningPlayerController())) bMaySwap = KPC->bTestKit;
 #if !UE_BUILD_SHIPPING
-	// TESTING ONLY (owner 2026-11-20): KNIGHT / TROLL toggle beside the Test kit button (the Escape screen's has the same swap). Single player only.
-	if (!bTestKitOpen)
+	bMaySwap = bMaySwap || GetNetMode() == NM_Standalone;
+#endif
+	if (!bTestKitOpen && bMaySwap)
 	{
-		const bool bSolo = GetNetMode() == NM_Standalone;
+		static double LastSwapAsk = -10.0;
+		const bool bReady = FPlatformTime::Seconds() - LastSwapAsk > 1.5;
 		const float TW = 78.f, TH = 30.f, TY = MapTop - Frame;
-		for (int32 C = 0; C < 2; ++C)
+		static const TCHAR* Names[3] = { TEXT("KNIGHT"), TEXT("TROLL"), TEXT("WIZARD") };
+		for (int32 C = 0; C < 3; ++C)
 		{
-			const float TX = MX - Frame - 12.f - 120.f - 10.f - (2 - C) * (TW + 6.f) + 6.f;
-			const bool bOn = (C == 1) == Knight->IsTroll();
+			const float TX = MX - Frame - 12.f - 120.f - 10.f - (3 - C) * (TW + 6.f) + 6.f;
+			const bool bOn = C == Knight->ClassIndex();
 			AddRect(TX, TY, TW, TH);
-			if (Btn(TX, TY, TW, TH, C == 0 ? TEXT("KNIGHT") : TEXT("TROLL"), bSolo, bOn, 0.9f) && bSolo && !bOn)
+			if (Btn(TX, TY, TW, TH, Names[C], bReady, bOn, 0.9f) && bReady && !bOn)
 			{
+				LastSwapAsk = FPlatformTime::Seconds();
 				Knight->SetPanelCursor(false);
-				Knight->SwapClassForTest(C == 1);   // (destroys this pawn: nothing below may use Knight)
+				Knight->RequestClass(C);   // (single player destroys this pawn at once: nothing below may use Knight)
 				bGreyGlass = false;
 				return;
 			}
-			if (Over(TX, TY, TW, TH)) SetTip({ TEXT("Play as the knight or the troll"), bSolo ? TEXT("Saves, then swaps in the same spot") : TEXT("Single player only"), TEXT("Testing only: not in the real game") });
+			if (Over(TX, TY, TW, TH)) SetTip({ TEXT("Play as the knight, the troll or the wizard"), TEXT("Saves, then swaps in the same spot"), TEXT("Testing only: not in the real game") });
 		}
 	}
-#endif
 
 	if (Knight->GetLootTarget()) DrawLootWindows(Knight, IX, IY, PW);   // an open sack, to the left of your windows
 	bGreyGlass = false;

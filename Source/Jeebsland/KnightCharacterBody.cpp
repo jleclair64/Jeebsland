@@ -389,8 +389,41 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 void AKnightCharacter::RefreshEquipment()
 {
 	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGauntlets, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
-	if (bIsWizard && Anim && Skills) Anim->SetWizardBook(Skills->Worn[JeebItems::K_Book] != 0);   // (the spell book on his belt)
+	if (bIsWizard && Anim && Skills) UpdateWizardBook();
 	RebuildHeld();
+}
+
+// The wizard's spell book (2026-11-22, owner: "a spell book model from meshy for the wizard to hold in his left hand"): Meshy's model (Art/Props/SpellBook.glb,
+// /Game/Props/SM_SpellBook) held by its spine in his left fist whenever he wears a book; the belt book (Wiz_BookBase/Robe) shows only if the model is missing.
+// Built like a tool on the right fist: its spine along the fist's line, turned BookRoll about it, moved BookShift (cm, in the book's own frame).
+static float BookRoll = 0.f, BookScale = 1.f;
+static FVector BookShift(-8.f, 0.f, 0.f);
+void AKnightCharacter::UpdateWizardBook()
+{
+	const bool bWant = bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && GetNetMode() != NM_DedicatedServer && ElbowL;
+	if (bWant && !WizardBookHeld)
+	{
+		if (UStaticMesh* M = JeebProps::Load(TEXT("/Game/Props/SM_SpellBook.SM_SpellBook")))
+			WizardBookHeld = JeebProps::MakeStatic(this, ElbowL, M);
+#if !UE_BUILD_SHIPPING
+		FString T; TArray<FString> V;   // (-BookTune=<roll>_<x>_<y>_<z>_<scale>: degrees and cm in tenths, scale in hundredths)
+		if (FParse::Value(FCommandLine::Get(), TEXT("BookTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
+		{
+			BookRoll = FCString::Atof(*V[0]) / 10.f; BookShift = FVector(FCString::Atof(*V[1]), FCString::Atof(*V[2]), FCString::Atof(*V[3])) / 10.f; BookScale = FCString::Atof(*V[4]) / 100.f;
+		}
+#endif
+		if (WizardBookHeld)
+		{
+			const FVector E = KM::DownTo(KnightDesign::BladeDir(-1));
+			const FQuat Q = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(E.Z)) * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(E.Y)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(E.X));
+			const FTransform Fist(Q, KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
+			WizardBookHeld->SetRelativeTransform(FTransform(FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(BookRoll)), BookShift, FVector(BookScale)) * Fist);
+			WizardBookHeld->SetCastShadow(true);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD held book %s"), WizardBookHeld ? TEXT("made") : TEXT("MISSING (/Game/Props/SM_SpellBook: Tools/BuildProps.ps1 SpellBook)"));
+	}
+	else if (!bWant && WizardBookHeld) { WizardBookHeld->DestroyComponent(); WizardBookHeld = nullptr; }
+	if (Anim) Anim->SetWizardBook(bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && !WizardBookHeld && GetNetMode() != NM_DedicatedServer);
 }
 
 // The worn amulet (2026-11-12, owner: a gold chain round the knight's neck): the chain lies round the base of his neck, over the collar, and drops in a V
@@ -402,6 +435,10 @@ static float ChainBareIn = 5.f;                                          // with
 static float PendantPitch = 8.f;                                         // the pendant leans out at the bottom, lying on the chest plate
 static float PendantScale = 3.9f;   // (2026-11-21, owner: three times larger: the models are 6 cm tall, so 23 cm now)
 static float ChainScale = 3.f;       // (the links too, and the chain spacing with them)
+// (2026-11-22, owner: "make the chain go all the way around the knight's neck ... it cuts off near the collar bone and sinks into the armor".) The back
+// half and the sides lie wider and higher, on top of the collar: with a chest plate these, bare (on the mail) the B numbers. The pendant stays where it was.
+static float ChainPlateSide = 13.f, ChainPlateBack = -11.f, ChainPlateUp = 8.f;
+static float ChainBareSide = 13.5f, ChainBareBack = -12.5f, ChainBareUp = 6.5f;
 void AKnightCharacter::UpdateAmulet()
 {
 	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
@@ -426,16 +463,23 @@ void AKnightCharacter::UpdateAmulet()
 			ChainFrontX = FCString::Atof(*V[0]) / 10.f; ChainDrop = FCString::Atof(*V[1]) / 10.f; ChainUp = FCString::Atof(*V[2]) / 10.f; ChainSideY = FCString::Atof(*V[3]) / 10.f;
 			ChainBackX = FCString::Atof(*V[4]) / 10.f; PendantPitch = FCString::Atof(*V[5]) / 10.f; PendantScale = FCString::Atof(*V[6]) / 100.f;
 		}
+		// (-AmuletRound=<plate side>_<plate back>_<plate up>_<bare side>_<bare back>_<bare up>, cm in tenths: the back half's ring)
+		if (FParse::Value(FCommandLine::Get(), TEXT("AmuletRound="), T) && T.ParseIntoArray(V, TEXT("_")) == 6)
+		{
+			ChainPlateSide = FCString::Atof(*V[0]) / 10.f; ChainPlateBack = FCString::Atof(*V[1]) / 10.f; ChainPlateUp = FCString::Atof(*V[2]) / 10.f;
+			ChainBareSide = FCString::Atof(*V[3]) / 10.f; ChainBareBack = FCString::Atof(*V[4]) / 10.f; ChainBareUp = FCString::Atof(*V[5]) / 10.f;
+		}
 	}
 #endif
+	const float SideY = bPlate ? ChainPlateSide : ChainBareSide, BackX = bPlate ? ChainPlateBack : ChainBareBack, RoundUp = bPlate ? ChainPlateUp : ChainBareUp;
 	UE_LOG(LogTemp, Log, TEXT("JEEBAMULET id %d variant %d neck in the chest frame (%.1f, %.1f, %.1f), pendant at (%.1f, %.1f, %.1f); chest in the world %s"), Id, JeebItems::VariantOf(Id), N.X, N.Y, N.Z, N.X + ChainFrontX, 0.f, N.Z + ChainUp - ChainDrop, *UpperPivot->GetComponentLocation().ToString());
 	// the chain's line, all the way round from the pendant (a = 0) and back
 	auto At = [&](float A)
 	{
 		const float C = FMath::Cos(A), S = FMath::Sin(A);
-		if (C <= 0.f) return FVector(N.X - C * ChainBackX, ChainSideY * S, N.Z + ChainUp);
-		const float U = FMath::Pow(C, 1.6f);
-		return FVector(N.X + (ChainFrontX - (bPlate ? 0.f : ChainBareIn)) * FMath::Sin(C * HALF_PI), ChainSideY * S, N.Z + ChainUp - ChainDrop * U);
+		if (C <= 0.f) return FVector(N.X - C * BackX, SideY * S, N.Z + RoundUp);
+		const float U = FMath::Pow(C, 1.6f);   // (the pendant, at C = 1, hangs where it always did: ChainUp - ChainDrop under the neck bone's height)
+		return FVector(N.X + (ChainFrontX - (bPlate ? 0.f : ChainBareIn)) * FMath::Sin(C * HALF_PI), SideY * S, N.Z + RoundUp - (ChainDrop + RoundUp - ChainUp) * U);
 	};
 	TArray<FVector> Line;
 	for (int32 i = 0; i <= 240; ++i) Line.Add(At(-PI + 2.f * PI * i / 240.f));

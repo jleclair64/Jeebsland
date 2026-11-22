@@ -119,6 +119,8 @@ PROPS = {
     "PotionPurple": dict(file="PotionPurple.glb", axes=("X", "-Y", "-Z"), length=17.0, grip=("Z", 0.22), mask="none", reduce=5000, bake=True),
     "PotionGreen":  dict(file="PotionGreen.glb",  axes=("X", "-Y", "-Z"), length=19.0, grip=("Z", 0.30), reduce=5000,
                      rg=lambda co, c: (1.0 if (c[1] > 1.25 * c[0] and c[1] > 1.1 * c[2] and _hue(c)[1] > 0.25) else 0.0, 0.0)),   # (the liquid takes the potion's colour: swiftness, radar)
+    # The wizard's spell book (2026-11-22, Meshy meshy-t2.5 from a picture, 19 credits): held by its spine in his left fist. Spine along game Z, the covers open toward -X, gem cover +Y.
+    "SpellBook": dict(file="SpellBook.glb", axes=("Z", "-X", "-Y"), length=24.0, grip=("Z", 0.5), mask="none"),
     "AmuletRune":       dict(AMULET, file="AmuletRune.glb",       axes=("-Y", "X", "Z")),
     "AmuletEmberHeart": dict(AMULET, file="AmuletEmberHeart.glb", axes=("-Y", "X", "Z")),
     "AmuletScarab":     dict(AMULET, file="AmuletScarab.glb",     axes=("Y", "-X", "Z")),
