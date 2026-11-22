@@ -484,7 +484,7 @@ struct FOakForestBuild
 			}
 			if (Kind == K_Oak) ++Oaks; else if (Kind == K_Aspen) ++Aspens;
 			const FVector2D P = Plan + FVector2D(0.f, OffY);
-			Puts.Add({ uint8(Kind), uint8(Col), FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) - 4.f), Yaw, FVector(Scale), true });
+			Puts.Add({ uint8(Kind), uint8(Col), FVector(P.X, P.Y, JeebTerrain::DrawnHeight(P.X, P.Y) - 4.f), Yaw, FVector(Scale), true });
 			Near.Add(Plan, Kinds[Kind].Crown * Scale, true);
 			Space.Add(P, Kinds[Kind].Crown * Scale, true);
 			++Trees;

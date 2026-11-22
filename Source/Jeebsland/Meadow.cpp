@@ -483,6 +483,44 @@ static void JeebFloatScan(UWorld* W)
 	for (const FBad& B : DrawnBad) UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT drawn-vs-solid %.0f %.0f drawn %.0f solid %.0f %s"), B.P.X, B.P.Y, B.Drawn, B.Hit, *B.What);
 	for (int32 i = 0; i < FMath::Min(40, Bad.Num()); ++i)
 		UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT bad %.0f %.0f grass %.0f drawn %.0f solid %.0f (%+.0f) %s"), Bad[i].P.X, Bad[i].P.Y, Bad[i].Grass, Bad[i].Drawn, Bad[i].Hit, Bad[i].Grass - Bad[i].Hit, *Bad[i].What);
+
+	// (2026-11-21) the other placers: every instance of the forest, the autumn decor and the fill, traced down past itself. Each
+	// mesh keeps its own sink (its median height over the solid ground); an instance more than 8 cm off that floats or sinks.
+	// "HeightAt" counts how many would be off had they been placed at HeightAt (the old way), for comparing.
+	for (TActorIterator<AActor> It(W); It; ++It)
+	{
+		const FString Cls = It->GetClass()->GetName();
+		if (!Cls.Contains(TEXT("OakForest")) && !Cls.Contains(TEXT("AutumnDecor")) && !Cls.Contains(TEXT("WorldFill"))) continue;
+		int32 NI = 0, NOff = 0, NOld = 0; float Worst = 0.f;
+		TArray<UInstancedStaticMeshComponent*> Comps; It->GetComponents(Comps);
+		for (UInstancedStaticMeshComponent* C : Comps)
+		{
+			const int32 Cnt = FMath::Min(C->GetInstanceCount(), 4000);
+			TArray<float> Rs, Ro; Rs.Reserve(Cnt); Ro.Reserve(Cnt);
+			FCollisionQueryParams Q(FName(TEXT("JeebFloatI")), true); Q.AddIgnoredComponent(C);
+			FCollisionObjectQueryParams O(ECC_WorldStatic);
+			for (int32 i = 0; i < Cnt; ++i)
+			{
+				FTransform T; C->GetInstanceTransform(i, T, true);
+				const FVector P = T.GetLocation();
+				const float G = JeebTerrain::HeightAt(P.X, P.Y);
+				if (FMath::Abs(P.Z - G) > 300.f) continue;   // (hung, on a roof, in the air: not on the ground)
+				FHitResult Hit;
+				if (!W->LineTraceSingleByObjectType(Hit, FVector(P.X, P.Y, G + 400.f), FVector(P.X, P.Y, G - 400.f), O, Q)) continue;
+				if (Hit.ImpactPoint.Z > JeebTerrain::DrawnHeight(P.X, P.Y) + 25.f) continue;   // (on a bridge or rock)
+				Rs.Add(P.Z - Hit.ImpactPoint.Z); Ro.Add(G - Hit.ImpactPoint.Z);
+			}
+			if (Rs.Num() == 0) continue;
+			TArray<float> S = Rs; S.Sort(); const float Med = S[S.Num() / 2];
+			for (int32 i = 0; i < Rs.Num(); ++i)
+			{
+				++NI; const float E = FMath::Abs(Rs[i] - Med); Worst = FMath::Max(Worst, E);
+				if (E > 8.f) ++NOff;
+				if (FMath::Abs(Ro[i]) > 8.f) ++NOld;
+			}
+		}
+		UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT placed %s: %d on the ground, off by over 8 cm at %d (worst %.0f); at HeightAt it would be %d"), *Cls, NI, NOff, Worst, NOld);
+	}
 }
 #endif
 
