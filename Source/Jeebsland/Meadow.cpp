@@ -743,7 +743,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 	// (jeeb.Grass.FarThin thins the far ring and widens what is left: half as many, about 1.4 times as wide, keeps the cover)
 	const float FarThin = FMath::Clamp(CVarGrassFarThin.GetValueOnGameThread(), 0.1f, 1.f);
 	float PackHere = PackChance * PackKeepAt(JobTier, FarThin) / (JobTier == NumTiers - 1 ? Stretch() : 1.f), CardHere = CardKeep[JobTier];
-	float PackWide = WideFor(PackKeepAt(JobTier, FarThin)), CardSize = FMath::Pow(CardHere, -0.4f), Taller = 1.f + 0.04f * JobTier;
+	float PackWide = WideFor(PackKeepAt(JobTier, FarThin)), CardSize = FMath::Pow(CardHere, -0.4f), Taller = 1.f;   // (2026-11-22, owner: far grass grew in taller then shrank as you came closer: one height at every step)
 	int32 KindsTier = JobTier <= 2 ? 0 : JobTier - 2;   // (0 every kind, 1 two, 2 or more one)
 	bool bFlowerTier = JobTier <= 3;
 	uint32 Seed = uint32(JobId.X) * 73856093u ^ uint32(JobId.Y) * 19349663u;
@@ -824,8 +824,10 @@ void AMeadow::StepJob(double BudgetSeconds)
 						if (KindsHere < Of[Kr].Num() && Of[Kr].IndexOfByKey(K) >= KindsHere) K = Of[Kr][FMath::Min(FMath::FloorToInt(Pick2 * KindsHere), KindsHere - 1)];
 						const FKind& Kd = Kinds[K];
 						const float TargetH = 48.f * Sz * Taller * Short * Kd.Height;
-						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * Jit * (1.f + 0.25f * Near) * PackWide;
-						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy * 0.55f, Xy * 1.6f);   // (never squashed or stretched far from its own shape)
+						const float Xy0 = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * Jit * (1.f + 0.25f * Near), Xy = Xy0 * PackWide;
+						// (never squashed or stretched far from its own shape; the floor from the unwidened clump, 2026-11-22: the far ring's
+						// wider clumps used to lift their own height too, so they grew in taller and shrank on the swap to a nearer step)
+						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy0 * 0.55f, Xy0 * 1.6f);
 						JobKindXf[K].Add(FTransform(Tilt, FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
 					}
 					// a flower clump now and then (a clump holds several, so fewer than our single flowers), one kind per drift; only on a spot
