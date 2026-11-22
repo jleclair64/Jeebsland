@@ -191,6 +191,28 @@ namespace JeebItemModel
 				}
 				break;
 			}
+			case EItemType::Venison:
+			{
+				// a dark red haunch steak with a rim of fat and the round of the bone
+				RBox(NewPart(Out, FLinearColor(0.50f, 0.10f, 0.10f)).Mesh, 8.5, 5.5, 1.8, 0.5, Xf(V3(0, 0, 0)));
+				Torus(NewPart(Out, FLinearColor(0.95f, 0.86f, 0.76f)).Mesh, 6.6, 0.9, 18, 6, 1.25, 0.85, Xf(V3(0, 0, 0.2)));
+				Blob(NewPart(Out, FLinearColor(0.93f, 0.90f, 0.80f)).Mesh, 1.5, 1.5, 1.1, Xf(V3(-2.5, 0.5, 1.4)));
+				break;
+			}
+			case EItemType::Antlers:
+			{
+				// a pair of antlers lying flat: each a curved beam with three tines
+				FMD& A = NewPart(Out, FLinearColor(0.62f, 0.47f, 0.30f)).Mesh;
+				for (int32 s = -1; s <= 1; s += 2)
+				{
+					const FVector Base = V3(0, s * 2.0, 1.2);
+					Lathe(A, Prof({ 0, 9, 1.1, 8, 1.3, -8, 0, -9 }), 8, 1.0, 1.0, Xf(Base + V3(0, s * 7.0, 0), V3(90, 0, s * 20.0)));
+					for (int32 t = 0; t < 3; ++t)
+						Lathe(A, Prof({ 0, 4.5, 0.6, 3.5, 0.9, -4, 0, -4.5 }), 6, 1.0, 1.0, Xf(Base + V3(3.5, s * (4.0 + t * 4.5), 0), V3(90, 0, s * 20.0 + 75.0)));
+				}
+				Blob(NewPart(Out, FLinearColor(0.90f, 0.86f, 0.76f)).Mesh, 2.4, 3.2, 1.6, Xf(V3(-0.5, 0, 1.2)));   // the bit of skull that joins them
+				break;
+			}
 			default: break;
 			}
 			Settle(Out);

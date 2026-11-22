@@ -14,6 +14,18 @@ for the map / settings screen there. For full screen with a working Escape, pick
 it plays offline straight away. To change the editor's Stop key: Editor
 Preferences > Keyboard Shortcuts > search "Stop" > set it to Shift+Escape.
 
+## Deer to hunt (2026-11-22; Docs/DeerPlan.md)
+
+Field map, Play (single player works; online the server runs them). Stags live in herds of 3 to 5: five herds in the country round Oak Hill and fourteen more spread over the open world.
+- `jeeb.Test.GoDeer 1` (console, test builds, single player) puts you 30 m from the first herd, facing it; `2` to `19` the others (1-5 are Oak Hill's).
+- Stand still and watch: they graze, lift their heads, look round and amble a few steps.
+- Walk toward them: at about 30 m in front of one (less from behind, less if you crouch with Ctrl, much less if you stand still) it lifts its head and stares, and the others look up. Come 3 m nearer, or inside 15 m, and the whole herd bolts. They run 8.6 m/s (you sprint 7.3), keep clear of towns and deep water, and stop once nobody is near for 9 s, then drift home.
+- Sprinting is heard from 24 m, walking from 13 m, crouch-walking from 6 m.
+- Shoot one: a tin bow's full-power arrow does about 8, a stag has 24 health, a headshot does 1.5 times. Hit, the whole herd runs; under half health it runs a fifth slower. Arrows stay stuck in it.
+- Down, it lies on its side and its loot lies beside it at once (E): 1-2 Raw Venison always, a Beast Hide 70% of the time, Stag Antlers 35%. All three sell at the store. The kill gives 25 Archery XP from range (Attack XP up close). The body sinks away after 20 s; a new stag stands at the herd's home 5 minutes later, only while no player is within 60 m.
+- Numbers: `Content/Data/Animals.csv` (health, speeds, senses, respawn, loot) and `AnimalHerds.csv` (where the herds are, how many wild ones). Restart after changing them. `jeeb.Deer 0` before the map loads: no deer.
+- Test runs (in a project copy, all off screen): `bash Tools/deer_net.sh` runs a world server and two players through the online test (`-JeebDeerTest`; log JEEBDEERTEST PASS / FAIL per step, JEEBDEERCLIENT for what reached each player). `bash Tools/deer_lab.sh 29736 25455 stills` (or `film`, `cost`) takes pictures, the 120 fps smear film or frame timing of four stags with fixed parts (`-DeerLab=X_Y_Yaw`). Pictures from the first run are in `Docs/Deer/`.
+
 ## The open world: mountains, snow, roads, trees, town sites (2026-11-22)
 
 Field map, Play (single player). Console commands (test builds only):

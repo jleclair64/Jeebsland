@@ -217,6 +217,74 @@ namespace JeebFoes
 	const TArray<FFoeDef>& Foes() { return All().Foes; }
 	const TArray<FCampDef>& Camps() { return All().Camps; }
 
+	namespace
+	{
+		struct FAnimalTables { TArray<FAnimalDef> Animals; TArray<FHerdDef> Herds; };
+		const FAnimalTables& AllAnimals()
+		{
+			static const FAnimalTables T = []()
+			{
+				FAnimalTables Out;
+				FSheet A;
+				if (A.Load(TEXT("Animals.csv")))
+					for (int32 r = 0; r < A.Rows.Num(); ++r)
+					{
+						FAnimalDef D;
+						const FString Key = A.S(r, TEXT("Key"));
+						if (Key.IsEmpty()) continue;
+						D.Key = FName(*Key);
+						D.Name = A.S(r, TEXT("Name")); if (D.Name.IsEmpty()) D.Name = Key;
+						D.Group = FName(*A.S(r, TEXT("Group")));
+						D.Model = A.S(r, TEXT("Model")); if (D.Model.IsEmpty()) D.Model = Key;
+						D.Scale = FMath::Clamp(A.F(r, TEXT("Scale"), 1.f), 0.2f, 5.f);
+						D.Hp = FMath::Max(1, A.I(r, TEXT("Health"), 24));
+						D.WalkSpeed = FMath::Max(10.f, A.F(r, TEXT("WalkSpeed"), 1.f) * 100.f);
+						D.RunSpeed = FMath::Max(D.WalkSpeed, A.F(r, TEXT("RunSpeed"), 8.6f) * 100.f);
+						D.Sight = A.F(r, TEXT("Sight"), 30.f) * 100.f;
+						D.Behind = FMath::Clamp(A.F(r, TEXT("Behind"), 0.35f), 0.f, 1.f);
+						D.HearRun = A.F(r, TEXT("HearRun"), 24.f) * 100.f;
+						D.HearWalk = A.F(r, TEXT("HearWalk"), 13.f) * 100.f;
+						D.HearSneak = A.F(r, TEXT("HearSneak"), 4.f) * 100.f;
+						D.FleeAt = A.F(r, TEXT("FleeAt"), 15.f) * 100.f;
+						D.Calm = FMath::Max(1.f, A.F(r, TEXT("Calm"), 9.f));
+						D.Roam = FMath::Max(200.f, A.F(r, TEXT("Roam"), 12.f) * 100.f);
+						D.Respawn = FMath::Max(1.f, A.F(r, TEXT("Respawn"), 300.f));
+						D.XP = FMath::Max(0, A.I(r, TEXT("XP"), 0));
+						D.WalkClip = FMath::Max(5.f, A.F(r, TEXT("WalkClip"), 63.f));
+						D.RunClip = FMath::Max(5.f, A.F(r, TEXT("RunClip"), 400.f));
+						ParseLoot(FString::Printf(TEXT("(Animals.csv) %s"), *Key), A.S(r, TEXT("Loot")), D.Loot);
+						Out.Animals.Add(D);
+					}
+				FSheet H;
+				if (H.Load(TEXT("AnimalHerds.csv")))
+					for (int32 r = 0; r < H.Rows.Num(); ++r)
+					{
+						FHerdDef D;
+						const FString Key = H.S(r, TEXT("Key"));
+						if (Key.IsEmpty()) continue;
+						D.Key = FName(*Key);
+						const FName Animal(*H.S(r, TEXT("Animal")));
+						D.Animal = Out.Animals.IndexOfByPredicate([&](const FAnimalDef& X) { return X.Key == Animal; });
+						if (D.Animal == INDEX_NONE) { Problem(FString::Printf(TEXT("AnimalHerds.csv, %s: no animal \"%s\" in Animals.csv"), *Key, *Animal.ToString())); continue; }
+						const FString Count = H.S(r, TEXT("Count"));
+						FString Lo, Hi;
+						if (Count.Split(TEXT("-"), &Lo, &Hi)) { D.Min = FCString::Atoi(*Lo); D.Max = FCString::Atoi(*Hi); }
+						else if (!Count.IsEmpty()) D.Min = D.Max = FCString::Atoi(*Count);
+						D.Min = FMath::Clamp(D.Min, 1, 12); D.Max = FMath::Clamp(D.Max, D.Min, 12);
+						D.bWild = H.S(r, TEXT("Where")).Equals(TEXT("wild"), ESearchCase::IgnoreCase);
+						D.Herds = D.bWild ? FMath::Clamp(H.I(r, TEXT("Herds"), 8), 0, 60) : 1;
+						D.Near = FVector2D(JeebOakHill::PosX + H.F(r, TEXT("North"), 0.f) * 100.f, JeebOakHill::PosY + H.F(r, TEXT("East"), 0.f) * 100.f);
+						Out.Herds.Add(D);
+					}
+				UE_LOG(LogJeebFoes, Log, TEXT("Jeebsland animals: %d kinds, %d herd rows"), Out.Animals.Num(), Out.Herds.Num());
+				return Out;
+			}();
+			return T;
+		}
+	}
+	const TArray<FAnimalDef>& Animals() { return AllAnimals().Animals; }
+	const TArray<FHerdDef>& Herds() { return AllAnimals().Herds; }
+
 	int32 FindFoe(FName Key)
 	{
 		return Foes().IndexOfByPredicate([&](const FFoeDef& D) { return D.Key == Key; });
@@ -233,13 +301,17 @@ namespace JeebFoes
 	{
 		if (Name.Equals(TEXT("PenKnight"), ESearchCase::IgnoreCase)) return true;
 		for (int32 i = 0; i < Foes().Num(); ++i) if (Matches(i, Name)) return true;
+		for (const FAnimalDef& A : Animals())   // (the huntable animals: "Stag", or the group "Deer")
+			if (A.Key.ToString().Equals(Name, ESearchCase::IgnoreCase) || (!A.Group.IsNone() && A.Group.ToString().Equals(Name, ESearchCase::IgnoreCase))) return true;
 		return false;
 	}
 
-	void RollLoot(const FFoeDef& D, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots)
+	void RollLoot(const FFoeDef& D, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots) { RollLoot(D.Loot, R, OutItems, OutIngots); }
+
+	void RollLoot(const TArray<FLootRoll>& Loot, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots)
 	{
 		OutIngots = 0;
-		for (const FLootRoll& L : D.Loot)
+		for (const FLootRoll& L : Loot)
 		{
 			if (R.FRand() >= L.Chance) continue;
 			const int32 Id = L.Ids[R.RandRange(0, L.Ids.Num() - 1)];

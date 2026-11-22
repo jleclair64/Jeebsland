@@ -308,6 +308,7 @@ public:
 
 	// Combat: health, damage dealt and taken
 	float GetHealth() const { return Health; }
+	bool IsCrouchedNow() const { return bCrouched; }   // (the animals see a crouched man less far: Deer.cpp)
 	int32 GetMaxHealth() const { return MaxHealth; }
 	// Something hits you for Raw points. A raised shield facing it takes all of it out of the guard; otherwise the armour piece
 	// covering Zone (JeebHit::EZone, where it landed; Z_None: the average of your armour) lets only part through

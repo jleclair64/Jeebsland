@@ -1,0 +1,13 @@
+Key,Animal,Count,Where,North,East,Herds
+# Where the herds live (2026-11-22, Docs/DeerPlan.md). The animals are in Animals.csv.
+# Animal: a Key from Animals.csv. Count: how many in each herd ("4" or "3-5").
+# Where: plaza = near the spot North / East metres from Oak Hill's plaza (negative: south / west). The server moves each herd to the nearest good ground within 80 m:
+#   dry, fairly level, 15 m or more from a road, 70 m from any town, 90 m from a bandit camp, clear of trees and rocks. It logs where (JEEBDEER herd).
+# Where: wild = Herds more herds spread over the whole open world by the same rules, 250 m or more apart, never on mountains (North / East unused).
+# Change the file, then restart the game and the world servers (only the server reads it).
+OakNorth,Stag,3-5,plaza,330,60,
+OakWest,Stag,3-4,plaza,260,-280,
+OakSouth,Stag,3-5,plaza,-360,-160,
+OakEast,Stag,3-4,plaza,-150,360,
+OakFar,Stag,4-5,plaza,460,300,
+Wild,Stag,3-5,wild,,,14

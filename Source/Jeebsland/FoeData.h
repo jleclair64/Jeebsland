@@ -74,6 +74,36 @@ namespace JeebFoes
 	// height), bSolid when it has collision there. False if the kind isn't listed.
 	bool FillKind(FName Kind, FString& OutMesh, FVector& OutSize, bool& bSolid);
 
+	// ---- Huntable animals (2026-11-22, Docs/DeerPlan.md): Animals.csv and AnimalHerds.csv, read like the foes. Deer.h runs them.
+	struct FAnimalDef
+	{
+		FName Key;
+		FString Name;
+		FName Group;
+		FString Model;               // /Game/Animals/SK_<Model> and its clips
+		float Scale = 1.f;
+		int32 Hp = 24;
+		float WalkSpeed = 100.f, RunSpeed = 860.f;                       // cm/s
+		float Sight = 3000.f, Behind = 0.35f;                            // cm, share
+		float HearRun = 2400.f, HearWalk = 1300.f, HearSneak = 400.f;    // cm
+		float FleeAt = 1500.f, Calm = 9.f, Roam = 1200.f, Respawn = 300.f;
+		int32 XP = 0;
+		float WalkClip = 63.f, RunClip = 400.f;                          // cm/s the clips cover at scale 1
+		TArray<FLootRoll> Loot;
+	};
+	struct FHerdDef
+	{
+		FName Key;
+		int32 Animal = INDEX_NONE;   // index into Animals()
+		int32 Min = 3, Max = 5;      // how many in each herd
+		bool bWild = false;          // spread over the open world: Herds of them
+		int32 Herds = 1;
+		FVector2D Near = FVector2D::ZeroVector;   // world cm (plaza rows)
+	};
+	const TArray<FAnimalDef>& Animals();
+	const TArray<FHerdDef>& Herds();
+	void RollLoot(const TArray<FLootRoll>& Loot, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots);
+
 	// The ground under foes as it is drawn (the world's 8 m mesh in the forest, Oak Hill's own 1 m ground)
 	float Ground(float X, float Y);
 }
