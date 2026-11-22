@@ -466,6 +466,13 @@ void USkillComponent::Explore(const FVector& At)
 {
 	if (!HasAuth()) return;   // the server decides what has been seen
 	if (Explored.Num() != FogN * FogN / 8) Explored.SetNumZeroed(FogN * FogN / 8);
+#if !UE_BUILD_SHIPPING
+	// TEMPORARY test setting (owner, 2026-11-21): the left half of the map (low world Y = screen left) starts uncovered; -NoTestFog turns it off.
+	static const bool bTestFog = !FParse::Param(FCommandLine::Get(), TEXT("NoTestFog"));
+	if (bTestFog && !(Explored[0] & 1))
+		for (int32 I = 0; I < FogN; ++I)
+			for (int32 J = 0; J < FogN / 2; ++J) { const int32 Bit = I * FogN + J; Explored[Bit >> 3] |= uint8(1 << (Bit & 7)); }
+#endif
 	const float Side = FMath::Max(JeebWorld::MaxX - JeebWorld::MinX, JeebWorld::MaxY - JeebWorld::MinY), Cell = Side / FogN;
 	const int32 R = FMath::CeilToInt(FogRevealRadius / Cell);
 	const int32 CI = FMath::FloorToInt((At.X - JeebWorld::MinX) / Cell), CJ = FMath::FloorToInt((At.Y - JeebWorld::MinY) / Cell);

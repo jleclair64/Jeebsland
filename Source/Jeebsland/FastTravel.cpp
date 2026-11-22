@@ -142,6 +142,11 @@ void UTravelComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 	if (HasAuth()) TickServer(DeltaTime);
 #if !UE_BUILD_SHIPPING
+	// TEMPORARY test setting (owner, 2026-11-21): every open town is known for fast travel; -NoTestTowns turns it off. Remove before real play.
+	static const bool bTestTowns = !FParse::Param(FCommandLine::Get(), TEXT("NoTestTowns"));
+	if (bTestTowns && HasAuth())
+		for (int32 I = 0; I < JeebTravel::Towns().Num() && I < 32; ++I)
+			if (JeebTravel::Towns()[I].bOpen) VisitedMask |= 1u << I;
 	TickTest(DeltaTime);
 #endif
 }
