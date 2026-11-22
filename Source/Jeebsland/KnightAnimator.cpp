@@ -1980,8 +1980,13 @@ void FClipLib::SolveGear()
 			for (int32 i = 0; i < 4; ++i) ShieldArm[i] = P.Rot[Bone[Arm[i]]];
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
 			const FVector Along = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			const FVector Face = FVector::CrossProduct(Along, FVector::UpVector).GetSafeNormal();   // (level, square to the forearm, on its outer side: forward and to his left)
-			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, FVector::UpVector).ToQuat();
+			FVector Face = FVector::CrossProduct(Along, FVector::UpVector).GetSafeNormal();   // (level, square to the forearm, on its outer side: forward and to his left)
+			// (owner 2026-11-21: "more flush with the wrist": rolled about the forearm (-14 deg: positive leans the top away) so the top leans in toward the arm and the face lies along the wrist)
+			float TiltIn = -14.f;
+			if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("ShieldFlushTilt="), TiltIn);
+			const FQuat Roll(Along, FMath::DegreesToRadians(TiltIn));
+			Face = Roll.RotateVector(Face);
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Roll.RotateVector(FVector::UpVector)).ToQuat();
 			ShieldAtGuard = FTransform(Q, FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.72f) + Face * OutFromFore - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing straight ahead, tilted back a touch, in the middle of his chest
