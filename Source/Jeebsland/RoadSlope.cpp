@@ -1,5 +1,5 @@
 // The road slope check (2026-11-20, owner: "I don't want any roads in the game to be so steep that the player can't walk on them").
-// -RoadSlope (any run): walks every road in the world data (JeebTerrain::PathDefs: Blackrock's, Oak Hill's streets, the forest roads,
+// -RoadSlope (any run): walks every road in the world data (JeebTerrain::PathDefs: the old village site's, Oak Hill's streets, the forest roads,
 // Steele Creek's, the bridge's approach), every 50 cm down its middle and 60% of the way to each edge, and measures the ground's slope
 // there (the steepest way, from the drawn ground's heights 50 cm either side), skipping the bridge's own deck. Logs JEEBROADS lines:
 // per kind, the samples steeper than 30 degrees and steeper than the knight's walkable floor (Unreal's default, 44.77 degrees), and
@@ -58,7 +58,7 @@ namespace JeebRoadSlope
 					}
 			}
 		}
-		static const TCHAR* Names[5] = { TEXT("Blackrock and the square"), TEXT("Oak Hill streets"), TEXT("forest and Steele roads"), TEXT("bridge approach"), TEXT("bridge span ends") };
+		static const TCHAR* Names[5] = { TEXT("the old village site and the square"), TEXT("Oak Hill streets"), TEXT("forest and Steele roads"), TEXT("bridge approach"), TEXT("bridge span ends") };
 		int32 AllWalk = 0, AllSteep = 0, AllN = 0;
 		for (int32 k = 0; k < 5; ++k)
 		{

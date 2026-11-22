@@ -136,37 +136,26 @@ void AKnightHUD::DrawHUD()
 	}
 
 	// Name of the town you appear in, fading in and out when the game starts
-	// (Oak Hill, where new players and the fallen appear; Blackrock if that is where a saved character logs in)
+	// (Oak Hill, where new players and the fallen appear; nothing elsewhere: the other towns show their own as you walk in)
 	{
 		const float T = GetWorld()->GetTimeSeconds();
 		const float Alpha = FMath::Clamp(FMath::Min(T / 1.2f, (7.f - T) / 1.5f), 0.f, 1.f);
 		if (Alpha > 0.f)
 		{
 			const bool bAtOak = Pawn && JeebOakHill::Enabled() && JeebOakHill::InBox(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y);
-			TitleBanner(bAtOak ? TEXT("OAK HILL") : TEXT("BLACKROCK"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
+			if (bAtOak) TitleBanner(TEXT("OAK HILL"), Canvas->ClipY * 0.14f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), Alpha);
 		}
 	}
 
-	// "BLACKROCK" fades in for a few seconds each time you walk in through the walls
+	// (test pictures: the game's and a town's title, as the start screen shows them. Blackrock's own walk-in title went with the town, 2026-11-22)
 	{
-		static const bool bShotBanner = FParse::Param(FCommandLine::Get(), TEXT("ShotBanner"));   // (test pictures: the game's and a town's title, as the start screen and the walls show them)
+		static const bool bShotBanner = FParse::Param(FCommandLine::Get(), TEXT("ShotBanner"));
 		if (bShotBanner)
 		{
 			TitleBanner(TEXT("JEEBSLAND"), Canvas->ClipY * 0.08f, Canvas->ClipY * 0.085f, 1.f);
-			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.24f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), 1.f);
-		}
-		const bool bIn = JeebTerrain::RectSD(FVector2D(Pawn->GetActorLocation().X, Pawn->GetActorLocation().Y), JeebTerrain::VillageCenter(), FVector2D(JeebTerrain::VillageHalf(), JeebTerrain::VillageHalf())) < 0.f;
-		const float T = GetWorld()->GetTimeSeconds();
-		if (bIn && !bInTown && T > 8.f) TownBannerT = T;
-		bInTown = bIn;
-		const float Age = T - TownBannerT;
-		if (TownBannerT > 0.f && Age < 4.5f)
-		{
-			const float A = FMath::Clamp(FMath::Min(Age / 0.8f, (4.5f - Age) / 1.2f), 0.f, 1.f);
-			TitleBanner(TEXT("BLACKROCK"), Canvas->ClipY * 0.15f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), A);
+			TitleBanner(TEXT("OAK HILL"), Canvas->ClipY * 0.24f, FMath::Clamp(Canvas->ClipY * 0.049f, 30.f, 62.f), 1.f);
 		}
 	}
-
 	// The other towns' names, the same way (2026-11-21, owner: "add the name so it shows up when you walk into the town area"): Oak Hill,
 	// Steele Creek and the sites of the towns still to be built (JeebOpen::Sites: a placeholder house each)
 	{

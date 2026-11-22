@@ -208,7 +208,7 @@ void AKnightPlayerController::PlayerTick(float DeltaTime)
 	if (GetNetMode() == NM_Client && !bSentLogin) SendLogin();
 	if (!MenuCam && !bMenuSetup && UJeebGameInstance::InMenu(this))
 	{
-		// The starting screen: the world behind it, seen from a camera slowly circling Blackrock; the mouse is free
+		// The starting screen: the world behind it, seen from a camera slowly circling the old village site; the mouse is free
 		bMenuSetup = true;
 		MenuCam = GetWorld()->SpawnActor<ACameraActor>(FVector::ZeroVector, FRotator::ZeroRotator);
 		if (MenuCam) SetViewTarget(MenuCam);
@@ -236,7 +236,7 @@ void AKnightPlayerController::PlayerTick(float DeltaTime)
 		}
 	}
 	if (!MenuCam) return;
-	// A slow circle round the walled town, high enough to see over it, looking in at its middle
+	// A slow circle round the old village site (empty since 2026-11-22, for the next town), looking in at its middle
 	MenuClock += DeltaTime;
 	const FVector2D C = JeebTerrain::VillageCenter();
 	const float R = JeebTerrain::VillageHalf() + 2600.f;

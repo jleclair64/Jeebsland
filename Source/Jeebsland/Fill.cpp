@@ -568,12 +568,12 @@ namespace
 	enum EZone : uint8
 	{
 		Z_None, Z_OakBoxingRing, Z_OakRuins, Z_OakGarden, Z_OakGraveyard, Z_OakForts, Z_OakWatchtower, Z_OakBridge, Z_OakPlaza, Z_OakStreet,
-		Z_OakYard, Z_OakFringe, Z_Blackrock, Z_MarketYard, Z_Cottage, Z_HutYards, Z_PigPen, Z_Pond, Z_Castle, Z_Graveyard,
+		Z_OakYard, Z_OakFringe, Z_OldVillage, Z_MarketYard, Z_Cottage, Z_HutYards, Z_PigPen, Z_Pond, Z_Castle, Z_Graveyard,
 		Z_Roadside, Z_RiverBank, Z_Grove, Z_WoodsEdge, Z_WoodsFloor, Z_Mountain, Z_PvP, Z_Open, Z_Count
 	};
 	const TCHAR* ZoneNames[Z_Count] = {
 		TEXT("None"), TEXT("OakBoxingRing"), TEXT("OakRuins"), TEXT("OakGarden"), TEXT("OakGraveyard"), TEXT("OakForts"), TEXT("OakWatchtower"), TEXT("OakBridge"), TEXT("OakPlaza"), TEXT("OakStreet"),
-		TEXT("OakYard"), TEXT("OakFringe"), TEXT("Blackrock"), TEXT("MarketYard"), TEXT("Cottage"), TEXT("HutYards"), TEXT("PigPen"), TEXT("Pond"), TEXT("Castle"), TEXT("Graveyard"),
+		TEXT("OakYard"), TEXT("OakFringe"), TEXT("OldVillage"), TEXT("MarketYard"), TEXT("Cottage"), TEXT("HutYards"), TEXT("PigPen"), TEXT("Pond"), TEXT("Castle"), TEXT("Graveyard"),
 		TEXT("Roadside"), TEXT("RiverBank"), TEXT("Grove"), TEXT("WoodsEdge"), TEXT("WoodsFloor"), TEXT("Mountain"), TEXT("PvP"), TEXT("Open") };
 	const TCHAR ZoneChar[Z_Count + 1] = TEXT(".abcdefghijklmnopqrstuvwxyzA");
 	bool IsOak(int32 Z) { return Z >= Z_OakBoxingRing && Z <= Z_OakFringe; }
@@ -609,7 +609,7 @@ namespace
 		if (FMath::Abs(X) < 12000.f && FMath::Abs(Y) < 12000.f)
 		{
 			using namespace JeebTerrain;
-			if (RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())) < -100.f) return Z_Blackrock;
+			if (RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())) < -100.f) return Z_OldVillage;
 			if (RectSD(P, MarketCenter(), MarketHalf() + FVector2D(600.f, 600.f)) < 0.f) return Z_MarketYard;
 			if (FVector2D::Distance(P, FVector2D(CottagePos().X, CottagePos().Y)) < 1400.f) return Z_Cottage;
 			for (const FVector2D& S : HutSites()) if (FVector2D::Distance(P, S) < 1000.f) return Z_HutYards;
@@ -639,7 +639,7 @@ namespace
 		auto Around = [](const FVector2D& C, const FVector2D& H) { return FBox2D(C - H, C + H); };
 		switch (Z)
 		{
-		case Z_Blackrock: return Around(VillageCenter(), FVector2D(VillageHalf(), VillageHalf()));
+		case Z_OldVillage: return Around(VillageCenter(), FVector2D(VillageHalf(), VillageHalf()));
 		case Z_MarketYard: return Around(MarketCenter(), MarketHalf() + FVector2D(600.f, 600.f));
 		case Z_Cottage: return Around(FVector2D(CottagePos().X, CottagePos().Y), FVector2D(1400.f, 1400.f));
 		case Z_HutYards: { FBox2D B(ForceInit); for (const FVector2D& S : HutSites()) B += Around(S, FVector2D(1000.f, 1000.f)); return B; }
@@ -970,42 +970,18 @@ struct FFillBuilder
 		}
 	}
 
-	// The original square: Blackrock's gates, ladders, benches, NPCs and their walks, the market's counters, huts' doors, the pen,
-	// the pier, the castle's gate and ladders, the forts' ladders, the scarecrows, the start
+	// The original square: its villagers' walks, the market's counters, huts' doors, the pen, the pier, the castle's gate and
+	// ladders, the forts' ladders, the scarecrows, the start (the old village's gates, ladders and benches went with it, 2026-11-22)
 	void SquareKeeps()
 	{
 		using namespace JeebTerrain;
-		const FVector2D VC = VillageCenter();
-		const float H = VillageHalf();
 		auto PathLane = [&](const FVector2D& From, float Rad, const FString& Name)
 		{
 			const FVector2D Np = NearestPathPoint(From.X, From.Y);
 			if (FVector2D::Distance(Np, From) < 2500.f) Keep(FShape::Lane(From, Np, Rad), Name + TEXT(" lane"));
 		};
-		// gates (east and north walls) and the way through them to the fountain and out to the road
-		const FVector2D Gates[2] = { VC + FVector2D(H, 0.f), VC + FVector2D(0.f, H) };
-		const FVector2D GateOut[2] = { FVector2D(1.f, 0.f), FVector2D(0.f, 1.f) };
-		for (int32 g = 0; g < 2; ++g)
+		// villagers' walks (Village.cpp: each one's beat round the square)
 		{
-			Keep(FShape::Lane(VC + GateOut[g] * 350.f, Gates[g] + GateOut[g] * 600.f, 200.f), FString::Printf(TEXT("Blackrock gate %d"), g));
-			PathLane(Gates[g] + GateOut[g] * 600.f, 120.f, FString::Printf(TEXT("Blackrock gate %d"), g));
-			Target(FString::Printf(TEXT("Blackrock gate %d inside"), g), Gates[g] - GateOut[g] * 300.f, 1);
-			Target(FString::Printf(TEXT("Blackrock gate %d outside"), g), Gates[g] + GateOut[g] * 400.f, 1);
-		}
-		for (const FLadder& L : Ladders()) { Keep(FShape::Lane(L.Pos, L.Pos + L.Out * 220.f, 80.f), TEXT("Blackrock ladder")); Target(TEXT("Blackrock ladder"), L.Pos + L.Out * 120.f, 1); }
-		for (const FSeat& S : Seats())
-		{
-			const FVector2D F(FMath::Cos(FMath::DegreesToRadians(S.Yaw)), FMath::Sin(FMath::DegreesToRadians(S.Yaw)));
-			Keep(FShape::Lane(S.Pos, S.Pos + F * 160.f, 90.f), TEXT("Blackrock bench front"));
-			Target(TEXT("Blackrock bench"), S.Pos + F * 110.f, 1);
-		}
-		// villagers' walks (Village.cpp: rings of 650 round the plaza with errands to the hut doors; the others' beats) and the gate knight's
-		{
-			TArray<FVector2D> Ring;
-			for (int32 k = 0; k < 24; ++k) { const float A = 2.f * PI * k / 24.f; Ring.Add(VC + FVector2D(FMath::Cos(A), FMath::Sin(A)) * 650.f); }
-			for (int32 k = 0; k < 24; ++k) Keep(FShape::Lane(Ring[k], Ring[(k + 1) % 24], 80.f), TEXT("villagers' walk"));
-			const FVector2D HutFronts[5] = { FVector2D(-900.f, 880.f), FVector2D(900.f, 880.f), FVector2D(-900.f, -880.f), FVector2D(900.f, -880.f), FVector2D(-780.f, 0.f) };
-			for (const FVector2D& Hf : HutFronts) Keep(FShape::Lane(VC + Hf.GetSafeNormal() * 650.f, VC + Hf, 80.f), TEXT("villagers' errand"));
 			auto RingAround = [&](const FVector2D& C, float R, const TCHAR* Name) { for (int32 k = 0; k < 18; ++k) { const float A0 = 2.f * PI * k / 18.f, A1 = 2.f * PI * (k + 1) / 18.f; Keep(FShape::Lane(C + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * R, C + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * R, 80.f), Name); } };
 			RingAround(HutSites()[0], 620.f, TEXT("Garrick's walk"));
 			RingAround(HutSites()[6], 620.f, TEXT("Wren's walk"));
@@ -1015,7 +991,6 @@ struct FFillBuilder
 			Keep(FShape::Lane(Pen + FVector2D(0.f, -960.f), Pen + FVector2D(500.f, -900.f), 80.f), TEXT("Hettie's walk"));
 			Keep(FShape::Lane(Cas + FVector2D(-1100.f, -300.f), Cas + FVector2D(-950.f, 0.f), 80.f), TEXT("Peregrine's walk"));
 			Keep(FShape::Lane(Cas + FVector2D(-950.f, 0.f), Cas + FVector2D(-1100.f, 300.f), 80.f), TEXT("Peregrine's walk"));
-			Keep(FShape::Lane(FVector2D(-780.f, -110.f), FVector2D(-780.f, -480.f), 90.f), TEXT("gate knight's walk"));
 		}
 		// the market's three traders: their stalls (solid already), the spot in front where you trade, and the way to it
 		const FVector2D Npcs[3] = { ShopNpcPos(), SmithNpcPos(), BankNpcPos() };

@@ -387,7 +387,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 	// Armour soaking a hit trains nothing, nor do hazards like poison smoke, nor damage that got through.
 	if (!bEnvironmental && ShieldStop > 0) Skills->AddXP(ESkillType::Defense, 2 + ShieldStop / 2);
 	if (bDrinking && !bEnvironmental) MulticastDrink(DrinkType, false);   // (any blow stops a drink, stun or not: he keeps the potion)
-	if (Health <= 0.f) { Die(); return; }   // any death: the sack, and a fresh start in Blackrock
+	if (Health <= 0.f) { Die(); return; }   // any death: the sack, and a fresh start in the old village site
 	// Attack beats kick (owner, 2026-10-31): a blow that lands while you are kicking throws you to the ground
 	if (!bEnvironmental && ShieldStop == 0 && IsKicking()) KnockDownBy(From);
 }
@@ -454,7 +454,7 @@ void AKnightCharacter::Die()
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
-	// Oak Hill's plaza (owner 2026-11-12); Blackrock's east gate in MoveLab or a test run without the town
+	// Oak Hill's plaza (owner 2026-11-12); the old village site's east side in MoveLab or a test run without the town
 	const bool bOak = JeebOakHill::Enabled() && !JeebHit::InMoveLab(GetWorld());
 	const FVector2D VC = JeebTerrain::VillageCenter();
 	const FVector2D Wake = FVector2D(VC.X + JeebTerrain::VillageHalf() - 450.f, VC.Y);

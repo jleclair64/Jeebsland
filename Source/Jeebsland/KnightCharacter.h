@@ -102,7 +102,7 @@ public:
 	virtual void StopJumping() override;                     // (the engine's jump; ours only clears bWantsRise)
 	virtual void CheckJumpInput(float DeltaTime) override;   // (offers a new press to climb, water and mantle first)
 	// Online: what the knight stands on is never used as its "movement base" unless it is a shared (replicated) actor. The
-	// ground, Blackrock, the towers and forts are built separately on every machine, so the server can't name them to the
+	// ground, the old village site, the towers and forts are built separately on every machine, so the server can't name them to the
 	// player's machine: a correction that names one is thrown away there, and the two copies of the knight drift apart
 	// until the knight jumps (then it snaps to wherever the server had it).
 	using ACharacter::SetBase;
@@ -196,7 +196,7 @@ public:
 	class ALootDrop* GetLootTarget() const { return LootTarget.Get(); }
 	void OpenLoot(class ALootDrop* Drop);
 	void CloseLoot() { LootTarget = nullptr; }
-	// Dying, of anything: everything you own goes into a sack where you fell, and you wake in Blackrock in the starting kit
+	// Dying, of anything: everything you own goes into a sack where you fell, and you wake in the old village site in the starting kit
 	void Die();
 	// Settings: show the side panel all the time (on), or only while the cursor is out with Tab (off)
 	bool GetPanelAlways() const { return bPanelAlways; }

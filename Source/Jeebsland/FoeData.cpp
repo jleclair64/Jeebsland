@@ -326,11 +326,11 @@ namespace JeebFoes
 	bool InTown(float X, float Y, float Margin)
 	{
 		if (JeebOakHill::InBox(X, Y, Margin)) return true;   // Oak Hill (its whole box: plots, roads, the fringe farms)
-		const float Sq = JeebTerrain::GroundHalf + Margin;   // the original square round the start: Blackrock, its walls and gates, the pen, the meadow
+		const float Sq = JeebTerrain::GroundHalf + Margin;   // the original square round the start: the old village site, the market, the pen, the meadow
 		if (FMath::Abs(X) < Sq && FMath::Abs(Y) < Sq) return true;
 		for (const JeebWorld::FTown& T : JeebWorld::Towns())   // every other town on the world map (Steele Creek, Silver Point ...)
 		{
-			if (FCString::Stricmp(T.Name, TEXT("Blackrock")) == 0 || FCString::Stricmp(T.Name, TEXT("Oak Hill")) == 0) continue;
+			if (FCString::Stricmp(T.Name, TEXT("Oak Hill")) == 0) continue;
 			const float R = FMath::Max(T.Flat, 10000.f) + Margin;
 			if (FVector2D::DistSquared(FVector2D(X, Y), T.Pos) < R * R) return true;
 		}

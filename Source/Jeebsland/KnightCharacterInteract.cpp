@@ -41,7 +41,7 @@
 #include "OakHill.h"
 
 // Oak Hill's shop counters (no shopkeepers yet, owner 2026-11-13: "We'll add NPCs to the shops later"): standing within this of a
-// counter, E opens that shop's window. The server checks its own range (NearTrader, 800 cm, like Blackrock's traders)
+// counter, E opens that shop's window. The server checks its own range (NearTrader, 800 cm, like the market's traders)
 static constexpr float CounterReach = 250.f;
 static const JeebOakHill::FCounter* CounterInReach(const AActor* Me)
 {
@@ -531,6 +531,7 @@ void AKnightCharacter::Dismount()
 
 void AKnightCharacter::SitOnSeat(int32 SeatIdx)
 {
+	if (!JeebTerrain::Seats().IsValidIndex(SeatIdx)) return;   // (no benches at all since Blackrock went, 2026-11-22)
 	const JeebTerrain::FSeat* Best = &JeebTerrain::Seats()[SeatIdx];
 
 	UCharacterMovementComponent* Move = GetCharacterMovement();

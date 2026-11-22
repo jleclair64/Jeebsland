@@ -9,7 +9,7 @@ class ANpc;
 // The townsfolk's days (2026-11-18, owner: "walk around or have tracks around houses as if they were the owners of a certain house",
 // "add the NPCs to the stores so it looks like they're manning the booths").
 //
-// Every person in Oak Hill, Blackrock and Steele Creek follows a ROUND: a fixed timeline of stays, turns and walks that repeats every
+// Every person in Oak Hill, the old village site and Steele Creek follows a ROUND: a fixed timeline of stays, turns and walks that repeats every
 // Period seconds. Where they are is worked out from the server's clock (AGameStateBase::GetServerWorldTimeSeconds), so every machine
 // shows them in the same place with nothing sent over the network. The rounds are built once on every machine from the towns' own
 // data (plots, doors, counters, streets) by ATownLife, after everything they walk round has been built (the fill props too), the

@@ -9,7 +9,7 @@ class UProceduralMeshComponent;
 class UBoxComponent;
 class UStaticMeshComponent;
 
-// The great stone bridge over the river between Blackrock (west) and Oak Hill (east), "the contested crossing of the war" (roadmap).
+// The great stone bridge over the river between the old village site (west) and Oak Hill (east), "the contested crossing of the war" (roadmap).
 // Model: /Game/Bridge/SM_Bridge (Meshy, Art/Bridge/Sources.md; Tools/BuildBridge.ps1), a three-arch hump-backed bridge about 27 m long
 // with a 4.6 m deck between low parapets. Collision is made here, never from the model's triangles: a closed solid for the deck and
 // arches (a procedural mesh), a box per 3 m of each parapet (each can be mantled: 80 cm over the deck), nothing for the model itself.
@@ -39,7 +39,7 @@ private:
 
 namespace JeebBridge
 {
-	// The span, in cm. L runs along the bridge from its middle (west negative, toward Blackrock); the deck's height over the world's Z is
+	// The span, in cm. L runs along the bridge from its middle (west negative, toward the old village site); the deck's height over the world's Z is
 	// DeckZ(L) for |L| up to DeckHalf.
 	FVector2D Centre();            // where the middle stands (X, Y)
 	float DeckZ(float L);          // the deck's walking surface at L (world Z)

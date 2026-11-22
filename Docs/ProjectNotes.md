@@ -494,6 +494,12 @@ The owner dropped the single-player story mode: Jeebsland is becoming an online 
 - Map fog grid and the Escape-screen world map now cover the whole world (fog reset once for everyone).
 - The moon and night sky are drawn 25x further out and bigger (SkyScale in Moon.h / NightSky.h, about 5 km) so they sit behind the mountains; height fog now reaches 4 km (FogCutoffDistance).
 
+## Blackrock removed; the old village site (2026-11-22)
+
+Owner: "Please remove Blackrock and everything in it from the game. It's out of date and we'll put something else in its place soon." Blackrock was the walled village in the original square (Village.cpp). The site is `JeebTerrain::VillageCenter()` = (-2900, -300) cm, a 40 x 40 m square (`VillageHalf()` 2000 cm), west of the river and of the stone bridge from Oak Hill; its sketch spot is (400, 870) in `WorldMap.h FromSketch`. It stays a level pad (`Pads()`), tree-free (`TreeBlocked` 3100 cm) and prop-free (fill zone `OldVillage`, off in FillZones.csv); its roads (PathDefs) and the bridge road still lead to it. Build the new town there.
+- Removed: palisade, gates, wall walk, corner towers, fountain (and AVillage's Tick), benches (`Seats()` empty), wall ladders (`Ladders()` empty), the five huts inside (`VillageHuts()` empty), Sir Aldous, villagers 0/2/7 (Mabry, Orsolya, Ansel) and their Townsfolk rows, the fountain-yard fill rows, the HUD walk-in title, the Tab map square, the world-map name (`JeebWorld::Towns`), the fast-travel entry (saves store town names, so a save that knew Blackrock just drops it), NpcLife's Blackrock town.
+- Kept: the rest of the original square (market store/smithy/bank and keepers, outside huts, cottage, pond, pig pen and its sparring knight, castle, graveyard, seven villagers, cats). Quest and dialogue lines that named Blackrock were reworded (Quests, QuestsSteps, QuestsPeople, Townsfolk, Lore.h); no quest, step or key changed, so saves with them in progress load as before. The fill set `Blackrock` is now `HutSide`.
+
 ## Code layout (split 2026-10-12; function bodies unchanged)
 
 `AKnightHUD` (header `KnightHUD.h`): `KnightHUD.cpp` main DrawHUD, bars, weapon bar, minimap; `KnightHUDGlass.cpp` liquid-glass drawing helpers, buttons, tooltips; `KnightHUDIcons.cpp` Poly/Disc and all item icons; `KnightHUDInventory.cpp` inventory, side panel, badges, drag and drop, drop box, loot windows; `KnightHUDShops.cpp` store, smithy, bank; `KnightHUDScreens.cpp` settings, dictionary, lore, skills screen, dialogue; `KnightHUDText.cpp` HDText, DrawLinesAt, NorseText.

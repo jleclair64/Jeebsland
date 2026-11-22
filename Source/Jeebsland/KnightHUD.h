@@ -158,7 +158,6 @@ private:
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
 	float PanelTop = 0.f;
 	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
-	bool bInTown = false; float TownBannerT = -100.f;   // the BLACKROCK banner
 	int32 AreaIn = -1; float AreaBannerT = -100.f; FString AreaName;   // the other towns' names on walking in (Oak Hill, Steele Creek, the placeholder sites: OpenWorld.h)
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame

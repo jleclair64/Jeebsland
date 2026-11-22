@@ -8,7 +8,7 @@
 class USkillComponent;
 class AKnightCharacter;
 
-// Fast travel (2026-11-18). A player can jump to any town their ACCOUNT has visited: Blackrock, Oak Hill, Steele Creek and, as they are
+// Fast travel (2026-11-18). A player can jump to any town their ACCOUNT has visited: Oak Hill, Steele Creek and, as they are
 // built, the four future towns (add a row to JeebTravel::Towns() below; nothing else needs to change).
 //
 // ONLINE the server owns all of it. The server marks a town visited when the knight first comes within the town's radius, saves that

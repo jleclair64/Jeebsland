@@ -15,7 +15,7 @@ class UMaterialInstanceDynamic;
 //  - The town: DZ cork oaks (fat) and columnar aspens (skinny) at 2:1, spruces where a conifer suits, at FillTrees.csv's marked spots and
 //    in the gaps between the plots (the spots the old woods' oaks and pines used), each crown kept off the buildings.
 //  - The forest: everything within JeebOakForest::Reach of the plaza except the town and its fringe farmland, the original square round
-//    the start (Blackrock, which keeps its own woods), the rivers and their banks, steep ground and the roads: cork oaks, aspens and the
+//    the start (the old village site, which keeps its own woods), the rivers and their banks, steep ground and the roads: cork oaks, aspens and the
 //    Spruce Forest's spruces in stands and glades, thicker in hollows, with bushes, saplings, fallen logs, stumps and boulders.
 //  - Three dirt roads (JeebOakForest::RoadLines) from the town's road ends out through the forest: north toward Silver Point, east toward
 //    Anchorage, south-east to the river's east branch (where a ford to Birch Grove would go). They are ordinary paths (JeebTerrain::PathDefs).
@@ -34,7 +34,7 @@ class AOakForest;
 struct FNodeCharge;
 
 // One of the forest's (and Oak Hill's) pack trees as a choppable node (owner, 2026-11-17: "Can we make the trees choppable?"). It is only
-// the gameplay part, like Blackrock's AChoppableTree but without its trunk capsule (the forest's hidden trunk solids block already): the
+// the gameplay part, like the old village site's AChoppableTree but without its trunk capsule (the forest's hidden trunk solids block already): the
 // server runs the chop as for any tree; when its charges run out every machine fells it (AOakForest::SetFelled) and it grows back.
 // Cork oaks and aspens give oak logs, spruces pine logs. Spawned on every machine at the tree's foot, in the same order: nodes are matched
 // online by where they stand (AKnightGameState::NodeCharges).

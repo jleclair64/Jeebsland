@@ -586,7 +586,7 @@ void ASteeleCreekTown::SpawnRocks()
 	UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE quarry: %d rocks"), Count);
 }
 
-// The town's people, on every machine like Blackrock's (the server checks a shop's keeper is near: KnightCharacterNet.cpp NearTrader).
+// The town's people, on every machine like the old village site's (the server checks a shop's keeper is near: KnightCharacterNet.cpp NearTrader).
 // Owner's mix: 40% knights, 20% wizards, 40% trolls; trolls run the smithy, wizards the bank, knights the store.
 void ASteeleCreekTown::SpawnPeople()
 {

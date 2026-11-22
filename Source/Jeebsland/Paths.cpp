@@ -24,7 +24,7 @@ void APaths::BeginPlay()
 	TArray<FVector2D> UV;
 	TArray<FLinearColor> Colors;
 	// Oak Hill's streets are cobbled (2026-11-12): red 1 on them (M_Dirt lays cobbles down the middle, fraying into packed earth at
-	// the sides and then into the grass); Blackrock's paths and the forest's roads stay packed earth (red 0).
+	// the sides and then into the grass); the old village site's paths and the forest's roads stay packed earth (red 0).
 	int32 FirstCobbled = Defs.Num(), FirstForest = Defs.Num();   // (Oak Hill's streets, then the forest's roads round it: OakForest.cpp, 2026-11-16)
 	for (int32 d = Defs.Num() - 1; d >= 0; --d) { if (Defs[d].Kind == 1) FirstCobbled = d; if (Defs[d].Kind == 2) FirstForest = d; }
 

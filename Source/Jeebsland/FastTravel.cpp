@@ -23,11 +23,8 @@ const TArray<JeebTravel::FTown>& JeebTravel::Towns()
 {
 	static const TArray<FTown> T = []()
 	{
-		const FVector2D VC = JeebTerrain::VillageCenter();
-		const float VH = JeebTerrain::VillageHalf();
 		TArray<FTown> A;
 		//          name               radius  home   open   arrival anchor (cm)                                                          yaw
-		A.Add({ TEXT("Blackrock"),     3200.f, false, true,  FVector2D(VC.X + VH - 450.f, VC.Y),                                          180.f });   // the east gate, just inside, facing the town
 		A.Add({ TEXT("Oak Hill"),      6500.f, true,  true,  FVector2D::ZeroVector,                                                       0.f });     // (AKnightGameMode::OakWakeSpot: the plaza's arc)
 		A.Add({ TEXT("Steele Creek"),  8000.f, false, true,  JeebSteele::ToWorld(JeebSteele::SpawnE, JeebSteele::SpawnN),                 JeebSteele::SpawnYaw });   // the forge yard, facing the smithy
 		// The four towns still to come: when one is built, set bOpen to true and give it an anchor and a way to face. Nothing else changes.
@@ -52,7 +49,6 @@ FVector2D JeebTravel::Centre(int32 Index)
 {
 	if (Index < 0 || Index >= Count()) return FVector2D::ZeroVector;
 	const FString N = Towns()[Index].Name;
-	if (N == TEXT("Blackrock")) return JeebTerrain::VillageCenter();
 	if (N == TEXT("Oak Hill")) return FVector2D(JeebOakHill::PosX, JeebOakHill::PosY);
 	if (N == TEXT("Steele Creek")) return FVector2D(JeebSteele::PosX, JeebSteele::PosY);
 	for (const JeebWorld::FTown& W : JeebWorld::Towns()) if (N == W.Name) return W.Pos;

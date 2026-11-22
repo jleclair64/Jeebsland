@@ -16,7 +16,7 @@
 //  FillSets.csv   (filllayout) Set, Kind, X, Y, Z, Yaw, Scale, Flags (drop|alt=A/B|turn=N|stack|hang): one row per piece, set-local metres.
 //  FillOakHill.csv(filllayout) Set, E, N, Yaw, Seed, Var, Plot, Note, optional Site: one placed set (or a single Kind) per row, metres
 //                 from Oak Hill's plaza; Site "Square" (fillfix 2026-11-16): E, N are metres from the world's origin instead (X = N, Y = E),
-//                 for hand-placed sets on the original square (Blackrock's fountain yard).
+//                 for hand-placed sets on the original square (none since the old village's fountain yard went, 2026-11-22).
 //  FillZones.csv  (filllayout) Zone, On, Density (sets per 100 m^2), Mix ("Set:Weight Set:Weight"), optional Seed, Facing
 //                 (random|road|wall), Trees (tree spots per 100 m^2).
 //  FillTrees.csv  (filllayout) Site, E, N, Class (shade|street|conifer|orchard), Radius (m kept clear), Note.

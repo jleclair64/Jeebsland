@@ -10,7 +10,7 @@
 
 AVillage::AVillage()
 {
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;   // (the fountain it animated went with Blackrock, 2026-11-22)
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
 
@@ -84,154 +84,8 @@ void AVillage::BeginPlay()
 	auto Ground = [](float X, float Y) { return JeebTerrain::HeightAt(X, Y); };
 	FRandomStream R(31337);
 
-	const FVector2D VC = JeebTerrain::VillageCenter();
-	const float Half = JeebTerrain::VillageHalf(); // the wall is a square, 4000 wide
-	const float GateHalf = 170.f;  // gate openings are 340 wide
-
-	// ---------------- Palisade: one side at a time ----------------
-	auto Side = [&](FVector2D C, FVector2D Dir, FVector2D In, bool bGate)
-	{
-		const FQuat Q = FRotator(0.f, FVector(Dir.X, Dir.Y, 0.f).Rotation().Yaw, 0.f).Quaternion();
-
-		for (float U = -Half; U <= Half; U += 44.f)
-		{
-			if (bGate && FMath::Abs(U) < GateHalf) continue;
-			const FVector2D P = C + Dir * U;
-			const float Z = Ground(P.X, P.Y);
-			const float H = R.FRandRange(330.f, 400.f);
-			Put(Log, FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + H * 0.5f), FVector(0.4f, 0.4f, H / 100.f)));
-			Put(Tip, FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + H + 18.f), FVector(0.4f, 0.4f, 0.4f)));
-		}
-
-		TArray<TPair<float, float>> Pieces;
-		if (bGate)
-		{
-			Pieces.Add(TPair<float, float>(-Half, -GateHalf));
-			Pieces.Add(TPair<float, float>(GateHalf, Half));
-		}
-		else
-		{
-			Pieces.Add(TPair<float, float>(-Half, Half));
-		}
-		for (const TPair<float, float>& Pc : Pieces)
-		{
-			const float Len = Pc.Value - Pc.Key;
-			const FVector2D Mid = C + Dir * ((Pc.Key + Pc.Value) * 0.5f);
-			const float Z = Ground(Mid.X, Mid.Y);
-			const FVector2D RailPos = Mid + In * 26.f;
-			Put(Beam, FTransform(Q, FVector(RailPos.X, RailPos.Y, Z + 130.f), FVector(Len / 100.f, 0.16f, 0.2f)));
-			Put(Beam, FTransform(Q, FVector(RailPos.X, RailPos.Y, Z + 270.f), FVector(Len / 100.f, 0.16f, 0.2f)));
-			AddSolid(FVector(Mid.X, Mid.Y, Z + 200.f), FVector(Len * 0.5f, 25.f, 200.f), Q);
-		}
-
-		if (bGate)
-		{
-			for (int32 s = -1; s <= 1; s += 2)
-			{
-				const FVector2D P = C + Dir * (s * GateHalf);
-				const float Z = Ground(P.X, P.Y);
-				Put(Log, FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 260.f), FVector(0.8f, 0.8f, 5.2f)));
-				Put(Tip, FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 540.f), FVector(0.8f, 0.8f, 0.8f)));
-				AddSolid(FVector(P.X, P.Y, Z + 260.f), FVector(40.f, 40.f, 260.f), Q);
-			}
-			const float Zc = Ground(C.X, C.Y);
-			Put(Beam, FTransform(Q, FVector(C.X, C.Y, Zc + 470.f), FVector((2.f * GateHalf + 90.f) / 100.f, 0.4f, 0.4f))); // lintel over the gate
-		}
-
-		// ----- Walkway along the inside of the wall (you walk under it through the gates) -----
-		{
-			const float DeckTop = JeebTerrain::HeightAt(VC.X, VC.Y) + JeebTerrain::DeckHeight();
-			const float DeckLen = 2.f * Half - 270.f; // stops at the corner towers
-			// One run of deck, or two with a break over each gate (nothing spans the doorway)
-			const float DeckEnd = DeckLen * 0.5f, GateBreak = 300.f;
-			TArray<TPair<float, float>> Runs;
-			if (bGate) { Runs.Add(TPair<float, float>(-DeckEnd, -GateBreak)); Runs.Add(TPair<float, float>(GateBreak, DeckEnd)); }
-			else Runs.Add(TPair<float, float>(-DeckEnd, DeckEnd));
-			for (const TPair<float, float>& Run : Runs)
-			{
-				const float RunLen = Run.Value - Run.Key;
-				const FVector2D DC = C + Dir * ((Run.Key + Run.Value) * 0.5f) + In * 115.f;
-				Put(Plank, FTransform(Q, FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(RunLen / 100.f, 1.7f, 0.2f)));
-				AddSolid(FVector(DC.X, DC.Y, DeckTop - 10.f), FVector(RunLen * 0.5f, 85.f, 10.f), Q);
-			}
-			for (float U = -Half + 250.f; U <= Half - 250.f; U += 400.f)
-			{
-				if (bGate && FMath::Abs(U) < 300.f) continue; // keep the gate road clear
-				const FVector2D PP = C + Dir * U + In * 190.f;
-				const float Zg = Ground(PP.X, PP.Y);
-				Put(Log, FTransform(FQuat::Identity, FVector(PP.X, PP.Y, Zg + (DeckTop - Zg) * 0.5f - 10.f), FVector(0.3f, 0.3f, (DeckTop - Zg - 20.f) / 100.f)));
-			}
-		}
-	};
-	Side(VC + FVector2D( Half, 0.f), FVector2D(0, 1), FVector2D(-1, 0), true);   // east wall, gate toward the start
-	Side(VC + FVector2D(0.f,  Half), FVector2D(1, 0), FVector2D(0, -1), true);   // north wall, gate toward the graveyard
-	Side(VC + FVector2D(-Half, 0.f), FVector2D(0, 1), FVector2D(1, 0),  false);  // west wall
-	Side(VC + FVector2D(0.f, -Half), FVector2D(1, 0), FVector2D(0, 1),  false);  // south wall
-
-	// ---------------- Ladders up to the walkway ----------------
-	for (const JeebTerrain::FLadder& L : JeebTerrain::Ladders())
-	{
-		const FQuat LQ = FRotator(0.f, FVector(-L.Out.Y, L.Out.X, 0.f).Rotation().Yaw, 0.f).Quaternion(); // local X runs sideways along the wall
-		const FVector2D Side2(-L.Out.Y, L.Out.X);
-		const float Zg = Ground(L.Pos.X, L.Pos.Y);
-		const float Top = JeebTerrain::HeightAt(VC.X, VC.Y) + JeebTerrain::DeckHeight() + 40.f;
-		const float Hgt = Top - Zg;
-		for (int32 sd = -1; sd <= 1; sd += 2)
-		{
-			const FVector2D RP = L.Pos + Side2 * (sd * 28.f);
-			Put(Beam, FTransform(LQ, FVector(RP.X, RP.Y, Zg + Hgt * 0.5f), FVector(0.07f, 0.07f, Hgt / 100.f)));
-		}
-		for (float Z = 30.f; Z < Hgt - 10.f; Z += 38.f)
-		{
-			Put(Beam, FTransform(LQ, FVector(L.Pos.X, L.Pos.Y, Zg + Z), FVector(0.56f, 0.05f, 0.05f)));
-		}
-	}
-
-	// ---------------- Corner towers ----------------
-	for (int32 sx = -1; sx <= 1; sx += 2)
-	{
-		for (int32 sy = -1; sy <= 1; sy += 2)
-		{
-			const FVector2D P = VC + FVector2D(sx * Half, sy * Half);
-			const float Z = Ground(P.X, P.Y);
-			Put(Stone, FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 230.f), FVector(2.4f, 2.4f, 4.6f)));
-			Put(Roof,  FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 460.f + 110.f), FVector(3.4f, 3.4f, 2.2f)));
-			AddSolid(FVector(P.X, P.Y, Z + 230.f), FVector(120.f, 120.f, 230.f), FQuat::Identity);
-		}
-	}
-
-	// ---------------- The fountain in the plaza ----------------
-	{
-		const float Z = Ground(VC.X, VC.Y);
-		auto At = [&](float Dz) { return FVector(VC.X, VC.Y, Z + Dz); };
-		Put(StoneRing, FTransform(FQuat::Identity, At(25.f), FVector(6.0f, 6.0f, 0.5f)));      // wide low basin wall
-		Put(Water,     FTransform(FQuat::Identity, At(47.f), FVector(5.4f, 5.4f, 0.02f)));     // basin water
-		Put(StoneRing, FTransform(FQuat::Identity, At(30.f), FVector(1.5f, 1.5f, 0.6f)));      // pedestal foot
-		Put(StoneRing, FTransform(FQuat::Identity, At(95.f), FVector(0.7f, 0.7f, 1.3f)));      // pillar
-		Put(StoneRing, FTransform(FQuat::Identity, At(165.f), FVector(2.3f, 2.3f, 0.28f)));    // upper bowl
-		Put(Water,     FTransform(FQuat::Identity, At(181.f), FVector(1.95f, 1.95f, 0.02f)));  // upper water
-		Put(StoneRing, FTransform(FQuat::Identity, At(215.f), FVector(0.3f, 0.3f, 0.7f)));     // spout column
-		Put(Water,     FTransform(FQuat::Identity, At(265.f), FVector(0.12f, 0.12f, 1.3f)));   // rising jet
-		Put(Roof,      FTransform(FQuat::Identity, At(245.f), FVector(0.5f, 0.5f, 0.35f)));   // cap
-		// Falling streams from the upper bowl down into the basin
-		for (int32 k = 0; k < 10; ++k)
-		{
-			const float Ang = k * 2.f * PI / 10.f;
-			const FVector Dir(FMath::Cos(Ang), FMath::Sin(Ang), 0.f);
-			const FVector A = At(172.f) + Dir * 112.f;
-			const FVector B = At(50.f) + Dir * 190.f;
-			const FVector D = B - A;
-			const float Len = D.Size();
-			const FQuat Q = FRotationMatrix::MakeFromZ(D / Len).ToQuat();
-			Put(Water, FTransform(Q, (A + B) * 0.5f, FVector(0.07f, 0.07f, Len / 100.f)));
-		}
-		FountainBase = At(0.f);
-		bFountain = true;
-		for (int32 k = 0; k < NumJetDrops + NumFallDrops; ++k) Drops->AddInstance(FTransform(FQuat::Identity, FountainBase, FVector(0.001f)));
-		AddSolid(At(30.f), FVector(285.f, 285.f, 32.f), FQuat::Identity);
-		AddSolid(At(30.f), FVector(285.f, 285.f, 32.f), FRotator(0.f, 45.f, 0.f).Quaternion());
-		AddSolid(At(150.f), FVector(80.f, 80.f, 150.f), FQuat::Identity);
-	}
+	// (2026-11-22: Blackrock, the walled village west of here, was taken out of the game: its palisade, gates, walkway,
+	// ladders, towers, fountain, benches, the five huts inside and Sir Aldous are gone. The site stays level for a new town.)
 
 	// ---------------- The market in front of the gate: the store (Brindle) and the smithy (Hobb) ----------------
 	{
@@ -405,19 +259,6 @@ void AVillage::BeginPlay()
 		}
 	}
 
-	// ---------------- Benches around the fountain (press E next to one to sit) ----------------
-	for (const JeebTerrain::FSeat& Seat : JeebTerrain::Seats())
-	{
-		const float Z = Ground(Seat.Pos.X, Seat.Pos.Y);
-		const FQuat Q = FRotator(0.f, Seat.Yaw, 0.f).Quaternion(); // local +X = the way a sitter faces
-		auto L = [&](FVector Off, FVector Size) { return FTransform(Q, FVector(Seat.Pos.X, Seat.Pos.Y, Z) + Q.RotateVector(Off), Size / 100.f); };
-		Put(Beam, L(FVector(0, 0, 28), FVector(44, 170, 8)));       // seat board
-		Put(Beam, L(FVector(-18, 0, 52), FVector(8, 170, 36)));     // backrest
-		Put(Beam, L(FVector(0, 70, 12), FVector(36, 12, 24)));      // legs
-		Put(Beam, L(FVector(0, -70, 12), FVector(36, 12, 24)));
-		AddSolid(FVector(Seat.Pos.X, Seat.Pos.Y, Z + 16.f), FVector(22.f, 85.f, 16.f), Q);
-	}
-
 	for (TPair<UInstancedStaticMeshComponent*, TArray<FTransform>>& Pair : Batch)
 	{
 		Pair.Key->AddInstances(Pair.Value, false, false, false);
@@ -435,11 +276,6 @@ void AVillage::BeginPlay()
 		}
 	};
 
-	// Inside the walls, doors facing the plaza (at least 5 m apart)
-	for (const JeebTerrain::FHutDef& HD : JeebTerrain::VillageHuts())
-	{
-		Hut(HD.Pos.X, HD.Pos.Y, HD.Yaw);
-	}
 
 	// Outside, each one facing the nearest road
 	// Four of the eight are locked, from easy to hard, each with a stash of ingots inside
@@ -475,21 +311,9 @@ void AVillage::BeginPlay()
 		{
 			N->Setup(ENpcRole::Banker);
 		}
-		// Sir Aldous patrols the grass outside the east gate
-		const FVector2D GK(-780.f, -110.f);
-		if (ANpc* N = World->SpawnActor<ANpc>(FVector(GK.X, GK.Y, Ground(GK.X, GK.Y) + 92.f), FRotator(0.f, -90.f, 0.f), Params))
-		{
-			N->Setup(ENpcRole::GateKnight);
-			TArray<FVector2D> Beat;
-			Beat.Add(FVector2D(-780.f, -110.f));
-			Beat.Add(FVector2D(-780.f, -480.f));
-			N->SetPatrol(Beat);
-		}
 
-		// Ten villagers, spread around the realm: three stroll the plaza and huts, the rest keep to their own corners
+		// Seven villagers (of the old ten; the three of the old village site's plaza went with it), each keeping to their own corners
 		// of the map (the graveyard, the pond, a hut on the hills, the road, the castle forecourt, outside the pig pen)
-		const FVector2D VCp = JeebTerrain::VillageCenter();
-		const FVector2D HutFronts[5] = { FVector2D(-900.f, 880.f), FVector2D(900.f, 880.f), FVector2D(-900.f, -880.f), FVector2D(900.f, -880.f), FVector2D(-780.f, 0.f) };
 		auto RingAround = [](const FVector2D& Centre, float Radius, float StartDeg, float Dir)
 		{
 			TArray<FVector2D> Pts;
@@ -523,18 +347,7 @@ void AVillage::BeginPlay()
 			case 9: Beat = { Pen + FVector2D(-500.f, -900.f), Pen + FVector2D(0.f, -960.f), Pen + FVector2D(500.f, -900.f), Pen + FVector2D(0.f, -960.f) }; break;   // Hettie, outside the pen
 			case 1: Beat = RoadWalk(0.30f); break;                                                                         // Tobin, on the road
 			case 8: Beat = { Cas + FVector2D(-1100.f, -300.f), Cas + FVector2D(-950.f, 0.f), Cas + FVector2D(-1100.f, 300.f), Cas + FVector2D(-950.f, 0.f) }; break;   // Peregrine, at the castle
-			default:
-			{
-				const float A0 = FMath::DegreesToRadians(i * 36.f);
-				const float Dir = (i % 2 == 0) ? 1.f : -1.f;
-				for (int32 k = 0; k < 6; ++k)
-				{
-					const float A = A0 + Dir * FMath::DegreesToRadians(k * 55.f);
-					Beat.Add(VCp + FVector2D(FMath::Cos(A), FMath::Sin(A)) * 650.f);
-				}
-				if (i % 3 != 2) Beat.Insert(VCp + HutFronts[i % 5], 3);   // an errand to a hut door
-				break;
-			}
+			default: continue;   // (0, 2 and 7 strolled Blackrock's plaza and huts: gone with the town, 2026-11-22)
 			}
 			const FVector2D S = Beat[0];
 			if (ANpc* N = World->SpawnActor<ANpc>(FVector(S.X, S.Y, Ground(S.X, S.Y) + 92.f), FRotator(0.f, i * 36.f + 90.f, 0.f), Params))

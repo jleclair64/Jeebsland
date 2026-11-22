@@ -710,7 +710,7 @@ const TArray<JeebOpen::FSite>& JeebOpen::Sites()
 		TArray<FSite> A;
 		for (const JeebWorld::FTown& T : JeebWorld::Towns())
 		{
-			if (T.Fade <= 0.f) continue;   // (Blackrock, Oak Hill and Steele Creek are built)
+			if (T.Fade <= 0.f) continue;   // (the old village site, Oak Hill and Steele Creek are built)
 			FSite S; S.Name = T.Name; S.Pos = SiteMid(T.Pos); S.Radius = T.Flat + 1500.f;
 			// the house: 16 m from the middle, on the side furthest from every road, its door toward the middle
 			float Best = -1.0e9f; S.House = S.Pos + FVector2D(1600.f, 0.f);

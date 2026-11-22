@@ -53,7 +53,7 @@ struct FTravelTestDriver
 		float& Next = NextAt.FindOrAdd(C);
 		if (C->TestClock < Next) return;
 		auto Wait = [&](float S) { Next = C->TestClock + S; };
-		const int32 Oak = JeebTravel::IndexOf(TEXT("Oak Hill")), Steele = JeebTravel::IndexOf(TEXT("Steele Creek")), Black = JeebTravel::IndexOf(TEXT("Blackrock"));
+		const int32 Oak = JeebTravel::IndexOf(TEXT("Oak Hill")), Steele = JeebTravel::IndexOf(TEXT("Steele Creek"));
 		auto InOak = [&]() { return JeebTravel::TownAt(FVector2D(K->GetActorLocation())) == Oak; };
 		switch (C->TestStage)
 		{
@@ -119,7 +119,7 @@ struct FTravelTestDriver
 			APawn* Pawn = Cast<APawn>(C->GetOwner());
 			AKnightPlayerController* PC = Pawn ? Cast<AKnightPlayerController>(Pawn->GetController()) : nullptr;
 			if (AKnightGameMode* GM = C->GetWorld()->GetAuthGameMode<AKnightGameMode>()) GM->SaveCharacter(PC);
-			Log(FString::Printf(TEXT("saved; %s; Blackrock known: %d"), *State(C), C->IsVisited(Black) ? 1 : 0));
+			Log(FString::Printf(TEXT("saved; %s"), *State(C)));
 			C->TestStage = 11; Wait(4.f); return;
 		}
 		case 11:
