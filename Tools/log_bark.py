@@ -70,6 +70,7 @@ unreal.log("LOGDIAG old log textures: %s" % {k: (v.get_name() if v else None) fo
 for src, dst in (("BaseTex", "Base"), ("NormalTex", "Normal"), ("MRTex", "MR")):
     if vals.get(src):
         MEL.set_material_instance_texture_parameter_value(mi, dst, vals[src])
+MEL.update_material_instance(mi)
 EAL.save_asset(mpath)
 sm = EAL.load_asset("/Game/TownDecor/SM_LogMossy")
 for i, sl in enumerate(sm.static_materials):
