@@ -1,4 +1,4 @@
-#include "WorldTerrain.h"
+﻿#include "WorldTerrain.h"
 namespace JeebRoadSlope { void Report(); }
 #include "Terrain.h"
 #include "WorldMap.h"
@@ -95,6 +95,21 @@ void AWorldTerrain::Tick(float DeltaSeconds)
 	SetUnderGrass(Mid, LowSunFill());   // (sets only what changed: the sun, the reach, jeeb.Ground.*)
 }
 
+// The ground's underside (seen only by a camera that dips under a slope): no collision, no shadow
+void AWorldTerrain::AddUnderside(const TArray<FVector>& V, const TArray<int32>& Back, const TArray<FVector>& N, const TArray<FVector2D>& UV, const TArray<FVector2D>& UV1, const TArray<FLinearColor>& Col, UMaterialInterface* Mat)
+{
+	UProceduralMeshComponent* U = NewObject<UProceduralMeshComponent>(this);
+	U->SetupAttachment(GetRootComponent());
+	U->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	U->SetCastShadow(false);
+	U->bAffectDistanceFieldLighting = false;
+	U->SetCanEverAffectNavigation(false);
+	U->RegisterComponent();
+	U->CreateMeshSection_LinearColor(0, V, Back, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+	if (Mat) U->SetMaterial(0, Mat);
+	Under.Add(U);
+}
+
 void AWorldTerrain::BuildLand()
 {
 	using namespace JeebWorld;
@@ -176,16 +191,16 @@ void AWorldTerrain::BuildLand()
 			// the underside too (no collision), so a camera that dips below a slope never sees through the world
 			TArray<int32> Back;
 			for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
-			PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+			// (2026-11-22, owner: "a triangle of strobing snow") the underside is its own component that casts no shadow: as a second section
+			// of the same mesh it cast one from exactly the ground's own place, and every 8 m triangle turned away from a low sun shadowed
+			// itself in flickering stripes (shadow acne)
+			if (!bServer) AddUnderside(V, Back, N, UV, UV1, Col, Mat);
 			PM->SetCollisionProfileName(TEXT("BlockAll"));
 			PM->ComponentTags.Add(FName(TEXT("JeebClimb")));   // (hills and rock: climbable where too steep to walk, KnightMovement.h)
 			if (!bServer)
 			{
-				for (int32 s = 0; s < 2; ++s)
-				{
-					if (Mat) PM->SetMaterial(s, Mat);
-					else if (UMaterialInstanceDynamic* M = PM->CreateDynamicMaterialInstance(s, Fallback)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.2f, 0.32f, 0.12f));
-				}
+				if (Mat) PM->SetMaterial(0, Mat);
+				else if (UMaterialInstanceDynamic* M = PM->CreateDynamicMaterialInstance(0, Fallback)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.2f, 0.32f, 0.12f));
 			}
 			else PM->SetVisibility(false);
 			Chunks.Add(PM);
@@ -264,10 +279,10 @@ void AWorldTerrain::BuildFine()
 				PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, Col, TArray<FProcMeshTangent>(), true);
 				TArray<int32> Back;
 				for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
-				PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, Col, TArray<FProcMeshTangent>(), false);
+				if (!bServer) AddUnderside(V, Back, N, UV, TArray<FVector2D>(), Col, Mat);   // (casts no shadow: see BuildLand)
 				PM->SetCollisionProfileName(TEXT("BlockAll"));
 				PM->ComponentTags.Add(FName(TEXT("JeebClimb")));
-				if (!bServer) { if (Mat) { PM->SetMaterial(0, Mat); PM->SetMaterial(1, Mat); } }
+				if (!bServer) { if (Mat) PM->SetMaterial(0, Mat); }
 				else PM->SetVisibility(false);
 				Chunks.Add(PM);
 			}
@@ -449,31 +464,41 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 	using namespace JeebWorld;
 	constexpr float Cs = 6400.f;
 	constexpr int32 Out = 20;
-	// grid lines: Out cells beyond each edge, the edge lines themselves, and even spans between
+	// (2026-11-22, owner: "the land that is unreachable is a sharp drop down. Could you make the cutoff not so apparent") The apron
+	// used to start 60 cm under the lowest real ground within 64 m along the edge, on 64 m cells: under every high stretch of the edge the
+	// real ground ended in a wall or a fin over it. Now the apron's lines along the edges are the world mesh's own 8 m points, so its first
+	// row is exactly the real edge (no gap, nothing to hide), and its rings start fine (8, 24, 48 m) and widen to 64 m; the edge's
+	// heights are smoothed more the further out, then eased to the far land over 1.2 km.
 	auto Lines = [&](float Lo, float Hi, bool bPastHi)
 	{
+		static const float Near[] = { 800.f, 2400.f, 4800.f };
+		TArray<float> Rings;
+		for (float R : Near) Rings.Add(R);
+		for (int32 k = 1; k <= Out; ++k) Rings.Add(k * Cs + 2400.f);
+		for (int32 k = 1; k <= 7; ++k) Rings.Add(Out * Cs + 2400.f + k * 10.f * Cs);   // (then seven wide cells out to about 5.8 km, for the horizon)
 		TArray<float> L;
-		for (int32 k = 7; k >= 1; --k) L.Add(Lo - Out * Cs - k * 10.f * Cs);   // (then seven wide cells out to about 5.8 km, for the horizon)
-		for (int32 k = Out; k >= 1; --k) L.Add(Lo - k * Cs);
-		const int32 In = FMath::Max(1, FMath::RoundToInt((Hi - Lo) / Cs));
+		for (int32 k = Rings.Num() - 1; k >= 0; --k) L.Add(Lo - Rings[k]);
+		const int32 In = FMath::Max(1, FMath::RoundToInt((Hi - Lo) / WorldStep));
 		for (int32 k = 0; k <= In; ++k) L.Add(Lo + (Hi - Lo) * k / In);
-		if (bPastHi) { for (int32 k = 1; k <= Out; ++k) L.Add(Hi + k * Cs); for (int32 k = 1; k <= 7; ++k) L.Add(Hi + Out * Cs + k * 10.f * Cs); }
+		if (bPastHi) for (float R : Rings) L.Add(Hi + R);
 		return L;
 	};
 	const TArray<float> Xs = Lines(MinX, MaxX, true), Ys = Lines(MinY, MaxY, false);
 	const int32 NXv = Xs.Num(), NYv = Ys.Num();
-	// the lowest real ground along the edge within a cell either way of an edge point: the apron's edge never stands above the real edge
-	auto EdgeLow = [&](float X, float Y)
+	// the real edge's height near an edge point, averaged along the edge over R either way (R 0: the point itself)
+	auto EdgeAvg = [&](float X, float Y, float R)
 	{
+		if (R < WorldStep) return JeebTerrain::HeightAt(X, Y);
 		const bool bAlongY = X <= MinX || X >= MaxX;   // (an edge that runs along Y; corners take both)
 		const bool bAlongX = Y <= MinY;
-		float Low = JeebTerrain::HeightAt(X, Y);
-		for (float D = -Cs; D <= Cs; D += WorldStep)
+		float Sum = 0.f, W = 0.f;
+		for (int32 k = -6; k <= 6; ++k)
 		{
-			if (bAlongY) Low = FMath::Min(Low, JeebTerrain::HeightAt(X, FMath::Clamp(Y + D, MinY, MaxY)));
-			if (bAlongX) Low = FMath::Min(Low, JeebTerrain::HeightAt(FMath::Clamp(X + D, MinX, MaxX), Y));
+			const float D = R * k / 6.f, Wk = 1.f - FMath::Abs(k) / 7.f;
+			if (bAlongY) { Sum += Wk * JeebTerrain::HeightAt(X, FMath::Clamp(Y + D, MinY, MaxY)); W += Wk; }
+			if (bAlongX) { Sum += Wk * JeebTerrain::HeightAt(FMath::Clamp(X + D, MinX, MaxX), Y); W += Wk; }
 		}
-		return Low - 60.f;
+		return W > 0.f ? Sum / W : JeebTerrain::HeightAt(X, Y);
 	};
 	TArray<float> H; H.SetNumUninitialized(NXv * NYv);
 	for (int32 i = 0; i < NXv; ++i)
@@ -482,13 +507,13 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 			const float X = Xs[i], Y = Ys[j];
 			const float Cx = FMath::Clamp(X, MinX, MaxX), Cy = FMath::Clamp(Y, MinY, MaxY);
 			const float D = FVector2D(X - Cx, Y - Cy).Size();
-			if (D <= 1.f && X > MinX && X < MaxX && Y > MinY) { H[i * NYv + j] = JeebTerrain::HeightAt(X, Y); continue; }   // (inside the map: not drawn, only for the edge points' normals)
-			const float Edge = EdgeLow(Cx, Cy);
+			if (D <= 1.f) { H[i * NYv + j] = JeebTerrain::HeightAt(X, Y); continue; }   // (on the edge: the world mesh's own point; inside: only for normals)
+			const float Edge = EdgeAvg(Cx, Cy, FMath::Min(D * 1.5f, 40000.f));
 			const FVector2D P(X, Y);
 			float Far = 300.f + 1800.f * (0.5f + 0.5f * FMath::PerlinNoise2D(P / 47000.f + FVector2D(3.3f, 7.1f)));
 			if (X > MaxX) Far = 3000.f + 9000.f * FMath::Square(0.5f + 0.5f * FMath::PerlinNoise2D(P / 33000.f + FVector2D(-2.6f, 1.9f))) + 1500.f * FMath::PerlinNoise2D(P / 14000.f + FVector2D(5.1f, 0.4f));   // the range carries on north
 			if (Cy - CoastY(Cx) > -3000.f) Far = SeaLevel - 800.f;                                                               // off the coast: seabed
-			H[i * NYv + j] = FMath::Lerp(Edge, Far, Smooth(0.f, 60000.f, D)) + 500.f * Smooth(0.f, 20000.f, D) * FMath::PerlinNoise2D(P / 15000.f + FVector2D(9.2f, -4.4f));
+			H[i * NYv + j] = FMath::Lerp(Edge, Far, Smooth(0.f, 120000.f, D)) + 500.f * Smooth(2000.f, 30000.f, D) * FMath::PerlinNoise2D(P / 15000.f + FVector2D(9.2f, -4.4f));
 		}
 	auto At = [&](int32 i, int32 j) { return H[FMath::Clamp(i, 0, NXv - 1) * NYv + FMath::Clamp(j, 0, NYv - 1)]; };
 	TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV, UV1; TArray<int32> Tri;
@@ -497,10 +522,14 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 		{
 			const float X = Xs[i], Y = Ys[j], Z = At(i, j);
 			V.Add(FVector(X, Y, Z));
-			const FVector Nrm = FVector((At(i - 1, j) - At(i + 1, j)) / FMath::Max(Xs[FMath::Min(i + 1, NXv - 1)] - Xs[FMath::Max(i - 1, 0)], 1.f), (At(i, j - 1) - At(i, j + 1)) / FMath::Max(Ys[FMath::Min(j + 1, NYv - 1)] - Ys[FMath::Max(j - 1, 0)], 1.f), 1.f).GetSafeNormal();
+			const bool bOnEdge = X >= MinX - 1.f && X <= MaxX + 1.f && Y >= MinY - 1.f;   // (a point of the world mesh's own edge: the same normal and paint)
+			const FVector Nrm = bOnEdge
+				? FVector(JeebTerrain::HeightAt(X - WorldStep, Y) - JeebTerrain::HeightAt(X + WorldStep, Y), JeebTerrain::HeightAt(X, Y - WorldStep) - JeebTerrain::HeightAt(X, Y + WorldStep), 2.f * WorldStep).GetSafeNormal()
+				: FVector((At(i - 1, j) - At(i + 1, j)) / FMath::Max(Xs[FMath::Min(i + 1, NXv - 1)] - Xs[FMath::Max(i - 1, 0)], 1.f), (At(i, j - 1) - At(i, j + 1)) / FMath::Max(Ys[FMath::Min(j + 1, NYv - 1)] - Ys[FMath::Max(j - 1, 0)], 1.f), 1.f).GetSafeNormal();
 			N.Add(Nrm);
 			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
-			Col.Add(FLinearColor(0.f, 0.f, 0.f, 0.f));
+			if (bOnEdge) { const FVector2D Cl(FMath::Clamp(X, MinX, MaxX), FMath::Clamp(Y, MinY, MaxY)); Col.Add(JeebGround::At(Cl.X, Cl.Y, Z, JeebGround::Upness(Cl.X, Cl.Y)).Color()); }
+			else Col.Add(FLinearColor(0.f, 0.f, 0.f, 0.f));
 			UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Nrm.Z) + 1.f, 0.f));
 		}
 	for (int32 i = 0; i + 1 < NXv; ++i)
@@ -508,6 +537,7 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 		{
 			const float Mx = 0.5f * (Xs[i] + Xs[i + 1]), My = 0.5f * (Ys[j] + Ys[j + 1]);
 			if (Mx > MinX && Mx < MaxX && My > MinY) continue;   // (a cell of the map itself)
+			if (Xs[i + 1] - Xs[i] < 1.f || Ys[j + 1] - Ys[j] < 1.f) continue;
 			const int32 A = i * NYv + j, B = A + NYv, C = A + 1, D = B + 1;
 			Tri.Append({ A, C, B, B, C, D });
 		}
@@ -523,5 +553,5 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 	PM->SetCastShadow(false);
 	PM->bAffectDistanceFieldLighting = false;
 	Chunks.Add(PM);
-	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN land beyond the edges: %d cells of 64 m out to %.0f m past the north, west and south edges (drawn only, no collision)"), Tri.Num() / 6, Out * Cs / 100.f);
+	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN land beyond the edges: %d cells (8 m along the edges, rings from 8 m to 64 m) out to %.0f m past the north, west and south edges (drawn only, no collision)"), Tri.Num() / 6, Out * Cs / 100.f);
 }

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -38,4 +38,5 @@ private:
 	FRandomStream Rand;
 	float Time = 0.f;
 	int32 Shown = 0;
+	float CoverWant = 0.f, CoverNow = 0.f, CoverAge = 99.f;   // how much snow lies round the camera: it only snows where snow lies (2026-11-22)
 };

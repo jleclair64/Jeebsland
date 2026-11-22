@@ -524,7 +524,10 @@ void ADayNight::TickMoon(float MoonW)
 		Moonlight->SetAtmosphereSunLight(true);
 		Moonlight->SetAtmosphereSunLightIndex(1);
 		Moonlight->SetAtmosphereSunDiskColorScale(FLinearColor::Black);   // (no second sun disc: the moon is AMoon's picture)
-		Moonlight->LightSourceAngle = 1.5f;   // (a little crisper than the sun's soft 4 degrees)
+		// (2026-11-22, owner: the knight's shadow on snow at night "pixely/fuzzy/static") the moon's long low shadows reached the soft
+		// filter's widest search almost everywhere, and on bright snow its per-pixel sample scatter showed as grain: the real moon's
+		// half a degree keeps its shadows crisp with a small soft edge (was 1.5)
+		Moonlight->LightSourceAngle = 0.5f;
 		Moonlight->ForwardShadingPriority = 2;   // (water, glass and fog take the moon at night; it is hidden by day)
 		Moonlight->SetVolumetricScatteringIntensity(0.f);
 		if (ADirectionalLight* S = Sun.Get())

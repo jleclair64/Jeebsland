@@ -2,6 +2,10 @@
 #include "ChoppableTree.h"
 #include "MiningRock.h"
 #include "Terrain.h"
+#include "OpenWorld.h"
+#include "Components/DecalComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "KnightAnimator.h"
@@ -139,7 +143,9 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 	{
 		// (nobody is looking at the server's knights: a pose ten times a second serves their hurt boxes, every frame only while a blade is out.
 		// Other players' knights off screen likewise. The gear follows the capsule in between.)
-		Anim->MoveTo(GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()), GetActorRotation().Yaw);   // (the boxes stay on him between poses)
+		FVector SnowFeetAt = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+		SnowFeet(Dt, SnowFeetAt);
+		Anim->MoveTo(SnowFeetAt, GetActorRotation().Yaw);   // (the boxes stay on him between poses)
 		AnimAccum += Dt;
 		float Every = 0.f;
 		if (IsNetMode(NM_DedicatedServer)) Every = bAttacking ? 0.f : 0.1f;
@@ -156,7 +162,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 			}
 			else
 			{
-				const FVector Feet = GetActorLocation() - FVector(0.f, 0.f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
+				const FVector Feet = SnowFeetAt;   // (sunk into deep snow: SnowFeet)
 				Anim->Update(AnimAccum, In, Feet, GetActorRotation().Yaw);
 				PlaceGear();
 			}
@@ -406,4 +412,44 @@ void AKnightCharacter::TickSuitTests(float Dt)
 		MulticastDrink(uint8(JeebItems::PotionType(Skills->PotionSlot.Id)), true);
 	}
 	else if (Do == TEXT("climb")) bClimbing = true;
+}
+
+// Feet in the snow (2026-11-22, owner: "it looks like the knights feet sink into the snow instead of standing perfectly on top of it").
+// Big games deform the snow itself (Red Dead 2's tessellated snow, render-target trails); a cheap version that costs nothing online:
+// the drawn body (and his hit boxes with it, by a few cm, the same on the server) stands up to JeebOpen::SinkDepth lower on deep snow, so
+// the boots go in to the ankle, and on players' machines he leaves soft footprints (decals, M_SnowPrint) that fade after half a minute.
+// Worked out from his position alone, so every machine draws every knight alike with nothing sent.
+void AKnightCharacter::SnowFeet(float Dt, FVector& Feet)
+{
+	const bool bGround = GetCharacterMovement() && GetCharacterMovement()->IsMovingOnGround();
+	const float Want = bGround && !bMounted ? JeebOpen::SnowSink(Feet) : 0.f;
+	SnowSinkNow = FMath::FInterpTo(SnowSinkNow, Want, Dt, 6.f);
+	Feet.Z -= SnowSinkNow;
+	if (IsNetMode(NM_DedicatedServer) || SnowSinkNow < 3.f) { PrintLast = Feet; return; }
+	static TWeakObjectPtr<UMaterialInterface> PrintMat;
+	static bool bTried = false;
+	if (!bTried) { bTried = true; PrintMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_SnowPrint.M_SnowPrint"), nullptr, LOAD_Quiet | LOAD_NoWarn); }
+	if (!PrintMat.IsValid()) return;
+	const FVector2D Step(Feet.X - PrintLast.X, Feet.Y - PrintLast.Y);
+	if (Step.SizeSquared() < 70.f * 70.f) return;
+	if (Step.SizeSquared() > 400.f * 400.f) { PrintLast = Feet; return; }   // (a teleport or a respawn: no trail across)
+	if (!bPrintNoDecals)
+	{   // (the prints are for the snow only: never on him)
+		bPrintNoDecals = true;
+		TArray<UPrimitiveComponent*> Prims; GetComponents<UPrimitiveComponent>(Prims, true);
+		for (UPrimitiveComponent* P : Prims) { P->bReceivesDecals = false; P->MarkRenderStateDirty(); }
+	}
+	const FVector2D Dir = Step.GetSafeNormal();
+	const FVector2D Side(-Dir.Y, Dir.X);
+	PrintSide ^= 1;
+	const FVector2D At = FVector2D(Feet.X, Feet.Y) + Side * (PrintSide ? 11.f : -11.f);
+	const float Z = JeebTerrain::DrawnHeight(At.X, At.Y);
+	const float Yaw = FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X));
+	// (a decal projects along its X: pitched straight down; its box 30 cm deep so it lands on the slope and nothing else)
+	if (UDecalComponent* D = UGameplayStatics::SpawnDecalAtLocation(this, PrintMat.Get(), FVector(15.f, 7.f, 13.f), FVector(At.X, At.Y, Z), FRotator(-90.f, Yaw, 0.f), 30.f))
+	{
+		D->SetFadeOut(18.f, 12.f, false);
+		D->SetFadeScreenSize(0.002f);
+	}
+	PrintLast = Feet;
 }

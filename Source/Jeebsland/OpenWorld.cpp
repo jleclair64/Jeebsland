@@ -1,4 +1,4 @@
-#include "OpenWorld.h"
+﻿#include "OpenWorld.h"
 #include "Terrain.h"
 #include "OakForest.h"
 #include "Misc/Crc.h"
@@ -515,19 +515,29 @@ namespace
 			Cut(1);
 			Round(1, &RoadW);
 		}
-		// one soft 3x3 blur where the offset is free all round (not on the rock bands, whose risers it would round off, nor on a road)
+		// (2026-11-22, owner: "a lot of straight lines to make the hills ... it doesn't look natural") the slope cut leaves eight-sided cones
+		// whose faces meet in long straight creases, and the 8 m mesh drew them as hard ridge lines. Now three passes of a 5x5 blur (about
+		// 25 m across together) where the offset is free all round round every crease into a curve; the rock bands take half of it (they
+		// stay steep and climbable, their edges softened), roads and the town sites none. A blur never makes ground steeper than it was.
 		{
-			TArray<float> Was = G.V;
-			for (int32 i = 1; i + 1 < NI; ++i)
-				for (int32 j = 1; j + 1 < N; ++j)
-				{
-					const int32 k = i * N + j;
-					if (Fixed[k]) continue;
-					bool bFree = true; float Sum = 0.f;
-					for (int32 a = -1; a <= 1; ++a) for (int32 b = -1; b <= 1; ++b) { const int32 q = k + a * N + b; bFree &= !Fixed[q]; Sum += Was[q]; }
-					if (!bFree) continue;
-					G.V[k] = FMath::Lerp(Sum / 9.f, Was[k], FMath::Max(Cliff[k], RoadW[k]));
-				}
+			constexpr int32 R = 2;
+			for (int32 Pass = 0; Pass < 3; ++Pass)
+			{
+				TArray<float> Was = G.V, Tmp; Tmp.SetNumUninitialized(Num);
+				for (int32 i = 0; i < NI; ++i)
+					for (int32 j = 0; j < N; ++j) { float S = 0.f; for (int32 b = -R; b <= R; ++b) S += Was[i * N + FMath::Clamp(j + b, 0, N - 1)]; Tmp[i * N + j] = S / (2 * R + 1); }
+				for (int32 i = R; i + R < NI; ++i)
+					for (int32 j = R; j + R < N; ++j)
+					{
+						const int32 k = i * N + j;
+						if (Fixed[k]) continue;
+						bool bFree = true; float S = 0.f;
+						for (int32 a = -R; a <= R && bFree; ++a) { bFree &= !Fixed[k + a * N - R] && !Fixed[k + a * N + R] && !Fixed[k + a * N]; S += Tmp[k + a * N]; }
+						if (!bFree) continue;
+						const float Hold = FMath::Max3(Cliff[k] * 0.5f, RoadW[k], 1.f - FMath::Clamp(Keep[k] * 3.f, 0.f, 1.f));
+						G.V[k] = FMath::Lerp(S / (2 * R + 1), Was[k], Hold);
+					}
+			}
 		}
 		for (int32 k = 0; k < Num; ++k) if (Fixed[k]) G.V[k] = 0.f;
 		Finished();
@@ -654,6 +664,26 @@ float JeebOpen::SnowRaw(float X, float Y, float Z, float Up)
 }
 
 float JeebOpen::Snow(float X, float Y, float Z, float Up) { return FMath::Clamp(SnowRaw(X, Y, Z, Up) * 1.3f, 0.f, 1.f); }
+
+float JeebOpen::SnowOnGround(float X, float Y)
+{
+	if (X < 30000.f) return 0.f;   // (no snow anywhere south of this: SnowRaw's own cut-off)
+	const float Z = JeebTerrain::HeightAt(X, Y);
+	if (Z < SnowFrom - 2500.f) return 0.f;
+	constexpr float S = JeebWorld::WorldStep;
+	const float Gx = (JeebTerrain::HeightAt(X + S, Y) - JeebTerrain::HeightAt(X - S, Y)) / (2.f * S), Gy = (JeebTerrain::HeightAt(X, Y + S) - JeebTerrain::HeightAt(X, Y - S)) / (2.f * S);
+	return Snow(X, Y, Z, 1.f / FMath::Sqrt(1.f + Gx * Gx + Gy * Gy));
+}
+
+float JeebOpen::SnowSink(const FVector& Feet)
+{
+	if (Feet.X < 30000.f) return 0.f;
+	const float Ground = JeebTerrain::DrawnHeight(Feet.X, Feet.Y);   // (the 8 m triangles as drawn and walked on)
+	// only on the open ground itself (not on a rock, a roof, a bridge, or in the air)
+	const float Above = Feet.Z - Ground;
+	if (Above > 25.f || Above < -25.f) return 0.f;
+	return SinkDepth * SnowOnGround(Feet.X, Feet.Y) * FMath::Clamp(1.f - Above / 25.f, 0.f, 1.f);
+}
 
 float JeebOpen::Snowing(double ServerSeconds)
 {

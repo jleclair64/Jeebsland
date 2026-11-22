@@ -1,4 +1,4 @@
-#include "OpenWorldActor.h"
+﻿#include "OpenWorldActor.h"
 #include "OpenWorld.h"
 #include "Terrain.h"
 #include "TownLabSwaps.h"
@@ -173,7 +173,19 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
 	const FVector Fwd = PC->PlayerCameraManager->GetCameraRotation().Vector();
 	const float High = JeebWorld::Smooth(1500.f, 7000.f, Cam.Z);
-	const float Amount = SnowNow * FMath::Lerp(FMath::Clamp(CVarSnowLow.GetValueOnGameThread(), 0.f, 1.f), 1.f, High) * 0.7f * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
+	// (2026-11-22, owner: "Why is it snowing in Oak hill? Snow only supposed to fall in snowy areas") the flakes show only where snow lies on
+	// the ground round the camera (JeebOpen's snow map, sampled at five spots 25 m apart twice a second), fading in over the snow's edge
+	CoverAge += DeltaSeconds;
+	if (CoverAge > 0.5f)
+	{
+		CoverAge = 0.f;
+		float Sum = 0.f;
+		for (const FVector2D& O : { FVector2D(0.f, 0.f), FVector2D(2500.f, 0.f), FVector2D(-2500.f, 0.f), FVector2D(0.f, 2500.f), FVector2D(0.f, -2500.f) })
+			Sum += JeebOpen::SnowOnGround(Cam.X + O.X, Cam.Y + O.Y);
+		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f);
+	}
+	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, 0.25f);
+	const float Amount = CoverNow * SnowNow * FMath::Lerp(FMath::Clamp(CVarSnowLow.GetValueOnGameThread(), 0.f, 1.f), 1.f, High) * 0.7f * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
 	const int32 Want = FMath::Clamp(FMath::RoundToInt(NumFlakes * Amount), 0, NumFlakes);
 	if (Want == 0 && Shown == 0) return;
 	const float SizeK = FMath::Clamp(CVarSnowSize.GetValueOnGameThread(), 0.2f, 4.f);
