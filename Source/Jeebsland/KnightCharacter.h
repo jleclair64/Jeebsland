@@ -125,6 +125,8 @@ public:
 	UFUNCTION(Server, Reliable) void ServerBlink(FVector_NetQuantizeNormal Dir);
 	UFUNCTION(NetMulticast, Reliable) void MultiBlink(FVector_NetQuantize From, FVector_NetQuantize To);
 	UPROPERTY() class UStaticMeshComponent* WizardOrb = nullptr;
+	UPROPERTY() class UStaticMeshComponent* WizardBookHeld = nullptr;   // the spell book in his left fist (UpdateWizardBook)
+	void UpdateWizardBook();
 	UPROPERTY() class UMaterialInstanceDynamic* WizardOrbMid = nullptr;
 	struct FBlinkPuff { TWeakObjectPtr<class UStaticMeshComponent> Comp; TWeakObjectPtr<class UMaterialInstanceDynamic> Mid; float T = 0.f; bool bIn = false; };
 	TArray<FBlinkPuff> BlinkPuffs;

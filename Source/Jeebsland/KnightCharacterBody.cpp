@@ -389,8 +389,41 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 void AKnightCharacter::RefreshEquipment()
 {
 	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGauntlets, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
-	if (bIsWizard && Anim && Skills) Anim->SetWizardBook(Skills->Worn[JeebItems::K_Book] != 0);   // (the spell book on his belt)
+	if (bIsWizard && Anim && Skills) UpdateWizardBook();
 	RebuildHeld();
+}
+
+// The wizard's spell book (2026-11-22, owner: "a spell book model from meshy for the wizard to hold in his left hand"): Meshy's model (Art/Props/SpellBook.glb,
+// /Game/Props/SM_SpellBook) held by its spine in his left fist whenever he wears a book; the belt book (Wiz_BookBase/Robe) shows only if the model is missing.
+// Built like a tool on the right fist: its spine along the fist's line, turned BookRoll about it, moved BookShift (cm, in the book's own frame).
+static float BookRoll = 0.f, BookScale = 1.f;
+static FVector BookShift(-8.f, 0.f, 0.f);
+void AKnightCharacter::UpdateWizardBook()
+{
+	const bool bWant = bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && GetNetMode() != NM_DedicatedServer && ElbowL;
+	if (bWant && !WizardBookHeld)
+	{
+		if (UStaticMesh* M = JeebProps::Load(TEXT("/Game/Props/SM_SpellBook.SM_SpellBook")))
+			WizardBookHeld = JeebProps::MakeStatic(this, ElbowL, M);
+#if !UE_BUILD_SHIPPING
+		FString T; TArray<FString> V;   // (-BookTune=<roll>_<x>_<y>_<z>_<scale>: degrees and cm in tenths, scale in hundredths)
+		if (FParse::Value(FCommandLine::Get(), TEXT("BookTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
+		{
+			BookRoll = FCString::Atof(*V[0]) / 10.f; BookShift = FVector(FCString::Atof(*V[1]), FCString::Atof(*V[2]), FCString::Atof(*V[3])) / 10.f; BookScale = FCString::Atof(*V[4]) / 100.f;
+		}
+#endif
+		if (WizardBookHeld)
+		{
+			const FVector E = KM::DownTo(KnightDesign::BladeDir(-1));
+			const FQuat Q = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(E.Z)) * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(E.Y)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(E.X));
+			const FTransform Fist(Q, KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
+			WizardBookHeld->SetRelativeTransform(FTransform(FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(BookRoll)), BookShift, FVector(BookScale)) * Fist);
+			WizardBookHeld->SetCastShadow(true);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD held book %s"), WizardBookHeld ? TEXT("made") : TEXT("MISSING (/Game/Props/SM_SpellBook: Tools/BuildProps.ps1 SpellBook)"));
+	}
+	else if (!bWant && WizardBookHeld) { WizardBookHeld->DestroyComponent(); WizardBookHeld = nullptr; }
+	if (Anim) Anim->SetWizardBook(bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && !WizardBookHeld && GetNetMode() != NM_DedicatedServer);
 }
 
 // The worn amulet (2026-11-12, owner: a gold chain round the knight's neck): the chain lies round the base of his neck, over the collar, and drops in a V
@@ -405,7 +438,7 @@ static float ChainScale = 3.f;       // (the links too, and the chain spacing wi
 // (2026-11-22, owner: "make the chain go all the way around the knight's neck ... it cuts off near the collar bone and sinks into the armor".) The back
 // half and the sides lie wider and higher, on top of the collar: with a chest plate these, bare (on the mail) the B numbers. The pendant stays where it was.
 static float ChainPlateSide = 13.f, ChainPlateBack = -11.f, ChainPlateUp = 8.f;
-static float ChainBareSide = 11.5f, ChainBareBack = -8.5f, ChainBareUp = 4.5f;
+static float ChainBareSide = 13.5f, ChainBareBack = -12.5f, ChainBareUp = 6.5f;
 void AKnightCharacter::UpdateAmulet()
 {
 	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
