@@ -44,8 +44,16 @@ namespace
 	constexpr float NearDensity = 0.0012f;   // full tufts per square cm, close up
 	constexpr float FarDensity = 0.0006f;    // thinner, cheaper tufts further out
 	constexpr float NearDist = 1100.f;
-	inline float TierDensity(int32 T) { return T == 0 ? 1.f : (T == 1 ? 0.55f : 0.3f); }
-	inline float TierSize(int32 T) { return T == 0 ? 1.f : (T == 1 ? 1.25f : 1.6f); }
+	// The steps of detail (2026-11-21): where each begins, the share of a square's spots that grow a realistic clump (times the pack's
+	// own share) and a painted card, and how much wider each is so the thinner crop still covers the ground. Every step keeps the
+	// spots of the steps beyond it (a spot's own fixed rank decides), so walking toward a square only ever adds clumps to it.
+	// Before: three steps at 17 and 32 m, the realistic share 1, 0.47, 0.09 (with jeeb.Grass.FarThin 0.5).
+	constexpr int32 NumTiers = 6;
+	constexpr float TierEdge[NumTiers - 1] = { 1200.f, 1700.f, 2400.f, 3200.f, 4100.f };
+	constexpr float PackKeep[NumTiers] = { 1.f, 0.75f, 0.5f, 0.3f, 0.16f, 0.09f };
+	constexpr float CardKeep[NumTiers] = { 1.f, 0.8f, 0.6f, 0.45f, 0.35f, 0.3f };
+	inline float PackKeepAt(int32 T, float FarThin) { return T >= 4 ? FMath::Min(1.f, PackKeep[T] * FarThin * 2.f) : PackKeep[T]; }   // (jeeb.Grass.FarThin 0.5 is the table's)
+	inline float WideFor(float Keep) { return FMath::Pow(FMath::Max(Keep, 0.02f), -0.45f); }
 
 	// Where the meadow grows (2026-11-12): all over the world's land, so the original square, Oak Hill and the open world are one
 	// meadow with no edge (before, only within FieldR of the start and in Oak Hill's rectangle, whose straight side showed).
@@ -71,7 +79,22 @@ AMeadow::AMeadow()
 // TownLab (the test map only, TownLab.h): over the rebuilt town the roads, buildings and wear are that town's.
 static bool InLab(float X, float Y) { return JeebTownLab::NewOn() && JeebTownLab::InPatch(X, Y); }
 bool AMeadow::GrowsHere(float X, float Y, float PadCm) const { return GrowsHereWorld(X, Y, PadCm); }
-int32 AMeadow::TierFor(float Dist) const { return Dist < Tier0 ? 0 : (Dist < Tier1 ? 1 : 2); }
+static TAutoConsoleVariable<int32> CVarGrassOldSteps(TEXT("jeeb.Grass.OldSteps"), 0, TEXT("1: the grass fills in by the three steps of before 2026-11-21 (17 and 32 m, a new crop at each), to compare; regrows round you"));
+static bool OldSteps() { return CVarGrassOldSteps.GetValueOnGameThread() != 0; }
+int32 AMeadow::TierFor(float Dist) const
+{
+	if (OldSteps()) return Dist < 1700.f ? 0 : (Dist < 3200.f ? 1 : 2);
+	int32 T = 0; while (T < NumTiers - 1 && Dist >= TierEdge[T]) ++T; return T; }
+// The ground as drawn at a spot (JeebTerrain::DrawnHeight), its meshes' grid points cached for the square being built
+float AMeadow::GroundAt(float X, float Y)
+{
+	return JeebTerrain::DrawnHeightWith(X, Y, [this](float A, float B)
+	{
+		const uint64 K = (uint64(uint32(FMath::RoundToInt(A))) << 32) | uint64(uint32(FMath::RoundToInt(B)));
+		if (const float* H = JobGround.Find(K)) return *H;
+		return JobGround.Add(K, JeebTerrain::HeightAt(A, B));
+	});
+}
 float AMeadow::Clearance(float X, float Y) const { return InLab(X, Y) ? JeebTownLab::RoadClearance(X, Y) : JeebTerrain::PathClearance(X, Y); }
 float AMeadow::WearAt(float X, float Y, float PathClearanceCm) const
 {
@@ -390,9 +413,89 @@ void AMeadow::RegrowAround(const FVector2D& Me)
 		}
 }
 
+#if !UE_BUILD_SHIPPING
+// (-FloatScan, 2026-11-21, owner: "Why are the grass and knight floating here?" beside a dirt road by the river) Along every road and
+// river, across a band 7 m either side, the ground he stands on (a trace down onto the world's solid ground) against the height the
+// grass is placed at and the height of the ground as drawn (JeebTerrain::DrawnHeight). Logs JEEBFLOAT: how many spots and how far.
+static void JeebFloatScan(UWorld* W)
+{
+	struct FBad { FVector2D P; float Grass, Drawn, Hit; FString What; };
+	TArray<FBad> Bad, DrawnBad;
+	int32 N = 0, NGrass = 0, NDrawn = 0, NMiss = 0, NOak = 0, NOakBad = 0;
+	double SumG = 0.0, SumOak = 0.0;
+	float MaxG = 0.f, MaxD = 0.f;
+	TMap<FString, int32> ByWhat;
+	auto Probe = [&](float X, float Y)
+	{
+		const float G = JeebTerrain::HeightAt(X, Y), D = JeebTerrain::DrawnHeight(X, Y);
+		FHitResult Hit;
+		FCollisionQueryParams Q(FName(TEXT("JeebFloat")), true);
+		FCollisionObjectQueryParams O(ECC_WorldStatic);
+		if (!W->LineTraceSingleByObjectType(Hit, FVector(X, Y, G + 1500.f), FVector(X, Y, G - 1500.f), O, Q)) { ++NMiss; return; }
+		++N;
+		const float H = Hit.ImpactPoint.Z;
+		const FString What = Hit.GetComponent() ? Hit.GetComponent()->GetOwner()->GetClass()->GetName() + TEXT(".") + Hit.GetComponent()->GetName() : TEXT("?");
+		if (H > D + 25.f) return;   // (standing on something: a bridge, a rock, a building)
+		const float Dg = G - H, Dd = D - H;
+		if (FMath::Abs(Dg) > 8.f) { ++NGrass; SumG += FMath::Abs(Dg); ByWhat.FindOrAdd(What)++; }
+		if (FMath::Abs(Dd) > 4.f) ++NDrawn;
+		MaxG = FMath::Max(MaxG, FMath::Abs(Dg)); MaxD = FMath::Max(MaxD, FMath::Abs(Dd));
+		if (FVector2D::Distance(FVector2D(X, Y), FVector2D(JeebOakHill::PosX, JeebOakHill::PosY)) < 50000.f) { ++NOak; if (FMath::Abs(Dg) > 8.f) { ++NOakBad; SumOak += FMath::Abs(Dg); } }
+		if (FMath::Abs(Dd) > 4.f && DrawnBad.Num() < 25) DrawnBad.Add({ FVector2D(X, Y), G, D, H, What });
+		if (FMath::Abs(Dg) > 20.f || FMath::Abs(Dd) > 8.f) Bad.Add({ FVector2D(X, Y), G, D, H, What });
+	};
+	auto Along = [&](const TArray<FVector2D>& Pts, bool bClosed)
+	{
+		float Next = 0.f, S = 0.f;
+		const int32 Segs = bClosed ? Pts.Num() : Pts.Num() - 1;
+		for (int32 i = 0; i < Segs; ++i)
+		{
+			const FVector2D A = Pts[i], B = Pts[(i + 1) % Pts.Num()];
+			const float L = FVector2D::Distance(A, B);
+			if (L < 1.f) continue;
+			const FVector2D Dir = (B - A) / L, Side(-Dir.Y, Dir.X);
+			while (Next <= S + L)
+			{
+				const FVector2D C = A + Dir * (Next - S);
+				for (float o = -700.f; o <= 700.f; o += 140.f) Probe(C.X + Side.X * o, C.Y + Side.Y * o);
+				Next += 300.f;
+			}
+			S += L;
+		}
+	};
+	for (const JeebTerrain::FPathDef& P : JeebTerrain::PathDefs()) Along(P.Pts, P.bClosed);
+	for (const JeebWorld::FRiver& R : JeebWorld::Rivers())
+	{
+		// (the banks: the river's line pushed out to each side by its half width, where the grass meets the water)
+		TArray<FVector2D> L, Rr;
+		for (int32 i = 0; i < R.Pts.Num(); ++i)
+		{
+			const FVector2D Dir = (R.Pts[FMath::Min(i + 1, R.Pts.Num() - 1)] - R.Pts[FMath::Max(i - 1, 0)]).GetSafeNormal();
+			const float Hw = R.Halfs.IsValidIndex(i) ? R.Halfs[i] : R.HalfWidth;
+			L.Add(R.Pts[i] + FVector2D(-Dir.Y, Dir.X) * (Hw + 500.f)); Rr.Add(R.Pts[i] - FVector2D(-Dir.Y, Dir.X) * (Hw + 500.f));
+		}
+		Along(L, false); Along(Rr, false);
+	}
+	Bad.Sort([](const FBad& A, const FBad& B) { return FMath::Abs(A.Grass - A.Hit) > FMath::Abs(B.Grass - B.Hit); });
+	UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT %d spots on the ground (%d missed): grass off the ground by over 8 cm at %d (mean %.1f cm, worst %.0f); drawn vs solid over 4 cm at %d (worst %.0f)"),
+		N, NMiss, NGrass, NGrass ? SumG / NGrass : 0.0, MaxG, NDrawn, MaxD);
+	UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT within 500 m of Oak Hill's plaza: %d spots, HeightAt off by over 8 cm at %d (mean %.1f cm)"), NOak, NOakBad, NOakBad ? SumOak / NOakBad : 0.0);
+	for (const FBad& B : DrawnBad) UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT drawn-vs-solid %.0f %.0f drawn %.0f solid %.0f %s"), B.P.X, B.P.Y, B.Drawn, B.Hit, *B.What);
+	for (int32 i = 0; i < FMath::Min(40, Bad.Num()); ++i)
+		UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT bad %.0f %.0f grass %.0f drawn %.0f solid %.0f (%+.0f) %s"), Bad[i].P.X, Bad[i].P.Y, Bad[i].Grass, Bad[i].Drawn, Bad[i].Hit, Bad[i].Grass - Bad[i].Hit, *Bad[i].What);
+}
+#endif
+
 void AMeadow::Tick(float Dt)
 {
 	Super::Tick(Dt);
+#if !UE_BUILD_SHIPPING
+	{
+		static double Born = FPlatformTime::Seconds();
+		static bool bScanned = false;
+		if (!bScanned && FPlatformTime::Seconds() - Born > 8.0 && FParse::Param(FCommandLine::Get(), TEXT("FloatScan"))) { bScanned = true; JeebFloatScan(GetWorld()); }
+	}
+#endif
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
 	if (!Pawn || !NearMesh) return;
@@ -402,8 +505,8 @@ void AMeadow::Tick(float Dt)
 		// the grass setting (jeeb.Grass.*): a change regrows everything round you; the first tick grows the start (the woods are
 		// planted by now, so grass can thin under them)
 		static FString Was;
-		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d %.2f"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
-			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread(), CVarGrassFarThin.GetValueOnGameThread());
+		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d %.2f %d"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
+			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread(), CVarGrassFarThin.GetValueOnGameThread(), CVarGrassOldSteps.GetValueOnGameThread());
 		bool bRegrow = !bPrewarmed || Now != Was;
 #if !UE_BUILD_SHIPPING
 		static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
@@ -483,8 +586,10 @@ void AMeadow::Tick(float Dt)
 void AMeadow::StartJob(const FIntPoint& Id, int32 Tier)
 {
 	bJob = true; JobId = Id; JobTier = Tier; JobDone = 0;
-	JobRand.Initialize(int32(uint32(Id.X) * 73856093u ^ uint32(Id.Y) * 19349663u ^ uint32(Tier) * 83492791u));
-	JobCount = FMath::RoundToInt(CellSize * CellSize * NearDensity * TierDensity(Tier));
+	// (the same spots at every step: the seed is the square's alone, and each spot draws from its own stream, StepJob)
+	JobRand.Initialize(int32(uint32(Id.X) * 73856093u ^ uint32(Id.Y) * 19349663u));
+	JobCount = FMath::RoundToInt(CellSize * CellSize * NearDensity);
+	JobGround.Reset();
 	// Far from every road, no tuft in this square can be near one: skip the (slow) road check for each tuft
 	const FVector2D Ctr((Id.X + 0.5f) * CellSize, (Id.Y + 0.5f) * CellSize);
 	bJobNearRoad = Clearance(Ctr.X, Ctr.Y) < CellSize * 0.75f + 200.f;
@@ -532,13 +637,37 @@ void AMeadow::StepJob(double BudgetSeconds)
 	const float FlowerShare = CVarGrassFlowers.GetValueOnGameThread();
 	// (jeeb.Grass.FarThin thins the far ring and widens what is left: half as many, about 1.4 times as wide, keeps the cover)
 	const float FarThin = FMath::Clamp(CVarGrassFarThin.GetValueOnGameThread(), 0.1f, 1.f);
-	const float TierChance[3] = { 1.f, 0.85f, 0.6f * FarThin }, TierWide[3] = { 1.f, 1.1f, 1.3f * FMath::Sqrt(1.f / FarThin) };
+	float PackHere = PackChance * PackKeepAt(JobTier, FarThin), CardHere = CardKeep[JobTier];
+	float PackWide = WideFor(PackKeepAt(JobTier, FarThin)), CardSize = FMath::Pow(CardHere, -0.4f), Taller = 1.f + 0.04f * JobTier;
+	int32 KindsTier = JobTier <= 2 ? 0 : JobTier - 2;   // (0 every kind, 1 two, 2 or more one)
+	bool bFlowerTier = JobTier <= 3;
+	uint32 Seed = uint32(JobId.X) * 73856093u ^ uint32(JobId.Y) * 19349663u;
+	if (OldSteps())   // (jeeb.Grass.OldSteps 1: the three steps of before 2026-11-21, a new crop at each, for comparing)
+	{
+		const float OldShare[3] = { 1.f, 0.55f * 0.85f, 0.3f * 0.6f * FarThin }, OldCard[3] = { 1.f, 0.55f, 0.3f }, OldSize[3] = { 1.f, 1.25f, 1.6f };
+		const float OldWide[3] = { 1.f, 1.1f, 1.3f * FMath::Sqrt(1.f / FarThin) };
+		PackHere = PackChance * OldShare[JobTier]; CardHere = OldCard[JobTier];
+		PackWide = OldWide[JobTier]; CardSize = OldSize[JobTier]; Taller = 1.f + 0.1f * JobTier;
+		KindsTier = JobTier; bFlowerTier = JobTier <= 1;
+		Seed ^= uint32(JobTier) * 83492791u;
+	}
+	const bool bCards = Pack == 0 || bFarCards;
+	const float Need = Pack == 0 ? CardHere : (bFarCards ? FMath::Max(CardHere, PackHere) : PackHere);
 	while (JobDone < JobCount)
 	{
 		if ((JobDone & 15) == 15 && FPlatformTime::Seconds() > End) return;   // (checked first, so a tuft skipped below never misses it; the next call picks up here)
 		++JobDone;
+		// (each spot its own stream: the same place, size and rank at every step, whatever the other spots did)
+		{
+			uint32 H = Seed ^ (uint32(JobDone) * 2654435761u);   // (a murmur finish, so neighbouring spots' streams share no pattern)
+			H ^= H >> 16; H *= 0x85ebca6bu; H ^= H >> 13; H *= 0xc2b2ae35u; H ^= H >> 16;
+			JobRand.Initialize(int32(H));
+			JobRand.GetUnsignedInt();
+		}
 		const float X = (JobId.X + JobRand.FRand()) * CellSize, Y = (JobId.Y + JobRand.FRand()) * CellSize;
-		const float Sxy = JobRand.FRandRange(0.85f, 1.3f) * TierSize(JobTier);
+		const float Rank = JobRand.FRand();
+		if (Rank >= Need) continue;   // (not grown at this step: the spots of the farther steps are the lowest ranks)
+		const float Sxy = JobRand.FRandRange(0.85f, 1.3f) * CardSize;
 		const float Yaw = JobRand.FRandRange(0.f, 360.f), Sz = JobRand.FRandRange(0.75f, 1.3f);
 		float Amount, Wear;
 		SampleJob(X, Y, Amount, Wear);
@@ -568,10 +697,10 @@ void AMeadow::StepJob(double BudgetSeconds)
 				Short *= 0.82f * (1.f + 1.3f * Tall * JobRand.FRandRange(0.8f, 1.15f));
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, FMath::Min(Short, 1.f)) * (1.f + 0.35f * Near) * (1.f + 0.12f * Tall);   // and wider by buildings, so the tufts overlap into one mat and the individual cards disappear
 				if (bThin) continue;
-				const float Gz = JeebTerrain::HeightAt(X, Y);
-				if (Pack == 0 || bFarCards)
+				const float Gz = GroundAt(X, Y);   // (the ground as drawn, not HeightAt: 2026-11-21, grass floated over the 8 m mesh's banks and cut roads)
+				if (bCards && Rank < CardHere)
 				{
-					JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, Gz + 4.f), FVector(Wide, Wide, Sz * (1.f + 0.1f * JobTier) * Short)));
+					JobXf.Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(X, Y, Gz + 4.f), FVector(Wide, Wide, Sz * Taller * Short)));
 					JobTall.Add(Tall);
 				}
 				if (Pack != 0)
@@ -579,37 +708,41 @@ void AMeadow::StepJob(double BudgetSeconds)
 					// a realistic clump at about this spot's card height (48 cm card x its scale), keeping its own proportions: long-patch kinds
 					// where the long grass is (more often toward a patch's heart), the short field kinds elsewhere
 					// (2026-11-15, for speed: past about 17 m fewer, wider clumps of fewer kinds, so the far ring costs less but still reads as grass)
-					if (JobRand.FRand() < PackChance * TierChance[FMath::Min(JobTier, 2)])
+					const float KindRoll = JobRand.FRand(), Pick2 = JobRand.FRand(), Jit = JobRand.FRandRange(0.85f, 1.15f);
+					const FRotator Tilt(JobRand.FRandRange(-4.f, 4.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-4.f, 4.f));
+					if (Rank < PackHere)
 					{
-						const int32 Kr = (Of[1].Num() > 0 && Tall > 0.2f && JobRand.FRand() < Tall * 1.25f) ? 1 : 0;
-						const int32 KindsHere = JobTier == 0 ? Of[Kr].Num() : FMath::Min(Of[Kr].Num(), JobTier == 1 ? 2 : 1);
-						TArray<int32> FarOf(Of[Kr].GetData(), KindsHere); TArray<float> FarW(OfW[Kr].GetData(), KindsHere);
-						const int32 K = PickKind(FarOf, FarW, X, Y, JobRand);
+						const int32 Kr = (Of[1].Num() > 0 && Tall > 0.2f && KindRoll < Tall * 1.25f) ? 1 : 0;
+						// (every kind within 24 m; beyond, two and then one, for fewer draws: a spot keeps its kind's place in the list)
+						const int32 KindsHere = KindsTier == 0 ? Of[Kr].Num() : FMath::Min(Of[Kr].Num(), KindsTier == 1 ? 2 : 1);
+						int32 K = PickKind(Of[Kr], OfW[Kr], X, Y, JobRand);
+						if (KindsHere < Of[Kr].Num() && Of[Kr].IndexOfByKey(K) >= KindsHere) K = Of[Kr][FMath::Min(FMath::FloorToInt(Pick2 * KindsHere), KindsHere - 1)];
 						const FKind& Kd = Kinds[K];
-						const float TargetH = 48.f * Sz * (1.f + 0.1f * JobTier) * Short * Kd.Height;
-						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * JobRand.FRandRange(0.85f, 1.15f) * (1.f + 0.25f * Near) * TierWide[FMath::Min(JobTier, 2)];
+						const float TargetH = 48.f * Sz * Taller * Short * Kd.Height;
+						const float Xy = FMath::Clamp(TargetH / Kd.NaturalH, 0.75f, 1.3f) * Kd.Width * Jit * (1.f + 0.25f * Near) * PackWide;
 						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy * 0.55f, Xy * 1.6f);   // (never squashed or stretched far from its own shape)
-						JobKindXf[K].Add(FTransform(FRotator(JobRand.FRandRange(-4.f, 4.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-4.f, 4.f)), FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
+						JobKindXf[K].Add(FTransform(Tilt, FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
 					}
-					// a flower clump now and then (a clump holds several, so fewer than our single flowers), one kind per drift
-					if (Of[2].Num() > 0 && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov) * FlowerShare)
+					// a flower clump now and then (a clump holds several, so fewer than our single flowers), one kind per drift; only on a spot
+					// grown at this step (so they thin with the grass and never pop on a nearer step's swap), as often near by as before
+					if (Of[2].Num() > 0 && bFlowerTier && Rank < PackHere && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov) * FlowerShare / FMath::Max(PackChance, 0.05f))
 					{
 						const float Fn = FMath::Clamp((FMath::PerlinNoise2D(FVector2D(X / 1700.f - 21.3f, Y / 1700.f + 5.1f)) * 0.5f + 0.5f) * 1.5f - 0.25f, 0.f, 0.999f);
 						const int32 K = JobRand.FRand() < 0.85f ? Of[2][FMath::FloorToInt(Fn * Of[2].Num())] : Of[2][JobRand.RandRange(0, Of[2].Num() - 1)];
 						const float S = JobRand.FRandRange(0.85f, 1.15f) * Kinds[K].Width;
 						const float Fx = X + JobRand.FRandRange(-20.f, 20.f), Fy = Y + JobRand.FRandRange(-20.f, 20.f);
-						JobKindXf[K].Add(FTransform(FRotator(0.f, JobRand.FRandRange(0.f, 360.f), 0.f), FVector(Fx, Fy, JeebTerrain::HeightAt(Fx, Fy)), FVector(S, S, S * Kinds[K].Height)));
+						JobKindXf[K].Add(FTransform(FRotator(0.f, JobRand.FRandRange(0.f, 360.f), 0.f), FVector(Fx, Fy, GroundAt(Fx, Fy)), FVector(S, S, S * Kinds[K].Height)));
 					}
 					continue;
 				}
 				// a flower beside this tuft now and then, its head just above the blades round it (tiers 0 and 1: within about 27 m;
 				// none on paths, trampled ground or under trees)
-				if (FlowerMesh && JobTier <= 1 && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov))
+				if (FlowerMesh && bFlowerTier && Rank < CardHere && Pc > 60.f && Wear < 0.3f && JobRand.FRand() < FlowerChance(X, Y) * (1.f - Cov))
 				{
 					const float Fx = X + JobRand.FRandRange(-20.f, 20.f), Fy = Y + JobRand.FRandRange(-20.f, 20.f);
 					const float Up = FMath::Clamp(Sz * Short * 1.75f * JobRand.FRandRange(0.9f, 1.1f), 0.7f, 2.4f);   // (the head at the blades' tips, 30 cm x Up against a 48 cm card)
 					const float S = JobRand.FRandRange(0.85f, 1.2f);
-					JobFlowerXf.Add(FTransform(FRotator(JobRand.FRandRange(-8.f, 8.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-8.f, 8.f)), FVector(Fx, Fy, JeebTerrain::HeightAt(Fx, Fy) + 1.f), FVector(S, S, Up)));
+					JobFlowerXf.Add(FTransform(FRotator(JobRand.FRandRange(-8.f, 8.f), JobRand.FRandRange(0.f, 360.f), JobRand.FRandRange(-8.f, 8.f)), FVector(Fx, Fy, GroundAt(Fx, Fy) + 1.f), FVector(S, S, Up)));
 					const int32 K = JobRand.FRand() < 0.85f ? FlowerKind(X, Y) : JobRand.RandRange(0, 4);
 					JobFlowerCol.Add(FlowerColours[K] * JobRand.FRandRange(0.85f, 1.1f));
 				}
@@ -632,12 +765,26 @@ void AMeadow::SampleJob(float X, float Y, float& OutAmount, float& OutWear) cons
 void AMeadow::FinishJob()
 {
 	bJob = false;
+#if !UE_BUILD_SHIPPING
+	{
+		// (test runs: each square that changes its step, when and how far off, to find the moment in a film)
+		static const bool bLog = FParse::Param(FCommandLine::Get(), TEXT("GrassStepLog"));
+		const FCell* Was = Cells.Find(JobId);
+		APlayerController* PC = bLog ? GetWorld()->GetFirstPlayerController() : nullptr;
+		if (Was && PC && PC->GetPawn())
+		{
+			const FVector P = PC->GetPawn()->GetActorLocation();
+			UE_LOG(LogTemp, Display, TEXT("JEEBGRASS step %d %d: %d -> %d at %.1f m, t %.3f"), JobId.X, JobId.Y, Was->Tier, JobTier,
+				FVector2D::Distance(FVector2D((JobId.X + 0.5f) * CellSize, (JobId.Y + 0.5f) * CellSize), FVector2D(P.X, P.Y)) / 100.f, GetWorld()->GetTimeSeconds());
+		}
+	}
+#endif
 	DropCell(JobId);
 	FCell Cell; Cell.Tier = JobTier;
 	if (JobXf.Num() > 0)
 	{
 		UInstancedStaticMeshComponent* Comp = NewObject<UInstancedStaticMeshComponent>(this);
-		Comp->SetStaticMesh(JobTier == 0 ? NearMesh : FarMesh);
+		Comp->SetStaticMesh(JobTier <= (OldSteps() ? 0 : 1) ? NearMesh : FarMesh);
 		Comp->SetupAttachment(RootComponent);
 		Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Comp->SetCastShadow(false);
@@ -687,7 +834,7 @@ void AMeadow::FinishJob()
 		P->bAffectDynamicIndirectLighting = false;
 		P->bAffectDistanceFieldLighting = false;
 		P->SetCullDistances(0, FMath::RoundToInt(PackFadeEnd + 200.f));
-		if (JobTier >= 2 && Kinds[k].Mesh->GetNumLODs() > 1) { P->bOverrideMinLOD = true; P->MinLOD = 1; }   // (the far ring: the pack's simpler model)
+		if (JobTier >= (OldSteps() ? 2 : 4) && Kinds[k].Mesh->GetNumLODs() > 1) { P->bOverrideMinLOD = true; P->MinLOD = 1; }   // (the far ring: the pack's simpler model)
 		P->RegisterComponent();
 		P->AddInstances(JobKindXf[k], false, true);
 		Cell.Packed.Add(P);

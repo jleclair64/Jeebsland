@@ -71,7 +71,12 @@ private:
 	bool bPrewarmed = false;
 	// One way everywhere since 2026-11-14 (the rebuilt Oak Hill's, first tried in TownLab): dense grass only within 40 m, in 15 m squares (about
 	// 25 draws instead of about 500), thinning past 15 m and sinking into the painted ground by 39 m (M_Grass FadeStart..FadeEnd)
-	float CellSize = 1500.f, Reach = 5000.f, Tier0 = 1700.f, Tier1 = 3200.f;
+	// (2026-11-21, owner: the grass "growing in" ahead of him was too obvious) Six steps of detail instead of three, each square's clumps
+	// a fixed set per spot so a nearer step only adds clumps among the ones already there (and widens them a little): it fills in by
+	// degrees instead of a square swapping to a new, twice as dense crop. Edges in cm from the square's middle (MeadowTiers in Meadow.cpp).
+	float CellSize = 1500.f, Reach = 5000.f;
+	TMap<uint64, float> JobGround;   // (the drawn ground's grid-point heights in the square being built)
+	float GroundAt(float X, float Y);
 	bool GrowsHere(float X, float Y, float PadCm = 0.f) const;
 	int32 TierFor(float Dist) const;
 	float Clearance(float X, float Y) const;
