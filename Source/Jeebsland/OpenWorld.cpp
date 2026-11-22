@@ -46,7 +46,20 @@ namespace
 		const FVector2D P(X, Y);
 		const float Open = 1.f - HillZone(P);
 		if (Open <= 0.f) return 0.f;
-		return Open * TownKeep(P) * Smooth(1500.f, 12000.f, FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf);
+		return Open * TownKeep(P) * Smooth(1500.f, 12000.f, FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf)
+			* Smooth(0.f, 1500.f, JeebWorld::CoastY(X) - Y);   // (never the sea floor or the islands)
+	}
+	// a town site's middle: the town's spot, moved off the water if it lies on a bank (Anchorage's is 22 m from the east branch's middle)
+	FVector2D SiteMid(const FVector2D& Town)
+	{
+		FVector2D P = Town;
+		for (int32 k = 0; k < 40 && JeebWorld::WaterEdge(P.X, P.Y) < 3500.f; ++k)
+		{
+			const FVector2D G(JeebWorld::WaterEdge(P.X + 200.f, P.Y) - JeebWorld::WaterEdge(P.X - 200.f, P.Y), JeebWorld::WaterEdge(P.X, P.Y + 200.f) - JeebWorld::WaterEdge(P.X, P.Y - 200.f));
+			if (G.IsNearlyZero()) break;
+			P += G.GetSafeNormal() * 200.f;
+		}
+		return P;
 	}
 	// the old range's share of the land there (WorldMap.h LandHeight)
 	float OldRange(const FVector2D& P)
@@ -59,11 +72,11 @@ namespace
 	// The northern range (cm): its foot runs east-west about 610 m north of the world's origin (wandering 45 m either way), the land climbs
 	// over about 300 m to the divide and stays high to the map's north edge. Along the divide a slow noise makes summits (up to
 	// RangeBase + RangeSummit) and saddles (RangeBase). Spurs and gullies run down its sides, a band of foothills stands in front of it,
-	// and it opens into a broad trough where the river runs (none within 15 m of the water, whole about 220 m out) and falls away to the coast.
+	// and it opens into a broad trough where the river runs (none within 15 m of the water, whole about 150 m out) and falls away to the coast.
 	constexpr float NorthFrom = 50000.f, NorthTo = 60000.f;
 	constexpr float RangeFoot = 61000.f, RangeFootWander = 4500.f, RangeRun = 30000.f;
 	constexpr float RangeBase = 5000.f, RangeSummit = 6200.f;   // (the rounding takes some metres off every top: JEEBOPEN logs the highest ground, about 100 m)
-	constexpr float SpurH = 1000.f, GullyH = 700.f, Foothill = 2300.f;
+	constexpr float SpurH = 1500.f, GullyH = 1000.f, Foothill = 2300.f;
 	// Rolling country elsewhere (cm): up to about RollBig + RollMid where a 500 m noise says hill country, a few metres on the plains
 	constexpr float RollBig = 1500.f, RollMid = 500.f, RollSmall = 130.f;
 	// Rock bands (cliffs) on the range: the height is stepped into sloping ledges with short risers, where the slope cut is eased to CliffSlope
@@ -93,8 +106,11 @@ namespace
 			const float Foot = RangeFoot + RangeFootWander * Perlin(FVector2D(Y, 0.f), 42000.f, 3.7f, 1.1f);
 			const float U = (Q.X - Foot) / RangeRun;
 			const float Env = Smooth(0.f, 1.f, U);
-			const float Summit = Smooth(-0.35f, 0.45f, Perlin(Q, 34000.f, 6.2f, -1.4f));
-			float H = FMath::Pow(Env, 1.3f) * (RangeBase + RangeSummit * Summit) * (0.86f + 0.14f * Perlin(Q, 15000.f, -3.1f, 8.4f));
+			// (summits where a slow noise says, and always a second massif east of the river, so the range stands on both sides of the valley)
+			const float Summit = FMath::Max(Smooth(-0.35f, 0.45f, Perlin(Q, 34000.f, 6.2f, -1.4f)), Smooth(30000.f, 9000.f, float(FVector2D::Distance(P, FVector2D(90000.f, 64000.f)))));
+			// (ridges: a rounded ridged noise gives the range distinct ridge lines with valleys between, not one dome)
+			const float Ridge = Smooth(0.f, 1.f, 1.f - FMath::Abs(Perlin(Q, 24000.f, 2.4f, 6.6f)));
+			float H = FMath::Pow(Env, 1.3f) * (RangeBase + RangeSummit * Summit) * (0.86f + 0.14f * Perlin(Q, 15000.f, -3.1f, 8.4f)) * (0.6f + 0.4f * Ridge);
 			const float Spur = FMath::Square(FMath::Max(0.f, 1.f - 1.9f * FMath::Abs(Perlin(Q, 11000.f, -6.4f, 3.3f))));
 			H += SpurH * Spur * Env * (0.4f + 0.6f * Summit);
 			const float Gully = FMath::Max(0.f, 1.f - 3.5f * FMath::Abs(Perlin(P + 0.35f * (Q - P), 6500.f, 2.9f, -7.1f)));
@@ -107,7 +123,7 @@ namespace
 			const float EdgeW = Smooth(11000.f, 0.f, Y - JeebWorld::MinY);
 			if (EdgeW > 0.f) H = FMath::Max(H, FMath::Pow(EdgeW, 1.6f) * (JeebWorld::MountainBase + JeebWorld::MountainRise * JeebWorld::Ridged(P)));
 			H = FMath::Max(H, 0.f);
-			H *= Smooth(1500.f, 22000.f + 5000.f * Perlin(P, 30000.f, 4.4f, 4.4f), We) * Smooth(3500.f, 30000.f, Shore);
+			H *= Smooth(1500.f, 15000.f + 4000.f * Perlin(P, 30000.f, 4.4f, 4.4f), We) * Smooth(3500.f, 16000.f, Shore);
 			const float Cm = Smooth(0.12f, 0.38f, Perlin(P, 17000.f, 9.1f, 1.3f)) * Smooth(1800.f, 4000.f, H) * North;
 			if (Cm > 0.f)
 			{
@@ -173,8 +189,8 @@ namespace
 	};
 
 	// ------------------------------------------------------------------ the roads' routes
-	// A least-cost search over every second grid point (16 m), sixteen headings: a step costs its length times 1 + 45 x its grade squared
-	// (5 degrees a third more, 11 degrees 2.8 times, 19 degrees 6.5 times), so a road follows valley floors and takes the lowest saddle;
+	// A least-cost search over every second grid point (16 m), sixteen headings: a step costs its length times 1 + 18 x its grade squared
+	// (11 degrees 1.7 times, 19 degrees 3.2 times: a road goes round a hill only when that is not much longer, since its corridor is levelled anyway), so a road follows valley floors and takes the lowest saddle;
 	// never in water or within 15 m of it, on the beach, in the original square, in Oak Hill or through a Steele Creek building.
 	struct FRouter
 	{
@@ -247,7 +263,7 @@ namespace
 					if (D[0] != 0 && D[1] != 0 && (Block[(a + Sa) * NB + b] || Block[a * NB + b + Sb] || Block[(a + Sa) * NB + b + Sb])) continue;
 					const float L = 2.f * Step * FMath::Sqrt(float(D[0] * D[0] + D[1] * D[1]));
 					const float Grade = FMath::Abs(Z(N2) - Zc) / L;
-					const float C = Cost[Cur.N] + L * (1.f + 45.f * Grade * Grade + Pen[N2]);
+					const float C = Cost[Cur.N] + L * (1.f + 18.f * Grade * Grade + Pen[N2]);
 					if (C >= Cost[N2]) continue;
 					Cost[N2] = C; From2[N2] = Cur.N;
 					Heap.HeapPush(FOpen{ C + float(FVector2D::Distance(Pos(N2), Goal)), N2 }, Less);
@@ -322,6 +338,10 @@ namespace
 				G.V[k] = Raw(X, Y, Cliff[k]);
 				Fixed[k] = Keep[k] < 0.01f ? 1 : 0;
 				if (Fixed[k]) G.V[k] = 0.f;
+				// (a town site is a level disc of the land, but Oak Hill's hills are laid on afterwards and Birch Grove lies in their rim:
+				// inside each disc the hills are taken off again, so the site is level)
+				const float InTown = 1.f - TownKeep(FVector2D(X, Y));
+				if (InTown > 0.f) { const float Hh = JeebHills::Offset(X, Y); if (Hh != 0.f) { G.V[k] -= Hh * InTown; Fixed[k] = 0; } }
 				Allow[k] = FMath::Lerp(1.f, CliffSlope / MaxSlope, Cliff[k]);
 			}
 		auto Finished = [&]() { for (int32 i = 0; i < NI; ++i) for (int32 j = 0; j < N; ++j) { const int32 k = i * N + j; G.T[k] = Finish(G.GX(i), G.GY(j), L0[k] + G.V[k]); } };
@@ -363,13 +383,13 @@ namespace
 			}
 		};
 		Cut(2);
-		Round(4, nullptr);
+		Round(2, nullptr);
 		Finished();
 
 		// ---- the roads, routed on that ground
 		{
 			const FRouter Router(G);
-			auto TownAt = [](const TCHAR* Name) { for (const JeebWorld::FTown& T : JeebWorld::Towns()) if (FCString::Strcmp(T.Name, Name) == 0) return T.Pos; return FVector2D::ZeroVector; };
+			auto TownAt = [](const TCHAR* Name) { for (const JeebWorld::FTown& T : JeebWorld::Towns()) if (FCString::Strcmp(T.Name, Name) == 0) return SiteMid(T.Pos); return FVector2D::ZeroVector; };
 			auto Add = [&](const TCHAR* What, const FVector2D& From, const FVector2D& To)
 			{
 				FRoad R;
@@ -435,17 +455,15 @@ namespace
 					for (int32 k = i + 1; k < M && S[k] - S[i] < 2000.f; ++k) { Sum += Base[k]; W += 1.f; }
 					Tt[i] = Sum / W;
 				}
+				Tt[0] = Base[0]; Tt[M - 1] = Base[M - 1];   // (the ends lie on the ground as it is: the road it carries on from, the town's level ground; the climb limit then eases the rest to them)
 				TArray<float> Lo = Tt, Hi = Tt;
 				for (int32 i = 1; i < M; ++i) { const float D = (S[i] - S[i - 1]) * JeebHills::RoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i - 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i - 1] - D); }
 				for (int32 i = M - 2; i >= 0; --i) { const float D = (S[i + 1] - S[i]) * JeebHills::RoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i + 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i + 1] - D); }
 				R.Want.SetNum(M); R.Ease.SetNum(M);
-				const float Total = S.Last();
 				for (int32 i = 0; i < M; ++i)
 				{
 					const float W = 0.5f * (Lo[i] + Hi[i]);
-					// (the ends: on the ground as it is, eased in over 60 m: the forest road it carries on from, the town's level ground)
-					const float EndW = Smooth(0.f, 6000.f, FMath::Min(S[i], Total - S[i]));
-					R.Want[i] = FMath::Lerp(Base[i], W, EndW);
+					R.Want[i] = W;
 					const float Diff = R.Want[i] - Base[i];
 					G.MaxCut = FMath::Max(G.MaxCut, -Diff); G.MaxFill = FMath::Max(G.MaxFill, Diff);
 					R.Ease[i] = FMath::Clamp(RoadEaseBy * FMath::Abs(Diff), RoadEaseMin, RoadEaseMax);
@@ -476,7 +494,7 @@ namespace
 						const float Ease = FMath::Lerp(R.Ease[BestI], R.Ease[BestI + 1], BestT);
 						if (D >= RoadFlat + Ease) continue;
 						float W = 1.f - Smooth(RoadFlat, RoadFlat + Ease, D);
-						W *= Smooth(1200.f, 3000.f, JeebWorld::WaterEdge(P.X, P.Y)) * TownKeep(P);
+						W *= Smooth(1200.f, 3000.f, JeebWorld::WaterEdge(P.X, P.Y));
 						if (JeebOakHill::InBox(P.X, P.Y, 1500.f) || JeebSteele::InBox(P.X, P.Y, 500.f) || FMath::Max(FMath::Abs(P.X), FMath::Abs(P.Y)) < JeebTerrain::GroundHalf + 1500.f) W = 0.f;
 						if (W <= 0.f) continue;
 						const float Odds = FMath::Min(W / FMath::Max(1.f - W, 1e-5f), 1.0e5f);
@@ -524,7 +542,7 @@ namespace
 
 float JeebOpen::Offset(float X, float Y)
 {
-	if (X <= JeebWorld::MinX || Y <= JeebWorld::MinY || X >= JeebWorld::MaxX || Y >= JeebWorld::MaxY) return 0.f;
+	if (X < JeebWorld::MinX || Y < JeebWorld::MinY || X > JeebWorld::MaxX || Y > JeebWorld::MaxY) return 0.f;   // (the edge points themselves take the grid: the map's rim keeps its height)
 	const FGrid& G = Grid();
 	return G.Tri(G.V, X, Y);
 }
@@ -612,14 +630,16 @@ float JeebOpen::Woods(float X, float Y)
 	return FMath::Max3(Dense, Copse, 0.03f);
 }
 
-float JeebOpen::Snow(float X, float Y, float Z, float Up)
+float JeebOpen::SnowRaw(float X, float Y, float Z, float Up)
 {
-	if (Z < SnowFrom - 1500.f) return 0.f;
+	if (Z < SnowFrom - 2500.f) return -1.f;
 	const FVector2D P(X, Y);
-	const float Nz = 0.5f * Perlin(P, 9000.f, 4.9f, -6.3f) + 0.3f * Perlin(P, 2300.f, -2.2f, 7.5f);
-	const float T = (Z - SnowFrom) / (SnowTo - SnowFrom) + 0.4f * Nz - 0.5f * Smooth(0.9f, 0.7f, Up);
-	return FMath::Clamp(T * 1.6f, 0.f, 1.f);
+	const float Nz = 0.7f * Perlin(P, 9000.f, 4.9f, -6.3f) + 0.4f * Perlin(P, 2300.f, -2.2f, 7.5f);
+	// (steep ground holds less: a 40 degree face stays bare rock about 24 m higher than a gentle one, so rock bands show through)
+	return (Z - SnowFrom) / (SnowTo - SnowFrom) + 0.4f * Nz - 0.8f * Smooth(0.9f, 0.72f, Up);
 }
+
+float JeebOpen::Snow(float X, float Y, float Z, float Up) { return FMath::Clamp(SnowRaw(X, Y, Z, Up) * 1.3f, 0.f, 1.f); }
 
 float JeebOpen::Snowing(double ServerSeconds)
 {
@@ -647,16 +667,17 @@ const TArray<JeebOpen::FSite>& JeebOpen::Sites()
 		for (const JeebWorld::FTown& T : JeebWorld::Towns())
 		{
 			if (T.Fade <= 0.f) continue;   // (Blackrock, Oak Hill and Steele Creek are built)
-			FSite S; S.Name = T.Name; S.Pos = T.Pos; S.Radius = T.Flat + 1500.f;
+			FSite S; S.Name = T.Name; S.Pos = SiteMid(T.Pos); S.Radius = T.Flat + 1500.f;
 			// the house: 16 m from the middle, on the side furthest from every road, its door toward the middle
-			float Best = -1.0e9f; S.House = T.Pos + FVector2D(1600.f, 0.f);
+			float Best = -1.0e9f; S.House = S.Pos + FVector2D(1600.f, 0.f);
 			for (int32 a = 0; a < 12; ++a)
 			{
-				const FVector2D Q = T.Pos + FVector2D(1600.f, 0.f).GetRotated(a * 30.f);
+				const FVector2D Q = S.Pos + FVector2D(1600.f, 0.f).GetRotated(a * 30.f);
+				if (JeebWorld::WaterEdge(Q.X, Q.Y) < 2500.f) continue;   // (never on a river bank)
 				const float C = JeebTerrain::PathClearance(Q.X, Q.Y);
 				if (C > Best + 1.f) { Best = C; S.House = Q; }
 			}
-			const FVector2D ToMid = T.Pos - S.House;
+			const FVector2D ToMid = S.Pos - S.House;
 			S.HouseYaw = FMath::RadiansToDegrees(FMath::Atan2(ToMid.Y, ToMid.X));
 			A.Add(S);
 		}

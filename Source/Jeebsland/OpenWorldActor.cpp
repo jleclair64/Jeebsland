@@ -21,11 +21,11 @@ float AOpenWorld::SnowNow = 0.f;
 namespace
 {
 	TAutoConsoleVariable<float> CVarSnowForce(TEXT("jeeb.Snow.Force"), -1.f, TEXT("The snowfall on this machine: -1 the shared weather (clear or snowing for a few minutes at a time), 0 always clear, 1 always snowing (anything between: that share of it). Looks only."));
-	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 1500 round the camera on the peaks; 0 none, 2 at most)"));
+	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 2200 round the camera on the peaks; 0 none, 2 at most)"));
 	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.45f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
-	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.6 to 3.4 cm)"));
+	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.3 to 2.8 cm)"));
 
-	constexpr int32 NumFlakes = 3000;          // (jeeb.Snow.Amount 2 shows them all; 1 half)
+	constexpr int32 NumFlakes = 4400;          // (jeeb.Snow.Amount 2 shows them all; 1 half)
 	constexpr float BoxR = 1500.f;             // the flakes' box: 30 m square round a spot 5 m ahead of the camera,
 	constexpr float BoxBelow = 500.f, BoxAbove = 1100.f;   // from 5 m under it to 11 m over it
 	const FVector Wind(55.f, 24.f, 0.f);       // cm/s: a light steady drift
@@ -71,7 +71,7 @@ void AOpenWorld::BeginPlay()
 	BuildHouses();
 	if (IsNetMode(NM_DedicatedServer)) return;   // (no snow to draw on a server)
 	if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))
-		if (UMaterialInstanceDynamic* M = Flakes->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.92f, 0.94f, 0.98f));
+		if (UMaterialInstanceDynamic* M = Flakes->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.5f, 1.52f, 1.58f));
 	TArray<FTransform> X;
 	Flake.SetNum(NumFlakes); NewT.SetNum(NumFlakes); PrevT.SetNum(NumFlakes); Seen.SetNumZeroed(NumFlakes);
 	for (int32 i = 0; i < NumFlakes; ++i)
@@ -80,7 +80,7 @@ void AOpenWorld::BeginPlay()
 		F.Pos = FVector(Rand.FRandRange(-BoxR, BoxR), Rand.FRandRange(-BoxR, BoxR), Rand.FRandRange(-BoxBelow, BoxAbove));
 		F.Fall = Rand.FRandRange(90.f, 170.f);
 		F.Phase = Rand.FRandRange(0.f, 6.28f);
-		F.Size = Rand.FRandRange(0.016f, 0.034f);
+		F.Size = Rand.FRandRange(0.013f, 0.028f);
 		F.Spin = Rand.FRandRange(0.5f, 1.6f);
 		F.bUnderRoof = false;
 		X.Add(FTransform(FQuat::Identity, FVector(0.f, 0.f, -100000.f), FVector(0.001f)));

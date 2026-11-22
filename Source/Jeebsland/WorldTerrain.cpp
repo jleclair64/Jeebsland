@@ -128,7 +128,7 @@ void AWorldTerrain::BuildLand()
 		for (int32 CJ = 0; CJ < NY; CJ += ChunkCells)
 		{
 			const int32 I1 = FMath::Min(CI + ChunkCells, NX), J1 = FMath::Min(CJ + ChunkCells, NY);
-			TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV; TArray<int32> Tri;
+			TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV, UV1; TArray<int32> Tri;
 			const int32 W = J1 - CJ + 1;
 			for (int32 i = CI; i <= I1; ++i)
 				for (int32 j = CJ; j <= J1; ++j)
@@ -138,11 +138,15 @@ void AWorldTerrain::BuildLand()
 					const FVector Nrm = FVector(At(i - 1, j) - At(i + 1, j), At(i, j - 1) - At(i, j + 1), 2.f * Step).GetSafeNormal();
 					N.Add(Nrm);
 					UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
-					if (bServer) { Col.Add(FLinearColor::White); continue; }
+					if (bServer) { Col.Add(FLinearColor::White); UV1.Add(FVector2D::ZeroVector); continue; }
 					// what the ground is here (rock, mud, sand, wear: GroundMask.h, the same function as the square's and Oak Hill's
 					// ground, so they meet without a seam); M_Ground paints it. The slope over 16 m comes from this grid's neighbours.
 					const float Up = JeebGround::Upness(At(i + 1, j), At(i - 1, j), At(i, j + 1), At(i, j - 1));
-					Col.Add(JeebGround::At(X, Y, Z, Up).Color());
+					const JeebGround::FMask Mask = JeebGround::At(X, Y, Z, Up);
+					Col.Add(Mask.Color());
+					// (2026-11-22: how much snow lies here goes in the second UV's U, from real noise worked out per point, JeebOpen::Snow: the
+					// material's own tiled noise pictures showed as a repeating weave along the snow's edge. Other grounds leave it 0: no snow)
+					UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up), 0.f));
 				}
 			for (int32 i = CI; i < I1; ++i)
 				for (int32 j = CJ; j < J1; ++j)
@@ -168,11 +172,11 @@ void AWorldTerrain::BuildLand()
 			PM->SetupAttachment(GetRootComponent());
 			PM->bUseAsyncCooking = true;
 			PM->RegisterComponent();
-			PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, Col, TArray<FProcMeshTangent>(), true);
+			PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), true);
 			// the underside too (no collision), so a camera that dips below a slope never sees through the world
 			TArray<int32> Back;
 			for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
-			PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, Col, TArray<FProcMeshTangent>(), false);
+			PM->CreateMeshSection_LinearColor(1, V, Back, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
 			PM->SetCollisionProfileName(TEXT("BlockAll"));
 			PM->ComponentTags.Add(FName(TEXT("JeebClimb")));   // (hills and rock: climbable where too steep to walk, KnightMovement.h)
 			if (!bServer)
@@ -186,6 +190,7 @@ void AWorldTerrain::BuildLand()
 			else PM->SetVisibility(false);
 			Chunks.Add(PM);
 		}
+	if (!bServer && Mat) BuildBeyond(Mat);
 	BuildFine();
 	JeebRoadSlope::Report();   // (-RoadSlope: the steepest ground on every road, 2026-11-20)
 }
@@ -432,4 +437,91 @@ void AWorldTerrain::BuildWater()
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBWATER rivers and lake: %d cells of 4 m in %d sheets"), Cells, Keys.Num());
 	}
+}
+
+// The land beyond the map's edges (2026-11-22). From the tall northern range a player sees over the map's north, west and south
+// edges, where there was nothing (the old 48 m edge ranges hid it from the ground). A coarse apron (64 m cells, 1.3 km out, no
+// collision, drawn on players' machines only) carries the ground on from the edge: it starts on the edge line, never above the real
+// ground's own edge, and eases out to far rolling land (more snowy range to the north, seabed off the coast), which the haze takes.
+// Looks only: nobody can walk there (AWorldEdge's walls).
+void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
+{
+	using namespace JeebWorld;
+	constexpr float Cs = 6400.f;
+	constexpr int32 Out = 20;
+	// grid lines: Out cells beyond each edge, the edge lines themselves, and even spans between
+	auto Lines = [&](float Lo, float Hi, bool bPastHi)
+	{
+		TArray<float> L;
+		for (int32 k = 7; k >= 1; --k) L.Add(Lo - Out * Cs - k * 10.f * Cs);   // (then seven wide cells out to about 5.8 km, for the horizon)
+		for (int32 k = Out; k >= 1; --k) L.Add(Lo - k * Cs);
+		const int32 In = FMath::Max(1, FMath::RoundToInt((Hi - Lo) / Cs));
+		for (int32 k = 0; k <= In; ++k) L.Add(Lo + (Hi - Lo) * k / In);
+		if (bPastHi) { for (int32 k = 1; k <= Out; ++k) L.Add(Hi + k * Cs); for (int32 k = 1; k <= 7; ++k) L.Add(Hi + Out * Cs + k * 10.f * Cs); }
+		return L;
+	};
+	const TArray<float> Xs = Lines(MinX, MaxX, true), Ys = Lines(MinY, MaxY, false);
+	const int32 NXv = Xs.Num(), NYv = Ys.Num();
+	// the lowest real ground along the edge within a cell either way of an edge point: the apron's edge never stands above the real edge
+	auto EdgeLow = [&](float X, float Y)
+	{
+		const bool bAlongY = X <= MinX || X >= MaxX;   // (an edge that runs along Y; corners take both)
+		const bool bAlongX = Y <= MinY;
+		float Low = JeebTerrain::HeightAt(X, Y);
+		for (float D = -Cs; D <= Cs; D += WorldStep)
+		{
+			if (bAlongY) Low = FMath::Min(Low, JeebTerrain::HeightAt(X, FMath::Clamp(Y + D, MinY, MaxY)));
+			if (bAlongX) Low = FMath::Min(Low, JeebTerrain::HeightAt(FMath::Clamp(X + D, MinX, MaxX), Y));
+		}
+		return Low - 60.f;
+	};
+	TArray<float> H; H.SetNumUninitialized(NXv * NYv);
+	for (int32 i = 0; i < NXv; ++i)
+		for (int32 j = 0; j < NYv; ++j)
+		{
+			const float X = Xs[i], Y = Ys[j];
+			const float Cx = FMath::Clamp(X, MinX, MaxX), Cy = FMath::Clamp(Y, MinY, MaxY);
+			const float D = FVector2D(X - Cx, Y - Cy).Size();
+			if (D <= 1.f && X > MinX && X < MaxX && Y > MinY) { H[i * NYv + j] = JeebTerrain::HeightAt(X, Y); continue; }   // (inside the map: not drawn, only for the edge points' normals)
+			const float Edge = EdgeLow(Cx, Cy);
+			const FVector2D P(X, Y);
+			float Far = 300.f + 1800.f * (0.5f + 0.5f * FMath::PerlinNoise2D(P / 47000.f + FVector2D(3.3f, 7.1f)));
+			if (X > MaxX) Far = 3000.f + 9000.f * FMath::Square(0.5f + 0.5f * FMath::PerlinNoise2D(P / 33000.f + FVector2D(-2.6f, 1.9f))) + 1500.f * FMath::PerlinNoise2D(P / 14000.f + FVector2D(5.1f, 0.4f));   // the range carries on north
+			if (Cy - CoastY(Cx) > -3000.f) Far = SeaLevel - 800.f;                                                               // off the coast: seabed
+			H[i * NYv + j] = FMath::Lerp(Edge, Far, Smooth(0.f, 60000.f, D)) + 500.f * Smooth(0.f, 20000.f, D) * FMath::PerlinNoise2D(P / 15000.f + FVector2D(9.2f, -4.4f));
+		}
+	auto At = [&](int32 i, int32 j) { return H[FMath::Clamp(i, 0, NXv - 1) * NYv + FMath::Clamp(j, 0, NYv - 1)]; };
+	TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV, UV1; TArray<int32> Tri;
+	for (int32 i = 0; i < NXv; ++i)
+		for (int32 j = 0; j < NYv; ++j)
+		{
+			const float X = Xs[i], Y = Ys[j], Z = At(i, j);
+			V.Add(FVector(X, Y, Z));
+			const FVector Nrm = FVector((At(i - 1, j) - At(i + 1, j)) / FMath::Max(Xs[FMath::Min(i + 1, NXv - 1)] - Xs[FMath::Max(i - 1, 0)], 1.f), (At(i, j - 1) - At(i, j + 1)) / FMath::Max(Ys[FMath::Min(j + 1, NYv - 1)] - Ys[FMath::Max(j - 1, 0)], 1.f), 1.f).GetSafeNormal();
+			N.Add(Nrm);
+			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
+			Col.Add(FLinearColor(0.f, 0.f, 0.f, 0.f));
+			UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Nrm.Z), 0.f));
+		}
+	for (int32 i = 0; i + 1 < NXv; ++i)
+		for (int32 j = 0; j + 1 < NYv; ++j)
+		{
+			const float Mx = 0.5f * (Xs[i] + Xs[i + 1]), My = 0.5f * (Ys[j] + Ys[j + 1]);
+			if (Mx > MinX && Mx < MaxX && My > MinY) continue;   // (a cell of the map itself)
+			const int32 A = i * NYv + j, B = A + NYv, C = A + 1, D = B + 1;
+			Tri.Append({ A, C, B, B, C, D });
+		}
+	if (Tri.Num() == 0) return;
+	const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
+	if (Fn.Z > 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
+	UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
+	PM->SetupAttachment(GetRootComponent());
+	PM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	PM->RegisterComponent();
+	PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
+	PM->SetMaterial(0, Mat);
+	PM->SetCastShadow(false);
+	PM->bAffectDistanceFieldLighting = false;
+	Chunks.Add(PM);
+	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN land beyond the edges: %d cells of 64 m out to %.0f m past the north, west and south edges (drawn only, no collision)"), Tri.Num() / 6, Out * Cs / 100.f);
 }

@@ -37,6 +37,8 @@ namespace JeebOpen
 	float Woods(float X, float Y);
 	// 0 .. 1: how much snow lies on ground at height Z whose normal's Z is Up (as M_Ground paints it, without its fine noise)
 	float Snow(float X, float Y, float Z, float Up);
+	// the same before it is clamped (under 0 none, over about 0.8 solid): AWorldTerrain gives it to M_Ground in the ground's second UV, which adds its fine noise
+	float SnowRaw(float X, float Y, float Z, float Up);
 	// 0 .. 1: how hard it is snowing at a moment of the shared clock (AGameStateBase::GetServerWorldTimeSeconds): clear or snowing for
 	// whole slots of SnowSlot seconds, eased in and out, the same for every player
 	constexpr double SnowSlot = 210.0;
