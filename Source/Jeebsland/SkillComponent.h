@@ -41,7 +41,10 @@ enum class EItemType : uint8
 	SilverOre,
 	GoldOre,
 	Onyx,
-	Emerald
+	Emerald,
+	// (2026-11-22, the deer: Docs/DeerPlan.md)
+	Venison,
+	Antlers
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)

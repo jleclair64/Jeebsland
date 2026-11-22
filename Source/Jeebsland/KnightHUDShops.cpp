@@ -51,8 +51,8 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 
 	// ----- Sell (left) -----
 	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
-		static const EItemType Sellable[15] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
-			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones };
+		static const EItemType Sellable[17] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
+			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers };
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
 	int32 Row = 0;
 	for (int32 m = 0; m < UE_ARRAY_COUNT(Sellable) && Row < 10; ++m)

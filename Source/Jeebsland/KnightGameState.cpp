@@ -91,6 +91,7 @@
 #include "ForestRuins.h"
 #include "Bridge.h"
 #include "FoeCamps.h"
+#include "Deer.h"
 #include "Bushes.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -318,6 +319,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
 	World->SpawnActor<AFoeCamps>(FVector::ZeroVector, FRotator::ZeroRotator);   // the bandits' camps in the forest (FoeCamps.h, FoeCamps.csv / Foes.csv; after the forest and its ruins, which they keep off; on every machine: the server places the bandits)
+	World->SpawnActor<ADeerHerds>(FVector::ZeroVector, FRotator::ZeroRotator);   // the stags' herds (Deer.h, Animals.csv / AnimalHerds.csv; after the camps and everything solid, which they keep off; the server places the animals, players' machines are sent them)
 	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
 

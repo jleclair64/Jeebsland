@@ -602,6 +602,23 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		Poly({ P(8, 16), P(30, 8), P(52, 16), P(58, 34), P(50, 52), P(30, 58), P(10, 50), P(4, 32) }, FLinearColor(0.42f, 0.27f, 0.14f));
 		Poly({ P(16, 24), P(30, 18), P(46, 24), P(50, 36), P(44, 46), P(30, 50), P(16, 44), P(12, 34) }, FLinearColor(0.52f, 0.35f, 0.19f));
 		break;
+	case EItemType::Venison:
+		Poly({ P(10, 22), P(30, 10), P(52, 18), P(56, 38), P(40, 54), P(18, 50), P(8, 36) }, FLinearColor(0.95f, 0.86f, 0.76f));
+		Poly({ P(14, 24), P(30, 15), P(48, 21), P(51, 37), P(38, 49), P(20, 46), P(13, 35) }, FLinearColor(0.58f, 0.12f, 0.12f));
+		DiscP(26, 30, 5, 5, FLinearColor(0.93f, 0.90f, 0.80f));
+		break;
+	case EItemType::Antlers:
+	{
+		const FLinearColor Horn(0.70f, 0.54f, 0.34f);
+		Poly({ P(28, 54), P(14, 30), P(10, 10), P(15, 10), P(19, 28), P(32, 50) }, Horn);
+		Poly({ P(36, 54), P(50, 30), P(54, 10), P(49, 10), P(45, 28), P(32, 50) }, Horn);
+		Poly({ P(15, 30), P(4, 22), P(6, 19), P(17, 25) }, Horn);
+		Poly({ P(49, 30), P(60, 22), P(58, 19), P(47, 25) }, Horn);
+		Poly({ P(18, 40), P(8, 38), P(9, 35), P(20, 36) }, Horn);
+		Poly({ P(46, 40), P(56, 38), P(55, 35), P(44, 36) }, Horn);
+		DiscP(32, 54, 6, 5, FLinearColor(0.93f, 0.90f, 0.80f));
+		break;
+	}
 	case EItemType::Bones:
 		Poly({ P(12, 44), P(46, 14), P(52, 20), P(18, 50) }, FLinearColor(0.93f, 0.90f, 0.80f));
 		DiscP(12, 48, 7, 7, FLinearColor(0.93f, 0.90f, 0.80f));

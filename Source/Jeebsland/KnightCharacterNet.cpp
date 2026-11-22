@@ -228,7 +228,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// ---- the trading post (beside the shopkeeper) ----
 	case EInvOp::SellAll:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || A < 0 || A > static_cast<int32>(EItemType::Bones)) break;
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || A < 0 || A > static_cast<int32>(EItemType::Antlers)) break;   // (the last material: before 2026-11-22 this stopped at Bones, so the newer ores could not be sold in one go)
 		const int32 Pay = Sk->SellAll(static_cast<EItemType>(A));
 		ShopNote(FString::Printf(TEXT("Sold for %d ingots."), Pay));
 		break;
