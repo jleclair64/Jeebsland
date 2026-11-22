@@ -961,7 +961,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 				if (const FClip* Low = Get(TEXT("CrouchIdle")))
 				{
 					Sample(*Low, Time, Over, true);
-					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
+					Overlay(B, Over, 0.f, In.BlockAlpha * (L.bTroll ? 0.f : 0.32f) * (1.f - In.CrouchAlpha));   // (the troll stands up in his block: review 2026-11-22, the crouch bent him double)
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
 				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)

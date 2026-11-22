@@ -399,6 +399,8 @@ void AKnightCharacter::TickRush(float Dt)
 	const float Speed = float(GetVelocity().Size2D());
 	const bool bOnFoot = !Move->IsFalling() && !bMounted && !bClimbing && !InClimbMove();
 	const bool bGoing = bSprinting && bOnFoot && Speed > T.TrollWalkSpeed * 1.05f;
+	// (online review 2026-11-22: the bar is the server's alone, replicated to the owner, so both use the same ease-down; no per-machine timer)
+	if (!HasAuthority()) return;
 	const int32 Lvl = Skills ? Skills->GetLevel(ESkillType::Stamina) : 1;
 	if (bGoing)
 	{
@@ -441,7 +443,9 @@ void AKnightCharacter::TickRush(float Dt)
 		if (!A || A == this) continue;
 		UHealthComponent* Hp = A->FindComponentByClass<UHealthComponent>();
 		if (!Hp || !Hp->IsAlive()) continue;
+		if (Cast<AKnightCharacter>(A)) continue;   // (other players: no PvP yet, online review 2026-11-22; deer, foes and creatures only)
 		if (const double* Was = RushHitAt.Find(A); Was && Now - *Was < T.TrollRushHitEvery) continue;
+		if (RushHitAt.Num() > 64) RushHitAt.Empty();
 		RushHitAt.Add(A, Now);
 		DealDamage(Hp, FMath::RoundToInt(T.TrollRushDamage), false, ESkillType::Attack);
 		if (ACharacter* C = Cast<ACharacter>(A))

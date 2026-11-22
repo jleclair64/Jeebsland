@@ -219,6 +219,9 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, bRushing);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RushBar, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RushSlow, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, bRushTired, COND_OwnerOnly);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardMax, COND_OwnerOnly);

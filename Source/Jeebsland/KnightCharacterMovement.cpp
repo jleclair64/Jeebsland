@@ -489,7 +489,7 @@ bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bS
 		StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
 		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
 	}
-	if (bExhausted && Stamina >= JeebTune::V().SprintRestartStamina) bExhausted = false;   // (owner 2026-11-22: sprint again from a part-filled bar; it lasts as long as what is in it)
+	if (bExhausted && Stamina >= JeebTune::V().SprintRestartShare * MaxStamina) bExhausted = false;   // (owner 2026-11-22: sprint again from a part-filled bar; online review: a fifth, not a sliver, so it never flickers on and off)
 	return bWantSprint;
 }
 

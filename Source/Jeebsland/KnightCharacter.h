@@ -549,8 +549,10 @@ protected:
 	double ServerChargeFrom = -1.0;   // (server) when the client said it started charging
 	float LeapCooldown = 0.f;         // seconds before the next charged jump
 	UPROPERTY(Replicated) bool bRushing = false;   // (server) at rush top speed: IsRushing
-	float RushBar = 1.f, RushT = 0.f, RushSlow = 0.f, RushXPAcc = 0.f;   // the rush bar (0..1), seconds rushing, the ease down to a walk (0..1), XP owed
-	bool bRushTired = false;
+	UPROPERTY(Replicated) float RushBar = 1.f;    // (server, to the owner) the rush bar 0..1
+	UPROPERTY(Replicated) float RushSlow = 0.f;   // (server, to the owner) the ease down to a walk 0..1 (SprintNow)
+	float RushT = 0.f, RushXPAcc = 0.f;   // (server) seconds rushing, XP owed
+	UPROPERTY(Replicated) bool bRushTired = false;
 	TMap<TWeakObjectPtr<AActor>, double> RushHitAt;   // (server) when each victim was last bowled over
 	void TickRush(float Dt);
 	float LeapCrouch = 0.f;           // the crouch as he charges (0..1, this machine)

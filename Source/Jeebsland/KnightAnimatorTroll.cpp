@@ -274,6 +274,24 @@ void FKnightAnimator::TrollClubClear(FPose& B)
 		TArray<FString> P;
 		if (CVarTrollBelly.GetValueOnAnyThread().ParseIntoArray(P, TEXT("_")) == 2) { Rad = FCString::Atof(*P[0]); Fwd = FCString::Atof(*P[1]); }
 	}
+	// (motion review 2026-11-22: his long arms and 50 cm hand took the knight's cut down to his hip and the club into the floor) the fist is
+	// first lifted until it is no lower than his hips and the whole club clears the floor by 35 cm
+	{
+		FQuat HR;
+		const FVector Hand = BonePos(B, RHand, &HR);
+		const FVector Grip = Hand + HR.RotateVector(L.RestRot[Bone[RHand]].Inverse().RotateVector(L.TrollFistR));
+		const FVector Dir = HR.RotateVector(L.BladeInHand).GetSafeNormal();
+		const float Floor = float(FMath::Min(BonePos(B, LToe).Z, BonePos(B, RToe).Z)) + 35.f;
+		float Lift = FMath::Max(0.f, float(BonePos(B, Hips).Z) - float(Grip.Z));
+		for (float s = 0.f; s <= 110.f; s += 10.f) Lift = FMath::Max(Lift, Floor - float((Grip + Dir * s).Z));
+		if (Lift > 0.5f)
+		{
+			L.ReachTo(B, RArm, RFore, RHand, Hand + FVector(0.f, 0.f, Lift), FVector(-0.8f, -0.3f, -0.6f));
+			FQuat Now;
+			BonePos(B, RHand, &Now);
+			TurnInMesh(B, RHand, HR * Now.Inverse());
+		}
+	}
 	if (Rad <= 1.f) return;
 	const FVector Mid = BonePos(B, Spine1) + FVector(0.f, Fwd, 0.f);
 	const float Lo = float(BonePos(B, Hips).Z) - 45.f, Hi = float(BonePos(B, Spine2).Z) + 10.f;
