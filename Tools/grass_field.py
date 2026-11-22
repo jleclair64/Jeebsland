@@ -14,6 +14,7 @@ GRASS_DESATURATION = 0.30   # how far the grass and the ground under it are pull
                             # until 2026-11-14's overhaul; the lawn's 0.30 now everywhere)
 
 import os as _os
+import unreal
 import sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import palette   # noqa: E402  (2026-11-15: the colours live in Content/Data/Palette.ini; the materials read them from MPC_JeebPalette)
@@ -183,3 +184,13 @@ try:
             lib.connect_material_property(a, pin, prop)
 except ImportError:
     pass
+
+
+def rot37(g, xy, off=0.0):
+    """World XY turned 37 degrees (and offset): a second sampling of a picture on it never lines up with the first's repeat
+    (2026-11-21, owner: randomize every repeating pattern)"""
+    u = g.mask(xy, True, False); v = g.mask(xy, False, True)
+    ap = g.node(unreal.MaterialExpressionAppendVector)   # (plain nodes: townlab_build's Graph has no append or subn)
+    g.link(g.addn(g.mul(u, 0.8), g.mul(v, -0.6)), ap, "A"); g.link(g.addn(g.mul(u, 0.6), g.mul(v, 0.8)), ap, "B")
+    r = ap
+    return g.add(r, off) if off else r
