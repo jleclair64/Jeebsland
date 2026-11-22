@@ -127,11 +127,14 @@ PROPS = {
     "AmuletEmber":      dict(AMULET, file="AmuletEmber.glb",      axes=("-Y", "X", "Z")),
     # Shields (2026-11-16, the owner's picks from the library; originals git-ignored in Art/Props/Originals, links in Art/Props/Sources.md): the face looks
     # along +X, up +Z, the width along Y; the origin at the back of the box, in the middle (KnightDesign's shield frame: JeebProps::ShieldPlace)
-    # Kite: the dark face (scratches and grime off: one clean charcoal), the steel rim, rivets and cross take the tier's colour (its rusty rivets become steel)
-    "ShieldKite":  dict(SHIELD, file="Originals/ShieldKite_Original.glb",  length=SHIELD_H[0], tier=[0, 1], vote=3, zone_else=2, zones=lambda u, v, rim: rim > 0.9 or (abs(u) < 0.2 and 0.1 < v < 0.9) or (abs(v - 0.6) < 0.11 and abs(u) < 0.62), paint=[
-                        dict(name="rivets", test=lambda Hd, S, V, Vb: (Hd < 50.0) & (S > 0.22) & (V > 0.09), to=(215.0, 0.04, 0.48), fine=0.3, slow=0.3, rough=0.35, metal=1.0, open=1),
-                        dict(name="steel", test=lambda Hd, S, V, Vb: (Vb > 0.32) & (V > 0.3) & (S < 0.3), fine=0.35, gain=1.1, sat=0.3, rough=0.35, metal=1.0, open=2),
-                        dict(name="face", test=lambda Hd, S, V, Vb: V >= 0.0, to=(220.0, 0.12, 0.10), fine=0.08, slow=0.25, rough=0.6, metal=0.0)]),
+    # Kite (2026-11-21, repainted; owner: "The paint on this shield looks horrible. It looks all smudged and the line where gold stops and black starts isn't
+    # defined."): its pictures are no longer sorted out of the library model's grimy one. repaint draws new ones from the model's shape (Tools/prop_repaint.py):
+    # one clean charcoal face, the rim, rivets and cross in clean steel that takes the tier's colour, a thin dark line where they meet the face, the cross's
+    # sunk panel a darker shade of the tier with its scrollwork lighter. front: the side of the model's own thin axis the face looks along. rows: how fine
+    # the shape is measured. tex / normal: the size of the colour and mask pictures / of the normal map (from the shape alone, no painted scratches). calm: how much of the
+    # face's dents and cracks is smoothed out of the normal map (0.85).
+    # look: any of prop_repaint.design's numbers (field colour, line width, brightness of border, panel, scrollwork and rim).
+    "ShieldKite":  dict(SHIELD, file="Originals/ShieldKite_Original.glb",  length=SHIELD_H[0], repaint=dict(front="-Y", rows=2048, tex=2048, normal=1024)),
     # Round: the planks rich brown with a touch of grain, the red ring a clean rich red, the iron rim, studs and boss take the tier's colour
     "ShieldRound": dict(SHIELD, file="Originals/ShieldRound_Original.glb", length=SHIELD_H[1], tier=[1], vote=3, paint=[
                         dict(name="red", test=lambda Hd, S, V, Vb: ((Hd < 12.0) | (Hd > 340.0)) & (S > 0.6) & (V > 0.12), to=(2.0, 0.8, 0.45), fine=0.25, slow=0.3, rough=0.5, metal=0.0, open=1),
@@ -306,7 +309,7 @@ def cull_hidden(me, name):
     bmesh.ops.delete(bm, geom=gone, context="FACES")
     bm.to_mesh(me); bm.free(); me.update()
     print("PROP", name, "hidden faces removed", len(gone))
-def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
+def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None, repaint=None):
     # The decimated model gets its own fresh UVs and its pictures baked from the full model (a heavy collapse across the library models' many UV seams
     # smears the old picture into speckled shards). Base and metal/roughness through emission, the normal map as Cycles bakes it.
     sc = bpy.context.scene
@@ -334,8 +337,19 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
     hi.select_set(True); o.select_set(True); bpy.context.view_layer.objects.active = o
     kw = dict(use_selected_to_active=True, cage_extrusion=0.01 * diag, max_ray_distance=0.03 * diag, margin=32, margin_type="EXTEND", use_clear=True)   # (2026-11-21: EXTEND fills round each island with its own edge colour, not black, so mips and texture filtering never pull black or a neighbour's colour into a seam)
     got = {}
+    if repaint:
+        # (repaint, 2026-11-21, the kite: new pictures drawn from the model's shape, Tools/prop_repaint.py. Measured and drawn before anything is baked)
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import prop_repaint
+        rp_ai = IDX[repaint["front"][-1]]
+        if not repaint["front"].startswith("-"): raise RuntimeError("PROP %s repaint: a front on the high side of its axis is not written yet" % name)
+        rp_f, rp_b, rp_fr = prop_repaint.height_fields(hi.data, rp_ai, repaint.get("rows", 2048))
+        rp_F, rp_B = prop_repaint.design(rp_f, rp_b, rp_fr, repaint["length"], name, repaint.get("look"))
+        # (the normal map from the model's shape alone: its own normal picture is all scratches and pitting, the smudged look in the light)
+        for l_ in list(hmat.node_tree.links):
+            if l_.to_socket.name == "Normal" and l_.to_node.type == "BSDF_PRINCIPLED": hmat.node_tree.links.remove(l_)
     if tn:
-        im = img("Normal", size // 2, True); tgt.image = im; ln.active = tgt
+        im = img("Normal", repaint.get("normal", size // 2) if repaint else size // 2, True); tgt.image = im; ln.active = tgt
         bpy.ops.object.bake(type="NORMAL", normal_space="TANGENT", **kw); got["Normal"] = im
     out_node = next(n for n in hmat.node_tree.nodes if n.type == "OUTPUT_MATERIAL")
     em = hmat.node_tree.nodes.new("ShaderNodeEmission")
@@ -345,11 +359,34 @@ def bake_to_new_uvs(o, hi, name, size=2048, swatch=False, extra=None):
         hmat.node_tree.links.new(tnode.outputs["Color"], em.inputs["Color"])
         im = img(tag, sz, nc); tgt.image = im; ln.active = tgt
         bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
-    for tag, eim in (extra or {}).items():   # (more pictures laid on the full model, baked the same way: the shields' tier mask)
+    for tag, eim in ({} if repaint else (extra or {})).items():   # (more pictures laid on the full model, baked the same way: the shields' tier mask)
         en = hmat.node_tree.nodes.new("ShaderNodeTexImage"); en.image = eim
         hmat.node_tree.links.new(en.outputs["Color"], em.inputs["Color"])
         im = img(tag, size // 2, True); tgt.image = im; ln.active = tgt
         bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
+    if repaint:
+        socks = prop_repaint.lay_on(hmat, rp_F, rp_B, rp_f, rp_b, rp_fr, name)
+        sc.cycles.samples = 16   # (several rays a pixel: a soft one-pixel edge, not steps)
+        for tag, sz, nc in (("Base", repaint.get("tex", size), False), ("MR", size // 2, True), ("Mask", repaint.get("tex", size), True)):
+            hmat.node_tree.links.new(socks[tag], em.inputs["Color"])
+            im = img(tag, sz, nc); tgt.image = im; ln.active = tgt
+            bpy.ops.object.bake(type="EMIT", **kw); got[tag] = im
+        sc.cycles.samples = 1
+        extra = {"Mask": None}
+        if "Normal" in got and repaint.get("calm", 0.85) > 0.0 and got["Normal"].size[0] == got["MR"].size[0]:
+            # (the painted face is clean, so its dents, cracks and scratches go from the normal map too, all but a hint: the face is where the new
+            # metal picture says no metal, a few pixels in from the steel so the foot of the cross and of the rim keep their shape)
+            import numpy as np
+            nw = got["Normal"].size[0]
+            na = np.array(got["Normal"].pixels[:], dtype=np.float32).reshape(nw, nw, 4)
+            ma = np.array(got["MR"].pixels[:], dtype=np.float32).reshape(nw, nw, 4)
+            face = (ma[..., 2] < 0.5).astype(np.float32)
+            for _i in range(3): face = np.minimum.reduce([face, np.roll(face, 1, 0), np.roll(face, -1, 0), np.roll(face, 1, 1), np.roll(face, -1, 1)])
+            for _i in range(2): face = (face + np.roll(face, 1, 0) + np.roll(face, -1, 0) + np.roll(face, 1, 1) + np.roll(face, -1, 1)) / 5.0
+            k_ = (face * repaint.get("calm", 0.85))[..., None]
+            na[..., :3] = na[..., :3] * (1.0 - k_) + np.array([0.5, 0.5, 1.0], dtype=np.float32) * k_
+            got["Normal"].pixels.foreach_set(na.reshape(-1)); got["Normal"].update()
+            print("PROP", name, "face calmed in the normal map: %.0f%% of it" % (100.0 * float(face.mean())))
     if swatch and "Base" in got:
         # (a model with no steel of its own, the longbow: added bands need a calm steel spot to take their colour from, and a baked picture is black between its
         # islands. A small steel-grey square goes into an empty corner of every picture, for steel_uv to find)
@@ -653,7 +690,8 @@ for name in names:
                     bpy.ops.mesh.customdata_custom_splitnormals_clear()
                 except Exception as e_: print("PROP", name, "custom normals kept:", e_)
                 me.shade_smooth(); me.set_sharp_from_angle(angle=math.radians(50.0))
-                baked_extra = bake_to_new_uvs(o, hi, name, swatch=bool(P.get("swatch")), extra={"Mask": src_mask} if src_mask else None)
+                baked_extra = bake_to_new_uvs(o, hi, name, swatch=bool(P.get("swatch")), extra={"Mask": src_mask} if src_mask else None,
+                                              repaint=dict(P["repaint"], length=P["length"]) if P.get("repaint") else None)
                 me = o.data
     print("PROP", name, "tris from", tris0, "to", sum(len(p.vertices) - 2 for p in me.polygons))
     # (the model's own normals, by corner: moving the vertices below doesn't turn them, and the game then lights the model from the wrong side. Kept as a corner attribute so cuts and bands carry them along)
@@ -991,9 +1029,10 @@ for name in names:
         graded.pixels.foreach_set(arr.reshape(-1)); graded.update(); base = graded
         print("PROP", name, "despeck: %.2f%% of the picture lifted" % (100.0 * spk.mean()))
     # the pictures
-    shrink(base, 1024, os.path.join(out, "T_%s_Base.png" % name))
-    if baked_extra and "Mask" in baked_extra:   # (src_paint: the tier mask baked from the model's own picture)
-        shrink(baked_extra["Mask"], 1024, os.path.join(out, "T_%s_Mask.png" % name))
+    tex_side = P.get("repaint", {}).get("tex", 1024)   # (repaint: a sharper picture, so the painted edges stay crisp close up)
+    shrink(base, tex_side, os.path.join(out, "T_%s_Base.png" % name))
+    if baked_extra and "Mask" in baked_extra:   # (src_paint: the tier mask baked from the model's own picture; repaint: drawn from its shape)
+        shrink(baked_extra["Mask"], tex_side, os.path.join(out, "T_%s_Mask.png" % name))
         print("PROP", name, "tier mask baked")
     elif tier_cls is not None and cls_map is not None:
         # (the shields: the tier's colour by pixel, not by face: a picture of its own, M_Prop's MaskTex. Clean edges where the bronze meets the planks,
@@ -1008,7 +1047,7 @@ for name in names:
         mim.pixels.foreach_set(ma_.reshape(-1)); mim.update()
         shrink(mim, 1024, os.path.join(out, "T_%s_Mask.png" % name))
         print("PROP", name, "tier mask by pixel: %.0f%% of the picture" % (100.0 * mk.mean()))
-    if normal: shrink(normal, 512, os.path.join(out, "T_%s_Normal.png" % name))
+    if normal: shrink(normal, P.get("repaint", {}).get("normal", 512), os.path.join(out, "T_%s_Normal.png" % name))
     if mr: shrink(mr, 512, os.path.join(out, "T_%s_MR.png" % name))
     tris = sum(len(p.vertices) - 2 for p in me.polygons)
     xs = [v.co for v in me.vertices]
