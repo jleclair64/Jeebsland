@@ -5,6 +5,7 @@
 #include "OpenWorldActor.generated.h"
 
 class UInstancedStaticMeshComponent;
+class UPointLightComponent;
 
 // The open world's two visible pieces that are not ground, roads or trees (OpenWorld.h has those):
 //  - a placeholder house at each town still to be built (JeebOpen::Sites: Silver Point, Anchorage, Birch Grove, Palmer Square), the
@@ -30,6 +31,21 @@ protected:
 
 private:
 	void BuildHouses();
+	// Floating candles over and round Silver Point (owner, 2026-11-22: "floating candles that light up (similar to Harry Potter)"): a few
+	// dozen slim cream candles hovering 2.5-6 m up, each with a flickering flame and halo, bobbing and drifting a little. The layout comes
+	// from a fixed seed (every machine the same); the bobbing and flicker are local looks only. Three instanced meshes, a handful of
+	// shadowless real lights on the candles nearest the camera, the lot lit by the night (dim flames by day).
+	void BuildCandles();
+	void TickCandles(float Dt, const FVector& Cam);
+	struct FCandle { FVector Home; float Bob, BobRate, BobPhase, Drift, DriftRate, DriftPhase, Height, Phase, Lean; };
+	TArray<FCandle> Candle;
+	FVector2D CandleSite = FVector2D::ZeroVector;
+	UPROPERTY() UInstancedStaticMeshComponent* CandleBody = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* CandleFlame = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* CandleHalo = nullptr;
+	UPROPERTY() TArray<UPointLightComponent*> CandleLights;
+	TArray<FTransform> CandleNow[3], CandlePrev[3];
+	bool bCandleSeen = false;
 	UPROPERTY() UInstancedStaticMeshComponent* Flakes = nullptr;
 	struct FFlake { FVector Pos; float Fall, Phase, Size, Spin; bool bUnderRoof; };
 	TArray<FFlake> Flake;
