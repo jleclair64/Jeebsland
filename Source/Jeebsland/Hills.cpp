@@ -99,6 +99,7 @@ namespace
 		float MaxCut = 0.f, MaxFill = 0.f;
 		int32 Capped = 0;
 		int32 Sloped = 0;
+		int32 PeaksBefore = 0, PeaksAfter = 0;
 	};
 
 	// 0 .. 1: where rock bands stand (patches a few hundred metres apart, kept 25-55 m from Oak Hill's box and 120 m from Steele Creek).
@@ -257,6 +258,59 @@ namespace
 		}
 		TArray<float> Cut; Cut.SetNumUninitialized(NI * N);
 		for (int32 k = 0; k < NI * N; ++k) { Cut[k] = G.V[k] > 0.f ? FMath::Max(0.f, T[k] - Base[k]) : G.V[k]; if (Cut[k] < G.V[k] - 1.f) ++G.Sloped; }
+		// Rounded tops (2026-11-22, owner: "hills like this that end in a point ... I want them all rounded off"). The slope cut above leaves
+		// every hill taller than the cap as a 35-degree cone with straight sides (an eight-sided pyramid, from the chamfer), and the spurs'
+		// ridged noise crests sharply too. So the ground is eased down, never up, toward its own 28 m average, RoundPasses times: convex
+		// places (summits, ridge lines, cone tips) sink and round off, while valleys and gullies (concave: the average is above them) keep
+		// their shape. The rock bands keep their edges (the easing fades out where the band's steeper slope is allowed).
+		auto CountPeaks = [&](const TArray<float>& Hill)   // (8 m mesh points above all eight neighbours, with the neighbours' mean over 80 cm below)
+		{
+			int32 Np = 0;
+			for (int32 i = 2; i + 2 < NI; i += 2)
+				for (int32 j = 2; j + 2 < N; j += 2)
+				{
+					const int32 k = i * N + j;
+					if (Hill[k] <= 50.f) continue;
+					const float H = Base[k] + Hill[k];
+					float Sum = 0.f; bool bTop = true;
+					for (int32 a = -2; a <= 2; a += 2) for (int32 b = -2; b <= 2; b += 2)
+					{
+						if (!a && !b) continue;
+						const int32 q = (i + a) * N + j + b; const float Hq = Base[q] + Hill[q];
+						bTop &= Hq < H; Sum += Hq;
+					}
+					Np += bTop && H - Sum / 8.f > 80.f;
+				}
+			return Np;
+		};
+		G.PeaksBefore = CountPeaks(Cut);
+		{
+			constexpr int32 R = 3, RoundPasses = 6;
+			TArray<float> Gd, Tmp, Avg; Gd.SetNumUninitialized(NI * N); Tmp.SetNumUninitialized(NI * N); Avg.SetNumUninitialized(NI * N);
+			for (int32 Pass = 0; Pass < RoundPasses; ++Pass)
+			{
+				for (int32 k = 0; k < NI * N; ++k) Gd[k] = Base[k] + Cut[k];
+				for (int32 i = 0; i < NI; ++i)   // (a separable box average, clamped at the grid's edges)
+					for (int32 j = 0; j < N; ++j)
+					{
+						float S = 0.f; for (int32 b = -R; b <= R; ++b) S += Gd[i * N + FMath::Clamp(j + b, 0, N - 1)];
+						Tmp[i * N + j] = S / (2 * R + 1);
+					}
+				for (int32 i = 0; i < NI; ++i)
+					for (int32 j = 0; j < N; ++j)
+					{
+						float S = 0.f; for (int32 a = -R; a <= R; ++a) S += Tmp[FMath::Clamp(i + a, 0, NI - 1) * N + j];
+						Avg[i * N + j] = S / (2 * R + 1);
+					}
+				for (int32 k = 0; k < NI * N; ++k)
+				{
+					if (Cut[k] <= 0.f || Avg[k] >= Gd[k]) continue;
+					const float Keep = FMath::Clamp((Allow[k] - 1.f) / (CliffSlope / MaxSlope - 1.f), 0.f, 1.f);   // (1 on a rock band)
+					Cut[k] = FMath::Max(0.f, Cut[k] - (Gd[k] - Avg[k]) * (1.f - Keep));
+				}
+			}
+		}
+		G.PeaksAfter = CountPeaks(Cut);
 		// one 3x3 blur of the hills (where there are hills all round), then never up into the snow: M_Ground paints snow on gentle ground
 		// from 60 m (Tools/world_material.py SnowFrom, its noise from about 58.4 m), so the land and the hills together ease under TopZ
 		// (2026-11-16: the north-east, where the land already climbs toward the mountains, had a snowfield)
@@ -398,8 +452,8 @@ void JeebHills::Prepare()
 	const FGrid& G = Grid();
 	float Top = 0.f;
 	for (float V : G.V) Top = FMath::Max(Top, V);
-	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS grid %dx%d (%.0f m step) from Steele Creek to %.0f m north of the plaza, scale %.2f, highest %.1f m, %d roads levelled (deepest cut %.1f m, highest bank %.1f m), %d grid points lowered to keep slopes under %.0f deg, %d eased under the snow line (%.0f m), built in %.0f ms; hash=%08x"),
-		G.NI, G.N, GridStep / 100.f, (GridX1 - Plaza.X) / 100.f, Scale(), Top / 100.f, G.RoadsN, G.MaxCut / 100.f, G.MaxFill / 100.f, G.Sloped, FMath::RadiansToDegrees(FMath::Atan(MaxSlope)), G.Capped, TopZ / 100.f, G.Ms, G.Hash);
+	UE_LOG(LogTemp, Log, TEXT("JEEBHILLS grid %dx%d (%.0f m step) from Steele Creek to %.0f m north of the plaza, scale %.2f, highest %.1f m, %d roads levelled (deepest cut %.1f m, highest bank %.1f m), %d grid points lowered to keep slopes under %.0f deg, %d eased under the snow line (%.0f m), sharp peaks (8 m) %d before rounding, %d after, built in %.0f ms; hash=%08x"),
+		G.NI, G.N, GridStep / 100.f, (GridX1 - Plaza.X) / 100.f, Scale(), Top / 100.f, G.RoadsN, G.MaxCut / 100.f, G.MaxFill / 100.f, G.Sloped, FMath::RadiansToDegrees(FMath::Atan(MaxSlope)), G.Capped, TopZ / 100.f, G.PeaksBefore, G.PeaksAfter, G.Ms, G.Hash);
 }
 
 void JeebHills::LogStats()
