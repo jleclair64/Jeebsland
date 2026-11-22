@@ -6,8 +6,7 @@
 
 class UInstancedStaticMeshComponent;
 
-// The walled village (palisade, gates, corner towers, a fountain, five huts, a walkway with ladders), the store and smithy
-// outside the east gate, and the huts scattered outside.
+// The original square: the huts scattered outside and the seven villagers (Blackrock and the market went, 2026-11-22).
 UCLASS()
 class AVillage : public AActor
 {
@@ -18,7 +17,6 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaSeconds) override;
 
 private:
 	UPROPERTY() UInstancedStaticMeshComponent* Log = nullptr;    // wall logs and gate posts (cylinders)
@@ -33,12 +31,7 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* Gold = nullptr;   // ingots and the store sign
 	UPROPERTY() UInstancedStaticMeshComponent* Ember = nullptr;  // the forge fire (glows)
 	UPROPERTY() UInstancedStaticMeshComponent* Iron = nullptr;   // anvil, coal, rack
-	UPROPERTY() UInstancedStaticMeshComponent* Drops = nullptr;  // fountain droplets (animated)
 
-	static constexpr int32 NumJetDrops = 48;
-	static constexpr int32 NumFallDrops = 64;
-	FVector FountainBase = FVector::ZeroVector;
-	bool bFountain = false;
 
 	UInstancedStaticMeshComponent* MakeISM(const TCHAR* Name, UStaticMesh* Mesh, const FLinearColor& Color, bool bShadow);
 	void AddSolid(const FVector& Center, const FVector& HalfExtent, const FQuat& Rot);

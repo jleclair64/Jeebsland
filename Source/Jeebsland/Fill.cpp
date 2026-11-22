@@ -568,14 +568,14 @@ namespace
 	enum EZone : uint8
 	{
 		Z_None, Z_OakBoxingRing, Z_OakRuins, Z_OakGarden, Z_OakGraveyard, Z_OakForts, Z_OakWatchtower, Z_OakBridge, Z_OakPlaza, Z_OakStreet,
-		Z_OakYard, Z_OakFringe, Z_OldVillage, Z_MarketYard, Z_Cottage, Z_HutYards, Z_PigPen, Z_Pond, Z_Castle, Z_Graveyard,
+		Z_OakYard, Z_OakFringe, Z_OldVillage, Z_Cottage, Z_HutYards, Z_PigPen, Z_Pond, Z_Castle, Z_Graveyard,
 		Z_Roadside, Z_RiverBank, Z_Grove, Z_WoodsEdge, Z_WoodsFloor, Z_Mountain, Z_PvP, Z_Open, Z_Count
 	};
 	const TCHAR* ZoneNames[Z_Count] = {
 		TEXT("None"), TEXT("OakBoxingRing"), TEXT("OakRuins"), TEXT("OakGarden"), TEXT("OakGraveyard"), TEXT("OakForts"), TEXT("OakWatchtower"), TEXT("OakBridge"), TEXT("OakPlaza"), TEXT("OakStreet"),
-		TEXT("OakYard"), TEXT("OakFringe"), TEXT("OldVillage"), TEXT("MarketYard"), TEXT("Cottage"), TEXT("HutYards"), TEXT("PigPen"), TEXT("Pond"), TEXT("Castle"), TEXT("Graveyard"),
+		TEXT("OakYard"), TEXT("OakFringe"), TEXT("OldVillage"), TEXT("Cottage"), TEXT("HutYards"), TEXT("PigPen"), TEXT("Pond"), TEXT("Castle"), TEXT("Graveyard"),
 		TEXT("Roadside"), TEXT("RiverBank"), TEXT("Grove"), TEXT("WoodsEdge"), TEXT("WoodsFloor"), TEXT("Mountain"), TEXT("PvP"), TEXT("Open") };
-	const TCHAR ZoneChar[Z_Count + 1] = TEXT(".abcdefghijklmnopqrstuvwxyzA");
+	const TCHAR ZoneChar[Z_Count + 1] = TEXT(".abcdefghijklmnopqrstuvwxyz");
 	bool IsOak(int32 Z) { return Z >= Z_OakBoxingRing && Z <= Z_OakFringe; }
 
 	bool OakOn() { return JeebOakHill::Enabled() && JeebTownLab::RealTown(); }
@@ -610,7 +610,6 @@ namespace
 		{
 			using namespace JeebTerrain;
 			if (RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())) < -100.f) return Z_OldVillage;
-			if (RectSD(P, MarketCenter(), MarketHalf() + FVector2D(600.f, 600.f)) < 0.f) return Z_MarketYard;
 			if (FVector2D::Distance(P, FVector2D(CottagePos().X, CottagePos().Y)) < 1400.f) return Z_Cottage;
 			for (const FVector2D& S : HutSites()) if (FVector2D::Distance(P, S) < 1000.f) return Z_HutYards;
 			{ const float Sd = RectSD(P, PenCenter(), PenHalf()); if (Sd >= 0.f && Sd < 600.f) return Z_PigPen; }
@@ -640,7 +639,6 @@ namespace
 		switch (Z)
 		{
 		case Z_OldVillage: return Around(VillageCenter(), FVector2D(VillageHalf(), VillageHalf()));
-		case Z_MarketYard: return Around(MarketCenter(), MarketHalf() + FVector2D(600.f, 600.f));
 		case Z_Cottage: return Around(FVector2D(CottagePos().X, CottagePos().Y), FVector2D(1400.f, 1400.f));
 		case Z_HutYards: { FBox2D B(ForceInit); for (const FVector2D& S : HutSites()) B += Around(S, FVector2D(1000.f, 1000.f)); return B; }
 		case Z_PigPen: return Around(PenCenter(), PenHalf() + FVector2D(600.f, 600.f));
@@ -970,7 +968,7 @@ struct FFillBuilder
 		}
 	}
 
-	// The original square: its villagers' walks, the market's counters, huts' doors, the pen, the pier, the castle's gate and
+	// The original square: its villagers' walks, huts' doors, the pen, the pier, the castle's gate and
 	// ladders, the forts' ladders, the scarecrows, the start (the old village's gates, ladders and benches went with it, 2026-11-22)
 	void SquareKeeps()
 	{
@@ -991,16 +989,6 @@ struct FFillBuilder
 			Keep(FShape::Lane(Pen + FVector2D(0.f, -960.f), Pen + FVector2D(500.f, -900.f), 80.f), TEXT("Hettie's walk"));
 			Keep(FShape::Lane(Cas + FVector2D(-1100.f, -300.f), Cas + FVector2D(-950.f, 0.f), 80.f), TEXT("Peregrine's walk"));
 			Keep(FShape::Lane(Cas + FVector2D(-950.f, 0.f), Cas + FVector2D(-1100.f, 300.f), 80.f), TEXT("Peregrine's walk"));
-		}
-		// the market's three traders: their stalls (solid already), the spot in front where you trade, and the way to it
-		const FVector2D Npcs[3] = { ShopNpcPos(), SmithNpcPos(), BankNpcPos() };
-		const TCHAR* NpcNames[3] = { TEXT("market store"), TEXT("market smith"), TEXT("market bank") };
-		for (int32 k = 0; k < 3; ++k)
-		{
-			const FVector2D Front = Npcs[k] + FVector2D(0.f, 330.f);
-			Keep(FShape::Circle(Front, 250.f), NpcNames[k]);
-			PathLane(Front, 75.f, NpcNames[k]);
-			Target(NpcNames[k], Front, 1);
 		}
 		// huts and the cottage: a door apron and the way to the road (ACottage: door on its +X at 380 cm, a lantern post beside it)
 		for (TActorIterator<ACottage> It(World); It; ++It)
@@ -1332,7 +1320,7 @@ struct FFillBuilder
 			if (bVar && P.Alts.Num() > 0) { const int32 k = FMath::Min(int32(AltRoll * (P.Alts.Num() + 1)), P.Alts.Num()); if (k > 0) KName = P.Alts[k - 1]; }
 			const FKind* K = KindOf(KName);
 			if (!K) { St.Skipped.FindOrAdd(TEXT("missing"))++; if (!P.bDrop && bAll) { if (OutWhy) *OutWhy = TEXT("missing ") + KName; return 0; } continue; }
-			// (Placement v2: wares for sale only at the market, a shop front or the square's market yard)
+			// (Placement v2: wares for sale only at the market, or a shop front)
 			if (K->bGoods && !GoodsOk(Zone)) { St.Skipped.FindOrAdd(TEXT("goods"))++; if (!P.bDrop && bAll) { if (OutWhy) *OutWhy = TEXT("goods ") + KName; return 0; } if (OutWhy) *OutWhy += FString::Printf(TEXT("%s%s: goods"), OutWhy->IsEmpty() ? TEXT("") : TEXT(", "), *KName); continue; }
 			const float PYaw = Yaw + P.Yaw + (bVar ? TurnRoll * P.Turn : 0.f);
 			const FVector2D Pw = Fr.World(FVector2D(P.Pos.X, P.Pos.Y));
@@ -1673,7 +1661,7 @@ struct FFillBuilder
 	bool GoodsOk(int32 Zone) const
 	{
 		if (!CurUse.IsEmpty()) return CurUse == TEXT("Market") || CurUse == TEXT("ShopFront");
-		return Zone == Z_OakPlaza || Zone == Z_MarketYard;
+		return Zone == Z_OakPlaza;
 	}
 	static bool InPoly(const TArray<FVector2D>& P, const FVector2D& Q)
 	{
@@ -2382,7 +2370,7 @@ struct FFillBuilder
 		for (const FPlaced& P : Placed)
 		{
 			if (!P.Kind->bGoods) continue;
-			const bool bOk = !P.Use.IsEmpty() ? (P.Use == TEXT("Market") || P.Use == TEXT("ShopFront")) : (P.Zone == Z_OakPlaza || P.Zone == Z_MarketYard);
+			const bool bOk = !P.Use.IsEmpty() ? (P.Use == TEXT("Market") || P.Use == TEXT("ShopFront")) : (P.Zone == Z_OakPlaza);
 			if (!bOk && Mis++ < 10) UE_LOG(LogTemp, Warning, TEXT("JEEBFILL MISPLACED %s (%s) in %s at E %.1f N %.1f"), *P.Kind->Name, *P.Set, P.Use.IsEmpty() ? ZoneNames[P.Zone] : *P.Use, JeebOakHill::EastM(P.Foot.C.Y), JeebOakHill::NorthM(P.Foot.C.X));
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBFILL ENCLOSURE %d plots, %d fenced plots not closed, %d run joins over 2 cm; MISPLACED %d"), PlotsB.Num(), Open, Gaps, Mis);
