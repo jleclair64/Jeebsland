@@ -218,15 +218,15 @@ void ABushes::Rebuild()
 				const float Roll = R.FRand();
 				if (Under > -15.f && Under < 30.f)
 				{
-					if (Roll >= 0.42f * Density) continue;
+					if (Roll >= 0.3f * Density) continue;
 					if (JeebTerrain::PathClearance(P.X, P.Y) < 200.f || JeebFill::Covered(P.X, P.Y)) continue;
 					if (JeebOakHill::InBox(P.X, P.Y, 0.f) && JeebOakHill::OnBuilding(P.X, P.Y, 4.f)) continue;
-					for (int32 n = 0, Nn = 3 + R.RandRange(0, 4); n < Nn; ++n)
+					for (int32 n = 0, Nn = 7 + R.RandRange(0, 6); n < Nn; ++n)
 					{
-						const FVector2D Q = P + FVector2D(R.FRandRange(-70.f, 70.f), R.FRandRange(-70.f, 70.f));
-						const float H = R.FRandRange(1.4f, 1.9f), W = R.FRandRange(0.9f, 1.2f);
+						const FVector2D Qp = P + FVector2D(R.FRandRange(-55.f, 55.f), R.FRandRange(-55.f, 55.f));
+						const float H = R.FRandRange(1.3f, 1.9f), W = R.FRandRange(1.1f, 1.5f);
 						Xf[R.FRand() < 0.55f ? B_Reed1 : B_Reed2].Add(FTransform(FRotator(R.FRandRange(-5.f, 5.f), R.FRandRange(0.f, 360.f), R.FRandRange(-5.f, 5.f)),
-							FVector(Q.X, Q.Y, JeebTerrain::DrawnHeight(Q.X, Q.Y) - 5.f), FVector(W, W, H)));
+							FVector(Qp.X, Qp.Y, JeebTerrain::DrawnHeight(Qp.X, Qp.Y) - 5.f), FVector(W, W, H)));
 						++NReed;
 					}
 				}
@@ -240,11 +240,11 @@ void ABushes::Rebuild()
 						bBank = !JeebWater::SurfaceAt(Bx, By, Sb) || JeebTerrain::DrawnHeight(Bx, By) > Sb;
 					}
 					if (!bBank) continue;
-					for (int32 n = 0, Nn = 2 + R.RandRange(0, 4); n < Nn; ++n)
+					for (int32 n = 0, Nn = 2 + R.RandRange(0, 2); n < Nn; ++n)
 					{
-						const FVector2D Q = P + FVector2D(R.FRandRange(-90.f, 90.f), R.FRandRange(-90.f, 90.f));
+						const FVector2D Qp = P + FVector2D(R.FRandRange(-160.f, 160.f), R.FRandRange(-160.f, 160.f));
 						const float Sz = R.FRandRange(0.30f, 0.55f);
-						Xf[B_Pad].Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f), FVector(Q.X, Q.Y, S + 0.8f), FVector(Sz, Sz, 0.012f)));
+						Xf[B_Pad].Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f), FVector(Qp.X, Qp.Y, S + 0.8f), FVector(Sz, Sz, 0.012f)));
 						++NPad;
 					}
 				}
@@ -295,7 +295,7 @@ void ABushes::Rebuild()
 		C->RegisterComponent();
 		if (k == B_Pad)
 			if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"), nullptr, LOAD_Quiet | LOAD_NoWarn))
-				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.10f, 0.26f, 0.07f));
+				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.035f, 0.075f, 0.02f));
 		C->AddInstances(Xf[k], false, true, false);
 		Sets.Add(C); SetReach.Add(Defs[k].Reach);
 		Total += Xf[k].Num();
