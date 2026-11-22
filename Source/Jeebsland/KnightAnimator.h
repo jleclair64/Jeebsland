@@ -323,6 +323,7 @@ private:
 	void MakeTrollMesh(AActor* Owner);
 	void TrollPose();
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
+	void TrollBareGuard(const JeebAnim::FInput& In, FPose& B);   // block with the bare left forearm raised (no shield)
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)

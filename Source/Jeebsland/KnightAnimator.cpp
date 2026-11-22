@@ -964,6 +964,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
+				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)
 			}
 	// (the crossbow is two-handed even at ease: held low across him, whatever his legs do)
 	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting;
@@ -1878,7 +1879,11 @@ void FClipLib::SolveGear()
 		FString S; TArray<FString> Pr;   // (test pictures: -SuitGrip=Along_Side_Fwd_Pitch_Yaw_Roll tries another grip without a rebuild)
 		if (FParse::Value(FCommandLine::Get(), TEXT("SuitGrip="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
 		{ Along = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2])); Turn = FRotator(FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4]), FCString::Atof(*Pr[5])); }
-		const FQuat Rot = Turn.Quaternion() * Q;
+		FQuat Rot = Turn.Quaternion() * Q;
+		// (owner 2026-11-21: the crossguard lay nearly across the hand; the sword is twisted about its own blade line, so grip, fist and blade stay where they were; test pictures: -SwordRoll=<degrees>)
+		float SwordRollDeg = 40.f;
+		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("SwordRoll="), SwordRollDeg);
+		Rot = FQuat(Rot.RotateVector(KnightDesign::BladeDir(1)).GetSafeNormal(), FMath::DegreesToRadians(SwordRollDeg)) * Rot;
 		// (2026-11-11) The grip sits in the hole of the closed fist: both hands are bent shut round this line in the mesh (Tools/knight_fist.py), in front of the palm at the base of the fingers
 		const FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();

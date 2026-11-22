@@ -407,3 +407,18 @@ float FKnightAnimator::TrollClubSwing(const FInput& In, FPose& B, float& OutBlen
 	bTrollHaft = true;   // (both hands on the haft: the left fist closes)
 	return 1.f;
 }
+
+// The troll's block with no shield (owner 2026-11-21: "just have him put his hand up as if he's trying to block with just his bare arm").
+// The left forearm is raised across in front of his chest and face, the elbow down and out, the fist up; the right arm keeps the guard the
+// block overlay left it. Placed by reach (like the punch), blended in by the block's own alpha, so the pose is a pure function of
+// In.BlockAlpha, which every machine derives from the replicated block flag: others see it too. Mesh space: +X his left, +Y ahead, +Z up.
+void FKnightAnimator::TrollBareGuard(const FInput& In, FPose& B)
+{
+	const float W = FMath::Clamp(In.BlockAlpha * (1.f - In.CrouchAlpha), 0.f, 1.f);
+	if (W < 0.01f) return;
+	const FVector Sh = BonePos(B, LArm);
+	const FVector Now = BonePos(B, LHand);
+	const float Arm = float(RefPos[Bone[LFore]].Size() + RefPos[Bone[LHand]].Size());
+	const FVector Want = Sh + FVector(-0.40f, 0.50f, 0.30f + JeebTune::V().TrollGuardUp) * Arm;   // (in front of the chest, a little toward the middle, fist about chin height)
+	L.ReachTo(B, LArm, LFore, LHand, FMath::Lerp(Now, Want, W), FVector(0.5f, -0.2f, -1.f));   // (the elbow down and a little out)
+}

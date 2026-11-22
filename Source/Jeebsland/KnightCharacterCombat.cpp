@@ -52,6 +52,15 @@
 #include "Misc/ConfigCacheIni.h"
 #include "TimerManager.h"
 
+// Raising the guard (the block button) works with a shield, and for the troll with his bare forearm (owner 2026-11-21: "just have him put his
+// hand up as if he's trying to block with just his bare arm"). Same rules as the shield: the wedge ahead, a health pool that drains while it is
+// up and heals after a pause (TrollArmGuard stands in for the shield's health), kicks crush half of it, no guard mid-swing. bIsTroll is the
+// same on every machine, so the server agrees.
+bool AKnightCharacter::GuardActive() const
+{
+	return bIsTroll || ShieldActive();
+}
+
 bool AKnightCharacter::ShieldActive() const
 {
 	if (!Skills || Skills->Worn[JeebItems::K_Shield] == 0) return false;
@@ -337,7 +346,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 	if (Now < InvulnUntil) return;
 
 	bool bFront = false;
-	if (!bEnvironmental && bBlocking && ShieldActive() && From)
+	if (!bEnvironmental && bBlocking && GuardActive() && From)
 	{
 		// (the shield's wedge: 45 degrees either side of straight ahead, HitBoxes.h)
 		const FVector To = (From->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
@@ -384,7 +393,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 void AKnightCharacter::StartBlock()
 {
 	bBlockHeld = true;
-	if (bSitting || bRolling || bClimbing || InClimbMove() || bDrinking || IsUIOpen() || !ShieldActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
+	if (bSitting || bRolling || bClimbing || InClimbMove() || bDrinking || IsUIOpen() || !GuardActive() || bAttacking || bKnockedDown || bGuardBroken || StunLeft > 0.f) return;   // no blocking mid-swing, lying down, in hitstun or with the guard broken
 	bBlocking = true;
 }
 
@@ -1200,7 +1209,7 @@ void AKnightCharacter::BeginRebound(float Dur)
 
 bool AKnightCharacter::GetShieldWedge(JeebHit::FShieldWedge& Out) const
 {
-	if (!bBlocking || !ShieldActive() || Health <= 0.f) return false;
+	if (!bBlocking || !GuardActive() || Health <= 0.f) return false;
 	if (!Anim || !Anim->IsReady()) return false;
 	Out = Anim->ShieldWedge(GetActorLocation(), GetActorForwardVector());   // (up to the top of his helm, and where the raised shield is)
 	return true;
@@ -1504,7 +1513,7 @@ void AKnightCharacter::TickGear(float Dt)
 		// The shield's health (owner, 2026-11-06). GuardMax follows what is worn, whatever is in the hand. This is the one place that answers a change of shield, by whatever path it came:
 		// the share that was left carries over, so no swap ever refills it, and a broken guard stays broken.
 		const int32 ShieldId = Skills ? Skills->Worn[JeebItems::K_Shield] : 0;
-		const float NewMax = JeebItems::ShieldHealth(ShieldId);
+		const float NewMax = (bIsTroll && !ShieldId) ? JeebTune::V().TrollArmGuard : JeebItems::ShieldHealth(ShieldId);   // (a troll guards with his bare arm: its own health, TrollArmGuard)
 		const float RecoverDelay = ShieldId ? JeebItems::ShieldRecoverDelay(JeebItems::StyleOf(ShieldId)) : 6.25f;
 		if (!FMath::IsNearlyEqual(NewMax, GuardMax))
 		{
@@ -1545,5 +1554,5 @@ void AKnightCharacter::TickGear(float Dt)
 
 	// The shield and the sword never work together: it is down during a swing, and comes back up once the swing is over if the button is still held
 	if (bAttacking || bRolling || Move->IsFalling() || bKnockedDown || bGuardBroken || StunLeft > 0.f || bDrinking) bBlocking = false;   // no guard mid-swing, mid-roll, in the air, knocked down, in hitstun or broken
-	else if (bBlockHeld && !bBlocking && ShieldActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !InClimbMove() && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
+	else if (bBlockHeld && !bBlocking && GuardActive() && !bRolling && !Move->IsFalling() && !bSliding && !bClimbing && !InClimbMove() && !bSitting && !bMounted && !IsUIOpen()) bBlocking = true;
 }
