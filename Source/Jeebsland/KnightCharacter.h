@@ -244,6 +244,7 @@ public:
 	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
+	bool GuardActive() const;                    // the guard can be raised: a shield, or a troll's bare arm
 	bool ShieldActive() const;                   // a shield is worn and the weapon in hand allows one
 	int32 SelectedKind() const;                  // kind of the weapon in hand, or -1
 	// Gathering: puts the right tool in hand (and tells you if you have none). OutTimeMult speeds up better tools.
