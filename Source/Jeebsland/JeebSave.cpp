@@ -133,6 +133,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->LastGambleHour = LastGambleHour;
 	if (UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Restore(QuestKeys, QuestSteps, QuestCounts, QuestDone);
 	if (UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Restore(TownsVisited, TownsVisited.Num() == 0);
+	Skills->StowRetiredGear();   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
 	return true;
 }
 

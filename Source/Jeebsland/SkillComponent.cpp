@@ -60,10 +60,8 @@ void USkillComponent::ResetToStartingKit()
 	RingB = 0;
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
-	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword, 2026-10-31, with iron and fire arrows)
+	// (no bow and no arrows since 2026-11-22, owner: "take away the bow as an option for the wizard and knight"; slot 2 starts empty)
 	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
-	AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), StartIronArrows);
-	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
 		Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Light, JeebItems::T_Tin);   // (ArmourId gives the classic shoulders: Light has none of its own)
@@ -82,6 +80,7 @@ void USkillComponent::ResetToStartingKit()
 		for (int32 i = 0; i < 5; ++i) Hotbar[i] = 0;
 		for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
 		Hotbar[0] = JeebItems::GearId(JeebItems::K_Staff, 0);
+		Hotbar[1] = JeebItems::GearId(JeebItems::K_Wand, 0);   // (owner 2026-11-22: staff and wand are his two weapons, the book in the shield spot)
 		for (int32 K : { JeebItems::K_Helmet, JeebItems::K_Chest, JeebItems::K_Boots }) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Wizard, JeebItems::T_Tin);
 		Worn[JeebItems::K_Book] = JeebItems::GearId(JeebItems::K_Book, 0);
 	}
@@ -421,7 +420,9 @@ bool USkillComponent::EquipFromSlot(int32 Idx)
 
 	if (JeebItems::IsWeaponKind(K))
 	{
-		const int32 H = JeebItems::BarSlotFor(K);   // (the bow slot for a bow, the hand for anything else; what was there goes to the pack)
+		// (2026-11-22: a wizard's staff to slot 1 and wand to slot 2; a bow to its own slot; anything else into the slot in hand. What was there goes to the pack)
+		const int32 H = JeebItems::OwnerIsWizard(this) && (K == JeebItems::K_Staff || K == JeebItems::K_Wand) ? (K == JeebItems::K_Wand ? 1 : 0)
+			: JeebItems::IsShooter(K) ? 1 : FMath::Clamp(Selected, 0, JeebItems::NumHotbar - 1);
 		Swap(Hotbar[H]);
 		SetSelected(H);
 		return true;
@@ -536,6 +537,29 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 	S.Count = Left;
 	if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
 	return true;
+}
+
+// (server, after a save is read) Bows were taken away from knights and wizards (owner 2026-11-22). A bow, longbow or crossbow still on an old
+// character's weapon bar goes into the pack, or the bank if the pack is full; nothing is deleted (if both are full it stays put, unusable).
+// A wizard from before then with no wand anywhere gets a tin one in slot 2. Trolls are left alone (their slots are another batch's).
+void USkillComponent::StowRetiredGear()
+{
+	if (!HasAuth() || JeebItems::OwnerIsTroll(this)) return;
+	for (int32 h = 0; h < 5; ++h)
+	{
+		const int32 Id = Hotbar[h];
+		if (!JeebItems::IsGear(Id) || !JeebItems::IsShooter(JeebItems::KindOf(Id))) continue;
+		if (PutInto(Slots, Id, 1) == 0 || PutInto(Bank, Id, 1) == 0) { Hotbar[h] = 0; UE_LOG(LogTemp, Log, TEXT("JEEBSLOTS stowed %s from bar slot %d"), *JeebItems::ItemName(Id), h + 1); }
+	}
+	if (JeebItems::OwnerIsWizard(this))
+	{
+		bool bWand = false;
+		for (int32 h = 0; h < 5; ++h) if (JeebItems::IsGear(Hotbar[h]) && JeebItems::KindOf(Hotbar[h]) == JeebItems::K_Wand) bWand = true;
+		for (const FInvSlot& S : Slots) if (JeebItems::IsGear(S.Id) && JeebItems::KindOf(S.Id) == JeebItems::K_Wand) bWand = true;
+		for (const FInvSlot& S : Bank) if (JeebItems::IsGear(S.Id) && JeebItems::KindOf(S.Id) == JeebItems::K_Wand) bWand = true;
+		if (!bWand && Hotbar[1] == 0) { Hotbar[1] = JeebItems::GearId(JeebItems::K_Wand, 0); UE_LOG(LogTemp, Log, TEXT("JEEBSLOTS gave a wizard his tin wand")); }
+	}
+	if (Hotbar[FMath::Clamp(Selected, 0, JeebItems::NumHotbar - 1)] == 0) for (int32 h = 0; h < JeebItems::NumHotbar; ++h) if (Hotbar[h]) { SetSelected(h); break; }
 }
 
 bool USkillComponent::BankDepositHot(int32 H)

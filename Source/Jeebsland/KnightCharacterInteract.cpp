@@ -108,7 +108,7 @@ void AKnightCharacter::Interact()
 		}
 		else if (K == JeebItems::K_Wand || K == JeebItems::K_Staff)
 		{
-			StartAttack(EAtkStyle::Cast, 1, 0.f);
+			BeginCastCharge();   // (2026-11-22: hold to charge, let go to cast: ReleaseCastCharge)
 		}
 		else if (JeebItems::FightsLikeSword(K) && bSprinting && !GetCharacterMovement()->IsFalling() && GetVelocity().Size2D() > WalkNow() * 1.15f
 			&& FVector::DotProduct(GetVelocity().GetSafeNormal2D(), GetActorForwardVector().GetSafeNormal2D()) > 0.7f)
@@ -136,6 +136,7 @@ void AKnightCharacter::Interact()
 void AKnightCharacter::InteractReleased()
 {
 	bAttackDown = false;
+	if (bCastCharging) { ReleaseCastCharge(); return; }   // (the wand's and staff's charged shot)
 	if (SelectedKind() == JeebItems::K_Crossbow) return;   // (letting go of the left button does nothing with the crossbow: the click shot)
 	if (Bow == EBow::Drawing && !bAimHeld)
 	{

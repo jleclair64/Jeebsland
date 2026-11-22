@@ -11,6 +11,8 @@ void AKnightHUD::DrawCastReticle(AKnightCharacter* Knight)
 	const FVector2D At = AKnightCharacter::CastReticleAt();
 	const float Cx = Canvas->ClipX * At.X, Cy = Canvas->ClipY * At.Y;
 	const float S = FMath::Clamp(Canvas->ClipY / 1080.f, 0.75f, 2.f);   // (the same size on any screen)
+	// (2026-11-22: the charged shot, like the bow's draw: an outer ring closes in on the reticle as the charge fills, gold when full)
+	const float F = Knight->IsChargingCast() ? Knight->CastChargeFrac() : 0.f;
 	const float R = 9.f * S, Th = 1.1f * S;
 	const FLinearColor Edge(0.f, 0.f, 0.f, 0.45f), Col(1.f, 1.f, 1.f, 0.85f);
 	auto Ring = [&](float Rad, float Half, const FLinearColor& C)
@@ -27,4 +29,11 @@ void AKnightHUD::DrawCastReticle(AKnightCharacter* Knight)
 	Ring(R, Th, Col);
 	Disc(Cx, Cy, 2.6f * S, 2.6f * S, Edge);
 	Disc(Cx, Cy, 1.6f * S, 1.6f * S, Col);
+	if (F > 0.f)
+	{
+		const FLinearColor CC = F >= 1.f ? FLinearColor(1.f, 0.85f, 0.4f, 0.95f) : FLinearColor(0.55f, 0.85f, 1.f, 0.85f);
+		const float RC = FMath::Lerp(30.f, 13.f, F) * S;
+		Ring(RC, Th + 0.9f * S, Edge);
+		Ring(RC, Th * 1.3f, CC);
+	}
 }

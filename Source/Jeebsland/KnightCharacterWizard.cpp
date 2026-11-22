@@ -8,6 +8,9 @@
 //   - his starting kit and what he may wear are in SkillComponent.cpp and Inventory.h (CanEquip); his body in KnightAnimatorWizard.cpp.
 // Numbers: Content/Data/Tuning.ini [Wizard].
 #include "KnightCharacter.h"
+#include "SpellFx.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "KnightMovement.h"
 #include "Inventory.h"
 #include "Components/CapsuleComponent.h"
@@ -121,6 +124,16 @@ void AKnightCharacter::MultiBlink_Implementation(FVector_NetQuantize From, FVect
 void AKnightCharacter::BlinkFx(const FVector& From, const FVector& To)
 {
 	if (IsNetMode(NM_DedicatedServer)) return;
+	// (2026-11-22, owner: "something more sophisticated than just a white circle ... a quick warp into a point and warp out at the next point
+	// like ... the portkey": a dark-blue swirl closing on a point where he was, and opening out of a point where he lands. SpellFx.cpp.
+	// -OldBlinkFx brings the old flashes back.)
+	static const bool bOld = FParse::Param(FCommandLine::Get(), TEXT("OldBlinkFx"));
+	if (!bOld)
+	{
+		ASpellFx::Play(GetWorld(), ESpellFx::WarpOut, From, FVector::ZeroVector, FLinearColor(0.25f, 0.55f, 1.f));
+		ASpellFx::Play(GetWorld(), ESpellFx::WarpIn, To, FVector::ZeroVector, FLinearColor(0.25f, 0.55f, 1.f));
+		return;
+	}
 	UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Wizard/M_WizardOrb.M_WizardOrb"));
 	if (!Ball || !Mat) return;
@@ -158,6 +171,10 @@ void AKnightCharacter::TickWizard(float Dt)
 			if (NetStep == 0 && NetT > 8.f) { NetStep = 1; UE_LOG(LogTemp, Log, TEXT("JEEBBLINK net test: asking, at %s"), *GetActorLocation().ToCompactString()); StartBlink(GetActorForwardVector().GetSafeNormal2D()); }
 			else if (NetStep == 1 && NetT > 10.f) { NetStep = 2; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: block, now at %s"), *GetActorLocation().ToCompactString()); StartBlock(); }
 			else if (NetStep == 2 && NetT > 13.f) { NetStep = 3; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: block off, blocking was %d"), bBlocking ? 1 : 0); StopBlock(); }
+			// (2026-11-22) a full charge with the staff at 15 s, then taps at 18.5 s and on until the magic is gone (log JEEBCAST on the server)
+			else if (NetStep == 3 && NetT > 15.f) { NetStep = 4; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: charging")); BeginCastCharge(); }
+			else if (NetStep == 4 && NetT > 16.6f) { NetStep = 5; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: release, charge %.2f"), CastChargeFrac()); ReleaseCastCharge(); }
+			else if (NetStep >= 5 && NetStep < 14 && NetT > 18.5f + (NetStep - 5) * 0.8f) { ++NetStep; BeginCastCharge(); ReleaseCastCharge(); UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: tap %d, magic I see %.0f"), NetStep - 5, Magic); }
 		}
 	}
 #endif

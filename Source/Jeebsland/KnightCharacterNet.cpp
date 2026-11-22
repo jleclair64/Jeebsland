@@ -478,7 +478,7 @@ void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float 
 	if (S == EAtkStyle::Thrust) return;   // (the spear's charged thrust and its lunge are gone: Docs/ToRecreate.md)
 	if (S == EAtkStyle::Cast && SelectedKind() != K_Wand && SelectedKind() != K_Staff) return;   // (only these cast; the bow shoots through ServerBowShoot)
 	if (S == EAtkStyle::Slash && IsShooter(SelectedKind())) return;   // (a bow is never swung: no arrow, no reload and a shot's reach)
-	const float C = FMath::Clamp(Charge, 0.f, 1.f);
+	const float C = S == EAtkStyle::Cast ? FMath::Min(FMath::Clamp(Charge, 0.f, 1.f), ServerCastChargeLimit()) : FMath::Clamp(Charge, 0.f, 1.f);   // (a cast never claims more charge than the server timed)
 	StartAttack(S, Dir < 0 ? -1 : 1, C);
 }
 
