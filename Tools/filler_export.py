@@ -54,6 +54,9 @@ for name in names:
     save_pic(base, os.path.join(out, "T_%s_Base.png" % name))
     if normal: save_pic(normal, os.path.join(out, "T_%s_Normal.png" % name))
     if mr: save_pic(mr, os.path.join(out, "T_%s_MR.png" % name))
+    gmf = os.path.join(SRC, name + "_GlowMask.png")   # (2026-11-21: the glass's pixel mask, for the Glow slot)
+    if os.path.exists(gmf):
+        import shutil; shutil.copyfile(gmf, os.path.join(out, "T_%s_GlowMask.png" % name))
     two = int(not body.use_backface_culling) if hasattr(body, "use_backface_culling") else 0
     for m in mats:
         if m.name.startswith("Glow"): m.name = "Glow"
