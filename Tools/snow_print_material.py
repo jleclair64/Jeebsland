@@ -13,11 +13,6 @@ if lib.does_asset_exist(path):
 mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(NAME, "/Game", unreal.Material, unreal.MaterialFactoryNew())
 mat.set_editor_property("material_domain", unreal.MaterialDomain.MD_DEFERRED_DECAL)
 mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-try:
-    mat.set_editor_property("decal_blend_mode", unreal.DecalBlendMode.DBM_TRANSLUCENT)
-except Exception:
-    pass
-
 
 def node(cls, x, y):
     return mel.create_material_expression(mat, cls, x, y)
