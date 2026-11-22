@@ -1372,6 +1372,34 @@ struct FFillBuilder
 			const float Gz = GroundUnder(T.Foot, Slope);
 			const float Sink = K->Height * P.Scale < 60.f ? 2.f : 0.f;
 			T.Xf = FTransform(FRotator(0.f, PYaw, 0.f), FVector(Pw.X, Pw.Y, Gz - Sink + P.Pos.Z), FVector(P.Scale));
+			// (2026-11-21, owner: "fix these underground flower pots": a low, long piece on a slope (raised beds, tulip beds, flower
+			// boxes) stood at its lowest corner, so its uphill end was buried. A low ground piece (under 80 cm) a metre or more long
+			// now leans with the ground instead: the ground's plane across its footprint, from the drawn ground at its four edge middles)
+			if (T.bGround && !P.bStack && T.Foot.Type == 0 && K->Height * P.Scale <= 80.f && FMath::Max(T.Foot.H.X, T.Foot.H.Y) >= 50.f && Slope > 1.f
+#if !UE_BUILD_SHIPPING
+				&& !FParse::Param(FCommandLine::Get(), TEXT("FillNoLean"))   // (the old way, for comparing; never on a server)
+#endif
+				)
+			{
+				const FShape& F = T.Foot;
+				auto Gd = [&](float Lx, float Ly) { const FVector2D Q = F.World(FVector2D(Lx, Ly)); return JeebTerrain::DrawnHeight(Q.X, Q.Y); };
+				const float Gx = (Gd(F.H.X, 0.f) - Gd(-F.H.X, 0.f)) / (2.f * F.H.X), Gy = (Gd(0.f, F.H.Y) - Gd(0.f, -F.H.Y)) / (2.f * F.H.Y);
+				const float Hc = 0.25f * (Gd(F.H.X, 0.f) + Gd(-F.H.X, 0.f) + Gd(0.f, F.H.Y) + Gd(0.f, -F.H.Y));
+				// (the plane's lowest point under the frame against the ground's: it never hangs over a dip by more than the sink)
+				float Under = 0.f;
+				for (float a = -1.f; a <= 1.01f; a += 0.5f) for (float b = -1.f; b <= 1.01f; b += 1.f)
+				{
+					Under = FMath::Max(Under, Hc + Gx * a * F.H.X + Gy * b * F.H.Y - Gd(a * F.H.X, b * F.H.Y));
+					Under = FMath::Max(Under, Hc + Gx * b * F.H.X + Gy * a * F.H.Y - Gd(b * F.H.X, a * F.H.Y));
+				}
+				const FVector2D Lp = F.Local(Pw);
+				FRotator R(FMath::RadiansToDegrees(FMath::Atan(Gx)), PYaw, FMath::RadiansToDegrees(FMath::Atan(Gy)));
+				// (the sign of pitch and roll: whichever lifts the piece's own +X and +Y the way the ground rises)
+				if (FMath::Sign(FRotationMatrix(R).GetScaledAxis(EAxis::X).Z) != FMath::Sign(Gx) && Gx != 0.f) R.Pitch = -R.Pitch;
+				if (FMath::Sign(FRotationMatrix(R).GetScaledAxis(EAxis::Y).Z) != FMath::Sign(Gy) && Gy != 0.f) R.Roll = -R.Roll;
+				const float Zp = Hc + Gx * Lp.X + Gy * Lp.Y - FMath::Min(Under, 6.f);
+				T.Xf = FTransform(R, FVector(Pw.X, Pw.Y, Zp - Sink + P.Pos.Z), FVector(P.Scale));
+			}
 			// (a lantern never stands on the ground (owner 2026-11-16): on a barrel, crate or post, or hung; and a stacked piece only
 			// where the piece it stands on was placed: its crate dropped or refused, it is left out too, never left floating)
 			if (T.bGround && K->bLight && K->Name.StartsWith(TEXT("Lantern")))
@@ -2794,10 +2822,20 @@ struct FFillBuilder
 				// the roof, posts and stones all round. Now it sits in the lantern on the post (SM_WellVillage's Glow faces, about -125 0 180
 				// in its own frame), dimmer and shorter, so only the lantern and the post beside it glow)
 				const bool bWell = P.Kind->Name == TEXT("WellVillage");
-				L->SetWorldLocation(bWell ? P.Xf.TransformPosition(FVector(-128.f, 0.f, 182.f)) : P.Xf.GetLocation() + FVector(0.f, 0.f, P.Kind->Height * P.Xf.GetScale3D().Z - 35.f));
+				// (2026-11-21, owner, the gallows lamp post: "why does this whole post light up instead of just the lantern?": every lamp
+				// post's light sat on the post's own axis 35 cm under its top, inside the post and crossbar, so the shadowless light lit the
+				// wood from within. Now it sits in the middle of the lantern's glass: each mesh's Glow slot, measured with -GlowLog)
+				FVector Glow;
+				const FString& Kn = P.Kind->Name;
+				const bool bGlow = bWell ? (Glow = FVector(-125.f, -11.f, 187.f), true)
+					: Kn == TEXT("LampPostGallows") ? (Glow = FVector(-72.f, 0.f, 186.f), true)
+					: Kn == TEXT("LampPostPillar") ? (Glow = FVector(-36.f, 0.f, 239.f), true)
+					: Kn == TEXT("LampPostStone") ? (Glow = FVector(-28.f, 0.f, 177.f), true) : false;
+				L->SetWorldLocation(bGlow ? P.Xf.TransformPosition(Glow) : P.Xf.GetLocation() + FVector(0.f, 0.f, P.Kind->Height * P.Xf.GetScale3D().Z - 35.f));
 				L->SetIntensityUnits(ELightUnits::Lumens);
 				L->SetIntensity(bWell ? 40.f : 100.f);
 				L->SetAttenuationRadius(bWell ? 200.f : 380.f);
+				L->SetSourceRadius(4.f);
 				if (bWell) UE_LOG(LogTemp, Log, TEXT("JEEBFILL well %s at %s yaw %.0f, its lantern light at %s"), *P.Kind->Name, *P.Xf.GetLocation().ToCompactString(), P.Xf.Rotator().Yaw, *L->GetComponentLocation().ToCompactString());
 				JeebLamp::TrackLight(L);
 				L->SetCastShadows(false);
