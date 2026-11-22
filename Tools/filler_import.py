@@ -54,7 +54,10 @@ def make_material(mname, two_sided, default_base, default_mr, default_normal):
     g.set_editor_property("parameter_name", "GlowAmount"); g.set_editor_property("default_value", 0.0)
     mul = E(m, unreal.MaterialExpressionMultiply, -350, 800)
     mel.connect_material_expressions(base, "RGB", mul, "A"); mel.connect_material_expressions(g, "", mul, "B")
-    mel.connect_material_property(mul, "", MP.MP_EMISSIVE_COLOR)
+    gmt = tex("GlowMaskTex", 1100, unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR, lib.load_asset("/Engine/EngineResources/WhiteSquareTexture"))   # (2026-11-21: the glass's pixel mask; white = the whole slot glows, as before)
+    mul2 = E(m, unreal.MaterialExpressionMultiply, -200, 900)
+    mel.connect_material_expressions(mul, "", mul2, "A"); mel.connect_material_expressions(gmt, "R", mul2, "B")
+    mel.connect_material_property(mul2, "", MP.MP_EMISSIVE_COLOR)
     mel.recompile_material(m)
     lib.save_asset(path)
     return m
@@ -74,6 +77,9 @@ def make_mi(n, suffix, parent_name, base, mr, nm, glow):
     if mr: mel.set_material_instance_texture_parameter_value(mi, "MRTex", mr)
     if nm: mel.set_material_instance_texture_parameter_value(mi, "NormalTex", nm)
     if glow: mel.set_material_instance_scalar_parameter_value(mi, "GlowAmount", GLOW)
+    if glow:
+        gmk = pic("T_%s_GlowMask" % n, False)
+        if gmk: mel.set_material_instance_texture_parameter_value(mi, "GlowMaskTex", gmk)
     lib.save_asset(p)
     return mi
 
