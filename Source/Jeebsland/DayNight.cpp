@@ -153,6 +153,7 @@ FLinearColor ADayNight::TrailLight = FLinearColor::White;
 FVector ADayNight::SunDir = FVector::UpVector;
 FVector ADayNight::MoonDir = FRotator(30.f, 205.f, 0.f).Vector();   // (15 degrees up until 2026-11-17; higher now it lights the night)
 float ADayNight::FixedPhase = -1.f;
+float ADayNight::IndoorBias = 0.f;
 
 ADayNight::ADayNight()
 {
@@ -492,7 +493,7 @@ void ADayNight::TickLook(float High)
 		S.AmbientOcclusionRadius = AORadius.GetValueOnGameThread();
 		S.AutoExposureBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() * (1.f - High) + JeebNight::Exposure.GetValueOnGameThread() * Night
 			+ JeebNight::Twilight.GetValueOnGameThread() * (1.f - FMath::SmoothStep(0.f, 7.f, FMath::Abs(SunElevation)))
-			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation);
+			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation) + IndoorBias;
 		{   // (LOW is the level without volumetric clouds, set by ApplyGraphics)
 			static IConsoleVariable* VC = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricCloud"));
 			if (VC && VC->GetInt() == 0) S.AutoExposureBias += LowTrim.GetValueOnGameThread();

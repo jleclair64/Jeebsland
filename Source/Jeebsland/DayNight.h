@@ -39,6 +39,7 @@ public:
 	static FLinearColor TrailLight;   // how glowing things that make their own light (sword and arrow trails) should look right now: white at noon, dimmer and warmer as the sun sinks
 	static FVector MoonDir;      // unit vector toward the moon (30 degrees up in the south-south-west; the moonlight comes from there)
 	static float FixedPhase;     // >= 0 freezes the clock at that phase (used for test screenshots)
+	static float IndoorBias;     // (2026-11-22) extra exposure in stops while the camera is inside a walk-in house (AHouseInterior; 0 outside)
 	static constexpr float CloudWindSpeed = 1.f;   // how fast the clouds drift; raise it if they crawl, lower it if they race
 
 protected:

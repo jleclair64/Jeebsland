@@ -9,6 +9,7 @@ class APostProcessVolume;
 class UStaticMesh;
 class UStaticMeshComponent;
 class UBoxComponent;
+class UInstancedStaticMeshComponent;
 class APawn;
 
 // The walk-in thatched house (2026-11-21, owner: House_CLS1 behind the church; Docs/TownLab/InteriorPlan.md). ATownLabTown draws that
@@ -90,6 +91,15 @@ private:
 	float TestClock = 0.f;
 	UPROPERTY() TArray<UPointLightComponent*> Lights;
 	TArray<float> LightBase;
+	// (2026-11-22, owner: "each candle light up"): a small bright flame and a soft halo at every wick (Content/Data/InteriorFlames.csv:
+	// each fixture mesh's wicks in its own frame), each flickering on its own; a fixture's one real light follows its flames' average
+	UPROPERTY() UInstancedStaticMeshComponent* FlameCones = nullptr;
+	UPROPERTY() UInstancedStaticMeshComponent* FlameHalos = nullptr;
+	struct FFlame { FVector At; float Size; float Phase; int32 Light; };
+	TArray<FFlame> Flames;
+	TArray<float> LightFlicker;   // (each light's flames' average this frame; 1 with none)
+	void AddFlames(const FRow& R, int32 LightIndex);
+	void TickFlames(bool bOn, float K);
 	UPROPERTY() APostProcessVolume* Post = nullptr;
 	FBox RoomLocal = FBox(ForceInit);   // the room inside the walls, in the house's frame
 	float Flicker = 0.f;
