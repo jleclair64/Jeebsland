@@ -303,10 +303,10 @@ void ATownLabTown::BuildBuildings()
 		const FString Asset = AssetName(P.Model);
 		FString Path = FString::Printf(TEXT("/Game/Buildings/SM_%s"), *Asset), ColPath = Path + TEXT("_Col");
 		if (bSwap) { Path = Pick.Mesh; ColPath = LoadMesh(Pick.Mesh + TEXT("_Col")) ? Pick.Mesh + TEXT("_Col") : ColPath; ++Rebuilt; }
-		// (the walk-in house, 2026-11-21: House_CLS1 alone gets the shell with its doorway cut, SM_TL_HouseOpen, and a room inside;
-		// the other thatched houses keep SM_TL_House. HouseInterior.h; -NoOpenHouse: closed like the rest)
+		// (the walk-in houses, 2026-11-21: every thatched house with a room list (Content/Data/Interior_<Id>.csv; all ten in Oak Hill) gets
+		// the shell with its doorway cut, SM_TL_HouseOpen, and a room inside. HouseInterior.h; -NoOpenHouse: all closed, SM_TL_House)
 		static const bool bNoOpen = FParse::Param(FCommandLine::Get(), TEXT("NoOpenHouse"));
-		const bool bOpenHouse = bRealSite && !bNoOpen && bSwap && P.Id && FCString::Stricmp(P.Id, AHouseInterior::OpenPlotId()) == 0 && Path.EndsWith(TEXT("SM_TL_House"))
+		const bool bOpenHouse = bRealSite && !bNoOpen && bSwap && P.Id && AHouseInterior::HasRoom(P.Id) && Path.EndsWith(TEXT("SM_TL_House"))
 			&& LoadMesh(Path + TEXT("Open")) && LoadMesh(Path + TEXT("Open_Col"));
 		if (bOpenHouse) { Path += TEXT("Open"); ColPath = Path + TEXT("_Col"); }
 		UE_LOG(LogTemp, Log, TEXT("%s PLOT %d %s (%s) -> %s at %.0f %.0f %.0f yaw %.0f id %s door %.0f"), Tag(), PlotIndex, P.Name, P.Model, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, Yaw,
@@ -450,6 +450,7 @@ void ATownLabTown::BuildBuildings()
 		if (bOpenHouse)
 			if (AHouseInterior* Room = GetWorld()->SpawnActorDeferred<AHouseInterior>(AHouseInterior::StaticClass(), FTransform(FRotator(0.f, Yaw, 0.f), At), this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
 			{
+				Room->PlotId = P.Id;
 				Room->FinishSpawning(FTransform(FRotator(0.f, Yaw, 0.f), At));
 				HashIn(Hash, float(Room->Hash % 100000u));
 				UE_LOG(LogTemp, Log, TEXT("%s OPEN HOUSE %s: walk-in room at %.0f %.0f %.0f yaw %.0f"), Tag(), P.Id, At.X, At.Y, At.Z, Yaw);

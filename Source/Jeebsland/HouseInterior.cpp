@@ -1,5 +1,6 @@
 #include "HouseInterior.h"
 #include "OakHill.h"
+#include "Terrain.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/BoxComponent.h"
@@ -69,19 +70,60 @@ float AHouseInterior::CamScaleAt(const UWorld* World, const FVector& At)
 	return 1.f;
 }
 
-// Content/Data/InteriorHouse.csv: Mesh,X,Y,Z,Yaw,Pitch,Roll,SX,SY,SZ,Solid,Shadow,Light,Radius,Mat (Mat: a material for every slot instead of its own)
+bool AHouseInterior::HasRoom(const TCHAR* PlotId)
+{
+	return PlotId && *PlotId && FPaths::FileExists(FPaths::ProjectContentDir() / FString::Printf(TEXT("Data/Interior_%s.csv"), PlotId));
+}
+
+// Content/Data/Interior_<PlotId>.csv (written by Tools/interior_rooms.py, which holds the shell every house shares): Mesh,X,Y,Z,Yaw,Pitch,Roll,SX,SY,SZ,Solid,Shadow,Light,Radius,Mat
+//  Mat: a material for every slot instead of its own, or slot=material|slot=material for single slots (slot: its number)
 //  Mesh: an asset path, or ROOM (X,Y,Z the room's low corner, SX,SY,SZ its high one), LIGHT (a lamp's light alone), FIRE (the hearth's
 //  light: flickers). X,Y,Z: cm in the house's frame (X along its long side, +Y out of the door), Z from the floor. SY/SZ empty = SX.
 //  Solid 1: a box from the mesh's bounds blocks him (every machine). Shadow 1: casts shadows. Light: lumens of a light at the spot
 //  (on a mesh row: at the mesh's middle top), Radius: its reach in cm.
 void AHouseInterior::Build()
 {
+	int32 Pieces = 0, Solids = 0, Missing = 0;
+	BuildFrom(FString::Printf(TEXT("Data/Interior_%s.csv"), *PlotId), Pieces, Solids, Missing);
+	const bool bServer = IsNetMode(NM_DedicatedServer);
+	const FTransform Xf = GetActorTransform();
+	// A gentle exposure lift inside, so the room reads cosy rather than black (a box over the room, above the land's own volume)
+	if (!bServer && RoomLocal.IsValid)
+	{
+		FActorSpawnParameters SP; SP.Owner = this;
+		Post = GetWorld()->SpawnActor<APostProcessVolume>(Xf.TransformPosition(RoomLocal.GetCenter()), Xf.Rotator(), SP);
+		if (Post)
+		{
+			Post->bUnbound = true;   // (a volume spawned in play has no brush to be inside of: its weight follows the camera instead, in Tick)
+			Post->BlendWeight = 0.f;
+			Post->Priority = 20.f;
+			if (UPrimitiveComponent* Pc = Cast<UPrimitiveComponent>(Post->GetRootComponent())) Pc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Post->Settings.bOverride_AutoExposureBias = true;
+			Post->Settings.AutoExposureBias = CVarIntExposure.GetValueOnGameThread();
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBINT house %s at %.0f %.0f %.0f yaw %.0f: %d pieces, %d solid, %d lights, room %s, hash %u"), *PlotId, Xf.GetLocation().X, Xf.GetLocation().Y, Xf.GetLocation().Z,
+		Xf.Rotator().Yaw, Pieces, Solids, Lights.Num(), *RoomLocal.ToString(), Hash);
+#if !UE_BUILD_SHIPPING
+	// (-RoomEyeLog, test pictures: where a -ShotEyes eye must be for spots in this room: the world X Y of a grid of spots in the house's
+	// frame and how far the floor is above the land there, since an eye's height counts from the land)
+	if (FParse::Param(FCommandLine::Get(), TEXT("RoomEyeLog")))
+		for (float Lx = -400.f; Lx <= 440.f; Lx += 60.f)
+			for (float Ly = -280.f; Ly <= 560.f; Ly += 60.f)
+			{
+				const FVector W = Xf.TransformPosition(FVector(Lx, Ly, FloorZ));
+				UE_LOG(LogTemp, Log, TEXT("JEEBINTEYE %s %.0f %.0f %.0f %.0f %.0f"), *PlotId, Lx, Ly, W.X, W.Y, W.Z - JeebTerrain::HeightAt(W.X, W.Y));
+			}
+#endif
+}
+
+void AHouseInterior::BuildFrom(const FString& File, int32& Pieces, int32& Solids, int32& Missing)
+{
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 	TArray<FString> Lines;
-	const FString Path = FPaths::ProjectContentDir() / TEXT("Data/InteriorHouse.csv");
-	if (!FFileHelper::LoadFileToStringArray(Lines, *Path)) { UE_LOG(LogTemp, Warning, TEXT("JEEBINT no %s: an empty house"), *Path); return; }
+	const FString Path = FPaths::ProjectContentDir() / File;
+	if (!FFileHelper::LoadFileToStringArray(Lines, *Path)) { UE_LOG(LogTemp, Warning, TEXT("JEEBINT no %s"), *Path); return; }
 	const FTransform Xf = GetActorTransform();
-	int32 Pieces = 0, Solids = 0, Missing = 0;
 	TMap<FString, UStaticMesh*> Cache;
 	for (int32 n = 1; n < Lines.Num(); ++n)
 	{
@@ -112,9 +154,17 @@ void AHouseInterior::Build()
 				Sm->SetMobility(EComponentMobility::Static);
 				Sm->SetWorldTransform(PieceXf);
 				Sm->SetCastShadow(bShadow);
-				if (C.IsValidIndex(14) && !C[14].TrimStartAndEnd().IsEmpty())   // (Mat: another material on every slot)
-					if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, *C[14].TrimStartAndEnd()))
-						for (int32 s = 0; s < Sm->GetNumMaterials(); ++s) Sm->SetMaterial(s, Mi);
+				if (C.IsValidIndex(14) && !C[14].TrimStartAndEnd().IsEmpty())   // (Mat: another material on every slot, or slot=material|slot=material)
+				{
+					TArray<FString> Ms; C[14].TrimStartAndEnd().ParseIntoArray(Ms, TEXT("|"));
+					for (const FString& One : Ms)
+					{
+						FString Slot, MatPath;
+						const bool bSlot = One.Split(TEXT("="), &Slot, &MatPath);
+						if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, bSlot ? *MatPath : *One))
+							for (int32 s = 0; s < Sm->GetNumMaterials(); ++s) if (!bSlot || FCString::Atoi(*Slot) == s) Sm->SetMaterial(s, Mi);
+					}
+				}
 				Sm->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 				Sm->SetCachedMaxDrawDistance(3000.f);
 				Sm->LDMaxDrawDistance = 3000.f;
@@ -157,23 +207,6 @@ void AHouseInterior::Build()
 			LightBase.Add(Mesh == TEXT("FIRE") ? -Lm : Lm);   // (negative: flickers)
 		}
 	}
-	// A gentle exposure lift inside, so the room reads cosy rather than black (a box over the room, above the land's own volume)
-	if (!bServer && RoomLocal.IsValid)
-	{
-		FActorSpawnParameters SP; SP.Owner = this;
-		Post = GetWorld()->SpawnActor<APostProcessVolume>(Xf.TransformPosition(RoomLocal.GetCenter()), Xf.Rotator(), SP);
-		if (Post)
-		{
-			Post->bUnbound = true;   // (a volume spawned in play has no brush to be inside of: its weight follows the camera instead, in Tick)
-			Post->BlendWeight = 0.f;
-			Post->Priority = 20.f;
-			if (UPrimitiveComponent* Pc = Cast<UPrimitiveComponent>(Post->GetRootComponent())) Pc->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Post->Settings.bOverride_AutoExposureBias = true;
-			Post->Settings.AutoExposureBias = CVarIntExposure.GetValueOnGameThread();
-		}
-	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBINT house at %.0f %.0f %.0f yaw %.0f: %d pieces, %d solid, %d lights, room %s, hash %u"), Xf.GetLocation().X, Xf.GetLocation().Y, Xf.GetLocation().Z,
-		Xf.Rotator().Yaw, Pieces, Solids, Lights.Num(), *RoomLocal.ToString(), Hash);
 }
 
 void AHouseInterior::Tick(float Dt)
@@ -214,11 +247,12 @@ void AHouseInterior::Tick(float Dt)
 	}
 }
 
-// Test helpers (not in a shipped game): jeeb.Test.GoHouse 1 (console, single player) or -StartAtOpenHouse puts him 2.5 m outside
-// the open house's door, facing it. -OpenHouseWalk then walks him in from 7 s for 4.5 s, through the door to the hearth's rug,
+// Test helpers (not in a shipped game): jeeb.Test.GoHouse N (console, single player; 1 CLS1 behind the church, 2 CLS2, 3 CLN2, 4 NL1,
+// 5 FL1, 6 SE1, 7 SE2, 8 SE3, 9 SE4, 10 SW2) or -StartAtOpenHouse (with -OpenHouse=<plot id>, else House_CLS1) puts him 2.5 m outside
+// that house's door, facing it. -OpenHouseWalk then walks him in from 7 s for 4.5 s, through the door to the hearth's rug,
 // logging where he is each half second (JEEBINT walk); -OpenHouseFilm also films his own camera every 4th frame meanwhile
 // (Saved/Shots/<ShotName>_walk_NNN.png).
-static TAutoConsoleVariable<int32> CVarGoHouse(TEXT("jeeb.Test.GoHouse"), 0, TEXT("Test builds, single player: 1 puts you just outside the open house's door (House_CLS1)."));
+static TAutoConsoleVariable<int32> CVarGoHouse(TEXT("jeeb.Test.GoHouse"), 0, TEXT("Test builds, single player: N puts you just outside a walk-in house's door (1 House_CLS1 behind the church, 2 CLS2, 3 CLN2, 4 NL1, 5 FL1, 6 SE1, 7 SE2, 8 SE3, 9 SE4, 10 SW2)."));
 void AHouseInterior::TestTick(float Dt)
 {
 #if !UE_BUILD_SHIPPING
@@ -227,12 +261,18 @@ void AHouseInterior::TestTick(float Dt)
 	APawn* Me = Pc ? Pc->GetPawn() : nullptr;
 	if (!Me) return;
 	TestClock += Dt;
+	// (each room looks only at its own number, or its own name for the command line's start)
+	static const TCHAR* Order[] = { TEXT("House_CLS1"), TEXT("House_CLS2"), TEXT("House_CLN2"), TEXT("House_NL1"), TEXT("House_FL1"), TEXT("House_SE1"), TEXT("House_SE2"), TEXT("House_SE3"), TEXT("House_SE4"), TEXT("House_SW2") };
+	const int32 Go = CVarGoHouse.GetValueOnGameThread();
+	const bool bGoMe = Go >= 1 && Go <= UE_ARRAY_COUNT(Order) && PlotId == Order[Go - 1];
+	static const FString StartId = []() { FString V = TEXT("House_CLS1"); FParse::Value(FCommandLine::Get(), TEXT("OpenHouse="), V); return V; }();
+	if (!bGoMe && PlotId != StartId) return;
 	const FTransform Xf = GetActorTransform();
 	const FVector Outside = Xf.TransformPosition(FVector(27.f, 520.f, 100.f));
 	const FRotator In(0.f, Xf.Rotator().Yaw - 90.f, 0.f);   // (toward -Y in the house: in through the door)
 	static const bool bStart = FParse::Param(FCommandLine::Get(), TEXT("StartAtOpenHouse")) || FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk"));
 	static bool bStarted = false;
-	if (CVarGoHouse.GetValueOnGameThread() != 0 || (bStart && !bStarted && TestClock > 5.f))
+	if (bGoMe || (bStart && !bStarted && PlotId == StartId && TestClock > 5.f))
 	{
 		CVarGoHouse->Set(0, ECVF_SetByConsole);
 		bStarted = true;
@@ -243,7 +283,7 @@ void AHouseInterior::TestTick(float Dt)
 	}
 	static const bool bWalk = FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk"));
 	static const bool bFilm = FParse::Param(FCommandLine::Get(), TEXT("OpenHouseFilm"));
-	if (!bWalk || !bStarted) return;
+	if (!bWalk || !bStarted || PlotId != StartId) return;
 	const float T = TestClock - 7.f;
 	if (T > 6.f) { Pc->ConsoleCommand(TEXT("quit")); return; }
 	if (T > 0.f && T < 4.5f)
