@@ -926,6 +926,12 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> AmuletParts;       // the worn amulet on its chain round his neck (UpdateAmulet)
 	int32 AmuletShownId = -1;
 	void UpdateAmulet();
+	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> RingParts;         // the worn rings on his gauntlet fingers (UpdateRings, 2026-11-21)
+	UPROPERTY(Transient) TObjectPtr<USceneComponent> RingHand[2];                // each hand's joint the rings hang on (0 right, 1 left)
+	struct FRingSlot { TWeakObjectPtr<USceneComponent> Band, Stone; int32 Side = 0; float Across = 0.f; };
+	TArray<FRingSlot> RingSlots;   // (each ring's two parts, placed every frame by how far its hand is closed)
+	int32 RingShownKey = -1;
+	void UpdateRings();
 	void UpdateBowBits();
 	void UpdateQuiver();
 	// (online: the server's numbers, sent to everyone)

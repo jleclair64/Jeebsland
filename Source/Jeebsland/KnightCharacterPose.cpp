@@ -260,6 +260,7 @@ void AKnightCharacter::PlaceGear()
 	UpdateBeltFlask();
 	if (QuiverParts.Num() > 0 && QuiverParts[0])
 		if (USceneComponent* Q = QuiverParts[0]->GetAttachParent()) Q->SetWorldTransform(Anim->QuiverWorld());
+	UpdateRings();
 	UpdateAmulet();   // (the chain is measured from his neck, so once the pose has been placed)
 }
 
