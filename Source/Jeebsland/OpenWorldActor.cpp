@@ -196,7 +196,8 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		if (FMath::Abs(Rel.Y) > BoxR) { Rel.Y = FMath::Fmod(FMath::Fmod(Rel.Y + BoxR, 2.f * BoxR) + 2.f * BoxR, 2.f * BoxR) - BoxR; bJumped = true; }
 		if (Rel.Z < -BoxBelow || Rel.Z > BoxAbove) { const float Hgt = BoxBelow + BoxAbove; Rel.Z = FMath::Fmod(FMath::Fmod(Rel.Z + BoxBelow, Hgt) + Hgt, Hgt) - BoxBelow; bJumped = true; }
 		if (bJumped) { F.Pos = C + Rel; F.bUnderRoof = UnderRoof(F.Pos.X, F.Pos.Y); }
-		const float S = F.bUnderRoof ? 0.001f : F.Size * SizeK;
+		// (never in the camera's face: a flake within a couple of metres of it shrinks away, or it reads as a white block)
+		const float S = F.bUnderRoof ? 0.001f : F.Size * SizeK * FMath::Max(0.03f, JeebWorld::Smooth(120.f, 320.f, float(FVector::Dist(F.Pos, Cam))));
 		const FTransform Now(FRotator(Time * F.Spin * 70.f + F.Phase * 40.f, Time * F.Spin * 50.f, F.Phase * 30.f).Quaternion(), F.Pos, FVector(S));
 		PrevT[i] = bJumped ? Now : NewT[i];
 		NewT[i] = Now;

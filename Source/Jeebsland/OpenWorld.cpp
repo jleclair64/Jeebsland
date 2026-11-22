@@ -409,7 +409,7 @@ namespace
 				if (Long && Long->Pts.Num() > 800)
 				{
 					FVector2D Fork = Long->Pts[0]; float Best = 1.0e18f;
-					for (const FVector2D& Q : Long->Pts) { const float D = FVector2D::DistSquared(Q, Birch); if (D < Best) { Best = D; Fork = Q; } }
+					for (const FVector2D& Q : Long->Pts) { const float D = FVector2D::DistSquared(Q, Birch); if (D < Best && JeebWorld::WaterEdge(Q.X, Q.Y) > 4500.f) { Best = D; Fork = Q; } }   // (not on the river bank at its north end: the fork needs room to be levelled)
 					Add(TEXT("Steele Creek's road to Birch Grove"), Fork, Birch);
 				}
 			}
@@ -609,6 +609,14 @@ void JeebOpen::LogStats()
 		const FVector2D Mid = L[L.Num() / 2];
 		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN road %d: %.0f m from %.0f %.0f to %.0f %.0f, steepest %.1f degrees (over 15 m) at %.0f %.0f, highest point %.1f m; middle %.0f %.0f"),
 			r, G.Roads[r].Len / 100.f, L[0].X, L[0].Y, L.Last().X, L.Last().Y, Worst, WorstAt.X, WorstAt.Y, High / 100.f, Mid.X, Mid.Y);
+	}
+	for (const FSite& S : Sites())
+	{
+		// (how level the site is: the finished ground within 30 m of its middle, and what each layer gives 10 m north-east of it)
+		float Lo = 1.0e9f, Hi = -1.0e9f;
+		for (float Dx = -3000.f; Dx <= 3000.f; Dx += 500.f) for (float Dy = -3000.f; Dy <= 3000.f; Dy += 500.f) { const float Z = JeebTerrain::HeightAt(S.Pos.X + Dx, S.Pos.Y + Dy); Lo = FMath::Min(Lo, Z); Hi = FMath::Max(Hi, Z); }
+		const float Qx = S.Pos.X + 700.f, Qy = S.Pos.Y + 700.f;
+		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN site %s level check: ground within 30 m %.0f to %.0f cm; 10 m north-east: land %.0f, hills %.0f, this grid %.0f, finished %.0f"), S.Name, Lo, Hi, JeebWorld::LandHeight(Qx, Qy), JeebHills::Offset(Qx, Qy), Offset(Qx, Qy), JeebTerrain::HeightAt(Qx, Qy));
 	}
 	for (const FSite& S : Sites())
 		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN site %s at %.0f %.0f (ground %.0f): house at %.0f %.0f yaw %.0f, %.0f cm from the nearest road"), S.Name, S.Pos.X, S.Pos.Y, JeebTerrain::HeightAt(S.Pos.X, S.Pos.Y), S.House.X, S.House.Y, S.HouseYaw, JeebTerrain::PathClearance(S.House.X, S.House.Y));
