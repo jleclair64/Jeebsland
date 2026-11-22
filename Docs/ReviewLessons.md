@@ -459,3 +459,9 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON: `if (x) UE_LOG(...); else ...` does not compile (the macro is a block): brace it.
 - LESSON: Meshy's quadruped rigging (`animation_type: quadruped`) takes a reduced, baked library model as a data URI, and any four-legged library clip plays on any four-legged rig (a stag uses fawn and cow clips). Its "death" clips are a lying pose held still, modelled above the ground: blend into it and lower the body by its height (the stag: 42 cm at scale 1).
 - LESSON: test scripts that call a .ps1 from Git Bash with a `/Game/...` argument need `MSYS_NO_PATHCONV=1`, or the map path becomes `C:/Program Files/Git/Game/...` and the run exits at once with no pictures.
+
+## Troll movement (2026-11-22)
+- LESSON: Any speed or ability limit that changes over time (drain bars, ease-downs, cooldown-scaled caps) must live in replicated server state or inside the saved move; a per-machine Tick timer feeding MaxWalkSpeed disagrees with the server by the latency. Check restart thresholds for flicker loops.
+- LESSON: When a one-handed swing borrows another character's cut on a bigger body, check from the side and the front that the weapon stays outside the torso and above the floor on every in-between frame.
+- LESSON: A held pose with a held weapon must keep the weapon clear of the raised arm and chest from the side too.
+- LESSON: Before blaming a retarget for body warping, read the mesh's skin weights (troll belt 90% on thighs, face 30% on shoulders).

@@ -73,6 +73,7 @@ namespace JeebAnim
 		TArray<FVector> RestPos;               // each bone at the bind pose, in the mesh's space
 		TArray<FQuat> RestRot;                 // ... and its turn there
 		TArray<FString> TrollBone;             // (troll) the troll mesh's bone for each of ours, empty if none
+		FVector TrollFistR = FVector::ZeroVector;   // (troll) the hole in his right fist from the wrist joint, mesh space, bind pose (his hand is 50 cm long)
 		int32 Bone[B_Count];
 		TArray<FString> BoneName;
 		TArray<int32> Parents;
@@ -341,6 +342,8 @@ private:
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
 	void TrollBareGuard(const JeebAnim::FInput& In, FPose& B);   // block with the bare left forearm raised (no shield)
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
+	void TrollClubClear(FPose& B);   // the troll's right hand pushed out until the held club clears his belly (the knight's cuts on his body)
+	bool bTrollOldSwing = false;     // (test builds, -TrollOldSwing: the 2026-11-21 two-handed club blows)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)
 	// The troll's throwing rocks and his own armour (2026-11-22, KnightAnimatorTrollThrow.cpp)

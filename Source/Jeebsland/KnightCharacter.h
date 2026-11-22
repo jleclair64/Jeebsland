@@ -136,7 +136,15 @@ public:
 	// The troll's charged jump: hold Space, let go. Client asks (ServerLeap), server checks and launches; the cooldown is the server's.
 	float LeapChargeShare() const;   // 0..1 while Space is held (this machine's own troll)
 	float LeapCooldownShare() const { return LeapCooldown > 0.f ? LeapCooldown / FMath::Max(0.1f, JeebTune::V().TrollLeapCooldown) : 0.f; }
+	float LeapFillUsed = 1.f;   // (the bar's fill the last leap took)
+	float LeapFill() const { return 1.f - LeapCooldownShare(); }   // (2026-11-22) the charged-jump bar: 1 full; a leap goes this share as far and empties it
 	bool IsLeapCharging() const { return LeapChargeFrom >= 0.0; }
+	// The troll's rush (owner 2026-11-22): sprinting builds up to 3x the knight's sprint over 10 s; after 5 s a rush bar drains (Stamina
+	// skill); empty, he eases down to his walking speed. At top speed he bowls over players and creatures (server). Tuning.ini [Troll].
+	bool IsRushing() const { return bRushing; }   // (replicated from the server: he is at rush top speed; arrows and others may read it)
+	float RushBarShare() const { return RushBar; }
+	bool IsRushTired() const { return bRushTired; }
+	static float RushSeconds(int32 StaminaLevel);   // how long a full rush bar lasts once it drains, at this Stamina level
 	UFUNCTION(Server, Reliable) void ServerLeapCharge(bool bStart);
 	UFUNCTION(Server, Reliable) void ServerLeap(float Charge, FVector_NetQuantizeNormal Dir);
 	UFUNCTION(Server, Reliable) void ServerHop(FVector_NetQuantizeNormal Dir);
@@ -572,6 +580,13 @@ protected:
 	double LeapChargeFrom = -1.0;     // when Space went down for a charged jump (this machine's clock; -1 none)
 	double ServerChargeFrom = -1.0;   // (server) when the client said it started charging
 	float LeapCooldown = 0.f;         // seconds before the next charged jump
+	UPROPERTY(Replicated) bool bRushing = false;   // (server) at rush top speed: IsRushing
+	UPROPERTY(Replicated) float RushBar = 1.f;    // (server, to the owner) the rush bar 0..1
+	UPROPERTY(Replicated) float RushSlow = 0.f;   // (server, to the owner) the ease down to a walk 0..1 (SprintNow)
+	float RushT = 0.f, RushXPAcc = 0.f;   // (server) seconds rushing, XP owed
+	UPROPERTY(Replicated) bool bRushTired = false;
+	TMap<TWeakObjectPtr<AActor>, double> RushHitAt;   // (server) when each victim was last bowled over
+	void TickRush(float Dt);
 	float LeapCrouch = 0.f;           // the crouch as he charges (0..1, this machine)
 	bool bAirLaunch = false;          // a hop or a charged jump is flying: the air speed clamp leaves it alone until he lands
 	float ShotLeapCharge = -1.f;      // (test pictures: -SuitDo=chargejump<hundredths>)

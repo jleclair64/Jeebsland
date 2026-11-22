@@ -266,7 +266,7 @@ void AKnightCharacter::Jump()
 	// The troll: Space down on the ground starts a charge; letting go jumps (StopJumping, ReleaseLeap: KnightCharacterTroll.cpp)
 	// (owner 2026-11-21: no charging while the charged jump cools down; Space is then the plain jump at once. The server's own
 	// LeapCooldown still refuses any early leap, ServerLeap.)
-	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0 && LeapCooldown <= 0.f)
+	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0 && LeapFill() >= JeebTune::V().TrollLeapMinFill)   // (2026-11-22: any time the bar holds enough; the leap goes as far as the bar is full)
 	{
 		LeapChargeFrom = GetWorld()->GetTimeSeconds();
 		if (!HasAuthority()) ServerLeapCharge(true); else ServerChargeFrom = LeapChargeFrom;
@@ -489,7 +489,7 @@ bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bS
 		StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
 		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
 	}
-	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+	if (bExhausted && Stamina >= JeebTune::V().SprintRestartShare * MaxStamina) bExhausted = false;   // (owner 2026-11-22: sprint again from a part-filled bar; online review: a fifth, not a sliver, so it never flickers on and off)
 	return bWantSprint;
 }
 
