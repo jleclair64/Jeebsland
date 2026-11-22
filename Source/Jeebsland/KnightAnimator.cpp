@@ -817,6 +817,9 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 			}
 			Comp->MarkRefreshTransformDirty();
 			Comp->RefreshBoneTransforms();
+			static IConsoleVariable* Inset = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Knight.InsetShadow"));
+			const bool bInset = !L.bTroll && Inset && Inset->GetInt() != 0;   // (live, see MakeMesh)
+			if (Comp->bCastInsetShadow != bInset) { Comp->SetCastInsetShadow(bInset); Comp->bLightAttachmentsAsGroup = bInset; Comp->MarkRenderStateDirty(); }
 		}
 		if (TrollComp && (TrollComp->WasRecentlyRendered(0.25f) || In.bShotLog)) TrollPose();
 	}
@@ -2083,6 +2086,15 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 	Comp->SetBoundsScale(2.5f);   // (a roll or a kick reaches well past the standing bounds)
 	Comp->SetLightingChannels(true, true, false);   // (channel 1: the sun's glint on polished plate, ADayNight's Glint light; the world's sun gives no shine, 2026-11-15)
 	Comp->RegisterComponent();
+	// (2026-11-21, ReviewLessons "troll smear") our pose must be the last word each frame: a poseable mesh that ticks after us rebuilds the
+	// same pose twice, loses last frame's bones and writes no motion vectors (TSR ghosts him). The knight only ticked first by luck.
+	if (!L.bTroll) Owner->AddTickPrerequisiteComponent(Comp);
+	// (2026-11-21, owner: the knight's shadow on the path "a checkerboard") his own per-object (inset) shadow map, as the troll's: far finer
+	// texels than the sun's 1024 cascade, so the soft-shadow scatter no longer shows as a coarse checker. jeeb.Knight.InsetShadow 0: the old way.
+	{
+		static IConsoleVariable* Inset = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Knight.InsetShadow"));
+		if (!Inset) Inset = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Knight.InsetShadow"), 1, TEXT("1: the knight casts his own fine per-object shadow (read when his mesh is made)"), ECVF_Default);
+	}
 	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
