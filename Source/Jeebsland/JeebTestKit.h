@@ -64,6 +64,7 @@ namespace JeebTestKit
 			if (Rings.Ids.Num()) O.Rows.Add(Rings);
 			if (Amulets.Ids.Num()) O.Rows.Add(Amulets);
 			O.Rows.Add({ KindName(K_Crest), { GearId(K_Crest, 0) } });
+			O.Rows.Add({ KindName(K_Book), Tiers([&](int32 T) { return GearId(K_Book, T); }) });   // (the wizard's spell book)
 			FRow Potions{ TEXT("Potions") }; for (int32 T = 0; T < NumPotions(); ++T) Potions.Ids.Add(PotionId(T));
 			if (Potions.Ids.Num()) O.Rows.Add(Potions);
 			FRow Arrows{ TEXT("Arrows") }; for (int32 i = 0; i < NumArrowKinds(); ++i) Arrows.Ids.Add(ArrowKindId(i));

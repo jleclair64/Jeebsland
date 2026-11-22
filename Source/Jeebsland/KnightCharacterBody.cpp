@@ -50,7 +50,9 @@ static constexpr float ShieldBackX = -14.f, ShieldBackZ = -4.f;   // a stowed sh
 // ---------------- The knight's body parts ----------------
 void AKnightCharacter::BuildKnight()
 {
-	Anim = MakeShared<FKnightAnimator>(bIsTroll);   // (the troll: the same animator with the troll's bones, KnightAnimatorTroll.cpp)
+	Anim = MakeShared<FKnightAnimator>(bIsTroll);
+	if (bIsWizard) Anim->SetWizard();   // (the wizard: the knight's animator and bones as they are, his own body drawn on them, KnightAnimatorWizard.cpp)
+	//   // (the troll: the same animator with the troll's bones, KnightAnimatorTroll.cpp)
 	if (!IsNetMode(NM_DedicatedServer)) Anim->MakeMesh(this, GetRootComponent());
 	// The only parts still modelled in code: the shield (arrows stick in its parts, so the server has them too). The pose places them.
 	TArray<KnightDesign::FDef> Defs;
@@ -352,7 +354,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 {
 	if (!Skills) return;
 	const int32 Kind = KindForSlot(Slot);
-	const int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
+	const int32 Id = (Slot == KnightDesign::SlotShield) ? (ShieldActive() && !bIsWizard ? Skills->Worn[Kind] : 0) : Skills->Worn[Kind];
 	const bool bWorn = Id != 0;
 	const int32 Var = bWorn ? JeebItems::VariantOf(Id) : 0;   // tier (or cape colour)
 	// The suit: each slot is one piece of it, tinted for the tier, gone when the slot is empty. Light, Classic and Heavy are the same model, they differ in the numbers (ArmourStyles.csv).
@@ -387,6 +389,7 @@ void AKnightCharacter::ApplyArmorSlot(int32 Slot)
 void AKnightCharacter::RefreshEquipment()
 {
 	for (int32 Slot : { KnightDesign::SlotHelmet, KnightDesign::SlotBody, KnightDesign::SlotShoulders, KnightDesign::SlotBoots, KnightDesign::SlotGauntlets, KnightDesign::SlotCape, KnightDesign::SlotShield }) ApplyArmorSlot(Slot);
+	if (bIsWizard && Anim && Skills) Anim->SetWizardBook(Skills->Worn[JeebItems::K_Book] != 0);   // (the spell book on his belt)
 	RebuildHeld();
 }
 

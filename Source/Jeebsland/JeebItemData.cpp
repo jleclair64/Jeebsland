@@ -13,7 +13,7 @@ namespace JeebItems
 		const TCHAR* const TierKeys[NumTiers] = { TEXT("Tin"), TEXT("Iron"), TEXT("Silver"), TEXT("Gold"), TEXT("Emerald"), TEXT("Diamond") };
 		const TCHAR* const KindKeys[K_Count] = { TEXT("Sword"), TEXT("Axe"), TEXT("Pickaxe"), TEXT("Spear"), TEXT("Broadsword"), TEXT("BattleAxe"), TEXT("Katana"),
 			TEXT("Wand"), TEXT("Staff"), TEXT("Bow"), TEXT("Rod"), TEXT("Shield"), TEXT("Helmet"), TEXT("Chest"), TEXT("Shoulders"), TEXT("Gauntlets"), TEXT("Boots"),
-			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow"), TEXT("Club") };
+			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow"), TEXT("Club"), TEXT("Book") };
 		const TCHAR* const MaterialKeys[] = { TEXT("CopperOre"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Bacon"), TEXT("PineLogs"), TEXT("RedwoodLogs"),
 			TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"),
 			TEXT("Onyx"), TEXT("Emerald") };
@@ -275,11 +275,11 @@ namespace JeebItems
 		void LoadArmourStyles(FItemTables& T)
 		{
 			T.ArmourStyles.SetNum(NumArmourStyles);
-			const TCHAR* Names[NumArmourStyles] = { TEXT("Classic"), TEXT("Light"), TEXT("Heavy"), TEXT("Dark Plate") };
+			const TCHAR* Names[NumArmourStyles] = { TEXT("Classic"), TEXT("Light"), TEXT("Heavy"), TEXT("Dark Plate"), TEXT("Wizard") };
 			for (int32 s = 0; s < NumArmourStyles; ++s) T.ArmourStyles[s].Name = Names[s];
 			FTable Tab;
 			if (!Tab.Load(TEXT("ArmourStyles.csv"))) return;
-			if (Tab.Rows.Num() < NumArmourStyles) Problem(TEXT("ArmourStyles.csv needs four rows: classic, light, heavy, dark plate"));
+			if (Tab.Rows.Num() < NumArmourStyles) Problem(TEXT("ArmourStyles.csv needs five rows: classic, light, heavy, dark plate, wizard"));
 			for (int32 s = 0; s < NumArmourStyles && s < Tab.Rows.Num(); ++s)
 			{
 				FArmourStyleRow& Row = T.ArmourStyles[s];

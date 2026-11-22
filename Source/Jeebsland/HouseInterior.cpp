@@ -174,24 +174,6 @@ void AHouseInterior::BuildDoor()
 			DoorMesh->LDMaxDrawDistance = 6000.f;
 			DoorMesh->RegisterComponent();
 		}
-	// While the room is not built here (someone else opened the door, you are further than LoadReach), a plain inner wall a metre
-	// behind the doorway, so the open door never shows straight through the house (the shell has no inside faces)
-	if (!IsNetMode(NM_DedicatedServer))
-		if (UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube")))
-		{
-			Backdrop = NewObject<UStaticMeshComponent>(this, TEXT("Backdrop"));
-			Backdrop->SetStaticMesh(Cube);
-			Backdrop->SetupAttachment(RootComponent);
-			Backdrop->SetMobility(EComponentMobility::Static);
-			Backdrop->SetRelativeLocation(FVector(27.f, 70.f, FloorZ + 125.f));
-			Backdrop->SetRelativeScale3D(FVector(1.8f, 0.2f, 2.5f));
-			if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Interior/Mats/MI_Int_Plaster_Cream"))) Backdrop->SetMaterial(0, Mi);
-			Backdrop->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-			Backdrop->SetCastShadow(false);
-			Backdrop->SetCachedMaxDrawDistance(4000.f);
-			Backdrop->LDMaxDrawDistance = 4000.f;
-			Backdrop->RegisterComponent();
-		}
 	DoorSolid = NewObject<UBoxComponent>(this, TEXT("DoorSolid"));
 	DoorSolid->SetupAttachment(DoorPivot);
 	DoorSolid->SetMobility(EComponentMobility::Movable);
@@ -396,7 +378,6 @@ void AHouseInterior::LoadRoom()
 		}
 	}
 	bLoaded = true;
-	if (Backdrop) Backdrop->SetVisibility(false);
 	UE_LOG(LogTemp, Log, TEXT("JEEBINT room %s loaded: %d pieces, %d lights in %.1f ms"), *PlotId, Pieces.Num(), Lights.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
 }
 
@@ -408,7 +389,6 @@ void AHouseInterior::UnloadRoom()
 	Pieces.Empty(); Lights.Empty(); LightBase.Empty();
 	if (Post) { Post->Destroy(); Post = nullptr; }
 	bLoaded = bLit = false;
-	if (Backdrop) Backdrop->SetVisibility(true);
 	LitAlpha = 0.f;
 	UE_LOG(LogTemp, Log, TEXT("JEEBINT room %s unloaded"), *PlotId);
 }
@@ -430,7 +410,11 @@ void AHouseInterior::Tick(float Dt)
 		const FVector Door = Xf.TransformPosition(DoorMid);
 		float D = FVector::Dist(Eye, Door);
 		if (Me) D = FMath::Min(D, FVector::Dist(Me->GetActorLocation(), Door));
-		const bool bInside = Me && RoomLocal.ExpandBy(50.f).IsInside(Xf.InverseTransformPosition(Me->GetActorLocation()));
+		// (inside: his knight, or the camera anywhere in the house up to the roof, e.g. pushed into a wall from the back yard: never an
+		// empty shell seen from within, whatever the distance to the door)
+		const FVector EyeIn = Xf.InverseTransformPosition(Eye);
+		const bool bInside = (Me && RoomLocal.ExpandBy(50.f).IsInside(Xf.InverseTransformPosition(Me->GetActorLocation())))
+			|| RoomLocal.ExpandBy(FVector(150.f, 150.f, 400.f)).IsInside(EyeIn);
 		if (!bLoaded && (D < CVarIntLoad.GetValueOnGameThread() || bInside)) LoadRoom();
 		else if (bLoaded && D > FMath::Max(CVarIntUnload.GetValueOnGameThread(), CVarIntLoad.GetValueOnGameThread() + 200.f) && !bInside) UnloadRoom();
 	}

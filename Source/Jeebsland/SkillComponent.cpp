@@ -76,6 +76,15 @@ void USkillComponent::ResetToStartingKit()
 		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] && !JeebItems::CanEquip(this, Hotbar[i])) Hotbar[i] = 0;
 		for (int32 i = 0; i < NumWornKinds; ++i) if (Worn[i] && !JeebItems::CanEquip(this, Worn[i])) Worn[i] = 0;
 	}
+	// The wizard (2026-11-21): his staff, his tin hat, robe and boots, and a spell book; no bow, no shield (his guard is the orb)
+	if (JeebItems::OwnerIsWizard(this))
+	{
+		for (int32 i = 0; i < 5; ++i) Hotbar[i] = 0;
+		for (int32 i = 0; i < NumWornKinds; ++i) Worn[i] = 0;
+		Hotbar[0] = JeebItems::GearId(JeebItems::K_Staff, 0);
+		for (int32 K : { JeebItems::K_Helmet, JeebItems::K_Chest, JeebItems::K_Boots }) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Wizard, JeebItems::T_Tin);
+		Worn[JeebItems::K_Book] = JeebItems::GearId(JeebItems::K_Book, 0);
+	}
 }
 
 // Dying: everything you own leaves you, sorted by where it was (0 pack, 1 weapon bar, 2 worn), plus all your ingots

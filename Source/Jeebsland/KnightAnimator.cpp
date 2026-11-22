@@ -964,6 +964,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
+				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)
 			}
 	// (the crossbow is two-handed even at ease: held low across him, whatever his legs do)
 	const bool bCross = In.Kind == JeebItems::K_Crossbow && !In.Stowed() && !In.bSitting;
@@ -1878,7 +1879,11 @@ void FClipLib::SolveGear()
 		FString S; TArray<FString> Pr;   // (test pictures: -SuitGrip=Along_Side_Fwd_Pitch_Yaw_Roll tries another grip without a rebuild)
 		if (FParse::Value(FCommandLine::Get(), TEXT("SuitGrip="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
 		{ Along = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2])); Turn = FRotator(FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4]), FCString::Atof(*Pr[5])); }
-		const FQuat Rot = Turn.Quaternion() * Q;
+		FQuat Rot = Turn.Quaternion() * Q;
+		// (owner 2026-11-21: the crossguard lay nearly across the hand; the sword is twisted about its own blade line, so grip, fist and blade stay where they were; test pictures: -SwordRoll=<degrees>)
+		float SwordRollDeg = 40.f;
+		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("SwordRoll="), SwordRollDeg);
+		Rot = FQuat(Rot.RotateVector(KnightDesign::BladeDir(1)).GetSafeNormal(), FMath::DegreesToRadians(SwordRollDeg)) * Rot;
 		// (2026-11-11) The grip sits in the hole of the closed fist: both hands are bent shut round this line in the mesh (Tools/knight_fist.py), in front of the palm at the base of the fingers
 		const FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();
@@ -1980,8 +1985,13 @@ void FClipLib::SolveGear()
 			for (int32 i = 0; i < 4; ++i) ShieldArm[i] = P.Rot[Bone[Arm[i]]];
 			const FTransform Fore = BindInGame(P, LFore), Hand = BindInGame(P, LHand);
 			const FVector Along = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
-			const FVector Face = FVector::CrossProduct(Along, FVector::UpVector).GetSafeNormal();   // (level, square to the forearm, on its outer side: forward and to his left)
-			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, FVector::UpVector).ToQuat();
+			FVector Face = FVector::CrossProduct(Along, FVector::UpVector).GetSafeNormal();   // (level, square to the forearm, on its outer side: forward and to his left)
+			// (owner 2026-11-21: "more flush with the wrist": rolled about the forearm (-14 deg: positive leans the top away) so the top leans in toward the arm and the face lies along the wrist)
+			float TiltIn = -14.f;
+			if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("ShieldFlushTilt="), TiltIn);
+			const FQuat Roll(Along, FMath::DegreesToRadians(TiltIn));
+			Face = Roll.RotateVector(Face);
+			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Roll.RotateVector(FVector::UpVector)).ToQuat();
 			ShieldAtGuard = FTransform(Q, FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.72f) + Face * OutFromFore - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing straight ahead, tilted back a touch, in the middle of his chest
@@ -2095,7 +2105,9 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 		static IConsoleVariable* Inset = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Knight.InsetShadow"));
 		if (!Inset) Inset = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Knight.InsetShadow"), 1, TEXT("1: the knight casts his own fine per-object shadow (read when his mesh is made)"), ECVF_Default);
 	}
-	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
+	if (L.bTroll) { MakeTrollMesh(Owner); return Comp; }
+	if (bWizard) { MakeWizardMesh(Owner); return Comp; }   // (the wizard: his own body on these bones; no plate, no mail)
+	//   // (the troll: his own mesh shows, the knight's carries the pose unseen; no armour yet)
 	// Each piece is a material slot of the suit (Tools/knight_suit_import.py); the dark cloth under the skirt is always there
 	static const TCHAR* const SlotNames[Piece_Count] = { TEXT("Chest"), TEXT("Legs"), TEXT("Helmet"), TEXT("Gauntlets"), TEXT("Shoulders") };
 	const TArray<FSkeletalMaterial>& Slots = Asset->GetMaterials();
@@ -2127,6 +2139,7 @@ UPoseableMeshComponent* FKnightAnimator::MakeMesh(AActor* Owner, USceneComponent
 
 void FKnightAnimator::Wear(int32 Piece, int32 Tier, int32 Style)
 {
+	if (bWizard) { if (Piece >= 0 && Piece < Piece_Count) { bWizWorn[Piece] = Tier >= 0; WornTiers[Piece] = Tier; WornStyles[Piece] = Style; RefreshWizard(); } return; }
 	if (!Comp || Piece < 0 || Piece >= Piece_Count || PieceMat[Piece] == INDEX_NONE) return;
 	const int32 Mat = PieceMat[Piece];
 	WornTiers[Piece] = Tier;

@@ -1,0 +1,16 @@
+{
+ "id": "01a20172-5114-7021-8d41-a1d291676a3d",
+ "type": "text-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Stylised 3D fantasy game item, three-quarter view, whole object in frame on a plain white background. A closed wizard's spell book on its own: a thick leather-bound tome with a deep blue leather cover, polished gold corner caps, a gold clasp strap, a round gold arcane star emblem with a small glowing blue gem in the centre of the front cover, raised bands on the spine, cream page edges. Slightly stylised, not quite realistic and a tiny bit cartoonish: sleek natural proportions, crisp bevels, hand-painted textures, rich clean colours, no rust, no dirt.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795320599006,
+ "started_at": 1795320599015,
+ "finished_at": 1795320622575,
+ "expires_at": 1795579822575,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a20172-5114-7021-8d41-a1d291676a3d_0.png?Expires=1795579822&Signature=jnGTk-~oUFa3OXw1U3rn-WaGwvbhwHpHxP47UxKoH1BiDM8WcCbVJfVwh9yromscboY7rXQKbL4gWiytFkaeFZIGy36wa9WUjCbbnQTO-pPVdDjeum3hbKpHawbYEeq7OjbgRXqvGMuUFnar7NMJyQPzxw2ydB2NcFOXQOSLQNt5lAncOl3Mm2fdhLvhZy4no~MDYQ6XfGyc4ajB5Z6~k-hXJrgOK3oKOZeqFFVF~YsFjXo2XNZu7PSRUmQh10mMm8ZeDZFEC6aXZ6XlhXOttwjz1J5uCQanLc95ead9wLXWmFkthVXVguwhq15HzdALPOXk3uIcmb4Cwixhf27qlQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

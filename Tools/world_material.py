@@ -200,14 +200,20 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     depth = g.node(unreal.MaterialExpressionPixelDepth)
 
     # soft noise at a few scales (the small T_Patches picture: cheap), shared by every layer's edge
-    rag = g.mask(g.tex(patches, g.mul(xy, 1.0 / 170.0)), True, False)            # ragged edges, about 1.5 m
+    # ragged edges, about 1.5-4 m (2026-11-21, owner: the grass-vs-dirt and sand edges made the same blob over and over; one 1.7 m
+    # sampling was the cause): three samplings at unrelated sizes, one turned, averaged and re-stretched to the old contrast
     fn = grass_field.noises(g, xy, patches)   # (10 m, 17 m, 45 m, broad swathes and the dry patches: the same as the blades', M_Grass)
+    rag_a = g.mask(g.tex(patches, g.mul(xy, 1.0 / 170.0)), True, False)
+    rag_b = g.mask(g.tex(patches, g.mul(grass_field.rot37(g, xy, 731.0), 1.0 / 263.0)), True, False)
+    rag_c = g.mask(g.tex(patches, g.mul(g.add(xy, -1913.0), 1.0 / 410.0)), True, False)
+    rag = g.add(g.mul(g.add(g.mul(g.addn(g.addn(rag_a, rag_b), rag_c), 1.0 / 3.0), -0.5), 1.7), 0.5)
+    rag = g.addn(rag, g.mul(g.add(fn["patchy"], -0.5), 0.5))   # and 45 m patches: some stretches mostly bare, some mostly grass
     med, medm = fn["med"], fn["medm"]
 
     # Grass: the painted picture, fading to its average far away (no tiling, no shimmer), lighter and darker in soft patches
     # two samplings at unrelated sizes, swapped in 10 m patches, so no 3 m repeat lines up into a grid
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
-    near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
+    near_b = g.tex(grass_tex, g.mul(grass_field.rot37(g, xy, 1777.0), 1.0 / 430.0))   # (turned 37 degrees: the two repeats never line up)
     near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), palette.colour(mat, "GroundGrass"))   # (no "RGB": a Lerp's one output is unnamed; asking for "RGB" left the near ground black)
     # past the grass blades (40 m since 2026-11-14) the ground carries the look: a broad sampling of the same picture keeps some
     # texture out to about 80 m before it settles to the average (as the rebuilt town's lawn, M_TL_Ground)
@@ -222,7 +228,9 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     grass = grass_field.under_grass_floor(g, grass, beyond)   # the meadow's shaded floor among the blades at the low sun
 
     # Soil (packed earth) for worn ground, mud and the fringe of rock
-    soil = g.muln(g.mask(g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0)), True, True, True), palette.colour(mat, "Earth"))   # (light packed tan: M_Dirt's earth is the same)
+    soil_a = g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0))
+    soil_b = g.tex(dirt_tex, g.mul(grass_field.rot37(g, xy, 2203.0), 1.0 / 520.0))
+    soil = g.muln(g.mask(g.lerp(soil_a, soil_b, g.ramp(fn["med2"], 0.4, 0.6)), True, True, True), palette.colour(mat, "Earth"))   # (two samplings, one turned, swapped in patches)   # (light packed tan: M_Dirt's earth is the same)
     soil = g.lerp(soil, g.muln(g.c3(EARTH_PICTURE_AVERAGE), palette.colour(mat, "Earth")), g.c(0.45))   # its darkest specks pulled up: worn ground at walls never reads as a black stain
 
     # Worn: first trampled grass (paler, a little earth showing through), then packed earth, in ragged patches
@@ -243,7 +251,26 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     side_uv = g.lerp(g.append(g.mask(wp, True, False), wz), g.append(g.mask(g.mask(wp, False, True), True, False), wz), g.ramp(g.subn(nx, ny), -0.05, 0.05))
     side = rock_untiled(g, rock_tex, side_uv, patches, 450.0)
     rock = g.lerp(top, side, g.ramp(g.addn(g.one(unreal.MaterialExpressionOneMinus, nz), g.mul(rag, 0.1)), 0.42, 0.58))
-    rock = g.lerp(rock, palette.colour(mat, "RockFar"), g.ramp(depth, 2500.0, 9000.0))   # far away the stone's pattern fades (no tiled paving on hillsides)
+    # Far away (2026-11-21, owner: a cliff 50-150 m off was one flat slate colour): the stone used to fade to the flat RockFar
+    # colour from 25 to 90 m. Now it fades to the same photo laid 5x larger (no fine repeat to show) half-mixed with RockFar, and at
+    # every distance steep faces get large-scale structure: horizontal strata (two band noises stretched along the wall, unrelated
+    # sizes), dark vertical gullies, warmer and cooler stretches, lighter upward faces and a little lichen on ledges.
+    wall_u = g.mask(side_uv, True, False)
+    big_pic = rock_picture(g, rock_tex, g.mul(g.add(side_uv, 4409.0), 1.0 / 2300.0))
+    rock = g.lerp(rock, g.lerp(palette.colour(mat, "RockFar"), big_pic, g.c(0.55)), g.ramp(depth, 2500.0, 9000.0))
+    band1 = g.mask(g.tex(patches, g.append(g.mul(wall_u, 1.0 / 9000.0), g.mul(wz, 1.0 / 700.0))), True, False)
+    band2 = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_u, 3331.0), 1.0 / 5300.0), g.mul(g.add(wz, 77.0), 1.0 / 430.0))), True, False)
+    gully = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_u, 1201.0), 1.0 / 380.0), g.mul(wz, 1.0 / 4200.0))), True, False)
+    tone = g.mask(g.tex(patches, g.mul(g.add(xy, -6131.0), 1.0 / 6500.0)), True, False)
+    strata = g.lerpc(0.72, 1.28, g.addn(g.mul(band1, 0.6), g.mul(band2, 0.4)))
+    gullies = g.lerpc(0.62, 1.0, g.ramp(gully, 0.18, 0.5))
+    warmcool = g.lerp(g.c3((1.08, 1.0, 0.9)), g.c3((0.92, 0.97, 1.05)), tone)
+    wall = g.ramp(g.one(unreal.MaterialExpressionOneMinus, nz), 0.35, 0.6)   # only on steep faces, not gentle stony ground
+    shaped = g.muln(g.muln(g.muln(rock, strata), gullies), warmcool)
+    shaped = g.muln(shaped, g.lerpc(1.0, 1.18, g.ramp(nz, 0.25, 0.6)))
+    rock = g.lerp(rock, shaped, wall)
+    lichen = g.muln(g.muln(g.ramp(nz, 0.2, 0.45), g.ramp(band2, 0.55, 0.75)), wall)
+    rock = g.lerp(rock, g.c3((0.06, 0.075, 0.035)), g.mul(lichen, 0.6))
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
     # Where stone shows (2026-11-21, owner: the slopes' stone patches repeated as the same blobs): the 10 m noise alone used to
     # cut them; now three samplings at unrelated sizes, one turned 37 degrees, plus 45 m patches (patch sizes vary), a little of
@@ -270,7 +297,10 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
 
     # Sand: the beach, warm and pale, with the earth picture's grain in it
     sand_m = g.mul(vc, 1.0, "A")   # (the vertex colour's plain output is RGB only: alpha comes from its own pin)
-    s_amt = g.sat(g.mul(g.add(g.addn(g.mul(sand_m, 1.4), g.mul(g.add(rag, -0.5), 0.4)), -0.25), 1.6))   # (2026-11-19: 1.6, was 2.6: a soft blend into the grass, not a hard edge)
+    # (2026-11-21, owner: the shore's grass/sand edge was a row of same-size zigzag teeth: the 8 m mesh's triangles showing through a
+    # thin noise. Now the edge's own noise is stronger and three-sized, plus a 17 m swell that widens and narrows the sand.)
+    s_noise = g.addn(g.mul(g.add(rag, -0.5), 0.75), g.mul(g.add(fn["med2"], -0.5), 0.6))
+    s_amt = g.sat(g.mul(g.add(g.addn(g.mul(sand_m, 1.4), s_noise), -0.25), 1.6))   # (2026-11-19: 1.6, was 2.6: a soft blend into the grass, not a hard edge)
     sand = g.muln(palette.colour(mat, "Sand"), g.lerpc(0.86, 1.08, g.mul(g.lum(soil), 7.5)))
     col = g.lerp(col, sand, s_amt)
 
@@ -309,10 +339,12 @@ def build_dirt(dirt_tex, cobble_tex, cobble_n, patches, grass_tex):
     mat.set_editor_property("opacity_mask_clip_value", 0.5)
     g = Graph(mat)
     xy = g.mask(g.node(unreal.MaterialExpressionWorldPosition), True, True)
-    near = g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0))
-    far = g.tex(dirt_tex, g.mul(xy, 1.0 / 1700.0))
+    near_a = g.tex(dirt_tex, g.mul(xy, 1.0 / 350.0))
+    near_b = g.tex(dirt_tex, g.mul(grass_field.rot37(g, xy, 2203.0), 1.0 / 520.0))
+    near = g.lerp(near_a, near_b, g.ramp(g.mask(g.tex(patches, g.mul(g.add(xy, -5300.0), 1.0 / 1730.0)), True, False), 0.4, 0.6))   # (2026-11-21: a turned second sampling, swapped in 17 m patches)
+    far = g.tex(dirt_tex, g.mul(grass_field.rot37(g, xy, 611.0), 1.0 / 1700.0))
     var = g.lerpc(0.86, 1.14, far, "G")   # (was 0.72-1.22: near-black blotches where the cobbles fray out)
-    earth = g.muln(g.muln(g.muln(near, var, "RGB"), g.vector("Tint", (1.0, 1.0, 1.0))), palette.colour(mat, "Earth"))
+    earth = g.muln(g.muln(g.muln(g.mask(near, True, True, True), var), g.vector("Tint", (1.0, 1.0, 1.0))), palette.colour(mat, "Earth"))
     earth = g.addn(g.mul(earth, 0.9), g.c3((0.024, 0.019, 0.013)))   # the darkest earth lifted a little (second review: near-black in shade beside the stones)
     uv =g.node(unreal.MaterialExpressionTextureCoordinate)
     edge = g.one(unreal.MaterialExpressionOneMinus, g.one(unreal.MaterialExpressionAbs, g.mul(g.add(g.mask(uv, True, False), -0.5), 2.0)))   # 0 at the sides, 1 down the middle
@@ -386,7 +418,7 @@ def build_stone(rock_tex, patches):
     ny = g.one(unreal.MaterialExpressionAbs, g.mask(g.mask(nrm, False, True), True, False))
     nz = g.mask(g.mask(nrm, False, False, True), True, False)
     wz = g.mask(g.mask(wp, False, False, True), True, False)
-    top = rock_picture(g, rock_tex, g.mul(g.mask(wp, True, True), 1.0 / 160.0))
+    top = rock_untiled(g, rock_tex, g.mask(wp, True, True), patches, 160.0)
     sx = rock_picture(g, rock_tex, g.mul(g.append(g.mask(g.mask(wp, False, True), True, False), wz), 1.0 / 160.0))
     sy = rock_picture(g, rock_tex, g.mul(g.append(g.mask(wp, True, False), wz), 1.0 / 160.0))
     side = g.lerp(sy, sx, g.ramp(g.subn(nx, ny), -0.15, 0.15))
@@ -443,10 +475,31 @@ def build_boulder(rock_tex, patches):
         shade = g.lum(g.tex(base_t, uv))
         col = g.muln(col, g.lerpc(0.55, 1.25, g.ramp(shade, 0.08, 0.6)))
     col = g.muln(col, g.vector("Tint", (0.88, 0.88, 0.88)))
-    n1 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 70.0)), True, False)
-    n2 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 23.0)), True, False)
-    moss_a = g.sat(g.mul(g.add(g.addn(g.mul(nz, 1.4), g.addn(g.mul(n1, 0.7), g.mul(n2, 0.35))), -1.45), 3.0))
-    moss_c = g.lerp(g.c3((0.07, 0.085, 0.045)), g.c3((0.13, 0.15, 0.07)), n2)   # dark olive moss with lighter tufts
+    # Moss (2026-11-21, owner: the moss was a camouflage of same-size blotches; that was the 23 cm noise): now mostly on the tops
+    # and in the model's dark hollows, in patches from three noises at unrelated sizes (one turned), soft ragged edges, a few
+    # flecks, and each boulder its own amount (per instance random).
+    p3 = g.mask(wp, True, True, True)
+    def nz3(size, off):   # a soft noise read from above and from two sides, blended by facing (no stretched patches on the sides)
+        t = g.mask(g.tex(patches, g.mul(g.add(g.mask(p3, True, True), off), 1.0 / size)), True, False)
+        a = g.mask(g.tex(patches, g.mul(g.add(g.append(g.mask(p3, True, False), wz), off), 1.0 / size)), True, False)
+        b = g.mask(g.tex(patches, g.mul(g.add(g.append(g.mask(g.mask(p3, False, True), True, False), wz), off), 1.0 / size)), True, False)
+        return g.lerp(g.lerp(a, b, g.ramp(g.subn(nx, ny), -0.2, 0.2)), t, g.ramp(g.one(unreal.MaterialExpressionAbs, nz), 0.4, 0.8))
+    big = nz3(330.0, 1234.0)
+    mid = nz3(127.0, 517.0)
+    fine = nz3(41.0, 2903.0)
+    rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
+    amount = g.lerpc(-0.35, 0.25, rnd)   # some boulders nearly bare, some mossy
+    hollow = g.c(0.0)
+    if base_t is not None:
+        hollow = g.one(unreal.MaterialExpressionOneMinus, g.ramp(shade, 0.1, 0.35))   # the model's dark cracks and hollows
+    up = g.ramp(nz, 0.05, 0.85)
+    field = g.addn(g.addn(g.mul(big, 0.55), g.mul(mid, 0.35)), g.mul(g.add(fine, -0.5), 0.22))
+    field = g.addn(g.addn(field, g.mul(up, 0.75)), g.addn(g.mul(hollow, 0.25), amount))
+    moss_a = g.ramp(field, 1.0, 1.28)
+    fleck = g.muln(g.ramp(fine, 0.72, 0.8), g.mul(up, 0.35))   # small scattered flecks beyond the patches
+    moss_a = g.sat(g.addn(moss_a, fleck))
+    n2 = mid
+    moss_c = g.lerp(g.c3((0.06, 0.07, 0.045)), g.c3((0.1, 0.115, 0.065)), fine)   # dark, muted olive with lighter tufts
     col = g.lerp(col, palette.grade_plant_extra(mat, moss_c), g.mul(moss_a, 0.75))
     g.out(palette.grade_world(mat, col), unreal.MaterialProperty.MP_BASE_COLOR)
     if nrm_t is not None:

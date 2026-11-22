@@ -20,6 +20,8 @@
 #include "Misc/CommandLine.h"
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
+#include "UObject/UObjectIterator.h"
+#include "Materials/MaterialInterface.h"
 
 // Which grass the meadow grows (2026-11-15, owner: "lean towards realism with the grass"; the packs are the owner's Fab library,
 // git-ignored, set up by Tools/BuildGrassPacks.ps1). Changing any of these regrows the grass round you at once (a short hitch).
@@ -81,10 +83,16 @@ static bool InLab(float X, float Y) { return JeebTownLab::NewOn() && JeebTownLab
 bool AMeadow::GrowsHere(float X, float Y, float PadCm) const { return GrowsHereWorld(X, Y, PadCm); }
 static TAutoConsoleVariable<int32> CVarGrassOldSteps(TEXT("jeeb.Grass.OldSteps"), 0, TEXT("1: the grass fills in by the three steps of before 2026-11-21 (17 and 32 m, a new crop at each), to compare; regrows round you"));
 static bool OldSteps() { return CVarGrassOldSteps.GetValueOnGameThread() != 0; }
+// (2026-11-21, owner: the grass steps about twice as far in every direction on HIGH, the outer steps very sparse.) The reach, the sinking
+// edge and the steps' edges past the first (by Stretch^(step/4): the nearest 12 m step stays, the last edge and the reach go the whole
+// way) are stretched; the outermost step's share is thinned by the stretch, so the far ring fills in from very sparse
+static TAutoConsoleVariable<float> CVarGrassStretch(TEXT("jeeb.Grass.Stretch"), 1.f, TEXT("How much farther the grass's steps reach (1: 50 m; 2: 100 m, the outer steps very sparse). Set by the graphics setting (LOW 1); regrows round you"));
+static float Stretch() { return OldSteps() ? 1.f : FMath::Clamp(CVarGrassStretch.GetValueOnGameThread(), 1.f, 3.f); }
 int32 AMeadow::TierFor(float Dist) const
 {
 	if (OldSteps()) return Dist < 1700.f ? 0 : (Dist < 3200.f ? 1 : 2);
-	int32 T = 0; while (T < NumTiers - 1 && Dist >= TierEdge[T]) ++T; return T; }
+	const float S = Stretch();
+	int32 T = 0; while (T < NumTiers - 1 && Dist >= TierEdge[T] * FMath::Pow(S, T / 4.f)) ++T; return T; }
 // The ground as drawn at a spot (JeebTerrain::DrawnHeight), its meshes' grid points cached for the square being built
 float AMeadow::GroundAt(float X, float Y)
 {
@@ -383,8 +391,8 @@ void AMeadow::LoadPack(int32 P)
 		Kinds.Reset(); KeepAlive.Reset();
 		return;
 	}
-	PackFadeEnd = FMath::Max(600.f, CVarGrassPackFade.GetValueOnGameThread());
-	PackFadeStart = FMath::Max(200.f, PackFadeEnd - 800.f);
+	PackFadeEnd = FMath::Max(600.f, CVarGrassPackFade.GetValueOnGameThread() * Stretch());
+	PackFadeStart = FMath::Max(200.f, PackFadeEnd - 800.f * Stretch());
 	bFarCards = CVarGrassFarCards.GetValueOnGameThread() != 0;
 	const float Density = P == 1 ? CVarGrassDensity1.GetValueOnGameThread() : CVarGrassDensity2.GetValueOnGameThread();
 	PackChance = FMath::Clamp(Density / (NearDensity * 10000.f), 0.f, 1.f);
@@ -401,18 +409,51 @@ void AMeadow::RegrowAround(const FVector2D& Me)
 	for (const FIntPoint& Id : All) DropCell(Id);
 	bJob = false;
 	const int32 Cx = FMath::FloorToInt(Me.X / CellSize), Cy = FMath::FloorToInt(Me.Y / CellSize);
-	const int32 Span = FMath::CeilToInt(Reach / CellSize) + 1;
+	const int32 Span = FMath::CeilToInt(Reach * Stretch() / CellSize) + 1;
 	for (int32 j = Cy - Span; j <= Cy + Span; ++j)
 		for (int32 i = Cx - Span; i <= Cx + Span; ++i)
 		{
 			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
 			const float D = FVector2D::Distance(Ctr, Me);
-			if (D > Reach || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;
+			if (D > Reach * Stretch() || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;
 			StartJob(FIntPoint(i, j), TierFor(D));
 			StepJob(1.0e6);
 		}
 }
 
+// (2026-11-21) -GlowLog: every loaded mesh with a glowing material slot (Glow, Flame, Fire, Candle, Emiss), the box of that slot's
+// vertices and of the whole mesh in its own frame, so each light can be put inside its glass or flame (see Fill.cpp's JeebGlowAt)
+static void JeebGlowLog()
+{
+#if WITH_EDITORONLY_DATA
+	for (TObjectIterator<UStaticMesh> It; It; ++It)
+	{
+		UStaticMesh* M = *It;
+		const TArray<FStaticMaterial>& Mats = M->GetStaticMaterials();
+		bool bAny = false;
+		for (const FStaticMaterial& S : Mats) { const FString N = S.MaterialSlotName.ToString() + (S.MaterialInterface ? S.MaterialInterface->GetName() : FString()); if (N.Contains(TEXT("Glow")) || N.Contains(TEXT("Flame")) || N.Contains(TEXT("Fire")) || N.Contains(TEXT("Candle")) || N.Contains(TEXT("Emiss"))) bAny = true; }
+		if (!bAny || !M->IsMeshDescriptionValid(0)) continue;
+		const FMeshDescription* Md = M->GetMeshDescription(0);
+		if (!Md) continue;
+		FStaticMeshConstAttributes A(*Md);
+		TVertexAttributesConstRef<FVector3f> Pos = A.GetVertexPositions();
+		TPolygonGroupAttributesConstRef<FName> Slot = A.GetPolygonGroupMaterialSlotNames();
+		FBox All(ForceInit);
+		for (const FVertexID V : Md->Vertices().GetElementIDs()) All += FVector(Pos[V]);
+		for (const FPolygonGroupID G : Md->PolygonGroups().GetElementIDs())
+		{
+			const FString N = Slot[G].ToString();
+			FString MatName; for (const FStaticMaterial& S : Mats) if (S.MaterialSlotName == Slot[G] && S.MaterialInterface) MatName = S.MaterialInterface->GetName();
+			const FString Both = N + TEXT(" ") + MatName;
+			if (!(Both.Contains(TEXT("Glow")) || Both.Contains(TEXT("Flame")) || Both.Contains(TEXT("Fire")) || Both.Contains(TEXT("Candle")) || Both.Contains(TEXT("Emiss")))) continue;
+			FBox B(ForceInit);
+			for (const FTriangleID T : Md->GetPolygonGroupTriangles(G)) for (const FVertexInstanceID Vi : Md->GetTriangleVertexInstances(T)) B += FVector(Pos[Md->GetVertexInstanceVertex(Vi)]);
+			UE_LOG(LogTemp, Display, TEXT("JEEBGLOW %s slot %s mat %s glow %.0f %.0f %.0f size %.0f %.0f %.0f mesh %.0f..%.0f %.0f..%.0f %.0f..%.0f"), *M->GetPathName(), *N, *MatName,
+				B.GetCenter().X, B.GetCenter().Y, B.GetCenter().Z, B.GetSize().X, B.GetSize().Y, B.GetSize().Z, All.Min.X, All.Max.X, All.Min.Y, All.Max.Y, All.Min.Z, All.Max.Z);
+		}
+	}
+#endif
+}
 #if !UE_BUILD_SHIPPING
 // (-FloatScan, 2026-11-21, owner: "Why are the grass and knight floating here?" beside a dirt road by the river) Along every road and
 // river, across a band 7 m either side, the ground he stands on (a trace down onto the world's solid ground) against the height the
@@ -519,6 +560,31 @@ static void JeebFloatScan(UWorld* W)
 				if (FMath::Abs(Ro[i]) > 8.f) ++NOld;
 			}
 		}
+		// (2026-11-21) buried or lifted ends: each ground piece's four bottom corners against the drawn ground (the fill only)
+		if (Cls.Contains(TEXT("WorldFill")))
+		{
+			TMap<FString, FVector4> WorstAt; TMap<FString, FIntPoint> Ends;   // mesh -> (pieces, pieces with a corner over 10 cm under or over the ground)
+			for (UInstancedStaticMeshComponent* C : Comps)
+			{
+				if (!C->GetStaticMesh()) continue;
+				const FBox B = C->GetStaticMesh()->GetBoundingBox();
+				for (int32 i = 0; i < C->GetInstanceCount(); ++i)
+				{
+					FTransform T; C->GetInstanceTransform(i, T, true);
+					const FVector P = T.GetLocation();
+					if (FMath::Abs(P.Z - JeebTerrain::DrawnHeight(P.X, P.Y)) > 30.f) continue;   // (stacked, hung, on a deck)
+					float WorstC = 0.f;
+					for (int32 c = 0; c < 4; ++c)
+					{
+						const FVector Q = T.TransformPosition(FVector(c & 1 ? B.Max.X : B.Min.X, c & 2 ? B.Max.Y : B.Min.Y, B.Min.Z));
+						WorstC = FMath::Max(WorstC, FMath::Abs(Q.Z - JeebTerrain::DrawnHeight(Q.X, Q.Y)));
+					}
+					FIntPoint& E = Ends.FindOrAdd(C->GetStaticMesh()->GetName()); ++E.X; if (WorstC > 10.f) ++E.Y;
+					FVector4& Wp = WorstAt.FindOrAdd(C->GetStaticMesh()->GetName(), FVector4(0, 0, 0, -1)); if (WorstC > Wp.W) Wp = FVector4(P.X, P.Y, P.Z, WorstC);
+				}
+			}
+			for (const TPair<FString, FIntPoint>& E : Ends) if (E.Value.Y > 0) { const FVector4 Wp = WorstAt[E.Key]; UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT ends %s: %d of %d pieces have a corner over 10 cm off the ground (worst %.0f cm at %.0f %.0f %.0f)"), *E.Key, E.Value.Y, E.Value.X, Wp.W, Wp.X, Wp.Y, Wp.Z); }
+		}
 		UE_LOG(LogTemp, Display, TEXT("JEEBFLOAT placed %s: %d on the ground, off by over 8 cm at %d (worst %.0f); at HeightAt it would be %d"), *Cls, NI, NOff, Worst, NOld);
 	}
 }
@@ -530,8 +596,9 @@ void AMeadow::Tick(float Dt)
 #if !UE_BUILD_SHIPPING
 	{
 		static double Born = FPlatformTime::Seconds();
-		static bool bScanned = false;
+		static bool bScanned = false, bGlowLogged = false;
 		if (!bScanned && FPlatformTime::Seconds() - Born > 8.0 && FParse::Param(FCommandLine::Get(), TEXT("FloatScan"))) { bScanned = true; JeebFloatScan(GetWorld()); }
+		if (!bGlowLogged && FPlatformTime::Seconds() - Born > 8.0 && FParse::Param(FCommandLine::Get(), TEXT("GlowLog"))) { bGlowLogged = true; JeebGlowLog(); }
 	}
 #endif
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
@@ -543,8 +610,8 @@ void AMeadow::Tick(float Dt)
 		// the grass setting (jeeb.Grass.*): a change regrows everything round you; the first tick grows the start (the woods are
 		// planted by now, so grass can thin under them)
 		static FString Was;
-		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d %.2f %d"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
-			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread(), CVarGrassFarThin.GetValueOnGameThread(), CVarGrassOldSteps.GetValueOnGameThread());
+		const FString Now = FString::Printf(TEXT("%d %.2f %.2f %.0f %d %.2f %d %.2f"), CVarGrassPack.GetValueOnGameThread(), CVarGrassDensity1.GetValueOnGameThread(),
+			CVarGrassDensity2.GetValueOnGameThread(), CVarGrassPackFade.GetValueOnGameThread(), CVarGrassFarCards.GetValueOnGameThread(), CVarGrassFarThin.GetValueOnGameThread(), CVarGrassOldSteps.GetValueOnGameThread(), CVarGrassStretch.GetValueOnGameThread());
 		bool bRegrow = !bPrewarmed || Now != Was;
 #if !UE_BUILD_SHIPPING
 		static const bool bShot = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));
@@ -590,7 +657,7 @@ void AMeadow::Tick(float Dt)
 	for (const TPair<FIntPoint, FCell>& P : Cells)
 	{
 		const FVector2D Ctr((P.Key.X + 0.5f) * CellSize, (P.Key.Y + 0.5f) * CellSize);
-		if (FVector2D::Distance(Ctr, Me) > Reach + CellSize) Far.Add(P.Key);
+		if (FVector2D::Distance(Ctr, Me) > Reach * Stretch() + CellSize) Far.Add(P.Key);
 	}
 	for (const FIntPoint& Id : Far) DropCell(Id);
 
@@ -601,13 +668,13 @@ void AMeadow::Tick(float Dt)
 	struct FWant { FIntPoint Id; int32 Tier; float D; };
 	TArray<FWant> Want;
 	const int32 Cx = FMath::FloorToInt(Me.X / CellSize), Cy = FMath::FloorToInt(Me.Y / CellSize);
-	const int32 Span = FMath::CeilToInt(Reach / CellSize) + 1;
+	const int32 Span = FMath::CeilToInt(Reach * Stretch() / CellSize) + 1;
 	for (int32 j = Cy - Span; j <= Cy + Span; ++j)
 		for (int32 i = Cx - Span; i <= Cx + Span; ++i)
 		{
 			const FVector2D Ctr((i + 0.5f) * CellSize, (j + 0.5f) * CellSize);
 			const float D = FVector2D::Distance(Ctr, Me);
-			if (D > Reach || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;   // (the whole world's land, 2026-11-12)
+			if (D > Reach * Stretch() || !GrowsHere(Ctr.X, Ctr.Y, CellSize * 0.75f)) continue;   // (the whole world's land, 2026-11-12)
 			const FCell* Have = Cells.Find(FIntPoint(i, j));
 			// Pick the detail from the nearer of now and a moment ahead, and only coarsen a square once it is well behind (no flicker at the boundary)
 			const float DA = FMath::Min(D, float(FVector2D::Distance(Ctr, Ahead)));
@@ -675,7 +742,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 	const float FlowerShare = CVarGrassFlowers.GetValueOnGameThread();
 	// (jeeb.Grass.FarThin thins the far ring and widens what is left: half as many, about 1.4 times as wide, keeps the cover)
 	const float FarThin = FMath::Clamp(CVarGrassFarThin.GetValueOnGameThread(), 0.1f, 1.f);
-	float PackHere = PackChance * PackKeepAt(JobTier, FarThin), CardHere = CardKeep[JobTier];
+	float PackHere = PackChance * PackKeepAt(JobTier, FarThin) / (JobTier == NumTiers - 1 ? Stretch() : 1.f), CardHere = CardKeep[JobTier];
 	float PackWide = WideFor(PackKeepAt(JobTier, FarThin)), CardSize = FMath::Pow(CardHere, -0.4f), Taller = 1.f + 0.04f * JobTier;
 	int32 KindsTier = JobTier <= 2 ? 0 : JobTier - 2;   // (0 every kind, 1 two, 2 or more one)
 	bool bFlowerTier = JobTier <= 3;
@@ -828,7 +895,7 @@ void AMeadow::FinishJob()
 		Comp->SetCastShadow(false);
 		Comp->bAffectDynamicIndirectLighting = false;
 		Comp->bAffectDistanceFieldLighting = false;
-		Comp->SetCullDistances(0, FMath::RoundToInt(Reach + 500.f));
+		Comp->SetCullDistances(0, FMath::RoundToInt(Reach * Stretch() + 500.f));
 		Comp->SetNumCustomDataFloats(1);   // (each tuft's long-grass share: M_Grass's golden tips)
 		Comp->RegisterComponent();
 		Comp->AddInstances(JobXf, false, true);

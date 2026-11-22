@@ -465,7 +465,7 @@ void AKnightCharacter::SetBase(FMovementBaseInterfaceData* Data, const FName Bon
 void AKnightCharacter::ServerAttack_Implementation(uint8 Style, int8 Dir, float Charge)
 {
 	if (!Skills || Style > static_cast<uint8>(EAtkStyle::Dash) || Health <= 0.f || bKnockedDown || bDrinking || InClimbMove()) return;   // (InClimbMove: no swings on a rock face or in a mantle)
-	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && !FightsLikeSword(SelectedKind())) return;   // (the low sweep and the dash attack are sword moves)
+	if ((Style == static_cast<uint8>(EAtkStyle::Sweep) || Style == static_cast<uint8>(EAtkStyle::Dash)) && !FightsLikeSword(SelectedKind()) && !(Style == static_cast<uint8>(EAtkStyle::Dash) && WizardDashKind(SelectedKind()))) return;   // (the low sweep and the dash attack are sword moves)
 	const double Now = FPlatformTime::Seconds();
 	const bool bCombo = Style == static_cast<uint8>(EAtkStyle::Sweep) && IsKicking() && bKickLanded && StunLeft <= 0.f;   // (a landed kick cut short by the sweep)
 	const int32 Held = SelectedKind();

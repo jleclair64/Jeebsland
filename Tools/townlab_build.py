@@ -157,7 +157,7 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
 
     # Grass ground: as M_Ground's (so it meets the world's ground and the meadow's tufts), with stronger Breath of the Wild drift
     near_a = g.tex(grass_tex, g.mul(xy, 1.0 / 300.0))
-    near_b = g.tex(grass_tex, g.mul(g.add(xy, 1777.0), 1.0 / 430.0))
+    near_b = g.tex(grass_tex, g.mul(grass_field.rot37(g, xy, 1777.0), 1.0 / 430.0))   # (turned, as M_Ground's)
     near = g.muln(g.lerp(near_a, near_b, g.ramp(medm, 0.42, 0.58)), palette.colour(mat, "GroundGrass"))
     # past the grass blades (40 m) the ground carries the look: a broad sampling of the same picture keeps some texture out to
     # about 80 m before it settles to the average (from the air the plain average read flat next to the real town's meadow)

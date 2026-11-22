@@ -1,0 +1,16 @@
+{
+ "id": "01a20172-5047-72c3-a80e-908ec1ffcb2d",
+ "type": "text-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Stylised 3D fantasy game item, three-quarter view from slightly above the front, whole object in frame on a plain white background. A wizard's hat on its own, nothing else, no head, no mannequin: a tall pointed cone with a gentle bend and a soft crumpled tip leaning backwards, a wide slightly wavy round brim, made of rich royal-blue felt with a brown leather hat band and a gold buckle, thin gold trim along the brim's edge. Slightly stylised, not quite realistic and a tiny bit cartoonish: sleek natural proportions, crisp bevels, hand-painted textures, rich clean colours, no rust, no dirt.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795320598799,
+ "started_at": 1795320598810,
+ "finished_at": 1795320618299,
+ "expires_at": 1795579818299,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a20172-5047-72c3-a80e-908ec1ffcb2d_0.png?Expires=1795579818&Signature=L09tZUnTfqNUPBPWD5eQuXACpyYAUNFzeNesEts-aB~EuChMWztNycpCysl8zSThdhN8iS5bjvb1H1ynWepwXO4m6Qu~raDoZZgciOMVrL7zW4KwwLy3KvjNOd~VOrD3~lVxW9Q~BBiKMYCAsTITSgAmDvjIeVQBowiMDEe9qbsjzlAFK5kbq~u-GfNfkmDwCYfbIgPaH6mu687MEck0YLRYMlxuNk5RAnR9uwj83-z0CRd~KvFIdB-JRuVNt9ZPQ2IZfn1XSaA6nYHBicRMzTZVcwxjvQsuq0aWCbjakSD9FY1fouuTsFEaBi9f0j4MECXKDaCcsVxZzUfMhhZC3w__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

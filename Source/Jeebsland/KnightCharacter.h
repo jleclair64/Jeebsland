@@ -111,6 +111,24 @@ public:
 	// The playable troll (2026-11-19, KnightCharacterTroll.cpp): a class mode of the knight. ATrollCharacter sets it in its constructor,
 	// so every machine knows it from the class alone. Everything else is the knight's code, with the troll's changes inside it.
 	bool IsTroll() const { return bIsTroll; }
+	// The playable wizard (2026-11-21, KnightCharacterWizard.cpp): a class mode of the knight too, on the knight's own skeleton and moves. AWizardCharacter sets it.
+	// His guard is a blue orb all round him in place of a shield; his roll is a short teleport the server places; he wears the wizard's hat, robe, boots and book.
+	bool IsWizard() const { return bIsWizard; }
+	bool WizardDashKind(int32 K) const { return bIsWizard && (K == 7 || K == 8); }   // (K_Wand, K_Staff: his dash attack is the knight's lunge with these too)
+	int32 WizardGuardItem() const;   // (what his orb is as strong as: a kite shield of his spell book's tier, tin with none)
+	void StartBlink(const FVector& Dir);
+	void DoBlink(const FVector& Dir);
+	bool BlinkSpot(const FVector& Dir, FVector& Out) const;
+	void BlinkFx(const FVector& From, const FVector& To);
+	void TickWizard(float Dt);
+	void SwapWizardForTest(bool bWizard);   // (single player, test builds: jeeb.PlayWizard 1|0)
+	UFUNCTION(Server, Reliable) void ServerBlink(FVector_NetQuantizeNormal Dir);
+	UFUNCTION(NetMulticast, Reliable) void MultiBlink(FVector_NetQuantize From, FVector_NetQuantize To);
+	UPROPERTY() class UStaticMeshComponent* WizardOrb = nullptr;
+	UPROPERTY() class UMaterialInstanceDynamic* WizardOrbMid = nullptr;
+	struct FBlinkPuff { TWeakObjectPtr<class UStaticMeshComponent> Comp; TWeakObjectPtr<class UMaterialInstanceDynamic> Mid; float T = 0.f; bool bIn = false; };
+	TArray<FBlinkPuff> BlinkPuffs;
+	float BlinkHide = 0.f;   // (seconds his body stays unseen after a teleport: the vanish)
 	float WalkNow() const;     // WalkSpeed, or the troll's (Tuning.ini [Troll])
 	float SprintNow() const;
 	// The troll's charged jump: hold Space, let go. Client asks (ServerLeap), server checks and launches; the cooldown is the server's.
@@ -244,6 +262,7 @@ public:
 	static float SwingSpeedScale();   // testing: sword swings slowed by DefaultGame.ini [Jeebsland.Testing] SwingSpeed (1 = normal)
 	bool bShotFace = false; float ShotFaceYaw = 0.f;
 	void RefreshEquipment();                     // redraws armour, shield and the weapon in your hand
+	bool GuardActive() const;                    // the guard can be raised: a shield, or a troll's bare arm
 	bool ShieldActive() const;                   // a shield is worn and the weapon in hand allows one
 	int32 SelectedKind() const;                  // kind of the weapon in hand, or -1
 	// Gathering: puts the right tool in hand (and tells you if you have none). OutTimeMult speeds up better tools.
@@ -507,6 +526,7 @@ protected:
 	void ApplyArmorSlot(int32 Slot);
 	// The troll (KnightCharacterTroll.cpp)
 	bool bIsTroll = false;
+	bool bIsWizard = false;
 	double LeapChargeFrom = -1.0;     // when Space went down for a charged jump (this machine's clock; -1 none)
 	double ServerChargeFrom = -1.0;   // (server) when the client said it started charging
 	float LeapCooldown = 0.f;         // seconds before the next charged jump
@@ -951,4 +971,14 @@ class ATrollCharacter : public AKnightCharacter
 	GENERATED_BODY()
 public:
 	ATrollCharacter(const FObjectInitializer& ObjectInitializer);
+};
+
+// The playable wizard (2026-11-21): the knight's pawn in wizard mode (KnightCharacterWizard.cpp). AKnightGameMode gives one to a player who
+// asked for it (-PlayAs=Wizard; AKnightPlayerController::ServerChooseWizard).
+UCLASS()
+class AWizardCharacter : public AKnightCharacter
+{
+	GENERATED_BODY()
+public:
+	AWizardCharacter(const FObjectInitializer& ObjectInitializer);
 };

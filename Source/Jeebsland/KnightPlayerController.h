@@ -42,6 +42,7 @@ public:
 	// (ServerChooseClass, sent just before the login); in single player the command line is read directly (AKnightGameMode::GetDefaultPawnClassForController).
 	int8 ClassChoice = -1;
 	UFUNCTION(Server, Reliable) void ServerChooseClass(bool bTroll);
+	UFUNCTION(Server, Reliable) void ServerChooseWizard();   // (2026-11-21: ClassChoice 2, the wizard; -PlayAs=Wizard)
 
 	// This machine: waiting for the server to say yes
 	bool IsLoggingIn() const { return bSentLogin && !bLoginDone; }
