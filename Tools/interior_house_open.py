@@ -20,6 +20,10 @@ DZ0, DZ1 = -0.02, 2.25
 FRONT = -2.45          # faces in front of this (y below it) belong to the front wall and its porch
 OUTER, INNER = -3.10, -2.38   # the lining runs from the porch's face back through the room's front wall (its room face is at y -2.40, 230 cm in the game)
 JAMB, HEAD = 0.07, 0.10
+# (2026-11-22, owner: "the top corner of the door is still blinking ... move the sides of the doorframe back a couple pixels"): the jambs
+# ran up through the head, so at both top corners the jamb's and the head's faces lay in the same planes and fought (outside and in).
+# They now stop under the head and stand SET back from its front and back faces.
+SET = 0.006
 
 def load(path):
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -82,8 +86,8 @@ bm = cut(ob, "shell")
 uvl = bm.loops.layers.uv.active
 col = bm.loops.layers.float_color.active or bm.loops.layers.color.active
 n0 = len(bm.faces)
-box(bm, DX0 - JAMB, DX0, OUTER, INNER, DZ0 - 0.02, DZ1 + HEAD, uv0, uvl, col)   # left jamb
-box(bm, DX1, DX1 + JAMB, OUTER, INNER, DZ0 - 0.02, DZ1 + HEAD, uv0, uvl, col)   # right jamb
+box(bm, DX0 - JAMB, DX0, OUTER + SET, INNER - SET, DZ0 - 0.02, DZ1, uv0, uvl, col)   # left jamb (2026-11-22: up to the head, not into it, and set back)
+box(bm, DX1, DX1 + JAMB, OUTER + SET, INNER - SET, DZ0 - 0.02, DZ1, uv0, uvl, col)   # right jamb
 box(bm, DX0 - JAMB, DX1 + JAMB, OUTER, INNER, DZ1, DZ1 + HEAD, uv0, uvl, col)   # head
 box(bm, DX0, DX1, OUTER, INNER, DZ0 - 0.06, DZ0, uv0, uvl, col)                 # threshold board
 print("HOUSEOPEN lining faces", len(bm.faces) - n0, "colour layer", bool(col))

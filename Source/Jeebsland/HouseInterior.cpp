@@ -5,6 +5,8 @@
 #include "KnightGameState.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/BoxComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
@@ -21,9 +23,14 @@
 #include "Camera/PlayerCameraManager.h"
 
 static TAutoConsoleVariable<float> CVarIntCam(TEXT("jeeb.Interior.Cam"), 0.5f, TEXT("The open house: the camera arm's share of its usual length while he stands inside (1 = as outside)."));
-static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), -0.5f, TEXT("The open house: exposure bias inside (EV; the land's own is about 0.35). Higher = brighter room."));
+static TAutoConsoleVariable<float> CVarIntExposure(TEXT("jeeb.Interior.Exposure"), -0.9f, TEXT("The open house: exposure bias inside (EV; the land's own is about 0.35). Higher = brighter room."));
 static TAutoConsoleVariable<float> CVarIntReach(TEXT("jeeb.Interior.LightReach"), 400.f, TEXT("The open house: its lights are on only while the camera is within this many cm of the room (inside it, or just outside the door)."));
-static TAutoConsoleVariable<float> CVarIntLight(TEXT("jeeb.Interior.Light"), 0.7f, TEXT("The open house: every light inside times this."));
+static TAutoConsoleVariable<float> CVarIntLight(TEXT("jeeb.Interior.Light"), 0.5f, TEXT("The open house: every light inside times this."));
+// (2026-11-22, owner: "still too bright ... much warmer ... focused on the candle, chandelier, oil lamp and fireplace", "each candle light
+// up", "intermittently blink as if they were real candles". Local visuals only.)
+static TAutoConsoleVariable<float> CVarIntFlame(TEXT("jeeb.Interior.Flame"), 1.f, TEXT("The open house: brightness of the little flames and their halos at every wick (0 hides them)."));
+static TAutoConsoleVariable<float> CVarIntBlink(TEXT("jeeb.Interior.Blink"), 1.f, TEXT("The open house: how strongly the flames now and then gutter and blink (0: only a gentle flicker)."));
+static TAutoConsoleVariable<float> CVarIntReachK(TEXT("jeeb.Interior.LightRadius"), 1.f, TEXT("The open house: every light's reach times this (smaller = pools of light round each flame, darker corners)."));
 static TAutoConsoleVariable<float> CVarIntLoad(TEXT("jeeb.Interior.LoadReach"), 600.f, TEXT("The open house: its room (furniture, lights) is built on your machine once your knight or camera is within this many cm of its door, or inside."));
 static TAutoConsoleVariable<float> CVarIntUnload(TEXT("jeeb.Interior.UnloadReach"), 1000.f, TEXT("The open house: its room is taken down again once you are further than this many cm from its door."));
 static TAutoConsoleVariable<float> CVarDoorClose(TEXT("jeeb.Interior.DoorClose"), 2.f, TEXT("The open house's door (server): it shuts by itself this many seconds after the doorway is clear (0: never)."));
@@ -351,15 +358,19 @@ void AHouseInterior::LoadRoom()
 			L->SetWorldLocation(Xf.TransformPosition(R.LightAt));
 			L->SetIntensityUnits(ELightUnits::Lumens);
 			L->SetIntensity(0.f);
-			L->SetAttenuationRadius(R.Rad);
-			// (2026-11-21 evening, owner: "reads very orange": still warm, nearer candle-white; were 1 0.55 0.25 and 1 0.72 0.42)
-			L->SetLightColor(R.bFire ? FLinearColor(1.f, 0.62f, 0.36f) : FLinearColor(1.f, 0.78f, 0.56f));   // warmer (owner, 2026-11-21: "about 50% dimmer and a warmer light"; dimming is Light 0.7 x Exposure -0.5)
-			L->SetCastShadows(R.bShadow);
-			L->SetSourceRadius(R.bFire ? 25.f : 3.f);
+			L->SetAttenuationRadius(R.Rad * FMath::Clamp(CVarIntReachK.GetValueOnGameThread(), 0.2f, 3.f));
+			// (2026-11-22, owner: "much warmer": candle and firelight colours, deep amber; were 1 0.62 0.36 and 1 0.78 0.56)
+			L->SetLightColor(R.bFire ? FLinearColor(1.f, 0.42f, 0.13f) : FLinearColor(1.f, 0.52f, 0.2f));
+			// (few shadowed lights for cost: the hearth and the chandelier; the small candles and lamps are shadowless)
+			const bool bChandelier = R.Mesh.Contains(TEXT("SM_Lamp_001"));
+			L->SetCastShadows(R.bShadow || R.bFire || bChandelier);
+			L->SetSourceRadius(R.bFire ? 25.f : 2.f);
 			L->SetVisibility(false);
 			L->RegisterComponent();
 			Lights.Add(L);
-			LightBase.Add(R.bFire ? -R.Lm : R.Lm);   // (negative: flickers)
+			LightBase.Add(R.Lm);
+			LightFlicker.Add(1.f);
+			AddFlames(R, Lights.Num() - 1);
 		}
 	}
 	// A gentle exposure lift inside, so the room reads cosy rather than black (a box over the room, above the land's own volume)
@@ -386,7 +397,9 @@ void AHouseInterior::UnloadRoom()
 	if (!bLoaded) return;
 	for (UStaticMeshComponent* Sm : Pieces) if (Sm) Sm->DestroyComponent();
 	for (UPointLightComponent* L : Lights) if (L) L->DestroyComponent();
-	Pieces.Empty(); Lights.Empty(); LightBase.Empty();
+	Pieces.Empty(); Lights.Empty(); LightBase.Empty(); LightFlicker.Empty(); Flames.Empty();
+	if (FlameCones) { FlameCones->DestroyComponent(); FlameCones = nullptr; }
+	if (FlameHalos) { FlameHalos->DestroyComponent(); FlameHalos = nullptr; }
 	if (Post) { Post->Destroy(); Post = nullptr; }
 	bLoaded = bLit = false;
 	LitAlpha = 0.f;
@@ -434,16 +447,120 @@ void AHouseInterior::Tick(float Dt)
 	if (!bOn && !bLit) return;
 	bLit = bOn;
 	Flicker += Dt;
+	TickFlames(bOn, LitAlpha);
 	const float K = LitAlpha * CVarIntLight.GetValueOnGameThread();
 	for (int32 i = 0; i < Lights.Num(); ++i)
 	{
 		UPointLightComponent* L = Lights[i];
 		if (!L) continue;
-		const float B = LightBase[i];
-		const float Fl = B < 0.f ? 0.85f + 0.1f * FMath::Sin(Flicker * 11.f) + 0.05f * FMath::Sin(Flicker * 23.7f + 1.3f) : 1.f;
 		if (L->IsVisible() != bOn) L->SetVisibility(bOn);
-		L->SetIntensity(FMath::Abs(B) * K * Fl);
+		L->SetIntensity(LightBase[i] * K * LightFlicker[i]);
 	}
+}
+
+namespace
+{
+	// Content/Data/InteriorFlames.csv: Mesh,X,Y,Z,Size: each fixture mesh's wicks in the mesh's own frame (cm, before the row's
+	// scale) and the flame's height in cm (times the row's height scale). Read once.
+	const TMap<FString, TArray<FVector4f>>& FlameTable()
+	{
+		static TMap<FString, TArray<FVector4f>> T;
+		static bool bRead = false;
+		if (bRead) return T;
+		bRead = true;
+		TArray<FString> Lines;
+		if (!FFileHelper::LoadFileToStringArray(Lines, *(FPaths::ProjectContentDir() / TEXT("Data/InteriorFlames.csv")))) { UE_LOG(LogTemp, Warning, TEXT("JEEBINT no InteriorFlames.csv")); return T; }
+		for (int32 n = 1; n < Lines.Num(); ++n)
+		{
+			FString Line = Lines[n];
+			int32 H; if (Line.FindChar(TEXT('#'), H)) Line.LeftInline(H);
+			TArray<FString> C; Line.ParseIntoArray(C, TEXT(","), false);
+			if (C.Num() < 4 || C[0].TrimStartAndEnd().IsEmpty()) continue;
+			T.FindOrAdd(C[0].TrimStartAndEnd()).Add(FVector4f(F(C, 1), F(C, 2), F(C, 3), F(C, 4, 3.f)));
+		}
+		return T;
+	}
+
+	// One flame's brightness now (about 1): a soft, quick waver, and now and then (every few seconds, each flame on its own) a
+	// short gutter where it dips and flutters, as a real candle does in a draught. Time-based, on this machine only.
+	float FlameNow(float T, float Ph, float Blink)
+	{
+		const float Waver = 0.06f * FMath::Sin(T * 8.3f + Ph) + 0.04f * FMath::Sin(T * 13.7f + 1.7f * Ph) + 0.05f * FMath::PerlinNoise1D(T * 5.f + Ph * 9.f);
+		const float Gust = FMath::Clamp((FMath::PerlinNoise1D(T * 0.55f + Ph * 13.f) - 0.22f) * 4.f, 0.f, 1.f);
+		const float Flutter = 0.55f + 0.45f * FMath::Sin(T * 27.f + Ph * 3.f);
+		return FMath::Max(0.15f, 0.95f + Waver - 0.55f * Blink * Gust * Flutter);
+	}
+}
+
+void AHouseInterior::AddFlames(const FRow& R, int32 LightIndex)
+{
+	const TArray<FVector4f>* Wicks = R.bMesh ? FlameTable().Find(R.Mesh) : nullptr;
+	if (!Wicks || Wicks->Num() == 0) return;
+	if (!FlameCones)
+	{
+		UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+		UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+		UMaterialInterface* ColorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+		UMaterialInterface* HaloMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Flame.M_Flame"));
+		auto Make = [this](UStaticMesh* M) {
+			UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this);
+			C->SetupAttachment(RootComponent);
+			C->SetMobility(EComponentMobility::Movable);
+			C->SetStaticMesh(M);
+			C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			C->SetCastShadow(false);
+			C->bAffectDynamicIndirectLighting = false;
+			C->bAffectDistanceFieldLighting = false;
+			C->SetCullDistances(0, 3000);
+			C->RegisterComponent();
+			C->SetWorldTransform(FTransform::Identity);
+			return C;
+		};
+		FlameCones = Make(Cone);
+		FlameHalos = Make(Ball);
+		if (ColorMat) if (UMaterialInstanceDynamic* M = FlameCones->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(9.f, 3.6f, 0.7f));
+		if (HaloMat) if (UMaterialInstanceDynamic* M = FlameHalos->CreateDynamicMaterialInstance(0, HaloMat)) { M->SetScalarParameterValue(TEXT("Intensity"), 0.35f); M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1.f, 0.45f, 0.12f)); }
+	}
+	const FVector S = R.Xf.GetScale3D();
+	FVector Sum = FVector::ZeroVector;
+	for (const FVector4f& W : *Wicks)
+	{
+		FFlame Fl;
+		Fl.At = R.Xf.TransformPosition(FVector(W.X, W.Y, W.Z));
+		Fl.Size = W.W * FMath::Abs(S.Z);
+		// (a phase from where it is, so it is the same every visit; each flame its own)
+		Fl.Phase = FMath::Frac(FMath::Sin(Fl.At.X * 0.0137f + Fl.At.Y * 0.0291f + Fl.At.Z * 0.0517f) * 43758.5453f) * 6.2832f;
+		Fl.Light = LightIndex;
+		Flames.Add(Fl);
+		Sum += Fl.At;
+		FlameCones->AddInstance(FTransform(FQuat::Identity, Fl.At, FVector::ZeroVector), true);
+		FlameHalos->AddInstance(FTransform(FQuat::Identity, Fl.At, FVector::ZeroVector), true);
+	}
+	// the fixture's real light sits among its flames (a little above, so the candles' own cups don't swallow it)
+	if (Lights.IsValidIndex(LightIndex) && Lights[LightIndex]) Lights[LightIndex]->SetWorldLocation(Sum / Wicks->Num() + FVector(0.f, 0.f, 3.f));
+}
+
+void AHouseInterior::TickFlames(bool bOn, float Alpha)
+{
+	for (float& V : LightFlicker) V = 0.f;
+	TArray<int32, TInlineAllocator<16>> Count; Count.SetNumZeroed(LightFlicker.Num());
+	const float Blink = FMath::Max(0.f, CVarIntBlink.GetValueOnGameThread());
+	const float Show = bOn ? Alpha * FMath::Max(0.f, CVarIntFlame.GetValueOnGameThread()) : 0.f;
+	for (int32 i = 0; i < Flames.Num(); ++i)
+	{
+		const FFlame& Fl = Flames[i];
+		const float B = FlameNow(Flicker, Fl.Phase, Blink);
+		if (LightFlicker.IsValidIndex(Fl.Light)) { LightFlicker[Fl.Light] += B; ++Count[Fl.Light]; }
+		// (Engine cone: 100 cm tall, its tip up, its base at the middle's -50; sphere: 100 cm across)
+		const float H = Fl.Size * (0.75f + 0.25f * B) * Show, Wd = Fl.Size * 0.38f * Show;
+		if (FlameCones) FlameCones->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Fl.At + FVector(0.f, 0.f, H * 0.5f), FVector(Wd, Wd, H) * 0.01f), true, false, true);
+		if (FlameHalos) FlameHalos->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Fl.At + FVector(0.f, 0.f, Fl.Size * 0.5f), FVector(Fl.Size * 3.2f * (0.7f + 0.3f * B) * Show * 0.01f)), true, false, true);
+	}
+	if (FlameCones) FlameCones->MarkRenderStateDirty();
+	if (FlameHalos) FlameHalos->MarkRenderStateDirty();
+	// a light with no flames (the hearth) flickers by itself, a little deeper; one with flames follows their average
+	for (int32 l = 0; l < LightFlicker.Num(); ++l)
+		LightFlicker[l] = Count[l] > 0 ? LightFlicker[l] / Count[l] : 0.88f + 0.08f * FMath::Sin(Flicker * 9.f + l) + 0.07f * FMath::PerlinNoise1D(Flicker * 4.f + l * 5.f);
 }
 
 // Test helpers (not in a shipped game): jeeb.Test.GoHouse N (console, single player; 1 CLS1 behind the church, 2 CLS2, 3 CLN2, 4 NL1,

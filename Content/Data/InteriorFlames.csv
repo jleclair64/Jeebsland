@@ -1,0 +1,2 @@
+Mesh,X,Y,Z,Size
+# Each fixture mesh's wicks, in the mesh's own frame (cm, before its row's scale), and the flame height in cm (times the row's height scale). AHouseInterior (HouseInterior.cpp, FlameTable).
