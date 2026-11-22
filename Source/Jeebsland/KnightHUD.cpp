@@ -349,6 +349,8 @@ void AKnightHUD::DrawHUD()
 		const float LX = (Canvas->ClipX - CW) * 0.5f, LY = Canvas->ClipY * 0.8f + 40.f;
 		if (Knight->IsLeapCharging()) Gauge(LX, LY, CW, CH, FMath::Max(0.03f, Knight->LeapChargeShare()), FLinearColor(1.f, 0.78f, 0.2f), Knight->LeapChargeShare() >= 1.f);
 		else if (Knight->LeapCooldownShare() > 0.f) Gauge(LX, LY, CW, CH, 1.f - Knight->LeapCooldownShare(), FLinearColor(0.55f, 0.43f, 0.11f), false);
+		// (2026-11-22) the rush bar, just under it: shows while it is below full; red while he is run dry and easing down
+		if (Knight->RushBarShare() < 0.999f) Gauge(LX, LY + 12.f, CW, 6.f, Knight->RushBarShare(), Knight->IsRushTired() ? FLinearColor(0.85f, 0.28f, 0.2f) : FLinearColor(0.64f, 0.92f, 0.2f), Knight->IsRushTired());
 	}
 
 	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)

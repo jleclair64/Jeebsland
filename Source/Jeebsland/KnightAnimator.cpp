@@ -1615,7 +1615,9 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 30: case 31:
 	{
 		const bool b2 = Key == 31;
-		if (L.bTroll && In.Kind == JeebItems::K_Club) { TrollClubSwing(In, B, OutBlend, b2); break; }   // (the troll's club blows: KnightAnimatorTroll.cpp)
+		// (2026-11-22, owner: "I want the swing to be a one-handed swing like the knight": the troll swings the club with the knight's own sword
+		// cuts, and TrollClubClear keeps the long club off his belly. -TrollOldSwing (test builds): his own two-handed blows of 2026-11-21.)
+		if (L.bTroll && In.Kind == JeebItems::K_Club && bTrollOldSwing) { TrollClubSwing(In, B, OutBlend, b2); break; }
 		const bool bGreat = In.Kind == JeebItems::K_Broadsword;   // (the big sword has its own two-handed rows; it has no shield to keep still)
 		const TCHAR* Nm = b2 ? (bGreat ? TEXT("Great_Jab2") : TEXT("Jab2")) : (bGreat ? TEXT("Great_Jab1") : TEXT("Jab1"));
 		if (const FMove* M = Moves.Find(Nm))
@@ -1648,6 +1650,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			// (the second swing's arm stays out through its pause, held at the end of its cut)
 			const float ReachW = b2 ? FMath::SmoothStep(From * 0.3f, From + 0.1f, U) : SwingReach(U, From, To);
 			if (!bGreat) ExtendArm(B, b2 ? Jab2Reach : Jab1Reach, ReachW);   // (owner 2026-11-06: the arm out further in both swings)
+			if (L.bTroll) TrollClubClear(B);
 		}
 		break;
 	}
@@ -1886,7 +1889,9 @@ void FClipLib::SolveGear()
 		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("SwordRoll="), SwordRollDeg);
 		Rot = FQuat(Rot.RotateVector(KnightDesign::BladeDir(1)).GetSafeNormal(), FMath::DegreesToRadians(SwordRollDeg)) * Rot;
 		// (2026-11-11) The grip sits in the hole of the closed fist: both hands are bent shut round this line in the mesh (Tools/knight_fist.py), in front of the palm at the base of the fingers
-		const FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
+		FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
+		if (bTroll && !TrollFistR.IsNearlyZero())   // (the troll's big hand: the middle of his curled fingers, KnightAnimatorTroll.cpp)
+			Fist = Hand.TransformPosition(RestRot[Bone[RHand]].Inverse().RotateVector(TrollFistR)) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();
 		// The real grip, measured on Mixamo's own Paladin W/Prop, who holds a sword on these clips (2026-11-05, Tools/knight_ref_grip.py).
 		// In his T-pose the blade leaves the fist forward, 14 degrees out and a little down; carried through the same line-up the clips use (knight_clip_retarget.py), that is

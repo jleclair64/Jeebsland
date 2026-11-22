@@ -220,6 +220,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
 	DOREPLIFETIME(AKnightCharacter, Health);
+	DOREPLIFETIME(AKnightCharacter, bRushing);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME(AKnightCharacter, bRockMode);   // (the troll's rocks in hand: KnightCharacterRock.cpp)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
