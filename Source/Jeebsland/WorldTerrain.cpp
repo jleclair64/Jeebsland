@@ -474,7 +474,10 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 		static const float Near[] = { 800.f, 2400.f, 4800.f };
 		TArray<float> Rings;
 		for (float R : Near) Rings.Add(R);
-		for (int32 k = 1; k <= Out; ++k) Rings.Add(k * Cs + 2400.f);
+		// (16 m rings out to about 320 m, where a player on the edge sees the ground's shape against the sky: 64 m cells drew straight
+		// ridge lines there, 2026-11-22 check pictures; then 64 m)
+		for (float R = 6400.f; R < 32500.f; R += 1600.f) Rings.Add(R);
+		for (int32 k = 6; k <= Out; ++k) Rings.Add(k * Cs + 2400.f);
 		for (int32 k = 1; k <= 7; ++k) Rings.Add(Out * Cs + 2400.f + k * 10.f * Cs);   // (then seven wide cells out to about 5.8 km, for the horizon)
 		TArray<float> L;
 		for (int32 k = Rings.Num() - 1; k >= 0; --k) L.Add(Lo - Rings[k]);
