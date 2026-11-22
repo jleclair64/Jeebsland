@@ -634,6 +634,22 @@ def fill_holes(o, sides, flat=False):
         if flat:
             u0 = f.loops[0][uvl].uv.copy()
             for l in f.loops: l[uvl].uv = u0
+    # (2026-11-22, the grain sack's speckle: a big fill also capped loops lying on the model's own surface, and those caps
+    # z-fought with it as black-dot patches. Drop every new face whose inside points all sit within a hair of an old face.)
+    from mathutils.bvhtree import BVHTree
+    bm.verts.index_update()
+    old = [f for f in bm.faces if f not in new]
+    if old and new:
+        tree = BVHTree.FromPolygons([v.co.copy() for v in bm.verts], [[v.index for v in f.verts] for f in old])
+        co = np.array([v.co[:] for v in bm.verts]); eps = 0.01 * float(np.linalg.norm(co.max(0) - co.min(0)))
+        def near(p):
+            h = tree.find_nearest(p); return h[0] is not None and h[3] < eps
+        lying = []
+        for f in new:
+            c = f.calc_center_median()
+            if all(near(p) for p in [c] + [l.vert.co.lerp(c, 0.5) for l in f.loops]): lying.append(f)
+        bmesh.ops.delete(bm, geom=lying, context="FACES_ONLY"); new -= set(lying)
+        print("FILLER fill caps lying on the surface dropped", len(lying))
     bm.to_mesh(o.data); bm.free(); o.data.update()
     print("FILLER holes filled", len(new))
 
@@ -1233,6 +1249,9 @@ def build_source(src, names):
         rgb, rough, metal, glow, Pl, same = recolour(name, got["Base"], got.get("Metal"), got.get("AO"), ids, used, zid, P)
         nrm = clean_normal(got["Normal"], Pl, same, P, size / 1024.0)
         if P.get("plain"): rgb, nrm = plain_zones(name, lo, back, P, rgb, nrm, size, comp, clus, co)
+        # (2026-11-22, the grain sack's speckle: faces on tiny UV charts sat in a dark empty background, which the smaller mips
+        # blended in as black dots. Fill every empty texel from its nearest charts, so every mip keeps the charts' own colours.)
+        rgb = fill_empty(rgb, used); nrm = fill_empty(nrm, used)
         # material(s): Body, and Glow for faces mostly painted glow
         mat = make_material(name, rgb, nrm, rough, metal, emissive=False, two_sided=P["two_sided"])
         me_lo = lo.data; me_lo.materials.clear(); me_lo.materials.append(mat)
@@ -1309,6 +1328,21 @@ def build_source(src, names):
         bpy.data.objects.remove(lo, do_unlink=True)
         for im in list(bpy.data.images):
             if im.users == 0: bpy.data.images.remove(im)
+
+def fill_empty(img, used):
+    # push-pull: average the used texels down a pyramid, then paint each level's empty texels from the coarser level above
+    if used.all(): return img
+    lv = [(img * used[..., None], used.astype(np.float32))]
+    while min(lv[-1][1].shape) > 1:
+        c, w = lv[-1]; h2, w2 = c.shape[0] // 2 * 2, c.shape[1] // 2 * 2
+        c = c[:h2, :w2].reshape(h2 // 2, 2, w2 // 2, 2, -1).sum((1, 3)); w = w[:h2, :w2].reshape(h2 // 2, 2, w2 // 2, 2).sum((1, 3))
+        lv.append((c, w))
+    col = lv[-1][0] / np.maximum(lv[-1][1], 1e-6)[..., None]
+    for c, w in reversed(lv[:-1]):
+        up = np.repeat(np.repeat(col, 2, 0), 2, 1)
+        up = np.pad(up, ((0, c.shape[0] - up.shape[0]), (0, c.shape[1] - up.shape[1]), (0, 0)), mode="edge")
+        a = np.clip(w, 0, 1)[..., None]; col = (c / np.maximum(w, 1e-6)[..., None]) * a + up * (1 - a)
+    return np.where(used[..., None], img, col).astype(img.dtype)
 
 def make_material(name, rgb, nrm, rough, metal, emissive, two_sided=False):
     mat = bpy.data.materials.new(name); mat.use_nodes = True
