@@ -21,11 +21,11 @@ float AOpenWorld::SnowNow = 0.f;
 namespace
 {
 	TAutoConsoleVariable<float> CVarSnowForce(TEXT("jeeb.Snow.Force"), -1.f, TEXT("The snowfall on this machine: -1 the shared weather (clear or snowing for a few minutes at a time), 0 always clear, 1 always snowing (anything between: that share of it). Looks only."));
-	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 2200 round the camera on the peaks; 0 none, 2 at most)"));
-	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.45f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
+	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 3000 round the camera on the peaks; 0 none, 1.4 at most)"));
+	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.6f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
 	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.3 to 2.8 cm)"));
 
-	constexpr int32 NumFlakes = 4400;          // (jeeb.Snow.Amount 2 shows them all; 1 half)
+	constexpr int32 NumFlakes = 4400;          // (jeeb.Snow.Amount 1.4 shows them all)
 	constexpr float BoxR = 1500.f;             // the flakes' box: 30 m square round a spot 5 m ahead of the camera,
 	constexpr float BoxBelow = 500.f, BoxAbove = 1100.f;   // from 5 m under it to 11 m over it
 	const FVector Wind(55.f, 24.f, 0.f);       // cm/s: a light steady drift
@@ -173,7 +173,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
 	const FVector Fwd = PC->PlayerCameraManager->GetCameraRotation().Vector();
 	const float High = JeebWorld::Smooth(1500.f, 7000.f, Cam.Z);
-	const float Amount = SnowNow * FMath::Lerp(FMath::Clamp(CVarSnowLow.GetValueOnGameThread(), 0.f, 1.f), 1.f, High) * 0.5f * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
+	const float Amount = SnowNow * FMath::Lerp(FMath::Clamp(CVarSnowLow.GetValueOnGameThread(), 0.f, 1.f), 1.f, High) * 0.7f * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
 	const int32 Want = FMath::Clamp(FMath::RoundToInt(NumFlakes * Amount), 0, NumFlakes);
 	if (Want == 0 && Shown == 0) return;
 	const float SizeK = FMath::Clamp(CVarSnowSize.GetValueOnGameThread(), 0.2f, 4.f);

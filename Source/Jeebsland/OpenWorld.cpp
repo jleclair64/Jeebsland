@@ -153,6 +153,7 @@ namespace
 	// ------------------------------------------------------------------ the grid
 	constexpr float RoadFlat = 400.f, RoadEaseMin = 1200.f, RoadEaseMax = 4500.f, RoadEaseBy = 3.5f;   // (the roads' corridors, as JeebHills')
 	constexpr float RoadClearIn = 3500.f, RoadClearOut = 6500.f;   // no steep rock within, full steepness allowed past (cm from a road's middle)
+	constexpr float OpenRoadGrade = 0.11f;   // tan 6.3 degrees: the steepest these roads climb (the forest roads round Oak Hill keep to 5: they have lower hills to cross)
 	struct FRoad
 	{
 		TArray<FVector2D> Line;   // every 60 cm
@@ -189,8 +190,8 @@ namespace
 	};
 
 	// ------------------------------------------------------------------ the roads' routes
-	// A least-cost search over every second grid point (16 m), sixteen headings: a step costs its length times 1 + 18 x its grade squared
-	// (11 degrees 1.7 times, 19 degrees 3.2 times: a road goes round a hill only when that is not much longer, since its corridor is levelled anyway), so a road follows valley floors and takes the lowest saddle;
+	// A least-cost search over every second grid point (16 m), sixteen headings: a step costs its length times 1 + 30 x its grade squared
+	// (11 degrees 2.1 times, 19 degrees 4.6 times: a road goes round a hill only when that is not much longer, since its corridor is levelled anyway), so a road follows valley floors and takes the lowest saddle;
 	// never in water or within 15 m of it, on the beach, in the original square, in Oak Hill or through a Steele Creek building.
 	struct FRouter
 	{
@@ -263,7 +264,7 @@ namespace
 					if (D[0] != 0 && D[1] != 0 && (Block[(a + Sa) * NB + b] || Block[a * NB + b + Sb] || Block[(a + Sa) * NB + b + Sb])) continue;
 					const float L = 2.f * Step * FMath::Sqrt(float(D[0] * D[0] + D[1] * D[1]));
 					const float Grade = FMath::Abs(Z(N2) - Zc) / L;
-					const float C = Cost[Cur.N] + L * (1.f + 18.f * Grade * Grade + Pen[N2]);
+					const float C = Cost[Cur.N] + L * (1.f + 30.f * Grade * Grade + Pen[N2]);
 					if (C >= Cost[N2]) continue;
 					Cost[N2] = C; From2[N2] = Cur.N;
 					Heap.HeapPush(FOpen{ C + float(FVector2D::Distance(Pos(N2), Goal)), N2 }, Less);
@@ -457,13 +458,16 @@ namespace
 				}
 				Tt[0] = Base[0]; Tt[M - 1] = Base[M - 1];   // (the ends lie on the ground as it is: the road it carries on from, the town's level ground; the climb limit then eases the rest to them)
 				TArray<float> Lo = Tt, Hi = Tt;
-				for (int32 i = 1; i < M; ++i) { const float D = (S[i] - S[i - 1]) * JeebHills::RoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i - 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i - 1] - D); }
-				for (int32 i = M - 2; i >= 0; --i) { const float D = (S[i + 1] - S[i]) * JeebHills::RoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i + 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i + 1] - D); }
+				for (int32 i = 1; i < M; ++i) { const float D = (S[i] - S[i - 1]) * OpenRoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i - 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i - 1] - D); }
+				for (int32 i = M - 2; i >= 0; --i) { const float D = (S[i + 1] - S[i]) * OpenRoadGrade; Lo[i] = FMath::Min(Lo[i], Lo[i + 1] + D); Hi[i] = FMath::Max(Hi[i], Hi[i + 1] - D); }
 				R.Want.SetNum(M); R.Ease.SetNum(M);
 				for (int32 i = 0; i < M; ++i)
 				{
 					const float W = 0.5f * (Lo[i] + Hi[i]);
-					R.Want[i] = W;
+					// (and inside the cones of that climb standing on both ends, so the road arrives on the ground as it is: the road it
+					// carries on from, the town's level ground. The mean alone left it up to 11 m over Birch Grove's middle)
+					const float FromA = S[i] * OpenRoadGrade, FromB = (S[M - 1] - S[i]) * OpenRoadGrade;
+					R.Want[i] = FMath::Clamp(FMath::Clamp(W, Base[0] - FromA, Base[0] + FromA), Base[M - 1] - FromB, Base[M - 1] + FromB);
 					const float Diff = R.Want[i] - Base[i];
 					G.MaxCut = FMath::Max(G.MaxCut, -Diff); G.MaxFill = FMath::Max(G.MaxFill, Diff);
 					R.Ease[i] = FMath::Clamp(RoadEaseBy * FMath::Abs(Diff), RoadEaseMin, RoadEaseMax);
