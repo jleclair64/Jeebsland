@@ -397,7 +397,8 @@ static float ChainBackX = -7.5f, ChainSideY = 10.5f, ChainUp = 3.f;    // round 
 static float ChainFrontX = 21.f, ChainDrop = 17.f;                      // where the pendant hangs: in front of the neck bone (on the chest plate), and below it
 static float ChainBareIn = 5.f;                                          // with no chest plate it lies this much nearer, on the mail
 static float PendantPitch = 8.f;                                         // the pendant leans out at the bottom, lying on the chest plate
-static float PendantScale = 1.3f;   // (the models are 6 cm tall: a little bolder than life, so it reads on the plate)
+static float PendantScale = 3.9f;   // (2026-11-21, owner: three times larger: the models are 6 cm tall, so 23 cm now)
+static float ChainScale = 3.f;       // (the links too, and the chain spacing with them)
 void AKnightCharacter::UpdateAmulet()
 {
 	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
@@ -437,7 +438,7 @@ void AKnightCharacter::UpdateAmulet()
 	for (int32 i = 0; i <= 240; ++i) Line.Add(At(-PI + 2.f * PI * i / 240.f));
 	// links every 1.1 cm along it, each turned a quarter from the last
 	KM::FMD Link;
-	KM::Torus(Link, 0.42, 0.12, 10, 5, 1.45, 1.0, KM::Xf(FVector::ZeroVector));
+	KM::Torus(Link, 0.42 * ChainScale, 0.12 * ChainScale, 10, 5, 1.45, 1.0, KM::Xf(FVector::ZeroVector));
 	KM::FMD Md;
 	float Walk = 0.f, NextAt = 0.f; int32 k = 0;
 	for (int32 i = 1; i < Line.Num(); ++i)
@@ -452,7 +453,7 @@ void AKnightCharacter::UpdateAmulet()
 			const int32 Base = Md.V.Num();
 			for (const FVector& V : Link.V) Md.V.Add(P + Q.RotateVector(V));
 			for (int32 Ix : Link.I) Md.I.Add(Base + Ix);
-			NextAt += 1.1f; ++k;
+			NextAt += 1.1f * ChainScale; ++k;
 		}
 		Walk += Len;
 	}
@@ -480,6 +481,87 @@ void AKnightCharacter::UpdateAmulet()
 		P->SetCastShadow(false);
 		P->SetRelativeScale3D(FVector(PendantScale));
 		AmuletParts.Add(P);
+	}
+}
+
+// The worn rings (2026-11-21, owner: "make sure the rings can be seen on the fingers"; they were never drawn since the old knight went): a band with its stone on
+// the back of a finger, on the hand bone's own frame (the gauntlet's fingers move with it; a fist turns them only a little), the first on his right hand, the second
+// on the left, a third beside the first. Every hand, open or fist, in every armour style and bare.
+static float RingAlong = 11.f, RingPalm = -1.f, RingAcross = 0.f, RingRad = 2.6f, RingThick = 0.8f;   // along the fingers from the wrist bone, off the hand's middle toward the palm, across the hand (cm); the band's radius and tube
+void AKnightCharacter::UpdateRings()
+{
+	if (!Skills || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
+	TArray<int32> Rings;
+	for (int32 C : { Skills->Worn[JeebItems::K_Ring], Skills->RingB, Skills->Worn[JeebItems::K_Amulet] })
+		if (C != 0 && JeebItems::KindOf(C) == JeebItems::K_Ring) Rings.Add(C);
+	int32 Key = 0; for (int32 R : Rings) Key = Key * 31 + R;
+	if (Key != RingShownKey)
+	{
+		RingShownKey = Key;
+		for (USceneComponent* C : RingParts) if (C) C->DestroyComponent();
+		RingParts.Reset();
+#if !UE_BUILD_SHIPPING
+		{   // (test pictures: -RingTune=<along>_<palm>_<across>_<radius>_<tube>, cm in tenths)
+			FString T; TArray<FString> V;
+			if (FParse::Value(FCommandLine::Get(), TEXT("RingTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
+			{ RingAlong = FCString::Atof(*V[0]) / 10.f; RingPalm = FCString::Atof(*V[1]) / 10.f; RingAcross = FCString::Atof(*V[2]) / 10.f; RingRad = FCString::Atof(*V[3]) / 10.f; RingThick = FCString::Atof(*V[4]) / 10.f; }
+		}
+#endif
+		UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
+		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+		for (int32 h = 0; h < 2; ++h)
+			if (!RingHand[h])
+			{
+				USceneComponent* G = NewObject<USceneComponent>(this);
+				G->SetupAttachment(GetRootComponent());
+				G->RegisterComponent();
+				RingHand[h] = G;
+			}
+		auto Proc = [&](USceneComponent* Parent, const KM::FMD& Md, const FLinearColor& Col, float Rough)
+		{
+			UProceduralMeshComponent* P = NewObject<UProceduralMeshComponent>(this);
+			P->SetupAttachment(Parent);
+			P->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			P->SetCastShadow(false);
+			P->RegisterComponent();
+			TArray<FVector> Normals; KM::ComputeNormals(Md, Normals);
+			TArray<int32> Tris;
+			for (int32 t = 0; t + 2 < Md.I.Num(); t += 3) Tris.Append({ Md.I[t], Md.I[t + 1], Md.I[t + 2], Md.I[t], Md.I[t + 2], Md.I[t + 1] });
+			P->CreateMeshSection_LinearColor(0, Md.V, Tris, Normals, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+			if (UMaterialInstanceDynamic* M = P->CreateDynamicMaterialInstance(0, Metal ? Metal : Base))
+			{
+				M->SetVectorParameterValue(TEXT("Color"), Col);
+				M->SetScalarParameterValue(TEXT("Metallic"), 1.f);
+				M->SetScalarParameterValue(TEXT("Roughness"), Rough);
+			}
+			RingParts.Add(P);
+			return P;
+		};
+		for (int32 i = 0; i < Rings.Num() && i < 3; ++i)
+		{
+			const int32 Side = (i == 1) ? 1 : 0;
+			FVector A, N;
+			if (!Anim->HandFrame(Side, A, N)) { RingShownKey = -1; return; }
+			const FVector Cx = FVector::CrossProduct(A, N).GetSafeNormal() * (Side == 0 ? 1.f : -1.f);   // (across the hand, the same way on each: a third ring goes beside the first)
+			const int32 Var = JeebItems::VariantOf(Rings[i]);
+			const JeebItems::FAccessoryRow& Row = JeebItems::AccessoryRow(JeebItems::K_Ring, Var);
+			const float Across = RingAcross + (i == 2 ? 2.4f : 0.f);
+			const FQuat Q = FRotationMatrix::MakeFromZX(A, -N).ToQuat();
+			const FVector Pos = A * RingAlong + N * RingPalm + Cx * Across;
+			KM::FMD Band, Stone;
+			KM::Torus(Band, RingRad, RingThick, 16, 8, 1.f, 1.f, KM::Xf(FVector::ZeroVector));
+			KM::Ellipsoid(Stone, RingThick * 1.5, RingThick * 1.3, RingThick * 1.2, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 0.9, 0.f, 0.f)));
+			UProceduralMeshComponent* B = Proc(RingHand[Side], Band, Row.Band, 0.3f);
+			UProceduralMeshComponent* S = Proc(RingHand[Side], Stone, Row.Gem, 0.1f);
+			B->SetRelativeLocationAndRotation(Pos, Q);
+			S->SetRelativeLocationAndRotation(Pos, Q);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBRING %d rings drawn"), Rings.Num());
+	}
+	if (Rings.Num() > 0)
+	{
+		RingHand[0]->SetWorldTransform(Anim->BoneWorld(JeebAnim::RHand));
+		RingHand[1]->SetWorldTransform(Anim->BoneWorld(JeebAnim::LHand));
 	}
 }
 

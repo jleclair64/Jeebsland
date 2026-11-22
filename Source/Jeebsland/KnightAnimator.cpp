@@ -2282,6 +2282,24 @@ void FKnightAnimator::MoveTo(const FVector& Feet, float ActorYaw)
 	ToWorld.AddToTranslation(WallOff);
 }
 
+// (rings, 2026-11-21) The hand bone's own axes: along the fingers (forearm bone to hand bone) and toward the palm (where the grip line lies off that), measured once per side.
+bool FKnightAnimator::HandFrame(int32 Side, FVector& OutAlong, FVector& OutPalm) const
+{
+	static FVector A[2], N[2]; static bool bGot[2] = { false, false };
+	if (!bGot[Side])
+	{
+		const FTransform H = BoneWorld(Side == 0 ? JeebAnim::RHand : JeebAnim::LHand), E = BoneWorld(Side == 0 ? JeebAnim::RFore : JeebAnim::LFore);
+		const FVector Al = H.InverseTransformVectorNoScale((H.GetLocation() - E.GetLocation()).GetSafeNormal());
+		const FVector G = Side == 0 ? GripInRightHand(L.RightGrip) : GripInLeftHand(L.LeftGrip);
+		const FVector Pl = (G - Al * FVector::DotProduct(G, Al)).GetSafeNormal();
+		if (Al.IsNearlyZero() || Pl.IsNearlyZero()) return false;
+		A[Side] = Al; N[Side] = Pl; bGot[Side] = true;
+		UE_LOG(LogTemp, Log, TEXT("JEEBRING hand %d frame: along %s palm %s grip %s"), Side, *Al.ToString(), *Pl.ToString(), *G.ToString());
+	}
+	OutAlong = A[Side]; OutPalm = N[Side];
+	return true;
+}
+
 FTransform FKnightAnimator::BoneWorld(int32 B) const
 {
 	return L.BindInGame(Final, B) * ToWorld;
