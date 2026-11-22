@@ -5,6 +5,8 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/PointLightComponent.h"
+#include "DayNight.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -24,6 +26,14 @@ namespace
 	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 3000 round the camera on the peaks; 0 none, 1.4 at most)"));
 	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.6f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
 	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.3 to 2.8 cm)"));
+
+	TAutoConsoleVariable<float> CVarCandles(TEXT("jeeb.Candles"), 1.f, TEXT("The floating candles over Silver Point: 0 hides them, 1 as built (48; a looks-only switch)."));
+	TAutoConsoleVariable<float> CVarCandleLight(TEXT("jeeb.Candles.Light"), 1.f, TEXT("The floating candles: strength of the few real lights on the candles nearest you (0 none)."));
+	TAutoConsoleVariable<float> CVarCandleGlow(TEXT("jeeb.Candles.Glow"), 1.f, TEXT("The floating candles: brightness of the flames and halos (0 hides them)."));
+	TAutoConsoleVariable<float> CVarCandleBy(TEXT("jeeb.Candles.Day"), 0.35f, TEXT("The floating candles: how bright the flames are in full daylight, against 1 at night."));
+	constexpr int32 NumCandles = 48;
+	constexpr int32 NumCandleLights = 6;
+	constexpr float CandleSeeReach = 25000.f;   // (cm from the site's middle past which the candles are put away)
 
 	constexpr int32 NumFlakes = 4400;          // (jeeb.Snow.Amount 1.4 shows them all)
 	constexpr float BoxR = 1500.f;             // the flakes' box: 30 m square round a spot 5 m ahead of the camera,
@@ -70,6 +80,7 @@ void AOpenWorld::BeginPlay()
 	SetActorLocation(FVector::ZeroVector);
 	BuildHouses();
 	if (IsNetMode(NM_DedicatedServer)) return;   // (no snow to draw on a server)
+	BuildCandles();
 	if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))
 		if (UMaterialInstanceDynamic* M = Flakes->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.5f, 1.52f, 1.58f));
 	TArray<FTransform> X;
@@ -159,6 +170,150 @@ void AOpenWorld::BuildHouses()
 	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN houses: %d placeholder houses; hash=%08x%s"), Placed, Hash, bServer ? TEXT(" (server: solids only)") : TEXT(""));
 }
 
+// The candles: laid out from a fixed seed on the first site (Silver Point), over the open ground round the middle and round the
+// placeholder house (never inside it), 2.5 to 6 m up. Every machine gets the same layout; the bobbing is local.
+void AOpenWorld::BuildCandles()
+{
+	const TArray<JeebOpen::FSite>& Sites = JeebOpen::Sites();
+	if (Sites.Num() == 0) return;
+	const JeebOpen::FSite& S = Sites[0];
+	CandleSite = S.Pos;
+	FRandomStream R(51515);
+	const float Reach = S.Radius + 600.f;
+	int32 Tries = 0;
+	while (Candle.Num() < NumCandles && Tries++ < 2000)
+	{
+		const float A = R.FRandRange(0.f, 6.2832f), D = Reach * FMath::Sqrt(R.FRand());
+		const FVector2D P = S.Pos + FVector2D(FMath::Cos(A), FMath::Sin(A)) * D;
+		if (FVector2D::Distance(P, S.House) < 1100.f) continue;   // (the house is about 9 m across; keep clear of it and its eaves)
+		const float Z = JeebTerrain::HeightAt(P.X, P.Y);
+		FCandle C;
+		C.Height = R.FRandRange(250.f, 600.f);
+		C.Home = FVector(P.X, P.Y, Z + C.Height);
+		C.Bob = R.FRandRange(8.f, 22.f); C.BobRate = R.FRandRange(0.9f, 1.8f); C.BobPhase = R.FRandRange(0.f, 6.2832f);
+		C.Drift = R.FRandRange(15.f, 45.f); C.DriftRate = R.FRandRange(0.2f, 0.5f); C.DriftPhase = R.FRandRange(0.f, 6.2832f);
+		C.Phase = R.FRandRange(0.f, 6.2832f);
+		C.Lean = R.FRandRange(-4.f, 4.f);
+		Candle.Add(C);
+	}
+	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	UStaticMesh* Cone = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone"));
+	UStaticMesh* Ball = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	UMaterialInterface* ColorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	UMaterialInterface* HaloMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Flame.M_Flame"));
+	auto Make = [this](UStaticMesh* M)
+	{
+		UInstancedStaticMeshComponent* C = NewObject<UInstancedStaticMeshComponent>(this);
+		C->SetupAttachment(GetRootComponent());
+		C->SetMobility(EComponentMobility::Movable);
+		C->SetStaticMesh(M);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCanEverAffectNavigation(false);
+		C->SetCastShadow(false);
+		C->bAffectDynamicIndirectLighting = false;
+		C->bAffectDistanceFieldLighting = false;
+		C->SetCullDistances(0, 9000);
+		C->RegisterComponent();
+		C->SetWorldTransform(FTransform::Identity);
+		return C;
+	};
+	if (!Cyl || !Cone || !Ball || Candle.Num() == 0) return;
+	CandleBody = Make(Cyl); CandleFlame = Make(Cone); CandleHalo = Make(Ball);
+	if (ColorMat)
+	{
+		if (UMaterialInstanceDynamic* M = CandleBody->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.85f, 0.74f, 0.52f));
+		if (UMaterialInstanceDynamic* M = CandleFlame->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(5.f, 1.9f, 0.3f));
+	}
+	if (HaloMat) if (UMaterialInstanceDynamic* M = CandleHalo->CreateDynamicMaterialInstance(0, HaloMat)) { M->SetScalarParameterValue(TEXT("Intensity"), 0.4f); M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(1.f, 0.5f, 0.14f)); }
+	TArray<FTransform> X;
+	for (int32 i = 0; i < Candle.Num(); ++i) X.Add(FTransform(FQuat::Identity, Candle[i].Home, FVector(0.001f)));
+	UInstancedStaticMeshComponent* Parts[3] = { CandleBody, CandleFlame, CandleHalo };
+	for (int32 k = 0; k < 3; ++k)
+	{
+		Parts[k]->AddInstances(X, false, true, false);
+		Parts[k]->SetHasPerInstancePrevTransforms(true);   // motion vectors for TSR: no smears while they bob
+		CandleNow[k] = X; CandlePrev[k] = X;
+	}
+	for (int32 i = 0; i < NumCandleLights; ++i)
+	{
+		UPointLightComponent* L = NewObject<UPointLightComponent>(this);
+		L->SetupAttachment(GetRootComponent());
+		L->SetMobility(EComponentMobility::Movable);
+		L->SetCastShadows(false);
+		L->SetLightColor(FLinearColor(1.f, 0.62f, 0.28f));
+		L->SetAttenuationRadius(900.f);
+		L->SetSourceRadius(2.f);
+		L->SetIntensity(0.f);
+		L->SetVisibility(false);
+		L->RegisterComponent();
+		CandleLights.Add(L);
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBCANDLES %d floating candles over %s at %.0f %.0f"), Candle.Num(), S.Name, S.Pos.X, S.Pos.Y);
+}
+
+void AOpenWorld::TickCandles(float Dt, const FVector& Cam)
+{
+	if (!CandleBody) return;
+	const float On = CVarCandles.GetValueOnGameThread();
+	const bool bNear = On > 0.f && FVector2D::Distance(FVector2D(Cam.X, Cam.Y), CandleSite) < CandleSeeReach;
+	if (!bNear)
+	{
+		CandleBody->SetVisibility(false); CandleFlame->SetVisibility(false); CandleHalo->SetVisibility(false);
+		for (UPointLightComponent* L : CandleLights) L->SetVisibility(false);
+		bCandleSeen = false;
+		return;
+	}
+	CandleBody->SetVisibility(true); CandleFlame->SetVisibility(true); CandleHalo->SetVisibility(true);
+	// lit by the night: dim flames by day, full from the dusk on (ADayNight::Night is 0 with the sun up, 1 from ten degrees under)
+	const float Dark = JeebWorld::Smooth(0.f, 0.6f, ADayNight::Night);
+	const float Lit = FMath::Lerp(FMath::Clamp(CVarCandleBy.GetValueOnGameThread(), 0.f, 1.f), 1.f, Dark) * FMath::Max(0.f, CVarCandleGlow.GetValueOnGameThread());
+	const float T = Time;
+	TArray<TPair<float, int32>, TInlineAllocator<64>> Near;
+	const int32 N = Candle.Num();
+	for (int32 i = 0; i < N; ++i)
+	{
+		const FCandle& C = Candle[i];
+		const float Bob = C.Bob * FMath::Sin(T * C.BobRate + C.BobPhase);
+		const FVector P = C.Home + FVector(C.Drift * FMath::Sin(T * C.DriftRate + C.DriftPhase), C.Drift * FMath::Cos(T * C.DriftRate * 0.83f + C.DriftPhase * 1.7f), Bob);
+		// the flame: a soft quick waver and now and then a little gutter, each its own
+		const float Waver = 0.07f * FMath::Sin(T * 8.3f + C.Phase) + 0.05f * FMath::Sin(T * 13.7f + 1.7f * C.Phase) + 0.05f * FMath::PerlinNoise1D(T * 5.f + C.Phase * 9.f);
+		const float Gust = FMath::Clamp((FMath::PerlinNoise1D(T * 0.55f + C.Phase * 13.f) - 0.25f) * 4.f, 0.f, 1.f);
+		const float B = FMath::Max(0.45f, 0.97f + Waver - 0.3f * Gust);
+		const FQuat Q = FRotator(C.Lean * FMath::Sin(T * 0.6f + C.Phase), 0.f, C.Lean * FMath::Cos(T * 0.5f + C.Phase)).Quaternion();
+		const float BodyH = 20.f, BodyR = 2.4f;
+		// (cylinder: 100 cm tall and across, centred; cone: 100 tall, tip up, centred; sphere 100 across)
+		const FVector Top = P + Q.RotateVector(FVector(0.f, 0.f, BodyH * 0.5f));
+		const float Show = FMath::Min(Lit, 1.f);
+		const float FlameH = 6.5f * B * Show, FlameW = 2.0f * Show * (0.9f + 0.1f * B);
+		CandleNow[0][i] = FTransform(Q, P, FVector(BodyR * 2.f, BodyR * 2.f, BodyH) * 0.01f);
+		CandleNow[1][i] = FTransform(Q, Top + Q.RotateVector(FVector(0.f, 0.f, FlameH * 0.5f + 0.5f)), FVector(FMath::Max(FlameW, 0.001f), FMath::Max(FlameW, 0.001f), FMath::Max(FlameH, 0.001f)) * 0.01f);
+		CandleNow[2][i] = FTransform(Q, Top + Q.RotateVector(FVector(0.f, 0.f, 3.f)), FVector(FMath::Max(FMath::Min(60.f * (0.7f + 0.3f * B), 90.f) * Show, 0.01f)) * 0.01f);
+		Near.Emplace(float(FVector::DistSquared(Top, Cam)), i);
+	}
+	if (!bCandleSeen) { for (int32 k = 0; k < 3; ++k) CandlePrev[k] = CandleNow[k]; bCandleSeen = true; }
+	UInstancedStaticMeshComponent* Parts[3] = { CandleBody, CandleFlame, CandleHalo };
+	for (int32 k = 0; k < 3; ++k)
+	{
+		Parts[k]->BatchUpdateInstancesTransforms(0, CandleNow[k], CandlePrev[k], true, false, true);
+		CandlePrev[k] = CandleNow[k];
+	}
+	// the real lights: the nearest few candles, faded out with distance so none pops on
+	Near.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
+	const float LightK = FMath::Max(0.f, CVarCandleLight.GetValueOnGameThread());
+	for (int32 l = 0; l < CandleLights.Num(); ++l)
+	{
+		UPointLightComponent* L = CandleLights[l];
+		if (!Near.IsValidIndex(l) || LightK <= 0.f) { L->SetVisibility(false); continue; }
+		const float Dist = FMath::Sqrt(Near[l].Key);
+		const float Fade = 1.f - JeebWorld::Smooth(2500.f, 4500.f, Dist);
+		const FCandle& C = Candle[Near[l].Value];
+		const float Flick = 0.85f + 0.1f * FMath::Sin(T * 9.f + C.Phase) + 0.07f * FMath::PerlinNoise1D(T * 4.f + C.Phase * 5.f);
+		L->SetVisibility(Fade > 0.01f);
+		L->SetWorldLocation(CandleNow[1][Near[l].Value].GetLocation());
+		L->SetIntensity(120.f * LightK * Lit * Flick * Fade * FMath::Lerp(0.5f, 1.f, Dark));
+	}
+}
+
 void AOpenWorld::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -166,6 +321,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	APlayerController* PC = W ? W->GetFirstPlayerController() : nullptr;   // (this machine's own view: looks only)
 	if (!PC || !PC->PlayerCameraManager || !Flakes || Flake.Num() == 0) return;
 	Time += DeltaSeconds;
+	TickCandles(DeltaSeconds, PC->PlayerCameraManager->GetCameraLocation());
 	const AGameStateBase* GS = W->GetGameState();
 	const double Clock = GS ? GS->GetServerWorldTimeSeconds() : double(W->GetTimeSeconds());
 	const float Force = CVarSnowForce.GetValueOnGameThread();
