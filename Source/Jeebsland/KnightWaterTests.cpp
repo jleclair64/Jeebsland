@@ -140,7 +140,7 @@ namespace
 		TArray<FVector2D> Spots;
 		for (const JeebTerrain::FHutDef& Hd : JeebTerrain::VillageHuts()) Spots.Add(Hd.Pos);
 		for (const FVector2D& S : JeebTerrain::HutSites()) Spots.Add(S);
-		Spots.Add(FVector2D(JeebTerrain::CottagePos())); Spots.Add(JeebTerrain::ShopPos()); Spots.Add(JeebTerrain::SmithyPos()); Spots.Add(JeebTerrain::BankPos()); Spots.Add(JeebTerrain::CastlePos());
+		Spots.Add(FVector2D(JeebTerrain::CottagePos())); Spots.Add(JeebTerrain::CastlePos());
 		for (const FVector2D& S : Spots)
 			for (float dx = -500.f; dx <= 500.f; dx += 100.f)
 				for (float dy = -500.f; dy <= 500.f; dy += 100.f)

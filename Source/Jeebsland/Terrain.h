@@ -35,18 +35,9 @@ namespace JeebTerrain
 	inline FVector2D PenCenter() { return FVector2D(300.f, 2700.f); }
 	inline FVector2D PenHalf() { return FVector2D(800.f, 550.f); }
 
-	// The market in front of the village gate: the store and the smithy side by side, open fronts facing north (+Y).
-	// ShopPos / SmithyPos are the middle of each building; the owner stands just behind the counter.
-	inline FVector2D ShopPos() { return FVector2D(-600.f, -820.f); }
-	inline FVector2D SmithyPos() { return FVector2D(-80.f, -820.f); }
-	inline FVector2D BankPos() { return FVector2D(440.f, -820.f); }
-	inline FVector2D BankNpcPos() { return BankPos() + FVector2D(0.f, 45.f); }
-	inline FVector2D ShopNpcPos() { return ShopPos() + FVector2D(0.f, 45.f); }
-	inline FVector2D SmithNpcPos() { return SmithyPos() + FVector2D(40.f, -10.f); }
-	inline FVector2D MarketCenter() { return FVector2D(-110.f, -800.f); }
-	inline FVector2D MarketHalf() { return FVector2D(790.f, 340.f); }
+	// (the market with the store, smithy and bank that stood south of the start went 2026-11-22)
 
-	// The fishing pond, south of the market. The ground dips into a bowl; the water is a flat disc a little below the rim.
+	// The fishing pond, south of the start. The ground dips into a bowl; the water is a flat disc a little below the rim.
 	inline FVector2D PondCenter() { return FVector2D(-300.f, -2900.f); }
 	constexpr float PondBowl = 900.f;       // the ground is shaped inside this radius
 	constexpr float PondFade = 1250.f;      // and blends back to the hills out to here
@@ -74,13 +65,12 @@ namespace JeebTerrain
 		const FVector2D D(FMath::Abs(P.X - C.X) - H.X, FMath::Abs(P.Y - C.Y) - H.Y);
 		return FVector2D(FMath::Max(D.X, 0.f), FMath::Max(D.Y, 0.f)).Size() + FMath::Min(FMath::Max(D.X, D.Y), 0.f);
 	}
-	// True if a prop of this radius would touch the pig pen and its fence, the market, the pond or the castle
+	// True if a prop of this radius would touch the pig pen and its fence, the pond or the castle
 	inline bool PropBlocked(float X, float Y, float Radius)
 	{
 		const FVector2D P(X, Y);
 		// (the village wall it once kept props off went with Blackrock, 2026-11-22)
 		if (RectSD(P, PenCenter(), PenHalf()) < Radius + 130.f) return true;
-		if (RectSD(P, MarketCenter(), MarketHalf()) < Radius + 40.f) return true;
 		if (FVector2D::Distance(P, PondCenter()) < PondBowl + Radius) return true;
 		if (FVector2D::Distance(P, CastlePos()) < CastleFlat + Radius) return true;
 		return false;
@@ -132,8 +122,6 @@ namespace JeebTerrain
 		for (const FVector2D& S : HutSites()) if (FVector2D::Distance(P, S) < 480.f) return true;
 		for (const FHutDef& H : VillageHuts()) if (FVector2D::Distance(P, H.Pos) < 480.f) return true;
 		if (FVector2D::Distance(P, FVector2D(CottagePos().X, CottagePos().Y)) < 480.f) return true;
-		const FVector2D Stalls[3] = { ShopPos(), SmithyPos(), BankPos() };
-		for (const FVector2D& St : Stalls) if (RectSD(P, St, FVector2D(270.f, 260.f)) < 0.f) return true;
 		if (FVector2D::Distance(P, CastlePos()) < CastleMoatOut + 80.f) return true;
 				if (FVector2D::Distance(P, PondCenter()) < PondWaterR) return true;
 		if (JeebWorld::InWater(X, Y)) return true;   // the river (it runs through the east side of the square)
@@ -951,8 +939,6 @@ namespace JeebTerrain
 		for (const FVector2D& S : HutSites()) D = FMath::Min(D, float(FVector2D::Distance(P, S)) - 480.f);
 		for (const FHutDef& H : VillageHuts()) D = FMath::Min(D, float(FVector2D::Distance(P, H.Pos)) - 480.f);
 		D = FMath::Min(D, float(FVector2D::Distance(P, FVector2D(CottagePos().X, CottagePos().Y))) - 480.f);
-		const FVector2D Stalls[3] = { ShopPos(), SmithyPos(), BankPos() };
-		for (const FVector2D& St : Stalls) D = FMath::Min(D, RectSD(P, St, FVector2D(270.f, 260.f)));
 		D = FMath::Min(D, float(FVector2D::Distance(P, CastlePos())) - (CastleMoatOut + 80.f));
 		D = FMath::Min(D, RectSD(P, VillageCenter(), FVector2D(VillageHalf(), VillageHalf())));   // the whole walled village
 		D = FMath::Min(D, RectSD(P, PenCenter(), PenHalf()));

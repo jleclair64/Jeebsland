@@ -765,10 +765,7 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	// Water
 	Marker(JeebTerrain::PondCenter(), 6.f, FLinearColor(0.2f, 0.55f, 0.95f), true);
 
-	// Stores: shop, smithy, bank
-	Marker(JeebTerrain::ShopPos(), 4.f, FLinearColor(1.f, 0.85f, 0.2f), false);
-	Marker(JeebTerrain::SmithyPos(), 4.f, FLinearColor(0.9f, 0.4f, 0.1f), false);
-	Marker(JeebTerrain::BankPos(), 4.f, FLinearColor(0.7f, 0.8f, 0.95f), false);
+	// Stores: shop, smithy, bank (the old market's three went 2026-11-22)
 	// Steele Creek's store, smithy and bank (SteeleCreek.h, 2026-11-18)
 	if (JeebSteele::Enabled())
 	{
