@@ -18,6 +18,7 @@
 #include "Engine/SkeletalMesh.h"
 #include "GrassField.h"
 #include "WorldTerrain.h"
+#include "WorldEdge.h"
 #include "WarFortLadders.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -181,6 +182,7 @@ void AKnightGameState::BuildWorld()
 	// The land (hills and grass)
 		World->SpawnActor<AGrassField>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
+	World->SpawnActor<AWorldEdge>(FVector::ZeroVector, FRotator::ZeroRotator);   // invisible pawn-only walls inside the map edge + server put-back for stray pawns (WorldEdge.h)
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
 	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill's plan checks (JEEBOAK), and the old town itself only with -OldOakHill or in TownLab (OakHill.h)
 	if (JeebTownLab::RealTown())   // Oak Hill (2026-11-14): the rebuilt town at the real plaza (TownLab.h, TownLabTown.cpp)
