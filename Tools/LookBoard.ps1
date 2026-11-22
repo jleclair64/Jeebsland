@@ -22,6 +22,7 @@ $Out = Join-Path $Project 'Saved\LookBoard'
 New-Item -ItemType Directory -Force $Out | Out-Null
 
 # Name, X, Y, eye height above the ground (cm), yaw (0 = north +X, 90 = east +Y), pitch, mask (1024 = the knight stands 3.5 m ahead in view). One field of view (80) for the whole run.
+# (2026-11-22, owner: Blackrock is out of date and will be removed; it is not part of the style, so it has no view)
 $Views = @(
 	@{ N = 'Meadow, river valley';   X = -3000; Y = 8000;  Z = 170; Yaw = 90;  Pitch = -4;  Mask = 0 },
 	@{ N = 'Meadow to forest edge';  X = -3000; Y = 5000;  Z = 170; Yaw = 180; Pitch = -3;  Mask = 0 },
@@ -31,7 +32,6 @@ $Views = @(
 	@{ N = 'Building close-up';      X = -2500; Y = 17000; Z = 170; Yaw = 28;  Pitch = 3;   Mask = 0 },
 	@{ N = 'Knight, third person';   X = -3000; Y = 8000;  Z = 190; Yaw = 90;  Pitch = -6;  Mask = 1024 },
 	@{ N = 'Far hills';              X = 800;   Y = 22200; Z = 1800; Yaw = 0;  Pitch = -4;   Mask = 0 },
-	@{ N = 'Blackrock';              X = -3500; Y = 0;     Z = 170; Yaw = 0;   Pitch = 4;   Mask = 0 },
 	@{ N = 'Sky and clouds';         X = -3000; Y = 8000;  Z = 170; Yaw = 90;  Pitch = 28;  Mask = 0 },
 	@{ N = 'Water close';            X = -2000; Y = 11300; Z = 170; Yaw = 90;  Pitch = -22; Mask = 0 },
 	@{ N = 'Oak Hill from the air';  X = -3550; Y = 15500; Z = 3000; Yaw = 90; Pitch = -32; Mask = 0 }
