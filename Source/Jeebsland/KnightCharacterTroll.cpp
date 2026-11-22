@@ -18,6 +18,12 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
 #include "Engine/LocalPlayer.h"
+#include "HealthComponent.h"
+#include "SkillComponent.h"
+#include "Engine/OverlapResult.h"
+#include "Deer.h"
+#include "EngineUtils.h"
+#include "Engine/World.h"
 
 ATrollCharacter::ATrollCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -32,7 +38,8 @@ bool JeebItems::OwnerIsTroll(const USkillComponent* S)
 }
 
 float AKnightCharacter::WalkNow() const { return bIsTroll ? JeebTune::V().TrollWalkSpeed : WalkSpeed; }
-float AKnightCharacter::SprintNow() const { return bIsTroll ? JeebTune::V().TrollSprintSpeed : SprintSpeed; }
+// (the troll: the rush's top, easing down to his walk over TrollRushSlow once the rush bar has run dry)
+float AKnightCharacter::SprintNow() const { return bIsTroll ? FMath::Lerp(JeebTune::V().TrollSprintSpeed, JeebTune::V().TrollWalkSpeed, RushSlow) : SprintSpeed; }
 
 float AKnightCharacter::LeapChargeShare() const
 {
@@ -108,13 +115,17 @@ FVector AKnightCharacter::LeapVelocity(float Charge, const FVector& Dir) const
 	const float Dist = FMath::Lerp(T.TrollLeapMinDist, T.TrollLeapFullDist, C);
 	const float High = FMath::Lerp(T.TrollLeapMinHeight, T.TrollLeapFullHeight, C);
 	const float G = FMath::Max(1.f, -GetCharacterMovement()->GetGravityZ());
-	const float Up = FMath::Sqrt(2.f * G * High);
-	const float Flight = 2.f * Up / G;   // (up and back down to the same height)
-	return Dir.GetSafeNormal2D() * (Dist / Flight) + FVector(0.f, 0.f, Up);
+	// (owner 2026-11-22: scaled by the bar's fill when the leap went: the distance and the height both times the fill)
+	const float F = FMath::Clamp(LeapFillUsed, 0.01f, 1.f);
+	const float UpF = FMath::Sqrt(2.f * G * High * F);
+	return Dir.GetSafeNormal2D() * (Dist * F / FMath::Max(2.f * UpF / G, 0.05f)) + FVector(0.f, 0.f, UpF);
 }
 
 void AKnightCharacter::DoLeap(float Charge, const FVector& Dir)
 {
+	// (owner 2026-11-22) the bar need not be full: the leap goes as far as the bar is filled (half a bar, half the distance) and empties it;
+	// each machine from its own bar, the server's counts
+	LeapFillUsed = FMath::Clamp(LeapFill(), 0.f, 1.f);
 	LeapCooldown = JeebTune::V().TrollLeapCooldown;
 	LeapCrouch = 0.f;   // (straight out of the crouch: no crouched frames into the flight)
 	bAirLaunch = true;
@@ -136,11 +147,11 @@ void AKnightCharacter::ReleaseLeap()
 	const float Charge = LeapChargeShare();
 	LeapChargeFrom = -1.0;
 	UCharacterMovementComponent* Move = GetCharacterMovement();
-	const bool bCan = Held >= T.TrollLeapTap && LeapCooldown <= 0.f && Move->IsMovingOnGround() && !bKnockedDown && !MoveLocked() && Smash != ESmash::Charging && !bSitting && !bClimbing && !InClimbMove();
+	const bool bCan = Held >= T.TrollLeapTap && LeapFill() >= T.TrollLeapMinFill && Move->IsMovingOnGround() && !bKnockedDown && !MoveLocked() && Smash != ESmash::Charging && !bSitting && !bClimbing && !InClimbMove();
 	if (!bCan)
 	{
 		if (!HasAuthority()) ServerLeapCharge(false);
-		if (Held >= T.TrollLeapTap && LeapCooldown > 0.f && Skills) Skills->Say(1.5f, FColor(200, 220, 255), FString::Printf(TEXT("Charged jump ready in %.0f s"), FMath::CeilToFloat(LeapCooldown)));
+		if (Held >= T.TrollLeapTap && LeapFill() < T.TrollLeapMinFill && Skills) Skills->Say(1.5f, FColor(200, 220, 255), FString::Printf(TEXT("Charged jump ready in %.0f s"), FMath::CeilToFloat(LeapCooldown)));
 		ACharacter::Jump();   // (the normal jump: the engine's, through CheckJumpInput as ever)
 		return;
 	}
@@ -164,7 +175,7 @@ void AKnightCharacter::ServerLeap_Implementation(float Charge, FVector_NetQuanti
 	const float SawHeld = ServerChargeFrom >= 0.0 ? float(Now - ServerChargeFrom) + 0.15f : 0.f;
 	ServerChargeFrom = -1.0;
 	UCharacterMovementComponent* Move = GetCharacterMovement();
-	if (!bIsTroll || LeapCooldown > 0.25f || Move->IsFalling() || bKnockedDown || MoveLocked() || bSitting || bClimbing || InClimbMove() || bMounted || SawHeld < T.TrollLeapTap)
+	if (!bIsTroll || LeapFill() + 0.25f / FMath::Max(T.TrollLeapCooldown, 0.1f) < T.TrollLeapMinFill || Move->IsFalling() || bKnockedDown || MoveLocked() || bSitting || bClimbing || InClimbMove() || bMounted || SawHeld < T.TrollLeapTap)
 	{
 		UE_LOG(LogTemp, Log, TEXT("JEEBLEAP server refused: cooldown %.2f falling %d held %.2f"), LeapCooldown, Move->IsFalling() ? 1 : 0, SawHeld);
 		ClientLeapRefused(LeapCooldown);
@@ -182,6 +193,7 @@ void AKnightCharacter::ClientLeapRefused_Implementation(float CooldownLeft)
 void AKnightCharacter::TickTroll(float Dt)
 {
 	LeapCooldown = FMath::Max(0.f, LeapCooldown - Dt);
+	TickRush(Dt);
 	// (a charge ends if he leaves the ground or is stopped: no jump comes of it)
 	if (LeapChargeFrom >= 0.0 && (GetCharacterMovement()->IsFalling() || bKnockedDown || bClimbing || InClimbMove() || bSitting || bMounted))
 	{
@@ -363,4 +375,81 @@ bool AKnightCharacter::TrollSuitTest(const FString& Do)
 	}
 	if (Do == TEXT("leaptest")) { Hold(1.f, 0.3f); Hold(1.f, 4.f); Hold(0.5f, 10.f); return true; }
 	return false;
+}
+
+// ---------------- The rush (owner 2026-11-22) ----------------
+// Shift: he builds up to TrollSprintSpeed (3x the knight's sprint) over about 10 s (TrollAccel, inside each move, KnightMovement.cpp).
+// The rush bar only drains once he has rushed TrollRushFree seconds; a full bar then lasts RushSeconds(Stamina level). Run dry, the
+// top speed eases down to his walk over TrollRushSlow (SprintNow), never a sudden stop; once the bar is back to TrollRushRestart he
+// can rush again. Every machine runs this from what it knows (Shift, his speed, his level) so the owner predicts what the server does;
+// the server alone decides bRushing (replicated), the Stamina XP and running people and creatures over.
+
+float AKnightCharacter::RushSeconds(int32 L)
+{
+	const auto& T = JeebTune::V();
+	L = FMath::Clamp(L, 1, 99);
+	return L <= 10 ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.TrollRushAt1, T.TrollRushAt10), float(L))
+	               : FMath::GetMappedRangeValueClamped(FVector2f(10.f, 99.f), FVector2f(T.TrollRushAt10, T.TrollRushAt99), float(L));
+}
+
+void AKnightCharacter::TickRush(float Dt)
+{
+	const auto& T = JeebTune::V();
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float Speed = float(GetVelocity().Size2D());
+	const bool bOnFoot = !Move->IsFalling() && !bMounted && !bClimbing && !InClimbMove();
+	const bool bGoing = bSprinting && bOnFoot && Speed > T.TrollWalkSpeed * 1.05f;
+	const int32 Lvl = Skills ? Skills->GetLevel(ESkillType::Stamina) : 1;
+	if (bGoing)
+	{
+		RushT += Dt;
+		if (RushT > T.TrollRushFree) RushBar = FMath::Max(0.f, RushBar - Dt / FMath::Max(RushSeconds(Lvl), 0.5f));
+		if (RushBar <= 0.f) bRushTired = true;
+	}
+	else
+	{
+		if (!bSprinting || Speed <= T.TrollWalkSpeed * 1.05f) RushT = 0.f;
+		if (!bSprinting || bRushTired) RushBar = FMath::Min(1.f, RushBar + Dt / FMath::Max(T.TrollRushRefill, 0.5f));
+	}
+	if (bRushTired && RushBar >= T.TrollRushRestart && Speed <= T.TrollWalkSpeed * 1.1f) bRushTired = false;
+	RushSlow = bRushTired ? FMath::Min(1.f, RushSlow + Dt / FMath::Max(T.TrollRushSlow, 0.1f)) : 0.f;
+
+	if (!HasAuthority()) return;
+	const bool bTop = bOnFoot && Speed >= T.TrollRushHitShare * T.TrollSprintSpeed;
+	if (bRushing != bTop) bRushing = bTop;
+	if (bGoing && Skills)
+	{
+		RushXPAcc += T.TrollRushXPPerSec * Dt;
+		if (RushXPAcc >= 1.f) { const int32 N = FMath::FloorToInt(RushXPAcc); RushXPAcc -= N; Skills->AddXP(ESkillType::Stamina, N); }
+	}
+	if (!bRushing) return;
+	// (server) bowling over: anything with health just ahead of him, once per TrollRushHitEvery each
+	const FVector Fwd = GetVelocity().GetSafeNormal2D();
+	const float R = GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const FVector At = GetActorLocation() + Fwd * (R + 30.f);
+	TArray<FOverlapResult> Hits;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(TrollRush), false, this);
+	FCollisionObjectQueryParams Obj(FCollisionObjectQueryParams::AllDynamicObjects);
+	GetWorld()->OverlapMultiByObjectType(Hits, At, FQuat::Identity, Obj, FCollisionShape::MakeSphere(R + 50.f), Q);
+	// (deer have no collision of their own, only hurt boxes: each one near enough counts too)
+	TArray<AActor*> Near;
+	for (const FOverlapResult& H : Hits) if (H.GetActor()) Near.AddUnique(H.GetActor());
+	for (TActorIterator<ADeer> It(GetWorld()); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < R + 90.f && FMath::Abs(It->GetActorLocation().Z - At.Z) < 200.f) Near.AddUnique(*It);
+	const double Now = GetWorld()->GetTimeSeconds();
+	for (AActor* A : Near)
+	{
+		if (!A || A == this) continue;
+		UHealthComponent* Hp = A->FindComponentByClass<UHealthComponent>();
+		if (!Hp || !Hp->IsAlive()) continue;
+		if (const double* Was = RushHitAt.Find(A); Was && Now - *Was < T.TrollRushHitEvery) continue;
+		RushHitAt.Add(A, Now);
+		DealDamage(Hp, FMath::RoundToInt(T.TrollRushDamage), false, ESkillType::Attack);
+		if (ACharacter* C = Cast<ACharacter>(A))
+		{
+			FVector Away = (A->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			if (Away.IsNearlyZero()) Away = Fwd;
+			C->LaunchCharacter(Away * T.TrollRushKnock + FVector(0.f, 0.f, T.TrollRushKnockUp), true, true);
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBRUSH %s ran over %s at %.0f cm/s"), *GetName(), *A->GetName(), Speed);
+	}
 }

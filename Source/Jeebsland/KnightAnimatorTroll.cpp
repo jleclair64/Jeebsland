@@ -154,6 +154,19 @@ FClipLib::FClipLib(const FClipLib& K, bool)
 		Clips.Add(Raw->Name, Raw);
 	}
 	HurtScale = JeebTune::V().TrollHurtScale;
+	// (2026-11-22, owner: "the troll isn't actually holding the club in his hand") His Meshy hand is 50 cm long and hangs about 40 cm
+	// below the wrist joint, fingers curled; the knight's fist hole is 12 cm past his wrist, so the club hung from the troll's wrist
+	// outside his fingers. The hole is the middle of his curled hand, measured in Blender on Troll_rigged.glb (the right hand's
+	// vertices weighted over 0.6 to RightHand, from the RightHand joint, Blender metres). -TrollFist=X_Y_Z (cm, Blender axes) tries another.
+	{
+		FVector Fb(-0.021f, -0.066f, -0.402f);
+		Fb *= 100.f;
+#if !UE_BUILD_SHIPPING
+		FString FS; TArray<FString> FP;
+		if (FParse::Value(FCommandLine::Get(), TEXT("TrollFist="), FS) && FS.ParseIntoArray(FP, TEXT("_")) == 3) Fb = FVector(FCString::Atof(*FP[0]), FCString::Atof(*FP[1]), FCString::Atof(*FP[2]));
+#endif
+		TrollFistR = Q.RotateVector(Fb);
+	}
 	Finalize();
 	bReady = Clips.Contains(TEXT("Rest"));
 	UE_LOG(LogTemp, Log, TEXT("JEEBTROLL rig: knight's Blender joints fit his own to %.2f cm; troll %.2fx the knight at the hips, hips %.0f cm up, head top %.0f cm; %d clips, ready %d"),
@@ -242,6 +255,52 @@ void FKnightAnimator::MakeTrollMesh(AActor* Owner)
 	bOldTick = FParse::Param(FCommandLine::Get(), TEXT("TrollOldTick"));
 #endif
 	if (!bOldTick) Owner->AddTickPrerequisiteComponent(TrollComp);
+#if !UE_BUILD_SHIPPING
+	bTrollOldSwing = FParse::Param(FCommandLine::Get(), TEXT("TrollOldSwing"));
+#endif
+}
+
+// The knight's sword cuts on the troll (2026-11-22): his belly is far bigger than the knight's and the club is 125 cm, so where a cut's
+// follow-through brings the club across his front, the right hand is pushed straight out from his middle until every point along the
+// club lies outside a round belly (an upright cylinder about his middle, live: jeeb.Troll.Belly). The hand keeps its turn, so the club's
+// angle and the cut's path are the knight's. A pure function of the pose: the server's hit boxes (on the blade bone) see the same.
+static TAutoConsoleVariable<FString> CVarTrollBelly(TEXT("jeeb.Troll.Belly"), TEXT("40_14"),
+	TEXT("The troll's belly the club keeps clear of in his cuts: Radius_Forward (cm; an upright cylinder, centred that far ahead of his spine). 0_0: off."), ECVF_Default);
+
+void FKnightAnimator::TrollClubClear(FPose& B)
+{
+	float Rad = 40.f, Fwd = 14.f;
+	{
+		TArray<FString> P;
+		if (CVarTrollBelly.GetValueOnAnyThread().ParseIntoArray(P, TEXT("_")) == 2) { Rad = FCString::Atof(*P[0]); Fwd = FCString::Atof(*P[1]); }
+	}
+	if (Rad <= 1.f) return;
+	const FVector Mid = BonePos(B, Spine1) + FVector(0.f, Fwd, 0.f);
+	const float Lo = float(BonePos(B, Hips).Z) - 45.f, Hi = float(BonePos(B, Spine2).Z) + 10.f;
+	for (int32 Pass = 0; Pass < 2; ++Pass)
+	{
+		FQuat HR;
+		const FVector Hand = BonePos(B, RHand, &HR);
+		const FVector Grip = Hand + HR.RotateVector(L.RestRot[Bone[RHand]].Inverse().RotateVector(L.TrollFistR));   // (the fist's hole)
+		const FVector Dir = HR.RotateVector(L.BladeInHand).GetSafeNormal();
+		FVector Push = FVector::ZeroVector;
+		for (float s = -15.f; s <= 100.f; s += 5.f)
+		{
+			const FVector Pt = Grip + Dir * s;
+			if (Pt.Z < Lo || Pt.Z > Hi) continue;
+			FVector D(Pt.X - Mid.X, Pt.Y - Mid.Y, 0.f);
+			const float Dist = float(D.Size());
+			if (Dist >= Rad) continue;
+			if (Dist < 1.f) D = FVector(0.f, 1.f, 0.f); else D /= Dist;
+			const FVector Need = D * (Rad - Dist);
+			if (Need.SizeSquared() > Push.SizeSquared()) Push = Need;
+		}
+		if (Push.IsNearlyZero(0.5f)) return;
+		L.ReachTo(B, RArm, RFore, RHand, Hand + Push, FVector(-0.8f, -0.3f, -0.6f));
+		FQuat Now;
+		BonePos(B, RHand, &Now);
+		TurnInMesh(B, RHand, HR * Now.Inverse());   // (the club keeps its angle)
+	}
 }
 
 // The troll's own shadow on himself (2026-11-21, owner: his body "isn't crisp"): the soft-shadow filter (PCSS) scatters its samples per
@@ -412,13 +471,44 @@ float FKnightAnimator::TrollClubSwing(const FInput& In, FPose& B, float& OutBlen
 // The left forearm is raised across in front of his chest and face, the elbow down and out, the fist up; the right arm keeps the guard the
 // block overlay left it. Placed by reach (like the punch), blended in by the block's own alpha, so the pose is a pure function of
 // In.BlockAlpha, which every machine derives from the replicated block flag: others see it too. Mesh space: +X his left, +Y ahead, +Z up.
+static TAutoConsoleVariable<FString> CVarTrollGuard(TEXT("jeeb.Troll.Guard"), TEXT("0.0_0.7_-0.45_90"),
+	TEXT("The troll's bare-hand block: Across_Ahead_Up (his left wrist from his head, in arm lengths; + his left, ahead, up) _Roll (degrees the hand turns about its fingers)."), ECVF_Default);
+
 void FKnightAnimator::TrollBareGuard(const FInput& In, FPose& B)
 {
 	const float W = FMath::Clamp(In.BlockAlpha * (1.f - In.CrouchAlpha), 0.f, 1.f);
 	if (W < 0.01f) return;
-	const FVector Sh = BonePos(B, LArm);
+	// (2026-11-22, owner: "his hand in front of his face with his palm facing away from his head, as if he's trying to block sunlight from
+	// his eyes", picture pt23/134.) The left hand is raised in front of his face, fingers up and leaning a little across to his right,
+	// palm out (ahead). His hand mesh runs 50 cm on from the wrist joint, so the wrist is placed below and ahead of the face and the hand
+	// stands up from it. Live: jeeb.Troll.Guard = Across_Ahead_Up (the wrist from his head, arm lengths) _Roll (degrees about the fingers).
+	float Ax = 0.f, Ah = 0.7f, Up = -0.45f, Roll = 90.f;
+	{
+		TArray<FString> P;
+		if (CVarTrollGuard.GetValueOnAnyThread().ParseIntoArray(P, TEXT("_")) == 4) { Ax = FCString::Atof(*P[0]); Ah = FCString::Atof(*P[1]); Up = FCString::Atof(*P[2]); Roll = FCString::Atof(*P[3]); }
+	}
+	const FVector HeadAt = BonePos(B, Head);
 	const FVector Now = BonePos(B, LHand);
 	const float Arm = float(RefPos[Bone[LFore]].Size() + RefPos[Bone[LHand]].Size());
-	const FVector Want = Sh + FVector(-0.40f, 0.50f, 0.30f + JeebTune::V().TrollGuardUp) * Arm;   // (in front of the chest, a little toward the middle, fist about chin height)
-	L.ReachTo(B, LArm, LFore, LHand, FMath::Lerp(Now, Want, W), FVector(0.5f, -0.2f, -1.f));   // (the elbow down and a little out)
+	const FVector Want = HeadAt + FVector(Ax, Ah, Up + JeebTune::V().TrollGuardUp) * Arm;
+	FQuat Was;
+	BonePos(B, LHand, &Was);
+	L.ReachTo(B, LArm, LFore, LHand, FMath::Lerp(Now, Want, W), FVector(0.6f, -0.1f, -1.f));   // (the elbow down and out)
+	// the hand's own turn: its fingers (wrist to the middle of the hand, in the bind pose) up, its palm (the bind pose's down side) ahead
+	const FQuat Rest = L.RestRot[Bone[LHand]];
+	const FVector FingL = Rest.Inverse().RotateVector(FVector(L.TrollFistR.X * -1.f, L.TrollFistR.Y, L.TrollFistR.Z).GetSafeNormal());   // (the left hand: the right's mirror across X)
+	FVector PalmM = FVector(0.f, 0.f, -1.f);
+	{
+		const FVector Fm = Rest.RotateVector(FingL);
+		PalmM = (PalmM - Fm * FVector::DotProduct(PalmM, Fm)).GetSafeNormal();
+	}
+	const FVector PalmL = Rest.Inverse().RotateVector(PalmM);
+	FQuat Cur;
+	BonePos(B, LHand, &Cur);
+	const FVector FingWant = FVector(-0.30f, 0.12f, 1.f).GetSafeNormal();   // (up, leaning a little across to his right)
+	FVector PalmWant = FVector(0.f, 1.f, 0.f);
+	PalmWant = FQuat(FingWant, FMath::DegreesToRadians(Roll)).RotateVector((PalmWant - FingWant * FVector::DotProduct(PalmWant, FingWant)).GetSafeNormal());
+	const FQuat CurFrame = FRotationMatrix::MakeFromXZ(Cur.RotateVector(FingL), Cur.RotateVector(PalmL)).ToQuat();
+	const FQuat WantFrame = FRotationMatrix::MakeFromXZ(FingWant, PalmWant).ToQuat();
+	TurnInMesh(B, LHand, FQuat::Slerp(FQuat::Identity, WantFrame * CurFrame.Inverse(), W));
 }

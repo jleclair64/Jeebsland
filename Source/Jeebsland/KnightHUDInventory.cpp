@@ -355,8 +355,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	// ================= Skills (down the left side of the screen) =================
 	{
 		// Only the skills you have discovered. The window grows to fit: up to 5 across, then more rows.
-		static const ESkillType Order[11] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming };
+		static const ESkillType Order[12] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+			ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming, ESkillType::Stamina };
 		TArray<ESkillType> Shown;
 		for (ESkillType T : Order) if (Skills->IsKnown(T)) Shown.Add(T);
 		const int32 N = FMath::Max(1, Shown.Num());
