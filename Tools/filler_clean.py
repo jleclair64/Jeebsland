@@ -1252,7 +1252,11 @@ def build_source(src, names):
             for p in me_lo.polygons:
                 uv = [np.array(uvd[li].uv[:]) for li in p.loop_indices]; c = np.mean(uv, 0)
                 share[p.index] = np.mean([_g(c)] + [_g(c + 0.75 * (q - c)) for q in uv])
-            g_on = share > 0.5
+            # (2026-11-21 round 2: the slot now only says WHERE glow may be; the glass's own edge comes from a pixel mask,
+            # <Piece>_GlowMask.png beside the glb, which the Glow material multiplies in. So every face with any glass in it goes to the
+            # slot, plus one ring round them, and the frame inside the slot stays dark by the mask)
+            g_on = share > 0.02
+            mask_mode = True
             ef = {}
             for p in me_lo.polygons:
                 for ek in p.edge_keys: ef.setdefault(ek, []).append(p.index)
@@ -1260,7 +1264,7 @@ def build_source(src, names):
             for fl in ef.values():
                 for i_ in fl:
                     nb[i_].extend(j_ for j_ in fl if j_ != i_)
-            for _pass in range(2):
+            for _pass in range(0 if mask_mode else 2):
                 g2 = g_on.copy()
                 for i_, n_ in enumerate(nb):
                     if len(n_) >= 2:
@@ -1268,8 +1272,15 @@ def build_source(src, names):
                         if v_ >= 0.67: g2[i_] = True
                         elif v_ <= 0.33: g2[i_] = False
                 g_on = g2
+            ring = g_on.copy()
+            for i_, n_ in enumerate(nb):
+                if g_on[i_]:
+                    for j_ in n_: ring[j_] = True
             for p in me_lo.polygons:
-                if g_on[p.index]: p.material_index = 1
+                if ring[p.index]: p.material_index = 1
+            gm_img = img_new("GlowMask_" + name, np.repeat(np.clip(glow, 0, 1)[..., None], 3, 2), True)
+            gm_img.filepath_raw = os.path.join(CLEAN, name + "_GlowMask.png"); gm_img.file_format = "PNG"; gm_img.save()
+            print("FILLER %s glow mask %.1f%% of the picture, %d faces in the Glow slot" % (name, 100.0 * float((glow > 0.5).mean()), int(ring.sum())))
         if P.get("cloth"):
             # opt-in "cloth": [material, ...] or "all": those faces go to their own two-sided slot named Cloth (the game's wind cloth)
             Wm = DEBUG_MATS.get(name, {})
