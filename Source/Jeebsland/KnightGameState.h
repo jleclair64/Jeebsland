@@ -43,6 +43,9 @@ public:
 	void SetNodeCharges(const FVector& Loc, int32 Charges, int32 Max);
 	// Cottage doors: the server's are the real ones; players' machines copy them (OnRep_Doors)
 	void SyncDoor(class ACottage* Hut);
+	// The open houses' doors (HouseInterior.h) share the list, keyed by their hinge
+	void SyncDoor(class AHouseInterior* House);
+	bool FindDoor(const FVector& Loc, bool& bOutOpen) const;
 
 	// The trading post's stock this hour, as the server has it (so everyone sees the same "3 left")
 	UPROPERTY(Replicated) int64 StoreHour = -1;
@@ -66,6 +69,7 @@ private:
 	UFUNCTION() void OnRep_Nodes();
 	UPROPERTY(ReplicatedUsing = OnRep_Doors) TArray<FDoorState> Doors;
 	UFUNCTION() void OnRep_Doors();
+	void OnRep_DoorsApply();
 
 	TWeakObjectPtr<class AExponentialHeightFog> FogActor;
 	float FogNow = 0.012f;

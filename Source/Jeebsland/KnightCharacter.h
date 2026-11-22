@@ -82,6 +82,7 @@ enum class EInvOp : uint8
 	PickArrow,      // Target: an arrow lying in the world (E)
 	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
 	ChooseArrows,   // A: the arrow id to shoot next
+	HouseDoor,      // At: an open house's door hinge (AHouseInterior::DoorKey): open or shut it (E)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse

@@ -1,4 +1,5 @@
 #include "KnightGameState.h"
+#include "HouseInterior.h"
 #include "Palette.h"
 #include "GameFramework/HUD.h"
 #include "WaterLook.h"
@@ -772,11 +773,41 @@ void AKnightGameState::SyncDoor(ACottage* Hut)
 	D->bLocked = Hut->IsLocked();
 }
 
+void AKnightGameState::SyncDoor(AHouseInterior* House)
+{
+	if (!House || !HasAuthority() || GetNetMode() == NM_Standalone) return;
+	const FVector L = House->DoorKey();
+	FDoorState* D = Doors.FindByPredicate([&](const FDoorState& S) { return FVector::DistSquared2D(S.Loc, L) < 9.f; });
+	if (!D) { D = &Doors.AddDefaulted_GetRef(); D->Loc = L; }
+	UE_LOG(LogTemp, Log, TEXT("JEEBDOOR server list: %s %s at %s (%d doors listed)"), *House->GetName(), House->IsDoorOpen() ? TEXT("open") : TEXT("shut"), *L.ToCompactString(), Doors.Num());
+	D->bOpen = House->IsDoorOpen();
+}
+
+bool AKnightGameState::FindDoor(const FVector& Loc, bool& bOutOpen) const
+{
+	const FDoorState* D = Doors.FindByPredicate([&](const FDoorState& S) { return FVector::DistSquared2D(S.Loc, Loc) < 9.f; });
+	if (D) bOutOpen = D->bOpen;
+	return D != nullptr;
+}
+
 void AKnightGameState::OnRep_Doors()
 {
+	UE_LOG(LogTemp, Log, TEXT("JEEBDOOR list from the server: %d doors"), Doors.Num());
+	OnRep_DoorsApply();
+}
+
+void AKnightGameState::OnRep_DoorsApply()
+{
 	for (const FDoorState& S : Doors)
+	{
+		bool bDone = false;
 		for (TActorIterator<ACottage> It(GetWorld()); It; ++It)
-			if (FVector::DistSquared2D(It->GetActorLocation(), S.Loc) < 9.f) { It->SetDoorState(S.bOpen, S.bLocked); break; }
+			if (FVector::DistSquared2D(It->GetActorLocation(), S.Loc) < 9.f) { It->SetDoorState(S.bOpen, S.bLocked); bDone = true; break; }
+		if (!bDone)
+			for (TActorIterator<AHouseInterior> It(GetWorld()); It; ++It)
+				if (FVector::DistSquared2D(It->DoorKey(), S.Loc) < 9.f) { It->SetDoorOpen(S.bOpen); bDone = true; break; }
+		if (!bDone) UE_LOG(LogTemp, Log, TEXT("JEEBDOOR the server's door at %s matches nothing here"), *FVector(S.Loc).ToCompactString());
+	}
 }
 
 void AKnightGameState::SyncStore()
