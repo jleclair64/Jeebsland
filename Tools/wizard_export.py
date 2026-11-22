@@ -20,6 +20,7 @@ KNIGHT, ART, OUT = a[0], a[1], a[2]
 os.makedirs(OUT, exist_ok=True)
 TEX = 2048
 ZCUT = {"Base": 0.345, "Robe": 0.345}    # (m) the boot line on each body: below it is the Feet slot
+HAND_SCALE = 0.8      # his hands, about the wrist (Meshy drew them big)
 HAT_WIDTH = 0.80      # (m) the brim's width on his head
 HAT_DROP = 0.105      # (m) how far the brim's plane sits under the top of his head
 HAT_YAW = 0.0         # (degrees) turns the hat about the upright
@@ -109,6 +110,13 @@ def body(tag):
                 o = d[b].lerp(d[c], t)
             off += o * g.weight; tot += g.weight
         if tot > 0: v.co += off / tot
+    # (owner, 2026-11-22: "huge hands ... 20% smaller") each hand drawn in toward its wrist, by how much of the point follows the hand bone
+    for v in ob.data.vertices:
+        tot = sum(g.weight for g in v.groups)
+        if tot <= 0: continue
+        for sd in ("Left", "Right"):
+            h = sum(g.weight for g in v.groups if gname[g.group] == sd + "Hand") / tot
+            if h > 0: v.co = K[sd + "Hand"] + (v.co - K[sd + "Hand"]) * (1.0 + (HAND_SCALE - 1.0) * h)
     for g in ob.vertex_groups: g.name = "mixamorig:" + NAME.get(g.name, g.name)
     for o in new:
         if o is not ob: bpy.data.objects.remove(o)

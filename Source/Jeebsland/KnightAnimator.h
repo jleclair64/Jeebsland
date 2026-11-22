@@ -323,7 +323,7 @@ private:
 	// The wizard (2026-11-21, KnightAnimatorWizard.cpp): the knight's bones and clips as they are. Comp carries the pose with every section hidden;
 	// WizComp (/Game/Wizard/SK_Wizard, on the suit's skeleton) follows it and shows the slots of what he wears (Tools/wizard_export.py).
 	bool bWizard = false, bWizBook = false;
-	bool bWizWorn[Piece_Count] = {};
+	bool bWizWorn[JeebAnim::Piece_Count] = {};
 	class USkeletalMeshComponent* WizComp = nullptr;
 	void MakeWizardMesh(AActor* Owner);
 	void RefreshWizard();
