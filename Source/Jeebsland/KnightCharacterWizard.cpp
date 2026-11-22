@@ -140,10 +140,27 @@ void AKnightCharacter::BlinkFx(const FVector& From, const FVector& To)
 		BlinkPuffs.Add(P);
 	}
 	BlinkHide = 0.f;
+	UE_LOG(LogTemp, Log, TEXT("JEEBBLINK flashes for %s (mine %d): %.0f cm"), *GetName(), IsLocallyControlled() ? 1 : 0, FVector::Dist2D(From, To));
 }
 
 void AKnightCharacter::TickWizard(float Dt)
 {
+	// (online tests: -WizardNetDo on a client makes its own wizard teleport ahead 8 s after he appears, raise the orb at 10 s and lower it at 13 s,
+	// through the same calls as the keys; never in Shipping)
+#if !UE_BUILD_SHIPPING
+	if (IsLocallyControlled() && !HasAuthority())
+	{
+		static const bool bNetDo = FParse::Param(FCommandLine::Get(), TEXT("WizardNetDo"));
+		static float NetT = 0.f; static int32 NetStep = 0;
+		if (bNetDo)
+		{
+			NetT += Dt;
+			if (NetStep == 0 && NetT > 8.f) { NetStep = 1; UE_LOG(LogTemp, Log, TEXT("JEEBBLINK net test: asking, at %s"), *GetActorLocation().ToCompactString()); StartBlink(GetActorForwardVector().GetSafeNormal2D()); }
+			else if (NetStep == 1 && NetT > 10.f) { NetStep = 2; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: block, now at %s"), *GetActorLocation().ToCompactString()); StartBlock(); }
+			else if (NetStep == 2 && NetT > 13.f) { NetStep = 3; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: block off, blocking was %d"), bBlocking ? 1 : 0); StopBlock(); }
+		}
+	}
+#endif
 	if (IsNetMode(NM_DedicatedServer)) return;
 	const auto& T = JeebTune::V();
 	// The orb: grows out of him as the guard comes up, a slow breath while held
@@ -160,6 +177,7 @@ void AKnightCharacter::TickWizard(float Dt)
 			WizardOrb->SetupAttachment(GetRootComponent());
 			WizardOrb->RegisterComponent();
 			WizardOrbMid = WizardOrb->CreateDynamicMaterialInstance(0, Mat);
+			UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD orb drawn for %s (mine %d)"), *GetName(), IsLocallyControlled() ? 1 : 0);
 		}
 	}
 	if (WizardOrb)
