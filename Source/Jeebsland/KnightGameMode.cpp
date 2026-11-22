@@ -205,6 +205,31 @@ void AKnightGameMode::SaveCharacter(AKnightPlayerController* PC)
 	}
 }
 
+void AKnightGameMode::SwapPawnClass(AKnightPlayerController* PC, int32 Class, const FTransform& At)
+{
+	AKnightCharacter* Old = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
+	if (!Old) return;
+	UJeebSave* Keep = nullptr;
+	if (IsOnline() && PC->bLoggedIn && Old->GetSkills())
+	{
+		SaveCharacter(PC);
+		Keep = UJeebSave::Capture(Old->GetSkills(), Old);
+	}
+	PC->ClassChoice = (int8)FMath::Clamp(Class, 0, 2);
+	PC->UnPossess();
+	Old->Destroy();
+	RestartPlayerAtTransform(PC, At);
+	AKnightCharacter* NewK = Cast<AKnightCharacter>(PC->GetPawn());
+	if (NewK && Keep)
+	{
+		if (Keep->ApplyTo(NewK->GetSkills())) NewK->RefreshEquipment();
+		if (NewK->GetTravel()) NewK->GetTravel()->LoadAccount(PC->AccountKey);
+		SaveCharacter(PC);
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBSWAP server: %s is now %s (%s)"), PC->PlayerState ? *PC->PlayerState->GetPlayerName() : TEXT("?"),
+		Class == 1 ? TEXT("troll") : Class == 2 ? TEXT("wizard") : TEXT("knight"), NewK ? *NewK->GetName() : TEXT("NO PAWN"));
+}
+
 void AKnightGameMode::AutosaveAll()
 {
 	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)

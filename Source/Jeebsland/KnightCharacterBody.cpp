@@ -402,6 +402,10 @@ static float ChainBareIn = 5.f;                                          // with
 static float PendantPitch = 8.f;                                         // the pendant leans out at the bottom, lying on the chest plate
 static float PendantScale = 3.9f;   // (2026-11-21, owner: three times larger: the models are 6 cm tall, so 23 cm now)
 static float ChainScale = 3.f;       // (the links too, and the chain spacing with them)
+// (2026-11-22, owner: "make the chain go all the way around the knight's neck ... it cuts off near the collar bone and sinks into the armor".) The back
+// half and the sides lie wider and higher, on top of the collar: with a chest plate these, bare (on the mail) the B numbers. The pendant stays where it was.
+static float ChainPlateSide = 13.f, ChainPlateBack = -11.f, ChainPlateUp = 8.f;
+static float ChainBareSide = 11.5f, ChainBareBack = -8.5f, ChainBareUp = 4.5f;
 void AKnightCharacter::UpdateAmulet()
 {
 	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
@@ -426,16 +430,23 @@ void AKnightCharacter::UpdateAmulet()
 			ChainFrontX = FCString::Atof(*V[0]) / 10.f; ChainDrop = FCString::Atof(*V[1]) / 10.f; ChainUp = FCString::Atof(*V[2]) / 10.f; ChainSideY = FCString::Atof(*V[3]) / 10.f;
 			ChainBackX = FCString::Atof(*V[4]) / 10.f; PendantPitch = FCString::Atof(*V[5]) / 10.f; PendantScale = FCString::Atof(*V[6]) / 100.f;
 		}
+		// (-AmuletRound=<plate side>_<plate back>_<plate up>_<bare side>_<bare back>_<bare up>, cm in tenths: the back half's ring)
+		if (FParse::Value(FCommandLine::Get(), TEXT("AmuletRound="), T) && T.ParseIntoArray(V, TEXT("_")) == 6)
+		{
+			ChainPlateSide = FCString::Atof(*V[0]) / 10.f; ChainPlateBack = FCString::Atof(*V[1]) / 10.f; ChainPlateUp = FCString::Atof(*V[2]) / 10.f;
+			ChainBareSide = FCString::Atof(*V[3]) / 10.f; ChainBareBack = FCString::Atof(*V[4]) / 10.f; ChainBareUp = FCString::Atof(*V[5]) / 10.f;
+		}
 	}
 #endif
+	const float SideY = bPlate ? ChainPlateSide : ChainBareSide, BackX = bPlate ? ChainPlateBack : ChainBareBack, RoundUp = bPlate ? ChainPlateUp : ChainBareUp;
 	UE_LOG(LogTemp, Log, TEXT("JEEBAMULET id %d variant %d neck in the chest frame (%.1f, %.1f, %.1f), pendant at (%.1f, %.1f, %.1f); chest in the world %s"), Id, JeebItems::VariantOf(Id), N.X, N.Y, N.Z, N.X + ChainFrontX, 0.f, N.Z + ChainUp - ChainDrop, *UpperPivot->GetComponentLocation().ToString());
 	// the chain's line, all the way round from the pendant (a = 0) and back
 	auto At = [&](float A)
 	{
 		const float C = FMath::Cos(A), S = FMath::Sin(A);
-		if (C <= 0.f) return FVector(N.X - C * ChainBackX, ChainSideY * S, N.Z + ChainUp);
-		const float U = FMath::Pow(C, 1.6f);
-		return FVector(N.X + (ChainFrontX - (bPlate ? 0.f : ChainBareIn)) * FMath::Sin(C * HALF_PI), ChainSideY * S, N.Z + ChainUp - ChainDrop * U);
+		if (C <= 0.f) return FVector(N.X - C * BackX, SideY * S, N.Z + RoundUp);
+		const float U = FMath::Pow(C, 1.6f);   // (the pendant, at C = 1, hangs where it always did: ChainUp - ChainDrop under the neck bone's height)
+		return FVector(N.X + (ChainFrontX - (bPlate ? 0.f : ChainBareIn)) * FMath::Sin(C * HALF_PI), SideY * S, N.Z + RoundUp - (ChainDrop + RoundUp - ChainUp) * U);
 	};
 	TArray<FVector> Line;
 	for (int32 i = 0; i <= 240; ++i) Line.Add(At(-PI + 2.f * PI * i / 240.f));

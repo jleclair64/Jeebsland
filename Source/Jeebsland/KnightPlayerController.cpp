@@ -174,6 +174,19 @@ void AKnightPlayerController::ServerTestLevels_Implementation(int32 Level)
 	}
 }
 
+void AKnightPlayerController::ServerTestSwapClass_Implementation(int32 Class)
+{
+	bool bMay = TestGate();   // (testers only, as the test kit)
+#if !UE_BUILD_SHIPPING
+	bMay = bMay || GetNetMode() == NM_Standalone;
+#endif
+	if (!bMay) return;
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastTestAsk < 1.0) return;
+	LastTestAsk = Now;
+	if (AKnightCharacter* Knight = Cast<AKnightCharacter>(GetPawn())) Knight->SwapToClass(FMath::Clamp(Class, 0, 2));
+}
+
 void AKnightPlayerController::ServerTestEmptyPack_Implementation()
 {
 	if (!TestGate()) return;

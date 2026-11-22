@@ -23,6 +23,9 @@ public:
 	void TryLogin(AKnightPlayerController* PC, const FString& Name, const FString& Password, bool bCreate, bool bDev);
 	void SaveCharacter(AKnightPlayerController* PC);   // writes this player's character to the server's disk
 	int32 PlayersOnline() const;
+	// (TEMPORARY test kit, 2026-11-22) Swap this player's pawn for another class (0 knight, 1 troll, 2 wizard) at At. Online the
+	// character is captured from the old pawn and put on the new one (and saved); single player the caller has autosaved.
+	void SwapPawnClass(AKnightPlayerController* PC, int32 Class, const FTransform& At);
 	// Where a new character, or one that has just died, appears in Oak Hill: on the plaza 10 m west of the big oak, facing it (OakHill.h's
 	// SpawnX/SpawnY), or if another knight stands there, the next free spot along the arc between the oak's lawn and the ring road (two
 	// rows, 22 spots), skipping any spot something solid stands in. Server only; Self (the dying knight) is not counted as in the way.

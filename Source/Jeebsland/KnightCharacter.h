@@ -140,6 +140,13 @@ public:
 	UFUNCTION(Server, Reliable) void ServerHop(FVector_NetQuantizeNormal Dir);
 	UFUNCTION(Client, Reliable) void ClientLeapRefused(float CooldownLeft);
 	void SwapClassForTest(bool bTroll);   // (single player, test builds: jeeb.PlayAs troll|knight saves, then comes back as the other in the same spot)
+	// (2026-11-22) Play as another class, online too (test kit's KNIGHT / TROLL / WIZARD buttons): the owning machine calls
+	// RequestClass (lets go of this pawn's input, asks AKnightPlayerController::ServerTestSwapClass); the server runs SwapToClass.
+	int32 ClassIndex() const { return bIsWizard ? 2 : bIsTroll ? 1 : 0; }
+	void RequestClass(int32 Class);
+	void SwapToClass(int32 Class);
+	void ReleaseInputForSwap();
+	void SwapTestStep();   // (-SwapTest: cycles the classes, logs JEEBSWAP check)
 
 	// For the HUD
 	float GetStaminaFraction() const { return Stamina / MaxStamina; }

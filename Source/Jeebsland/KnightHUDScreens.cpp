@@ -1,4 +1,5 @@
 #include "KnightHUD.h"
+#include "KnightPlayerController.h"
 #include "SkillTips.h"
 #include "SkillComponent.h"
 #include "Engine/Canvas.h"
@@ -91,6 +92,34 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			return;
 		}
 		if (!bOnline) Wrapped(TEXT("(Offline play has no starting screen.)"), BX + 4.f, PY + 274.f, BW - 8.f, 0.9f, FLinearColor(0.6f, 0.6f, 0.65f));
+		// TESTING ONLY (owner 2026-11-22): play as the knight, the troll or the wizard (the same as the buttons beside the Test kit;
+		// online the server checks the test-kit gate and swaps the pawn: AKnightPlayerController::ServerTestSwapClass)
+		{
+			bool bMaySwap = false;
+			if (const AKnightPlayerController* KPC = Cast<AKnightPlayerController>(GetOwningPlayerController())) bMaySwap = KPC->bTestKit;
+#if !UE_BUILD_SHIPPING
+			bMaySwap = bMaySwap || GetNetMode() == NM_Standalone;
+#endif
+			if (bMaySwap)
+			{
+				HDText(TEXT("Play as (testing only):"), FLinearColor(1.f, 0.85f, 0.5f), BX + 4.f, PY + 330.f, Font, 1.0f);
+				static double LastSwapAsk = -10.0;
+				const bool bReady = FPlatformTime::Seconds() - LastSwapAsk > 1.5;
+				static const TCHAR* Names[3] = { TEXT("KNIGHT"), TEXT("TROLL"), TEXT("WIZARD") };
+				const float CW = (BW - 12.f) / 3.f;
+				for (int32 C = 0; C < 3; ++C)
+				{
+					const bool bOn = C == Knight->ClassIndex();
+					if (Btn(BX + C * (CW + 6.f), PY + 362.f, CW, 46.f, Names[C], bReady, bOn, 1.0f) && bReady && !bOn)
+					{
+						LastSwapAsk = FPlatformTime::Seconds();
+						Knight->RequestClass(C);   // (single player destroys this pawn at once: nothing below may use Knight)
+						return;
+					}
+				}
+				Wrapped(TEXT("Saves, then you come back as the other one in the same spot."), BX + 4.f, PY + 418.f, BW - 8.f, 0.9f, FLinearColor(0.7f, 0.72f, 0.78f));
+			}
+		}
 		HDText(TEXT("Press Esc to go back to the game."), FLinearColor(0.8f, 0.8f, 0.8f), BX + 4.f, PY + PH - 50.f, Font, 1.0f);
 	}
 	else if (SettingsTab == 1)
