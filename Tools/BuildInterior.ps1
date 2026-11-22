@@ -3,7 +3,8 @@
 #     TownLab bake's TL_House.fbx (Saved/KnightBuild/TownLab, or -HouseFbx <path>)
 #  2. Blender cuts the doorway through both (Tools/interior_house_open.py) and reduces the Meshy community props (Tools/interior_props.py)
 #  3. Unreal imports SM_TL_HouseOpen(+_Col) into /Game/TownLab/Buildings and the props into /Game/Interior (Tools/interior_import.py)
-# -ImportOnly skips 1-2. -Only house|props imports just that half. The room itself is Content/Data/InteriorHouse.csv (no build needed).
+# -ImportOnly skips 1-2. -Only house|props imports just that half. The rooms themselves are Content/Data/Interior_<PlotId>.csv, written by
+# Tools/interior_rooms.py (no build needed); their plasters and wood tints are made by Tools/interior_fix.py, the last step here.
 param([switch]$Export, [switch]$ImportOnly, [string]$Only = 'all', [string]$HouseFbx = '')
 $proj = Split-Path $PSScriptRoot -Parent
 $blender = 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe'

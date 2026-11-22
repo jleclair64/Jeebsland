@@ -1,0 +1,80 @@
+Mesh,X,Y,Z,Yaw,Pitch,Roll,SX,SY,SZ,Solid,Shadow,Light,Radius,Mat
+# House_SE4: the woodcutter's, on Southeast Road: stacked logs, the chopping block, axes on the wall, a workbench. Written by Tools/interior_rooms.py (edit there and run it again; no build needed). AHouseInterior, HouseInterior.h.
+# X along the house's long side, +Y out of the door, Z from the floor, cm. Room X -455..495, Y -315..230, 270 high; door X -49..103.
+ROOM,-455,-315,0,,,,495,230,270
+# --- floor, ceiling
+/Game/Medieval_Tavern/Meshes/Modular/SM_Floor_002,-455,230,-7,0,0,0,0.95,0.545,1,1,1
+/Game/Medieval_Tavern/Meshes/Modular/SM_Floor_002,-455,-315,280,0,0,180,0.95,0.545,1,1,1
+# --- walls: front (door side; the lintel 1 cm in front and 4 cm down over the doorway lining), back, west, east
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-455,242.5,0,0,0,0,1.015,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-252,242.5,0,0,0,0,1.015,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,103,242.5,0,0,0,0,0.98,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,299,242.5,0,0,0,0,0.98,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-53,241.5,222,0,0,0,0.79,0.5,0.16,0,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,495,-327.5,0,180,0,0,0.95,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_002,305,-327.5,0,180,0,0,0.95,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,115,-327.5,0,180,0,0,0.95,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-75,-327.5,0,180,0,0,0.95,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-265,-327.5,0,180,0,0,0.95,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-467.5,-315,0,90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-467.5,-133.3,0,90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,-467.5,48.3,0,90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,507.5,230,0,-90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,507.5,48.3,0,-90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+/Game/Medieval_Tavern/Meshes/Modular/SM_Wall_001,507.5,-133.3,0,-90,0,0,0.9083,0.5,0.9,1,1,,,0=/Game/Interior/Mats/MI_Int_Plaster_Straw
+# --- beams across the ceiling and corner posts
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,-300,-315,258,90,-90,0,1,1,2.725,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,-80,-315,258,90,-90,0,1,1,2.725,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,140,-315,258,90,-90,0,1,1,2.725,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,340,-315,258,90,-90,0,1,1,2.725,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-445,-305,0,0,0,0,1,1,0.9,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,-305,0,0,0,0,1,1,0.9,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-445,220,0,0,0,0,1,1,0.9,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,485,220,0,0,0,0,1,1,0.9,0,0
+# --- the hearth (west end, under the chimney): stone back, timber jambs and mantle, logs and fire
+/Game/TownDecor/SM_WallStone,-436,-50,0,90,0,0,1,0.5,1.05,1,0
+/Game/TownDecor/SM_WallStone,-445,-50,124,90,0,0,0.75,0.35,1.25,0,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,-130,0,0,0,0,3.5,2,0.42,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_001,-385,30,0,0,0,0,3.5,2,0.42,1,0
+/Game/Medieval_Tavern/Meshes/Modular/SM_Beam_002,-350,-150,126,90,-90,0,1.3,1.3,1,0,0
+/Game/TownDecor/SM_Firewood,-385,-50,0,90,0,0,0.7,0.7,0.7,0,0
+/Game/TownDecor/SM_TorchBlazingFlame,-385,-50,-40,0,0,0,0.75,0.75,0.75,0,0
+FIRE,-300,-50,88,,,,,,,0,0,320,800
+# --- by the fire: logs stacked both sides, a stool and a chair on a rug
+/Game/Medieval_Tavern/Meshes/Props/SM_Carpet_001,-235,-50,3.3,0,0,0,0.6,0.6,1,0,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_001,-232.4,63.2,3,-233.4,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_002,-230.6,-164.9,3,53.4,0,0,1,1,1,1,0
+/Game/TownDecor/SM_LogStackSmall,-398.7,139.6,4,-90,0,0,1,1,1,1,0
+/Game/TownDecor/SM_LogStackSmall,-407,-245.4,3.9,-90,0,0,0.85,0.85,0.85,1,0
+# --- back wall: the firewood rack, axes and a pickaxe hung over it, the workbench under the window
+/Game/TownDecor/SM_FirewoodRack,-130.1,-287.7,3.1,0,0,0,0.85,0.85,0.85,1,0
+/Game/Props/SM_Axe,-197.2,-309.8,235.3,0,0,0,1.3,1.3,1.3,0,0
+/Game/Props/SM_Axe,-117.2,-309.8,235.3,0,0,0,1.3,1.3,1.3,0,0
+/Game/Props/SM_Pickaxe,-50.3,-310.2,236.8,90,0,0,1.2,1.2,1.2,0,0
+/Game/TownDecor/SM_TrestleTable,209.4,-263.8,3.5,0,0,0,0.85,0.85,0.85,1,0
+/Game/TownDecor/SM_RopeHank,159.9,-263.9,83.6,0,0,0,1,1,1,0,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Props_009,227.6,-255.9,83.1,40,0,0,1,1,1,0,0
+/Game/TownDecor/SM_LanternBlack,270,-263.9,83.1,0,0,0,1,1,1,0,0,130,330
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_002,210.2,-180.5,3,-180,0,0,1,1,1,1,0
+# --- the middle: the chopping block on a rug, a round table and stools
+/Game/TownDecor/SM_ChoppingBlock,-90.8,-150.9,3.2,30,0,0,0.8,0.8,0.8,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Carpet_002,130,-40,3.3,0,0,0,0.55,0.55,1,0,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Table_002,129.9,-39.9,3,0,0,0,0.85,0.85,0.85,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_002,130.2,49.5,3,-180,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_002,224.5,-40.2,3,90,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chair_002,40.4,-59.6,3,-77.5,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Props_010,151.5,-20,81.7,0,0,0,1,1,1,0,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Props_011,105,-30,81.7,0,0,0,1,1,1,0,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Props_001,130,-75,81.7,0,0,0,1,1,1,0,0
+/Game/Interior/Candlesticks/SM_Int_Candlesticks,130,-40,81.7,30,0,0,1,1,1,0,0,120,280
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_001,130,-40,265,0,0,0,0.45,0.45,0.45,0,0,240,650
+# --- east end: the bed, a trunk, rope and a barrel
+/Game/Interior/Bed/SM_Int_Bed,436,-211,3,0,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Chest_001,462.7,-40,3,90,0,0,0.8,0.8,0.8,1,0
+/Game/TownDecor/SM_BarrelSmall,458.5,60,3,90,0,0,1,1,1,1,0
+/Game/TownDecor/SM_RopeCoil,440.2,140.1,3,0,0,0,1,1,1,0,0
+# --- front wall: a bench and crate right of the door; a log pile, pail and the wall lamp left of it
+/Game/Medieval_Tavern/Meshes/Props/SM_Bench_001,290,212.5,3,180,0,0,0.6,0.6,0.6,1,0
+/Game/TownDecor/SM_LogStackSmall,-229.7,177.7,3.9,270,0,0,0.85,0.85,0.85,1,0
+/Game/TownDecor/SM_Pail,-129.8,209,2.9,180,0,0,1,1,1,1,0
+/Game/Medieval_Tavern/Meshes/Props/SM_Lamp_002,-120,230,191.6,180,0,0,1,1,1,0,0,110,300
