@@ -243,7 +243,7 @@ void AAutumnDecor::WallTorch(const FVector2D& WallPt, const FVector2D& Out, floa
 // A torch on its own post
 void AAutumnDecor::PostTorch(const FVector2D& P)
 {
-	const float Z = JeebTerrain::HeightAt(P.X, P.Y);
+	const float Z = JeebTerrain::DrawnHeight(P.X, P.Y);
 	Wood->AddInstance(FTransform(FQuat::Identity, FVector(P.X, P.Y, Z + 115.f), FVector(0.14f, 0.14f, 2.3f)));
 	TorchHead(FVector(P.X, P.Y, Z + 230.f));
 }
@@ -309,7 +309,7 @@ void AAutumnDecor::BeginPlay()
 	// Collect transforms per mesh, then add them all in one go
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Batch;
 	auto Put = [&](UInstancedStaticMeshComponent* C, const FTransform& T) { Batch.FindOrAdd(C).Add(T); };
-	auto Ground = [](float X, float Y) { return JeebTerrain::HeightAt(X, Y); };
+	auto Ground = [](float X, float Y) { return JeebTerrain::DrawnHeight(X, Y); };
 	const FVector Cottage = JeebTerrain::CottagePos();
 	const FVector2D CottageXY(Cottage.X, Cottage.Y);
 

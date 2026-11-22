@@ -1323,7 +1323,7 @@ struct FFillBuilder
 		else { Pts[1] = F.C + FVector2D(F.R, 0.f); Pts[2] = F.C - FVector2D(F.R, 0.f); Pts[3] = F.C + FVector2D(0.f, F.R); Pts[4] = F.C - FVector2D(0.f, F.R); }
 		float Lo = 1.0e9f, Hi = -1.0e9f;
 		float Zs[5]; int32 n = 0;
-		for (const FVector2D& P : Pts) { const float Z = JeebTerrain::HeightAt(P.X, P.Y); Zs[n++] = Z; Lo = FMath::Min(Lo, Z); Hi = FMath::Max(Hi, Z); }
+		for (const FVector2D& P : Pts) { const float Z = JeebTerrain::DrawnHeight(P.X, P.Y); Zs[n++] = Z; Lo = FMath::Min(Lo, Z); Hi = FMath::Max(Hi, Z); }
 		// (the steepest rise between any two of the five spots: the ground's own slope, whichever way the piece is turned)
 		float Grad = 0.f;
 		for (int32 a = 0; a < 5; ++a) for (int32 b = a + 1; b < 5; ++b) { const float Dd = FVector2D::Distance(Pts[a], Pts[b]); if (Dd > 10.f) Grad = FMath::Max(Grad, FMath::Abs(Zs[a] - Zs[b]) / Dd); }
@@ -1958,7 +1958,7 @@ struct FFillBuilder
 		FTry T;
 		T.Kind = &Post; T.bGround = true; T.bSolid = Post.Col != ECol::None; T.bWalkBlock = T.bSolid && Post.Height > 45.f; T.bDrop = false;
 		T.Foot = FootOf(Post, At, Yaw, 1.f);
-		T.Xf = FTransform(FRotator(0.f, Yaw, 0.f), FVector(At.X, At.Y, JeebTerrain::HeightAt(At.X, At.Y) - 2.f), FVector(1.f));
+		T.Xf = FTransform(FRotator(0.f, Yaw, 0.f), FVector(At.X, At.Y, JeebTerrain::DrawnHeight(At.X, At.Y) - 2.f), FVector(1.f));
 		return T;
 	}
 	// A run piece is clear of everything fixed (its own building excepted) and of other plots' pieces
@@ -2089,7 +2089,7 @@ struct FFillBuilder
 					T.Kind = Panel; T.bGround = true; T.bSolid = Panel->Col != ECol::None; T.bWalkBlock = T.bSolid; T.bDrop = false;
 					const float LYaw = FMath::RadiansToDegrees(FMath::Atan2(Dl.Y, Dl.X));
 					T.Foot = FShape::Box(C, FVector2D(W * 0.5f, Panel->FootY * 0.5f), LYaw);
-					T.Xf = FTransform(FRotator(0.f, LYaw, 0.f), FVector(C.X, C.Y, JeebTerrain::HeightAt(C.X, C.Y) - 2.f), FVector(W / Panel->FootX, 1.f, 1.f));
+					T.Xf = FTransform(FRotator(0.f, LYaw, 0.f), FVector(C.X, C.Y, JeebTerrain::DrawnHeight(C.X, C.Y) - 2.f), FVector(W / Panel->FootX, 1.f, 1.f));
 					GateLeaf = T; bLeaf = true;
 				}
 				RunSpan(Pl, *Panel, A, Ext(*Post, PostYaw[e], Dir), G1, GPost->FootX, Tries);
