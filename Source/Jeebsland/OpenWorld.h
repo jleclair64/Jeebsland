@@ -39,6 +39,12 @@ namespace JeebOpen
 	float Snow(float X, float Y, float Z, float Up);
 	// the same before it is clamped (under 0 none, over about 0.8 solid): AWorldTerrain gives it to M_Ground in the ground's second UV, which adds its fine noise
 	float SnowRaw(float X, float Y, float Z, float Up);
+	// 0 .. 1: the snow on the world's ground at a spot (Snow at the ground's own height and slope)
+	float SnowOnGround(float X, float Y);
+	// cm a character's drawn body sinks into the snow when its feet stand at Feet on the open ground (0 off the snow, in the air, on
+	// rock or roofs); a pure function of the position, so every machine draws the same (2026-11-22, owner: feet sink into the snow)
+	constexpr float SinkDepth = 13.f;
+	float SnowSink(const FVector& Feet);
 	// 0 .. 1: how hard it is snowing at a moment of the shared clock (AGameStateBase::GetServerWorldTimeSeconds): clear or snowing for
 	// whole slots of SnowSlot seconds, eased in and out, the same for every player
 	constexpr double SnowSlot = 210.0;

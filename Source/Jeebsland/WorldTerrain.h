@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -39,6 +39,8 @@ protected:
 private:
 	UPROPERTY() TArray<UProceduralMeshComponent*> Chunks;
 	UPROPERTY() TArray<UProceduralMeshComponent*> Water;
+	void AddUnderside(const TArray<FVector>& V, const TArray<int32>& Back, const TArray<FVector>& N, const TArray<FVector2D>& UV, const TArray<FVector2D>& UV1, const TArray<FLinearColor>& Col, UMaterialInterface* Mat);
+	UPROPERTY() TArray<TObjectPtr<UProceduralMeshComponent>> Under;
 	void BuildLand();
 	void BuildFine();   // (the 2 m patches: Steele Creek, the lake, the split)
 	void BuildWater();

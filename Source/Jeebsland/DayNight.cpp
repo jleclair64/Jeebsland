@@ -172,6 +172,10 @@ void ADayNight::BeginPlay()
 		{
 			L->LightSourceAngle = 4.f;   // a bigger sun disc: shadow edges soften with distance from what casts them (branch shadows blur)
 			L->ForwardShadingPriority = 1;   // (the one for water, glass and fog, ahead of the armour's glint light below)
+			// (2026-11-22, owner: "a triangle of strobing snow") an 8 m ground triangle turned just away from a low sun shadowed itself in
+			// stripes (shadow acne) that crawled as the sun moved; twice the engine's slope bias keeps a surface from shadowing itself at
+			// grazing angles (the moon copies it)
+			L->ShadowSlopeBias = FMath::Max(L->ShadowSlopeBias, 1.f);
 			L->MarkRenderStateDirty();
 			SunBaseDiffuse = L->DiffuseScale;
 			SunBaseSpecular = L->SpecularScale;
@@ -525,7 +529,10 @@ void ADayNight::TickMoon(float MoonW)
 		Moonlight->SetAtmosphereSunLight(true);
 		Moonlight->SetAtmosphereSunLightIndex(1);
 		Moonlight->SetAtmosphereSunDiskColorScale(FLinearColor::Black);   // (no second sun disc: the moon is AMoon's picture)
-		Moonlight->LightSourceAngle = 1.5f;   // (a little crisper than the sun's soft 4 degrees)
+		// (2026-11-22, owner: the knight's shadow on snow at night "pixely/fuzzy/static") the moon's long low shadows reached the soft
+		// filter's widest search almost everywhere, and on bright snow its per-pixel sample scatter showed as grain: the real moon's
+		// half a degree keeps its shadows crisp with a small soft edge (was 1.5)
+		Moonlight->LightSourceAngle = 0.5f;
 		Moonlight->ForwardShadingPriority = 2;   // (water, glass and fog take the moon at night; it is hidden by day)
 		Moonlight->SetVolumetricScatteringIntensity(0.f);
 		if (ADirectionalLight* S = Sun.Get())

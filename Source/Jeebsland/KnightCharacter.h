@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "JeebslandCharacter.h"
@@ -747,6 +747,9 @@ private:
 	bool bCrouched = false;
 	bool bBlocking = false;
 	float StrafeSprint = 1.f;   // strafe mode: how much of the sprint applies, eased (it fades in as you turn toward straight ahead)
+	float SnowSinkNow = 0.f;   // cm the drawn body stands sunk in deep snow (JeebOpen::SnowSink, eased; looks only, the same on every machine)
+	FVector PrintLast = FVector::ZeroVector; int32 PrintSide = 0; bool bPrintNoDecals = false;   // footprints in the snow (KnightCharacterPose.cpp)
+	void SnowFeet(float Dt, FVector& Feet);
 	float LegYaw = 0.f;   // facing the camera (strafe mode, shield stance): how far the hips and legs turn toward the way you move (Fortnite style)
 	bool bStrafeMode = true;    // strafe mode (wheel click or X; on from the start, owner 2026-10-31): always face where the camera looks, sidestep and back up instead of turning
 	void ToggleStrafe();
