@@ -572,6 +572,10 @@ void AKnightCharacter::UpdateRings()
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBRING %d rings drawn"), Rings.Num());
 	}
+	// (2026-11-22, owner: rings show on bare hands only; under gauntlets they're just the slot and its bonuses, as in RuneScape)
+	const bool bGloved = Skills->Worn[JeebItems::K_Gauntlets] != 0;
+	for (USceneComponent* C : RingParts) if (C && C->IsVisible() == bGloved) C->SetVisibility(!bGloved);
+	if (bGloved) return;
 	for (const FRingSlot& Slot : RingSlots)
 	{
 		FVector A, N;
