@@ -517,6 +517,7 @@ void AKnightCharacter::ServerSlide_Implementation(FVector_NetQuantizeNormal Dir,
 void AKnightCharacter::ServerClimb_Implementation(bool bOn)
 {
 	// On the ladder the knight is moved by the player's machine; the server follows it instead of pulling it back
+	if (bOn && bIsTroll) return;   // (trolls don't climb: the server never trusts a troll on a ladder)
 	UCharacterMovementComponent* Move = GetCharacterMovement();
 	bClimbing = bOn;
 	if (bOn)

@@ -117,6 +117,9 @@ float UKnightMovement::MoveCap(const FVector& Dir) const
 float UKnightMovement::AccelRuleNow() const
 {
 	const JeebTune::FValues& T = JeebTune::V();
+	// (owner 2026-11-21: the troll is as fast as the knight but takes a few seconds to get going: one slow push on the ground, worked out
+	// from the move's own state like the rest, so the server and the client agree; braking stays the usual quick one)
+	if (const AKnightCharacter* K = Knight(); K && K->IsTroll() && !IsFalling() && !InWater()) return T.TrollAccel;
 	if (!SpeedRule.bAccelRule || IsFalling()) return T.SprintAccel;
 	const float Cap = SpeedRule.bByMove ? MoveCap(Velocity) : MaxWalkSpeed;
 	const float WalkCap = FMath::Min(Cap, SpeedRule.WalkCapBase * MoveAirMul);
@@ -267,6 +270,7 @@ void UKnightMovement::OnMovementUpdated(float Dt, const FVector& OldLocation, co
 bool UKnightMovement::TryGrab()
 {
 	AKnightCharacter* K = Knight();
+	if (K && K->IsTroll()) return false;   // (owner 2026-11-21: trolls don't climb rock faces; same check on server and client)
 	if (!K || bNoRegrab || bClimbExhausted || ClimbStamina <= 0.02f || bWantsLetGo) return false;
 	if (K->bClimbing || K->bSitting || K->bMounted || K->bRolling || K->bSliding || K->bKnockedDown || K->StunLeft > 0.f) return false;
 	const FVector Dir = Flat(Acceleration);
