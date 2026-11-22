@@ -443,10 +443,31 @@ def build_boulder(rock_tex, patches):
         shade = g.lum(g.tex(base_t, uv))
         col = g.muln(col, g.lerpc(0.55, 1.25, g.ramp(shade, 0.08, 0.6)))
     col = g.muln(col, g.vector("Tint", (0.88, 0.88, 0.88)))
-    n1 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 70.0)), True, False)
-    n2 = g.mask(g.tex(patches, g.mul(g.mask(wp, True, True), 1.0 / 23.0)), True, False)
-    moss_a = g.sat(g.mul(g.add(g.addn(g.mul(nz, 1.4), g.addn(g.mul(n1, 0.7), g.mul(n2, 0.35))), -1.45), 3.0))
-    moss_c = g.lerp(g.c3((0.07, 0.085, 0.045)), g.c3((0.13, 0.15, 0.07)), n2)   # dark olive moss with lighter tufts
+    # Moss (2026-11-21, owner: the moss was a camouflage of same-size blotches; that was the 23 cm noise): now mostly on the tops
+    # and in the model's dark hollows, in patches from three noises at unrelated sizes (one turned), soft ragged edges, a few
+    # flecks, and each boulder its own amount (per instance random).
+    p3 = g.mask(wp, True, True, True)
+    def nz3(size, off):   # a soft noise read from above and from two sides, blended by facing (no stretched patches on the sides)
+        t = g.mask(g.tex(patches, g.mul(g.add(g.mask(p3, True, True), off), 1.0 / size)), True, False)
+        a = g.mask(g.tex(patches, g.mul(g.add(g.append(g.mask(p3, True, False), wz), off), 1.0 / size)), True, False)
+        b = g.mask(g.tex(patches, g.mul(g.add(g.append(g.mask(g.mask(p3, False, True), True, False), wz), off), 1.0 / size)), True, False)
+        return g.lerp(g.lerp(a, b, g.ramp(g.subn(nx, ny), -0.2, 0.2)), t, g.ramp(g.one(unreal.MaterialExpressionAbs, nz), 0.4, 0.8))
+    big = nz3(330.0, 1234.0)
+    mid = nz3(127.0, 517.0)
+    fine = nz3(41.0, 2903.0)
+    rnd = g.node(unreal.MaterialExpressionPerInstanceRandom)
+    amount = g.lerpc(-0.35, 0.25, rnd)   # some boulders nearly bare, some mossy
+    hollow = g.c(0.0)
+    if base_t is not None:
+        hollow = g.one(unreal.MaterialExpressionOneMinus, g.ramp(shade, 0.1, 0.35))   # the model's dark cracks and hollows
+    up = g.ramp(nz, 0.05, 0.85)
+    field = g.addn(g.addn(g.mul(big, 0.55), g.mul(mid, 0.35)), g.mul(g.add(fine, -0.5), 0.22))
+    field = g.addn(g.addn(field, g.mul(up, 0.75)), g.addn(g.mul(hollow, 0.25), amount))
+    moss_a = g.ramp(field, 1.0, 1.28)
+    fleck = g.muln(g.ramp(fine, 0.72, 0.8), g.mul(up, 0.35))   # small scattered flecks beyond the patches
+    moss_a = g.sat(g.addn(moss_a, fleck))
+    n2 = mid
+    moss_c = g.lerp(g.c3((0.06, 0.07, 0.045)), g.c3((0.1, 0.115, 0.065)), fine)   # dark, muted olive with lighter tufts
     col = g.lerp(col, palette.grade_plant_extra(mat, moss_c), g.mul(moss_a, 0.75))
     g.out(palette.grade_world(mat, col), unreal.MaterialProperty.MP_BASE_COLOR)
     if nrm_t is not None:
