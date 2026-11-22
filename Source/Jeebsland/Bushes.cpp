@@ -7,6 +7,7 @@
 #include "Canopy.h"
 #include "Fill.h"
 #include "TreeLook.h"
+#include "JeebWater.h"
 #include "Engine/World.h"
 #include "Engine/StaticMesh.h"
 #include "EngineUtils.h"
@@ -32,7 +33,7 @@ namespace
 
 	TWeakObjectPtr<ABushes> GBushes;
 
-	enum EBush : uint8 { B_Full, B_Small, B_Fine, B_Low, B_Flower1, B_Flower2, B_Num };
+	enum EBush : uint8 { B_Full, B_Small, B_Fine, B_Low, B_Flower1, B_Flower2, B_Reed1, B_Reed2, B_Pad, B_Num };
 	struct FBushDef { const TCHAR* Path; float Reach; float Foot; const TCHAR* Title; };
 	const FBushDef Defs[B_Num] = {
 		{ TEXT("/Game/Bushes/SM_BushFull.SM_BushFull"), 7000.f, 100.f, TEXT("full") },
@@ -42,6 +43,12 @@ namespace
 		// (the flowering bush: a small bush with the meadow's own flowers, the realistic grass pack's, through it)
 		{ TEXT("/Game/PN_MeadowFlowers/Meshes/flowerMesh/flower_14_06.flower_14_06"), 3500.f, 0.f, TEXT("flower a") },
 		{ TEXT("/Game/PN_MeadowFlowers/Meshes/flowerMesh/flower_17_05.flower_17_05"), 3500.f, 0.f, TEXT("flower b") },
+		// (2026-11-21, owner: reeds where the bushes stood in the water) the realistic grass pack's two tallest, narrowest clumps (0.9 m), drawn
+		// 1.4-1.9 times as tall in the shallows and the wet edge of the rivers, lakes and the sea's inlets; their own wind, as the meadow's grass
+		{ TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/grass_03_01_mesh.grass_03_01_mesh"), 4500.f, 0.f, TEXT("reed a") },
+		{ TEXT("/Game/PN_GrassLibrary/Meshes/grassMesh/grass_12_11_mesh.grass_12_11_mesh"), 4500.f, 0.f, TEXT("reed b") },
+		// lily pads on the calmer, deeper water near the banks: a flat disc in the pond's colours (Pond.cpp has the same), no flowers here
+		{ TEXT("/Engine/BasicShapes/Cylinder.Cylinder"), 3500.f, 0.f, TEXT("lily pad") },
 	};
 
 	// Where to look: round Oak Hill's forest, Blackrock's woods round the square, Steele Creek, and the land between Oak Hill and Steele
@@ -128,11 +135,18 @@ void ABushes::Rebuild()
 			if (!InRegion(P)) continue;
 			if (FMath::Max(FMath::Abs(P.X), FMath::Abs(P.Y)) < JeebTerrain::GroundHalf + 500.f) continue;   // (the original square: the fill's)
 			if (JeebSteele::InBox(P.X, P.Y, -4000.f)) continue;   // (Steele Creek's middle)
-			if (JeebWorld::InWater(P.X, P.Y)) continue;
-			// on a bank: water within 4.5 m
+			// (2026-11-21, owner: "Why are there bushes in the water?") A bush is 2-4 m across and only its centre had to be dry, so bank bushes
+			// stood half in the river. Now no water within 3.5 m of the centre; the water's edge itself gets reeds instead (below)
+			if (JeebWorld::InWater(P.X, P.Y) || JeebWorld::NearRiver(P.X, P.Y, 350.f)) continue;
+			{
+				bool bWet = false;
+				for (int32 k = 0; k < 6 && !bWet; ++k) bWet = JeebWorld::InWater(P.X + Ring6[k].X * 350.f, P.Y + Ring6[k].Y * 350.f);
+				if (bWet) continue;
+			}
+			// on a bank: water within 6 m
 			bool bShore = false;
-			for (int32 k = 0; k < 6 && !bShore; k += 2) bShore = JeebWorld::InWater(P.X + Ring6[k].X * 450.f, P.Y + Ring6[k].Y * 450.f);
-			if (!bShore) bShore = JeebWorld::InWater(P.X - 450.f, P.Y);
+			for (int32 k = 0; k < 6 && !bShore; k += 2) bShore = JeebWorld::InWater(P.X + Ring6[k].X * 600.f, P.Y + Ring6[k].Y * 600.f);
+			if (!bShore) bShore = JeebWorld::InWater(P.X - 600.f, P.Y);
 			// at a forest edge: some open ground and some canopy within 7 m; under the trees: canopy all round
 			const float C0 = JeebCanopy::Cover(P.X, P.Y);
 			int32 Open = 0, Shade = 0;
@@ -183,6 +197,60 @@ void ABushes::Rebuild()
 				}
 		}
 
+	// Reeds and lily pads (2026-11-21) along the water's edge: a jittered 1.6 m lattice near the water, each cell its own seed. Reeds in clumps
+	// where the ground lies from 30 cm under the surface to 15 cm above it; a few pads where it is 50-140 cm deep within 4 m of the bank.
+	int32 NReed = 0, NPad = 0;
+	if (Density > 0.f)
+	{
+		const float RC = 160.f;
+		const int32 RI = FMath::CeilToInt((Hi.X - Lo.X) / RC), RJ = FMath::CeilToInt((Hi.Y - Lo.Y) / RC);
+		for (int32 i = 0; i < RI; ++i)
+			for (int32 j = 0; j < RJ; ++j)
+			{
+				const FVector2D P0(Lo.X + (i + 0.5f) * RC, Lo.Y + (j + 0.5f) * RC);
+				if (!JeebWorld::NearRiver(P0.X, P0.Y, 450.f) && P0.Y - JeebWorld::CoastY(P0.X) < -200.f) continue;   // (cheap: far from any water)
+				if (!InRegion(P0) || JeebSteele::InBox(P0.X, P0.Y, -4000.f)) continue;
+				FRandomStream R(int32(HashCombine(GetTypeHash(i * 6151 + 29), GetTypeHash(j * 92821 + 7))) ^ 0x7EED);
+				const FVector2D P(P0.X + R.FRandRange(-0.45f, 0.45f) * RC, P0.Y + R.FRandRange(-0.45f, 0.45f) * RC);
+				float S;
+				if (!JeebWater::SurfaceAt(P.X, P.Y, S)) continue;
+				const float G = JeebTerrain::DrawnHeight(P.X, P.Y), Under = S - G;
+				const float Roll = R.FRand();
+				if (Under > -15.f && Under < 30.f)
+				{
+					if (Roll >= 0.42f * Density) continue;
+					if (JeebTerrain::PathClearance(P.X, P.Y) < 200.f || JeebFill::Covered(P.X, P.Y)) continue;
+					if (JeebOakHill::InBox(P.X, P.Y, 0.f) && JeebOakHill::OnBuilding(P.X, P.Y, 4.f)) continue;
+					for (int32 n = 0, Nn = 3 + R.RandRange(0, 4); n < Nn; ++n)
+					{
+						const FVector2D Q = P + FVector2D(R.FRandRange(-70.f, 70.f), R.FRandRange(-70.f, 70.f));
+						const float H = R.FRandRange(1.4f, 1.9f), W = R.FRandRange(0.9f, 1.2f);
+						Xf[R.FRand() < 0.55f ? B_Reed1 : B_Reed2].Add(FTransform(FRotator(R.FRandRange(-5.f, 5.f), R.FRandRange(0.f, 360.f), R.FRandRange(-5.f, 5.f)),
+							FVector(Q.X, Q.Y, JeebTerrain::DrawnHeight(Q.X, Q.Y) - 5.f), FVector(W, W, H)));
+						++NReed;
+					}
+				}
+				else if (Under > 50.f && Under < 140.f && Roll < 0.10f * Density)
+				{
+					bool bBank = false;   // (within 4 m of the bank: some ring point is dry)
+					for (int32 k = 0; k < 6 && !bBank; ++k)
+					{
+						const float Bx = P.X + Ring6[k].X * 400.f, By = P.Y + Ring6[k].Y * 400.f;
+						float Sb;
+						bBank = !JeebWater::SurfaceAt(Bx, By, Sb) || JeebTerrain::DrawnHeight(Bx, By) > Sb;
+					}
+					if (!bBank) continue;
+					for (int32 n = 0, Nn = 2 + R.RandRange(0, 4); n < Nn; ++n)
+					{
+						const FVector2D Q = P + FVector2D(R.FRandRange(-90.f, 90.f), R.FRandRange(-90.f, 90.f));
+						const float Sz = R.FRandRange(0.30f, 0.55f);
+						Xf[B_Pad].Add(FTransform(FRotator(0.f, R.FRandRange(0.f, 360.f), 0.f), FVector(Q.X, Q.Y, S + 0.8f), FVector(Sz, Sz, 0.012f)));
+						++NPad;
+					}
+				}
+			}
+	}
+
 #if !UE_BUILD_SHIPPING
 	// (test pictures: -BushLineupX=X -BushLineupY=Y puts one of each kind in a row 6 m apart along +X from there, plus a hedge, for a close look)
 	float X0 = 0.f, Y0 = 0.f;
@@ -225,6 +293,9 @@ void ABushes::Rebuild()
 		C->bAffectDistanceFieldLighting = false;
 		C->bAffectDynamicIndirectLighting = false;
 		C->RegisterComponent();
+		if (k == B_Pad)
+			if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"), nullptr, LOAD_Quiet | LOAD_NoWarn))
+				if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.10f, 0.26f, 0.07f));
 		C->AddInstances(Xf[k], false, true, false);
 		Sets.Add(C); SetReach.Add(Defs[k].Reach);
 		Total += Xf[k].Num();
@@ -233,6 +304,16 @@ void ABushes::Rebuild()
 	ApplyLook();
 	UE_LOG(LogTemp, Log, TEXT("JEEBBUSH wild bushes: %d instances (%d river and lake banks, %d forest edges, %d under the trees; %d tried, %d in a solid),%s; density %.2f, %.0f ms"),
 		Total, Where[0], Where[1], Where[2], Tried, Blocked, *List, Density, (FPlatformTime::Seconds() - T0) * 1000.0);
+	UE_LOG(LogTemp, Log, TEXT("JEEBREED reeds %d, lily pads %d"), NReed, NPad);
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot")))
+		for (int32 k : { (int32)B_Reed1, (int32)B_Pad })
+			for (int32 n = 0; n < FMath::Min(6, Xf[k].Num()); ++n)
+			{
+				const FVector L = Xf[k][(n * 7919 + 13) % Xf[k].Num()].GetLocation();
+				UE_LOG(LogTemp, Log, TEXT("JEEBREED spot %s %.0f %.0f %.0f (from the plaza %.0f m)"), Defs[k].Title, L.X, L.Y, L.Z, FVector2D::Distance(FVector2D(L), FVector2D(JeebOakHill::PosX, JeebOakHill::PosY)) / 100.f);
+			}
+#endif
 	// the towns' bushes, from the fill (its pieces with a /Game/Bushes mesh)
 	TMap<FString, int32> Town;
 	for (TActorIterator<AWorldFill> It(World); It; ++It)
