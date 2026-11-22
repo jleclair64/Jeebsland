@@ -490,8 +490,8 @@ void AKnightCharacter::UpdateAmulet()
 // The worn rings (2026-11-21, owner: "make sure the rings can be seen on the fingers"; they were never drawn since the old knight went): a band with its stone on
 // the back of a finger, on the hand bone's own frame (the gauntlet's fingers move with it; a fist turns them only a little), the first on his right hand, the second
 // on the left, a third beside the first. Every hand, open or fist, in every armour style and bare.
-static float RingFistAlong = 8.8f, RingFistPalm = -0.5f;   // (the closed hand's place, see UpdateRings)
-static float RingAlong = 9.5f, RingPalm = 0.f, RingAcross = 0.f, RingRad = 2.4f, RingThick = 0.7f;  // along the fingers from the wrist bone, off the hand's middle toward the palm, across the hand (cm); the band's radius and tube
+static float RingFistAlong = 8.8f, RingFistPalm = -0.5f, RingFistPalmR = 1.2f;   // (the sword fist is a thicker block than the shield fist: its band sits half sunk so it shows as an arch)   // (the closed hand's place, see UpdateRings)
+static float RingAlong = 9.5f, RingPalm = 0.f, RingAcross = 0.f, RingRad = 2.9f, RingThick = 0.8f;  // along the fingers from the wrist bone, off the hand's middle toward the palm, across the hand (cm); the band's radius and tube
 void AKnightCharacter::UpdateRings()
 {
 	if (!Skills || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
@@ -510,7 +510,7 @@ void AKnightCharacter::UpdateRings()
 			if (FParse::Value(FCommandLine::Get(), TEXT("RingTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
 			{ RingAlong = FCString::Atof(*V[0]) / 10.f; RingPalm = FCString::Atof(*V[1]) / 10.f; RingAcross = FCString::Atof(*V[2]) / 10.f; RingRad = FCString::Atof(*V[3]) / 10.f; RingThick = FCString::Atof(*V[4]) / 10.f; }
 		}
-		FString TF; TArray<FString> VF; if (FParse::Value(FCommandLine::Get(), TEXT("RingFist="), TF) && TF.ParseIntoArray(VF, TEXT("_")) == 2) { RingFistAlong = FCString::Atof(*VF[0]) / 10.f; RingFistPalm = FCString::Atof(*VF[1]) / 10.f; }
+		FString TF; TArray<FString> VF; if (FParse::Value(FCommandLine::Get(), TEXT("RingFist="), TF) && TF.ParseIntoArray(VF, TEXT("_")) == 2) { RingFistAlong = FCString::Atof(*VF[0]) / 10.f; RingFistPalm = RingFistPalmR = FCString::Atof(*VF[1]) / 10.f; }
 #endif
 		UMaterialInterface* Metal = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Metal.M_Metal"));
 		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
@@ -553,7 +553,7 @@ void AKnightCharacter::UpdateRings()
 			const float Across = RingAcross + (i == 2 ? 2.4f : 0.f);
 			KM::FMD Band, Stone;
 			KM::Torus(Band, RingRad, RingThick, 16, 8, 1.f, 1.f, KM::Xf(FVector::ZeroVector));
-			KM::Ellipsoid(Stone, RingThick * 1.5, RingThick * 1.3, RingThick * 1.2, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 0.9, 0.f, 0.f)));
+			KM::Ellipsoid(Stone, RingThick * 2.0, RingThick * 1.7, RingThick * 1.5, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 1.1, 0.f, 0.f)));
 			UProceduralMeshComponent* B = Proc(RingHand[Side], Band, Row.Band, 0.3f);
 			UProceduralMeshComponent* S = Proc(RingHand[Side], Stone, Row.Gem, 0.1f);
 			FRingSlot Slot; Slot.Band = B; Slot.Stone = S; Slot.Side = Side; Slot.Across = Across; RingSlots.Add(Slot);
@@ -563,7 +563,7 @@ void AKnightCharacter::UpdateRings()
 				{
 					KM::FMD B2, S2;
 					KM::Torus(B2, RingRad, RingThick, 16, 8, 1.f, 1.f, KM::Xf(FVector::ZeroVector));
-					KM::Ellipsoid(S2, RingThick * 1.5, RingThick * 1.3, RingThick * 1.2, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 0.9, 0.f, 0.f)));
+					KM::Ellipsoid(S2, RingThick * 2.0, RingThick * 1.7, RingThick * 1.5, 1.f, 1.f, 10, 7, KM::Xf(FVector(RingRad + RingThick * 1.1, 0.f, 0.f)));
 					UProceduralMeshComponent* Bb = Proc(RingHand[Side], B2, Row.Band, 0.3f);
 					UProceduralMeshComponent* Sb = Proc(RingHand[Side], S2, FLinearColor::MakeFromHSV8(uint8((k + 4) * 32), 255, 255), 0.1f);
 					FRingSlot Sl; Sl.Band = Bb; Sl.Stone = Sb; Sl.Side = Side; Sl.Across = Across; Sl.AlongAdd = float(k); RingSlots.Add(Sl);
@@ -583,7 +583,7 @@ void AKnightCharacter::UpdateRings()
 		const FVector Cx = FVector::CrossProduct(A, N).GetSafeNormal() * (Slot.Side == 0 ? 1.f : -1.f);
 		const FVector U = -N;   // (measured on pictures 2026-11-22: the closed gauntlet's knuckles lie on the hand's own line, so the band keeps the open hand's turn)
 		const FVector T = A;
-		const FVector POpen = A * (RingAlong + Slot.AlongAdd) + N * RingPalm, PFist = A * (RingFistAlong + Slot.AlongAdd) + N * RingFistPalm;
+		const FVector POpen = A * (RingAlong + Slot.AlongAdd) + N * RingPalm, PFist = A * (RingFistAlong + Slot.AlongAdd) + N * (Slot.Side == 0 ? RingFistPalmR : RingFistPalm);
 		const FVector Axis = FMath::Lerp(A, T, W).GetSafeNormal(), Out = FMath::Lerp(-N, U, W).GetSafeNormal();
 		const FQuat Q = FRotationMatrix::MakeFromZX(Axis, Out).ToQuat();
 		const FVector Pos = FMath::Lerp(POpen, PFist, W) + Cx * Slot.Across;
