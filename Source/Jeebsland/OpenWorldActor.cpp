@@ -249,6 +249,7 @@ namespace
 			if (!S.IsValidIndex(N)) return;
 			const FVector2D Out = (S[N].Pos - S[N].House).GetSafeNormal();   // (away from the house, on the far side of the middle)
 			const FVector2D At = S[N].Pos + Out * (S[N].Radius + 1200.f);
+			UE_LOG(LogTemp, Display, TEXT("JEEBGOTOWN %d: site middle %.0f %.0f, knight at %.0f %.0f"), N + 1, S[N].Pos.X, S[N].Pos.Y, At.X, At.Y);   // (for -ShotEyes coordinates)
 			GoTo(W, At, FMath::RadiansToDegrees(FMath::Atan2(-Out.Y, -Out.X)));
 		}));
 	FAutoConsoleCommandWithWorld GoPeak(TEXT("jeeb.Test.GoPeak"), TEXT("Test: puts your knight high on the northern range, looking south over the map (single player)"),

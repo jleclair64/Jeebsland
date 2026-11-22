@@ -23,6 +23,8 @@ Before any large task or batch, recommend a model and effort, balancing usage ag
 
 ## Ending a session
 
+**File cleanup** (owner, 2026-11-22; C: once hit 98% full from 47 agent copies at 3-11 GB each): after merging an agent's branch, remove its copy (`bash Tools/AgentCopy.sh remove NAME`) unless the next batch reuses it. At every session end, run a file review: `df -h /c`, list `../JeebsAgents` (remove every merged copy not in use), delete `Saved/Shots`, `Saved/Review`, `Saved/StagedBuilds`, `Saved/Cooked`, scratch files and packages older than the trusted one, then report what was freed. If `remove` stops on a Fab pack folder that is a real folder rather than a link (old copies), check the copy has no links inside (`Get-ChildItem -Recurse -Attributes ReparsePoint`) and delete it with `Remove-Item`.
+
 When the owner says goodbye or goodnight, first ask if they'd like you to commit and refresh "Current state" below for their next chat. If yes: update it (what was just done, what's unfinished, known issues, decisions), remove stale lines, keep it to about a screen, move anything historical into `Docs/ProjectNotes.md`, and commit. In the same question, ask whether to repackage (only if code or content changed since the last package; then make `Packaged/Jeebsland.zip` without the `.pdb`, and remind them to restart the worlds with `Tools/HostWorlds.bat` and send friends the new zip).
 
 ## Current state (2026-11-21)
