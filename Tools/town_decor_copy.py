@@ -269,9 +269,9 @@ for n in names:
                 EAL.delete_asset(mi_path)
             new_mi = tools.create_asset(mi_name, DST, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
             MEL.set_material_instance_parent(new_mi, parents[mi_two])
-            for p in ("BaseTex", "MRTex", "NormalTex"):
+            for p in ("BaseTex", "MRTex", "NormalTex", "GlowMaskTex"):
                 t = MEL.get_material_instance_texture_parameter_value(mi, p)
-                if t is None:
+                if t is None or (p == "GlowMaskTex" and not t.get_path_name().startswith(SRC + "/")):   # (the glow mask only where the lamp has its own; the parent's white otherwise)
                     continue
                 tname = t.get_name()
                 tpath = DST + "/" + tname
