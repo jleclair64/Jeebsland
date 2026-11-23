@@ -376,6 +376,7 @@ public:
 	void BeginCastCharge(int32 Slot = 0);   // Slot: which of the active row's three spells (the server is told first: EInvOp::CastSlot)
 	void ReleaseCastCharge();
 	void CancelCastCharge();
+	bool bCastQueued = false; float QueuedCastCharge = 0.f;   // (a cast let go mid-cast: TickWizard starts it when the last one ends)
 	UFUNCTION(Server, Reliable) void ServerCastCharge(bool bOn);
 	bool bCastCharging = false;                // this machine: the player holding the button (or, on the server, as he told us)
 	double CastChargeStart = 0.0;              // world seconds it began (each machine its own clock)

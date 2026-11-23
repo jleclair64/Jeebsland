@@ -182,6 +182,12 @@ void AKnightCharacter::TickWizard(float Dt)
 		}
 	}
 #endif
+	if (bCastQueued && IsLocallyControlled() && !bAttacking)   // (a spell let go mid-cast: ReleaseCastCharge)
+	{
+		bCastQueued = false;
+		const int32 QK = SelectedKind();
+		if ((QK == JeebItems::K_Wand || QK == JeebItems::K_Staff) && !bDrinking && !bKnockedDown && !IsUIOpen() && !bPanelCursor) StartAttack(EAtkStyle::Cast, 1, QueuedCastCharge);
+	}
 	if (IsNetMode(NM_DedicatedServer)) return;
 	const auto& T = JeebTune::V();
 	// The orb: grows out of him as the guard comes up, a slow breath while held

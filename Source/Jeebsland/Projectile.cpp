@@ -363,13 +363,13 @@ void AProjectile::Tick(float DeltaSeconds)
 		Body->SetRelativeScale3D(FVector(FMath::Max(Len, 1.f) / 100.f, 0.075f * Sz, 0.075f * Sz));
 		if (Fletch) Fletch->SetRelativeScale3D(FVector(0.24f * Sz * (1.f + 0.12f * FMath::Sin(Travelled * 0.05f))));
 		// (2026-11-22, owner: "sort of like a bottle rocket with a sparkly/smokey trail") sparks in the spell's colour and soft puffs of smoke
-		// left hanging in the air behind it, each gone within about 0.8 s (SpellFx Spark / Smoke); none in its first metre (the hand)
+		// left hanging in the air behind it, each gone within about 0.8 s (SpellFx Spark / Smoke; about 20 alive per bolt at the staff's speed); none in its first metre (the hand)
 		if (Travelled > 100.f)
 		{
 			const FLinearColor Col = JeebSpells::Get(L.Spell).Color;
 			const FVector Back = -Velocity.GetSafeNormal();
-			if (Travelled - SparkAt >= 60.f) { SparkAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Spark, GetActorLocation() + Back * 20.f, Back, Col); }
-			if (Travelled - SmokeAt >= 150.f) { SmokeAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Smoke, GetActorLocation() + Back * 40.f, Back, Col); }
+			if (Travelled - SparkAt >= 200.f) { SparkAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Spark, GetActorLocation() + Back * 20.f, Back, Col); }
+			if (Travelled - SmokeAt >= 350.f) { SmokeAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Smoke, GetActorLocation() + Back * 40.f, Back, Col); }
 		}
 	}
 	if (L.bBolt && Travelled > L.Range) { if (bAuth) Destroy(); else Wait(); }   // (bolts fade out at their range; arrows fly on until they land)

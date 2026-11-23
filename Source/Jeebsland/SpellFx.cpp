@@ -53,7 +53,7 @@ void ASpellFx::Start()
 	case ESpellFx::Muzzle: Life = 0.14f; Add(0.22f); break;
 	case ESpellFx::Spark:
 		Life = 0.6f;
-		for (int32 i = 0; i < 3; ++i) { FBit& S = Add(R.FRandRange(0.012f, 0.025f)); S.Kind = 2; S.V = (Dir * 0.6f + R.GetUnitVector()).GetSafeNormal() * R.FRandRange(60.f, 180.f); }
+		for (int32 i = 0; i < 2; ++i) { FBit& S = Add(R.FRandRange(0.02f, 0.035f)); S.Kind = 2; S.V = (Dir * 0.6f + R.GetUnitVector()).GetSafeNormal() * R.FRandRange(60.f, 180.f); }
 		break;
 	case ESpellFx::Smoke:
 		Life = 0.8f;

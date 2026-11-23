@@ -163,6 +163,8 @@ void AKnightCharacter::ReleaseCastCharge()
 	const float C = CastChargeFrac();
 	CancelCastCharge();
 	const int32 K = SelectedKind();
+	// (2026-11-22) a spell let go while the last cast still plays is kept and cast as soon as it ends (TickWizard), not dropped
+	if ((K == JeebItems::K_Wand || K == JeebItems::K_Staff) && bAttacking && AtkStyle == EAtkStyle::Cast && !bDrinking && !bKnockedDown) { bCastQueued = true; QueuedCastCharge = C; return; }
 	if (!(K == JeebItems::K_Wand || K == JeebItems::K_Staff) || bAttacking || bDrinking || bKnockedDown || IsUIOpen() || bPanelCursor) return;
 	StartAttack(EAtkStyle::Cast, 1, C);
 }
