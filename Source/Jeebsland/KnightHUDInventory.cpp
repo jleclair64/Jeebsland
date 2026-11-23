@@ -266,7 +266,11 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 	}
 	if (!bCursor) { bGreyGlass = false; return; }
 
+	// The wizard's APPAREL / SPELL BOOK tabs over the window above the inventory (2026-11-22, KnightHUDSpells.cpp): the book takes the apparel's place
+	const bool bBook = Knight->IsWizard() && DrawSpellTabs(Knight, IX, IY, PW);
+
 	// ================= Armor (just above the inventory) =================
+	if (!bBook)
 	{
 		// Laid out like the knight himself: helmet on top; gauntlets, chest and shoulders across the middle; boots below,
 		// with the cape beside them (the shield lives in the slot at the end of the weapon bar). The three miscellaneous slots run down the right edge.
@@ -355,6 +359,8 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			Guard > 0 ? FString::Printf(TEXT("Shield health %d of %d. It heals faster the higher your Defence level"), FMath::RoundToInt(Knight->GetGuardFraction() * Knight->GetGuardMax()), Guard) : FString(TEXT("No shield ready")),
 			FString::Printf(TEXT("Armour weight %s: %d%% slower"), *WeightText(TotalWeight(Skills)), FMath::RoundToInt(WeightSlow(TotalWeight(Skills)) * 100.f)) });
 	}
+
+	if (Knight->IsWizard()) ArmorTopY = SpellTabsTop;   // (the windows above clear the spell tabs too)
 
 	// ================= Skills (down the left side of the screen) =================
 	{

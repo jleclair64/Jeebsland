@@ -2,6 +2,7 @@
 #include "SkillComponent.h"
 #include "Inventory.h"
 #include "Lore.h"
+#include "JeebSpells.h"
 #include "QuestComponent.h"
 #include "FastTravel.h"
 #include "Kismet/GameplayStatics.h"
@@ -79,6 +80,9 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->LoreFound = Skills->LoreFound;
 	S->Explored = Skills->Explored;
 	S->LastGambleHour = Skills->LastGambleHour;
+	S->SpellLevels = Skills->SpellLevels;
+	S->SpellEquip = Skills->SpellEquip;
+	S->SpellPick = Skills->SpellPick;
 	if (const UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Capture(S->QuestKeys, S->QuestSteps, S->QuestCounts, S->QuestDone);
 	if (const UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Capture(S->TownsVisited);
 	if (Body)
@@ -133,6 +137,14 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->LastGambleHour = LastGambleHour;
 	if (UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Restore(QuestKeys, QuestSteps, QuestCounts, QuestDone);
 	if (UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Restore(TownsVisited, TownsVisited.Num() == 0);
+	Skills->SpellLevels = SpellLevels;
+	Skills->SpellLevels.SetNum(FMath::Min(SpellLevels.Num(), JeebSpells::Num()));
+	for (uint8& Lv : Skills->SpellLevels) Lv = uint8(FMath::Min<int32>(Lv, 20));
+	Skills->SpellEquip = SpellEquip;
+	Skills->SpellEquip.SetNum(USkillComponent::SpellRows * USkillComponent::SpellSlots);
+	for (uint8& E : Skills->SpellEquip) if (E > JeebSpells::Num()) E = 0;
+	Skills->SpellPick = uint8(FMath::Clamp(SpellPick, 0, USkillComponent::SpellRows - 1));
+	Skills->EnsureStarterSpells();   // TEMPORARY (test setup): every spell learned
 	Skills->StowRetiredGear();   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
 	return true;
 }

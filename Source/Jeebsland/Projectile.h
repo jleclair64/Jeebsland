@@ -27,6 +27,7 @@ struct FProjLaunch
 	UPROPERTY() uint8 Seq = 0;
 	UPROPERTY() float Sag = 300.f;   // cm/s/s it drops (a weakly drawn arrow drops fast and lands close)
 	UPROPERTY() float Straight = 0.f;   // cm it flies dead straight before it starts to drop (a full draw, Breath of the Wild style)
+	UPROPERTY() uint8 Spell = 0;   // a bolt's spell: its row in Content/Data/Spells.csv (its colour and look, JeebSpells.h)
 };
 
 // Where an arrow ended up (owner, 2026-10-31): stuck in the ground, a tree, a shield or a body for StuckSeconds. On (with Comp)
@@ -60,6 +61,8 @@ public:
 
 	// What the reticle is on: how far along A..B (0..1; 2 = nothing) the first body or raised shield with hit boxes lies, other
 	// than Ignore. (Knights and foes are not solid to the world's traces, so aiming with a trace alone looks straight through them.)
+	void SetSpell(int32 Row) { L.Spell = uint8(FMath::Clamp(Row, 0, 255)); }   // (server, before Launch: which spell a bolt is)
+
 	static float FirstBodyAlong(UWorld* World, const FVector& A, const FVector& B, const AActor* Ignore);
 
 	virtual void Tick(float DeltaSeconds) override;
@@ -104,6 +107,7 @@ private:
 	bool bSpent = false;          // glanced off a shield: no damage, and no picking it up
 	FVector Velocity = FVector::ZeroVector;
 	float Travelled = 0.f;
+	float SparkAt = 0.f, SmokeAt = 0.f;   // (a bolt's bottle-rocket trail: the distance flown at the last spark and puff, players' machines)
 	int32 Damage = 1;
 public:
 	float GuardMul = 1.f;   // x what it takes out of a raised shield's guard (server)

@@ -5,6 +5,7 @@
 #include "WaterLook.h"
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
+#include "SkillComponent.h"
 #include "GearWall.h"
 #include "FillerLineup.h"
 #include "TreeGroves.h"
@@ -1099,6 +1100,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotRingB="), ShotRingB) && ShotRingB >= 0) S->RingB = JeebItems::GearId(JeebItems::K_Ring, ShotRingB);
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
+				// (2026-11-22: -ShotSpellBook opens the wizard's spell book tab, with -ShotPanel; -ShotSpell=<F slot> picks the spell cast next)
+				if (FParse::Param(FCommandLine::Get(), TEXT("ShotSpellBook")))
+					if (APlayerController* SPC = Cast<APlayerController>(K->GetController()))
+						if (AKnightHUD* H = Cast<AKnightHUD>(SPC->GetHUD())) H->ShotOpenSpellBook();
+				int32 ShotSpell = -1;
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotSpell="), ShotSpell)) { S->EnsureStarterSpells(); S->SetSpellCell(1, 2); S->SetSpellCell(3, 2); S->PickSpellRow(ShotSpell); }   // (Fire Bolt in row 1 slot 2 and row 2 slot 1)
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
 			}
 #if !UE_BUILD_SHIPPING

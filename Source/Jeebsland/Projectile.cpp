@@ -1,5 +1,6 @@
 #include "Projectile.h"
 #include "SpellFx.h"
+#include "JeebSpells.h"
 #include "JeebProps.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
@@ -25,7 +26,7 @@
 
 // The magic bolt's look, live in Play (read as each bolt is cast). 2026-11-18 second review: its light lit a pool about 3 m wide at dusk
 // (700 out to 320 cm); now a tight glow round the bolt and the hand that cast it.
-static const FLinearColor BoltGem(0.1f, 0.45f, 1.f);   // (2026-11-22: one blue spell for the staff and the wand)
+// (2026-11-22: a bolt's colour and look come from its spell's row in Content/Data/Spells.csv, L.Spell: the blue Arcane Bolt, the red Fire Bolt)
 static TAutoConsoleVariable<float> CVarBoltLight(TEXT("jeeb.Magic.BoltLight"), 150.f, TEXT("Brightness of the light a magic bolt carries (was 700; 0 = no light)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBoltLightRadius(TEXT("jeeb.Magic.BoltLightRadius"), 90.f, TEXT("How far (cm) a magic bolt's light reaches (was 320)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 0.9f, TEXT("Brightness on screen of the magic bolt's orb (M_GlowOrb Strength, exposure-locked since 2026-11-19: the same by day and at dusk; was 4 on the scene's scale, a white blob)."), ECVF_Default);
@@ -144,7 +145,14 @@ void AProjectile::ApplyLaunch()
 		// a white-hot core, a soft blue halo round it (Fletch) and a streak of light trailing behind (Body, a ball stretched along the flight,
 		// growing with the distance flown so it never pokes back through the caster: TickBoltLook), a flash as it leaves and a burst where it
 		// lands (SpellFx.cpp). /Game/Props/M_GlowOrb, unlit and additive; the old flat paint if it is missing.
-		const FLinearColor Gem = BoltGem;
+		// (2026-11-22, owner: a second spell "a different color like yellow or red": the Fire Bolt, a bigger ball with a yellow-hot core and
+		// an orange halo; its size and colour from Spells.csv)
+		const JeebSpells::FSpell& Sp = JeebSpells::Get(L.Spell);
+		const bool bFireSpell = Sp.Look == JeebSpells::Look_Fire;
+		const FLinearColor Gem = Sp.Color;
+		const float Sz = Sp.Size;
+		Head->SetRelativeScale3D(FVector(0.11f * Sz));
+		UE_LOG(LogTemp, Log, TEXT("JEEBSPELL bolt seen: %s (row %d) colour %s, cast by %s"), *Sp.Name, int32(L.Spell), *Gem.ToString(), Shooter ? *Shooter->GetName() : TEXT("?"));
 		UMaterialInterface* OrbMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Props/M_GlowOrb.M_GlowOrb"));
 		if (OrbMat)
 		{
@@ -160,10 +168,10 @@ void AProjectile::ApplyLaunch()
 					M->SetScalarParameterValue(TEXT("Strength"), Strength);
 				}
 			};
-			Glowing(Head, FMath::Lerp(Gem, FLinearColor::White, 0.6f), G * 1.6f);
-			Glowing(Fletch, Gem, G * 0.55f);
+			Glowing(Head, bFireSpell ? FLinearColor(1.f, 0.85f, 0.35f) : FMath::Lerp(Gem, FLinearColor::White, 0.6f), G * 1.6f);
+			Glowing(Fletch, Gem, G * (bFireSpell ? 0.7f : 0.55f));
 			Fletch->SetRelativeLocationAndRotation(FVector::ZeroVector, FRotator::ZeroRotator);
-			Fletch->SetRelativeScale3D(FVector(0.24f));
+			Fletch->SetRelativeScale3D(FVector(0.24f * Sz));
 			Glowing(Body, Gem, G * 0.7f);
 			Body->SetRelativeRotation(FRotator::ZeroRotator);
 			Body->SetRelativeScale3D(FVector(0.001f));
@@ -218,7 +226,7 @@ void AProjectile::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const bool bRock = JeebItems::IsRock(L.ArrowId);   // (a thrown rock: no streak, it tumbles, it bounces off what it hits)
-	if (!IsNetMode(NM_DedicatedServer) && !L.bBolt && !bRock) TickTrail();
+	if (!IsNetMode(NM_DedicatedServer)) TickTrail();   // (2026-11-22, owner: the white movement line on spells and the troll's rock too)
 	if (!bFlying || IsHidden()) return;
 	if (Travelled >= L.Straight) Velocity.Z -= L.Sag * DeltaSeconds;   // (a full draw: none at all for its first L.Straight)
 	const FVector From = GetActorLocation();   // (the tip)
@@ -227,7 +235,12 @@ void AProjectile::Tick(float DeltaSeconds)
 	// (a player's copy just stops and waits: the server says where it ended up, or relaunches it off a shield)
 	auto Wait = [this]() { bFlying = false; SetActorHiddenInGame(true); };
 	const FVector Dir = Velocity.GetSafeNormal();
-	auto BoltBurst = [&](const FVector& P) { if (L.bBolt && !IsNetMode(NM_DedicatedServer)) ASpellFx::Play(GetWorld(), ESpellFx::Burst, P, Dir, BoltGem); };   // (2026-11-22: a burst where a spell lands)
+	auto BoltBurst = [&](const FVector& P)
+	{
+		if (!L.bBolt || IsNetMode(NM_DedicatedServer)) return;
+		const JeebSpells::FSpell& Sp = JeebSpells::Get(L.Spell);
+		ASpellFx::Play(GetWorld(), Sp.Look == JeebSpells::Look_Fire ? ESpellFx::FireBurst : ESpellFx::Burst, P, Dir, Sp.Color);
+	};   // (2026-11-22: a burst where a spell lands)
 
 	// Anything with hit boxes along the way (HitBoxes.h): a raised shield's wedge first, then the body. Whatever the tip meets first.
 	if (!bSpent)
@@ -344,10 +357,20 @@ void AProjectile::Tick(float DeltaSeconds)
 	else SetActorRotation(Velocity.Rotation());
 	if (L.bBolt && !IsNetMode(NM_DedicatedServer) && Body && Body->IsVisible())   // (2026-11-22: the streak behind the spell, up to 90 cm, and the halo's shimmer)
 	{
-		const float Len = FMath::Min(Travelled, 90.f);
+		const float Sz = JeebSpells::Get(L.Spell).Size;
+		const float Len = FMath::Min(Travelled, 90.f * Sz);
 		Body->SetRelativeLocation(FVector(-Len * 0.5f, 0.f, 0.f));
-		Body->SetRelativeScale3D(FVector(FMath::Max(Len, 1.f) / 100.f, 0.075f, 0.075f));
-		if (Fletch) Fletch->SetRelativeScale3D(FVector(0.24f * (1.f + 0.12f * FMath::Sin(Travelled * 0.05f))));
+		Body->SetRelativeScale3D(FVector(FMath::Max(Len, 1.f) / 100.f, 0.075f * Sz, 0.075f * Sz));
+		if (Fletch) Fletch->SetRelativeScale3D(FVector(0.24f * Sz * (1.f + 0.12f * FMath::Sin(Travelled * 0.05f))));
+		// (2026-11-22, owner: "sort of like a bottle rocket with a sparkly/smokey trail") sparks in the spell's colour and soft puffs of smoke
+		// left hanging in the air behind it, each gone within about 0.8 s (SpellFx Spark / Smoke; about 20 alive per bolt at the staff's speed); none in its first metre (the hand)
+		if (Travelled > 100.f)
+		{
+			const FLinearColor Col = JeebSpells::Get(L.Spell).Color;
+			const FVector Back = -Velocity.GetSafeNormal();
+			if (Travelled - SparkAt >= 200.f) { SparkAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Spark, GetActorLocation() + Back * 20.f, Back, Col); }
+			if (Travelled - SmokeAt >= 350.f) { SmokeAt = Travelled; ASpellFx::Play(GetWorld(), ESpellFx::Smoke, GetActorLocation() + Back * 40.f, Back, Col); }
+		}
 	}
 	if (L.bBolt && Travelled > L.Range) { if (bAuth) Destroy(); else Wait(); }   // (bolts fade out at their range; arrows fly on until they land)
 }
@@ -476,7 +499,7 @@ void AProjectile::TickTrail()
 	if (bFlying && !IsHidden())
 	{
 		static constexpr float TrailSkip = 220.f, TrailRamp = 45.f;
-		const FVector Tail = GetActorLocation() - GetActorForwardVector() * 68.f * GetActorScale3D().X;
+		const FVector Tail = GetActorLocation() - GetActorForwardVector() * (L.bBolt ? 0.f : JeebItems::IsRock(L.ArrowId) ? 8.f : 68.f * GetActorScale3D().X);
 		if (TrailFlown < 0.f) { TrailFlown = 0.f; TrailLast = Tail; TrailLastT = Now; }
 		const float Step = FVector::Dist(Tail, TrailLast), From = TrailFlown, To = From + Step;
 		auto AddAt = [&](float D)
