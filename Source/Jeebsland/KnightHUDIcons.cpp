@@ -495,6 +495,28 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Quad(29, 41, 35, 49, Tr);
 			break;
 		case K_Book:   // (the wizard's spell book: a closed cover, its spine, a clasp and a round emblem)
+			if (StyleOf(Id) == WO_Ball)   // (2026-11-22: the crystal ball: a blue-violet glass ball with a swirl and a glint, over a soft glow)
+			{
+				DiscP(32, 54, 14, 4, FLinearColor(0.30f, 0.45f, 1.f, 0.45f));
+				DiscP(32, 29, 21, 21, FLinearColor(0.22f, 0.30f, 0.85f));
+				DiscP(32, 29, 17, 17, FLinearColor(0.45f, 0.52f, 1.f));
+				DiscP(29, 32, 9, 6, FLinearColor(0.72f, 0.55f, 1.f));
+				DiscP(34, 26, 5, 4, FLinearColor(0.85f, 0.95f, 1.f));
+				DiscP(24, 20, 3, 3, FLinearColor(1.f, 1.f, 1.f));
+				break;
+			}
+			if (StyleOf(Id) == WO_Pipe)   // (the pipe: a long curved brown stem, a round bowl with a gold rim and band, a wisp of smoke)
+			{
+				const FLinearColor Pw(0.40f, 0.22f, 0.10f), Gd(0.95f, 0.75f, 0.25f);
+				Poly({ P(6, 14), P(10, 11), P(30, 36), P(36, 40), P(33, 45), P(26, 40) }, Pw);
+				Quad(29, 36, 35, 41, Gd);
+				DiscP(43, 44, 11, 11, Pw);
+				DiscP(43, 35, 10, 3, Gd);
+				DiscP(43, 35, 7, 2, FLinearColor(0.08f, 0.05f, 0.03f));
+				DiscP(46, 22, 4, 4, FLinearColor(0.85f, 0.85f, 0.88f, 0.6f));
+				DiscP(41, 14, 5, 4, FLinearColor(0.85f, 0.85f, 0.88f, 0.45f));
+				break;
+			}
 			Quad(14, 9, 50, 55, Pl);
 			Quad(14, 9, 21, 55, Dk);
 			Quad(40, 28, 50, 36, Tr);

@@ -861,6 +861,18 @@ static void ShotEyesSet(APlayerController* PC, int32 EyeIdx)
 			}
 			continue;
 		}
+		if (Name == TEXT("offhand"))   // (2026-11-22: offhand=<0 book, 1 crystal ball, 2 pipe, -1 none> in the wizard's book slot, tin)
+		{
+			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
+			if (USkillComponent* S = K ? K->GetSkills() : nullptr)
+			{
+				const int32 St = FCString::Atoi(*Val);
+				S->Worn[JeebItems::K_Book] = St < 0 ? 0 : JeebItems::WizOffId(FMath::Clamp(St, 0, JeebItems::NumWizOffStyles - 1), 0);
+				S->OnGearChanged.Broadcast();
+				UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d offhand %s"), EyeIdx, *Val);
+			}
+			continue;
+		}
 		if (Name == TEXT("wear"))
 		{
 			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);

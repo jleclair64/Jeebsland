@@ -733,6 +733,15 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	if (Act == 0 && StateKey >= 100 && StateKey < 130) BlendFor = StateKey == 106 ? 0.7f : bMoving ? 0.3f : 0.45f;   // (out of an emote: up off the ground slowly; walking off, quicker)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
 	StaffCarry(In, Base, Act, Dt);   // (the staff upright at his side, before the blend so every change of state eases: KnightAnimatorCast.cpp)
+	// (2026-11-22) the wizard's off-hand item held out on his palm: a fixed pose (WizHoldArm), so walking and running never swing it; over every clip
+	// but his attacks and moves (a cast keeps it through PlayKeepOffArm)
+	WizHoldW = FMath::FInterpTo(WizHoldW, In.bWizHold && Act == 0 ? 1.f : 0.f, Dt, 7.f);
+	if (WizHoldW > 0.005f)
+	{
+		const int32 Arm[4] = { LShoulder, LArm, LFore, LHand };
+		for (int32 i = 0; i < 4; ++i) Base.Rot[Bone[Arm[i]]] = Nlerp(Base.Rot[Bone[Arm[i]]], L.WizHoldArm[i], WizHoldW);
+	}
+	if (In.bShotLog && In.bWizHold) { static int32 N = 0; if (++N % 120 == 1) UE_LOG(LogTemp, Log, TEXT("JEEBWIZHOLD w %.2f act %d"), WizHoldW, Act); }
 
 	if (!ForcedClip.IsEmpty())
 	{
@@ -1999,6 +2008,31 @@ void FClipLib::SolveGear()
 			Face = Roll.RotateVector(Face);
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Roll.RotateVector(FVector::UpVector)).ToQuat();
 			ShieldAtGuard = FTransform(Q, FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.72f) + Face * OutFromFore - Q.RotateVector(Strap)) * Fore.Inverse();
+		}
+		// The wizard's off hand held out (2026-11-22, owner: the book "open and held upright in his left hand", the crystal ball "floats above his open left hand",
+		// with pictures of wizards holding a book or an orb out on an open palm): the upper arm down by his side and a little forward, the forearm forward and
+		// rising a touch, in a little toward his middle, and the hand turned palm up (its thumb out to his left). A fixed pose (WizHoldArm), so walking and
+		// running never swing it; what sits on the palm is placed by AKnightCharacter::PlaceWizardOffHand.
+		{
+			if (RestC) Sample(*RestC, 0.f, P, false);
+			auto ToMesh = [](const FVector& G) { return FVector(-G.Y, G.X, G.Z); };   // (game frame to mesh frame)
+			FVector ArmGame(0.22f, -0.30f, -0.93f), ForeGame(0.86f, 0.22f, 0.30f);
+			FString S; TArray<FString> Pr;   // (test pictures: -WizHoldTune=ArmX_ArmY_ArmZ_ForeX_ForeY_ForeZ)
+			if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("WizHoldTune="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
+			{ ArmGame = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2])); ForeGame = FVector(FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4]), FCString::Atof(*Pr[5])); }
+			const FVector ArmDir = ToMesh(ArmGame.GetSafeNormal()), ForeDir = ToMesh(ForeGame.GetSafeNormal());
+			TurnInMesh(P, LArm, FQuat::FindBetweenNormals((BonePos(P, LFore) - BonePos(P, LArm)).GetSafeNormal(), ArmDir));
+			TurnInMesh(P, LFore, FQuat::FindBetweenNormals((BonePos(P, LHand) - BonePos(P, LFore)).GetSafeNormal(), ForeDir));
+			if (RefRot.IsValidIndex(Bone[LHand])) P.Rot[Bone[LHand]] = RefRot[Bone[LHand]];   // (a straight wrist, as at bind: the rest clip's hand bends up)
+			FQuat LR;
+			BonePos(P, LHand, &LR);
+			FVector Thumb = LR.RotateVector(LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1)));
+			Thumb = (Thumb - ForeDir * FVector::DotProduct(Thumb, ForeDir)).GetSafeNormal();
+			const FVector OutL = ToMesh(FVector(0.f, -1.f, 0.f));
+			const FVector Want = (OutL - ForeDir * FVector::DotProduct(OutL, ForeDir)).GetSafeNormal();   // (thumb out to his left: the palm faces up)
+			TurnInMesh(P, LFore, FQuat(ForeDir, FMath::Atan2(float(FVector::DotProduct(FVector::CrossProduct(Thumb, Want), ForeDir)), float(FVector::DotProduct(Thumb, Want)))));
+			const int32 Arm[4] = { LShoulder, LArm, LFore, LHand };
+			for (int32 i = 0; i < 4; ++i) WizHoldArm[i] = P.Rot[Bone[Arm[i]]];
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing straight ahead, tilted back a touch, in the middle of his chest
 			if (const FMove* M = Moves.Find(TEXT("Block")))

@@ -21,8 +21,8 @@ os.makedirs(OUT, exist_ok=True)
 TEX = 2048
 ZCUT = {"Base": 0.345, "Robe": 0.345}    # (m) the boot line on each body: below it is the Feet slot
 HAND_SCALE = 0.8      # his hands, about the wrist (Meshy drew them big)
-HAT_WIDTH = 0.80      # (m) the brim's width on his head
-HAT_DROP = 0.105      # (m) how far the brim's plane sits under the top of his head
+HAT_WIDTH = 0.56      # (m) the brim's width on his head (owner 2026-11-22: "about 30% smaller", was 0.80)
+HAT_DROP = 0.085     # (m) how far the brim's plane sits under the top of his head
 HAT_YAW = 0.0         # (degrees) turns the hat about the upright
 HAT_TILT = -8.0       # (degrees) tips it back
 BOOK_LONG = 0.25      # (m) the book's long side
@@ -58,9 +58,29 @@ def save_pics(ob, tag):
         kind = tex_kind(mat, n)
         if not kind: continue
         c = n.image.copy(); c.scale(TEX, TEX)
+        if kind == "Base" and tag in NAVY_ON: navy(c)
         c.filepath_raw = os.path.join(OUT, "T_Wiz_%s_%s.png" % (tag, kind)); c.file_format = "PNG"; c.save()
         bpy.data.images.remove(c)
     return mat
+
+NAVY_ON = ("Robe", "Hat")   # (owner 2026-11-22: "less bright blue, somewhere between this current color and navy blue. Keep the gold trim.")
+NAVY_HUE = (185.0, 265.0)   # (degrees) the blues that are darkened; the gold trim (about 40) and the skin are left as they are
+NAVY_VAL, NAVY_SAT = 0.50, 1.10
+def navy(img):
+    import numpy as np
+    px = np.empty(len(img.pixels), dtype=np.float32); img.pixels.foreach_get(px)
+    a = px.reshape(-1, 4); rgb = a[:, :3]
+    mx = rgb.max(1); mn = rgb.min(1); d = mx - mn; dd = np.maximum(d, 1e-6)
+    r, g, b = rgb[:, 0], rgb[:, 1], rgb[:, 2]
+    h = np.where(d < 1e-6, 0, np.where(mx == r, ((g - b) / dd) % 6, np.where(mx == g, (b - r) / dd + 2, (r - g) / dd + 4))) * 60.0
+    s = np.where(mx > 0, d / np.maximum(mx, 1e-6), 0)
+    # eased in over the hue and saturation edges so no seam shows where blue meets grey or purple
+    e = np.clip(np.minimum(h - NAVY_HUE[0], NAVY_HUE[1] - h) / 15.0, 0, 1) * np.clip((s - 0.18) / 0.1, 0, 1)
+    v2 = mx * (1 - (1 - NAVY_VAL) * e); s2 = np.minimum(1, s * (1 + (NAVY_SAT - 1) * e))
+    nmin = v2 * (1 - s2); frac = np.where(d[:, None] > 1e-6, (rgb - mn[:, None]) / dd[:, None], 0)
+    rgb[:] = nmin[:, None] + frac * (v2 - nmin)[:, None]
+    img.pixels.foreach_set(a.ravel())
+    print("WIZ navy on %s: %.0f%% of pixels" % (img.name, 100.0 * (e > 0.5).mean()))
 
 def flatten(ob):
     """The mesh in world space, with no parent."""
@@ -83,6 +103,134 @@ def split_slots(ob, mat, names, pick):
     for p in ob.data.polygons:
         p.material_index = pick(p); cnt[p.material_index] += 1
     print("WIZ slots", dict(zip(names, cnt)))
+
+ARM_PIT = 0.06    # (m) torso points this far in from the upper arm's line lose its weights, eased over ARM_EASE
+ARM_EASE = 0.07
+SHARD_INNER, SHARD_NEAR, SHARD_RINGS = 0.27, 0.012, 3   # (m, m, times)
+HAND_DOWN, HAND_RADIUS, HAND_INNER = 0.10, 0.13, 0.31
+LEFTOVER_INNER = 0.26   # (m) hand leftovers lie this far or more out from his middle; the robe's side stays inside   # (m) the palm's middle under the wrist, how far round it fingers reach, and how far out from his middle a finger point lies (the robe stays inside)
+def clean_weights(ob, gname):
+    """(2026-11-22, owner: "the hands stretch out when he's running", "the armpit seems to stretch out", the open hand "stiff orange spikes".)
+    Meshy's auto-rig bled weights across parts that touch in its A-pose: fingers and wrists follow the thigh (the hand hangs at the hip),
+    the robe's sides follow the hand, and the torso's side 20-30 cm under the armpit follows the upper arm. Each point is first given to
+    its own limb (the arm chain or the leg chain, by which holds more of it) and loses the other chain's weights; then torso points
+    inside the upper arm's line lose the arm's weights to the rest (the chest if nothing is left)."""
+    idx = {}
+    for g in ob.vertex_groups: idx.setdefault(gname[g.index], g.index)
+    chest = idx.get("Spine2")
+    changed = 0
+    for sd in ("Left", "Right"):
+        arm = {sd + b for b in ("Arm", "ForeArm", "Hand")}
+        leg = {sd + b for b in ("UpLeg", "Leg", "Foot", "ToeBase")} | {"Hips"}
+        sgn = -1.0 if sd == "Right" else 1.0
+        a0, a1 = K[sd + "Arm"], K[sd + "ForeArm"]
+        for v in ob.data.vertices:
+            w = {gname[g.group]: g.weight for g in v.groups if g.weight > 0}
+            A = sum(x for b, x in w.items() if b in arm); L = sum(x for b, x in w.items() if b in leg)
+            if A <= 0: continue
+            drop = {}
+            if L > 0:
+                kill = leg if A >= L else arm
+                drop = {b: 0.0 for b in w if b in kill}
+            # the torso under the armpit: points nearer the body's middle than the upper arm's line (at their height) are the body's, not the arm's
+            if a1.z < v.co.z < a0.z - 0.03:
+                t = (a0.z - v.co.z) / max(a0.z - a1.z, 1e-6)
+                inside = (a0.x + (a1.x - a0.x) * t) * sgn - v.co.x * sgn - ARM_PIT
+                if inside > 0:
+                    keep = max(0.0, 1.0 - inside / ARM_EASE)
+                    for b in w:
+                        if b in arm and b not in drop: drop[b] = w[b] * keep
+            if not drop: continue
+            lost = sum(w[b] - x for b, x in drop.items())
+            for b, x in drop.items():
+                if x <= 0: ob.vertex_groups[idx[b]].remove([v.index])
+                else: ob.vertex_groups[idx[b]].add([v.index], x, "REPLACE")
+            if sum(x for b, x in w.items() if b not in drop) + sum(drop.values()) < 1e-3 and chest is not None:
+                ob.vertex_groups[chest].add([v.index], max(lost, 1e-3), "ADD")
+            changed += 1
+    print("WIZ weights cleaned on", changed, "points")
+    # finger tips Meshy weighted to the thigh they touched go back to the hand: points round the palm, out past the robe
+    moved = 0
+    for sd in ("Left", "Right"):
+        h0 = K[sd + "Hand"]; palm = h0 - Vector((0, 0, HAND_DOWN)); out = 1.0 if sd == "Left" else -1.0
+        hi = idx.get(sd + "Hand"); fi = idx.get(sd + "ForeArm")
+        for v in ob.data.vertices:
+            if v.co.x * out < HAND_INNER: continue
+            # (round the palm, and up the sleeve's cuff above the wrist: the first in-game pictures showed cuff and finger shards left on the belt)
+            cuff = h0.z < v.co.z < h0.z + 0.12 and abs(v.co.y - h0.y) < 0.12
+            if not cuff and (v.co.z > h0.z + 0.02 or (v.co - palm).length > HAND_RADIUS): continue
+            w = {gname[g.group]: g.weight for g in v.groups if g.weight > 0}
+            if sum(x for b, x in w.items() if b in (sd + "UpLeg", sd + "Leg", "Hips", "Spine")) <= 0.5 * sum(w.values()): continue   # (only the strays the leg had taken)
+            for g in list(v.groups): ob.vertex_groups[g.group].remove([v.index])
+            ob.vertex_groups[fi if cuff else hi].add([v.index], 1.0, "REPLACE"); moved += 1
+    print("WIZ finger points back on the hands:", moved)
+    # (2026-11-22, the second in-game pictures: shards of the cuffs and finger tips still hung at his hips when the arms moved.) Leg points out past
+    # the robe that lie on an arm point's surface (within SHARD_NEAR) take that point's weights, a few rings out from the arm.
+    from mathutils import kdtree
+    for ring in range(SHARD_RINGS):
+        arm_pts = [v for v in ob.data.vertices if sum(g.weight for g in v.groups if gname[g.group].endswith(("ForeArm", "Hand"))) > 0.5 * max(sum(g.weight for g in v.groups), 1e-6)]
+        kd = kdtree.KDTree(len(arm_pts))
+        for i, v in enumerate(arm_pts): kd.insert(v.co, i)
+        kd.balance()
+        took = 0
+        for v in ob.data.vertices:
+            if abs(v.co.x) < SHARD_INNER or v.co.z < 0.6 or v.co.z > 1.15: continue
+            w = {gname[g.group]: g.weight for g in v.groups if g.weight > 0}
+            tot = max(sum(w.values()), 1e-6)
+            if sum(x for b, x in w.items() if b.endswith(("ForeArm", "Hand"))) > 0.5 * tot: continue
+            co, i, d = kd.find(v.co)
+            if i is None or d > SHARD_NEAR: continue
+            src = arm_pts[i]
+            for g in list(v.groups): ob.vertex_groups[g.group].remove([v.index])
+            for g in src.groups: ob.vertex_groups[g.group].add([v.index], g.weight, "REPLACE")
+            took += 1
+        print("WIZ shard points back on the arms, ring", ring, ":", took)
+        if not took: break
+    for v in ob.data.vertices:   # (what was taken away is shared out among what is left: every point's weights add up to one again)
+        tot = sum(g.weight for g in v.groups)
+        if 0 < tot and abs(tot - 1.0) > 1e-3:
+            for g in v.groups: g.weight /= tot
+    # Meshy fused each hand to the thigh it rested on: triangles bridging a hand/arm point and a leg point stretch into long spikes when
+    # either moves. Those bridges are cut out (they lie hidden where hand meets robe in the rest pose).
+    cls = []
+    for v in ob.data.vertices:
+        w = {gname[g.group]: g.weight for g in v.groups if g.weight > 0}
+        tot = max(sum(w.values()), 1e-6); c = 0
+        for i, sd in enumerate(("Left", "Right")):
+            if sum(x for b, x in w.items() if b in (sd + "ForeArm", sd + "Hand")) / tot > 0.5: c = 1 + i
+            if sum(x for b, x in w.items() if b in (sd + "UpLeg", sd + "Leg", "Hips")) / tot > 0.5: c = 3 + i
+        cls.append(c)
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    cut = [f for f in bm.faces if len({cls[v.index] for v in f.verts} & {1, 2}) and len({cls[v.index] for v in f.verts} & {3, 4})]
+    # (they are cut out, not copied onto the robe: copies kept the hand's picture and hung at his hips as cuff and finger shards when the arms moved;
+    # the few small holes left lie where the hand rested, under it at rest)
+    bmesh.ops.delete(bm, geom=cut, context="FACES_ONLY")
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print("WIZ hand-to-thigh bridges cut:", len(cut))
+    # (2026-11-22, round 5: cuff and finger bits still hung at his hips.) Once the bridges are cut, leg-weighted points that lie in the hand's
+    # rest space (round the palm or up the cuff, out past the robe's side) are the hand's leftovers, chosen by weights and place rather than by
+    # piece size (a size rule took the sleeves too). Giving them the hand's weights stretched them into strips (they join leg faces), so
+    # every face touching one is cut out.
+    arm_pts = [v for v in ob.data.vertices if cls[v.index] in (1, 2)]
+    kd = kdtree.KDTree(len(arm_pts))
+    for i, v in enumerate(arm_pts): kd.insert(v.co, i)
+    kd.balance()
+    back = {"Left": 0, "Right": 0}; left = set()
+    for sd, c in (("Left", 3), ("Right", 4)):
+        h0 = K[sd + "Hand"]; palm = h0 - Vector((0, 0, HAND_DOWN)); out = 1.0 if sd == "Left" else -1.0
+        for v in ob.data.vertices:
+            if cls[v.index] != c or v.co.x * out < LEFTOVER_INNER: continue
+            cuff = h0.z - 0.02 < v.co.z < h0.z + 0.22 and abs(v.co.y - h0.y) < 0.15
+            if not cuff and (v.co - palm).length > HAND_RADIUS * 1.9: continue
+            co, i, d = kd.find(v.co)
+            if i is None or d > 0.12: continue
+            left.add(v.index); back[sd] += 1
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    gone = [f for f in bm.faces if any(v.index in left for v in f.verts)]
+    bmesh.ops.delete(bm, geom=gone, context="FACES_ONLY")
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print("WIZ hand leftovers cut:", back, "points,", len(gone), "faces")
 
 def body(tag):
     before = set(bpy.data.objects)
@@ -110,6 +258,7 @@ def body(tag):
                 o = d[b].lerp(d[c], t)
             off += o * g.weight; tot += g.weight
         if tot > 0: v.co += off / tot
+    clean_weights(ob, gname)
     # (owner, 2026-11-22: "huge hands ... 20% smaller") each hand drawn in toward its wrist, by how much of the point follows the hand bone
     for v in ob.data.vertices:
         tot = sum(g.weight for g in v.groups)

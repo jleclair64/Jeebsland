@@ -163,7 +163,8 @@ g = lib.load_asset(GLOW)
 # live on the held staff: keep the two equal), the core at 55% of the rim. The wand keeps its passed look: lock 0, core 1, as before.
 for name, centre, radii, colour, strength, core, lock in (
         ("MI_Staff", (0.0, 0.0, -117.3), (10.5, 10.5, 9.5), (0.02, 0.72, 1.0), 1.3, 0.55, 1.0),
-        ("MI_Wand", (0.0, 0.0, -40.9), (3.8, 3.8, 3.6), (0.62, 0.20, 1.0), 3.5, 1.0, 0.0)):
+        ("MI_Wand", (0.0, 0.0, -40.9), (3.8, 3.8, 3.6), (0.62, 0.20, 1.0), 3.5, 1.0, 0.0),
+        ("MI_CrystalBall", (0.0, 0.0, 0.0), (6.2, 6.2, 6.2), (0.30, 0.45, 1.0), 1.0, 0.45, 1.0)):   # (2026-11-22: the wizard's crystal ball, 11 cm, lit right through)
     p = "/Game/Props/" + name
     mi = lib.load_asset(p)
     if mi is None: raise RuntimeError("FIXLOOK no " + p)
