@@ -258,6 +258,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door"); return true; }
+	if (NearBroomStall()) { OutText = TEXT("Press E to browse the brooms"); return true; }   // (Silver Point's broom stall, 2026-11-22)
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: OutText = TEXT("Press E to mount the horse"); return true;
@@ -405,6 +406,7 @@ void AKnightCharacter::OnInteractKey()
 	if (bShopOpen) { CloseShop(); return; }
 	if (bSmithOpen) { CloseSmith(); return; }
 	if (bBankOpen) { CloseBank(); return; }
+	if (!IsUIOpen() && !bOnBroom && NearBroomStall()) { OpenBroomShop(); return; }   // (Silver Point's broom stall, 2026-11-22)
 	if (IsUIOpen() || bRolling || bSliding || bClimbing || InClimbMove() || GetCharacterMovement()->IsFalling()) return;
 	int32 Idx = -1;
 	ANpc* Npc = nullptr;
@@ -486,6 +488,7 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 
 void AKnightCharacter::CallHorse()
 {
+	if (bIsWizard) { ToggleBroom(); return; }   // (2026-11-22, owner: T calls the wizard's broom: KnightCharacterBroom.cpp)
 	if (IsUIOpen() || bMounted) return;
 	AHorse* Best = nullptr;
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It) { if (!It->HasRider()) { Best = *It; break; } }

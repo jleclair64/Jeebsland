@@ -25,3 +25,5 @@ Thieves,kill,,Bandit,4,,,Beat 4 bandits at their camps in the forest round Oak H
 Thieves,talk,Corin,,,,,Tell Captain Corin the roads are a little safer.,"You're back in one piece! Good. I'd half a mind to come looking for you.",
 RedHal,kill,,RedHal,1,,,Beat Red Hal at his camp by an old ruin in the forest.,,
 RedHal,talk,Corin,,,,,Tell Captain Corin that Red Hal is beaten.,"Beaten, and you walked away? Ha! He'll think twice before he comes near Oak Hill again.",
+Broom,bring,Hazel,Logs,4,,,Chop 4 logs from the oaks round town and bring them to Hazel.,Good straight oak. That'll make a fine handle.,"Four logs for the handle, dear. Any oak round town."
+Broom,bring,Hazel,Hide,2,,,Bring Hazel 2 beast hides for the binding (deer in the woods have them).,Nice and supple. Now give me a moment...,"Two hides for the binding. The deer in the woods, dear."

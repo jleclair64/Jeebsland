@@ -70,6 +70,8 @@ namespace JeebTestKit
 			FRow Arrows{ TEXT("Arrows") }; for (int32 i = 0; i < NumArrowKinds(); ++i) Arrows.Ids.Add(ArrowKindId(i));
 			O.Rows.Add(Arrows);
 			O.Rows.Add({ TEXT("Throwing rocks"), { IdRocks } });   // (the troll's ammunition, 2026-11-22)
+			FRow Brooms{ TEXT("Flying brooms") }; for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) Brooms.Ids.Add(BroomId(b));   // (the wizard's brooms, 2026-11-22)
+			if (Brooms.Ids.Num()) O.Rows.Add(Brooms);
 		}
 		return P;
 	}

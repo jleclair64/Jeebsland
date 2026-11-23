@@ -105,6 +105,7 @@ namespace JeebQuests
 			for (int32 m = 0; m < UE_ARRAY_COUNT(MaterialKeys); ++m) Ids.Add(MaterialId(static_cast<EItemType>(m)));
 			for (int32 p = 0; p < NumPotions(); ++p) Ids.Add(PotionId(p));
 			for (int32 a = 0; a < NumArrowKinds(); ++a) Ids.Add(ArrowKindId(a));
+			for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) Ids.Add(BroomId(b));   // (flying brooms: "Hazel's Old Broom")
 			for (int32 k = 0; k < K_Count; ++k)
 				for (int32 t = 0; t < NumTiers; ++t)
 				{

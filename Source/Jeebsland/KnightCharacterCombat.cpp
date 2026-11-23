@@ -59,6 +59,7 @@
 // same on every machine, so the server agrees.
 bool AKnightCharacter::GuardActive() const
 {
+	if (bIsWizard && Magic < (bBlocking ? 0.5f : JeebTune::V().BroomMinMagic)) return false;   // (2026-11-22, owner: holding the orb drains magic; with none it drops, and it needs a little back to rise: KnightCharacterBroom.cpp)
 	return bIsTroll || bIsWizard || ShieldActive();   // (the wizard, 2026-11-21: his orb, all round him, whatever he holds)
 }
 
@@ -309,7 +310,7 @@ void AKnightCharacter::AttackLands()
 		if (!bBow && SpellRow < 0) { UE_LOG(LogTemp, Log, TEXT("JEEBSPELL slot %d of row %d is empty: no cast"), Skills->CastSlot, Skills->SpellPick); return; }
 		const JeebSpells::FSpell& Spell = JeebSpells::Get(SpellRow);
 		const float SpellDmg = bBow ? 1.f : JeebSpells::DamageMul(SpellRow, Skills->SpellLevel(SpellRow));
-		const float Cost = (bBow ? 1.f : Spell.CostMul) * FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f));
+		const float Cost = (bBow ? 1.f : Spell.CostMul) * FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f)) * SpellCostMul(K, Tier);   // (spell, item in MagicCosts.csv, dearer on a broom)
 		const float Power = bBow || Cost <= 0.f ? 1.f : FMath::Clamp(Magic / Cost, FMath::Clamp(TW.MagicMinPower, 0.f, 1.f), 1.f);
 		if (!bBow) { Magic = FMath::Max(0.f, Magic - Cost); MagicUsedAt = GetWorld()->GetTimeSeconds(); }
 		const int32 Dmg = FMath::Max(1, JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit, ChargeMul * Power * SpellDmg));

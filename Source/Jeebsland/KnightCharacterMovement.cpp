@@ -54,7 +54,7 @@ void AKnightCharacter::StopSprint()
 void AKnightCharacter::StartCrouch()
 {
 	if (UKnightMovement* KM = KnightMove()) { KM->bWantsLetGo = true; if (KM->InClimbMove() || KM->InWater()) return; }   // Ctrl on a rock face lets go (and never grabs while held); in the water it dives
-	if (bSitting || bRolling || bSliding || bClimbing || bMounted) return;
+	if (bSitting || bRolling || bSliding || bClimbing || bMounted || bOnBroom) return;   // (on the broom Ctrl only sinks)
 	bCrouched = true;
 }
 

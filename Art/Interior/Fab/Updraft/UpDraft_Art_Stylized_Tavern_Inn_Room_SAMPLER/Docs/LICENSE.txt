@@ -1,0 +1,33 @@
+UpDraft Art — Standard Asset License (v1.0)
+================================================
+
+This license applies to all 3D assets, files, and renders included in this product (the “Content”).
+
+YOU MAY
+------------------------------------------------
+- Use the Content in personal or commercial projects (games, films, renders, etc.).
+- Modify the Content to fit your project needs.
+- Combine the Content with other assets.
+
+YOU MAY NOT
+------------------------------------------------
+- Resell, redistribute, share, or re-upload the Content (or derivatives) as a standalone asset pack.
+- Publish the Content in a way that allows others to extract the raw 3D files (e.g., “asset dump”, “free model download”, or similar).
+- Use the Content to create competing asset packs or template packs for resale.
+
+TEAM / CLIENT USE
+------------------------------------------------
+- You may share the Content with your internal team members and contractors working on the same project.
+- You may deliver final project files to a client, but you may not give the client the raw Content for reuse outside that project unless they also purchase a license.
+
+OWNERSHIP
+------------------------------------------------
+UpDraft Art retains ownership of the original Content. You are purchasing a license to use the Content, not ownership of the Content itself.
+
+WARRANTY
+------------------------------------------------
+The Content is provided “as is” with no warranties. UpDraft Art is not liable for damages arising from use of the Content.
+
+CONTACT
+------------------------------------------------
+UpDraft Art: https://updraft.art

@@ -1,4 +1,5 @@
 ﻿#include "OpenWorldActor.h"
+#include "Broom.h"
 #include "OpenWorld.h"
 #include "Terrain.h"
 #include "TownLabSwaps.h"
@@ -79,6 +80,7 @@ void AOpenWorld::BeginPlay()
 	Super::BeginPlay();
 	SetActorLocation(FVector::ZeroVector);
 	BuildHouses();
+	ABroomStall::PlaceIn(GetWorld());   // (Silver Point's broom stall, 2026-11-22: Broom.cpp)
 	if (IsNetMode(NM_DedicatedServer)) return;   // (no snow to draw on a server)
 	BuildCandles();
 	if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))

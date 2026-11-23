@@ -56,7 +56,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bClimbing = bClimbing;
 	In.ClimbPhase = ClimbPhase;
 	In.bSitting = bSitting;
-	In.bMounted = bMounted;
+	In.bMounted = bMounted || bOnBroom; In.bBroom = bOnBroom;   // (the broom rides astride, as the horse: KnightCharacterBroom.cpp)
 	In.bSliding = bSliding;
 	In.bFishing = bFishing;
 	In.Emote = EmoteId; In.EmoteT = EmoteT; In.bEmoteStow = EmoteStows();   // (KnightCharacterEmote.cpp)

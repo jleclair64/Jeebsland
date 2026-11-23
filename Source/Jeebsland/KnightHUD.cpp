@@ -230,7 +230,7 @@ void AKnightHUD::DrawHUD()
 		if (Knight->IsWizard())
 		{
 			const float M = Knight->GetMagicFraction();
-			Gauge(BarX, BY + BarH + 4.f, BarW, BarH - 1.f, M, FLinearColor(0.22f, 0.45f, 0.95f), M < 0.05f);
+			Gauge(BarX, BY + BarH + 4.f, BarW, BarH - 1.f, M, FLinearColor(0.56f, 0.24f, 0.92f), M < 0.05f);   // (purple since 2026-11-22, owner)
 		}
 	}
 

@@ -228,6 +228,14 @@ namespace JeebItemModel
 			Settle(Out);
 			return;
 		}
+		// ---------------- a flying broom: a handle and a straw bundle (2026-11-22) ----------------
+		if (IsBroom(Id))
+		{
+			Lathe(NewPart(Out, FLinearColor(0.20f, 0.09f, 0.04f)).Mesh, Prof({ 0, 30, 1.2, 29.5, 1.2, -18, 0, -18.5 }), 8, 1.0, 1.0, Xf(V3(0, 0, 0), V3(0, 90, 0)));
+			Lathe(NewPart(Out, FLinearColor(0.78f, 0.62f, 0.32f)).Mesh, Prof({ 1.6, -16, 5.5, -30, 4.0, -38, 0, -39 }), 10, 1.0, 1.0, Xf(V3(0, 0, 0), V3(0, 90, 0)), false, true);
+			Settle(Out);
+			return;
+		}
 		// ---------------- arrows: a bundle of three ----------------
 		if (IsArrow(Id))
 		{

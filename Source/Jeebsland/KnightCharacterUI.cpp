@@ -103,6 +103,7 @@ void AKnightCharacter::ToggleInventory()
 void AKnightCharacter::OpenShop()
 {
 	if (bSettingsOpen || bShopOpen) return;
+	bBroomShop = false;   // (OpenBroomShop sets it after: KnightCharacterBroom.cpp)
 	bInventoryOpen = false;
 	bSmithOpen = false;
 	bShopOpen = true;

@@ -691,6 +691,7 @@ void FKnightAnimator::ToolHeadClear(FPose& P, const FInput& In) const
 // ---------------- The frame ----------------
 
 static TAutoConsoleVariable<float> CVarRideRaise(TEXT("jeeb.Ride.Raise"), 100.f, TEXT("How far (cm) the seated pose is lifted when riding the horse, from the bench seat up to the saddle."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBroomRaise(TEXT("jeeb.Broom.Raise"), 40.f, TEXT("How far (cm) the seated pose is lifted on the wizard's broom (2026-11-22)."), ECVF_Default);
 static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behind the right fist's grip point the left fist's goes, along the grip)
 
 // Polished plate (owner 2026-11-15: "very shiny, reflective like a mirror"): live in Play through jeeb.Armour.Rough (the plate's roughness; the tier's own
@@ -1808,7 +1809,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 71:   // sitting: down into the seat over ClipStart..ClipHit, then held
 		if (const FMove* M = Moves.Find(TEXT("Sit")))
 			PlayAt(TEXT("Sit"), FMath::Min(M->ClipStart + ActionT, M->ClipHit), 1000.f, B, &OutBlend);
-		if (In.bMounted) B.Hip.Z += CVarRideRaise.GetValueOnGameThread();   // (riding: up from the bench seat to the saddle)
+		if (In.bMounted) B.Hip.Z += In.bBroom ? CVarBroomRaise.GetValueOnGameThread() : CVarRideRaise.GetValueOnGameThread();   // (riding: up from the bench seat to the saddle; on the broom only up to it)
 		break;
 	case 72:   // sliding: into the slide over ClipStart..ClipHit, then held
 		if (const FMove* M = Moves.Find(TEXT("Slide")))
