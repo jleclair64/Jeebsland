@@ -136,7 +136,8 @@ float AKnightHUD::TitleTextAt(const FString& TextIn, float X, float Y, float H, 
 	const float X0 = X >= 0.f ? X : (Canvas->ClipX - Total) * 0.5f;
 	if (X < 0.f) NoteTitle(Y + H * 1.3f, Alpha);   // (a screen title: the world's marks under it fade next frame)
 	const float Top = Y - Line * S * 0.185f;   // (the line's empty top)
-	const FLinearColor Ivory = H >= 24.f ? FLinearColor(0.98f, 0.93f, 0.80f, Alpha) : FLinearColor(1.f, 0.90f, 0.66f, Alpha);
+	FLinearColor Ivory = H >= 24.f ? FLinearColor(0.98f, 0.93f, 0.80f, Alpha) : FLinearColor(1.f, 0.90f, 0.66f, Alpha);
+	if (TitleTint.IsSet()) { Ivory = TitleTint.GetValue(); Ivory.A = Alpha; }
 	const float Sh = FMath::Max(1.f, H * 0.045f);
 	for (int32 Pass = 0; Pass < 3; ++Pass)
 	{
@@ -163,7 +164,8 @@ void AKnightHUD::TitleBanner(const FString& Text, float Y, float H, float Alpha)
 	for (int32 i = 0; i < Steps; ++i)
 	{
 		const float U = float(i) / Steps, Len = Long / Steps;
-		const FLinearColor C(0.98f, 0.86f, 0.58f, 0.75f * Alpha * FMath::Square(1.f - U));
+		FLinearColor C(0.98f, 0.86f, 0.58f, 0.75f * Alpha * FMath::Square(1.f - U));
+		if (TitleTint.IsSet()) { C = TitleTint.GetValue(); C.A = 0.75f * Alpha * FMath::Square(1.f - U); }
 		DrawRect(C, Mid + From + U * Long, RuleY - Thick * 0.5f, Len + 0.5f, Thick);
 		DrawRect(C, Mid - From - U * Long - Len, RuleY - Thick * 0.5f, Len + 0.5f, Thick);
 	}

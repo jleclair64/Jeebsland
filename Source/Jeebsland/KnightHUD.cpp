@@ -186,6 +186,7 @@ void AKnightHUD::DrawHUD()
 	}
 
 
+	DrawPvp(Pawn->GetActorLocation(), GetWorld()->GetTimeSeconds());   // (PvP zones: the red title on entering and the icon while inside: KnightHUDPvp.cpp)
 	DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
 	DrawWeaponBar(Knight);

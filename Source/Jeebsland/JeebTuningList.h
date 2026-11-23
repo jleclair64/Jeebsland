@@ -257,3 +257,10 @@ JEEB_TUNE(TrollRocks, RockDamageLow, 3.f)
 JEEB_TUNE(TrollRocks, RockDamageFull, 12.f)
 JEEB_TUNE(TrollRocks, RockDamagePerLevel, 0.01f)
 JEEB_TUNE(TrollRocks, RockCooldown, 0.35f)
+
+// [Pvp] PvP zones, fall damage and the mounted-target arrow bonus (2026-11-23): PvpZones.cpp, KnightCharacterFall.cpp
+JEEB_TUNE(Pvp, FallSafeHeight, 450.f)
+JEEB_TUNE(Pvp, FallDamagePerMetre, 8.f)
+JEEB_TUNE(Pvp, FallMaxDamage, 100.f)
+JEEB_TUNE(Pvp, FallWaterDepth, 90.f)
+JEEB_TUNE(Pvp, ArrowMountedMul, 2.f)
