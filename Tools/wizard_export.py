@@ -107,7 +107,8 @@ def split_slots(ob, mat, names, pick):
 ARM_PIT = 0.06    # (m) torso points this far in from the upper arm's line lose its weights, eased over ARM_EASE
 ARM_EASE = 0.07
 SHARD_INNER, SHARD_NEAR, SHARD_RINGS = 0.27, 0.012, 3   # (m, m, times)
-HAND_DOWN, HAND_RADIUS, HAND_INNER = 0.10, 0.13, 0.31   # (m) the palm's middle under the wrist, how far round it fingers reach, and how far out from his middle a finger point lies (the robe stays inside)
+HAND_DOWN, HAND_RADIUS, HAND_INNER = 0.10, 0.13, 0.31
+LEFTOVER_INNER = 0.26   # (m) hand leftovers lie this far or more out from his middle; the robe's side stays inside   # (m) the palm's middle under the wrist, how far round it fingers reach, and how far out from his middle a finger point lies (the robe stays inside)
 def clean_weights(ob, gname):
     """(2026-11-22, owner: "the hands stretch out when he's running", "the armpit seems to stretch out", the open hand "stiff orange spikes".)
     Meshy's auto-rig bled weights across parts that touch in its A-pose: fingers and wrists follow the thigh (the hand hangs at the hip),
@@ -207,6 +208,29 @@ def clean_weights(ob, gname):
     bmesh.ops.delete(bm, geom=cut, context="FACES_ONLY")
     bm.to_mesh(ob.data); bm.free(); ob.data.update()
     print("WIZ hand-to-thigh bridges cut:", len(cut))
+    # (2026-11-22, round 5: cuff and finger bits still hung at his hips.) Once the bridges are cut, leg-weighted points that lie in the hand's
+    # rest space (round the palm or up the cuff, out past the robe's side) are the hand's leftovers, chosen by weights and place rather than by
+    # piece size (a size rule took the sleeves too). Giving them the hand's weights stretched them into strips (they join leg faces), so
+    # every face touching one is cut out.
+    arm_pts = [v for v in ob.data.vertices if cls[v.index] in (1, 2)]
+    kd = kdtree.KDTree(len(arm_pts))
+    for i, v in enumerate(arm_pts): kd.insert(v.co, i)
+    kd.balance()
+    back = {"Left": 0, "Right": 0}; left = set()
+    for sd, c in (("Left", 3), ("Right", 4)):
+        h0 = K[sd + "Hand"]; palm = h0 - Vector((0, 0, HAND_DOWN)); out = 1.0 if sd == "Left" else -1.0
+        for v in ob.data.vertices:
+            if cls[v.index] != c or v.co.x * out < LEFTOVER_INNER: continue
+            cuff = h0.z - 0.02 < v.co.z < h0.z + 0.22 and abs(v.co.y - h0.y) < 0.15
+            if not cuff and (v.co - palm).length > HAND_RADIUS * 1.9: continue
+            co, i, d = kd.find(v.co)
+            if i is None or d > 0.12: continue
+            left.add(v.index); back[sd] += 1
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    gone = [f for f in bm.faces if any(v.index in left for v in f.verts)]
+    bmesh.ops.delete(bm, geom=gone, context="FACES_ONLY")
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print("WIZ hand leftovers cut:", back, "points,", len(gone), "faces")
 
 def body(tag):
     before = set(bpy.data.objects)

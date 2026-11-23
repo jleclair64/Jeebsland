@@ -50,6 +50,7 @@ orb = tools.create_asset("M_WizardOrb", folder, unreal.Material, unreal.Material
 orb.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
 orb.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
 orb.set_editor_property("two_sided", True)
+orb.set_editor_property("used_with_instanced_static_meshes", True)   # (the pipe's smoke puffs are instanced)
 col = mel.create_material_expression(orb, unreal.MaterialExpressionVectorParameter, -700, 0)
 col.set_editor_property("parameter_name", "Color"); col.set_editor_property("default_value", unreal.LinearColor(0.25, 0.55, 1.0, 1.0))
 opa = mel.create_material_expression(orb, unreal.MaterialExpressionScalarParameter, -700, 250)
