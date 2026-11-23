@@ -12,6 +12,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
+#include "Misc/CommandLine.h"
 
 // jeeb.Critters: 1 the fireflies and the frogs (Frogs.cpp) are there, 0 neither
 TAutoConsoleVariable<int32> CVarCritters(TEXT("jeeb.Critters"), 1, TEXT("1: night fireflies and the frogs on the river banks and lily pads; 0: neither (to compare frame times)"));
@@ -39,7 +40,7 @@ void AFireflies::BeginPlay()
 	{
 		UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Mat, this);
 		M->SetVectorParameterValue(TEXT("Tint"), FLinearColor(0.75f, 1.0f, 0.25f));   // a yellow-green glow
-		M->SetScalarParameterValue(TEXT("Intensity"), 5.f);
+		M->SetScalarParameterValue(TEXT("Intensity"), 12.f);
 		Bugs->SetMaterial(0, M);
 	}
 	else UE_LOG(LogTemp, Warning, TEXT("M_Flame is missing: run Tools/BuildMaterials.ps1. Fireflies will not glow."));
@@ -129,7 +130,7 @@ void AFireflies::Tick(float DeltaSeconds)
 
 	// draw the fireflies within reach; the ones near its edge fade out with distance
 	const float T = GetWorld()->GetTimeSeconds();
-	const float Size0 = 0.05f * CVarFireflySize.GetValueOnGameThread();
+	const float Size0 = 0.11f * CVarFireflySize.GetValueOnGameThread();
 	int32 Used = 0;
 	for (int32 i = I0; i <= I1; ++i)
 		for (int32 j = J0; j <= J1; ++j)
@@ -146,10 +147,13 @@ void AFireflies::Tick(float DeltaSeconds)
 				const float Px = B.Home.X + FMath::Cos(A) * B.Radius, Py = B.Home.Y + FMath::Sin(A * 1.3f) * B.Radius;
 				const FVector Pos(Px, Py, FMath::Max(JeebTerrain::DrawnHeight(Px, Py), B.Home.Z) + B.Rise + 30.f * FMath::Sin(A * 0.9f + B.Phase));
 				const float Pulse = 0.12f + 0.88f * FMath::Pow(0.5f + 0.5f * FMath::Sin(T * B.Blink * 2.2f + B.Phase * 3.f), 4.f);   // slow pulses of light
-				const float Size = Size0 * Fade * Near * (0.3f + 0.7f * Pulse);
+				const float Size = Size0 * (1.f + D / 1000.f) * Fade * Near * (0.45f + 0.55f * Pulse);   // (bigger with distance, so far ones still read as a glow)
 				Bugs->UpdateInstanceTransform(Used++, FTransform(FQuat::Identity, Pos, FVector(FMath::Max(Size, 0.001f))), true, false, true);
 			}
 		}
 	for (int32 k = Used; k < MaxBugs; ++k) Bugs->UpdateInstanceTransform(k, FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)), true, false, true);
 	Bugs->MarkRenderStateDirty();
+#if !UE_BUILD_SHIPPING
+	static float LogT = 0.f; LogT += DeltaSeconds; if (LogT > 4.f && FParse::Param(FCommandLine::Get(), TEXT("JeebShot"))) { LogT = 0.f; UE_LOG(LogTemp, Log, TEXT("JEEBFIREFLY %d drawn, fade %.2f, %d squares worked out, player %.0f %.0f"), Used, Fade, Cells.Num(), Pl.X, Pl.Y); }
+#endif
 }

@@ -9,7 +9,7 @@ a = sys.argv[sys.argv.index("--") + 1:]
 src, out = a[0], a[1]
 os.makedirs(out, exist_ok=True)
 LILY = {"Frog": 3000}
-GREEN_GAIN = 1.0
+GREEN_GAIN = 0.78
 names = a[2:] or list(LILY)
 
 def tex_node(mat, sock_name):
@@ -107,12 +107,13 @@ for name in names:
     me.update()
     hi = o.copy(); hi.data = o.data.copy(); bpy.context.scene.collection.objects.link(hi)
     tris0 = sum(len(p.vertices) - 2 for p in me.polygons)
+    bm0 = bmesh.new(); bm0.from_mesh(o.data); bmesh.ops.remove_doubles(bm0, verts=bm0.verts, dist=0.02); bm0.to_mesh(o.data); bm0.free()   # (weld the glb's split vertices first: decimating split seams opened see-through cracks)
     md = o.modifiers.new("Dec", "DECIMATE"); md.decimate_type = "COLLAPSE"; md.ratio = min(1.0, LILY[name] / float(tris0)); md.use_collapse_triangulate = True
     bpy.ops.object.modifier_apply(modifier=md.name)
     me = o.data
     me.shade_smooth()
-    got = own_pictures(hi, name)
-    bpy.data.objects.remove(hi, do_unlink=True)
+    got = bake(o, hi, name, 2048)   # (a fresh atlas with a 16 px margin: Meshy's own, shrunk, left white flecks along its seams on the frog)
+    if "Base" in got: calm_greens(got["Base"])
     for tag, im in got.items():
         im.filepath_raw = os.path.join(out, "T_%s_%s.png" % (name, tag)); im.file_format = "PNG"; im.save()
     o.name = name; o.data.name = name

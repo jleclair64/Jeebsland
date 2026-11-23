@@ -23,7 +23,8 @@ static TAutoConsoleVariable<float> CVarFrogDensity(TEXT("jeeb.Frog.Density"), 1.
 static TAutoConsoleVariable<float> CVarFrogScare(TEXT("jeeb.Frog.Scare"), 420.f, TEXT("cm: how near the player must come to make a sitting frog hop away (a running player scares from half as far again)"));
 static TAutoConsoleVariable<float> CVarFrogCroak(TEXT("jeeb.Frog.Croak"), 1.f, TEXT("How loud the night croaks are (0 none)"));
 static TAutoConsoleVariable<float> CVarFrogSize(TEXT("jeeb.Frog.Size"), 0.17f, TEXT("A frog's length in metres-ish: the model is 100 cm long, scaled by this (live)"));
-static TAutoConsoleVariable<float> CVarFrogYaw(TEXT("jeeb.Frog.ModelYaw"), 0.f, TEXT("degrees: which way the model's nose points in its own frame (Meshy's frog; live)"));
+static TAutoConsoleVariable<float> CVarFrogYaw(TEXT("jeeb.Frog.ModelYaw"), 90.f, TEXT("degrees: which way the model's nose points in its own frame (Meshy's frog; live)"));
+static TAutoConsoleVariable<int32> CVarFrogTurn(TEXT("jeeb.Frog.Turn"), 1, TEXT("1: sitting frogs turn their heads now and then; 0: they keep still (test pictures)"));
 
 namespace
 {
@@ -32,6 +33,7 @@ namespace
 	constexpr float ForgetReach = 14000.f;
 	constexpr float WakeReach = 5500.f;     // a frog this near the player is a mesh
 	constexpr float SleepReach = 7000.f;
+	inline float TurnToward(float Yaw, float To, float Dt, float K) { return Yaw + FMath::FindDeltaAngleDegrees(Yaw, To) * (1.f - FMath::Exp(-K * Dt)); }
 	inline int64 KeyOf(int32 I, int32 J) { return (int64(I) << 32) ^ int64(uint32(J)); }
 	inline int64 KeyAt(float X, float Y) { return KeyOf(FMath::FloorToInt(X / CellSize), FMath::FloorToInt(Y / CellSize)); }
 	inline float Edge(float X, float Y)
@@ -136,12 +138,12 @@ void AFrogs::AddFrog(int64 Cell, const FVector& Home, int32 Pad, FRandomStream& 
 {
 	FFrog F;
 	F.Cell = Cell; F.Home = Home; F.Pos = Home; F.HomePad = Pad; F.Pad = Pad;
-	F.HomeYaw = F.Yaw = R.FRandRange(-180.f, 180.f);
+	F.HomeYaw = F.Yaw = F.TurnTo = R.FRandRange(-180.f, 180.f);
 	F.Seed = R.FRand();
 	F.Idle = R.FRandRange(1.5f, 6.f);
 	if (Pad >= 0) Pads[Pad].bTaken = true;
 #if !UE_BUILD_SHIPPING
-	if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot"))) UE_LOG(LogTemp, Log, TEXT("JEEBFROG spot %.0f %.0f %.0f %s"), Home.X, Home.Y, Home.Z, Pad >= 0 ? TEXT("on a pad") : TEXT("on the bank"));
+	if (FParse::Param(FCommandLine::Get(), TEXT("JeebShot"))) UE_LOG(LogTemp, Log, TEXT("JEEBFROG spot %.0f %.0f %.0f (HeightAt %.0f) yaw %.0f %s"), Home.X, Home.Y, Home.Z, JeebTerrain::HeightAt(Home.X, Home.Y), F.Yaw, Pad >= 0 ? TEXT("on a pad") : TEXT("on the bank"));
 #endif
 	Frogs.Add(F);
 }
@@ -168,8 +170,13 @@ void AFrogs::WorkOutCell(int32 I, int32 J)
 				const float X = A.X + FMath::Cos(Ang) * Rad, Y = A.Y + FMath::Sin(Ang) * Rad;
 				bool bWet;
 				const float Z = GroundZ(X, Y, bWet);
-				if (bWet || FMath::Abs(Z - A.Z) > 35.f) continue;
+				float Sw;
+				if (bWet || FMath::Abs(Z - A.Z) > 35.f || (JeebWater::SurfaceAt(X, Y, Sw) && Z < Sw + 8.f)) continue;   // (dry, not at the waterline)
 				AddFrog(Key, FVector(X, Y, Z), -1, R);
+				{   // bank frogs face the water, give or take
+					const FVector2D Gr(Edge(X + 100.f, Y) - Edge(X - 100.f, Y), Edge(X, Y + 100.f) - Edge(X, Y - 100.f));
+					if (Gr.SizeSquared() > 1.f) Frogs.Last().HomeYaw = Frogs.Last().Yaw = Frogs.Last().TurnTo = FMath::RadiansToDegrees(FMath::Atan2(-Gr.Y, -Gr.X)) + R.FRandRange(-35.f, 35.f);
+				}
 				++Placed;
 			}
 			if (Placed) ++Groups;
@@ -215,7 +222,7 @@ void AFrogs::Sleep(FFrog& F)
 	// out of sight, so back on its spot
 	if (F.Pad != F.HomePad && F.Pad >= 0) Pads[F.Pad].bTaken = false;
 	if (F.HomePad >= 0) Pads[F.HomePad].bTaken = true;
-	F.Pad = F.HomePad; F.Pos = F.Home; F.Yaw = F.HomeYaw; F.State = EState::Sit; F.Croak = 0.f; F.Away = 0.f;
+	F.Pad = F.HomePad; F.Pos = F.Home; F.Yaw = F.TurnTo = F.HomeYaw; F.State = EState::Sit; F.Croak = 0.f; F.Away = 0.f;
 }
 
 void AFrogs::StartHop(FFrog& F, const FVector& Pl)
@@ -274,8 +281,8 @@ void AFrogs::Place(FFrog& F, const FVector& Pl, float Dt)
 		const float Br = FMath::Sin(GetWorld()->GetTimeSeconds() * (2.2f + F.Seed) + F.Seed * 20.f);
 		Sz = 1.f + 0.025f * Br; Sx = Sy = 1.f - 0.012f * Br;
 		F.Idle -= Dt;
-		if (F.Idle <= 0.f) { F.Idle = FMath::FRandRange(3.f, 9.f); F.TurnTo = F.Yaw + FMath::FRandRange(-55.f, 55.f); }
-		F.Yaw = FMath::FInterpTo(F.Yaw, F.TurnTo, Dt, 2.5f);
+		if (F.Idle <= 0.f && CVarFrogTurn.GetValueOnGameThread() != 0) { F.Idle = FMath::FRandRange(3.f, 9.f); F.TurnTo = F.Yaw + FMath::FRandRange(-55.f, 55.f); }
+		F.Yaw = TurnToward(F.Yaw, F.TurnTo, Dt, 2.5f);
 		float Scare = CVarFrogScare.GetValueOnGameThread() * (0.85f + 0.3f * F.Seed);
 		if (APawn* P = UGameplayStatics::GetPlayerPawn(this, 0)) if (P->GetVelocity().SizeSquared2D() > 450.f * 450.f) Scare *= 1.5f;
 		if (Scare > 0.f && DistP < Scare)
@@ -289,7 +296,7 @@ void AFrogs::Place(FFrog& F, const FVector& Pl, float Dt)
 	{
 		const float U = FMath::Clamp(F.T / F.Dur, 0.f, 1.f);
 		Sz = 1.f - 0.2f * U; Sx = Sy = 1.f + 0.08f * U;
-		F.Yaw = FMath::FInterpTo(F.Yaw, F.TurnTo, Dt, 14.f);
+		F.Yaw = TurnToward(F.Yaw, F.TurnTo, Dt, 14.f);
 		if (F.T >= F.Dur) StartHop(F, Pl);
 		break;
 	}
@@ -299,7 +306,7 @@ void AFrogs::Place(FFrog& F, const FVector& Pl, float Dt)
 		F.Pos = FMath::Lerp(F.From, F.To, U);
 		const float Arc = 18.f + 0.14f * FVector::Dist2D(F.From, F.To);
 		F.Pos.Z += 4.f * U * (1.f - U) * Arc;
-		F.Yaw = FMath::FInterpTo(F.Yaw, F.TurnTo, Dt, 20.f);
+		F.Yaw = TurnToward(F.Yaw, F.TurnTo, Dt, 20.f);
 		Pitch = FMath::Lerp(32.f, -38.f, U);                 // nose up as it leaves, down as it lands
 		Sz = 1.f + 0.18f * FMath::Sin(U * PI); Sx = Sy = 1.f - 0.07f * FMath::Sin(U * PI);   // stretched in flight
 		if (U >= 1.f) { F.Pos = F.To; F.State = F.bToWet ? EState::Sink : EState::Land; F.T = 0.f; F.Dur = F.bToWet ? 0.8f : 0.16f; }
