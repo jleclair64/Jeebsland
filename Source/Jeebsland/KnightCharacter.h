@@ -161,11 +161,14 @@ public:
 	bool IsFastMounted() const { return IsRushing() || bFastHorse || bOnBroom; }
 	bool bFastHorse = false;   // (server) riding a horse at a gallop
 	// Fall damage (owner 2026-11-23, KnightCharacterFall.cpp; the server decides, Tuning.ini [Pvp])
-	void TickFall();
+	void TickFall(float DeltaSeconds);
 #if !UE_BUILD_SHIPPING
 	friend struct FPvpTestDriver;   // (PvpTest.cpp: the online test of the PvP zones, fall damage and the mounted-target arrow bonus)
 #endif
 	float FallPeakZ = 0.f, FallLastZ = 0.f; bool bFallWasFalling = false;
+	FVector FallLastLoc = FVector::ZeroVector; bool bFallTeleported = true;
+	void NoteTeleport() { bFallTeleported = true; }   // (every server teleport: fast travel, portkey, catch-up, respawn; the fall tracker forgets the old peak, TickFall also spots any other sudden jump)
+	virtual bool TeleportTo(const FVector& DestLocation, const FRotator& DestRotation, bool bIsATest = false, bool bNoCheck = false) override;
 	float RushBarShare() const { return RushBar; }
 	bool IsRushTired() const { return bRushTired; }
 	static float RushSeconds(int32 StaminaLevel);   // how long a full rush bar lasts once it drains, at this Stamina level
@@ -950,6 +953,7 @@ private:
 	float BowCharge = 0.f;         // 0 - 1: how far drawn
 	float BowAimAlpha = 0.f;       // the aiming pose and camera, eased in and out
 	float BowCamAlpha = 0.f;
+	float CastCamAlpha = 0.f;   // (the wand or staff in hand: the camera slides right so the wizard is left of the reticle)
 	int32 ArrowPick = 0;           // the arrows picked in the arrow slot (when you still have some)
 public:
 	// Free climbing and the mantle (2026-11-12): the movement component is KnightMovement.h; the knight's side is KnightCharacterClimb.cpp

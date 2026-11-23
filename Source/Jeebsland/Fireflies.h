@@ -31,6 +31,8 @@ private:
 	UPROPERTY() UInstancedStaticMeshComponent* Bugs = nullptr;
 	struct FBug { FVector Home; float Phase, Rate, Blink, Radius, Rise; };
 	TMap<int64, TArray<FBug>> Cells;   // squares worked out so far (their fireflies, maybe none)
+	TArray<FTransform> NowT, PrevT;   // this and last frame's transform of every instance (motion vectors for TSR)
+	TArray<uint32> SlotId;            // which firefly fills each instance, so a slot that changes bug does not smear
 	float Fade = 0.f;
 	float CellTimer = 0.f;
 	float LastDensity = 1.f;

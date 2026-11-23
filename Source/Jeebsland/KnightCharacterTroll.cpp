@@ -306,7 +306,12 @@ void AKnightCharacter::SwapToClass(int32 Class)
 void AKnightCharacter::SwapTestStep()
 {
 #if !UE_BUILD_SHIPPING
-	static int32 SwapsLeft = FParse::Param(FCommandLine::Get(), TEXT("SwapTest")) ? 7 : 0;
+	// -SwapSeq=2,1,0,2,0 (classes: 0 knight, 1 troll, 2 wizard) goes through exactly those classes, logging every pawn's gear (JEEBCLASS) and what its class may
+	// equip; the last pawn, if a knight, draws and looses a bow (JEEBCLASS bow ...). Without it: the old knight -> troll -> wizard -> knight walk.
+	static TArray<int32> Seq;
+	static int32 SeqAt = 0;
+	static const bool bSeq = []() { FString V; if (!FParse::Value(FCommandLine::Get(), TEXT("SwapSeq="), V, false)) return false; TArray<FString> P; V.ParseIntoArray(P, TEXT(",")); for (const FString& s : P) Seq.Add(FCString::Atoi(*s)); return Seq.Num() > 0; }();
+	static int32 SwapsLeft = bSeq ? Seq.Num() + 1 : FParse::Param(FCommandLine::Get(), TEXT("SwapTest")) ? 7 : 0;
 	if (SwapsLeft <= 0) return;
 	TWeakObjectPtr<AKnightCharacter> W(this);
 	FTimerHandle H;
@@ -320,7 +325,50 @@ void AKnightCharacter::SwapTestStep()
 		UE_LOG(LogTemp, Log, TEXT("JEEBSWAP check %s (%s): input component %d, its context applied %d, look ignored %d, move ignored %d"),
 			K->ClassIndex() == 1 ? TEXT("troll") : K->ClassIndex() == 2 ? TEXT("wizard") : TEXT("knight"), K->HasAuthority() ? TEXT("server") : TEXT("client"),
 			K->InputComponent ? 1 : 0, S && K->KnightContext ? (S->HasMappingContext(K->KnightContext) ? 1 : 0) : 0, P->IsLookInputIgnored() ? 1 : 0, P->IsMoveInputIgnored() ? 1 : 0);
-		if (--SwapsLeft > 0) K->RequestClass((K->ClassIndex() + 1) % 3);
+		if (bSeq && K->GetSkills())
+		{
+			using namespace JeebItems;
+			USkillComponent* Sk = K->GetSkills();
+			auto Nm = [](int32 Id) { return Id ? ItemName(Id) : FString(TEXT("-")); };
+			FString Bar, Wn;
+			for (int32 h = 0; h < NumHotbar; ++h) Bar += Nm(Sk->Hotbar[h]) + TEXT(" | ");
+			for (int32 k = 0; k < USkillComponent::NumWornKinds; ++k) if (Sk->Worn[k]) Wn += Nm(Sk->Worn[k]) + TEXT(" | ");
+			int32 Arrows = 0, Rocks = 0, Bows = 0;
+			for (const FInvSlot& Sl : Sk->Slots) { if (IsArrow(Sl.Id)) Arrows += Sl.Count; if (IsRock(Sl.Id)) Rocks += Sl.Count; if (IsGear(Sl.Id) && IsShooter(KindOf(Sl.Id))) ++Bows; }
+			FString Why;
+			const bool bBow = CanEquip(Sk, GearId(K_Bow, 0), &Why), bSword = CanEquip(Sk, GearId(K_Sword, 0)), bStaff = CanEquip(Sk, GearId(K_Staff, 0)), bClub = CanEquip(Sk, GearId(K_Club, 0)), bBook = CanEquip(Sk, GearId(K_Book, 0));
+			UE_LOG(LogTemp, Log, TEXT("JEEBCLASS %s step %d: bar [%s] worn [%s] arrows %d rocks %d bows in pack %d; may equip bow %d sword %d staff %d club %d book %d; selected kind %d arrow slot %d"),
+				K->ClassIndex() == 1 ? TEXT("troll") : K->ClassIndex() == 2 ? TEXT("wizard") : TEXT("knight"), SeqAt, *Bar, *Wn, Arrows, Rocks, Bows, bBow, bSword, bStaff, bClub, bBook, K->SelectedKind(), K->ArrowSlotId());
+			// the pack's own weapons, put in hand the way the player does (EquipFromSlot): each class equips what it may and is refused the rest
+			for (int32 i = 0; i < Sk->Slots.Num(); ++i)
+				if (IsGear(Sk->Slots[i].Id) && IsWeaponKind(KindOf(Sk->Slots[i].Id)) && (KindOf(Sk->Slots[i].Id) == K_Bow || KindOf(Sk->Slots[i].Id) == K_Staff || KindOf(Sk->Slots[i].Id) == K_Sword || KindOf(Sk->Slots[i].Id) == K_Club))
+				{ const FString N = ItemName(Sk->Slots[i].Id); const bool bOk = Sk->EquipFromSlot(i); UE_LOG(LogTemp, Log, TEXT("JEEBCLASS equip from the pack %s: %s"), *N, bOk ? TEXT("equipped") : TEXT("refused")); break; }
+			if (SwapsLeft == 1 && K->ClassIndex() == 0)
+			{
+				const int32 Before = Arrows;
+				if (Sk->Hotbar[1] == 0 || !IsShooter(KindOf(Sk->Hotbar[1]))) for (int32 i = 0; i < Sk->Slots.Num(); ++i) if (IsGear(Sk->Slots[i].Id) && IsShooter(KindOf(Sk->Slots[i].Id))) { Sk->EquipFromSlot(i); break; }
+				Sk->SetSelected(1);
+				K->StartDraw();
+				TWeakObjectPtr<AKnightCharacter> W2(K);
+				FTimerHandle H2;
+				K->GetWorldTimerManager().SetTimer(H2, FTimerDelegate::CreateLambda([W2, Before]()
+				{
+					AKnightCharacter* K2 = W2.Get(); if (!K2 || !K2->GetSkills()) return;
+					const float Charge = K2->BowCharge;
+					K2->ReleaseDraw();
+					TWeakObjectPtr<AKnightCharacter> W3(K2);
+					FTimerHandle H3;
+					K2->GetWorldTimerManager().SetTimer(H3, FTimerDelegate::CreateLambda([W3, Before, Charge]()
+					{
+						AKnightCharacter* K3 = W3.Get(); if (!K3 || !K3->GetSkills()) return;
+						int32 After = 0; for (const FInvSlot& Sl : K3->GetSkills()->Slots) if (JeebItems::IsArrow(Sl.Id)) After += Sl.Count;
+						UE_LOG(LogTemp, Log, TEXT("JEEBCLASS bow %s: drew to %.2f, arrows %d -> %d, bow in slot 2: %d"), After < Before ? TEXT("PASS shot an arrow") : TEXT("FAIL no arrow left"), Charge, Before, After, K3->GetSkills()->Hotbar[1]);
+					}), 0.8f, false);
+				}), 2.f, false);
+			}
+		}
+		++SeqAt;
+		if (--SwapsLeft > 0) K->RequestClass(bSeq ? Seq[FMath::Clamp(SeqAt - 1, 0, Seq.Num() - 1)] : (K->ClassIndex() + 1) % 3);
 	}), 5.f, false);
 #endif
 }

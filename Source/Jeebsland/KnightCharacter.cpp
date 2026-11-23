@@ -469,7 +469,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickCastCharge(Dt);   // (the wand's and staff's charged shot: KnightCharacterCastAim.cpp)
 	TickKnock(Dt);
 	TickHealth(Dt);
-	TickFall();   // (fall damage, the server's: KnightCharacterFall.cpp)
+	TickFall(DeltaSeconds);   // (fall damage, the server's: KnightCharacterFall.cpp)
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
 	TickDrink(Dt);
 	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
@@ -519,7 +519,8 @@ void AKnightCharacter::TickHousekeeping()
 		// (an Oak Hill shop has no shopkeeper yet: there it is the distance from its counter, JeebOakHill::Counters)
 		const JeebOakHill::EShop Shop = bSmithOpen ? JeebOakHill::EShop::Smith : bBankOpen ? JeebOakHill::EShop::Bank : JeebOakHill::EShop::Store;
 		const bool bAtCounter = !N && !bDialogueOpen && JeebOakHill::NearCounter(Shop, GetActorLocation().X, GetActorLocation().Y, 650.f) != nullptr;
-		if (!bAtCounter && (!N || FVector::Dist2D(GetActorLocation(), N->GetActorLocation()) > 650.f))
+		const bool bAtBroomStall = bBroomShop && bShopOpen && NearBroomStall();   // (Silver Point's stall has no keeper and no counter: this closed the broom shop the moment it opened, 2026-11-22)
+		if (!bAtCounter && !bAtBroomStall && (!N || FVector::Dist2D(GetActorLocation(), N->GetActorLocation()) > 650.f))
 		{
 			CloseDialogue();
 			if (bShopOpen) CloseShop();

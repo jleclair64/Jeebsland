@@ -45,6 +45,8 @@ void AFireflies::BeginPlay()
 	}
 	else UE_LOG(LogTemp, Warning, TEXT("M_Flame is missing: run Tools/BuildMaterials.ps1. Fireflies will not glow."));
 	for (int32 i = 0; i < MaxBugs; ++i) Bugs->AddInstance(FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)));
+	Bugs->SetHasPerInstancePrevTransforms(true);   // motion vectors: a drifting, resizing additive glow smeared under TSR without them
+	NowT.Init(FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)), MaxBugs); PrevT = NowT; SlotId.Init(0, MaxBugs);
 	Bugs->SetVisibility(false);
 }
 
@@ -137,8 +139,10 @@ void AFireflies::Tick(float DeltaSeconds)
 		{
 			const TArray<FBug>* L = Cells.Find((int64(i) << 32) ^ int64(uint32(j)));
 			if (!L) continue;
+			int32 Idx = 0;
 			for (const FBug& B : *L)
 			{
+				const uint32 Id = HashCombine(GetTypeHash(i * 7919 + j), GetTypeHash(Idx++)) | 1u;
 				if (Used >= MaxBugs) break;
 				const float D = FVector2D::Distance(FVector2D(B.Home), FVector2D(Pl));
 				if (D > Reach) continue;
@@ -148,11 +152,14 @@ void AFireflies::Tick(float DeltaSeconds)
 				const FVector Pos(Px, Py, FMath::Max(JeebTerrain::DrawnHeight(Px, Py), B.Home.Z) + B.Rise + 30.f * FMath::Sin(A * 0.9f + B.Phase));
 				const float Pulse = 0.12f + 0.88f * FMath::Pow(0.5f + 0.5f * FMath::Sin(T * B.Blink * 2.2f + B.Phase * 3.f), 4.f);   // slow pulses of light
 				const float Size = Size0 * (1.f + D / 1000.f) * Fade * Near * (0.45f + 0.55f * Pulse);   // (bigger with distance, so far ones still read as a glow)
-				Bugs->UpdateInstanceTransform(Used++, FTransform(FQuat::Identity, Pos, FVector(FMath::Max(Size, 0.001f))), true, false, true);
+				const FTransform Cur = FTransform(FQuat::Identity, Pos, FVector(FMath::Max(Size, 0.001f)));
+				PrevT[Used] = (SlotId[Used] == Id) ? NowT[Used] : Cur;
+				SlotId[Used] = Id;
+				NowT[Used++] = Cur;
 			}
 		}
-	for (int32 k = Used; k < MaxBugs; ++k) Bugs->UpdateInstanceTransform(k, FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)), true, false, true);
-	Bugs->MarkRenderStateDirty();
+	for (int32 k = Used; k < MaxBugs; ++k) { PrevT[k] = NowT[k] = FTransform(FQuat::Identity, FVector(0, 0, -9000.f), FVector(0.001f)); SlotId[k] = 0; }
+	Bugs->BatchUpdateInstancesTransforms(0, NowT, PrevT, true, false, true);
 #if !UE_BUILD_SHIPPING
 	static float LogT = 0.f; LogT += DeltaSeconds; if (LogT > 4.f && FParse::Param(FCommandLine::Get(), TEXT("JeebShot"))) { LogT = 0.f; UE_LOG(LogTemp, Log, TEXT("JEEBFIREFLY %d drawn, fade %.2f, %d squares worked out, player %.0f %.0f"), Used, Fade, Cells.Num(), Pl.X, Pl.Y); }
 #endif

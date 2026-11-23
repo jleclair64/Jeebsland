@@ -377,9 +377,9 @@ namespace JeebItems
 			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is not made for wizards."), *ItemName(Id));
 			return false;
 		}
-		if (IsShooter(K) && !OwnerIsTroll(S))   // (owner 2026-11-22: "take away the bow as an option for the wizard and knight")
+		if (IsShooter(K) && (bWizard || OwnerIsTroll(S)))   // (owner 2026-11-22: bows are the knight's alone; wizards and trolls don't use them)
 		{
-			if (OutWhy) *OutWhy = FString::Printf(TEXT("Bows are put away for now: %s can't be used."), *ItemName(Id));
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is a knight's weapon: wizards and trolls don't use bows."), *ItemName(Id));
 			return false;
 		}
 		if (K == K_Book) return true;
@@ -390,6 +390,12 @@ namespace JeebItems
 			return false;
 		}
 		if (!IsWeaponKind(K) && !IsArmorKind(K) && K != K_Shield) return true;
+		// (class switches, 2026-11-22: a knight doesn't carry the troll's club or the wizard's staff and wand; they stay in his pack)
+		if (IsWeaponKind(K) && !bWizard && !OwnerIsTroll(S) && (KindClass(K) == 2 || KindClass(K) == 3))
+		{
+			if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is made for %s. A knight can't use it."), *ItemName(Id), KindClass(K) == 2 ? TEXT("trolls") : TEXT("wizards"));
+			return false;
+		}
 		const int32 T = VariantOf(Id);
 		// The playable troll (2026-11-19): only troll-class and "all" gear (Kinds.csv Class), and only common or troll tiers. Knights are not held to their class yet.
 		// (an old save's sword or other knight's gear stays where it is and can still be taken off: unequipping never asks here)

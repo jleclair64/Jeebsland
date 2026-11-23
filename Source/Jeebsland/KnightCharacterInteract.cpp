@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "JeebBroomData.h"
 #include "Messages.h"
 #include "KnightAnimator.h"
 #include "Components/CapsuleComponent.h"
@@ -258,7 +259,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door"); return true; }
-	if (NearBroomStall()) { OutText = TEXT("Press E to browse the brooms"); return true; }   // (Silver Point's broom stall, 2026-11-22)
+	if (NearBroomStall()) { OutText = TEXT("Broom shop"); return true; }   // (Silver Point's broom stall, 2026-11-22)
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: OutText = Horse && Horse->IsWild() ? TEXT("Press E to climb on the wild horse") : Horse && Horse->GetOwnerKnight() == this ? TEXT("Press E to ride your horse") : TEXT("Press E to ride the horse"); return true;
@@ -340,6 +341,7 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { Float(H->DoorHandle(), 0.f); return true; }
+	if (NearBroomStall()) { Float(JeebBroom::StallSpot(), 160.f); return true; }   // (Silver Point's broom stall: no anchor meant no E prompt on screen, 2026-11-22)
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: Float(Horse->GetActorLocation(), 150.f); return true;
