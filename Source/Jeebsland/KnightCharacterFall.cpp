@@ -7,21 +7,53 @@
 #include "SkillComponent.h"
 #include "JeebTuning.h"
 #include "JeebWater.h"
+#include "Terrain.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
-void AKnightCharacter::TickFall()
+void AKnightCharacter::TickFall(float DeltaSeconds)
 {
 	if (!HasAuthority() || !Skills || !GetWorld()) return;
 	UCharacterMovementComponent* M = GetCharacterMovement();
 	if (!M) return;
+#if !UE_BUILD_SHIPPING
+	// -FallTest (single player): the highest and lowest ground on a coarse grid; stand on the high one, fast travel (TravelPlaced) to the low one (no damage),
+	// then teleport 30 m up over it and fall (damage). Logs JEEBFALLTEST.
+	static const bool bFallTest = FParse::Param(FCommandLine::Get(), TEXT("FallTest"));
+	if (bFallTest && GetNetMode() == NM_Standalone && IsLocallyControlled())
+	{
+		static float FT = 0.f; static int32 FS = 0; static FVector Hi, Lo; static float HealthAt = 0.f;
+		FT += DeltaSeconds;
+		if (FS == 0 && FT > 2.f)
+		{
+			float HiZ = -1e9f, LoZ = 1e9f;
+			for (float X = -30000.f; X <= 30000.f; X += 1500.f) for (float Y = -30000.f; Y <= 30000.f; Y += 1500.f)
+			{
+				const float Z = JeebTerrain::HeightAt(X, Y);
+				float Surf = 0.f;
+				if (JeebWater::DepthAt(FVector(X, Y, Z), Surf) > 0.f) continue;   // (dry ground only)
+				if (Z > HiZ) { HiZ = Z; Hi = FVector(X, Y, Z); }
+				if (Z < LoZ) { LoZ = Z; Lo = FVector(X, Y, Z); }
+			}
+			FS = 1;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFALLTEST high ground %.0f,%.0f z %.0f; low ground %.0f,%.0f z %.0f; health %.0f"), Hi.X, Hi.Y, Hi.Z, Lo.X, Lo.Y, Lo.Z, Health);
+			TeleportTo(Hi + FVector(0.f, 0.f, 130.f), GetActorRotation(), false, true);
+		}
+		if (FS == 1 && FT > 6.f) { FS = 2; HealthAt = Health; UE_LOG(LogTemp, Log, TEXT("JEEBFALLTEST on the high ground: health %.0f, z %.0f. Fast travel down %.0f cm"), Health, GetActorLocation().Z, GetActorLocation().Z - Lo.Z); TravelPlaced(Lo + FVector(0.f, 0.f, 130.f), 0.f); }
+		if (FS == 2 && FT > 11.f) { FS = 3; UE_LOG(LogTemp, Log, TEXT("JEEBFALLTEST %s after fast travel: health %.0f (was %.0f), z %.0f"), Health >= HealthAt ? TEXT("PASS") : TEXT("FAIL"), Health, HealthAt, GetActorLocation().Z); HealthAt = Health; TeleportTo(GetActorLocation() + FVector(0.f, 0.f, 3000.f), GetActorRotation(), false, true); }
+		if (FS == 3 && FT > 18.f) { FS = 4; UE_LOG(LogTemp, Log, TEXT("JEEBFALLTEST %s after a real 30 m drop: health %.0f (was %.0f)"), Health < HealthAt ? TEXT("PASS") : TEXT("FAIL"), Health, HealthAt); }
+	}
+#endif
 	const FVector Loc = GetActorLocation();
 	const bool bAir = M->IsFalling();
-	const bool bPlaced = FMath::Abs(Loc.Z - FallLastZ) > 1500.f;   // (put somewhere else in one step: a teleport is not a fall)
-	if (bPlaced) { bFallWasFalling = false; FallPeakZ = float(Loc.Z); }
+	// put somewhere else: a noted teleport, or any sudden jump no fall could make (a respawn, GoTown, a SetActorLocation): never a fall (owner 2026-11-22: fast travel hurt)
+	const float Step = float(FVector::Dist(Loc, FallLastLoc)), Allowed = float(M->Velocity.Size()) * FMath::Max(DeltaSeconds, 0.02f) * 1.5f + 300.f;
+	const bool bPlaced = bFallTeleported || Step > Allowed || FMath::Abs(Loc.Z - FallLastZ) > 1500.f;
+	if (bPlaced) { bFallWasFalling = false; FallPeakZ = float(Loc.Z); bFallTeleported = false; }
+	FallLastLoc = Loc;
 #if !UE_BUILD_SHIPPING
 	static const bool bTrace = FParse::Param(FCommandLine::Get(), TEXT("JeebPvpTest"));   // (the online test: every start and end of a fall)
 	if (bTrace && bAir != bFallWasFalling) UE_LOG(LogTemp, Log, TEXT("JEEBFALL trace %s air %d z %.0f peak %.0f mode %d"), *GetName(), bAir ? 1 : 0, Loc.Z, FallPeakZ, int32(M->MovementMode));
@@ -55,4 +87,12 @@ void AKnightCharacter::TickFall()
 	if (!bAir) FallPeakZ = float(Loc.Z);   // (standing, walking, swimming, climbing: the next fall starts from here)
 	bFallWasFalling = bAir;
 	FallLastZ = float(Loc.Z);
+}
+
+// Every teleport (TravelPlaced, the portkey, the broom's catch-up, Hazel's fetch, camp and horse moves) goes through TeleportTo: the fall tracker forgets the fall
+bool AKnightCharacter::TeleportTo(const FVector& DestLocation, const FRotator& DestRotation, bool bIsATest, bool bNoCheck)
+{
+	const bool bOk = Super::TeleportTo(DestLocation, DestRotation, bIsATest, bNoCheck);
+	if (bOk && !bIsATest) NoteTeleport();
+	return bOk;
 }

@@ -269,8 +269,9 @@ void UKnightMovement::OnMovementUpdated(float Dt, const FVector& OldLocation, co
 	// move could change; now server and client decide it from the same move, like the mantle). Only after running into it: no probes for anyone else.
 	if (bRock && CharacterOwner && CharacterOwner->GetLocalRole() != ROLE_SimulatedProxy && MovementMode != MOVE_Custom && (IsMovingOnGround() || IsFalling()) && TryGrab()) return;
 	if (!bFence || !CharacterOwner || CharacterOwner->GetLocalRole() == ROLE_SimulatedProxy || MovementMode == MOVE_Custom || Acceleration.SizeSquared2D() <= 1.f) return;
-	if (IsMovingOnGround() && JeebTune::V().MantleAuto > 0.5f && !bWantsLetGo) TryMantle(false);   // (MantleAuto 0 in Tuning.ini: only Space by one)
-	else if (IsFalling() && MantleNearby()) TryMantle(true);
+	const bool bAutoMantle = JeebTune::V().MantleAuto > 0.5f || bWantsRise;   // (owner 2026-11-22: not automatic: only with Space held, MantleAuto 1 brings the old behaviour back; bWantsRise travels in the saved move, so server and client agree)
+	if (IsMovingOnGround() && bAutoMantle && !bWantsLetGo) TryMantle(false);
+	else if (IsFalling() && bAutoMantle && MantleNearby()) TryMantle(true);
 }
 
 bool UKnightMovement::TryGrab()

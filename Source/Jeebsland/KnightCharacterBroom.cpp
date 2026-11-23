@@ -27,6 +27,8 @@
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
 static TAutoConsoleVariable<float> CVarBroomFwd(TEXT("jeeb.Broom.Forward"), 6.f, TEXT("The broom under the wizard: cm forward of his hips (looks only)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBroomPitch(TEXT("jeeb.Broom.Pitch"), 6.f, TEXT("The broom under the wizard: degrees its tip is raised (looks only)."), ECVF_Default);
@@ -287,6 +289,39 @@ void AKnightCharacter::TickBroom(float Dt)
 			if (bOnBroom && Tick2 != int32((BroomTestT - Dt) / 2.f))
 				UE_LOG(LogTemp, Log, TEXT("JEEBBROOMDO t %.0f: %.1f m up, speed %.0f, magic I see %.1f, empty %d"), BroomTestT, Above, Move ? Move->Velocity.Size2D() : 0.f, Magic, bBroomEmpty ? 1 : 0);
 		}
+	}
+	// Single-player test of the broom stall (-StallTest, owner 2026-11-22: "no E button ... all I see is a stand"): stand in front of the stall, log the E prompt
+	// and its anchor, press E (shop opens), buy an Oak Broom, take pictures of the prompt and the open shop (Saved/Screenshots).
+	static const bool bStallTest = FParse::Param(FCommandLine::Get(), TEXT("StallTest"));
+	if (bStallTest && GetNetMode() == NM_Standalone && IsLocallyControlled() && Skills)
+	{
+		static float StallT = 0.f; static int32 StallStep = 0;
+		StallT += Dt;
+		APlayerController* SPC = Cast<APlayerController>(GetController());
+		if (StallStep == 0 && StallT > 2.f)
+		{
+			StallStep = 1; Skills->AddIngots(1000);
+			const FVector S = JeebBroom::StallSpot();
+			const float Yaw = JeebBroom::StallYaw();
+			const FVector2D To = FVector2D(S) + FVector2D(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw))) * 300.f;
+			TeleportTo(FVector(To.X, To.Y, JeebTerrain::HeightAt(To.X, To.Y) + 120.f), FRotator(0.f, Yaw + 180.f, 0.f), false, true);
+			if (SPC) SPC->SetControlRotation(FRotator(-8.f, Yaw + 180.f, 0.f));
+			UE_LOG(LogTemp, Log, TEXT("JEEBSTALL at the stall %s, ingots %d"), *S.ToCompactString(), Skills->GetIngots());
+		}
+		if (StallStep == 1 && StallT > 5.f)
+		{
+			StallStep = 2;
+			FString P; FVector An; bool bE = false;
+			const bool bP = GetInteractPrompt(P), bA = GetInteractAnchor(An, bE);
+			UE_LOG(LogTemp, Log, TEXT("JEEBSTALL prompt %d '%s' anchor %d E %d near %d falling %d"), bP, *P, bA, bE, NearBroomStall(), GetCharacterMovement()->IsFalling());
+			if (SPC) SPC->ConsoleCommand(TEXT("HighResShot 1280x720"));
+		}
+		if (StallStep == 2 && StallT > 7.f) { StallStep = 3; OnInteractKey(); UE_LOG(LogTemp, Log, TEXT("JEEBSTALL E pressed: shop open %d broom shop %d"), IsShopOpen(), IsBroomShopOpen()); }
+		if (StallStep == 3 && StallT > 9.f) { StallStep = 4; if (SPC) SPC->ConsoleCommand(TEXT("HighResShot 1280x720")); }
+		if (StallStep == 4 && StallT > 10.f) { StallStep = 5; Inv(EInvOp::BuyBroom, 1, JeebItems::BroomId(1)); Inv(EInvOp::SellAll, int32(EItemType::Logs)); UE_LOG(LogTemp, Log, TEXT("JEEBSTALL bought: Oak Broom %d, ingots %d (started 1000, price 400)"), Skills->CountItem(JeebItems::BroomId(1)), Skills->GetIngots()); }
+		if (StallStep == 5 && StallT > 12.f) { StallStep = 6; if (SPC) SPC->ConsoleCommand(TEXT("HighResShot 1280x720")); }
+		if (StallStep == 6 && StallT > 13.f && bIsWizard) { StallStep = 7; CloseShop(); BeginCastCharge(); ReleaseCastCharge(); UE_LOG(LogTemp, Log, TEXT("JEEBSTALL wizard casts a bolt (camera side %.0f)"), JeebTune::V().CastCamSide); }
+		if (StallStep == 7 && StallT > 13.3f) { StallStep = 8; if (SPC) SPC->ConsoleCommand(TEXT("HighResShot 1280x720")); }
 	}
 	// Pictures and films, single player (-PlayAs=Wizard -BroomShot or -BroomShot=fly, with -JeebShot -ShotEyes=...): a broom and up at 1 s;
 	// "fly" flies ahead at full speed after 2 s (a close-up eye follows him: the smear film)

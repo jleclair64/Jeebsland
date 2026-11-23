@@ -62,7 +62,9 @@ void USkillComponent::ResetToStartingKit()
 	RingB = 0;
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
-	// (no bow and no arrows since 2026-11-22, owner: "take away the bow as an option for the wizard and knight"; slot 2 starts empty)
+	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword; the knight keeps it, owner 2026-11-22: bows go from the wizard and troll only)
+	AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), StartIronArrows);
+	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
@@ -624,18 +626,13 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 	return true;
 }
 
-// (server, after a save is read) Bows were taken away from knights and wizards (owner 2026-11-22). A bow, longbow or crossbow still on an old
-// character's weapon bar goes into the pack, or the bank if the pack is full; nothing is deleted (if both are full it stays put, unusable).
-// A wizard from before then with no wand anywhere gets a tin one in slot 2. Trolls are left alone (their slots are another batch's).
+// (server, after a save is read) Class switches (FitToClass): what the class can't use goes to the pack. Bows are the knight's again (owner 2026-11-22: only
+// the wizard and the troll lose them). A wizard from before then with no wand anywhere gets a tin one in slot 2.
 void USkillComponent::StowRetiredGear()
 {
-	if (!HasAuth() || JeebItems::OwnerIsTroll(this)) return;
-	for (int32 h = 0; h < 5; ++h)
-	{
-		const int32 Id = Hotbar[h];
-		if (!JeebItems::IsGear(Id) || !JeebItems::IsShooter(JeebItems::KindOf(Id))) continue;
-		if (PutInto(Slots, Id, 1) == 0 || PutInto(Bank, Id, 1) == 0) { Hotbar[h] = 0; UE_LOG(LogTemp, Log, TEXT("JEEBSLOTS stowed %s from bar slot %d"), *JeebItems::ItemName(Id), h + 1); }
-	}
+	if (!HasAuth()) return;
+	FitToClass();
+	if (JeebItems::OwnerIsTroll(this)) return;
 	if (JeebItems::OwnerIsWizard(this))
 	{
 		bool bWand = false;
@@ -784,4 +781,67 @@ void USkillComponent::RestoreSkills(const TArray<int32>& InXP, const TArray<uint
 		Known[i] = (InKnown.IsValidIndex(i) && InKnown[i] != 0) || i == static_cast<int32>(ESkillType::Attack) || i == static_cast<int32>(ESkillType::Defense);
 	}
 	Ingots = InIngots;
+}
+
+// The class switch (owner 2026-11-22: "after switching between the knight/troll/wizard, the assigned weapons get confused"). The pack is one
+// character's whatever class it plays, so a switch loads the last class's gear on the new body: a knight in the wizard's book, a troll in a
+// sword, nothing in hand. After every load: whatever this class cannot use (CanEquip) goes to the pack or bank; then, only if something had to
+// come off (a class change, never a normal login), the class's own essentials are put back on: a weapon in hand, its armour, shield or book,
+// taken from the pack (the best that fits) or, if there is none, a starter piece, so no class ever ends up with an empty hand or a foreign kit.
+void USkillComponent::FitToClass()
+{
+	if (!HasAuth()) return;
+	using namespace JeebItems;
+	bool bMoved = false;
+	auto Stow = [&](int32& Id, const TCHAR* Where)
+	{
+		if (!IsGear(Id) || CanEquip(this, Id)) return;
+		if (PutInto(Slots, Id, 1) == 0 || PutInto(Bank, Id, 1) == 0) { UE_LOG(LogTemp, Log, TEXT("JEEBCLASS stowed %s from %s"), *ItemName(Id), Where); Id = 0; bMoved = true; }
+	};
+	for (int32 h = 0; h < NumHotbar; ++h) Stow(Hotbar[h], TEXT("the weapon bar"));
+	for (int32 k = 0; k < NumWornKinds; ++k) Stow(Worn[k], TEXT("worn"));
+	if (bMoved)
+	{
+		// the best matching piece in the pack (a wanted kind that this class may equip), else a starter one
+		auto TakeFor = [&](int32 Kind, int32 Starter) -> int32
+		{
+			int32 Best = -1;
+			for (int32 i = 0; i < Slots.Num(); ++i)
+			{
+				const int32 Id = Slots[i].Id;
+				if (!IsGear(Id) || KindOf(Id) != Kind || !CanEquip(this, Id)) continue;
+				if (Best < 0 || VariantOf(Id) > VariantOf(Slots[Best].Id)) Best = i;
+			}
+			if (Best >= 0) { const int32 Id = Slots[Best].Id; Slots[Best].Id = 0; Slots[Best].Count = 0; return Id; }
+			return Starter;
+		};
+		const bool bTroll = OwnerIsTroll(this), bWiz = OwnerIsWizard(this);
+		auto Hand = [&](int32 H, int32 Kind) { if (Hotbar[H] == 0) { Hotbar[H] = TakeFor(Kind, GearId(Kind, 0)); UE_LOG(LogTemp, Log, TEXT("JEEBCLASS bar %d: %s"), H + 1, *ItemName(Hotbar[H])); } };
+		auto Wear = [&](int32 Kind, int32 Style) { if (Worn[Kind] == 0) Worn[Kind] = TakeFor(Kind, ArmourId(Kind, Style, T_Tin)); };
+		if (bWiz)
+		{
+			Hand(0, K_Staff); Hand(1, K_Wand);
+			for (int32 K : { K_Helmet, K_Chest, K_Boots }) Wear(K, AS_Wizard);
+			if (Worn[K_Book] == 0) Worn[K_Book] = TakeFor(K_Book, GearId(K_Book, 0));
+		}
+		else if (bTroll)
+		{
+			Hand(0, K_Club);
+			for (int32 K = K_Helmet; K <= K_Boots; ++K) Wear(K, AS_Troll);
+			bool bRocks = false;
+			for (const FInvSlot& S : Slots) if (IsRock(S.Id)) bRocks = true;
+			if (!bRocks) AddInvItem(IdRocks, StartRocks);
+		}
+		else
+		{
+			Hand(0, K_Sword); Hand(1, K_Bow);
+			bool bArrows = false;
+			for (const FInvSlot& S : Slots) if (IsArrow(S.Id)) bArrows = true;
+			if (!bArrows) { AddInvItem(ArrowId(T_Iron), StartIronArrows); AddInvItem(IdFireArrow, StartFireArrows); }
+			if (Worn[K_Shield] == 0) Worn[K_Shield] = TakeFor(K_Shield, GearId(K_Shield, 0));
+			for (int32 K = K_Helmet; K <= K_Boots; ++K) Wear(K, AS_Light);
+		}
+	}
+	if (Hotbar[FMath::Clamp(Selected, 0, NumHotbar - 1)] == 0) for (int32 h = 0; h < NumHotbar; ++h) if (Hotbar[h]) { SetSelected(h); break; }
+	if (bMoved) OnGearChanged.Broadcast();
 }

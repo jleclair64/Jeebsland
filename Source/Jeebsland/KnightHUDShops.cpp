@@ -39,7 +39,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	WindowTitle(TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
+	WindowTitle(Knight->IsBroomShopOpen() ? TEXT("THE BROOM STALL") : TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
@@ -53,6 +53,12 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
 		static const EItemType Sellable[17] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
 			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers };
+	if (Knight->IsBroomShopOpen())
+	{
+		HDText(TEXT("The broom seller only sells brooms and buys nothing."), FLinearColor(0.85f, 0.85f, 0.85f), PX + 30.f, PY + 100.f, Font, 1.0f);
+		HDText(TEXT("Sell your goods at the trading post in town."), FLinearColor(0.75f, 0.75f, 0.75f), PX + 30.f, PY + 130.f, Font, 0.95f);
+	}
+	else {
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
 	int32 Row = 0;
 	for (int32 m = 0; m < UE_ARRAY_COUNT(Sellable) && Row < 10; ++m)
@@ -91,6 +97,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		}
 	}
 
+	}
 	// ----- Buy (right): this hour's random wares, and the mystery satchel -----
 	{
 		const float RX = PX + 574.f, RW = PW - 574.f - 30.f;
@@ -156,6 +163,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		}
 
 		// The mystery satchel
+		if (!Knight->IsBroomShopOpen())   // (the broom seller has no satchel: the server only rolls one at the trading post)
 		{
 			const float BY = PY + 96.f + 3 * (CH + 8.f) + 4.f, BH = 74.f;
 			const int64 Hour = JeebStore::HourNow();

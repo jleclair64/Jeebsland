@@ -6,6 +6,7 @@
 #include "Messages.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
+#include "JeebTuning.h"
 #include "Projectile.h"
 #include "HitBoxes.h"
 #include "Components/StaticMeshComponent.h"
@@ -365,6 +366,13 @@ void AKnightCharacter::TickBow(float Dt)
 			RoomCam = FMath::FInterpTo(RoomCam, AHouseInterior::CamScaleAt(GetWorld(), GetActorLocation()), Dt, 3.f);
 			Boom->TargetArmLength = FMath::Lerp(540.f * RoomCam, FMath::Min(BowCamLength, 540.f * RoomCam), A);
 			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
+			{
+				// the wizard (always, owner 2026-11-22: "I want the wizard always to the left ... he doesn't aim, just shoots"): the reticle is the middle of the
+				// screen, so the camera sits over his right shoulder and he stands left of it; it eases in and out only when the class changes
+				const float Side = JeebTune::V().CastCamSide;
+				CastCamAlpha = FMath::FInterpTo(CastCamAlpha, (bIsWizard && Side > 0.f) ? 1.f : 0.f, Dt, FMath::Max(0.5f, JeebTune::V().CastCamBlend));
+				Boom->SocketOffset.Y += Side * CastCamAlpha * CastCamAlpha * (3.f - 2.f * CastCamAlpha) * (1.f - A);
+			}
 			// A jump leaves the ground at full speed, and a camera nailed to him whips the whole world up and down with it: its height follows softly instead, the same whatever the frame rate.
 			const float Z = GetActorLocation().Z;
 			if (!bAimCamZSet) { AimCamZ = Z; bAimCamZSet = true; }

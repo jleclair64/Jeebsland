@@ -641,7 +641,8 @@ void AKnightHUD::DrawSwapPopup(AKnightCharacter* Knight)
 			const bool bFits = SwapSlot == 4 ? IsPotion(S.Id)
 				: !IsGear(S.Id) ? false
 				: SwapSlot == 1 ? KindOf(S.Id) == Kind
-				: FitsBarSlot(SwapSlot == 2 ? 1 : 0, S.Id) && !IsShooter(KindOf(S.Id));   // (2026-11-22: either slot takes any weapon or tool but a bow)
+				: (SwapSlot == 2 && !Knight->IsWizard() && !Knight->IsTroll()) ? IsShooter(KindOf(S.Id))   // (a knight's second slot is his bow: bows only again, owner 2026-11-22)
+				: FitsBarSlot(SwapSlot == 2 ? 1 : 0, S.Id) && !IsShooter(KindOf(S.Id));   // (the wizard's wand slot: any weapon but a bow)
 			if (bFits) List.Add({ S.Id, S.Count, i });
 		}
 		if (SwapSlot == 1 && Sk->Worn[Kind] != 0) List.Add({ 0, 0, -2 });

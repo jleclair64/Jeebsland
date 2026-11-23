@@ -152,6 +152,7 @@ public:
 	bool BankWithdraw(int32 BankIdx);    // the whole stack (or as much as fits in the pack)
 	bool BankDepositHot(int32 H);        // a weapon straight from the weapon bar
 	void StowRetiredGear();              // (server, after a save is read) bows off the bar into the pack or bank; a wizard's missing wand
+	void FitToClass();                   // (server, after a save is read) gear this class cannot use goes into the pack, and the class gets back its own or a starter piece (class switches)
 	int32 BankUsed() const;
 
 	// The 16 inventory slots (drawn by the HUD, changed by the shops and equipping)
