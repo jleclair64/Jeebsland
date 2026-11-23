@@ -465,3 +465,10 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON: When a one-handed swing borrows another character's cut on a bigger body, check from the side and the front that the weapon stays outside the torso and above the floor on every in-between frame.
 - LESSON: A held pose with a held weapon must keep the weapon clear of the raised arm and chest from the side too.
 - LESSON: Before blaming a retarget for body warping, read the mesh's skin weights (troll belt 90% on thighs, face 30% on shoulders).
+
+## Fireflies and frogs (2026-11-22, agent critters)
+- LESSON: a Meshy glb arrives with split vertices at every UV seam; decimating it as is opens hairline see-through cracks that show as white flecks along the seams in game. Weld first (`bmesh.ops.remove_doubles`, `Tools/frog_clean.py`) and bake a fresh atlas with a 16 px margin; Meshy's own shrunk pictures bled white at the seams.
+- LESSON: `-ShotEyes` puts the (hidden) pawn under the eye, so anything that reacts to the player (frogs hop, animals bolt) reacts to the camera: set the reaction off (`-ExecCmds="jeeb.Frog.Scare 0"`) for stills, and an eye's Z is above the terrain's HeightAt there, not absolute (water's bed is 1-2 m lower: the log prints HeightAt).
+- LESSON: glowing dots a few centimetres wide vanish past about 10 m even with a strong emissive; scale a far glow with distance, and test with a picture at night before trusting a log count.
+- LESSON: a facing that is interpolated toward a target must start with the target equal to the current facing, and use shortest-arc steps (`FindDeltaAngleDegrees`), or every new actor spins to yaw 0 first.
+- LESSON: a Build.bat started from a background Git Bash loses its console ("SetConsoleWindowTitle" error) yet still builds; run builds through the PowerShell tool.
