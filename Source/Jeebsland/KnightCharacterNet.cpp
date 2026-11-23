@@ -265,8 +265,9 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 	case EInvOp::BuyBroom:   // (Silver Point's broom stall, 2026-11-22: the price is the server's sheet, the stall's place the server's plan)
 	{
-		if (!NearBroomStall()) break;
+		if (!NearBroomStall()) { UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s refused: not at the stall (%.0f cm off)"), *GetName(), FVector::Dist2D(GetActorLocation(), JeebBroom::StallSpot())); break; }
 		const JeebBroom::FBroomRow& R = JeebBroom::Row(A);
+		UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s asks for row %d id %d (expects %d, price %d, ingots %d, room %d)"), *GetName(), A, B, BroomId(A), R.Price, Sk->GetIngots(), Sk->CanAdd(B, 1) ? 1 : 0);
 		if (A < 0 || A >= JeebBroom::NumBrooms() || BroomId(A) != B || R.Price <= 0) { ShopNote(TEXT("The stall has changed. Have another look.")); break; }
 		if (Sk->GetIngots() < R.Price) ShopNote(TEXT("Not enough ingots."));
 		else if (!Sk->CanAdd(B, 1)) ShopNote(TEXT("Your pack is full."));
