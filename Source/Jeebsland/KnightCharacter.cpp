@@ -123,6 +123,7 @@ void AKnightCharacter::BeginPlay()
 		if ((bIsTroll || bIsWizard) && HasAuthority()) Skills->ResetToStartingKit();   // (the troll's own kit: the club, no knight's gear)
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
+		Skills->EnsureStarterSpells();   // TEMPORARY (test setup): both spells learned and in the F cycle
 	}
 	// TESTING ONLY: editor Play in single player on the owner's PC gets every skill at 99 while MaxLevelInEditor is on
 	// ([Jeebsland.Testing] in DefaultGame.ini; online logins are handled by AKnightGameMode). Never in a packaged game.
@@ -333,6 +334,10 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(NextWeaponAction, EKeys::R);   // (R steps through the weapon bar; the wheel no longer does)
 	ArrowsAction = MakeBool(TEXT("KnightArrows"));
 	KnightContext->MapKey(ArrowsAction, EKeys::F);   // (F picks the arrows: the arrow slot)
+	SpellMouseActions[0] = MakeBool(TEXT("KnightSpell2"));
+	KnightContext->MapKey(SpellMouseActions[0], EKeys::ThumbMouseButton);    // (mouse button 4: the wizard's second spell)
+	SpellMouseActions[1] = MakeBool(TEXT("KnightSpell3"));
+	KnightContext->MapKey(SpellMouseActions[1], EKeys::ThumbMouseButton2);   // (mouse button 5: his third)
 	InventoryAction = MakeBool(TEXT("KnightInventory"));
 	KnightContext->MapKey(InventoryAction, EKeys::Tab);
 	PanelTabAction = MakeBool(TEXT("KnightPanelTab"));
@@ -410,6 +415,11 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(HotbarActions[2], ETriggerEvent::Started, this, &AKnightCharacter::Select3);
 		EIC->BindAction(HotbarActions[3], ETriggerEvent::Started, this, &AKnightCharacter::Select4);
 		EIC->BindAction(HotbarActions[4], ETriggerEvent::Started, this, &AKnightCharacter::Select5);
+		// (2026-11-22) the wizard's spell slots: 1-3 and mouse buttons 4 and 5, let go to cast
+		for (int32 i = 0; i < 3; ++i) EIC->BindAction(HotbarActions[i], ETriggerEvent::Completed, this, &AKnightCharacter::SpellKeyUp);
+		EIC->BindAction(SpellMouseActions[0], ETriggerEvent::Started, this, &AKnightCharacter::Spell2Down);
+		EIC->BindAction(SpellMouseActions[1], ETriggerEvent::Started, this, &AKnightCharacter::Spell3Down);
+		for (int32 i = 0; i < 2; ++i) EIC->BindAction(SpellMouseActions[i], ETriggerEvent::Completed, this, &AKnightCharacter::SpellKeyUp);
 	}
 }
 

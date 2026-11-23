@@ -337,6 +337,15 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	case EInvOp::ChooseArrows:
 		if (A == 0 || (IsArrow(A) && Sk->CountItem(A) > 0)) ArrowPick = A;
 		break;
+	case EInvOp::ChooseSpell:   // (the server checks the slot holds a spell he has learned and has the Magic level for)
+		if (bIsWizard) Sk->PickSpellRow(A);
+		break;
+	case EInvOp::EquipSpell:
+		if (bIsWizard) Sk->SetSpellCell(A, B);
+		break;
+	case EInvOp::CastSlot:
+		if (bIsWizard && A >= 0 && A < USkillComponent::SpellSlots) Sk->CastSlot = uint8(A);
+		break;
 	case EInvOp::TakeFromWall:
 	{
 #if !UE_BUILD_SHIPPING

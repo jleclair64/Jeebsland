@@ -9,6 +9,7 @@
 // Numbers: Content/Data/Tuning.ini [Wizard].
 #include "KnightCharacter.h"
 #include "SpellFx.h"
+#include "SkillComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "KnightMovement.h"
@@ -174,7 +175,10 @@ void AKnightCharacter::TickWizard(float Dt)
 			// (2026-11-22) a full charge with the staff at 15 s, then taps at 18.5 s and on until the magic is gone (log JEEBCAST on the server)
 			else if (NetStep == 3 && NetT > 15.f) { NetStep = 4; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: charging")); BeginCastCharge(); }
 			else if (NetStep == 4 && NetT > 16.6f) { NetStep = 5; UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: release, charge %.2f"), CastChargeFrac()); ReleaseCastCharge(); }
-			else if (NetStep >= 5 && NetStep < 14 && NetT > 18.5f + (NetStep - 5) * 0.8f) { ++NetStep; BeginCastCharge(); ReleaseCastCharge(); UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: tap %d, magic I see %.0f"), NetStep - 5, Magic); }
+			else if (NetStep >= 5 && NetStep < 14 && NetT > 18.5f + (NetStep - 5) * 0.8f) { ++NetStep;
+				// (2026-11-22) F before the fourth tap: the rest are Fire Bolts (log JEEBSPELL on the server and on every client that sees them)
+				if (NetStep == 8) { Inv(EInvOp::EquipSpell, 3, 2); UE_LOG(LogTemp, Log, TEXT("JEEBSPELL net test: Fire Bolt into row 2 slot 1")); }
+				if (NetStep == 9 && Skills) { CycleArrows(); UE_LOG(LogTemp, Log, TEXT("JEEBSPELL net test: F, slot %d"), Skills->SpellPick); } BeginCastCharge(); ReleaseCastCharge(); UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD net test: tap %d, magic I see %.0f"), NetStep - 5, Magic); }
 		}
 	}
 #endif

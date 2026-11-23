@@ -83,6 +83,9 @@ enum class EInvOp : uint8
 	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
 	ChooseArrows,   // A: the arrow id to shoot next
 	HouseDoor,      // At: an open house's door hinge (AHouseInterior::DoorKey): open or shut it (E)
+	ChooseSpell,    // A: the wizard's loadout row to cast from (F, or a click in the spell book)
+	EquipSpell,     // A: a cell of the spell book's 3x3 grid (row * 3 + slot), B: the spell row + 1 to put in it (0: empty it)
+	CastSlot,       // A: which of the active row's three spells the next cast is (sent just before the charge starts)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -370,7 +373,7 @@ public:
 	// and never believes more charge than it has seen; damage is x1 to x CastChargeMax. Others see the tip's glow grow (bCastChargingRep).
 	bool IsChargingCast() const { return bCastCharging; }
 	float CastChargeFrac() const;
-	void BeginCastCharge();
+	void BeginCastCharge(int32 Slot = 0);   // Slot: which of the active row's three spells (the server is told first: EInvOp::CastSlot)
 	void ReleaseCastCharge();
 	void CancelCastCharge();
 	UFUNCTION(Server, Reliable) void ServerCastCharge(bool bOn);
@@ -555,9 +558,15 @@ protected:
 	void OnSkillsKey() { ToggleSkills(); }
 	void RefreshUIMode();
 	void OnSettingsKey() { ToggleSettings(); }
-	void Select1() { SelectHotbar(0); }          // keys 1-5 pick the weapon bar slot
-	void Select2() { SelectHotbar(1); }
-	void Select3() { SelectHotbar(2); }
+	void Select1() { if (!SpellKeyDown(0)) SelectHotbar(0); }          // keys 1-5 pick the weapon bar slot (a wizard with wand or staff: 1-3 cast his spells)
+	void Select2() { if (!SpellKeyDown(1)) SelectHotbar(1); }
+	void Select3() { if (!SpellKeyDown(2)) SelectHotbar(2); }
+	// (owner, 2026-11-22) the wizard's three spell slots of his active loadout row: slot 1 left click or 1, slot 2 mouse button 4 or 2,
+	// slot 3 mouse button 5 or 3. Hold to charge, let go to cast. False: not a wizard holding a wand or staff (the key does its usual job).
+	bool SpellKeyDown(int32 Slot);
+	void SpellKeyUp() { if (bCastCharging) ReleaseCastCharge(); }
+	void Spell2Down() { SpellKeyDown(1); }
+	void Spell3Down() { SpellKeyDown(2); }
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
 	void ScrollUp() { StartKick(); }   // (the wheel up kicks)
@@ -623,6 +632,7 @@ private:
 	UPROPERTY() UInputAction* NextWeaponAction = nullptr;
 	UPROPERTY() UInputAction* ArrowsAction = nullptr;   // F: the next kind of arrows
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+	UPROPERTY() UInputAction* SpellMouseActions[2] = { nullptr, nullptr };   // mouse buttons 4 and 5: the wizard's spell slots 2 and 3
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
 	UPROPERTY() TArray<UStaticMeshComponent*> HeldStatics;       // the parts of it that are models from /Game/Props

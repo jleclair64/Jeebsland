@@ -3,6 +3,8 @@
 #include "Engine/Engine.h"
 #include "Inventory.h"
 #include "Lore.h"
+#include "JeebSpells.h"
+#include "Misc/ConfigCacheIni.h"
 #include "Terrain.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/Pawn.h"
@@ -270,6 +272,84 @@ void USkillComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 	DOREPLIFETIME_CONDITION(USkillComponent, LoreFound, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(USkillComponent, Explored, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(USkillComponent, LastGambleHour, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, SpellLevels, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, SpellEquip, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(USkillComponent, SpellPick, COND_OwnerOnly);
+}
+
+// ---- the wizard's spell book (JeebSpells.h) ----
+bool USkillComponent::CanUseSpell(int32 Row) const
+{
+	return Row >= 0 && Row < JeebSpells::Num() && SpellLevel(Row) > 0 && GetLevel(ESkillType::Magic) >= JeebSpells::Get(Row).LevelNeeded;
+}
+
+int32 USkillComponent::SpellInCell(int32 Cell) const
+{
+	if (!SpellEquip.IsValidIndex(Cell) || SpellEquip[Cell] == 0) return -1;
+	const int32 Row = SpellEquip[Cell] - 1;
+	return CanUseSpell(Row) ? Row : -1;
+}
+
+int32 USkillComponent::NextSpellRow() const
+{
+	for (int32 s = 1; s <= SpellRows; ++s)
+	{
+		const int32 R = (SpellPick + s) % SpellRows;
+		for (int32 k = 0; k < SpellSlots; ++k) if (SpellInCell(R * SpellSlots + k) >= 0) return R;   // (fully empty rows are skipped)
+	}
+	return SpellPick;
+}
+
+void USkillComponent::EnsureStarterSpells()
+{
+	if (!HasAuth()) return;
+	SpellEquip.SetNum(SpellRows * SpellSlots);
+	if (SpellLevels.Num() < JeebSpells::Num()) SpellLevels.SetNum(JeebSpells::Num());
+	bool bAnyEquipped = false;
+	for (uint8 E : SpellEquip) bAnyEquipped |= E > 0;
+	// (owner, 2026-11-22: "I don't want players to start with zero spells") the standard damage spell, row 0 of Spells.csv, always learned
+	if (SpellLevels.Num() > 0 && SpellLevels[0] == 0) SpellLevels[0] = 1;
+	// TEMPORARY test setting (owner: "For testing for me, unlock them all as we create them"): [Jeebsland.Testing] UnlockAllSpells in
+	// DefaultGame.ini learns every spell in Spells.csv, new rows too. Never in Shipping.
+	bool bUnlockAll = false;
+#if !UE_BUILD_SHIPPING
+	if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("UnlockAllSpells"), bUnlockAll, GGameIni);
+#endif
+	if (bUnlockAll) for (int32 r = 0; r < JeebSpells::Num(); ++r) if (SpellLevels[r] == 0) SpellLevels[r] = 1;
+	if (!bAnyEquipped) SpellEquip[0] = 1;   // (row 1, slot 1: the standard spell; slots may stay empty)
+	if (SpellPick >= SpellRows) SpellPick = 0;
+}
+
+bool USkillComponent::LearnSpell(int32 Row)
+{
+	if (!HasAuth() || Row < 0 || Row >= JeebSpells::Num()) return false;
+	if (SpellLevels.Num() < JeebSpells::Num()) SpellLevels.SetNum(JeebSpells::Num());
+	if (SpellLevels[Row] > 0) return false;
+	SpellLevels[Row] = 1;
+	return true;
+}
+
+bool USkillComponent::UpgradeSpell(int32 Row)
+{
+	if (!HasAuth() || SpellLevel(Row) <= 0 || SpellLevel(Row) >= JeebSpells::Get(Row).MaxLevel) return false;
+	++SpellLevels[Row];
+	return true;
+}
+
+bool USkillComponent::SetSpellCell(int32 Cell, int32 RowPlusOne)
+{
+	if (!HasAuth() || Cell < 0 || Cell >= SpellRows * SpellSlots) return false;
+	if (RowPlusOne != 0 && !CanUseSpell(RowPlusOne - 1)) return false;
+	SpellEquip.SetNum(SpellRows * SpellSlots);
+	SpellEquip[Cell] = uint8(RowPlusOne);
+	return true;
+}
+
+bool USkillComponent::PickSpellRow(int32 Row)
+{
+	if (!HasAuth() || Row < 0 || Row >= SpellRows) return false;
+	SpellPick = uint8(Row);
+	return true;
 }
 
 bool USkillComponent::CanAdd(int32 Id, int32 Amount) const

@@ -2,6 +2,7 @@
 #include "KnightDesign.h"
 #include "Inventory.h"
 #include "Projectile.h"
+#include "SkillComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -122,10 +123,26 @@ float AKnightCharacter::CastChargeFrac() const
 	return FMath::Clamp(Held / FMath::Max(0.05f, T.CastChargeTime - T.CastTapTime), 0.f, 1.f);
 }
 
-void AKnightCharacter::BeginCastCharge()
+bool AKnightCharacter::SpellKeyDown(int32 Slot)
+{
+	const int32 K = SelectedKind();
+	if (!bIsWizard || !(K == JeebItems::K_Wand || K == JeebItems::K_Staff)) return false;
+	if (bAttacking || bDrinking || bKnockedDown || IsUIOpen() || bPanelCursor || bBlocking) return true;
+	BeginCastCharge(Slot);
+	return true;
+}
+
+void AKnightCharacter::BeginCastCharge(int32 Slot)
 {
 	const int32 K = SelectedKind();
 	if (bCastCharging || !(K == JeebItems::K_Wand || K == JeebItems::K_Staff)) return;
+	// (2026-11-22) a wizard's empty slot casts nothing; the server is told which slot before the charge (both reliable, in order)
+	if (bIsWizard && Skills)
+	{
+		if (Skills->SpellAt(Slot) < 0) { Skills->Say(1.5f, FColor(200, 200, 200), FString::Printf(TEXT("Spell slot %d is empty: Tab, SPELL BOOK"), Slot + 1)); return; }
+		Skills->CastSlot = uint8(Slot);
+		Inv(EInvOp::CastSlot, Slot);
+	}
 	bCastCharging = true;
 	CastChargeStart = GetWorld()->GetTimeSeconds();
 	if (GetNetMode() != NM_Standalone && !HasAuthority()) ServerCastCharge(true);

@@ -520,13 +520,15 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 	const float SS = 46.f, Step = SS + 12.f;   // small slots, low on the screen
 	const float BarGap = 18.f;   // (owner 2026-11-06: the same gap before the bow as before the potion; every other place reads BarCellX)
 	// (owner 2026-11-22: a wizard has no arrow slot: staff, book, wand, then the potion)
-	const bool bNoArrows = Knight->IsWizard();
-	const float TotalW = (bNoArrows ? 3.f : 4.f) * Step + 2.f * BarGap + SS;
+	// (owner 2026-11-22, later: "make the F key switch spells, similar to how the knight switches arrows": the arrow slot's place shows his spell)
+	const bool bSpellCell = Knight->IsWizard();
+	const bool bNoArrows = false;
+	const float TotalW = (bNoArrows ? 3.f : 4.f) * Step + 2.f * BarGap + SS + (bSpellCell ? 2.f * Step : 0.f);   // (his three spell cells)
 	const float X0 = (Canvas->ClipX - TotalW) * 0.5f;
-	auto SlotX = [&](int32 Pos) { const int32 P = (bNoArrows && Pos == 4) ? 3 : Pos; return X0 + P * Step + (P >= 2 ? BarGap : 0.f) + (Pos >= 4 ? BarGap : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
+	auto SlotX = [&](int32 Pos) { const int32 P = (bNoArrows && Pos == 4) ? 3 : Pos; return X0 + P * Step + (P >= 2 ? BarGap : 0.f) + (Pos >= 4 ? BarGap + (bSpellCell ? 2.f * Step : 0.f) : 0.f); };   // 0 hand, 1 shield, 2 bow, 3 arrows, 4 potion
 	const float Y0 = Canvas->ClipY - 46.f - SS;   // just above the health bar
 	for (int32 p = 0; p < 5; ++p) BarCellX[p] = SlotX(p);
-	if (bNoArrows) BarCellX[3] = -100000.f;   // (no arrow cell to click)
+	if (bSpellCell) BarCellX[3] = -100000.f;   // (no arrow cell to click: the spell cell instead)
 	BarCellY = Y0;
 
 	for (int32 i = 0; i < NumHotbar; ++i)
@@ -643,7 +645,8 @@ void AKnightHUD::DrawWeaponBar(AKnightCharacter* Knight)
 
 	// The arrow slot, right of the bow: the arrows the bow shoots next and how many of them are left. F picks the next kind you
 	// carry; a click with the cursor out lists them (DrawSwapPopup).
-	if (!bNoArrows && !Knight->IsTroll())   // (nor the troll: he throws rocks, 2026-11-22)
+	if (bSpellCell) DrawSpellCell(Knight, SlotX(3), Y0, SS, Step);   // (KnightHUDSpells.cpp)
+	if (!bSpellCell && !Knight->IsTroll())   // (nor the troll: he throws rocks, 2026-11-22)
 	{
 		const float X = SlotX(3);
 		Panel(X - 3.f, Y0 - 3.f, SS + 6.f, SS + 6.f);
