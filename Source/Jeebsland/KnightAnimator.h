@@ -175,6 +175,7 @@ namespace JeebAnim
 		bool bClimbing = false; float ClimbPhase = 0.f;
 		bool bSitting = false;
 		bool bMounted = false;   // riding (the test horse): the sitting pose, raised to the saddle
+		bool bBroom = false;     // (2026-11-22) on the wizard's broom: the riding pose, raised only to the broom (jeeb.Broom.Raise)
 		bool bSliding = false;
 		bool bFishing = false;
 		bool bDrinking = false; float DrinkU = 0.f;   // a potion on its way down: 0..1

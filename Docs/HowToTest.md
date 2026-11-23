@@ -14,6 +14,16 @@ for the map / settings screen there. For full screen with a working Escape, pick
 it plays offline straight away. To change the editor's Stop key: Editor
 Preferences > Keyboard Shortcuts > search "Stop" > set it to Shift+Escape.
 
+## The wizard's flying broom (2026-11-22, agent `broom`)
+
+| What | How to test |
+|---|---|
+| Getting a broom | Test kit, row "Flying brooms" (four brooms), or the quest: **Hazel Fernwick** (purple, by the plaza oak in Oak Hill) asks for 4 logs and 2 beast hides and gives **Hazel's Old Broom** (+150 Magic XP). Or buy one at **Silver Point's broom stall** (purple striped awning on the green, E opens it; Oak Broom 400, Ashwood 1200, Starlight 3500 ingots). Brooms: `Content/Data/Brooms.csv`. |
+| Flying | As a wizard (`-PlayAs=Wizard`), press **T**: he hops onto the best broom in his pack. WASD steers, **Space** climbs, **Ctrl** sinks, up to 80 m above the ground. Full speed is the horse's gallop (23 m/s; x the broom's SpeedMul). **T** within 3 m of the ground steps off. Knights' T still calls the horse. |
+| Magic | The magic bar is **purple** now. Flying drains it (Brooms.csv Drain, 2.5-3.5 a second) and it does not refill in the air. At 0 the broom slows to a halt, then drifts straight down at 2.5 m/s and he steps off on landing. Spells cast in flight cost 1.5x. Holding the orb guard drains it too (MagicCosts.csv: book 8/s, crystal ball 6/s, pipe 10/s); with none left the orb drops and needs 10 back to rise. The bar grows by 2 for each Magic level above 1 (Magic XP comes from spell damage). Tuning.ini `[Broom]` and `[Wizard]` MagicPerLevel. |
+| Online | `bash Tools/broom_net.sh`: a server and two wizard clients; one flies to the ceiling, runs out and lands, the other buys at the stall and finishes Hazel's quest (log `JEEBBROOMTEST` PASS/FAIL, `JEEBBROOMSEE` what the other client saw). |
+| Live sliders | `jeeb.Broom.Raise` (how high he sits), `jeeb.Broom.Forward`, `jeeb.Broom.Pitch`, `jeeb.Broom.Scale`; Tuning.ini `BroomSeatUp`. |
+
 ## Blackrock removed (2026-11-22)
 
 Blackrock, the walled village west of the river from Oak Hill, is out of the game (owner: out of date, something else goes there soon). Gone: its palisade, gates, wall walk and ladders, corner towers, fountain and benches, the five huts inside, Sir Aldous at the gate, its three villagers (Mabry, Dame Orsolya, Brother Ansel), its fill props, its fast-travel point, its candle strings, plaza lamps and wall torches, its walk-in title and its square on the Tab map and name on the world map. The site (about 40 x 40 m at the old village centre, -29 m / -3 m from the world origin) stays level, tree-free open grass for the next town; the roads still lead to it.

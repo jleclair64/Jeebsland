@@ -250,6 +250,15 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		DiscP(32, 25, 14, 11.5f, Dark); DiscP(31, 23, 12.5f, 10, Mid); DiscP(27, 19, 4.5f, 3, Hi);
 		return;
 	}
+	// ---------------- a flying broom: a handle across the slot and a straw bundle (2026-11-22) ----------------
+	if (IsBroom(Id))
+	{
+		const FLinearColor Wood(0.36f, 0.17f, 0.08f), Straw(0.86f, 0.68f, 0.36f), Band(0.9f, 0.7f, 0.22f);
+		Poly({ P(54.f, 6.f), P(58.f, 10.f), P(27.f, 41.f), P(23.f, 37.f) }, Wood);
+		Poly({ P(25.f, 35.f), P(29.f, 39.f), P(14.f, 62.f), P(2.f, 50.f) }, Straw);
+		Poly({ P(22.f, 34.f), P(30.f, 42.f), P(27.f, 45.f), P(19.f, 37.f) }, Band);
+		return;
+	}
 	// ---------------- arrows: a bundle of three ----------------
 	if (IsArrow(Id))
 	{

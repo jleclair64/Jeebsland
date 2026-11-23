@@ -352,6 +352,15 @@ void AKnightHUD::ItemTip(int32 Id)
 		SetTip(L);
 		return;
 	}
+	if (IsBroom(Id))   // (a flying broom, 2026-11-22: Brooms.csv)
+	{
+		const JeebBroom::FBroomRow& R = JeebBroom::Row(BroomRowOf(Id));
+		L.Add(ItemName(Id));
+		if (!R.Blurb.IsEmpty()) L.Add(R.Blurb);
+		L.Add(FString::Printf(TEXT("Speed x%.1f, %.1f magic a second while flying. T to call it (wizards only)"), R.SpeedMul, R.Drain));
+		SetTip(L);
+		return;
+	}
 	if (IsRock(Id))
 	{
 		L.Add(ItemName(Id));

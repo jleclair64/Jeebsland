@@ -83,6 +83,7 @@ enum class EInvOp : uint8
 	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
 	ChooseArrows,   // A: the arrow id to shoot next
 	HouseDoor,      // At: an open house's door hinge (AHouseInterior::DoorKey): open or shut it (E)
+	BuyBroom,       // A: the row in Brooms.csv, B the id the player saw (Silver Point's broom stall)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -1064,6 +1065,38 @@ private:
 	bool bSideways = false; // woodcutting sweeps the arm sideways instead of overhead
 
 	TArray<TPair<UStaticMeshComponent*, FLinearColor>> Parts;
+
+	// ---------------- The wizard's flying broom (2026-11-22, owner; KnightCharacterBroom.cpp) ----------------
+	// T calls the best broom he carries (Brooms.csv) and he rides it (MOVE_Flying, UKnightMovement::PhysFlying): Space climbs, Ctrl sinks, up to
+	// Tuning.ini [Broom] BroomCeiling metres above the ground. It drains magic; with none left it slows to a halt and drifts down, and he steps off
+	// on landing. Everything is the server's: it starts and ends the ride, drains the bar and tells everyone (bOnBroom replicates to all).
+public:
+	bool IsOnBroom() const { return bOnBroom; }        // (replicated to everyone: for the later double-arrow-damage rule)
+	bool IsBroomEmpty() const { return bBroomEmpty; }  // out of magic: drifting down
+	float MagicCap() const;                            // the bar's size: MagicMax + MagicPerLevel x (Magic level - 1)
+	float SpellCostMul(int32 Kind, int32 Tier) const;  // the spell-cost hook: the item's CastMul (MagicCosts.csv) x BroomSpellCostMul in flight
+	bool IsBroomShopOpen() const { return bShopOpen && bBroomShop; }
+	bool NearBroomStall() const;
+	void OpenBroomShop();
+	void ToggleBroom();                                // (T, for a wizard)
+	int32 BestBroomRow() const;                        // the best broom in his pack (-1: none)
+protected:
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bOnBroom = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bBroomEmpty = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) uint8 BroomRow = 0;
+	UFUNCTION() void OnRep_Broom();
+	UFUNCTION(Server, Reliable) void ServerToggleBroom();
+	void StartBroomSrv(int32 Row);
+	void EndBroomSrv(const TCHAR* Why);
+	void ApplyBroomMovement();
+	void TickBroom(float Dt);
+	void UpdateBroomModel();
+	float WizardGuardDrain() const;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BroomModel;
+	bool bBroomShop = false;
+	bool bGuardMagicOut = false;   // (the server: the orb guard dropped for want of magic until the bar is back to BroomMinMagic)
+	bool bBroomApplied = false;    // (this machine has put the movement into flight)
+	float BroomTestT = 0.f; int32 BroomTestStep = 0;
 };
 
 // The playable troll (2026-11-19): the knight's pawn in troll mode (KnightCharacterTroll.cpp). AKnightGameMode gives one to a player who

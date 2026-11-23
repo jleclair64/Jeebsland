@@ -1,0 +1,11 @@
+Item,Tier,CastMul,GuardDrain
+# Magic costs by item (2026-11-22). Item: Wand, Staff (the spell's cost: Tuning.ini [Wizard] MagicTapCost to MagicFullCost, x CastMul),
+# Book, Ball, Pipe (the off-hand item: GuardDrain = magic a second while the orb guard is held). Tier: all, or one tier (Tin, Iron, Silver, Gold, Emerald, Diamond)
+# to override the "all" row for it. Brooms' drain is in Brooms.csv; casting on a broom costs x Tuning.ini [Broom] BroomSpellCostMul more.
+Wand,all,1.0,0
+Staff,all,1.0,0
+Book,all,0,8
+Ball,all,0,6
+Pipe,all,0,10
+Book,Diamond,0,5
+Ball,Diamond,0,4

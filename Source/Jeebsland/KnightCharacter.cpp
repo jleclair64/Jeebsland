@@ -219,6 +219,9 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
+	DOREPLIFETIME(AKnightCharacter, bOnBroom);   // (the flying broom, everyone: KnightCharacterBroom.cpp)
+	DOREPLIFETIME(AKnightCharacter, bBroomEmpty);
+	DOREPLIFETIME(AKnightCharacter, BroomRow);
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, bRushing);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RushBar, COND_OwnerOnly);
@@ -459,6 +462,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickGear(Dt);
 	if (bIsTroll) TickTroll(Dt);
 	if (bIsWizard) TickWizard(Dt);   // (the orb and the teleport's puffs: KnightCharacterWizard.cpp)
+	TickBroom(Dt);   // (the wizard's flying broom: KnightCharacterBroom.cpp)
 	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)

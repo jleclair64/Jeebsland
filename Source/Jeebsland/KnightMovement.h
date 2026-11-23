@@ -99,6 +99,7 @@ public:
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
+	virtual void PhysFlying(float DeltaTime, int32 Iterations) override;   // (the wizard's broom: KnightCharacterBroom.cpp)
 	virtual void PhysicsRotation(float DeltaTime) override;
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	virtual float GetMaxSpeed() const override;

@@ -178,8 +178,9 @@ void AKnightCharacter::TickCastCharge(float Dt)
 	if (HasAuthority())   // (the magic bar fills again after a pause: the server's number)
 	{
 		const auto& TM = JeebTune::V();
-		if (Magic < TM.MagicMax && GetWorld()->GetTimeSeconds() - MagicUsedAt > TM.MagicRegenDelay) Magic = FMath::Min(TM.MagicMax, Magic + TM.MagicRegen * Dt);
-		else if (Magic > TM.MagicMax) Magic = TM.MagicMax;
+		const float Cap = MagicCap();   // (the bar grows with the Magic level: KnightCharacterBroom.cpp)
+		if (Magic < Cap && GetWorld()->GetTimeSeconds() - MagicUsedAt > TM.MagicRegenDelay) Magic = FMath::Min(Cap, Magic + TM.MagicRegen * Dt);
+		else if (Magic > Cap) Magic = Cap;
 	}
 	const int32 K = SelectedKind();
 	const bool bCaster = K == JeebItems::K_Wand || K == JeebItems::K_Staff;
@@ -236,5 +237,5 @@ FVector AKnightCharacter::CastStartPoint(int32 Kind) const
 // ---------------- The wizard's magic bar (2026-11-22, owner) ----------------
 float AKnightCharacter::GetMagicFraction() const
 {
-	return FMath::Clamp(Magic / FMath::Max(1.f, JeebTune::V().MagicMax), 0.f, 1.f);
+	return FMath::Clamp(Magic / FMath::Max(1.f, MagicCap()), 0.f, 1.f);
 }

@@ -5,6 +5,7 @@
 #include "JeebItemData.h"
 #include "HitBoxes.h"
 #include "JeebTuning.h"
+#include "JeebBroomData.h"
 
 // ===================================================================================================
 // Everything about items: ids, names, stack sizes, damage and defence numbers, prices, smithing recipes,
@@ -69,6 +70,10 @@ namespace JeebItems
 	// (KnightCharacterRock.cpp). One kind, stacks to 99 like arrows.
 	constexpr int32 IdRocks = 940;
 	inline bool IsRock(int32 Id) { return Id == IdRocks; }
+	// Flying brooms (2026-11-22, owner): 930 + the row in Brooms.csv (JeebBroomData.h). One to a slot; T calls the best one you carry (wizards only).
+	inline bool IsBroom(int32 Id) { return JeebBroom::IsBroomRange(Id) && Id - JeebBroom::IdBase < JeebBroom::NumBrooms(); }
+	inline int32 BroomId(int32 Row) { return JeebBroom::IdBase + Row; }
+	inline int32 BroomRowOf(int32 Id) { return Id - JeebBroom::IdBase; }
 	// Potions: 950 + the row in Potions.csv. The first four rows are swiftness, healing, vigour and radar (the starting pack
 	// and the practice pack name them by these numbers).
 	constexpr int32 IdPotionBase = 950;
@@ -184,6 +189,7 @@ namespace JeebItems
 	{
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsRock(Id)) return TEXT("Throwing Rocks");
+		if (IsBroom(Id)) return JeebBroom::Row(BroomRowOf(Id)).Name;
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (IsMaterial(Id) && Tables().Materials.IsValidIndex(Id - 1)) return MaterialName(MaterialType(Id));   // (the wall's prompt names ores and fish too)
@@ -419,6 +425,7 @@ namespace JeebItems
 	inline int32 GearSellPrice(int32 Id)
 	{
 		if (IsArrow(Id) || IsRock(Id)) return 1;
+		if (IsBroom(Id)) return FMath::Max(1, JeebBroom::Row(BroomRowOf(Id)).Price / 2);
 		if (!IsGear(Id)) return 0;
 		return FMath::Max(1, BuyPrice(KindOf(Id), IsArmorKind(KindOf(Id)) ? FullVariant(Id) : VariantOf(Id)) / 2);
 	}
