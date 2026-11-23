@@ -23,6 +23,7 @@ class UInstancedStaticMeshComponent;
 class UProceduralMeshComponent;
 class ANpc;
 class AHorse;
+class URiderComponent;
 class UHealthComponent;
 class ACottage;
 class ALootDrop;
@@ -91,6 +92,7 @@ UCLASS()
 class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
+	friend struct FHorseTestDriver;   // (-JeebHorseTest, HorseTest.cpp)
 
 public:
 	AKnightCharacter(const FObjectInitializer& ObjectInitializer);
@@ -277,18 +279,19 @@ public:
 	// Gathering: puts the right tool in hand (and tells you if you have none). OutTimeMult speeds up better tools.
 	bool PrepareTool(ESkillType Skill, float& OutTimeMult);
 	float GetStaminaMult() const;
-	// Riding: T calls the horse, E beside it mounts. The bar counts 100 down while sprinting, then refills before the next sprint.
+	// Riding (Horse.h): E beside a horse mounts, T calls your own (hold 1 s: follow). The server decides who rides (RideHorse, replicated).
+	// The gallop bar counts 100 down over JeebHorse::GallopSecs while sprinting, then refills.
 	bool IsMounted() const { return bMounted; }
-	void MountHorse(AHorse* H) { Mount(H); }   // (test pictures: -ShotMount)
-	void DismountHorse() { Dismount(); }      // (test pictures: -ShotDismount)
+	AHorse* GetRideHorse() const { return RideHorse; }
+	void MountHorse(AHorse* H) { ServerSideMount(H); }   // (test pictures: -ShotMount; server)
+	void DismountHorse() { ServerSideDismount(); }      // (test pictures: -ShotDismount; server)
+	void ServerSideMount(AHorse* H);    // (server) H carries this knight now
+	void ServerSideDismount();          // (server) off the horse, beside it
+	URiderComponent* GetRider() const { return Rider; }
 	void SetStrafeForTest(bool bOn) { bStrafeMode = bOn; }
 	void SprintForTest(bool bOn) { if (bOn) StartSprint(); else StopSprint(); }
 	bool OrientsToMovement() const;
 	float GetHorseEnergy() const { return HorseEnergy; }   // 0 - 100
-	float GetHorseHealth() const { return HorseHealth; }
-	float GetHorseMaxHealth() const { return HorseMaxHealth; }
-	// The horse is hurt separately from the knight (its own hit boxes come later). Heals only after 10 s unhurt.
-	void HurtHorse(float Amount);
 	bool IsHorseTired() const { return bHorseTired; }
 	// Shield guard, for the HUD
 	float GetGuardFraction() const { return GuardMax > 0.f ? GuardPool / GuardMax : 0.f; }
@@ -546,9 +549,18 @@ protected:
 	FVector PendingRollDir = FVector::ZeroVector;
 	void OnInteractKey();       // E: sit, trade, talk, mount, open doors ...
 	void UseDoor(ACottage* Hut);   // open, close, or try to pick the lock
-	void CallHorse();           // (T, when the horse is back)
-	void Mount(AHorse* H);
+	void CallHorse();           // T pressed
+	void CallHorseUp();         // T let go: a tap calls your horse, a hold (1 s) makes it follow or stop following
+	double CallHorseDown = -1.0;
+	void Mount(AHorse* H);      // (asks the server)
 	void Dismount();
+	enum EHorseOp : uint8 { HO_Mount, HO_Dismount, HO_Call, HO_Follow };
+	UFUNCTION(Server, Reliable) void ServerHorse(uint8 Op, AHorse* H);
+	UPROPERTY(ReplicatedUsing = OnRep_RideHorse) AHorse* RideHorse = nullptr;
+	UFUNCTION() void OnRep_RideHorse();
+	void ApplyMount(bool bOn);  // (every machine that has this knight: the riding pose, the steering, the hop off)
+	UPROPERTY() URiderComponent* Rider = nullptr;
+	float RideDist = 0.f;       // (server) cm ridden toward the next Riding XP
 	void SitOnSeat(int32 SeatIdx);
 	void StandUp();
 	void OnInventoryKey();      // Tab: closes an open screen, otherwise frees or hides the cursor for the side panel
@@ -712,16 +724,13 @@ private:
 	int32 DialogueIdx = 0;
 	enum class EInteract : uint8 { None, Bench, Npc, Horse, Door, Loot, Drop, Arrow, GearWall };
 	EInteract FindInteractable(int32& OutIndex, ANpc*& OutNpc, AHorse*& OutHorse) const;
-	TWeakObjectPtr<AHorse> MyHorse;
 	bool bMounted = false;
 	float HorseEnergy = 100.f;
-	float HorseHealth = 100.f, HorseMaxHealth = 100.f;
 	float HorseSpeedNow = 0.f;   // the horse's current top speed while ridden (ramps up when sprinting)
 	bool bSavedOrientMount = true;
 	double LastBackTime = -10.0;          // last time S was held while riding (backing the horse up)
 	float StanceFwd = 0.f, StanceRight = 0.f;   // the last movement input while the shield is up
 	bool bBackOrient = false, bBackSavedOrient = true;
-	float LastHorseHurtTime = -100.f;
 	bool bHorseTired = false;
 	bool bFishing = false;
 	int32 GraphicsLevel = 1;      // see GetGraphicsLevel

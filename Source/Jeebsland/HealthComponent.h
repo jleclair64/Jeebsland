@@ -32,6 +32,7 @@ public:
 	TFunction<void(AActor* From)> OnDamaged;
 	// Optional: lets the owner soften a blow before it lands (a raised shield). Returns the damage that gets through.
 	TFunction<int32(int32 Amount, AActor* From)> ModifyDamage;
+	TFunction<bool(AActor* From)> CanBeHurt;   // (2026-11-22) false: no damage at all from From, hit boxes or not (horses outside PvP zones)
 	// On players' machines (online): the server says it was hit (for the flinch). OnDamaged only runs on the server.
 	TFunction<void()> OnHitSeen;
 	// Optional: the owner's hurt boxes (HitBoxes.h), where a hit box must touch for a blow to land. Unset: an upright capsule

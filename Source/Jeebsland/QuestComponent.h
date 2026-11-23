@@ -47,6 +47,7 @@ public:
 
 	// ---- the server's hooks ----
 	static void OnFoeBeaten(AActor* By, const TCHAR* Foe);   // a foe yielded to this actor (AFoeKnight)
+	static void OnHorseTamed(AActor* By, AActor* Horse);      // (server) By calmed a wild horse by riding it (AHorse): the tame step
 
 	// ---- questions (every machine, from the replicated state) ----
 	enum class EState : uint8 { Locked, Available, Active, Done };

@@ -15,7 +15,7 @@
 // ===================================================================================================
 namespace JeebQuests
 {
-	enum class EStep : uint8 { Talk, Bring, Kill, Visit };
+	enum class EStep : uint8 { Talk, Bring, Kill, Visit, Tame };   // (Tame, 2026-11-22: ride a wild horse until it calms, Horse.cpp)
 
 	struct FNeed
 	{

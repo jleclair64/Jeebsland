@@ -10,7 +10,10 @@ mel = unreal.MaterialEditingLibrary
 proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(proj, "Saved", "DeerBuild")
 FOLDER = "/Game/Animals"
-CLIPS = ("Idle", "Idle2", "Walk", "Run", "Graze", "Alert", "Death")
+CLIPS = ("Idle", "Idle2", "Walk", "Run", "Graze", "Alert", "Death", "Back")
+# (per animal: how much grey and what tint M_Animal puts on its coat; the stag's are M_Animal's defaults. The horse's bay coat is already
+# a rich brown, so it keeps nearly all of it)
+LOOK = {"Horse": (0.08, (0.95, 0.93, 0.91))}
 
 def log(s): unreal.log("DEERDIAG " + s)
 
@@ -100,6 +103,9 @@ for n in names:
     mel.set_material_instance_parent(mi, m)
     mel.set_material_instance_texture_parameter_value(mi, "Base", tb)
     mel.set_material_instance_texture_parameter_value(mi, "Normal", tn)
+    if n in LOOK:
+        mel.set_material_instance_scalar_parameter_value(mi, "Grey", LOOK[n][0])
+        mel.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(*LOOK[n][1], 1.0))
     lib.save_loaded_asset(mi, False)
     slots = []
     for s in skm.get_editor_property("materials"):
@@ -141,4 +147,37 @@ for n in names:
         if seq is None: log("%s clip %s did not import" % (n, key)); continue
         log("%s clip %s: %.2f s" % (n, key, seq.get_play_length()))
 lib.save_directory(FOLDER, only_if_is_dirty=False, recursive=True)
+
+# The horse's saddle (Tools/saddle_prep.py): a static mesh with its own instance of M_Animal (a flat normal)
+sf = os.path.join(SRC, "SM_Saddle.fbx")
+if os.path.exists(sf):
+    ts = run(os.path.join(SRC, "T_Saddle_Base.png"), FOLDER, "T_Saddle_Base")
+    ts.set_editor_property("max_texture_size", 1024)
+    lib.save_loaded_asset(ts, False)
+    us = unreal.FbxImportUI()
+    us.set_editor_property("import_mesh", True)
+    us.set_editor_property("import_as_skeletal", False)
+    us.set_editor_property("mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
+    us.set_editor_property("import_materials", False)
+    us.set_editor_property("import_textures", False)
+    sd = us.get_editor_property("static_mesh_import_data")
+    sd.set_editor_property("convert_scene", True)
+    sd.set_editor_property("convert_scene_unit", True)
+    sd.set_editor_property("combine_meshes", True)
+    sd.set_editor_property("generate_lightmap_u_vs", False)
+    sm = run(sf, FOLDER, "SM_Saddle", us)
+    if sm is None: log("SM_Saddle did not import")
+    else:
+        mi = tools.create_asset("MI_Saddle", FOLDER, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
+        mel.set_material_instance_parent(mi, m)
+        mel.set_material_instance_texture_parameter_value(mi, "Base", ts)
+        mel.set_material_instance_texture_parameter_value(mi, "Normal", lib.load_asset("/Engine/EngineMaterials/FlatNormal"))
+        mel.set_material_instance_scalar_parameter_value(mi, "Grey", 0.0)
+        mel.set_material_instance_vector_parameter_value(mi, "Tint", unreal.LinearColor(1.15, 1.1, 1.05, 1.0))
+        lib.save_loaded_asset(mi, False)
+        sm.set_material(0, mi)
+        lib.save_loaded_asset(sm, False)
+        b = sm.get_bounds()
+        log("saddle: bounds origin %s extent %s" % (b.origin, b.box_extent))
+    lib.save_directory(FOLDER, only_if_is_dirty=False, recursive=True)
 log("done")

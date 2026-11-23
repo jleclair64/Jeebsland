@@ -25,3 +25,8 @@ Thieves,kill,,Bandit,4,,,Beat 4 bandits at their camps in the forest round Oak H
 Thieves,talk,Corin,,,,,Tell Captain Corin the roads are a little safer.,"You're back in one piece! Good. I'd half a mind to come looking for you.",
 RedHal,kill,,RedHal,1,,,Beat Red Hal at his camp by an old ruin in the forest.,,
 RedHal,talk,Corin,,,,,Tell Captain Corin that Red Hal is beaten.,"Beaten, and you walked away? Ha! He'll think twice before he comes near Oak Hill again.",
+StableHorse,bring,Bram,Logs,4,,,Bring 4 logs to Bram the stablemaster.,"Good straight logs. The rails thank you.","Four logs for the rails, if you would."
+StableHorse,bring,Bram,TinOre,2,,,Bring 2 tin ore to Bram.,"Tin for the bits. Nearly there.","Two lumps of tin, for the bits."
+StableHorse,bring,Bram,Hide,1,,,Bring a beast hide to Bram (deer give them).,"A fine hide. Now for the horse.|Go out to the meadow past my yard. Press E by a wild horse to climb on, and stay on her till she calms.","A hide from a deer will do."
+StableHorse,tame,,,1,,16 165,Ride a wild horse on the meadow east of the stable until it calms.,,
+StableHorse,talk,Bram,,,,,Go back to Bram with your calmed horse.,"",

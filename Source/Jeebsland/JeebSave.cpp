@@ -4,6 +4,7 @@
 #include "Lore.h"
 #include "QuestComponent.h"
 #include "FastTravel.h"
+#include "Horse.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
@@ -81,6 +82,7 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->LastGambleHour = Skills->LastGambleHour;
 	if (const UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Capture(S->QuestKeys, S->QuestSteps, S->QuestCounts, S->QuestDone);
 	if (const UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Capture(S->TownsVisited);
+	if (const URiderComponent* Rc = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<URiderComponent>() : nullptr) Rc->Capture(S->bHasHorse, S->HorseStable);
 	if (Body)
 	{
 		S->bHasPos = true;
@@ -133,6 +135,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->LastGambleHour = LastGambleHour;
 	if (UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Restore(QuestKeys, QuestSteps, QuestCounts, QuestDone);
 	if (UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Restore(TownsVisited, TownsVisited.Num() == 0);
+	if (URiderComponent* Rc = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<URiderComponent>() : nullptr) Rc->Restore(bHasHorse, HorseStable);
 	Skills->StowRetiredGear();   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
 	return true;
 }

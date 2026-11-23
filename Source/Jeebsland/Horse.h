@@ -1,14 +1,58 @@
 #pragma once
 
+// Horses (2026-11-22, agent horse; replaces the single-player test horse of 2026-11-16). Docs/HowToTest.md "Horses".
+//  - AHorse is one horse. Online it is the SERVER's: the server moves it, decides who rides it, who owns it and its health; every player's
+//    machine is sent where it is (FDeerMove, as the stag), its state, its rider, its owner and whether it wears a saddle. While someone
+//    rides it, every machine simply carries it under that rider (the rider's movement is the knight's own, predicted as usual).
+//  - Wild horses roam a meadow beside each stable (AStable). Any knight can ride one (E). Riding one for HorseTameSecs tames it for the
+//    stablemaster's quest ("A Horse of Your Own", Quests.csv StableHorse); finishing that quest makes it yours.
+//  - Your own horse waits at the stable you last used. T calls it (it comes running, or appears near you if it can't get to you),
+//    holding T for a second makes it follow you (or stop following). Anyone may ride your horse; when you press T, they are put down.
+//  - Horses are only hurt by players inside PvP zones (JeebPvp::IsInPvpZone, PvpZones.h; none exist yet). A horse that falls goes back
+//    to its stable and rests there for HorseRestSecs before it can be called again.
+//  - URiderComponent (on the knight) holds whether you own a horse and where it is stabled (saved with the character, JeebSave).
+// The body is a skinned library model in /Game/Animals (SK_Horse, Tools/BuildDeer.ps1, Tools/horse_retarget.py), played by the stag's
+// code-driven animator (UDeerAnimInstance, Deer.h). The saddle is /Game/Animals/SM_Saddle, shown when the horse wears one.
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Components/ActorComponent.h"
+#include "Deer.h"
 #include "Horse.generated.h"
 
+class USkeletalMeshComponent;
 class UStaticMeshComponent;
+class UHealthComponent;
+class AKnightCharacter;
+class AStable;
 
-// A chestnut horse built from simple shapes. Press T to call it; it gallops to you. Press E beside it to mount.
-// While you ride, the horse follows the knight (the knight's movement code gives the speed), so it is twice as fast
-// as walking and twice as fast as sprinting. Its legs and head animate to match.
+// What a horse is doing (sent to players as a number: add new ones at the end)
+enum class EHorseState : uint8 { Idle, Walk, Run, Ridden, Dead, Graze };
+
+namespace JeebHorse
+{
+	struct FStableDef
+	{
+		FName Key;
+		FString Name;
+		FVector2D Pos = FVector2D::ZeroVector;    // the yard's middle, world cm
+		float Yaw = 0.f;                          // the yard's open side faces this way (degrees, Unreal yaw)
+		FVector2D Wild = FVector2D::ZeroVector;   // the wild horses' meadow, world cm
+		int32 WildCount = 3;
+	};
+	const TArray<FStableDef>& Stables();         // Content/Data/Stables.csv
+	const FStableDef* FindStable(FName Key);
+	const FStableDef* NearestStable(const FVector2D& At, float MaxDist = 1.0e9f);
+	int32 SaddleId();                             // the saddle item (Accessories.csv "Leather Saddle"), 0 if missing
+	bool WearsSaddle(const AKnightCharacter* K);
+	// The Horse Riding skill: top speed and gallop length grow with the level (Tuning.ini [Horse])
+	float SpeedMul(int32 Level);
+	float GallopSecs(int32 Level);
+	constexpr float Scale = 1.25f;                // the model at 1.25: a 15-hand riding horse, the saddle at the old test horse's height
+	constexpr float Reach = 300.f;                // how near a knight must be to mount (cm; the server allows lag on top)
+	extern const FName QuestKey;                  // the stablemaster's quest that gives you your own horse
+}
+
 UCLASS()
 class AHorse : public AActor
 {
@@ -16,34 +60,135 @@ class AHorse : public AActor
 
 public:
 	AHorse();
-
-	void CallTo(AActor* Target);
-	void SetRider(AActor* InRider) { Rider = InRider; bCalled = false; }
-	bool HasRider() const { return Rider.IsValid(); }
-	bool IsCalled() const { return bCalled; }
-
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// ---- the server's side ----
+	// (before FinishSpawning) Wild: a meadow horse of Stable; otherwise Owner's horse, waiting at Stable
+	void SetupHorse(AStable* InStable, bool bInWild, AKnightCharacter* InOwner, bool bInSaddled, int32 Seed);
+	void CallTo(AKnightCharacter* K);                    // run to K (teleports near K when it can't get there)
+	void SetFollow(AKnightCharacter* K, bool bOn);       // keep near K while K is on foot
+	void SetRider(AKnightCharacter* K);                  // (server, from the knight's mount and dismount) null: nobody
+	void MakeOwned(AKnightCharacter* K);                 // a tamed wild horse becomes K's
+	void PutSaddleOn() { bRepSaddled = true; }
+	void SendHome(AStable* To, float RestSecs);          // back to a stable (fell, or its owner left)
+	float RestLeft() const;                              // seconds before it can be called again (server)
+	TWeakObjectPtr<AKnightCharacter> TamedBy;            // (server) the last rider who calmed it
+
+	// ---- every machine ----
+	AKnightCharacter* GetRider() const { return RepRider; }
+	bool HasRider() const { return RepRider != nullptr; }
+	AKnightCharacter* GetOwnerKnight() const { return RepOwner; }
+	bool IsWild() const { return bRepWild; }
+	bool IsSaddled() const { return bRepSaddled; }
+	bool IsFollowing() const { return bFollow; }
+	bool IsDown() const { return EHorseState(RepState) == EHorseState::Dead; }
+	EHorseState StateNow() const { return EHorseState(RepState); }
+	AStable* GetStable() const { return Stable.Get(); }
+	UPROPERTY() UHealthComponent* Hp = nullptr;
+
+#if !UE_BUILD_SHIPPING
+	int32 LabRole = -1;   // (-HorseLab test pictures) 0 stands and cycles its clips, 1 canters laps, 2 walks laps
+	FVector2D LabA = FVector2D::ZeroVector, LabB = FVector2D::ZeroVector;
+	static void BuildLab(UWorld* World);
+#endif
 
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY() USceneComponent* Root = nullptr;
-	UPROPERTY() USceneComponent* BodyPivot = nullptr;
-	UPROPERTY() USceneComponent* NeckPivot = nullptr;
-	UPROPERTY() USceneComponent* TailPivot = nullptr;
-	UPROPERTY() USceneComponent* LegFL = nullptr;
-	UPROPERTY() USceneComponent* LegFR = nullptr;
-	UPROPERTY() USceneComponent* LegBL = nullptr;
-	UPROPERTY() USceneComponent* LegBR = nullptr;
-	TArray<TPair<UStaticMeshComponent*, FLinearColor>> Parts;
+	UPROPERTY() USkeletalMeshComponent* Body = nullptr;
+	UPROPERTY() UStaticMeshComponent* SaddleMesh = nullptr;
+	UPROPERTY() UDeerAnimInstance* Anim = nullptr;
 
-	TWeakObjectPtr<AActor> Rider;
-	TWeakObjectPtr<AActor> CallTarget;
-	bool bCalled = false;
-	float Phase = 0.f;
-	float Clock = 0.f;
-	float SpeedBlend = 0.f;
-	float GrazeT = 0.f;
-	FVector LastPos = FVector::ZeroVector;
+	UPROPERTY(ReplicatedUsing = OnRep_Move) FDeerMove RepMove;
+	UPROPERTY(Replicated) uint8 RepState = 0;
+	UPROPERTY(Replicated) AKnightCharacter* RepRider = nullptr;
+	UPROPERTY(Replicated) AKnightCharacter* RepOwner = nullptr;
+	UPROPERTY(Replicated) bool bRepWild = true;
+	UPROPERTY(Replicated) bool bRepSaddled = false;
+	UPROPERTY(Replicated) bool bFollow = false;
+	UFUNCTION() void OnRep_Move();
+	double MoveAt = 0.0;
+	bool bPlaced = false;
+
+	void BuildBody();
+	void TickLook(float Dt, float Speed, bool bBack);
+	void GatherHurt(TArray<JeebHit::FCapsule>& Out) const;
+	float SlopePitch = 0.f, Fall = 0.f;
+
+	// the server's mind
+	enum class EGoal : uint8 { Stay, Wander, Call, Follow };
+	EGoal Goal = EGoal::Stay;
+	TWeakObjectPtr<AKnightCharacter> Target;
+	TWeakObjectPtr<AStable> Stable;
+	FVector2D Home = FVector2D::ZeroVector, WanderTo = FVector2D::ZeroVector;
+	FRandomStream Rand;
+	float Speed = 0.f, StateT = 0.f, StuckT = 0.f, ProgressT = 0.f, ProgressD = 0.f, DeadT = 0.f, TameT = 0.f;
+	double RestUntil = -1.0;
+	bool bBacking = false;
+	void SetState(EHorseState S);
+	void TickMind(float Dt);
+	void TickRidden(float Dt);
+	bool StepToward(const FVector2D& To, float Want, float Dt);   // false when walled in
+	bool CatchUp(const AKnightCharacter* K);                        // appear a little way behind K (the Lego Star Wars catch-up)
+	bool Clear(const FVector& At) const;
+	void OnHurt(AActor* From);
+	void Die(AActor* From);
+	void SendMove();
+	friend struct FHorseTestDriver;
+};
+
+// A stable: a fenced yard with hay, water and a hitching rail (built from the TownDecor props on every machine), where owned horses
+// wait, and the wild horses' meadow nearby (the server keeps WildCount of them there).
+UCLASS()
+class AStable : public AActor
+{
+	GENERATED_BODY()
+
+public:
+	AStable();
+	virtual void Tick(float DeltaSeconds) override;
+	void SetupStable(const JeebHorse::FStableDef& D);
+	FName GetKey() const { return Def.Key; }
+	const JeebHorse::FStableDef& GetDef() const { return Def; }
+	FVector2D StallSpot() const;
+	static AStable* Find(const UWorld* World, FName Key);
+	static AStable* Nearest(const UWorld* World, const FVector2D& At, float MaxDist = 1.0e9f);
+	TArray<TWeakObjectPtr<AHorse>> Wild;   // (server)
+
+protected:
+	virtual void BeginPlay() override;
+
+private:
+	JeebHorse::FStableDef Def;
+	float WildClock = 0.f;
+	int32 WildSeed = 0;
+	void BuildYard();
+	void SpawnWild();
+	friend struct FHorseTestDriver;
+};
+
+// On the knight: does this character own a horse, and where is it stabled (saved, JeebSave). The server spawns the horse at its
+// stable when the character comes into the world and takes it away when they leave.
+UCLASS()
+class URiderComponent : public UActorComponent
+{
+	GENERATED_BODY()
+
+public:
+	URiderComponent();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+
+	UPROPERTY(Replicated) bool bOwnsHorse = false;   // (sent to the owner only)
+	FName StableKey;                                 // the stable last used (server)
+	TWeakObjectPtr<AHorse> Horse;                    // (server) the owned horse in the world
+	void GrantHorse(AHorse* Tamed);                  // (server) the quest's reward: Tamed becomes yours (or a new one at the stable)
+	AHorse* MyHorse() const { return Horse.Get(); }
+	// saving (JeebSave)
+	void Capture(bool& bOut, FString& OutStable) const { bOut = bOwnsHorse; OutStable = StableKey.ToString(); }
+	void Restore(bool bIn, const FString& InStable);
 };

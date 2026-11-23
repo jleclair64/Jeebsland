@@ -8,6 +8,7 @@
 #include "FoeCamps.h"
 #include "ForestRuins.h"
 #include "Terrain.h"
+#include "Horse.h"
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -365,6 +366,13 @@ void UQuestComponent::Finish(FQuestProgress& P, const FQuestDef& Q)
 	if (!Sk) return;
 	for (const TPair<ESkillType, int32>& X : Q.RewardXP) Sk->AddXP(X.Key, X.Value);
 	Sk->AddIngots(Q.RewardIngots);
+	if (Q.Key == JeebHorse::QuestKey)   // (the stablemaster: the wild horse you calmed becomes yours, or a new one waits at his stable)
+		if (AKnightCharacter* K = Cast<AKnightCharacter>(GetOwner())) if (URiderComponent* Rc = K->FindComponentByClass<URiderComponent>())
+		{
+			AHorse* Tamed = nullptr;
+			for (TActorIterator<AHorse> It(GetWorld()); It; ++It) if (It->IsWild() && It->TamedBy.Get() == K && !It->IsDown()) { Tamed = *It; break; }
+			Rc->GrantHorse(Tamed);
+		}
 	for (const FInvSlot& I : Q.RewardItems)
 		if (!Sk->AddInvItem(I.Id, I.Count)) Sk->Say(4.f, FColor::Orange, FString::Printf(TEXT("No room for %s: your pack is full."), *JeebItems::ItemName(I.Id)));
 	Sk->Say(6.f, FColor(255, 215, 90), FString::Printf(TEXT("Quest complete: %s!  You get %s."), *Q.Title, *RewardText(Q)));
@@ -397,6 +405,19 @@ void UQuestComponent::OnFoeBeaten(AActor* By, const TCHAR* Foe)
 	}
 }
 
+
+void UQuestComponent::OnHorseTamed(AActor* By, AActor* Horse)
+{
+	UQuestComponent* C = By ? By->FindComponentByClass<UQuestComponent>() : nullptr;
+	if (!C || !C->HasAuth()) return;
+	for (const FQuestDef& Q : JeebQuests::Quests())
+	{
+		FQuestProgress* P = C->Quests.FindByPredicate([&](const FQuestProgress& X) { return X.Key == Q.Key; });
+		if (!P || P->bDone || !Q.Steps.IsValidIndex(P->Step) || Q.Steps[P->Step].Type != EStep::Tame) continue;
+		UE_LOG(LogTemp, Log, TEXT("JEEBQUEST %s: tamed %s for %s"), *By->GetName(), Horse ? *Horse->GetName() : TEXT("?"), *Q.Key.ToString());
+		C->Advance(*P, Q);
+	}
+}
 void UQuestComponent::TickVisits()
 {
 	const AActor* Me = GetOwner();

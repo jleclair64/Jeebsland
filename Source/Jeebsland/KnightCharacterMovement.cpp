@@ -519,7 +519,8 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling && (GetWorld()->GetTimeSeconds() - LastBackTime > 0.15);
 		if (bAsk && HorseEnergy > 0.f)
 		{
-			// the horse never tires: its gallop energy does not drain
+			// the gallop bar drains over GallopSecs (Horse Riding level: Tuning.ini [Horse])
+			HorseEnergy = FMath::Max(0.f, HorseEnergy - 100.f / FMath::Max(1.f, JeebHorse::GallopSecs(Skills ? Skills->GetLevel(ESkillType::Riding) : 1)) * Dt);
 			bHorseSprint = true;
 			if (HorseEnergy <= 0.f) bHorseTired = true;
 		}
@@ -532,7 +533,8 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// The horse builds up to a gallop: it does not jump to full speed when you sprint. Twice as fast since 2026-11-16 (owner:
 	// "make the horse twice as fast"; was 1.6 x the knight's walk and sprint, now 3.2 x). The build-up and the easing off are
 	// doubled too, so the gallop still comes in over about 1.7 s. (Backing up stays at half the knight's walk: bBackStep below.)
-	const float HorseMul = 3.2f;
+	// (2026-11-22: x a little more per Horse Riding level, and less on a horse with no saddle)
+	const float HorseMul = 3.2f * JeebHorse::SpeedMul(Skills ? Skills->GetLevel(ESkillType::Riding) : 1) * ((RideHorse && !RideHorse->IsSaddled()) ? JeebTune::V().BarebackMul : 1.f);
 	float HorseTarget = HorseMul * (bHorseSprint ? Sprint_ : Walk_);
 	if (!bMounted) HorseSpeedNow = 0.f;
 	else
@@ -542,6 +544,12 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	}
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
+	// Horse Riding XP: the server counts the distance ridden (capped per frame, so a teleport or a correction earns nothing)
+	if (bMounted && HasAuthority() && Skills)
+	{
+		RideDist += FMath::Min(GetVelocity().Size2D(), 3000.f) * Dt;
+		if (RideDist >= 10000.f) { RideDist -= 10000.f; Skills->AddXP(ESkillType::Riding, FMath::Max(1, FMath::RoundToInt(JeebTune::V().RidingXPPer100m))); }
+	}
 	const bool bBackStep = bMounted && (GetWorld()->GetTimeSeconds() - LastBackTime < 0.15);
 	const bool bStance = bBlockHeld && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;
 	const bool bFaceCam = (bStance || ((bStrafeMode || Bow == EBow::Drawing || Bow == EBow::Recover || Rock != ERock::None) && !ActiveNode.IsValid())) && !bMounted && !bRolling && !bSliding && !bClimbing && !InClimbMove() && !bSitting;   // strafe mode faces the camera too, at full speed (not while chopping or mining: he stays square on to it)

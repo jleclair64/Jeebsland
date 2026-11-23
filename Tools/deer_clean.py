@@ -10,6 +10,7 @@ a = sys.argv[sys.argv.index("--") + 1:]
 SRC, DST = a[0], a[1]
 TRIS = int(a[2]) if len(a) > 2 else 20000
 SIZE = int(a[3]) if len(a) > 3 else 2048
+NAME = a[4] if len(a) > 4 else "Stag"   # (2026-11-22: the horse reuses this)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
@@ -63,21 +64,21 @@ def tex_node(mat, sock):
 hmat = hi.data.materials[0]
 tb = tex_node(hmat, "Base Color"); tn = tex_node(hmat, "Normal")
 print("DEER full model pictures: base %s, normal %s" % (tb.image.size[:] if tb else None, tn.image.size[:] if tn else None))
-lmat = bpy.data.materials.new("M_Stag"); lmat.use_nodes = True
+lmat = bpy.data.materials.new("M_" + NAME); lmat.use_nodes = True
 me.materials.clear(); me.materials.append(lmat)
 ln = lmat.node_tree.nodes; lpr = next(n for n in ln if n.type == "BSDF_PRINCIPLED")
 tgt = ln.new("ShaderNodeTexImage")
 diag = (hi_ - lo_).length
 hi.select_set(True); lo.select_set(True); bpy.context.view_layer.objects.active = lo
 kw = dict(use_selected_to_active=True, cage_extrusion=0.008 * diag, max_ray_distance=0.02 * diag, margin=32, margin_type="EXTEND", use_clear=True)
-imn = bpy.data.images.new("T_Stag_Normal", SIZE // 2, SIZE // 2, alpha=False); imn.colorspace_settings.name = "Non-Color"
+imn = bpy.data.images.new("T_" + NAME + "_Normal", SIZE // 2, SIZE // 2, alpha=False); imn.colorspace_settings.name = "Non-Color"
 tgt.image = imn; ln.active = tgt
 bpy.ops.object.bake(type="NORMAL", normal_space="TANGENT", **kw)
 out_node = next(n for n in hmat.node_tree.nodes if n.type == "OUTPUT_MATERIAL")
 em = hmat.node_tree.nodes.new("ShaderNodeEmission")
 hmat.node_tree.links.new(em.outputs[0], out_node.inputs["Surface"])
 hmat.node_tree.links.new(tb.outputs["Color"], em.inputs["Color"])
-imb = bpy.data.images.new("T_Stag_Base", SIZE, SIZE, alpha=False)
+imb = bpy.data.images.new("T_" + NAME + "_Base", SIZE, SIZE, alpha=False)
 tgt.image = imb; ln.active = tgt
 bpy.ops.object.bake(type="EMIT", **kw)
 ln.remove(tgt)
@@ -89,7 +90,7 @@ lpr.inputs["Roughness"].default_value = 0.8; lpr.inputs["Metallic"].default_valu
 for n_ in old: me.uv_layers.remove(me.uv_layers[n_])
 for im in (imb, imn): im.pack()
 bpy.data.objects.remove(hi, do_unlink=True)
-lo.name = "Stag"; me.name = "Stag"
+lo.name = NAME; me.name = NAME
 # feet on the ground, middle over the origin
 lo.location = Vector((-(lo_.x + hi_.x) / 2, -(lo_.y + hi_.y) / 2, -lo_.z))
 bpy.ops.object.select_all(action="DESELECT"); lo.select_set(True); bpy.context.view_layer.objects.active = lo

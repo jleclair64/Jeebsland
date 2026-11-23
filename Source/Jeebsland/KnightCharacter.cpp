@@ -56,6 +56,7 @@ AKnightCharacter::AKnightCharacter(const FObjectInitializer& ObjectInitializer)
 	Skills = CreateDefaultSubobject<USkillComponent>(TEXT("Skills"));
 	Quests = CreateDefaultSubobject<UQuestComponent>(TEXT("Quests"));
 	Travel = CreateDefaultSubobject<UTravelComponent>(TEXT("Travel"));
+	Rider = CreateDefaultSubobject<URiderComponent>(TEXT("Rider"));   // (2026-11-22: owning a horse, Horse.h)
 
 	// Movement feel
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
@@ -219,6 +220,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
+	DOREPLIFETIME(AKnightCharacter, RideHorse);   // (2026-11-22: who rides what is the server's, Horse.h)
 	DOREPLIFETIME(AKnightCharacter, Health);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME(AKnightCharacter, bRockMode);   // (the troll's rocks in hand: KnightCharacterRock.cpp)
@@ -400,6 +402,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(PanelTabAction, ETriggerEvent::Started, this, &AKnightCharacter::CyclePanelTab);
 		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
+		EIC->BindAction(CallHorseAction, ETriggerEvent::Completed, this, &AKnightCharacter::CallHorseUp);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 		EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
 		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);

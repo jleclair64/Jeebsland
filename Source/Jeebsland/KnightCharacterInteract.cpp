@@ -168,8 +168,8 @@ AKnightCharacter::EInteract AKnightCharacter::FindInteractable(int32& OutIndex, 
 	// Your horse, if it is standing right beside you
 	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
 	{
-		if (It->HasRider()) continue;
-		if (FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y)) < 200.f) { OutHorse = *It; return EInteract::Horse; }
+		if (It->HasRider() || It->IsDown()) continue;
+		if (FVector2D::Distance(Me, FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y)) < JeebHorse::Reach) { OutHorse = *It; return EInteract::Horse; }
 	}
 	// Villagers (store, smithy, gate knight): talk to the nearest one in reach
 	float NpcD = 230.f;
@@ -260,7 +260,7 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door"); return true; }
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
-	case EInteract::Horse: OutText = TEXT("Press E to mount the horse"); return true;
+	case EInteract::Horse: OutText = Horse && Horse->IsWild() ? TEXT("Press E to climb on the wild horse") : Horse && Horse->GetOwnerKnight() == this ? TEXT("Press E to ride your horse") : TEXT("Press E to ride the horse"); return true;
 	case EInteract::Npc:
 		OutText = FString::Printf(TEXT("Press E to talk to %s"), *Npc->GetNpcName());
 		return true;
@@ -484,52 +484,146 @@ void AKnightCharacter::UseDoor(ACottage* Hut)
 	Inv(EInvOp::PickLock, 0, 0, 0, nullptr, Hut->GetActorLocation());
 }
 
+// ---------------- Horses (2026-11-22, Horse.h) ----------------
+// The player's machine only asks (ServerHorse); the server checks, then mounts, calls or sets following, and RideHorse replicates back.
 void AKnightCharacter::CallHorse()
 {
-	if (IsUIOpen() || bMounted) return;
-	AHorse* Best = nullptr;
-	for (TActorIterator<AHorse> It(GetWorld()); It; ++It) { if (!It->HasRider()) { Best = *It; break; } }
-	if (!Best) return;
-	Best->CallTo(this);
-	if (GEngine) JeebMsg::Post(2.5f, FColor::Yellow, TEXT("You whistle. Your horse comes galloping."));
+	CallHorseDown = IsUIOpen() ? -1.0 : FPlatformTime::Seconds();
+}
+
+void AKnightCharacter::CallHorseUp()
+{
+	if (CallHorseDown < 0.0) return;
+	const double Held = FPlatformTime::Seconds() - CallHorseDown;
+	CallHorseDown = -1.0;
+	if (IsUIOpen()) return;
+	ServerHorse(Held >= 1.0 ? HO_Follow : HO_Call, nullptr);
 }
 
 void AKnightCharacter::Mount(AHorse* H)
 {
 	if (!H || bMounted || bSitting || bClimbing) return;
-	bMounted = true;
-	MyHorse = H;
+	ServerHorse(HO_Mount, H);
+}
+
+void AKnightCharacter::Dismount()
+{
+	if (bMounted) ServerHorse(HO_Dismount, nullptr);
+}
+
+void AKnightCharacter::ServerHorse_Implementation(uint8 Op, AHorse* H)
+{
+	if (Health <= 0.f || !Skills) return;
+	AHorse* Mine = Rider ? Rider->MyHorse() : nullptr;
+	switch (Op)
+	{
+	case HO_Mount:
+	{
+		if (!H || bMounted || bSitting || bClimbing || InClimbMove() || H->HasRider() || H->IsDown()) return;
+		if (FVector::Dist2D(H->GetActorLocation(), GetActorLocation()) > JeebHorse::Reach + 150.f) return;   // (lag allowance)
+		ServerSideMount(H);
+		return;
+	}
+	case HO_Dismount: ServerSideDismount(); return;
+	case HO_Call:
+	case HO_Follow:
+	{
+		if (!Mine)
+		{
+			Skills->Say(4.f, FColor(235, 205, 150), Rider && Rider->bOwnsHorse ? TEXT("Your horse is on its way to its stable.")
+				: TEXT("You have no horse of your own yet. Bram the stablemaster, east of the plaza, can help."));
+			return;
+		}
+		if (Mine->IsDown() || Mine->RestLeft() > 0.f)
+		{
+			Skills->Say(4.f, FColor(255, 170, 130), FString::Printf(TEXT("Your horse is resting at its stable (%d s)."), FMath::Max(1, FMath::CeilToInt(Mine->RestLeft()))));
+			return;
+		}
+		if (Mine->GetRider() == this) return;
+		if (Op == HO_Call)
+		{
+			Mine->CallTo(this);
+			Skills->Say(2.5f, FColor::Yellow, TEXT("You whistle. Your horse comes galloping."));
+		}
+		else
+		{
+			const bool bOn = !Mine->IsFollowing();
+			if (bOn && Mine->HasRider()) Mine->CallTo(this);   // (someone else on it: they are put down first)
+			Mine->SetFollow(this, bOn);
+			Skills->Say(3.f, FColor::Yellow, bOn ? TEXT("Your horse will follow you.") : TEXT("Your horse stays put."));
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBHORSE %s %s %s"), *GetName(), Op == HO_Call ? TEXT("called") : TEXT("toggled following of"), *Mine->GetName());
+		return;
+	}
+	default: return;
+	}
+}
+
+void AKnightCharacter::ServerSideMount(AHorse* H)
+{
+	if (!H || !HasAuthority() || bMounted || H->HasRider()) return;
+	if (bSitting) StandUp();
+	RideHorse = H;
 	H->SetRider(this);
-	bCrouched = false;
-	bBlocking = false;
-	bAttacking = false;
-	HorseEnergy = 100.f;
-	bHorseTired = false;
-	GetCharacterMovement()->StopMovementImmediately();
-	GetCharacterMovement()->MaxWalkSpeed = WalkNow() * 3.2f;   // (TickGroundSpeed sets the real riding speed from the next frame)
-	// The on-foot facing to come back to. Strafe mode (on by default), the bow's draw or the shield stance have already turned
-	// turning-to-movement off for themselves (bBackOrient, TickGroundSpeed), so the real on-foot value is the one they saved, not
-	// the live one, and they let go of it here. Before 2026-11-16 the live "off" was saved, TickGroundSpeed then handed the
-	// strafe's saved "on" back mid-ride, and the dismount restored "off" for good: with strafe mode off after a ride, the knight
-	// no longer turned to where he walked.
-	UCharacterMovementComponent* Move = GetCharacterMovement();
-	bSavedOrientMount = bBackOrient ? bBackSavedOrient : Move->bOrientRotationToMovement;
-	bBackOrient = false;
-	Move->bOrientRotationToMovement = false;   // the horse faces where it steers, not where it is pushed
+	ApplyMount(true);
+	ForceNetUpdate();
+	UE_LOG(LogTemp, Log, TEXT("JEEBHORSE %s mounted %s (%s)"), *GetName(), *H->GetName(), H->IsWild() ? TEXT("wild") : H->GetOwnerKnight() == this ? TEXT("own") : TEXT("someone else's"));
+}
+
+void AKnightCharacter::ServerSideDismount()
+{
+	if (!HasAuthority() || !RideHorse) return;
+	AHorse* H = RideHorse;
+	RideHorse = nullptr;
+	H->SetRider(nullptr);
+	// your own horse, left near a stable: that is the stable it waits at from now on
+	if (Rider && H->GetOwnerKnight() == this)
+		if (AStable* S = AStable::Nearest(GetWorld(), FVector2D(GetActorLocation()), 4000.f)) Rider->StableKey = S->GetKey();
+	ApplyMount(false);
+	ForceNetUpdate();
+	UE_LOG(LogTemp, Log, TEXT("JEEBHORSE %s got off %s"), *GetName(), *H->GetName());
+}
+
+void AKnightCharacter::OnRep_RideHorse()
+{
+	if ((RideHorse != nullptr) != bMounted) ApplyMount(RideHorse != nullptr);
 }
 
 bool AKnightCharacter::OrientsToMovement() const { return GetCharacterMovement()->bOrientRotationToMovement; }
 
-void AKnightCharacter::Dismount()
+void AKnightCharacter::ApplyMount(bool bOn)
 {
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	if (bOn)
+	{
+		if (bMounted) return;
+		bMounted = true;
+		bCrouched = false;
+		bBlocking = false;
+		bAttacking = false;
+		HorseEnergy = 100.f;
+		bHorseTired = false;
+		Move->StopMovementImmediately();
+		Move->MaxWalkSpeed = WalkNow() * 3.2f;   // (TickGroundSpeed sets the real riding speed from the next frame)
+		// The on-foot facing to come back to. Strafe mode (on by default), the bow's draw or the shield stance have already turned
+		// turning-to-movement off for themselves (bBackOrient, TickGroundSpeed), so the real on-foot value is the one they saved, not
+		// the live one, and they let go of it here (the 2026-11-16 fix).
+		bSavedOrientMount = bBackOrient ? bBackSavedOrient : Move->bOrientRotationToMovement;
+		bBackOrient = false;
+		Move->bOrientRotationToMovement = false;   // the horse faces where it steers, not where it is pushed
+		if (AHorse* H = RideHorse) SetActorRotation(FRotator(0.f, H->GetActorRotation().Yaw, 0.f));
+		return;
+	}
 	if (!bMounted) return;
 	bMounted = false;
-	GetCharacterMovement()->bOrientRotationToMovement = bSavedOrientMount;   // (strafe mode takes it over again next frame if it is on)
+	Move->bOrientRotationToMovement = bSavedOrientMount;   // (strafe mode takes it over again next frame if it is on)
 	bBackOrient = false;
-	if (AHorse* H = MyHorse.Get()) H->SetRider(nullptr);
-	// Hop off to the right of the horse
-	SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));
-	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+	// Hop off to the right of the horse (the server's hop is the one that counts; the owner's machine does the same so it doesn't snap)
+	if (HasAuthority() || IsLocallyControlled())
+	{
+		SetActorLocation(GetActorLocation() + GetActorRightVector() * 190.f + FVector(0.f, 0.f, 20.f));
+		Move->SetMovementMode(MOVE_Falling);
+	}
 }
 
 void AKnightCharacter::SitOnSeat(int32 SeatIdx)

@@ -113,6 +113,7 @@ namespace JeebQuests
 					else if (IsArmorKind(k)) { for (int32 s = 0; s < NumArmourStyles; ++s) Ids.Add(ArmourId(k, s, t)); }
 					else Ids.Add(GearId(k, t));
 				}
+			for (int32 v = 0; v < NumAmulets(); ++v) Ids.Add(GearId(K_Amulet, v));   // (every amulet row, past the tiers too: the Leather Saddle, 2026-11-22)
 			for (int32 Id : Ids) if (ItemName(Id).Equals(Name, ESearchCase::IgnoreCase)) return Id;
 			return -1;
 		}
@@ -245,8 +246,8 @@ namespace JeebQuests
 				if (!Q) { Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: no quest \"%s\""), r + 2, *QKey.ToString())); continue; }
 				FStepDef S;
 				const FString Type = T.S(r, TEXT("Type")).ToLower();
-				S.Type = Type == TEXT("bring") ? EStep::Bring : Type == TEXT("kill") ? EStep::Kill : Type == TEXT("visit") ? EStep::Visit : EStep::Talk;
-				if (Type != TEXT("talk") && Type != TEXT("bring") && Type != TEXT("kill") && Type != TEXT("visit")) Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: unknown type \"%s\" (talk, bring, kill or visit); read as talk"), r + 2, *Type));
+				S.Type = Type == TEXT("bring") ? EStep::Bring : Type == TEXT("kill") ? EStep::Kill : Type == TEXT("visit") ? EStep::Visit : Type == TEXT("tame") ? EStep::Tame : EStep::Talk;
+				if (Type != TEXT("talk") && Type != TEXT("bring") && Type != TEXT("kill") && Type != TEXT("visit") && Type != TEXT("tame")) Problem(FString::Printf(TEXT("QuestsSteps.csv row %d: unknown type \"%s\" (talk, bring, kill, visit or tame); read as talk"), r + 2, *Type));
 				S.At = FName(*T.S(r, TEXT("At")));
 				S.Target = T.S(r, TEXT("Target"));
 				S.Count = FMath::Clamp(T.I(r, TEXT("Count"), 1), 1, 999);

@@ -1,0 +1,7 @@
+Key,Name,North,East,Yaw,WildNorth,WildEast,WildCount
+# Stables (2026-11-22, Horse.cpp). Owned horses wait at the stable last used; wild horses roam its meadow.
+# North, East: metres from Oak Hill's plaza (the big oak), as QuestsPeople.csv. Yaw: the way the yard's gate faces (0 north, 90 east, 180 south, 270 west).
+# If the yard would land on a wall, in water or on a slope it moves to the nearest open level ground (the log says where: JEEBHORSE stable ... moved).
+# WildNorth, WildEast: the middle of the wild horses' meadow (metres from the plaza); WildCount: how many roam there (0 to 8).
+# Keys are saved with characters: never change one.
+OakHill,Oak Hill Stable,15.9,99.8,270,16,165,3

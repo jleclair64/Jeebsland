@@ -49,6 +49,9 @@ public:
 	UPROPERTY() TArray<uint8> QuestDone;
 	// Towns visited (UTravelComponent, 2026-11-18), by name. Older saves have none: the towns the map fog shows explored count (Restore).
 	UPROPERTY() TArray<FString> TownsVisited;
+	// Your own horse (URiderComponent, 2026-11-22): whether you have one, and the stable it waits at
+	UPROPERTY() bool bHasHorse = false;
+	UPROPERTY() FString HorseStable;
 
 	// Where the knight stood (online: you log back in where you logged out)
 	UPROPERTY() bool bHasPos = false;

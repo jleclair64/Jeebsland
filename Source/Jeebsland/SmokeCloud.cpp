@@ -59,12 +59,9 @@ void ASmokeCloud::Tick(float DeltaSeconds)
 	if (!HasAuthority()) return;   // (online the server does the hurting, to every player inside)
 	const FVector Here = GetActorLocation();
 	auto Inside = [&](const FVector& P) { return FVector::Dist2D(P, Here) < Radius && FMath::Abs(P.Z - Here.Z) < Radius; };
-	bool bHorseIn = false;
-	for (TActorIterator<AHorse> It(GetWorld()); It && !bHorseIn; ++It) bHorseIn = Inside(It->GetActorLocation());   // a horse standing in it
 	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
 	{
 		const bool bKnightIn = Inside(It->GetActorLocation());
 		if (bKnightIn) It->Hurt(KnightHit, this, true);
-		if ((bKnightIn && It->IsMounted()) || bHorseIn) It->HurtHorse(HorseHit);   // riding, the horse is in it with you
 	}
 }

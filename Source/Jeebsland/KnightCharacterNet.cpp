@@ -581,7 +581,7 @@ void AKnightCharacter::OnRep_MoveFlags()
 // The server says we fell: wake up on Oak Hill's plaza here too
 void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float Yaw)
 {
-	if (bMounted) Dismount();
+	if (bMounted && !HasAuthority()) ApplyMount(false);   // (the server already put us down; RideHorse follows)
 	if (bClimbing) ExitClimb(false, false);
 	if (bSitting) StandUp();
 	if (EmoteId) StopEmote(TEXT("died"));

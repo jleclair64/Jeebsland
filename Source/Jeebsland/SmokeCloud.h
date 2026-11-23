@@ -19,7 +19,7 @@ public:
 	float Radius = 300.f;          // how far across the poison reaches
 	float HitEvery = 0.5f;         // seconds between hits
 	int32 KnightHit = 14;          // damage to the knight per hit: it ignores armour and shields
-	float HorseHit = 18.f;         // damage to the horse per hit (of 100)
+	// (2026-11-22: the gas no longer hurts horses: only players in PvP zones do, Horse.h)
 
 protected:
 	virtual void BeginPlay() override;

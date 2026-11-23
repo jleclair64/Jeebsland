@@ -92,6 +92,7 @@
 #include "Bridge.h"
 #include "FoeCamps.h"
 #include "Deer.h"
+#include "FoeData.h"
 #include "Bushes.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -111,9 +112,6 @@ void AKnightGameState::BeginPlay()
 	BuildWorld();
 }
 
-#if !UE_BUILD_SHIPPING
-static TAutoConsoleVariable<int32> CVarTestHorse(TEXT("jeeb.Test.Horse"), 1, TEXT("TEMPORARY test setting: 1 (default) puts a horse beside the start in single player at the next load, 0 leaves it out. Never online, never in Shipping."), ECVF_Default);
-#endif
 
 void AKnightGameState::BuildWorld()
 {
@@ -276,20 +274,9 @@ void AKnightGameState::BuildWorld()
 		}
 	}
 
-	// Your horse (TEMPORARY test setting, owner 2026-11-16): single player and editor Play only, never on a server or an online client (horses aren't shared online),
-	// never in Shipping. It waits on open ground beside the start (Oak Hill's plaza, or the old spot elsewhere); T calls it, E beside it mounts. `jeeb.Test.Horse 0` leaves it out.
-#if !UE_BUILD_SHIPPING
-	if (GetNetMode() == NM_Standalone && CVarTestHorse.GetValueOnGameThread() != 0)
-	{
-		const bool bOakStart = JeebOakHill::Enabled() && !GetWorld()->GetMapName().Contains(TEXT("MoveLab"));
-		const FVector2D HorseAt = bOakStart ? FVector2D(JeebOakHill::SpawnX + 450.f, JeebOakHill::SpawnY) : FVector2D(650.f, 420.f);
-		AHorse* H = World->SpawnActor<AHorse>(FVector(HorseAt.X, HorseAt.Y, JeebTerrain::HeightAt(HorseAt.X, HorseAt.Y)), FRotator(0.f, bOakStart ? JeebOakHill::SpawnYaw + 180.f : 200.f, 0.f));
-		UE_LOG(LogTemp, Display, TEXT("JEEBHORSE spawned at %.0f,%.0f (%s)"), HorseAt.X, HorseAt.Y, H ? TEXT("ok") : TEXT("failed"));
-	}
-#endif
 	{
 		const FVector2D HP(650.f, 420.f);
-		// (the horse itself is spawned above; the smoke cloud stays where the old spot was)
+		// (the old test horse's spot)
 		// A cloud of purple poison smoke a few metres from the horse, to see how a hazard looks and feels
 		World->SpawnActor<ASmokeCloud>(FVector(HP.X + 380.f, HP.Y, JeebTerrain::HeightAt(HP.X + 380.f, HP.Y)), FRotator::ZeroRotator);
 	}
@@ -319,6 +306,11 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
 	World->SpawnActor<AFoeCamps>(FVector::ZeroVector, FRotator::ZeroRotator);   // the bandits' camps in the forest (FoeCamps.h, FoeCamps.csv / Foes.csv; after the forest and its ruins, which they keep off; on every machine: the server places the bandits)
+	for (const JeebHorse::FStableDef& D : JeebHorse::Stables())   // the stables and their wild horses (Horse.h, Stables.csv; after everything solid, which the yard keeps off; every machine builds the yard, the server keeps the horses)
+		if (AStable* S = World->SpawnActorDeferred<AStable>(AStable::StaticClass(), FTransform::Identity)) { S->SetupStable(D); const FVector2D P = S->GetDef().Pos; S->FinishSpawning(FTransform(FRotator(0.f, S->GetDef().Yaw, 0.f), FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)))); }
+#if !UE_BUILD_SHIPPING
+	AHorse::BuildLab(World);   // (-HorseLab test pictures)
+#endif
 	World->SpawnActor<ADeerHerds>(FVector::ZeroVector, FRotator::ZeroRotator);   // the stags' herds (Deer.h, Animals.csv / AnimalHerds.csv; after the camps and everything solid, which they keep off; the server places the animals, players' machines are sent them)
 	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out

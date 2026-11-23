@@ -444,7 +444,7 @@ void AKnightCharacter::UpdateAmulet()
 	if (!Skills || !UpperPivot || !Anim.IsValid() || GetNetMode() == NM_DedicatedServer) return;
 	int32 Id = 0;
 	for (int32 C : { Skills->Worn[JeebItems::K_Amulet], Skills->Worn[JeebItems::K_Ring], Skills->RingB })
-		if (C != 0 && JeebItems::KindOf(C) == JeebItems::K_Amulet) { Id = C; break; }
+		if (C != 0 && JeebItems::KindOf(C) == JeebItems::K_Amulet && C != JeebHorse::SaddleId()) { Id = C; break; }   // (the saddle is carried, not hung round the neck)
 	const bool bPlate = Anim->WornTier(JeebAnim::Piece_Chest) >= 0;
 	const int32 Shown = Id * 2 + (bPlate ? 1 : 0);   // (rebuilt when the chest plate comes on or off too)
 	if (Shown == AmuletShownId) return;

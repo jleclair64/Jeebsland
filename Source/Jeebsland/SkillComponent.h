@@ -17,7 +17,8 @@ enum class ESkillType : uint8
 	Magic,
 	Lockpicking,
 	Climbing,     // (owner 2026-11-12: a skill now, its mechanics later; always add new skills at the end, saves store them by number)
-	Swimming      // (2026-11-13: how long the swimming bar and the breath last, KnightMovementSwim.cpp)
+	Swimming,     // (2026-11-13: how long the swimming bar and the breath last, KnightMovementSwim.cpp)
+	Riding        // (2026-11-22: Horse Riding; XP by distance ridden, a little more speed and gallop per level, Horse.cpp)
 };
 
 UENUM(BlueprintType)
@@ -48,7 +49,7 @@ enum class EItemType : uint8
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
-constexpr int32 JeebNumSkills = 11;
+constexpr int32 JeebNumSkills = 12;
 constexpr int32 JeebNumWornKinds = 25;
 
 // One inventory slot: what is in it (see Inventory.h for ids) and how many

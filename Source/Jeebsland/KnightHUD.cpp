@@ -351,11 +351,14 @@ void AKnightHUD::DrawHUD()
 		else if (Knight->LeapCooldownShare() > 0.f) Gauge(LX, LY, CW, CH, 1.f - Knight->LeapCooldownShare(), FLinearColor(0.55f, 0.43f, 0.11f), false);
 	}
 
-	// While riding: the horse's health bar, above the hotbar. (Its gallop energy never runs out, so there is no bar for it.)
+	// While riding: the horse's health bar, and its gallop bar above it (2026-11-22)
 	if (Knight->IsMounted())
 	{
 		const float BY = Canvas->ClipY - 46.f - 46.f - 40.f;   // above the shield bar
-		const float F = FMath::Clamp(Knight->GetHorseHealth() / Knight->GetHorseMaxHealth(), 0.f, 1.f);
+		const AHorse* RH = Knight->GetRideHorse();
+		const float F = (RH && RH->Hp && RH->Hp->Max > 0) ? FMath::Clamp(float(RH->Hp->Cur) / float(RH->Hp->Max), 0.f, 1.f) : 1.f;
+		const float G = FMath::Clamp(Knight->GetHorseEnergy() / 100.f, 0.f, 1.f);
+		Gauge(BarX, BY - BarH - 6.f, BarW, BarH * 0.7f, G, Knight->IsHorseTired() ? FLinearColor(0.55f, 0.43f, 0.11f) : FLinearColor(0.95f, 0.78f, 0.25f), false);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);
 	}
@@ -796,8 +799,8 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	{
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.f, FLinearColor::White, false);
 	}
-	// Your horse
-	for (TActorIterator<AHorse> It(GetWorld()); It; ++It)
+	// Your horse (and the one you ride)
+	for (TActorIterator<AHorse> It(GetWorld()); It; ++It) if (It->GetOwnerKnight() == MapKnight || It->GetRider() == MapKnight)
 	{
 		Marker(FVector2D(It->GetActorLocation().X, It->GetActorLocation().Y), 3.5f, FLinearColor(0.75f, 0.45f, 0.18f), true);
 	}

@@ -419,12 +419,6 @@ void AKnightCharacter::StopBlock()
 	bBlocking = false;
 }
 
-void AKnightCharacter::HurtHorse(float Amount)
-{
-	HorseHealth = FMath::Clamp(HorseHealth - Amount, 0.f, HorseMaxHealth);
-	LastHorseHurtTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-}
-
 // ---------------- Dying ----------------
 // Whatever killed you (a blow, the poison gas, anything), everything you own goes into a big sack where you fell: your pack,
 // your weapon bar, your armour and the rest of what you wore, your potions and your ingots. You wake up on Oak Hill's
@@ -432,7 +426,7 @@ void AKnightCharacter::HurtHorse(float Amount)
 void AKnightCharacter::Die()
 {
 	if (!Skills || !HasAuthority()) return;
-	if (bMounted) Dismount();
+	if (bMounted) ServerSideDismount();
 	if (bClimbing) ExitClimb(false, false);
 	DropFromWall(true);
 	if (bSitting) StandUp();
@@ -1479,9 +1473,6 @@ void AKnightCharacter::DrawBoxes()
 // Health (and the horse's): the bigger bar from Defence, the Vitality amulet and the vigour potion; healing after 10 s unhurt
 void AKnightCharacter::TickHealth(float Dt)
 {
-	// The horse heals the same way: 10 s after its last hit, a full bar takes 10 s. (Not in PvP areas, once those exist.)
-	if (HorseHealth < HorseMaxHealth && GetWorld()->GetTimeSeconds() - LastHorseHurtTime > 10.f)
-		HorseHealth = FMath::Min(HorseMaxHealth, HorseHealth + HorseMaxHealth * 0.1f * Dt);
 	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s (the server's job online)
 	if (Skills && HasAuthority())
 	{

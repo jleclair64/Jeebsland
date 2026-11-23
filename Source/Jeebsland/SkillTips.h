@@ -5,6 +5,7 @@
 #include "SkillComponent.h"
 #include "KnightCharacter.h"
 #include "Inventory.h"
+#include "Horse.h"
 
 #define TipBarMark TEXT("\u0001")
 
@@ -101,6 +102,10 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 	case ESkillType::Swimming:
 		L.Add(FString::Printf(TEXT("Swimming stamina: %s seconds"), *Secs(AKnightCharacter::SwimSeconds(Level))));
 		L.Add(FString::Printf(TEXT("Breath under water: %s seconds"), *Secs(AKnightCharacter::BreathSeconds(Level))));
+		break;
+	case ESkillType::Riding:
+		L.Add(FString::Printf(TEXT("Horse top speed: x%.2f"), JeebHorse::SpeedMul(Level)));
+		L.Add(FString::Printf(TEXT("Gallop stamina: %s seconds"), *Secs(JeebHorse::GallopSecs(Level))));
 		break;
 	case ESkillType::Lockpicking:
 		L.Add(FString::Printf(TEXT("Can pick locks up to level %d"), Level));
