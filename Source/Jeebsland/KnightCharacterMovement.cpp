@@ -54,7 +54,7 @@ void AKnightCharacter::StopSprint()
 void AKnightCharacter::StartCrouch()
 {
 	if (UKnightMovement* KM = KnightMove()) { KM->bWantsLetGo = true; if (KM->InClimbMove() || KM->InWater()) return; }   // Ctrl on a rock face lets go (and never grabs while held); in the water it dives
-	if (bSitting || bRolling || bSliding || bClimbing || bMounted) return;
+	if (bSitting || bRolling || bSliding || bClimbing || bMounted || bOnBroom) return;   // (on the broom Ctrl only sinks)
 	bCrouched = true;
 }
 
@@ -266,7 +266,7 @@ void AKnightCharacter::Jump()
 	// The troll: Space down on the ground starts a charge; letting go jumps (StopJumping, ReleaseLeap: KnightCharacterTroll.cpp)
 	// (owner 2026-11-21: no charging while the charged jump cools down; Space is then the plain jump at once. The server's own
 	// LeapCooldown still refuses any early leap, ServerLeap.)
-	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0 && LeapCooldown <= 0.f)
+	if (bIsTroll && IsLocallyControlled() && GetCharacterMovement()->IsMovingOnGround() && LeapChargeFrom < 0.0 && LeapFill() >= JeebTune::V().TrollLeapMinFill)   // (2026-11-22: any time the bar holds enough; the leap goes as far as the bar is full)
 	{
 		LeapChargeFrom = GetWorld()->GetTimeSeconds();
 		if (!HasAuthority()) ServerLeapCharge(true); else ServerChargeFrom = LeapChargeFrom;
@@ -489,7 +489,7 @@ bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bS
 		StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
 		if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + 16.f * Dt * GetStaminaMult());   // ...and comes back faster
 	}
-	if (bExhausted && Stamina >= 4.f) bExhausted = false;   // sprint again as soon as a little has come back
+	if (bExhausted && Stamina >= JeebTune::V().SprintRestartShare * MaxStamina) bExhausted = false;   // (owner 2026-11-22: sprint again from a part-filled bar; online review: a fifth, not a sliver, so it never flickers on and off)
 	return bWantSprint;
 }
 
@@ -514,6 +514,9 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	// Riding: twice the walking speed, and twice the sprint. The horse sprints for about four seconds, then needs
 	// its 100-point bar to refill completely before the next gallop.
 	bool bHorseSprint = false;
+#if !UE_BUILD_SHIPPING
+	if (bMounted && bTestGallop) bHorseSprint = true;   // (-JeebHorseTest: a gallop without anyone holding Shift, HorseTest.cpp)
+#endif
 	if (bMounted)
 	{
 		const bool bAsk = bSprinting && Speed > 200.f && !bHorseTired && !bFalling && (GetWorld()->GetTimeSeconds() - LastBackTime > 0.15);
@@ -544,6 +547,7 @@ bool AKnightCharacter::TickGroundSpeed(float Dt, float Speed, bool bFalling, boo
 	}
 	// The horse backs up slowly with S (never sprinting). On foot, a raised shield is a combat stance: you face where the camera
 	// points and sidestep or back up instead of turning round, at full walking (jog) speed in every direction; never sprinting.
+	if (HasAuthority()) bFastHorse = bMounted && bHorseSprint;   // (galloping: arrows do ArrowMountedMul to him, IsFastMounted / Projectile.cpp)
 	// Horse Riding XP: the server counts the distance ridden (capped per frame, so a teleport or a correction earns nothing)
 	if (bMounted && HasAuthority() && Skills)
 	{

@@ -2,6 +2,7 @@
 #include "KnightDesign.h"
 #include "Inventory.h"
 #include "Projectile.h"
+#include "SkillComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -122,10 +123,26 @@ float AKnightCharacter::CastChargeFrac() const
 	return FMath::Clamp(Held / FMath::Max(0.05f, T.CastChargeTime - T.CastTapTime), 0.f, 1.f);
 }
 
-void AKnightCharacter::BeginCastCharge()
+bool AKnightCharacter::SpellKeyDown(int32 Slot)
+{
+	const int32 K = SelectedKind();
+	if (!bIsWizard || !(K == JeebItems::K_Wand || K == JeebItems::K_Staff)) return false;
+	if (bAttacking || bDrinking || bKnockedDown || IsUIOpen() || bPanelCursor || bBlocking) return true;
+	BeginCastCharge(Slot);
+	return true;
+}
+
+void AKnightCharacter::BeginCastCharge(int32 Slot)
 {
 	const int32 K = SelectedKind();
 	if (bCastCharging || !(K == JeebItems::K_Wand || K == JeebItems::K_Staff)) return;
+	// (2026-11-22) a wizard's empty slot casts nothing; the server is told which slot before the charge (both reliable, in order)
+	if (bIsWizard && Skills)
+	{
+		if (Skills->SpellAt(Slot) < 0) { Skills->Say(1.5f, FColor(200, 200, 200), FString::Printf(TEXT("Spell slot %d is empty: Tab, SPELL BOOK"), Slot + 1)); return; }
+		Skills->CastSlot = uint8(Slot);
+		Inv(EInvOp::CastSlot, Slot);
+	}
 	bCastCharging = true;
 	CastChargeStart = GetWorld()->GetTimeSeconds();
 	if (GetNetMode() != NM_Standalone && !HasAuthority()) ServerCastCharge(true);
@@ -146,6 +163,8 @@ void AKnightCharacter::ReleaseCastCharge()
 	const float C = CastChargeFrac();
 	CancelCastCharge();
 	const int32 K = SelectedKind();
+	// (2026-11-22) a spell let go while the last cast still plays is kept and cast as soon as it ends (TickWizard), not dropped
+	if ((K == JeebItems::K_Wand || K == JeebItems::K_Staff) && bAttacking && AtkStyle == EAtkStyle::Cast && !bDrinking && !bKnockedDown) { bCastQueued = true; QueuedCastCharge = C; return; }
 	if (!(K == JeebItems::K_Wand || K == JeebItems::K_Staff) || bAttacking || bDrinking || bKnockedDown || IsUIOpen() || bPanelCursor) return;
 	StartAttack(EAtkStyle::Cast, 1, C);
 }
@@ -178,8 +197,9 @@ void AKnightCharacter::TickCastCharge(float Dt)
 	if (HasAuthority())   // (the magic bar fills again after a pause: the server's number)
 	{
 		const auto& TM = JeebTune::V();
-		if (Magic < TM.MagicMax && GetWorld()->GetTimeSeconds() - MagicUsedAt > TM.MagicRegenDelay) Magic = FMath::Min(TM.MagicMax, Magic + TM.MagicRegen * Dt);
-		else if (Magic > TM.MagicMax) Magic = TM.MagicMax;
+		const float Cap = MagicCap();   // (the bar grows with the Magic level: KnightCharacterBroom.cpp)
+		if (Magic < Cap && GetWorld()->GetTimeSeconds() - MagicUsedAt > TM.MagicRegenDelay) Magic = FMath::Min(Cap, Magic + TM.MagicRegen * Dt);
+		else if (Magic > Cap) Magic = Cap;
 	}
 	const int32 K = SelectedKind();
 	const bool bCaster = K == JeebItems::K_Wand || K == JeebItems::K_Staff;
@@ -236,5 +256,5 @@ FVector AKnightCharacter::CastStartPoint(int32 Kind) const
 // ---------------- The wizard's magic bar (2026-11-22, owner) ----------------
 float AKnightCharacter::GetMagicFraction() const
 {
-	return FMath::Clamp(Magic / FMath::Max(1.f, JeebTune::V().MagicMax), 0.f, 1.f);
+	return FMath::Clamp(Magic / FMath::Max(1.f, MagicCap()), 0.f, 1.f);
 }

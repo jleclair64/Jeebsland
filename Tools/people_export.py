@@ -96,6 +96,60 @@ print("PEOPLE %s texture %dx%d garment share %.3f mean lum %.4f (gamma-space)" %
 mask = np.zeros((h, w, 4), dtype=np.float32); mask[..., 0] = key; mask[..., 3] = 1.0
 mi = bpy.data.images.new("Mask", w, h, alpha=False); mi.pixels = mask.ravel()
 mi.filepath_raw = os.path.join(OUT, "T_%s_Mask.png" % NAME); mi.file_format = 'PNG'; mi.save()
+
+# ---- The troll's skin weights (2026-11-22, owner: "his belt and cloth warps and wobbles a ton when he sprints ... his face gets all
+# squished"). Meshy's auto weights put his face 30% on the two shoulder bones (and the jaw also on the spine), and his belt and
+# loincloth about 90% on the two thighs and only 4-8% on the hips: every arm pump pulled his face and every stride tore the belt
+# and cloth between the legs. Each move below is a share of the weight a vertex already has, so the result stays as smooth as before.
+def troll_reweight(o):
+    vg = {g.name: g for g in o.vertex_groups}
+    idx = {g.index: g.name for g in o.vertex_groups}
+    me = o.data
+    uv = me.uv_layers.active.data if me.uv_layers.active else None
+    col = np.zeros((len(me.vertices), 3), dtype=np.float32); cnt = np.zeros(len(me.vertices), dtype=np.float32)
+    if uv is not None:
+        for loop in me.loops:
+            u, v = uv[loop.index].uv
+            x = min(w - 1, max(0, int((u % 1.0) * w))); y = min(h - 1, max(0, int((v % 1.0) * h)))
+            col[loop.vertex_index] += rgb[y, x]; cnt[loop.vertex_index] += 1
+    col /= np.maximum(cnt, 1)[:, None]
+    def ss(a, b, x): t = min(1.0, max(0.0, (x - a) / (b - a))); return t * t * (3 - 2 * t)
+    moved_face = moved_belt = 0
+    mw = o.matrix_world
+    for v in me.vertices:
+        ws = {idx[g.group]: g.weight for g in v.groups}
+        if not ws: continue
+        p = mw @ v.co
+        # the head: as much of the shoulder and spine weight as the vertex is already head (headfront + Head) goes to the Head
+        hd = ws.get("Head", 0.0) + ws.get("headfront", 0.0)
+        f = ss(0.12, 0.45, hd)
+        if f > 0.0:
+            take = 0.0
+            for b in ("LeftShoulder", "RightShoulder", "Spine", "Spine01", "Spine02", "LeftArm", "RightArm"):
+                if b in ws and ws[b] > 0.0:
+                    t = ws[b] * f; ws[b] -= t; take += t
+            if take > 1e-4: ws["Head"] = ws.get("Head", 0.0) + take; moved_face += 1
+        # the belt and the cloth below it: leg weight to the hips, all of it at the belt, less down the loincloth; bare skin of the
+        # thighs keeps its legs below the belt (his own green-grey skin: low saturation, not the brown/orange leather)
+        c = col[v.index]; mx_ = float(c.max()); mn_ = float(c.min()); sat_ = (mx_ - mn_) / max(mx_, 1e-4)
+        cloth = c[0] >= c[1] and c[0] >= c[2] and sat_ > 0.25   # (leather: red the strongest channel)
+        z = p.z
+        if cloth: f = (0.55 + 0.45 * ss(0.80, 1.00, z)) if z > 0.35 else 0.0
+        else: f = ss(0.98, 1.12, z)
+        legw = ws.get("LeftUpLeg", 0.0) + ws.get("RightUpLeg", 0.0)
+        if f > 0.0 and legw > 1e-4 and z < 1.35:
+            take = 0.0
+            for b in ("LeftUpLeg", "RightUpLeg"):
+                if b in ws: t = ws[b] * f; ws[b] -= t; take += t
+            ws["Hips"] = ws.get("Hips", 0.0) + take; moved_belt += 1
+        tot = sum(ws.values())
+        for b, wt in ws.items():
+            if b not in vg: vg[b] = o.vertex_groups.new(name=b); idx[vg[b].index] = b
+            if wt <= 1e-5: vg[b].remove([v.index])
+            else: vg[b].add([v.index], wt / tot, 'REPLACE')
+    print("PEOPLE %s reweighted: %d face vertices to the Head, %d belt/cloth vertices toward the Hips" % (NAME, moved_face, moved_belt))
+if NAME == "Troll" and os.environ.get("TROLL_OLD_WEIGHTS") != "1":
+    for o in meshes: troll_reweight(o)
 export(os.path.join(OUT, "SK_%s.fbx" % NAME), [arm] + meshes, False)
 
 # ---- The clips

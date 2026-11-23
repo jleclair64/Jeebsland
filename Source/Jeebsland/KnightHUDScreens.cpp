@@ -517,7 +517,7 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		Quad(30, 41, 34, 52, Dk);
 		break;
 	}
-	case 11:   // Horse Riding: a brown horse's head and mane in a horseshoe (2026-11-22)
+	case 12:   // Horse Riding: a brown horse's head and mane in a horseshoe (2026-11-22)
 	{
 		const FLinearColor Shoe(0.62f, 0.64f, 0.68f), Coat(0.50f, 0.30f, 0.16f), Mane(0.18f, 0.11f, 0.07f);
 		Ln(14, 58, 10, 26, Shoe, 5.f); Ln(10, 26, 22, 8, Shoe, 5.f); Ln(22, 8, 42, 8, Shoe, 5.f); Ln(42, 8, 54, 26, Shoe, 5.f); Ln(54, 26, 50, 58, Shoe, 5.f);
@@ -535,6 +535,15 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		D(51, 21, 3.5f, 3.5f, Skin);
 		for (int32 k = 0; k < 4; ++k) { const float x = 4.f + k * 15.f; Ln(x, 42, x + 7.5f, 37, Foam, 3.f); Ln(x + 7.5f, 37, x + 15.f, 42, Foam, 3.f); }   // the wave's crest
 		Ln(10, 52, 54, 52, FLinearColor(0.35f, 0.62f, 0.92f), 2.f);
+		break;
+	}
+	case 11:   // Stamina (2026-11-22): a green running boot with speed lines behind it
+	{
+		const FLinearColor Boot(0.30f, 0.62f, 0.25f), Sole(0.20f, 0.14f, 0.08f), Wind(0.85f, 0.95f, 0.80f);
+		Quad(28, 14, 42, 44, Boot);    // the shaft
+		Quad(28, 40, 56, 50, Boot);    // the foot
+		Quad(26, 50, 58, 55, Sole);
+		for (int32 k = 0; k < 3; ++k) Ln(4.f, 22.f + k * 12.f, 22.f, 22.f + k * 12.f, Wind, 3.f);
 		break;
 	}
 	case 9:   // Climbing: a wooden ladder leaning up a grey rock
@@ -562,8 +571,8 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSkills(); return; }
 
 	// Order: fighting skills first, then gathering and crafting
-	static const ESkillType Order[12] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming, ESkillType::Riding };
+	static const ESkillType Order[13] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming, ESkillType::Stamina, ESkillType::Riding };
 	int32 Total = 0;
 	for (ESkillType T : Order) Total += Sk->GetLevel(T);
 	{

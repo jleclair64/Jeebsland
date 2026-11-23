@@ -104,7 +104,11 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		}
 
 		AKnightGameState::ApplyStore(GetWorld());   // online: what is left is the server's count
-		TArray<JeebStore::FWare>& Wares = JeebStore::Stock();
+		// (2026-11-22) at Silver Point's broom stall the same screen sells brooms (Brooms.csv, every one with a price; the server sells them: EInvOp::BuyBroom)
+		TArray<JeebStore::FWare> BroomWares;
+		const bool bBrooms = Knight->IsBroomShopOpen();
+		if (bBrooms) for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) if (JeebBroom::Row(b).Price > 0) { JeebStore::FWare W; W.Id = BroomId(b); W.Price = JeebBroom::Row(b).Price; W.Stock = 99; BroomWares.Add(W); }
+		TArray<JeebStore::FWare>& Wares = bBrooms ? BroomWares : JeebStore::Stock();
 		const float CW = (RW - 3 * 8.f) / 4.f, CH = 142.f;
 		for (int32 i = 0; i < Wares.Num(); ++i)
 		{
@@ -129,6 +133,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			}
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
 			else if (IsPotion(W.Id)) { Stat = *PotionRow(PotionType(W.Id)).Shop; }
+			else if (IsBroom(W.Id)) Stat = FString::Printf(TEXT("Speed x%.1f, %.1f magic a second"), JeebBroom::Row(BroomRowOf(W.Id)).SpeedMul, JeebBroom::Row(BroomRowOf(W.Id)).Drain);
 			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
 			DrawIngot(CX + 8.f, CY + CH - 30.f, 22.f);
 			HDText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);
@@ -143,6 +148,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				{
 					if (!bAfford) ShopMsg = TEXT("Not enough ingots.");
 					else if (!Skills->CanAdd(W.Id, W.Count)) ShopMsg = TEXT("Your pack is full.");
+					else if (bBrooms) Knight->Inv(EInvOp::BuyBroom, BroomRowOf(W.Id), W.Id);
 					else Knight->Inv(EInvOp::Buy, i, W.Id);   // the server says how it went
 					ShopMsgUntil = Now + 3.f;
 				}

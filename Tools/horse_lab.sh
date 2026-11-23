@@ -4,7 +4,8 @@
 # X Y: a clear spot in the Field map (world cm; 29736 25455, the first herd's meadow, works). -HorseLab puts three horses there: one
 # standing with a saddle (idle, graze, idle, 6 s each), one cantering laps, one walking laps (no saddle).
 #   stills: close views round the standing horse in game light (shattering check) and the lappers: Saved/Shots/horsestills_N.png
-#   film:   HIGH at 120 fps, camera turning and sliding, 260 frames with the walker and the canterer going by (smear check)
+#   film:   HIGH at 120 fps, camera turning and sliding, 260 frames with the walker and the canterer going by (smear check);
+#           with -HorseLabRide the canterer jumps a 90 cm log and the player gallops a fourth horse over another (the automatic jump)
 #           Run both inside one `Tools/uqueue.sh solo` window.
 W="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$W"
@@ -16,7 +17,7 @@ case "$MODE" in
     ARGS="-ShotName=horsestills -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=3.4 -ResX=1280 -ResY=720"; SECS=150; NAME=horsestills ;;
   film)
     EYES="$(e -300 2200 170 -90 -4)"
-    ARGS="-ShotName=horsefilm -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=12 -ShotEyesMove=12_120_0 -ShotEyesFilm=2.2_260 -ShotEyesNoPics -benchmark -fps=120 -ResX=1280 -ResY=720"; SECS=240; NAME=horsefilm ;;
+    ARGS="-ShotName=horsefilm -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=12 -ShotEyesMove=12_120_0 -ShotEyesFilm=2.2_260 -HorseLabRide -ShotEyesNoPics -benchmark -fps=120 -ResX=1280 -ResY=720"; SECS=240; NAME=horsefilm ;;
   cost)
     EYES="$(e -300 1250 150 -90 -4)+$(e 0 600 160 -90 -8)"
     ARGS="-ShotName=horsecost -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=9 -ShotEyesNoPics -ResX=1280 -ResY=720"; SECS=150; NAME=horsecost ;;

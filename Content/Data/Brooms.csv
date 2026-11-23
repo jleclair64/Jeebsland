@@ -1,0 +1,8 @@
+Key,Name,Price,SpeedMul,Drain,Blurb
+# The wizard's flying brooms (2026-11-22). Item id = 930 + the row (never reorder or delete rows: saves keep the number; add new brooms at the end, up to 10).
+# Price: ingots at the broom stall in Silver Point (0 = never sold: a quest reward). SpeedMul: x Tuning.ini [Broom] BroomSpeed (the horse's gallop).
+# Drain: magic a second while flying (the bar is Tuning.ini [Wizard] MagicMax + MagicPerLevel for each Magic level above 1). Blurb: the tooltip.
+Hazel,Hazel's Old Broom,0,1.0,3.0,"A well-worn broom from Hazel Fernwick, a gift for a good deed. Press T to call it and ride (wizards only)."
+Oak,Oak Broom,400,1.0,3.5,"A sturdy oak broom. Press T to call it and ride (wizards only)."
+Ash,Ashwood Broom,1200,1.1,3.0,"A light ashwood broom: a little faster, and gentler on your magic."
+Starlight,Starlight Broom,3500,1.2,2.5,"Silver-bound and charmed with starlight: the fastest broom, and the gentlest on your magic."

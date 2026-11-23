@@ -73,6 +73,7 @@ namespace JeebAnim
 		TArray<FVector> RestPos;               // each bone at the bind pose, in the mesh's space
 		TArray<FQuat> RestRot;                 // ... and its turn there
 		TArray<FString> TrollBone;             // (troll) the troll mesh's bone for each of ours, empty if none
+		FVector TrollFistR = FVector::ZeroVector;   // (troll) the hole in his right fist from the wrist joint, mesh space, bind pose (his hand is 50 cm long)
 		int32 Bone[B_Count];
 		TArray<FString> BoneName;
 		TArray<int32> Parents;
@@ -99,6 +100,7 @@ namespace JeebAnim
 		FTransform DrinkInHand = FTransform::Identity;
 		FQuat ChestRest = FQuat::Identity;              // the chest bone's turn at rest (game frame)
 		FQuat ShieldArm[4];                             // the left arm's pose holding a shield (LShoulder, LArm, LFore, LHand)
+		FQuat WizHoldArm[4];                            // the left arm's pose holding out a wizard's off-hand item, palm up (LShoulder, LArm, LFore, LHand)
 		FVector MouthInHead = FVector::ZeroVector;      // his visor's mouth, in the head bone's frame
 		// Where a tool's head is at its clip's blow, from between his feet in his own frame (forward, right, up)
 		FVector ToolContact(bool bChop, int32 Kind, float Share = 1.f) const;   // (Share: how far through the blow, 0 tool up, 1 the end of it)
@@ -173,12 +175,14 @@ namespace JeebAnim
 		bool bClimbing = false; float ClimbPhase = 0.f;
 		bool bSitting = false;
 		bool bMounted = false;   // riding (the test horse): the sitting pose, raised to the saddle
+		bool bBroom = false;     // (2026-11-22) on the wizard's broom: the riding pose, raised only to the broom (jeeb.Broom.Raise)
 		bool bSliding = false;
 		bool bFishing = false;
 		bool bDrinking = false; float DrinkU = 0.f;   // a potion on its way down: 0..1
 		bool bSwinging = false; bool bSideways = false; float SwingU = 0.f;   // a tool at work: chopping or mining
 		bool bShotLog = false;      // test pictures: log JEEBANIM
 		bool bShieldArm = false;    // a shield on his left arm, not on his back: the forearm holds it out in front
+		bool bWizHold = false;      // (2026-11-22) a wizard's off-hand item (open book, crystal ball, pipe): the left forearm held out, palm up (WizHoldArm)
 		// free climbing and the mantle (2026-11-12, KnightMovement.h): 1 on the rock, 2 its jump, 3 the ledge climb-up, 4 a mantle over, 5 onto
 		uint8 WallMode = 0;
 		FVector WallN = FVector::BackwardVector, WallPoint = FVector::ZeroVector; bool bMantleEdge = false;   // the rock: its normal, and a point on it (world); a mantle: WallPoint is the top of the obstacle's near edge (bMantleEdge)
@@ -341,6 +345,8 @@ private:
 	void TrollPunch(const JeebAnim::FInput& In, FPose& B, float& OutBlend);
 	void TrollBareGuard(const JeebAnim::FInput& In, FPose& B);   // block with the bare left forearm raised (no shield)
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
+	void TrollClubClear(FPose& B);   // the troll's right hand pushed out until the held club clears his belly (the knight's cuts on his body)
+	bool bTrollOldSwing = false;     // (test builds, -TrollOldSwing: the 2026-11-21 two-handed club blows)
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)
 	// The troll's throwing rocks and his own armour (2026-11-22, KnightAnimatorTrollThrow.cpp)
@@ -409,6 +415,7 @@ private:
 	float AirT = 0.f;
 	float ShakePhase = 0.f;  // the charged smash's tremble
 	float ShieldArmW = 0.f;  // how far the left arm is in its shield pose
+	float WizHoldW = 0.f;    // how far the left arm is in its off-hand pose (the wizard's book, ball or pipe)
 	float CutHeading = 0.f, CutAt = -10.f;   // (which way the blade points across the floor: LevelCut)
 	float JabStepT = 0.f;    // (seconds left of a stance change between the two jabs: the moving boot lifts higher, LiftDraggedFeet)
 	float GreatW = 0.f, GreatLineW = 0.f;   // the big sword: how far the left hand is on the grip, and how far the blade follows the line through his fists

@@ -19,9 +19,8 @@ OakFringe,0,0.08,Hayfield:2 Farmstead:1 FenceRun:3 WoodStack:1 Boulders:2,111,ro
 # pieces). Since fillfix (2026-11-16) spots are drawn only inside the zone's own open ground, so the yield in game is close to
 # Density x area (JEEBFILL zone lines); the densities were lowered to keep the piece count. OldVillage: the empty site of the walled
 # village taken out of the game on 2026-11-22, off (0) and kept free for the town that will replace it.
-# Placement v2 (2026-11-16): densities halved, and no wares (amphora rows, veg carts) or lone palisade pieces outside the market yard.
+# Placement v2 (2026-11-16): densities halved, and no wares (amphora rows, veg carts) or lone palisade pieces.
 OldVillage,0,1.1,StorageCorner:2 SackCorner:2 WoodYard:2 BarrelRow:2 WashingCorner:1 BushClump:1,201,wall,0.03
-MarketYard,1,10,ShopFront:2 BarrelRow:3 SackCorner:3 AmphoraRow:2 StorageCorner:1 VegCorner:1,202,road,0
 Cottage,1,2.5,BushClump:5 WashingCorner:1 KitchenGarden:1 LogCorner:1,203,wall,0
 HutYards,1,0.9,HutSide:2 WoodYard:1 SackCorner:2 LogCorner:1 BarrelRow:1 BushClump:3,204,wall,0.02
 PigPen,1,3,PenSide:2 SackCorner:2 BarrelRow:1 BushClump:1,205,random,0

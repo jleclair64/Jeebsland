@@ -49,6 +49,10 @@ public:
 	UPROPERTY() TArray<uint8> QuestDone;
 	// Towns visited (UTravelComponent, 2026-11-18), by name. Older saves have none: the towns the map fog shows explored count (Restore).
 	UPROPERTY() TArray<FString> TownsVisited;
+	// The wizard's spell book (2026-11-22, USkillComponent::SpellLevels). Older saves have none: the starter spells are given (ApplyTo).
+	UPROPERTY() TArray<uint8> SpellLevels;
+	UPROPERTY() TArray<uint8> SpellEquip;
+	UPROPERTY() int32 SpellPick = 0;
 	// Your own horse (URiderComponent, 2026-11-22): whether you have one, and the stable it waits at
 	UPROPERTY() bool bHasHorse = false;
 	UPROPERTY() FString HorseStable;

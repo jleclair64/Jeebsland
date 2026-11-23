@@ -51,6 +51,10 @@ namespace JeebHorse
 	constexpr float Scale = 1.25f;                // the model at 1.25: a 15-hand riding horse, the saddle at the old test horse's height
 	constexpr float Reach = 300.f;                // how near a knight must be to mount (cm; the server allows lag on top)
 	extern const FName QuestKey;                  // the stablemaster's quest that gives you your own horse
+	// The automatic jump (owner 2026-11-22): something low ahead along Dir within Reach (a log, a rock, a fence, a low wall) with open,
+	// fairly level ground beyond it. OutTop = its height over Feet, OutDist = how far ahead its face is. Taller things and trees still block.
+	constexpr float JumpMaxTop = 150.f;
+	bool JumpProbe(const UWorld* W, const FVector& Feet, const FVector2D& Dir, float Reach, const AActor* Ignore1, const AActor* Ignore2, float& OutTop, float& OutDist);
 }
 
 UCLASS()
@@ -88,7 +92,7 @@ public:
 	UPROPERTY() UHealthComponent* Hp = nullptr;
 
 #if !UE_BUILD_SHIPPING
-	int32 LabRole = -1;   // (-HorseLab test pictures) 0 stands and cycles its clips, 1 canters laps, 2 walks laps
+	int32 LabRole = -1;   // (-HorseLab test pictures) 0 stands and cycles its clips, 1 canters laps, 2 walks laps, 3 carries the player at a gallop (-HorseLabRide)
 	FVector2D LabA = FVector2D::ZeroVector, LabB = FVector2D::ZeroVector;
 	static void BuildLab(UWorld* World);
 #endif
@@ -110,6 +114,16 @@ private:
 	UPROPERTY(Replicated) bool bRepSaddled = false;
 	UPROPERTY(Replicated) bool bFollow = false;
 	UFUNCTION() void OnRep_Move();
+	// the automatic jump while it runs by itself (called, following): the server starts it, every machine draws the same arc
+	UPROPERTY(ReplicatedUsing = OnRep_Jump) uint8 RepJumpSeq = 0;
+	UPROPERTY(Replicated) uint8 RepJumpH = 0;   // the arc's height, in 2 cm
+	UFUNCTION() void OnRep_Jump();
+	float JumpT = -1.f, JumpH = 0.f, JumpFromZ = 0.f, JumpPitch = 0.f;
+	FVector2D JumpDir = FVector2D::ZeroVector;
+	static constexpr float JumpDur = 0.8f;
+	void StartJump(float Top, const FVector2D& Dir);
+	float JumpZ(float GroundZ) const;            // the arc over this spot's ground while JumpT runs
+	void StepJump(float Dt);                     // JumpT and the nose's pitch along the arc
 	double MoveAt = 0.0;
 	bool bPlaced = false;
 

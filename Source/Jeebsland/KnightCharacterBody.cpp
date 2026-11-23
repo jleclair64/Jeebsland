@@ -393,37 +393,115 @@ void AKnightCharacter::RefreshEquipment()
 	RebuildHeld();
 }
 
-// The wizard's spell book (2026-11-22, owner: "a spell book model from meshy for the wizard to hold in his left hand"): Meshy's model (Art/Props/SpellBook.glb,
-// /Game/Props/SM_SpellBook) held by its spine in his left fist whenever he wears a book; the belt book (Wiz_BookBase/Robe) shows only if the model is missing.
-// Built like a tool on the right fist: its spine along the fist's line, turned BookRoll about it, moved BookShift (cm, in the book's own frame).
-static float BookRoll = 0.f, BookScale = 1.f;
-static FVector BookShift(-8.f, 0.f, 0.f);
+// The wizard's off-hand item (2026-11-22, agent wizlook; owner: "change the book to be open and held upright in his left hand", "a glowing crystal ball that floats
+// above his open left hand ... a wizard pipe to be another option for this slot"). Whatever he wears in the book slot (JeebItems::EWizOff, the item's style digit)
+// is held out on his left palm: the animator holds the forearm out, palm up (FKnightAnimator WizHoldArm, In.bWizHold), and PlaceWizardOffHand puts the model
+// on the palm every frame, square to his body: the open book upright with its pages to the front, the crystal ball floating and bobbing over the palm with
+// a breathing glow (M_PropGlow), the pipe lying in the palm with a few puffs of smoke from its bowl (this machine only). Nothing here is gameplay: the server
+// makes none of it. The belt book (Wiz_BookBase/Robe) shows only if the model is missing.
+// Per item, in the hand's frame (cm, degrees: X forward along the forearm, Y to his right, Z up; pitch, yaw, roll; scale): jeeb.Wizard.OffHand<Book|Ball|Pipe>.
+static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,14,0,90,-65,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("9,-1,15,0,0,0,1"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("8,0,4,0,0,0,1"), TEXT("The pipe in the wizard's left palm: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 1.0f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBallBob(TEXT("jeeb.Wizard.BallBob"), 1.6f, TEXT("How far the crystal ball bobs up and down over the wizard's palm (cm)."), ECVF_Default);
+static TAutoConsoleVariable<int32> CVarPipeSmoke(TEXT("jeeb.Wizard.PipeSmoke"), 1, TEXT("1: a few puffs of smoke rise from the wizard's pipe (this machine only); 0: none."), ECVF_Default);
+
+static const TCHAR* WizOffMesh(int32 Style)
+{
+	return Style == JeebItems::WO_Ball ? TEXT("/Game/Props/SM_CrystalBall.SM_CrystalBall") : Style == JeebItems::WO_Pipe ? TEXT("/Game/Props/SM_Pipe.SM_Pipe") : TEXT("/Game/Props/SM_OpenBook.SM_OpenBook");
+}
+
 void AKnightCharacter::UpdateWizardBook()
 {
-	const bool bWant = bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && GetNetMode() != NM_DedicatedServer && ElbowL;
+	const int32 Item = (bIsWizard && Skills) ? Skills->Worn[JeebItems::K_Book] : 0;
+	const int32 Style = Item ? FMath::Clamp(JeebItems::StyleOf(Item), 0, JeebItems::NumWizOffStyles - 1) : -1;
+	const bool bWant = Item != 0 && GetNetMode() != NM_DedicatedServer;
+	if (WizardBookHeld && (!bWant || Style != WizardOffStyle))
+	{
+		WizardBookHeld->DestroyComponent(); WizardBookHeld = nullptr;
+		if (WizardPipeSmoke) { WizardPipeSmoke->DestroyComponent(); WizardPipeSmoke = nullptr; }
+	}
 	if (bWant && !WizardBookHeld)
 	{
-		if (UStaticMesh* M = JeebProps::Load(TEXT("/Game/Props/SM_SpellBook.SM_SpellBook")))
-			WizardBookHeld = JeebProps::MakeStatic(this, ElbowL, M);
-#if !UE_BUILD_SHIPPING
-		FString T; TArray<FString> V;   // (-BookTune=<roll>_<x>_<y>_<z>_<scale>: degrees and cm in tenths, scale in hundredths)
-		if (FParse::Value(FCommandLine::Get(), TEXT("BookTune="), T) && T.ParseIntoArray(V, TEXT("_")) == 5)
-		{
-			BookRoll = FCString::Atof(*V[0]) / 10.f; BookShift = FVector(FCString::Atof(*V[1]), FCString::Atof(*V[2]), FCString::Atof(*V[3])) / 10.f; BookScale = FCString::Atof(*V[4]) / 100.f;
-		}
-#endif
+		WizardOffStyle = Style;
+		if (UStaticMesh* M = JeebProps::Load(WizOffMesh(Style)))
+			WizardBookHeld = JeebProps::MakeStatic(this, GetRootComponent(), M);
 		if (WizardBookHeld)
 		{
-			const FVector E = KM::DownTo(KnightDesign::BladeDir(-1));
-			const FQuat Q = FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(E.Z)) * FQuat(FVector::YAxisVector, FMath::DegreesToRadians(E.Y)) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(E.X));
-			const FTransform Fist(Q, KnightDesign::GripPos(true) - KnightDesign::PivotPos(KnightDesign::P_ElbowL));
-			WizardBookHeld->SetRelativeTransform(FTransform(FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(BookRoll)), BookShift, FVector(BookScale)) * Fist);
-			WizardBookHeld->SetCastShadow(true);
+			WizardBookHeld->SetUsingAbsoluteLocation(true); WizardBookHeld->SetUsingAbsoluteRotation(true); WizardBookHeld->SetUsingAbsoluteScale(true);
+			WizardBookHeld->SetCastShadow(Style != JeebItems::WO_Ball);   // (the ball is lit from within)
+			// (a material of its own, so the ball's glow can breathe; its pictures set again from the prop's own textures, which the first test pictures
+			// showed missing: a grey book and a checker ball)
+			const TCHAR* Prop = Style == JeebItems::WO_Ball ? TEXT("CrystalBall") : Style == JeebItems::WO_Pipe ? TEXT("Pipe") : TEXT("OpenBook");
+			UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Props/MI_%s.MI_%s"), Prop, Prop));
+			if (UMaterialInstanceDynamic* M = WizardBookHeld->CreateDynamicMaterialInstance(0, Base))
+				for (const TCHAR* Kind : { TEXT("Base"), TEXT("MR"), TEXT("Normal") })
+					if (UTexture* Tex = LoadObject<UTexture>(nullptr, *FString::Printf(TEXT("/Game/Props/T_%s_%s.T_%s_%s"), Prop, Kind, Prop, Kind)))
+						M->SetTextureParameterValue(*FString::Printf(TEXT("%sTex"), Kind), Tex);
+			if (Style == JeebItems::WO_Pipe && CVarPipeSmoke.GetValueOnGameThread() != 0)
+			{
+				WizardPipeSmoke = NewObject<UInstancedStaticMeshComponent>(this);
+				WizardPipeSmoke->SetupAttachment(GetRootComponent());
+				WizardPipeSmoke->SetUsingAbsoluteLocation(true); WizardPipeSmoke->SetUsingAbsoluteRotation(true); WizardPipeSmoke->SetUsingAbsoluteScale(true);
+				WizardPipeSmoke->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				WizardPipeSmoke->SetCastShadow(false);
+				WizardPipeSmoke->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+				// (pale grey wisps: the wizard's orb material, see-through and soft at the rim, in grey; M_Smoke is the poison's purple)
+				if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Wizard/M_WizardOrb.M_WizardOrb")))
+					if (UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Mat, this))
+					{
+						M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.55f, 0.55f, 0.58f));
+						M->SetScalarParameterValue(TEXT("Opacity"), 0.8f);
+						WizardPipeSmoke->SetMaterial(0, M);
+					}
+				WizardPipeSmoke->RegisterComponent();
+				WizardPipeSmoke->SetWorldTransform(FTransform::Identity);
+				for (int32 i = 0; i < 6; ++i) WizardPipeSmoke->AddInstance(FTransform(FVector::ZeroVector), true);
+			}
 		}
-		UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD held book %s"), WizardBookHeld ? TEXT("made") : TEXT("MISSING (/Game/Props/SM_SpellBook: Tools/BuildProps.ps1 SpellBook)"));
+		UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD held %s %s"), JeebItems::WizOffName(Style), WizardBookHeld ? TEXT("made") : TEXT("MISSING (/Game/Props: Tools/BuildProps.ps1 OpenBook CrystalBall Pipe)"));
 	}
-	else if (!bWant && WizardBookHeld) { WizardBookHeld->DestroyComponent(); WizardBookHeld = nullptr; }
-	if (Anim) Anim->SetWizardBook(bIsWizard && Skills && Skills->Worn[JeebItems::K_Book] != 0 && !WizardBookHeld && GetNetMode() != NM_DedicatedServer);
+	if (Anim) Anim->SetWizardBook(bWant && !WizardBookHeld);
+}
+
+// Every frame (PlaceGear): the off-hand model on his palm, in the hand's frame (the forearm's line, made level, and his up)
+void AKnightCharacter::PlaceWizardOffHand()
+{
+	if (!WizardBookHeld || !Anim) return;
+	const FVector Hand = Anim->BoneAt(JeebAnim::LHand), Fore = Anim->BoneAt(JeebAnim::LFore);
+	FVector Fwd = (Hand - Fore).GetSafeNormal2D();
+	if (Fwd.IsNearlyZero()) Fwd = GetActorForwardVector();
+	const FQuat Frame = FRotationMatrix::MakeFromXZ(Fwd, FVector::UpVector).ToQuat();
+	TArray<FString> P;
+	(WizardOffStyle == JeebItems::WO_Ball ? CVarOffBall : WizardOffStyle == JeebItems::WO_Pipe ? CVarOffPipe : CVarOffBook).GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
+	float V[7] = { 0, 0, 0, 0, 0, 0, 1 };
+	for (int32 i = 0; i < FMath::Min(P.Num(), 7); ++i) V[i] = FCString::Atof(*P[i]);
+	const float T = GetWorld()->GetTimeSeconds();
+	FVector At(V[0], V[1], V[2]);
+	FRotator R(V[3], V[4], V[5]);
+	if (WizardOffStyle == JeebItems::WO_Ball)
+	{
+		At.Z += CVarBallBob.GetValueOnGameThread() * FMath::Sin(T * 2.1f);   // (floating: a slow bob and a slow turn)
+		R = FRotator(0.f, FMath::Fmod(T * 25.f, 360.f), 0.f);
+		const float Glow = FMath::Max(0.f, CVarBallGlow.GetValueOnGameThread()) * (1.f + 0.25f * FMath::Sin(T * 2.7f));
+		for (int32 i = 0; i < WizardBookHeld->GetNumMaterials(); ++i)
+			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(WizardBookHeld->GetMaterial(i))) M->SetScalarParameterValue(TEXT("GlowStrength"), Glow);
+	}
+	const FTransform Xf(Frame * R.Quaternion(), Hand + Frame.RotateVector(At), FVector(FMath::Max(V[6], 0.05f)));
+	WizardBookHeld->SetWorldTransform(Xf);
+	if (WizardPipeSmoke)   // (the bowl's mouth: the pipe's +X end, up; each puff rises, swells and drifts back over 2.4 s)
+	{
+		const FVector Bowl = Xf.TransformPosition(FVector(11.f, 0.f, 5.f));
+		const int32 N = WizardPipeSmoke->GetInstanceCount();
+		for (int32 i = 0; i < N; ++i)
+		{
+			const float U = FMath::Fmod(T / 2.4f + float(i) / N, 1.f);
+			const FVector Pos = Bowl + FVector(0.f, 0.f, U * 28.f) - Fwd * (U * U * 10.f) + FVector(FMath::Sin(T * 1.3f + i) * 2.f * U, FMath::Cos(T * 1.1f + i) * 2.f * U, 0.f);
+			const float S = (0.015f + 0.06f * U) * (U < 0.85f ? 1.f : (1.f - U) / 0.15f);
+			WizardPipeSmoke->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Pos, FVector(FMath::Max(S, 0.001f))), true, i == N - 1, false);
+		}
+	}
 }
 
 // The worn amulet (2026-11-12, owner: a gold chain round the knight's neck): the chain lies round the base of his neck, over the collar, and drops in a V

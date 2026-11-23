@@ -124,6 +124,7 @@ void AKnightCharacter::BeginPlay()
 		if ((bIsTroll || bIsWizard) && HasAuthority()) Skills->ResetToStartingKit();   // (the troll's own kit: the club, no knight's gear)
 		Skills->FillPracticePack();   // TEMPORARY: a pack full of random gear for practising swaps (remove this line when done)
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
+		Skills->EnsureStarterSpells();   // TEMPORARY (test setup): both spells learned and in the F cycle
 	}
 	// TESTING ONLY: editor Play in single player on the owner's PC gets every skill at 99 while MaxLevelInEditor is on
 	// ([Jeebsland.Testing] in DefaultGame.ini; online logins are handled by AKnightGameMode). Never in a packaged game.
@@ -220,8 +221,15 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
+	DOREPLIFETIME(AKnightCharacter, bOnBroom);   // (the flying broom, everyone: KnightCharacterBroom.cpp)
+	DOREPLIFETIME(AKnightCharacter, bBroomEmpty);
+	DOREPLIFETIME(AKnightCharacter, BroomRow);
 	DOREPLIFETIME(AKnightCharacter, RideHorse);   // (2026-11-22: who rides what is the server's, Horse.h)
 	DOREPLIFETIME(AKnightCharacter, Health);
+	DOREPLIFETIME(AKnightCharacter, bRushing);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RushBar, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, RushSlow, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AKnightCharacter, bRushTired, COND_OwnerOnly);
 	DOREPLIFETIME(AKnightCharacter, MaxHealth);
 	DOREPLIFETIME(AKnightCharacter, bRockMode);   // (the troll's rocks in hand: KnightCharacterRock.cpp)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, GuardPool, COND_OwnerOnly);
@@ -335,6 +343,10 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(NextWeaponAction, EKeys::R);   // (R steps through the weapon bar; the wheel no longer does)
 	ArrowsAction = MakeBool(TEXT("KnightArrows"));
 	KnightContext->MapKey(ArrowsAction, EKeys::F);   // (F picks the arrows: the arrow slot)
+	SpellMouseActions[0] = MakeBool(TEXT("KnightSpell2"));
+	KnightContext->MapKey(SpellMouseActions[0], EKeys::ThumbMouseButton);    // (mouse button 4: the wizard's second spell)
+	SpellMouseActions[1] = MakeBool(TEXT("KnightSpell3"));
+	KnightContext->MapKey(SpellMouseActions[1], EKeys::ThumbMouseButton2);   // (mouse button 5: his third)
 	InventoryAction = MakeBool(TEXT("KnightInventory"));
 	KnightContext->MapKey(InventoryAction, EKeys::Tab);
 	PanelTabAction = MakeBool(TEXT("KnightPanelTab"));
@@ -413,6 +425,11 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(HotbarActions[2], ETriggerEvent::Started, this, &AKnightCharacter::Select3);
 		EIC->BindAction(HotbarActions[3], ETriggerEvent::Started, this, &AKnightCharacter::Select4);
 		EIC->BindAction(HotbarActions[4], ETriggerEvent::Started, this, &AKnightCharacter::Select5);
+		// (2026-11-22) the wizard's spell slots: 1-3 and mouse buttons 4 and 5, let go to cast
+		for (int32 i = 0; i < 3; ++i) EIC->BindAction(HotbarActions[i], ETriggerEvent::Completed, this, &AKnightCharacter::SpellKeyUp);
+		EIC->BindAction(SpellMouseActions[0], ETriggerEvent::Started, this, &AKnightCharacter::Spell2Down);
+		EIC->BindAction(SpellMouseActions[1], ETriggerEvent::Started, this, &AKnightCharacter::Spell3Down);
+		for (int32 i = 0; i < 2; ++i) EIC->BindAction(SpellMouseActions[i], ETriggerEvent::Completed, this, &AKnightCharacter::SpellKeyUp);
 	}
 }
 
@@ -452,12 +469,14 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickCastCharge(Dt);   // (the wand's and staff's charged shot: KnightCharacterCastAim.cpp)
 	TickKnock(Dt);
 	TickHealth(Dt);
+	TickFall();   // (fall damage, the server's: KnightCharacterFall.cpp)
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
 	TickDrink(Dt);
 	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
 	TickGear(Dt);
 	if (bIsTroll) TickTroll(Dt);
 	if (bIsWizard) TickWizard(Dt);   // (the orb and the teleport's puffs: KnightCharacterWizard.cpp)
+	TickBroom(Dt);   // (the wizard's flying broom: KnightCharacterBroom.cpp)
 	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)
@@ -478,15 +497,16 @@ void AKnightCharacter::TickHousekeeping()
 	// Coming from the starting screen the mouse is still in menu mode: hand it back to the camera once our knight is ours
 	if (!bUIModeSet && IsLocallyControlled() && GetController()) { bUIModeSet = true; RefreshUIMode(); }
 
-	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
+	// The camera can look straight down and straight up (owner 2026-11-23: it was held to 60 degrees down and 35 up; CalcCamera keeps it above
+	// the grass now, so the full range is safe). Just short of 90 so the view never flips.
 	if (!bPitchLimitsSet)
 	{
 		if (APlayerController* PCtl = Cast<APlayerController>(GetController()))
 		{
 			if (PCtl->PlayerCameraManager)
 			{
-				PCtl->PlayerCameraManager->ViewPitchMin = -60.f;
-				PCtl->PlayerCameraManager->ViewPitchMax = 35.f;
+				PCtl->PlayerCameraManager->ViewPitchMin = -89.f;
+				PCtl->PlayerCameraManager->ViewPitchMax = 89.f;
 				bPitchLimitsSet = true;
 			}
 		}

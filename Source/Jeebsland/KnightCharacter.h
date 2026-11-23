@@ -84,6 +84,10 @@ enum class EInvOp : uint8
 	TakeFromWall,   // A: a peg of the MoveLab gear wall (E; test builds only)
 	ChooseArrows,   // A: the arrow id to shoot next
 	HouseDoor,      // At: an open house's door hinge (AHouseInterior::DoorKey): open or shut it (E)
+	ChooseSpell,    // A: the wizard's loadout row to cast from (F, or a click in the spell book)
+	EquipSpell,     // A: a cell of the spell book's 3x3 grid (row * 3 + slot), B: the spell row + 1 to put in it (0: empty it)
+	CastSlot,       // A: which of the active row's three spells the next cast is (sent just before the charge starts)
+	BuyBroom,       // A: the row in Brooms.csv, B the id the player saw (Silver Point's broom stall)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -93,6 +97,10 @@ class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
 	friend struct FHorseTestDriver;   // (-JeebHorseTest, HorseTest.cpp)
+	friend class AHorse;              // (-HorseLabRide: the lab puts the player on a horse, Horse.cpp BuildLab)
+#if !UE_BUILD_SHIPPING
+	bool bTestGallop = false;
+#endif
 
 public:
 	AKnightCharacter(const FObjectInitializer& ObjectInitializer);
@@ -129,6 +137,9 @@ public:
 	UPROPERTY() class UStaticMeshComponent* WizardOrb = nullptr;
 	UPROPERTY() class UStaticMeshComponent* WizardBookHeld = nullptr;   // the spell book in his left fist (UpdateWizardBook)
 	void UpdateWizardBook();
+	void PlaceWizardOffHand();     // (every frame: the off-hand book, ball or pipe on his palm, KnightCharacterBody.cpp)
+	int32 WizardOffStyle = -1;     // which one WizardBookHeld is (JeebItems::EWizOff)
+	UPROPERTY() class UInstancedStaticMeshComponent* WizardPipeSmoke = nullptr;   // the pipe's puffs (this machine only)
 	UPROPERTY() class UMaterialInstanceDynamic* WizardOrbMid = nullptr;
 	struct FBlinkPuff { TWeakObjectPtr<class UStaticMeshComponent> Comp; TWeakObjectPtr<class UMaterialInstanceDynamic> Mid; float T = 0.f; bool bIn = false; };
 	TArray<FBlinkPuff> BlinkPuffs;
@@ -138,7 +149,26 @@ public:
 	// The troll's charged jump: hold Space, let go. Client asks (ServerLeap), server checks and launches; the cooldown is the server's.
 	float LeapChargeShare() const;   // 0..1 while Space is held (this machine's own troll)
 	float LeapCooldownShare() const { return LeapCooldown > 0.f ? LeapCooldown / FMath::Max(0.1f, JeebTune::V().TrollLeapCooldown) : 0.f; }
+	float LeapFillUsed = 1.f;   // (the bar's fill the last leap took)
+	float LeapFill() const { return 1.f - LeapCooldownShare(); }   // (2026-11-22) the charged-jump bar: 1 full; a leap goes this share as far and empties it
 	bool IsLeapCharging() const { return LeapChargeFrom >= 0.0; }
+	// The troll's rush (owner 2026-11-22): sprinting builds up to 3x the knight's sprint over 10 s; after 5 s a rush bar drains (Stamina
+	// skill); empty, he eases down to his walking speed. At top speed he bowls over players and creatures (server). Tuning.ini [Troll].
+	bool IsRushing() const { return bRushing; }   // (replicated from the server: he is at rush top speed; arrows and others may read it)
+	// On a fast mount (owner 2026-11-23): arrows do ArrowMountedMul (Tuning.ini [Pvp], 2x) damage to him. True on a rushing troll, on a galloping
+	// horse and on a broom. The server decides (Projectile.cpp); the horse and broom work set bFastHorse / bOnBroom on the server (place-holders:
+	// nothing sets them yet).
+	bool IsFastMounted() const { return IsRushing() || bFastHorse || bOnBroom; }
+	bool bFastHorse = false;   // (server) riding a horse at a gallop
+	// Fall damage (owner 2026-11-23, KnightCharacterFall.cpp; the server decides, Tuning.ini [Pvp])
+	void TickFall();
+#if !UE_BUILD_SHIPPING
+	friend struct FPvpTestDriver;   // (PvpTest.cpp: the online test of the PvP zones, fall damage and the mounted-target arrow bonus)
+#endif
+	float FallPeakZ = 0.f, FallLastZ = 0.f; bool bFallWasFalling = false;
+	float RushBarShare() const { return RushBar; }
+	bool IsRushTired() const { return bRushTired; }
+	static float RushSeconds(int32 StaminaLevel);   // how long a full rush bar lasts once it drains, at this Stamina level
 	UFUNCTION(Server, Reliable) void ServerLeapCharge(bool bStart);
 	UFUNCTION(Server, Reliable) void ServerLeap(float Charge, FVector_NetQuantizeNormal Dir);
 	UFUNCTION(Server, Reliable) void ServerHop(FVector_NetQuantizeNormal Dir);
@@ -373,9 +403,10 @@ public:
 	// and never believes more charge than it has seen; damage is x1 to x CastChargeMax. Others see the tip's glow grow (bCastChargingRep).
 	bool IsChargingCast() const { return bCastCharging; }
 	float CastChargeFrac() const;
-	void BeginCastCharge();
+	void BeginCastCharge(int32 Slot = 0);   // Slot: which of the active row's three spells (the server is told first: EInvOp::CastSlot)
 	void ReleaseCastCharge();
 	void CancelCastCharge();
+	bool bCastQueued = false; float QueuedCastCharge = 0.f;   // (a cast let go mid-cast: TickWizard starts it when the last one ends)
 	UFUNCTION(Server, Reliable) void ServerCastCharge(bool bOn);
 	bool bCastCharging = false;                // this machine: the player holding the button (or, on the server, as he told us)
 	double CastChargeStart = 0.0;              // world seconds it began (each machine its own clock)
@@ -567,9 +598,15 @@ protected:
 	void OnSkillsKey() { ToggleSkills(); }
 	void RefreshUIMode();
 	void OnSettingsKey() { ToggleSettings(); }
-	void Select1() { SelectHotbar(0); }          // keys 1-5 pick the weapon bar slot
-	void Select2() { SelectHotbar(1); }
-	void Select3() { SelectHotbar(2); }
+	void Select1() { if (!SpellKeyDown(0)) SelectHotbar(0); }          // keys 1-5 pick the weapon bar slot (a wizard with wand or staff: 1-3 cast his spells)
+	void Select2() { if (!SpellKeyDown(1)) SelectHotbar(1); }
+	void Select3() { if (!SpellKeyDown(2)) SelectHotbar(2); }
+	// (owner, 2026-11-22) the wizard's three spell slots of his active loadout row: slot 1 left click or 1, slot 2 mouse button 4 or 2,
+	// slot 3 mouse button 5 or 3. Hold to charge, let go to cast. False: not a wizard holding a wand or staff (the key does its usual job).
+	bool SpellKeyDown(int32 Slot);
+	void SpellKeyUp() { if (bCastCharging) ReleaseCastCharge(); }
+	void Spell2Down() { SpellKeyDown(1); }
+	void Spell3Down() { SpellKeyDown(2); }
 	void Select4() { SelectHotbar(3); }
 		void Select5() { SelectHotbar(4); }
 	void ScrollUp() { StartKick(); }   // (the wheel up kicks)
@@ -584,6 +621,13 @@ protected:
 	double LeapChargeFrom = -1.0;     // when Space went down for a charged jump (this machine's clock; -1 none)
 	double ServerChargeFrom = -1.0;   // (server) when the client said it started charging
 	float LeapCooldown = 0.f;         // seconds before the next charged jump
+	UPROPERTY(Replicated) bool bRushing = false;   // (server) at rush top speed: IsRushing
+	UPROPERTY(Replicated) float RushBar = 1.f;    // (server, to the owner) the rush bar 0..1
+	UPROPERTY(Replicated) float RushSlow = 0.f;   // (server, to the owner) the ease down to a walk 0..1 (SprintNow)
+	float RushT = 0.f, RushXPAcc = 0.f;   // (server) seconds rushing, XP owed
+	UPROPERTY(Replicated) bool bRushTired = false;
+	TMap<TWeakObjectPtr<AActor>, double> RushHitAt;   // (server) when each victim was last bowled over
+	void TickRush(float Dt);
 	float LeapCrouch = 0.f;           // the crouch as he charges (0..1, this machine)
 	bool bAirLaunch = false;          // a hop or a charged jump is flying: the air speed clamp leaves it alone until he lands
 	float ShotLeapCharge = -1.f;      // (test pictures: -SuitDo=chargejump<hundredths>)
@@ -635,6 +679,7 @@ private:
 	UPROPERTY() UInputAction* NextWeaponAction = nullptr;
 	UPROPERTY() UInputAction* ArrowsAction = nullptr;   // F: the next kind of arrows
 	UPROPERTY() UInputAction* HotbarActions[5] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+	UPROPERTY() UInputAction* SpellMouseActions[2] = { nullptr, nullptr };   // mouse buttons 4 and 5: the wizard's spell slots 2 and 3
 	TArray<FArmorPart> ArmorParts;
 	UPROPERTY() TArray<UProceduralMeshComponent*> HeldComps;
 	UPROPERTY() TArray<UStaticMeshComponent*> HeldStatics;       // the parts of it that are models from /Game/Props
@@ -1055,6 +1100,38 @@ private:
 	bool bSideways = false; // woodcutting sweeps the arm sideways instead of overhead
 
 	TArray<TPair<UStaticMeshComponent*, FLinearColor>> Parts;
+
+	// ---------------- The wizard's flying broom (2026-11-22, owner; KnightCharacterBroom.cpp) ----------------
+	// T calls the best broom he carries (Brooms.csv) and he rides it (MOVE_Flying, UKnightMovement::PhysFlying): Space climbs, Ctrl sinks, up to
+	// Tuning.ini [Broom] BroomCeiling metres above the ground. It drains magic; with none left it slows to a halt and drifts down, and he steps off
+	// on landing. Everything is the server's: it starts and ends the ride, drains the bar and tells everyone (bOnBroom replicates to all).
+public:
+	bool IsOnBroom() const { return bOnBroom; }        // (replicated to everyone: for the later double-arrow-damage rule)
+	bool IsBroomEmpty() const { return bBroomEmpty; }  // out of magic: drifting down
+	float MagicCap() const;                            // the bar's size: MagicMax + MagicPerLevel x (Magic level - 1)
+	float SpellCostMul(int32 Kind, int32 Tier) const;  // the spell-cost hook: the item's CastMul (MagicCosts.csv) x BroomSpellCostMul in flight
+	bool IsBroomShopOpen() const { return bShopOpen && bBroomShop; }
+	bool NearBroomStall() const;
+	void OpenBroomShop();
+	void ToggleBroom();                                // (T, for a wizard)
+	int32 BestBroomRow() const;                        // the best broom in his pack (-1: none)
+protected:
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bOnBroom = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bBroomEmpty = false;
+	UPROPERTY(ReplicatedUsing = OnRep_Broom) uint8 BroomRow = 0;
+	UFUNCTION() void OnRep_Broom();
+	UFUNCTION(Server, Reliable) void ServerToggleBroom();
+	void StartBroomSrv(int32 Row);
+	void EndBroomSrv(const TCHAR* Why);
+	void ApplyBroomMovement();
+	void TickBroom(float Dt);
+	void UpdateBroomModel();
+	float WizardGuardDrain() const;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BroomModel;
+	bool bBroomShop = false;
+	bool bGuardMagicOut = false;   // (the server: the orb guard dropped for want of magic until the bar is back to BroomMinMagic)
+	bool bBroomApplied = false;    // (this machine has put the movement into flight)
+	float BroomTestT = 0.f; int32 BroomTestStep = 0;
 };
 
 // The playable troll (2026-11-19): the knight's pawn in troll mode (KnightCharacterTroll.cpp). AKnightGameMode gives one to a player who

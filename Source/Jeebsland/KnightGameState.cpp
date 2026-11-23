@@ -5,6 +5,7 @@
 #include "WaterLook.h"
 #include "GameFramework/GameUserSettings.h"
 #include "KnightCharacter.h"
+#include "SkillComponent.h"
 #include "GearWall.h"
 #include "FillerLineup.h"
 #include "TreeGroves.h"
@@ -38,6 +39,7 @@
 #include "Forest.h"
 #include "AutumnDecor.h"
 #include "OpenWorldActor.h"
+#include "PvpSigns.h"
 #include "Fill.h"
 #include "QuestPeople.h"
 #include "NpcLife.h"
@@ -62,6 +64,7 @@
 #include "OakHill.h"
 #include "Cat.h"
 #include "Fireflies.h"
+#include "Frogs.h"
 #include "KnightHUD.h"
 #include "Terrain.h"
 #include "ProceduralMeshComponent.h"
@@ -302,6 +305,7 @@ void AKnightGameState::BuildWorld()
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AOpenWorld>(FVector::ZeroVector, FRotator::ZeroRotator);   // the placeholder houses of the towns still to be built (every machine: they are solid) and the snowfall (players only); OpenWorldActor.h
+	World->SpawnActor<APvpSigns>(FVector::ZeroVector, FRotator::ZeroRotator);   // the warning signs along the PvP zones' edges (PvpSigns.h; players only)
 	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
@@ -314,6 +318,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<ADeerHerds>(FVector::ZeroVector, FRotator::ZeroRotator);   // the stags' herds (Deer.h, Animals.csv / AnimalHerds.csv; after the camps and everything solid, which they keep off; the server places the animals, players' machines are sent them)
 	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
+	if (!bServerOnly) World->SpawnActor<AFrogs>(FVector::ZeroVector, FRotator::ZeroRotator);   // little green frogs on river banks and lily pads (Frogs.h; after the bushes, whose lily pads they sit on; clients)
 
 	// Three cats that roam near the town: an orange tabby, a black cat and a grey-and-white one
 	{
@@ -853,6 +858,18 @@ static void ShotEyesSet(APlayerController* PC, int32 EyeIdx)
 			}
 			continue;
 		}
+		if (Name == TEXT("offhand"))   // (2026-11-22: offhand=<0 book, 1 crystal ball, 2 pipe, -1 none> in the wizard's book slot, tin)
+		{
+			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
+			if (USkillComponent* S = K ? K->GetSkills() : nullptr)
+			{
+				const int32 St = FCString::Atoi(*Val);
+				S->Worn[JeebItems::K_Book] = St < 0 ? 0 : JeebItems::WizOffId(FMath::Clamp(St, 0, JeebItems::NumWizOffStyles - 1), 0);
+				S->OnGearChanged.Broadcast();
+				UE_LOG(LogTemp, Display, TEXT("JEEBEYESET eye %d offhand %s"), EyeIdx, *Val);
+			}
+			continue;
+		}
 		if (Name == TEXT("wear"))
 		{
 			AKnightCharacter* K = Cast<AKnightCharacter>(PC ? PC->GetPawn() : nullptr);
@@ -1079,6 +1096,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotRingB="), ShotRingB) && ShotRingB >= 0) S->RingB = JeebItems::GearId(JeebItems::K_Ring, ShotRingB);
 				if (S) S->OnGearChanged.Broadcast();   // (the knight redraws its armour)
 				if (bShotPanel) K->SetPanelCursor(true);
+				// (2026-11-22: -ShotSpellBook opens the wizard's spell book tab, with -ShotPanel; -ShotSpell=<F slot> picks the spell cast next)
+				if (FParse::Param(FCommandLine::Get(), TEXT("ShotSpellBook")))
+					if (APlayerController* SPC = Cast<APlayerController>(K->GetController()))
+						if (AKnightHUD* H = Cast<AKnightHUD>(SPC->GetHUD())) H->ShotOpenSpellBook();
+				int32 ShotSpell = -1;
+				if (S && FParse::Value(FCommandLine::Get(), TEXT("ShotSpell="), ShotSpell)) { S->EnsureStarterSpells(); S->SetSpellCell(1, 2); S->SetSpellCell(3, 2); S->PickSpellRow(ShotSpell); }   // (Fire Bolt in row 1 slot 2 and row 2 slot 1)
 				if (S) UE_LOG(LogTemp, Display, TEXT("JEEBWEIGHT kg=%.2f speed x%.3f"), JeebItems::TotalWeight(S), JeebItems::WeightSpeedMul(S));
 			}
 #if !UE_BUILD_SHIPPING

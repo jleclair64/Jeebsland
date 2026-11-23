@@ -212,6 +212,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON: never read a function's out-parameter in the same expression that calls it (`RiverDistance(X, Y, Half) < Half + 250`): C++ doesn't fix the order, MSVC read `Half` before the call set it, and the rivers stopped counting as water (no swimming, 2026-11-15). Call first, compare on the next line (`JeebWorld::NearRiver`).
 - LESSON: when ground is shaped in stages (world, hills, pads), check the finished height, not one stage: capping only the hills left the pads' 3 m fade by the river as a 52 degree step (2026-11-15).
 - PowerShell: matching text in CRLF files needs `` `r`n ``, and short function names can clash with aliases (R, Rp); prefer the Edit tool for multi-line changes.
+- LESSON: Meshy animates only four-legged rigs it recognizes; a horse rig came back unrecognized four times (25 credits). Rig the model, then try ONE cheap animation call before spending more; if refused, put the clips on a recognized rig (the stag's) and retarget them in Blender (Tools/horse_retarget.py).
+- LESSON: `UQuestComponent` Talk takes the PERSON's key (Bram), not the quest's key; a test driver calling `ServerQuest(Talk, QuestKey)` silently does nothing.
 
 - Text on any browse board (titles, headers, row labels) needs its own clear strip outside the item area and must be legible from where the player first sees it; check from the start spot as well as close up.
 - Judge slot cuts first on the flat-colour per-slot render (ragged cuts show as other-slot fringes at hems), and give reviewers crops where the knight fills at least half the frame.
@@ -459,3 +461,16 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON: `if (x) UE_LOG(...); else ...` does not compile (the macro is a block): brace it.
 - LESSON: Meshy's quadruped rigging (`animation_type: quadruped`) takes a reduced, baked library model as a data URI, and any four-legged library clip plays on any four-legged rig (a stag uses fawn and cow clips). Its "death" clips are a lying pose held still, modelled above the ground: blend into it and lower the body by its height (the stag: 42 cm at scale 1).
 - LESSON: test scripts that call a .ps1 from Git Bash with a `/Game/...` argument need `MSYS_NO_PATHCONV=1`, or the map path becomes `C:/Program Files/Git/Game/...` and the run exits at once with no pictures.
+
+## Troll movement (2026-11-22)
+- LESSON: Any speed or ability limit that changes over time (drain bars, ease-downs, cooldown-scaled caps) must live in replicated server state or inside the saved move; a per-machine Tick timer feeding MaxWalkSpeed disagrees with the server by the latency. Check restart thresholds for flicker loops.
+- LESSON: When a one-handed swing borrows another character's cut on a bigger body, check from the side and the front that the weapon stays outside the torso and above the floor on every in-between frame.
+- LESSON: A held pose with a held weapon must keep the weapon clear of the raised arm and chest from the side too.
+- LESSON: Before blaming a retarget for body warping, read the mesh's skin weights (troll belt 90% on thighs, face 30% on shoulders).
+
+## Fireflies and frogs (2026-11-22, agent critters)
+- LESSON: a Meshy glb arrives with split vertices at every UV seam; decimating it as is opens hairline see-through cracks that show as white flecks along the seams in game. Weld first (`bmesh.ops.remove_doubles`, `Tools/frog_clean.py`) and bake a fresh atlas with a 16 px margin; Meshy's own shrunk pictures bled white at the seams.
+- LESSON: `-ShotEyes` puts the (hidden) pawn under the eye, so anything that reacts to the player (frogs hop, animals bolt) reacts to the camera: set the reaction off (`-ExecCmds="jeeb.Frog.Scare 0"`) for stills, and an eye's Z is above the terrain's HeightAt there, not absolute (water's bed is 1-2 m lower: the log prints HeightAt).
+- LESSON: glowing dots a few centimetres wide vanish past about 10 m even with a strong emissive; scale a far glow with distance, and test with a picture at night before trusting a log count.
+- LESSON: a facing that is interpolated toward a target must start with the target equal to the current facing, and use shortest-arc steps (`FindDeltaAngleDegrees`), or every new actor spins to yaw 0 first.
+- LESSON: a Build.bat started from a background Git Bash loses its console ("SetConsoleWindowTitle" error) yet still builds; run builds through the PowerShell tool.

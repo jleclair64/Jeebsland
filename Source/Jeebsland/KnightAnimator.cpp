@@ -691,6 +691,7 @@ void FKnightAnimator::ToolHeadClear(FPose& P, const FInput& In) const
 // ---------------- The frame ----------------
 
 static TAutoConsoleVariable<float> CVarRideRaise(TEXT("jeeb.Ride.Raise"), 100.f, TEXT("How far (cm) the seated pose is lifted when riding the horse, from the bench seat up to the saddle."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBroomRaise(TEXT("jeeb.Broom.Raise"), 40.f, TEXT("How far (cm) the seated pose is lifted on the wizard's broom (2026-11-22)."), ECVF_Default);
 static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behind the right fist's grip point the left fist's goes, along the grip)
 
 // Polished plate (owner 2026-11-15: "very shiny, reflective like a mirror"): live in Play through jeeb.Armour.Rough (the plate's roughness; the tier's own
@@ -733,6 +734,15 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	if (Act == 0 && StateKey >= 100 && StateKey < 130) BlendFor = StateKey == 106 ? 0.7f : bMoving ? 0.3f : 0.45f;   // (out of an emote: up off the ground slowly; walking off, quicker)
 	int32 Key = Act != 0 ? Act : (bMoving ? 1 : bOnGuard ? 2 : 0);
 	StaffCarry(In, Base, Act, Dt);   // (the staff upright at his side, before the blend so every change of state eases: KnightAnimatorCast.cpp)
+	// (2026-11-22) the wizard's off-hand item held out on his palm: a fixed pose (WizHoldArm), so walking and running never swing it; over every clip
+	// but his attacks and moves (a cast keeps it through PlayKeepOffArm)
+	WizHoldW = FMath::FInterpTo(WizHoldW, In.bWizHold && Act == 0 ? 1.f : 0.f, Dt, 7.f);
+	if (WizHoldW > 0.005f)
+	{
+		const int32 Arm[4] = { LShoulder, LArm, LFore, LHand };
+		for (int32 i = 0; i < 4; ++i) Base.Rot[Bone[Arm[i]]] = Nlerp(Base.Rot[Bone[Arm[i]]], L.WizHoldArm[i], WizHoldW);
+	}
+	if (In.bShotLog && In.bWizHold) { static int32 N = 0; if (++N % 120 == 1) UE_LOG(LogTemp, Log, TEXT("JEEBWIZHOLD w %.2f act %d"), WizHoldW, Act); }
 
 	if (!ForcedClip.IsEmpty())
 	{
@@ -962,7 +972,7 @@ void FKnightAnimator::Overlays(float Dt, const FInput& In, FPose& B)
 				if (const FClip* Low = Get(TEXT("CrouchIdle")))
 				{
 					Sample(*Low, Time, Over, true);
-					Overlay(B, Over, 0.f, In.BlockAlpha * 0.32f * (1.f - In.CrouchAlpha));
+					Overlay(B, Over, 0.f, In.BlockAlpha * (L.bTroll ? 0.f : 0.32f) * (1.f - In.CrouchAlpha));   // (the troll stands up in his block: review 2026-11-22, the crouch bent him double)
 				}
 				TurnInMesh(B, Spine, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-5.f * In.BlockAlpha)));
 				if (L.bTroll) TrollBareGuard(In, B);   // (no shield for the troll: his bare left forearm is raised, KnightAnimatorTroll.cpp)
@@ -1615,7 +1625,9 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 30: case 31:
 	{
 		const bool b2 = Key == 31;
-		if (L.bTroll && In.Kind == JeebItems::K_Club) { TrollClubSwing(In, B, OutBlend, b2); break; }   // (the troll's club blows: KnightAnimatorTroll.cpp)
+		// (2026-11-22, owner: "I want the swing to be a one-handed swing like the knight": the troll swings the club with the knight's own sword
+		// cuts, and TrollClubClear keeps the long club off his belly. -TrollOldSwing (test builds): his own two-handed blows of 2026-11-21.)
+		if (L.bTroll && In.Kind == JeebItems::K_Club && bTrollOldSwing) { TrollClubSwing(In, B, OutBlend, b2); break; }
 		const bool bGreat = In.Kind == JeebItems::K_Broadsword;   // (the big sword has its own two-handed rows; it has no shield to keep still)
 		const TCHAR* Nm = b2 ? (bGreat ? TEXT("Great_Jab2") : TEXT("Jab2")) : (bGreat ? TEXT("Great_Jab1") : TEXT("Jab1"));
 		if (const FMove* M = Moves.Find(Nm))
@@ -1648,6 +1660,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 			// (the second swing's arm stays out through its pause, held at the end of its cut)
 			const float ReachW = b2 ? FMath::SmoothStep(From * 0.3f, From + 0.1f, U) : SwingReach(U, From, To);
 			if (!bGreat) ExtendArm(B, b2 ? Jab2Reach : Jab1Reach, ReachW);   // (owner 2026-11-06: the arm out further in both swings)
+			if (L.bTroll) TrollClubClear(B);
 		}
 		break;
 	}
@@ -1796,7 +1809,7 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 	case 71:   // sitting: down into the seat over ClipStart..ClipHit, then held
 		if (const FMove* M = Moves.Find(TEXT("Sit")))
 			PlayAt(TEXT("Sit"), FMath::Min(M->ClipStart + ActionT, M->ClipHit), 1000.f, B, &OutBlend);
-		if (In.bMounted) B.Hip.Z += CVarRideRaise.GetValueOnGameThread();   // (riding: up from the bench seat to the saddle)
+		if (In.bMounted) B.Hip.Z += In.bBroom ? CVarBroomRaise.GetValueOnGameThread() : CVarRideRaise.GetValueOnGameThread();   // (riding: up from the bench seat to the saddle; on the broom only up to it)
 		break;
 	case 72:   // sliding: into the slide over ClipStart..ClipHit, then held
 		if (const FMove* M = Moves.Find(TEXT("Slide")))
@@ -1886,7 +1899,9 @@ void FClipLib::SolveGear()
 		if (!UE_BUILD_SHIPPING) FParse::Value(FCommandLine::Get(), TEXT("SwordRoll="), SwordRollDeg);
 		Rot = FQuat(Rot.RotateVector(KnightDesign::BladeDir(1)).GetSafeNormal(), FMath::DegreesToRadians(SwordRollDeg)) * Rot;
 		// (2026-11-11) The grip sits in the hole of the closed fist: both hands are bent shut round this line in the mesh (Tools/knight_fist.py), in front of the palm at the base of the fingers
-		const FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
+		FVector Fist = FistHole(Hand.GetLocation(), NewF, Rot.RotateVector(KnightDesign::BladeDir(1)), 1) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
+		if (bTroll && !TrollFistR.IsNearlyZero())   // (the troll's big hand: the middle of his curled fingers, KnightAnimatorTroll.cpp)
+			Fist = Hand.TransformPosition(RestRot[Bone[RHand]].Inverse().RotateVector(TrollFistR)) + NewF * (Along.X - 7.f) + FVector(0.f, Along.Y, 0.f) + FVector(Along.Z, 0.f, 0.f);
 		RightGrip = FTransform(Rot, Fist - Rot.RotateVector(G)) * Hand.Inverse();
 		// The real grip, measured on Mixamo's own Paladin W/Prop, who holds a sword on these clips (2026-11-05, Tools/knight_ref_grip.py).
 		// In his T-pose the blade leaves the fist forward, 14 degrees out and a little down; carried through the same line-up the clips use (knight_clip_retarget.py), that is
@@ -1994,6 +2009,31 @@ void FClipLib::SolveGear()
 			Face = Roll.RotateVector(Face);
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Roll.RotateVector(FVector::UpVector)).ToQuat();
 			ShieldAtGuard = FTransform(Q, FMath::Lerp(Fore.GetLocation(), Hand.GetLocation(), 0.72f) + Face * OutFromFore - Q.RotateVector(Strap)) * Fore.Inverse();
+		}
+		// The wizard's off hand held out (2026-11-22, owner: the book "open and held upright in his left hand", the crystal ball "floats above his open left hand",
+		// with pictures of wizards holding a book or an orb out on an open palm): the upper arm down by his side and a little forward, the forearm forward and
+		// rising a touch, in a little toward his middle, and the hand turned palm up (its thumb out to his left). A fixed pose (WizHoldArm), so walking and
+		// running never swing it; what sits on the palm is placed by AKnightCharacter::PlaceWizardOffHand.
+		{
+			if (RestC) Sample(*RestC, 0.f, P, false);
+			auto ToMesh = [](const FVector& G) { return FVector(-G.Y, G.X, G.Z); };   // (game frame to mesh frame)
+			FVector ArmGame(0.22f, -0.30f, -0.93f), ForeGame(0.86f, 0.22f, 0.30f);
+			FString S; TArray<FString> Pr;   // (test pictures: -WizHoldTune=ArmX_ArmY_ArmZ_ForeX_ForeY_ForeZ)
+			if (!UE_BUILD_SHIPPING && FParse::Value(FCommandLine::Get(), TEXT("WizHoldTune="), S) && S.ParseIntoArray(Pr, TEXT("_")) == 6)
+			{ ArmGame = FVector(FCString::Atof(*Pr[0]), FCString::Atof(*Pr[1]), FCString::Atof(*Pr[2])); ForeGame = FVector(FCString::Atof(*Pr[3]), FCString::Atof(*Pr[4]), FCString::Atof(*Pr[5])); }
+			const FVector ArmDir = ToMesh(ArmGame.GetSafeNormal()), ForeDir = ToMesh(ForeGame.GetSafeNormal());
+			TurnInMesh(P, LArm, FQuat::FindBetweenNormals((BonePos(P, LFore) - BonePos(P, LArm)).GetSafeNormal(), ArmDir));
+			TurnInMesh(P, LFore, FQuat::FindBetweenNormals((BonePos(P, LHand) - BonePos(P, LFore)).GetSafeNormal(), ForeDir));
+			if (RefRot.IsValidIndex(Bone[LHand])) P.Rot[Bone[LHand]] = RefRot[Bone[LHand]];   // (a straight wrist, as at bind: the rest clip's hand bends up)
+			FQuat LR;
+			BonePos(P, LHand, &LR);
+			FVector Thumb = LR.RotateVector(LeftGrip.TransformVectorNoScale(KnightDesign::BladeDir(-1)));
+			Thumb = (Thumb - ForeDir * FVector::DotProduct(Thumb, ForeDir)).GetSafeNormal();
+			const FVector OutL = ToMesh(FVector(0.f, -1.f, 0.f));
+			const FVector Want = (OutL - ForeDir * FVector::DotProduct(OutL, ForeDir)).GetSafeNormal();   // (thumb out to his left: the palm faces up)
+			TurnInMesh(P, LFore, FQuat(ForeDir, FMath::Atan2(float(FVector::DotProduct(FVector::CrossProduct(Thumb, Want), ForeDir)), float(FVector::DotProduct(Thumb, Want)))));
+			const int32 Arm[4] = { LShoulder, LArm, LFore, LHand };
+			for (int32 i = 0; i < 4; ++i) WizHoldArm[i] = P.Rot[Bone[Arm[i]]];
 		}
 			// Held up to guard (the Block row of KnightMoves.csv): facing straight ahead, tilted back a touch, in the middle of his chest
 			if (const FMove* M = Moves.Find(TEXT("Block")))

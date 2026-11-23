@@ -39,6 +39,16 @@ int32 AKnightCharacter::ArrowSlotId() const
 void AKnightCharacter::CycleArrows()
 {
 	if (!Skills || IsUIOpen()) return;
+	if (bIsWizard)
+	{
+		// (owner, 2026-11-22: F switches the wizard's spells, as it does a knight's arrows) the next equipped spell in the spell book's
+		// F cycle; shown at once here, the server checks it and its copy is what the cast uses (AttackLands)
+		const int32 Next = Skills->NextSpellRow();
+		if (Next == Skills->SpellPick) return;
+		if (!HasAuthority()) Skills->SpellPick = uint8(Next);
+		Inv(EInvOp::ChooseSpell, Next);
+		return;
+	}
 	const int32 N = JeebItems::NumArrowKinds();
 	const int32 Now = ArrowSlotId();
 	int32 At = 0;

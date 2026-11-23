@@ -99,6 +99,7 @@ public:
 	virtual void UpdateFromCompressedFlags(uint8 Flags) override;
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	virtual void PhysCustom(float DeltaTime, int32 Iterations) override;
+	virtual void PhysFlying(float DeltaTime, int32 Iterations) override;   // (the wizard's broom: KnightCharacterBroom.cpp)
 	virtual void PhysicsRotation(float DeltaTime) override;
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	virtual float GetMaxSpeed() const override;
@@ -183,6 +184,7 @@ private:
 	void StartClimb(const FVector& Normal);
 	void DropOff(bool bExhausted, float Push);
 	bool TryLedge();
+	bool TryHorseJump();   // riding into a log, a rock or a fence: the horse jumps it by itself (KnightMovementHorse.cpp)
 	bool PlanLedge(const FVector& Center, const FVector& N, FVector& OutTo, float& OutTop) const;
 	bool TryMantle(bool bInAir);
 	bool PlanMantle(const FVector& Center, const FVector& Fwd, bool bInAir, uint8& OutMode, FVector& OutTo, float& OutTop, FVector& OutFace, FVector* OutEdge = nullptr, float* OutFar = nullptr) const;

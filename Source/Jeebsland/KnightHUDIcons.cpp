@@ -250,6 +250,15 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		DiscP(32, 25, 14, 11.5f, Dark); DiscP(31, 23, 12.5f, 10, Mid); DiscP(27, 19, 4.5f, 3, Hi);
 		return;
 	}
+	// ---------------- a flying broom: a handle across the slot and a straw bundle (2026-11-22) ----------------
+	if (IsBroom(Id))
+	{
+		const FLinearColor Wood(0.36f, 0.17f, 0.08f), Straw(0.86f, 0.68f, 0.36f), Band(0.9f, 0.7f, 0.22f);
+		Poly({ P(54.f, 6.f), P(58.f, 10.f), P(27.f, 41.f), P(23.f, 37.f) }, Wood);
+		Poly({ P(25.f, 35.f), P(29.f, 39.f), P(14.f, 62.f), P(2.f, 50.f) }, Straw);
+		Poly({ P(22.f, 34.f), P(30.f, 42.f), P(27.f, 45.f), P(19.f, 37.f) }, Band);
+		return;
+	}
 	// ---------------- arrows: a bundle of three ----------------
 	if (IsArrow(Id))
 	{
@@ -495,6 +504,28 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Quad(29, 41, 35, 49, Tr);
 			break;
 		case K_Book:   // (the wizard's spell book: a closed cover, its spine, a clasp and a round emblem)
+			if (StyleOf(Id) == WO_Ball)   // (2026-11-22: the crystal ball: a blue-violet glass ball with a swirl and a glint, over a soft glow)
+			{
+				DiscP(32, 54, 14, 4, FLinearColor(0.30f, 0.45f, 1.f, 0.45f));
+				DiscP(32, 29, 21, 21, FLinearColor(0.22f, 0.30f, 0.85f));
+				DiscP(32, 29, 17, 17, FLinearColor(0.45f, 0.52f, 1.f));
+				DiscP(29, 32, 9, 6, FLinearColor(0.72f, 0.55f, 1.f));
+				DiscP(34, 26, 5, 4, FLinearColor(0.85f, 0.95f, 1.f));
+				DiscP(24, 20, 3, 3, FLinearColor(1.f, 1.f, 1.f));
+				break;
+			}
+			if (StyleOf(Id) == WO_Pipe)   // (the pipe: a long curved brown stem, a round bowl with a gold rim and band, a wisp of smoke)
+			{
+				const FLinearColor Pw(0.40f, 0.22f, 0.10f), Gd(0.95f, 0.75f, 0.25f);
+				Poly({ P(6, 14), P(10, 11), P(30, 36), P(36, 40), P(33, 45), P(26, 40) }, Pw);
+				Quad(29, 36, 35, 41, Gd);
+				DiscP(43, 44, 11, 11, Pw);
+				DiscP(43, 35, 10, 3, Gd);
+				DiscP(43, 35, 7, 2, FLinearColor(0.08f, 0.05f, 0.03f));
+				DiscP(46, 22, 4, 4, FLinearColor(0.85f, 0.85f, 0.88f, 0.6f));
+				DiscP(41, 14, 5, 4, FLinearColor(0.85f, 0.85f, 0.88f, 0.45f));
+				break;
+			}
 			Quad(14, 9, 50, 55, Pl);
 			Quad(14, 9, 21, 55, Dk);
 			Quad(40, 28, 50, 36, Tr);

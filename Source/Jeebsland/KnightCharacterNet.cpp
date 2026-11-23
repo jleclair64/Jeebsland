@@ -263,6 +263,22 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		}
 		break;
 	}
+	case EInvOp::BuyBroom:   // (Silver Point's broom stall, 2026-11-22: the price is the server's sheet, the stall's place the server's plan)
+	{
+		if (!NearBroomStall()) break;
+		const JeebBroom::FBroomRow& R = JeebBroom::Row(A);
+		if (A < 0 || A >= JeebBroom::NumBrooms() || BroomId(A) != B || R.Price <= 0) { ShopNote(TEXT("The stall has changed. Have another look.")); break; }
+		if (Sk->GetIngots() < R.Price) ShopNote(TEXT("Not enough ingots."));
+		else if (!Sk->CanAdd(B, 1)) ShopNote(TEXT("Your pack is full."));
+		else
+		{
+			Sk->SpendIngots(R.Price);
+			Sk->AddInvItem(B, 1);
+			ShopNote(FString::Printf(TEXT("Bought %s. It is in your pack (Tab). Press T to ride it."), *ItemName(B)));
+			UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s bought %s for %d ingots"), *GetName(), *ItemName(B), R.Price);
+		}
+		break;
+	}
 	case EInvOp::Gamble:
 	{
 		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper))) break;
@@ -336,6 +352,15 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 	case EInvOp::ChooseArrows:
 		if (A == 0 || (IsArrow(A) && Sk->CountItem(A) > 0)) ArrowPick = A;
+		break;
+	case EInvOp::ChooseSpell:   // (the server checks the slot holds a spell he has learned and has the Magic level for)
+		if (bIsWizard) Sk->PickSpellRow(A);
+		break;
+	case EInvOp::EquipSpell:
+		if (bIsWizard) Sk->SetSpellCell(A, B);
+		break;
+	case EInvOp::CastSlot:
+		if (bIsWizard && A >= 0 && A < USkillComponent::SpellSlots) Sk->CastSlot = uint8(A);
 		break;
 	case EInvOp::TakeFromWall:
 	{

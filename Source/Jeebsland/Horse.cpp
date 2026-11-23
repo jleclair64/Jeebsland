@@ -27,6 +27,9 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/StaticMeshActor.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/PawnMovementComponent.h"
 
 static TAutoConsoleVariable<float> CVarHorseMeshYaw(TEXT("jeeb.Horse.MeshYaw"), -90.f, TEXT("Degrees the horse's model is turned to face the way it walks (looks only)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarSaddle(TEXT("jeeb.Horse.Saddle"), TEXT("50 116 -90 0"),
@@ -183,6 +186,8 @@ void AHorse::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePr
 	DOREPLIFETIME(AHorse, bRepWild);
 	DOREPLIFETIME(AHorse, bRepSaddled);
 	DOREPLIFETIME(AHorse, bFollow);
+	DOREPLIFETIME(AHorse, RepJumpSeq);
+	DOREPLIFETIME(AHorse, RepJumpH);
 }
 
 void AHorse::SetupHorse(AStable* InStable, bool bInWild, AKnightCharacter* InOwner, bool bInSaddled, int32 Seed)
@@ -210,12 +215,12 @@ void AHorse::BeginPlay()
 		Hp->ModifyDamage = [this](int32 Amount, AActor* From) -> int32
 		{
 			const bool bPlayer = From && (From->IsA<AKnightCharacter>() || Cast<AKnightCharacter>(From->GetInstigator()) || Cast<AKnightCharacter>(From->GetOwner()));
-			return (bPlayer && JeebPvp::IsInPvpZone(GetWorld(), GetActorLocation())) ? Amount : 0;
+			return (bPlayer && IsInPvpZone(GetActorLocation())) ? Amount : 0;
 		};
 		Hp->CanBeHurt = [this](AActor* From)
 		{
 			const bool bPlayer = From && (From->IsA<AKnightCharacter>() || Cast<AKnightCharacter>(From->GetInstigator()) || Cast<AKnightCharacter>(From->GetOwner()));
-			return bPlayer && JeebPvp::IsInPvpZone(GetWorld(), GetActorLocation());
+			return bPlayer && IsInPvpZone(GetActorLocation());
 		};
 		Hp->OnDamaged = [this](AActor* From) { OnHurt(From); };
 		const FVector L = GetActorLocation();
@@ -264,6 +269,79 @@ void AHorse::BuildBody()
 	}
 }
 
+// ---------------------------------------------------------------- the automatic jump (owner 2026-11-22)
+
+bool JeebHorse::JumpProbe(const UWorld* W, const FVector& Feet, const FVector2D& Dir2, float Ahead, const AActor* Ignore1, const AActor* Ignore2, float& OutTop, float& OutDist)
+{
+	if (!W || Dir2.IsNearlyZero()) return false;
+	FCollisionQueryParams Q(SCENE_QUERY_STAT(HorseJump), false);
+	if (Ignore1) Q.AddIgnoredActor(Ignore1);
+	if (Ignore2) Q.AddIgnoredActor(Ignore2);
+	const FVector D(Dir2.GetSafeNormal(), 0.f);
+	// something solid and steep at knee to chest height ahead
+	bool bHit = false;
+	float Dist = Ahead;
+	for (float Z : { 40.f, 85.f, 130.f })
+	{
+		FHitResult T;
+		if (W->LineTraceSingleByChannel(T, Feet + FVector(0, 0, Z), Feet + FVector(0, 0, Z) + D * Ahead, ECC_WorldStatic, Q) && T.ImpactNormal.Z < 0.6f && T.Distance < Dist)
+		{ Dist = T.Distance; bHit = true; }
+	}
+	if (!bHit) return false;
+	// over its top it must be open (a house, a cliff, a tree trunk, a tall wall: no)
+	const float Over = JumpMaxTop + 40.f;
+	if (W->LineTraceTestByChannel(Feet + FVector(0, 0, Over), Feet + FVector(0, 0, Over) + D * (Dist + 280.f), ECC_WorldStatic, Q)) return false;
+	// its height, just past its face
+	FHitResult Top;
+	const FVector TopAt = Feet + D * (Dist + 25.f);
+	if (!W->LineTraceSingleByChannel(Top, TopAt + FVector(0, 0, Over), TopAt - FVector(0, 0, 60.f), ECC_WorldStatic, Q)) return false;
+	OutTop = Top.ImpactPoint.Z - Feet.Z;
+	if (OutTop < 30.f || OutTop > JumpMaxTop) return false;
+	// solid, fairly level ground to land on beyond it, not much higher than here, not water
+	FHitResult Land;
+	const FVector LandAt = Feet + D * (Dist + 260.f);
+	if (!W->LineTraceSingleByChannel(Land, LandAt + FVector(0, 0, Over), LandAt - FVector(0, 0, 250.f), ECC_WorldStatic, Q)) return false;
+	if (Land.ImpactNormal.Z < 0.7f || Land.ImpactPoint.Z - Feet.Z > 60.f) return false;
+	if (JeebWorld::InWater(LandAt.X, LandAt.Y)) return false;
+	OutDist = Dist;
+	return true;
+}
+
+void AHorse::StartJump(float Top, const FVector2D& Dir)
+{
+	JumpT = 0.f;
+	JumpH = FMath::Clamp(Top + 45.f, 60.f, 200.f);
+	JumpFromZ = GetActorLocation().Z;
+	JumpDir = Dir.GetSafeNormal();
+	if (HasAuthority())
+	{
+		RepJumpH = uint8(FMath::Clamp(FMath::RoundToInt(JumpH * 0.5f), 0, 255));
+		++RepJumpSeq;
+		UE_LOG(LogTemp, Log, TEXT("JEEBHORSEJUMP %s jumps by itself over %.0f cm"), *GetName(), Top);
+	}
+}
+
+void AHorse::OnRep_Jump()
+{
+	if (!bPlaced) return;
+	JumpT = 0.f;
+	JumpH = RepJumpH * 2.f;
+	JumpFromZ = GetActorLocation().Z;
+}
+
+float AHorse::JumpZ(float GroundZ) const
+{
+	const float T = FMath::Clamp(JumpT / JumpDur, 0.f, 1.f);
+	return FMath::Max(GroundZ, FMath::Lerp(JumpFromZ, GroundZ, T) + 4.f * JumpH * T * (1.f - T));
+}
+
+void AHorse::StepJump(float Dt)
+{
+	JumpT += Dt;
+	JumpPitch = FMath::Clamp(4.f * JumpH * (1.f - 2.f * JumpT / JumpDur) / JumpDur / 700.f * 18.f, -18.f, 18.f);   // nose up rising, down falling
+	if (JumpT >= JumpDur) { JumpT = -1.f; JumpPitch = 0.f; }
+}
+
 void AHorse::OnRep_Move()
 {
 	MoveAt = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
@@ -292,7 +370,7 @@ void AHorse::SetState(EHorseState S)
 // Hurt boxes (only inside a PvP zone; outside one a horse can't be struck at all): body, neck and head, two pairs of legs
 void AHorse::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
 {
-	if (IsDown() || !JeebPvp::IsInPvpZone(GetWorld(), GetActorLocation())) return;
+	if (IsDown() || !IsInPvpZone(GetActorLocation())) return;
 	const float S = JeebHorse::Scale;
 	const FTransform Xf(FRotator(0.f, GetActorRotation().Yaw, 0.f), GetActorLocation());
 	auto Cap = [&](const FVector& A, const FVector& B, float R, uint8 Zone)
@@ -445,7 +523,28 @@ bool AHorse::StepToward(const FVector2D& To, float Want, float Dt)
 	const FVector2D Me(L);
 	FVector2D Dir = (To - Me).GetSafeNormal();
 	if (Dir.IsNearlyZero()) return true;
+	// mid-jump: straight on along the arc
+	if (JumpT >= 0.f)
+	{
+		StepJump(Dt);
+		const FVector2D N = Me + JumpDir * Speed * Dt;
+		const float Z = JumpT >= 0.f ? JumpZ(JeebFoes::Ground(N.X, N.Y)) : JeebFoes::Ground(N.X, N.Y);
+		SetActorLocationAndRotation(FVector(N.X, N.Y, Z), FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(JumpDir.Y, JumpDir.X)), 0.f));
+		return true;
+	}
 	Speed = FMath::FInterpConstantTo(Speed, Want, Dt, Want > Speed ? 1400.f : 2600.f);
+	// something low in the way (a log, a rock, a fence): over it in a short jump
+	if (Speed > 150.f)
+	{
+		float Top = 0.f, Dist = 0.f;
+		const float Front = 110.f * JeebHorse::Scale;
+		if (JeebHorse::JumpProbe(GetWorld(), L, Dir, Front + FMath::Max(80.f, Speed * 0.3f), this, nullptr, Top, Dist))
+		{
+			Speed = FMath::Max(Speed, (Dist + 300.f) / JumpDur);
+			StartJump(Top, Dir);
+			return true;
+		}
+	}
 	// feel ahead for anything solid; turn round it if one side is open
 	const float Look = FMath::Clamp(Speed * 0.45f, 220.f, 700.f);
 	bool bFound = false;
@@ -547,7 +646,7 @@ void AHorse::TickMind(float Dt)
 	}
 	else SetState(Speed > TrotSpeed * 0.9f ? EHorseState::Run : EHorseState::Walk);
 	// healing: 10 s after the last hit, a full bar in 10 s (never inside a PvP zone)
-	if (Hp->Cur < Hp->Max && GetWorld()->GetTimeSeconds() - Hp->LastHitTime > 10.f && !JeebPvp::IsInPvpZone(GetWorld(), GetActorLocation()))
+	if (Hp->Cur < Hp->Max && GetWorld()->GetTimeSeconds() - Hp->LastHitTime > 10.f && !IsInPvpZone(GetActorLocation()))
 		Hp->Cur = FMath::Min(Hp->Max, Hp->Cur + FMath::Max(1, FMath::RoundToInt(Hp->Max * 0.1f * Dt)));
 }
 
@@ -559,6 +658,10 @@ void AHorse::TickRidden(float Dt)
 	const FVector V = R->GetVelocity();
 	Speed = V.Size2D();
 	bBacking = Speed > 20.f && FVector::DotProduct(V.GetSafeNormal2D(), R->GetActorForwardVector()) < -0.3f;
+	// over a log with a rider (the rider's own jump, UKnightMovement::TryHorseJump): nose up on the way up, down on the way down
+	const bool bAir = R->GetMovementComponent() && R->GetMovementComponent()->IsFalling();
+	JumpT = -1.f;
+	JumpPitch = FMath::FInterpTo(JumpPitch, bAir ? FMath::Clamp(float(V.Z) / 700.f * 18.f, -18.f, 18.f) : 0.f, Dt, 12.f);
 	const FRotator Turned = FMath::RInterpTo(GetActorRotation(), FRotator(0.f, R->GetActorRotation().Yaw, 0.f), Dt, 7.f);
 	SetActorLocationAndRotation(FVector(L.X, L.Y, L.Z - R->GetSimpleCollisionHalfHeight()), Turned);
 	if (!HasAuthority()) return;
@@ -580,6 +683,25 @@ void AHorse::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const float Dt = FMath::Min(DeltaSeconds, 0.25f);
+#if !UE_BUILD_SHIPPING
+	if (LabRole == 3 && HasAuthority())   // (-HorseLabRide) the player rides this one at a gallop between LabA and LabB, over the log
+	{
+		AKnightCharacter* P = Cast<AKnightCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));   // (test pictures only)
+		if (P && !RepRider && StateT > 2.f && !P->IsMounted())
+		{
+			P->SetActorLocation(GetActorLocation() + FVector(0.f, 0.f, 120.f));
+			P->ServerHorse_Implementation(AKnightCharacter::HO_Mount, this);
+		}
+		StateT += Dt;
+		if (P && RepRider == P)
+		{
+			const FVector2D Me(P->GetActorLocation());
+			if (FVector2D::Distance(Me, LabB) < 250.f) Swap(LabA, LabB);
+			P->bTestGallop = true;
+			P->AddMovementInput(FVector((LabB - Me).GetSafeNormal(), 0.f));
+		}
+	}
+#endif
 	if (RepRider && IsValid(RepRider))
 	{
 		TickRidden(Dt);
@@ -599,7 +721,7 @@ void AHorse::Tick(float DeltaSeconds)
 			}
 		}
 #if !UE_BUILD_SHIPPING
-		else if (LabRole >= 1)   // (-HorseLab) laps between two spots
+		else if (LabRole == 1 || LabRole == 2)   // (-HorseLab) laps between two spots
 		{
 			const FVector2D Me(GetActorLocation());
 			if (FVector2D::Distance(Me, LabB) < 200.f) Swap(LabA, LabB);
@@ -630,7 +752,9 @@ void AHorse::Tick(float DeltaSeconds)
 	FVector2D Me(GetActorLocation());
 	if (FVector2D::DistSquared(Me, TargetP) > FMath::Square(900.f)) Me = TargetP;   // (it appeared somewhere else: no gliding across the map)
 	else Me += (TargetP - Me) * (1.f - FMath::Exp(-14.f * Dt));
-	SetActorLocationAndRotation(FVector(Me.X, Me.Y, JeebFoes::Ground(Me.X, Me.Y)), FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, Yaw, 720.f * Dt), 0.f));
+	float Z = JeebFoes::Ground(Me.X, Me.Y);
+	if (JumpT >= 0.f) { StepJump(Dt); if (JumpT >= 0.f) Z = JumpZ(Z); }   // (the server's jump: the same arc here, OnRep_Jump)
+	SetActorLocationAndRotation(FVector(Me.X, Me.Y, Z), FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, Yaw, 720.f * Dt), 0.f));
 	TickLook(FMath::Min(Dt, 0.1f), float(RepMove.Speed), false);
 }
 
@@ -692,7 +816,7 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 	else SlopePitch = FMath::FInterpTo(SlopePitch, 0.f, Dt, 6.f);
 	Body->SetRelativeLocation(FVector(0.f, 0.f, -40.f * S * FMath::SmoothStep(0.f, 1.f, Fall)));
 	const float MeshYaw = CVarHorseMeshYaw.GetValueOnGameThread();
-	Body->SetRelativeRotation((FRotator(SlopePitch, 0.f, 0.f).Quaternion() * FRotator(0.f, MeshYaw, 0.f).Quaternion()).Rotator());
+	Body->SetRelativeRotation((FRotator(SlopePitch + JumpPitch, 0.f, 0.f).Quaternion() * FRotator(0.f, MeshYaw, 0.f).Quaternion()).Rotator());
 	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())   // (looks only: this machine's own camera)
 	{
 		FVector CamL; FRotator CamR;
@@ -952,6 +1076,30 @@ void AHorse::BuildLab(UWorld* World)
 		H->LabRole = i;
 		H->LabA = Spots[i]; H->LabB = Spots[i] + Fw * 3600.f;
 		H->FinishSpawning(Xf);
+	}
+	// a fallen log (90 cm) across the canterer's lap, and with -HorseLabRide a fourth horse carrying the player over a second one (the jump)
+	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	const bool bRide = FParse::Param(FCommandLine::Get(), TEXT("HorseLabRide"));
+	for (int32 i = 0; i < (bRide ? 2 : 1) && Cyl; ++i)
+	{
+		const FVector2D C = At + Rt * (i == 0 ? 600.f : -600.f) - Fw * 300.f;
+		AStaticMeshActor* Log = World->SpawnActor<AStaticMeshActor>(FVector(C.X, C.Y, JeebFoes::Ground(C.X, C.Y) + 40.f), FRotator(0.f, Yaw, 90.f));
+		if (!Log) continue;
+		Log->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+		Log->GetStaticMeshComponent()->SetStaticMesh(Cyl);
+		Log->SetActorScale3D(FVector(0.9f, 0.9f, 4.f));
+	}
+	if (bRide)
+	{
+		const FVector2D S = At - Rt * 600.f - Fw * 1800.f;
+		const FTransform Xf(FRotator(0.f, Yaw, 0.f), FVector(S.X, S.Y, JeebFoes::Ground(S.X, S.Y)));
+		if (AHorse* H = World->SpawnActorDeferred<AHorse>(AHorse::StaticClass(), Xf, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+		{
+			H->SetupHorse(nullptr, false, nullptr, true, 903);
+			H->LabRole = 3;
+			H->LabA = S; H->LabB = S + Fw * 3600.f;
+			H->FinishSpawning(Xf);
+		}
 	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBHORSE lab: three horses at %.0f %.0f (ground %.0f), laps toward yaw %.0f"), At.X, At.Y, JeebFoes::Ground(At.X, At.Y), Yaw);
 }

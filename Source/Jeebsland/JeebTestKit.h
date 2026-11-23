@@ -64,12 +64,14 @@ namespace JeebTestKit
 			if (Rings.Ids.Num()) O.Rows.Add(Rings);
 			if (Amulets.Ids.Num()) O.Rows.Add(Amulets);
 			O.Rows.Add({ KindName(K_Crest), { GearId(K_Crest, 0) } });
-			O.Rows.Add({ KindName(K_Book), Tiers([&](int32 T) { return GearId(K_Book, T); }) });   // (the wizard's spell book)
+			for (int32 S = 0; S < NumWizOffStyles; ++S) O.Rows.Add({ WizOffName(S), Tiers([&](int32 T) { return WizOffId(S, T); }) });   // (the wizard's off hand: spell book, crystal ball, pipe)
 			FRow Potions{ TEXT("Potions") }; for (int32 T = 0; T < NumPotions(); ++T) Potions.Ids.Add(PotionId(T));
 			if (Potions.Ids.Num()) O.Rows.Add(Potions);
 			FRow Arrows{ TEXT("Arrows") }; for (int32 i = 0; i < NumArrowKinds(); ++i) Arrows.Ids.Add(ArrowKindId(i));
 			O.Rows.Add(Arrows);
 			O.Rows.Add({ TEXT("Throwing rocks"), { IdRocks } });   // (the troll's ammunition, 2026-11-22)
+			FRow Brooms{ TEXT("Flying brooms") }; for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) Brooms.Ids.Add(BroomId(b));   // (the wizard's brooms, 2026-11-22)
+			if (Brooms.Ids.Num()) O.Rows.Add(Brooms);
 		}
 		return P;
 	}

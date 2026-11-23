@@ -119,7 +119,13 @@ float UKnightMovement::AccelRuleNow() const
 	const JeebTune::FValues& T = JeebTune::V();
 	// (owner 2026-11-21: the troll is as fast as the knight but takes a few seconds to get going: one slow push on the ground, worked out
 	// from the move's own state like the rest, so the server and the client agree; braking stays the usual quick one)
-	if (const AKnightCharacter* K = Knight(); K && K->IsTroll() && !IsFalling() && !InWater()) return T.TrollAccel;
+	// (owner 2026-11-22: "no acceleration ... to the walking speed, just to the sprint": up to running speed he gets there at once like the
+	// knight; only the climb from running to a full sprint takes the slow push)
+	if (const AKnightCharacter* K = Knight(); K && K->IsTroll() && !IsFalling() && !InWater())
+	{
+		const float WalkCap = SpeedRule.bAccelRule ? FMath::Min(SpeedRule.bByMove ? MoveCap(Velocity) : MaxWalkSpeed, SpeedRule.WalkCapBase * MoveAirMul) : K->WalkNow() * MoveAirMul;
+		return Velocity.Size2D() < WalkCap - 5.f ? T.WalkAccel : T.TrollAccel;
+	}
 	if (!SpeedRule.bAccelRule || IsFalling()) return T.SprintAccel;
 	const float Cap = SpeedRule.bByMove ? MoveCap(Velocity) : MaxWalkSpeed;
 	const float WalkCap = FMath::Min(Cap, SpeedRule.WalkCapBase * MoveAirMul);
@@ -257,6 +263,7 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 void UKnightMovement::OnMovementUpdated(float Dt, const FVector& OldLocation, const FVector& OldVelocity)
 {
 	Super::OnMovementUpdated(Dt, OldLocation, OldVelocity);
+	if (TryHorseJump()) { bTouchMantle = bTouchRock = false; return; }   // (riding: the horse's own jump, KnightMovementHorse.cpp)
 	const bool bFence = bTouchMantle, bRock = bTouchRock;
 	bTouchMantle = bTouchRock = false;
 	// The grab, in the same move as the bump into steep rock or ground (2026-11-20: it used to wait for the next move, which a merged or replayed

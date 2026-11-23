@@ -5,6 +5,7 @@
 #include "JeebItemData.h"
 #include "HitBoxes.h"
 #include "JeebTuning.h"
+#include "JeebBroomData.h"
 
 // ===================================================================================================
 // Everything about items: ids, names, stack sizes, damage and defence numbers, prices, smithing recipes,
@@ -69,6 +70,10 @@ namespace JeebItems
 	// (KnightCharacterRock.cpp). One kind, stacks to 99 like arrows.
 	constexpr int32 IdRocks = 940;
 	inline bool IsRock(int32 Id) { return Id == IdRocks; }
+	// Flying brooms (2026-11-22, owner): 930 + the row in Brooms.csv (JeebBroomData.h). One to a slot; T calls the best one you carry (wizards only).
+	inline bool IsBroom(int32 Id) { return JeebBroom::IsBroomRange(Id) && Id - JeebBroom::IdBase < JeebBroom::NumBrooms(); }
+	inline int32 BroomId(int32 Row) { return JeebBroom::IdBase + Row; }
+	inline int32 BroomRowOf(int32 Id) { return Id - JeebBroom::IdBase; }
 	// Potions: 950 + the row in Potions.csv. The first four rows are swiftness, healing, vigour and radar (the starting pack
 	// and the practice pack name them by these numbers).
 	constexpr int32 IdPotionBase = 950;
@@ -96,6 +101,13 @@ namespace JeebItems
 	constexpr int32 NumShieldStyles = 3;
 	inline int32 StyleOf(int32 Id) { return ((Id - IdGearBase) % 100) / 10; }
 	inline int32 ShieldId(int32 Style, int32 Tier) { return IdGearBase + 11 * 100 + Style * 10 + Tier; }   // 11 = K_Shield
+	// The wizard's off-hand items (2026-11-22, owner: "a glowing crystal ball ... an item that can be used in the book slot ... a wizard pipe to be another option
+	// for this slot"): all are K_Book gear, told apart by the style digit as shields' and armour's are; the tier digit is their tier (the orb's strength).
+	// Every one is held in his left hand (AKnightCharacter::UpdateWizardBook): 0 the spell book, open; 1 a crystal ball floating over the palm; 2 a pipe.
+	enum EWizOff { WO_Book = 0, WO_Ball = 1, WO_Pipe = 2 };
+	constexpr int32 NumWizOffStyles = 3;
+	inline int32 WizOffId(int32 Style, int32 Tier) { return IdGearBase + K_Book * 100 + Style * 10 + Tier; }
+	inline const TCHAR* WizOffName(int32 Style) { return Style == WO_Ball ? TEXT("Crystal Ball") : Style == WO_Pipe ? TEXT("Wizard Pipe") : TEXT("Spell Book"); }
 	inline const FShieldStyleRow& ShieldStyleRow(int32 Style) { return Tables().ShieldStyles[FMath::Clamp(Style, 0, NumShieldStyles - 1)]; }
 	inline const TCHAR* ShieldStyleName(int32 Style) { return *ShieldStyleRow(Style).Name; }
 	inline float ShieldGuardMul(int32 Style) { return ShieldStyleRow(Style).GuardMul; }
@@ -177,6 +189,7 @@ namespace JeebItems
 	{
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsRock(Id)) return TEXT("Throwing Rocks");
+		if (IsBroom(Id)) return JeebBroom::Row(BroomRowOf(Id)).Name;
 		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (IsMaterial(Id) && Tables().Materials.IsValidIndex(Id - 1)) return MaterialName(MaterialType(Id));   // (the wall's prompt names ores and fish too)
@@ -184,6 +197,7 @@ namespace JeebItems
 		const int32 K = KindOf(Id), V = VariantOf(Id);
 		if (K == K_Cape) return FString::Printf(TEXT("%s Cape"), TierName(V));
 		if (K == K_Shield) return FString::Printf(TEXT("%s %s"), TierName(V), ShieldStyleName(StyleOf(Id)));
+		if (K == K_Book) return FString::Printf(TEXT("%s %s"), TierName(V), WizOffName(StyleOf(Id)));   // (spell book, crystal ball or pipe)
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
 		if (IsArmorKind(K) && StyleOf(Id) == AS_Wizard) return FString::Printf(TEXT("%s Wizard %s"), TierName(V), K == K_Helmet ? TEXT("Hat") : K == K_Chest ? TEXT("Robe") : TEXT("Boots"));
 		if (IsArmorKind(K) && StyleOf(Id) != AS_Classic) return FString::Printf(TEXT("%s %s %s"), TierName(V), *ArmourStyleRow(StyleOf(Id)).Name, KindName(K));   // "Iron Light Helmet"
@@ -411,6 +425,7 @@ namespace JeebItems
 	inline int32 GearSellPrice(int32 Id)
 	{
 		if (IsArrow(Id) || IsRock(Id)) return 1;
+		if (IsBroom(Id)) return FMath::Max(1, JeebBroom::Row(BroomRowOf(Id)).Price / 2);
 		if (!IsGear(Id)) return 0;
 		return FMath::Max(1, BuyPrice(KindOf(Id), IsArmorKind(KindOf(Id)) ? FullVariant(Id) : VariantOf(Id)) / 2);
 	}

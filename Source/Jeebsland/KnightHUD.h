@@ -156,9 +156,26 @@ private:
 	void DrawAnnulus(float X, float Y, float R, const FLinearColor& Col);
 	void DrawInventoryScreen(AKnightCharacter* Knight);
 	void DrawSidePanel(AKnightCharacter* Knight);   // lower left: Inventory, Apparel, Skills
+	// The wizard's spells (2026-11-22, KnightHUDSpells.cpp): the spell cell on the weapon bar (F), the APPAREL / SPELL BOOK tabs above the
+	// inventory, and the spell book page drawn where the apparel window goes. True from DrawSpellTabs: the book is open (skip the apparel).
+	void DrawSpellCell(AKnightCharacter* Knight, float X, float Y, float S, float Step);   // the active row's three spells
+	bool DrawSpellTabs(AKnightCharacter* Knight, float X, float Y, float W);
+	void DrawSpellBook(AKnightCharacter* Knight, float X, float Y, float W, float H);
+	bool bSpellBookTab = false;
+	float SpellTabsTop = 0.f;
+public:
+	void ShotOpenSpellBook() { bSpellBookTab = true; }   // (test pictures)
+private:
 	float PanelTop = 0.f;
 	bool bGreyGlass = false;   // while set, Panel and Tile draw a dimmer, smoky-grey glass (the side panel)
 	int32 AreaIn = -1; float AreaBannerT = -100.f; FString AreaName;   // the other towns' names on walking in (Oak Hill, Steele Creek, the placeholder sites: OpenWorld.h)
+	// PvP zones (owner 2026-11-23): the red title on walking in and the small icon at the top of the screen while inside (KnightHUDPvp.cpp)
+	int32 PvpIn = -1; float PvpBannerT = -100.f; FString PvpTitle;
+	void DrawPvp(const FVector& Where, float Now);
+#if !UE_BUILD_SHIPPING
+	friend struct FPvpTestDriver;   // (PvpTest.cpp)
+#endif
+	TOptional<FLinearColor> TitleTint;   // (while set, TitleBanner and TitleTextAt letter in this colour instead of ivory)
 	// Drag and drop between the pack (side panel) and the weapon bar
 	float InvCellX[32] = {}, InvCellY[32] = {}, InvCellS = 0.f; int32 InvCellCount = 0;   // where the pack cells were drawn this frame
 	float HotCellX[5] = {}, HotCellY[5] = {}, HotCellS = 0.f; bool bHotCells = false;

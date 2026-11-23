@@ -15,6 +15,8 @@
 #include "HealthComponent.h"
 #include "FoeData.h"
 #include "JeebTuning.h"
+#include "Projectile.h"
+#include "PvpZones.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -39,6 +41,17 @@ struct FHorseTestDriver
 		return P ? (P->bDone ? 100 : int32(P->Step)) : -1;
 	}
 	static float Dist(const AActor* A, const AActor* B) { return (A && B) ? FVector::Dist2D(A->GetActorLocation(), B->GetActorLocation()) / 100.f : -1.f; }
+	static void FireAt(AKnightCharacter* From, AKnightCharacter* At, int32 Dmg)   // (a real arrow, as PvpTest.cpp fires them)
+	{
+		const FVector B = At->GetActorLocation() + FVector(0.f, 0.f, At->IsMounted() ? 70.f : 20.f);   // (a rider: his chest)
+		// a rider is shot from above his horse (from the shooter's side, close in), so the horse's own body (hurtable in a PvP zone) never takes the arrow
+		const FVector A = At->IsMounted() ? B + FVector(0.f, 0.f, 220.f) - (B - From->GetActorLocation()).GetSafeNormal2D() * 160.f : From->GetActorLocation() + FVector(0.f, 0.f, 40.f);
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FVector Dir = (B - A).GetSafeNormal();
+		if (AProjectile* P = From->GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), A + Dir * 60.f, Dir.Rotation(), SP))
+			P->Launch(From, Dir, 3500.f, 0.f, Dmg, false, ESkillType::Archery, false, 0, 0, 0.f, 0.f);
+	}
 
 	static void Server(AStable* St, float Dt)
 	{
@@ -233,7 +246,51 @@ struct FHorseTestDriver
 			Check(FVector2D::Distance(At, FVector2D(H->GetActorLocation())) < 1.f, TEXT("while it rests, T doesn't bring it"));
 			Next(0.5f); return;
 		}
-		case 12:
+		case 12:   // pvpfall's arrow bonus: inside a PvP zone, the second player on a galloping horse takes double from an arrow
+		{
+			static TWeakObjectPtr<AHorse> Steed; static float D1 = 0.f, Hp0f = 0.f;
+			if (JeebPvp::Zones().Num() == 0 || !K2) { Check(false, TEXT("a PvP zone and a second player for the arrow check")); Stage = 900; return; }
+			const JeebPvp::FZone& Z = JeebPvp::Zones()[0];
+			const FVector2D Mid = (Z.Min + Z.Max) * 0.5f;
+			if (Sub == 0)
+			{
+				AHorse* W2 = nullptr;
+				for (TActorIterator<AHorse> It(W); It; ++It) if (!It->IsDown() && !It->HasRider() && *It != H) { W2 = *It; break; }
+				if (!W2) { Check(false, TEXT("a horse for the arrow check")); Stage = 900; return; }
+				Steed = W2;
+				W2->SetActorLocation(FVector(Mid.X, Mid.Y, JeebFoes::Ground(Mid.X, Mid.Y)));
+				Place(K2, Mid + FVector2D(0.f, 150.f), Mid + FVector2D(1000.f, 0.f));
+				Place(K, Mid + FVector2D(-900.f, 150.f), Mid + FVector2D(0.f, 150.f));
+				Sub = 1; NextAt = Clock + 1.f; return;
+			}
+			if (Sub == 1)
+			{
+				K2->ServerHorse_Implementation(AKnightCharacter::HO_Mount, Steed.Get());
+				Check(K2->IsMounted() && IsInPvpZone(K2->GetActorLocation()) && IsInPvpZone(K->GetActorLocation()), TEXT("arrow check: the second player rides inside a PvP zone"));
+				Hp0f = K2->Health; K2->InvulnUntil = 0.f;
+				FireAt(K, K2, 10);
+				Sub = 2; NextAt = Clock + 2.f; return;
+			}
+			if (Sub == 2)
+			{
+				D1 = Hp0f - K2->Health;
+				K2->Health = Hp0f; K2->InvulnUntil = 0.f;
+				K2->bTestGallop = true;
+				Sub = 3; NextAt = Clock + 1.f; return;
+			}
+			if (Sub == 3)
+			{
+				Check(K2->bFastHorse && K2->IsFastMounted(), FString::Printf(TEXT("galloping sets bFastHorse on the server (%d)"), K2->bFastHorse ? 1 : 0));
+				FireAt(K, K2, 10);
+				Sub = 4; NextAt = Clock + 2.f; return;
+			}
+			const float D2 = Hp0f - K2->Health;
+			Check(D1 > 0.f && FMath::Abs(D2 - 2.f * D1) <= 1.5f, FString::Printf(TEXT("a galloping rider takes double from an arrow: %.0f against %.0f"), D2, D1));
+			K2->bTestGallop = false; K2->Health = Hp0f;
+			K2->ServerHorse_Implementation(AKnightCharacter::HO_Dismount, nullptr);
+			Next(0.5f); return;
+		}
+		case 13:
 			Log(FString::Printf(TEXT("DONE: %d passed, %d failed"), Passes, Fails));
 			Stage = 1000; return;
 		case 900:
@@ -294,7 +351,7 @@ struct FHorseTestDriver
 };
 
 #include "PvpZones.h"
-bool FHorseTestDriver::JeebPvp_Test(UWorld* W, AHorse* H) { return JeebPvp::IsInPvpZone(W, H->GetActorLocation()); }
+bool FHorseTestDriver::JeebPvp_Test(UWorld* W, AHorse* H) { return IsInPvpZone(H->GetActorLocation()); }
 
 void JeebHorseTestTick(AStable* St, float Dt)
 {

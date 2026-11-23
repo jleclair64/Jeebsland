@@ -18,6 +18,7 @@ enum class ESkillType : uint8
 	Lockpicking,
 	Climbing,     // (owner 2026-11-12: a skill now, its mechanics later; always add new skills at the end, saves store them by number)
 	Swimming,     // (2026-11-13: how long the swimming bar and the breath last, KnightMovementSwim.cpp)
+	Stamina,      // (2026-11-22: the troll's rush, how long his rush bar lasts; trained by rushing, KnightCharacterTroll.cpp)
 	Riding        // (2026-11-22: Horse Riding; XP by distance ridden, a little more speed and gallop per level, Horse.cpp)
 };
 
@@ -49,7 +50,7 @@ enum class EItemType : uint8
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
-constexpr int32 JeebNumSkills = 12;
+constexpr int32 JeebNumSkills = 13;
 constexpr int32 JeebNumWornKinds = 25;
 
 // One inventory slot: what is in it (see Inventory.h for ids) and how many
@@ -113,6 +114,28 @@ public:
 	// Lore fragments heard so far (indices into JeebLore::Entries()). Returns true the first time.
 	UPROPERTY(Replicated) TArray<int32> LoreFound;
 	bool DiscoverLore(int32 Index);
+
+	// The wizard's spell book (2026-11-22; JeebSpells.h, Content/Data/Spells.csv). SpellLevels: one per spell row, 0 not learned, else its
+	// upgrade level. SpellEquip: the book's 3x3 grid (owner: "Something similar to Hogwarts game"), three loadout rows of three slots
+	// (cell = row * 3 + slot), each a spell row + 1 (0 empty; a spell may sit in several cells). SpellPick: the active loadout row (F: the
+	// next). Slot 1 is left click and key 1, slot 2 mouse button 4 and key 2, slot 3 mouse button 5 and key 3.
+	// The server changes them (EInvOp::ChooseSpell / EquipSpell / CastSlot, and the hooks below); saved with the character.
+	static constexpr int32 SpellSlots = 3, SpellRows = 3;
+	UPROPERTY(Replicated) TArray<uint8> SpellLevels;
+	UPROPERTY(Replicated) TArray<uint8> SpellEquip;
+	UPROPERTY(Replicated) uint8 SpellPick = 0;
+	uint8 CastSlot = 0;                  // which of the active row's slots the cast being charged is (the server's copy: EInvOp::CastSlot)
+	int32 SpellLevel(int32 Row) const { return SpellLevels.IsValidIndex(Row) ? SpellLevels[Row] : 0; }
+	int32 SpellInCell(int32 Cell) const; // the spell row in a grid cell if it is usable; -1 if empty or not usable
+	int32 SpellAt(int32 Slot) const { return SpellInCell(int32(SpellPick) * SpellSlots + Slot); }   // the active row's slot
+	bool CanUseSpell(int32 Row) const;   // learned, and your Magic level is high enough
+	void EnsureStarterSpells();          // TEMPORARY (test setup): every spell in Spells.csv learned at level 1, and a default grid
+	// Hooks for quests and XP to call later (server only): learn a spell, raise it a level. False if nothing changed.
+	bool LearnSpell(int32 Row);
+	bool UpgradeSpell(int32 Row);
+	bool SetSpellCell(int32 Cell, int32 RowPlusOne);   // put a learned spell (row + 1) in a grid cell, or 0 to empty it
+	bool PickSpellRow(int32 Row);
+	int32 NextSpellRow() const;          // F: the next loadout row holding any spell (after the third, the first); SpellPick if none
 
 	// Map fog: the ground this character has seen, as a FogN x FogN grid over the whole world (JeebWorld bounds; about 12 m
 	// cells). The server marks it as the knight walks (Explore); it is saved with the character and never lost on death.

@@ -1,5 +1,6 @@
 #include "KnightCharacter.h"
 #include "JeebProps.h"
+#include "JeebSpells.h"
 #if WITH_EDITOR
 #include "ShaderCompiler.h"
 #endif
@@ -48,6 +49,7 @@
 #include "Projectile.h"
 #include "Combat.h"
 #include "WeaponDesign.h"
+#include "PvpZones.h"
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
 #include "TimerManager.h"
@@ -58,6 +60,7 @@
 // same on every machine, so the server agrees.
 bool AKnightCharacter::GuardActive() const
 {
+	if (bIsWizard && Magic < (bBlocking ? 0.5f : JeebTune::V().BroomMinMagic)) return false;   // (2026-11-22, owner: holding the orb drains magic; with none it drops, and it needs a little back to rise: KnightCharacterBroom.cpp)
 	return bIsTroll || bIsWizard || ShieldActive();   // (the wizard, 2026-11-21: his orb, all round him, whatever he holds)
 }
 
@@ -302,19 +305,27 @@ void AKnightCharacter::AttackLands()
 		const float ChargeMul = bBow ? 1.f : FMath::Lerp(1.f, FMath::Max(1.f, JeebTune::V().CastChargeMax), FMath::Clamp(AtkCharge, 0.f, 1.f));
 		// (2026-11-22, owner: the magic bar) the cast spends magic by its charge; with less than the cost it still goes, at that share of its power
 		const auto& TW = JeebTune::V();
-		const float Cost = FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f));
+		// (2026-11-22, owner: F switches spells) the server's own copy of the spell picked in the spell book's F cycle: its damage, speed and cost shares
+		if (!bBow && Skills->SpellLevels.Num() == 0) Skills->EnsureStarterSpells();   // TEMPORARY (test setup): a character from before spells
+		const int32 SpellRow = bBow ? 0 : Skills->SpellAt(Skills->CastSlot);   // (the server's grid, active row and slot)
+		if (!bBow && SpellRow < 0) { UE_LOG(LogTemp, Log, TEXT("JEEBSPELL slot %d of row %d is empty: no cast"), Skills->CastSlot, Skills->SpellPick); return; }
+		const JeebSpells::FSpell& Spell = JeebSpells::Get(SpellRow);
+		const float SpellDmg = bBow ? 1.f : JeebSpells::DamageMul(SpellRow, Skills->SpellLevel(SpellRow));
+		const float Cost = (bBow ? 1.f : Spell.CostMul) * FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f)) * SpellCostMul(K, Tier);   // (spell, item in MagicCosts.csv, dearer on a broom)
 		const float Power = bBow || Cost <= 0.f ? 1.f : FMath::Clamp(Magic / Cost, FMath::Clamp(TW.MagicMinPower, 0.f, 1.f), 1.f);
 		if (!bBow) { Magic = FMath::Max(0.f, Magic - Cost); MagicUsedAt = GetWorld()->GetTimeSeconds(); }
-		const int32 Dmg = FMath::Max(1, JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit, ChargeMul * Power));
+		const int32 Dmg = FMath::Max(1, JeebItems::RollDamage(Skills, K, Tier, bBow ? PendingArrowTier : 0, bCrit, ChargeMul * Power * SpellDmg));
 		const float Range = JeebItems::WeaponBase(K).Range;
 		// (2026-11-22, owner: "200% faster": Tuning.ini [Wizard] StaffBoltSpeed / WandBoltSpeed, 3x the old 1800 / 2200)
-		const float BoltSpeed = K == JeebItems::K_Staff ? JeebTune::V().StaffBoltSpeed : JeebTune::V().WandBoltSpeed;
+		const float BoltSpeed = Spell.SpeedMul * (K == JeebItems::K_Staff ? JeebTune::V().StaffBoltSpeed : JeebTune::V().WandBoltSpeed);
+		if (!bBow) UE_LOG(LogTemp, Log, TEXT("JEEBSPELL cast %s (row %d, level %d) dmg x%.2f cost %.1f speed %.0f"), *Spell.Name, SpellRow, Skills->SpellLevel(SpellRow), SpellDmg, Cost, BoltSpeed);
 		UE_LOG(LogTemp, Log, TEXT("JEEBCAST kind %d charge %.2f x%.2f power %.2f magic left %.0f dmg %d speed %.0f start %s dir %s target %s fresh %d"), K, AtkCharge, ChargeMul, Power, Magic, Dmg, BoltSpeed,
 			*Start.ToCompactString(), *Dir.ToCompactString(), *CastTarget.ToCompactString(), bFresh ? 1 : 0);
 		FActorSpawnParameters SP;
 		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), Start, Dir.Rotation(), SP))
 		{
+			if (!bBow) P->SetSpell(SpellRow);   // (replicated with the launch: every machine draws the spell's colour and look)
 			P->Launch(this, Dir, bBow ? 3500.f : BoltSpeed, Range, Dmg, bCrit, Sk, !bBow,
 				bBow ? PendingArrowTier : (K == JeebItems::K_Staff ? 100 : 0));
 		}
@@ -357,6 +368,9 @@ void AKnightCharacter::AttackLands()
 void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 Zone, bool bHeadshot)
 {
 	if (Health <= 0.f || Raw <= 0 || !Skills || !HasAuthority()) return;   // (only the server hurts anyone)
+	// (2026-11-23, owner) another player's blow, arrow, spell or fire hurts only where both stand in a PvP zone (PvpZones.h): the one place
+	// the server settles it, whatever the way it came
+	if (const AKnightCharacter* FromK = Cast<AKnightCharacter>(From)) if (!JeebPvp::MayHurt(FromK, this)) return;
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < InvulnUntil) return;
 
@@ -1382,12 +1396,13 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				DealDamage(H, Dmg, bCrit, Sk, true, Zone);
 				if (H->React && H->IsAlive()) H->React(this, React);
 			}
-			// Other players' knights: only in MoveLab for now (no PvP yet)
-			if (!bOver && JeebHit::InMoveLab(GetWorld()))
+			// Other players' knights: only where both stand in a PvP zone (PvpZones.h; MoveLab always)
+			if (!bOver)
 				for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
 				{
 					AKnightCharacter* K = *It;
 					if (K == this || K->GetHealth() <= 0.f || KickedKnights.Contains(K)) continue;
+					if (!JeebPvp::MayHurt(this, K)) continue;
 					if (FVector::DistSquared(K->GetActorLocation(), GetActorLocation()) > FMath::Square(450.f)) continue;
 					Hurt.Reset();
 					K->GatherHurt(Hurt);
