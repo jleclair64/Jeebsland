@@ -22,6 +22,12 @@
 #include "SkillComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Deer.h"
+#include "Misc/ConfigCacheIni.h"
+
+// (-SwapTest's bow check: with [Jeebsland.Testing] UnlimitedArrows=True the count never drops, so a full draw is the pass)
+#if !UE_BUILD_SHIPPING
+static bool UnlimitedArrowsTest() { bool v = false; if (GConfig) GConfig->GetBool(TEXT("Jeebsland.Testing"), TEXT("UnlimitedArrows"), v, GGameIni); return v; }
+#endif
 #include "EngineUtils.h"
 #include "Engine/World.h"
 
@@ -362,7 +368,7 @@ void AKnightCharacter::SwapTestStep()
 					{
 						AKnightCharacter* K3 = W3.Get(); if (!K3 || !K3->GetSkills()) return;
 						int32 After = 0; for (const FInvSlot& Sl : K3->GetSkills()->Slots) if (JeebItems::IsArrow(Sl.Id)) After += Sl.Count;
-						UE_LOG(LogTemp, Log, TEXT("JEEBCLASS bow %s: drew to %.2f, arrows %d -> %d, bow in slot 2: %d"), After < Before ? TEXT("PASS shot an arrow") : TEXT("FAIL no arrow left"), Charge, Before, After, K3->GetSkills()->Hotbar[1]);
+						UE_LOG(LogTemp, Log, TEXT("JEEBCLASS bow %s: drew to %.2f, arrows %d -> %d, bow in slot 2: %d"), (After < Before || (UnlimitedArrowsTest() && Charge > 0.5f && After > 0)) ? (After < Before ? TEXT("PASS shot an arrow") : TEXT("PASS shot an arrow (UnlimitedArrows keeps the count; see JEEBARROW)")) : TEXT("FAIL no arrow left"), Charge, Before, After, K3->GetSkills()->Hotbar[1]);
 					}), 0.8f, false);
 				}), 2.f, false);
 			}
