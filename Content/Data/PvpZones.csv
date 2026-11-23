@@ -1,0 +1,6 @@
+Name,Title,X0,Y0,X1,Y1,SignEvery
+# PvP zones (2026-11-23, Source/Jeebsland/PvpZones.cpp). One row per zone, a rectangle on the ground. Players can hurt each other only while BOTH stand inside the same kind of zone (the server decides).
+# Coordinates are metres in the world's own axes: X grows NORTH, Y grows EAST (Oak Hill's plaza is about X -35, Y 183); the map runs X -1264 .. 1056, Y -360 .. 1344. Corners past the map's edge are fine.
+# Title: the red name shown on entering. SignEvery: metres between the warning signs along the zone's edge (0 = none); signs stand 3 m outside the line, facing out.
+# Every machine builds the signs and shows the title from this file and the server decides the damage from it, so change it, then restart the game and the world servers. (The warning signs only show at the map's edges that lie inside the map.)
+Snowy North,THE FROZEN NORTH,840,-400,1100,1400,60

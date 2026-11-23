@@ -38,6 +38,7 @@
 #include "Forest.h"
 #include "AutumnDecor.h"
 #include "OpenWorldActor.h"
+#include "PvpSigns.h"
 #include "Fill.h"
 #include "QuestPeople.h"
 #include "NpcLife.h"
@@ -315,6 +316,7 @@ void AKnightGameState::BuildWorld()
 	// Pumpkins, hay, scarecrows, lamps, a graveyard, floating candles and falling leaves
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AOpenWorld>(FVector::ZeroVector, FRotator::ZeroRotator);   // the placeholder houses of the towns still to be built (every machine: they are solid) and the snowfall (players only); OpenWorldActor.h
+	World->SpawnActor<APvpSigns>(FVector::ZeroVector, FRotator::ZeroRotator);   // the warning signs along the PvP zones' edges (PvpSigns.h; players only)
 	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)

@@ -142,6 +142,18 @@ public:
 	// The troll's rush (owner 2026-11-22): sprinting builds up to 3x the knight's sprint over 10 s; after 5 s a rush bar drains (Stamina
 	// skill); empty, he eases down to his walking speed. At top speed he bowls over players and creatures (server). Tuning.ini [Troll].
 	bool IsRushing() const { return bRushing; }   // (replicated from the server: he is at rush top speed; arrows and others may read it)
+	// On a fast mount (owner 2026-11-23): arrows do ArrowMountedMul (Tuning.ini [Pvp], 2x) damage to him. True on a rushing troll, on a galloping
+	// horse and on a broom. The server decides (Projectile.cpp); the horse and broom work set bFastHorse / bOnBroom on the server (place-holders:
+	// nothing sets them yet).
+	bool IsFastMounted() const { return IsRushing() || bFastHorse || bOnBroom; }
+	bool bFastHorse = false;   // (server) riding a horse at a gallop
+	bool bOnBroom = false;     // (server) flying on a broom
+	// Fall damage (owner 2026-11-23, KnightCharacterFall.cpp; the server decides, Tuning.ini [Pvp])
+	void TickFall();
+#if !UE_BUILD_SHIPPING
+	friend struct FPvpTestDriver;   // (PvpTest.cpp: the online test of the PvP zones, fall damage and the mounted-target arrow bonus)
+#endif
+	float FallPeakZ = 0.f, FallLastZ = 0.f; bool bFallWasFalling = false;
 	float RushBarShare() const { return RushBar; }
 	bool IsRushTired() const { return bRushTired; }
 	static float RushSeconds(int32 StaminaLevel);   // how long a full rush bar lasts once it drains, at this Stamina level

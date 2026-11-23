@@ -4,6 +4,8 @@
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
 #include "HitBoxes.h"
+#include "PvpZones.h"
+#include "JeebTuning.h"
 #include "Combat.h"
 #include "Terrain.h"
 #include "Components/StaticMeshComponent.h"
@@ -258,9 +260,10 @@ void AProjectile::Tick(float DeltaSeconds)
 		};
 		for (UHealthComponent* H : UHealthComponent::All())
 			if (H && H->IsAlive() && H->GetOwner() && H->GetOwner() != Shooter) Consider(H, nullptr, H->GetOwner());
-		if (JeebHit::InMoveLab(GetWorld()))   // other players' knights: only in MoveLab until PvP exists
-			for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
-				if (*It != Shooter && It->GetHealth() > 0.f) Consider(nullptr, *It, *It);
+		// other players' knights: only where the shooter and the target both stand in a PvP zone (PvpZones.h; MoveLab always). The server
+		// decides; a player's copy of the arrow flies for show and stops at nobody it may not hurt.
+		for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
+			if (*It != Shooter && It->GetHealth() > 0.f && JeebPvp::MayHurt(Shooter, *It)) Consider(nullptr, *It, *It);
 		if (Best <= 1.f)
 		{
 			AActor* Target = BestK ? static_cast<AActor*>(BestK) : BestH->GetOwner();
@@ -301,7 +304,13 @@ void AProjectile::Tick(float DeltaSeconds)
 			if (!bAuth) { BoltBurst(At); SetActorLocation(At); Wait(); return; }
 			// A headshot (owner, 2026-11-02): arrows and bolts to the head do 1.5x, before the helmet takes its share
 			const bool bHead = BestZone == JeebHit::Z_Head;
-			const int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul()) : Damage;
+			int32 Dmg = bHead ? FMath::RoundToInt(Damage * JeebCombat::HeadshotMul()) : Damage;
+			// (2026-11-23, owner) arrows (not bolts or rocks) do double to a target on a galloping horse, a broom or a troll's rush
+			if (BestK && !L.bBolt && !bRock && BestK->IsFastMounted())
+			{
+				Dmg = FMath::Max(1, FMath::RoundToInt(Dmg * FMath::Max(1.f, JeebTune::V().ArrowMountedMul)));
+				if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW fast-mounted target: x%.1f -> %d"), JeebTune::V().ArrowMountedMul, Dmg);
+			}
 			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead);
 			else if (Shooter) Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead);
 			if (JeebItems::IsFireArrow(L.ArrowId)) Burn(Target);
@@ -455,7 +464,7 @@ void AProjectile::Burn(AActor* Target)
 		{
 			AActor* A = T.Get();
 			if (!A) return;
-			if (AKnightCharacter* K = Cast<AKnightCharacter>(A)) { if (K->GetHealth() > 0.f) K->Hurt(BurnDamage, S.Get(), true); }
+			if (AKnightCharacter* K = Cast<AKnightCharacter>(A)) { if (K->GetHealth() > 0.f && JeebPvp::MayHurt(S.Get(), K)) K->Hurt(BurnDamage, S.Get(), true); }
 			else if (UHealthComponent* Hc = A->FindComponentByClass<UHealthComponent>())
 			{
 				if (!Hc->IsAlive()) return;

@@ -48,6 +48,7 @@
 #include "Projectile.h"
 #include "Combat.h"
 #include "WeaponDesign.h"
+#include "PvpZones.h"
 #include "ProceduralMeshComponent.h"
 #include "Misc/ConfigCacheIni.h"
 #include "TimerManager.h"
@@ -357,6 +358,9 @@ void AKnightCharacter::AttackLands()
 void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 Zone, bool bHeadshot)
 {
 	if (Health <= 0.f || Raw <= 0 || !Skills || !HasAuthority()) return;   // (only the server hurts anyone)
+	// (2026-11-23, owner) another player's blow, arrow, spell or fire hurts only where both stand in a PvP zone (PvpZones.h): the one place
+	// the server settles it, whatever the way it came
+	if (const AKnightCharacter* FromK = Cast<AKnightCharacter>(From)) if (!JeebPvp::MayHurt(FromK, this)) return;
 	const float Now = GetWorld()->GetTimeSeconds();
 	if (Now < InvulnUntil) return;
 
@@ -1388,12 +1392,13 @@ void AKnightCharacter::TickHitboxes(float Dt)
 				DealDamage(H, Dmg, bCrit, Sk, true, Zone);
 				if (H->React && H->IsAlive()) H->React(this, React);
 			}
-			// Other players' knights: only in MoveLab for now (no PvP yet)
-			if (!bOver && JeebHit::InMoveLab(GetWorld()))
+			// Other players' knights: only where both stand in a PvP zone (PvpZones.h; MoveLab always)
+			if (!bOver)
 				for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
 				{
 					AKnightCharacter* K = *It;
 					if (K == this || K->GetHealth() <= 0.f || KickedKnights.Contains(K)) continue;
+					if (!JeebPvp::MayHurt(this, K)) continue;
 					if (FVector::DistSquared(K->GetActorLocation(), GetActorLocation()) > FMath::Square(450.f)) continue;
 					Hurt.Reset();
 					K->GatherHurt(Hurt);

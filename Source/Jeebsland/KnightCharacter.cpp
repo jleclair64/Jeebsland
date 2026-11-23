@@ -450,6 +450,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickCastCharge(Dt);   // (the wand's and staff's charged shot: KnightCharacterCastAim.cpp)
 	TickKnock(Dt);
 	TickHealth(Dt);
+	TickFall();   // (fall damage, the server's: KnightCharacterFall.cpp)
 	const bool bWantSprint = TickStamina(Dt, Speed, bFalling, bSpecial);
 	TickDrink(Dt);
 	TickEmote(Dt);   // (KnightCharacterEmote.cpp)
@@ -476,15 +477,16 @@ void AKnightCharacter::TickHousekeeping()
 	// Coming from the starting screen the mouse is still in menu mode: hand it back to the camera once our knight is ours
 	if (!bUIModeSet && IsLocallyControlled() && GetController()) { bUIModeSet = true; RefreshUIMode(); }
 
-	// The camera can't swing all the way overhead or underfoot: from looking 60 degrees down to 35 degrees up
+	// The camera can look straight down and straight up (owner 2026-11-23: it was held to 60 degrees down and 35 up; CalcCamera keeps it above
+	// the grass now, so the full range is safe). Just short of 90 so the view never flips.
 	if (!bPitchLimitsSet)
 	{
 		if (APlayerController* PCtl = Cast<APlayerController>(GetController()))
 		{
 			if (PCtl->PlayerCameraManager)
 			{
-				PCtl->PlayerCameraManager->ViewPitchMin = -60.f;
-				PCtl->PlayerCameraManager->ViewPitchMax = 35.f;
+				PCtl->PlayerCameraManager->ViewPitchMin = -89.f;
+				PCtl->PlayerCameraManager->ViewPitchMax = 89.f;
 				bPitchLimitsSet = true;
 			}
 		}
