@@ -54,6 +54,23 @@ enum class EItemType : uint8
 constexpr int32 JeebNumSkills = 14;
 constexpr int32 JeebNumWornKinds = 25;
 
+// One class's own pack and worn gear (2026-11-24, owner: knight, troll and wizard each keep their own). The class being played lives in the
+// component (Slots, Hotbar, Worn ...); the other classes' sets wait in ClassPacks and in the save. Bank, ingots and skills are shared.
+USTRUCT()
+struct FJeebClassPack
+{
+	GENERATED_BODY()
+	UPROPERTY() bool bUsed = false;   // false: this class has never been played (it gets its starter kit)
+	UPROPERTY() TArray<int32> SlotIds;
+	UPROPERTY() TArray<int32> SlotCounts;
+	UPROPERTY() TArray<int32> Hotbar;
+	UPROPERTY() int32 Selected = 0;
+	UPROPERTY() TArray<int32> Worn;
+	UPROPERTY() int32 RingB = 0;
+	UPROPERTY() int32 PotionId = 0;
+	UPROPERTY() int32 PotionCount = 0;
+};
+
 // One inventory slot: what is in it (see Inventory.h for ids) and how many
 USTRUCT()
 struct FInvSlot
@@ -155,7 +172,10 @@ public:
 	bool BankDeposit(int32 PackIdx);     // the whole stack; false if the bank has no room
 	bool BankWithdraw(int32 BankIdx);    // the whole stack (or as much as fits in the pack)
 	bool BankDepositHot(int32 H);        // a weapon straight from the weapon bar
-	void StowRetiredGear();              // (server, after a save is read) bows off the bar into the pack or bank; a wizard's missing wand
+	// The other classes' packs (server only; 0 knight, 1 troll, 2 wizard; the played class's entry is unused) and the class the live pack belongs to
+	TArray<FJeebClassPack> ClassPacks;
+	int32 PackClass = -1;
+	void StowRetiredGear();             // (server, after a save is read) bows off the bar into the pack or bank; a wizard's missing wand
 	void FitToClass();                   // (server, after a save is read) gear this class cannot use goes into the pack, and the class gets back its own or a starter piece (class switches)
 	int32 BankUsed() const;
 

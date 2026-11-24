@@ -358,11 +358,36 @@ namespace JeebItems
 	// (2026-11-19) Is this pack a playable troll's? (KnightCharacterTroll.cpp)
 	bool OwnerIsTroll(const USkillComponent* S);
 	bool OwnerIsWizard(const USkillComponent* S);   // (2026-11-21, KnightCharacterWizard.cpp)
+	// Which class an item belongs to (2026-11-24, owner: each class holds only its own gear): 0 every class (materials, potions, ingots, capes, rings,
+	// amulets, the helm brush, and every tool or weapon whose Kinds.csv Class is "all"), 1 knight, 2 troll, 3 wizard. Only EQUIPPING is gated by it
+	// (CanEquip); picking up, carrying and banking any item is fine. Weapons come from Kinds.csv's Class column; armour from its style (the wizard's
+	// and troll's sets are theirs, every other style the knight's); shields, arrows and fire arrows are the knight's, rocks the troll's, brooms and the book the wizard's.
+	inline int32 ItemClass(int32 Id)
+	{
+		if (IsArrow(Id)) return 1;
+		if (IsRock(Id)) return 2;
+		if (IsBroom(Id)) return 3;
+		if (!IsGear(Id)) return 0;
+		const int32 K = KindOf(Id);
+		if (K == K_Shield) return 1;
+		if (IsArmorKind(K)) return StyleOf(Id) == AS_Wizard ? 3 : StyleOf(Id) == AS_Troll ? 2 : 1;
+		if (K == K_Book) return 3;
+		return KindClass(K);
+	}
+	inline int32 OwnerClass(const USkillComponent* S) { return OwnerIsWizard(S) ? 3 : OwnerIsTroll(S) ? 2 : 1; }
 	// Can this player wear or wield this item? If not, OutWhy says why. (Capes, rings, amulets and the brush have no gate.)
 	inline bool CanEquip(const USkillComponent* S, int32 Id, FString* OutWhy = nullptr)
 	{
 		if (!IsGear(Id)) return true;
 		const int32 K = KindOf(Id);
+		{
+			const int32 IC = ItemClass(Id), Me = OwnerClass(S);
+			if (IC != 0 && IC != Me)
+			{
+				if (OutWhy) *OutWhy = FString::Printf(TEXT("%s is made for %ss. A %s can't use it."), *ItemName(Id), IC == 1 ? TEXT("knight") : IC == 2 ? TEXT("troll") : TEXT("wizard"), Me == 1 ? TEXT("knight") : Me == 2 ? TEXT("troll") : TEXT("wizard"));
+				return false;
+			}
+		}
 		// The wizard (2026-11-21): the spell book and the wizard's hat, robe and boots are his alone; he wears no other armour and no shield
 		// (his guard is the orb), and wields wizards' and everyone's weapons. Unequipping never asks here.
 		const bool bWizard = OwnerIsWizard(S);

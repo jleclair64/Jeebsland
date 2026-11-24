@@ -168,6 +168,7 @@ void AKnightGameMode::TryLogin(AKnightPlayerController* PC, const FString& Name,
 	if (PC->PlayerState) PC->PlayerState->SetPlayerName(Display);
 	PC->PendingSave = UJeebSave::ReadFile(JeebAccounts::CharacterPath(Key));
 	UE_LOG(LogTemp, Log, TEXT("Jeebsland: %s: %s"), *Key, PC->PendingSave ? TEXT("saved character loaded") : TEXT("new character"));
+	if (PC->ClassChoice < 0 && PC->PendingSave && PC->PendingSave->SavedClass >= 0 && PC->PendingSave->SavedClass <= 2) PC->ClassChoice = (int8)PC->PendingSave->SavedClass;   // (back as the class you left as)
 	PC->ClientLoginResult(true, FString());
 	RestartPlayer(PC);
 	if (AKnightCharacter* Knight = Cast<AKnightCharacter>(PC->GetPawn()))

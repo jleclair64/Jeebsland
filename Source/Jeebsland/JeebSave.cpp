@@ -6,6 +6,7 @@
 #include "QuestComponent.h"
 #include "FastTravel.h"
 #include "Horse.h"
+#include "KnightCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
@@ -81,6 +82,15 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->LoreFound = Skills->LoreFound;
 	S->Explored = Skills->Explored;
 	S->LastGambleHour = Skills->LastGambleHour;
+	{
+		const AKnightCharacter* KC = Cast<AKnightCharacter>(Skills->GetOwner());
+		S->SavedClass = Skills->PackClass >= 0 ? Skills->PackClass : (KC ? KC->ClassIndex() : 0);
+		S->Packs = Skills->ClassPacks;
+		S->Packs.SetNum(3);
+#if !UE_BUILD_SHIPPING
+		if (FParse::Param(FCommandLine::Get(), TEXT("TestOldSaveFormat"))) { S->SavedClass = -1; S->Packs.Empty(); }   // (test: writes a save as the game made them before separate class packs)
+#endif
+	}
 	S->SpellLevels = Skills->SpellLevels;
 	S->SpellEquip = Skills->SpellEquip;
 	S->SpellPick = Skills->SpellPick;
@@ -105,6 +115,29 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 		return false;
 	}
 	Migrate();
+
+	// Separate packs per class (2026-11-24): this file's pack arrays belong to SavedClass (an older save: whichever class loads it). If the pawn is
+	// another class, the file's set is put away and that class's own set comes out (never played: empty, and it gets its starter kit below).
+	const AKnightCharacter* Pawn = Cast<AKnightCharacter>(Skills->GetOwner());
+	const int32 Cls = Pawn ? Pawn->ClassIndex() : 0;
+	const int32 From = (SavedClass >= 0 && SavedClass <= 2) ? SavedClass : Cls;
+	TArray<FJeebClassPack> Others = Packs;
+	Others.SetNum(3);
+	bool bFreshClass = false;
+	if (From != Cls)
+	{
+		FJeebClassPack& Away = Others[From];
+		Away = FJeebClassPack();
+		Away.bUsed = true; Away.SlotIds = SlotIds; Away.SlotCounts = SlotCounts; Away.Hotbar = Hotbar; Away.Selected = Selected; Away.Worn = Worn;
+		Away.RingB = RingB; Away.PotionId = PotionId; Away.PotionCount = PotionCount;
+		const FJeebClassPack Mine = Others[Cls];
+		Others[Cls] = FJeebClassPack();
+		bFreshClass = !Mine.bUsed;
+		SlotIds = Mine.SlotIds; SlotCounts = Mine.SlotCounts; Hotbar = Mine.Hotbar; Selected = Mine.Selected; Worn = Mine.Worn;
+		RingB = Mine.RingB; PotionId = Mine.PotionId; PotionCount = Mine.PotionCount;
+		UE_LOG(LogTemp, Log, TEXT("JEEBPACK class %d -> %d: %s"), From, Cls, bFreshClass ? TEXT("starter kit (never played)") : TEXT("its own pack comes out"));
+	}
+	else Others[Cls] = FJeebClassPack();
 
 	// Everything is checked on the way in: unknown ids vanish, counts are held to the stack size
 	auto Fill = [](TArray<FInvSlot>& Dest, const TArray<int32>& Ids, const TArray<int32>& Counts)
@@ -148,7 +181,21 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	Skills->SpellPick = uint8(FMath::Clamp(SpellPick, 0, USkillComponent::SpellRows - 1));
 	Skills->EnsureStarterSpells();   // TEMPORARY (test setup): every spell learned
 	if (URiderComponent* Rc = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<URiderComponent>() : nullptr) Rc->Restore(bHasHorse, HorseStable);
-	Skills->StowRetiredGear();   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
+	Skills->ClassPacks = Others;
+	Skills->PackClass = Cls;
+	if (bFreshClass)
+	{
+		for (FInvSlot& Sl : Skills->Slots) Sl = FInvSlot();
+		Skills->PotionSlot = FInvSlot();
+		Skills->ResetToStartingKit();   // (class-aware: the pawn is already this class)
+	}
+	Skills->StowRetiredGear();
+	{
+		int64 Sum = 0; int32 Items = 0;
+		for (const FInvSlot& Sl : Skills->Slots) if (Sl.Id) { ++Items; Sum += int64(Sl.Id) * Sl.Count; }
+		int64 WornSum = 0; for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) WornSum += Skills->Worn[i];
+		UE_LOG(LogTemp, Log, TEXT("JEEBPACK applied for class %d (file's pack was class %d): %d pack items, id sum %lld, worn sum %lld, bar %d/%d"), Cls, From, Items, Sum, WornSum, Skills->Hotbar[0], Skills->Hotbar[1]);
+	}   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
 	return true;
 }
 

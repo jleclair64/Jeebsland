@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "SkillComponent.h"
 #include "JeebSave.generated.h"
 
 class USkillComponent;
@@ -56,6 +57,11 @@ public:
 	// Your own horse (URiderComponent, 2026-11-22): whether you have one, and the stable it waits at
 	UPROPERTY() bool bHasHorse = false;
 	UPROPERTY() FString HorseStable;
+
+	// Separate packs per class (2026-11-24): the arrays above (SlotIds, Hotbar, Worn, RingB, potion, Selected) are the pack of SavedClass (0 knight,
+	// 1 troll, 2 wizard; -1 in an older save = whichever class loads it); Packs holds the other classes' sets. Bank, ingots and skills are shared.
+	UPROPERTY() int32 SavedClass = -1;
+	UPROPERTY() TArray<FJeebClassPack> Packs;
 
 	// Where the knight stood (online: you log back in where you logged out)
 	UPROPERTY() bool bHasPos = false;
