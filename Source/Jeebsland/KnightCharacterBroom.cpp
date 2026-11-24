@@ -21,6 +21,7 @@
 #include "JeebTuning.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -124,10 +125,18 @@ void AKnightCharacter::StartBroomSrv(int32 Row)
 	UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s takes off on %s at %s, magic %.0f of %.0f"), *GetName(), *JeebItems::ItemName(JeebItems::BroomId(Row)), *GetActorLocation().ToCompactString(), Magic, MagicCap());
 }
 
+bool AKnightCharacter::BroomSprinting() const
+{
+	if (!bOnBroom || bBroomEmpty) return false;
+	if (IsLocallyControlled()) { const UKnightMovement* KM = KnightMove(); return KM && KM->bWantsFast; }   // (his own machine goes by his key at once, as the flight itself does)
+	return bBroomSprint;
+}
+
 void AKnightCharacter::EndBroomSrv(const TCHAR* Why)
 {
 	if (!bOnBroom) return;
 	bOnBroom = false;
+	bBroomSprint = false;
 	bBroomEmpty = false;
 	ApplyBroomMovement();
 	UpdateBroomModel();
@@ -186,7 +195,14 @@ void AKnightCharacter::TickBroom(float Dt)
 			{
 				// (owner 2026-11-23: twice the drain, but only while Space holds it up; gliding down is free and the bar may refill)
 				const UKnightMovement* DKM = KnightMove();
-				if (DKM && DKM->bWantsRise)
+				const bool bSprintSrv = DKM && DKM->bWantsFast && !bBroomEmpty;   // (the sprint key, from his saved moves)
+				if (bBroomSprint != bSprintSrv) { bBroomSprint = bSprintSrv; ForceNetUpdate(); if (bSprintSrv && bCastCharging) CancelCastCharge(); }
+				if (bSprintSrv)   // (owner 2026-11-24: sprinting drains more, with or without Space)
+				{
+					Magic = FMath::Max(0.f, Magic - JeebBroom::Row(BroomRow).Drain * FMath::Max(0.f, T.BroomSprintDrainMul) * Dt);
+					MagicUsedAt = GetWorld()->GetTimeSeconds();
+				}
+				else if (DKM && DKM->bWantsRise)
 				{
 					Magic = FMath::Max(0.f, Magic - JeebBroom::Row(BroomRow).Drain * FMath::Max(0.f, T.BroomDrainMul) * Dt);
 					MagicUsedAt = GetWorld()->GetTimeSeconds();
@@ -336,6 +352,24 @@ void AKnightCharacter::TickBroom(float Dt)
 		BroomTestT += Dt;
 		if (BroomTestStep == 0 && BroomTestT > 1.f) { BroomTestStep = 1; Skills->AddInvItem(JeebItems::BroomId(0), 1); Magic = 1000.f; ServerToggleBroom(); UE_LOG(LogTemp, Log, TEXT("JEEBBROOMSHOT on the broom %d"), bOnBroom ? 1 : 0); }
 		if (bOnBroom) Magic = FMath::Max(Magic, 50.f);   // (never runs out in a film)
+		if (bOnBroom && ShotMode.StartsWith(TEXT("pics")))   // (2026-11-24: hover at about 4 m, the camera swung to each side, HighResShot of the poses; "pics2" forces the sprint lean in the hover)
+		{
+			UKnightMovement* SKM = KnightMove();
+			const float AboveM = (GetActorLocation().Z - JeebTerrain::HeightAt(GetActorLocation().X, GetActorLocation().Y)) / 100.f;
+			if (SKM) SKM->bWantsRise = AboveM < 4.f;
+			APlayerController* SPC = Cast<APlayerController>(GetController());
+			const float Yaw = GetActorRotation().Yaw;
+			static const float Sched[][2] = { {4.f, 90.f}, {6.f, -90.f}, {8.f, 90.f}, {10.f, -90.f}, {12.f, 0.f} };
+			for (int32 s = 0; s < 5; ++s)
+			{
+				if (BroomTestT > Sched[s][0] && BroomTestT - Dt <= Sched[s][0] && SPC)
+				{
+					if (s >= 2) IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Test.BroomLean"))->Set(1);
+					SPC->SetControlRotation(FRotator(-8.f, Yaw + Sched[s][1], 0.f));
+				}
+				if (BroomTestT > Sched[s][0] + 1.f && BroomTestT - Dt <= Sched[s][0] + 1.f && SPC) { SPC->ConsoleCommand(TEXT("HighResShot 1280x720")); UE_LOG(LogTemp, Log, TEXT("JEEBBROOMSHOT picture %d at %.1f m"), s, AboveM); }
+			}
+		}
 		if (bOnBroom && ShotMode.StartsWith(TEXT("fly")) && BroomTestT > 2.f) AddMovementInput(GetActorForwardVector().GetSafeNormal2D(), 1.f);
 	}
 	// Anyone's machine with -BroomNetDo: what it sees of the other players' brooms, every 3 s
@@ -353,6 +387,9 @@ void AKnightCharacter::TickBroom(float Dt)
 void AKnightCharacter::UpdateBroomModel()
 {
 	if (IsNetMode(NM_DedicatedServer)) return;
+	// (owner 2026-11-24: his left hand is on the broom, so the book, ball or pipe is not shown while he rides; it comes back on landing. Its effects still apply)
+	if (WizardBookHeld) WizardBookHeld->SetVisibility(!bOnBroom);
+	if (WizardPipeSmoke) WizardPipeSmoke->SetVisibility(!bOnBroom);
 	if (!bOnBroom)
 	{
 		if (BroomModel) BroomModel->SetVisibility(false);
@@ -372,7 +409,11 @@ void AKnightCharacter::UpdateBroomModel()
 	BroomModel->SetVisibility(true);
 	FVector Hip = GetActorLocation();
 	if (USkeletalMeshComponent* Sk = GetMesh(); Sk && Sk->GetBoneIndex(TEXT("Hips")) != INDEX_NONE) Hip = Sk->GetBoneLocation(TEXT("Hips"));
-	const FRotator Face(CVarBroomPitch.GetValueOnGameThread(), GetActorRotation().Yaw, 0.f);
+	// (sprinting, the broom points the way it flies, eased)
+	float Pitch = CVarBroomPitch.GetValueOnGameThread();
+	if (BroomSprinting() && GetVelocity().Size() > 300.f) Pitch = GetVelocity().Rotation().Pitch;
+	BroomPitchNow = FMath::FInterpTo(BroomPitchNow, Pitch, FMath::Max(GetWorld()->GetDeltaSeconds(), 0.001f), 8.f);
+	const FRotator Face(BroomPitchNow, GetActorRotation().Yaw, 0.f);
 	BroomModel->SetWorldLocationAndRotation(Hip + Face.Vector() * CVarBroomFwd.GetValueOnGameThread() + FVector(0.f, 0.f, JeebTune::V().BroomSeatUp), Face);
 	BroomModel->SetWorldScale3D(FVector(CVarBroomScale.GetValueOnGameThread()));
 }
@@ -388,6 +429,27 @@ void UKnightMovement::PhysFlying(float DeltaTime, int32 Iterations)
 	const float Half = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 	const float Above = Loc.Z - Half - JeebTerrain::HeightAt(Loc.X, Loc.Y);
 
+	// SPRINT (owner 2026-11-24): the sprint key (bWantsFast, carried in the saved move) flies him faster, straight where the camera looks, pitch too
+	const bool bSprintNow = !bEmpty && bWantsFast;
+	float Vz = 0.f;
+	if (bSprintNow)
+	{
+		FRotator Look = K->GetControlRotation();
+		Look.Pitch = FMath::Clamp(FRotator::NormalizeAxis(Look.Pitch), -80.f, 80.f);
+		const FVector Dir = Look.Vector();
+		const float Top = MaxFlySpeed * FMath::Max(1.f, T.BroomSprintMul);
+		float Speed = Velocity.Size();
+		FVector Cur = Speed > 600.f ? Velocity / Speed : Dir;   // (coming out of the hover he simply sets off the way he looks)
+		Speed = FMath::Max(Speed, 600.f);
+		Cur = FQuat::Slerp(FQuat::FindBetweenNormals(FVector::ForwardVector, Cur), FQuat::FindBetweenNormals(FVector::ForwardVector, Dir), 1.f - FMath::Exp(-FMath::Max(0.1f, T.BroomSprintTurn) * DeltaTime)).RotateVector(FVector::ForwardVector);
+		Speed = FMath::FInterpConstantTo(Speed, Top, DeltaTime, T.BroomAccel);
+		Velocity = Cur * Speed;
+		if (Above > T.BroomCeiling * 100.f) Velocity.Z = FMath::Min(Velocity.Z, -120.f);
+		else if (Above > T.BroomCeiling * 100.f - 150.f) Velocity.Z = FMath::Min(Velocity.Z, 0.f);
+		Vz = Velocity.Z;
+	}
+	else
+	{
 	// Across: toward the push at the broom's speed; with no magic, slowing to a halt
 	FVector H(Velocity.X, Velocity.Y, 0.f);
 	const FVector Push(Acceleration.X, Acceleration.Y, 0.f);
@@ -398,8 +460,9 @@ void UKnightMovement::PhysFlying(float DeltaTime, int32 Iterations)
 	float VzWant = bEmpty ? (H.Size() < 60.f ? -T.BroomDrift : 0.f) : (bWantsRise ? T.BroomClimb : bWantsLetGo ? -T.BroomClimb : -T.BroomGlide);
 	if (!bEmpty && Above > T.BroomCeiling * 100.f) VzWant = FMath::Min(VzWant, -120.f);                   // (over the ceiling: eased back under it)
 	else if (!bEmpty && Above > T.BroomCeiling * 100.f - 150.f) VzWant = FMath::Min(VzWant, 0.f);         // (at the ceiling: no higher)
-	const float Vz = FMath::FInterpConstantTo(Velocity.Z, VzWant, DeltaTime, 1400.f);
+	Vz = FMath::FInterpConstantTo(Velocity.Z, VzWant, DeltaTime, 1400.f);
 	Velocity = H + FVector(0.f, 0.f, Vz);
+	}
 
 	const FVector Delta = Velocity * DeltaTime;
 	const FVector HitVel = Velocity;
@@ -409,7 +472,7 @@ void UKnightMovement::PhysFlying(float DeltaTime, int32 Iterations)
 	{
 		const bool bGround = Hit.ImpactNormal.Z > 0.7f && Vz <= 0.f;
 		// (a glide that touches the ground lands him, any time Space is not holding him up: no fall damage, TickFall sees walking, not falling. The server ends the ride)
-		if (bGround && (bEmpty || !bWantsRise)) { SetMovementMode(MOVE_Walking); return; }
+		if (bGround && !bSprintNow && (bEmpty || !bWantsRise)) { SetMovementMode(MOVE_Walking); return; }
 		// (owner 2026-11-23: flying into a tree or a house at speed hurts; the server decides, scaled by the speed into the surface, nothing at low speed)
 		if (!bGround && K->HasAuthority() && !Cast<ACharacter>(Hit.GetActor()))
 		{
@@ -427,7 +490,7 @@ void UKnightMovement::PhysFlying(float DeltaTime, int32 Iterations)
 	}
 	if (!HasValidData()) return;
 	if (!bJustTeleported) Velocity = (UpdatedComponent->GetComponentLocation() - Loc) / DeltaTime;
-	if ((bEmpty || !bWantsRise) && Above < 6.f)   // (within a hand of the ground: down)
+	if (!bSprintNow && (bEmpty || !bWantsRise) && Above < 6.f)   // (within a hand of the ground: down)
 	{
 		FFindFloorResult F;
 		FindFloor(UpdatedComponent->GetComponentLocation(), F, false);
