@@ -24,6 +24,8 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
 3. **Invisibility potion:** knight nearly transparent with a slight air distortion (refraction), like other games. Check for smearing.
 4. **Hunting skill, deer meat and bones** (drop tables above).
 5. **New animals:** rabbit, fox, boar (flee), wolf and bear (attack players), moose (50/50 per moose), eagle (scavenges meat and bones from nearby kills at random). The flee distance from the easy batch is the default for all.
+   - **Tiring** (owner, 2026-11-23): after being chased a few times, an animal gets tired: it runs slower and flees a shorter distance. Recovers over time. Shared by every animal.
+   - **Arrow kills** (owner, 2026-11-23): animal health set so a low-level archer needs 3-4 arrows, a medium one about 2, a high-level one 1. Base it on the real arrow damage by Ranged level; per-animal health in a CSV.
 6. **House loot and lockpicking:** potions, arrows, ingots etc. in houses; a Lockpicking skill; higher level, better loot. Server-decided.
 7. **Broom sprint:** hover stays at walking speed; sprint flies where the camera faces (steer by looking), uses more magic (hover uses less), no spells while sprinting, camera in strafe mode, wizard leans forward.
 8. **Recurring quests** (daily, 3-day, weekly) and **quest rewards** (skill XP, items, ingots). The owner is sending quest ideas over Thanksgiving week.
