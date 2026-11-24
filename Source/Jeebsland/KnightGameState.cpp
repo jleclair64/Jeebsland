@@ -1051,6 +1051,9 @@ void AKnightGameState::Tick(float DeltaSeconds)
 				if (FParse::Param(FCommandLine::Get(), TEXT("ShotNoHud")) && PC && PC->GetHUD()) PC->GetHUD()->bShowHUD = false;   // (a film with nothing over him)
 			}
 			// (with -ShotEyes too, 2026-11-15: the move only sets him up, e.g. -ShotMove=bowidle for the bow in hand, and the eyes take the pictures)
+			// (-ShotCamTurn=<deg/s>, 2026-11-23: the camera turns round him while the move plays, for smear films: a moving camera and a moving weapon)
+			static float CamTurn = 0.f; static const bool bCamTurn = FParse::Value(FCommandLine::Get(), TEXT("ShotCamTurn="), CamTurn);
+			if (bCamTurn && ShotMoveClock >= 0.f) ShotRot.Yaw += CamTurn * DeltaSeconds;
 			static const bool bEyesToo = FCString::Strifind(FCommandLine::Get(), TEXT("ShotEyes=")) != nullptr;
 			if (ShotMoveClock >= 0.f && !bEyesToo)
 			{
