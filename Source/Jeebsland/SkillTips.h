@@ -105,6 +105,11 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 		break;
 	case ESkillType::Stamina:
 		L.Add(FString::Printf(TEXT("Troll rush: the bar lasts %s seconds once it starts to drain"), *Secs(AKnightCharacter::RushSeconds(Level))));
+		break;
+	case ESkillType::Agility:
+		L.Add(FString::Printf(TEXT("Running stamina: %s seconds of sprinting"), *Secs(AKnightCharacter::AgilitySprintSecs(Level))));
+		L.Add(FString::Printf(TEXT("Empty to full again in %s seconds"), *Secs(AKnightCharacter::AgilityRefillSecs(Level))));
+		break;
 	case ESkillType::Riding:
 		L.Add(FString::Printf(TEXT("Horse top speed: x%.2f"), JeebHorse::SpeedMul(Level)));
 		L.Add(FString::Printf(TEXT("Gallop stamina: %s seconds"), *Secs(JeebHorse::GallopSecs(Level))));

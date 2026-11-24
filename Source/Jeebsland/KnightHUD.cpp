@@ -226,6 +226,17 @@ void AKnightHUD::DrawHUD()
 		const float F = FMath::Clamp(Knight->GetHealth() / (float)FMath::Max(1, Knight->GetMaxHealth()), 0.f, 1.f);
 		const FLinearColor HpCol = (F < 0.18f) ? FLinearColor(0.72f, 0.14f, 0.12f) : (F < 0.4f ? FLinearColor(0.82f, 0.68f, 0.18f) : FLinearColor(0.28f, 0.62f, 0.30f));
 		Gauge(BarX, BY, BarW, BarH, F, HpCol, F < 0.18f);   // throbs when nearly dead
+		// Running stamina (2026-11-23, knight and wizard; the size is the Agility skill): a gold bar just over his health, shown while it
+		// is not full (and 0.6 s after), red and throbbing once run dry until it has refilled enough to sprint again.
+		if (Knight->ShowsRunBar())
+		{
+			static double RunBarSeen = -10.0;
+			const double NowR = GetWorld()->GetTimeSeconds();
+			const float SF = FMath::Clamp(Knight->GetStaminaFraction(), 0.f, 1.f);
+			if (SF < 0.999f) RunBarSeen = NowR;
+			if (NowR - RunBarSeen < 0.6)
+				Gauge(BarX, BY - BarH - 5.f, BarW, BarH - 1.f, SF, Knight->IsExhausted() ? FLinearColor(0.85f, 0.28f, 0.2f) : FLinearColor(0.95f, 0.75f, 0.2f), Knight->IsExhausted() || SF < 0.2f);
+		}
 		// (2026-11-22, owner: the wizard's magic, "start at full, then go down with every spell ... then charge back up"): a blue bar just
 		// under his health, the server's number (Tuning.ini [Wizard] Magic*). Empty it throbs; spells still go, weaker (AttackLands).
 		if (Knight->IsWizard())

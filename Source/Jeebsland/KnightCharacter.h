@@ -171,6 +171,9 @@ public:
 	virtual bool TeleportTo(const FVector& DestLocation, const FRotator& DestRotation, bool bIsATest = false, bool bNoCheck = false) override;
 	float RushBarShare() const { return RushBar; }
 	bool IsRushTired() const { return bRushTired; }
+	static float AgilitySprintSecs(int32 AgilityLevel);   // a full running bar lasts this long at this Agility level (knight and wizard; Tuning.ini [Agility])
+	static float AgilityRefillSecs(int32 AgilityLevel);   // empty to full again
+	bool ShowsRunBar() const { return !bIsTroll && !bMounted; }   // the running stamina bar is for the knight and wizard
 	static float RushSeconds(int32 StaminaLevel);   // how long a full rush bar lasts once it drains, at this Stamina level
 	UFUNCTION(Server, Reliable) void ServerLeapCharge(bool bStart);
 	UFUNCTION(Server, Reliable) void ServerLeap(float Charge, FVector_NetQuantizeNormal Dir);
@@ -859,6 +862,8 @@ private:
 	bool bSavedOrient = true;
 	float CrouchAlpha = 0.f, BlockAlpha = 0.f;
 	float Stamina = 10000.f, MaxStamina = 10000.f, StaminaDelay = 0.f;
+	UPROPERTY(Replicated) float StaminaRep = 10000.f;   // the server stamina, sent to the owner only (the owner predicts it and snaps if it drifts); knight and wizard, 2026-11-23
+	float AgilityXPAcc = 0.f;
 	float SlideT = 0.f, SlideSpeed = 0.f, SlideCooldown = 0.f, SlideGlide = 0.f;
 	FVector SlideDir = FVector::ForwardVector;
 	float RollT = 0.f, RollDur = 0.6f, RollCooldown = 0.f;

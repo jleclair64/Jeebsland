@@ -473,11 +473,51 @@ bool AKnightCharacter::TickRollSlide(float Dt, bool bFalling, float& OutSpecialS
 	return bRolling || bSliding;
 }
 
+float AKnightCharacter::AgilitySprintSecs(int32 L)
+{
+	const JeebTune::FValues& T = JeebTune::V();
+	return FMath::Lerp(T.AgilitySprintAt1, T.AgilitySprintAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+}
+float AKnightCharacter::AgilityRefillSecs(int32 L)
+{
+	const JeebTune::FValues& T = JeebTune::V();
+	return FMath::Lerp(T.AgilityRefillAt1, T.AgilityRefillAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+}
+
 // Sprint stamina. Returns whether the knight is trying to sprint (and may).
 bool AKnightCharacter::TickStamina(float Dt, float Speed, bool bFalling, bool bSpecial)
 {
 	const bool bWantSprint = !bMounted && bSprinting && !bCrouched && !bBlocking && !bExhausted;
 	const bool bDrain = bWantSprint && Speed > 330.f && !bFalling && !bSpecial;
+	if (!bIsTroll)
+	{
+		// Knight and wizard (2026-11-23): the bar's size and refill speed come from the Agility skill (Tuning.ini [Agility]). The unit is
+		// 16 per second of sprinting, so a roll (20) or a slide (10) still costs what it did. The server decides; the owner predicts it.
+		const JeebTune::FValues& T = JeebTune::V();
+		const int32 Lvl = Skills ? Skills->GetLevel(ESkillType::Agility) : 1;
+		MaxStamina = AgilitySprintSecs(Lvl) * 16.f;
+		if (Stamina > MaxStamina) Stamina = MaxStamina;   // (also trims the old 10000 start)
+		if (bDrain)
+		{
+			Stamina = FMath::Max(0.f, Stamina - 16.f * Dt / GetStaminaMult());
+			StaminaDelay = T.AgilityRegenDelay;
+			if (Stamina <= 0.f) bExhausted = true;
+			if (HasAuthority() && Skills)   // Agility XP while sprinting (server only, in lumps so the pop-up shows now and then)
+			{
+				AgilityXPAcc += T.AgilityXPPerSec * Dt;
+				if (AgilityXPAcc >= 5.f) { const int32 N = FMath::FloorToInt(AgilityXPAcc); AgilityXPAcc -= N; Skills->AddXP(ESkillType::Agility, N); }
+			}
+		}
+		else
+		{
+			StaminaDelay = FMath::Max(0.f, StaminaDelay - Dt);
+			if (StaminaDelay <= 0.f) Stamina = FMath::Min(MaxStamina, Stamina + MaxStamina / FMath::Max(0.5f, AgilityRefillSecs(Lvl)) * Dt * GetStaminaMult());
+		}
+		if (HasAuthority()) StaminaRep = FMath::RoundToFloat(Stamina);
+		else if (GetLocalRole() == ROLE_AutonomousProxy && FMath::Abs(StaminaRep - Stamina) > 0.15f * MaxStamina) Stamina = StaminaRep;   // the server word wins
+		if (bExhausted && Stamina >= T.SprintRestartShare * MaxStamina) bExhausted = false;
+		return bWantSprint;
+	}
 	if (bDrain)
 	{
 		Stamina = FMath::Max(0.f, Stamina - 16.f * Dt / GetStaminaMult());   // better boots: it lasts longer...

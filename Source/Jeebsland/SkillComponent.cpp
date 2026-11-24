@@ -139,6 +139,7 @@ FString USkillComponent::SkillName(ESkillType Skill)
 	case ESkillType::Swimming:    return TEXT("Swimming");
 	case ESkillType::Stamina:     return TEXT("Stamina");
 	case ESkillType::Riding:      return TEXT("Horse Riding");
+	case ESkillType::Agility:     return TEXT("Agility");
 	default:                      return TEXT("Fishing");
 	}
 }

@@ -220,6 +220,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
+	DOREPLIFETIME_CONDITION(AKnightCharacter, StaminaRep, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
 	DOREPLIFETIME(AKnightCharacter, bOnBroom);   // (the flying broom, everyone: KnightCharacterBroom.cpp)
 	DOREPLIFETIME(AKnightCharacter, bBroomEmpty);
