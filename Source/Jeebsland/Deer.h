@@ -15,6 +15,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimInstanceProxy.h"
 #include "HitBoxes.h"
+#include "AnimalTire.h"
 #include "Deer.generated.h"
 
 class UAnimSequence;
@@ -137,6 +138,7 @@ private:
 	TWeakObjectPtr<ADeerHerds> Herds;
 	FVector2D Home = FVector2D::ZeroVector, Goal = FVector2D::ZeroVector, ThreatAt = FVector2D::ZeroVector, HerdFlee = FVector2D::ZeroVector;
 	FRandomStream Rand;
+	FAnimalTire Tire;   // (shared by every animal: AnimalTire.h)
 	float StateT = 0.f, StateFor = 5.f, SenseT = 0.f, CalmT = 0.f, AlertD0 = 0.f, Speed = 0.f, RespawnT = 0.f, StepSide = 1.f, StuckT = 0.f;
 	double StepSideAt = -10.0;
 	bool bSleeping = false, bGoHome = false;

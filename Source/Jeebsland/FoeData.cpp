@@ -253,6 +253,11 @@ namespace JeebFoes
 						D.WalkClip = FMath::Max(5.f, A.F(r, TEXT("WalkClip"), 63.f));
 						D.RunClip = FMath::Max(5.f, A.F(r, TEXT("RunClip"), 400.f));
 						ParseLoot(FString::Printf(TEXT("(Animals.csv) %s"), *Key), A.S(r, TEXT("Loot")), D.Loot);
+						D.HuntXP = FMath::Max(0, A.I(r, TEXT("HuntXP"), 0));
+						D.DropTable = FName(*A.S(r, TEXT("DropTable")));
+						auto ItemCell = [&](const TCHAR* Col) { const FString N = A.S(r, Col); if (N.IsEmpty()) return 0; const int32 Id = JeebQuests::ItemFromName(N); if (Id <= 0) Problem(FString::Printf(TEXT("Animals.csv, %s: no item called \"%s\" in %s"), *Key, *N, Col)); return FMath::Max(0, Id); };
+						D.MeatId = ItemCell(TEXT("Meat"));
+						D.BonesId = ItemCell(TEXT("Bones"));
 						Out.Animals.Add(D);
 					}
 				FSheet H;
@@ -321,6 +326,48 @@ namespace JeebFoes
 			if (FInvSlot* Have = OutItems.FindByPredicate([&](const FInvSlot& S) { return S.Id == Id; })) { Have->Count += N; continue; }
 			OutItems.Add(FInvSlot(Id, N));
 		}
+	}
+
+	namespace
+	{
+		struct FHuntRow { FName Table; int32 Count = 1; float P1 = 0.f, P99 = 0.f; };
+		const TArray<FHuntRow>& HuntRows()
+		{
+			static const TArray<FHuntRow> Rows = []()
+			{
+				TArray<FHuntRow> Out;
+				FSheet T;
+				if (T.Load(TEXT("HuntDrops.csv")))
+					for (int32 r = 0; r < T.Rows.Num(); ++r)
+					{
+						FHuntRow W;
+						W.Table = FName(*T.S(r, TEXT("Table")));
+						if (W.Table.IsNone()) continue;
+						W.Count = FMath::Max(1, T.I(r, TEXT("Count"), 1));
+						W.P1 = FMath::Max(0.f, T.F(r, TEXT("Level1"), 0.f));
+						W.P99 = FMath::Max(0.f, T.F(r, TEXT("Level99"), 0.f));
+						Out.Add(W);
+					}
+				return Out;
+			}();
+			return Rows;
+		}
+	}
+
+	int32 HuntCount(FName Table, int32 HuntingLevel, FRandomStream& R)
+	{
+		const float B = FMath::Clamp((HuntingLevel - 1) / 98.f, 0.f, 1.f);
+		float Total = 0.f;
+		for (const FHuntRow& W : HuntRows()) if (W.Table == Table) Total += FMath::Lerp(W.P1, W.P99, B);
+		if (Total <= 0.f) return 1;
+		float Pick = R.FRand() * Total;
+		for (const FHuntRow& W : HuntRows())
+		{
+			if (W.Table != Table) continue;
+			Pick -= FMath::Lerp(W.P1, W.P99, B);
+			if (Pick <= 0.f) return W.Count;
+		}
+		return 1;
 	}
 
 	bool InTown(float X, float Y, float Margin)

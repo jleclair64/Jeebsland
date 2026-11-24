@@ -90,6 +90,9 @@ namespace JeebFoes
 		int32 XP = 0;
 		float WalkClip = 63.f, RunClip = 400.f;                          // cm/s the clips cover at scale 1
 		TArray<FLootRoll> Loot;
+		int32 MeatId = 0, BonesId = 0;   // what a kill drops, counted by the killer's Hunting level (HuntDrops.csv, table DropTable); 0 = none
+		FName DropTable;
+		int32 HuntXP = 0;                // Hunting XP for the kill
 	};
 	struct FHerdDef
 	{
@@ -103,6 +106,8 @@ namespace JeebFoes
 	const TArray<FAnimalDef>& Animals();
 	const TArray<FHerdDef>& Herds();
 	void RollLoot(const TArray<FLootRoll>& Loot, FRandomStream& R, TArray<FInvSlot>& OutItems, int32& OutIngots);
+	// How many of a hunted thing one kill drops at this Hunting level: a roll on HuntDrops.csv's table, its chances blended between the Level1 and Level99 columns
+	int32 HuntCount(FName Table, int32 HuntingLevel, FRandomStream& R);
 
 	// The ground under foes as it is drawn (the world's 8 m mesh in the forest, Oak Hill's own 1 m ground)
 	float Ground(float X, float Y);

@@ -293,6 +293,7 @@ void ADeer::SetState(EDeerState S, const TCHAR* Why)
 {
 	if (StateNow() == S) return;
 	static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead") };
+	if (S == EDeerState::Flee) Tire.Chase();   // (StateNow() != S here: a new chase)
 	const bool bLoud = S == EDeerState::Alert || S == EDeerState::Flee || S == EDeerState::Dead || StateNow() == EDeerState::Flee || StateNow() == EDeerState::Dead;
 	if (bLoud) UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s (herd %d) %s -> %s: %s; at %.0f %.0f, %.0f m from home, health %d/%d"), *GetName(), Herd,
 		Names[RepState], Names[uint8(S)], Why, GetActorLocation().X, GetActorLocation().Y, FVector2D::Distance(FVector2D(GetActorLocation()), Home) / 100.f, Hp->Cur, Hp->Max);
@@ -496,6 +497,7 @@ void ADeer::TickMind(float Dt)
 {
 	const JeebFoes::FAnimalDef& D = DefOf(RepKind);
 	StateT += Dt;
+	Tire.Tick(Dt);
 #if !UE_BUILD_SHIPPING
 	if (LabRole >= 0)   // (test pictures: no mind, a fixed part to play)
 	{
@@ -540,7 +542,7 @@ void ADeer::TickMind(float Dt)
 		if (bSenseNow) { if (bSensed) CalmT = 0.f; }
 		CalmT += Dt;
 		const float Far = FVector2D::Distance(Me, ThreatAt);
-		const float FleeMul = FMath::Max(0.5f, JeebTune::V().AnimalFleeMul);   // (2026-11-23 owner: "run further away after being alerted": every animal runs this many times as long and as far as its Animals.csv Calm and Sight say)
+		const float FleeMul = FMath::Max(0.5f, JeebTune::V().AnimalFleeMul) * Tire.FleeMul();   // (2026-11-23 owner: "run further away after being alerted": every animal runs this many times as long and as far as its Animals.csv Calm and Sight say)
 		if (CalmT > D.Calm * FleeMul || (StateT > 4.f * FleeMul && Far > D.Sight * 2.2f * FleeMul && CalmT > 2.5f * FleeMul))
 		{
 			bGoHome = true;
@@ -551,7 +553,7 @@ void ADeer::TickMind(float Dt)
 		FVector2D Away = (Me - ThreatAt).GetSafeNormal();
 		if (Away.IsNearlyZero()) Away = FVector2D(GetActorForwardVector());
 		const FVector2D Dir = (Away * 0.6f + HerdFlee * 0.4f).GetSafeNormal();
-		const float Run = D.RunSpeed * (Hp->Cur * 2 < Hp->Max ? 0.8f : 1.f);
+		const float Run = D.RunSpeed * (Hp->Cur * 2 < Hp->Max ? 0.8f : 1.f) * Tire.SpeedMul();
 		if (!Step(Dir.IsNearlyZero() ? Away : Dir, Run, 520.f, Dt)) { StuckT += Dt; if (StuckT > 0.6f) { StuckT = 0.f; StepSide = -StepSide; HerdFlee = Away.GetRotated(Rand.FRandRange(-80.f, 80.f)); } }
 		else StuckT = 0.f;
 		return;
@@ -653,6 +655,12 @@ void ADeer::Die(AActor* From)
 	TArray<FInvSlot> Items;
 	int32 Ingots = 0;
 	JeebFoes::RollLoot(D.Loot, Rand, Items, Ingots);
+	// Meat and bones: how many, by the killer's Hunting level (HuntDrops.csv), each rolled on its own
+	USkillComponent* KSk = K ? K->FindComponentByClass<USkillComponent>() : nullptr;
+	const int32 HuntLv = KSk ? KSk->GetLevel(ESkillType::Hunting) : 1;
+	int32 MeatN = 0, BoneN = 0;
+	if (D.MeatId > 0) { MeatN = JeebFoes::HuntCount(D.DropTable, HuntLv, Rand); Items.Add(FInvSlot(D.MeatId, MeatN)); }
+	if (D.BonesId > 0) { BoneN = JeebFoes::HuntCount(D.DropTable, HuntLv, Rand); Items.Add(FInvSlot(D.BonesId, BoneN)); }
 	FString What;
 	const FVector2D Side(-GetActorForwardVector().Y, GetActorForwardVector().X);
 	for (int32 i = 0; i < Items.Num(); ++i)
@@ -667,11 +675,12 @@ void ADeer::Die(AActor* From)
 	if (USkillComponent* Sk = K ? K->FindComponentByClass<USkillComponent>() : nullptr)
 	{
 		if (D.XP > 0) Sk->AddXP(bRanged ? ESkillType::Archery : ESkillType::Attack, D.XP);
+		if (D.HuntXP > 0) Sk->AddXP(ESkillType::Hunting, D.HuntXP);
 		Sk->Say(4.f, FColor(255, 210, 120), D.XP > 0 ? FString::Printf(TEXT("You brought down a %s! (+%d %s XP)"), *D.Name, D.XP, bRanged ? TEXT("Archery") : TEXT("Attack"))
 			: FString::Printf(TEXT("You brought down a %s!"), *D.Name));
 	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s (%s, herd %d) brought down by %s at %.0f %.0f: drops %s; +%d %s XP; back in %.0f s"), *D.Name, *GetName(), Herd,
-		K ? *K->GetName() : TEXT("nobody"), Me.X, Me.Y, What.IsEmpty() ? TEXT("nothing") : *What, K ? D.XP : 0, bRanged ? TEXT("Archery") : TEXT("Attack"), RespawnSecs);
+	UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s (%s, herd %d) brought down by %s at %.0f %.0f: drops %s (meat %d, bones %d at Hunting %d); +%d %s XP, +%d Hunting XP; back in %.0f s"), *D.Name, *GetName(), Herd,
+		K ? *K->GetName() : TEXT("nobody"), Me.X, Me.Y, What.IsEmpty() ? TEXT("nothing") : *What, MeatN, BoneN, HuntLv, K ? D.XP : 0, bRanged ? TEXT("Archery") : TEXT("Attack"), K ? D.HuntXP : 0, RespawnSecs);
 	if (AActor* By = K ? static_cast<AActor*>(K) : From)
 	{
 		UQuestComponent::OnFoeBeaten(By, *D.Key.ToString());
@@ -703,7 +712,7 @@ void ADeer::Rise()
 	}
 	Hp->Reset();
 	Hp->Cur = Hp->Max;
-	DeadFor = 0.f; Fall = 0.f; CalmT = 0.f; bGoHome = false;
+	DeadFor = 0.f; Fall = 0.f; CalmT = 0.f; bGoHome = false; Tire.Reset();
 	SetActorLocationAndRotation(FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f));
 	SetActorHiddenInGame(false);
 	StateFor = Rand.FRandRange(4.f, 10.f);

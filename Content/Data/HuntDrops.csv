@@ -1,0 +1,9 @@
+Table,Count,Level1,Level99
+# How many meat (and, rolled separately, bones) one hunted animal drops, by the killer's Hunting level (2026-11-24). Animals.csv names the table in DropTable.
+# Count: how many drop. Level1 / Level99: the chance (any numbers; they are shares of the column's total) at Hunting level 1 and 99; every level between blends the two straight across.
+# Level 1: always 1. Level 99: 5 at 40%, 4 at 30%, 3 at 12%, 2 at 8%, 1 at 10%. A new animal can reuse "Deer" or get its own table.
+Deer,1,100,10
+Deer,2,0,8
+Deer,3,0,12
+Deer,4,0,30
+Deer,5,0,40
