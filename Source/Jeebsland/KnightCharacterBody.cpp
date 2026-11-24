@@ -396,13 +396,13 @@ void AKnightCharacter::RefreshEquipment()
 // The wizard's off-hand item (2026-11-22, agent wizlook; owner: "change the book to be open and held upright in his left hand", "a glowing crystal ball that floats
 // above his open left hand ... a wizard pipe to be another option for this slot"). Whatever he wears in the book slot (JeebItems::EWizOff, the item's style digit)
 // is held out on his left palm: the animator holds the forearm out, palm up (FKnightAnimator WizHoldArm, In.bWizHold), and PlaceWizardOffHand puts the model
-// on the palm every frame, square to his body: the open book upright with its pages to the front, the crystal ball floating and bobbing over the palm with
-// a breathing glow (M_PropGlow), the pipe lying in the palm with a few puffs of smoke from its bowl (this machine only). Nothing here is gameplay: the server
+// on the palm every frame, square to his body: the open book lying face up on the palm, the crystal ball floating and bobbing over the palm with
+// a breathing glow (M_PropGlow), the pipe with its bowl in the palm, stem up and out with a few puffs of smoke from its bowl (this machine only). Nothing here is gameplay: the server
 // makes none of it. The belt book (Wiz_BookBase/Robe) shows only if the model is missing.
 // Per item, in the hand's frame (cm, degrees: X forward along the forearm, Y to his right, Z up; pitch, yaw, roll; scale): jeeb.Wizard.OffHand<Book|Ball|Pipe>.
-static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,14,0,90,-65,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,6.5,0,90,0,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("11,-1,16.5,0,0,0,1.25"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
-static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("8,0,4,0,0,0,1"), TEXT("The pipe in the wizard's left palm: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("15,0,12.5,-40,180,0,1"), TEXT("The pipe, bowl cradled in the wizard's left palm, stem up and out: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 0.9f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBallBob(TEXT("jeeb.Wizard.BallBob"), 1.6f, TEXT("How far the crystal ball bobs up and down over the wizard's palm (cm)."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarPipeSmoke(TEXT("jeeb.Wizard.PipeSmoke"), 1, TEXT("1: a few puffs of smoke rise from the wizard's pipe (this machine only); 0: none."), ECVF_Default);
