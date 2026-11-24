@@ -39,4 +39,5 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
    - Top arrow: needs eagle feathers.
    - Models: check the Meshy CC0 library first; likely one shared shaft with distinct Meshy heads and fletchings (cheap, consistent). Shattering and smearing checks.
    - **Eagles** (with the new animals): fly around and sometimes perch on tree branches (a lucky still shot); land on a player's hunting kill, sit a few seconds and peck at it (a window to shoot it); can be shot in flight; drop eagle feathers.
+14. **Mountain snowstorms** (owner, 2026-11-23): on the mountain tops only, switch at random a game day at a time between a snowstorm and blue skies. Storm: falling snow and thick fog, nothing clear beyond about 50 m. Blue skies: no snowfall at all. Same weather on server and every client (seeded by day). Check the snow for smearing and frame cost.
 12. **Stamina bar** for the knight and wizard, based on Agility (medium; do now if the limit allows).
