@@ -409,6 +409,7 @@ public:
 	// and never believes more charge than it has seen; damage is x1 to x CastChargeMax. Others see the tip's glow grow (bCastChargingRep).
 	bool IsChargingCast() const { return bCastCharging; }
 	float CastChargeFrac() const;
+	float CastHoldNow() const;   // the cast pose held while charging, as a share of the cast move (KnightCharacterCastAim.cpp)
 	void BeginCastCharge(int32 Slot = 0);   // Slot: which of the active row's three spells (the server is told first: EInvOp::CastSlot)
 	void ReleaseCastCharge();
 	void CancelCastCharge();

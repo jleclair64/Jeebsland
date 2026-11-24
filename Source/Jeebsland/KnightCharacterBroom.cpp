@@ -118,7 +118,7 @@ void AKnightCharacter::StartBroomSrv(int32 Row)
 	MagicUsedAt = GetWorld()->GetTimeSeconds();
 	ApplyBroomMovement();
 	UpdateBroomModel();
-	GetCharacterMovement()->Velocity.Z = 350.f;   // (a little hop up as he takes off)
+	GetCharacterMovement()->Velocity.Z = 650.f;   // (a hop up as he takes off: the broom sinks on its own now, so Space must follow)
 	ForceNetUpdate();
 	if (Skills) Skills->Say(3.f, FColor(190, 140, 255), FString::Printf(TEXT("%s. Space climbs, Ctrl sinks, T near the ground steps off."), *JeebItems::ItemName(JeebItems::BroomId(Row))));
 	UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s takes off on %s at %s, magic %.0f of %.0f"), *GetName(), *JeebItems::ItemName(JeebItems::BroomId(Row)), *GetActorLocation().ToCompactString(), Magic, MagicCap());
@@ -184,9 +184,13 @@ void AKnightCharacter::TickBroom(float Dt)
 			else if (Health <= 0.f || bKnockedDown || !bIsWizard) EndBroomSrv(TEXT("knocked off"));
 			else
 			{
-				const float Drain = JeebBroom::Row(BroomRow).Drain;
-				Magic = FMath::Max(0.f, Magic - Drain * Dt);
-				MagicUsedAt = GetWorld()->GetTimeSeconds();   // (no refilling while flying)
+				// (owner 2026-11-23: twice the drain, but only while Space holds it up; gliding down is free and the bar may refill)
+				const UKnightMovement* DKM = KnightMove();
+				if (DKM && DKM->bWantsRise)
+				{
+					Magic = FMath::Max(0.f, Magic - JeebBroom::Row(BroomRow).Drain * FMath::Max(0.f, T.BroomDrainMul) * Dt);
+					MagicUsedAt = GetWorld()->GetTimeSeconds();
+				}
 				if (Magic <= 0.f && !bBroomEmpty)
 				{
 					bBroomEmpty = true;
@@ -390,24 +394,40 @@ void UKnightMovement::PhysFlying(float DeltaTime, int32 Iterations)
 	const FVector Want = bEmpty ? FVector::ZeroVector : Push.GetClampedToMaxSize(GetMaxAcceleration()) / FMath::Max(1.f, GetMaxAcceleration()) * MaxFlySpeed;
 	H = FMath::VInterpConstantTo(H, Want, DeltaTime, bEmpty ? T.BroomStop : T.BroomAccel);
 	// Up and down: Space climbs, Ctrl sinks; with no magic it hangs until it has stopped, then drifts straight down
-	float VzWant = bEmpty ? (H.Size() < 60.f ? -T.BroomDrift : 0.f) : (bWantsRise ? T.BroomClimb : bWantsLetGo ? -T.BroomClimb : 0.f);
+	// (owner 2026-11-23: the broom always sinks slowly, as if Ctrl were held; Space holds it up and climbs)
+	float VzWant = bEmpty ? (H.Size() < 60.f ? -T.BroomDrift : 0.f) : (bWantsRise ? T.BroomClimb : bWantsLetGo ? -T.BroomClimb : -T.BroomGlide);
 	if (!bEmpty && Above > T.BroomCeiling * 100.f) VzWant = FMath::Min(VzWant, -120.f);                   // (over the ceiling: eased back under it)
 	else if (!bEmpty && Above > T.BroomCeiling * 100.f - 150.f) VzWant = FMath::Min(VzWant, 0.f);         // (at the ceiling: no higher)
 	const float Vz = FMath::FInterpConstantTo(Velocity.Z, VzWant, DeltaTime, 1400.f);
 	Velocity = H + FVector(0.f, 0.f, Vz);
 
 	const FVector Delta = Velocity * DeltaTime;
+	const FVector HitVel = Velocity;
 	FHitResult Hit(1.f);
 	SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
 	if (Hit.Time < 1.f)
 	{
 		const bool bGround = Hit.ImpactNormal.Z > 0.7f && Vz <= 0.f;
-		if (bGround && bEmpty) { SetMovementMode(MOVE_Walking); return; }   // (out of magic and down: he steps off; the server ends the ride)
+		// (a glide that touches the ground lands him, any time Space is not holding him up: no fall damage, TickFall sees walking, not falling. The server ends the ride)
+		if (bGround && (bEmpty || !bWantsRise)) { SetMovementMode(MOVE_Walking); return; }
+		// (owner 2026-11-23: flying into a tree or a house at speed hurts; the server decides, scaled by the speed into the surface, nothing at low speed)
+		if (!bGround && K->HasAuthority() && !Cast<ACharacter>(Hit.GetActor()))
+		{
+			const double Now = K->GetWorld()->GetTimeSeconds();
+			const float Into = -float(FVector::DotProduct(HitVel, Hit.ImpactNormal));
+			if (Into > T.BroomCrashMin && Now - BroomCrashAt > 0.8)
+			{
+				const int32 Dmg = FMath::Clamp(FMath::RoundToInt((Into - T.BroomCrashMin) / 100.f * T.BroomCrashPerMS), 1, FMath::Max(1, FMath::RoundToInt(T.BroomCrashMax)));
+				BroomCrashAt = Now;
+				UE_LOG(LogTemp, Log, TEXT("JEEBBROOM %s crashed into %s at %.0f cm/s: %d damage"), *K->GetName(), *GetNameSafe(Hit.GetActor()), Into, Dmg);
+				K->Hurt(Dmg, nullptr, true);
+			}
+		}
 		SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
 	}
 	if (!HasValidData()) return;
 	if (!bJustTeleported) Velocity = (UpdatedComponent->GetComponentLocation() - Loc) / DeltaTime;
-	if (bEmpty && Above < 6.f)   // (within a hand of the ground: down)
+	if ((bEmpty || !bWantsRise) && Above < 6.f)   // (within a hand of the ground: down)
 	{
 		FFindFloorResult F;
 		FindFloor(UpdatedComponent->GetComponentLocation(), F, false);

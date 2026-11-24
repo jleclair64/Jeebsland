@@ -128,6 +128,7 @@ public:
 	// dives, Shift (bWantsFast, FLAG_Custom_1) swims fast, Space (bWantsRise, FLAG_Custom_2) rises. The swimming bar or the breath running out
 	// is drowning (mode Drown): he sinks, and the SERVER alone ends it with AKnightCharacter::Die once DrownT reaches DrownSinkTime.
 	bool bWantsFast = false, bWantsRise = false;
+	double BroomCrashAt = -100.0;   // (server: when a broom crash last hurt him, so a scrape along a wall costs once)
 	float SwimStamina = 1.f;          // 0..1, lasts AKnightCharacter::SwimSeconds(level) of normal swimming; refills only on dry ground
 	float Breath = 1.f;               // 0..1, drains with his head under water (BreathSeconds), refills with it out
 	float SwimRefillWait = 0.f;

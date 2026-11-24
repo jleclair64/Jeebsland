@@ -28,7 +28,8 @@ FVector2D AKnightCharacter::CastReticleAt()
 	TArray<FString> P;
 	CVarReticle.GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
 	if (P.Num() != 2) return FVector2D(0.56f, 0.40f);
-	return FVector2D(FMath::Clamp(FCString::Atof(*P[0]), 0.05f, 0.95f), FMath::Clamp(FCString::Atof(*P[1]), 0.05f, 0.95f));
+	const auto& T = JeebTune::V();   // (2026-11-23 owner: slightly right of the middle; the aim trace and the drawn reticle both read this, so the spell lands on it)
+	return FVector2D(FMath::Clamp(FCString::Atof(*P[0]) + T.ReticleOffsetX, 0.05f, 0.95f), FMath::Clamp(FCString::Atof(*P[1]) + T.ReticleOffsetY, 0.05f, 0.95f));
 }
 
 float AKnightCharacter::StaffSlide()
@@ -161,12 +162,24 @@ void AKnightCharacter::ReleaseCastCharge()
 {
 	if (!bCastCharging) return;
 	const float C = CastChargeFrac();
+	const float HeldU = CastHoldNow();   // (the pose he was holding: a cast carries on from there, not from the start)
 	CancelCastCharge();
 	const int32 K = SelectedKind();
 	// (2026-11-22) a spell let go while the last cast still plays is kept and cast as soon as it ends (TickWizard), not dropped
 	if ((K == JeebItems::K_Wand || K == JeebItems::K_Staff) && bAttacking && AtkStyle == EAtkStyle::Cast && !bDrinking && !bKnockedDown) { bCastQueued = true; QueuedCastCharge = C; return; }
 	if (!(K == JeebItems::K_Wand || K == JeebItems::K_Staff) || bAttacking || bDrinking || bKnockedDown || IsUIOpen() || bPanelCursor) return;
 	StartAttack(EAtkStyle::Cast, 1, C);
+	if (C <= 0.f && HeldU > 0.f) AttackT = HeldU * AttackDur;
+}
+
+// (2026-11-23 owner: "do the cast animation and hold it during the charge-up") how far into the cast move the charge's held pose is, 0 when not charging
+float AKnightCharacter::CastHoldNow() const
+{
+	const int32 K = SelectedKind();
+	if (!(K == JeebItems::K_Wand || K == JeebItems::K_Staff) || bAttacking || !GetWorld()) return 0.f;
+	if (!(IsLocallyControlled() ? bCastCharging : bCastChargingRep)) return 0.f;
+	const auto& T = JeebTune::V();
+	return FMath::Clamp(T.CastHoldU, 0.f, 0.29f) * FMath::SmoothStep(0.f, FMath::Max(0.05f, T.CastHoldRamp), float(GetWorld()->GetTimeSeconds() - CastChargeStart));
 }
 
 void AKnightCharacter::ServerCastCharge_Implementation(bool bOn)

@@ -120,7 +120,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 	bAttackHit = false;
 	HitThisSwing.Reset();     // (a new move can hit everyone again)
 	bHitPrevValid = false;
-	AttackT = 0.f;
+	AttackT = (Style == EAtkStyle::Cast && Charge > 0.f) ? FMath::Clamp(JeebTune::V().CastHoldU, 0.f, 0.29f) * AttackDur : 0.f;   // (a charged cast carries on from the pose he held: server and player's machine alike)
 	QueuedClick = -10.f;
 	QueuedJabs = 0;   // (a new swing starts with an empty buffer: presses made before it began are used up)
 	Smash = ESmash::None; bSmashSwing = false; SmashT = 0.f; SmashCoilNow = 0.f;   //(the caller makes hit 1 a smash; online the player's next swing ends the server's end lag)

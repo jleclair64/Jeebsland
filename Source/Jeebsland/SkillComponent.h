@@ -97,6 +97,8 @@ public:
 	double LastSkillTime = -1000.0;
 	double LevelUpTime = -1000.0;
 	int32 LastXPGain = 0;
+	int32 TrickleXP[JeebNumSkills] = {};       // XP gained by moving, waiting for its once-a-minute popup (ShowXP)
+	double TrickleStart[JeebNumSkills] = {};   // when the first of it came
 
 	// The store's mystery satchel can be opened once per real-world hour (hours since 1970)
 	UPROPERTY(Replicated) int64 LastGambleHour = -1;

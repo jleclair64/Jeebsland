@@ -1,5 +1,6 @@
 #include "SkillComponent.h"
 #include "Messages.h"
+#include "JeebTuning.h"
 #include "Engine/Engine.h"
 #include "Inventory.h"
 #include "Lore.h"
@@ -200,6 +201,16 @@ void USkillComponent::ShowXP(ESkillType Skill, int32 Amount, bool bLevelUp)
 {
 	const double Now = FPlatformTime::Seconds();
 	const bool bQuiet = (Skill == ESkillType::Attack || Skill == ESkillType::Defense);
+	// (owner 2026-11-23: skills trained by moving gain a little all the time. Add it up and pop up once every TrickleXPSeconds with the total, and at once on a level up)
+	if (Skill == ESkillType::Stamina || Skill == ESkillType::Riding)
+	{
+		const int32 S = static_cast<int32>(Skill);
+		if (TrickleXP[S] <= 0) TrickleStart[S] = Now;
+		TrickleXP[S] += Amount;
+		if (!bLevelUp && Now - TrickleStart[S] < JeebTune::V().TrickleXPSeconds) return;
+		Amount = TrickleXP[S];
+		TrickleXP[S] = 0;
+	}
 	if (!bQuiet)
 	{
 		LastSkill = Skill;
