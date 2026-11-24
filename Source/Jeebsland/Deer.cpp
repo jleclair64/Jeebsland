@@ -1,4 +1,5 @@
 #include "Deer.h"
+#include "JeebTuning.h"
 #include "FoeData.h"
 #include "FoeCamps.h"
 #include "HealthComponent.h"
@@ -539,7 +540,8 @@ void ADeer::TickMind(float Dt)
 		if (bSenseNow) { if (bSensed) CalmT = 0.f; }
 		CalmT += Dt;
 		const float Far = FVector2D::Distance(Me, ThreatAt);
-		if (CalmT > D.Calm || (StateT > 4.f && Far > D.Sight * 2.2f && CalmT > 2.5f))
+		const float FleeMul = FMath::Max(0.5f, JeebTune::V().AnimalFleeMul);   // (2026-11-23 owner: "run further away after being alerted": every animal runs this many times as long and as far as its Animals.csv Calm and Sight say)
+		if (CalmT > D.Calm * FleeMul || (StateT > 4.f * FleeMul && Far > D.Sight * 2.2f * FleeMul && CalmT > 2.5f * FleeMul))
 		{
 			bGoHome = true;
 			StateFor = Rand.FRandRange(4.f, 8.f);

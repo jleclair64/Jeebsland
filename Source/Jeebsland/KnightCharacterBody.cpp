@@ -401,9 +401,9 @@ void AKnightCharacter::RefreshEquipment()
 // makes none of it. The belt book (Wiz_BookBase/Robe) shows only if the model is missing.
 // Per item, in the hand's frame (cm, degrees: X forward along the forearm, Y to his right, Z up; pitch, yaw, roll; scale): jeeb.Wizard.OffHand<Book|Ball|Pipe>.
 static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,14,0,90,-65,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
-static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("9,-1,15,0,0,0,1"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("9,-1,15,0,0,0,1.25"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("8,0,4,0,0,0,1"), TEXT("The pipe in the wizard's left palm: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
-static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 1.0f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 1.4f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBallBob(TEXT("jeeb.Wizard.BallBob"), 1.6f, TEXT("How far the crystal ball bobs up and down over the wizard's palm (cm)."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarPipeSmoke(TEXT("jeeb.Wizard.PipeSmoke"), 1, TEXT("1: a few puffs of smoke rise from the wizard's pipe (this machine only); 0: none."), ECVF_Default);
 

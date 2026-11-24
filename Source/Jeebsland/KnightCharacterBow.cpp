@@ -1,3 +1,4 @@
+#include "Components/CapsuleComponent.h"
 #include "KnightCharacter.h"
 #include "HouseInterior.h"
 #include "JeebProps.h"
@@ -353,7 +354,7 @@ void AKnightCharacter::TickBow(float Dt)
 	// The camera closes in over his right shoulder while aiming (the player's own machine)
 	if (IsLocallyControlled() && !ShotSideOn())
 	{
-		const bool bAimCam = Bow == EBow::Drawing || (bAimButton && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor) || IsAimingRock();   // (IsAimingRock: the troll winding up a rock)   // (it stays in for as long as the button is down, and pulls back out when it is let go)
+		const bool bAimCam = Bow == EBow::Drawing || (bAimButton && bBowIn && !bTaken && !IsUIOpen() && !bPanelCursor);   // (owner 2026-11-23: no zoom in on the troll while he winds up a rock, so IsAimingRock no longer closes the camera in)   // (it stays in for as long as the button is down, and pulls back out when it is let go)
 		BowCamAlpha = FMath::FInterpTo(BowCamAlpha, bAimCam ? 1.f : 0.f, Dt, bAimCam ? 7.f : 5.f);
 		if (USpringArmComponent* Boom = GetCameraBoom())
 		{
@@ -364,8 +365,11 @@ void AKnightCharacter::TickBow(float Dt)
 			// (the walk-in house, 2026-11-21: a shorter arm while he stands inside, eased in and out; HouseInterior.h)
 			static float RoomCam = 1.f;
 			RoomCam = FMath::FInterpTo(RoomCam, AHouseInterior::CamScaleAt(GetWorld(), GetActorLocation()), Dt, 3.f);
-			Boom->TargetArmLength = FMath::Lerp(540.f * RoomCam, FMath::Min(BowCamLength, 540.f * RoomCam), A);
-			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, 60.f), FVector(0.f, 75.f, 42.f), A);
+			// (owner 2026-11-23: "stop the camera from going inside the troll's body": this line forced the knight's 540 on every class and overrode the troll's longer arm. Now each class keeps its own length and height, and no camera comes nearer than its capsule radius x CamMinRadii)
+			const float BaseLen = bIsTroll ? JeebTune::V().TrollBoomLength : 540.f, BaseUp = bIsTroll ? JeebTune::V().TrollBoomUp : 60.f;
+			const float MinLen = GetCapsuleComponent()->GetUnscaledCapsuleRadius() * JeebTune::V().CamMinRadii;
+			Boom->TargetArmLength = FMath::Max(MinLen, FMath::Lerp(BaseLen * RoomCam, FMath::Min(BowCamLength, BaseLen * RoomCam), A));
+			Boom->SocketOffset = FMath::Lerp(FVector(0.f, 0.f, BaseUp), FVector(0.f, 75.f, 42.f + (BaseUp - 60.f)), A);
 			{
 				// the wizard (always, owner 2026-11-22: "I want the wizard always to the left ... he doesn't aim, just shoots"): the reticle is the middle of the
 				// screen, so the camera sits over his right shoulder and he stands left of it; it eases in and out only when the class changes

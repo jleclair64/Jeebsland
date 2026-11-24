@@ -183,7 +183,7 @@ void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool 
 
 // The staff's orb glow and its place in the fist, live in Play (2026-11-18 second review: the orb read white and blew out at night; the
 // carried fist sat off the shaft). Players' machines only: nothing here changes what the game decides.
-static TAutoConsoleVariable<float> CVarOrbGlow(TEXT("jeeb.Magic.OrbGlow"), 1.3f, TEXT("The staff's orb: its glow's brightness on screen (M_PropGlow GlowStrength; with the exposure lock about 1 is white's edge; keep MI_Staff's default in Tools/fixlook_assets.py equal)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarOrbGlow(TEXT("jeeb.Magic.OrbGlow"), 1.7f, TEXT("The staff's orb: its glow's brightness on screen (M_PropGlow GlowStrength; with the exposure lock about 1 is white's edge; keep MI_Staff's default in Tools/fixlook_assets.py equal)."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarOrbLock(TEXT("jeeb.Magic.OrbLock"), 1.f, TEXT("The staff's orb: 1 keeps its glow the same brightness on screen by day and night; 0 is a glow in the scene's light (it whitens at night)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarStaffGrip(TEXT("jeeb.Knight.StaffGrip"), TEXT("0,0,0"), TEXT("The staff moved in the fist, in its own frame (cm: X and Y across the shaft, Z along it, + toward the butt)."), ECVF_Default);
 

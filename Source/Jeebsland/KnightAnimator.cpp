@@ -586,6 +586,14 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 			Sample(*Rs, 0.f, Scratch, false);
 			for (const int32 i : { LShoulder, LArm, LFore, LHand }) Out.Rot[Bone[i]] = Nlerp(Out.Rot[Bone[i]], Scratch.Rot[Bone[i]], 0.5f * USprint);
 		}
+	// The troll's run (owner 2026-11-23: "the troll's arms flail too much when he runs"): both arms keep only part of the clip's swing, the rest is the standing pose (Tuning.ini TrollRunArmCalm)
+	if (L.bTroll && JeebTune::V().TrollRunArmCalm > 0.f && Kind != JeebItems::K_Longbow)
+		if (const FClip* Rs = Get(TEXT("Rest")))
+		{
+			Sample(*Rs, 0.f, Scratch, false);
+			const float Calm = FMath::Clamp(JeebTune::V().TrollRunArmCalm, 0.f, 1.f) * FMath::Max(URun, USprint);
+			for (const int32 i : { LShoulder, LArm, LFore, RShoulder, RArm, RFore }) Out.Rot[Bone[i]] = Nlerp(Out.Rot[Bone[i]], Scratch.Rot[Bone[i]], Calm);
+		}
 	// the hips turn toward the way he goes, the chest stays square to the camera
 	if (FMath::Abs(LegYaw) > 0.1f)
 	{
@@ -1785,6 +1793,12 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 		}
 		break;
 	case 39:   // a wand's or staff's cast (2026-11-18: its own Mixamo clips, KnightAnimatorCast.cpp)
+		// (2026-11-23 owner: "the wizard starts running in mid-air when he casts a spell while on the broom": a rider casts from the seat, so the seated pose goes down first and the cast then plays over the arms and chest only, as CastPose keeps the legs as they are)
+		if (In.bMounted) if (const FMove* Sit = Moves.Find(TEXT("Sit")))
+		{
+			PlayAt(TEXT("Sit"), Sit->ClipHit, 1000.f, B, &OutBlend);
+			B.Hip.Z += In.bBroom ? CVarBroomRaise.GetValueOnGameThread() : CVarRideRaise.GetValueOnGameThread();
+		}
 		if (Moves.Contains(TEXT("Cast_Wand"))) { CastPose(In, B, OutBlend); break; }
 		[[fallthrough]];   // (no cast rows: the spear's lunge below)
 	case 38:   // the spear's thrust: the sword's lunge with the arms only
@@ -1973,7 +1987,10 @@ void FClipLib::SolveGear()
 			const FVector Along = (Hand.GetLocation() - Fore.GetLocation()).GetSafeNormal();
 			FVector Face = (FVector(0.f, -1.f, 0.f) - Along * FVector::DotProduct(FVector(0.f, -1.f, 0.f), Along)).GetSafeNormal();   // (straight out to his left)
 			Face = FQuat(Along, -FMath::DegreesToRadians(TurnFwd)).RotateVector(Face);   // (and a little toward the front, as the arm hangs)
-			const FVector Up = FQuat(Face, FMath::DegreesToRadians(Tilt)).RotateVector(-Along);
+			// (owner 2026-11-23: the resting shield leaned out at the top; "adjust the shield angle to be the red line" = upright. ShieldRestUpright: 0 = long axis along the forearm as before, 1 = standing upright; read at start)
+			const FVector Vert = (FVector::UpVector - Face * FVector::DotProduct(FVector::UpVector, Face)).GetSafeNormal();
+			const FVector Lean = FMath::Lerp(-Along, Vert, FMath::Clamp(JeebTune::V().ShieldRestUpright, 0.f, 1.f)).GetSafeNormal();
+			const FVector Up = FQuat(Face, FMath::DegreesToRadians(Tilt)).RotateVector(Lean);
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
 			ShieldAtRest = FTransform(Q, Mid + Face * Out - Q.RotateVector(Strap)) * Fore.Inverse();
 		}
