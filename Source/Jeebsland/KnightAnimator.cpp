@@ -593,6 +593,17 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 			Sample(*Rs, 0.f, Scratch, false);
 			const float Calm = FMath::Clamp(JeebTune::V().TrollRunArmCalm, 0.f, 1.f) * FMath::Max(URun, USprint);
 			for (const int32 i : { LShoulder, LArm, LFore, RShoulder, RArm, RFore }) Out.Rot[Bone[i]] = Nlerp(Out.Rot[Bone[i]], Scratch.Rot[Bone[i]], Calm);
+			// ...and the hands ride up near the chest, never swinging back behind the torso (owner 2026-11-23; Tuning.ini TrollRunArmChest)
+			const float Chest = FMath::Clamp(JeebTune::V().TrollRunArmChest, 0.f, 1.f) * FMath::Max(URun, USprint);
+			if (Chest > 0.01f)
+			{
+				FPose Raised = Out;
+				// (mesh frame: -X his right, +Y ahead, +Z up; each hand goes in front of the chest, below the shoulder)
+				const FVector RS = L.BonePos(Raised, RArm), LS = L.BonePos(Raised, LArm);
+				L.ReachTo(Raised, RArm, RFore, RHand, RS + FVector(10.f, 26.f, -20.f), FVector(-0.6f, -0.2f, -1.f));
+				L.ReachTo(Raised, LArm, LFore, LHand, LS + FVector(-10.f, 26.f, -20.f), FVector(0.6f, -0.2f, -1.f));
+				for (const int32 i : { LArm, LFore, RArm, RFore }) Out.Rot[Bone[i]] = Nlerp(Out.Rot[Bone[i]], Raised.Rot[Bone[i]], Chest);
+			}
 		}
 	// the hips turn toward the way he goes, the chest stays square to the camera
 	if (FMath::Abs(LegYaw) > 0.1f)

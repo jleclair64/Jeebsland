@@ -520,6 +520,16 @@ void AKnightCharacter::ServerHorse_Implementation(uint8 Op, AHorse* H)
 {
 	if (Health <= 0.f || !Skills) return;
 	AHorse* Mine = Rider ? Rider->MyHorse() : nullptr;
+	if (bIsTroll && (Op == HO_Mount || Op == HO_Call || Op == HO_Follow))
+	{
+		Skills->Say(3.f, FColor(235, 205, 150), TEXT("Trolls are too big to ride, and run fast enough already."));
+		return;
+	}
+	if (bIsWizard && Op == HO_Mount && Magic < JeebTune::V().BroomMinMagic)
+	{
+		Skills->Say(3.f, FColor(190, 140, 255), TEXT("You have too little magic to ride."));
+		return;
+	}
 	switch (Op)
 	{
 	case HO_Mount:
@@ -754,3 +764,17 @@ void AKnightCharacter::EndGathering()
 	bFishing = false;
 }
 
+
+// (server, every frame) A wizard on a horse spends magic (Tuning.ini [Horse] HorseMagicDrain, half the broom's); with none left he is put down.
+// The bar replicates already (Magic), so every machine sees it fall. He can still cast; spells just draw from the same bar.
+void AKnightCharacter::TickHorseMagic(float Dt)
+{
+	if (!HasAuthority() || !bIsWizard || !bMounted || !RideHorse || Health <= 0.f) return;
+	Magic = FMath::Max(0.f, Magic - JeebTune::V().HorseMagicDrain * Dt);
+	MagicUsedAt = GetWorld()->GetTimeSeconds();   // (no refilling while riding)
+	if (Magic <= 0.f)
+	{
+		ServerSideDismount();
+		if (Skills) Skills->Say(3.f, FColor(190, 140, 255), TEXT("Your magic is spent. You slide off the horse."));
+	}
+}

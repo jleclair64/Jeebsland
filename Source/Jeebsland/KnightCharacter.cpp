@@ -477,6 +477,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	if (bIsTroll) TickTroll(Dt);
 	if (bIsWizard) TickWizard(Dt);   // (the orb and the teleport's puffs: KnightCharacterWizard.cpp)
 	TickBroom(Dt);   // (the wizard's flying broom: KnightCharacterBroom.cpp)
+	TickHorseMagic(Dt);   // (a wizard on a horse drains magic: KnightCharacterInteract.cpp)
 	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);
 	float S = 0.f, C = 0.f;   // where the stride is (for the footfall dust)

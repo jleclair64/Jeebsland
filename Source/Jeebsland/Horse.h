@@ -130,7 +130,7 @@ private:
 	void BuildBody();
 	void TickLook(float Dt, float Speed, bool bBack);
 	void GatherHurt(TArray<JeebHit::FCapsule>& Out) const;
-	float SlopePitch = 0.f, Fall = 0.f;
+	float SlopePitch = 0.f, SlopeRoll = 0.f, Fall = 0.f;
 
 	// the server's mind
 	enum class EGoal : uint8 { Stay, Wander, Call, Follow };

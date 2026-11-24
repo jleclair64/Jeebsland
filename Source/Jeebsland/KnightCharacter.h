@@ -1129,6 +1129,7 @@ protected:
 	void EndBroomSrv(const TCHAR* Why);
 	void ApplyBroomMovement();
 	void TickBroom(float Dt);
+	void TickHorseMagic(float Dt);   // (server) a wizard riding a horse drains magic; with none left he is put down
 	void UpdateBroomModel();
 	float WizardGuardDrain() const;
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> BroomModel;

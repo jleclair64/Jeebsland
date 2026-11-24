@@ -808,15 +808,19 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 	}
 	const FVector L = GetActorLocation();
 	const FVector Fw = GetActorForwardVector();
-	if (!HasRider())
+	// Lean to the ground under it, along (up and down hills) and across (a slope on its side), ridden or not (owner 2026-11-23: all four feet on the
+	// ground on slopes). The legs themselves are the clip's, not placed one by one (no leg IK yet); the body lies on the slope so they reach it.
 	{
-		const float Ahead = JeebFoes::Ground(L.X + Fw.X * 80.f * S, L.Y + Fw.Y * 80.f * S), Back = JeebFoes::Ground(L.X - Fw.X * 80.f * S, L.Y - Fw.Y * 80.f * S);
-		SlopePitch = FMath::FInterpTo(SlopePitch, FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Ahead - Back, 160.f * S)), -20.f, 20.f), Dt, 6.f);
+		const float RideMul = HasRider() ? 0.7f : 1.f;   // (the rider sits upright in the saddle: a little less lean with him on)
+		const FVector Rt = GetActorRightVector();
+		const float Ahead = JeebFoes::Ground(L.X + Fw.X * 90.f * S, L.Y + Fw.Y * 90.f * S), Back = JeebFoes::Ground(L.X - Fw.X * 90.f * S, L.Y - Fw.Y * 90.f * S);
+		const float Rgt = JeebFoes::Ground(L.X + Rt.X * 40.f * S, L.Y + Rt.Y * 40.f * S), Lft = JeebFoes::Ground(L.X - Rt.X * 40.f * S, L.Y - Rt.Y * 40.f * S);
+		SlopePitch = FMath::FInterpTo(SlopePitch, RideMul * FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Ahead - Back, 180.f * S)), -25.f, 25.f), Dt, 6.f);
+		SlopeRoll = FMath::FInterpTo(SlopeRoll, RideMul * FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Lft - Rgt, 80.f * S)), -15.f, 15.f), Dt, 6.f);
 	}
-	else SlopePitch = FMath::FInterpTo(SlopePitch, 0.f, Dt, 6.f);
 	Body->SetRelativeLocation(FVector(0.f, 0.f, -40.f * S * FMath::SmoothStep(0.f, 1.f, Fall)));
 	const float MeshYaw = CVarHorseMeshYaw.GetValueOnGameThread();
-	Body->SetRelativeRotation((FRotator(SlopePitch + JumpPitch, 0.f, 0.f).Quaternion() * FRotator(0.f, MeshYaw, 0.f).Quaternion()).Rotator());
+	Body->SetRelativeRotation((FRotator(SlopePitch + JumpPitch, 0.f, SlopeRoll).Quaternion() * FRotator(0.f, MeshYaw, 0.f).Quaternion()).Rotator());
 	if (const APlayerController* PC = GetWorld()->GetFirstPlayerController())   // (looks only: this machine's own camera)
 	{
 		FVector CamL; FRotator CamR;
