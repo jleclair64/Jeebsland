@@ -32,4 +32,11 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
 9. **Fishing redo:** fish in the river; bites less often; a 0.5 s click window to reel; trout, salmon, bass (Meshy or a free model) that flop on the line then go limp into the pack; higher Fishing, more frequent bites. Sizes on a normal curve: salmon and trout average 27 in, 36 in at 0.03% (board fish at 36 in or more); bass average 15 in, 21 in at 0.03% (board at 21 in or more). All-time board per species, weekly board, personal achievements page in settings. Deer antlers get points on the same idea (realistic point counts, a board threshold).
 10. **Stealth** (design above).
 11. **Separate class inventories** (above).
+13. **Distinct items instead of colour tiers** (owner approved 2026-11-23; for everything in the end, arrows first). Gate the making, not the using: one craft level per item, anyone can fire what they have; rarity through materials; archery level softly helps any arrow (accuracy, draw speed); arrows differ by job, not just damage. Map old tier rows to the new items carefully (never delete Potions/Accessories rows). Arrows so far:
+   - Cheap arrow: made from wood only, easy, low damage.
+   - Broadhead: mined iron + wood; better against animals.
+   - Bodkin (armour-piercing, PvP), heavy (knockback), fire: ingredients later.
+   - Top arrow: needs eagle feathers.
+   - Models: check the Meshy CC0 library first; likely one shared shaft with distinct Meshy heads and fletchings (cheap, consistent). Shattering and smearing checks.
+   - **Eagles** (with the new animals): fly around and sometimes perch on tree branches (a lucky still shot); land on a player's hunting kill, sit a few seconds and peck at it (a window to shoot it); can be shot in flight; drop eagle feathers.
 12. **Stamina bar** for the knight and wizard, based on Agility (medium; do now if the limit allows).
