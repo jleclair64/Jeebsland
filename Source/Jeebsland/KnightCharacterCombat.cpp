@@ -91,6 +91,7 @@ float AKnightCharacter::GetStaminaMult() const
 void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 {
 	if (bDrinking) return;   // (the bottle is in that hand)
+	if (Style == EAtkStyle::Cast && BroomSprinting()) return;   // (2026-11-24: the server too: no spells in the broom's sprint)
 	const int32 K = SelectedKind();
 	const float Cd = (K >= 0) ? JeebItems::WeaponBase(K).Cooldown : 0.5f;
 	if (bAttacking && AtkStyle == EAtkStyle::Kick && Style == EAtkStyle::Sweep) { KickFade = 1.f; KickFadeT = AttackT / FMath::Max(AttackDur, 0.01f); }   // (a landed kick cut short by the sweep: the leg eases out from there)

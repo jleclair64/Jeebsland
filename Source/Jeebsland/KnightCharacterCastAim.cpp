@@ -137,6 +137,7 @@ void AKnightCharacter::BeginCastCharge(int32 Slot)
 {
 	const int32 K = SelectedKind();
 	if (bCastCharging || !(K == JeebItems::K_Wand || K == JeebItems::K_Staff)) return;
+	if (BroomSprinting()) return;   // (2026-11-24: no spells in the broom's sprint)
 	// (2026-11-22) a wizard's empty slot casts nothing; the server is told which slot before the charge (both reliable, in order)
 	if (bIsWizard && Skills)
 	{

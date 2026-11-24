@@ -711,6 +711,8 @@ void FKnightAnimator::ToolHeadClear(FPose& P, const FInput& In) const
 
 static TAutoConsoleVariable<float> CVarRideRaise(TEXT("jeeb.Ride.Raise"), 100.f, TEXT("How far (cm) the seated pose is lifted when riding the horse, from the bench seat up to the saddle."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBroomRaise(TEXT("jeeb.Broom.Raise"), 40.f, TEXT("How far (cm) the seated pose is lifted on the wizard's broom (2026-11-22)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarBroomHandR(TEXT("jeeb.Broom.HandR"), TEXT("24,-3,4"), TEXT("Right wrist on the broom: cm along the handle from the seat, cm to his left, cm above the handle (2026-11-24)."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarBroomHandL(TEXT("jeeb.Broom.HandL"), TEXT("54,3,4"), TEXT("Left wrist on the broom: cm along the handle from the seat, cm to his left, cm above the handle (2026-11-24)."), ECVF_Default);
 static constexpr float GreatLeftBelow = 14.f;   // (the big sword: how far behind the right fist's grip point the left fist's goes, along the grip)
 
 // Polished plate (owner 2026-11-15: "very shiny, reflective like a mirror"): live in Play through jeeb.Armour.Rough (the plate's roughness; the tier's own
@@ -813,6 +815,7 @@ void FKnightAnimator::Update(float Dt, const FInput& In, const FVector& Feet, fl
 	LiftDraggedFeet(Final, In, Dt);
 	BowArmOut(Final, In, Dt);   // (before HandsOffThighs, which then pushes out only what is still missing)
 	HandsOffThighs(Final, In, Dt);
+	BroomHands(Final, In, Dt);   // (2026-11-24: both hands on the broom; the forward lean in the sprint)
 	BowFistTurn(Final, In);   // (after the arm is placed: the wrist holds the bow steady against the forearm)
 	LogBowGap(Final, In, Dt);
 	GreatGripLine(Final, In, Dt);
@@ -2851,4 +2854,40 @@ void FKnightAnimator::HandsOffThighs(FPose& P, const FInput& In, float Dt)
 		UE_LOG(LogTemp, Log, TEXT("JEEBTHIGH t %.2f key %d clip L %.1f R %.1f after L %.1f R %.1f out L %.1f R %.1f (cm, min over the last second)"), Time, StateKey, ThighMinRaw[0], ThighMinRaw[1], ThighMin[0], ThighMin[1], ThighOut[0], ThighOut[1]);
 		ThighLogT = 0.f; ThighMin[0] = ThighMin[1] = ThighMinRaw[0] = ThighMinRaw[1] = 1e4f;
 	}
+}
+
+// (2026-11-24, owner) On the broom both hands hold the handle, the right one near him and the left one in front of it, in the hover and the sprint. In the
+// sprint (In.bBroomSprint) the spine leans forward over the broom, BroomSprintLean degrees, the head kept up. The wrists are reached to points along the broom's own
+// line (it sits at the hips, pitched In.BroomPitch: see UpdateBroomModel), measured from the hips; mesh frame: +X his left, +Y ahead, Z up.
+void FKnightAnimator::BroomHands(FPose& P, const FInput& In, float Dt)
+{
+	const bool bOn = In.bBroom && StateKey == 71;
+	BroomHandW = FMath::FInterpConstantTo(BroomHandW, bOn ? 1.f : 0.f, Dt, 6.f);
+	BroomLeanW = FMath::FInterpTo(BroomLeanW, bOn && In.bBroomSprint ? 1.f : 0.f, Dt, 4.f);
+	if (BroomHandW <= 0.001f && BroomLeanW <= 0.001f) return;
+	if (BroomLeanW > 0.001f)
+	{
+		const float Lean = JeebTune::V().BroomSprintLean * BroomLeanW;
+		TurnInMesh(P, Spine, FQuat(FVector::XAxisVector, -FMath::DegreesToRadians(Lean * 0.35f)));
+		TurnInMesh(P, Spine1, FQuat(FVector::XAxisVector, -FMath::DegreesToRadians(Lean * 0.35f)));
+		TurnInMesh(P, Spine2, FQuat(FVector::XAxisVector, -FMath::DegreesToRadians(Lean * 0.30f)));
+		TurnInMesh(P, Neck, FQuat(FVector::XAxisVector, FMath::DegreesToRadians(Lean * 0.45f)));   // (his head stays up to see where he flies)
+	}
+	if (BroomHandW <= 0.001f) return;
+	const FVector HipAt = BonePos(P, Hips);
+	const float Pr = FMath::DegreesToRadians(In.BroomPitch), Cs = FMath::Cos(Pr), Sn = FMath::Sin(Pr);
+	auto Wrist = [&](const FString& S)
+	{
+		TArray<FString> V; S.ParseIntoArray(V, TEXT(","));
+		const float D = V.Num() > 0 ? FCString::Atof(*V[0]) : 0.f, Side = V.Num() > 1 ? FCString::Atof(*V[1]) : 0.f, Lift = V.Num() > 2 ? FCString::Atof(*V[2]) : 0.f;
+		const float Fwd = 6.f + D * Cs - Lift * Sn, Up = JeebTune::V().BroomSeatUp + D * Sn + Lift * Cs;   // (the broom's pivot is 6 cm ahead of the hips and BroomSeatUp above them)
+		return HipAt + FVector(Side, Fwd, Up);
+	};
+	const int32 Arms[6] = { LArm, LFore, LHand, RArm, RFore, RHand };
+	FQuat Was[6];
+	for (int32 i = 0; i < 6; ++i) Was[i] = P.Rot[L.Bone[Arms[i]]];
+	L.ReachTo(P, LArm, LFore, LHand, Wrist(CVarBroomHandL.GetValueOnGameThread()), FVector(0.6f, -0.3f, -1.f));
+	L.ReachTo(P, RArm, RFore, RHand, Wrist(CVarBroomHandR.GetValueOnGameThread()), FVector(-0.6f, -0.3f, -1.f));
+	const float W = FMath::SmoothStep(0.f, 1.f, BroomHandW);
+	for (int32 i = 0; i < 6; ++i) { FQuat& R = P.Rot[L.Bone[Arms[i]]]; R = FQuat::Slerp(Was[i], R, W); }
 }

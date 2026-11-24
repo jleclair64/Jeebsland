@@ -224,6 +224,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AKnightCharacter, Magic, COND_OwnerOnly);   // (the wizard's magic bar)
 	DOREPLIFETIME(AKnightCharacter, bOnBroom);   // (the flying broom, everyone: KnightCharacterBroom.cpp)
 	DOREPLIFETIME(AKnightCharacter, bBroomEmpty);
+	DOREPLIFETIME(AKnightCharacter, bBroomSprint);
 	DOREPLIFETIME(AKnightCharacter, BroomRow);
 	DOREPLIFETIME(AKnightCharacter, RideHorse);   // (2026-11-22: who rides what is the server's, Horse.h)
 	DOREPLIFETIME(AKnightCharacter, Health);

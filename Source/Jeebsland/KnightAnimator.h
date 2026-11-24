@@ -175,6 +175,8 @@ namespace JeebAnim
 		bool bClimbing = false; float ClimbPhase = 0.f;
 		bool bSitting = false;
 		bool bMounted = false;   // riding (the test horse): the sitting pose, raised to the saddle
+		bool bBroomSprint = false;   // (2026-11-24) sprinting on the broom: leaning forward over it
+		float BroomPitch = 6.f;      // (2026-11-24) the broom's pitch in degrees, so the hands follow the handle
 		bool bBroom = false;     // (2026-11-22) on the wizard's broom: the riding pose, raised only to the broom (jeeb.Broom.Raise)
 		bool bSliding = false;
 		bool bFishing = false;
@@ -305,6 +307,8 @@ private:
 	void LiftDraggedFeet(FPose& P, const FInput& In, float Dt);
 	void HandsOffThighs(FPose& P, const FInput& In, float Dt);
 	float ThighOut[2] = { 0.f, 0.f };   // HandsOffThighs: each arm's eased outward turn (degrees)
+	float BroomHandW = 0.f, BroomLeanW = 0.f;   // BroomHands: how much the hands are on the broom, and the forward lean (eased)
+	void BroomHands(FPose& P, const FInput& In, float Dt);   // (2026-11-24) both hands on the broom handle; sprinting, leaning forward over it
 	float ThighLogT = 0.f, ThighMin[2] = { 1e4f, 1e4f }, ThighMinRaw[2] = { 1e4f, 1e4f };
 	void BowArmOut(FPose& P, const FInput& In, float Dt);   // the resting bow's arm held a little out from his body, the bow still in the fist
 	void BowFistTurn(FPose& P, const FInput& In);   // the resting bow held steady at the wrist: the string stays up the inside of the forearm whatever the clip does with the hand

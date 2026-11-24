@@ -1118,6 +1118,7 @@ private:
 public:
 	bool IsOnBroom() const { return bOnBroom; }        // (replicated to everyone: for the later double-arrow-damage rule)
 	bool IsBroomEmpty() const { return bBroomEmpty; }  // out of magic: drifting down
+	bool BroomSprinting() const;                       // on the broom and in sprint: flies where the camera looks, no spells (2026-11-24)
 	float MagicCap() const;                            // the bar's size: MagicMax + MagicPerLevel x (Magic level - 1)
 	float SpellCostMul(int32 Kind, int32 Tier) const;  // the spell-cost hook: the item's CastMul (MagicCosts.csv) x BroomSpellCostMul in flight
 	bool IsBroomShopOpen() const { return bShopOpen && bBroomShop; }
@@ -1129,6 +1130,7 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bOnBroom = false;
 	UPROPERTY(ReplicatedUsing = OnRep_Broom) bool bBroomEmpty = false;
 	UPROPERTY(ReplicatedUsing = OnRep_Broom) uint8 BroomRow = 0;
+	UPROPERTY(Replicated) bool bBroomSprint = false;   // (the server: sprinting on the broom, for everyone else's lean and facing)
 	UFUNCTION() void OnRep_Broom();
 	UFUNCTION(Server, Reliable) void ServerToggleBroom();
 	void StartBroomSrv(int32 Row);
@@ -1143,6 +1145,7 @@ protected:
 	bool bGuardMagicOut = false;   // (the server: the orb guard dropped for want of magic until the bar is back to BroomMinMagic)
 	bool bBroomApplied = false;    // (this machine has put the movement into flight)
 	float BroomTestT = 0.f; int32 BroomTestStep = 0;
+	float BroomPitchNow = 6.f;   // (the broom model's eased pitch)
 };
 
 // The playable troll (2026-11-19): the knight's pawn in troll mode (KnightCharacterTroll.cpp). AKnightGameMode gives one to a player who
