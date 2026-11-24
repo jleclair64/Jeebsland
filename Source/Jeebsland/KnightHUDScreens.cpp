@@ -517,6 +517,15 @@ void AKnightHUD::DrawSkillIcon(int32 Idx, float X, float Y, float S)
 		Quad(30, 41, 34, 52, Dk);
 		break;
 	}
+	case 13:   // Agility: a golden running figure with speed lines (2026-11-23)
+	{
+		const FLinearColor Gd(0.95f, 0.75f, 0.2f), Wind(0.95f, 0.9f, 0.7f);
+		D(40, 12, 6, 6, Gd);
+		Ln(38, 20, 32, 38, Gd, 6.f); Ln(32, 38, 44, 48, Gd, 5.f); Ln(44, 48, 42, 60, Gd, 5.f); Ln(32, 38, 22, 50, Gd, 5.f); Ln(22, 50, 14, 58, Gd, 5.f);
+		Ln(38, 22, 50, 30, Gd, 4.f); Ln(36, 24, 24, 28, Gd, 4.f);
+		for (int32 k = 0; k < 3; ++k) Ln(4.f, 20.f + k * 12.f, 16.f, 20.f + k * 12.f, Wind, 3.f);
+		break;
+	}
 	case 12:   // Horse Riding: a brown horse's head and mane in a horseshoe (2026-11-22)
 	{
 		const FLinearColor Shoe(0.62f, 0.64f, 0.68f), Coat(0.50f, 0.30f, 0.16f), Mane(0.18f, 0.11f, 0.07f);
@@ -571,8 +580,8 @@ void AKnightHUD::DrawSkillsScreen(AKnightCharacter* Knight)
 	if (CloseBtn(PX, PY, PW)) { Knight->ToggleSkills(); return; }
 
 	// Order: fighting skills first, then gathering and crafting
-	static const ESkillType Order[13] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
-		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming, ESkillType::Stamina, ESkillType::Riding };
+	static const ESkillType Order[14] = { ESkillType::Attack, ESkillType::Defense, ESkillType::Archery, ESkillType::Magic,
+		ESkillType::Mining, ESkillType::Woodcutting, ESkillType::Fishing, ESkillType::Smithing, ESkillType::Lockpicking, ESkillType::Climbing, ESkillType::Swimming, ESkillType::Stamina, ESkillType::Riding, ESkillType::Agility };
 	int32 Total = 0;
 	for (ESkillType T : Order) Total += Sk->GetLevel(T);
 	{

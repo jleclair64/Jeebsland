@@ -13,6 +13,14 @@ JEEB_TUNE(Movement, SprintAccel, 2048.f)
 JEEB_TUNE(Movement, SprintRestartShare, 0.2f)
 JEEB_TUNE(Movement, KnightGravity, 2.f)
 
+// [Agility] (2026-11-23: the knight and wizard running stamina bar; the troll keeps his own Stamina skill and rush)
+JEEB_TUNE(Agility, AgilitySprintAt1, 8.f)
+JEEB_TUNE(Agility, AgilitySprintAt99, 30.f)
+JEEB_TUNE(Agility, AgilityRefillAt1, 12.f)
+JEEB_TUNE(Agility, AgilityRefillAt99, 4.f)
+JEEB_TUNE(Agility, AgilityRegenDelay, 1.f)
+JEEB_TUNE(Agility, AgilityXPPerSec, 1.f)
+
 // [Bow]
 JEEB_TUNE(Bow, BowDrawTime, 1.f)
 JEEB_TUNE(Archery, DrawAt1, 2.f)
