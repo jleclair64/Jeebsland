@@ -1990,7 +1990,9 @@ void FClipLib::SolveGear()
 			// (owner 2026-11-23: the resting shield leaned out at the top; "adjust the shield angle to be the red line" = upright. ShieldRestUpright: 0 = long axis along the forearm as before, 1 = standing upright; read at start)
 			const FVector Vert = (FVector::UpVector - Face * FVector::DotProduct(FVector::UpVector, Face)).GetSafeNormal();
 			const FVector Lean = FMath::Lerp(-Along, Vert, FMath::Clamp(JeebTune::V().ShieldRestUpright, 0.f, 1.f)).GetSafeNormal();
-			const FVector Up = FQuat(Face, FMath::DegreesToRadians(Tilt)).RotateVector(Lean);
+			// (owner 2026-11-23: "swing the bottom in toward his body": the top turns out along Face, so the bottom edge tucks toward him and the shield hangs close beside the fist)
+			const FVector Tucked = (Lean + Face * FMath::Tan(FMath::DegreesToRadians(JeebTune::V().ShieldRestBottomIn))).GetSafeNormal();
+			const FVector Up = FQuat(Face, FMath::DegreesToRadians(Tilt)).RotateVector(Tucked);
 			const FQuat Q = FRotationMatrix::MakeFromXZ(Face, Up).ToQuat();
 			ShieldAtRest = FTransform(Q, Mid + Face * Out - Q.RotateVector(Strap)) * Fore.Inverse();
 		}

@@ -96,6 +96,11 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 		}
 		else In.Move = AttackDir == JabSecond ? EMove::Jab2 : EMove::Jab1;
 	}
+	else if (const float Hold = CastHoldNow(); Hold > 0.f)
+	{
+		In.Move = EMove::Cast;   // (charging a spell: the cast pose held until release)
+		In.MoveU = Hold;
+	}
 }
 
 void AKnightCharacter::TickPose(float Dt, const FVector& Vel, float Speed, bool bFalling, bool bFaceCam, float& OutS, float& OutC)
