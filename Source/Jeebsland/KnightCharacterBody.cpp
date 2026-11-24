@@ -401,11 +401,13 @@ void AKnightCharacter::RefreshEquipment()
 // makes none of it. The belt book (Wiz_BookBase/Robe) shows only if the model is missing.
 // Per item, in the hand's frame (cm, degrees: X forward along the forearm, Y to his right, Z up; pitch, yaw, roll; scale): jeeb.Wizard.OffHand<Book|Ball|Pipe>.
 static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,14,0,90,-65,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
-static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("9,-1,15,0,0,0,1.25"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("11,-1,16.5,0,0,0,1.25"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("8,0,4,0,0,0,1"), TEXT("The pipe in the wizard's left palm: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
-static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 1.4f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 0.9f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBallBob(TEXT("jeeb.Wizard.BallBob"), 1.6f, TEXT("How far the crystal ball bobs up and down over the wizard's palm (cm)."), ECVF_Default);
 static TAutoConsoleVariable<int32> CVarPipeSmoke(TEXT("jeeb.Wizard.PipeSmoke"), 1, TEXT("1: a few puffs of smoke rise from the wizard's pipe (this machine only); 0: none."), ECVF_Default);
+
+static TAutoConsoleVariable<int32> CVarSmokeVel(TEXT("jeeb.Wizard.SmokeVel"), 1, TEXT("1: the pipe's puffs carry last frame's places (motion vectors, no TSR smear); 0: the old way, for comparing."), ECVF_Default);
 
 static const TCHAR* WizOffMesh(int32 Style)
 {
@@ -448,16 +450,19 @@ void AKnightCharacter::UpdateWizardBook()
 				WizardPipeSmoke->SetCastShadow(false);
 				WizardPipeSmoke->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
 				// (pale grey wisps: the wizard's orb material, see-through and soft at the rim, in grey; M_Smoke is the poison's purple)
-				if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Wizard/M_WizardOrb.M_WizardOrb")))
+				UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Wizard/M_PipePuff.M_PipePuff"));   // (2026-11-23: a soft puff; the guard bubble's rim-lit one stacked into a chain of rings)
+				if (!Mat) Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Wizard/M_WizardOrb.M_WizardOrb"));
+				if (Mat)
 					if (UMaterialInstanceDynamic* M = UMaterialInstanceDynamic::Create(Mat, this))
 					{
-						M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.55f, 0.55f, 0.58f));
-						M->SetScalarParameterValue(TEXT("Opacity"), 0.8f);
+						M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.3f, 0.3f, 0.33f));
+						M->SetScalarParameterValue(TEXT("Opacity"), Mat->GetName().Contains(TEXT("PipePuff")) ? 0.2f : 0.8f);
 						WizardPipeSmoke->SetMaterial(0, M);
 					}
 				WizardPipeSmoke->RegisterComponent();
 				WizardPipeSmoke->SetWorldTransform(FTransform::Identity);
-				for (int32 i = 0; i < 6; ++i) WizardPipeSmoke->AddInstance(FTransform(FVector::ZeroVector), true);
+				for (int32 i = 0; i < 9; ++i) WizardPipeSmoke->AddInstance(FTransform(FVector::ZeroVector), true);
+				WizardPipeSmoke->SetHasPerInstancePrevTransforms(true);   // (motion vectors: PlaceWizardOffHand)
 			}
 		}
 		UE_LOG(LogTemp, Log, TEXT("JEEBWIZARD held %s %s"), JeebItems::WizOffName(Style), WizardBookHeld ? TEXT("made") : TEXT("MISSING (/Game/Props: Tools/BuildProps.ps1 OpenBook CrystalBall Pipe)"));
@@ -489,18 +494,36 @@ void AKnightCharacter::PlaceWizardOffHand()
 			if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(WizardBookHeld->GetMaterial(i))) M->SetScalarParameterValue(TEXT("GlowStrength"), Glow);
 	}
 	const FTransform Xf(Frame * R.Quaternion(), Hand + Frame.RotateVector(At), FVector(FMath::Max(V[6], 0.05f)));
+	const FTransform PrevXf = WizardBookHeld->GetComponentTransform();   // (last frame's place, for the smoke's motion vectors)
 	WizardBookHeld->SetWorldTransform(Xf);
 	if (WizardPipeSmoke)   // (the bowl's mouth: the pipe's +X end, up; each puff rises, swells and drifts back over 2.4 s)
 	{
-		const FVector Bowl = Xf.TransformPosition(FVector(11.f, 0.f, 5.f));
+		// (2026-11-23, owner: "the pipe bubbles are smearing") each puff carries last frame's place too (SetHasPerInstancePrevTransforms, as the leaves, bats
+		// and fireflies): without it TSR has no motion vector for them and keeps older copies. jeeb.Wizard.SmokeVel 0 is the old way, for comparing.)
 		const int32 N = WizardPipeSmoke->GetInstanceCount();
-		for (int32 i = 0; i < N; ++i)
+		const float Dt = FMath::Max(GetWorld()->GetDeltaSeconds(), 0.0001f);
+		auto Puff = [&](int32 i, float Tm, const FTransform& Hold, float& U)
 		{
-			const float U = FMath::Fmod(T / 2.4f + float(i) / N, 1.f);
-			const FVector Pos = Bowl + FVector(0.f, 0.f, U * 28.f) - Fwd * (U * U * 10.f) + FVector(FMath::Sin(T * 1.3f + i) * 2.f * U, FMath::Cos(T * 1.1f + i) * 2.f * U, 0.f);
+			const FVector Bowl = Hold.TransformPosition(FVector(11.f, 0.f, 5.f));
+			U = FMath::Fmod(Tm / 2.4f + float(i) / N, 1.f);
+			const FVector Pos = Bowl + FVector(0.f, 0.f, U * 28.f) - Fwd * (U * U * 10.f) + FVector(FMath::Sin(Tm * 1.3f + i) * 2.f * U, FMath::Cos(Tm * 1.1f + i) * 2.f * U, 0.f);
 			const float S = (0.015f + 0.06f * U) * (U < 0.85f ? 1.f : (1.f - U) / 0.15f);
-			WizardPipeSmoke->UpdateInstanceTransform(i, FTransform(FQuat::Identity, Pos, FVector(FMath::Max(S, 0.001f))), true, i == N - 1, false);
+			return FTransform(FQuat::Identity, Pos, FVector(FMath::Max(S, 0.001f)));
+		};
+		if (CVarSmokeVel.GetValueOnGameThread() != 0)
+		{
+			TArray<FTransform> Now, Prev; Now.SetNum(N); Prev.SetNum(N);
+			for (int32 i = 0; i < N; ++i)
+			{
+				float U1 = 0.f, U0 = 0.f;
+				Now[i] = Puff(i, T, Xf, U1);
+				Prev[i] = Puff(i, T - Dt, PrevXf, U0);
+				if (U0 > U1) Prev[i] = Now[i];   // (a puff that began again this frame did not travel from the end)
+			}
+			WizardPipeSmoke->BatchUpdateInstancesTransforms(0, Now, Prev, true, false, true);
 		}
+		else
+			for (int32 i = 0; i < N; ++i) { float U = 0.f; WizardPipeSmoke->UpdateInstanceTransform(i, Puff(i, T, Xf, U), true, i == N - 1, false); }
 	}
 }
 

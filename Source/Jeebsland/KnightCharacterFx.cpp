@@ -201,6 +201,7 @@ static TAutoConsoleVariable<float> CVarTrailFade(TEXT("jeeb.Trail.Fade"), 0.12f,
 static TAutoConsoleVariable<float> CVarTrailWidth(TEXT("jeeb.Trail.Width"), 16.f, TEXT("Sword trail: width at the blade, cm (tapers to nothing at the tail)."));
 static TAutoConsoleVariable<float> CVarTrailBright(TEXT("jeeb.Trail.Bright"), 1.1f, TEXT("Sword trail: brightness (0.5 = the old soft wisp; above 1 a slight glow)."));
 static TAutoConsoleVariable<float> CVarTrailOpacity(TEXT("jeeb.Trail.Opacity"), 0.85f, TEXT("Sword trail: opacity in its core (0.55 = the old wisp)."));
+static TAutoConsoleVariable<int32> CVarTrailSpear(TEXT("jeeb.Trail.Spear"), 0, TEXT("1: the spear leaves the sword's wind ribbon too (it hung in the air detached from the point: the owner's \"spear is smearing\", 2026-11-23); 0: none."));
 
 void AKnightCharacter::TickSwordTrail(float Dt)
 {
@@ -229,7 +230,7 @@ void AKnightCharacter::TickSwordTrail(float Dt)
 	const float Wide = FMath::Max(CVarTrailWidth.GetValueOnGameThread(), 1.f);
 	// Every sword move with hit boxes leaves one (2026-11-01): the cuts, the low sweep and the dash's stab (not the kick)
 	const bool bSweep = AtkStyle == EAtkStyle::Sweep, bDash = AtkStyle == EAtkStyle::Dash;
-	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && WristR && Smash != ESmash::Rebound)
+	if (bAttacking && (AtkStyle == EAtkStyle::Slash || bSweep || bDash) && JeebItems::FightsLikeSword(SelectedKind()) && (SelectedKind() != JeebItems::K_Spear || CVarTrailSpear.GetValueOnGameThread() != 0) && WristR && Smash != ESmash::Rebound)
 	{
 		const FTransform W = WristR->GetComponentTransform();
 		auto Along = [&](float Cm) { return W.TransformPosition(KnightDesign::GripPos(false) + KnightDesign::BladeDir(1) * Cm - KnightDesign::PivotPos(KnightDesign::P_WristR)); };
