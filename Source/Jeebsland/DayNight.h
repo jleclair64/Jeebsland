@@ -29,6 +29,7 @@ public:
 	// Noon to the low golden point (and the same back). 60 s to preview; set to 1200 for 20 minutes.
 	static constexpr float HalfLoopSeconds = 600.f;   // a full loop of the sun every 20 minutes (owner, 2026-11-15; was 2 minutes)
 	float ClockSpeed = 1.f;   // how fast this sun runs (MoveLab sets 3, to see the light change quickly; the world stays at 1)
+	float SunSpeedExtra = 0.f;   // local extra clock from the LOOK tab's sun-speed slider (jeeb.Sun.Speed)
 
 	// Shared state, updated every frame
 	static float Phase;          // 0 = noon, 0.5 = the sun's lowest point

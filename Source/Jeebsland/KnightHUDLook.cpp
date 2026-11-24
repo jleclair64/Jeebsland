@@ -128,6 +128,7 @@ namespace
 		{ 1, TEXT("Night: extra brightness right at sunset (stops)"), TEXT("jeeb.Night.Twilight"), EK::Float, 0, 0.f, 2.f, false, NoDef },
 		{ 1, TEXT("Night: brightness just after sunset, till night"), TEXT("jeeb.Night.DuskLift"), EK::Float, 0, 0.f, 6.f, false, NoDef },
 		{ 1, TEXT("Sun: lowest point (degrees)"), TEXT("jeeb.Sun.Low"), EK::Float, 0, -45.f, 11.f, false, NoDef },
+		{ 1, TEXT("Sun: speed (1 normal, 20 a day in 60 s)"), TEXT("jeeb.Sun.Speed"), EK::Float, 0, 1.f, 20.f, false, NoDef },
 	};
 	constexpr int32 NumItems = UE_ARRAY_COUNT(Items);
 	constexpr int32 ShotSatItem = 0, ShotTintGreenItem = 36;   // (the test run's two sliders: saturation, grass green)

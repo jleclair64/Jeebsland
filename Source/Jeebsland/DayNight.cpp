@@ -64,6 +64,8 @@ namespace JeebLook
 	static TAutoConsoleVariable<int32> Shafts(TEXT("jeeb.Look.Shafts"), 1, TEXT("Gentle light shafts round the sun (bloom shafts only, no occlusion pass): 1 on, 0 off"));
 	// (2026-11-15, owner: "a slider for me to move the sun in the sky"; the LOOK tab's SKY + HAZE group. This machine's view only.)
 	static TAutoConsoleVariable<float> SunPhase(TEXT("jeeb.Sun.Phase"), -1.f, TEXT("Holds the sun at a point of its daily loop: 0 noon (41 degrees up), 0.26 sunset glow (5 up), 0.29 sunset, 0.34 10 degrees down, 0.5 midnight (25 down), 0.71 sunrise; negative: the clock moves it"));
+	// (2026-11-23, owner: a SKY + HAZE slider for the sun's speed, fastest a full day in 60 s.) This machine's view only: the extra time is added locally, so other players keep the normal sun.
+	static TAutoConsoleVariable<float> SunSpeed(TEXT("jeeb.Sun.Speed"), 1.f, TEXT("How fast the sun moves on this machine: 1 normal (a day in 20 minutes), 20 a day in 60 seconds"));
 	// (2026-11-15, owner: the silver armour "much too flat/grey ... reflective like a mirror": the sun's own shine is off for the whole world, so plate had no highlight at all)
 	static TAutoConsoleVariable<float> SkyGround(TEXT("jeeb.Sky.Ground"), 0.f, TEXT("The sky light's colour from below the horizon, a meadow green-brown at this strength (0: the sky atmosphere's own, nearly black, as before 2026-11-15): what polished armour mirrors facing down"));
 	static TAutoConsoleVariable<float> ArmourGlint(TEXT("jeeb.Armour.Glint"), 0.1345f, TEXT("The sun's glint on the knights' plate armour (shine only, lighting channel 1): 0 none, 1 as bright as the sun"));
@@ -266,7 +268,10 @@ void ADayNight::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	// (2026-11-15) the server's clock, so every player online sees the sun in the same place (each machine kept its own until then)
 	const AGameStateBase* GS = GetWorld()->GetGameState();
+	// jeeb.Sun.Speed: extra local time builds up while it is above 1, so moving the slider never makes the sun jump
+	SunSpeedExtra += DeltaSeconds * ClockSpeed * (FMath::Clamp(JeebLook::SunSpeed.GetValueOnGameThread(), 0.f, 20.f) - 1.f);
 	Clock = GS ? float(GS->GetServerWorldTimeSeconds()) * ClockSpeed : Clock + DeltaSeconds * ClockSpeed;
+	Clock += SunSpeedExtra;
 	TickClouds(DeltaSeconds);
 	const float HeldPhase = JeebLook::SunPhase.GetValueOnGameThread();
 	Phase = HeldPhase >= 0.f ? FMath::Fmod(HeldPhase, 1.f) : FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
