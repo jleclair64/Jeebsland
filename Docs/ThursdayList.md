@@ -43,4 +43,6 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
 15. **Troll helmet and shoulder armour** look cracked and sink into his body (owner, 2026-11-23): fold into the Fable troll review (item 2).
 16. **Wizard's left hand on the broom handle** (owner, 2026-11-23): hide the book, crystal ball and pipe while flying (their effects still apply).
 17. **Blackrock:** leave it all as it is for now; big changes are planned there later (owner, 2026-11-23).
-12. **Stamina bar** for the knight and wizard, based on Agility (medium; do now if the limit allows).
+18. **Horse hoof placement on slopes** (owner, 2026-11-23): the body now pitches and rolls with the slope, but each hoof still follows its clip. Per-leg IK in the shared deer/horse anim instance (`Deer.cpp`), with a picture check.
+19. **Smearing not yet filmed:** axes, katana, battle axe, bows and arrows, troll club and rocks; the pipe smoke while the wizard runs. The crystal ball's blue swirl reads pale and patchy, and the staff orb's swirl is barely visible.
+12. **Stamina bar** (done 2026-11-23) for the knight and wizard, based on Agility (medium; do now if the limit allows).
