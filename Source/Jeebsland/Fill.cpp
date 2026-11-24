@@ -1,4 +1,5 @@
 #include "Fill.h"
+#include "JeebTuning.h"
 #include "FillData.h"
 #include "OakHill.h"
 #include "TownLab.h"
@@ -2769,7 +2770,7 @@ struct FFillBuilder
 				// the lamp and never the crossbar over it or the post beside it near the lantern, which a shadowless point light lit bright)
 				const bool bPost = P.Kind->Name.StartsWith(TEXT("LampPost")) && P.Kind->Name != TEXT("LampPostRope");
 				UPointLightComponent* L = bPost ? NewObject<USpotLightComponent>(Owner) : NewObject<UPointLightComponent>(Owner);
-				if (bPost) { USpotLightComponent* Sp = static_cast<USpotLightComponent*>(L); Sp->SetOuterConeAngle(40.f); Sp->SetInnerConeAngle(15.f); Sp->SetWorldRotation(FRotator(-90.f, 0.f, 0.f)); }
+				if (bPost) { USpotLightComponent* Sp = static_cast<USpotLightComponent*>(L); Sp->SetOuterConeAngle(JeebTune::V().LampPostOuterCone); Sp->SetInnerConeAngle(JeebTune::V().LampPostInnerCone); Sp->SetWorldRotation(FRotator(-90.f, 0.f, 0.f)); }
 				L->SetupAttachment(Root);
 				// (the village well, 2026-11-21 owner: "the whole well lights up": its light hung under the roof's middle, shadowless, and lit
 				// the roof, posts and stones all round. Now it sits in the lantern on the post (SM_WellVillage's Glow faces, about -125 0 180
@@ -2786,8 +2787,8 @@ struct FFillBuilder
 					: Kn == TEXT("LampPostStone") ? (Glow = FVector(-28.f, 0.f, 177.f), true) : false;
 				L->SetWorldLocation(bGlow ? P.Xf.TransformPosition(Glow) : P.Xf.GetLocation() + FVector(0.f, 0.f, P.Kind->Height * P.Xf.GetScale3D().Z - 35.f));
 				L->SetIntensityUnits(ELightUnits::Lumens);
-				L->SetIntensity(bWell ? 40.f : 100.f);
-				L->SetAttenuationRadius(bWell ? 200.f : 380.f);
+				L->SetIntensity(bWell ? 40.f : JeebTune::V().LampPostLumens);   // (2026-11-23 owner: 30% dimmer, wider area: 100 -> 70, radius 380 -> 600)
+				L->SetAttenuationRadius(bWell ? 200.f : JeebTune::V().LampPostRadius);
 				L->SetSourceRadius(4.f);
 				if (bWell) UE_LOG(LogTemp, Log, TEXT("JEEBFILL well %s at %s yaw %.0f, its lantern light at %s"), *P.Kind->Name, *P.Xf.GetLocation().ToCompactString(), P.Xf.Rotator().Yaw, *L->GetComponentLocation().ToCompactString());
 				JeebLamp::TrackLight(L);
@@ -3006,5 +3007,5 @@ void AWorldFill::UpdateLights()
 	const float Dk = ADayNight::Dusk;
 	if (FMath::Abs(Dk - LastDusk) < 0.01f) return;
 	LastDusk = Dk;
-	for (UPointLightComponent* L : Lights) if (L) L->SetIntensity((L->AttenuationRadius < 300.f ? 40.f : 100.f) * FMath::Lerp(0.15f, 1.f, Dk));   // (the well's lantern: 40, short reach)
+	for (UPointLightComponent* L : Lights) if (L) L->SetIntensity((L->AttenuationRadius < 300.f ? 40.f : JeebTune::V().LampPostLumens) * FMath::Lerp(0.15f, 1.f, Dk));   // (the well's lantern: 40, short reach)
 }
