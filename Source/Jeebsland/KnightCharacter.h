@@ -1065,6 +1065,7 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> RockSack;     // the sack of rocks in his left fist
 	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> RockInHand;   // the rock in his right fist while he winds up
 	bool bRockSackTried = false;
+	FString TrollDoLast; float TrollDoRunFor = 0.f;   // (test films: jeeb.Test.TrollDo, KnightCharacterTroll.cpp)
 	bool bRockClubHidden = false;   // (the club's parts are hidden while the rocks are in hand)
 	UPROPERTY(Transient) TArray<TObjectPtr<USceneComponent>> AmuletParts;       // the worn amulet on its chain round his neck (UpdateAmulet)
 	int32 AmuletShownId = -1;

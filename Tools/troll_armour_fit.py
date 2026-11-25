@@ -54,11 +54,13 @@ def region(groups, xsign=0):
 #   limb: (top joint, bottom joint, groups): laid along that bone, length share Len, its cross-section fitted to the skin round it x Grow
 PIECES = [
     # (boxes measured off his body in slices: head y -0.57..-0.2 at z 1.65-2.06, torso x +-0.42, y -0.23 (chest) .. 0.5 (his hunched back))
-    dict(name="Helmet", file="helmet", fixed=((-0.26, -0.63, 1.73), (0.26, -0.08, 2.14)), clear=0.012, rigid="Head", noconform=True),
-    dict(name="Chest", file="chest", fixed=((-0.50, -0.33, 1.08), (0.50, 0.62, 1.86)), clear=0.015, allow=["Hips", "Spine", "Spine01", "Spine02", "neck", "RightShoulder"]),
-    dict(name="Shoulders", file="shoulder", rot=(0, 0, -90), fixed=((-0.84, -0.16, 1.70), (-0.36, 0.50, 2.16)), mirror=True, clear=0.015, allow=["RightShoulder", "RightArm", "Spine02"]),
+    # (2026-11-24: weld / smooth: see repair(); poseclear: the clearance kept in the test poses, see pose_clear(); taper: (from, margin), see taper_top().
+    # The helmet's model is a heap of loose plates and fur strands: it is welded but left flat-shaded, smooth shading across its shards looked worse.)
+    dict(name="Helmet", file="helmet", fixed=((-0.26, -0.63, 1.73), (0.26, -0.08, 2.14)), clear=0.012, rigid="Head", noconform=True, smooth=False),
+    dict(name="Chest", file="chest", fixed=((-0.50, -0.33, 1.08), (0.50, 0.62, 1.86)), clear=0.015, poseclear=(0.012, 0.05, ["Hips", "Spine", "Spine01", "Spine02", "neck", "RightShoulder"]), poseonly=(lambda co: co.y > 0.2), allow=["Hips", "Spine", "Spine01", "Spine02", "neck", "RightShoulder"]),
+    dict(name="Shoulders", file="shoulder", rot=(0, 0, -90), fixed=((-0.90, -0.18, 1.74), (-0.38, 0.52, 2.24)), mirror=True, clear=0.015, allow=["RightShoulder", "RightArm", "Spine02"]),
     dict(name="Arms", file="gauntlet", limb=("RightForeArm", "RightHand", ["RightForeArm"]), grow=1.18, len=1.05, cut_skin=True, clear=0.012, mirror=True, allow=["RightForeArm", "RightHand"]),
-    dict(name="Legs", file="boot", limb=("RightLeg", "RightToeBase", ["RightLeg", "RightFoot"]), grow=1.15, len=1.08, cut_skin=True, clear=0.012, mirror=True, allow=["RightLeg", "RightFoot", "RightToeBase"]),
+    dict(name="Legs", file="boot", limb=("RightLeg", "RightToeBase", ["RightLeg", "RightFoot"]), grow=1.15, len=1.08, cut_skin=True, clear=0.012, taper=(0.42, 0.03), poseclear=(0.006, 0.025, ["RightLeg", "RightFoot", "RightToeBase"]), mirror=True, allow=["RightLeg", "RightFoot"]),   # (not the toe bone: the boot is stiff, and the bits of it that followed his toe joint swung out under and behind his foot as he ran)
 ]
 ONLY = os.environ.get("TK_ONLY", "")
 
@@ -284,10 +286,168 @@ def mirror_copy(ob):
     bpy.ops.object.join()
     return ob
 
+# ---------------- 2026-11-24: repairs (owner: armour "looks cracked and sinks into his body", "boot tops too wide", chest "sinks into his back when he runs") ----------------
+def repair(ob, weld, smooth):
+    """Meshy's pieces come as loose triangles (the chest: 16000 triangles in 595 separate bits, most edges open), so every later step that
+    moved points one by one pulled the triangles apart and his skin showed through the cracks. The points are welded first (Weld, in the
+    model's own units of about 2 across), so neighbours share their corners and move together; with Smooth the faces are then shaded
+    smooth below 50 degrees instead of every triangle flat."""
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    n0 = len(bm.verts); e0 = sum(1 for e in bm.edges if len(e.link_faces) == 1)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=weld)
+    e1 = sum(1 for e in bm.edges if len(e.link_faces) == 1)
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    if smooth:
+        for p in ob.data.polygons: p.use_smooth = True
+        ob.data.set_sharp_from_angle(angle=math.radians(50))
+    log("%s: welded %d -> %d points, open edges %d -> %d" % (ob.name, n0, len(ob.data.vertices), e0, e1))
+
+def taper_top(ob, top, bottom, groups, start, margin):
+    """The boot's top fitted to his calf (owner: "boot tops too wide: fit them to the calves; the lower half of the boot is fine"). The
+    boot was grown as a whole until the foot cleared his skin, which left the top a wide ring far off the calf. From Start (share of the
+    way up from the ankle to the knee) the boot is drawn in toward the middle of the calf, more with height, until at the top its inner
+    wall stands Margin off the calf's skin; below Start nothing moves."""
+    A, Bj = joint(top), joint(bottom)
+    up = (A - Bj).normalized(); L = (A - Bj).length
+    R = region(groups, -1 if top.startswith("Right") else 1)
+    upn = np.array(tuple(up)); b0 = np.array(tuple(Bj))
+    def frame(P):
+        t = (P - b0) @ upn / L
+        return t
+    ts = frame(R)
+    band = R[(ts > 0.72) & (ts < 1.0)]
+    if len(band) < 10: log("%s: no calf skin found for the taper" % ob.name); return
+    def radial(P, c):
+        d = P - c; d = d - np.outer(d @ upn, upn); return d
+    c_top = band.mean(0)
+    low = R[(ts > start - 0.1) & (ts < start + 0.1)]
+    c_low = low.mean(0) if len(low) > 10 else c_top
+    rs = np.linalg.norm(radial(band, c_top), axis=1)
+    P = verts_world(ob); tp = frame(P)
+    topv = P[(tp > 0.72) & (tp < 1.0)]
+    if len(topv) < 10: log("%s: no boot top found for the taper" % ob.name); return
+    rb = np.linalg.norm(radial(topv, c_top), axis=1)
+    Rs, Rb = float(np.percentile(rs, 90)), float(np.percentile(rb, 15))
+    k = max(0.5, min(1.0, (Rs + margin) / max(Rb, 1e-4)))
+    for v in ob.data.vertices:
+        p = np.array(tuple(ob.matrix_world @ v.co)); t = float((p - b0) @ upn / L)
+        if t <= start: continue
+        w = min(1.0, max(0.0, (t - start) / max(0.85 - start, 1e-3))); w = w * w * (3 - 2 * w)
+        c = c_low + (c_top - c_low) * min(1.0, max(0.0, (t - start) / max(0.86 - start, 1e-3)))
+        along = c + upn * float((p - c) @ upn)
+        q = along + (p - along) * (1 + (k - 1) * w)
+        v.co = ob.matrix_world.inverted() @ Vector(q)
+    ob.data.update()
+    log("%s: top drawn in x%.2f (calf %.1f cm, the boot's inner wall was %.1f cm from its middle)" % (ob.name, k, Rs * 100, Rb * 100))
+
+# Test poses for the armour (world axes: +X his left, -Y his front, +Z up; degrees about each bone's own joint, parents first). A lean
+# forward is + about X; an arm swung forward is - about X; his right arm lifted sideways is + about Y, his left - about Y.
+POSES = {
+    "runA": [("Spine", 'X', 10), ("Spine01", 'X', 10), ("Spine02", 'X', 10), ("Spine02", 'Z', 10), ("RightArm", 'X', -40), ("LeftArm", 'X', 30), ("RightUpLeg", 'X', -35), ("LeftUpLeg", 'X', 25), ("RightLeg", 'X', 40), ("LeftLeg", 'X', 55), ("RightFoot", 'X', -20), ("LeftFoot", 'X', 25)],
+    "runB": [("Spine", 'X', 10), ("Spine01", 'X', 10), ("Spine02", 'X', 10), ("Spine02", 'Z', -10), ("RightArm", 'X', 30), ("LeftArm", 'X', -40), ("RightUpLeg", 'X', 25), ("LeftUpLeg", 'X', -35), ("RightLeg", 'X', 55), ("LeftLeg", 'X', 40), ("RightFoot", 'X', 25), ("LeftFoot", 'X', -20)],
+    "hunch": [("Spine", 'X', 14), ("Spine01", 'X', 14), ("Spine02", 'X', 12), ("RightShoulder", 'Z', -14), ("LeftShoulder", 'Z', 14), ("RightArm", 'X', -55), ("LeftArm", 'X', -55), ("neck", 'X', -15), ("Head", 'X', -12)],
+    "back": [("Spine", 'X', -8), ("Spine01", 'X', -8), ("Spine02", 'X', -8), ("RightArm", 'X', 35), ("LeftArm", 'X', 35), ("Head", 'X', 10)],
+    "armsup": [("RightArm", 'Y', 65), ("LeftArm", 'Y', -65), ("RightForeArm", 'X', -40), ("LeftForeArm", 'X', -40)],
+    "wind": [("Spine01", 'Z', -18), ("Spine02", 'Z', -18), ("RightArm", 'Y', 80), ("RightArm", 'X', 30), ("LeftArm", 'X', -60)],
+    "twistL": [("Spine01", 'Z', 18), ("Spine02", 'Z', 18), ("RightArm", 'X', -70), ("RightForeArm", 'X', -30)],
+}
+
+def set_pose(pose):
+    arm.data.pose_position = "POSE"
+    for pb in arm.pose.bones: pb.matrix_basis = Matrix.Identity(4)
+    bpy.context.view_layer.update()
+    Aw = arm.matrix_world
+    for name, axis, deg in (pose or []):
+        pb = arm.pose.bones.get(name)
+        if pb is None: continue
+        Mw = Aw @ pb.matrix
+        h = Mw.to_translation()
+        pb.matrix = Aw.inverted() @ (Matrix.Translation(h) @ Matrix.Rotation(math.radians(deg), 4, axis) @ Matrix.Translation(-h) @ Mw)
+        bpy.context.view_layer.update()
+
+def posed_points(ob):
+    dg = bpy.context.evaluated_depsgraph_get()
+    e = ob.evaluated_get(dg); me = e.to_mesh()
+    P = [e.matrix_world @ v.co for v in me.vertices]
+    e.to_mesh_clear()
+    return P
+
+def posed_bvh(ob, groups=None):
+    """His skin as posed now; with Groups, only the part of it that mostly follows those bones (a chest plate is not to be pushed about by
+    an arm swinging through its armhole)."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    e = ob.evaluated_get(dg); me = e.to_mesh()
+    bm = bmesh.new(); bm.from_mesh(me); bm.transform(e.matrix_world)
+    if groups:
+        bm.verts.ensure_lookup_table()
+        gone = [f for f in bm.faces if sum(1 for v in f.verts if bgrp[v.index] in groups) * 2 < len(f.verts)]
+        bmesh.ops.delete(bm, geom=gone, context='FACES')
+    bm.normal_update()
+    t = BVHTree.FromBMesh(bm)
+    e.to_mesh_clear()
+    return t, bm
+
+def pose_clear(ob, clear, rounds=3, most=0.07, groups=None, only=None):
+    """The piece checked on his body in the test poses above (a run both ways, a hunch, leaning back, arms up, a wind-up, a twist): wherever
+    one of its points ends up under his skin, or within Clear of it, that point is moved out by what is missing along the skin's normal at
+    the bind pose, with the amount spread to its neighbours so the shell swells smoothly instead of spiking; repeated a few times."""
+    me = ob.data
+    nb = [[] for _ in me.vertices]
+    for e in me.edges: a, b = e.vertices; nb[a].append(b); nb[b].append(a)
+    report = []
+    if groups: groups = set(groups) | {g.replace("Right", "Left") for g in groups}
+    set_pose(None); arm.data.pose_position = "REST"; bpy.context.view_layer.update()
+    rest_tree, rest_keep = posed_bvh(body, groups)
+    for rnd in range(rounds):
+        need = np.zeros(len(me.vertices)); worst = {}
+        for pname, pose in POSES.items():
+            set_pose(pose)
+            tree, keep = posed_bvh(body, groups)
+            P = posed_points(ob)
+            k = 0
+            for i, p in enumerate(P):
+                loc, nrm, idx, d = tree.find_nearest(p)
+                if loc is None or d > 0.06: continue
+                if only is not None and not only(me.vertices[i].co): continue
+                s = (p - loc).dot(nrm * NSIGN)
+                if s < clear:
+                    need[i] = max(need[i], min(most, clear - s))
+                    if s < 0: k += 1
+            keep.free()
+            worst[pname] = k
+        set_pose(None); arm.data.pose_position = "REST"; bpy.context.view_layer.update()
+        report.append(worst)
+        if need.max() <= 1e-5: break
+        # (first pictures: spread only along edges, the amount stopped at every crack the weld had not closed and the plate's front broke up
+        # into shards. It is spread through space instead: every point within 9 cm of a point that must move goes with it, less with distance.)
+        from mathutils import kdtree
+        kd = kdtree.KDTree(len(me.vertices))
+        for i, v in enumerate(me.vertices): kd.insert(v.co, i)
+        kd.balance()
+        sm = need.copy()
+        for i in np.nonzero(need > 1e-5)[0]:
+            for co, j, dist in kd.find_range(me.vertices[i].co, 0.09):
+                w = need[i] * (1 - dist / 0.09) ** 0.5
+                if w > sm[j]: sm[j] = w
+        need = sm
+        Wm = ob.matrix_world; Wi = Wm.inverted()
+        for i, v in enumerate(me.vertices):
+            if need[i] <= 1e-5: continue
+            p = Wm @ v.co
+            loc, nrm, idx, d = rest_tree.find_nearest(p)
+            if loc is None: continue
+            n = nrm * NSIGN
+            if d > 1e-4 and (p - loc).dot(n) > 0: n = ((p - loc).normalized() + n).normalized()   # (out, away from the skin)
+            v.co = Wi @ (p + n * float(need[i]) * 1.05)
+        me.update()
+    rest_keep.free()
+    log("%s: points under the skin by pose, each round: %s" % (ob.name, "; ".join(" ".join("%s %d" % (k, v) for k, v in w.items()) for w in report)))
+
 made = []
 for P in PIECES:
     if ONLY and P["name"] not in ONLY.split(","): continue
     ob = load_piece(P["file"]); ob.name = P["name"]
+    repair(ob, P.get("weld", 0.004), P.get("smooth", True))
     if len(ob.data.polygons) > 30000:              # (a piece the prep left whole)
         dm = ob.modifiers.new("D", 'DECIMATE'); dm.ratio = 24000 / len(ob.data.polygons)
         bpy.context.view_layer.objects.active = ob; bpy.ops.object.modifier_apply(modifier="D")
@@ -319,12 +479,14 @@ for P in PIECES:
         cy = (lo[1] + hi[1]) / 2; lo[1], hi[1] = cy - 0.16, cy + 0.16
         lay_in_box(ob, lo, hi)
     if "limb" in P: inflate(ob, P["clear"], joint(P["limb"][0]) - joint(P["limb"][1]))
+    if "taper" in P: taper_top(ob, P["limb"][0], "RightFoot", ["RightLeg"], P["taper"][0], P["taper"][1])
     elif not P.get("shoulder") and "fixed" not in P: inflate(ob, P["clear"])
     n = 0 if P.get("noconform") else conform(ob, P["clear"])
     log("%s: %d points pushed out of the skin" % (P["name"], n))
     if P.get("mirror") or P.get("shoulder"): mirror_copy(ob)
     split_metal(ob, P["name"])
     skin_to_body(ob, P.get("rigid"), P.get("allow"))
+    if P.get("poseclear"): pose_clear(ob, P["poseclear"][0], 3, P["poseclear"][1], P["poseclear"][2], P.get("poseonly"))
     tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
     Pw = verts_world(ob)
     log("%s: %d triangles, box %s .. %s" % (P["name"], tris, np.round(Pw.min(0), 3), np.round(Pw.max(0), 3)))
@@ -335,7 +497,7 @@ if RENDER:
         if n.type == 'TEX_IMAGE' and n.image and n.image.name == "texture_0": body.material_slots[0].material.node_tree.nodes.active = n
     sc = bpy.context.scene
     sc.render.engine = 'BLENDER_WORKBENCH'; sc.display.shading.color_type = 'TEXTURE'; sc.display.shading.light = 'STUDIO'
-    sc.render.resolution_x, sc.render.resolution_y = 500, 700
+    sc.render.resolution_x, sc.render.resolution_y = 1000, 1400
     cam = bpy.data.objects.new("C", bpy.data.cameras.new("C")); sc.collection.objects.link(cam); sc.camera = cam
     cam.data.type = 'ORTHO'; cam.data.ortho_scale = 2.6
     c = Vector((0, 0, 1.15))

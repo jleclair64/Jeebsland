@@ -1200,8 +1200,12 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			static int32 FilmEye = -1, FilmIdx = 0;
 			if (bFilm && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotClock - EyeStart - EyeGap * EyeIdx > FilmFrom)
 			{
-				if (FilmEye != EyeIdx) { FilmEye = EyeIdx; FilmIdx = 0; }
-				if (FilmIdx < FilmFrames)
+				// (-ShotEyesFilmEvery=N, 2026-11-24: only every Nth frame is kept, for a frame sheet of a move instead of a smear film)
+				static int32 FilmEvery = 1, FilmTick = 0;
+				static const bool bFilmEvery = FParse::Value(FCommandLine::Get(), TEXT("ShotEyesFilmEvery="), FilmEvery);
+				(void)bFilmEvery;
+				if (FilmEye != EyeIdx) { FilmEye = EyeIdx; FilmIdx = 0; FilmTick = 0; }
+				if ((FilmTick++ % FMath::Max(FilmEvery, 1)) == 0 && FilmIdx < FilmFrames)
 					FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / FString::Printf(TEXT("%s_%d_%03d.png"), *ShotName, EyeIdx, FilmIdx++), false, false);
 			}
 			if (!bNoPics && EyeIdx >= 0 && EyeIdx < ShotEyes.Num() && ShotIdx < EyeIdx && ShotClock - EyeStart - EyeGap * EyeIdx > 1.4f && GFrameCounter > EyeMovedFrame + 30)   // (1.4 s and 30 frames after the move: settled, even after a long frame regrowing the grass)

@@ -214,6 +214,54 @@ void AKnightCharacter::TickTroll(float Dt)
 		FString NetDo;
 		if (FParse::Value(FCommandLine::Get(), TEXT("TrollNetDo="), NetDo)) { UE_LOG(LogTemp, Log, TEXT("JEEBLEAP net test %s"), *NetDo); TrollSuitTest(NetDo); }
 	}
+	// (test films, 2026-11-24: jeeb.Test.TrollDo <name> runs a test move on this machine's own troll whenever its value changes, so one run can
+	// film many moves, each from its own -ShotEyes eye: -ShotEyesSet=0:jeeb.Test.TrollDo=jab;1:jeeb.Test.TrollDo=rockhold;... Names: every
+	// -SuitDo name of TrollSuitTest, plus jab, rockhold (a wind-up held), rockoff, block, unblock, run<seconds>, sprint<seconds>, kind<number>.)
+	if (IsLocallyControlled())
+	{
+		static TAutoConsoleVariable<FString> CVarTrollDo(TEXT("jeeb.Test.TrollDo"), TEXT(""), TEXT("Test films: runs this test move on the troll you play when the value changes (jab, rockhold, rockoff, rock100, block, unblock, run3, sprint3, kind4, punch ...)."), ECVF_Default);
+		FString Do = CVarTrollDo.GetValueOnGameThread();
+		if (Do != TrollDoLast)
+		{
+			TrollDoLast = Do;
+			int32 Bang = INDEX_NONE;   // (anything after a '!' is dropped: jab!2 runs jab again when the value before was jab)
+			if (Do.FindChar(TEXT('!'), Bang)) Do.LeftInline(Bang);
+			UE_LOG(LogTemp, Log, TEXT("JEEBTROLLDO %s"), *Do);
+			TrollDoRunFor = 0.f;
+			if (Rock == ERock::Charging) { SetRockPhase(ERock::None); }
+			if (bBlocking && Do != TEXT("block")) StopBlock();
+			if (bSprinting) StopSprint();
+			if (Do == TEXT("jab")) { if (bRockMode) SetRockMode(false); StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }
+			else if (Do == TEXT("jab1")) { if (bRockMode) SetRockMode(false); StartAttack(EAtkStyle::Slash, JabFirst, 0.f); }
+			else if (Do == TEXT("rockhold")) { SetRockMode(true); RockCooldown = 0.f; RockPress(); }
+			else if (Do.StartsWith(TEXT("rockthrow")))   // (rockthrow<hundredths of a second held>: a wind-up now, let go after that long; 125 by default)
+			{
+				SetRockMode(true); RockCooldown = 0.f; RockPress();
+				FTimerHandle H;
+				GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]() { RockRelease(); }), Do.Len() > 9 ? FMath::Max(FCString::Atoi(*Do.Mid(9)) / 100.f, 0.05f) : 1.25f, false);
+			}
+			else if (Do == TEXT("rockon")) SetRockMode(true);
+			else if (Do == TEXT("rockoff")) SetRockMode(false);
+			else if (Do == TEXT("unblock")) {}
+			else if (Do.StartsWith(TEXT("run"))) { TrollDoRunFor = FMath::Max(FCString::Atof(*Do.Mid(3)), 0.5f); }
+			else if (Do.StartsWith(TEXT("sprint"))) { TrollDoRunFor = FMath::Max(FCString::Atof(*Do.Mid(6)), 0.5f); StartSprint(); }
+			else if ((Do == TEXT("bigjab") || Do == TEXT("clubsprint")) && Skills)   // (the broadsword in hand, then both swings; the club back in hand, then a sprint)
+			{
+				const bool bBig = Do == TEXT("bigjab");
+				if (bRockMode) SetRockMode(false);
+				Skills->Hotbar[0] = JeebItems::GearId(bBig ? JeebItems::K_Broadsword : JeebItems::K_Club, 0); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast();
+				if (bBig)
+				{
+					FTimerHandle H;
+					GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this]() { StartAttack(EAtkStyle::Slash, JabFirst, 0.f); QueuedJabs = 1; }), 0.5f, false);
+				}
+				else { TrollDoRunFor = 1.6f; StartSprint(); }
+			}
+			else if (Do.StartsWith(TEXT("kind")) && Skills) { if (bRockMode) SetRockMode(false); Skills->Hotbar[0] = JeebItems::GearId(FCString::Atoi(*Do.Mid(4)), 0); SelectHotbar(0); RebuildHeld(); Skills->OnGearChanged.Broadcast(); }
+			else if (!Do.IsEmpty()) TrollSuitTest(Do);
+		}
+		if (TrollDoRunFor > 0.f) { TrollDoRunFor -= Dt; AddMovementInput(GetActorForwardVector(), 1.f); if (TrollDoRunFor <= 0.f && bSprinting) StopSprint(); }
+	}
 #endif
 	// the crouch as it charges (this machine only)
 	if (IsLocallyControlled()) LeapCrouch = FMath::FInterpTo(LeapCrouch, IsLeapCharging() ? 0.25f + 0.75f * LeapChargeShare() : 0.f, Dt, 12.f);

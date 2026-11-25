@@ -18,7 +18,7 @@ def black(ob):
 def export(ob, name):
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); bpy.context.view_layer.objects.active = ob
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT, name + ".fbx"), use_selection=True, object_types={"MESH"}, apply_scale_options="FBX_SCALE_NONE",
-                             apply_unit_scale=True, axis_forward="-Y", axis_up="Z", mesh_smooth_type="FACE", colors_type="SRGB", path_mode='STRIP')
+                             apply_unit_scale=True, axis_forward="-Y", axis_up="Z", mesh_smooth_type="EDGE", colors_type="SRGB", path_mode='STRIP')
 
 def save_pic(img, path, size=1024):
     c = img.copy(); c.scale(size, size); c.filepath_raw = path; c.file_format = 'PNG'; c.save(); bpy.data.images.remove(c)
@@ -36,6 +36,26 @@ lo, hi = P.min(0), P.max(0)
 s = 0.42 / (hi[2] - lo[2])
 top = Vector(((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, hi[2] - (hi[2] - lo[2]) * 0.08))   # (the knot, a little under the very top)
 sack.data.transform(Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(-top))
+# (2026-11-24, owner: the bag "is shattered".) Meshy's sack is 6000 loose triangles in 465 separate bits, shaded flat, some facing inwards: in the game
+# it read as a net of black holes. Its points are welded (3 mm here), every face is turned to face out from the sack's middle line, and it is shaded
+# smooth below 45 degrees; the game's material is two-sided as well (troll_kit_import.py), so a face still the wrong way round is not a hole.
+bm = bmesh.new(); bm.from_mesh(sack.data)
+n0 = len(bm.verts); e0 = sum(1 for e in bm.edges if len(e.link_faces) == 1)
+bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.003)
+bm.normal_update()
+flip = []
+zs = [v.co.z for v in bm.verts]; zlo, zhi = min(zs), max(zs)
+for f in bm.faces:
+    c = f.calc_center_median()
+    if c.z > zlo + (zhi - zlo) * 0.78: continue          # (the rocks on top and the strap: left as they are)
+    out = Vector((c.x, c.y, (c.z - (zlo + (zhi - zlo) * 0.4)) * 0.6))
+    if out.length > 1e-5 and f.normal.dot(out) < 0: flip.append(f)
+bmesh.ops.reverse_faces(bm, faces=flip)
+e1 = sum(1 for e in bm.edges if len(e.link_faces) == 1)
+bm.to_mesh(sack.data); bm.free(); sack.data.update()
+for p in sack.data.polygons: p.use_smooth = True
+sack.data.set_sharp_from_angle(angle=math.radians(45))
+print("TKROCK sack welded %d -> %d points, open edges %d -> %d, %d faces turned outwards" % (n0, len(sack.data.vertices), e0, e1, len(flip)))
 black(sack)
 for n in sack.material_slots[0].material.node_tree.nodes:
     if n.type == 'TEX_IMAGE' and n.image:
