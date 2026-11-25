@@ -315,10 +315,15 @@ void AKnightCharacter::UpdateRockSack()
 	const FTransform L = Anim->TrollLeftFistWorld();
 	const FRotator Yaw(0.f, GetActorRotation().Yaw + 90.f, 0.f);
 	RockSack->SetWorldLocationAndRotation(L.GetLocation(), Yaw);
-	if (RockSack->GetStaticMesh() && RockSack->GetStaticMesh()->GetName() != TEXT("Sphere")) RockSack->SetWorldScale3D(FVector(1.f));
+	// (2026-11-24, owner: the bag "not in his hand, and too small": bigger, and its neck in the hole of his fist, KnightAnimatorTrollThrow.cpp)
+	if (RockSack->GetStaticMesh() && RockSack->GetStaticMesh()->GetName() != TEXT("Sphere")) RockSack->SetWorldScale3D(FVector(FMath::Clamp(JeebTune::V().RockSackScale, 0.3f, 4.f)));
 	else RockSack->SetWorldLocation(L.GetLocation() - FVector(0.f, 0.f, 18.f));
 	const FTransform R = Anim->TrollRightFistWorld();
+	if (RockLog() && Rock == ERock::Charging && RockT > 1.f && RockT < 1.05f)   // (test log: where the drawn fists are against our own bones' wrists)
+		UE_LOG(LogTemp, Log, TEXT("JEEBROCK hands: left fist %s (our wrist %s), right fist %s (our wrist %s), sack %s rock %s"), *L.GetLocation().ToCompactString(), *Anim->BoneAt(JeebAnim::LHand).ToCompactString(),
+			*R.GetLocation().ToCompactString(), *Anim->BoneAt(JeebAnim::RHand).ToCompactString(), *RockSack->GetComponentLocation().ToCompactString(), *RockInHand->GetComponentLocation().ToCompactString());
 	RockInHand->SetWorldLocationAndRotation(R.GetLocation(), R.GetRotation());
+	if (RockInHand->GetStaticMesh() && RockInHand->GetStaticMesh()->GetName() != TEXT("Sphere")) RockInHand->SetWorldScale3D(FVector(FMath::Clamp(JeebTune::V().RockHandScale, 0.3f, 4.f)));
 }
 
 // ---------------- Tests ----------------

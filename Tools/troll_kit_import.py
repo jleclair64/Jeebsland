@@ -29,6 +29,15 @@ def pic(name, srgb, group=unreal.TextureGroup.TEXTUREGROUP_CHARACTER):
     lib.save_asset(folder + "/" + name)
     return t
 
+def two_sided(mi):
+    """(2026-11-24, owner: armour and sack 'cracked', 'shattered') Meshy's pieces are loose plates, some facing inwards: one-sided they showed as holes
+    with his skin behind. Drawn two-sided, a plate the wrong way round is still a plate."""
+    ov = mi.get_editor_property("base_property_overrides")
+    ov.set_editor_property("override_two_sided", True)
+    ov.set_editor_property("two_sided", True)
+    mi.set_editor_property("base_property_overrides", ov)
+    mel.update_material_instance(mi)
+
 skin = lib.load_asset("/Game/Knight/M_KnightSkin")
 flat = lib.load_asset("/Engine/EngineMaterials/FlatNormal")
 mats = {}
@@ -41,6 +50,7 @@ for p in PIECES:
         mel.set_material_instance_texture_parameter_value(mi, "BaseTex", base)
         if mr: mel.set_material_instance_texture_parameter_value(mi, "MRTex", mr)
         mel.set_material_instance_texture_parameter_value(mi, "NormalTex", nrm if nrm else flat)
+        two_sided(mi)
         lib.save_asset(folder + "/" + n)
         mats["%s_%s" % (p, part)] = mi
 
@@ -88,6 +98,7 @@ for n in ("RockSack", "TrollRock"):
     if mr: mel.set_material_instance_texture_parameter_value(mi, "MRTex", mr)
     nm = pic("T_%s_Normal" % n, False, unreal.TextureGroup.TEXTUREGROUP_WORLD)
     if nm: mel.set_material_instance_texture_parameter_value(mi, "NormalTex", nm)
+    if n == "RockSack": two_sided(mi)
     lib.save_asset(folder + "/MI_" + n)
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)

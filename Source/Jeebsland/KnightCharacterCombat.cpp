@@ -268,6 +268,12 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 
 void AKnightCharacter::DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes, uint8 Zone, bool bHeadshot)
 {
+#if !UE_BUILD_SHIPPING
+	{
+		static const bool bShotLog = FParse::Param(FCommandLine::Get(), TEXT("JeebShot"));   // (test runs: every blow that lands, to prove a move's hit boxes reach)
+		if (bShotLog) UE_LOG(LogTemp, Log, TEXT("JEEBDEAL %s deals %d to %s (zone %d, attack %d)"), *GetName(), Dmg, Target && Target->GetOwner() ? *Target->GetOwner()->GetName() : TEXT("?"), int32(Zone), bAttacking ? 1 : 0);
+	}
+#endif
 	if (!Target || !Target->IsAlive()) return;
 	const int32 Dealt = Target->ApplyDamage(Dmg, this, bCrit, bHitBoxes, Zone, bHeadshot);
 	if (Dealt > 0 && Skills) Skills->AddXP(Skill, 3 + Dealt / 3);
@@ -1335,6 +1341,10 @@ void AKnightCharacter::TickHitboxes(float Dt)
 			HitPrev[i] = Now;
 		}
 		bHitPrevValid = true;
+#if !UE_BUILD_SHIPPING
+		if (bShotFace && bIsTroll && bSword && NumBoxes > 0)   // (test runs: where the troll's blow carries its hit balls, in his own frame: X ahead, Y right, Z from his middle; log JEEBTROLLTIP)
+			UE_LOG(LogTemp, Log, TEXT("JEEBTROLLTIP blow %d T %.2f first %s last %s"), AttackDir == JabSecond ? 2 : 1, T, *GetActorTransform().InverseTransformPosition(HitLive[HitLive.Num() - NumBoxes].B).ToCompactString(), *GetActorTransform().InverseTransformPosition(HitLive.Last().B).ToCompactString());
+#endif
 		if (bShotFace && bSweep)   // test pictures: how low the sweep's tip runs (log: JEEBSWEEP)
 			UE_LOG(LogTemp, Log, TEXT("JEEBSWEEP T %.2f tip %s"), T, *GetActorTransform().InverseTransformPosition(HitLive[0].B).ToCompactString());
 		if (HasAuthority() && Skills)

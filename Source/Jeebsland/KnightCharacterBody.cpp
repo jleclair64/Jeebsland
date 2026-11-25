@@ -846,12 +846,25 @@ void AKnightCharacter::RebuildHeld()
 		return;
 	}
 	// Everything else lies through the fist the way a sword does, the grip across it and the working end out past the thumb
+	const int32 FirstHeld = HeldComps.Num();
 	Make(WristR, KnightDesign::P_WristR, KM::Xf(KnightDesign::GripPos(false), KM::DownTo(KnightDesign::BladeDir(1))));
+	// (2026-11-24, owner: "the way he holds a sword makes no sense".) A knight-sized sword in the troll's 50 cm hand had its whole grip hidden inside
+	// his fist and a blade no longer than his forearm. In his hand every knight-sized weapon and tool is drawn bigger about its grip (Tuning.ini
+	// TrollWeaponScale; his own club is already his size). Looks only: the hit boxes and reach stay the weapon's own.
+	const float TrollScale = (bIsTroll && K != JeebItems::K_Club) ? FMath::Clamp(JeebTune::V().TrollWeaponScale, 0.5f, 3.f) : 1.f;
+	if (TrollScale != 1.f)
+		for (int32 i = FirstHeld; i < HeldComps.Num(); ++i)
+			if (HeldComps[i] && HeldComps[i]->GetAttachParent() == WristR)
+			{
+				HeldComps[i]->SetRelativeScale3D(FVector(TrollScale));
+				HeldComps[i]->SetRelativeLocation(KnightDesign::GripPos(false) * (1.f - TrollScale) - KnightDesign::PivotPos(KnightDesign::P_WristR));
+			}
 	if (K == JeebItems::K_Katana) Make(ElbowL, KnightDesign::P_ElbowL, KM::Xf(KnightDesign::GripPos(true), KM::DownTo(KnightDesign::BladeDir(-1))));
 	if (UStaticMeshComponent* S = JeebProps::Make(this, WristR, K, T))
 	{
 		// (owner 2026-11-06: the pickaxe's head stands upright in the hand, in the plane of its swing, not flat across it. A turn about the haft.)
 		S->SetRelativeTransform(K == JeebItems::K_Pickaxe ? FTransform(FQuat(FVector::ZAxisVector, FMath::DegreesToRadians(90.f))) * FistPlace() : FistPlace());
+		if (TrollScale != 1.f) S->SetRelativeScale3D(FVector(TrollScale));   // (the model is built round its grip)
 		HeldStatics.Add(S);
 	}
 }

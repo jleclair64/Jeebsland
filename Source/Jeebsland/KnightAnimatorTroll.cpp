@@ -257,6 +257,7 @@ void FKnightAnimator::MakeTrollMesh(AActor* Owner)
 	if (!bOldTick) Owner->AddTickPrerequisiteComponent(TrollComp);
 #if !UE_BUILD_SHIPPING
 	bTrollOldSwing = FParse::Param(FCommandLine::Get(), TEXT("TrollOldSwing"));
+	bTrollKnightSwing = FParse::Param(FCommandLine::Get(), TEXT("TrollKnightSwing"));
 #endif
 }
 
@@ -483,6 +484,100 @@ float FKnightAnimator::TrollClubSwing(const FInput& In, FPose& B, float& OutBlen
 	OutBlend = 0.12f;
 	bTrollHaft = true;   // (both hands on the haft: the left fist closes)
 	return 1.f;
+}
+
+// The troll's own one-handed blows (2026-11-24, owner: "his club swings need review (natural path, weight, follow-through)"). The knight's
+// sword cuts bend the knight at the waist to reach; on the troll's long trunk that doubled him over until his chest was level with the
+// floor and the club went round out of sight. These are made for him instead, on the same timing rows (Jab1 / Jab2 in Tuning.ini: From..To
+// are the hit frames, past 1 the still moment after), so the server's hit boxes (they ride the blade bone) and every machine read the same
+// MoveU. He stands up in both; the weight is in the trunk's coil and the slow start of each blow.
+//   Blow 1: the club drawn back over his right shoulder with the chest coiled right, his weight back and the left arm out ahead as a
+//           counterweight, then an overhand chop down and in across his middle line to his front left: he steps his weight in (hips
+//           forward and down, feet planted), the chest comes through and leans in, the left arm swings back.
+//   Blow 2: from there the club is carried up across to the left side of his chest, the chest coiled left, and swept back level across
+//           his front at his chest height to end out wide on his right (a backhand), the chest uncoiling right.
+// Measured on the still sparring knight (log JEEBTROLLTIP / JEEBDEAL): the club's head reaches 2.2 m (blow 1) and 2.1 m (blow 2) ahead of
+// his middle and both blows land on a knight 1.7, 2.0 and 2.4 m off. (The knight's cuts on him carried the whole club 2.3 to 3 m out: they
+// reached further but passed clean over a knight 2 m away.)
+// The hand goes round the shoulder on an arc (its direction turned, its distance eased), the club is turned onto its line, and
+// TrollClubClear then keeps the whole club off his belly and the floor. Hand places are from the right shoulder in arm lengths, club
+// directions unit vectors, Twist the chest's turn (+ right shoulder back), Lean + back; mesh space: +X his left, +Y ahead, +Z up.
+namespace
+{
+	struct FOneKey { FVector Hand; FVector Dir; float Twist; float Lean; FVector Left; float Lunge; };   // (Lunge: his hips' share of the step in, -1..1)
+	static FVector ArcLerp(const FVector& A, const FVector& B, float W)
+	{
+		const FQuat Q = FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(A.GetSafeNormal(), B.GetSafeNormal()), W);
+		return Q.RotateVector(A.GetSafeNormal()) * FMath::Lerp(float(A.Size()), float(B.Size()), W);
+	}
+	static FOneKey LerpOne(const FOneKey& A, const FOneKey& B, float W)
+	{
+		return { ArcLerp(A.Hand, B.Hand, W), ArcLerp(A.Dir.GetSafeNormal(), B.Dir.GetSafeNormal(), W), FMath::Lerp(A.Twist, B.Twist, W), FMath::Lerp(A.Lean, B.Lean, W), FMath::Lerp(A.Left, B.Left, W), FMath::Lerp(A.Lunge, B.Lunge, W) };
+	}
+}
+
+void FKnightAnimator::TrollSwingOneHand(const FInput& In, FPose& B, float& OutBlend, bool b2)
+{
+	const auto& Tn = JeebTune::V();
+	if (const FClip* G = Get(TEXT("Idle_SS"))) { Sample(*G, IdleT, Over, true); Overlay(B, Over, 1.f, 1.f); }
+	const float U = In.MoveU;
+	const float From = b2 ? Tn.Jab2From : Tn.Jab1From, To = b2 ? Tn.Jab2To : Tn.Jab1To;
+	const float UEnd = 1.f + (b2 ? Tn.Jab2Pause : Tn.Jab1Pause) / FMath::Max(b2 ? Tn.Jab2Share : Tn.Jab1Share, 0.05f);
+	static const FOneKey Rest  = { FVector(-0.25f, 0.45f, -0.05f), FVector(-0.10f, 0.35f, 0.93f),   0.f,   0.f, FVector(0.10f, 0.35f, -0.50f), 0.f };
+	static const FOneKey Wind1 = { FVector(-0.44f, -0.20f, 0.70f), FVector(-0.25f, -0.62f, 0.74f),  32.f,   7.f, FVector(0.05f, 0.62f, -0.08f), -0.25f };   // over the right shoulder, the head tipped back, his weight back
+	// (hit check, log JEEBTROLLTIP: aimed straight ahead of his right shoulder the head came down half a metre to the right of a knight stood in
+	// front of him; the hand and the club are angled in so the head crosses his middle line at a knight's chest height, 1.75 m out)
+	static const FOneKey Hit1  = { FVector(0.15f, 0.96f, -0.12f), FVector(0.37f, 0.90f, -0.30f), -26.f, -20.f, FVector(0.42f, -0.02f, -0.50f), 1.f };  // the arm out across his front, the head at a knight's chest on his middle line
+	static const FOneKey End1  = { FVector(0.34f, 0.62f, -0.50f),  FVector(0.52f, 0.52f, -0.68f), -40.f, -22.f, FVector(0.48f, -0.20f, -0.48f), 0.8f };  // run on low to his front left, the head clear of his left leg
+	// (blow 2 is swept at his own chest height, about 1.3 m: a knight's chest and head; at his shoulder height it passed over a knight)
+	static const FOneKey Wind2 = { FVector(0.50f, 0.42f, -0.12f),  FVector(0.62f, -0.55f, 0.55f), -46.f,  -4.f, FVector(0.50f, -0.20f, -0.45f), 0.2f };  // carried up across to the left side of his chest, the head behind it
+	static const FOneKey Hit2  = { FVector(-0.30f, 0.90f, -0.40f), FVector(-0.35f, 0.93f, -0.04f),  8.f, -14.f, FVector(0.50f, 0.05f, -0.45f), 1.f };   // level across his front at arm's length
+	static const FOneKey End2  = { FVector(-0.98f, 0.25f, -0.30f), FVector(-0.80f, -0.55f, 0.16f),  40.f,  -3.f, FVector(0.30f, 0.50f, -0.30f), 0.4f };   // out wide on his right, the head run on behind
+	const FOneKey& K0 = b2 ? Wind2 : Wind1, &K1 = b2 ? Hit2 : Hit1, &K2 = b2 ? End2 : End1;
+	FOneKey Now;
+	if (U < From) Now = LerpOne(b2 ? End1 : Rest, K0, FMath::SmoothStep(0.f, From * 0.88f, U));   // (drawn back, and a breath there: the weight gathers)
+	// (hit check on the sparring knight 2 m off: with the blow only arriving at the last hit frame, blow 1 never touched him. The club is on
+	// its hit line 70% of the way through the hit frames and carries on a third of the way into the follow-through while they last.)
+	const FOneKey Through = LerpOne(K1, K2, 0.35f);
+	if (U < From) {}
+	else if (U < To)
+	{
+		const float F = (U - From) / FMath::Max(To - From, 0.01f);
+		Now = F < 0.7f ? LerpOne(K0, K1, FMath::Pow(F / 0.7f, 1.6f)) : LerpOne(K1, Through, (F - 0.7f) / 0.3f);   // (a heavy blow: slow to start, fastest at the hit)
+	}
+	else { const float S = FMath::Clamp((U - To) / FMath::Max((UEnd - To) * 0.75f, 0.01f), 0.f, 1.f); Now = LerpOne(Through, K2, 1.f - FMath::Square(1.f - S)); }   // (it runs on and stops)
+	// the step in (hit check: standing bolt upright his club reached 1.8 m, no further than a knight's sword): his hips go forward and down
+	// with the blow, back a little in the wind-up, and both legs are bent to keep his feet where they stand, turned as they were
+	if (FMath::Abs(Now.Lunge) > 0.01f)
+	{
+		FQuat LQ, RQ;
+		const FVector LF = BonePos(B, LFoot, &LQ), RF = BonePos(B, RFoot, &RQ);
+		B.Hip += FVector(0.f, 36.f * Now.Lunge, -10.f * FMath::Abs(Now.Lunge));
+		L.ReachTo(B, LUp, LLeg, LFoot, LF, FVector(0.2f, 1.f, 0.2f));
+		L.ReachTo(B, RUp, RLeg, RFoot, RF, FVector(-0.2f, 1.f, 0.2f));
+		FQuat Q;
+		BonePos(B, LFoot, &Q); TurnInMesh(B, LFoot, LQ * Q.Inverse());
+		BonePos(B, RFoot, &Q); TurnInMesh(B, RFoot, RQ * Q.Inverse());
+	}
+	// the trunk: the coil shared up the spine, the head turned back by most of it so he keeps his eyes on what he hits
+	const float Yaw = FMath::DegreesToRadians(Now.Twist), Lean = FMath::DegreesToRadians(Now.Lean);
+	static const float Share[3] = { 0.22f, 0.36f, 0.42f };
+	const int32 SpineB[3] = { Spine, Spine1, Spine2 };
+	for (int32 i = 0; i < 3; ++i) TurnInMesh(B, SpineB[i], FQuat(FVector::UpVector, Yaw * Share[i]) * FQuat(FVector::XAxisVector, Lean * Share[i]));
+	TurnInMesh(B, Neck, FQuat(FVector::UpVector, -Yaw * 0.35f));
+	TurnInMesh(B, Head, FQuat(FVector::UpVector, -Yaw * 0.35f));
+	// the right hand, then the club turned onto its line
+	const float Arm = float(RefPos[Bone[RFore]].Size() + RefPos[Bone[RHand]].Size());
+	const FVector Sh = BonePos(B, RArm);
+	L.ReachTo(B, RArm, RFore, RHand, Sh + Now.Hand * Arm, FVector(-0.8f, -0.3f, -0.6f));
+	FQuat HandRot;
+	BonePos(B, RHand, &HandRot);
+	TurnInMesh(B, RHand, FQuat::FindBetweenNormals(HandRot.RotateVector(L.BladeInHand).GetSafeNormal(), Now.Dir.GetSafeNormal()));
+	// the left arm: his balance
+	const FVector ShL = BonePos(B, LArm), NowL = BonePos(B, LHand);
+	L.ReachTo(B, LArm, LFore, LHand, FMath::Lerp(NowL, ShL + Now.Left * Arm, 0.85f), FVector(0.8f, -0.4f, -0.5f));
+	TrollClubClear(B);
+	OutBlend = 0.12f;
 }
 
 // The troll's block with no shield (owner 2026-11-21: "just have him put his hand up as if he's trying to block with just his bare arm").

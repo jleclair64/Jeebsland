@@ -351,12 +351,17 @@ private:
 	float TrollClubSwing(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's club blows; returns 1 (the left hand holds the haft)
 	void TrollClubClear(FPose& B);   // the troll's right hand pushed out until the held club clears his belly (the knight's cuts on his body)
 	bool bTrollOldSwing = false;     // (test builds, -TrollOldSwing: the 2026-11-21 two-handed club blows)
+	bool bTrollKnightSwing = false;  // (test builds, -TrollKnightSwing: the knight's own sword cuts on him, as 2026-11-22/23)
+	void TrollSwingOneHand(const JeebAnim::FInput& In, FPose& B, float& OutBlend, bool b2);   // the troll's own one-handed blows (2026-11-24): club and broadsword
 	float TrollHaftW = 0.f; bool bTrollHaft = false;   // (the left fist closes on the club's haft while a club blow plays)
 	float TrollLeapAir(const JeebAnim::FInput& In, FPose& B);   // returns how far the knees tuck (0..1)
 	// The troll's throwing rocks and his own armour (2026-11-22, KnightAnimatorTrollThrow.cpp)
 	void TrollThrow(const JeebAnim::FInput& In, FPose& B, float Dt);   // the wind-up and the overarm throw, laid over whatever he is doing
 	void TrollSackHand(const JeebAnim::FInput& In, FPose& B);          // the left fist held a little out and forward, round the sack's neck
 	float TrollThrowW = 0.f;   // how far the throw's pose is on (eased)
+	float TrollSackW = 0.f;    // how far the sack's carrying arm is on (eased; 2026-11-24)
+	uint8 TrollThrowMode = 0; float TrollThrowT = 0.f, TrollThrowC = 0.f;   // the wind-up or throw being shown, kept while its pose fades out (2026-11-24)
+	FTransform TrollFistWorld(bool bLeft, float AlongBlade) const;   // the hole of his drawn fist, from his own mesh's hand bone
 	void WearTroll(int32 Piece, int32 Tier);
 	class USkeletalMeshComponent* TrollArmourComp = nullptr;   // /Game/TrollKit/SK_TrollArmour: follows TrollComp's bones, one section per piece
 	int32 TrollArmourMat[JeebAnim::Piece_Count] = { INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE };   // each piece's iron slot
