@@ -1,4 +1,4 @@
-Key,Name,Group,Model,Scale,Health,WalkSpeed,RunSpeed,Sight,Behind,HearRun,HearWalk,HearSneak,FleeAt,Calm,Roam,Respawn,XP,WalkClip,RunClip,Loot,Meat,Bones,DropTable,HuntXP
+Key,Name,Group,Model,Scale,Health,WalkSpeed,RunSpeed,Sight,Behind,HearRun,HearWalk,HearSneak,FleeAt,Calm,Roam,Respawn,XP,WalkClip,RunClip,Loot,Meat,Bones,DropTable,HuntXP,Temper,Damage,Reach,Windup,Cool,Leash,LieDrop,BoxLong,BoxTall
 # The world's huntable animals (2026-11-22, Docs/DeerPlan.md). One row per kind; where their herds live is in AnimalHerds.csv. The server runs them (Deer.cpp).
 # Key: the animal's name for the game (AnimalHerds.csv and quests name it; a quest's kill step may name a Key or a Group). Name: what players see. Group: e.g. Deer.
 # Model: its body in /Game/Animals (SK_<Model> and the clips A_<Model>_Idle, Idle2, Walk, Run, Graze, Alert, Death; Tools/BuildDeer.ps1). Scale: its size (1 = as modelled).
@@ -13,4 +13,13 @@ Key,Name,Group,Model,Scale,Health,WalkSpeed,RunSpeed,Sight,Behind,HearRun,HearWa
 # WalkClip / RunClip: cm/s the clip's hooves cover at Scale 1 (the game plays the clip at real speed / this, so hooves don't slide).
 # Loot: as in Foes.csv: items separated by ";", each a name or Materials.csv key, a count (x2 or 1-2), then @ and the chance in % (none = always).
 # Change the file, then restart the game and the world servers (the server's copy decides everything; players' copies only the looks).
-Stag,Stag,Deer,Stag,1.3,26,1.0,8.6,30,0.35,24,13,4,15,9,12,300,25,63,400,Hide @70; Antlers @35,Venison,Bones,Deer,40
+Stag,Stag,Deer,Stag,1.3,26,1.0,8.6,30,0.35,24,13,4,15,9,12,300,25,63,400,Hide @70; Antlers @35,Venison,Bones,Deer,40,flee,,,,,,42,1,1
+# (2026-11-24, Docs/AnimalsPlan2.md) Temper: flee (as the stag), cornered (flees, but turns on a player who hurts it from within 8 m for 10 s), fight (comes for any player inside FleeAt,
+#   and the whole pack with it), moody (each animal rolls once when placed: half fight, half flee). Damage: raw damage of one strike (armour and a raised shield count, as against a bandit;
+#   a new player has 100 health). Reach: metres (centre to centre) from which it strikes. Windup: seconds from the start of its leap to the bite. Cool: seconds between strikes.
+#   Leash: metres from home; past it it gives up, walks home and heals. LieDrop: cm its death pose is lowered (at Scale 1). BoxLong / BoxTall: the stag's hurt boxes stretched to its shape.
+Rabbit,Rabbit,Rabbit,Rabbit,1.1,20,0.6,6.0,18,0.5,18,9,3,9,6,10,180,8,93.6,140.4,,GameMeat,Bones,Small,15,flee,,,,,,0,0.31,0.25
+Fox,Fox,Fox,Fox,1.25,22,1.0,7.5,24,0.4,22,11,4,12,8,14,240,12,52.6,248.5,Hide @40,GameMeat,Bones,Small,20,flee,,,,,,0,0.46,0.39
+Boar,Wild Boar,Boar,Boar,1.0,28,0.9,6.5,20,0.35,22,12,4,12,9,12,300,22,122.7,493.6,Hide @60,Bacon,Bones,Deer,40,cornered,10,1.7,0.55,2.2,35,12,1.2,0.7
+Wolf,Wolf,Wolf,Wolf,1.25,26,1.2,8.0,30,0.5,26,14,5,20,8,15,300,30,108.3,422.1,Hide @60,GameMeat,Bones,Deer,45,fight,7,1.7,0.4,1.4,45,0,0.88,0.62
+Moose,Moose,Moose,Moose,1.3,30,1.2,7.0,26,0.4,24,13,4,14,9,15,360,35,233,868.6,Hide @80; Antlers @40,Venison,Bones,Big,60,moody,14,2.8,0.6,2.4,45,39,1.46,1.35

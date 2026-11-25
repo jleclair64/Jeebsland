@@ -43,7 +43,7 @@ namespace
 			M.bTried = true;
 			const FString Base = TEXT("/Game/Animals/");
 			M.Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%sSK_%s.SK_%s"), *Base, *Name, *Name));
-			static const TCHAR* Keys[JeebDeer::C_Count] = { TEXT("Idle"), TEXT("Idle2"), TEXT("Walk"), TEXT("Run"), TEXT("Graze"), TEXT("Alert"), TEXT("Death") };
+			static const TCHAR* Keys[JeebDeer::C_Count] = { TEXT("Idle"), TEXT("Idle2"), TEXT("Walk"), TEXT("Run"), TEXT("Graze"), TEXT("Alert"), TEXT("Death"), TEXT("Attack") };
 			int32 Got = 0;
 			for (int32 i = 0; i < JeebDeer::C_Count; ++i)
 			{
@@ -111,8 +111,10 @@ void FDeerAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds
 		}
 	}
 	// Cross-fade toward the wanted clip (0.3 s; into a run 0.18 s, it bolts; into the fall 0.5 s), and run every clip that shows
-	const float Fade = A->Want == JeebDeer::C_Run ? 0.18f : A->Want == JeebDeer::C_Death ? 0.5f : 0.3f;
+	const float Fade = A->Want == JeebDeer::C_Run ? 0.18f : A->Want == JeebDeer::C_Death ? 0.5f : A->Want == JeebDeer::C_Attack ? 0.12f : 0.3f;
 	const float Step = DeltaSeconds / Fade;
+	if (A->Want != LastWant && A->Want == JeebDeer::C_Attack) Time[JeebDeer::C_Attack] = 0.f;   // (every strike from its start)
+	LastWant = A->Want;
 	for (int32 i = 0; i < N; ++i)
 	{
 		Weight[i] = (i == A->Want) ? FMath::Min(1.f, Weight[i] + Step) : FMath::Max(0.f, Weight[i] - Step);
@@ -120,8 +122,8 @@ void FDeerAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds
 		const float Len = FMath::Max(Clip[i]->GetPlayLength(), 0.01f);
 		if (Weight[i] > 0.f || i == A->Want)
 		{
-			const float R = (i == JeebDeer::C_Walk || i == JeebDeer::C_Run) ? A->Rate : 1.f;
-			Time[i] = (i == JeebDeer::C_Death) ? FMath::Min(Time[i] + DeltaSeconds, Len - 0.01f) : FMath::Fmod(Time[i] + DeltaSeconds * R, Len);
+			const float R = (i == JeebDeer::C_Walk || i == JeebDeer::C_Run || i == JeebDeer::C_Attack) ? A->Rate : 1.f;
+			Time[i] = (i == JeebDeer::C_Attack) ? FMath::Min(Time[i] + DeltaSeconds * R, Len - 0.01f) : (i == JeebDeer::C_Death) ?FMath::Min(Time[i] + DeltaSeconds, Len - 0.01f) : FMath::Fmod(Time[i] + DeltaSeconds * R, Len);
 		}
 		else if (i == JeebDeer::C_Death || i == JeebDeer::C_Graze || i == JeebDeer::C_Alert) Time[i] = 0.f;   // (these start from their beginning)
 	}
@@ -201,6 +203,77 @@ void ADeer::SetupDeer(int32 InKind, int32 InHerd, ADeerHerds* InHerds, const FVe
 	const JeebFoes::FAnimalDef& D = DefOf(InKind);
 	Hp->Max = Hp->Cur = D.Hp;
 	RespawnSecs = D.Respawn;
+	bFights = D.Temper == 2 || (D.Temper == 3 && Rand.FRand() < 0.5f);   // (a moose's temper is rolled once, here: Docs/AnimalsPlan2.md)
+}
+
+namespace
+{
+	AKnightCharacter* NearestKnight(UWorld* W, const FVector2D& P, float Max)
+	{
+		AKnightCharacter* Best = nullptr;
+		float BestD = Max;
+		for (TActorIterator<AKnightCharacter> It(W); It; ++It)
+		{
+			if (It->GetHealth() <= 0.f) continue;
+			const float Dd = FVector2D::Distance(FVector2D(It->GetActorLocation()), P);
+			if (Dd < BestD) { BestD = Dd; Best = *It; }
+		}
+		return Best;
+	}
+}
+
+bool ADeer::WillFight() const { return bFights || AngryT > 0.f; }
+
+void ADeer::Attack(AKnightCharacter* K, const TCHAR* Why)
+{
+	if (!K || IsDown() || !HasAuthority()) return;
+	Target = K;
+	if (StateNow() != EDeerState::Chase && StateNow() != EDeerState::Strike) { CalmT = 0.f; SetState(EDeerState::Chase, Why); }
+}
+
+// (server) running at its target and striking; it gives up past its leash (or a cornered boar once its anger cools), walks home and heals
+void ADeer::TickFight(float Dt)
+{
+	const JeebFoes::FAnimalDef& D = DefOf(RepKind);
+	AngryT -= Dt; CoolT -= Dt;
+	AKnightCharacter* K = Target.Get();
+	const FVector2D Me(GetActorLocation());
+	if (!K || K->GetHealth() <= 0.f || FVector2D::Distance(Me, Home) > D.Leash || !WillFight() || JeebFoes::InTown(K->GetActorLocation().X, K->GetActorLocation().Y, TownKeep))
+	{
+		Target = nullptr;
+		AngryT = 0.f;
+		if (D.Temper == 1) { CalmT = 0.f; SetState(EDeerState::Flee, TEXT("its anger is spent")); return; }
+		Hp->Cur = Hp->Max;
+		bGoHome = true; Goal = Home;
+		SetState(EDeerState::Walk, TEXT("gives up the chase"));
+		return;
+	}
+	const FVector2D P(K->GetActorLocation());
+	const float Dd = FVector2D::Distance(Me, P);
+	auto Face = [&]()
+	{
+		const float WantYaw = FMath::RadiansToDegrees(FMath::Atan2(P.Y - Me.Y, P.X - Me.X));
+		SetActorRotation(FRotator(0.f, FMath::FixedTurn(GetActorRotation().Yaw, WantYaw, 360.f * Dt), 0.f));
+	};
+	if (StateNow() == EDeerState::Strike)
+	{
+		Speed = FMath::FInterpTo(Speed, 0.f, Dt, 8.f);
+		Face();
+		if (!bStruck && StateT >= D.Windup)
+		{
+			bStruck = true;
+			const bool bHit = Dd < D.Reach * 1.3f && FMath::Abs(K->GetActorLocation().Z - GetActorLocation().Z) < 250.f;
+			if (bHit) K->Hurt(D.Damage, this);
+			UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s strikes %s at %.1f m: %s (%d)"), *D.Name, *K->GetName(), Dd / 100.f, bHit ? TEXT("hit") : TEXT("missed"), bHit ? D.Damage : 0);
+		}
+		if (StateT >= D.Windup + 0.45f) { CoolT = D.Cool; SetState(EDeerState::Chase, TEXT("after its strike")); }
+		return;
+	}
+	if (Dd < D.Reach && CoolT <= 0.f) { bStruck = false; SetState(EDeerState::Strike, TEXT("strikes")); return; }
+	if (Dd < D.Reach * 0.75f) { Speed = FMath::FInterpTo(Speed, 0.f, Dt, 8.f); Face(); return; }
+	const float Run = D.RunSpeed * Tire.SpeedMul() * (Dd < D.Reach * 2.5f ? 0.65f : 1.f);
+	if (!Step((P - Me).GetSafeNormal(), Run, 540.f, Dt)) { StuckT += Dt; if (StuckT > 3.f) { StuckT = 0.f; Target = nullptr; } }
+	else StuckT = 0.f;
 }
 
 float ADeer::Scale() const { return DefOf(RepKind).Scale * (0.92f + 0.16f * RepSize / 255.f); }
@@ -209,7 +282,8 @@ void ADeer::BeginPlay()
 {
 	Super::BeginPlay();
 	const float S = Scale();
-	Hp->BarHeight = 198.f * S; Hp->HitHeight = 82.f * S; Hp->HitRadius = 70.f * S;
+	const JeebFoes::FAnimalDef& D = DefOf(RepKind);
+	Hp->BarHeight = 198.f * S * D.BoxTall; Hp->HitHeight = 82.f * S * D.BoxTall; Hp->HitRadius = 70.f * S * FMath::Sqrt(D.BoxLong * D.BoxTall);
 	Hp->GatherHurt = [this](TArray<JeebHit::FCapsule>& Out) { GatherHurt(Out); };
 	if (HasAuthority())
 	{
@@ -292,9 +366,9 @@ void ADeer::SetSleeping(bool bSleep)
 void ADeer::SetState(EDeerState S, const TCHAR* Why)
 {
 	if (StateNow() == S) return;
-	static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead") };
+	static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead"), TEXT("chase"), TEXT("strike") };
 	if (S == EDeerState::Flee) Tire.Chase();   // (StateNow() != S here: a new chase)
-	const bool bLoud = S == EDeerState::Alert || S == EDeerState::Flee || S == EDeerState::Dead || StateNow() == EDeerState::Flee || StateNow() == EDeerState::Dead;
+	const bool bLoud = S == EDeerState::Alert || S == EDeerState::Flee || S == EDeerState::Dead || S == EDeerState::Chase || StateNow() == EDeerState::Flee || StateNow() == EDeerState::Dead;
 	if (bLoud) UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s (herd %d) %s -> %s: %s; at %.0f %.0f, %.0f m from home, health %d/%d"), *GetName(), Herd,
 		Names[RepState], Names[uint8(S)], Why, GetActorLocation().X, GetActorLocation().Y, FVector2D::Distance(FVector2D(GetActorLocation()), Home) / 100.f, Hp->Cur, Hp->Max);
 	RepState = uint8(S);
@@ -309,9 +383,12 @@ void ADeer::GatherHurt(TArray<JeebHit::FCapsule>& Out) const
 	if (IsDown()) return;
 	const float S = Scale();
 	const FTransform Xf(FRotator(0.f, GetActorRotation().Yaw, 0.f), GetActorLocation());
+	const JeebFoes::FAnimalDef& D = DefOf(RepKind);
+	const FVector Fit(D.BoxLong, FMath::Sqrt(D.BoxLong * D.BoxTall), D.BoxTall);   // (the stag's boxes stretched to this animal's shape)
+	const float FitR = FMath::Sqrt(D.BoxLong * D.BoxTall);
 	auto Cap = [&](const FVector& A, const FVector& B, float R, uint8 Zone)
 	{
-		JeebHit::FCapsule C; C.A = Xf.TransformPosition(A * S); C.B = Xf.TransformPosition(B * S); C.R = R * S; C.Zone = Zone;
+		JeebHit::FCapsule C; C.A = Xf.TransformPosition(A * Fit * S); C.B = Xf.TransformPosition(B * Fit * S); C.R = R * FitR * S; C.Zone = Zone;
 		Out.Add(C);
 	};
 	const float G = HeadDown;
@@ -334,9 +411,10 @@ void ADeer::TickLook(float Dt, float MoveSpeed)
 	if (St == EDeerState::Dead) { DeadFor += Dt; Fall = FMath::FInterpConstantTo(Fall, 1.f, Dt, 2.f); }
 	else Fall = FMath::FInterpConstantTo(Fall, 0.f, Dt, 4.f);
 	const float Hd = FMath::SmoothStep(0.f, 1.f, HeadDown);
-	JBody->SetRelativeLocation(FVector(-8.f, 0.f, FMath::Lerp(85.f, 24.f, Fall)) * S);
-	JNeck->SetRelativeLocation(FMath::Lerp(FVector(38.f, 0.f, 110.f), FVector(52.f, 0.f, 64.f), Hd) * S);
-	JHead->SetRelativeLocation(FMath::Lerp(FVector(57.f, 0.f, 128.f), FVector(84.f, 0.f, 16.f), Hd) * S);
+	const FVector Fit(D.BoxLong, 1.f, D.BoxTall);
+	JBody->SetRelativeLocation(FVector(-8.f, 0.f, FMath::Lerp(85.f, 24.f, Fall)) * Fit * S);
+	JNeck->SetRelativeLocation(FMath::Lerp(FVector(38.f, 0.f, 110.f), FVector(52.f, 0.f, 64.f), Hd) * Fit * S);
+	JHead->SetRelativeLocation(FMath::Lerp(FVector(57.f, 0.f, 128.f), FVector(84.f, 0.f, 16.f), Hd) * Fit * S);
 	if (!Body) return;
 	int32 Clip = JeebDeer::C_Idle;
 	float Rate = 1.f;
@@ -346,13 +424,14 @@ void ADeer::TickLook(float Dt, float MoveSpeed)
 	case EDeerState::Look:  Clip = JeebDeer::C_Look; break;
 	case EDeerState::Alert: Clip = JeebDeer::C_Alert; break;
 	case EDeerState::Dead:  Clip = JeebDeer::C_Death; break;
+	case EDeerState::Strike: Clip = JeebDeer::C_Attack; Rate = 2.4f; break;   // (the pounce clips are slow: its leap lands about 0.6 s in)
 	default: break;
 	}
-	if (St != EDeerState::Dead && MoveSpeed > 25.f)
+	if (St != EDeerState::Dead && St != EDeerState::Strike && MoveSpeed > 25.f)
 	{
 		const bool bRun = MoveSpeed > D.WalkSpeed * 2.4f;
 		Clip = bRun ? JeebDeer::C_Run : JeebDeer::C_Walk;
-		Rate = FMath::Clamp(MoveSpeed / ((bRun ? D.RunClip : D.WalkClip) * S), 0.5f, 2.6f);
+		Rate = FMath::Clamp(MoveSpeed / ((bRun ? D.RunClip : D.WalkClip) * S), 0.3f, 4.f);
 	}
 	if (Anim) Anim->Drive(Clip, Rate);
 	// lean with the ground under it, and lie on it when down (the lying pose is modelled 42 cm up)
@@ -361,7 +440,7 @@ void ADeer::TickLook(float Dt, float MoveSpeed)
 	const float Ahead = JeebFoes::Ground(L.X + Fw.X * 55.f * S, L.Y + Fw.Y * 55.f * S), Back = JeebFoes::Ground(L.X - Fw.X * 55.f * S, L.Y - Fw.Y * 55.f * S);
 	SlopePitch = FMath::FInterpTo(SlopePitch, FMath::Clamp(FMath::RadiansToDegrees(FMath::Atan2(Ahead - Back, 110.f * S)), -22.f, 22.f), Dt, 6.f);
 	const float Sink = (St == EDeerState::Dead && DeadFor > 20.f) ? FMath::Min(DeadFor - 20.f, 1.6f) * 70.f : 0.f;   // (after a while it sinks away; the server hides it then)
-	Body->SetRelativeLocation(FVector(0.f, 0.f, -42.f * S * FMath::SmoothStep(0.f, 1.f, Fall) - Sink));
+	Body->SetRelativeLocation(FVector(0.f, 0.f, -D.LieDrop * S * FMath::SmoothStep(0.f, 1.f, Fall) - Sink));
 	// (the mesh is yawed to face forward, so its own roll axis is the animal's pitch)
 	const float MeshYaw = CVarDeerMeshYaw.GetValueOnGameThread();
 	Body->SetRelativeRotation((FRotator(SlopePitch, 0.f, 0.f).Quaternion() * FRotator(0.f, MeshYaw, 0.f).Quaternion()).Rotator());
@@ -394,10 +473,10 @@ void ADeer::Tick(float DeltaSeconds)
 	const float Yaw = RepMove.Yaw * (360.f / 65536.f);
 	const float Since = FMath::Min(float(W->GetTimeSeconds() - MoveAt), 0.25f);
 	const FVector2D Fw(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)));
-	const FVector2D Target = FVector2D(RepMove.Loc.X, RepMove.Loc.Y) + Fw * (float(RepMove.Speed) * Since);
+	const FVector2D GlideTo = FVector2D(RepMove.Loc.X, RepMove.Loc.Y) + Fw * (float(RepMove.Speed) * Since);
 	FVector2D Me(GetActorLocation());
-	if (FVector2D::DistSquared(Me, Target) > FMath::Square(900.f)) Me = Target;   // (it came back to life somewhere else: no gliding across the map)
-	else Me += (Target - Me) * (1.f - FMath::Exp(-14.f * Dt));
+	if (FVector2D::DistSquared(Me, GlideTo) > FMath::Square(900.f)) Me = GlideTo;   // (it came back to life somewhere else: no gliding across the map)
+	else Me += (GlideTo - Me) * (1.f - FMath::Exp(-14.f * Dt));
 	const float NewYaw = FMath::FixedTurn(GetActorRotation().Yaw, Yaw, 720.f * Dt);
 	SetActorLocationAndRotation(FVector(Me.X, Me.Y, JeebFoes::Ground(Me.X, Me.Y)), FRotator(0.f, NewYaw, 0.f));
 	TickLook(FMath::Min(Dt, 0.1f), float(RepMove.Speed));
@@ -480,6 +559,11 @@ void ADeer::Startle(const FVector2D& From, bool bBolt, const FVector2D& HerdDir)
 {
 	if (IsDown() || !HasAuthority()) return;
 	ThreatAt = From;
+	if (bBolt && WillFight())
+	{
+		if (StateNow() != EDeerState::Chase && StateNow() != EDeerState::Strike) Attack(NearestKnight(GetWorld(), From, 600.f), TEXT("the pack goes in"));
+		return;
+	}
 	if (bBolt)
 	{
 		HerdFlee = HerdDir;
@@ -525,9 +609,11 @@ void ADeer::TickMind(float Dt)
 	if (bSleeping)   // nobody within reach: it stands where it is
 	{
 		Speed = 0.f;
-		if (StateNow() == EDeerState::Flee || StateNow() == EDeerState::Alert || StateNow() == EDeerState::Walk) SetState(EDeerState::Graze, TEXT("nobody near"));
+		if (StateNow() == EDeerState::Flee || StateNow() == EDeerState::Alert || StateNow() == EDeerState::Walk || StateNow() == EDeerState::Chase || StateNow() == EDeerState::Strike)
+		{ Target = nullptr; AngryT = 0.f; SetState(EDeerState::Graze, TEXT("nobody near")); }
 		return;
 	}
+	if (StateNow() == EDeerState::Chase || StateNow() == EDeerState::Strike) { TickFight(Dt); return; }
 	const FVector2D Me(GetActorLocation());
 	SenseT -= Dt;
 	FVector2D At = ThreatAt; float Dist = 1.0e9f;
@@ -561,6 +647,12 @@ void ADeer::TickMind(float Dt)
 
 	if (bSenseNow && bSensed)
 	{
+		if (Dist < D.FleeAt && WillFight())   // (wolves, bears, a fighting moose: they come for you, and the pack with them)
+		{
+			Attack(NearestKnight(GetWorld(), At, 300.f), TEXT("goes for a player"));
+			if (ADeerHerds* H = Herds.Get()) H->Alarm(Herd, this, At, true);
+			return;
+		}
 		if (Dist < D.FleeAt)
 		{
 			if (ADeerHerds* H = Herds.Get()) H->Alarm(Herd, this, At, true);
@@ -633,9 +725,19 @@ void ADeer::OnHurt(AActor* From)
 {
 	if (Hp->Cur <= 0) { Die(From); return; }
 	// hit and still standing: the whole herd runs from whoever did it
-	const AKnightCharacter* K = HitterOf(From);
+	AKnightCharacter* K = HitterOf(From);
 	const FVector2D Me(GetActorLocation());
 	const FVector2D At = K ? FVector2D(K->GetActorLocation()) : (From ? FVector2D(From->GetActorLocation()) : Me - FVector2D(GetActorForwardVector()) * 500.f);
+	// a cornered boar turns on whoever hurt it from close by (for a while); a fighter goes for whoever hurt it
+	const JeebFoes::FAnimalDef& D = DefOf(RepKind);
+	if (K && D.Temper == 1 && FVector2D::Distance(At, Me) < 800.f) AngryT = 10.f;
+	if (K && WillFight())
+	{
+		if (StateNow() != EDeerState::Chase && StateNow() != EDeerState::Strike) Attack(K, TEXT("is hurt and turns"));
+		else Target = K;
+		if (ADeerHerds* H = Herds.Get()) H->Alarm(Herd, this, At, true);
+		return;
+	}
 	if (ADeerHerds* H = Herds.Get()) H->Alarm(Herd, this, At, true);
 	else Startle(At, true, (Me - At).GetSafeNormal());
 }
@@ -713,6 +815,7 @@ void ADeer::Rise()
 	Hp->Reset();
 	Hp->Cur = Hp->Max;
 	DeadFor = 0.f; Fall = 0.f; CalmT = 0.f; bGoHome = false; Tire.Reset();
+	Target = nullptr; AngryT = 0.f; CoolT = 0.f;
 	SetActorLocationAndRotation(FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)), FRotator(0.f, Rand.FRandRange(0.f, 360.f), 0.f));
 	SetActorHiddenInGame(false);
 	StateFor = Rand.FRandRange(4.f, 10.f);
@@ -931,6 +1034,11 @@ void ADeerHerds::BuildLab()
 	const FVector2D At(FCString::Atof(*P[0]), FCString::Atof(*P[1]));
 	const float Yaw = P.Num() > 2 ? FCString::Atof(*P[2]) : 0.f;
 	const FVector2D Fw(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw))), Rt(-Fw.Y, Fw.X);
+	// (2026-11-24) -DeerLabKind=Wolf: the lab holds that Animals.csv row instead of the first
+	int32 LabKind = 0;
+	FString KindKey;
+	if (FParse::Value(FCommandLine::Get(), TEXT("DeerLabKind="), KindKey))
+		for (int32 k = 0; k < JeebFoes::Animals().Num(); ++k) if (JeebFoes::Animals()[k].Key.ToString() == KindKey) LabKind = k;
 	FHerd H; H.Key = TEXT("Lab"); H.Home = At;
 	const FVector2D Spots[4] = { At, At + Rt * 500.f - Fw * 1500.f, At + Rt * 900.f - Fw * 800.f, At - Rt * 450.f };
 	for (int32 i = 0; i < 4; ++i)
@@ -938,7 +1046,7 @@ void ADeerHerds::BuildLab()
 		const FTransform Xf(FRotator(0.f, i == 0 ? Yaw + 90.f : i == 3 ? Yaw + 60.f : Yaw, 0.f), FVector(Spots[i].X, Spots[i].Y, JeebFoes::Ground(Spots[i].X, Spots[i].Y)));
 		ADeer* Dr = GetWorld()->SpawnActorDeferred<ADeer>(ADeer::StaticClass(), Xf, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (!Dr) continue;
-		Dr->SetupDeer(0, 0, this, At, 500 + i, i == 0 ? 1.06f : 1.f);
+		Dr->SetupDeer(LabKind, 0, this, At, 500 + i, i == 0 ? 1.06f : 1.f);
 		Dr->LabRole = i;
 		Dr->LabA = Spots[i]; Dr->LabB = Spots[i] + Fw * 3000.f;
 		Dr->FinishSpawning(Xf);
@@ -968,7 +1076,7 @@ struct FDeerTestDriver
 	}
 	static FString States(const ADeerHerds::FHerd& H, const FVector2D& From)
 	{
-		static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead") };
+		static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead"), TEXT("chase"), TEXT("strike") };
 		FString S;
 		for (const TWeakObjectPtr<ADeer>& D : H.Deer) if (D.IsValid()) S += FString::Printf(TEXT(" [%s %.0f m hp %d]"), Names[uint8(D->StateNow())], FVector2D::Distance(FVector2D(D->GetActorLocation()), From) / 100.f, D->Hp->Cur);
 		return S;
@@ -1180,7 +1288,7 @@ struct FDeerTestDriver
 				UE_LOG(LogTemp, Log, TEXT("JEEBDEERCLIENT picture deer_%s"), *ShotName);
 			}
 		}
-		static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead") };
+		static const TCHAR* const Names[] = { TEXT("graze"), TEXT("idle"), TEXT("look"), TEXT("walk"), TEXT("alert"), TEXT("flee"), TEXT("dead"), TEXT("chase"), TEXT("strike") };
 		const FVector Me = K->GetActorLocation();
 		int32 N = 0, Fleeing = 0;
 		ADeer* Fleer = nullptr;

@@ -256,6 +256,18 @@ namespace JeebFoes
 						D.HuntXP = FMath::Max(0, A.I(r, TEXT("HuntXP"), 0));
 						D.DropTable = FName(*A.S(r, TEXT("DropTable")));
 						auto ItemCell = [&](const TCHAR* Col) { const FString N = A.S(r, Col); if (N.IsEmpty()) return 0; const int32 Id = JeebQuests::ItemFromName(N); if (Id <= 0) Problem(FString::Printf(TEXT("Animals.csv, %s: no item called \"%s\" in %s"), *Key, *N, Col)); return FMath::Max(0, Id); };
+						{
+							const FString Tm = A.S(r, TEXT("Temper")).ToLower();
+							D.Temper = Tm == TEXT("cornered") ? 1 : Tm == TEXT("fight") ? 2 : Tm == TEXT("moody") ? 3 : 0;
+						}
+						D.Damage = FMath::Max(0, A.I(r, TEXT("Damage"), 0));
+						D.Reach = FMath::Max(50.f, A.F(r, TEXT("Reach"), 1.8f) * 100.f);
+						D.Windup = FMath::Clamp(A.F(r, TEXT("Windup"), 0.5f), 0.1f, 3.f);
+						D.Cool = FMath::Clamp(A.F(r, TEXT("Cool"), 1.6f), 0.3f, 10.f);
+						D.Leash = FMath::Max(1000.f, A.F(r, TEXT("Leash"), 45.f) * 100.f);
+						D.LieDrop = A.F(r, TEXT("LieDrop"), 42.f);
+						D.BoxLong = FMath::Clamp(A.F(r, TEXT("BoxLong"), 1.f), 0.1f, 4.f);
+						D.BoxTall = FMath::Clamp(A.F(r, TEXT("BoxTall"), 1.f), 0.1f, 4.f);
 						D.MeatId = ItemCell(TEXT("Meat"));
 						D.BonesId = ItemCell(TEXT("Bones"));
 						Out.Animals.Add(D);

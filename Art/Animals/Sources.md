@@ -32,3 +32,31 @@ Downloaded 2026-11-13 from Meshy's free community library (CC0) for inspection o
 - Hoof speeds at scale 1 (deer_export.py): walk 106 cm/s, canter 397 cm/s, back 123 cm/s. In the game the horse is 1.25 x.
 - The saddle: `Tools/saddle_prep.py` (8k triangles, its horn along +X, 52 cm long, origin where it sits on the back) -> `/Game/Animals/SM_Saddle`.
 - Into the game: `Tools/BuildDeer.ps1` (both).
+
+## Rabbit, fox, boar, wolf, moose, bear, eagle (2026-11-24, Docs/AnimalsPlan2.md)
+
+| File (Originals/, git-ignored) | Library model | Author | Library page | Licence |
+|---|---|---|---|---|
+| Hare_johaniashivclaw.glb | European Hare | johaniashivclaw | https://www.meshy.ai/posts/019d70e9-a49b-7ffc-986b-6ff3a569d888 | CC0 |
+| Fox_chrismayac.glb (207 MB, 4.3M triangles) | Danfield | chrismayac | https://www.meshy.ai/posts/daniel-01a0d4be-ccb1-743b-8ede-930e07fbf7e1 | CC0 |
+| Boar_cyber_fox.glb | Wild Boar | cyber_fox | https://www.meshy.ai/posts/019d0161-8d61-7cd9-8f23-80488c499483 | CC0 |
+| Wolf_Ganda.glb | Wolf | Ganda | https://www.meshy.ai/posts/019c9efb-84be-7cca-b060-a41923a85381 | CC0 |
+| Moose_cyber_fox.glb | Moose | cyber_fox | https://www.meshy.ai/posts/019cfe2d-73df-787c-955c-313c2e5b4b92 | CC0 |
+| Bear_johaniashivclaw.glb | Eurasian Brown Bear | johaniashivclaw | https://www.meshy.ai/posts/019ccbb6-7c72-72e5-a0d1-6ace92f2af53 | CC0 |
+| EaglePerch_cyber_fox.glb | Eagle (perched on a rock) | cyber_fox | https://www.meshy.ai/posts/019cbd33-0ff7-7b89-b6ff-6ba5e16544d1 | CC0 |
+| EagleFly_Talli.glb | Ascendant Eagle (wings spread, pale grey) | Talli | https://www.meshy.ai/posts/019e78f4-5a9c-7617-b61a-8539b31e910b | CC0 |
+
+- Each quadruped: `Tools/deer_clean.py` (rabbit 8k, fox 12k, boar and wolf 16k, bear 18k, moose 20k triangles; 2048 colour, 1024 normal), Meshy
+  rigging (`animation_type quadruped`, 5 credits each; a recognised rig also hands back a free dog walk and run), then paid clips on that rig
+  (3 credits each), merged into `<Name>/<Name>_clips.glb` by `Tools/animal_merge_clips.py`:
+  - Rabbit: 1229 Rabbit idle, 1227 Rabbit hop (walk), 1222 Rabbit gallop (run), 1221 Rabbit death (12 credits).
+  - Fox: 1146 Fox idle, 1250 Wolf death (6); walk and run are the free dog clips.
+  - Boar: 1066 Cow idle, 1065 Cow death, 1192 Leopard pounce (the charge) (9).
+  - Wolf: 1251 Wolf idle, 1250 Wolf death, 1192 Leopard pounce (the bite) (9).
+  - Moose: 1091 Deer idle, 1065 Cow death, 1192 Leopard pounce (9).
+- **The bear**: rigged twice (heights 1.2 and 1.4 m, 10 credits); both times Meshy answered that the four-legged skeleton was not recognised
+  (the model is mid-stride, one forefoot lifted, like the horse). Not in the game yet: either `Tools/horse_retarget.py`-style copying of the
+  wolf's clips onto its own rig, or a different, square-standing bear model.
+- **The eagle**: both cut to 6k triangles (`Eagle/EaglePerch_clean.glb`, `Eagle/EagleFly_clean.glb`); not in the game yet (the flying one is
+  pale grey and needs repainting brown to match; the perched one still stands on its rock).
+- Credits (Meshy API): rigs 35 (six animals plus the bear's second try), clips 45: 80 in all; the balance read 78 at the start and 18 at the end (it rose by about 20 on its own during the run).

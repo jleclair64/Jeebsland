@@ -7,3 +7,12 @@ Deer,2,0,8
 Deer,3,0,12
 Deer,4,0,30
 Deer,5,0,40
+# Small (2026-11-24: rabbit, fox): 1 at level 1; at 99, 2 at 60% and 1 at 40%. Big (moose, bear): 2 at level 1; at 99, 3 to 7.
+Small,1,100,40
+Small,2,0,60
+Big,2,100,0
+Big,3,0,10
+Big,4,0,15
+Big,5,0,20
+Big,6,0,25
+Big,7,0,30

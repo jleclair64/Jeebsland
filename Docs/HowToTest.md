@@ -30,6 +30,15 @@ Blackrock, the walled village west of the river from Oak Hill, is out of the gam
 The old market (store, smithy and bank with Brindle, Hobb and Pell, south of the start) was cleared too (2026-11-22; Oak Hill and Steele Creek keep a store, smithy and bank each). Kept: the original square round it (the scattered huts, the cottage, the pond, the pig pen, the castle, the graveyard and the other seven villagers). Quests that mentioned Blackrock still work; their lines now speak of the pond and the pig pen over the river.
 - Look: from Oak Hill walk west over the stone bridge and down the road: empty grass where the walls stood. Fast travel and the map list no Blackrock.
 
+## More animals: rabbit, fox, boar, wolf, moose (2026-11-24; Docs/AnimalsPlan2.md)
+
+- Rabbits and a fox live just outside Oak Hill (`jeeb.Test.GoDeer 20` and `21`; `22` onward are the wild groups: rabbits, foxes, boars, wolf packs, moose, in that order in AnimalHerds.csv).
+- Rabbits and foxes flee like the deer (shared flee distance and tiring). A boar flees, but shoot or hit it from within 8 m and it charges you for 10 s.
+- Wolves come for you inside 20 m, the whole pack, and bite (7 a bite; a raised shield takes it). Fight back with sword, arrows or spells. Run 45 m from their home and they give up, walk back and heal.
+- A moose is either one or the other: half of them charge like a wolf (14 a hit), half flee. You only find out when you get close.
+- Drops: rabbit and fox 1-2 Raw Game Meat (new) and Bones, boar Raw Pork, wolf Raw Game Meat, moose Deer Meat (more of it with Hunting level), plus hides and moose antlers. Numbers: Animals.csv (new columns Temper, Damage, Reach, Windup, Cool, Leash), HuntDrops.csv (tables Small, Deer, Big).
+- Not in yet: the bear (Meshy couldn't rig the model), the eagle (models ready, no code).
+
 ## Deer to hunt (2026-11-22; Docs/DeerPlan.md)
 
 Field map, Play (single player works; online the server runs them). Stags live in herds of 3 to 5: five herds in the country round Oak Hill and fourteen more spread over the open world.

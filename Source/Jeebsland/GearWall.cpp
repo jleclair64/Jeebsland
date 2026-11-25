@@ -212,7 +212,7 @@ void AGearWall::Build()
 			{ { TEXT("Potions"), Potions }, { TEXT("Rings"), Many(K_Ring, NumRings()) }, { TEXT("Amulets and helm brush"), Charms } },
 			{ { TEXT("Logs"), Mats({ EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs }, true) }, { TEXT("Ores"), Mats({ EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre }, false) },
 			  { TEXT("Gems"), Mats({ EItemType::Diamond, EItemType::Emerald }, false) }, { TEXT("Fish"), Mats({ EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp }, true) },
-			  { TEXT("Animal drops"), Mats({ EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers }, true) } } };
+			  { TEXT("Animal drops"), Mats({ EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather }, true) } } };
 		for (int32 b = 0; b < Bands.Num(); ++b)
 		{
 			const float HeaderZ = TopHeaderZ - b * BandPitch;

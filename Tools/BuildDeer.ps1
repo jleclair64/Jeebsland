@@ -17,7 +17,13 @@ $animals = @(
   @('Stag', 'Idle=deer_idle', 'Idle2=deer_idle01', 'Walk=deer_walk', 'Run=deer_run', 'Graze=fawn_idle01', 'Alert=cattle_alert', 'Death=cattle_dead'),
   # (the horse: Meshy couldn't animate its own rig, so its clips were put on the stag's rig and copied across by Tools/horse_retarget.py
   # into Horse_clips.glb; 2026-11-22)
-  @('Horse', 'Idle=horse_Idle', 'Idle2=horse_Idle1', 'Walk=horse_Walk', 'Run=horse_Canter', 'Back=horse_Walk_Back', 'Death=cattle_dead')
+  @('Horse', 'Idle=horse_Idle', 'Idle2=horse_Idle1', 'Walk=horse_Walk', 'Run=horse_Canter', 'Back=horse_Walk_Back', 'Death=cattle_dead'),
+  # (2026-11-24, Docs/AnimalsPlan2.md: library models rigged by Meshy, its free dog walk and run plus a few paid clips; Tools/animal_merge_clips.py)
+  @('Rabbit', 'Idle=rabbit_Idle', 'Walk=rabbit_ANIM_Rabbit_Walk', 'Run=rabbit_ANIM_Rabbit_Gallop', 'Death=rabbit_ANIM_Rabbit_Death'),
+  @('Fox', 'Idle=fox_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=wolf_dead'),
+  @('Boar', 'Idle=cattle_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=cattle_dead', 'Attack=leopard_skill2'),
+  @('Wolf', 'Idle=wolf_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=wolf_dead', 'Attack=leopard_skill2'),
+  @('Moose', 'Idle=deer_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=cattle_dead', 'Attack=leopard_skill2')
 )
 foreach ($a in $animals) {
   $n = $a[0]; $dir = Join-Path $art $n

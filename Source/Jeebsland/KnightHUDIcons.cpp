@@ -647,6 +647,15 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		Poly({ P(14, 24), P(30, 15), P(48, 21), P(51, 37), P(38, 49), P(20, 46), P(13, 35) }, FLinearColor(0.58f, 0.12f, 0.12f));
 		DiscP(26, 30, 5, 5, FLinearColor(0.93f, 0.90f, 0.80f));
 		break;
+	case EItemType::GameMeat:
+		Poly({ P(12, 26), P(30, 14), P(50, 22), P(52, 40), P(36, 52), P(16, 46) }, FLinearColor(0.96f, 0.88f, 0.78f));
+		Poly({ P(16, 28), P(30, 19), P(46, 25), P(47, 39), P(35, 47), P(19, 42) }, FLinearColor(0.66f, 0.17f, 0.15f));
+		break;
+	case EItemType::EagleFeather:
+		Poly({ P(10, 56), P(14, 50), P(46, 10), P(54, 6), P(52, 14), P(18, 54) }, FLinearColor(0.38f, 0.25f, 0.14f));
+		Poly({ P(46, 10), P(54, 6), P(52, 14), P(48, 16) }, FLinearColor(0.95f, 0.93f, 0.88f));
+		Poly({ P(8, 58), P(10, 56), P(50, 10), P(51, 11) }, FLinearColor(0.90f, 0.86f, 0.74f));
+		break;
 	case EItemType::Antlers:
 	{
 		const FLinearColor Horn(0.70f, 0.54f, 0.34f);

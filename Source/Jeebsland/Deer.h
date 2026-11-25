@@ -25,11 +25,11 @@ class AKnightCharacter;
 class ADeerHerds;
 
 // What it is doing (sent to players as a number: add new ones at the end)
-enum class EDeerState : uint8 { Graze, Idle, Look, Walk, Alert, Flee, Dead };
+enum class EDeerState : uint8 { Graze, Idle, Look, Walk, Alert, Flee, Dead, Chase, Strike };   // (Chase, Strike: 2026-11-24, the animals that fight: Docs/AnimalsPlan2.md)
 
 namespace JeebDeer
 {
-	enum EClip { C_Idle, C_Look, C_Walk, C_Run, C_Graze, C_Alert, C_Death, C_Count };
+	enum EClip { C_Idle, C_Look, C_Walk, C_Run, C_Graze, C_Alert, C_Death, C_Attack, C_Count };
 }
 
 // Plays the animal's clips with cross-fades; walk and run are played at the speed its feet really cover
@@ -41,7 +41,7 @@ public:
 	void SetClips(UAnimSequence* const* In, float StartAt);
 	void Drive(int32 InClip, float InRate) { Want = InClip; Rate = InRate; }
 
-	UPROPERTY(Transient) TObjectPtr<UAnimSequence> Clip[7];
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> Clip[8];   // (JeebDeer::C_Count)
 	int32 Want = 0;
 	float Rate = 1.f, Start = 0.f;
 	bool bNewClips = false;
@@ -61,9 +61,10 @@ struct FDeerAnimProxy : public FAnimInstanceProxy
 	virtual void PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds) override;
 	virtual bool Evaluate(FPoseContext& Output) override;
 
-	UAnimSequence* Clip[7] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-	float Time[7] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
-	float Weight[7] = { 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	UAnimSequence* Clip[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	float Time[8] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	int32 LastWant = 0;
+	float Weight[8] = { 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 };
 
 // Where it is, as the server sends it (players' machines put it on their own ground: the height is the same everywhere)
@@ -152,6 +153,13 @@ private:
 	void Die(AActor* From);
 	void Rise();
 	void SendMove();
+	// (server) the animals that fight (Animals.csv Temper; Docs/AnimalsPlan2.md): bFights is rolled once at spawn (a moose's 50/50)
+	bool bFights = false, bStruck = false;
+	float AngryT = 0.f, CoolT = 0.f;
+	TWeakObjectPtr<AKnightCharacter> Target;
+	void TickFight(float Dt);
+	bool WillFight() const;   // does it turn on players now (wolves, bears, a fighting moose; a cornered boar for a while)
+	void Attack(AKnightCharacter* K, const TCHAR* Why);
 	friend class ADeerHerds;
 	friend struct FDeerTestDriver;
 };
