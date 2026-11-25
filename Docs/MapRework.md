@@ -106,3 +106,45 @@ of a test must use the same switch.
 - Not packaged; Shipping not compiled (`-NoMapRework` is compiled out there).
 - The moor's ground colours show from 30 m out; nearer, the blades and heather clumps carry it. The join was looked at in stills only.
 - The cliff tops north of X 84,000 are inside the Frozen North PvP zone; its warning signs along that edge were not looked at.
+
+## Second pass (2026-11-25, evening)
+
+Owner: "redo the cliffs. I want fewer obvious straight lines that make it look zig zaggy. Also that land bridge you made it too perfectly
+round on the bottom, please look at pictures of real land bridges ... making the grass a bit thicker/denser near the edges to mask the
+edge." Boards: `Docs/MapRework/cliffs_v2.jpg`, `spots_v2.jpg`, `moor_v2.jpg` (the bay did not change). Remake:
+`MapBoard.ps1 -Stage <stage> -Tag after`, then `-Compose -Suffix _v2` (a missing before still is cut out of the first board).
+
+- **Why the cliffs were boxes:** a wall is a drop in the height, and on a plain 2 m grid a drop can only run along grid lines. Now, in
+  the cliffs' patches, the grid points beside a drop are moved sideways onto its true line (`AWorldTerrain::BuildFine`: the high point
+  to the line, the low point 0.4 to 2.3 m beyond it, so faces lean back unevenly). The wall follows whatever line the height function
+  draws. It is still the one height field: collision, climbing and swimming are as before, and the drawn height by a wall is the true
+  height (`FineMeshHeight`), so grass stands level to the lip.
+- **The line itself** (`SeaCliffRag`): headlands and bights about 70 m and 26 m across, buttresses 8 m across, and narrow inlets cut
+  20 m and more into the land (it used to wander by under 5 m). The top's height wanders too; sheer and stepped stretches ease into
+  each other with ledges that pinch out (`CliffDrops`), where the wall used to jog 9 m in one straight cut.
+- **The faces:** every wall triangle is cut into bands 2 m high and their points pushed in or out by `JeebRework::WallRough` (beds,
+  bulges, hollows; an overhang of up to a metre here and there), welded and shaded round. 36,000 wall points where there were 9,400;
+  the fine ground still builds in under half a second.
+- **Stacks and the Needles** (`StackHeight`): each its own squeezed, lobed outline, a domed tilted top, a shoulder on part of it and
+  low wave-cut rocks at its foot on another part; seven more stacks, from 6 m stumps to 21 m towers.
+- **The rock's beds** (`world_material.py`): they roll by up to 4 m, step at faults and lens out within 20 to 50 m; gullies fainter.
+- **The arch** (`BuildArch`): a tube of rock with a rounded uneven section instead of a slab with a half-circle cut out: the opening
+  18 m wide and 10.5 m high, lopsided (highest 40% of the way out, steeper on the land side), a thick seaward pier, a thick humped
+  top, narrower over the opening and swelling at its feet, roughened like the cliffs. Still walkable on top, with collision.
+- **Grass at the lip** (`SeaCliffLipNear`, Meadow.cpp): within 6 m of a sea cliff's lip the grass is up to 45% taller with up to three
+  more clumps beside each one. Grass now grows to the very lip and on the ledges. No tree within 12 m of a lip.
+- **Heather:** the stems-with-flower-spikes model is now a low cushion (34 triangles, 80 to 130 cm across, 15 to 30 cm high), six per
+  square metre, full to a drift's edge, purple to purple-brown (`jeeb.Moor.Heather`, `jeeb.Moor.HeatherColour`).
+- **Moor grass less yellow:** `jeeb.Moor.Tawny` 1.2 1.1 0.66 (was 1.75 1.2 0.55), half its dry stems greened, the ground's tawny
+  colour pulled toward olive.
+- **"Water above the camera":** the cove beach view stood 35 m out, where the cove is now sea, and a view's height is measured from
+  the sea bed. The view moved onto the beach; nothing was wrong in the world. Two more views moved for the same kind of reason (the
+  lip view stood in a new inlet, the Needles sunset view inside a pillar).
+- **Checked in the log, unchanged from the first pass:** roads 32bcdd3d and f5c5483c, ruins a0979b3d, camps ef21b435, Oak Hill
+  24656a15, Steele Creek 04a37d07, placeholder houses da99497b, every fill zone. The forest's hash changed (trees by the lip).
+
+**Left, second pass:** two picture rounds used. The heather is a carpet now but reads as bright purple faceted tiles with pale sprig
+tips close up, more purple than purple-brown: try `jeeb.Moor.HeatherColour 0.38 0.23 0.33` in Play, and smoother cushions if it stays
+blocky. The pale cove's wall still shows some vertical streaks from the air. The rock's swirled beds can look marbled close up.
+Shading has a faint seam where two 120 m chunks of wall meet. Everything under "Not done, not checked" above still stands (frame cost
+not timed, no server-plus-client run, not walked in play, Shipping not compiled).

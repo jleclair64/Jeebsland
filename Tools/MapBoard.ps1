@@ -28,7 +28,7 @@ $Stages = @{
 		@{ N = 'Cliffs at sunset, from the sea';          E = '80000_101500_3200_-150_2_0.26' },
 		@{ N = 'From inland, looking east to the edge';   E = '60000_80000_2500_90_-4_0' },
 		@{ N = 'Foot of the wall, close';                 E = '66500_97200_2300_-95_8_0' },
-		@{ N = 'On the cliff top by the lip (new view)';     E = '64000_95100_230_150_-12_0' },
+		@{ N = 'On the cliff top by the lip (new view)';     E = '60300_95300_190_165_-14_0' },
 		@{ N = 'Ledges, from the sea (new view)';            E = '60500_101800_2800_-80_6_0' }
 	)
 	bay = @(
