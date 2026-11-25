@@ -2490,7 +2490,31 @@ FTransform FKnightAnimator::ShieldWorld(float BlockAlpha, int32 Style) const
 		static FString LastOut; static TArray<float> NOut;
 		In -= CVarNumbers(CVarShieldSwingOut, ShieldSwingOutDefault, LastOut, NOut, 3)[FMath::Clamp(Style, 0, 2)] * K;
 	}
-	return FTransform(FVector(-In, 0.f, 0.f)) * Strap * BoneWorld(LFore);
+	FTransform W = FTransform(FVector(-In, 0.f, 0.f)) * Strap * BoneWorld(LFore);
+	// (owner 2026-11-24, third try: the shield is fixed to the forearm, which hangs forward and out in the idle pose, so it flared at the bottom whatever the bind-pose numbers said.
+	// Hanging, it is now turned in the world about its strap point: long axis straight down, bottom swung in toward his body by ShieldRestBottomIn degrees; fades out as the forearm comes up)
+	// (the sword-in-hand idle has the forearm only 30-45 degrees below level, which ShieldUpOf already reads as mostly "strapped": the hanging fix has its own, wider window: jeeb.Knight.ShieldHang = lo, hi of the forearm's downward slope)
+	static TAutoConsoleVariable<FString> CVarHang(TEXT("jeeb.Knight.ShieldHang"), TEXT("-0.5,-0.25"), TEXT("Hanging shield: the forearm's downward slope (0 level, 1 straight down) below which the shield stays as strapped (lo) and above which it hangs fully plumb (hi)."), ECVF_Default);
+	float HangLo = -0.5f, HangHi = -0.25f;
+	{ TArray<FString> HP; CVarHang.GetValueOnAnyThread().ParseIntoArray(HP, TEXT(",")); if (HP.Num() >= 2) { HangLo = FCString::Atof(*HP[0]); HangHi = FCString::Atof(*HP[1]); } }
+	const float Hang = FMath::SmoothStep(HangLo, HangHi, float(-ForeDir.Z)) * (1.f - FMath::Clamp(BlockAlpha, 0.f, 1.f));
+#if !UE_BUILD_SHIPPING
+	{ static int32 HN = 0; if (BlockAlpha <= 0.f && ++HN % 90 == 1) UE_LOG(LogTemp, Log, TEXT("JEEBSHIELDHANG forearm down-slope %.2f up %.2f hang %.2f"), -ForeDir.Z, Up, Hang); }
+#endif
+	if (Hang > 0.f)
+	{
+		static TAutoConsoleVariable<float> CVarRestIn(TEXT("jeeb.Knight.ShieldRestIn"), -1.f, TEXT("Test pictures: degrees the hanging shield's bottom is swung in (-1: use Tuning.ini ShieldRestBottomIn)."), ECVF_Default);
+		const float Deg = CVarRestIn.GetValueOnAnyThread() >= 0.f ? CVarRestIn.GetValueOnAnyThread() : JeebTune::V().ShieldRestBottomIn;
+		const FVector StrapPt(14.f, -41.f, -8.f);
+		const FQuat Q0 = W.GetRotation();
+		FVector Face = Q0.GetAxisX(); Face.Z = 0.f; Face = Face.GetSafeNormal();   // (level: the forearm tilts the face up a little, and a plumb shield wants a plumb face)
+		const FVector Vert = (FVector::UpVector - Face * FVector::DotProduct(FVector::UpVector, Face)).GetSafeNormal();
+		const FVector Want = (Vert + Face * FMath::Tan(FMath::DegreesToRadians(Deg))).GetSafeNormal();
+		const FQuat Qn = FQuat::Slerp(Q0, FRotationMatrix::MakeFromXZ(Face, Want).ToQuat(), Hang);
+		const FVector C = W.TransformPosition(StrapPt);
+		W.SetRotation(Qn); W.SetTranslation(C - Qn.RotateVector(StrapPt));
+	}
+	return W;
 }
 
 #if !UE_BUILD_SHIPPING
