@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "MapRework.h"
 
 // The whole world (2026-10-30), traced from the owner's hand-drawn map (Docs/MapSketch.jpg, with the old village (Blackrock until 2026-11-22) and Oak Hill
 // swapped: the village WEST of the river, Oak Hill east of it). Blank for now: the land's shape only (mountains, the river and
@@ -89,10 +90,15 @@ namespace JeebWorld
 			for (const auto& Q : S) A.Add(FromSketch(Q[0], Q[1]));   // X falls as the sketch goes down the page
 			return A;
 		}();
-		if (X >= C[0].X) return C[0].Y;
-		for (int32 i = 0; i + 1 < C.Num(); ++i)
-			if (X >= C[i + 1].X) { const float T = (C[i].X - X) / FMath::Max(C[i].X - C[i + 1].X, 1.f); return FMath::Lerp(C[i].Y, C[i + 1].Y, T); }
-		return C.Last().Y;
+		// (2026-11-25, the map rework: headlands and bights along the north-east's sea cliffs, MapRework.h)
+		float Base = C.Last().Y;
+		if (X >= C[0].X) Base = C[0].Y;
+		else
+			for (int32 i = 0; i + 1 < C.Num(); ++i)
+				if (X >= C[i + 1].X) { const float T = (C[i].X - X) / FMath::Max(C[i].X - C[i + 1].X, 1.f); Base = FMath::Lerp(C[i].Y, C[i + 1].Y, T); break; }
+		// Anchorage's bay: the coast curves in between two headlands where it used to stand out in a cape
+		if (const float Bay = JeebRework::BayBlend(X); Bay > 0.f) Base = FMath::Lerp(Base, JeebRework::BayLine(X), Bay);
+		return Base + JeebRework::CoastWiggle(X);
 	}
 
 	// ------------------------------------------------------------------ the river
@@ -187,6 +193,11 @@ namespace JeebWorld
 					const float Nz = 0.6f * FMath::Sin(2.f * PI * S2[i] / 41000.f + 1.3f) + 0.4f * FMath::Sin(2.f * PI * S2[i] / 17000.f + 0.4f);
 					Rv.Halfs[i] = HalfWidth * (1.f + 0.22f * Nz * Keep[i]);
 				}
+				// (2026-11-25, the map rework) the east branch ends where it runs into Anchorage's bay (it used to carry on 120 m out over what
+				// is now the bay); every point before that is exactly where it was
+				if (Kind == 1 && JeebRework::On())
+					for (int32 i = 0; i < N; ++i)
+						if (Rv.Pts[i].Y - CoastY(Rv.Pts[i].X) > 600.f) { Rv.Pts.SetNum(i + 1); Rv.Halfs.SetNum(i + 1); break; }
 				A.Add(Rv);
 			};
 			// the main river, from its spring in the mountains to the fork south of the old village site and Oak Hill
@@ -414,6 +425,7 @@ namespace JeebWorld
 		for (int32 r = 1; r < MaxRivers; ++r) if (N[r].Dr - N[r].Half < N[B].Dr - N[B].Half) B = r;
 		const float Lake = N[LakeBody].Dr - LakeHalf;
 		OutStill = 1.f - Smooth01(-500.f, 2500.f, Lake);
+		if (JeebRework::On()) OutStill = FMath::Max(OutStill, Smooth01(-4500.f, -500.f, Y - CoastY(X)));   // (and where a river runs out into the sea)
 		// where two channels meet (the fork, the split's ends) the water is still too, so overlapping currents never fight
 		for (int32 r = 0; r < MaxRivers; ++r)
 			if (r != B && N[r].Dr < 1.0e8f) OutStill = FMath::Max(OutStill, 1.f - Smooth01(0.f, 3500.f, (N[r].Dr - N[r].Half) - FMath::Max(0.f, N[B].Dr - N[B].Half)));
@@ -592,21 +604,89 @@ namespace JeebWorld
 		return FMath::Min(H, C) - Hh * Hh * K * 0.25f;
 	}
 
+	// ------------------------------------------------------------------ the sea cliffs (2026-11-25, MapRework.h)
+	// cm the cliff wall's line wanders at a spot (buttresses and gullies about 26 m and 8 m across)
+	inline float SeaCliffRag(float X, float Y)
+	{
+		const FVector2D P(X, Y);
+		return 380.f * Noise(P + FVector2D(700.f, -300.f), 2600.f) + 110.f * Noise(P + FVector2D(-90.f, 410.f), 800.f);
+	}
+	// where a sea stack stands (its Y is measured out from the coast line)
+	inline float StackY(const JeebRework::FStack& S)
+	{
+		static const TArray<float> Ys = []() { TArray<float> A; for (const JeebRework::FStack& K : JeebRework::Stacks()) A.Add(CoastY(K.X) + K.Off); return A; }();
+		return Ys[int32(&S - JeebRework::Stacks().GetData())];
+	}
+	// The sea cliffs at a point: Amount 0 .. 1 (the stretch of coast: 0 away from the cliffs and more than Inland cm inland of the coast
+	// line); OutFace 0 .. 1 on the wall itself (between its lip and its foot), OutD cm past the wall's foot line (negative inland)
+	inline float SeaCliffNear(float X, float Y, float Inland, float* OutFace = nullptr, float* OutD = nullptr)
+	{
+		if (OutFace) *OutFace = 0.f;
+		if (!JeebRework::InCliffX(X)) return 0.f;
+		const float D = Y - CoastY(X);
+		if (D < -Inland) return 0.f;
+		const JeebRework::FSeaCliff Cl = JeebRework::SeaCliffAt(X);
+		if (Cl.A <= 0.f) return 0.f;
+		const float Dw = D + Cl.A * SeaCliffRag(X, Y);
+		if (OutD) *OutD = Dw;
+		if (OutFace) *OutFace = Cl.A * Smooth(-Cl.Run - 150.f, -Cl.Run + 50.f, Dw) * Smooth(150.f, -50.f, Dw);
+		return Cl.A;
+	}
+
 	// The full world height (without the original square round the start): the land, then the sea and the coast, then the
 	// river valleys and channels
 	inline float SeaAndRivers(float X, float Y, float H, float* OutRiverD = nullptr, float* OutRiverHalf = nullptr)
 	{
 		const FVector2D P(X, Y);
 		// The coast: the land eases down to a beach at the shoreline; past it the sea floor drops away
+		H += JeebRework::HeadlandRise(X, Y);   // (2026-11-25: the headlands of Anchorage's bay)
+		if (JeebRework::NearNeedles(X, Y, 0.f))   // (2026-11-25: the Needles, pillars of rock standing on the land as it is)
+			for (const JeebRework::FStack& S : JeebRework::Needles()) { const float Hs = JeebRework::StackHeight(S, X - S.X, Y - S.Off); if (Hs > -1.0e8f) H += Hs; }
 		const float D = Y - CoastY(X);   // > 0 out at sea
-		if (D > -3500.f)
+		// (2026-11-25, the map rework) the north-east's sea cliffs (MapRework.h): along that coast the land is lifted in a wedge that rises
+		// toward the sea and ends in a wall, in place of the beach
+		const JeebRework::FSeaCliff Cl = D > -JeebRework::CliffWedge ? JeebRework::SeaCliffAt(X) : JeebRework::FSeaCliff();
+		if (D > -3500.f || Cl.A > 0.f)
 		{
-			if (D <= 0.f) H = FMath::Lerp(H, SeaLevel + 30.f, Smooth(-3500.f, 0.f, D));
-			else H = SeaLevel + 30.f - 1900.f * Smooth(0.f, 5000.f, D);
-			for (const FVector2D& I : Islands())   // little islands off the coast
+			const float PaleShelf = JeebRework::InPaleX(X) ? Smooth(9500.f, 6000.f, FMath::Abs(X - JeebRework::PaleCoveX)) * Smooth(14000.f, 9000.f, D) : 0.f;   // (the Pale Cove's shallows: light water over sand)
+			float Hb = H;   // the old shore: a beach, then the sea floor
+			if (D > -3500.f)
 			{
-				const float Di = FVector2D::Distance(P, I);
-				if (Di < 2600.f) H = FMath::Max(H, SeaLevel + 700.f * FMath::Square(1.f - Di / 2600.f) - 100.f);
+				if (D <= 0.f) Hb = FMath::Lerp(H, SeaLevel + 30.f, Smooth(-3500.f, 0.f, D));
+				else Hb = SeaLevel + 30.f - FMath::Lerp(1900.f * Smooth(0.f, 5000.f, D), 650.f * Smooth(0.f, 9000.f, D), FMath::Max(JeebRework::BayShelter(X, Y), PaleShelf));   // (Anchorage's bay and the Pale Cove: a broad shallow shelf)
+			}
+			if (Cl.A > 0.f)
+			{
+				// (the wall's line wanders by a few metres at two sizes: buttresses and gullies, never a ruled edge)
+				const float Dw = D + Cl.A * SeaCliffRag(X, Y);
+				const float Lifted = H + FMath::Max(0.f, SeaLevel + Cl.Top + 0.25f * H - H) * Smooth(Cl.Pale > 0.5f ? -6000.f : -JeebRework::CliffWedge, -Cl.Run - 300.f, Dw);   // (the Pale Cove lifts only its last 60 m: a 300 m wedge there reached the Birch Grove to Palmer Square road and moved it)
+				const float Foot = SeaLevel + FMath::Lerp(-260.f, 90.f, Cl.Beach);   // straight into deep water, or onto a rocky beach
+				const float BeachW = 1000.f * Cl.Beach;
+				float Hc;
+				if (Dw <= -Cl.Run) Hc = Lifted;
+				else if (Dw < 0.f) Hc = FMath::Lerp(Foot, Lifted, JeebRework::CliffStep(-Dw / Cl.Run, Cl.Ledge, X));
+				else Hc = Foot - 110.f * Cl.Beach * Smooth(0.f, FMath::Max(BeachW, 1.f), Dw) - FMath::Lerp(1900.f * Smooth(BeachW, BeachW + 5000.f, Dw), 520.f * Smooth(BeachW, BeachW + 11000.f, Dw), PaleShelf);
+				H = FMath::Lerp(Hb, Hc, Cl.A);
+			}
+			else H = Hb;
+			if (D > -3500.f)
+			{
+				for (const FVector2D& I : Islands())   // little islands off the coast
+				{
+					const float Di = FVector2D::Distance(P, I);
+					if (Di < 2600.f) H = FMath::Max(H, SeaLevel + 700.f * FMath::Square(1.f - Di / 2600.f) - 100.f);
+				}
+				for (const JeebRework::FSkerry& K : JeebRework::Skerries())   // the low rocks off Anchorage's bay
+				{
+					const float Di = FVector2D::Distance(P, FVector2D(K.X, K.Y));
+					if (Di < K.R) H = FMath::Max(H, SeaLevel - 150.f + (K.Top + 150.f) * FMath::Square(1.f - Di / K.R));
+				}
+				for (const JeebRework::FStack& S : JeebRework::Stacks())   // the sea stacks off the cliffs
+				{
+					if (FMath::Abs(X - S.X) > S.R * JeebRework::StackReach) continue;
+					const float Hs = JeebRework::StackHeight(S, X - S.X, Y - StackY(S));
+					if (Hs > -1.0e8f) H = FMath::Max(H, SeaLevel + Hs);
+				}
 			}
 		}
 		// The rivers and the lake: a wide valley with a level floor, and a channel down its middle

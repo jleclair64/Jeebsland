@@ -20,12 +20,13 @@ namespace JeebGround
 	struct FMask
 	{
 		float Worn = 0.f, Rock = 0.f, Mud = 0.f, Sand = 0.f;
+		float Cliff = 0.f;   // (2026-11-25: on a sea cliff's wall, for the grass only: no tufts on the faces, MapRework.h)
 		float Snow = 0.f;   // (2026-11-21: for the grass only. M_Ground paints its snow from the height itself, so it is not in the colour)
 		FLinearColor Color() const { return FLinearColor(Worn, Rock, Mud, Sand); }
 		static FMask Lerp(const FMask& A, const FMask& B, float T)
 		{
 			FMask M; M.Worn = FMath::Lerp(A.Worn, B.Worn, T); M.Rock = FMath::Lerp(A.Rock, B.Rock, T); M.Mud = FMath::Lerp(A.Mud, B.Mud, T); M.Sand = FMath::Lerp(A.Sand, B.Sand, T);
-			M.Snow = FMath::Lerp(A.Snow, B.Snow, T);
+			M.Snow = FMath::Lerp(A.Snow, B.Snow, T); M.Cliff = FMath::Lerp(A.Cliff, B.Cliff, T);
 			return M;
 		}
 	};
@@ -151,6 +152,28 @@ namespace JeebGround
 			M.Sand = JeebWorld::Smooth(JeebWorld::SeaLevel + 170.f + 80.f * N, JeebWorld::SeaLevel + 50.f, Z) * JeebWorld::Smooth(-4500.f, -800.f, Y - JeebWorld::CoastY(X));
 			M.Mud *= 1.f - M.Sand;
 		}
+		// The sea cliffs (2026-11-25, MapRework.h). The slope above is measured over 16 m, which would turn the last 8 m of every cliff top
+		// to stone. The wall is cut in whole steps one cell wide (MapRework.h CliffStep) and AWorldTerrain::BuildFine gives those faces their
+		// own stone-coloured, flat-shaded triangles: so here the wall's zone is grass (the top to its very lip, and the ledges), beside it
+		// the rock follows the ground's slope over 2 m, and the foot is dark shingle and boulders, not pale sand.
+		{
+			float Face = 0.f, Dw = 0.f;
+			const float Sea = JeebWorld::SeaCliffNear(X, Y, 4500.f, &Face, &Dw);
+			if (Sea > 0.f)
+			{
+				const float N = Soft(X, Y, 330.f, 29.f), N2 = Soft(X, Y, 1300.f, 67.f);
+				constexpr float S2 = 200.f;
+				const float Gx = (JeebTerrain::HeightAt(X + S2, Y) - JeebTerrain::HeightAt(X - S2, Y)) / (2.f * S2), Gy = (JeebTerrain::HeightAt(X, Y + S2) - JeebTerrain::HeightAt(X, Y - S2)) / (2.f * S2);
+				const float Up2 = 1.f / FMath::Sqrt(1.f + Gx * Gx + Gy * Gy);
+				float Rock = JeebWorld::Smooth(0.84f, 0.68f, Up2 + 0.08f * (N - 0.5f)) * (1.f - FMath::Clamp(Face / Sea, 0.f, 1.f));
+				M.Cliff = Face;
+				const float Dark = JeebRework::InPaleX(X) ? 0.f : 1.f;   // (the Pale Cove keeps its sand)
+				Rock = FMath::Max(Rock, Dark * JeebWorld::Smooth(JeebWorld::SeaLevel + 230.f + 120.f * N2, JeebWorld::SeaLevel + 40.f, Z) * (0.55f + 0.45f * N));   // the foot and the sea bed by it
+				const float In = Sea * JeebWorld::Smooth(-4500.f, -3200.f, Dw);
+				M.Rock = FMath::Lerp(M.Rock, Rock, In);
+				M.Sand *= 1.f - 0.85f * In * Dark;
+			}
+		}
 		// Sand: a beach round the lake and its island, and the bars on the inside of the rivers' tight bends, from just under the water to
 		// about a metre over it (2026-11-18)
 		{
@@ -197,6 +220,6 @@ namespace JeebGround
 	inline float GrassAmount(const FMask& M)
 	{
 		return (1.f - JeebWorld::Smooth(0.25f, 0.65f, M.Rock)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Mud)) * (1.f - JeebWorld::Smooth(0.15f, 0.5f, M.Sand))
-			* (1.f - JeebWorld::Smooth(0.2f, 0.75f, M.Snow));   // (tufts thin out through the patchy snow and stop where it lies solid)
+			* (1.f - JeebWorld::Smooth(0.2f, 0.75f, M.Snow)) * (1.f - JeebWorld::Smooth(0.03f, 0.3f, M.Cliff));   // (tufts thin out through the patchy snow and stop where it lies solid)
 	}
 }

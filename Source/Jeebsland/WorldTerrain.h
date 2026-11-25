@@ -43,6 +43,7 @@ private:
 	UPROPERTY() TArray<TObjectPtr<UProceduralMeshComponent>> Under;
 	void BuildLand();
 	void BuildFine();   // (the 2 m patches: Steele Creek, the lake, the split)
+	void BuildArch();   // (the Pale Cove's rock arch, 2026-11-25: MapRework.h)
 	void BuildWater();
 	void BuildBeyond(UMaterialInterface* Mat);   // (the land drawn past the map's north, west and south edges, so nobody looks out into nothing; players only)
 };

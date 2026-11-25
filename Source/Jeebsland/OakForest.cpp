@@ -768,6 +768,8 @@ struct FOakForestBuild
 			const float Ds = FVector2D::Distance(P, SteeleC);
 			if (Ds < 21000.f) return 0.f;
 			const float Shore = JeebWorld::CoastY(X) - Y;
+			if (JeebRework::NearNeedles(X, Y, 0.f))   // (2026-11-25: nothing grows out of the Needles' pillars; MapRework.h)
+				for (const JeebRework::FStack& Nd : JeebRework::Needles()) if (FVector2D::DistSquared(P, FVector2D(Nd.X, Nd.Off)) < FMath::Square(Nd.R * JeebRework::StackReach + 250.f)) return 0.f;
 			if (Shore < 3000.f) return 0.f;
 			const float Rd = JeebWorld::WaterEdge(X, Y);
 			if (Rd < 1200.f) return 0.f;
@@ -812,7 +814,8 @@ struct FOakForestBuild
 				const float Hollow = FMath::Clamp((Around - Z) / 200.f, -1.f, 1.f);
 				const float RoadSide = OnForestRoadBox(X, Y, 1500.f) ? JeebWorld::Smooth(400.f, 1500.f, JeebTerrain::PathClearance(X, Y)) : 1.f;
 				const float Stand = bLone ? Wd : Wd * FMath::Lerp(0.05f, 1.f, Glade) * (0.78f + 0.2f * Hollow);
-				const float Want = Density * W * HighKeep * Stand * (1.f - 0.6f * JeebWorld::Smooth(0.58f, 0.72f, Slope)) * FMath::Lerp(0.55f, 1.f, RoadSide);
+				const float Moor = JeebRework::Moor(X, Y);   // (2026-11-25, the moor: hardly a tree, and what stands there is a lone pine)
+				const float Want = Density * W * HighKeep * Stand * (1.f - 0.6f * JeebWorld::Smooth(0.58f, 0.72f, Slope)) * FMath::Lerp(0.55f, 1.f, RoadSide) * (1.f - 0.82f * Moor);
 				if (Keep > Want) { if (W > 0.3f && Wd > 0.45f && A < 0.4f) Open.Add(P); continue; }
 				// what grows here
 				const float ConiferField = 0.5f + 0.5f * Noise(P, 7000.f, -4.4f, 1.7f);
@@ -821,6 +824,7 @@ struct FOakForestBuild
 				ConiferP += 0.25f * JeebWorld::Smooth(30000.f, 70000.f, X);                                                                  // more spruce to the north
 				ConiferP *= (1.f - 0.85f * BirchLand) * (1.f - 0.8f * JeebWorld::Smooth(-45000.f, -75000.f, X) * JeebWorld::Smooth(55000.f, 75000.f, Y));   // Birch Grove's aspens; few toward the tropics
 				ConiferP = FMath::Clamp(FMath::Max(ConiferP, JeebWorld::Smooth(0.16f, 0.5f, A)), 0.02f, 1.f);                                // and with height
+				ConiferP = FMath::Max(ConiferP, 0.8f * Moor);
 				const float HighScale = FMath::Lerp(1.f, 0.58f, JeebWorld::Smooth(0.4f, JeebOpen::Treeline, A));
 				int32 Kind; float Scale; int32 Col = 0;
 				if (Pick < ConiferP)
@@ -902,6 +906,45 @@ struct FOakForestBuild
 				Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - (bBig ? 0.18f * Sz * 100.f : 0.15f * Sz * 100.f) - Slope * 0.15f * Foot), Yaw, FVector(Sx, Sy, Sz), false, Hs.UpAt(P.X, P.Y, 2.f * Foot, 0.9f) });
 				++Count[Kind]; ++Rocks;
 			}
+		}
+		// ---- the moor's tors (2026-11-25, MapRework.h: "low stone outcrops"): on the moor's rises, a line of big flat stones half sunk
+		// in the ground with smaller ones round it, each outcrop along its own strike. Their own stream, after everything else, so no tree
+		// or stone placed above moves.
+		{
+			FRandomStream Tr(9696);
+			int32 Tors = 0, TorStones = 0;
+			for (int32 c = 0; c < 260; ++c)
+			{
+				const FVector2D Ctr(Tr.FRandRange(JeebRework::MoorMinX, JeebRework::MoorMaxX), Tr.FRandRange(JeebRework::MoorMinY, JeebRework::MoorMaxY));
+				const int32 Big = Tr.RandRange(3, 6), Small = Tr.RandRange(2, 5);
+				const float Chance = Tr.FRand(), Turn = Tr.FRandRange(0.f, 180.f), Long = Tr.FRandRange(1.1f, 2.1f);
+				const float Rise = Hs.At(Ctr.X, Ctr.Y) - 0.25f * (Hs.At(Ctr.X + 3000.f, Ctr.Y) + Hs.At(Ctr.X - 3000.f, Ctr.Y) + Hs.At(Ctr.X, Ctr.Y + 3000.f) + Hs.At(Ctr.X, Ctr.Y - 3000.f));
+				// (mostly on ground that stands above what is 30 m round it; one in six anywhere)
+				const bool bHere = JeebRework::Moor(Ctr.X, Ctr.Y) > 0.4f && Edge(Ctr.X, Ctr.Y) > 0.f && (Rise > 70.f ? Chance < 0.75f : Chance < 0.16f)
+					&& !(OnForestRoadBox(Ctr.X, Ctr.Y, 2500.f) && JeebTerrain::PathClearance(Ctr.X, Ctr.Y) < 900.f);
+				const FVector2D Dir(FMath::Cos(FMath::DegreesToRadians(Turn)), FMath::Sin(FMath::DegreesToRadians(Turn))), Across(-Dir.Y, Dir.X);
+				bool bAny = false;
+				for (int32 k = 0; k < Big + Small; ++k)
+				{
+					const bool bBig = k < Big;
+					const float Ua = Tr.FRandRange(-1.f, 1.f), Va = Tr.FRandRange(-1.f, 1.f);
+					const FVector2D P = Ctr + Dir * (Ua * (bBig ? 380.f : 640.f) * Long) + Across * (Va * (bBig ? 150.f : 380.f));
+					const float S = bBig ? Tr.FRandRange(1.5f, 3.1f) * (k == 0 ? 1.2f : 0.85f) : Tr.FRandRange(0.5f, 1.1f);
+					const float Sx = S * Tr.FRandRange(1.05f, 1.5f), Sy = S * Tr.FRandRange(0.8f, 1.1f), Sz = S * Tr.FRandRange(0.42f, 0.66f), Yaw = Turn + Tr.FRandRange(-25.f, 25.f);
+					const int32 Kind = bBig ? K_Boulder : (Tr.FRand() < 0.5f ? K_RockMossy : K_RockPale);
+					if (!bHere || Edge(P.X, P.Y) <= 0.f) continue;
+					float Slope;
+					const float Z = Hs.At(P.X, P.Y, &Slope);
+					if (Slope > 0.6f) continue;
+					const float Foot = Kinds[Kind].Crown * FMath::Max(Sx, Sy);
+					if (!Space.Clear(P, Foot * 0.55f, 0.3f, 0.f)) continue;   // (an outcrop's stones run into each other: half footprints)
+					Space.Add(P, Foot * 0.55f, false);
+					Puts.Add({ uint8(Kind), 0, FVector(P.X, P.Y, Z - 0.3f * Sz * 100.f - Slope * 0.2f * Foot), Yaw, FVector(Sx, Sy, Sz), false, Hs.UpAt(P.X, P.Y, 2.f * Foot, 0.9f) });
+					++Count[Kind]; ++Rocks; ++TorStones; bAny = true;
+				}
+				Tors += bAny;
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST moor: %d outcrops (%d stones) on the moor"), Tors, TorStones);
 		}
 		ForestTrees += Trees;
 		FString List;

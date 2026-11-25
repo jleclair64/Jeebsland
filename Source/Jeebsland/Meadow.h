@@ -46,6 +46,7 @@ private:
 	UPROPERTY() UStaticMesh* NearMesh = nullptr;
 	UPROPERTY() UStaticMesh* FarMesh = nullptr;
 	UPROPERTY() UStaticMesh* FlowerMesh = nullptr;
+	UPROPERTY() UStaticMesh* HeatherMesh = nullptr;   // (2026-11-25: the moor's heather clumps, MapRework.h)
 	UPROPERTY() UMaterialInstanceDynamic* GrassMid = nullptr;   // M_Grass with the low sun's Dusk set each frame (cooler blades at the golden sun)
 
 		// A square is built a little each frame (a time budget) and only appears when it is finished, so walking never hitches
@@ -58,6 +59,8 @@ private:
 	TArray<float> JobTall;            // each tuft's long-grass share (0..1, per-instance data 0: M_Grass warms its tips)
 	TArray<FTransform> JobFlowerXf;   // the flowers in this square (tiers 0 and 1)
 	TArray<FLinearColor> JobFlowerCol;
+	TArray<FTransform> JobHeatherXf;   // the heather in this square (the moor)
+	TArray<FLinearColor> JobHeatherCol;
 	// The ground's mask over the square being built, on a 5 x 5 grid (GroundMask.h), worked out once per square: how much grass
 	// grows (none on rock, mud or sand) and how trampled it is round buildings; each tuft reads it between the grid points
 	float JobAmount[25] = {}, JobWear[25] = {};
