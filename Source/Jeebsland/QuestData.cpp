@@ -98,8 +98,8 @@ namespace JeebQuests
 			if (Name.IsEmpty()) return 0;
 			if (Name.IsNumeric()) return FCString::Atoi(*Name);
 			static const TCHAR* const MaterialKeys[] = { TEXT("CopperOre"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Bacon"), TEXT("PineLogs"), TEXT("RedwoodLogs"),
-				TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"), TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers") };
-			static_assert(UE_ARRAY_COUNT(MaterialKeys) == int32(EItemType::Antlers) + 1, "MaterialKeys must list every EItemType, in order (JeebItemData.cpp)");
+				TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"), TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers"), TEXT("GameMeat"), TEXT("EagleFeather") };
+			static_assert(UE_ARRAY_COUNT(MaterialKeys) == int32(EItemType::EagleFeather) + 1, "MaterialKeys must list every EItemType, in order (JeebItemData.cpp)");
 			for (int32 m = 0; m < UE_ARRAY_COUNT(MaterialKeys); ++m) if (Name.Equals(MaterialKeys[m], ESearchCase::IgnoreCase)) return MaterialId(static_cast<EItemType>(m));
 			TArray<int32> Ids;
 			for (int32 m = 0; m < UE_ARRAY_COUNT(MaterialKeys); ++m) Ids.Add(MaterialId(static_cast<EItemType>(m)));

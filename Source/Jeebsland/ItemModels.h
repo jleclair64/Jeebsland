@@ -213,6 +213,21 @@ namespace JeebItemModel
 				Blob(NewPart(Out, FLinearColor(0.90f, 0.86f, 0.76f)).Mesh, 2.4, 3.2, 1.6, Xf(V3(-0.5, 0, 1.2)));   // the bit of skull that joins them
 				break;
 			}
+			case EItemType::GameMeat:
+			{
+				// (2026-11-24) a smaller, rosier cut than the deer's haunch, with its fat rim and no bone
+				RBox(NewPart(Out, FLinearColor(0.62f, 0.16f, 0.14f)).Mesh, 7.0, 4.6, 1.7, 0.6, Xf(V3(0, 0, 0)));
+				Torus(NewPart(Out, FLinearColor(0.96f, 0.88f, 0.78f)).Mesh, 5.4, 0.8, 18, 6, 1.25, 0.85, Xf(V3(0, 0, 0.2)));
+				break;
+			}
+			case EItemType::EagleFeather:
+			{
+				// (2026-11-24) a long brown flight feather with a pale quill and a white-tipped end
+				RBox(NewPart(Out, FLinearColor(0.36f, 0.24f, 0.13f)).Mesh, 11.0, 2.6, 0.3, 1.2, Xf(V3(1.0, 0, 0.3)));
+				RBox(NewPart(Out, FLinearColor(0.93f, 0.91f, 0.86f)).Mesh, 2.2, 2.2, 0.32, 1.0, Xf(V3(6.6, 0, 0.32)));
+				RBox(NewPart(Out, FLinearColor(0.88f, 0.84f, 0.72f)).Mesh, 15.0, 0.35, 0.4, 0.15, Xf(V3(0, 0, 0.4)));
+				break;
+			}
 			default: break;
 			}
 			Settle(Out);

@@ -93,6 +93,12 @@ namespace JeebFoes
 		int32 MeatId = 0, BonesId = 0;   // what a kill drops, counted by the killer's Hunting level (HuntDrops.csv, table DropTable); 0 = none
 		FName DropTable;
 		int32 HuntXP = 0;                // Hunting XP for the kill
+		// (2026-11-24, Docs/AnimalsPlan2.md) 0 flee, 1 cornered (flees; turns on whoever hurts it from close), 2 fight, 3 moody (50/50 per animal)
+		uint8 Temper = 0;
+		int32 Damage = 0;                // raw damage of a strike on a player
+		float Reach = 180.f, Windup = 0.5f, Cool = 1.6f, Leash = 4500.f;   // cm, s, s, cm from home
+		float LieDrop = 42.f;            // cm the death pose's body is lowered (at scale 1)
+		float BoxLong = 1.f, BoxTall = 1.f;   // the stag's hurt boxes stretched to this animal
 	};
 	struct FHerdDef
 	{

@@ -11,3 +11,11 @@ OakSouth,Stag,3-5,plaza,-360,-160,
 OakEast,Stag,3-4,plaza,-150,360,
 OakFar,Stag,4-5,plaza,460,300,
 Wild,Stag,3-5,wild,,,14
+# (2026-11-24, Docs/AnimalsPlan2.md) rabbits and a fox near Oak Hill to find quickly; the rest wild. Wolves only wild (packs).
+OakRabbits,Rabbit,1-2,plaza,210,170,
+OakFox,Fox,1,plaza,-260,260,
+WildRabbits,Rabbit,1-2,wild,,,14
+WildFox,Fox,1,wild,,,10
+WildBoar,Boar,2-4,wild,,,8
+WildWolves,Wolf,3-4,wild,,,6
+WildMoose,Moose,1-2,wild,,,6

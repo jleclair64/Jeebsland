@@ -24,7 +24,7 @@ bool UJeebSave::Exists()
 bool UJeebSave::ValidId(int32 Id)
 {
 	if (Id == 0) return true;
-	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::Antlers;   // (the last material; new ones go after it)
+	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::EagleFeather;   // (the last material; new ones go after it)
 	if (IsArrow(Id) || IsRock(Id) || IsPotionRange(Id) || JeebBroom::IsBroomRange(Id)) return true;   // (brooms: any broom number; any potion number: a shorter Potions.csv never loses saved potions)
 	return IsGear(Id) && KindOf(Id) < K_Count;
 }
