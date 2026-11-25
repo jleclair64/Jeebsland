@@ -349,7 +349,7 @@ namespace
 				if (InTown > 0.f) { const float Hh = JeebHills::Offset(X, Y); if (Hh != 0.f) { G.V[k] -= Hh * InTown; Fixed[k] = 0; } }
 				Allow[k] = FMath::Lerp(1.f, CliffSlope / MaxSlope, Cliff[k]);
 				// (2026-11-25, the sea cliffs, MapRework.h: from 65 m inland of the coast line to the sea the slope cut and the rounding leave the ground alone)
-				if (JeebWorld::SeaCliffNear(X, Y, 6500.f) > 0.f || JeebRework::NearNeedles(X, Y, 2400.f)) { Cliff[k] = 1.f; Allow[k] = 80.f; }
+				if (JeebWorld::SeaCliffNear(X, Y, 9000.f) > 0.f || JeebRework::NearNeedles(X, Y, 2400.f)) { Cliff[k] = 1.f; Allow[k] = 80.f; }
 			}
 		auto Finished = [&]() { for (int32 i = 0; i < NI; ++i) for (int32 j = 0; j < N; ++j) { const int32 k = i * N + j; G.T[k] = Finish(G.GX(i), G.GY(j), L0[k] + G.V[k]); } };
 		// The slope cut is made on the finished ground (rivers and coast applied) and taken off the offset; near water the land answers

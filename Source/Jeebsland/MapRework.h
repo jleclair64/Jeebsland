@@ -133,7 +133,7 @@ namespace JeebRework
 		if (X < PaleToX)
 		{
 			const float Dc = FMath::Abs(X - PaleCoveX);
-			C.Top = (1650.f + 380.f * FMath::PerlinNoise1D(X / 6000.f + 12.9f)) * Ramp(PaleFromX, PaleFromX + 4500.f, X) * Ramp(PaleToX, PaleToX - 4500.f, X) * Ramp(1300.f, 3800.f, Dc);
+			C.Top = (1650.f + 380.f * FMath::PerlinNoise1D(X / 6000.f + 12.9f) + 160.f * FMath::PerlinNoise1D(X / 1900.f + 3.3f)) * Ramp(PaleFromX, PaleFromX + 4500.f, X) * Ramp(PaleToX, PaleToX - 4500.f, X) * Ramp(1300.f, 3800.f, Dc);
 			C.A = Ramp(250.f, 900.f, C.Top);
 			C.Beach = Ramp(7500.f, 3500.f, Dc);
 			C.Run = 600.f;
@@ -142,11 +142,15 @@ namespace JeebRework
 		}
 		float Hc = 4300.f + 1300.f * FMath::PerlinNoise1D(X / 52000.f + 3.1f) + 500.f * FMath::PerlinNoise1D(X / 19000.f - 8.4f);
 		Hc = FMath::Lerp(Hc, FMath::Min(Hc, 3400.f), Ramp(48000.f, 58000.f, X));
+		// (second pass: the top's height also wanders over 20 to 60 m, so the skyline is never one ruled line)
+		Hc += 330.f * FMath::PerlinNoise1D(X / 5600.f + 21.3f) + 150.f * FMath::PerlinNoise1D(X / 2100.f - 4.9f);
 		C.Top = Hc * Ramp(CliffFromX, 31000.f, X) * Ramp(CliffToX, 93000.f, X) * CliffCoves(X);
 		C.A = Ramp(250.f, 1100.f, C.Top);
 		C.Beach = Ramp(0.08f, 0.4f, FMath::PerlinNoise1D(X / 14000.f + 31.7f));
-		C.Ledge = (FMath::PerlinNoise1D(X / 11000.f + 4.4f) > -0.08f && C.Top >= 2600.f) ? 1.f : 0.f;   // (stepped only where the wall is tall enough for two real ledges)
-		C.Run = C.Ledge > 0.5f ? 1500.f : 600.f;
+		// (stepped only where the wall is tall enough for two real ledges. Second pass: it eases between sheer and stepped over some
+		// 20 m, the ledges pinching out, where it used to jump 9 m sideways in one straight cut)
+		C.Ledge = Ramp(-0.2f, 0.06f, FMath::PerlinNoise1D(X / 11000.f + 4.4f)) * Ramp(2300.f, 2900.f, C.Top);
+		C.Run = FMath::Lerp(600.f, 1500.f, C.Ledge);
 		return C;
 	}
 	// cm added to the coast line's Y there: headlands and bights along the cliffs (two waves at unrelated sizes), a bite at each cove
@@ -165,13 +169,40 @@ namespace JeebRework
 	// a clean line, each face is one cell wide (80 degrees and more) and the wall's line bends along the grid like chiselled blocks.
 	// Sheer: one drop. Stepped (Ledge 1, a wall 15 m wide in plan): three drops with two grassy ledges about 5 m wide between them, at
 	// heights that wander along the coast. A ledge is never narrower than two cells: narrower ones came and went from row to row (teeth).
+	// (Second pass, 2026-11-25. The mesh no longer has to keep the wall on grid lines: AWorldTerrain::BuildFine moves the grid's points onto
+	// each drop's true line. So the three drops' places and the ledges' heights now wander along the coast at unrelated sizes, a ledge
+	// may pinch out to nothing, and Ledge runs smoothly from 0 (one drop) to 1 (three).)
+	// where the three drops stand (T, from the foot): the lowest, the middle, the lip
+	inline void CliffDrops(float Ledge, float X, float& T3, float& T2, float& T1)
+	{
+		T1 = FMath::Lerp(0.5f, 0.82f + 0.13f * FMath::PerlinNoise1D(X / 2300.f + 8.8f), Ledge);
+		T2 = FMath::Lerp(0.5f, 0.45f + 0.24f * FMath::PerlinNoise1D(X / 3100.f - 2.7f), Ledge);
+		T3 = FMath::Lerp(0.5f, 0.11f + 0.09f * FMath::PerlinNoise1D(X / 1700.f + 14.1f), Ledge);
+		T2 = FMath::Min(T2, T1); T3 = FMath::Min(T3, T2);
+	}
 	inline float CliffStep(float T, float Ledge, float X)
 	{
-		if (Ledge < 0.5f) return T >= 0.5f ? 1.f : 0.f;
-		if (T >= 0.8f) return 1.f;
-		if (T >= 0.433f) return 0.66f + 0.09f * FMath::PerlinNoise1D(X / 9000.f + 5.5f);
-		if (T >= 0.1f) return 0.31f + 0.10f * FMath::PerlinNoise1D(X / 7000.f + 1.2f);
+		float T3, T2, T1;
+		CliffDrops(Ledge, X, T3, T2, T1);
+		if (T >= T1) return 1.f;
+		if (T >= T2) return 0.66f + 0.2f * FMath::PerlinNoise1D(X / 3700.f + 5.5f);
+		if (T >= T3) return 0.3f + 0.2f * FMath::PerlinNoise1D(X / 2900.f + 1.2f);
 		return 0.f;
+	}
+	// the lip's place: cm past the wall's foot line (negative: inland) where the top ends
+	inline float CliffLip(const FSeaCliff& C, float X)
+	{
+		float T3, T2, T1;
+		CliffDrops(C.Ledge, X, T3, T2, T1);
+		return -C.Run * T1;
+	}
+	// How far a point on a wall's face stands out from the flat face (cm, + outward): beds that stand proud or are eaten back (they dip
+	// a little along the coast and undulate), and bulges and hollows at two unrelated sizes. AWorldTerrain::BuildFine cuts every wall
+	// face into bands 2 m high and moves their points by this, so a face is never a flat board and overhangs here and there.
+	inline float WallRough(const FVector& Q)
+	{
+		const float Bed = Q.Z + 0.06f * (Q.X + Q.Y) + 170.f * FMath::PerlinNoise2D(FVector2D(Q.X / 2300.f + 1.7f, Q.Y / 2300.f - 3.9f));
+		return 85.f * FMath::PerlinNoise1D(Bed / 430.f) + 125.f * FMath::PerlinNoise3D(Q / 1100.f + FVector(3.7f, -8.2f, 1.9f)) + 45.f * FMath::PerlinNoise3D(Q / 390.f + FVector(-11.f, 4.4f, 7.3f));
 	}
 	// Sea stacks off the wall: X along the coast, Off cm out from the coast line, R radius, Top height over the sea, Ph a turn for its outline
 	struct FStack { float X, Off, R, Top, Ph; };
@@ -187,12 +218,20 @@ namespace JeebRework
 			{ PaleCoveX + 5300.f, 3100.f, 750.f, 1500.f, 0.4f },
 			{ PaleCoveX - 4800.f, 4600.f, 1200.f, 1700.f, 3.6f },
 			{ PaleCoveX + 1500.f, 7600.f, 800.f, 1000.f, 5.1f },
+			// (second pass: more of them, of every size, from stumps to towers)
+			{ 59700.f, 3900.f, 600.f, 1150.f, 3.3f },
+			{ 68000.f, 5600.f, 1050.f, 2150.f, 5.6f },
+			{ 69500.f, 8200.f, 560.f, 800.f, 1.1f },
+			{ 84700.f, 8000.f, 700.f, 1350.f, 2.5f },
+			{ 36300.f, 8700.f, 620.f, 850.f, 4.9f },
+			{ 90300.f, 5200.f, 820.f, 1600.f, 0.3f },
+			{ 39800.f, 5000.f, 500.f, 600.f, 2.0f },
 		};
 		return S;
 	}
 	constexpr int32 ArchStack = 4;        // the stack the Pale Cove's arch reaches (AWorldTerrain::BuildArch spans from the cliff to it)
-	constexpr float ArchWidth = 620.f;    // the arch's thickness in plan (cm)
-	constexpr float ArchHole = 780.f;     // the opening's height over the sea at its middle (cm): room to swim or wade through
+	constexpr float ArchWidth = 700.f;    // the arch's thickness in plan (cm), on average: it narrows over the opening and swells at its feet
+	constexpr float ArchHole = 1050.f;    // the opening's height over the sea at its highest (cm): room to swim or wade through
 
 	// ---- the Needles (a character spot, after the owner's picture of tall rock pillars in forest): a cluster of pale rock pillars 9 to
 	// 22 m tall on wooded ground in the hills south of Anchorage. X, Y, radius, height over the ground round it, a turn for its outline.
@@ -214,19 +253,26 @@ namespace JeebRework
 	inline bool NearNeedles(float X, float Y, float Margin) { return On() && FMath::Abs(X - NeedlesX) < NeedlesHalf + Margin && FMath::Abs(Y - NeedlesY) < NeedlesHalf + Margin; }
 	// 0 .. 1: pale rock (the Pale Cove's cliffs, stacks and arch, the Needles): M_Ground lightens the stone there
 	inline float PaleAt(float X, float Y) { return (InPaleX(X) || NearNeedles(X, Y, 800.f)) ? 1.f : 0.f; }
-	constexpr float StackReach = 1.3f;   // (times its radius: where its outline's bulges end)
+	constexpr float StackReach = 1.5f;   // (times its radius: where its outline's bulges end)
 	// A stack's height over the sea at (Dx, Dy) from its middle (cm), or -1e9 outside it: a domed, grassy top and a sheer side
 	// whose outline bulges and bites (never a circle)
+	// (Second pass: every stack its own shape. Its outline is squeezed along one axis and bulges at four unrelated sizes; its top is
+	// domed and tilts; a shoulder at about half height stands on part of its outline and low wave-cut rocks at its foot on another
+	// part. BuildFine draws each drop on its true line and roughens the faces.)
 	inline float StackHeight(const FStack& S, float Dx, float Dy)
 	{
-		const float Di = FMath::Sqrt(Dx * Dx + Dy * Dy);
+		float Di = FMath::Sqrt(Dx * Dx + Dy * Dy);
 		if (Di > S.R * StackReach) return -1.0e9f;
 		const float Ang = FMath::Atan2(Dy, Dx);
-		const float Rr = S.R * (1.f + 0.17f * FMath::Sin(3.f * Ang + S.Ph) + 0.09f * FMath::Sin(5.f * Ang + 2.3f * S.Ph));
+		Di *= 1.f + (0.22f + 0.2f * FMath::Sin(S.Ph * 3.1f)) * FMath::Square(FMath::Cos(Ang - S.Ph));
+		const float Rr = S.R * (1.f + 0.2f * FMath::Sin(2.f * Ang + S.Ph) + 0.13f * FMath::Sin(3.f * Ang + 2.3f * S.Ph) + 0.08f * FMath::Sin(5.f * Ang + 0.7f * S.Ph) + 0.06f * FMath::Sin(8.f * Ang + 4.1f * S.Ph));
 		const float U = Di / Rr;
 		if (U >= 1.f) return -1.0e9f;
-		// (one drop from the top to the sea bed, see CliffStep; and on about half its outline a shoulder at half height, so it is not a plain drum)
-		if (U < 0.62f) return S.Top * (1.f - 0.15f * U * U);
-		return (S.R >= 1100.f && FMath::Sin(2.f * Ang + 1.7f * S.Ph) > 0.1f) ? S.Top * 0.52f : -1.0e9f;   // (a shoulder under two cells wide would come and go: the small stack has none)
+		const float Core = 0.52f + 0.13f * FMath::Sin(3.f * Ang + 1.3f * S.Ph);
+		if (U < Core) return S.Top * (1.f - 0.3f * FMath::Square(U / Core) + 0.1f * (U / Core) * FMath::Cos(Ang - 1.9f * S.Ph));
+		const float Mid = 0.8f + 0.1f * FMath::Sin(2.f * Ang + 2.9f * S.Ph);
+		if (U < Mid && S.R >= 600.f && FMath::Sin(2.f * Ang + 1.7f * S.Ph) > -0.25f) return S.Top * (0.5f + 0.13f * FMath::Sin(3.f * Ang + 0.4f * S.Ph));
+		if (FMath::Sin(3.f * Ang + 0.9f * S.Ph) > 0.05f) return FMath::Max(170.f, S.Top * (0.1f + 0.05f * FMath::Sin(5.f * Ang + S.Ph)));
+		return -1.0e9f;
 	}
 }

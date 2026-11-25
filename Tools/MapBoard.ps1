@@ -12,6 +12,7 @@ param(
 	[switch]$Compose,
 	[string]$Extra = '',
 	[string]$Queue = 'map',
+	[string]$Suffix = '',          # -Compose: added to the board's file name (_v2: the second pass)
 	[int]$TimeLimitSeconds = 600
 )
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,7 @@ $Stages = @{
 		@{ N = 'Sea stacks and the wall, from the sea';   E = '57500_108000_3600_-78_0_0' },
 		@{ N = 'Along the cliff top, looking south';      E = '63000_91200_260_172_-9_0' },
 		@{ N = 'From the air';                            E = '72000_111000_15000_-125_-24_0' },
-		@{ N = 'The cove beach, looking north';           E = '46500_98300_800_8_4_0' },
+		@{ N = 'The cove beach, looking north';           E = '46700_93000_220_25_2_0' },
 		@{ N = 'Cliffs at sunset, from the sea';          E = '80000_101500_3200_-150_2_0.26' },
 		@{ N = 'From inland, looking east to the edge';   E = '60000_80000_2500_90_-4_0' },
 		@{ N = 'Foot of the wall, close';                 E = '66500_97200_2300_-95_8_0' },
@@ -54,7 +55,7 @@ $Stages = @{
 		@{ N = 'On the cove''s beach';         E = '-65000_91500_250_90_0_0' },
 		@{ N = 'The Needles from the air';    E = '-50500_74000_7000_90_-35_0' },
 		@{ N = 'Among the Needles';          E = '-52800_78200_250_45_12_0' },
-		@{ N = 'The Needles at sunset';      E = '-47500_77500_400_135_8_0.26' }
+		@{ N = 'The Needles at sunset';      E = '-44300_75300_400_138_9_0.26' }
 	)
 }
 if (Test-Path (Join-Path $PSScriptRoot 'MapBoardViews.ps1')) { . (Join-Path $PSScriptRoot 'MapBoardViews.ps1') }   # (more stages or changed views)
@@ -87,7 +88,14 @@ if ($Compose) {
 		$k = 0
 		foreach ($t in 'before', 'after') {
 			$f = Join-Path $Keep ("{0}_{1}_{2}.jpg" -f $Stage, $t, $i)
-			if (Test-Path $f) { $img = [Drawing.Image]::FromFile($f); $g.DrawImage($img, $k * $TW, 26 + $i * $TH, $TW, $TH); $img.Dispose() }
+			# (a before still that is gone is cut out of the first board, whose left column it was)
+			$old = Join-Path $Project "Docs\MapRework\$Stage.jpg"
+			if (-not (Test-Path $f) -and $t -eq 'before' -and $Suffix -and (Test-Path $old)) {
+				$ob = [Drawing.Image]::FromFile($old); $cb = New-Object Drawing.Bitmap $TW, $TH; $cg = [Drawing.Graphics]::FromImage($cb)
+				$cg.DrawImage($ob, (New-Object Drawing.Rectangle 0, 0, $TW, $TH), (New-Object Drawing.Rectangle 0, (26 + $i * $TH), $TW, $TH), [Drawing.GraphicsUnit]::Pixel)
+				Save-Jpeg $cb $f 92; $cg.Dispose(); $cb.Dispose(); $ob.Dispose()
+			}
+			if (Test-Path $f) { $img =[Drawing.Image]::FromFile($f); $g.DrawImage($img, $k * $TW, 26 + $i * $TH, $TW, $TH); $img.Dispose() }
 			else { Draw-Label $g 'missing' ($k * $TW + 20) (26 + $i * $TH + 150) 22 }
 			$k++
 		}
@@ -95,7 +103,7 @@ if ($Compose) {
 	}
 	$OutDir = Join-Path $Project 'Docs\MapRework'
 	New-Item -ItemType Directory -Force $OutDir | Out-Null
-	$path = Join-Path $OutDir ($Stage + '.jpg')
+	$path = Join-Path $OutDir ($Stage + $Suffix + '.jpg')
 	Save-Jpeg $b $path 74
 	$g.Dispose(); $b.Dispose()
 	Write-Host ("MAPBOARD board: $path ({0:N2} MB)" -f ((Get-Item $path).Length / 1MB))

@@ -36,9 +36,9 @@ static TAutoConsoleVariable<FString> CVarGrassTint2(TEXT("jeeb.Grass.Tint2"), TE
 static TAutoConsoleVariable<float> CVarGrassField(TEXT("jeeb.Grass.PackField"), 1.f, TEXT("How much of our field colour (patches, swathes, dry patches) the realistic blades take, 0..1 (live)"));
 static TAutoConsoleVariable<float> CVarGrassPackDesat(TEXT("jeeb.Grass.PackDesat"), 0.2983f, TEXT("How far the realistic blades are pulled toward grey (live)"));
 static TAutoConsoleVariable<float> CVarGrassGreenDry(TEXT("jeeb.Grass.GreenDry"), 1.f, TEXT("How far the Grass Library's yellow stems and seed heads are pulled to green, 0..1 (live; owner: they stood out)"));
-static TAutoConsoleVariable<FString> CVarMoorTawny(TEXT("jeeb.Moor.Tawny"), TEXT("1.75 1.2 0.55"), TEXT("The moor's tawny grass (2026-11-25): its colour as a multiplier on the grass tint, \"r g b\" (live)"));
-static TAutoConsoleVariable<float> CVarMoorHeather(TEXT("jeeb.Moor.Heather"), 7.f, TEXT("Heather clumps per square metre in the heart of a heather drift on the moor (read as the grass grows; 0 none)"));
-static TAutoConsoleVariable<FString> CVarMoorHeatherCol(TEXT("jeeb.Moor.HeatherColour"), TEXT("0.40 0.19 0.42"), TEXT("The heather's flower colour, \"r g b\" (read as the grass grows)"));
+static TAutoConsoleVariable<FString> CVarMoorTawny(TEXT("jeeb.Moor.Tawny"), TEXT("1.2 1.1 0.66"), TEXT("The moor's tawny grass (2026-11-25): its colour as a multiplier on the grass tint, \"r g b\" (live)"));
+static TAutoConsoleVariable<float> CVarMoorHeather(TEXT("jeeb.Moor.Heather"), 6.f, TEXT("Heather cushions per square metre in the heart of a heather drift on the moor (read as the grass grows; 0 none)"));
+static TAutoConsoleVariable<FString> CVarMoorHeatherCol(TEXT("jeeb.Moor.HeatherColour"), TEXT("0.50 0.27 0.47"), TEXT("The heather's flower colour, \"r g b\" (read as the grass grows)"));
 static TAutoConsoleVariable<float> CVarGrassFlowers(TEXT("jeeb.Grass.PackFlowers"), 0.4286f, TEXT("Flower clumps against our single flowers (a clump holds several)"));
 static TAutoConsoleVariable<float> CVarGrassFarThin(TEXT("jeeb.Grass.FarThin"), 0.5f, TEXT("The far ring's clumps (past about 32 m) against before 2026-11-16 (1): 0.5 half as many, each a little wider so the ground stays covered (2026-11-16, for speed). Regrows round you. Near grass unchanged."));
 
@@ -210,9 +210,11 @@ static UStaticMesh* MakeFlowerMesh(UObject* Outer, UMaterialInterface* Mat)
 	return SM;
 }
 
-// A clump of heather (2026-11-25, the moor: MapRework.h): seven thin woody stems leaning out from one root, each ending in a flower
-// spike (two crossed slim diamonds). Vertex red 0 on the stems, 1 on the flowers (M_GrassFlower: the flowers take the instance's
-// colour); V runs as a tuft's card, so it sways with the grass. About 30 cm across and 30 cm tall at scale 1; 56 triangles.
+// A cushion of heather (2026-11-25, the moor: MapRework.h). Second pass: the first model, seven stems with a flower spike each, read as
+// scattered purple flowers on bare ground. Heather is a low, dense mat: so this is a bumpy dome about 54 cm across and 17 cm high
+// (a rim, a shoulder ring, a crown) with seven short sprigs standing out of it for a ragged outline; many of them overlap into one
+// carpet. Vertex red 0 is the plant's green (the rim), 1 the instance's colour (the flowering top), mottled between; V runs as a
+// tuft's card, so it stirs with the grass. 34 triangles.
 static UStaticMesh* MakeHeatherMesh(UObject* Outer, UMaterialInterface* Mat)
 {
 	UStaticMesh* SM = NewObject<UStaticMesh>(Outer);
@@ -229,9 +231,10 @@ static UStaticMesh* MakeHeatherMesh(UObject* Outer, UMaterialInterface* Mat)
 	TPolygonGroupAttributesRef<FName> GroupSlot = Attr.GetPolygonGroupMaterialSlotNames();
 	const FPolygonGroupID Group = MD.CreatePolygonGroup();
 	GroupSlot[Group] = FName("Flower");
-	auto Tri = [&](const FVector& A, const FVector& B, const FVector& C, float Head)
+	auto Tri = [&](const FVector& A, const FVector& B, const FVector& C, float HeadA, float HeadB, float HeadC)
 	{
 		const FVector Pts[3] = { A, B, C };
+		const float Heads[3] = { HeadA, HeadB, HeadC };
 		TArray<FVertexInstanceID> Inst;
 		for (int32 k = 0; k < 3; ++k)
 		{
@@ -242,25 +245,35 @@ static UStaticMesh* MakeHeatherMesh(UObject* Outer, UMaterialInterface* Mat)
 			Tan[I] = FVector3f(1.f, 0.f, 0.f);
 			Sign[I] = 1.f;
 			UVs[I] = FVector2f(0.5f, FMath::Max(0.f, 1.f - float(Pts[k].Z) / 30.f));
-			Cols[I] = FVector4f(Head, 0.f, 0.f, 1.f);
+			Cols[I] = FVector4f(Heads[k], 0.f, 0.f, 1.f);
 			Inst.Add(I);
 		}
 		MD.CreatePolygon(Group, Inst);
 	};
 	FRandomStream R(7711);
+	constexpr int32 Seg = 9;
+	FVector Rim[Seg], Sh[Seg]; float RimH[Seg], ShH[Seg];
+	for (int32 s = 0; s < Seg; ++s)
+	{
+		const float A = s * 2.f * PI / Seg + R.FRandRange(-0.2f, 0.2f), Rr = R.FRandRange(23.f, 31.f), In = R.FRandRange(0.5f, 0.68f);
+		Rim[s] = FVector(FMath::Cos(A) * Rr, FMath::Sin(A) * Rr, -1.f);
+		Sh[s] = FVector(FMath::Cos(A + 0.2f) * Rr * In, FMath::Sin(A + 0.2f) * Rr * In, R.FRandRange(9.f, 15.f));
+		RimH[s] = R.FRandRange(0.3f, 0.6f); ShH[s] = R.FRandRange(0.6f, 1.f);
+	}
+	const FVector Crown(R.FRandRange(-3.f, 3.f), R.FRandRange(-3.f, 3.f), 17.f);
+	for (int32 s = 0; s < Seg; ++s)
+	{
+		const int32 n = (s + 1) % Seg;
+		Tri(Rim[s], Rim[n], Sh[n], RimH[s], RimH[n], ShH[n]);
+		Tri(Rim[s], Sh[n], Sh[s], RimH[s], ShH[n], ShH[s]);
+		Tri(Sh[s], Sh[n], Crown, ShH[s], ShH[n], 0.8f);
+	}
 	for (int32 s = 0; s < 7; ++s)
 	{
-		const float A = s * 2.f * PI / 6.f + R.FRandRange(-0.3f, 0.3f), Lean = s == 6 ? 1.5f : R.FRandRange(8.f, 15.f), H = R.FRandRange(21.f, 31.f);
+		const float A = R.FRandRange(0.f, 2.f * PI), Rad = R.FRandRange(4.f, 21.f);
 		const FVector Out(FMath::Cos(A), FMath::Sin(A), 0.f), Side(-Out.Y, Out.X, 0.f);
-		const FVector Foot = Out * 1.5f, Tip = Out * Lean + FVector(0.f, 0.f, H), Mid = FMath::Lerp(Foot, Tip, 0.42f), Belly = FMath::Lerp(Mid, Tip, 0.4f);
-		Tri(Foot - Side * 0.45f, Foot + Side * 0.45f, Mid + Side * 0.45f, 0.f);
-		Tri(Foot - Side * 0.45f, Mid + Side * 0.45f, Mid - Side * 0.45f, 0.f);
-		for (int32 c = 0; c < 2; ++c)
-		{
-			const FVector W = (c == 0 ? Side : Out) * 2.7f;
-			Tri(Mid, Belly + W, Tip, 1.f);
-			Tri(Mid, Tip, Belly - W, 1.f);
-		}
+		const FVector Base = Out * Rad + FVector(0.f, 0.f, 8.f), Tip = Base + Out * R.FRandRange(1.f, 6.f) + FVector(0.f, 0.f, R.FRandRange(10.f, 16.f));
+		Tri(Base - Side * 2.4f, Base + Side * 2.4f, Tip, 0.55f, 0.55f, 1.f);
 	}
 	UStaticMesh::FBuildMeshDescriptionsParams Params;
 	Params.bBuildSimpleCollision = false;
@@ -715,7 +728,7 @@ void AMeadow::Tick(float Dt)
 					K.Mid->SetVectorParameterValue(TEXT("JeebTint"), bFlower ? FLinearColor::White : (K.Role == 3 ? Tint * ParseRgb(CVarMoorTawny.GetValueOnGameThread()) : Tint));
 					K.Mid->SetScalarParameterValue(TEXT("JeebField"), CVarGrassField.GetValueOnGameThread() * (bFlower ? 0.3f : 1.f));
 					K.Mid->SetScalarParameterValue(TEXT("JeebDesat"), bFlower ? 0.f : CVarGrassPackDesat.GetValueOnGameThread());
-					K.Mid->SetScalarParameterValue(TEXT("JeebGreenDry"), K.Role == 3 ? 0.f : CVarGrassGreenDry.GetValueOnGameThread());   // (the moor's tawny grass keeps its dry stems)
+					K.Mid->SetScalarParameterValue(TEXT("JeebGreenDry"), K.Role == 3 ? 0.45f * CVarGrassGreenDry.GetValueOnGameThread() : CVarGrassGreenDry.GetValueOnGameThread());   // (the moor's tawny grass keeps some of its dry stems; all of them read too yellow)
 				}
 		}
 	}
@@ -869,7 +882,11 @@ void AMeadow::StepJob(double BudgetSeconds)
 				// to twice that, a touch wider, never where LongGrassRoom says no (roads, buildings, trees, trampled ground, plazas)
 				// (2026-11-25, the moor, MapRework.h: long grass almost everywhere, short among the heather)
 				const float Moor = JeebRework::Moor(X, Y), Hea = Moor > 0.f ? JeebRework::Heather(X, Y) : 0.f, Taw = Moor > 0.f ? JeebRework::Tawny(X, Y) : 0.f;
-				Short *= 1.f - 0.5f * Hea;
+				Short *= 1.f - 0.6f * Hea;
+				// (second pass, owner: "making the grass a bit thicker/denser near the edges to mask the edge": within 6 m of a sea cliff's
+				// lip the grass stands taller and wider, and more clumps grow between, below)
+				const float LipNear = JeebWorld::SeaCliffLipNear(X, Y, 600.f);
+				Short *= 1.f + 0.45f * LipNear;
 				const float Tall = FMath::Lerp(LongGrassNoise(X, Y), FMath::Max(LongGrassNoise(X, Y), 0.4f + 0.6f * LongGrassNoise(X + 9100.f, Y - 4700.f)), Moor * (1.f - Hea)) * LongGrassRoom(X, Y, Pc, Near, Cov, Wear);
 				Short *= 0.82f * (1.f + 1.3f * Tall * JobRand.FRandRange(0.8f, 1.15f));
 				const float Wide = Sxy * FMath::Lerp(0.75f, 1.f, FMath::Min(Short, 1.f)) * (1.f + 0.35f * Near) * (1.f + 0.12f * Tall);   // and wider by buildings, so the tufts overlap into one mat and the individual cards disappear
@@ -901,6 +918,15 @@ void AMeadow::StepJob(double BudgetSeconds)
 						// wider clumps used to lift their own height too, so they grew in taller and shrank on the swap to a nearer step)
 						const float Zs = FMath::Clamp(TargetH / Kd.NaturalH, Xy0 * 0.55f, Xy0 * 1.6f);
 						JobKindXf[K].Add(FTransform(Tilt, FVector(X, Y, Gz), FVector(Xy, Xy, Zs)));
+						if (LipNear > 0.05f)   // (the sea cliffs' lip: up to three more clumps beside this one, a thick fringe that hides the edge)
+							for (int32 e = 0; e < 3; ++e)
+							{
+								const float Ex = X + JobRand.FRandRange(-45.f, 45.f), Ey = Y + JobRand.FRandRange(-45.f, 45.f), Roll = JobRand.FRand(), Turn = JobRand.FRandRange(0.f, 360.f), Big = JobRand.FRandRange(1.f, 1.3f);
+								if (Roll >= LipNear) continue;
+								const float Ez = GroundAt(Ex, Ey);
+								if (FMath::Abs(Ez - Gz) > 60.f) continue;   // (over the lip)
+								JobKindXf[K].Add(FTransform(FRotator(Tilt.Pitch, Turn, Tilt.Roll), FVector(Ex, Ey, Ez), FVector(Xy * Big, Xy * Big, Zs * Big)));
+							}
 					}
 					// a flower clump now and then (a clump holds several, so fewer than our single flowers), one kind per drift; only on a spot
 					// grown at this step (so they thin with the grass and never pop on a nearer step's swap), as often near by as before
@@ -915,12 +941,13 @@ void AMeadow::StepJob(double BudgetSeconds)
 					// (2026-11-25, the moor, MapRework.h) heather: clumps in drifts, as many per square metre whatever the grass's own density,
 					// thinning with distance as the grass does; none on paths or trampled ground
 					if (HeatherMesh && bFlowerTier && Hea > 0.08f && Rank < PackHere && Pc > 60.f && Wear < 0.3f
-						&& JobRand.FRand() < Hea * HeatherPerM2 / (NearDensity * 10000.f * FMath::Max(PackChance, 0.05f)))
+						&& JobRand.FRand() < JeebRework::Ramp(0.1f, 0.45f, Hea) * HeatherPerM2 / (NearDensity * 10000.f * FMath::Max(PackChance, 0.05f)))   // (second pass: full to a drift's ragged edge, not thinning all the way through it)
 					{
-						const float S = JobRand.FRandRange(0.55f, 0.95f);   // (small and many: at 1 to 1.7 they read as crocuses)
+						const float S = JobRand.FRandRange(1.5f, 2.4f);   // (cushions 80 to 130 cm across and 15 to 30 cm high that overlap into a carpet: at half that they stood apart as dark molehills)
 						const float Hx = X + JobRand.FRandRange(-25.f, 25.f), Hy = Y + JobRand.FRandRange(-25.f, 25.f);
-						JobHeatherXf.Add(FTransform(FRotator(0.f, JobRand.FRandRange(0.f, 360.f), 0.f), FVector(Hx, Hy, GroundAt(Hx, Hy) - 1.f), FVector(S, S, S * JobRand.FRandRange(0.8f, 1.15f))));
-						JobHeatherCol.Add(HeatherCol * JobRand.FRandRange(0.7f, 1.2f));
+						JobHeatherXf.Add(FTransform(FRotator(0.f, JobRand.FRandRange(0.f, 360.f), 0.f), FVector(Hx, Hy, GroundAt(Hx, Hy) - 1.f), FVector(S, S, S * JobRand.FRandRange(0.5f, 0.85f))));
+						// (purple to purple-brown: some cushions in flower, some going over)
+						JobHeatherCol.Add(FMath::Lerp(HeatherCol, FLinearColor(0.3f, 0.19f, 0.14f), 0.65f * FMath::Square(JobRand.FRand())) * JobRand.FRandRange(0.75f, 1.2f));
 					}
 					continue;
 				}

@@ -771,6 +771,7 @@ struct FOakForestBuild
 			if (JeebRework::NearNeedles(X, Y, 0.f))   // (2026-11-25: nothing grows out of the Needles' pillars; MapRework.h)
 				for (const JeebRework::FStack& Nd : JeebRework::Needles()) if (FVector2D::DistSquared(P, FVector2D(Nd.X, Nd.Off)) < FMath::Square(Nd.R * JeebRework::StackReach + 250.f)) return 0.f;
 			if (Shore < 3000.f) return 0.f;
+			{ float CliffD = 0.f; if (JeebWorld::SeaCliffNear(X, Y, 9000.f, nullptr, &CliffD) > 0.f && CliffD > -JeebRework::SeaCliffAt(X).Run - 1200.f) return 0.f; }   // (second pass: the wall's line wanders further inland than 30 m at the inlets)
 			const float Rd = JeebWorld::WaterEdge(X, Y);
 			if (Rd < 1200.f) return 0.f;
 			if (bLab && JeebTownLab::InSite(JeebTownLab::LabSite(), X, Y, 2500.f)) return 0.f;

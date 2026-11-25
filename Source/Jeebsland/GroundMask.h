@@ -158,7 +158,7 @@ namespace JeebGround
 		// the rock follows the ground's slope over 2 m, and the foot is dark shingle and boulders, not pale sand.
 		{
 			float Face = 0.f, Dw = 0.f;
-			const float Sea = JeebWorld::SeaCliffNear(X, Y, 4500.f, &Face, &Dw);
+			const float Sea = JeebWorld::SeaCliffNear(X, Y, 9000.f, &Face, &Dw);   // (9000: the wall stands up to 60 m inland of the coast line at an inlet's head)
 			if (Sea > 0.f)
 			{
 				const float N = Soft(X, Y, 330.f, 29.f), N2 = Soft(X, Y, 1300.f, 67.f);
@@ -166,7 +166,7 @@ namespace JeebGround
 				const float Gx = (JeebTerrain::HeightAt(X + S2, Y) - JeebTerrain::HeightAt(X - S2, Y)) / (2.f * S2), Gy = (JeebTerrain::HeightAt(X, Y + S2) - JeebTerrain::HeightAt(X, Y - S2)) / (2.f * S2);
 				const float Up2 = 1.f / FMath::Sqrt(1.f + Gx * Gx + Gy * Gy);
 				float Rock = JeebWorld::Smooth(0.84f, 0.68f, Up2 + 0.08f * (N - 0.5f)) * (1.f - FMath::Clamp(Face / Sea, 0.f, 1.f));
-				M.Cliff = Face;
+				M.Cliff = Z < JeebWorld::SeaLevel + 60.f ? Face : 0.f;   // (second pass: grass to the very lip and on the ledges, the walls being drawn on their true lines; none at the foot)
 				const float Dark = JeebRework::InPaleX(X) ? 0.f : 1.f;   // (the Pale Cove keeps its sand)
 				Rock = FMath::Max(Rock, Dark * JeebWorld::Smooth(JeebWorld::SeaLevel + 230.f + 120.f * N2, JeebWorld::SeaLevel + 40.f, Z) * (0.55f + 0.45f * N));   // the foot and the sea bed by it
 				const float In = Sea * JeebWorld::Smooth(-4500.f, -3200.f, Dw);

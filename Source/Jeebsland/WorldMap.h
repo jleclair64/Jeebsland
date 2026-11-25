@@ -605,11 +605,17 @@ namespace JeebWorld
 	}
 
 	// ------------------------------------------------------------------ the sea cliffs (2026-11-25, MapRework.h)
-	// cm the cliff wall's line wanders at a spot (buttresses and gullies about 26 m and 8 m across)
+	// cm the cliff wall's line wanders at a spot (positive: the wall stands further inland)
+	// (second pass, owner: "fewer obvious straight lines that make it look zig zaggy": the line used to wander by under 5 m, so the wall
+	// ran straight for a hundred metres at a time. Now headlands and bights about 70 m and 26 m across, buttresses about 8 m across,
+	// and here and there a narrow inlet cut 20 m and more into the land.)
 	inline float SeaCliffRag(float X, float Y)
 	{
 		const FVector2D P(X, Y);
-		return 380.f * Noise(P + FVector2D(700.f, -300.f), 2600.f) + 110.f * Noise(P + FVector2D(-90.f, 410.f), 800.f);
+		const bool bPale = X < JeebRework::PaleToX;   // (the Pale Cove is 180 m long: smaller bends, no inlets)
+		float R = (bPale ? 420.f : 1150.f) * Noise(P + FVector2D(-5100.f, 2300.f), 7000.f) + (bPale ? 380.f : 520.f) * Noise(P + FVector2D(700.f, -300.f), 2600.f) + 150.f * Noise(P + FVector2D(-90.f, 410.f), 800.f);
+		if (!bPale) R += 2500.f * JeebRework::Ramp(0.27f, 0.47f, FMath::PerlinNoise1D(X / 4300.f + 17.7f)) * (0.75f + 0.5f * FMath::PerlinNoise1D(X / 9000.f + 40.f));
+		return R;
 	}
 	// where a sea stack stands (its Y is measured out from the coast line)
 	inline float StackY(const JeebRework::FStack& S)
@@ -629,8 +635,19 @@ namespace JeebWorld
 		if (Cl.A <= 0.f) return 0.f;
 		const float Dw = D + Cl.A * SeaCliffRag(X, Y);
 		if (OutD) *OutD = Dw;
-		if (OutFace) *OutFace = Cl.A * Smooth(-Cl.Run - 150.f, -Cl.Run + 50.f, Dw) * Smooth(150.f, -50.f, Dw);
+		if (OutFace) *OutFace = Cl.A * Smooth(-Cl.Run - 450.f, -Cl.Run - 250.f, Dw) * Smooth(450.f, 250.f, Dw);
 		return Cl.A;
+	}
+
+	// 0 .. 1: on a sea cliff's top within Reach cm of its lip (second pass, owner: "making the grass a bit thicker/denser near the edges
+	// to mask the edge": Meadow.cpp)
+	inline float SeaCliffLipNear(float X, float Y, float Reach)
+	{
+		float Dw = 0.f;
+		if (SeaCliffNear(X, Y, 8000.f + Reach, nullptr, &Dw) <= 0.f) return 0.f;
+		const JeebRework::FSeaCliff Cl = JeebRework::SeaCliffAt(X);
+		const float Lip = JeebRework::CliffLip(Cl, X);
+		return Dw > Lip ? 0.f : Cl.A * Smooth(Lip - Reach, Lip - Reach * 0.35f, Dw);
 	}
 
 	// The full world height (without the original square round the start): the land, then the sea and the coast, then the

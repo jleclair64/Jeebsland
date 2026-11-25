@@ -471,8 +471,12 @@ namespace JeebTerrain
 		const float Fx = GX - I, Fy = GY - J;
 		const float X0 = P.X0 + I * FineStep, Y0 = P.Y0 + J * FineStep;
 		const float A = FineVertexZ(P, X0, Y0), B = FineVertexZ(P, X0 + FineStep, Y0), C = FineVertexZ(P, X0, Y0 + FineStep);
+		// (second pass on the sea cliffs: a cell a wall runs through is drawn with its points moved onto the wall's true line
+		// (AWorldTerrain::BuildFine), so there the drawn ground is the true height, a level top right to the lip)
+		if (P.bWalls && FMath::Max3(A, B, C) - FMath::Min3(A, B, C) > 250.f) return HeightAt(X, Y);
 		if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;
 		const float D = FineVertexZ(P, X0 + FineStep, Y0 + FineStep);
+		if (P.bWalls && FMath::Abs(D - A) > 250.f) return HeightAt(X, Y);
 		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
 	}
 
