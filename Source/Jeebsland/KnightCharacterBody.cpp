@@ -400,7 +400,7 @@ void AKnightCharacter::RefreshEquipment()
 // a breathing glow (M_PropGlow), the pipe with its bowl in the palm, stem up and out with a few puffs of smoke from its bowl (this machine only). Nothing here is gameplay: the server
 // makes none of it. The belt book (Wiz_BookBase/Robe) shows only if the model is missing.
 // Per item, in the hand's frame (cm, degrees: X forward along the forearm, Y to his right, Z up; pitch, yaw, roll; scale): jeeb.Wizard.OffHand<Book|Ball|Pipe>.
-static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,6.5,0,90,0,1"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
+static TAutoConsoleVariable<FString> CVarOffBook(TEXT("jeeb.Wizard.OffHandBook"), TEXT("9,-1,12,0,90,0,2"), TEXT("The open spell book on the wizard's left palm: x,y,z (cm, forward along the forearm, right, up from the hand bone), pitch,yaw,roll (degrees), scale."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarOffBall(TEXT("jeeb.Wizard.OffHandBall"), TEXT("11,-1,16.5,0,0,0,1.25"), TEXT("The crystal ball over the wizard's left palm: x,y,z (cm, from the hand bone: forward along the forearm, right, up), -, -, -, scale. It bobs about this."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarOffPipe(TEXT("jeeb.Wizard.OffHandPipe"), TEXT("15,0,12.5,-40,180,0,1"), TEXT("The pipe, bowl cradled in the wizard's left palm, stem up and out: x,y,z (cm), pitch,yaw,roll (degrees), scale."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarBallGlow(TEXT("jeeb.Wizard.BallGlow"), 0.9f, TEXT("The crystal ball's glow (M_PropGlow GlowStrength, brightness on screen); it breathes 25% either side of this."), ECVF_Default);
@@ -479,7 +479,7 @@ void AKnightCharacter::PlaceWizardOffHand()
 	if (Fwd.IsNearlyZero()) Fwd = GetActorForwardVector();
 	const FQuat Frame = FRotationMatrix::MakeFromXZ(Fwd, FVector::UpVector).ToQuat();
 	TArray<FString> P;
-	(WizardOffStyle == JeebItems::WO_Ball ? CVarOffBall : WizardOffStyle == JeebItems::WO_Pipe ? CVarOffPipe : CVarOffBook).GetValueOnGameThread().ParseIntoArray(P, TEXT(","));
+	(WizardOffStyle == JeebItems::WO_Ball ? CVarOffBall : WizardOffStyle == JeebItems::WO_Pipe ? CVarOffPipe : CVarOffBook).GetValueOnGameThread().Replace(TEXT("_"), TEXT(",")).ParseIntoArray(P, TEXT(","));   // ("_" also separates, for -ExecCmds, which splits on commas)
 	float V[7] = { 0, 0, 0, 0, 0, 0, 1 };
 	for (int32 i = 0; i < FMath::Min(P.Num(), 7); ++i) V[i] = FCString::Atof(*P[i]);
 	const float T = GetWorld()->GetTimeSeconds();

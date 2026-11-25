@@ -388,8 +388,10 @@ void AKnightCharacter::UpdateBroomModel()
 {
 	if (IsNetMode(NM_DedicatedServer)) return;
 	// (owner 2026-11-24: his left hand is on the broom, so the book, ball or pipe is not shown while he rides; it comes back on landing. Its effects still apply)
-	if (WizardBookHeld) WizardBookHeld->SetVisibility(!bOnBroom);
-	if (WizardPipeSmoke) WizardPipeSmoke->SetVisibility(!bOnBroom);
+	// (owner 2026-11-24: he also puts it away while he works: chopping, mining, fishing, at the anvil: bSwinging, bFishing, bSmithOpen)
+	const bool bPutAway = bOnBroom || bSwinging || bFishing || bSmithOpen;
+	if (WizardBookHeld) WizardBookHeld->SetVisibility(!bPutAway);
+	if (WizardPipeSmoke) WizardPipeSmoke->SetVisibility(!bPutAway);
 	if (!bOnBroom)
 	{
 		if (BroomModel) BroomModel->SetVisibility(false);
