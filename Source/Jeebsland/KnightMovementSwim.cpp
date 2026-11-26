@@ -164,6 +164,7 @@ void UKnightMovement::PhysSwim(float Dt)
 		if (Climbable(Hit) && K && !bWantsLetGo && !bClimbExhausted && ClimbStamina > 0.02f && M > 0.2f && !NF.IsNearlyZero()
 			&& FVector::DotProduct(-NF, A.GetSafeNormal()) > 0.643f)
 		{
+			bClimbFromWater = true;
 			StartClimb(Hit.ImpactNormal);
 			return;
 		}
