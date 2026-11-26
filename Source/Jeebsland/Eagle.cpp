@@ -1,4 +1,5 @@
 #include "Eagle.h"
+#include "OakForest.h"
 #include "FoeData.h"
 #include "HealthComponent.h"
 #include "KnightCharacter.h"
@@ -269,6 +270,13 @@ bool AEagle::Fly(const FVector& To, float Want, float Dt)
 bool AEagle::FindPerch(FVector& Out)
 {
 	// a tree top near home: straight down from high, and the first solid thing well over the ground is a tree
+	// the forest's own tree list first (2026-11-26: the trunk solids are hidden collision, so the straight-down trace found nothing)
+	if (const AOakForest* F = AOakForest::Instance(GetWorld()))
+		if (F->RandomTreeTop(Home, bLab ? 4000.f : 9000.f, Rand, Out))
+		{
+			UE_LOG(LogTemp, Log, TEXT("JEEBEAGLE %s found a perch on a forest tree, %.1f m up"), *GetName(), (Out.Z - JeebFoes::Ground(Out.X, Out.Y)) / 100.f);
+			return true;
+		}
 	FCollisionObjectQueryParams Obj;
 	Obj.AddObjectTypesToQuery(ECC_WorldStatic);
 	for (int32 t = 0; t < 16; ++t)

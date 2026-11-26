@@ -1014,7 +1014,7 @@ struct FOakForestBuild
 				{
 					AOakForest::FFellable F;
 					F.Key = P.Kind * 4 + P.Col; F.KeyIndex = Visual[F.Key].Num() - 1;
-					F.Trunk = TrunkX.Num() - 1; F.Tree = Xf; F.TrunkSolid = TrunkX.Last(); F.Radius = Rad;
+					F.Trunk = TrunkX.Num() - 1; F.Tree = Xf; F.TrunkSolid = TrunkX.Last(); F.Radius = Rad; F.Top = Bx.Max.Z * P.Scale.Z;
 					Self->Fellable.Add(F);
 					FellKind.Add(P.Kind);
 				}
@@ -1518,6 +1518,20 @@ void AOakTreeNode::OnChargesChanged(int32 Remaining, int32 Max)
 {
 	bDepleted = Remaining <= 0;
 	if (AOakForest* F = Forest.Get()) F->SetFelled(Index, Remaining <= 0);
+}
+
+bool AOakForest::RandomTreeTop(const FVector2D& At, float Radius, FRandomStream& Rand, FVector& Out) const
+{
+	// reservoir pick among the whole trees in range (a short loop over the forest's list, only when an eagle goes looking)
+	int32 Seen = 0;
+	for (const FFellable& F : Fellable)
+	{
+		if (F.bFelled || F.Top < 500.f) continue;
+		const FVector L = F.Tree.GetLocation();
+		if (FVector2D::DistSquared(FVector2D(L), At) > Radius * Radius) continue;
+		if (Rand.RandRange(0, Seen++) == 0) Out = L + FVector(0.f, 0.f, F.Top * 0.93f);
+	}
+	return Seen > 0;
 }
 
 void AOakForest::SetFelled(int32 Index, bool bFelled)

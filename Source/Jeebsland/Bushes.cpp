@@ -6,6 +6,7 @@
 #include "SteeleCreek.h"
 #include "Canopy.h"
 #include "Fill.h"
+#include "SightCover.h"
 #include "TreeLook.h"
 #include "JeebWater.h"
 #include "Engine/World.h"
@@ -112,9 +113,12 @@ void ABushes::Rebuild()
 	UWorld* World = GetWorld();
 	if (!World || !JeebOakHill::Enabled()) return;
 
+	const bool bData = IsNetMode(NM_DedicatedServer);   // (2026-11-26: the server places them too, for the sight cover only: no meshes, no components)
+	JeebSightCover::Reset(JeebSightCover::Wild);
 	UStaticMesh* Meshes[B_Num] = {};
 	for (int32 k = 0; k < B_Num; ++k)
 	{
+		if (bData) continue;
 		Meshes[k] = LoadObject<UStaticMesh>(nullptr, Defs[k].Path, nullptr, LOAD_Quiet | LOAD_NoWarn);
 		if (!Meshes[k]) UE_LOG(LogTemp, Warning, TEXT("JEEBBUSH missing %s (run Tools/BuildBushes.ps1): left out"), Defs[k].Path);
 	}
@@ -180,7 +184,7 @@ void ABushes::Rebuild()
 				bFlowers = Pick >= 0.82f && C0 < 0.35f;   // (a flowering bush on the sunny side of the edge)
 			}
 			else Kind = Pick < 0.6f ? B_Low : B_Small;
-			if (!Meshes[Kind]) continue;
+			if (!Meshes[Kind] && !bData) continue;
 			const float Scale = Kind == B_Low ? FMath::Lerp(0.8f, 1.3f, Sc) : FMath::Lerp(0.75f, 1.2f, Sc);
 			const float Foot = Defs[Kind].Foot * Scale;
 			// never in a solid: trunks, logs, stumps, rocks, ruins, walls, fill pieces, camps (an overlap above the ground with the world's collision)
@@ -189,6 +193,12 @@ void ABushes::Rebuild()
 			const float Sink = 4.f + Slope * 0.5f * FMath::Min(Foot, 100.f);
 			Xf[Kind].Add(FTransform(FRotator(0.f, Yaw, 0.f), FVector(P.X, P.Y, Z - Sink), FVector(Scale, Scale, Scale * FMath::Lerp(0.9f, 1.1f, Jx))));
 			++Where[Kind3];
+			{
+				// sight cover (SightCover.h): the bush as an upright box, a little smaller than its leafy rim
+				static const float HalfW[4] = { 110.f, 80.f, 105.f, 115.f }, Tall[4] = { 190.f, 130.f, 180.f, 100.f };
+				const float Hw = HalfW[Kind] * Scale * 0.8f;
+				JeebSightCover::Add(JeebSightCover::Wild, P.X, P.Y, Z, Tall[Kind] * Scale * 0.9f, Hw, Hw, Yaw);
+			}
 			if (bFlowers)
 				for (int32 f = 0, Nf = 3 + int32(Sc * 2.99f); f < Nf; ++f)
 				{
@@ -203,7 +213,7 @@ void ABushes::Rebuild()
 	// Reeds and lily pads (2026-11-21) along the water's edge: a jittered 1.6 m lattice near the water, each cell its own seed. Reeds in clumps
 	// where the ground lies from 30 cm under the surface to 15 cm above it; a few pads where it is 50-140 cm deep within 4 m of the bank.
 	int32 NReed = 0, NPad = 0;
-	if (Density > 0.f)
+	if (Density > 0.f && !bData)
 	{
 		const float RC = 160.f;
 		const int32 RI = FMath::CeilToInt((Hi.X - Lo.X) / RC), RJ = FMath::CeilToInt((Hi.Y - Lo.Y) / RC);
@@ -307,6 +317,7 @@ void ABushes::Rebuild()
 		List += FString::Printf(TEXT(" %s %d"), Defs[k].Title, Xf[k].Num());
 	}
 	ApplyLook();
+	UE_LOG(LogTemp, Log, TEXT("JEEBSIGHTCOVER wild bushes %d (%s)"), JeebSightCover::Count(JeebSightCover::Wild), bData ? TEXT("server, data only") : TEXT("with meshes"));
 	UE_LOG(LogTemp, Log, TEXT("JEEBBUSH wild bushes: %d instances (%d river and lake banks, %d forest edges, %d under the trees; %d tried, %d in a solid),%s; density %.2f, %.0f ms"),
 		Total, Where[0], Where[1], Where[2], Tried, Blocked, *List, Density, (FPlatformTime::Seconds() - T0) * 1000.0);
 	UE_LOG(LogTemp, Log, TEXT("JEEBREED reeds %d, lily pads %d"), NReed, NPad);
@@ -351,6 +362,7 @@ void ABushes::Rebuild()
 // The leaf colour, draw distance and shadows, live. The fill's town bushes (its pieces with a /Game/Bushes mesh) share the same leaf colour.
 void ABushes::ApplyLook()
 {
+	if (IsNetMode(NM_DedicatedServer)) return;   // (data only on the server)
 	const FLinearColor Tint = LeafTint();
 	auto Shared = [&](UMaterialInterface* M) -> UMaterialInterface*
 	{
