@@ -209,7 +209,7 @@ namespace JeebItems
 				Row.Text = Tab.S(r, TEXT("Text"));
 				Row.Shop = Tab.S(r, TEXT("Shop"));
 				const FString E = Tab.S(r, TEXT("Effect")).ToLower();
-				Row.Effect = E == TEXT("speed") ? PE_Speed : E == TEXT("heal") ? PE_Heal : E == TEXT("vigour") || E == TEXT("vigor") ? PE_Vigour : E == TEXT("radar") ? PE_Radar : PE_None;
+				Row.Effect = E == TEXT("speed") ? PE_Speed : E == TEXT("heal") ? PE_Heal : E == TEXT("vigour") || E == TEXT("vigor") ? PE_Vigour : E == TEXT("radar") ? PE_Radar : E == TEXT("invisible") || E == TEXT("invis") ? PE_Invis : PE_None;
 				if (Row.Effect == PE_None) Problem(FString::Printf(TEXT("Potions.csv, %s: unknown effect \"%s\" (speed, heal, vigour or radar)"), *Row.Name, *E));
 				Row.Amount = Tab.F(r, TEXT("Amount"), 1.f);
 				Row.Seconds = Tab.F(r, TEXT("Seconds"), 0.f);

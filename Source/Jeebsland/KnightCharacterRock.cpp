@@ -177,6 +177,7 @@ void AKnightCharacter::MulticastRock_Implementation(uint8 Phase, float Charge)
 // (server) One rock out of the pack, thrown
 void AKnightCharacter::ThrowRock(const FVector& Dir, float Charge, const FVector& From)
 {
+	EndInvisible(TEXT("threw a rock"));
 	if (!Skills || !HasAuthority()) return;
 	if (Skills->CountItem(JeebItems::IdRocks) <= 0 && !UnlimitedRocks()) { Skills->Say(2.f, FColor::Orange, TEXT("You have no rocks to throw.")); return; }
 	if (!UnlimitedRocks()) Skills->RemoveItems(JeebItems::IdRocks, 1);

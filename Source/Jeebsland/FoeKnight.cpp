@@ -326,6 +326,7 @@ AKnightCharacter* AFoeKnight::FindTarget(float& OutDist) const
 	{
 		if (It->GetHealth() <= 0.f) continue;
 		const float D = FVector::Dist2D(It->GetActorLocation(), GetActorLocation());
+		if (It->IsInvisible() && D > JeebTune::V().InvisSeeRange) continue;   // (the invisibility potion: only close by)
 		if (D < OutDist) { OutDist = D; Best = *It; }
 	}
 	return Best;

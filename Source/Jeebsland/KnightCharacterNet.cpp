@@ -131,6 +131,7 @@ void AKnightCharacter::ApplyPotion(int32 T)
 	case PE_Heal:   Health = FMath::Min((float)MaxHealth, Health + MaxHealth * P.Amount); break;
 	case PE_Vigour: VigourUntil = Now + P.Seconds; VigourMul = P.Amount; break;   // the bigger bar is worked out in Tick (the extra comes full)
 	case PE_Radar:  RadarUntil = Now + P.Seconds; LastRadarScan = -10.0; break;
+	case PE_Invis:  { const float Secs = JeebTune::V().InvisSeconds > 0.f ? JeebTune::V().InvisSeconds : P.Seconds; if (HasAuthority()) StartInvisible(Secs); else InvisUntil = Now + Secs; } break;   // (Tuning.ini [Invisibility] Seconds)
 	default: break;
 	}
 	if (PotionReadyAt.Num() <= T) PotionReadyAt.SetNumZeroed(T + 1);

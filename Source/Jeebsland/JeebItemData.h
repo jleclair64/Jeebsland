@@ -67,7 +67,7 @@ namespace JeebItems
 		FLinearColor Color = FLinearColor(0.5f, 0.5f, 0.5f);
 		int32 GatherLevel = 1, FishXP = 8;
 	};
-	enum EPotionEffect : int32 { PE_None, PE_Speed, PE_Heal, PE_Vigour, PE_Radar };
+	enum EPotionEffect : int32 { PE_None, PE_Speed, PE_Heal, PE_Vigour, PE_Radar, PE_Invis };
 	struct FPotionRow
 	{
 		FString Name, Text, Shop;

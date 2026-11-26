@@ -234,6 +234,13 @@ public:
 	// Radar potion, for the minimap: seconds left (0 = off) and the red dots to draw (world X, Y)
 	float GetRadarLeft() const;
 	const TArray<FVector2D>& GetRadarDots() const { return RadarDots; }
+	// Invisibility potion (2026-11-26, KnightCharacterInvis.cpp): the server's word, replicated to everyone. Nearly see-through with a shimmer on
+	// every machine (the drinker sees himself a little more), enemies see him only close by (Stealth.cpp), attacking, casting, shooting,
+	// throwing or dying ends it early. Seconds and looks: Tuning.ini [Invisibility].
+	bool IsInvisible() const { return bInvisible; }
+	float GetInvisLeft() const;                       // (the drinker's machine and the server: seconds left, 0 = off)
+	void StartInvisible(float Seconds);               // (server)
+	void EndInvisible(const TCHAR* Why);              // (server; nothing if not invisible)
 	// A sack on the ground opened with E: its windows show beside yours until you walk away or put the cursor away
 	class ALootDrop* GetLootTarget() const { return LootTarget.Get(); }
 	void OpenLoot(class ALootDrop* Drop);
@@ -755,6 +762,22 @@ private:
 	UPROPERTY(Replicated) TArray<FVector2D> RadarDots;
 	double LastRadarScan = -10.0;
 	void UpdateRadar();
+	UPROPERTY(ReplicatedUsing = OnRep_Invisible) bool bInvisible = false;
+	UFUNCTION() void OnRep_Invisible();
+	float InvisUntil = -1.f;          // (server: when it ends; the drinker's machine: its own estimate for the HUD)
+	float InvisScanT = 0.f;
+	bool bInvisShown = false;         // (this machine has swapped the materials)
+	struct FInvisSlot { TWeakObjectPtr<class UMeshComponent> Comp; int32 Slot = 0; class UMaterialInterface* Mat = nullptr; };
+	TArray<FInvisSlot> InvisSaved;    // every swapped material slot and what it was, to put back
+	TArray<TWeakObjectPtr<class USceneComponent>> InvisHiddenFx;   // lights and effects hidden meanwhile
+	UPROPERTY() TArray<TObjectPtr<class UMaterialInterface>> InvisKeep;   // (keeps the originals alive meanwhile)
+	UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> InvisMID;
+	void TickInvisible(float Dt);
+	void ShowInvisible(bool bOn);
+#if !UE_BUILD_SHIPPING
+	float InvisTestT = 0.f; int32 InvisTestStep = 0;
+	void TickInvisTest(float Dt);
+#endif
 
 	// The steps of Tick, in order (see AKnightCharacter::Tick for which file each lives in)
 	void TickHousekeeping();

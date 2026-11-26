@@ -146,6 +146,7 @@ void AKnightHUD::DrawChat(AKnightCharacter* Knight, APlayerController* PC)
 	{
 		const AActor* Who = B.Who.Get();
 		FVector2D SP;
+		if (const AKnightCharacter* WK = Cast<AKnightCharacter>(Who)) if (WK->IsInvisible() && WK != PC->GetPawn()) continue;   // (an invisible player's words show in the chat box only)
 		if (!Who || !PC->ProjectWorldLocationToScreen(Who->GetActorLocation() + FVector(0.f, 0.f, 135.f), SP)) continue;
 		const float A = FMath::Clamp(float((B.Until - Now) / 0.5), 0.f, 1.f);
 		TArray<FString> Lines;

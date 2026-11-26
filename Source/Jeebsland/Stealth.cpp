@@ -139,7 +139,12 @@ AKnightCharacter* UStealthSense::Update(float Dt, const FStealthSenses& S, float
 				const float ConeR = bCone ? S.Sight * S.SightMul * NightM * ConeShare(Lv) : 0.f;
 				if (ConeR > SeeR) { SeeR = ConeR; bByCone = true; }
 			}
-			const float HearR = bCrouch ? 0.f : (V > 600.f ? S.HearRun : V > 260.f ? S.HearWalk : S.HearStill) * NightM;
+			float HearR = bCrouch ? 0.f : (V > 600.f ? S.HearRun : V > 260.f ? S.HearWalk : S.HearStill) * NightM;
+			if (K->IsInvisible())   // (the invisibility potion: seen or heard only close by, whatever the stance)
+			{
+				const float IR = FMath::Max(0.f, T.InvisSeeRange);
+				SeeR = FMath::Min(SeeR, IR); HearR = FMath::Min(HearR, IR); bByCone = false;
+			}
 
 			bool bSeen = false, bLos = false;
 			if (Dist <= SeeR)
