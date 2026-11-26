@@ -20,13 +20,13 @@
 #include "UObject/ConstructorHelpers.h"
 
 float AOpenWorld::SnowNow = 0.f;
+float AOpenWorld::StormNow = 0.f;
 
 namespace
 {
-	TAutoConsoleVariable<float> CVarSnowForce(TEXT("jeeb.Snow.Force"), -1.f, TEXT("The snowfall on this machine: -1 the shared weather (clear or snowing for a few minutes at a time), 0 always clear, 1 always snowing (anything between: that share of it). Looks only."));
+	TAutoConsoleVariable<float> CVarSnowForce(TEXT("jeeb.Weather.Force"), -1.f, TEXT("The mountain-top weather on this machine: -1 the shared weather (one per game day: a snowstorm or blue skies), 0 always blue skies, 1 always a snowstorm (anything between: that share). Looks only; the storm shows only above the storm height (Tuning.ini [Weather])."));
 	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 3000 round the camera on the peaks; 0 none, 1.4 at most)"));
-	TAutoConsoleVariable<float> CVarSnowLow(TEXT("jeeb.Snow.Low"), 0.6f, TEXT("The share of the snowfall that reaches the low country (under about 15 m; all of it from about 70 m up)"));
-	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.f, TEXT("Flake size (1 as built: 1.3 to 2.8 cm)"));
+	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.8f, TEXT("Flake size (1.8 as built: 2.3 to 5 cm)"));
 
 	TAutoConsoleVariable<float> CVarCandles(TEXT("jeeb.Candles"), 1.f, TEXT("The floating candles over Silver Point: 0 hides them, 1 as built (60; a looks-only switch)."));
 	TAutoConsoleVariable<float> CVarCandleLight(TEXT("jeeb.Candles.Light"), 1.f, TEXT("The floating candles: strength of the few real lights on the candles nearest you (0 none)."));
@@ -330,7 +330,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	SnowNow = Force >= 0.f ? FMath::Min(Force, 1.f) : JeebOpen::Snowing(Clock);
 	const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
 	const FVector Fwd = PC->PlayerCameraManager->GetCameraRotation().Vector();
-	const float High = JeebWorld::Smooth(1500.f, 7000.f, Cam.Z);
+	StormNow = SnowNow * JeebOpen::StormAlt(Cam.Z);   // (the storm where the camera is: ADayNight thickens the fog with it)
 	// (2026-11-22, owner: "Why is it snowing in Oak hill? Snow only supposed to fall in snowy areas") the flakes show only where snow lies on
 	// the ground round the camera (JeebOpen's snow map, sampled at five spots 25 m apart twice a second), fading in over the snow's edge
 	CoverAge += DeltaSeconds;
@@ -343,7 +343,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f);
 	}
 	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, 0.25f);
-	const float Amount = CoverNow * SnowNow * FMath::Lerp(FMath::Clamp(CVarSnowLow.GetValueOnGameThread(), 0.f, 1.f), 1.f, High) * 0.7f * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
+	const float Amount = CoverNow * SnowNow * JeebOpen::StormAlt(Cam.Z) * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
 	const int32 Want = FMath::Clamp(FMath::RoundToInt(NumFlakes * Amount), 0, NumFlakes);
 	if (Want == 0 && Shown == 0) return;
 	const float SizeK = FMath::Clamp(CVarSnowSize.GetValueOnGameThread(), 0.2f, 4.f);

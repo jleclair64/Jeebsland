@@ -25,6 +25,7 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 
 	static float SnowNow;   // 0 clear .. 1 snowing: the weather this frame (for anything else that wants to follow it)
+	static float StormNow;   // 0 .. 1: the storm at this machine's camera (the day's weather x the mountain-top height gate)
 
 protected:
 	virtual void BeginPlay() override;

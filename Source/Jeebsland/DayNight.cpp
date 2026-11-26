@@ -18,6 +18,8 @@
 #include "ProceduralMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
+#include "OpenWorldActor.h"
+#include "JeebTuning.h"
 
 // The picture's look (2026-11-12, owner: "more professional, Breath of the Wild meets Overwatch"). Console variables, so a
 // test run can try other numbers with -ExecCmds="jeeb.Look.Sat 1.1" without a build; the defaults are the chosen look.
@@ -156,6 +158,7 @@ FVector ADayNight::SunDir = FVector::UpVector;
 FVector ADayNight::MoonDir = FRotator(30.f, 205.f, 0.f).Vector();   // (15 degrees up until 2026-11-17; higher now it lights the night)
 float ADayNight::FixedPhase = -1.f;
 float ADayNight::IndoorBias = 0.f;
+float ADayNight::Storm = 0.f;
 
 ADayNight::ADayNight()
 {
@@ -201,6 +204,7 @@ void ADayNight::BeginPlay()
 		OldDirGlow = FC->DirectionalInscatteringLuminance;
 		OldDirExponent = FC->DirectionalInscatteringExponent;
 		OldDirStart = FC->DirectionalInscatteringStartDistance;
+		OldFalloff = FC->FogHeightFalloff;
 		break;
 	}
 	for (TActorIterator<AActor> It(World); It; ++It)
@@ -272,7 +276,14 @@ void ADayNight::Tick(float DeltaSeconds)
 	SunSpeedExtra += DeltaSeconds * ClockSpeed * (FMath::Clamp(JeebLook::SunSpeed.GetValueOnGameThread(), 0.f, 20.f) - 1.f);
 	Clock = GS ? float(GS->GetServerWorldTimeSeconds()) * ClockSpeed : Clock + DeltaSeconds * ClockSpeed;
 	Clock += SunSpeedExtra;
+	Storm = FMath::FInterpConstantTo(Storm, AOpenWorld::StormNow, DeltaSeconds, 0.5f);   // (the storm comes in over 2 s at most, however fast the camera climbs: a teleport never pops)
 	TickClouds(DeltaSeconds);
+#if !UE_BUILD_SHIPPING
+	{
+		static float LogAge = 0.f; LogAge += DeltaSeconds;
+		if (LogAge > 4.f && (Storm > 0.001f || AOpenWorld::StormNow > 0.001f)) { LogAge = 0.f; if (const UExponentialHeightFogComponent* F = Fog.IsValid() ? Fog->GetComponent() : nullptr) UE_LOG(LogTemp, Log, TEXT("JEEBSTORM storm %.2f (target %.2f) fog density %.3f falloff %.3f start %.0f maxopacity %.2f"), Storm, AOpenWorld::StormNow, F->FogDensity, F->FogHeightFalloff, F->StartDistance, F->FogMaxOpacity); }
+	}
+#endif
 	const float HeldPhase = JeebLook::SunPhase.GetValueOnGameThread();
 	Phase = HeldPhase >= 0.f ? FMath::Fmod(HeldPhase, 1.f) : FixedPhase >= 0.f ? FixedPhase : FMath::Fmod(Clock / (2.f * HalfLoopSeconds), 1.f);
 
@@ -459,11 +470,19 @@ void ADayNight::TickLook(float High)
 		// (2026-11-17) the haze glows by itself, so at night it is a dim moonlit blue: the same on screen whatever the exposure (it is divided by it)
 		const float NightBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() + JeebNight::Exposure.GetValueOnGameThread();
 		const FLinearColor NightHaze = FLinearColor(0.16f, 0.21f, 0.34f) * FMath::Exp2(-NightBias);
-		FC->SetFogInscatteringColor(FMath::Lerp(DayHaze, NightHaze, Night * Night));   // (Night squared: the golden hour keeps its colours)
-		FC->SetStartDistance(HazeStart.GetValueOnGameThread());
+		// (2026-11-26) the mountain-top snowstorm (Tuning.ini [Weather]): the haze goes flat grey, starts at the camera and the fall-off with height
+		// is nearly gone, so up there nothing is clear past about 50 m (the density itself is set in AKnightGameState with the other fog changes)
+		{
+			FLinearColor Haze = FMath::Lerp(DayHaze, NightHaze, Night * Night);
+			const float L = Haze.GetLuminance();
+			Haze = FMath::Lerp(Haze, FLinearColor(L * 0.95f, L, L * 1.06f), Storm * FMath::Clamp(JeebTune::V().FogGrey, 0.f, 1.f));
+			FC->SetFogInscatteringColor(Haze);
+			FC->SetFogHeightFalloff(FMath::Lerp(OldFalloff, JeebTune::V().FogFalloff, Storm));
+			FC->SetStartDistance(FMath::Lerp(HazeStart.GetValueOnGameThread(), 0.f, Storm));
+		}
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)
 		const FLinearColor SunCol = SunNow;
-		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High) * (1.f - Night * Night)));   // (none at night)
+		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High) * (1.f - Night * Night) * (1.f - 0.8f * Storm)));   // (none at night, little in a storm)
 		FC->SetDirectionalInscatteringExponent(6.f);
 		FC->SetDirectionalInscatteringStartDistance(4000.f);
 	}
@@ -482,7 +501,7 @@ void ADayNight::TickLook(float High)
 		// (2026-11-17) the night's grade, eased in with Night: a blue shift and paler colours (jeeb.Night.Tint, the eye's night
 		// vision, as in Ghost of Tsushima's Purkinje shift), no warm highlights, and a blue lift in the darkest shadows
 		const float Nt = Night * Night * FMath::Clamp(JeebNight::Tint.GetValueOnGameThread(), 0.f, 2.f);
-		const float Sa = FMath::Lerp(1.f, Sat.GetValueOnGameThread(), High) * (1.f - 0.3f * Nt);
+		const float Sa = FMath::Lerp(1.f, Sat.GetValueOnGameThread(), High) * (1.f - 0.3f * Nt) * (1.f - 0.35f * Storm);   // (a storm greys the colours)
 		const float Co = Contrast.GetValueOnGameThread(), Wa = Warm.GetValueOnGameThread() * (1.f - Night * Night), Sh = ShadowCool.GetValueOnGameThread();
 		const float NL = Night * FMath::Max(0.f, JeebNight::ShadowLift.GetValueOnGameThread());
 		S.bOverride_ColorSaturation = true;
@@ -502,7 +521,7 @@ void ADayNight::TickLook(float High)
 		S.AmbientOcclusionRadius = AORadius.GetValueOnGameThread();
 		S.AutoExposureBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() * (1.f - High) + JeebNight::Exposure.GetValueOnGameThread() * Night
 			+ JeebNight::Twilight.GetValueOnGameThread() * (1.f - FMath::SmoothStep(0.f, 7.f, FMath::Abs(SunElevation)))
-			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation) + IndoorBias;
+			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation) + IndoorBias - 0.3f * Storm;   // (a storm is a little darker)
 		{   // (LOW is the level without volumetric clouds, set by ApplyGraphics)
 			static IConsoleVariable* VC = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricCloud"));
 			if (VC && VC->GetInt() == 0) S.AutoExposureBias += LowTrim.GetValueOnGameThread();
@@ -607,8 +626,9 @@ void ADayNight::TickClouds(float DeltaSeconds)
 	if (JeebLook::CloudCoverFix.GetValueOnGameThread() >= 0.f) CloudCover = JeebLook::CloudCoverFix.GetValueOnGameThread();   // (test pictures)
 
 	// Cover moves the amount of sky the clouds fill; density thins them to wisps (and nothing) toward a clear sky
-	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), BaseCoverage + 0.5f * (CloudCover - 1.f));
-	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), BaseDensity * JeebLook::CloudDensity.GetValueOnGameThread() * FMath::Clamp(0.15f + 0.85f * CloudCover, 0.f, 1.3f));
+	const float CoverUse = FMath::Lerp(CloudCover, 2.6f, Storm);   // (a storm: the sky is solid cloud)
+	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalCoverage"), BaseCoverage + 0.5f * (CoverUse - 1.f));
+	CloudMat->SetScalarParameterValue(TEXT("Cloud_GlobalDensity"), BaseDensity * JeebLook::CloudDensity.GetValueOnGameThread() * FMath::Clamp(0.15f + 0.85f * CoverUse, 0.f, 1.3f));
 #if !UE_BUILD_SHIPPING
 	// (test pictures: jeeb.Cloud.Set="Name=Value;Name=Value" sets any of the material's scalars each frame)
 	const FString Set = JeebLook::CloudSet.GetValueOnGameThread();

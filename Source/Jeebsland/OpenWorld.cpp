@@ -2,6 +2,7 @@
 #include "Terrain.h"
 #include "OakForest.h"
 #include "Misc/Crc.h"
+#include "JeebTuning.h"
 #include "Algo/Reverse.h"
 
 // The open world's land and roads (OpenWorld.h). Every number that shapes them is here; log JEEBOPEN.
@@ -691,22 +692,31 @@ float JeebOpen::SnowSink(const FVector& Feet)
 	return SinkDepth * SnowOnGround(Feet.X, Feet.Y) * FMath::Clamp(1.f - Above / 25.f, 0.f, 1.f);
 }
 
+// (2026-11-26, owner's snowstorm request) one weather per game day, midnight to midnight on the server's clock (the sun's loop is
+// 2 x 600 s, noon at clock 0, so midnight falls at 600 s + 1200 s x k). The day number seeds it, so every machine agrees. The changeover
+// is eased over BlendSeconds centred on midnight (the night hides most of it).
 float JeebOpen::Snowing(double ServerSeconds)
 {
-	auto On = [](int64 S) -> float
+	auto On = [](int64 D) -> float
 	{
-		if (S <= 0) return 0.f;   // (clear to begin with)
-		if (S == 1) return 1.f;   // (then the first snow)
-		uint32 H = uint32(S) * 2654435761u; H ^= H >> 15; H *= 2246822519u; H ^= H >> 13;
-		return (H % 1000u) < 450u ? 1.f : 0.f;
+		uint32 H = uint32(int32(D)) * 2654435761u + 0x9e3779b9u; H ^= H >> 15; H *= 2246822519u; H ^= H >> 13; H *= 3266489917u; H ^= H >> 16;
+		return (double(H % 100000u) / 100000.0) < double(FMath::Clamp(JeebTune::V().StormChance, 0.f, 1.f)) ? 1.f : 0.f;
 	};
-	constexpr double Ease = 25.0;
-	const double T = FMath::Max(ServerSeconds, 0.0);
-	const int64 S = int64(T / SnowSlot);
-	const double In = T - double(S) * SnowSlot;
-	const float Now = On(S);
-	if (In < SnowSlot - Ease) return Now;
-	return FMath::Lerp(Now, On(S + 1), Smooth(0.f, 1.f, float((In - (SnowSlot - Ease)) / Ease)));
+	constexpr double Day = 1200.0, Midnight = 600.0;
+	const double T = FMath::Max(ServerSeconds, 0.0) + Midnight;   // (day 0 runs from -600 s to 600 s: noon is its middle)
+	const int64 D = int64(T / Day);
+	const double In = T - double(D) * Day;
+	const double Half = 0.5 * FMath::Max(1.f, JeebTune::V().BlendSeconds);
+	if (In < Half && D > 0) return FMath::Lerp(On(D - 1), On(D), Smooth(0.f, 1.f, float((In + Half) / (2.0 * Half))));
+	if (In > Day - Half) return FMath::Lerp(On(D), On(D + 1), Smooth(0.f, 1.f, float((In - (Day - Half)) / (2.0 * Half))));
+	return On(D);
+}
+
+// 0 below the storm's height, 1 above it (world height of the camera, cm)
+float JeebOpen::StormAlt(float Z)
+{
+	const float A = JeebTune::V().AltFromM * 100.f, B = FMath::Max(A + 100.f, JeebTune::V().AltToM * 100.f);
+	return Smooth(A, B, Z);
 }
 
 const TArray<JeebOpen::FSite>& JeebOpen::Sites()
