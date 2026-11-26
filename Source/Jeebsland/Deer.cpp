@@ -4,6 +4,7 @@
 #include "FoeCamps.h"
 #include "HealthComponent.h"
 #include "KnightCharacter.h"
+#include "Stealth.h"
 #include "SkillComponent.h"
 #include "QuestComponent.h"
 #include "Loot.h"
@@ -177,6 +178,7 @@ ADeer::ADeer()
 	JNeck = CreateDefaultSubobject<USceneComponent>(TEXT("JNeck")); JNeck->SetupAttachment(Root);
 	JHead = CreateDefaultSubobject<USceneComponent>(TEXT("JHead")); JHead->SetupAttachment(Root);
 
+	Stealth = CreateDefaultSubobject<UStealthSense>(TEXT("Stealth"));
 	Hp = CreateDefaultSubobject<UHealthComponent>(TEXT("Hp"));
 	Hp->Max = Hp->Cur = 24;
 	Hp->BarHeight = 215.f;
@@ -490,25 +492,22 @@ bool ADeer::Sense(FVector2D& OutAt, float& OutDist) const
 	const FVector2D Me(GetActorLocation());
 	const FVector2D Fw(GetActorForwardVector());
 	const bool bHeadDown = StateNow() == EDeerState::Graze;
-	bool bAny = false;
 	OutDist = 1.0e9f;
-	for (TActorIterator<AKnightCharacter> It(GetWorld()); It; ++It)
-	{
-		if (It->GetHealth() <= 0.f) continue;
-		const FVector2D P(It->GetActorLocation());
-		const float Dist = FVector2D::Distance(P, Me);
-		if (Dist > FMath::Max(D.Sight, D.HearRun)) continue;
-		// hearing: by how fast he moves (sprinting carries far; crouched or standing still hardly at all)
-		const float V = It->GetVelocity().Size2D();
-		const float Hear = V > 600.f ? D.HearRun : V > 260.f ? D.HearWalk : V > 40.f ? D.HearSneak * 1.5f : D.HearSneak;
-		// sight: in front and to the sides (a deer sees most of the way round), less with its head in the grass, less of a crouched man
-		const bool bFront = FVector2D::DotProduct(Fw, (P - Me).GetSafeNormal()) > -0.45f;
-		float See = bFront ? D.Sight : D.Sight * D.Behind;
-		if (bHeadDown) See *= 0.75f;
-		if (It->IsCrouchedNow()) See *= 0.55f;
-		if (Dist < FMath::Max(Hear, See) && Dist < OutDist) { OutDist = Dist; OutAt = P; bAny = true; }
-	}
-	return bAny;
+	// (2026-11-26) through the shared detection meter (Stealth.h): sight in front and to the sides (a deer sees most of the way round), less
+	// behind and with its head in the grass; hearing by how fast you move; crouching, the Stealth skill, the night and cover as the meter says
+	if (!Stealth) return false;
+	(void)Fw;
+	FStealthSenses S;
+	S.Sight = D.Sight; S.Behind = D.Behind; S.FrontDot = -0.45f;
+	S.HearRun = D.HearRun; S.HearWalk = D.HearWalk; S.HearStill = D.HearSneak;
+	S.SightMul = bHeadDown ? 0.75f : 1.f;
+	S.EyeZ = FMath::Max(60.f, Hp ? Hp->BarHeight * 0.6f : 130.f);
+	if (Stealth->LogName.IsEmpty() || Stealth->LogName == GetName()) Stealth->LogName = FString::Printf(TEXT("%s (%s)"), *D.Name, *GetName());
+	float Dist = 0.f;
+	AKnightCharacter* K = Stealth->Update(0.2f, S, Dist);   // (called every 0.2 s: SenseT)
+	if (!K) return false;
+	OutDist = Dist; OutAt = FVector2D(K->GetActorLocation());
+	return true;
 }
 
 bool ADeer::Clear(const FVector2D& From, const FVector2D& To) const
@@ -609,6 +608,7 @@ void ADeer::TickMind(float Dt)
 	if (bSleeping)   // nobody within reach: it stands where it is
 	{
 		Speed = 0.f;
+		if (Stealth && Stealth->Mark() != 0) Stealth->Clear();
 		if (StateNow() == EDeerState::Flee || StateNow() == EDeerState::Alert || StateNow() == EDeerState::Walk || StateNow() == EDeerState::Chase || StateNow() == EDeerState::Strike)
 		{ Target = nullptr; AngryT = 0.f; SetState(EDeerState::Graze, TEXT("nobody near")); }
 		return;

@@ -26,6 +26,7 @@
 #include "TextureResource.h"
 #include "RenderUtils.h"
 #include "Messages.h"
+#include "Stealth.h"
 
 using namespace JeebItems;
 
@@ -109,6 +110,33 @@ void AKnightHUD::DrawHUD()
 			}
 			else if (Best->GetIngots() > 0) Lines = { TEXT("Ingots"), FString::Printf(TEXT("%d ingots"), Best->GetIngots()) };
 			DrawLinesAt(Lines, SP.X, SP.Y, FMath::Clamp((300.f - BestD) / 80.f, 0.f, 1.f) * UnderTitle(SP.Y), Best->ShownId());   // fades in over the last metre
+		}
+	}
+
+	// Stealth marks (2026-11-26, Stealth.h): a yellow "!" over an animal or bandit that is suspicious, a red one as it notices someone
+	if (PC && !Knight->IsUIOpen())
+	{
+		const double NowS = FPlatformTime::Seconds();
+		for (const TWeakObjectPtr<UStealthSense>& SnW : UStealthSense::All())
+		{
+			const UStealthSense* Sn = SnW.Get();
+			const AActor* Who = Sn ? Sn->GetOwner() : nullptr;
+			if (!Who || Sn->Mark() == 0 || Who->IsHidden() || Who->GetWorld() != GetWorld()) continue;
+			const UHealthComponent* H = Who->FindComponentByClass<UHealthComponent>();
+			if (H && H->Cur <= 0) continue;
+			const FVector Top = Who->GetActorLocation() + FVector(0.f, 0.f, (H ? H->BarHeight : 150.f) + 45.f);
+			const float D = FVector::Dist(Top, Pawn->GetActorLocation());
+			const float A = FMath::Clamp((6000.f - D) / 1000.f, 0.f, 1.f);   // full within 50 m, gone past 60 m
+			if (A <= 0.f) continue;
+			FVector2D SP;
+			if (!PC->ProjectWorldLocationToScreen(Top, SP)) continue;
+			const bool bAlert = Sn->Mark() == 2;
+			const float Sc = bAlert ? 3.2f : 2.6f + 0.25f * float(FMath::Sin(NowS * 8.0));   // (the yellow one throbs a little)
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(TEXT("!"), TW, TH, Font, Sc);
+			const FLinearColor C = bAlert ? FLinearColor(1.f, 0.22f, 0.12f, A) : FLinearColor(1.f, 0.85f, 0.2f, A);
+			HDText(TEXT("!"), FLinearColor(0.f, 0.f, 0.f, 0.75f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, Sc);
+			HDText(TEXT("!"), C, SP.X - TW * 0.5f, SP.Y - TH, Font, Sc);
 		}
 	}
 

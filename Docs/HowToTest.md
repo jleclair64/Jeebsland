@@ -330,3 +330,14 @@ Test pictures (never in Shipping): `-JeebShot -ShotUI` opens every screen in tur
 - **Class switching:** gear a class can't use goes to the pack on every switch, and the class gets its own kit back (knight: sword, bow, shield, arrows, light tin; wizard: staff, wand, book, wizard tin; troll: club, rocks, troll armour). Bows are the knight's again (wizards and trolls can't use them). Test: `-SwapTest -SwapSeq=2,1,0,2,0` (knight to wizard, troll, knight, wizard, knight) logs JEEBCLASS for every pawn; if the last is a knight he draws and looses a bow.
 
 - **Separate class packs (2026-11-24):** knight, troll and wizard each keep their own pack, weapon bar and worn gear; switching class stores the current set and brings out the other (a class never played gets its starter kit). Skills, ingots and the bank are shared. Only equipping is class-locked (`JeebItems::ItemClass`, Kinds.csv `Class`); every class can carry and bank anything. A character logs back in as the class it left as. Test: `bash Tools/class_net.sh` (old-format save loads as the knight's, swaps 2,1,0,2, relogin as wizard; read the JEEBPACK lines).
+
+## Stealth (2026-11-26, agent stealth; Stealth.h, Docs/StealthPlan.md)
+
+Every animal (deer, boar, wolves, bears, moose...) and every camp bandit now notices you through one detection meter instead of at once.
+- **Crouch (C) near a deer herd.** At Stealth 1 a crouched player is noticed at half the range of a standing one; at 99 not at all, except straight in front of the animal (a 90-degree cone: full sight range at level 1, 30% at 99, `StealthConeAt99`).
+- **At night** every range is half.
+- **Trees, walls, rocks and hills** between you and it block its sight (bushes don't yet: they have no collision). Standing up behind a trunk close to it (it hears you), a **yellow "!"** throbs over it; crouch again within about 2 s and it fades, stay up and it turns into a **red "!"** and the animal reacts as before (watches, bolts, or charges).
+- Seen in plain view the meter fills in 0.3 s close up to 1.5 s at the edge of its range; it drains in 3 s once it neither sees nor hears you. Being hit still alerts at once.
+- **Stealth skill** (16th, a dark hood with two eyes): XP while crouched and moving inside an animal's or bandit's normal range without being noticed (2 XP a second, given in lumps of 5).
+- Tuning: Tuning.ini [Stealth]; `StealthLog = 1` logs every scan (`JEEBSTEALTH` lines; state changes are always logged).
+- Test: a standalone game with `-JeebStealthTest` (off-screen) puts the player round a watcher with a deer's senses, standing/crouched, Stealth 1/99, day/night, behind a trunk; `JEEBSTEALTHTEST PASS/FAIL` lines.

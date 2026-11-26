@@ -21,7 +21,8 @@ enum class ESkillType : uint8
 	Stamina,      // (2026-11-22: the troll's rush, how long his rush bar lasts; trained by rushing, KnightCharacterTroll.cpp)
 	Riding,       // (2026-11-22: Horse Riding; XP by distance ridden, a little more speed and gallop per level, Horse.cpp)
 	Agility,      // (2026-11-23: the knight and wizard running stamina bar: bigger and quicker to refill per level; XP for sprinting, KnightCharacterMovement.cpp)
-	Hunting       // (2026-11-24: XP for bringing down game animals; more meat and bones per kill, Deer.cpp, Content/Data/HuntDrops.csv)
+	Hunting,      // (2026-11-24: XP for bringing down game animals; more meat and bones per kill, Deer.cpp, Content/Data/HuntDrops.csv)
+	Stealth       // (2026-11-26: XP for sneaking near animals and bandits unnoticed while crouched; shrinks the crouched detection range, Stealth.cpp)
 };
 
 UENUM(BlueprintType)
@@ -55,7 +56,7 @@ enum class EItemType : uint8
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
-constexpr int32 JeebNumSkills = 15;
+constexpr int32 JeebNumSkills = 16;
 constexpr int32 JeebNumWornKinds = 25;
 
 // One class's own pack and worn gear (2026-11-24, owner: knight, troll and wizard each keep their own). The class being played lives in the

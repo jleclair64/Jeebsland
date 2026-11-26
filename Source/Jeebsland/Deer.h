@@ -99,6 +99,7 @@ public:
 	void Startle(const FVector2D& From, bool bBolt, const FVector2D& HerdDir);
 	float RespawnSecs = 300.f;
 	UPROPERTY() UHealthComponent* Hp = nullptr;
+	UPROPERTY() class UStealthSense* Stealth = nullptr;   // (2026-11-26) whom it has noticed: the shared detection meter, Stealth.h
 
 #if !UE_BUILD_SHIPPING
 	int32 LabRole = -1;   // (-DeerLab test pictures) 0 stands and cycles its clips, 1 runs laps, 2 walks laps, 3 falls after a while

@@ -6,6 +6,7 @@
 #include "KnightCharacter.h"
 #include "Inventory.h"
 #include "Horse.h"
+#include "Stealth.h"
 
 #define TipBarMark TEXT("\u0001")
 
@@ -113,6 +114,11 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 	case ESkillType::Hunting:
 		L.Add(TEXT("More meat and bones from every animal you bring down"));
 		L.Add(TEXT("Level 1: always 1 of each; level 99: usually 3 to 5"));
+		break;
+	case ESkillType::Stealth:
+		L.Add(FString::Printf(TEXT("Crouched, animals and bandits notice you at %d%% of their usual range"), FMath::RoundToInt(UStealthSense::CrouchShare(Level) * 100.f)));
+		L.Add(FString::Printf(TEXT("Straight in front of them (a 90 degree cone): %d%% of their sight"), FMath::RoundToInt(UStealthSense::ConeShare(Level) * 100.f)));
+		L.Add(TEXT("Every range halves at night; trees and walls hide you"));
 		break;
 	case ESkillType::Riding:
 		L.Add(FString::Printf(TEXT("Horse top speed: x%.2f"), JeebHorse::SpeedMul(Level)));
