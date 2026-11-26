@@ -13,6 +13,7 @@
 #include "OakHill.h"
 #include "Cottage.h"
 #include "HouseInterior.h"
+#include "HouseLoot.h"
 #include "ResourceNode.h"
 #include "KnightHUD.h"
 #include "KnightGameState.h"
@@ -155,7 +156,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// On a rock face, in a mantle or in the water (2026-11-13): his hands are busy, so no taking a weapon in hand and nothing done to the world
 	// (the client refuses these too; this is the server's own check)
 	if (InClimbMove() && (Op == EInvOp::Select || Op == EInvOp::Gather || Op == EInvOp::PickArrow || Op == EInvOp::PickLock
-		|| Op == EInvOp::HutLoot || Op == EInvOp::ToggleDoor || Op == EInvOp::HouseDoor || Op == EInvOp::TakeFromWall)) return;
+		|| Op == EInvOp::HutLoot || Op == EInvOp::ToggleDoor || Op == EInvOp::HouseDoor || Op == EInvOp::TakeFromWall || Op == EInvOp::BoxSearch || Op == EInvOp::BoxPick)) return;
 
 	switch (Op)
 	{
@@ -396,6 +397,10 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		else if (!ArmourBusy(true)) bGear = Drop->EquipTo(A, this, B, C % 100, C >= 100);   // (no changing gear from a sack mid-fight either)
 		break;
 	}
+
+	// ---- (2026-11-26) the chests, cupboards and crates in town houses: HouseLoot.cpp checks reach, level, rate and emptiness ----
+	case EInvOp::BoxSearch: JeebHouseLoot::Search(this, At); break;
+	case EInvOp::BoxPick:   JeebHouseLoot::StartPick(this, At); break;
 
 	// ---- cottages: a stash of ingots, and picking a lock ----
 	case EInvOp::ToggleDoor:

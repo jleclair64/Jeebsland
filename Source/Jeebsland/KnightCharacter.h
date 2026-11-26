@@ -89,6 +89,8 @@ enum class EInvOp : uint8
 	CastSlot,       // A: which of the active row's three spells the next cast is (sent just before the charge starts)
 	BuyBroom,       // A: the row in Brooms.csv, B the id the player saw (Silver Point's broom stall)
 	Reel,           // (2026-11-26) the click while fishing: reel in (the server judges the 0.5 s window, Pond.cpp)
+	BoxSearch,      // (2026-11-26, HouseLoot.h) At: an unlocked house container's spot: search it
+	BoxPick,        // At: a locked house container's spot: start picking its lock (the server finishes it, FinishBoxPick)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -259,6 +261,13 @@ public:
 	UFUNCTION(Client, Reliable) void ClientShopNote(const FString& Text, float Seconds);
 	UFUNCTION(Client, Reliable) void ClientGather(FVector_NetQuantize At, uint8 Skill, bool bStart);
 	UFUNCTION(Client, Reliable) void ClientDrank(uint8 Type);
+	// House loot (2026-11-26, HouseLoot.h): the server starts a lock pick (Seconds; 0 stops it) and this machine draws the bar
+	UFUNCTION(Client, Reliable) void ClientLockPick(float Seconds);
+	float LockPickStart = -100.f, LockPickEnd = -100.f;   // (this machine's clock, the HUD's pick bar)
+	FTimerHandle BoxPickTimer;                           // (server) the pick under way
+	FVector BoxPickAt = FVector::ZeroVector;
+	float BoxAskUntil = 0.f;                             // (server) one container request a second
+	void FinishBoxPick();
 	// Fishing (2026-11-26, Docs/FishingPlan.md): the server tells this player's machine the float went under, and what was caught (to show it on the line)
 	void FishBite(class AFishingSpot* Spot);
 	void FishCaught(class AFishingSpot* Spot, EItemType Item, float Size);

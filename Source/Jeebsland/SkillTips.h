@@ -126,6 +126,7 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 		break;
 	case ESkillType::Lockpicking:
 		L.Add(FString::Printf(TEXT("Can pick locks up to level %d"), Level));
+		L.Add(TEXT("Chests, cupboards and crates in town houses: higher locks, better loot"));
 		break;
 	default: break;
 	}
