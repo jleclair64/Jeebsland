@@ -115,3 +115,4 @@ WellVillage,/Game/TownDecor/SM_WellVillage,circle,3.20,3.20,-0.09,0.00,3.29,caps
 WheatSack,/Game/TownDecor/SM_WheatSack,box,0.89,0.61,0.00,-0.00,1.02,none,no,medium,,,M F Y,lods,6000,300,0.89,0.61,0.00,0
 WindowBoxRed,/Game/TownDecor/SM_WindowBoxRed,box,1.08,0.52,0.00,-0.00,0.61,none,no,medium,,hang,S,lods,12000,298,1.08,0.52,0.00,1
 WoodTub,/Game/TownDecor/SM_WoodTub,circle,0.72,0.72,-0.00,0.00,0.56,none,no,small,,,Y G F W,lods,10000,300,0.72,0.68,0.00,0
+Gallows,/Game/WorldProps/SM_Gallows,box,5.56,4.31,0.00,0.00,4.00,mesh,yes,landmark,,,,lods,6407,384,5.56,4.31,0.00,0

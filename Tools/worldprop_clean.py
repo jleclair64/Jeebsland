@@ -39,6 +39,10 @@ WORLD = {
                  course=dict(centre=(10.0, 0.0), wedge=(158.0, -70.0), z=(302.0, 360.0), lip=4.0, lip_from=190.0, joint=70.0, cell=2.0, voxel=2.5, drop=62.0),
                  recalc=False, stone=(36.0, 0.13, 0.52, 0.55, 0.45), hulls=(70.0, 35.0)),
 }
+WORLD["Gallows"] = dict(file="Originals/Gallows_Original.glb", axes=("X", "Y", "Z"), height=400.0, reduce=6500,
+                        # "Gallows Platform" by szpeylin (Meshy community, CC0): a timber gallows with a deck, stairs and four plain nooses. 6.4k triangles, kept as they are.
+                        # gap: a column's points are split into separate hulls where they skip more than 'gap' cm of height (so the nooses hang free of the deck).
+                        hulls=(40.0, 20.0), gap=45.0)
 names = a[2:] or list(WORLD)
 IDX = {"X": 0, "Y": 1, "Z": 2}
 
@@ -459,7 +463,16 @@ for name in names:
         cell, lowest = P["hulls"]
         cols = {}
         for c in xs: cols.setdefault((int(math.floor(c.x / cell)), int(math.floor(c.y / cell))), []).append(c)
+        groups = []
         for key, ps in sorted(cols.items()):
+            if P.get("gap"):
+                ps = sorted(ps, key=lambda q: q.z); cur = [ps[0]]
+                for q in ps[1:]:
+                    if q.z - cur[-1].z > P["gap"]: groups.append((key, cur)); cur = []
+                    cur.append(q)
+                groups.append((key, cur))
+            else: groups.append((key, ps))
+        for key, ps in groups:
             if len(ps) < 8: continue
             if max(p.z for p in ps) - min(p.z for p in ps) < lowest and max(p.z for p in ps) < lowest: continue
             hb = bmesh.new()
