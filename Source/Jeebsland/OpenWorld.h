@@ -45,10 +45,9 @@ namespace JeebOpen
 	// rock or roofs); a pure function of the position, so every machine draws the same (2026-11-22, owner: feet sink into the snow)
 	constexpr float SinkDepth = 13.f;
 	float SnowSink(const FVector& Feet);
-	// 0 .. 1: how hard it is snowing at a moment of the shared clock (AGameStateBase::GetServerWorldTimeSeconds): clear or snowing for
-	// whole slots of SnowSlot seconds, eased in and out, the same for every player
-	constexpr double SnowSlot = 210.0;
-	float Snowing(double ServerSeconds);
+	// 0 .. 1: the weather of a moment of the shared clock (AGameStateBase::GetServerWorldTimeSeconds): 1 a storm day, 0 blue skies; one per game day
+	float Snowing(double ServerSeconds);   // (2026-11-26: one weather per game day, see OpenWorld.cpp)
+	float StormAlt(float Z);   // 0 .. 1 by the camera's height: the storm is on the mountain tops only
 
 	// The towns still to be built: a placeholder house each, and the name shown on walking in
 	struct FSite { const TCHAR* Name; FVector2D Pos; float Radius; FVector2D House; float HouseYaw; };

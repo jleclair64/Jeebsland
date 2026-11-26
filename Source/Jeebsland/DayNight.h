@@ -41,6 +41,7 @@ public:
 	static FVector MoonDir;      // unit vector toward the moon (30 degrees up in the south-south-west; the moonlight comes from there)
 	static float FixedPhase;     // >= 0 freezes the clock at that phase (used for test screenshots)
 	static float IndoorBias;     // (2026-11-22) extra exposure in stops while the camera is inside a walk-in house (AHouseInterior; 0 outside)
+	static float Storm;          // (2026-11-26) 0 .. 1: the mountain-top snowstorm at this machine's camera (fog, grey haze, heavy cloud, falling snow)
 	static constexpr float CloudWindSpeed = 1.f;   // how fast the clouds drift; raise it if they crawl, lower it if they race
 
 protected:
@@ -66,6 +67,7 @@ private:
 	float Clock = 0.f;
 	FLinearColor OldDirGlow = FLinearColor::Black;   // the map's own sun glow in the haze (for -OldLook)
 	float OldDirExponent = 4.f, OldDirStart = 10000.f, OldAerialStart = 0.1f;
+	float OldFalloff = 0.2f;   // the map's own height fog fall-off (a snowstorm flattens it)
 	float ContactNow = -1.f;   // the sun's contact shadow length last set (it is only re-sent when it changes)
 	float DfNow = -1.f;        // the sun's distance field shadow reach last set, m (jeeb.Shadow.DF)
 	float FarNow = -1.f;      // the sun's far shadow cascade reach last set, m (jeeb.Shadow.Far)
