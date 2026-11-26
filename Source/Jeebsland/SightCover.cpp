@@ -56,3 +56,59 @@ bool JeebSightCover::Blocked(const FVector& A, const FVector& B)
 	}
 	return false;
 }
+
+#if !UE_BUILD_SHIPPING
+// -JeebSightCoverTest (a dedicated server, a listen server or a client): after the world is built, logs the three lists' counts and a
+// hash of them (a server and a client must agree), and on a server or standalone game checks a crouched player behind the first wild bush
+// and the first fill bush: eye 1.3 m up on one side, feet on the other, through the middle = blocked; the same line moved 12 m aside = clear.
+#include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "Containers/Ticker.h"
+#include "Misc/Parse.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Crc.h"
+#include "Misc/CoreDelegates.h"
+
+static struct FSightCoverTestHook
+{
+	FSightCoverTestHook()
+	{
+		FWorldDelegates::OnPostWorldInitialization.AddLambda([](UWorld* W, const UWorld::InitializationValues)
+		{
+			if (!W || !W->IsGameWorld() || !FParse::Param(FCommandLine::Get(), TEXT("JeebSightCoverTest"))) return;
+			static bool bArmed = false;
+			if (bArmed) return;
+			bArmed = true;
+			(void)W;
+			FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float)
+			{
+				static double T = 0.0; T += 1.0 / 30.0;
+				if (T < 40.0) return true;
+				UWorld* Wd = nullptr;
+				if (GEngine) for (const FWorldContext& Ctx : GEngine->GetWorldContexts()) if ((Ctx.WorldType == EWorldType::Game || Ctx.WorldType == EWorldType::PIE) && Ctx.World() && Ctx.World()->GetName() == TEXT("Field")) Wd = Ctx.World();
+				if (!Wd) { T = FMath::Min(T, 39.0); return true; }
+				const bool bClient = Wd->GetNetMode() == NM_Client;
+				for (int32 s = 0; s < JeebSightCover::NumSources; ++s)
+				{
+					uint32 H = 0;
+					for (const FCoverBox& B : Boxes[s]) { const int32 Q[4] = { FMath::RoundToInt(B.X), FMath::RoundToInt(B.Y), FMath::RoundToInt(B.H), FMath::RoundToInt(B.Hx) }; H = FCrc::MemCrc32(Q, sizeof(Q), H); }
+					UE_LOG(LogTemp, Log, TEXT("JEEBSIGHTCOVERTEST %s list %d: %d boxes, hash %08x"), bClient ? TEXT("client") : TEXT("server"), s, Boxes[s].Num(), H);
+				}
+				if (!bClient)
+					for (int32 s = 0; s < 2; ++s)
+					{
+						if (Boxes[s].Num() == 0) { UE_LOG(LogTemp, Log, TEXT("JEEBSIGHTCOVERTEST FAIL list %d is empty"), s); continue; }
+						const FCoverBox& B = Boxes[s][0];
+						const float Z = B.Z, R = FMath::Max(B.Hx, B.Hy) + 400.f;
+						const FVector Eye(B.X - R, B.Y, Z + 130.f), Feet(B.X + R, B.Y, Z);
+						const bool bBehind = JeebSightCover::Blocked(Eye, Feet);
+						const bool bAside = JeebSightCover::Blocked(Eye + FVector(0.f, 1200.f, 0.f), Feet + FVector(0.f, 1200.f, 0.f));
+						UE_LOG(LogTemp, Log, TEXT("JEEBSIGHTCOVERTEST %s crouched behind the first %s bush at %.0f %.0f (%.0f cm tall): blocked %d, 12 m aside blocked %d"),
+							bBehind && !bAside ? TEXT("PASS") : TEXT("FAIL"), s == 0 ? TEXT("wild") : TEXT("fill"), B.X, B.Y, B.H, bBehind, bAside);
+					}
+				return false;
+			}));
+		});
+	}
+} GSightCoverTestHook;
+#endif
