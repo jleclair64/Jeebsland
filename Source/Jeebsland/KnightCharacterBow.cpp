@@ -282,6 +282,7 @@ static bool UnlimitedArrows()
 // (server) One arrow from the pack, out of the bow
 void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId, const FVector& From)
 {
+	EndInvisible(TEXT("shot an arrow"));
 	if (!Skills || !HasAuthority()) return;
 	int32 Id = (JeebItems::IsArrow(ArrowId) && Skills->CountItem(ArrowId) > 0) ? ArrowId : 0;
 	if (Id == 0) { const int32 Saved = ArrowPick; ArrowPick = 0; Id = ArrowSlotId(); ArrowPick = Saved; }

@@ -218,6 +218,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
+	DOREPLIFETIME(AKnightCharacter, bInvisible);   // (2026-11-26: the invisibility potion, everyone)
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, StaminaRep, COND_OwnerOnly);
@@ -487,6 +488,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickHitboxes(Dt);   // (after the pose: the hit boxes and hurt boxes follow the joints as posed this frame)
 	TickDust(Dt, bFalling, bSpecial, S, C);
 	TickSwordTrail(Dt);
+	TickInvisible(Dt);   // (the invisibility potion: KnightCharacterInvis.cpp)
 }
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader

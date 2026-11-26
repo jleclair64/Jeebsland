@@ -143,6 +143,7 @@ void AKnightCharacter::StartAttack(EAtkStyle Style, int32 Dir, float Charge)
 		else if (bStrafeMode) SetActorRotation(FRotator(0.f, C->GetControlRotation().Yaw, 0.f));
 	}
 	AttackYaw = GetActorRotation().Yaw;   // (a sword hit keeps this heading: TickAttack)
+	if (HasAuthority()) EndInvisible(Style == EAtkStyle::Cast ? TEXT("cast a spell") : TEXT("attacked"));   // (the invisibility potion ends with any attack or cast)
 	// Online: our swing goes to the server (which lands it); the server shows it to everyone else
 	if (GetNetMode() != NM_Standalone)
 	{
@@ -482,6 +483,7 @@ void AKnightCharacter::Die()
 	CloseLoot();
 	bAttacking = false; bCharging = false; bBlocking = false; bBlockHeld = false; bAimHeld = false;
 	SpeedUntil = -1.f; VigourUntil = -1.f; RadarUntil = -1.f;
+	EndInvisible(TEXT("died"));
 	GetCharacterMovement()->Velocity = FVector::ZeroVector;
 	// Oak Hill's plaza (owner 2026-11-12); the old village site's east side in MoveLab or a test run without the town
 	const bool bOak = JeebOakHill::Enabled() && !JeebHit::InMoveLab(GetWorld());
