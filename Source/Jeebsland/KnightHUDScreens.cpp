@@ -211,6 +211,7 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 			{ TEXT("Tab"),            TEXT("Inventory: click gear to wear or hold it, click worn gear to take it off") },
 			{ TEXT("K"),              TEXT("Skills: your levels, shown as icons") },
 			{ TEXT("E at a door"),    TEXT("Open or close it. Locked huts need Lockpicking; shutting one locks it again") },
+			{ TEXT("E at a chest"),   TEXT("Search it, or pick its lock (Lockpicking). Emptied ones refill after ten minutes") },
 			{ TEXT("Click / hold"),   TEXT("Sword: click to swing (chain), hold to charge a smash; sprinting ahead: a dash lunge. Bow: hold left or right to draw, let go to shoot. Crossbow: hold right, click left to shoot") },
 			{ TEXT("Wheel up"),       TEXT("Kick: goes through a raised shield and knocks anyone down (but loses to a sword swing)") },
 			{ TEXT("Wheel down"),     TEXT("Dodge roll, the way W, A, S or D are held (two keys: the diagonal; none: straight ahead)") },

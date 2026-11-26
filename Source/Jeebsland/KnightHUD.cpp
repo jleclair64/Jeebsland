@@ -453,6 +453,22 @@ void AKnightHUD::DrawHUD()
 		}
 	}
 
+	// (2026-11-26) picking a house container's lock: a bar under the middle of the screen while the server's pick runs (HouseLoot.h)
+	{
+		const float T = GetWorld()->GetTimeSeconds();
+		if (T < Knight->LockPickEnd && Knight->LockPickEnd > Knight->LockPickStart)
+		{
+			const float F = FMath::Clamp((T - Knight->LockPickStart) / (Knight->LockPickEnd - Knight->LockPickStart), 0.f, 1.f);
+			const float W = 260.f, H = 14.f, X = (Canvas->ClipX - W) * 0.5f, Y = Canvas->ClipY * 0.62f;
+			const FString Label = TEXT("Picking the lock...");
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(Label, TW, TH, Font, 1.0f);
+			Tile(X - 12.f, Y - TH - 12.f, W + 24.f, TH + H + 22.f, FLinearColor(0.05f, 0.07f, 0.12f), 0.55f, false);
+			HDText(Label, FLinearColor::White, (Canvas->ClipX - TW) * 0.5f, Y - TH - 6.f, Font, 1.0f);
+			Gauge(X, Y, W, H, F, FLinearColor(0.95f, 0.78f, 0.3f));
+		}
+	}
+
 	DrawQuestHUD(Knight, PC);   // (quest marks, the tracker and the J key: KnightHUDQuests.cpp)
 	DrawTravelHUD(Knight, PC);  // (fast travel: the count and the DISCOVERED title, KnightHUDTravel.cpp)
 	DrawQuestTitle(Knight);     // (over the marks and prompts above)

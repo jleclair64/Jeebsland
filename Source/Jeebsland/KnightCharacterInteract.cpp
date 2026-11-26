@@ -30,6 +30,7 @@
 #include "Horse.h"
 #include "Cottage.h"
 #include "HouseInterior.h"
+#include "HouseLoot.h"
 #include "Loot.h"
 #include "Pond.h"
 #include "HealthComponent.h"
@@ -268,6 +269,15 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { OutText = H->IsDoorOpen() ? TEXT("Press E to close the door") : TEXT("Press E to open the door"); return true; }
+	if (const JeebHouseLoot::FLootBox* Box = JeebHouseLoot::InReach(this))   // (2026-11-26, HouseLoot.h)
+	{
+		if (GetWorld()->GetTimeSeconds() < LockPickEnd) return false;   // (the pick bar shows instead)
+		const TCHAR* What = JeebHouseLoot::KindName(Box->Kind);
+		if (Box->Lock <= 0) OutText = FString::Printf(TEXT("Press E to search the %s"), What);
+		else if (Skills && Skills->GetLevel(ESkillType::Lockpicking) >= Box->Lock) OutText = FString::Printf(TEXT("Press E to pick the %s's lock (Lockpicking %d)"), What, Box->Lock);
+		else OutText = FString::Printf(TEXT("Locked. Needs Lockpicking level %d"), Box->Lock);
+		return true;
+	}
 	if (NearBroomStall()) { OutText = TEXT("Broom shop"); return true; }   // (Silver Point's broom stall, 2026-11-22)
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
@@ -350,6 +360,12 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 	ANpc* Npc = nullptr;
 	AHorse* Horse = nullptr;
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { Float(H->DoorHandle(), 0.f); return true; }
+	if (const JeebHouseLoot::FLootBox* Box = JeebHouseLoot::InReach(this))
+	{
+		Float(Box->Top, 0.f);
+		if (Box->Lock > 0 && !(Skills && Skills->GetLevel(ESkillType::Lockpicking) >= Box->Lock)) bOutE = false;
+		return true;
+	}
 	if (NearBroomStall()) { Float(JeebBroom::StallSpot(), 160.f); return true; }   // (Silver Point's broom stall: no anchor meant no E prompt on screen, 2026-11-22)
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
@@ -424,6 +440,13 @@ void AKnightCharacter::OnInteractKey()
 	AHorse* Horse = nullptr;
 	// Facing an open house's door: the door first, even with its villager on the doorstep
 	if (const AHouseInterior* H = AHouseInterior::DoorInReach(this, true)) { Inv(EInvOp::HouseDoor, 0, 0, 0, nullptr, H->DoorKey()); return; }
+	// (2026-11-26) a chest, cupboard or crate in a town house: search it, or pick its lock (the server decides, HouseLoot.cpp)
+	if (const JeebHouseLoot::FLootBox* Box = JeebHouseLoot::InReach(this))
+	{
+		if (GetWorld()->GetTimeSeconds() < LockPickEnd) return;   // (already picking)
+		Inv(Box->Lock > 0 ? EInvOp::BoxPick : EInvOp::BoxSearch, 0, 0, 0, nullptr, Box->At);
+		return;
+	}
 	switch (FindInteractable(Idx, Npc, Horse))
 	{
 	case EInteract::Horse: Mount(Horse); break;

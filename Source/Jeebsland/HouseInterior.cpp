@@ -4,6 +4,7 @@
 #include "KnightCharacter.h"
 #include "KnightGameState.h"
 #include "DayNight.h"
+#include "HouseLoot.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -89,6 +90,7 @@ void AHouseInterior::BeginPlay()
 void AHouseInterior::EndPlay(const EEndPlayReason::Type Why)
 {
 	GRooms.RemoveAll([this](const TWeakObjectPtr<AHouseInterior>& R) { return !R.IsValid() || R.Get() == this; });
+	JeebHouseLoot::RemoveHouse(this);
 	if (GBiasBy.Get() == this || !GBiasBy.IsValid()) { ADayNight::IndoorBias = 0.f; GBiasBy = nullptr; }
 	JeebOakHill::OpenRooms().RemoveAll([this](const JeebOakHill::FOpenRoom& R) { return R.Owner == this; });
 	Super::EndPlay(Why);
@@ -242,6 +244,17 @@ void AHouseInterior::Build()
 	const FTransform Xf = GetActorTransform();
 	int32 NLights = 0;
 	for (const FRow& R : Rows) if (R.Lm > 0.f) ++NLights;
+	// (2026-11-26) the chests, cupboards and crates in the list hold loot (HouseLoot.h): the same on every machine
+	{
+		int32 NBox = 0;
+		const FVector Mid = RoomLocal.IsValid ? Xf.TransformPosition(RoomLocal.GetCenter()) : Xf.GetLocation();
+		const float FloorW = Xf.TransformPosition(FVector(0.f, 0.f, FloorZ)).Z;
+		for (const FRow& R : Rows)
+		{
+			JeebHouseLoot::EBoxKind K;
+			if (R.bMesh && JeebHouseLoot::IsContainerMesh(R.Mesh, K)) JeebHouseLoot::AddBox(this, PlotId, NBox++, K, R.Xf, Mid, FloorW);
+		}
+	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBINT house %s at %.0f %.0f %.0f yaw %.0f: %d pieces, %d solid, %d lights, room %s, hash %u (room built when a player comes near)"), *PlotId, Xf.GetLocation().X, Xf.GetLocation().Y, Xf.GetLocation().Z,
 		Xf.Rotator().Yaw, Pieces0, Solids, NLights, *RoomLocal.ToString(), Hash);
 #if !UE_BUILD_SHIPPING
@@ -414,6 +427,7 @@ void AHouseInterior::Tick(float Dt)
 	Super::Tick(Dt);
 	TestTick(Dt);
 	NetTestTick(Dt);
+	JeebHouseLoot::TestTick(this, Dt);
 	TickDoor(Dt);
 	if (IsNetMode(NM_DedicatedServer) || !RoomLocal.IsValid) return;
 	// (local visuals only: this machine's own knight and camera; other players' knights never build a room here)
