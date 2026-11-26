@@ -68,6 +68,19 @@ dt.layers_vgroup_select_src = "ALL"; dt.layers_vgroup_select_dst = "NAME"
 bpy.ops.object.select_all(action="DESELECT"); M.select_set(True); bpy.context.view_layer.objects.active = M
 bpy.ops.object.modifier_apply(modifier="dt")
 bpy.data.objects.remove(P)
+# (2026-11-26, critters) the front paws folded flat like a blade in the walk (the heat weights tied the paw to the lower-leg bone while the ankle
+# swung): every vertex of a front paw, under the ankle, goes rigidly to the foot bone, blended into the old weights over the 12 cm above it
+FOOT = {"FL": "frontHorselink.L", "FR": "frontHorselink.R"}
+for k, bone in FOOT.items():
+    c = FEET[k]; gi = M.vertex_groups.get(bone) or M.vertex_groups.new(name=bone); n = 0
+    for v in M.data.vertices:
+        p = M.matrix_world @ v.co
+        if (Vector((p.x, p.y)) - Vector((c.x, c.y))).length > 0.22 or p.z > 0.30: continue
+        w = max(0.0, min(1.0, (0.30 - p.z) / 0.12))
+        for g in list(v.groups):
+            if g.group != gi.index: M.vertex_groups[g.group].add([v.index], g.weight * (1.0 - w), "REPLACE")
+        gi.add([v.index], w + (next((g.weight for g in v.groups if g.group == gi.index), 0.0)) * (1.0 - w), "REPLACE"); n += 1
+    print("BEAR paw %s: %d verts on %s" % (k, n, bone))
 M.parent = A; M.matrix_parent_inverse = A.matrix_world.inverted(); print("BEAR arm matrix", A.matrix_world); am = M.modifiers.new("Armature", "ARMATURE"); am.object = A
 unw = sum(1 for v in M.data.vertices if not v.groups)
 print("BEAR groups %d, unweighted verts %d of %d" % (len(M.vertex_groups), unw, len(M.data.vertices)))
