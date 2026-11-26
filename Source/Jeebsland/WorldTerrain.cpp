@@ -161,7 +161,7 @@ void AWorldTerrain::BuildLand()
 					Col.Add(Mask.Color());
 					// (2026-11-22: how much snow lies here goes in the second UV's U, from real noise worked out per point, JeebOpen::Snow: the
 					// material's own tiled noise pictures showed as a repeating weave along the snow's edge. Other grounds leave it 0: no snow)
-					UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up) + 1.f, 0.f));   // (+ 1: a ground that gives no second UV reads 0, which must mean no snow at all)
+					UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up) + 1.f, JeebRework::MoorTint(X, Y)));   // (V, 2026-11-25: the moor's heather and tawny grass, MapRework.h)   // (+ 1: a ground that gives no second UV reads 0, which must mean no snow at all)
 				}
 			for (int32 i = CI; i < I1; ++i)
 				for (int32 j = CJ; j < J1; ++j)
@@ -207,6 +207,7 @@ void AWorldTerrain::BuildLand()
 		}
 	if (!bServer && Mat) BuildBeyond(Mat);
 	BuildFine();
+	BuildArch();
 	JeebRoadSlope::Report();   // (-RoadSlope: the steepest ground on every road, 2026-11-20)
 }
 
@@ -218,7 +219,7 @@ void AWorldTerrain::BuildFine()
 	UMaterialInterface* Mat = SharedGround(GetWorld());
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 	const float S = JeebTerrain::FineStep;
-	int32 Cells = 0;
+	int32 Cells = 0, WallPoints = 0;
 	for (const JeebTerrain::FFinePatch& P : JeebTerrain::FinePatches())
 	{
 		const int32 NX = FMath::RoundToInt((P.X1 - P.X0) / S), NY = FMath::RoundToInt((P.Y1 - P.Y0) / S);
@@ -232,24 +233,89 @@ void AWorldTerrain::BuildFine()
 				H[i * GY + j] = (i >= 1 && j >= 1 && i <= NX + 1 && j <= NY + 1) ? JeebTerrain::FineVertexZ(P, X, Y) : JeebTerrain::HeightAt(X, Y);
 			}
 		auto At = [&](int32 i, int32 j) { return H[(i + 1) * GY + (j + 1)]; };
+		// (Second pass on the sea cliffs, 2026-11-25; owner: "fewer obvious straight lines that make it look zig zaggy".) A wall is a
+		// drop in the height itself, and on a plain grid a drop can only run along grid lines: every wall was a staircase of 2 m
+		// straight cuts. So in a walled patch the points beside a drop are moved sideways onto it: the point on the high side to the
+		// drop's true line (found by halving along the grid edge), the point on the low side to a little beyond it (the face leans
+		// back by 0.4 to 2.3 m, never the same). The wall then follows the line the height function draws, at any angle and curve.
+		// Points on the patch's border never move (they meet the 8 m mesh).
+		const int32 VW = NY + 1;
+		TArray<FVector2D> Mv;
+		int32 Snapped = 0, Eased = 0;
+		if (P.bWalls)
+		{
+			Mv.SetNumZeroed((NX + 1) * VW);
+			constexpr float Jump = 250.f;
+			for (int32 i = 1; i < NX; ++i)
+				for (int32 j = 1; j < NY; ++j)
+				{
+					const float H0 = At(i, j), X0 = P.X0 + i * S, Y0 = P.Y0 + j * S;
+					for (int32 Axis = 0; Axis < 2; ++Axis)
+					{
+						int32 Dir = 0; float Best = 0.f, BestDh = 0.f;
+						for (int32 Dd = -1; Dd <= 1; Dd += 2)
+						{
+							const float Dh = (Axis == 0 ? At(i + Dd, j) : At(i, j + Dd)) - H0;
+							if (FMath::Abs(Dh) < Jump) continue;
+							const float Score = FMath::Abs(Dh) + (Dh < 0.f ? 1.0e6f : 0.f);   // (a point at a drop's top stays its top)
+							if (Score > Best) { Best = Score; Dir = Dd; BestDh = Dh; }
+						}
+						if (Dir == 0) continue;
+						const float X1 = X0 + (Axis == 0 ? Dir * S : 0.f), Y1 = Y0 + (Axis == 1 ? Dir * S : 0.f), MidH = H0 + 0.5f * BestDh;
+						float Lo = 0.f, Hi = 1.f;
+						for (int32 k = 0; k < 7; ++k)
+						{
+							const float M = 0.5f * (Lo + Hi);
+							if ((JeebTerrain::HeightAt(FMath::Lerp(X0, X1, M), FMath::Lerp(Y0, Y1, M)) > MidH) == (BestDh < 0.f)) Lo = M; else Hi = M;
+						}
+						float D;
+						if (BestDh < 0.f) D = FMath::Min(Lo * S, 0.95f * S);
+						else
+						{
+							const float Lean = FMath::Min(40.f + 190.f * FMath::Clamp(0.5f + FMath::PerlinNoise2D(FVector2D(X0 / 900.f + 5.3f, Y0 / 900.f - 2.2f)), 0.f, 1.f), 0.3f * BestDh);
+							D = FMath::Clamp(Hi * S - Lean, -0.45f * S, 0.95f * S);
+						}
+						(Axis == 0 ? Mv[i * VW + j].X : Mv[i * VW + j].Y) = Dir * D;
+						++Snapped;
+					}
+				}
+			// (no cell may fold over or shrink to a sliver: where one would, its points go half way back)
+			auto Pt = [&](int32 i, int32 j) { return FVector2D(P.X0 + i * S, P.Y0 + j * S) + Mv[i * VW + j]; };
+			for (int32 Pass = 0; Pass < 4; ++Pass)
+			{
+				int32 Bad = 0;
+				for (int32 i = 0; i < NX; ++i)
+					for (int32 j = 0; j < NY; ++j)
+					{
+						const FVector2D A = Pt(i, j), B = Pt(i + 1, j), C = Pt(i, j + 1), D = Pt(i + 1, j + 1);
+						if (FVector2D::CrossProduct(B - A, C - A) > 0.05f * S * S && FVector2D::CrossProduct(D - B, C - B) > 0.05f * S * S) continue;
+						Mv[i * VW + j] *= 0.5f; Mv[(i + 1) * VW + j] *= 0.5f; Mv[i * VW + j + 1] *= 0.5f; Mv[(i + 1) * VW + j + 1] *= 0.5f;
+						++Bad;
+					}
+				Eased += Bad;
+				if (Bad == 0) break;
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBREWORK walls in patch X %.0f..%.0f: %d grid points moved onto a drop's line, %d cells eased back"), P.X0, P.X1, Snapped, Eased);
+		}
 		constexpr int32 Chunk = 60;
 		for (int32 CI = 0; CI < NX; CI += Chunk)
 			for (int32 CJ = 0; CJ < NY; CJ += Chunk)
 			{
 				const int32 I1 = FMath::Min(CI + Chunk, NX), J1 = FMath::Min(CJ + Chunk, NY);
-				TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV; TArray<int32> Tri;
+				TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV, UV1; TArray<int32> Tri;
 				const int32 W = J1 - CJ + 1;
 				for (int32 i = CI; i <= I1; ++i)
 					for (int32 j = CJ; j <= J1; ++j)
 					{
-						const float X = P.X0 + i * S, Y = P.Y0 + j * S, Z = At(i, j);
+						const float X = P.X0 + i * S + (P.bWalls ? Mv[i * VW + j].X : 0.f), Y = P.Y0 + j * S + (P.bWalls ? Mv[i * VW + j].Y : 0.f), Z = At(i, j);
 						V.Add(FVector(X, Y, Z));
 						N.Add(FVector(At(i - 1, j) - At(i + 1, j), At(i, j - 1) - At(i, j + 1), 2.f * S).GetSafeNormal());
 						UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
-						if (bServer) { Col.Add(FLinearColor::White); continue; }
+						if (bServer) { Col.Add(FLinearColor::White); UV1.Add(FVector2D::ZeroVector); continue; }
 						// (the slope over 16 m, as the 8 m mesh measures it, so the two paint alike)
 						const float Up = JeebGround::Upness(JeebTerrain::HeightAt(X + 800.f, Y), JeebTerrain::HeightAt(X - 800.f, Y), JeebTerrain::HeightAt(X, Y + 800.f), JeebTerrain::HeightAt(X, Y - 800.f));
 						Col.Add(JeebGround::At(X, Y, Z, Up).Color());
+						UV1.Add(FVector2D(JeebOpen::SnowRaw(X, Y, Z, Up) + 1.f, JeebRework::MoorTint(X, Y)));   // (V, 2026-11-25: the moor's heather and tawny grass, MapRework.h)   // (2026-11-25: the snow, as the 8 m mesh gives it: the sea cliffs' patches reach into the north)
 					}
 				for (int32 i = CI; i < I1; ++i)
 					for (int32 j = CJ; j < J1; ++j)
@@ -272,14 +338,90 @@ void AWorldTerrain::BuildFine()
 					const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
 					if (Fn.Z > 0.f) for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
 				}
+				// (2026-11-25, the sea cliffs and stacks: MapRework.h) A triangle steeper than 60 degrees is a wall's face. It gets its own
+				// points (so neither the grass of the top nor its light runs down the wall, and the top is lit as level ground right to its
+				// lip), plain stone for its colour, and (second pass) it is cut into bands 2 m high whose points stand in or out by
+				// JeebRework::WallRough: beds, bulges and hollows, an overhang here and there, shaded round instead of in flat boards.
+				// Cut points lie on the triangles' edges at fixed heights, so neighbouring faces share them and no crack opens.
+				if (P.bWalls)
+				{
+					const int32 Shared = V.Num();
+					TArray<FVector> Acc; Acc.SetNumZeroed(Shared);
+					TArray<uint8> Touch; Touch.SetNumZeroed(Shared);
+					TArray<int32> Kept; Kept.Reserve(Tri.Num());
+					TMap<FIntVector, int32> Weld;
+					constexpr float Band = 200.f;
+					auto OutOf = [&](int32 Idx) { const int32 i = CI + Idx / W, j = CJ + Idx % W; return FVector2D(At(i - 1, j) - At(i + 1, j), At(i, j - 1) - At(i, j + 1)).GetSafeNormal(); };
+					// a wall's point on the edge between two of the chunk's points (Lo the lower) at height Z
+					auto WallPoint = [&](int32 Lo, int32 Hi, float Z) -> int32
+					{
+						const FVector A = V[Lo], B = V[Hi];
+						const float T = (B.Z - A.Z) > 1.f ? FMath::Clamp((Z - A.Z) / (B.Z - A.Z), 0.f, 1.f) : 0.f;
+						const FVector Q = A + (B - A) * T;
+						const FIntVector Key(FMath::RoundToInt32(Q.X * 2.f), FMath::RoundToInt32(Q.Y * 2.f), FMath::RoundToInt32(Q.Z * 2.f));
+						if (const int32* Found = Weld.Find(Key)) return *Found;
+						FVector Pd = Q;
+						if (T > 0.f && T < 1.f)
+						{
+							const FVector2D O = FMath::Lerp(OutOf(Lo), OutOf(Hi), T).GetSafeNormal();
+							Pd += FVector(O.X, O.Y, 0.f) * (JeebRework::WallRough(Q) * JeebRework::Ramp(0.f, 220.f, FMath::Min(Z - A.Z, B.Z - Z)));
+						}
+						const int32 New = V.Add(Pd);
+						N.Add(FVector::ZeroVector);
+						UV.Add(FVector2D(Pd.X / 1000.f, Pd.Y / 1000.f));
+						UV1.Add(FVector2D(FMath::Lerp(UV1[Lo].X, UV1[Hi].X, T), 1.f + JeebRework::PaleAt(Q.X, Q.Y)));   // (V from 1: a wall, and how pale its stone is: the Pale Cove, the Needles)
+						Col.Add(FLinearColor(0.f, 1.f, 0.f, 0.f));
+						Weld.Add(Key, New);
+						++WallPoints;
+						return New;
+					};
+					auto Cuts = [&](int32 Lo, int32 Hi, TArray<int32, TInlineAllocator<48>>& Out)
+					{
+						const float Z0 = V[Lo].Z, Z1 = V[Hi].Z;
+						for (float Z = (FMath::FloorToFloat((Z0 + 20.f) / Band) + 1.f) * Band; Z < Z1 - 20.f; Z += Band) Out.Add(WallPoint(Lo, Hi, Z));
+					};
+					for (int32 t = 0; t + 2 < Tri.Num(); t += 3)
+					{
+						const FVector C0 = FVector::CrossProduct(V[Tri[t + 1]] - V[Tri[t]], V[Tri[t + 2]] - V[Tri[t]]);
+						FVector Fn = C0.GetSafeNormal();
+						if (Fn.Z < 0.f) Fn = -Fn;
+						if (Fn.Z >= 0.5f) { for (int32 k = 0; k < 3; ++k) { Acc[Tri[t + k]] += Fn; Kept.Add(Tri[t + k]); } continue; }
+						int32 Ix[3] = { Tri[t], Tri[t + 1], Tri[t + 2] };
+						for (int32 k = 0; k < 3; ++k) Touch[Ix[k]] = 1;
+						auto Lower = [&](int32 A, int32 B) { return V[A].Z < V[B].Z || (V[A].Z == V[B].Z && A < B); };
+						if (Lower(Ix[1], Ix[0])) Swap(Ix[0], Ix[1]);
+						if (Lower(Ix[2], Ix[1])) Swap(Ix[1], Ix[2]);
+						if (Lower(Ix[1], Ix[0])) Swap(Ix[0], Ix[1]);
+						const bool bSame = FVector::DotProduct(FVector::CrossProduct(V[Ix[1]] - V[Ix[0]], V[Ix[2]] - V[Ix[0]]), C0) > 0.f;
+						TArray<int32, TInlineAllocator<48>> Lc, Rc;
+						const int32 Wa = WallPoint(Ix[0], Ix[0], V[Ix[0]].Z), Wb = WallPoint(Ix[1], Ix[1], V[Ix[1]].Z), Wc = WallPoint(Ix[2], Ix[2], V[Ix[2]].Z);
+						Lc.Add(Wa); Cuts(Ix[0], Ix[2], Lc); Lc.Add(Wc);
+						Rc.Add(Wa); Cuts(Ix[0], Ix[1], Rc); Rc.Add(Wb); Cuts(Ix[1], Ix[2], Rc); Rc.Add(Wc);
+						int32 Li = 0, Ri = 0;
+						while (Li < Lc.Num() - 1 || Ri < Rc.Num() - 1)
+						{
+							const bool bLeft = Ri == Rc.Num() - 1 || (Li < Lc.Num() - 1 && V[Lc[Li + 1]].Z <= V[Rc[Ri + 1]].Z);
+							const int32 Q0 = Lc[Li], Q1 = Rc[Ri], Q2 = bLeft ? Lc[Li + 1] : Rc[Ri + 1];
+							if (bLeft) ++Li; else ++Ri;
+							if (Q0 == Q1 || Q1 == Q2 || Q0 == Q2) continue;
+							const int32 R1 = bSame ? Q1 : Q2, R2 = bSame ? Q2 : Q1;
+							Kept.Append({ Q0, R1, R2 });
+							const FVector Wn = -FVector::CrossProduct(V[R1] - V[Q0], V[R2] - V[Q0]);   // (the ground's triangles are wound with their cross product down)
+							N[Q0] += Wn; N[R1] += Wn; N[R2] += Wn;
+						}
+					}
+					for (int32 v = 0; v < Shared; ++v) if (Touch[v] && !Acc[v].IsNearlyZero()) N[v] = Acc[v].GetSafeNormal();
+					for (int32 v = Shared; v < V.Num(); ++v) N[v] = N[v].IsNearlyZero() ? FVector::UpVector : N[v].GetSafeNormal();
+					Tri = MoveTemp(Kept);
+				}
 				UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
 				PM->SetupAttachment(GetRootComponent());
 				PM->bUseAsyncCooking = true;
 				PM->RegisterComponent();
-				PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, Col, TArray<FProcMeshTangent>(), true);
+				PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), true);
 				TArray<int32> Back;
 				for (int32 t = 0; t + 2 < Tri.Num(); t += 3) Back.Append({ Tri[t], Tri[t + 2], Tri[t + 1] });
-				if (!bServer) AddUnderside(V, Back, N, UV, TArray<FVector2D>(), Col, Mat);   // (casts no shadow: see BuildLand)
+				if (!bServer) AddUnderside(V, Back, N, UV, UV1, Col, Mat);   // (casts no shadow: see BuildLand)
 				PM->SetCollisionProfileName(TEXT("BlockAll"));
 				PM->ComponentTags.Add(FName(TEXT("JeebClimb")));
 				if (!bServer) { if (Mat) PM->SetMaterial(0, Mat); }
@@ -288,7 +430,23 @@ void AWorldTerrain::BuildFine()
 			}
 	}
 	for (const JeebTerrain::FFinePatch& Fp : JeebTerrain::FinePatches()) UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine patch X %.0f..%.0f Y %.0f..%.0f"), Fp.X0, Fp.X1, Fp.Y0, Fp.Y1);
-	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m, built in %.0f ms"), JeebTerrain::FinePatches().Num(), Cells, (FPlatformTime::Seconds() - T0) * 1000.0);
+	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m (%d points on the sea cliffs' walls), built in %.0f ms"), JeebTerrain::FinePatches().Num(), Cells, WallPoints, (FPlatformTime::Seconds() - T0) * 1000.0);
+	// (2026-11-25, the map rework: where the sea cliffs and Anchorage's bay lie, for placing test views and for comparing machines)
+	{
+		uint32 Hash = 0;
+		for (float X = 24000.f; X <= 100000.f; X += 4000.f)
+		{
+			const JeebRework::FSeaCliff C = JeebRework::SeaCliffAt(X);
+			const float Cy = JeebWorld::CoastY(X), Top = JeebTerrain::HeightAt(X, Cy - C.Run - 600.f);
+			Hash = FCrc::MemCrc32(&Cy, sizeof(float), Hash); Hash = FCrc::MemCrc32(&Top, sizeof(float), Hash);
+			float LipY = 0.f;   // (where the top ends, walking in from the sea: for placing test views)
+			for (float D = -2500.f; D <= 9000.f; D += 50.f) if (JeebTerrain::HeightAt(X, Cy - D) > JeebWorld::SeaLevel + 0.8f * C.Top * C.A) { LipY = Cy - D; break; }
+			UE_LOG(LogTemp, Log, TEXT("JEEBREWORK cliff at X %.0f: coast Y %.0f, wall %.1f m (%s%s), ground at its lip %.1f m, lip at Y %.0f"), X, Cy, C.Top * C.A / 100.f, C.Ledge > 0.5f ? TEXT("stepped") : TEXT("sheer"), C.Beach > 0.3f ? TEXT(", beach at its foot") : TEXT(""), Top / 100.f, LipY);
+		}
+		for (float X = -36000.f; X <= -6000.f; X += 3000.f) { const float Cy = JeebWorld::CoastY(X); Hash = FCrc::MemCrc32(&Cy, sizeof(float), Hash); UE_LOG(LogTemp, Log, TEXT("JEEBREWORK bay at X %.0f: shore Y %.0f"), X, Cy); }
+		const TArray<FVector2D>& East = JeebWorld::Rivers()[1].Pts;
+		UE_LOG(LogTemp, Log, TEXT("JEEBREWORK the east branch ends in the bay at %.0f %.0f (%d points); hash=%08x"), East.Last().X, East.Last().Y, East.Num(), Hash);
+	}
 
 	// Checks (every machine: compare the hash lines between a server and a client)
 	{
@@ -439,7 +597,7 @@ void AWorldTerrain::BuildWater()
 				const FVector2D Dir = FlowAt(X, Y, Still);
 				const FLinearColor F = JeebWaterLook::FlowColor(Dir.IsNearlyZero() ? FVector2D(1.f, 0.f) : Dir);
 				Col.Add(FLinearColor(FMath::Lerp(F.R, 0.5f, Still), FMath::Lerp(F.G, 0.5f, Still), 0.f, 1.f));
-				V.Add(FVector(X, Y, RiverLevel));
+				V.Add(FVector(X, Y, JeebRework::On() ? FMath::Lerp(RiverLevel, SeaLevel + 2.f, Smooth(-2500.f, 300.f, Y - CoastY(X))) : RiverLevel));   // (2026-11-25: a river eases down to the sea over its last 25 m, so its sheet no longer ends in a 40 cm step in Anchorage's bay)
 				return VertOf.Add(K, V.Num() - 1);
 			};
 			for (const FIntPoint& C : Cs)
@@ -557,4 +715,95 @@ void AWorldTerrain::BuildBeyond(UMaterialInterface* Mat)
 	PM->bAffectDistanceFieldLighting = false;
 	Chunks.Add(PM);
 	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN land beyond the edges: %d cells (8 m along the edges, rings from 8 m to 64 m) out to %.0f m past the north, west and south edges (drawn only, no collision)"), Tri.Num() / 6, Out * Cs / 100.f);
+}
+
+// The Pale Cove's rock arch (2026-11-25, MapRework.h; the owner's picture of a pale rock arch over light water). A height field cannot
+// have a hole under it, so this one piece is its own mesh: a slab of rock from the cliff top out to the top of the nearest stack, with
+// an opening under it to swim or wade through. Both ends are buried in the cliff and the stack, which are ordinary ground. Built on
+// every machine with collision (the server too), climbable like the cliffs; flat-shaded faces as theirs, pale stone on the sides and
+// underside, grass on top, with the one ground material.
+void AWorldTerrain::BuildArch()
+{
+	using namespace JeebWorld;
+	if (!JeebRework::On() || JeebRework::Stacks().Num() <= JeebRework::ArchStack) return;
+	const JeebRework::FStack& St = JeebRework::Stacks()[JeebRework::ArchStack];
+	const FVector2D B(St.X, StackY(St));
+	// (Second pass, owner: "too perfectly round on the bottom, please look at pictures of real land bridges". Durdle Door, the Azure
+	// Window, Arch Rock: the opening is lopsided, steep on one side and leaning on the other, its highest point off the middle; the
+	// seaward leg is a thick pier; the top is thick and humped; the rock narrows unevenly over the opening and swells at its feet;
+	// nothing is flat or straight. So: a tube of rock with a rounded, uneven cross-section, roughened as the cliffs' faces.)
+	float LipIn = -1.0e9f;   // (cm inland of the coast line where the cliff's top begins, found by walking in from the sea)
+	for (float D = -900.f; D <= 4500.f; D += 50.f) if (JeebTerrain::HeightAt(St.X, CoastY(St.X) - D) > SeaLevel + 900.f) { LipIn = D; break; }
+	const FVector2D A(St.X, CoastY(St.X) - LipIn - 700.f);   // (7 m in from the lip: on the cliff top)
+	const float ZA = LipIn > -1.0e8f ? JeebTerrain::HeightAt(A.X, A.Y) : 0.f, ZB = JeebTerrain::HeightAt(B.X, B.Y);
+	const float L = FVector2D::Distance(A, B);
+	if (LipIn < -1.0e8f || L < 2500.f || ZA < SeaLevel + 900.f || ZB < SeaLevel + 900.f) { UE_LOG(LogTemp, Warning, TEXT("JEEBREWORK no arch: the cliff top (%.0f) or the stack (%.0f) is not there"), ZA, ZB); return; }
+	const FVector2D Dir = (B - A) / L, Side(-Dir.Y, Dir.X);
+	const float O1 = 700.f + 130.f, O2 = FMath::Min(O1 + 1750.f, L - 0.75f * St.R);   // the opening, cm along: from the wall to a thick seaward pier
+	constexpr int32 Nn = 44, Mm = 12;
+	TArray<FVector> V; TArray<FVector> N; TArray<FLinearColor> Col; TArray<FVector2D> UV, UV1; TArray<int32> Tri;
+	TArray<FVector> Ctr;
+	for (int32 i = 0; i <= Nn; ++i)
+	{
+		const float S = float(i) / Nn, U = (S * L - O1) / (O2 - O1);
+		float Bot = SeaLevel - 450.f, Over = 0.f;
+		if (U > 0.f && U < 1.f)
+		{
+			// (highest 40% of the way out, the land side the steeper; its outline wavers)
+			const float Vv = U < 0.4f ? U / 0.4f * 0.5f : 0.5f + (U - 0.4f) / 0.6f * 0.5f;
+			Over = FMath::Pow(FMath::Sin(PI * Vv), U < 0.4f ? 0.5f : 0.8f);
+			Bot += (JeebRework::ArchHole + 450.f) * Over * (1.f + 0.07f * FMath::Sin(U * 11.f + 0.8f));
+		}
+		float Top = FMath::Lerp(ZA, ZB, S) + 60.f + 230.f * FMath::Square(FMath::Sin(PI * FMath::Clamp((S - 0.1f) / 0.75f, 0.f, 1.f))) + 70.f * FMath::PerlinNoise1D(S * 4.3f + 3.1f);
+		Top -= 160.f * (1.f - JeebRework::Ramp(0.f, 0.07f, S)) + 160.f * (1.f - JeebRework::Ramp(1.f, 0.93f, S));   // (both ends sink into the cliff top and the stack)
+		Bot = FMath::Min(Bot, Top - 380.f);
+		const float Half = 0.5f * JeebRework::ArchWidth * (1.3f - 0.5f * Over + 0.22f * FMath::PerlinNoise1D(S * 5.7f + 9.2f));
+		const FVector2D Mid = A + Dir * (S * L) + Side * (110.f * FMath::PerlinNoise1D(S * 3.1f + 0.6f));
+		Ctr.Add(FVector(Mid.X, Mid.Y, 0.5f * (Bot + Top)));
+		for (int32 k = 0; k < Mm; ++k)
+		{
+			const float Th = 2.f * PI * k / Mm, Cy = FMath::Cos(Th), Sz = FMath::Sin(Th);
+			const float Sy = FMath::Sign(Cy) * FMath::Pow(FMath::Abs(Cy), 0.65f), Szz = FMath::Sign(Sz) * FMath::Pow(FMath::Abs(Sz), 0.5f);
+			const float Lat = Half * Sy * (1.f - 0.2f * FMath::Max(Szz, 0.f)) * (1.f + 0.3f * FMath::Max(-Szz, 0.f) * (1.f - Over));   // (rounded shoulders; the feet swell)
+			FVector Q(Mid.X + Side.X * Lat, Mid.Y + Side.Y * Lat, FMath::Lerp(Bot, Top, 0.5f + 0.5f * Szz));
+			const bool bGrass = Szz > 0.8f;
+			const float Rough = 0.8f * JeebRework::WallRough(Q) + 30.f * FMath::PerlinNoise3D(Q / 240.f + FVector(5.1f, 2.2f, -6.3f));
+			Q += FVector(Side.X * Sy, Side.Y * Sy, 0.45f * Szz) * (Rough * (bGrass ? 0.25f : 1.f));
+			V.Add(Q);
+			N.Add(FVector::ZeroVector);
+			UV.Add(FVector2D(Q.X / 1000.f, Q.Y / 1000.f));
+			UV1.Add(FVector2D(0.f, bGrass ? 0.f : 2.f));   // (U 0: no snow; V 2: a wall of pale stone)
+			Col.Add(bGrass ? FLinearColor(0.f, 0.f, 0.f, 0.f) : FLinearColor(0.f, 1.f, 0.f, 0.f));
+		}
+	}
+	// (wound as the ground's: a triangle's cross product points into the rock)
+	auto Face = [&](int32 I0, int32 I1, int32 I2, const FVector& Out)
+	{
+		FVector C = FVector::CrossProduct(V[I1] - V[I0], V[I2] - V[I0]);
+		if (FVector::DotProduct(C, Out) > 0.f) { Swap(I1, I2); C = -C; }
+		Tri.Append({ I0, I1, I2 });
+		N[I0] -= C; N[I1] -= C; N[I2] -= C;
+	};
+	for (int32 i = 0; i < Nn; ++i)
+		for (int32 k = 0; k < Mm; ++k)
+		{
+			const int32 K1 = (k + 1) % Mm, P0 = i * Mm + k, P1 = i * Mm + K1, P2 = (i + 1) * Mm + K1, P3 = (i + 1) * Mm + k;
+			const FVector Out = 0.25f * (V[P0] + V[P1] + V[P2] + V[P3]) - 0.5f * (Ctr[i] + Ctr[i + 1]);
+			Face(P0, P1, P2, Out); Face(P0, P2, P3, Out);
+		}
+	for (FVector& Nv : N) Nv = Nv.IsNearlyZero() ? FVector::UpVector : Nv.GetSafeNormal();
+	const bool bServer = IsNetMode(NM_DedicatedServer);
+	UProceduralMeshComponent* PM = NewObject<UProceduralMeshComponent>(this);
+	PM->SetupAttachment(GetRootComponent());
+	PM->bUseAsyncCooking = true;
+	PM->RegisterComponent();
+	PM->CreateMeshSection_LinearColor(0, V, Tri, N, UV, UV1, TArray<FVector2D>(), TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), true);
+	PM->SetCollisionProfileName(TEXT("BlockAll"));
+	PM->ComponentTags.Add(FName(TEXT("JeebClimb")));
+	if (!bServer) { if (UMaterialInterface* Mat = SharedGround(GetWorld())) PM->SetMaterial(0, Mat); }
+	else PM->SetVisibility(false);
+	Chunks.Add(PM);
+	const uint32 Hash = FCrc::MemCrc32(V.GetData(), V.Num() * sizeof(FVector));
+	UE_LOG(LogTemp, Log, TEXT("JEEBREWORK arch: from the cliff top at %.0f %.0f (%.0f) to the stack at %.0f %.0f (%.0f), %.0f m long, opening %.0f m wide and %.1f m high over the sea; %d triangles; hash=%08x"),
+		A.X, A.Y, ZA, B.X, B.Y, ZB, L / 100.f, (O2 - O1) / 100.f, JeebRework::ArchHole / 100.f, Tri.Num() / 3, Hash);
 }

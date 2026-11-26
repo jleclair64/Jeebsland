@@ -46,8 +46,12 @@ namespace
 		const FVector2D P(X, Y);
 		const float Open = 1.f - HillZone(P);
 		if (Open <= 0.f) return 0.f;
+		// (2026-11-25, the sea cliffs, MapRework.h: the fade to nothing over the last 15 m before the coast line left the old coastal range
+		// standing as a rim along the cliffs' lip, half cancelled; where there is a cliff the grid carries on to 15 m past the coast line)
+		const float Shore = JeebWorld::CoastY(X) - Y;
+		const float CoastKeep = FMath::Lerp(Smooth(0.f, 1500.f, Shore), Smooth(-3000.f, -1500.f, Shore), JeebRework::SeaCliffAt(X).A);
 		return Open * TownKeep(P) * Smooth(1500.f, 12000.f, FMath::Max(FMath::Abs(X), FMath::Abs(Y)) - JeebTerrain::GroundHalf)
-			* Smooth(0.f, 1500.f, JeebWorld::CoastY(X) - Y);   // (never the sea floor or the islands)
+			* CoastKeep;   // (never the sea floor or the islands)
 	}
 	// a town site's middle: the town's spot, moved off the water if it lies on a bank (Anchorage's is 22 m from the east branch's middle)
 	FVector2D SiteMid(const FVector2D& Town)
@@ -344,6 +348,8 @@ namespace
 				const float InTown = 1.f - TownKeep(FVector2D(X, Y));
 				if (InTown > 0.f) { const float Hh = JeebHills::Offset(X, Y); if (Hh != 0.f) { G.V[k] -= Hh * InTown; Fixed[k] = 0; } }
 				Allow[k] = FMath::Lerp(1.f, CliffSlope / MaxSlope, Cliff[k]);
+				// (2026-11-25, the sea cliffs, MapRework.h: from 65 m inland of the coast line to the sea the slope cut and the rounding leave the ground alone)
+				if (JeebWorld::SeaCliffNear(X, Y, 9000.f) > 0.f || JeebRework::NearNeedles(X, Y, 2400.f)) { Cliff[k] = 1.f; Allow[k] = 80.f; }
 			}
 		auto Finished = [&]() { for (int32 i = 0; i < NI; ++i) for (int32 j = 0; j < N; ++j) { const int32 k = i * N + j; G.T[k] = Finish(G.GX(i), G.GY(j), L0[k] + G.V[k]); } };
 		// The slope cut is made on the finished ground (rivers and coast applied) and taken off the offset; near water the land answers

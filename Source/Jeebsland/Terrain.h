@@ -368,7 +368,7 @@ namespace JeebTerrain
 	// on a 2 m grid (AWorldTerrain), each patch a box on the 8 m grid's lines; its edge points lie on the 8 m mesh's edges, so the two
 	// meshes meet without a crack.
 	constexpr float FineStep = 200.f;
-	struct FFinePatch { float X0, X1, Y0, Y1; };
+	struct FFinePatch { float X0, X1, Y0, Y1; bool bWalls = false; };   // (bWalls: the sea cliffs, whose steep triangles are drawn as flat stone faces)
 	inline const TArray<FFinePatch>& FinePatches()
 	{
 		static const TArray<FFinePatch> All = []()
@@ -386,6 +386,28 @@ namespace JeebTerrain
 			const FBox2D L = FBox2D(JeebWorld::Lake().Shore).ExpandBy(2400.f);
 			Add(L.Min.X, L.Max.X, L.Min.Y, L.Max.Y);
 			Add(16000.f, 32800.f, 3200.f, 14400.f);   // (the split's north part: the south part lies on the square's 2 m ground and Oak Hill's 1 m)
+			// (2026-11-25, the map rework) the north-east's sea cliffs and stacks (MapRework.h): a wall 10-17 m wide in plan needs the 2 m
+			// ground. A strip of boxes 96 m long along the coast, each from 55 m inland of its coast line to 20 m out (further where a stack stands)
+			// (and the Pale Cove in the south-east, the same way)
+			for (int32 Part = 0; Part < 2; ++Part)
+			for (float X0 = Part == 0 ? 22400.f : -74400.f; X0 < (Part == 0 ? JeebRework::CliffToX : JeebRework::PaleToX); X0 += 9600.f)
+			{
+				float Lo = 1.0e9f, Hi = -1.0e9f; bool bCliff = false;
+				for (float X = X0; X <= X0 + 9600.f; X += 400.f)
+				{
+					const float C = JeebWorld::CoastY(X);
+					Lo = FMath::Min(Lo, C); Hi = FMath::Max(Hi, C);
+					bCliff |= JeebRework::SeaCliffAt(X).A > 0.f;
+				}
+				if (!bCliff) continue;
+				Hi += 2000.f;
+				for (const JeebRework::FStack& K : JeebRework::Stacks())
+					if (K.X + K.R * JeebRework::StackReach > X0 - 800.f && K.X - K.R * JeebRework::StackReach < X0 + 9600.f + 800.f) Hi = FMath::Max(Hi, JeebWorld::StackY(K) + K.R * JeebRework::StackReach + 800.f);
+				Add(X0, X0 + 9600.f, Lo - 5500.f, Hi);
+				A.Last().bWalls = true;
+			}
+			// the Needles (MapRework.h): pillars of rock, the same stepped walls
+			if (JeebRework::On()) { Add(JeebRework::NeedlesX - JeebRework::NeedlesHalf, JeebRework::NeedlesX + JeebRework::NeedlesHalf, JeebRework::NeedlesY - JeebRework::NeedlesHalf, JeebRework::NeedlesY + JeebRework::NeedlesHalf); A.Last().bWalls = true; }
 			return A;
 		}();
 		return All;
@@ -449,8 +471,12 @@ namespace JeebTerrain
 		const float Fx = GX - I, Fy = GY - J;
 		const float X0 = P.X0 + I * FineStep, Y0 = P.Y0 + J * FineStep;
 		const float A = FineVertexZ(P, X0, Y0), B = FineVertexZ(P, X0 + FineStep, Y0), C = FineVertexZ(P, X0, Y0 + FineStep);
+		// (second pass on the sea cliffs: a cell a wall runs through is drawn with its points moved onto the wall's true line
+		// (AWorldTerrain::BuildFine), so there the drawn ground is the true height, a level top right to the lip)
+		if (P.bWalls && FMath::Max3(A, B, C) - FMath::Min3(A, B, C) > 250.f) return HeightAt(X, Y);
 		if (Fx + Fy <= 1.f) return A + (B - A) * Fx + (C - A) * Fy;
 		const float D = FineVertexZ(P, X0 + FineStep, Y0 + FineStep);
+		if (P.bWalls && FMath::Abs(D - A) > 250.f) return HeightAt(X, Y);
 		return D + (C - D) * (1.f - Fx) + (B - D) * (1.f - Fy);
 	}
 

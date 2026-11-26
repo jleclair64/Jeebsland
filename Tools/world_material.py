@@ -31,6 +31,9 @@ ROCK_AVERAGE = palette.rgb("RockFar")   # what the stone fades to far away: a da
                                        # them, read lavender or pink-beige against the green hills)
 ROCK_PHOTO_GAIN = (2.2, 2.1, 2.0)   # (rock_face is dark rust: desaturated 70% then brightened to about the old stone's level)
 ROCK_TINT = (1.0, 1.0, 1.0)   # the RockTint parameter's default
+MOOR_HEATHER = (0.098, 0.060, 0.086)   # the moor's heather from a distance: a dusky purple-brown (2026-11-25)
+MOOR_TAWNY = (0.118, 0.118, 0.058)      # and its tawny deer grass: a dry gold-brown
+PALE_ROCK = (2.25, 2.2, 2.05)          # the Pale Cove's and the Needles' stone: the same rock greyed and about twice as light
 EARTH_BALANCE = palette.rgb("Earth")   # T_Dirt (average linear 0.069, 0.036, 0.016: dark rust) times this averages a light packed tan
                                      # (0.14, 0.10, 0.062): roads and worn ground never read as dark stains beside cobbles and grass
 EARTH_AVERAGE = (0.14, 0.10, 0.062)   # T_Dirt x EARTH_BALANCE's average (linear)
@@ -224,6 +227,18 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     grass = grass_field.before_grey(g, grass, fn)   # lightness and hue patches and the dry patches, exactly as the blades
     grass = g.desat(g.muln(grass, g.vector("Tint", (1.0, 1.0, 1.0))), GRASS_DESATURATION)
     grass = palette.grade_plant_extra(mat, grass)   # the palette's season and Greenness on the grass only (World on the whole, below)
+    # The moor (2026-11-25, Source/Jeebsland/MapRework.h: "a Scottish grasslands feel"): the world mesh's second UV carries, in V, how
+    # much heather (above 0) or tawny deer grass (below 0) grows at each point; the ground under and beyond the blades takes their
+    # colour, with the ragged 1.5 m noise on the edges. Grounds that give no second UV read 0: plain grass.
+    uv1m = g.node(unreal.MaterialExpressionTextureCoordinate)
+    uv1m.set_editor_property("coordinate_index", 1)
+    moor_v = g.mask(uv1m, False, True)
+    m_edge = g.addn(g.mul(g.add(rag, -0.5), 0.7), g.mul(g.add(med, -0.5), 0.5))
+    hea = g.sat(g.mul(g.add(g.addn(moor_v, m_edge), -0.22), 2.6))
+    taw = g.sat(g.mul(g.add(g.addn(g.mul(moor_v, -1.0), m_edge), -0.22), 2.6))
+    m_shade = g.muln(g.lerpc(0.78, 1.22, medm), g.lerpc(0.62, 1.38, rag))   # (light and shade at 10 m, and clumps at 1.5-4 m: heather is never one flat colour)
+    grass = g.lerp(grass, g.muln(g.c3(MOOR_HEATHER), m_shade), g.mul(hea, 0.86))
+    grass = g.lerp(grass, g.muln(g.c3(MOOR_TAWNY), m_shade), g.mul(taw, 0.66))
     beyond = grass_field.beyond_blades(g, depth)   # (0 among the grass blades near the camera, 1 past them; grass_field.py, 2026-11-15)
     grass = grass_field.under_grass_floor(g, grass, beyond)   # the meadow's shaded floor among the blades at the low sun
 
@@ -256,22 +271,46 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # every distance steep faces get large-scale structure: horizontal strata (two band noises stretched along the wall, unrelated
     # sizes), dark vertical gullies, warmer and cooler stretches, lighter upward faces and a little lichen on ledges.
     wall_u = g.mask(side_uv, True, False)
-    big_pic = rock_picture(g, rock_tex, g.mul(g.add(side_uv, 4409.0), 1.0 / 2300.0))
+    wall_far = g.append(g.mul(g.addn(g.mask(wp, True, False), g.mask(g.mask(wp, False, True), True, False)), 0.7071), wz)   # (one coordinate along the wall for every face, as the beds below)
+    big_pic = rock_picture(g, rock_tex, g.mul(g.add(wall_far, 4409.0), 1.0 / 2300.0))
     rock = g.lerp(rock, g.lerp(palette.colour(mat, "RockFar"), big_pic, g.c(0.55)), g.ramp(depth, 2500.0, 9000.0))
-    band1 = g.mask(g.tex(patches, g.append(g.mul(wall_u, 1.0 / 9000.0), g.mul(wz, 1.0 / 700.0))), True, False)
-    band2 = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_u, 3331.0), 1.0 / 5300.0), g.mul(g.add(wz, 77.0), 1.0 / 430.0))), True, False)
-    gully = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_u, 1201.0), 1.0 / 380.0), g.mul(wz, 1.0 / 4200.0))), True, False)
+    # (2026-11-25, the sea cliffs: on a wall 40 m high and hundreds of metres long the old streaks showed their repeat, a dark stripe
+    # every 3.8 m and a bed every 7 m. The beds now dip a little along the wall and undulate (their height is bent by a 29 m noise), in
+    # three thicknesses at unrelated sizes; the gullies are two samplings 23 m and 8.7 m wide, so neither lines up into a rhythm.)
+    # (the beds and gullies are laid by one coordinate along the wall whichever way a face looks, x + y: with the face's own x or y they
+    # jumped at every corner of the stepped sea cliffs, and neighbouring faces read as a checkerboard)
+    wall_d = g.mul(g.addn(g.mask(wp, True, False), g.mask(g.mask(wp, False, True), True, False)), 0.7071)
+    bend = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 2713.0), 1.0 / 2900.0), g.mul(wz, 1.0 / 2900.0))), True, False)
+    # (second pass, 2026-11-25: the beds still read as ruler-straight stripes. They now roll by up to 4 m over 30 m and by half a metre
+    # over 7 m, break at faults (two samplings cut to hard edges along the wall: the beds step up or down by up to 3.5 m and 1.5 m
+    # across them), and each bed lenses out within 20 to 50 m instead of running 90 m unchanged.)
+    bend2 = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, -941.0), 1.0 / 730.0), g.mul(g.add(wz, 190.0), 1.0 / 1100.0))), True, False)
+    fault_a = g.ramp(g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 6007.0), 1.0 / 6100.0), g.mul(wz, 1.0 / 23000.0))), True, False), 0.49, 0.51)
+    fault_b = g.ramp(g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, -2203.0), 1.0 / 2700.0), g.mul(g.add(wz, 900.0), 1.0 / 17000.0))), True, False), 0.47, 0.49)
+    bed = g.addn(g.addn(wz, g.mul(wall_d, 0.05)), g.mul(g.add(bend, -0.5), 800.0))
+    bed = g.addn(g.addn(bed, g.mul(g.add(bend2, -0.5), 110.0)), g.addn(g.mul(fault_a, 350.0), g.mul(fault_b, -150.0)))
+    band1 = g.mask(g.tex(patches, g.append(g.mul(wall_d, 1.0 / 5200.0), g.mul(bed, 1.0 / 1700.0))), True, False)
+    band2 = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 3331.0), 1.0 / 2900.0), g.mul(g.add(bed, 77.0), 1.0 / 730.0))), True, False)
+    band3 = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 517.0), 1.0 / 1300.0), g.mul(g.add(bed, 311.0), 1.0 / 290.0))), True, False)
+    gully_a = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 1201.0), 1.0 / 2300.0), g.mul(wz, 1.0 / 9000.0))), True, False)
+    gully_b = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, -777.0), 1.0 / 870.0), g.mul(g.add(wz, 500.0), 1.0 / 6100.0))), True, False)
+    gully = g.addn(g.mul(gully_a, 0.6), g.mul(gully_b, 0.4))
     tone = g.mask(g.tex(patches, g.mul(g.add(xy, -6131.0), 1.0 / 6500.0)), True, False)
-    strata = g.lerpc(0.72, 1.28, g.addn(g.mul(band1, 0.6), g.mul(band2, 0.4)))
-    gullies = g.lerpc(0.62, 1.0, g.ramp(gully, 0.18, 0.5))
+    strata = g.lerpc(0.68, 1.3, g.ramp(g.addn(g.addn(g.mul(band1, 0.45), g.mul(band2, 0.35)), g.mul(band3, 0.2)), 0.36, 0.64))
+    beds = g.lerp(g.c3((1.2, 1.06, 0.86)), g.c3((0.96, 1.0, 1.06)), g.ramp(band2, 0.35, 0.65))   # warm ochre beds between cooler grey ones (the Cliffs of Moher)
+    gullies = g.lerpc(0.8, 1.0, g.ramp(gully, 0.25, 0.5))
     warmcool = g.lerp(g.c3((1.08, 1.0, 0.9)), g.c3((0.92, 0.97, 1.05)), tone)
     wall = g.ramp(g.one(unreal.MaterialExpressionOneMinus, nz), 0.35, 0.6)   # only on steep faces, not gentle stony ground
-    shaped = g.muln(g.muln(g.muln(rock, strata), gullies), warmcool)
+    shaped = g.muln(g.muln(g.muln(g.muln(rock, strata), gullies), warmcool), beds)
     shaped = g.muln(shaped, g.lerpc(1.0, 1.18, g.ramp(nz, 0.25, 0.6)))
     rock = g.lerp(rock, shaped, wall)
     lichen = g.muln(g.muln(g.ramp(nz, 0.2, 0.45), g.ramp(band2, 0.55, 0.75)), wall)
     rock = g.lerp(rock, g.c3((0.06, 0.075, 0.035)), g.mul(lichen, 0.6))
     rock = g.muln(rock, g.vector("RockTint", ROCK_TINT))
+    # Pale stone (2026-11-25, MapRework.h: the Pale Cove and the Needles, after the owner's pictures of pale rock walls): a wall's points
+    # carry 1 + how pale it is in the second UV's V (the moor's grass tint lives under 1 there); greyed and lightened.
+    pale = g.sat(g.add(moor_v, -1.0))
+    rock = g.lerp(rock, g.muln(g.desat(rock, 0.5), g.c3(PALE_ROCK)), pale)
     # Where stone shows (2026-11-21, owner: the slopes' stone patches repeated as the same blobs): the 10 m noise alone used to
     # cut them; now three samplings at unrelated sizes, one turned 37 degrees, plus 45 m patches (patch sizes vary), a little of
     # the ragged 1.5 m noise for natural edges, and more stone the steeper the slope.
