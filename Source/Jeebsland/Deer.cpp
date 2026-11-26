@@ -12,6 +12,7 @@
 #include "WorldMap.h"
 #include "OakHill.h"
 #include "TownLab.h"
+#include "Eagle.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimationPoseData.h"
 #include "AnimationRuntime.h"
@@ -783,6 +784,7 @@ void ADeer::Die(AActor* From)
 	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBDEER %s (%s, herd %d) brought down by %s at %.0f %.0f: drops %s (meat %d, bones %d at Hunting %d); +%d %s XP, +%d Hunting XP; back in %.0f s"), *D.Name, *GetName(), Herd,
 		K ? *K->GetName() : TEXT("nobody"), Me.X, Me.Y, What.IsEmpty() ? TEXT("nothing") : *What, MeatN, BoneN, HuntLv, K ? D.XP : 0, bRanged ? TEXT("Archery") : TEXT("Attack"), K ? D.HuntXP : 0, RespawnSecs);
+	AEagle::OnKill(GetWorld(), FVector(Me.X, Me.Y, JeebFoes::Ground(Me.X, Me.Y)));   // (2026-11-26) an eagle nearby may come down to the body
 	if (AActor* By = K ? static_cast<AActor*>(K) : From)
 	{
 		UQuestComponent::OnFoeBeaten(By, *D.Key.ToString());
@@ -970,6 +972,11 @@ void ADeerHerds::Build()
 		if (Made < D.Herds) UE_LOG(LogTemp, Warning, TEXT("JEEBDEER %s: room for only %d of %d wild herds"), *D.Key.ToString(), Made, D.Herds);
 	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBDEER %d animals in %d herds, placed in %.1f ms"), Total, Herds.Num(), (FPlatformTime::Seconds() - T0) * 1000.0);
+	{   // (2026-11-26) the eagles circle over the herds' homes (Eagle.cpp)
+		TArray<FVector2D> Homes;
+		for (const FHerd& H : Herds) Homes.Add(H.Home);
+		AEagle::SpawnAll(GetWorld(), Homes);
+	}
 }
 
 void ADeerHerds::Alarm(int32 Herd, const ADeer* By, const FVector2D& From, bool bBolt)
@@ -1054,6 +1061,7 @@ void ADeerHerds::BuildLab()
 		H.Deer.Add(Dr);
 	}
 	Herds.Add(H);
+	if (FParse::Param(FCommandLine::Get(), TEXT("EagleLab"))) AEagle::SpawnLab(GetWorld(), At, Fw);   // (2026-11-26) two low eagles for pictures; the falling stag's body brings one down
 	UE_LOG(LogTemp, Log, TEXT("JEEBDEER lab: four stags at %.0f %.0f (ground %.0f), laps toward yaw %.0f"), At.X, At.Y, JeebFoes::Ground(At.X, At.Y), Yaw);
 }
 
