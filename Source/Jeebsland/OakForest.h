@@ -102,6 +102,8 @@ public:
 	// felled state and grows back the rest, with or without a node actor (they are lazy: a late joiner has none yet)
 	void SyncNodeCharges(const TArray<FNodeCharge>& List);
 	static AOakForest* Instance(UWorld* World);
+	// (server, eagles) the top of a whole tree within Radius of At, picked with Rand; false if none
+	bool RandomTreeTop(const FVector2D& At, float Radius, FRandomStream& Rand, FVector& Out) const;
 
 private:
 	struct FFellable
@@ -110,7 +112,7 @@ private:
 		int32 Drawn = -1, Shadow = -1;     // (its drawn set and its place in ShadowAll; -1 on the server)
 		int32 Trunk = -1;                  // (its instance in the trunk solids)
 		FTransform Tree, TrunkSolid;
-		float Radius = 20.f;
+		float Radius = 20.f, Top = 0.f;      // (Top: the drawn tree's height above its foot, cm)
 		int32 Stump = -1;                  // (its instance in FelledStumps, once felled)
 		bool bFelled = false;
 		uint8 Kind = 0;                   // (its tree kind, for its node)

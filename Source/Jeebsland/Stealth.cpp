@@ -1,5 +1,6 @@
 // Stealth (2026-11-26): the shared detection meter. See Stealth.h and Docs/StealthPlan.md.
 #include "Stealth.h"
+#include "SightCover.h"
 #include "KnightCharacter.h"
 #include "SkillComponent.h"
 #include "HealthComponent.h"
@@ -143,13 +144,13 @@ AKnightCharacter* UStealthSense::Update(float Dt, const FStealthSenses& S, float
 			bool bSeen = false, bLos = false;
 			if (Dist <= SeeR)
 			{
-				// one line trace: trunks, walls, rocks, the ground's own humps
+				// one line trace: trunks, walls, rocks, the ground's own humps and then the bush list (bushes have no collision)
 				FCollisionQueryParams Q(SCENE_QUERY_STAT(JeebStealth), false, Me);
 				Q.AddIgnoredActor(K);
 				FCollisionObjectQueryParams Obj; Obj.AddObjectTypesToQuery(ECC_WorldStatic);
 				const FVector Eye(At.X, At.Y, JeebFoes::Ground(At.X, At.Y) + S.EyeZ);
 				const FVector Body = K->GetActorLocation() + FVector(0.f, 0.f, bCrouch ? 0.f : 50.f);
-				bLos = !W->LineTraceTestByObjectType(Eye, Body, Obj, Q);
+				bLos = !W->LineTraceTestByObjectType(Eye, Body, Obj, Q) && !JeebSightCover::Blocked(Eye, Body);   // (bushes and hedges too: SightCover.h)
 				bSeen = bLos;
 			}
 			const bool bHeard = Dist <= HearR;
@@ -222,7 +223,7 @@ AKnightCharacter* UStealthSense::Update(float Dt, const FStealthSenses& S, float
 // crouched, at Stealth 1 or 99, by day and night, and behind a stand-in tree trunk. Each stage logs JEEBSTEALTHTEST PASS/FAIL.
 struct FStealthTestDriver
 {
-	struct FStage { const TCHAR* Name; FVector2D Off; bool bCrouch; int32 Level; bool bNight; bool bBlock; float Secs; int32 Want; bool bThenCrouch; };
+	struct FStage { const TCHAR* Name; FVector2D Off; bool bCrouch; int32 Level; bool bNight; bool bBlock; float Secs; int32 Want; bool bThenCrouch; bool bBush = false; };
 	TWeakObjectPtr<UWorld> World;
 	TWeakObjectPtr<AActor> Watcher, Trunk;
 	TWeakObjectPtr<UStealthSense> Sense;
@@ -297,6 +298,8 @@ struct FStealthTestDriver
 				{ TEXT("standing, in front, 10 m, behind a trunk, day"),       FVector2D(1000, 0),  false, 1,  false, true,  3.f, 0, false },
 				{ TEXT("standing up 3 m away behind a trunk (heard, not seen), stays up"), FVector2D(300, 0), false, 1, false, true, 3.5f, 2, false },
 				{ TEXT("standing up 3 m away behind a trunk, crouches again after 1 s"),   FVector2D(300, 0), false, 1, false, true, 4.f, 1, true },
+				{ TEXT("standing, in front, 10 m, behind a bush (sight cover), day"),  FVector2D(1000, 0),  false, 1,  false, false, 3.f, 0, false, true },
+				{ TEXT("crouched, in front, 7 m, behind a bush, day, Stealth 1"),     FVector2D(700, 0),   true,  1,  false, false, 3.f, 0, false, true },
 			};
 			Stage = -1; StageT = 0.f;
 			return true;
@@ -347,6 +350,8 @@ struct FStealthTestDriver
 				const FVector2D Mid = W0 + S.Off * 0.5f;
 				Tr->SetActorLocation(S.bBlock ? FVector(Mid.X, Mid.Y, JeebFoes::Ground(Mid.X, Mid.Y) + 200.f) : FVector(W0.X, W0.Y, -100000.f));
 			}
+			JeebSightCover::Reset(JeebSightCover::Test);
+			if (S.bBush) { const FVector2D Mb = W0 + S.Off * 0.5f; JeebSightCover::Add(JeebSightCover::Test, Mb.X, Mb.Y, JeebFoes::Ground(Mb.X, Mb.Y), 190.f, 90.f, 90.f, 0.f); }
 			Place(K, W0 + S.Off, S.bCrouch, S.Level);
 			Sn->Clear();
 			Stage = Next; StageT = 0.f; MaxState = 0; bCrouchedLate = false;

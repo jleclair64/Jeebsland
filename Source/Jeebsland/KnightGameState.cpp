@@ -318,7 +318,7 @@ void AKnightGameState::BuildWorld()
 	AHorse::BuildLab(World);   // (-HorseLab test pictures)
 #endif
 	World->SpawnActor<ADeerHerds>(FVector::ZeroVector, FRotator::ZeroRotator);   // the stags' herds (Deer.h, Animals.csv / AnimalHerds.csv; after the camps and everything solid, which they keep off; the server places the animals, players' machines are sent them)
-	if (!bServerOnly) World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
+	World->SpawnActor<ABushes>(FVector::ZeroVector, FRotator::ZeroRotator);   // the wild bushes at forest edges and on banks (Bushes.h; visual only, after everything solid they keep off; clients)
 	if (!bServerOnly) World->SpawnActor<AFireflies>(FVector::ZeroVector, FRotator::ZeroRotator);   // swarms that drift in and out
 	if (!bServerOnly) World->SpawnActor<AFrogs>(FVector::ZeroVector, FRotator::ZeroRotator);   // little green frogs on river banks and lily pads (Frogs.h; after the bushes, whose lily pads they sit on; clients)
 

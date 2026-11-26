@@ -64,7 +64,7 @@ AOpenWorld::AOpenWorld()
 	bReplicates = false;
 	USceneComponent* Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Plane.Plane"));   // (soft round flakes: camera-facing quads with M_Snowflake, 2026-11-26; they were cubes)
 	Flakes = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("SnowFlakes"));
 	Flakes->SetupAttachment(Root);
 	Flakes->SetStaticMesh(Cube.Object);
@@ -83,7 +83,9 @@ void AOpenWorld::BeginPlay()
 	ABroomStall::PlaceIn(GetWorld());   // (Silver Point's broom stall, 2026-11-22: Broom.cpp)
 	if (IsNetMode(NM_DedicatedServer)) return;   // (no snow to draw on a server)
 	BuildCandles();
-	if (UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))
+	UMaterialInterface* FlakeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Snowflake.M_Snowflake"), nullptr, LOAD_Quiet | LOAD_NoWarn);
+	if (!FlakeMat) UE_LOG(LogTemp, Warning, TEXT("JEEBSNOW M_Snowflake missing (run Tools/BuildSnowflake.ps1): flakes fall back to plain squares"));
+	if (UMaterialInterface* Base = FlakeMat ? FlakeMat : LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color")))
 		if (UMaterialInstanceDynamic* M = Flakes->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(1.5f, 1.52f, 1.58f));
 	TArray<FTransform> X;
 	Flake.SetNum(NumFlakes); NewT.SetNum(NumFlakes); PrevT.SetNum(NumFlakes); Seen.SetNumZeroed(NumFlakes);
@@ -348,6 +350,8 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	if (Want == 0 && Shown == 0) return;
 	const float SizeK = FMath::Clamp(CVarSnowSize.GetValueOnGameThread(), 0.2f, 4.f);
 	const FVector C = Cam + FVector(Fwd.X, Fwd.Y, 0.f).GetSafeNormal() * 500.f;
+	const FRotator CamRot = PC->PlayerCameraManager->GetCameraRotation();
+	const FQuat Face = FRotationMatrix::MakeFromZX(-CamRot.Vector(), FRotationMatrix(CamRot).GetScaledAxis(EAxis::Y)).ToQuat();
 	const int32 Upto = FMath::Max(Want, Shown);
 	for (int32 i = 0; i < Upto; ++i)
 	{
@@ -368,7 +372,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		if (bJumped) { F.Pos = C + Rel; F.bUnderRoof = UnderRoof(F.Pos.X, F.Pos.Y); }
 		// (never in the camera's face: a flake within a couple of metres of it shrinks away, or it reads as a white block)
 		const float S = F.bUnderRoof ? 0.001f : F.Size * SizeK * FMath::Max(0.03f, JeebWorld::Smooth(120.f, 320.f, float(FVector::Dist(F.Pos, Cam))));
-		const FTransform Now(FRotator(Time * F.Spin * 70.f + F.Phase * 40.f, Time * F.Spin * 50.f, F.Phase * 30.f).Quaternion(), F.Pos, FVector(S));
+		const FTransform Now(Face, F.Pos, FVector(S * 1.25f));   // (a round flake faces the camera; its spin would not show)
 		PrevT[i] = bJumped ? Now : NewT[i];
 		NewT[i] = Now;
 		Seen[i] = 1;

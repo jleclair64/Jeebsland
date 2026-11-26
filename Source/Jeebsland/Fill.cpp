@@ -1,4 +1,5 @@
 #include "Fill.h"
+#include "SightCover.h"
 #include "JeebTuning.h"
 #include "FillData.h"
 #include "OakHill.h"
@@ -2708,6 +2709,18 @@ struct FFillBuilder
 			Boxes->AddInstance(FTransform(FRotator(0.f, Yaw, 0.f), FVector(Mid.X, Mid.Y, P.Xf.GetLocation().Z + Size.Z * 0.5f), Size / 100.f), true);
 			++BodyCount;
 		}
+		// bushes and hedges block an NPC's sight (SightCover.h; on every machine, the server decides stealth)
+		JeebSightCover::Reset(JeebSightCover::Fill);
+		for (const FPlaced& P : Placed)
+		{
+			const FKind& K = *P.Kind;
+			if (!K.Name.StartsWith(TEXT("Bush")) && !K.Name.StartsWith(TEXT("Hedge")) && !K.Name.StartsWith(TEXT("Shrub"))) continue;
+			const FVector L = P.Xf.GetLocation();
+			const float Hgt = FMath::Max(K.Height, 60.f) * P.Xf.GetScale3D().Z * 0.9f;
+			if (P.Foot.Type == 0) JeebSightCover::Add(JeebSightCover::Fill, P.Foot.C.X, P.Foot.C.Y, L.Z, Hgt, P.Foot.H.X, P.Foot.H.Y, FMath::RadiansToDegrees(FMath::Atan2(P.Foot.Sn, P.Foot.Cs)));
+			else { const float R = FMath::Max(P.Foot.R * 0.85f, 30.f); JeebSightCover::Add(JeebSightCover::Fill, P.Foot.C.X, P.Foot.C.Y, L.Z, Hgt, R, R, 0.f); }
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBSIGHTCOVER fill bushes and hedges: %d"), JeebSightCover::Count(JeebSightCover::Fill));
 		if (bServer) return;
 		// drawn sets: one per kind (and its flame), culled by size, shadows by class
 		TMap<UStaticMesh*, UInstancedStaticMeshComponent*> Sets;
