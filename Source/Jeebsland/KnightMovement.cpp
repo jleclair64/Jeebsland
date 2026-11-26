@@ -220,7 +220,11 @@ void UKnightMovement::UpdateCharacterStateBeforeMovement(float Dt)
 
 	// The water at his feet (JeebWater: the same answer on every machine). Deep enough, walking, falling or climbing down into it becomes the swim.
 	SenseWater();
-	if (!InWater() && WaterDepth > T.SwimEnterDepth && (IsMovingOnGround() || IsFalling() || (IsCustom(JeebClimb::Climb) && WaterDepth > T.SwimEnterDepth + 20.f)))
+	// (a wall grabbed from the swim stays grabbed while his head is out of the water: the deep water at his feet must not throw him back into the swim every move; map rework check 2026-11-26)
+	if (!IsCustom(JeebClimb::Climb) || WaterDepth <= T.SwimEnterDepth) bClimbFromWater = false;
+	const bool bClimbHeadUnder = UpdatedComponent && float(UpdatedComponent->GetComponentLocation().Z) + 72.f < WaterSurface - 5.f;   // (72 cm: his eyes over the capsule's middle, as the swim's HeadUp)
+	const bool bClimbDownIntoWater = IsCustom(JeebClimb::Climb) && WaterDepth > T.SwimEnterDepth + 20.f && (!bClimbFromWater || bClimbHeadUnder);
+	if (!InWater() && WaterDepth > T.SwimEnterDepth && (IsMovingOnGround() || IsFalling() || bClimbDownIntoWater))
 	{
 		bJumpAsked = false;
 		bTouchRock = bTouchMantle = false;
@@ -910,7 +914,7 @@ void FKnightMoveResponse::ServerFillResponseData(const UCharacterMovementCompone
 {
 	FCharacterMoveResponseDataContainer::ServerFillResponseData(CharacterMovement, PendingAdjustment);
 	const UKnightMovement& K = static_cast<const UKnightMovement&>(CharacterMovement);
-	Stamina = K.ClimbStamina; RefillWait = K.RefillWait; bExhausted = K.bClimbExhausted; bNoRegrab = K.bNoRegrab; WallNormal = K.WallNormal;
+	Stamina = K.ClimbStamina; RefillWait = K.RefillWait; bExhausted = K.bClimbExhausted; bNoRegrab = K.bNoRegrab; bFromWater = K.bClimbFromWater; WallNormal = K.WallNormal;
 	ActFrom = K.ActFrom; ActTo = K.ActTo; ActDir = K.ActDir; ActT = K.ActT; ActDur = K.ActDur; ActTop = K.ActTop; ActCarry = K.ActCarry; ActHold = K.ActHold;
 	SwimStamina = K.SwimStamina; Breath = K.Breath; SwimRefillWait = K.SwimRefillWait; DrownT = K.DrownT; bHeadUnder = K.bHeadUnder;
 	StrafeSprint = K.MoveStrafeSprint; AirMul = K.MoveAirMul; ActEdge = K.ActEdge; ActFar = K.ActFar;
@@ -926,6 +930,7 @@ bool FKnightMoveResponse::Serialize(UCharacterMovementComponent& CharacterMoveme
 		Ar << Stamina;
 		Ar.SerializeBits(&bExhausted, 1);
 		Ar.SerializeBits(&bNoRegrab, 1);
+		Ar.SerializeBits(&bFromWater, 1);
 		Ar << RefillWait;
 		FVector3f V[4] = { FVector3f(WallNormal), FVector3f(ActFrom), FVector3f(ActTo), FVector3f(ActDir) };   // (single precision: plenty at the world's size)
 		for (FVector3f& X : V) Ar << X;
@@ -949,7 +954,7 @@ void UKnightMovement::ClientHandleMoveResponse(const FCharacterMoveResponseDataC
 	++NetFixes;
 	UE_LOG(LogTemp, Log, TEXT("JEEBNETFIX client correction %d mode %d at (%.0f,%.0f,%.0f)"), NetFixes, int32(ClimbMode()), MoveResponse.ClientAdjustment.NewLoc.X, MoveResponse.ClientAdjustment.NewLoc.Y, MoveResponse.ClientAdjustment.NewLoc.Z);
 	const FKnightMoveResponse& R = static_cast<const FKnightMoveResponse&>(MoveResponse);
-	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; WallNormal = R.WallNormal;
+	ClimbStamina = R.Stamina; RefillWait = R.RefillWait; bClimbExhausted = R.bExhausted; bNoRegrab = R.bNoRegrab; bClimbFromWater = R.bFromWater; WallNormal = R.WallNormal;
 	ActFrom = R.ActFrom; ActTo = R.ActTo; ActDir = R.ActDir; ActT = R.ActT; ActDur = R.ActDur; ActTop = R.ActTop; ActCarry = R.ActCarry; ActHold = R.ActHold;
 	SwimStamina = R.SwimStamina; Breath = R.Breath; SwimRefillWait = R.SwimRefillWait; DrownT = R.DrownT; bHeadUnder = R.bHeadUnder;
 	MoveStrafeSprint = R.StrafeSprint; MoveAirMul = R.AirMul; ActEdge = R.ActEdge; ActFar = R.ActFar;

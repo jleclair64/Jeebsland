@@ -148,3 +148,11 @@ tips close up, more purple than purple-brown: try `jeeb.Moor.HeatherColour 0.38 
 blocky. The pale cove's wall still shows some vertical streaks from the air. The rock's swirled beds can look marbled close up.
 Shading has a faint seam where two 120 m chunks of wall meet. Everything under "Not done, not checked" above still stands (frame cost
 not timed, no server-plus-client run, not walked in play, Shipping not compiled).
+
+## Checks run 2026-11-26 (agent `checks`)
+
+- **Frame cost** (one `solo` window, editor -game, 1280x720, nine spots, medians over 6 s, with and without `-NoMapRework`): HIGH, new minus old ms: cliff lip +1.62 (6.79 vs 5.17), cliffs from the sea +0.03, along the cliff top +0.15, heather close +0.38, moor looking east -0.08, moor north -0.11, cove from the sea -0.06, arch -0.16, cove beach -0.72. LOW: lip +0.75, the rest between -0.30 and +0.16. Only the lip view is over 0.5 ms. Census there: grass instances 22,130 against 10,929 and 52 ground chunks against 24 (25 of them casting shadows against 11): the three extra clumps within 6 m of the lip (`Meadow.cpp`) and the cliff patches' shadow-casting chunks. Cheaper if wanted: two extra clumps instead of three, or no shadow from the wall chunks.
+- **Online** (`Tools/map_net.sh`): server and one client joined; roads, Oak Hill, ruins, camps, forest, fill, houses, life, water, the east branch, the arch and the 20 cliff lines all matched.
+- **Walking** (`-MapWalk`, `-MapProbe`, `-MapHeather`; `MapWalkTest.cpp`, test builds only): lip, ledges, the arch's top, swimming under the arch, the cove beach 2 and a beach under a sheer wall all pass, no fall through the ground and no invisible wall. Found and fixed: a swimmer who grabbed a wall was thrown back into the swim every move by the deep water at his feet (`bClimbFromWater`, carried in the move response). Left: cove 1 (X 47,500) has a 55 degree band about 8 m tall on its way down, not walkable (a fall of 11.7 m); climbing out of the sea stalls at X 56,000 (no movement at all) and X 60,000 (stops under a rock lip 1.5 m up); a sheer wall is more than a level-1 climber's bar can climb.
+- **Shipping**: compiles.
+- **Smear**: 120 fps film, moving camera, over the moor grass, the lip grass and the heather cushions: no ghost copies. The heather's pale pink sprig tips stand out as sharp shards close up.

@@ -44,7 +44,7 @@ struct FKnightMoveResponse : public FCharacterMoveResponseDataContainer
 {
 	float Stamina = 1.f;
 	float RefillWait = 0.f;
-	bool bExhausted = false, bNoRegrab = false;
+	bool bExhausted = false, bNoRegrab = false, bFromWater = false;
 	FVector WallNormal = FVector::BackwardVector;
 	FVector ActFrom = FVector::ZeroVector, ActTo = FVector::ZeroVector, ActDir = FVector::ZeroVector;
 	float ActT = 0.f, ActDur = 0.f, ActTop = 0.f, ActCarry = 0.f, ActHold = 0.f;
@@ -110,6 +110,7 @@ public:
 	// The climbing state (simulated on the server and predicted on the player's machine; the server's travels back in corrections)
 	float ClimbStamina = 1.f;
 	bool bClimbExhausted = false;
+	bool bClimbFromWater = false;   // (grabbed a wall from the swim: stays on it while his head is out of the water, not thrown back into the swim by the deep water at his feet; map rework check 2026-11-26)
 	bool bNoRegrab = false;          // let go or ran out: no grabbing again until he has landed
 	FVector WallNormal = FVector::BackwardVector;
 	float WallDist = 0.f;            // capsule centre to the rock's plane (cm), for the pose
