@@ -247,6 +247,8 @@ private:
 	void DrawQuestHUD(AKnightCharacter* Knight, APlayerController* PC);
 	void DrawQuestTitle(AKnightCharacter* Knight);   // ("QUEST COMPLETE": drawn after the world's marks and prompts, so on top of them)
 	void DrawQuestLog(AKnightCharacter* Knight, float PX, float PY, float PW, float PH);
+	// The RECORDS tab (2026-11-26, JeebRecords.h): your largest fish and antlers, the all-time and weekly boards of every world
+	void DrawRecords(AKnightCharacter* Knight, float PX, float PY, float PW, float PH);
 	void DrawQuestMapMark(AKnightCharacter* Knight, const FVector2D& Screen, float Size);
 	FName QuestSel;
 	void LookTypeChar(TCHAR C);

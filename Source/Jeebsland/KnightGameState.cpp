@@ -263,6 +263,7 @@ void AKnightGameState::BuildWorld()
 	if (!bServerOnly) World->SpawnActor<ANightSky>(FVector::ZeroVector, FRotator::ZeroRotator);
 	if (!bServerOnly) World->SpawnActor<ABatSwarm>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AFishingPond>(FVector::ZeroVector, FRotator::ZeroRotator);
+	AFishingSpot::SpawnRiverSpots(World);   // (2026-11-26: fishing in the rivers, Pond.cpp)
 
 	// The castle, with its moat, bridge and spire
 	if (ACastle* Keep = World->SpawnActor<ACastle>(FVector::ZeroVector, FRotator::ZeroRotator)) Keep->Build();

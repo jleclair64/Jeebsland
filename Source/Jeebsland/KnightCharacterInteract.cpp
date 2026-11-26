@@ -70,6 +70,15 @@ void AKnightCharacter::Interact()
 		return;
 	}
 	if (Bow == EBow::Drawing) return;
+	if (bFishing && ActiveNode.IsValid())   // (2026-11-26) fishing: a click reels in; the server judges whether it was in time
+	{
+		if (AFishingSpot* Spot = Cast<AFishingSpot>(ActiveNode.Get()))
+		{
+			if (HasAuthority()) Spot->Reel(this);
+			else Inv(EInvOp::Reel, 0, 0, 0, nullptr, Spot->GetActorLocation());
+		}
+		return;
+	}
 	if (ActiveNode.IsValid()) return;                               // already working
 	if (bAttacking) { QueuedClick = GetWorld()->GetTimeSeconds(); QueuedJabs = 1; return; }   // swinging: buffer ONE press for the next swing (Smash style: more presses in the same swing don't stack)
 

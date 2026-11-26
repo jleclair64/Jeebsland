@@ -92,7 +92,7 @@ bool AResourceNode::StartGathering(AActor* Gatherer)
 	// (owner 2026-11-06) One click is about ten swings of the axe or pick, a yield every EffectiveSeconds, unless he moves off (TickGatherReach). A cast of the rod is still one catch.
 	WorkLeft = Knight && Skill != ESkillType::Fishing ? JeebTune::V().GatherSwings * Knight->GatherSwingSeconds() : 0.f;
 	Tell(Gatherer, EffectiveSeconds, FColor::Yellow, StartText);
-	GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
+	if (!BeginOwnGather(Knight)) GetWorldTimerManager().SetTimer(GatherTimer, this, &AResourceNode::FinishGathering, EffectiveSeconds, false);
 	UE_LOG(LogTemp, Log, TEXT("JEEBGATHER start: %.1f s a yield, %.1f s of work"), EffectiveSeconds, WorkLeft);
 	return true;
 }
@@ -137,7 +137,7 @@ void AResourceNode::FinishGathering()
 			Tell(Gatherer, 3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));
 			bPackFull = true;
 		}
-		else Skills->AddXP(Skill, XP);
+		else { Skills->AddXP(Skill, XP); OnYield(Gatherer, Item); }
 	}
 
 	if (!bPackFull)

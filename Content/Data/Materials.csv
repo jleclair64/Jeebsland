@@ -25,3 +25,5 @@ Venison,Deer Meat,animal,5,10,0.5 0.5 0.5,1,0
 Antlers,Stag Antlers,animal,5,28,0.5 0.5 0.5,1,0
 GameMeat,Raw Game Meat,animal,5,8,0.5 0.5 0.5,1,0
 EagleFeather,Eagle Feather,animal,20,24,0.5 0.5 0.5,1,0
+Salmon,Salmon,fish,10,16,0.5 0.5 0.5,15,30
+Bass,Bass,fish,10,8,0.5 0.5 0.5,1,14

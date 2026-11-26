@@ -144,12 +144,13 @@ namespace JeebItemModel
 				for (int32 k = -1; k <= 1; ++k) RBox(Fat, 9.1, 0.6, 1.45, 0.5, Xf(V3(0, k * 2.6, 0)));
 				break;
 			}
-			case EItemType::Perch: case EItemType::Trout: case EItemType::GoldenCarp:
+			case EItemType::Perch: case EItemType::Trout: case EItemType::GoldenCarp: case EItemType::Salmon: case EItemType::Bass:
 			{
 				// a fish lying on its side: body, tail, a fin on its back, an eye
 				const EItemType T = MaterialType(Id);
-				const FLinearColor Body = T == EItemType::Perch ? FLinearColor(0.42f, 0.52f, 0.18f) : T == EItemType::Trout ? FLinearColor(0.62f, 0.6f, 0.58f) : FLinearColor(1.0f, 0.68f, 0.12f);
-				const double L = T == EItemType::Trout ? 15.0 : 12.0;
+				const FLinearColor Body = T == EItemType::Perch ? FLinearColor(0.42f, 0.52f, 0.18f) : T == EItemType::Trout ? FLinearColor(0.62f, 0.6f, 0.58f)
+					: T == EItemType::Salmon ? FLinearColor(0.58f, 0.64f, 0.70f) : T == EItemType::Bass ? FLinearColor(0.32f, 0.44f, 0.16f) : FLinearColor(1.0f, 0.68f, 0.12f);
+				const double L = (T == EItemType::Trout || T == EItemType::Salmon) ? 15.0 : 12.0;
 				FPart& B = NewPart(Out, Body, T == EItemType::GoldenCarp);
 				Ellipsoid(B.Mesh, L, 2.4, 4.6, 1.0, 1.0, 18, 12, Xf(V3(0, 0, 0)));
 				TArray<FVector> Tail = { V3(-L + 1.0, 0, 0), V3(-L - 5.5, 0, 4.0), V3(-L - 4.0, 0, 0), V3(-L - 5.5, 0, -4.0) };
@@ -159,6 +160,8 @@ namespace JeebItemModel
 				FMD& Eye = NewPart(Out, FLinearColor(0.02f, 0.02f, 0.02f)).Mesh;
 				Bead(Eye, 0.8, V3(L - 3.0, 1.9, 1.2));
 				Bead(Eye, 0.8, V3(L - 3.0, -1.9, 1.2));
+				if (T == EItemType::Bass)   // a dark stripe along its side
+					RBox(NewPart(Out, FLinearColor(0.12f, 0.18f, 0.07f)).Mesh, L * 0.8, 1.4, 0.8, 0.5, Xf(V3(0, 0, 0)));
 				if (T == EItemType::Trout)   // a pink stripe
 					RBox(NewPart(Out, FLinearColor(0.85f, 0.45f, 0.5f)).Mesh, L * 0.75, 2.5, 0.8, 0.6, Xf(V3(0, 0, 0)));
 				Turn(Out, V3(90, 0, 0));   // onto its side

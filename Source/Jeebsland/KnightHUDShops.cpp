@@ -51,8 +51,8 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 
 	// ----- Sell (left) -----
 	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
-		static const EItemType Sellable[19] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
-			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather };
+		static const EItemType Sellable[] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
+			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather, EItemType::Salmon, EItemType::Bass };
 	if (Knight->IsBroomShopOpen())
 	{
 		HDText(TEXT("The broom seller only sells brooms and buys nothing."), FLinearColor(0.85f, 0.85f, 0.85f), PX + 30.f, PY + 100.f, Font, 1.0f);

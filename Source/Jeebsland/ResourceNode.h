@@ -53,9 +53,13 @@ protected:
 	virtual void OnChargesChanged(int32 Remaining, int32 Max) {}
 	// Subclasses may decide what each gather gives (fishing picks a fish by your level). Default: ItemType and XPReward.
 	virtual void RollYield(USkillComponent* Skills, EItemType& OutItem, int32& OutXP) {}
+	// (2026-11-26) after a yield went into the pack (fishing records the catch)
+	virtual void OnYield(AActor* Gatherer, EItemType Item) {}
+	// (2026-11-26) a node that runs its own clock (fishing: wait for a bite, then a click): return true and call FinishGathering yourself
+	virtual bool BeginOwnGather(class AKnightCharacter* Knight) { return false; }
 	int32 RequiredLevel() const;   // skill level needed (coal, diamond, pine and redwood need more than 1)
 
-private:
+protected:
 	TWeakObjectPtr<AActor> CurrentGatherer;
 	FTimerHandle GatherTimer;
 	FTimerHandle RespawnTimer;
@@ -67,8 +71,10 @@ private:
 	bool bLockedNode = false;
 
 	void FinishGathering();
+private:
 	void Respawn();
 	void ChargesChanged();   // redraws, and (online, on the server) tells every player
+public:
 	// A message for whoever is gathering (sent to their machine when the server runs it)
 	static void Tell(AActor* Who, float Seconds, const FColor& Color, const FString& Text);
 };

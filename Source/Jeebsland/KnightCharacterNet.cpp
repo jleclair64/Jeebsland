@@ -23,6 +23,8 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Pond.h"
+#include "JeebRecords.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 using namespace JeebItems;
@@ -228,7 +230,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// ---- the trading post (beside the shopkeeper) ----
 	case EInvOp::SellAll:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || A < 0 || A > static_cast<int32>(EItemType::EagleFeather)) break;   // (the last material: before 2026-11-22 this stopped at Bones, so the newer ores could not be sold in one go)
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || A < 0 || A > static_cast<int32>(EItemType::Bass)) break;   // (the last material: before 2026-11-22 this stopped at Bones, so the newer ores could not be sold in one go)
 		const int32 Pay = Sk->SellAll(static_cast<EItemType>(A));
 		ShopNote(FString::Printf(TEXT("Sold for %d ingots."), Pay));
 		break;
@@ -459,6 +461,11 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		}
 		break;
 
+	// ---- (2026-11-26) the click while fishing ----
+	case EInvOp::Reel:
+		if (AFishingSpot* Spot = Cast<AFishingSpot>(ActiveNode.Get())) Spot->Reel(this);
+		break;
+
 	// ---- a fragment of lore, heard from a villager ----
 	case EInvOp::Lore:
 		for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
@@ -627,4 +634,61 @@ void AKnightCharacter::ClientDied_Implementation(FVector_NetQuantize Wake, float
 	SetActorRotation(FRotator(0.f, Yaw, 0.f));
 	if (AController* C = GetController()) C->SetControlRotation(FRotator(0.f, Yaw, 0.f));
 	JeebMsg::Post(5.f, FColor::Red, TEXT("You fell. Everything you had is in a sack where you fell. You wake up in Oak Hill."));
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Fishing and trophy records (2026-11-26, Docs/FishingPlan.md). The server runs the cast (Pond.cpp); these carry what the
+// player's own machine shows: the float going under, the fish on the line. The records live on the server (JeebRecords.h).
+// ---------------------------------------------------------------------------------------------------
+static AFishingSpot* SpotAt(UWorld* W, const FVector& At)
+{
+	for (TActorIterator<AFishingSpot> It(W); It; ++It) if (FVector::Dist2D(It->GetActorLocation(), At) < 5.f) return *It;
+	return nullptr;
+}
+
+void AKnightCharacter::FishBite(AFishingSpot* Spot)
+{
+	if (!Spot) return;
+	if (IsLocallyControlled()) Spot->ShowBite();
+	else ClientFishBite(Spot->GetActorLocation());
+}
+
+void AKnightCharacter::FishCaught(AFishingSpot* Spot, EItemType Item, float Size)
+{
+	if (!Spot) return;
+	if (IsLocallyControlled()) Spot->ShowCatch(this, Item, Size);
+	else ClientFishCatch(Spot->GetActorLocation(), static_cast<uint8>(Item), Size);
+}
+
+void AKnightCharacter::ClientFishBite_Implementation(FVector_NetQuantize At)
+{
+	if (AFishingSpot* S = SpotAt(GetWorld(), At)) S->ShowBite();
+}
+
+void AKnightCharacter::ClientFishCatch_Implementation(FVector_NetQuantize At, uint8 Item, float Size)
+{
+	if (Item > static_cast<uint8>(EItemType::Bass)) return;
+	if (AFishingSpot* S = SpotAt(GetWorld(), At)) S->ShowCatch(this, static_cast<EItemType>(Item), Size);
+}
+
+void AKnightCharacter::AskRecords()
+{
+	RecordsAskedAt = GetWorld()->GetTimeSeconds();
+	if (HasAuthority()) { FString Key, Name; JeebRecords::WhoIs(this, Key, Name); RecordsText = JeebRecords::Report(GetWorld(), Key); }
+	else ServerAskRecords();
+}
+
+void AKnightCharacter::ServerAskRecords_Implementation()
+{
+	const double Now = FPlatformTime::Seconds();
+	if (Now - LastRecordsServe < 2.0) return;   // (at most one answer every 2 s per player)
+	LastRecordsServe = Now;
+	FString Key, Name;
+	JeebRecords::WhoIs(this, Key, Name);
+	ClientRecords(JeebRecords::Report(GetWorld(), Key));
+}
+
+void AKnightCharacter::ClientRecords_Implementation(const FString& Text)
+{
+	RecordsText = Text.Left(8000);
 }

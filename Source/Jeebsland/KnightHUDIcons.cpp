@@ -678,11 +678,15 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	case EItemType::Perch:
 	case EItemType::Trout:
 	case EItemType::GoldenCarp:
+	case EItemType::Salmon:
+	case EItemType::Bass:
 	{
 		const EItemType T = MaterialType(Id);
 		FLinearColor Body(0.35f, 0.55f, 0.50f), Belly(0.80f, 0.85f, 0.70f), Fin(0.75f, 0.35f, 0.15f);
 		if (T == EItemType::Trout) { Body = FLinearColor(0.62f, 0.45f, 0.40f); Belly = FLinearColor(0.95f, 0.78f, 0.72f); Fin = FLinearColor(0.50f, 0.30f, 0.25f); }
 		if (T == EItemType::GoldenCarp) { Body = FLinearColor(1.f, 0.78f, 0.12f); Belly = FLinearColor(1.f, 0.95f, 0.55f); Fin = FLinearColor(1.f, 0.55f, 0.1f); }
+		if (T == EItemType::Salmon) { Body = FLinearColor(0.55f, 0.60f, 0.66f); Belly = FLinearColor(0.95f, 0.70f, 0.62f); Fin = FLinearColor(0.35f, 0.40f, 0.48f); }
+		if (T == EItemType::Bass) { Body = FLinearColor(0.30f, 0.42f, 0.18f); Belly = FLinearColor(0.88f, 0.86f, 0.62f); Fin = FLinearColor(0.22f, 0.30f, 0.12f); }
 		Poly({ P(46, 32), P(62, 18), P(60, 32), P(62, 46) }, Fin);                     // tail
 		DiscP(28, 32, 24, 13, Body);
 		DiscP(28, 38, 20, 7, Belly);

@@ -88,6 +88,7 @@ enum class EInvOp : uint8
 	EquipSpell,     // A: a cell of the spell book's 3x3 grid (row * 3 + slot), B: the spell row + 1 to put in it (0: empty it)
 	CastSlot,       // A: which of the active row's three spells the next cast is (sent just before the charge starts)
 	BuyBroom,       // A: the row in Brooms.csv, B the id the player saw (Silver Point's broom stall)
+	Reel,           // (2026-11-26) the click while fishing: reel in (the server judges the 0.5 s window, Pond.cpp)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -257,6 +258,18 @@ public:
 	UFUNCTION(Client, Reliable) void ClientShopNote(const FString& Text, float Seconds);
 	UFUNCTION(Client, Reliable) void ClientGather(FVector_NetQuantize At, uint8 Skill, bool bStart);
 	UFUNCTION(Client, Reliable) void ClientDrank(uint8 Type);
+	// Fishing (2026-11-26, Docs/FishingPlan.md): the server tells this player's machine the float went under, and what was caught (to show it on the line)
+	void FishBite(class AFishingSpot* Spot);
+	void FishCaught(class AFishingSpot* Spot, EItemType Item, float Size);
+	UFUNCTION(Client, Reliable) void ClientFishBite(FVector_NetQuantize At);
+	UFUNCTION(Client, Reliable) void ClientFishCatch(FVector_NetQuantize At, uint8 Item, float Size);
+	// Trophy records (JeebRecords.h): the RECORDS tab asks; the server answers with the lines to show
+	void AskRecords();
+	UFUNCTION(Server, Reliable) void ServerAskRecords();
+	UFUNCTION(Client, Reliable) void ClientRecords(const FString& Text);
+	FString RecordsText;
+	double RecordsAskedAt = -100.0;
+	double LastRecordsServe = -100.0;   // (server)
 	// Drinking takes time (owner, 2026-11-05): the server starts it and ends it, every machine plays it. The potion is used and works only at the end.
 	UFUNCTION(NetMulticast, Reliable) void MulticastDrink(uint8 Type, bool bStart);
 	bool bDrinking = false;

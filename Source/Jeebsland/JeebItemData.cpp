@@ -16,9 +16,9 @@ namespace JeebItems
 			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow"), TEXT("Club"), TEXT("Book") };
 		const TCHAR* const MaterialKeys[] = { TEXT("CopperOre"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Bacon"), TEXT("PineLogs"), TEXT("RedwoodLogs"),
 			TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"),
-			TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers"), TEXT("GameMeat"), TEXT("EagleFeather") };
+			TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers"), TEXT("GameMeat"), TEXT("EagleFeather"), TEXT("Salmon"), TEXT("Bass") };
 		constexpr int32 NumMaterials = UE_ARRAY_COUNT(MaterialKeys);
-		static_assert(NumMaterials == int32(EItemType::EagleFeather) + 1, "MaterialKeys must list every EItemType, in order");
+		static_assert(NumMaterials == int32(EItemType::Bass) + 1, "MaterialKeys must list every EItemType, in order");
 
 		void Problem(const FString& What) { UE_LOG(LogJeebItems, Error, TEXT("Jeebsland items: %s"), *What); }
 

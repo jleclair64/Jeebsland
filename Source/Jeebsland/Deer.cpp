@@ -1,4 +1,5 @@
 #include "Deer.h"
+#include "JeebRecords.h"
 #include "JeebTuning.h"
 #include "FoeData.h"
 #include "FoeCamps.h"
@@ -771,6 +772,16 @@ void ADeer::Die(AActor* From)
 		if (ALootDrop* Drop = GetWorld()->SpawnActor<ALootDrop>(FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)), FRotator::ZeroRotator))
 			Drop->Setup(ELootLook::Item, TArray<FInvSlot>{ Items[i] }, 0);
 		What += FString::Printf(TEXT("%s%d %s"), i ? TEXT(", ") : TEXT(""), Items[i].Count, *JeebItems::ItemName(Items[i].Id));
+	}
+	// (2026-11-26) A stag's antlers have points (JeebRecords.h: mean 8, a trophy at 14): counted for the killer's records and the boards
+	if (K && D.Key == FName(TEXT("Stag")) && Items.ContainsByPredicate([](const FInvSlot& S) { return S.Id == JeebItems::MaterialId(EItemType::Antlers); }))
+	{
+		const float Points = JeebRecords::RollSize(JeebRecords::S_Antlers);
+		FString Key, Who, Note;
+		JeebRecords::WhoIs(K, Key, Who);
+		JeebRecords::Record(GetWorld(), Key, Who, JeebRecords::S_Antlers, Points, Note);
+		if (USkillComponent* Sk = K->FindComponentByClass<USkillComponent>())
+			Sk->Say(5.f, FColor(255, 215, 90), FString::Printf(TEXT("Its antlers carry %d points.%s%s"), FMath::RoundToInt(Points), Note.IsEmpty() ? TEXT("") : TEXT(" "), *Note));
 	}
 	// The kill's XP: Archery from range, Attack up close (the XP for every hit came with the hits)
 	const bool bRanged = K && FVector2D::Distance(FVector2D(K->GetActorLocation()), Me) > 450.f;

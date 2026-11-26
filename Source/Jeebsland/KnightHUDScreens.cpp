@@ -53,14 +53,14 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 
 	// Tabs
 #if !UE_BUILD_SHIPPING
-	const int32 NumTabs = 7;   // (the LOOK tab, for tuning the picture, is not in the game players get)
-	const float TabW = 118.f, TabH = 32.f, TabY = PY + 10.f, TabScale = 1.05f;
+	const int32 NumTabs = 8;   // (the LOOK tab, for tuning the picture, is not in the game players get)
+	const float TabW = 106.f, TabH = 32.f, TabY = PY + 10.f, TabScale = 0.95f;
 #else
-	const int32 NumTabs = 6;
-	const float TabW = 140.f, TabH = 32.f, TabY = PY + 10.f, TabScale = 1.2f;
+	const int32 NumTabs = 7;
+	const float TabW = 124.f, TabH = 32.f, TabY = PY + 10.f, TabScale = 1.05f;
 #endif
-	const TCHAR* TabNames[7] = { TEXT("MAP"), TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE"), TEXT("LOOK"), TEXT("QUESTS") };
-	const int32 TabOrder[7] = { 0, 6, 1, 2, 3, 4, 5 };   // (QUESTS, added last, shows second)
+	const TCHAR* TabNames[8] = { TEXT("MAP"), TEXT("SETTINGS"), TEXT("CONTROLS"), TEXT("DICTIONARY"), TEXT("LORE"), TEXT("LOOK"), TEXT("QUESTS"), TEXT("RECORDS") };
+	const int32 TabOrder[8] = { 0, 6, 7, 1, 2, 3, 4, 5 };   // (QUESTS, added later, shows second; RECORDS, 2026-11-26, third)
 	for (int32 i = 0; i < NumTabs; ++i)
 	{
 		const int32 t = TabOrder[i];
@@ -239,6 +239,10 @@ void AKnightHUD::DrawSettingsScreen(AKnightCharacter* Knight)
 	else if (SettingsTab == 6)
 	{
 		DrawQuestLog(Knight, PX, PY, PW, PH);   // (KnightHUDQuests.cpp)
+	}
+	else if (SettingsTab == 7)
+	{
+		DrawRecords(Knight, PX, PY, PW, PH);
 	}
 	else if (SettingsTab == 3)
 	{
@@ -687,3 +691,43 @@ void AKnightHUD::DrawLore(float PX, float PY, float PW, float PH)
 
 
 
+
+// ---------------------------------------------------------------------------------------------------
+// RECORDS (2026-11-26, JeebRecords.h): the server sends lines "T|title", "R|cell|cell|...", drawn as headings and rows of columns
+void AKnightHUD::DrawRecords(AKnightCharacter* Knight, float PX, float PY, float PW, float PH)
+{
+	if (!Knight) return;
+	if (GetWorld()->GetTimeSeconds() - Knight->RecordsAskedAt > 10.0) Knight->AskRecords();   // (fresh every 10 s while the tab is open)
+	UFont* Font = GEngine->GetMediumFont();
+	float Y = PY + 58.f;
+	if (Knight->RecordsText.IsEmpty())
+	{
+		HDText(TEXT("Asking the world for the records..."), FLinearColor(0.8f, 0.78f, 0.7f), PX + 30.f, Y, Font, 1.1f);
+		return;
+	}
+	TArray<FString> Lines;
+	Knight->RecordsText.ParseIntoArrayLines(Lines);
+	for (const FString& L : Lines)
+	{
+		TArray<FString> C;
+		L.ParseIntoArray(C, TEXT("|"), false);
+		if (C.Num() < 2) continue;
+		if (C[0] == TEXT("T"))
+		{
+			Y += 8.f;
+			HDText(C[1], FLinearColor(1.f, 0.84f, 0.4f), PX + 30.f, Y, Font, 1.15f);
+			Y += 30.f;
+		}
+		else if (C[0] == TEXT("R"))
+		{
+			HDText(C[1], FLinearColor::White, PX + 50.f, Y, Font, 1.0f);
+			const float ColW = (PW - 230.f) / 3.f;
+			for (int32 i = 2; i < C.Num() && i < 5; ++i)
+				if (!C[i].IsEmpty()) HDText(C[i], C[i].StartsWith(TEXT("trophy")) ? FLinearColor(0.6f, 0.6f, 0.6f) : FLinearColor(0.85f, 0.9f, 1.f), PX + 180.f + (i - 2) * ColW, Y, Font, 1.0f);
+			Y += 24.f;
+		}
+		if (Y > PY + PH - 60.f) break;
+	}
+	HDText(TEXT("Trophy sizes: trout and salmon 36 in, bass 21 in, antlers 14 points. The weekly board starts again every Sunday at midnight."),
+		FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 34.f, Font, 0.9f);
+}

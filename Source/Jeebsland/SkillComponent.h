@@ -51,7 +51,10 @@ enum class EItemType : uint8
 	Antlers,
 	// (2026-11-24, more animals: Docs/AnimalsPlan2.md)
 	GameMeat,
-	EagleFeather
+	EagleFeather,
+	// (2026-11-26, the fishing redo: Docs/FishingPlan.md)
+	Salmon,
+	Bass
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)

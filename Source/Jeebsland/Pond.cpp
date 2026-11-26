@@ -2,6 +2,16 @@
 #include "Terrain.h"
 #include "Inventory.h"
 #include "WaterLook.h"
+#include "WorldMap.h"
+#include "JeebRecords.h"
+#include "JeebTuning.h"
+#include "KnightCharacter.h"
+#include "ItemModels.h"
+#include "Messages.h"
+#include "TimerManager.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
+#include "Camera/PlayerCameraManager.h"
 #include "ProceduralMeshComponent.h"
 #include "EngineUtils.h"
 #include "Engine/StaticMeshActor.h"
@@ -91,14 +101,74 @@ void AFishingSpot::BeginPlay()
 			if (UMaterialInstanceDynamic* M = Ring->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.25f, 0.28f));
 			Rings.Add(Ring);
 		}
+		// (2026-11-26) three fish under the water near the spot: the bass model in one dark, murky colour (seen through the water),
+		// one mesh each, circling on their own paths (Tick). Players' machines only; hidden when the camera is far off.
+		TArray<JeebItemModel::FPart> Parts;
+		JeebItemModel::Build(JeebItems::MaterialId(EItemType::Bass), Parts);
+		JeebItemModel::Turn(Parts, FVector(-90.f, 0.f, 0.f));   // (back up, as it swims)
+		KM::FMD One;
+		for (const JeebItemModel::FPart& P : Parts)
+		{
+			const int32 Off = One.V.Num();
+			One.V.Append(P.Mesh.V);
+			for (int32 Ix : P.Mesh.I) One.I.Add(Ix + Off);
+		}
+		FVector Mid(0.f);
+		for (const FVector& Vx : One.V) Mid += Vx;
+		if (One.V.Num() > 0) Mid /= float(One.V.Num());
+		for (FVector& Vx : One.V) Vx -= Mid;
+		TArray<FVector> FN;
+		KM::ComputeNormals(One, FN);
+		TArray<int32> FT;
+		for (int32 t = 0; t + 2 < One.I.Num(); t += 3) { FT.Add(One.I[t]); FT.Add(One.I[t + 1]); FT.Add(One.I[t + 2]); FT.Add(One.I[t]); FT.Add(One.I[t + 2]); FT.Add(One.I[t + 1]); }
+		FRandomStream R(int32(GetActorLocation().X * 7.f + GetActorLocation().Y * 13.f));
+		for (int32 f = 0; f < 3; ++f)
+		{
+			UProceduralMeshComponent* Fish = NewObject<UProceduralMeshComponent>(this);
+			Fish->SetupAttachment(GetRootComponent());
+			Fish->SetUsingAbsoluteLocation(true);
+			Fish->SetUsingAbsoluteRotation(true);
+			Fish->SetUsingAbsoluteScale(true);
+			Fish->SetWorldScale3D(FVector(R.FRandRange(1.4f, 2.2f)));
+			Fish->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Fish->SetCastShadow(false);
+			Fish->RegisterComponent();
+			Fish->CreateMeshSection_LinearColor(0, One.V, FT, FN, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+			if (UMaterialInstanceDynamic* M = Fish->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.035f, 0.045f, 0.03f));
+			Swimmers.Add(Fish);
+			SwimPlan.Add(FVector4f(R.FRandRange(120.f, 300.f), R.FRandRange(0.25f, 0.55f) * (R.FRand() < 0.5f ? -1.f : 1.f), R.FRandRange(0.f, 2.f * PI), R.FRandRange(18.f, 35.f)));
+		}
 	}
+	else SetActorTickEnabled(false);   // (the server draws nothing: the bite and the reel run on timers)
+}
+
+// The local player, while he fishes here (players' machines: only for what this machine draws)
+AActor* AFishingSpot::LocalFisher() const
+{
+	if (IsBeingGathered()) return GetCurrentGatherer();
+	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	AKnightCharacter* K = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
+	return (K && K->WorkingOn(this)) ? K : nullptr;
+}
+
+FVector AFishingSpot::RodTip(const AActor* G) const
+{
+	return G->GetActorLocation() + G->GetActorForwardVector() * 150.f + G->GetActorRightVector() * 25.f + FVector(0.f, 0.f, 75.f);
 }
 
 void AFishingSpot::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-		Clock += DeltaSeconds;
+	Clock += DeltaSeconds;
 	const FVector Spot = GetActorLocation();
+	const double Now = GetWorld()->GetTimeSeconds();
+
+	// Far from the camera: nothing to draw (the river has many spots)
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	const bool bNear = PC && PC->PlayerCameraManager && FVector::DistSquared(PC->PlayerCameraManager->GetCameraLocation(), Spot) < FMath::Square(6000.f);
+	for (UProceduralMeshComponent* R : Rings) if (R && R->IsVisible() != bNear) R->SetVisibility(bNear);
+	for (UProceduralMeshComponent* S : Swimmers) if (S && S->IsVisible() != bNear) S->SetVisibility(bNear);
+	if (!bNear && CatchAt < Now - 3.0) { if (Bobber->IsVisible()) { Bobber->SetVisibility(false); Line->SetVisibility(false); } return; }
 
 	// Ripples spread out from the spot all the time, so you can see where to fish
 	for (int32 r = 0; r < Rings.Num(); ++r)
@@ -108,41 +178,261 @@ void AFishingSpot::Tick(float DeltaSeconds)
 		Rings[r]->SetWorldScale3D(FVector(S, S, 1.f));
 		Rings[r]->SetWorldLocation(Spot + FVector(0.f, 0.f, 0.6f - 9.f * R * R));
 	}
-
-	const bool bOn = IsBeingGathered();
-	if (Bobber->IsVisible() != bOn)
+	// Fish under the water: dark shapes circling slowly near the spot, each with its own path and a little tail sway
+	for (int32 i = 0; i < Swimmers.Num(); ++i)
 	{
-		Bobber->SetVisibility(bOn);
-		Line->SetVisibility(bOn);
+		const FVector4f& P = SwimPlan[i];
+		const float A = P.Z + P.Y * Clock;
+		const float Wob = 0.25f * FMath::Sin(Clock * 1.3f + P.Z * 3.f);
+		const FVector At = Spot + FVector(P.X * (1.f + Wob) * FMath::Cos(A), P.X * FMath::Sin(A), -P.W);
+		const float Head = FMath::RadiansToDegrees(A) + (P.Y > 0.f ? 90.f : -90.f) + 12.f * FMath::Sin(Clock * 6.f + P.Z * 5.f);
+		Swimmers[i]->SetWorldLocationAndRotation(At, FRotator(0.f, Head, 0.f));
 	}
+
+	// The float and line, and a caught fish on the line
+	AActor* G = LocalFisher();
+	const bool bCatch = Now - CatchAt < 2.2 && CatchBy.IsValid();
+	if (bCatch) G = CatchBy.Get();
+	const bool bOn = G != nullptr;
+	if (Bobber->IsVisible() != (bOn && !bCatch)) Bobber->SetVisibility(bOn && !bCatch);
+	if (Line->IsVisible() != bOn) Line->SetVisibility(bOn);
+	if (CatchRoot && CatchRoot->IsVisible() != bCatch) CatchRoot->SetVisibility(bCatch, true);
 	if (!bOn) return;
-	AActor* G = GetCurrentGatherer();
-	if (!G) return;
 
-	const FVector BobPos = Spot + FVector(0.f, 0.f, 5.f + 3.f * FMath::Sin(Clock * 3.f));
-	Bobber->SetWorldLocation(BobPos);
-
-
-	// The line runs from the tip of the pole to the float
-	const FVector Tip = G->GetActorLocation() + G->GetActorForwardVector() * 150.f + G->GetActorRightVector() * 25.f + FVector(0.f, 0.f, 75.f);
-	const FVector D = BobPos - Tip;
+	const FVector Tip = RodTip(G);
+	FVector End;
+	if (bCatch && CatchRoot)
+	{
+		// up out of the water in 0.4 s, flopping hard and then weaker for 1.3 s, then hanging limp under the tip until it goes into the pack
+		const float T = float(Now - CatchAt);
+		const float Up = FMath::SmoothStep(0.f, 0.4f, T);
+		End = FMath::Lerp(Spot, Tip - FVector(0.f, 0.f, 55.f), Up);
+		const float Flop = T < 1.7f ? FMath::Clamp(1.7f - T, 0.f, 1.f) : 0.f;
+		const float Roll = 38.f * Flop * FMath::Sin(T * 17.f);
+		const float Bend = 22.f * Flop * FMath::Sin(T * 11.f + 1.f);
+		CatchRoot->SetWorldLocationAndRotation(End, FRotator(-90.f + Bend, G->GetActorRotation().Yaw + 90.f, Roll));   // (head up, hung by the mouth)
+	}
+	else
+	{
+		// bobbing; a bite pulls it under, shaking
+		const float SinceBite = float(Now - LocalBiteAt);
+		const float Dip = SinceBite < 0.9f ? -14.f * FMath::Sin(FMath::Min(SinceBite / 0.12f, 1.f) * HALF_PI) + 2.5f * FMath::Sin(SinceBite * 45.f) : 0.f;
+		End = Spot + FVector(0.f, 0.f, 5.f + 3.f * FMath::Sin(Clock * 3.f) + Dip);
+		Bobber->SetWorldLocation(End);
+	}
+	// The line runs from the tip of the pole to the float (or the fish)
+	const FVector D = End - Tip;
 	const float Len = FMath::Max(D.Size(), 1.f);
-	Line->SetWorldLocationAndRotation((Tip + BobPos) * 0.5f, FRotationMatrix::MakeFromZ(D / Len).Rotator());
+	Line->SetWorldLocationAndRotation((Tip + End) * 0.5f, FRotationMatrix::MakeFromZ(D / Len).Rotator());
 	Line->SetWorldScale3D(FVector(0.008f, 0.008f, Len / 100.f));
+}
+
+// ---- the server's side of a cast ----
+bool AFishingSpot::BeginOwnGather(AKnightCharacter* Knight)
+{
+	bBiting = false;
+	ScheduleBite();
+	return true;
+}
+
+void AFishingSpot::ScheduleBite()
+{
+	const int32 Id = ++CastId;
+	USkillComponent* Sk = GetCurrentGatherer() ? GetCurrentGatherer()->FindComponentByClass<USkillComponent>() : nullptr;
+	const int32 L = Sk ? Sk->GetLevel(ESkillType::Fishing) : 1;
+	const JeebTune::FValues& V = JeebTune::V();
+	const float MaxWait = FMath::Lerp(V.FishBiteMaxAt1, V.FishBiteMaxAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+	const float PoleMul = FMath::Clamp(EffectiveSeconds / FMath::Max(GatherSeconds, 0.01f), 0.3f, 2.f);   // (a better pole bites sooner)
+	const float Wait = FMath::FRandRange(V.FishBiteMin, FMath::Max(V.FishBiteMin, MaxWait)) * PoleMul;
+	UE_LOG(LogTemp, Log, TEXT("JEEBFISH cast %d: Fishing %d, a bite in %.1f s (longest at this level %.1f, pole x%.2f)"), Id, L, Wait, MaxWait, PoleMul);
+	FTimerHandle H;
+	GetWorldTimerManager().SetTimer(H, FTimerDelegate::CreateWeakLambda(this, [this, Id]()
+	{
+		if (Id != CastId || !IsBeingGathered()) return;
+		AKnightCharacter* K = Cast<AKnightCharacter>(GetCurrentGatherer());
+		if (!K) return;
+		bBiting = true;
+		BiteAt = GetWorld()->GetTimeSeconds();
+		// online the click needs a round trip: the server allows the ping on top, up to FishPingAllowance
+		float Ping = 0.f;
+		if (!K->IsLocallyControlled()) if (const APlayerState* PS = K->GetPlayerState()) Ping = FMath::Min(PS->ExactPing / 1000.f, JeebTune::V().FishPingAllowance);
+		const float Window = JeebTune::V().FishReelWindow + Ping;
+		K->FishBite(this);
+		UE_LOG(LogTemp, Log, TEXT("JEEBFISH cast %d: a bite, %.2f s to reel (ping allowance %.2f)"), Id, Window, Ping);
+		FTimerHandle M;
+		GetWorldTimerManager().SetTimer(M, FTimerDelegate::CreateWeakLambda(this, [this, Id]()
+		{
+			if (Id != CastId || !bBiting || !IsBeingGathered()) return;
+			bBiting = false;
+			bBeingGathered = false;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFISH cast %d: it got away"), Id);
+			Tell(GetCurrentGatherer(), 2.5f, FColor::Orange, TEXT("It got away! Click the moment the float goes under."));
+			if (AKnightCharacter* Kn = Cast<AKnightCharacter>(GetCurrentGatherer())) Kn->EndGathering();
+		}), Window, false);
+	}), Wait, false);
+}
+
+void AFishingSpot::Reel(AKnightCharacter* Knight)
+{
+	if (!IsBeingGathered() || GetCurrentGatherer() != Knight) return;
+	if (!bBiting)
+	{
+		// too soon: the splash scares it off, and the wait starts again
+		Tell(Knight, 2.f, FColor::Orange, TEXT("Too soon! The fish are spooked. Wait for the float to go under."));
+		UE_LOG(LogTemp, Log, TEXT("JEEBFISH cast %d: reeled too soon"), CastId);
+		ScheduleBite();
+		return;
+	}
+	bBiting = false;
+	++CastId;   // (the miss timer is void now)
+	UE_LOG(LogTemp, Log, TEXT("JEEBFISH reeled %.2f s after the bite"), GetWorld()->GetTimeSeconds() - BiteAt);
+	FinishGathering();
+}
+
+static int32 SpeciesOf(EItemType T)
+{
+	return T == EItemType::Trout ? JeebRecords::S_Trout : T == EItemType::Salmon ? JeebRecords::S_Salmon : T == EItemType::Bass ? JeebRecords::S_Bass : -1;
 }
 
 void AFishingSpot::RollYield(USkillComponent* Skills, EItemType& OutItem, int32& OutXP)
 {
 	const int32 L = Skills ? Skills->GetLevel(ESkillType::Fishing) : 1;
-	const float CarpChance = (L >= JeebItems::FishingLevelFor(EItemType::GoldenCarp)) ? 0.12f : 0.f;
-	const float TroutChance = (L >= JeebItems::FishingLevelFor(EItemType::Trout)) ? 0.35f : 0.f;
 	const float Roll = FMath::FRand();
-	if (Roll < CarpChance) OutItem = EItemType::GoldenCarp;
-	else if (Roll < CarpChance + TroutChance) OutItem = EItemType::Trout;
-	else OutItem = EItemType::Perch;
+	if (bRiver)
+	{
+		// the river: bass at any level, trout from Fishing 5, salmon from 15 (Materials.csv GatherLevel)
+		const float SalmonChance = (L >= JeebItems::FishingLevelFor(EItemType::Salmon)) ? 0.25f : 0.f;
+		const float TroutChance = (L >= JeebItems::FishingLevelFor(EItemType::Trout)) ? 0.35f : 0.f;
+		OutItem = Roll < SalmonChance ? EItemType::Salmon : Roll < SalmonChance + TroutChance ? EItemType::Trout : EItemType::Bass;
+	}
+	else
+	{
+		const float CarpChance = (L >= JeebItems::FishingLevelFor(EItemType::GoldenCarp)) ? 0.12f : 0.f;
+		const float TroutChance = (L >= JeebItems::FishingLevelFor(EItemType::Trout)) ? 0.35f : 0.f;
+		OutItem = Roll < CarpChance ? EItemType::GoldenCarp : Roll < CarpChance + TroutChance ? EItemType::Trout : EItemType::Perch;
+	}
 	OutXP = JeebItems::FishXP(OutItem);
-	const TCHAR* Name = (OutItem == EItemType::GoldenCarp) ? TEXT("golden carp") : (OutItem == EItemType::Trout ? TEXT("trout") : TEXT("perch"));
-	SuccessText = FString::Printf(TEXT("You caught a %s! (+%d XP)"), Name, OutXP);
+	const int32 S = SpeciesOf(OutItem);
+	LastSize = S >= 0 ? JeebRecords::RollSize(S) : 0.f;
+	const FString Name = FString(JeebItems::MaterialName(OutItem)).ToLower();
+	SuccessText = S >= 0 ? FString::Printf(TEXT("You caught a %s %s! (+%d XP)"), *JeebRecords::SizeText(S, LastSize), *Name, OutXP)
+		: FString::Printf(TEXT("You caught a %s! (+%d XP)"), *Name, OutXP);
+}
+
+void AFishingSpot::OnYield(AActor* Gatherer, EItemType Item)
+{
+	const int32 S = SpeciesOf(Item);
+	if (S >= 0)
+	{
+		FString Key, Name, Note;
+		JeebRecords::WhoIs(Gatherer, Key, Name);
+		JeebRecords::Record(GetWorld(), Key, Name, S, LastSize, Note);
+		if (!Note.IsEmpty()) Tell(Gatherer, 5.f, FColor(255, 215, 90), Note);
+	}
+	if (AKnightCharacter* K = Cast<AKnightCharacter>(Gatherer)) K->FishCaught(this, Item, S >= 0 ? LastSize : 10.f);
+}
+
+// ---- what players' machines draw ----
+void AFishingSpot::ShowBite()
+{
+	LocalBiteAt = GetWorld()->GetTimeSeconds();
+	JeebMsg::Post(1.2f, FColor(255, 235, 120), TEXT("A bite! Click now!"));
+}
+
+void AFishingSpot::ShowCatch(AActor* Knight, EItemType Item, float Size)
+{
+	if (IsNetMode(NM_DedicatedServer) || !Knight) return;
+	CatchAt = GetWorld()->GetTimeSeconds();
+	CatchBy = Knight;
+	for (UProceduralMeshComponent* C : CatchParts) if (C) C->DestroyComponent();
+	CatchParts.Reset();
+	if (!CatchRoot)
+	{
+		CatchRoot = NewObject<USceneComponent>(this);
+		CatchRoot->SetupAttachment(GetRootComponent());
+		CatchRoot->SetUsingAbsoluteLocation(true);
+		CatchRoot->SetUsingAbsoluteRotation(true);
+		CatchRoot->RegisterComponent();
+	}
+	// the pack's own fish model (ItemModels.h), grown to the fish's real length (inches), hung by its mouth
+	TArray<JeebItemModel::FPart> Parts;
+	JeebItemModel::Build(JeebItems::MaterialId(Item), Parts);
+	JeebItemModel::Turn(Parts, FVector(-90.f, 0.f, 0.f));   // (back upright: the model lies on its side on the ground)
+	FBox Bx(ForceInit);
+	for (const JeebItemModel::FPart& P : Parts) for (const FVector& V : P.Mesh.V) Bx += V;
+	if (!Bx.IsValid) return;
+	const float Grow = FMath::Clamp(Size * 2.54f / FMath::Max(float(Bx.GetSize().X), 1.f), 0.5f, 6.f);
+	const FVector Mouth(Bx.Max.X, 0.f, Bx.GetCenter().Z);
+	UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Color.M_Color"));
+	for (const JeebItemModel::FPart& P : Parts)
+	{
+		UProceduralMeshComponent* C = NewObject<UProceduralMeshComponent>(this);
+		C->SetupAttachment(CatchRoot);
+		C->SetRelativeScale3D(FVector(Grow));
+		C->SetRelativeLocation(-Mouth * Grow);
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		C->SetCastShadow(true);
+		C->RegisterComponent();
+		TArray<FVector> N;
+		KM::ComputeNormals(P.Mesh, N);
+		TArray<int32> Tris;
+		for (int32 t = 0; t + 2 < P.Mesh.I.Num(); t += 3) { Tris.Add(P.Mesh.I[t]); Tris.Add(P.Mesh.I[t + 1]); Tris.Add(P.Mesh.I[t + 2]); Tris.Add(P.Mesh.I[t]); Tris.Add(P.Mesh.I[t + 2]); Tris.Add(P.Mesh.I[t + 1]); }
+		C->CreateMeshSection_LinearColor(0, P.Mesh.V, Tris, N, TArray<FVector2D>(), TArray<FLinearColor>(), TArray<FProcMeshTangent>(), false);
+		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), P.Color);
+		CatchParts.Add(C);
+	}
+}
+
+// ---- the river's spots: every 120 m along each river, near alternate banks, in the water ----
+void AFishingSpot::SpawnRiverSpots(UWorld* World)
+{
+	if (!World) return;
+	FActorSpawnParameters P;
+	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	int32 N = 0;
+	const TArray<JeebWorld::FRiver>& Rivers = JeebWorld::Rivers();
+	for (int32 r = 0; r < Rivers.Num(); ++r)
+	{
+		const JeebWorld::FRiver& Rv = Rivers[r];
+		int32 Side = 1;
+		for (int32 i = 8; i + 8 < Rv.Pts.Num() && N < 80; i += 24)
+		{
+			const FVector2D T = (Rv.Pts[i + 1] - Rv.Pts[i - 1]).GetSafeNormal();
+			const FVector2D Nrm(-T.Y, T.X);
+			const float Half = Rv.Halfs.IsValidIndex(i) ? Rv.Halfs[i] : Rv.HalfWidth;
+			Side = -Side;
+			if (Half < 250.f) continue;
+			const FVector2D At = Rv.Pts[i] + Nrm * float(Side) * FMath::Max(0.f, Half - 230.f);
+			if (JeebWorld::WaterEdge(At.X, At.Y) > -120.f) continue;   // (not in open water here)
+			if (FVector2D::Distance(At, JeebWorld::BridgeAt()) < 2500.f) continue;
+			if (AFishingSpot* S = World->SpawnActor<AFishingSpot>(FVector(At.X, At.Y, JeebWorld::RiverLevel + 2.f), FRotator::ZeroRotator, P))
+			{
+				S->bRiver = true;
+				++N;
+			}
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBFISH %d river fishing spots"), N);
+
+	// -JeebFishTest (server or single player): check the size curves and the records file once, in the log
+	if (FParse::Param(FCommandLine::Get(), TEXT("JeebFishTest")) && World->GetNetMode() != NM_Client)
+	{
+		for (int32 s = 0; s < JeebRecords::S_Num; ++s)
+		{
+			const int32 Count = 2000000;
+			double Sum = 0.0, Sq = 0.0; int32 Board = 0;
+			for (int32 i = 0; i < Count; ++i) { const float X = JeebRecords::RollSize(s); Sum += X; Sq += double(X) * X; if (X >= JeebRecords::BoardAt(s)) ++Board; }
+			const double M = Sum / Count;
+			UE_LOG(LogTemp, Log, TEXT("JEEBFISHTEST %s: mean %.2f, sd %.3f, at or over %.0f: %.4f%%"), JeebRecords::SpeciesName(s), M, FMath::Sqrt(Sq / Count - M * M), JeebRecords::BoardAt(s), 100.0 * Board / Count);
+		}
+		FString Note;
+		JeebRecords::Record(World, TEXT("fishtest"), TEXT("Fish Test"), JeebRecords::S_Trout, 29.3f, Note);
+		JeebRecords::Record(World, TEXT("fishtest"), TEXT("Fish Test"), JeebRecords::S_Bass, 21.4f, Note);
+		JeebRecords::Record(World, TEXT("fishtest"), TEXT("Fish Test"), JeebRecords::S_Antlers, 14.f, Note);
+		TArray<FString> Lines;
+		JeebRecords::Report(World, TEXT("fishtest")).ParseIntoArrayLines(Lines);
+		for (const FString& L : Lines) UE_LOG(LogTemp, Log, TEXT("JEEBFISHTEST %s"), *L);
+	}
 }
 
 // ======================================================================================= the pond
