@@ -19,3 +19,5 @@ WildFox,Fox,1,wild,,,10
 WildBoar,Boar,2-4,wild,,,8
 WildWolves,Wolf,3-4,wild,,,6
 WildMoose,Moose,1-2,wild,,,6
+# (2026-11-26) bears: alone, wild only.
+WildBear,Bear,1,wild,,,5

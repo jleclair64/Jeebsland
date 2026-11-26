@@ -23,7 +23,9 @@ $animals = @(
   @('Fox', 'Idle=fox_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=wolf_dead'),
   @('Boar', 'Idle=cattle_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=cattle_dead', 'Attack=leopard_skill2'),
   @('Wolf', 'Idle=wolf_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=wolf_dead', 'Attack=leopard_skill2'),
-  @('Moose', 'Idle=deer_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=cattle_dead', 'Attack=leopard_skill2')
+  @('Moose', 'Idle=deer_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=cattle_dead', 'Attack=leopard_skill2'),
+  # (2026-11-26: Meshy couldn't rig the mid-stride bear; the wolf's rig and clips were moved onto it by Tools/bear_rig.py)
+  @('Bear', 'Idle=wolf_idle', 'Walk=dog_walk', 'Run=dog_run', 'Death=wolf_dead', 'Attack=leopard_skill2')
 )
 foreach ($a in $animals) {
   $n = $a[0]; $dir = Join-Path $art $n
@@ -34,6 +36,9 @@ foreach ($a in $animals) {
 # the saddle (a static mesh shown on the horse): Tools\saddle_prep.py from the CC0 library saddle (Art\Animals\Sources.md)
 $saddle = Join-Path $art 'Originals\Saddle_Karrades.glb'
 if (Test-Path $saddle) { & $blender -b --factory-startup -P (Join-Path $PSScriptRoot 'saddle_prep.py') -- $saddle $out 2>&1 | Select-String 'SADDLE|Traceback|Error' | ForEach-Object { Write-Host $_.Line } }
+# the eagle's two still bodies (2026-11-26): Tools\eagle_prep.py
+$eg = Join-Path $art 'Eagle'
+if (Test-Path (Join-Path $eg 'EagleFly_clean.glb')) { & $blender -b --factory-startup -P (Join-Path $PSScriptRoot 'eagle_prep.py') -- (Join-Path $eg 'EagleFly_clean.glb') (Join-Path $eg 'EaglePerch_clean.glb') $out 2>&1 | Select-String 'EAGLE|Traceback|Error' | ForEach-Object { Write-Host $_.Line } }
 $content = Join-Path $proj 'Content\Animals'
 if (Test-Path $content) { Remove-Item -Recurse -Force $content }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
