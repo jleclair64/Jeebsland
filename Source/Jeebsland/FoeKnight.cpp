@@ -3,6 +3,7 @@
 #include "WeaponDesign.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
+#include "Stealth.h"
 #include "Combat.h"
 #include "Loot.h"
 #include "Terrain.h"
@@ -37,6 +38,7 @@ AFoeKnight::AFoeKnight()
 	WristR = CreateDefaultSubobject<USceneComponent>(TEXT("WristR"));
 	WristR->SetupAttachment(Capsule);
 
+	Stealth = CreateDefaultSubobject<UStealthSense>(TEXT("Stealth"));   // (2026-11-26: how the bandits notice players, Stealth.h)
 	Hp = CreateDefaultSubobject<UHealthComponent>(TEXT("Hp"));
 	Hp->Max = Hp->Cur = MaxHp;
 	Hp->BarHeight = 130.f;

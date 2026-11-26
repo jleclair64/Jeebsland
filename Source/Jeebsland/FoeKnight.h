@@ -78,6 +78,7 @@ private:
 	void TickBody(float Dt);        // his pose, after whatever he did this frame
 	UPROPERTY() TArray<UProceduralMeshComponent*> ShieldMeshes;   // his shield's parts
 	UPROPERTY() UHealthComponent* Hp = nullptr;
+	UPROPERTY() class UStealthSense* Stealth = nullptr;   // (2026-11-26) the shared detection meter (Stealth.h): whom a bandit has noticed
 
 	FVector2D PenCenter = FVector2D::ZeroVector;
 	FVector2D PenHalf = FVector2D(700.f, 450.f);

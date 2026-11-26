@@ -14,6 +14,7 @@
 #include "FoeData.h"
 #include "KnightCharacter.h"
 #include "HealthComponent.h"
+#include "Stealth.h"
 #include "Loot.h"
 #include "QuestComponent.h"
 #include "SkillComponent.h"
@@ -109,27 +110,20 @@ void AFoeKnight::SetMind(EMind M, const TCHAR* Why)
 		FVector2D::Distance(FVector2D(GetActorLocation()), CampAt) / 100.f, Hp ? Hp->Cur : 0, Hp ? Hp->Max : 0);
 }
 
-// Whom he would notice now: the nearest player standing within his sight (less behind him), outside every town
-static AKnightCharacter* NoticeSomeone(const AFoeKnight* Me, const JeebFoes::FFoeDef& D, const FVector2D& CampAt)
+// Whom he has noticed now (2026-11-26: through the shared detection meter, Stealth.h): his sight in front (about 100 degrees either side), less
+// behind, a little hearing; crouching, the Stealth skill, the night and cover as the meter says; never anyone in a town or past his leash
+static AKnightCharacter* NoticeSomeone(AFoeKnight* Me, UStealthSense* Sn, const JeebFoes::FFoeDef& D, const FVector2D& CampAt)
 {
-	AKnightCharacter* Best = nullptr;
-	float BestD = 1.0e9f;
-	const FVector2D At(Me->GetActorLocation());
-	const FVector2D Fwd(Me->GetActorForwardVector().GetSafeNormal2D());
-	for (TActorIterator<AKnightCharacter> It(Me->GetWorld()); It; ++It)
-	{
-		AKnightCharacter* K = *It;
-		if (K->GetHealth() <= 0.f || K->IsHidden()) continue;
-		const FVector2D P(K->GetActorLocation());
-		const float Dd = FVector2D::Distance(P, At);
-		if (Dd > D.Sight || Dd >= BestD) continue;
-		const bool bFront = FVector2D::DotProduct(Fwd, (P - At) / FMath::Max(Dd, 1.f)) > -0.17f;   // (about 100 degrees either side counts as in front)
-		if (!bFront && Dd > D.Sight * D.Behind) continue;
-		if (FVector2D::Distance(P, CampAt) > D.Leash + D.Sight) continue;   // (never one he would give up on straight away)
-		if (JeebFoes::InTown(P.X, P.Y)) continue;
-		Best = K; BestD = Dd;
-	}
-	return Best;
+	if (!Sn) return nullptr;
+	FStealthSenses S;
+	S.Sight = D.Sight; S.Behind = D.Behind; S.FrontDot = -0.17f;
+	S.HearRun = D.Sight * 0.6f; S.HearWalk = D.Sight * 0.3f; S.HearStill = 250.f;
+	S.EyeZ = 165.f; S.bSkipTowns = true;
+	if (Sn->LogName.IsEmpty() || Sn->LogName == Me->GetName()) Sn->LogName = FString::Printf(TEXT("%s (%s)"), *Me->FoeName(), *Me->GetName());
+	float Dd = 0.f;
+	AKnightCharacter* K = Sn->Update(0.25f, S, Dd);   // (called every 0.25 s: SenseT)
+	if (K && FVector2D::Distance(FVector2D(K->GetActorLocation()), CampAt) > D.Leash + D.Sight) return nullptr;   // (never one he would give up on straight away)
+	return K;
 }
 
 AKnightCharacter* AFoeKnight::BanditTarget(float& OutDist, float Dt)
@@ -146,7 +140,7 @@ AKnightCharacter* AFoeKnight::BanditTarget(float& OutDist, float Dt)
 		SenseT -= Dt;
 		if (SenseT > 0.f) return nullptr;
 		SenseT = 0.25f;
-		AKnightCharacter* K = NoticeSomeone(this, D, CampAt);
+		AKnightCharacter* K = NoticeSomeone(this, Stealth, D, CampAt);
 		if (!K) return nullptr;
 		Target = K;
 		SetMind(EMind::Fight, TEXT("notices a player"));
@@ -168,7 +162,7 @@ AKnightCharacter* AFoeKnight::BanditTarget(float& OutDist, float Dt)
 	if (!T)
 	{
 		SenseT -= Dt;
-		if (SenseT <= 0.f) { SenseT = 0.25f; T = NoticeSomeone(this, D, CampAt); }   // anyone else near?
+		if (SenseT <= 0.f) { SenseT = 0.25f; T = NoticeSomeone(this, Stealth, D, CampAt); }   // anyone else near?
 		if (!T) { const bool bDown = Target.IsValid() && Target->GetHealth() <= 0.f; Target = nullptr; SetMind(EMind::Return, bDown ? TEXT("beat his foe") : TEXT("lost his foe")); return nullptr; }
 	}
 	Target = T;

@@ -98,6 +98,7 @@ class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
 	friend struct FHorseTestDriver;   // (-JeebHorseTest, HorseTest.cpp)
+	friend struct FStealthTestDriver;   // (-JeebStealthTest, Stealth.cpp)
 	friend class AHorse;              // (-HorseLabRide: the lab puts the player on a horse, Horse.cpp BuildLab)
 #if !UE_BUILD_SHIPPING
 	bool bTestGallop = false;
