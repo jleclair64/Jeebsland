@@ -247,7 +247,7 @@ static void ArrowLineup(UWorld* W, float Dt)
 		AKnightCharacter* K = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
 		if (!K) return;
 		FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		const FVector A = O + FVector(800.f, -900.f, 140.f);
+		const FVector A = O + FVector(800.f, -900.f, 320.f);   // (over the tall grass)
 		if (AProjectile* Pj = W->SpawnActor<AProjectile>(AProjectile::StaticClass(), A, FRotator(0.f, 90.f, 0.f), SP))
 			Pj->Launch(K, FVector(0.f, 1.f, 0.f), 3000.f, 0.f, 1, false, ESkillType::Archery, false, 0, JeebItems::ArrowId(Order[FlyK++ % 6]), 0.f, 0.f);
 	}

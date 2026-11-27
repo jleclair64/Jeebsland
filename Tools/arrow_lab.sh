@@ -15,8 +15,8 @@ case "$MODE" in
     EYES="$(e -110 0 120 0 -4)+$(e 110 0 120 180 -4)+$(e 0 -110 125 90 -10)+$(e 0 110 125 -90 -10)+$(e 160 0 150 0 -8)+$(e -60 -60 200 45 -40)"
     ARGS="-ShotName=arrstills -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=3 -ResX=1280 -ResY=720"; SECS=150; NAME=arrstills ;;
   film)
-    EYES="$(e 800 -700 150 90 -4)"
-    ARGS="-ShotName=arrfilm -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=12 -ShotEyesMove=12_120_0 -ShotEyesFilm=2.2_260 -ShotEyesNoPics -benchmark -fps=120 -ResX=1280 -ResY=720"; SECS=240; NAME=arrfilm ;;
+    EYES="$(e 640 0 330 0 0)"
+    ARGS="-ShotName=arrfilm -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=12 -ShotEyesMove=3_40_0 -ShotEyesFilm=2.2_720 -ShotEyesNoPics -benchmark -fps=120 -ResX=1280 -ResY=720"; SECS=300; NAME=arrfilm ;;
   hand)
     EYES="$(e -400 0 150 0 -6)_0_1024_-1_90_160+$(e -400 0 160 0 -8)_0_1024_-1_160_150"
     ARGS="-ShotName=arrhand -ShotEyes=$EYES -ShotEyesStart=9 -ShotEyesGap=3.5 -ShotMove=bowidle -ShotKind=9 -ShotArrow=$ROW -ResX=1280 -ResY=720"; SECS=150; NAME=arrhand ;;
