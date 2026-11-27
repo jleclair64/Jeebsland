@@ -9,6 +9,6 @@ if ($args -notcontains '-ImportOnly') { & $blender -b -P (Join-Path $PSScriptRoo
 if ($args -notcontains '-ImportOnly') { & $blender -b -P (Join-Path $PSScriptRoot 'troll_rocks_export.py') -- $lo $out 2>&1 | Select-String 'TKROCK|Error|Traceback' | ForEach-Object { Write-Host $_.Line } }
 if ($args -contains '-ExportOnly') { exit 0 }
 $exe = 'C:\Program Files\Epic Games\UE_5.8\Engine\Binaries\Win64\UnrealEditor-Cmd.exe'
-$r = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'troll_kit_import.py').Replace('\','/'))" -unattended -nosplash -nullrhi -stdout -FullStdOutLogOutput
+$r = & $exe (Join-Path $proj 'Jeebsland.uproject') "-ExecutePythonScript=$((Join-Path $PSScriptRoot 'troll_kit_import.py').Replace('\','/'))" -unattended -nosplash -nullrhi -stdout -FullStdOutLogOutput -Multiprocess -LiveCoding=false "-abslog=$(Join-Path $proj 'Saved\Logs\trollkit.log')"
 $r | Select-String -Pattern 'TKDIAG|Traceback|Error:' | ForEach-Object { Write-Host $_.Line }
 if ($r -match 'TKDIAG done') { Write-Host 'Troll kit imported.'; exit 0 } else { Write-Host 'Troll kit import FAILED.'; exit 1 }

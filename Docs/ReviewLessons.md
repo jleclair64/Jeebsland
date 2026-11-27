@@ -487,3 +487,8 @@ not the one-off fix). Keep each line short; merge lines that say the same thing.
 - LESSON: a mesh made in code under a two-sided material must be wound so its faces are front faces from where it is seen: a back face has its normal turned over and is lit from underneath. If a new code-made mesh looks dark whatever colour it is given, check the winding before touching the colour.
 - LESSON: a frame-cost target for one view needs the cost split first (per-setting eyes with `-ShotEyesSet` and `-ShotCensus` in one solo run): the lip grass was a third of the lip view's cost, the rest was the new land itself.
 - LESSON: a swimmer or climber test that "stalls" needs the probe results logged (`-BankClimb`: JEEBCLIMB stopped ...) before the rock is reshaped: one of the two stalls was the grab rule, not the wall.
+
+## Troll kit clean-up (2026-11-26, agent trollkit)
+- LESSON: Blender's voxel remesh cannot tell inside from outside on loose open triangles (it returned a lattice); give every triangle thickness (Solidify) first so each is a closed slab, then remesh.
+- LESSON: never bake a tangent normal map from a shattered model's own surface (the shards bake in as speckle); bake it from a clean fine surface (the voxel mesh), and unwrap on a heavily smoothed copy of the new mesh so fur tufts and lumps do not each become a UV island.
+- LESSON: an Unreal startup command run from a script needs `-Multiprocess -LiveCoding=false -abslog=` like every other run, or it sits at the startup SDK check while another build runs.

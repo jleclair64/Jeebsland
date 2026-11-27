@@ -50,6 +50,7 @@ for f in bm.faces:
     if c.z > zlo + (zhi - zlo) * 0.78: continue          # (the rocks on top and the strap: left as they are)
     out = Vector((c.x, c.y, (c.z - (zlo + (zhi - zlo) * 0.4)) * 0.6))
     if out.length > 1e-5 and f.normal.dot(out) < 0: flip.append(f)
+if sum(1 for e in bm.edges if len(e.link_faces) == 1) < 100: flip = []   # (2026-11-26: the cleaned sack, Tools/troll_kit_clean.py, is one closed surface with its normals already outward)
 bmesh.ops.reverse_faces(bm, faces=flip)
 e1 = sum(1 for e in bm.edges if len(e.link_faces) == 1)
 bm.to_mesh(sack.data); bm.free(); sack.data.update()

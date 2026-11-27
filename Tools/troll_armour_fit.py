@@ -56,7 +56,7 @@ PIECES = [
     # (boxes measured off his body in slices: head y -0.57..-0.2 at z 1.65-2.06, torso x +-0.42, y -0.23 (chest) .. 0.5 (his hunched back))
     # (2026-11-24: weld / smooth: see repair(); poseclear: the clearance kept in the test poses, see pose_clear(); taper: (from, margin), see taper_top().
     # The helmet's model is a heap of loose plates and fur strands: it is welded but left flat-shaded, smooth shading across its shards looked worse.)
-    dict(name="Helmet", file="helmet", fixed=((-0.26, -0.63, 1.73), (0.26, -0.08, 2.14)), clear=0.012, rigid="Head", noconform=True)   # (2026-11-25: the clean Meshy remesh, one connected mesh, so smooth shading is fine),
+    dict(name="Helmet", file="helmet", fixed=((-0.26, -0.63, 1.73), (0.26, -0.08, 2.14)), clear=0.012, rigid="Head", noconform=True),   # (2026-11-25: the clean Meshy remesh, one connected mesh, so smooth shading is fine)
     dict(name="Chest", file="chest", fixed=((-0.50, -0.33, 1.08), (0.50, 0.62, 1.86)), clear=0.015, poseclear=(0.012, 0.05, ["Hips", "Spine", "Spine01", "Spine02", "neck", "RightShoulder"]), poseonly=(lambda co: co.y > 0.2), allow=["Hips", "Spine", "Spine01", "Spine02", "neck", "RightShoulder"]),
     dict(name="Shoulders", file="shoulder", rot=(0, 0, -90), fixed=((-0.90, -0.18, 1.74), (-0.38, 0.52, 2.24)), mirror=True, clear=0.015, allow=["RightShoulder", "RightArm", "Spine02"]),
     dict(name="Arms", file="gauntlet", limb=("RightForeArm", "RightHand", ["RightForeArm"]), grow=1.18, len=1.05, cut_skin=True, clear=0.012, mirror=True, allow=["RightForeArm", "RightHand"]),
