@@ -81,7 +81,7 @@ void AGearWall::AddItem(int32 Id, int32 Count, const FVector& Local, float Size,
 
 	TArray<JeebItemModel::FPart> Parts;
 	JeebItemModel::Build(Id, Parts);
-	UStaticMesh* Prop = JeebItems::IsGear(Id) ? JeebProps::MeshForItem(Id) : nullptr;   // (a model from /Game/Props)
+	UStaticMesh* Prop = (JeebItems::IsGear(Id) || JeebProps::IsFishItem(Id)) ? JeebProps::MeshForItem(Id) : nullptr;   // (a model from /Game/Props)
 	if (Parts.Num() == 0 && !Prop) return;
 	FBox Bx(ForceInit);
 	if (Prop) Bx = Prop->GetBoundingBox();

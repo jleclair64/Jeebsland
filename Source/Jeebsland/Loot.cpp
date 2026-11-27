@@ -293,11 +293,12 @@ void ALootDrop::BuildItemLook()
 	}
 	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
 	// (a model from /Game/Props: it floats the same way)
-	if (First && JeebItems::IsGear(First->Id))
+	const bool bFish = First && JeebProps::IsFishItem(First->Id);   // (2026-11-26: the fish models, at their pack length; a stack shows up to three, scattered)
+	if (First && (JeebItems::IsGear(First->Id) || bFish))
 		if (UStaticMesh* Prop = JeebProps::MeshForItem(First->Id))
 		{
 			const FBox PB = Prop->GetBoundingBox();
-			const float PGrow = FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
+			const float PGrow = bFish ? JeebProps::FishLen(JeebItems::MaterialType(First->Id)) / FMath::Max((float)PB.GetSize().GetMax(), 1.f) : FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
 			Hover = NewObject<USceneComponent>(this);
 			Hover->SetupAttachment(Origin);
 			Hover->RegisterComponent();
@@ -305,7 +306,14 @@ void ALootDrop::BuildItemLook()
 			HoverZ = 30.f + 0.5f * (float)PB.GetSize().Z * PGrow;
 			Hover->SetRelativeLocation(FVector(0.f, 0.f, HoverZ));
 			ItemTop = HoverZ + 0.5f * (float)PB.GetSize().Z * PGrow + 16.f;
-			if (UStaticMeshComponent* S = JeebProps::MakeItem(this, Hover, First->Id)) S->SetRelativeLocation(-PB.GetCenter());
+			const int32 Fc = bFish ? FMath::Clamp(First->Count, 1, 3) : 1;
+			FRandomStream FR(GetUniqueID());
+			for (int32 c = 0; c < Fc; ++c)
+				if (UStaticMeshComponent* S = JeebProps::MakeItem(this, Hover, First->Id))
+				{
+					S->SetRelativeLocation(-PB.GetCenter() + (c == 0 ? FVector::ZeroVector : FVector(FR.FRandRange(-6.f, 6.f), FR.FRandRange(-6.f, 6.f), c * 14.f - 10.f) / PGrow));
+					if (bFish) S->SetRelativeRotation(FRotator(0.f, JeebProps::FishYaw + (c == 0 ? 0.f : FR.FRandRange(-40.f, 40.f)), 0.f));
+				}
 			return;
 		}
 	if (Parts.Num() == 0) { Body->SetVisibility(true); return; }   // nothing to show: keep the plain parcel
