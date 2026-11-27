@@ -168,7 +168,9 @@ public:
 	void TickFall(float DeltaSeconds);
 #if !UE_BUILD_SHIPPING
 	friend struct FPvpTestDriver;   // (PvpTest.cpp: the online test of the PvP zones, fall damage and the mounted-target arrow bonus)
+	friend struct FArrowTestDriver;   // (ArrowTest.cpp: the online test of the distinct arrows)
 #endif
+	bool SmithArrowsNow(int32 Row);   // (server) a bundle of the arrow in this Arrows.csv row at the smithy: checks the Smithing level and the materials
 	float FallPeakZ = 0.f, FallLastZ = 0.f; bool bFallWasFalling = false;
 	FVector FallLastLoc = FVector::ZeroVector; bool bFallTeleported = true;
 	void NoteTeleport() { bFallTeleported = true; }   // (every server teleport: fast travel, portkey, catch-up, respawn; the fall tracker forgets the old peak, TickFall also spots any other sudden jump)
@@ -383,7 +385,7 @@ public:
 	// covering Zone (JeebHit::EZone, where it landed; Z_None: the average of your armour) lets only part through
 	// (JeebItems::ZoneTake). bHeadshot: a projectile to the head (already x1.5; its number is drawn as a headshot).
 	// bEnvironmental: a hazard (poison smoke, fire): armour and shields do not stop it, and it trains no Defence.
-	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false, uint8 Zone = 0, bool bHeadshot = false);
+	void Hurt(int32 Raw, AActor* From, bool bEnvironmental = false, uint8 Zone = 0, bool bHeadshot = false, float Pierce = 0.f);   // (Pierce: the share of his armour a bodkin arrow goes through)
 	// You (or your arrow / bolt) hit something: applies the damage and awards skill XP (Zone, bHeadshot: as for Hurt)
 	void DealDamage(UHealthComponent* Target, int32 Dmg, bool bCrit, ESkillType Skill, bool bHitBoxes = false, uint8 Zone = 0, bool bHeadshot = false);
 	// A raised shield's wedge (HitBoxes.h), for the box view; false while the shield is down

@@ -372,9 +372,11 @@ void AKnightHUD::ItemTip(int32 Id)
 	if (IsArrow(Id))
 	{
 		L.Add(ItemName(Id));
-		int32 A, B; WeaponDamage(K_Bow, ArrowTier(Id), A, B, ArrowTier(Id));
+		int32 A, B; WeaponDamage(K_Bow, T_Tin, A, B, ArrowRowOf(Id));
 		L.Add(FString::Printf(TEXT("Fired from a bow. Bow damage with these: %d-%d"), A, B));
-		if (IsFireArrow(Id)) L.Add(TEXT("Sets what it hits burning for a few seconds"));
+		L.Add(ArrowJob(ArrowRowOf(Id)));
+		if (!ArrowRowFor(Id).Text.IsEmpty()) L.Add(ArrowRowFor(Id).Text);
+		if (CanSmithArrow(ArrowRowOf(Id))) L.Add(FString::Printf(TEXT("Made at the smithy from Smithing %d. Anyone can shoot them."), ArrowRowFor(Id).Level));
 		SetTip(L);
 		return;
 	}

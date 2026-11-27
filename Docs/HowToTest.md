@@ -9,6 +9,14 @@
 | The full game: starting screen, accounts, both worlds | Close the editor. `Tools\HostWorlds.bat`, wait for "Jeebsland world up", then `Tools\RunClient.bat` (twice for 2 players). Address `127.0.0.1`. Account names use only letters, numbers and spaces. |
 | See exactly what friends get | Same as above, but open `Packaged\Windows\Jeebsland.exe` instead of RunClient (only right after repackaging). |
 
+## Distinct arrows (2026-11-26, agent `arrows`; Content/Data/Arrows.csv)
+- The tier arrows are gone; each arrow has a job. Your old arrows kept their counts: tin became **Wooden**, iron **Broadhead**, silver **Bodkin**, gold **Heavy**, emerald and diamond **Eagle**, fire stays **Fire**.
+- **Wooden** (2 logs, Smithing 1): cheap, low damage. **Broadhead** (iron ore + 2 logs, Smithing 10): x1.5 against animals. **Bodkin** (2 iron ore + pine, Smithing 20): goes through 60% of armour, for PvP. **Heavy** (3 iron ore + redwood, Smithing 30): knocks back and staggers, flies slower. **Fire** (iron ore + 2 pine + bones, Smithing 25): burns 6 over 2 s. **Eagle** (2 Eagle Feathers + silver ore + redwood, Smithing 45): hits hardest, flies fastest, 30% through armour.
+- Anyone can shoot any arrow; only making them needs the level. Make them at the smithy (Arrows column: one card per arrow, with what it does). The store sells wooden and broadhead arrows, and now and then bodkin, heavy or fire.
+- Archery level helps every arrow: faster draw (as before), more damage (as before) and steadier aim: a shot strays up to 1.2 degrees at level 1, none from level 60, half as much on a full draw (`[Archery] SpreadAt1`, `SpreadGoneAt` in Tuning.ini, live).
+- Try it: F steps through the arrows you carry; each has its own head (wooden point, wide broadhead, slim bodkin needle, blunt heavy head with a collar, fire bundle, eagle leaf blade with bigger feathers). Hover an arrow (Tab) for what it does. Test kit: every arrow. `-ShotArrow=<row 0-6>` for test pictures.
+- Online test: `bash Tools/arrows_net.sh` (server + 2 players: every arrow at a player, a deer, the real bow path, the smithy checks; `JEEBARROWTEST`). Models: `Tools/BuildArrows.ps1` (Blender heads on the shared Meshy shaft, editor closed). Lineup: `Docs/Arrows/`.
+
 In the editor's preview window (New Editor Window / Selected Viewport), Escape stops Play and it can't go full screen: use **O**
 for the map / settings screen there. For full screen with a working Escape, pick **Standalone Game** (⋮ next to Play > Modes):
 it plays offline straight away. To change the editor's Stop key: Editor

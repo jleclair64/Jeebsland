@@ -233,8 +233,7 @@ public:
 	bool RemoveItems(int32 Id, int32 Count);
 	int32 CountWood() const;                          // any logs
 	bool TakeWood(int32 Count);                       // takes ordinary logs first, then pine, then redwood
-	int32 BestArrowTier() const;                      // -1 if you carry no arrows
-	int32 TakeBestArrow();                            // uses one arrow of the best tier; -1 if none
+	int32 BestArrowRow() const;                       // the hardest-hitting arrow you carry (its Arrows.csv row); -1 if none
 
 	int32 GetItemCount(EItemType Item) const;
 	static constexpr int32 MaxLevel = 99;

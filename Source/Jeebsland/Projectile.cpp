@@ -19,6 +19,9 @@
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 #include "Inventory.h"
+#include "Deer.h"
+#include "Eagle.h"
+#include "GameFramework/Character.h"
 #include "ProceduralMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
@@ -34,7 +37,7 @@ static TAutoConsoleVariable<float> CVarBoltLightRadius(TEXT("jeeb.Magic.BoltLigh
 static TAutoConsoleVariable<float> CVarBoltGlow(TEXT("jeeb.Magic.BoltGlow"), 0.9f, TEXT("Brightness on screen of the magic bolt's orb (M_GlowOrb Strength, exposure-locked since 2026-11-19: the same by day and at dusk; was 4 on the scene's scale, a white blob)."), ECVF_Default);
 
 // (test pictures: say where each arrow ended up)
-static bool ArrowLog() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")); return b; }
+static bool ArrowLog() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("JeebShot")) || FParse::Param(FCommandLine::Get(), TEXT("JeebArrowTest")); return b; }
 
 AProjectile::AProjectile()
 {
@@ -194,7 +197,7 @@ void AProjectile::ApplyLaunch()
 		return;
 	}
 	const bool bFire = JeebItems::IsFireArrow(L.ArrowId);
-	if (UStaticMesh* ArrowModel = JeebProps::ArrowMesh())
+	if (UStaticMesh* ArrowModel = JeebProps::ArrowMesh(L.ArrowId))
 	{
 		// (2026-11-12) the arrows' model: its tip is the actor's origin, as the shapes' was; its head and feathers in the arrow's colours
 		Body->SetStaticMesh(ArrowModel);
@@ -324,9 +327,22 @@ void AProjectile::Tick(float DeltaSeconds)
 				Dmg = FMath::Max(1, FMath::RoundToInt(Dmg * FMath::Max(1.f, JeebTune::V().ArrowMountedMul)));
 				if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW fast-mounted target: x%.1f -> %d"), JeebTune::V().ArrowMountedMul, Dmg);
 			}
-			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead);
-			else if (Shooter) Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead);
-			if (JeebItems::IsFireArrow(L.ArrowId)) Burn(Target);
+			// (2026-11-26) each arrow's job (Arrows.csv), all on the server: broadheads hurt animals more, bodkins go through armour, heavy arrows shove, fire arrows burn
+			const bool bArrow = !L.bBolt && !bRock && JeebItems::IsArrow(L.ArrowId);
+			const JeebItems::FArrowRow& AR = JeebItems::ArrowRowFor(L.ArrowId);
+			const bool bAnimal = Target->IsA<ADeer>() || Target->IsA<AEagle>();
+			if (bArrow && bAnimal && !FMath::IsNearlyEqual(AR.AnimalMul, 1.f)) Dmg = FMath::Max(1, FMath::RoundToInt(Dmg * AR.AnimalMul));
+			const float Pierce = bArrow ? AR.Pierce : 0.f;
+			if (ArrowLog()) UE_LOG(LogTemp, Log, TEXT("JEEBARROW %s hits %s: dmg %d animal %d pierce %.2f knock %.0f burn %.0f"), *JeebItems::ItemName(L.ArrowId), *Target->GetName(), Dmg, bAnimal ? 1 : 0, Pierce, bArrow ? AR.Knock : 0.f, bArrow ? AR.Burn : 0.f);
+			if (BestK) BestK->Hurt(Dmg, Shooter, false, BestZone, bHead, Pierce);
+			else if (Shooter) { BestH->PierceNext = Pierce; Shooter->DealDamage(BestH, Dmg, bCrit, Skill, true, BestZone, bHead); BestH->PierceNext = 0.f; }
+			if (bArrow && AR.Knock > 0.f)
+			{
+				const FVector Away = Dir.GetSafeNormal2D();
+				if (BestK) { if (BestK->GetHealth() > 0.f && JeebPvp::MayHurt(Shooter, BestK)) { JeebHit::FReact R; R.Stun = 0.35f; R.Push = AR.Knock; BestK->TakeReact(Shooter ? static_cast<AActor*>(Shooter) : this, R); } }
+				else if (ACharacter* C = Cast<ACharacter>(Target)) C->LaunchCharacter(Away * AR.Knock + FVector(0.f, 0.f, 120.f), true, false);
+			}
+			if (bArrow && AR.Burn > 0.f) Burn(Target, AR.Burn);
 			if (bRock) { Deflect(At, -Dir.GetSafeNormal2D()); return; }   // (a rock never sticks in anyone: it drops off him, spent)
 			// stuck in him at the joint nearest the tip (his armour: spent)
 			USceneComponent* Joint = nullptr;
@@ -475,24 +491,25 @@ void AProjectile::Deflect(const FVector& At, const FVector& Away)
 }
 
 // (server) A fire arrow's target keeps burning: a few points every so often (fire ignores armour, as hazards do)
-void AProjectile::Burn(AActor* Target)
+void AProjectile::Burn(AActor* Target, float Total)
 {
-	if (!Target || !GetWorld()) return;
+	if (!Target || !GetWorld() || Total <= 0.f) return;
+	const int32 Per = FMath::Max(1, FMath::RoundToInt(Total / BurnTicks));
 	TWeakObjectPtr<AActor> T(Target);
 	TWeakObjectPtr<AKnightCharacter> S(Shooter);
 	for (int32 i = 1; i <= BurnTicks; ++i)
 	{
 		FTimerHandle H;
-		GetWorld()->GetTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([T, S]()
+		GetWorld()->GetTimerManager().SetTimer(H, FTimerDelegate::CreateLambda([T, S, Per]()
 		{
 			AActor* A = T.Get();
 			if (!A) return;
-			if (AKnightCharacter* K = Cast<AKnightCharacter>(A)) { if (K->GetHealth() > 0.f && JeebPvp::MayHurt(S.Get(), K)) K->Hurt(BurnDamage, S.Get(), true); }
+			if (AKnightCharacter* K = Cast<AKnightCharacter>(A)) { if (K->GetHealth() > 0.f && JeebPvp::MayHurt(S.Get(), K)) K->Hurt(Per, S.Get(), true); }
 			else if (UHealthComponent* Hc = A->FindComponentByClass<UHealthComponent>())
 			{
 				if (!Hc->IsAlive()) return;
-				if (S.IsValid()) S->DealDamage(Hc, BurnDamage, false, ESkillType::Archery, true);
-				else Hc->ApplyDamage(BurnDamage, nullptr, false, true);
+				if (S.IsValid()) S->DealDamage(Hc, Per, false, ESkillType::Archery, true);
+				else Hc->ApplyDamage(Per, nullptr, false, true);
 			}
 		}), BurnEvery * i, false);
 	}

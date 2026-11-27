@@ -138,7 +138,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				else if (IsArmorKind(K)) Stat = FString::Printf(TEXT("Stops %d%%, %s"), ArmourProtect(FullVariant(W.Id)), *WeightText(PieceWeight(K, FullVariant(W.Id))));
 				else if (IsAccessoryKind(K)) Stat = AccessoryText(K, V);
 			}
-			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, ArrowTier(W.Id), A, B, ArrowTier(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
+			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, T_Tin, A, B, ArrowRowOf(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
 			else if (IsPotion(W.Id)) { Stat = *PotionRow(PotionType(W.Id)).Shop; }
 			else if (IsBroom(W.Id)) Stat = FString::Printf(TEXT("Speed x%.1f, %.1f magic a second"), JeebBroom::Row(BroomRowOf(W.Id)).SpeedMul, JeebBroom::Row(BroomRowOf(W.Id)).Drain);
 			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
@@ -256,19 +256,24 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	for (int32 t = 0; t < NumTiersKnight; ++t)
 	{
 		const float CX = CX0 + t * (CW + CGap);
-		const FRecipe R = SmithRecipe(BKind, t, bArrows, IsArmorKind(Kind) ? Style : 0);
-		const int32 Id = bArrows ? ArrowId(t) : IsArmorKind(Kind) ? ArmourId(Kind, Style, t) : Kind == K_Shield ? ShieldId(Style, t) : GearId(Kind, t);
+		// (2026-11-26) arrows: one column per arrow (ArrowKindId), its own recipe in Arrows.csv; gear: one column per tier
+		const int32 ARow = bArrows ? ArrowRowOf(ArrowKindId(t)) : 0;
+		FArrowRecipe R;
+		if (bArrows) R = ArrowRecipe(ARow);
+		else { const FRecipe G = SmithRecipe(BKind, t, false, IsArmorKind(Kind) ? Style : 0); for (int32 i = 0; i < 2; ++i) { R.Mat[i] = G.Mat[i]; R.Num[i] = G.Num[i]; } R.Level = G.Level; R.XP = G.XP; }
+		const int32 Id = bArrows ? ArrowId(ARow) : IsArmorKind(Kind) ? ArmourId(Kind, Style, t) : Kind == K_Shield ? ShieldId(Style, t) : GearId(Kind, t);
 		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
-		DrawRect(Palette(t, 0), CX, CY, CW, 5.f);
+		DrawRect(bArrows ? ArrowFeatherColor(Id) : Palette(t, 0), CX, CY, CW, 5.f);
 		DrawIcon(Id, CX + (CW - 90.f) * 0.5f, CY + 14.f, 90.f);
 		float Y = CY + 120.f;
-		Y += Wrapped(bArrows ? FString::Printf(TEXT("%s Arrows"), TierName(t)) : ItemName(Id), CX + 8.f, Y, CW - 14.f, 0.9f, FLinearColor(1.f, 0.9f, 0.6f)) - 26.f;
+		Y += Wrapped(ItemName(Id), CX + 8.f, Y, CW - 14.f, 0.9f, FLinearColor(1.f, 0.9f, 0.6f)) - 26.f;
 		Y += 26.f;
 		if (bArrows)
 		{
-			int32 A, B; WeaponDamage(K_Bow, t, A, B, t);
+			int32 A, B; WeaponDamage(K_Bow, T_Tin, A, B, ARow);
 			HDText(FString::Printf(TEXT("Makes %d arrows"), ArrowBundle), FLinearColor(0.9f, 0.9f, 0.9f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
 			HDText(FString::Printf(TEXT("Bow damage %d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + 8.f, Y, Font, 0.95f); Y += 26.f;
+			HDText(ArrowJob(ARow), FLinearColor(0.95f, 0.85f, 0.55f), CX + 8.f, Y, Font, 0.85f); Y += 22.f;
 		}
 		else if (IsWeaponKind(Kind))
 		{
@@ -287,7 +292,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		// Materials: have / need
 		HDText(TEXT("MATERIALS"), FLinearColor(0.65f, 0.65f, 0.65f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
 		bool bHaveAll = true;
-		for (int32 i = 0; i < 2; ++i)
+		for (int32 i = 0; i < 3; ++i)
 		{
 			if (R.Num[i] <= 0) continue;
 			const int32 Have = Skills->GetItemCount(R.Mat[i]);
@@ -309,12 +314,12 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		{
 			const int32 Count = bArrows ? ArrowBundle : 1;
 			if (!Skills->CanAdd(Id, Count)) { ShopMsg = TEXT("Your pack is full."); ShopMsgUntil = Now + 3.f; }
-			else Knight->Inv(EInvOp::Smith, bArrows ? -1 : Kind, t, Style);   // the server checks the recipe and makes it
+			else Knight->Inv(EInvOp::Smith, bArrows ? -1 : Kind, bArrows ? ARow : t, Style);   // the server checks the recipe and makes it
 		}
-		if (Over(CX, CY, CW, CH - 56.f) && !bArrows) ItemTip(Id);
+		if (Over(CX, CY, CW, CH - 56.f)) ItemTip(Id);
 	}
 	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	HDText(TEXT("Tin, iron, silver and gold: their ores. Emerald and diamond: the gem and gold ore.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	HDText(bArrows ? FString(TEXT("Arrows: wood for the shaft, iron or silver for the head; eagle arrows need Eagle Feathers. Anyone can shoot any arrow.   E or X to leave.")) : FString(TEXT("Tin, iron, silver and gold: their ores. Emerald and diamond: the gem and gold ore.   E or X to leave.")), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 

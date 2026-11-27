@@ -262,14 +262,17 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 	// ---------------- arrows: a bundle of three ----------------
 	if (IsArrow(Id))
 	{
-		const int32 T = ArrowTier(Id);
+		const int32 R = ArrowRowOf(Id);
 		const bool bFire = IsFireArrow(Id);   // (fire arrows: a flame-orange head and red fletching)
-		const FLinearColor Head = bFire ? FLinearColor(1.f, 0.45f, 0.08f) : Lift(Palette(T, 0), 1.3f), Shaft(0.50f, 0.34f, 0.17f), Fl = ArrowFeatherColor(Id);
+		const FLinearColor Head = bFire ? FLinearColor(1.f, 0.45f, 0.08f) : R == A_Wooden ? FLinearColor(0.62f, 0.44f, 0.24f) : Lift(ArrowTipColor(Id), 1.3f) + FLinearColor(0.08f, 0.08f, 0.09f), Shaft(0.50f, 0.34f, 0.17f), Fl = ArrowFeatherColor(Id);
+		// (2026-11-26) each head its own outline: slim needle, wide barbs, blunt, a leaf blade; the wooden arrow just a point
+		const float HW = R == A_Bodkin ? 2.5f : R == A_Heavy ? 6.5f : R == A_Eagle ? 5.0f : R == A_Wooden ? 2.0f : 5.5f, HTop = R == A_Bodkin ? 0.f : R == A_Heavy ? 5.f : 2.f, HLen = R == A_Bodkin ? 16.f : R == A_Eagle ? 15.f : 14.f;
 		for (int32 k = 0; k < 3; ++k)
 		{
 			const float Ox = (k - 1) * 11.f;
 			Quad(30.f + Ox, 12.f, 33.f + Ox, 56.f, Shaft);
-			Poly({ P(31.5f + Ox, 2.f), P(37.f + Ox, 14.f), P(31.5f + Ox, 11.f), P(26.f + Ox, 14.f) }, Head);
+			Poly({ P(31.5f + Ox, HTop), P(31.5f + HW + Ox, HLen), P(31.5f + Ox, HLen - 3.f), P(31.5f - HW + Ox, HLen) }, Head);
+			if (bFire) Quad(28.f + Ox, HLen, 35.f + Ox, HLen + 6.f, FLinearColor(0.35f, 0.2f, 0.1f));   // (the pitch bundle)
 			Poly({ P(31.5f + Ox, 52.f), P(37.f + Ox, 62.f), P(31.5f + Ox, 58.f), P(26.f + Ox, 62.f) }, Fl);
 		}
 		return;

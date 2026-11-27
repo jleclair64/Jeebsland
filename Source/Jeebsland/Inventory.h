@@ -56,16 +56,21 @@ namespace JeebItems
 	inline int32 MaterialId(EItemType T) { return static_cast<int32>(T) + 1; }
 	inline bool IsMaterial(int32 Id) { return Id >= 1 && Id < 100; }
 	inline EItemType MaterialType(int32 Id) { return static_cast<EItemType>(Id - 1); }
-	inline int32 ArrowId(int32 Tier) { return IdArrowBase + Tier; }
-	// Fire arrows (2026-10-31): iron arrows that burn what they hit (a few points of fire damage over the next seconds) and glow
-	// in flight. They count as iron for damage. Later kinds (poison ...) go after it (907, 908 ...), below the potions.
-	constexpr int32 IdFireArrow = IdArrowBase + NumTiers;   // 906
+	// Arrows (2026-11-26, owner: Docs/ThursdayList.md item 13): distinct arrows that differ by job, one row each in Content/Data/Arrows.csv (id 900 + row).
+	// The rows took over the old tier arrows' numbers so saves keep their counts: tin -> wooden, iron -> broadhead, silver -> bodkin, gold -> heavy,
+	// emerald (retired) and diamond -> eagle, fire -> fire. Making them is gated by the Smithing level (the row's Level); anyone may fire any arrow.
+	enum EArrow : int32 { A_Wooden = 0, A_Broadhead = 1, A_Bodkin = 2, A_Heavy = 3, A_RetiredEmerald = 4, A_Eagle = 5, A_Fire = 6 };
+	inline int32 ArrowId(int32 Row) { return IdArrowBase + Row; }
+	constexpr int32 IdFireArrow = IdArrowBase + A_Fire;   // 906
 	inline bool IsFireArrow(int32 Id) { return Id == IdFireArrow; }
-	inline bool IsArrow(int32 Id) { return (Id >= IdArrowBase && Id < IdArrowBase + NumTiers) || Id == IdFireArrow; }
-	inline int32 ArrowTier(int32 Id) { return Id == IdFireArrow ? T_Iron : Id - IdArrowBase; }
-	// Every kind of arrow, in the order the arrow slot steps through them (F)
-	inline int32 NumArrowKinds() { return NumTiers + 1; }
-	inline int32 ArrowKindId(int32 i) { return i < NumTiers ? ArrowId(i) : IdFireArrow; }
+	inline bool IsArrow(int32 Id) { return Id >= IdArrowBase && Id < IdArrowBase + NumArrowRows; }
+	inline int32 ArrowRowOf(int32 Id) { return FMath::Clamp(Id - IdArrowBase, 0, NumArrowRows - 1); }
+	inline const FArrowRow& ArrowRow(int32 Row) { static const FArrowRow None; const TArray<FArrowRow>& A = Tables().Arrows; return A.IsValidIndex(Row) ? A[Row] : None; }
+	inline const FArrowRow& ArrowRowFor(int32 Id) { return ArrowRow(ArrowRowOf(Id)); }
+	inline bool IsRetiredArrow(int32 Id) { return Id == ArrowId(A_RetiredEmerald); }
+	// Every arrow there is, in the order the arrow slot steps through them (F) and the smithy lists them: cheapest job first
+	inline int32 NumArrowKinds() { return 6; }
+	inline int32 ArrowKindId(int32 i) { static const int32 Order[6] = { A_Wooden, A_Broadhead, A_Bodkin, A_Heavy, A_Fire, A_Eagle }; return ArrowId(Order[FMath::Clamp(i, 0, 5)]); }
 	// Throwing rocks (2026-11-22, owner): the troll's ammunition in place of the bow and arrows, thrown from the sack in his left hand
 	// (KnightCharacterRock.cpp). One kind, stacks to 99 like arrows.
 	constexpr int32 IdRocks = 940;
@@ -95,7 +100,7 @@ namespace JeebItems
 	inline int32 VariantOf(int32 Id) { return (Id - IdGearBase) % 10; }   // the tier (or cape colour, or which ring)
 	// Kinds taken out of the game (owner): never sold, smithed or handed out; any already owned turn into a sword of the same tier when a save loads. The katana since 2026-11-12.
 	inline bool IsRetiredKind(int32 K) { return K == 6; }   // (K_Katana; the number, since EKind is declared below)
-	inline int32 ReplaceRetired(int32 Id) { return (IsGear(Id) && IsRetiredKind(KindOf(Id))) ? GearId(0, VariantOf(Id)) : Id; }   // (0 = K_Sword)
+	inline int32 ReplaceRetired(int32 Id) { if (IsRetiredArrow(Id)) return ArrowId(A_Eagle); return (IsGear(Id) && IsRetiredKind(KindOf(Id))) ? GearId(0, VariantOf(Id)) : Id; }   // (0 = K_Sword)
 	// Shields come in three styles: 0 kite (the all-rounder), 1 round (a smaller guard that recovers twice as fast, and you move
 	// quicker behind it), 2 tower (a guard half as big again, but slower to move behind)
 	constexpr int32 NumShieldStyles = 3;
@@ -113,7 +118,7 @@ namespace JeebItems
 	inline float ShieldGuardMul(int32 Style) { return ShieldStyleRow(Style).GuardMul; }
 	inline float ShieldMoveMul(int32 Style) { return ShieldStyleRow(Style).MoveMul; }
 	inline float ShieldRecoverDelay(int32 Style) { return ShieldStyleRow(Style).RecoverDelay; }
-	inline int32 TierOf(int32 Id) { return IsArrow(Id) ? ArrowTier(Id) : VariantOf(Id); }
+	inline int32 TierOf(int32 Id) { return IsArrow(Id) ? 0 : VariantOf(Id); }   // (arrows have no tier since 2026-11-26)
 	// Armour comes in three styles too (2026-11-03), packed the same way (variant = style x 10 + tier): 0 classic (the gold
 	// armour model; every armour id before the styles is classic), 1 light (the crusader tunic: lighter, stops less), 2 heavy
 	// (the original knight: stops more, heavier). Every tier comes in every style; the tier is only the colour. ArmourStyles.csv.
@@ -190,7 +195,7 @@ namespace JeebItems
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsRock(Id)) return TEXT("Throwing Rocks");
 		if (IsBroom(Id)) return JeebBroom::Row(BroomRowOf(Id)).Name;
-		if (IsArrow(Id)) return FString::Printf(TEXT("%s Arrows"), TierName(ArrowTier(Id)));
+		if (IsArrow(Id)) return ArrowRowFor(Id).Name;
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
 		if (IsMaterial(Id) && Tables().Materials.IsValidIndex(Id - 1)) return MaterialName(MaterialType(Id));   // (the wall's prompt names ores and fish too)
 		if (!IsGear(Id)) return FString();
@@ -207,21 +212,9 @@ namespace JeebItems
 	// ---------------------------------------------------------------- tier colours (Tiers.csv)
 	// Roles follow EArmorRole: Plate, Under, Trim, Cloth, Accent, Leather, BootBody.
 	inline FLinearColor Palette(int32 T, int32 Role) { return TierRow(T).Palette[FMath::Clamp(Role, 0, 6)]; }
-	// An arrow's head and feathers by its tier (owner 2026-11-05: emerald arrows have green feathers; flying, nocked, in the quiver and in the icon)
-	inline FLinearColor ArrowTipColor(int32 Id)
-	{
-		static const FLinearColor Tips[NumTiers] = {
-			FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.035f, 0.035f, 0.04f),
-			FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.75f, 0.25f), FLinearColor(0.1f, 1.0f, 0.4f), FLinearColor(0.7f, 1.1f, 1.5f) };   // tin ... diamond
-		return IsFireArrow(Id) ? FLinearColor(4.f, 1.4f, 0.25f) : Tips[FMath::Clamp<int32>(ArrowTier(Id), 0, NumTiers - 1)];
-	}
-	inline FLinearColor ArrowFeatherColor(int32 Id)
-	{
-		static const FLinearColor Feathers[NumTiers] = {
-			FLinearColor(0.42f, 0.43f, 0.44f), FLinearColor(0.05f, 0.05f, 0.055f),
-			FLinearColor(0.85f, 0.87f, 0.92f), FLinearColor(1.0f, 0.72f, 0.18f), FLinearColor(0.06f, 0.75f, 0.25f), FLinearColor(0.55f, 0.85f, 1.0f) };   // tin ... diamond
-		return IsFireArrow(Id) ? FLinearColor(0.85f, 0.18f, 0.08f) : Feathers[FMath::Clamp<int32>(ArrowTier(Id), 0, NumTiers - 1)];
-	}
+	// An arrow's head and feathers (Arrows.csv Head and Feather; a Head above 1 glows: the fire arrow), flying, nocked, in the quiver and in the icon
+	inline FLinearColor ArrowTipColor(int32 Id) { return ArrowRowFor(Id).Head; }
+	inline FLinearColor ArrowFeatherColor(int32 Id) { return ArrowRowFor(Id).Feather; }
 	inline FLinearColor GemColor(int32 T) { return TierRow(T).Gem; }
 	// Shine (Tiers.csv Metal, Rough; owner, 2026-11-04): tin and iron have none, the other four shine
 	inline float TierMetal(int32 T) { return TierRow(T).Metal; }
@@ -243,11 +236,11 @@ namespace JeebItems
 		const FWeaponBase B = WeaponBase(K);
 		return FMath::Max(1, FMath::RoundToInt((B.Min + B.Max) * 0.25f));
 	}
-	// Plain damage range of a weapon (before rings, amulets and skill). Bows add the arrow tier fully and the bow tier by half.
-	inline void WeaponDamage(int32 K, int32 T, int32& OutMin, int32& OutMax, int32 ArrowTierForBow = 0)
+	// Plain damage range of a weapon (before rings, amulets and skill). Bows add the arrow's steps fully (Arrows.csv Steps) and the bow tier's by half.
+	inline void WeaponDamage(int32 K, int32 T, int32& OutMin, int32& OutMax, int32 ArrowRowForBow = 0)
 	{
 		const FWeaponBase B = WeaponBase(K);
-		const float Steps = IsShooter(K) ? (TierSteps(ArrowTierForBow) + 0.5f * TierSteps(T)) : TierSteps(T);
+		const float Steps = IsShooter(K) ? (ArrowRow(ArrowRowForBow).Steps + 0.5f * TierSteps(T)) : TierSteps(T);
 		const int32 Add = FMath::RoundToInt(TierStep(K) * Steps);
 		OutMin = B.Min + Add;
 		OutMax = B.Max + Add;
@@ -303,7 +296,7 @@ namespace JeebItems
 		return FMath::Max(1, FMath::RoundToInt(BaseBuyPrice(K) * TierPriceMult(Variant % 10) * StyleMul));
 	}
 	constexpr int32 ArrowBundle = 10;
-	inline int32 ArrowBundlePrice(int32 T) { return FMath::Max(2, FMath::RoundToInt(8.f * TierPriceMult(T))); }
+	inline int32 ArrowBundlePrice(int32 Row) { return FMath::Max(1, ArrowRow(Row).Price); }
 
 	// ---------------------------------------------------------------- smithing (Kinds.csv Mass and SmithExtraLevel, Tiers.csv)
 	// How much raw material a piece takes ("mass"), and which materials each tier uses (2026-10-30):
@@ -327,6 +320,31 @@ namespace JeebItems
 		R.Level = TR.SmithLevel + ((T == T_Tin || bArrows) ? 0 : KindRow(K).SmithExtraLevel);
 		R.XP = M * TR.SmithXP;
 		return R;
+	}
+	// An arrow bundle (ArrowBundle of them) at the smithy: up to three materials, the row's Smithing level and XP (Arrows.csv)
+	struct FArrowRecipe { EItemType Mat[3] = { EItemType::Logs, EItemType::Logs, EItemType::Logs }; int32 Num[3] = { 0, 0, 0 }; int32 Level = 1; int32 XP = 0; };
+	inline FArrowRecipe ArrowRecipe(int32 Row)
+	{
+		const FArrowRow& A = ArrowRow(Row);
+		FArrowRecipe R;
+		for (int32 i = 0; i < 3; ++i) { R.Mat[i] = A.Mat[i]; R.Num[i] = A.Num[i]; }
+		R.Level = A.Level; R.XP = A.XP;
+		return R;
+	}
+	inline bool CanSmithArrow(int32 Row) { return Row >= 0 && Row < NumArrowRows && !IsRetiredArrow(ArrowId(Row)) && ArrowRow(Row).Level > 0; }
+	// One line on what an arrow is for, from its numbers (the smithy and tooltips)
+	inline FString ArrowJob(int32 Row)
+	{
+		const FArrowRow& A = ArrowRow(Row);
+		TArray<FString> P;
+		if (A.AnimalMul > 1.01f) P.Add(FString::Printf(TEXT("x%.1f vs animals"), A.AnimalMul));
+		if (A.Pierce > 0.01f) P.Add(FString::Printf(TEXT("pierces %d%% of armour"), FMath::RoundToInt(A.Pierce * 100.f)));
+		if (A.Knock > 0.f) P.Add(TEXT("knocks back"));
+		if (A.Burn > 0.f) P.Add(FString::Printf(TEXT("burns for %d"), FMath::RoundToInt(A.Burn)));
+		if (A.SpeedMul > 1.01f) P.Add(TEXT("flies faster"));
+		else if (A.SpeedMul < 0.99f) P.Add(TEXT("flies slower"));
+		if (P.Num() == 0) P.Add(TEXT("cheap and plain"));
+		return FString::Join(P, TEXT(", "));
 	}
 
 	// Levels needed to gather things (Materials.csv GatherLevel), and Fishing XP per catch
@@ -582,7 +600,7 @@ namespace JeebItems
 		Min = Max = 0;
 		if (!S || H < 0 || H > 4 || S->Hotbar[H] == 0) return false;
 		const int32 Id = S->Hotbar[H];
-		DamageRange(S, KindOf(Id), VariantOf(Id), FMath::Max(0, S->BestArrowTier()), Min, Max);
+		DamageRange(S, KindOf(Id), VariantOf(Id), FMath::Max(0, S->BestArrowRow()), Min, Max);
 		return true;
 	}
 	inline float StaminaMult(const USkillComponent* S)
@@ -599,6 +617,12 @@ namespace JeebItems
 		FString S;
 		auto Add = [&](int32 N, const TCHAR* Name) { if (N > 0) { if (!S.IsEmpty()) S += TEXT(", "); S += FString::Printf(TEXT("%d %s"), N, Name); } };
 		for (int32 i = 0; i < 2; ++i) Add(R.Num[i], MaterialName(R.Mat[i]));
+		return S;
+	}
+	inline FString RecipeText(const FArrowRecipe& R)
+	{
+		FString S;
+		for (int32 i = 0; i < 3; ++i) if (R.Num[i] > 0) { if (!S.IsEmpty()) S += TEXT(", "); S += FString::Printf(TEXT("%d %s"), R.Num[i], MaterialName(R.Mat[i])); }
 		return S;
 	}
 }

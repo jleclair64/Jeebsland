@@ -61,7 +61,9 @@ int32 UHealthComponent::ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool
 	if (CanBeHurt && !CanBeHurt(From)) return 0;
 	UTravelComponent::NoteCombat(From);   // (a blow dealt: no fast travel for a while; FastTravel.h)
 	if (ModifyDamage && !bHitBoxes) { Amount = ModifyDamage(Amount, From); if (Amount <= 0) { if (OnDamaged) OnDamaged(From); return 0; } }
-	if (ZoneTake && From) Amount = FMath::Max(1, FMath::RoundToInt(Amount * ZoneTake(Zone)));   // (his armour where it landed; hazards with no one behind them skip it)
+	const float Pierce = FMath::Clamp(PierceNext, 0.f, 1.f);
+	PierceNext = 0.f;
+	if (ZoneTake && From) Amount = FMath::Max(1, FMath::RoundToInt(Amount * FMath::Lerp(ZoneTake(Zone), 1.f, Pierce)));   // (his armour where it landed; hazards with no one behind them skip it)
 	const int32 Dealt = FMath::Min(Amount, Cur);
 	Cur -= Dealt;
 	if (UWorld* W = GetWorld())

@@ -1,0 +1,16 @@
+Key,Name,Model,Steps,AnimalMul,Pierce,Knock,Burn,SpeedMul,Level,Mat1,Num1,Mat2,Num2,Mat3,Num3,XP,Price,Head,Feather,Shop,Text
+# Arrows (2026-11-26, owner: Docs/ThursdayList.md item 13). Distinct arrows instead of the colour tiers: the making is gated (Smithing Level), never the using: anyone can fire any arrow they carry.
+# Keep these SEVEN rows in this order: a save stores arrows as 900 + the row. Rows 0-5 were the tin ... diamond arrows and row 6 the fire arrows; old saves keep their counts:
+#   tin -> Wooden, iron -> Broadhead, silver -> Bodkin, gold -> Heavy, emerald -> Eagle (row 4 is retired: a save's emerald arrows turn into Eagle arrows when it loads), diamond -> Eagle, fire -> Fire.
+# Every column can be changed. Model: /Game/Props/SM_<Model> (Tools/BuildArrows.ps1). Steps: damage steps the arrow adds to the bow's (as Tiers.csv DamageSteps; the bow's own tier adds half its steps).
+# AnimalMul: damage x this against animals (deer, wolves, bears, eagles). Pierce: the share of armour it goes through (0 none, 1 all) on knights and armoured foes.
+# Knock: cm/s it shoves a knight or foe it hits (0 none) with a short stagger. Burn: fire damage points over the next seconds (3 ticks). SpeedMul: flight speed x this (a heavy arrow drops sooner).
+# Level: the Smithing level needed to make a bundle of 10 at the smithy. Mat1-3 / Num1-3: what a bundle takes (Materials.csv keys; Num 0 = unused). XP: Smithing XP per bundle. Price: store price per bundle.
+# Head, Feather: colours (red green blue; above 1 glows). Shop: yes to sell it at the store. Retired rows have Level 0 and are never made or sold.
+Wooden,Wooden Arrows,Arrow_Cheap,0,1,0,0,0,1,1,Logs,2,,0,,0,6,4,0.36 0.22 0.11,0.80 0.78 0.72,yes,"Whittled from wood alone: cheap and easy to make, but they hit lightly."
+Broadhead,Broadhead Arrows,Arrow,1.2,1.5,0,0,0,1,10,IronOre,1,Logs,2,,0,14,10,0.05 0.05 0.06,0.85 0.86 0.88,yes,"A wide iron blade that cuts deep: half as much again against animals. The hunter's arrow."
+Bodkin,Bodkin Arrows,Arrow_Bodkin,1.4,0.8,0.6,0,0,1.05,20,IronOre,2,PineLogs,1,,0,24,20,0.30 0.32 0.36,0.12 0.20 0.45,yes,"A slim steel needle that punches through armour: most of a hit goes past plate and mail. For fighting other players."
+Heavy,Heavy Arrows,Arrow_Heavy,1.8,1,0,700,0,0.85,30,IronOre,3,RedwoodLogs,1,,0,32,30,0.10 0.10 0.11,0.55 0.10 0.08,yes,"A thick iron head with weight behind it: it knocks back whoever it hits and staggers them, but it flies slower and drops sooner."
+RetiredEmerald,Eagle Arrows,Arrow_Eagle,3.2,1.2,0.3,0,0,1.15,0,EagleFeather,1,SilverOre,1,RedwoodLogs,1,0,0,0.88 0.90 0.95,0.42 0.27 0.14,no,"(retired row: the old emerald arrows; a save's turn into Eagle arrows)"
+Eagle,Eagle Arrows,Arrow_Eagle,3.2,1.2,0.3,0,0,1.15,45,EagleFeather,2,SilverOre,1,RedwoodLogs,1,60,0,0.88 0.90 0.95,0.42 0.27 0.14,no,"Fletched with eagle feathers on a silver leaf blade: the hardest-hitting arrow, it flies fastest and truest and goes partly through armour. Eagle Feathers come from eagles shot down over the wild herds."
+Fire,Fire Arrows,Arrow_Fire,1,1,0,0,6,1,25,IronOre,1,PineLogs,2,Bones,1,28,24,4.0 1.4 0.25,0.85 0.18 0.08,yes,"A pitch-soaked bundle of pine resin and rendered bone fat behind the head: whatever it hits burns for a few seconds."

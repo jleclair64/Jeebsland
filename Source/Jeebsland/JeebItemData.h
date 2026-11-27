@@ -85,6 +85,18 @@ namespace JeebItems
 	};
 	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 6.25f, HealMul = 1.f, Weight = 5.f; };
 	struct FArmourStyleRow { FString Name, Note; float StopMul = 1.f, WeightMul = 1.f, PriceMul = 1.f; };
+	// An arrow (Arrows.csv, 2026-11-26): one row per arrow id (900 + row), in the file's order
+	constexpr int32 NumArrowRows = 7;
+	struct FArrowRow
+	{
+		FString Key, Name, Model, Text;
+		float Steps = 0.f, AnimalMul = 1.f, Pierce = 0.f, Knock = 0.f, Burn = 0.f, SpeedMul = 1.f;
+		int32 Level = 1, XP = 0, Price = 8;
+		EItemType Mat[3] = { EItemType::Logs, EItemType::Logs, EItemType::Logs };
+		int32 Num[3] = { 0, 0, 0 };
+		FLinearColor Head = FLinearColor(0.4f, 0.4f, 0.4f), Feather = FLinearColor(0.8f, 0.8f, 0.8f);
+		bool bShop = false;
+	};
 
 	struct FItemTables
 	{
@@ -96,6 +108,7 @@ namespace JeebItems
 		FAccessoryRow Crest;
 		TArray<FShieldStyleRow> ShieldStyles;   // always 3 rows (kite, round, tower)
 		TArray<FArmourStyleRow> ArmourStyles;   // always 3 rows (classic, light, heavy)
+		TArray<FArrowRow> Arrows;               // always NumArrowRows rows (Arrows.csv)
 	};
 
 	// The tables (read from Content/Data the first time they are needed)
