@@ -10,6 +10,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Camera/PlayerCameraManager.h"
@@ -28,6 +30,8 @@ namespace
 	TAutoConsoleVariable<float> CVarCaveGlow(TEXT("jeeb.Cave.Glow"), 2.5f, TEXT("Caves: the crystals' own glow (M_CaveCrystal Glow)."));
 	TAutoConsoleVariable<float> CVarCaveLight(TEXT("jeeb.Cave.Light"), 450.f, TEXT("Caves: each crystal light's strength (lumens)."));
 	TAutoConsoleVariable<float> CVarCaveReach(TEXT("jeeb.Cave.Reach"), 1100.f, TEXT("Caves: each crystal light's reach (cm)."));
+	TAutoConsoleVariable<int32> CVarCaveChannel(TEXT("jeeb.Cave.Channel"), 1, TEXT("Caves: 1 the crystal lights light only the cave shells, crystals, ore rocks and people (lighting channel 1), so they cannot shine through the rock onto the hillside; 0 everything."));
+	TAutoConsoleVariable<int32> CVarCaveShadows(TEXT("jeeb.Cave.Shadows"), 0, TEXT("Caves: crystal lights casting shadows: 0 none, 1 one per cave, 2 all (each costs the scene drawn six times)."));
 	TAutoConsoleVariable<float> CVarCaveNear(TEXT("jeeb.Cave.LightsNear"), 1500.f, TEXT("Caves: a cave's lights are on while the camera is this near its mouth (cm), or inside it."));
 
 	bool GPrepared = false;
@@ -545,6 +549,7 @@ void JeebCaves::BuildShells(AActor* Owner, UMaterialInterface* Mat, bool bServer
 		PM->SetCollisionProfileName(TEXT("BlockAll"));
 		PM->ComponentTags.Add(FName(TEXT("JeebCave")));
 		PM->bCastShadowAsTwoSided = true;   // (the rock keeps the sun out from either side)
+		PM->SetLightingChannels(true, true, false);   // (channel 1: the cave lights reach only the shells, crystals, ore rocks and people, ACaves::Tick)
 		if (!bServer) { if (Mat) PM->SetMaterial(0, Mat); }
 		else PM->SetVisibility(false);
 		MeshHash = FCrc::MemCrc32(V.GetData(), V.Num() * sizeof(FVector), MeshHash);
@@ -609,6 +614,7 @@ void ACaves::BeginPlay()
 		G->CreateMeshSection_LinearColor(0, V, T, N, TArray<FVector2D>(), Col, TArray<FProcMeshTangent>(), false);
 		G->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		G->SetCastShadow(false);
+		G->SetLightingChannels(true, true, false);
 		G->SetCachedMaxDrawDistance(12000.f);
 		G->LDMaxDrawDistance = 12000.f;
 		if (Base)
@@ -630,7 +636,8 @@ void ACaves::BeginPlay()
 			L->SetIntensity(CVarCaveLight.GetValueOnGameThread());
 			L->SetAttenuationRadius(CVarCaveReach.GetValueOnGameThread());
 			L->SetLightColor(FLinearColor::LerpUsingHSV(C.Glow, FLinearColor(1.f, 0.9f, 0.75f), 0.35f));
-			L->SetCastShadows(true);   // (a light with no shadow would shine on through the rock onto the hillside)
+			L->SetCastShadows(false);   // (Tick: jeeb.Cave.Shadows; with jeeb.Cave.Channel the light cannot reach the hillside through the rock anyway)
+		L->SetLightingChannels(false, true, false);
 			L->SetSourceRadius(20.f);
 			L->SetVisibility(false);
 			L->RegisterComponent();
@@ -683,11 +690,35 @@ void ACaves::Tick(float Dt)
 	{
 		UPointLightComponent* L = Lamps[i];
 		if (!L) continue;
+		// (reach, channels and shadows change only while the light is off: changed on a lit light they left the renderer's copy stale
+		// and crashed a test run, 2026-11-26. A change turns the light off for one frame.)
+		const bool bCh = CVarCaveChannel.GetValueOnGameThread() != 0;
+		const int32 Sh = CVarCaveShadows.GetValueOnGameThread();
+		const bool bShadow = Sh >= 2 || (Sh == 1 && (i == 0 || LampCave[i - 1] != LampCave[i]));
+		const bool bStale = FMath::Abs(L->AttenuationRadius - Reach) > 1.f || L->LightingChannels.bChannel1 != bCh || L->LightingChannels.bChannel0 == bCh || L->CastShadows != bShadow;
+		if (bStale)
+		{
+			if (L->IsVisible()) { L->SetVisibility(false); continue; }
+			L->SetAttenuationRadius(Reach);
+			L->SetLightingChannels(!bCh, bCh, false);
+			L->SetCastShadows(bShadow);
+			continue;
+		}
 		if (L->IsVisible() != On[LampCave[i]]) L->SetVisibility(On[LampCave[i]]);
 		if (!On[LampCave[i]]) continue;
 		const float Want = Lm * (1.f + 0.06f * FMath::Sin(Pulse * 0.9f + i * 1.7f));   // (a slow breath, never a flicker)
 		if (FMath::Abs(L->Intensity - Want) > Lm * 0.01f) L->SetIntensity(Want);
-		if (FMath::Abs(L->AttenuationRadius - Reach) > 1.f) L->SetAttenuationRadius(Reach);
+	}
+	// (people take the cave lights too: every pawn's parts on channel 1 as well, looked over once a second; outside no light uses it)
+	PawnCheck -= Dt;
+	if (PawnCheck <= 0.f)
+	{
+		PawnCheck = 1.f;
+		for (TActorIterator<APawn> It(GetWorld()); It; ++It)
+		{
+			TInlineComponentArray<UPrimitiveComponent*> Parts(*It);
+			for (UPrimitiveComponent* Pc2 : Parts) if (Pc2 && !Pc2->LightingChannels.bChannel1 && Pc2->LightingChannels.bChannel0) Pc2->SetLightingChannels(true, true, Pc2->LightingChannels.bChannel2);
+		}
 	}
 	const float Glow = CVarCaveGlow.GetValueOnGameThread();
 	for (UMaterialInstanceDynamic* M : GemMats) if (M) { float Now = 0.f; M->GetScalarParameterValue(FName(TEXT("Glow")), Now); if (!FMath::IsNearlyEqual(Now, Glow)) M->SetScalarParameterValue(TEXT("Glow"), Glow); }

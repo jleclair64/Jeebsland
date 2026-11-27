@@ -88,4 +88,5 @@ private:
 	TArray<int32> LampCave;
 	TArray<float> LampBase;
 	float Pulse = 0.f;
+	float PawnCheck = 0.f;
 };

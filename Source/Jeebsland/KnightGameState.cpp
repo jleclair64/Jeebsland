@@ -263,7 +263,7 @@ void AKnightGameState::BuildWorld()
 		if (Cv.Ore >= 0)
 		{
 			const FTransform Xf(FRotator(0.f, FRandomStream(FMath::RoundToInt(Cv.RockAt.X) * 7919 + FMath::RoundToInt(Cv.RockAt.Y) * 104729).FRandRange(0.f, 360.f), 0.f), Cv.RockAt);
-			if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf)) { Rock->SetOre(EItemType(Cv.Ore)); Rock->FinishSpawning(Xf); }
+			if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf)) { Rock->SetOre(EItemType(Cv.Ore)); Rock->FinishSpawning(Xf); TInlineComponentArray<UPrimitiveComponent*> Parts(Rock); for (UPrimitiveComponent* P : Parts) P->SetLightingChannels(true, true, false); }
 		}
 
 	// Dirt roads and the walled village with its huts

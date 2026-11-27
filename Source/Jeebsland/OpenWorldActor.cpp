@@ -345,7 +345,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 			Sum += JeebOpen::SnowOnGround(Cam.X + O.X, Cam.Y + O.Y);
 		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f) * (1.f - ACaves::CameraInside);   // (no snow falls in a cave, Caves.h)
 	}
-	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, 0.25f);
+	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, ACaves::CameraInside > 0.05f ? 3.f : 0.25f);   // (2026-11-26: gone at once on stepping into a cave; flakes hung in the Storm Peak passage)
 	const float Amount = CoverNow * SnowNow * JeebOpen::StormAlt(Cam.Z) * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
 	const int32 Want = FMath::Clamp(FMath::RoundToInt(NumFlakes * Amount), 0, NumFlakes);
 	if (Want == 0 && Shown == 0) return;
