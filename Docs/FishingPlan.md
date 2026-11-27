@@ -28,6 +28,6 @@ Normal curve; the 0.03% upper tail is z = 3.4316.
 The Escape screen's new **RECORDS** tab (third, after QUESTS): your largest trout, salmon, bass and antlers (with the trophy size still to beat), then the all-time and this week's boards. The tab asks the server (`ServerAskRecords`, at most every 2 s per player; refreshed every 10 s while open).
 
 ## Not done / later
-- Free or Meshy fish models: the items are still our code-built fish (ItemModels.h, now with salmon and bass looks). The Meshy balance is about 13 credits; the community library was not searched in this batch.
+- Fish models (done 2026-11-26): the five fish are free Meshy community models (`Art/Fish/Sources.md`, `Tools/BuildFish.ps1`, `/Game/Fish`), used swimming, on the line, dropped and on the shop wall. The pack icons are still drawn in code (new colours).
 - Other players don't see the fish on someone else's line (only the fishing pose).
 - Moose antlers aren't counted (only stags).

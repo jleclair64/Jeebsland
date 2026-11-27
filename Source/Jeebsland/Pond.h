@@ -54,7 +54,9 @@ private:
 	TWeakObjectPtr<AActor> CatchBy;
 	UPROPERTY() USceneComponent* CatchRoot = nullptr;
 	UPROPERTY() TArray<TObjectPtr<class UProceduralMeshComponent>> CatchParts;
-	UPROPERTY() TArray<TObjectPtr<class UProceduralMeshComponent>> Swimmers;   // fish shapes under the water near the spot
+	UPROPERTY() TArray<TObjectPtr<USceneComponent>> Swimmers;   // fish under the water near the spot (the fish models, or the old code-built shape)
+	UPROPERTY() TObjectPtr<UStaticMeshComponent> CatchModel = nullptr;   // the caught fish, when its model is in the game
+	bool bSwimStatic = false, bSwimSetUp = false;
 	TArray<FVector4f> SwimPlan;   // per swimmer: radius, speed (rad/s), phase, depth
 	AActor* LocalFisher() const;
 	FVector RodTip(const AActor* G) const;

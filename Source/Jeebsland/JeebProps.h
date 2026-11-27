@@ -109,8 +109,32 @@ namespace JeebProps
 		return FTransform(At[FMath::Clamp<int32>(Style, 0, 2)]);
 	}
 	// A gear item's model by its id (a shield's style is in its id), or null
+	// (2026-11-26) the fish: Meshy community models (Art/Fish/Sources.md), /Game/Fish/SM_<Name> by Tools/BuildFish.ps1, each 100 cm long along its Y axis, nose toward -Y,
+	// centred, back up. FishYaw turns the nose to +X; FishLen is how long each lies in the pack, hovers as a drop or hangs on the shop wall (a caught fish grows to its real size).
+	constexpr float FishYaw = 90.f;
+	inline bool IsFishType(EItemType T) { return T == EItemType::Perch || T == EItemType::Trout || T == EItemType::GoldenCarp || T == EItemType::Salmon || T == EItemType::Bass; }
+	inline bool IsFishItem(int32 Id) { return JeebItems::IsMaterial(Id) && IsFishType(JeebItems::MaterialType(Id)); }
+	inline const TCHAR* FishName(EItemType T)
+	{
+		switch (T)
+		{
+		case EItemType::Perch: return TEXT("Perch");
+		case EItemType::Trout: return TEXT("Trout");
+		case EItemType::GoldenCarp: return TEXT("GoldenCarp");
+		case EItemType::Salmon: return TEXT("Salmon");
+		case EItemType::Bass: return TEXT("Bass");
+		default: return nullptr;
+		}
+	}
+	inline float FishLen(EItemType T) { return T == EItemType::Salmon ? 40.f : T == EItemType::Trout ? 36.f : T == EItemType::Bass ? 34.f : T == EItemType::GoldenCarp ? 30.f : 26.f; }
+	inline UStaticMesh* FishMesh(EItemType T)
+	{
+		const TCHAR* N = FishName(T);
+		return N ? Load(*FString::Printf(TEXT("/Game/Fish/SM_%s.SM_%s"), N, N)) : nullptr;
+	}
 	inline UStaticMesh* MeshForItem(int32 Id)
 	{
+		if (IsFishItem(Id)) return FishMesh(JeebItems::MaterialType(Id));
 		const int32 K = JeebItems::KindOf(Id);
 		return K == JeebItems::K_Shield ? ShieldMesh(JeebItems::StyleOf(Id)) : MeshFor(K);
 	}
@@ -176,7 +200,7 @@ namespace JeebProps
 	{
 		if (!Owner || Owner->GetNetMode() == NM_DedicatedServer) return nullptr;
 		UStaticMeshComponent* C = MakeStatic(Owner, Attach, MeshForItem(Id));
-		if (C) TintTier(C, JeebItems::VariantOf(Id));
+		if (C && !IsFishItem(Id)) TintTier(C, JeebItems::VariantOf(Id));
 		return C;
 	}
 	// A shield's model on one of its code-built parts (the plate of that style), in the tier's colour; the caller hides the code-built parts of that

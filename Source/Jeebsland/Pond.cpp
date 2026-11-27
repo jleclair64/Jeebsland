@@ -7,6 +7,8 @@
 #include "JeebTuning.h"
 #include "KnightCharacter.h"
 #include "ItemModels.h"
+#include "JeebProps.h"
+#include "Loot.h"
 #include "Messages.h"
 #include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
@@ -101,8 +103,29 @@ void AFishingSpot::BeginPlay()
 			if (UMaterialInstanceDynamic* M = Ring->CreateDynamicMaterialInstance(0, Base)) M->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.20f, 0.25f, 0.28f));
 			Rings.Add(Ring);
 		}
-		// (2026-11-26) three fish under the water near the spot: the bass model in one dark, murky colour (seen through the water),
-		// one mesh each, circling on their own paths (Tick). Players' machines only; hidden when the camera is far off.
+		// (2026-11-26, the fish models) three fish under the water, each its own model, picked in the first Tick (river spots: bass, trout, salmon; the pond: perch,
+		// trout, golden carp), circling on their own paths (Tick). Players' machines only; hidden when the camera is far off. The old code-built shape (the bass model
+		// in one dark, murky colour) below is the fallback when /Game/Fish is missing.
+		bSwimStatic = JeebProps::FishMesh(EItemType::Bass) != nullptr;
+		if (bSwimStatic)
+		{
+			FRandomStream R(int32(GetActorLocation().X * 7.f + GetActorLocation().Y * 13.f));
+			for (int32 f = 0; f < 3; ++f)
+			{
+				UStaticMeshComponent* Fish = NewObject<UStaticMeshComponent>(this);
+				Fish->SetupAttachment(GetRootComponent());
+				Fish->SetUsingAbsoluteLocation(true);
+				Fish->SetUsingAbsoluteRotation(true);
+				Fish->SetUsingAbsoluteScale(true);
+				Fish->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+				Fish->SetCastShadow(false);
+				Fish->RegisterComponent();
+				Swimmers.Add(Fish);
+				SwimPlan.Add(FVector4f(R.FRandRange(120.f, 300.f), R.FRandRange(0.25f, 0.55f) * (R.FRand() < 0.5f ? -1.f : 1.f), R.FRandRange(0.f, 2.f * PI), R.FRandRange(18.f, 35.f)));
+			}
+		}
+		else
+		{
 		TArray<JeebItemModel::FPart> Parts;
 		JeebItemModel::Build(JeebItems::MaterialId(EItemType::Bass), Parts);
 		JeebItemModel::Turn(Parts, FVector(-90.f, 0.f, 0.f));   // (back up, as it swims)
@@ -138,6 +161,7 @@ void AFishingSpot::BeginPlay()
 			Swimmers.Add(Fish);
 			SwimPlan.Add(FVector4f(R.FRandRange(120.f, 300.f), R.FRandRange(0.25f, 0.55f) * (R.FRand() < 0.5f ? -1.f : 1.f), R.FRandRange(0.f, 2.f * PI), R.FRandRange(18.f, 35.f)));
 		}
+		}
 	}
 	else SetActorTickEnabled(false);   // (the server draws nothing: the bite and the reel run on timers)
 }
@@ -167,7 +191,23 @@ void AFishingSpot::Tick(float DeltaSeconds)
 	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	const bool bNear = PC && PC->PlayerCameraManager && FVector::DistSquared(PC->PlayerCameraManager->GetCameraLocation(), Spot) < FMath::Square(6000.f);
 	for (UProceduralMeshComponent* R : Rings) if (R && R->IsVisible() != bNear) R->SetVisibility(bNear);
-	for (UProceduralMeshComponent* S : Swimmers) if (S && S->IsVisible() != bNear) S->SetVisibility(bNear);
+	if (bSwimStatic && !bSwimSetUp)
+	{
+		// (bRiver is set just after the spawn, so the species is chosen here, once: a trout, a bass or a salmon (a perch, a trout or a golden carp in the pond), at its real length)
+		bSwimSetUp = true;
+		FRandomStream R(int32(Spot.X * 3.f + Spot.Y * 11.f));
+		const EItemType Kinds[2][3] = { { EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp }, { EItemType::Bass, EItemType::Trout, EItemType::Salmon } };
+		for (int32 f = 0; f < Swimmers.Num(); ++f)
+		{
+			const EItemType K = Kinds[bRiver ? 1 : 0][(f + R.RandRange(0, 2)) % 3];
+			if (UStaticMeshComponent* M = Cast<UStaticMeshComponent>(Swimmers[f].Get()))
+			{
+				M->SetStaticMesh(JeebProps::FishMesh(K));
+				M->SetWorldScale3D(FVector(R.FRandRange(0.85f, 1.3f) * JeebProps::FishLen(K) * 1.5f / 100.f));
+			}
+		}
+	}
+	for (USceneComponent* S : Swimmers) if (S && S->IsVisible() != bNear) S->SetVisibility(bNear);
 	if (!bNear && CatchAt < Now - 3.0) { if (Bobber->IsVisible()) { Bobber->SetVisibility(false); Line->SetVisibility(false); } return; }
 
 	// Ripples spread out from the spot all the time, so you can see where to fish
@@ -186,7 +226,7 @@ void AFishingSpot::Tick(float DeltaSeconds)
 		const float Wob = 0.25f * FMath::Sin(Clock * 1.3f + P.Z * 3.f);
 		const FVector At = Spot + FVector(P.X * (1.f + Wob) * FMath::Cos(A), P.X * FMath::Sin(A), -P.W);
 		const float Head = FMath::RadiansToDegrees(A) + (P.Y > 0.f ? 90.f : -90.f) + 12.f * FMath::Sin(Clock * 6.f + P.Z * 5.f);
-		Swimmers[i]->SetWorldLocationAndRotation(At, FRotator(0.f, Head, 0.f));
+		Swimmers[i]->SetWorldLocationAndRotation(At, FRotator(0.f, Head + (bSwimStatic ? JeebProps::FishYaw : 0.f), 0.f));
 	}
 
 	// The float and line, and a caught fish on the line
@@ -354,6 +394,22 @@ void AFishingSpot::ShowCatch(AActor* Knight, EItemType Item, float Size)
 		CatchRoot->SetUsingAbsoluteRotation(true);
 		CatchRoot->RegisterComponent();
 	}
+	if (CatchModel) { CatchModel->DestroyComponent(); CatchModel = nullptr; }
+	if (UStaticMesh* FM = JeebProps::FishMesh(Item))
+	{
+		// (2026-11-26) the fish's own model (100 cm long, nose toward +X after FishYaw), grown to its real length (inches), hung by its mouth: the nose is the root, which
+		// Tick tips head up, shakes and lets hang limp
+		const float L = Size > 0.f ? FMath::Clamp(Size * 2.54f, 12.f, 150.f) : JeebProps::FishLen(Item) * 1.3f;
+		CatchModel = NewObject<UStaticMeshComponent>(this);
+		CatchModel->SetupAttachment(CatchRoot);
+		CatchModel->SetStaticMesh(FM);
+		CatchModel->SetRelativeScale3D(FVector(L / 100.f));
+		CatchModel->SetRelativeRotation(FRotator(0.f, JeebProps::FishYaw, 0.f));
+		CatchModel->SetRelativeLocation(FVector(-0.5f * L, 0.f, 0.f));
+		CatchModel->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		CatchModel->RegisterComponent();
+		return;
+	}
 	// the pack's own fish model (ItemModels.h), grown to the fish's real length (inches), hung by its mouth
 	TArray<JeebItemModel::FPart> Parts;
 	JeebItemModel::Build(JeebItems::MaterialId(Item), Parts);
@@ -390,6 +446,7 @@ void AFishingSpot::SpawnRiverSpots(UWorld* World)
 	FActorSpawnParameters P;
 	P.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	int32 N = 0;
+	AFishingSpot* LabSpot = nullptr;
 	const TArray<JeebWorld::FRiver>& Rivers = JeebWorld::Rivers();
 	for (int32 r = 0; r < Rivers.Num(); ++r)
 	{
@@ -408,11 +465,52 @@ void AFishingSpot::SpawnRiverSpots(UWorld* World)
 			if (AFishingSpot* S = World->SpawnActor<AFishingSpot>(FVector(At.X, At.Y, JeebWorld::RiverLevel + 2.f), FRotator::ZeroRotator, P))
 			{
 				S->bRiver = true;
-				++N;
+				if (++N == 1) LabSpot = S;
 			}
 		}
 	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBFISH %d river fishing spots"), N);
+	UE_LOG(LogTemp, Log, TEXT("JEEBFISH %d river fishing spots (the first at %.0f %.0f)"), N, LabSpot ? LabSpot->GetActorLocation().X : 0.f, LabSpot ? LabSpot->GetActorLocation().Y : 0.f);
+
+	// -FishLab (2026-11-26, Tools/fish_lab.sh; players' machines): at the first river spot, a row of the five fish at real catch size in the air, a drop of each, and a
+	// fisherman who lands a fish every 3.6 s in turn (trout, salmon, bass, perch, golden carp), for pictures and the smear film
+	if (LabSpot && FParse::Param(FCommandLine::Get(), TEXT("FishLab")) && World->GetNetMode() != NM_DedicatedServer)
+	{
+		const FVector Sp = LabSpot->GetActorLocation();
+		const EItemType Kinds[5] = { EItemType::Trout, EItemType::Salmon, EItemType::Bass, EItemType::Perch, EItemType::GoldenCarp };
+		const float Inches[5] = { 27.f, 27.f, 15.f, 11.f, 18.f };
+		AStaticMeshActor* Row = World->SpawnActor<AStaticMeshActor>(Sp + FVector(0.f, 0.f, 150.f), FRotator::ZeroRotator, P);
+		if (Row) Row->GetStaticMeshComponent()->SetMobility(EComponentMobility::Movable);
+		AStaticMeshActor* Man = World->SpawnActor<AStaticMeshActor>(Sp + FVector(0.f, -150.f, 120.f), FRotator(0.f, 90.f, 0.f), P);   // (stands in for the fisher: forward +Y; high, so the fish hangs in the air over the water)
+		for (int32 k = 0; k < 5 && Row; ++k)
+		{
+			const float L = Inches[k] * 2.54f;
+			if (UStaticMeshComponent* C = JeebProps::MakeStatic(Row, Row->GetRootComponent(), JeebProps::FishMesh(Kinds[k])))
+			{
+				C->SetRelativeScale3D(FVector(L / 100.f));
+				C->SetRelativeRotation(FRotator(0.f, JeebProps::FishYaw, 0.f));
+				C->SetRelativeLocation(FVector(500.f + k * 90.f, 0.f, 0.f));
+			}
+			if (ALootDrop* D = World->SpawnActor<ALootDrop>(Sp + FVector(500.f + k * 90.f, 300.f, 150.f), FRotator::ZeroRotator, P))
+			{
+				TArray<FInvSlot> L2;
+				L2.Add(FInvSlot{ JeebItems::MaterialId(Kinds[k]), 3 });
+				D->Setup(ELootLook::Item, L2, 0);
+			}
+		}
+		static int32 LabK = 0;
+		static FTimerHandle LabTimer;
+		float LabPeriod = 3.6f;   // (-FishLabPeriod=1 lands one every second: always flopping, for stills)
+		FParse::Value(FCommandLine::Get(), TEXT("FishLabPeriod="), LabPeriod);
+		TWeakObjectPtr<AFishingSpot> WS(LabSpot);
+		TWeakObjectPtr<AActor> WM(Man);
+		World->GetTimerManager().SetTimer(LabTimer, FTimerDelegate::CreateLambda([WS, WM, Kinds, Inches]()
+		{
+			if (!WS.IsValid() || !WM.IsValid()) return;
+			const int32 K = (LabK++) % 5;
+			WS->ShowCatch(WM.Get(), Kinds[K], Inches[K]);
+		}), LabPeriod, true, 4.f);
+		UE_LOG(LogTemp, Log, TEXT("JEEBFISHLAB at %.0f %.0f %.0f: the row at +500..+860 in X, the drops +300 in Y, the spot at the middle"), Sp.X, Sp.Y, Sp.Z);
+	}
 
 	// -JeebFishTest (server or single player): check the size curves and the records file once, in the log
 	if (FParse::Param(FCommandLine::Get(), TEXT("JeebFishTest")) && World->GetNetMode() != NM_Client)
