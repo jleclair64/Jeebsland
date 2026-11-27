@@ -998,3 +998,23 @@ Owner's list (pictures pt 6-10): hand too close to his face when aiming a rock, 
 - Arrow film (`Tools/arrow_lab.sh film`, `-ArrowFilmCam`): all six arrows are single crisp copies at HIGH 120 fps with a moving camera; no motion-vector change needed. The white line is the designed streak (`AProjectile::TickTrail`).
 - Invisible players' frame cost (HIGH, 1080p, meadow view at -3000,8000, solo window; `jeeb.Test.InvisCrowd`): 0 knights 7.08 ms frame / 6.11 GPU; 1 knight 7.34 / 6.32; 4 knights 7.76 / 6.67; back to 0 7.13 / 6.21. About +0.15 ms per invisible character (draws +45 / +170, triangles +0.25 M / +1.0 M for 4 knights), so no cheaper path is needed.
 - First-drink hitch: the 200-350 ms first measured was the test's own camera move (grass regrowing at the first eye), not the drink. Properly measured (same-view second eye): 37 ms without precache (ShowInvisible took 28 ms: the sync LoadObject of M_Invisible), 18-23 ms with it. Fix kept: `AKnightCharacter::TickInvisible` loads and holds the material and shows it for one frame 3 s after a local knight ticks (the swap-in/out costs one 25-30 ms frame then). Editor numbers only; a cooked build's PSO behaviour was not measured.
+
+## Silver Point wizard village (2026-11-26/27, agent wizvillage)
+
+- **Buildings:** 12 Meshy designs (style reference: the free trial cottage) on 19 plots.
+  - Layout and plots are in `Source/Jeebsland/SilverPoint.h` (JeebSilver: ring plots round the middle with doors facing it, and a high street along the road heading). They are placed in `OpenWorldActor.cpp` BuildHouses.
+  - Models are `/Game/TownLab/Silver/SM_TL_SP<Kind>` with `_Col`. FModel rows are in OakHill.h.
+  - Rebuild them with `Tools/BuildSilverPoint.ps1 [-Only A,B] [-ImportOnly]`.
+  - Grass, snow and candles skip buildings through `JeebTerrain::JeebSilverOnBuilding`. The WorldMap Silver Point flat disc is 6600 cm.
+- **Windows:** the town hall, academy and wand shop have painted windows (their glow pictures held too few lit texels). `townlab_panes.py` now skips a building that fails instead of stopping.
+- **People:** Wizard, Witch and Goblin bodies (Meshy, rigged, with Meshy idle/walk/talk clips) in `Art/People`. Import with `Tools/ImportPeople.ps1`; its "FAILED" line is a false alarm if PEOPLEDIAG done is in the log.
+  - In `Townsfolk.csv`, the Silver Point keepers are talk-only (shops are for the economy agent).
+  - Goblins: `FFolk::bGoblin` gives speed 330, up to 10 errands, and 2-6 s stays.
+  - Silver Point errands use a per-errand seed, so Oak Hill's rounds are unchanged.
+- **Meshy credits:** 627 spent (1013 to 386).
+- **Open:**
+  - No cobbles on the plaza or streets.
+  - The layout is more spread out than narrow lanes.
+  - The broom stall still stands for the economy agent.
+  - Pets that follow you come later.
+  - Skipped: observatory, library, graveyard, greenhouse and wishing well.

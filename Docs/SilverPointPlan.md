@@ -59,12 +59,9 @@ The owner will refill Meshy first; until then only the one free trial building (
 - **Later, when credits allow:** an observatory, a library, a graveyard, a greenhouse, a wishing well.
 - **Ideas for later, not now:** enchanting, a joke shop.
 
-## Free trial building (2026-11-26, 0 credits)
-- Model: "The Enchanted Crooked Cottage", Meshy community library (CC0), https://www.meshy.ai/posts/019f48d4-039d-7cd4-9770-27612c3103d2 (892k faces as downloaded).
-- Pipeline: `Tools/BuildSilverPoint.ps1` (reduce to 300k, building_clean.py 8 m across / 16 m to the hat's tip, flatten, townlab_bake.py 50k with 2048 pictures, import to `/Game/TownLab/Silver/SM_TL_WizardHouse` + `_Col`). It stands in place of Silver Point's placeholder house (`AOpenWorld::BuildHouses`, model row `SilverWizardHouse` in OakHill.h); the other sites keep the Oak Hill house.
-- Pictures: `Docs/SilverPoint/wizardhouse_*.jpg` (mid noon, mid dusk, near noon, close-up noon).
-- Seen: reads well from the plaza and at dusk; close up the plaster carries Meshy's painted grime (dark blotches) and the roof trim has thin spiky edges. No holes or see-through faces in the close-ups. Its brooms, lanterns and cauldron are part of the model (against the shells-only rule) and its lit windows are painted, not real glass yet.
-- To use it for real: clean the plaster in the bake's grade (or a Meshy retexture), cut the brooms/lanterns/cauldron off and place them as decor, run window_inserts.py for real glass, decide the size (now about a 1.5-storey tower plus a tall hat).
+## Free trial building (removed)
+
+The free CC0 trial cottage (2026-11-26) set the style; it is no longer on the site. Every building now is our own Meshy model made with it as the style reference.
 
 ## Built (2026-11-26/27, after the Meshy refill)
 The trial cottage is gone from the site; the owner liked its look, so every building is our own Meshy model drawn in its style.

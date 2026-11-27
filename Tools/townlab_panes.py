@@ -150,10 +150,10 @@ def groups3d(pts, cell):   # parts of a cloud of spots on the model, joined with
     return lab[inv]
 
 keep = os.path.join(folder, "PrePanes"); os.makedirs(keep, exist_ok=True)
-for n in names:
+def one(n):
     P = lambda k: os.path.join(folder, "T_%s_%s.png" % (n, k))
-    if not os.path.exists(P("Glow")): log(n, "no glow picture: no lit windows, left alone"); continue
-    if n in OLD_FORGE: log(n, "an old model with a forge: its fire can't be told from the windows in the glow picture, left alone"); continue
+    if not os.path.exists(P("Glow")): log(n, "no glow picture: no lit windows, left alone"); return
+    if n in OLD_FORGE: log(n, "an old model with a forge: its fire can't be told from the windows in the glow picture, left alone"); return
     stamp = os.path.join(keep, "%s.done" % n)   # (the sizes this tool wrote last: a picture that differs is a fresh bake and replaces the kept original)
     done = open(stamp).read().split() if os.path.exists(stamp) else []
     kinds = ("Base", "Glow", "Mask") if os.path.exists(P("Mask")) else ("Base", "Glow")
@@ -348,4 +348,9 @@ for n in names:
     write(new_base, P("Base")); write(new_glow, P("Glow"))
     if not old: write(new_mask, P("Mask"))
     open(stamp, "w").write(" ".join(str(os.path.getsize(P(k))) for k in kinds))
+
+for n in names:   # (one building failing no longer stops the rest, 2026-11-27)
+    try: one(n)
+    except Exception as e: log(n, "FAILED, skipped:", repr(e))
+
 log("done")
