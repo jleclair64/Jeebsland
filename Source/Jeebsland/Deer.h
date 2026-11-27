@@ -29,7 +29,8 @@ enum class EDeerState : uint8 { Graze, Idle, Look, Walk, Alert, Flee, Dead, Chas
 
 namespace JeebDeer
 {
-	enum EClip { C_Idle, C_Look, C_Walk, C_Run, C_Graze, C_Alert, C_Death, C_Attack, C_Count };
+	enum EClip { C_Idle, C_Look, C_Walk, C_Run, C_Graze, C_Alert, C_Death, C_Attack, C_Gallop, C_Count };   // (C_Gallop: the horse only, 2026-11-26)
+	static_assert(C_Count == 9, "UDeerAnimInstance::Clip[9] and GaitOff[9]");
 }
 
 // Plays the animal's clips with cross-fades; walk and run are played at the speed its feet really cover
@@ -41,7 +42,11 @@ public:
 	void SetClips(UAnimSequence* const* In, float StartAt);
 	void Drive(int32 InClip, float InRate) { Want = InClip; Rate = InRate; }
 
-	UPROPERTY(Transient) TObjectPtr<UAnimSequence> Clip[8];   // (JeebDeer::C_Count)
+	UPROPERTY(Transient) TObjectPtr<UAnimSequence> Clip[9];   // (JeebDeer::C_Count)
+	// Gait sync (2026-11-26, the horse): walk, canter and gallop share one stride phase, each clip offset by where its leading forefoot
+	// lands (GaitOff, 0-1 of the clip), so a cross-fade between gaits blends matching foot positions instead of popping. Off when all 0.
+	float GaitOff[9] = {};
+	bool bGaitSync = false;
 	int32 Want = 0;
 	float Rate = 1.f, Start = 0.f;
 	bool bNewClips = false;
@@ -72,10 +77,13 @@ struct FDeerAnimProxy : public FAnimInstanceProxy
 	virtual void PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds) override;
 	virtual bool Evaluate(FPoseContext& Output) override;
 
-	UAnimSequence* Clip[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-	float Time[8] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	UAnimSequence* Clip[JeebDeer::C_Count] = {};
+	float Time[JeebDeer::C_Count] = {};
 	int32 LastWant = 0;
-	float Weight[8] = { 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	float Weight[JeebDeer::C_Count] = { 1.f };
+	float GaitPhase = 0.f;   // (bGaitSync: the shared stride phase, 0-1)
+	bool bSync = false;
+	float GOff[JeebDeer::C_Count] = {};
 	// foot IK (UDeerAnimInstance::SetLegs)
 	UDeerAnimInstance* Owner = nullptr;
 	bool bIK = false, bGround = false, bFloor = false, bSole = false;

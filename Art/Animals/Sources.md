@@ -29,7 +29,7 @@ Downloaded 2026-11-13 from Meshy's free community library (CC0) for inspection o
 | (tried, not used: Originals/RidingHorse_Original.glb; its loose mane and tail fell apart in the reduction) | | https://www.meshy.ai/posts/019cf879-33e0-76ec-939b-317645e80c79 | CC0 |
 
 - The horse was cleaned like the stag (`Tools/deer_clean.py ... Horse`: 20k triangles, baked 2048 colour and 1024 normal pictures) and rigged by Meshy (`animation_type: quadruped`, height 1.6 m; task 01a20597-bd47-74e8-bfc5-17249e63b950). **Meshy would not animate it**: four rigs (with and without the tail, the Riding Horse too; 25 credits in all) each answered that the four-legged skeleton "was not recognized" (a horse's long legs and neck land on a different bone layout from the template). The stag's rig is recognized, so the horse clips (Horse Idle x2, Walk, Canter, Sprint, Walk Back, Cow Death; 24 credits; task 01a2059b-c950-73fd-8175-a239607adda7) were put on the stag's rig and copied onto the horse's own skeleton by `Tools/horse_retarget.py` -> `Horse/Horse_clips.glb` (53 bones, root and toes renamed for deer_export.py).
-- Hoof speeds at scale 1 (deer_export.py): walk 106 cm/s, canter 397 cm/s, back 123 cm/s. In the game the horse is 1.25 x.
+- Hoof speeds at scale 1 (deer_export.py): walk 106 cm/s, canter 397 cm/s, back 123 cm/s, gallop (horse_Sprint, 2026-11-26) 751 cm/s by the same measure, but per hoof in stance 800-1140 (the game uses 850, `jeeb.Horse.GallopHoof`). In the game the horse is 1.25 x.
 - The saddle: `Tools/saddle_prep.py` (8k triangles, its horn along +X, 52 cm long, origin where it sits on the back) -> `/Game/Animals/SM_Saddle`.
 - Into the game: `Tools/BuildDeer.ps1` (both).
 
