@@ -368,8 +368,35 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     # (2026-11-15: emissive ignores shadow, so among the blades it lit the ground under trees at dusk above the shaded blades, owner:
     # "seems to glow". Now it comes in only past the blades: grass_field.under_grass_fill.)
     fill = g.muln(g.muln(g.muln(col, g.c3((1.12, 0.97, 0.8))), g.scalar("SkyFill", 0.0)), bare)
+    # Caves (2026-11-26, Source/Jeebsland/Caves.h): a cave's shell gives in its third UV how deep inside a point is (0 at the mouth, 1 from
+    # 7 m in). There the rock takes no sky light (ambient occlusion 0: the game has no distance fields to shade the sky light by itself)
+    # and none of the low sun's fill, only real lights (the sun through the mouth, the crystals). A procedural mesh always has four UVs, so
+    # every other ground reads 0: open air, as before.
+    uv2 = g.node(unreal.MaterialExpressionTextureCoordinate)
+    uv2.set_editor_property("coordinate_index", 2)
+    open_air = g.one(unreal.MaterialExpressionOneMinus, g.sat(g.mask(uv2, True, False)))
+    g.out(open_air, unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    fill = g.muln(fill, open_air)
     g.out(grass_field.under_grass_fill(g, fill, beyond), unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     finish(mat, "M_Ground")
+
+
+def build_cave_crystal():
+    # The caves' glowing crystals (2026-11-26, Source/Jeebsland/Caves.cpp ACaves): opaque, so they write depth and motion like any rock
+    # (no smear under TSR), a deep tint of their colour lit as glass-smooth stone plus their own glow: Tint x Glow, brightest face-on and
+    # a little darker at the grazing edges (each flat facet reads), times the vertex red (each crystal's own brightness, 0.65 to 1).
+    mat = fresh_material("M_CaveCrystal")
+    g = Graph(mat)
+    vc = g.node(unreal.MaterialExpressionVertexColor)
+    tint = g.vector("Tint", (0.35, 0.8, 1.0))
+    rim = g.node(unreal.MaterialExpressionFresnel, exponent=2.0, base_reflect_fraction=0.0)
+    face = g.lerpc(1.0, 0.45, rim)
+    glow = g.muln(g.muln(g.muln(tint, g.scalar("Glow", 6.0), "RGB"), face), g.mask(vc, True, False))
+    g.out(g.mul(tint, 0.18, "RGB"), unreal.MaterialProperty.MP_BASE_COLOR)
+    g.out(g.c(0.22), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.c(0.6), unreal.MaterialProperty.MP_SPECULAR)
+    g.out(glow, unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    finish(mat, "M_CaveCrystal")
 
 
 def build_dirt(dirt_tex, cobble_tex, cobble_n, patches, grass_tex):
@@ -618,6 +645,7 @@ else:
     build_stone(rock_tex, patches)
     build_boulder(rock_tex, patches)
     build_stumps()
+    build_cave_crystal()
     # (2026-11-22: a fresh M_StumpBark has no default pictures and fails to compile, drawing every stump flat grey; give it a stump's)
     exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "stump_fix.py")).read())
     for old in ("M_WorldGround", "T_Ground"):   # the old flat world material and the old ground picture: replaced

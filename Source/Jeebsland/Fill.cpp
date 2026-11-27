@@ -1,4 +1,5 @@
 #include "Fill.h"
+#include "Caves.h"
 #include "SightCover.h"
 #include "JeebTuning.h"
 #include "FillData.h"
@@ -467,7 +468,13 @@ namespace
 }
 
 bool JeebFill::AnyCovered() { return GCover.Num() > 0; }
+static bool CoveredByFill(float X, float Y);
 bool JeebFill::Covered(float X, float Y)
+{
+	if (JeebCaves::Covered(X, Y)) return true;   // (a cave's rock frame at its mouth, 2026-11-26: the grass, bushes, fireflies and frogs ask here too)
+	return CoveredByFill(X, Y);
+}
+static bool CoveredByFill(float X, float Y)
 {
 	if (GCover.Num() == 0 || X < GCoveredBox.Min.X || X > GCoveredBox.Max.X || Y < GCoveredBox.Min.Y || Y > GCoveredBox.Max.Y) return false;
 	const TArray<int32>* L = GCoverBuckets.Find(FIntPoint(FMath::FloorToInt(X / 400.f), FMath::FloorToInt(Y / 400.f)));
