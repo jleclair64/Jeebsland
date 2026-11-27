@@ -391,3 +391,20 @@ Seven caves: four in the mountains (Storm Peak by the snowstorm peaks, West Rang
 - `-ShotEyes` heights may start with `A` for an absolute height (`X_Y_A8993_yaw_pitch_sun`); the `JEEBCAVE eyes` log lines give near/mid/passage/chamber/lookout eyes for each cave.
 
 **Fish models (2026-11-26, agent fish).** Trout, salmon, bass, perch and golden carp are now real models (free Meshy community models, CC0; sources in `Art/Fish/Sources.md`), in `/Game/Fish`. They are used for the fish swimming under the water at every fishing spot (river: bass, trout, salmon; pond: perch, trout, golden carp; dark through the water), the fish that comes up on the line (grown to its real length in inches; it flops hard, then weaker, then hangs limp by its mouth, unchanged), dropped fish (a stack shows up to three) and the fish on the shop wall. The little fish pictures in the pack are still drawn in code, in the new fish's colours. To judge: fish in the river (any Fishing level for bass) and the pond; watch the fish circle under the float, the catch coming up, a dropped catch, and the store's sell list (it lists Salmon and Bass). Rebuild the models with `Tools\BuildFish.ps1` (editor closed; needs the glb files in `Art/Fish`, git-ignored, links in Sources.md). Test pictures: `bash Tools/fish_lab.sh find` prints the lab's spot (the first river spot, 94421 29282), then `bash Tools/fish_lab.sh 94421 29282 stills|film`: `-FishLab` hangs a row of the five fish at real size over the water, drops three of each beside it, and lands a fish at the spot over and over (`-FishLabPeriod=<seconds>`); `film` is a 120 fps HIGH smear film. A lineup is in `Docs/Fishing/FishLineup.png`.
+
+## Standing-stone circles and the noon loot event (2026-11-26, agent trollkit; StoneCircle.h, Docs/StoneCirclePlan.md)
+
+- **Where:** The Grey Ring, in the new PvP zone **The Hollow Heath** (red title, signs every 60 m; X 35-335 m, Y 605-905 m), on the moor
+  east of Oak Hill's forest at (185, 755) m, about 70 m from the forest's edge; and The Frostmere Stones, snowy and frost-capped, in The
+  Frozen North at (965, 690) m. Both are in `Content/Data/StoneCircles.csv`; the zone is the last row of `PvpZones.csv`.
+- **The event:** each circle wakes every 10 game days (`[StoneCircle] IntervalDays`; a game day is 20 minutes, so every 200 minutes), the
+  Grey Ring on day 3 of the cycle, the Frostmere Stones on day 8, never the same day. At that day's dawn every player gets a title and a
+  message; 3 minutes before high noon (`CountdownSeconds`) a countdown shows at the top of the screen; at noon the runes glow teal (ice blue
+  in the north) and one prize lies on the centre stone. Walk up, E takes it. The first player to take from it owns it; anyone else is told
+  "Someone else has already claimed this gift." Loot: `Content/Data/StoneCircleLoot.csv` (weight-0 rows always, plus `LootDraws` drawn).
+- **Try it now** (not in packages): console `jeeb.Stones.WakeNow 0` (the Grey Ring; `1` the Frostmere Stones; a second number = seconds to
+  its noon, default 190) in single player, or start the world server with `-StoneWakeIn=120 -StoneWakeCircle=0`. Fast travel is blocked in
+  PvP zones, so walk from Oak Hill east past the forest's edge.
+- **Tests:** pictures `bash Tools/stone_lab.sh 18500 75500 stills|wake|film|cost` (`CIRCLE=1` and `96500 69000` for the north);
+  online `bash Tools/stone_net.sh` (JEEBSTONETEST PASS lines on the server; JEEBSTONE hud lines on both players at the same server times).
+  `-JeebStoneSearch` logs how the spots were chosen. Log `JEEBSTONE`.

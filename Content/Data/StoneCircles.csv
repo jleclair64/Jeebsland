@@ -1,0 +1,7 @@
+Name,Zone,X,Y,Radius,Frost,DayOffset
+# The standing-stone circles (2026-11-26, StoneCircle.h, Docs/StoneCirclePlan.md). Every machine builds them from this file, in the same spot.
+# X, Y: the middle in metres (X north, Y east, as PvpZones.csv). Radius: metres from the middle to the ring. Frost: yes for the snowy, frost-touched stones.
+# DayOffset: which game day of the [StoneCircle] IntervalDays cycle (Tuning.ini) the circle wakes on; give each circle its own so they never share a day.
+# Zone: the PvP zone named in the messages (the circle must stand inside a PvpZones.csv rectangle). Change it, then restart the game and the world servers.
+The Grey Ring,The Hollow Heath,185,755,9,no,3
+The Frostmere Stones,The Frozen North,965,690,9,yes,8

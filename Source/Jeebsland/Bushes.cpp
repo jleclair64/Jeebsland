@@ -1,4 +1,5 @@
 #include "Bushes.h"
+#include "StoneCircle.h"
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "OakHill.h"
@@ -170,7 +171,7 @@ void ABushes::Rebuild()
 			const float Want = (Kind3 == 0 ? 0.26f : Kind3 == 1 ? 0.2f : 0.025f) * Density;
 			if (Roll >= Want) continue;
 			++Tried;
-			if (JeebTerrain::PathClearance(P.X, P.Y) < (bShore ? 150.f : 180.f)) continue;
+			if (JeebTerrain::PathClearance(P.X, P.Y) < (bShore ? 150.f : 180.f) || JeebStones::KeepOut(P.X, P.Y, 600.f)) continue;
 			if (JeebTerrain::NoGroundCover(P.X, P.Y) || JeebFill::Covered(P.X, P.Y)) continue;
 			if (bTown && JeebOakHill::OnBuilding(P.X, P.Y, 4.f)) continue;
 			const float Z = JeebTerrain::DrawnHeight(P.X, P.Y);
@@ -232,7 +233,7 @@ void ABushes::Rebuild()
 				if (Under > -15.f && Under < 30.f)
 				{
 					if (Roll >= 0.3f * Density) continue;
-					if (JeebTerrain::PathClearance(P.X, P.Y) < 200.f || JeebFill::Covered(P.X, P.Y)) continue;
+					if (JeebTerrain::PathClearance(P.X, P.Y) < 200.f || JeebFill::Covered(P.X, P.Y) || JeebStones::KeepOut(P.X, P.Y, 600.f)) continue;
 					if (JeebOakHill::InBox(P.X, P.Y, 0.f) && JeebOakHill::OnBuilding(P.X, P.Y, 4.f)) continue;
 					for (int32 n = 0, Nn = 7 + R.RandRange(0, 6); n < Nn; ++n)
 					{

@@ -50,6 +50,9 @@ public:
 	// The trading post's stock this hour, as the server has it (so everyone sees the same "3 left")
 	UPROPERTY(Replicated) int64 StoreHour = -1;
 	UPROPERTY(Replicated) TArray<int32> StoreLeft;
+	// The stone circles' test wake (StoneCircle.h; set by the server only through jeeb.Stones.WakeNow or -StoneWakeIn, not Shipping): its noon on the server clock, -1 none
+	UPROPERTY(Replicated) double StoneTestNoon = -1.0;
+	UPROPERTY(Replicated) int32 StoneTestCircle = -1;
 	void SyncStore();                        // server: after a sale
 
 	// A floating damage number, from the server to every player (see JeebCombat::AddNumber)

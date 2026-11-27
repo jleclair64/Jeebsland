@@ -395,6 +395,11 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	{
 		ALootDrop* Drop = Cast<ALootDrop>(Target);
 		if (!Drop || Drop->IsActorBeingDestroyed() || FVector::Dist2D(Drop->GetActorLocation(), GetActorLocation()) > 500.f) break;
+		if (Drop->bOneTaker)
+		{
+			if (Drop->ClaimedBy.IsValid() && Drop->ClaimedBy.Get() != this) { if (USkillComponent* SkC = FindComponentByClass<USkillComponent>()) SkC->Say(2.5f, FColor(255, 170, 120), TEXT("Someone else has already claimed this gift.")); break; }
+			Drop->ClaimedBy = this;
+		}
 		if (Op == EInvOp::LootTakeAll) Drop->TakeAll(this);
 		else if (Op == EInvOp::LootTakeOne) { if (A < 0) Drop->TakeIngots(this); else Drop->TakeOne(A, this); }
 		else if (!ArmourBusy(true)) bGear = Drop->EquipTo(A, this, B, C % 100, C >= 100);   // (no changing gear from a sack mid-fight either)

@@ -1,4 +1,5 @@
 #include "OakForest.h"
+#include "StoneCircle.h"
 #include "Caves.h"
 #include "TreeLook.h"
 #include "Terrain.h"
@@ -768,6 +769,7 @@ struct FOakForestBuild
 			if (Sq < 1200.f) return 0.f;
 			const float Ds = FVector2D::Distance(P, SteeleC);
 			if (Ds < 21000.f) return 0.f;
+			if (JeebStones::KeepOut(X, Y, 2500.f)) return 0.f;   // (2026-11-26: the standing-stone circles stand in open fields, StoneCircle.h)
 			const float Shore = JeebWorld::CoastY(X) - Y;
 			if (JeebCaves::Covered(X, Y)) return 0.f;   // (2026-11-26: no tree on a cave's rock frame, Caves.h)
 			if (JeebRework::NearNeedles(X, Y, 0.f))   // (2026-11-25: nothing grows out of the Needles' pillars; MapRework.h)
