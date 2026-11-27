@@ -528,6 +528,28 @@ bool ANpc::KeeperGestures() const
 	return Since > Every - G;
 }
 
+void ANpc::Alarm(const FVector& LookAt, float Seconds, float BubbleSeconds, const FString& Line, bool bShout)
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	AlarmLook = LookAt;
+	AlarmUntil = Now + Seconds;
+	BubbleUntil = Line.IsEmpty() ? -1.0 : Now + BubbleSeconds;
+	AlarmLine = Line;
+	bAlarmShout = bShout;
+	SetActorTickInterval(0.f);   // (a far one may tick slowly: turn smoothly now)
+}
+
+bool ANpc::AlarmShown(FString& OutLine, bool& bOutShout, float& OutBubble, float& OutMark) const
+{
+	const double Now = GetWorld()->GetTimeSeconds();
+	if (Now >= AlarmUntil) return false;
+	OutLine = Now < BubbleUntil ? AlarmLine : FString();
+	bOutShout = bAlarmShout;
+	OutBubble = FMath::Clamp(float(BubbleUntil - Now) / 0.4f, 0.f, 1.f);
+	OutMark = FMath::Clamp(float(AlarmUntil - Now) / 0.6f, 0.f, 1.f);
+	return true;
+}
+
 void ANpc::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -569,7 +591,7 @@ void ANpc::Tick(float DeltaSeconds)
 		const double Clock = JeebLife::Now(GetWorld());
 		// Holding still (looks only, never on a dedicated server): while you talk to them, or when you stand right in their way.
 		// They catch up afterwards, mostly by cutting their next stays short, a little by walking faster.
-		bool bHold = !bDedi && bTalking;
+		bool bHold = !bDedi && (bTalking || GetWorld()->GetTimeSeconds() < AlarmUntil);   // (or alarmed: Guards.h)
 		if (!bDedi && !bHold && bPoseWalk && Player && DistToPlayer < 130.f)
 			bHold = FVector2D::DotProduct(FVector2D(ToPlayer.X, ToPlayer.Y).GetSafeNormal(), FVector2D(GetActorForwardVector().X, GetActorForwardVector().Y)) > 0.3f;
 		if (bHold) Lag = FMath::Min(Lag + DeltaSeconds, 600.f);
@@ -608,7 +630,9 @@ void ANpc::Tick(float DeltaSeconds)
 		float WantYaw = HomeYaw;
 		if (bChat && !ChatAt.IsZero()) WantYaw = FVector(ChatAt.X - At.X, ChatAt.Y - At.Y, 0.f).Rotation().Yaw;
 		if (bTalking || (bNear && !(bChat && DistToPlayer > 220.f))) WantYaw = FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw;
-		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : 90.f));
+		const bool bAlarmed = !bDedi && GetWorld()->GetTimeSeconds() < AlarmUntil;   // (the alarm: they look at the thief, quickly)
+		if (bAlarmed) WantYaw = FVector(AlarmLook.X - At.X, AlarmLook.Y - At.Y, 0.f).Rotation().Yaw;
+		SetActorRotation(FMath::RInterpConstantTo(GetActorRotation(), FRotator(0.f, WantYaw, 0.f), DeltaSeconds, bTalking ? 180.f : bAlarmed ? 300.f : 90.f));
 	}
 
 	// The head's turn toward you: up to 55 degrees, and back to straight ahead as you go round behind them (2026-11-18, motion review: the
@@ -624,7 +648,8 @@ void ANpc::Tick(float DeltaSeconds)
 		LastLoc = Now;
 		MoveSpeed = FMath::FInterpTo(MoveSpeed, FMath::Min(Moved, 400.f), DeltaSeconds, 8.f);
 		const float Rel = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, FVector(ToPlayer.X, ToPlayer.Y, 0.f).Rotation().Yaw);
-		const int32 State = (KeeperGestures() || bChatTalk) ? 2 : (WalkBlend > 0.35f ? 1 : 0);   // (a keeper mostly idles while you shop: KeeperGestures)
+		const bool bShouting = GetWorld()->GetTimeSeconds() < BubbleUntil && bAlarmShout;   // (the alarm's shout: they gesture as they talk)
+		const int32 State = (KeeperGestures() || bChatTalk || bShouting) ? 2 : (WalkBlend > 0.35f ? 1 : 0);   // (a keeper mostly idles while you shop: KeeperGestures)
 #if !UE_BUILD_SHIPPING
 		if (bTalking && OffersTrade())
 		{

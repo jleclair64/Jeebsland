@@ -99,6 +99,7 @@ UCLASS()
 class AKnightCharacter : public AJeebslandCharacter
 {
 	GENERATED_BODY()
+	friend class ATownGuard;   // (Guards.cpp: a caught thief is knocked down, KnockDownBy)
 	friend struct FHorseTestDriver;   // (-JeebHorseTest, HorseTest.cpp)
 	friend struct FStealthTestDriver;   // (-JeebStealthTest, Stealth.cpp)
 	friend class AHorse;              // (-HorseLabRide: the lab puts the player on a horse, Horse.cpp BuildLab)

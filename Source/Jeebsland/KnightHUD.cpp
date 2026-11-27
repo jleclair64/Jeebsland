@@ -23,6 +23,7 @@
 #include "Store.h"
 #include "Engine/Texture2D.h"
 #include "Engine/Font.h"
+#include "Guards.h"
 #include "TextureResource.h"
 #include "RenderUtils.h"
 #include "Messages.h"
@@ -137,6 +138,68 @@ void AKnightHUD::DrawHUD()
 			const FLinearColor C = bAlert ? FLinearColor(1.f, 0.22f, 0.12f, A) : FLinearColor(1.f, 0.85f, 0.2f, A);
 			HDText(TEXT("!"), FLinearColor(0.f, 0.f, 0.f, 0.75f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, Sc);
 			HDText(TEXT("!"), C, SP.X - TW * 0.5f, SP.Y - TH, Font, Sc);
+		}
+	}
+
+	// The alarm (2026-11-26, Guards.h): a townsperson who heard a thief shouts in a speech bubble under a red "!", those near them a yellow
+	// "!"; the town guards' own lines, a red "!" over one who is chasing, their name when you are close; and to the thief, a warning
+	if (PC && !Knight->IsUIOpen())
+	{
+		auto Mark = [&](const FVector& Top, bool bRed, float A, const FString& Line, float LineA)
+		{
+			const float D = FVector::Dist(Top, Pawn->GetActorLocation());
+			A *= FMath::Clamp((5000.f - D) / 1000.f, 0.f, 1.f);   // (full within 40 m, gone past 50 m)
+			if (A <= 0.f) return;
+			FVector2D SP;
+			if (!PC->ProjectWorldLocationToScreen(Top, SP)) return;
+			const float Sc = bRed ? 3.2f : 2.6f;
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(TEXT("!"), TW, TH, Font, Sc);
+			const FLinearColor C = bRed ? FLinearColor(1.f, 0.22f, 0.12f, A) : FLinearColor(1.f, 0.85f, 0.2f, A);
+			HDText(TEXT("!"), FLinearColor(0.f, 0.f, 0.f, 0.75f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, Sc);
+			HDText(TEXT("!"), C, SP.X - TW * 0.5f, SP.Y - TH, Font, Sc);
+			const float La = LineA * FMath::Clamp((3500.f - D) / 1000.f, 0.f, 1.f);   // (the words within 25 m)
+			if (Line.IsEmpty() || La <= 0.f) return;
+			float LW = 0.f, LH = 0.f;
+			HDTextSize(Line, LW, LH, Font, 1.7f);
+			const float Pad = 8.f, BX = SP.X - LW * 0.5f - Pad, BY = SP.Y - TH - LH - 2.f * Pad - 6.f;
+			DrawRect(FLinearColor(0.98f, 0.96f, 0.9f, 0.92f * La), BX, BY, LW + 2.f * Pad, LH + 2.f * Pad);
+			DrawRect(FLinearColor(0.98f, 0.96f, 0.9f, 0.92f * La), SP.X - 5.f, BY + LH + 2.f * Pad, 10.f, 5.f);   // (the bubble's tail)
+			HDText(Line, FLinearColor(0.12f, 0.08f, 0.05f, La), BX + Pad, BY + Pad, Font, 1.7f);
+		};
+		for (TActorIterator<ANpc> It(GetWorld()); It; ++It)
+		{
+			FString Line; bool bShout = false; float BubA = 0.f, MarkA = 0.f;
+			if (!It->AlarmShown(Line, bShout, BubA, MarkA)) continue;
+			Mark(FVector(It->GetActorLocation().X, It->GetActorLocation().Y, It->HeadTopZ() + 40.f), bShout, MarkA, Line, BubA);
+		}
+		for (TActorIterator<ATownGuard> It(GetWorld()); It; ++It)
+		{
+			float SayA = 0.f;
+			const FString Line = It->SayingNow(SayA);
+			const bool bChase = It->Mode() == ATownGuard::EMode::Chase;
+			const FVector Top(It->GetActorLocation().X, It->GetActorLocation().Y, It->HeadZ() + 40.f);
+			if (bChase || !Line.IsEmpty()) Mark(Top, true, bChase ? 1.f : 0.f, Line, SayA);
+			const float D = FVector::Dist2D(Top, Pawn->GetActorLocation());
+			const float A = FMath::Clamp((800.f - D) / 150.f, 0.f, 1.f);   // (the name within 6.5 m)
+			FVector2D SP;
+			if (A > 0.f && !bChase && Line.IsEmpty() && PC->ProjectWorldLocationToScreen(Top - FVector(0.f, 0.f, 25.f), SP))
+			{
+				const FString Nm = TEXT("Town Guard");
+				float TW = 0.f, TH = 0.f;
+				HDTextSize(Nm, TW, TH, Font, 2.f);
+				HDText(Nm, FLinearColor(0.f, 0.f, 0.f, 0.8f * A), SP.X - TW * 0.5f + 2.f, SP.Y - TH + 2.f, Font, 2.f);
+				HDText(Nm, FLinearColor(0.55f, 0.75f, 1.f, 0.95f * A), SP.X - TW * 0.5f, SP.Y - TH, Font, 2.f);
+			}
+		}
+		if (JeebGuards::IsChased(Knight))
+		{
+			const FString W = TEXT("A guard is after you! Leave town or hide.");
+			float TW = 0.f, TH = 0.f;
+			HDTextSize(W, TW, TH, Font, 2.2f);
+			const float A = 0.75f + 0.25f * FMath::Sin(GetWorld()->GetTimeSeconds() * 6.f);
+			HDText(W, FLinearColor(0.f, 0.f, 0.f, 0.8f), Canvas->ClipX * 0.5f - TW * 0.5f + 2.f, Canvas->ClipY * 0.2f + 2.f, Font, 2.2f);
+			HDText(W, FLinearColor(1.f, 0.3f, 0.2f, A), Canvas->ClipX * 0.5f - TW * 0.5f, Canvas->ClipY * 0.2f, Font, 2.2f);
 		}
 	}
 
