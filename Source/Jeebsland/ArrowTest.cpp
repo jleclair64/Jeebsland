@@ -248,8 +248,22 @@ static void ArrowLineup(UWorld* W, float Dt)
 		if (!K) return;
 		FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		const FVector A = O + FVector(800.f, -900.f, 320.f);   // (over the tall grass)
-		if (AProjectile* Pj = W->SpawnActor<AProjectile>(AProjectile::StaticClass(), A, FRotator(0.f, 90.f, 0.f), SP))
-			Pj->Launch(K, FVector(0.f, 1.f, 0.f), 3000.f, 0.f, 1, false, ESkillType::Archery, false, 0, JeebItems::ArrowId(Order[FlyK++ % 6]), 0.f, 0.f);
+		FVector From = A, Dir(0.f, 1.f, 0.f);
+		static const bool bCam = FParse::Param(FCommandLine::Get(), TEXT("ArrowFilmCam"));
+		if (bCam)   // (-ArrowFilmCam, smear film 2026-11-26: each arrow crosses the view 4 m in front of the camera, left to right, wherever the camera has got to)
+		{
+			AActor* VT = PC->GetViewTarget();
+			if (VT)
+			{
+				const FRotator Y = VT->GetActorRotation();   // (the camera's own look, pitch too, so the arrow crosses wherever it points)
+				float D = 300.f; FParse::Value(FCommandLine::Get(), TEXT("ArrowFilmDist="), D);
+				Dir = FRotationMatrix(Y).GetScaledAxis(EAxis::Y);
+				From = VT->GetActorLocation() + Y.Vector() * D - Dir * D * 1.05f;
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("JEEBARROWFLY #%d kind %d at clock %.2f from %s"), FlyK, Order[FlyK % 6], Clock, *From.ToCompactString());
+		if (AProjectile* Pj = W->SpawnActor<AProjectile>(AProjectile::StaticClass(), From, Dir.Rotation(), SP))
+			Pj->Launch(K, Dir, 3000.f, 0.f, 1, false, ESkillType::Archery, false, 0, JeebItems::ArrowId(Order[FlyK++ % 6]), 0.f, 0.f);
 	}
 }
 
