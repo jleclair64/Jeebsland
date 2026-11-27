@@ -22,5 +22,5 @@ bash Tools/uqueue.sh release mapnetS >/dev/null; bash Tools/uqueue.sh release ma
 rm -f Saved/Accounts/mapnet* Saved/Characters/mapnet*
 echo "== server errors"; grep -E "Error: |Fatal|Ensure" Saved/Logs/mapnS.log | cut -c30-250 | head -5
 echo "== client joined"; grep -E "Join succeeded|JEEBLOGIN|logged in" Saved/Logs/mapnC.log | cut -c30-200 | head -5
-PAT='JEEBOPEN stats|JEEBOPEN houses|JEEBREWORK (the east|arch)|JEEBWATER (shape|pads)|JEEBHILLS stats|JEEBROADS|JEEBRUINS|JEEBFOE|JEEBFOREST|JEEBFILL total|JEEBOAK|JEEBSTEELE|JEEBLIFE'
+PAT='JEEBCAVE (all|shells)|JEEBOPEN stats|JEEBOPEN houses|JEEBREWORK (the east|arch)|JEEBWATER (shape|pads)|JEEBHILLS stats|JEEBROADS|JEEBRUINS|JEEBFOE|JEEBFOREST|JEEBFILL total|JEEBOAK|JEEBSTEELE|JEEBLIFE'
 for n in mapnS mapnC; do echo "-- $n"; grep -E "$PAT" Saved/Logs/$n.log | sed -nE 's/^.*(JEEB[A-Z]+ [A-Za-z]+ ?[A-Za-z]*).*hash[= ]*([0-9a-f]{8}).*/\1  \2/p'; done

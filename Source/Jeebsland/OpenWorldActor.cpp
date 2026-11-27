@@ -1,4 +1,5 @@
 ﻿#include "OpenWorldActor.h"
+#include "Caves.h"
 #include "Broom.h"
 #include "OpenWorld.h"
 #include "Terrain.h"
@@ -332,7 +333,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	SnowNow = Force >= 0.f ? FMath::Min(Force, 1.f) : JeebOpen::Snowing(Clock);
 	const FVector Cam = PC->PlayerCameraManager->GetCameraLocation();
 	const FVector Fwd = PC->PlayerCameraManager->GetCameraRotation().Vector();
-	StormNow = SnowNow * JeebOpen::StormAlt(Cam.Z);   // (the storm where the camera is: ADayNight thickens the fog with it)
+	StormNow = SnowNow * JeebOpen::StormAlt(Cam.Z) * (1.f - ACaves::CameraInside);   // (none inside a cave)   // (the storm where the camera is: ADayNight thickens the fog with it)
 	// (2026-11-22, owner: "Why is it snowing in Oak hill? Snow only supposed to fall in snowy areas") the flakes show only where snow lies on
 	// the ground round the camera (JeebOpen's snow map, sampled at five spots 25 m apart twice a second), fading in over the snow's edge
 	CoverAge += DeltaSeconds;
@@ -342,7 +343,7 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		float Sum = 0.f;
 		for (const FVector2D& O : { FVector2D(0.f, 0.f), FVector2D(2500.f, 0.f), FVector2D(-2500.f, 0.f), FVector2D(0.f, 2500.f), FVector2D(0.f, -2500.f) })
 			Sum += JeebOpen::SnowOnGround(Cam.X + O.X, Cam.Y + O.Y);
-		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f);
+		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f) * (1.f - ACaves::CameraInside);   // (no snow falls in a cave, Caves.h)
 	}
 	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, 0.25f);
 	const float Amount = CoverNow * SnowNow * JeebOpen::StormAlt(Cam.Z) * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);

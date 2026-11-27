@@ -199,3 +199,7 @@ Board: `Docs/MapRework/fixes.jpg` (the first four rows are before and after; the
 cliff ground, e.g. no underside copy for the cliff chunks, about half of the 0.36 million extra triangles). The heather is still low-poly
 mounds: soft at 3 m and beyond, plainly faceted at your feet; a painted card model would be the next step if the owner wants finer.
 The glen's north wall shows a broad smooth slab of grey rock from inland. Shipping was not compiled with these changes. Not played by hand.
+
+## Caves (2026-11-26, agent `mapfix`; Caves.h/.cpp, Docs/CavesPlan.md, board Docs/Caves/)
+
+Seven caves found by search from the finished height field (deterministic, same hash on server and clients): four mountain caves (one by the Storm Peak snowstorm) and three sea caves in the northern cliffs. Each is one procedural rock shell (a passage of 24-point rings every 1.5 m, two bends, a chamber, an end cap) with a frame that folds into the slope or the cliff face. The 2 m ground cells at a mountain mouth are left out; on a sea cliff only the wall faces inside the opening go (whole cells cut a notch up the cliff). Darkness comes from M_Ground's AO channel (UV2) plus a dimmed sky light and darker fog while the camera is inside; crystals glow (M_CaveCrystal) and three shadowed point lights per cave turn on only near it. Shells add 13,680 triangles in all; the search takes about 0.35 s at start-up.

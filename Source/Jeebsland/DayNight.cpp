@@ -1,4 +1,5 @@
 #include "DayNight.h"
+#include "Caves.h"
 #include "Palette.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -388,7 +389,7 @@ void ADayNight::Tick(float DeltaSeconds)
 		const FLinearColor SkyCol = FMath::Lerp(FLinearColor(0.66f, 0.66f, 0.86f), FLinearColor(0.88f, 0.88f, 0.96f), High);
 		C->SetLightColor(FMath::Lerp(SkyCol, FLinearColor(0.62f, 0.72f, 1.0f), Night * Night));   // (a moonlit blue at night)
 		// generous sky light: shade stays soft and readable, never black; at night times jeeb.Night.Ambient (the night's floor)
-		C->SetIntensity((1.7f + 0.5f * High) * FMath::Lerp(1.f, FMath::Max(0.f, JeebNight::Ambient.GetValueOnGameThread()), Night));
+		C->SetIntensity((1.7f + 0.5f * High) * FMath::Lerp(1.f, FMath::Max(0.f, JeebNight::Ambient.GetValueOnGameThread()), Night) * FMath::Lerp(1.f, JeebCaves::SkyKeep(), ACaves::CameraInside));   // (inside a cave, Caves.h: the sky does not reach)
 		{   // (2026-11-15) what the sky light gives from below the horizon: black left polished plate mirroring black wherever it faced down
 			// (the map's sky light takes the sky atmosphere's own planet ground below the horizon, nearly black: jeeb.Sky.Ground > 0 puts a meadow colour there instead)
 			const float Gd = FMath::Max(JeebLook::SkyGround.GetValueOnGameThread(), 0.f);
@@ -476,13 +477,13 @@ void ADayNight::TickLook(float High)
 			FLinearColor Haze = FMath::Lerp(DayHaze, NightHaze, Night * Night);
 			const float L = Haze.GetLuminance();
 			Haze = FMath::Lerp(Haze, FLinearColor(L * 0.95f, L, L * 1.06f), Storm * FMath::Clamp(JeebTune::V().FogGrey, 0.f, 1.f));
-			FC->SetFogInscatteringColor(Haze);
+			FC->SetFogInscatteringColor(Haze * (1.f - 0.85f * ACaves::CameraInside));   // (inside a cave the air between is dark, Caves.h)
 			FC->SetFogHeightFalloff(FMath::Lerp(OldFalloff, JeebTune::V().FogFalloff, Storm));
 			FC->SetStartDistance(FMath::Lerp(HazeStart.GetValueOnGameThread(), 0.f, Storm));
 		}
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)
 		const FLinearColor SunCol = SunNow;
-		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High) * (1.f - Night * Night) * (1.f - 0.8f * Storm)));   // (none at night, little in a storm)
+		FC->SetDirectionalInscatteringColor(SunCol * (SunGlow.GetValueOnGameThread() * FMath::Lerp(0.3f, 0.1f, High) * (1.f - Night * Night) * (1.f - 0.8f * Storm) * (1.f - ACaves::CameraInside)));   // (none at night, little in a storm, none in a cave)
 		FC->SetDirectionalInscatteringExponent(6.f);
 		FC->SetDirectionalInscatteringStartDistance(4000.f);
 	}
@@ -521,7 +522,7 @@ void ADayNight::TickLook(float High)
 		S.AmbientOcclusionRadius = AORadius.GetValueOnGameThread();
 		S.AutoExposureBias = Exposure.GetValueOnGameThread() + LowLift.GetValueOnGameThread() * (1.f - High) + JeebNight::Exposure.GetValueOnGameThread() * Night
 			+ JeebNight::Twilight.GetValueOnGameThread() * (1.f - FMath::SmoothStep(0.f, 7.f, FMath::Abs(SunElevation)))
-			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation) + IndoorBias - 0.3f * Storm;   // (a storm is a little darker)
+			+ FMath::Max(0.f, JeebNight::DuskLift.GetValueOnGameThread()) * JeebNight::DuskShapeAt(SunElevation) + IndoorBias - 0.3f * Storm + JeebCaves::ExposureLift() * ACaves::CameraInside;   // (a storm is a little darker)
 		{   // (LOW is the level without volumetric clouds, set by ApplyGraphics)
 			static IConsoleVariable* VC = IConsoleManager::Get().FindConsoleVariable(TEXT("r.VolumetricCloud"));
 			if (VC && VC->GetInt() == 0) S.AutoExposureBias += LowTrim.GetValueOnGameThread();

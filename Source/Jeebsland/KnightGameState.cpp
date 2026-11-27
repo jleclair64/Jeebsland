@@ -102,6 +102,7 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Caves.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -138,6 +139,7 @@ void AKnightGameState::BuildWorld()
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 	JeebHills::Prepare();    // the forested hills round Oak Hill (Hills.h): worked out once, here on the game thread before anything asks for a height; logs JEEBHILLS
 	JeebOpen::Prepare();     // the open world outside those hills (OpenWorld.h): the tall northern range, rolling country, the roads between the towns; logs JEEBOPEN
+	JeebCaves::Prepare(World);   // the caves in the mountains and the sea cliffs (Caves.h, 2026-11-26): placed from the finished height; before anything asks for the ground's 2 m patches
 #if !UE_BUILD_SHIPPING
 	JeebHills::LogStats();   // (about 30 ms of checks: slopes, heights, the finished ground's hash)
 	JeebOpen::LogStats();
@@ -187,6 +189,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
 	World->SpawnActor<AWorldEdge>(FVector::ZeroVector, FRotator::ZeroRotator);   // invisible pawn-only walls inside the map edge + server put-back for stray pawns (WorldEdge.h)
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
+	World->SpawnActor<ACaves>(FVector::ZeroVector, FRotator::ZeroRotator);   // the caves' crystals and lights, and this machine's camera inside one (Caves.h; the shells are the terrain's)
 	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill's plan checks (JEEBOAK), and the old town itself only with -OldOakHill or in TownLab (OakHill.h)
 	if (JeebTownLab::RealTown())   // Oak Hill (2026-11-14): the rebuilt town at the real plaza (TownLab.h, TownLabTown.cpp)
 		if (ATownLabTown* Town = World->SpawnActorDeferred<ATownLabTown>(ATownLabTown::StaticClass(), FTransform::Identity))
@@ -254,6 +257,14 @@ void AKnightGameState::BuildWorld()
 		if (JeebTerrain::PropBlocked(X, Y, 120.f)) continue; // nor against fences
 		SpawnRock(X, Y, OreMix[NextOre++ % OreMix.Num()]);
 	}
+
+	// a rarer ore deep in some of the caves (Caves.h, 2026-11-26): on the chamber's floor, not the hill's height over it
+	for (const JeebCaves::FCave& Cv : JeebCaves::All())
+		if (Cv.Ore >= 0)
+		{
+			const FTransform Xf(FRotator(0.f, FRandomStream(FMath::RoundToInt(Cv.RockAt.X) * 7919 + FMath::RoundToInt(Cv.RockAt.Y) * 104729).FRandRange(0.f, 360.f), 0.f), Cv.RockAt);
+			if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf)) { Rock->SetOre(EItemType(Cv.Ore)); Rock->FinishSpawning(Xf); }
+		}
 
 	// Dirt roads and the walled village with its huts
 	World->SpawnActor<APaths>(FVector::ZeroVector, FRotator::ZeroRotator);
@@ -1258,6 +1269,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 					EyeSunBase = ((P.Num() >= 7 ? FCString::Atoi(*P[6]) : 0) & 32) ? ADayNight::FixedPhase : -1.f;
 					const float Ex = FCString::Atof(*P[0]), Ey = FCString::Atof(*P[1]);   // (Z: above the ground there, or above the floor in MoveLab)
 					FVector L(Ex, Ey, FCString::Atof(*P[2]) + (GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? JeebTerrain::HeightAt(0.f, 0.f) : JeebTerrain::HeightAt(Ex, Ey)));
+					if (P[2].StartsWith(TEXT("A"))) L.Z = FCString::Atof(*P[2].Mid(1));   // (2026-11-26: A<z> is an absolute height, for eyes inside a cave under the hill)
 					const FRotator R(FCString::Atof(*P[4]), FCString::Atof(*P[3]), 0.f);
 					if (APawn* Me = PC->GetPawn())   // (he stands under the eye, hidden, so the grass grows round the view as round a player there)
 					{

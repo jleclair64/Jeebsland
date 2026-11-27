@@ -18,10 +18,11 @@
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "MapRework.h"
+#include "Caves.h"
 
 namespace
 {
-	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false, bFullBar = false; };
+	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false, bFullBar = false; FString Tag; };
 	TArray<FLeg> Legs;
 	int32 LegIdx = -1;
 	double LegStart = 0.0, LastLog = 0.0, LastMoveT = 0.0;
@@ -56,7 +57,7 @@ namespace
 				Legs.Add(L);
 			}
 		}
-		if (Walk.IsEmpty() && Probe.IsEmpty() && !FParse::Param(FCommandLine::Get(), TEXT("MapHeather"))) { bDone = true; return true; }
+		if (Walk.IsEmpty() && Probe.IsEmpty() && !FParse::Param(FCommandLine::Get(), TEXT("MapHeather")) && !FCString::Strifind(FCommandLine::Get(), TEXT("CaveWalk"))) { bDone = true; return true; }
 		UWorld* W = nullptr;
 		for (const FWorldContext& C : GEngine->GetWorldContexts()) if (C.World() && (C.WorldType == EWorldType::Game || C.WorldType == EWorldType::PIE) && C.World()->GetNetMode() == NM_Standalone) W = C.World();
 		if (!W) return true;
@@ -87,10 +88,32 @@ namespace
 				UE_LOG(LogTemp, Log, TEXT("JEEBMAPSLOPE X %.0f Y %.0f..%.0f: steepest %.1f degrees over %.0f cm at Y %.0f"), X, Y0, Y1, FMath::RadiansToDegrees(FMath::Atan(Worst)), St, WorstY);
 			}
 		}
+		// (-CaveWalk, 2026-11-26: into every cave, Caves.h, from 12 m outside its mouth (out at sea for a sea cave) along its passage to the
+		// chamber's far end and back out; -CaveWalk=2 one cave. Each leg's line names the cave and the stretch: JEEBMAPWALK leg ... [cave 2 in 30])
+		static bool bCaveLegs = false;
+		if (!bCaveLegs && FCString::Strifind(FCommandLine::Get(), TEXT("CaveWalk")) && JeebCaves::All().Num() > 0)
+		{
+			bCaveLegs = true;
+			int32 Only = -1;
+			FParse::Value(FCommandLine::Get(), TEXT("CaveWalk="), Only);
+			for (int32 c = 0; c < JeebCaves::All().Num(); ++c)
+			{
+				if (Only >= 0 && c != Only) continue;
+				const JeebCaves::FCave& Cv = JeebCaves::All()[c];
+				FLeg T; T.P = Cv.Mouth - Cv.D * (Cv.bSea ? 1500.f : 1200.f); T.bTele = true; T.Tag = FString::Printf(TEXT("cave %d outside"), c); Legs.Add(T);
+				TArray<FLeg> In;
+				for (int32 s = 0; s < Cv.St.Num() && Cv.St[s].A <= 5300.f; s += 3) { FLeg L; L.P = Cv.St[s].P; L.Tag = FString::Printf(TEXT("cave %d in %d"), c, FMath::RoundToInt(Cv.St[s].A / 100.f)); In.Add(L); }
+				Legs.Append(In);
+				for (int32 k = In.Num() - 2; k >= 0; k -= 2) { FLeg L = In[k]; L.Tag = FString::Printf(TEXT("cave %d out %s"), c, *In[k].Tag.RightChop(In[k].Tag.Find(TEXT(" in ")) + 4)); Legs.Add(L); }
+				FLeg O; O.P = Cv.Mouth - Cv.D * 900.f; O.Tag = FString::Printf(TEXT("cave %d back outside"), c); Legs.Add(O);
+			}
+			if (Legs.Num() > 0) Legs[0].bTele = false;   // (the first point is the start's teleport anyway)
+			UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK caves: %d legs"), Legs.Num());
+		}
 		if (Legs.Num() == 0) { if (bProbed) bDone = true; return true; }
 		APlayerController* PC = W->GetFirstPlayerController();
 		AKnightCharacter* Me = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
-		if (!Me) return true;
+		if (!Me) { static double Wn = 0.0; if (FPlatformTime::Seconds() - Wn > 10.0) { Wn = FPlatformTime::Seconds(); UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK waiting: controller %s, pawn %s"), PC ? TEXT("yes") : TEXT("none"), (PC && PC->GetPawn()) ? *PC->GetPawn()->GetClass()->GetName() : TEXT("none")); } return true; }
 		if (WorldReady < 0.0) WorldReady = W->GetTimeSeconds();
 		if (W->GetTimeSeconds() - WorldReady < 12.0) return true;   // (the world and the grass settle first)
 		UCharacterMovementComponent* M = Me->GetCharacterMovement();
@@ -114,7 +137,7 @@ namespace
 		const float Dist = To.Size();
 		if (Dist < 150.f || Now - LegStart > 40.0)
 		{
-			UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK leg %d %s: at %.0f %.0f z %.0f, %.0f cm from its point after %.1f s"), LegIdx, Dist < 150.f ? TEXT("DONE") : TEXT("TIMEOUT"), P.X, P.Y, P.Z, Dist, Now - LegStart);
+			UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK leg %d %s: at %.0f %.0f z %.0f, %.0f cm from its point after %.1f s [%s]"), LegIdx, Dist < 150.f ? TEXT("DONE") : TEXT("TIMEOUT"), P.X, P.Y, P.Z, Dist, Now - LegStart, *L.Tag);
 				++LegIdx;
 				while (LegIdx < Legs.Num() && Legs[LegIdx].bTele)   // (a T leg: stand him there)
 				{

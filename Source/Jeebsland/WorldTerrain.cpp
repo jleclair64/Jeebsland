@@ -1,6 +1,7 @@
 ﻿#include "WorldTerrain.h"
 namespace JeebRoadSlope { void Report(); }
 #include "Terrain.h"
+#include "Caves.h"
 #include "WorldMap.h"
 #include "GroundMask.h"
 #include "WaterLook.h"
@@ -219,6 +220,7 @@ void AWorldTerrain::BuildLand()
 	if (!bServer && Mat) BuildBeyond(Mat);
 	BuildFine();
 	BuildArch();
+	JeebCaves::BuildShells(this, bServer ? nullptr : SharedGround(GetWorld()), bServer);   // (the caves' rock shells, 2026-11-26: Caves.h)
 	JeebRoadSlope::Report();   // (-RoadSlope: the steepest ground on every road, 2026-11-20)
 }
 
@@ -230,7 +232,7 @@ void AWorldTerrain::BuildFine()
 	UMaterialInterface* Mat = SharedGround(GetWorld());
 	const bool bServer = IsNetMode(NM_DedicatedServer);
 	const float S = JeebTerrain::FineStep;
-	int32 Cells = 0, WallPoints = 0;
+	int32 Cells = 0, WallPoints = 0, CaveCut = 0;
 	for (const JeebTerrain::FFinePatch& P : JeebTerrain::FinePatches())
 	{
 		const int32 NX = FMath::RoundToInt((P.X1 - P.X0) / S), NY = FMath::RoundToInt((P.Y1 - P.Y0) / S);
@@ -340,6 +342,7 @@ void AWorldTerrain::BuildFine()
 							if (Cx >= Q.X0 - 1.f && Cx + S <= Q.X1 + 1.f && Cy >= Q.Y0 - 1.f && Cy + S <= Q.Y1 + 1.f) { bTaken = true; break; }
 						}
 						if (bTaken) continue;
+						if (!P.bWalls && JeebCaves::HoleCell(Cx, Cy)) { ++CaveCut; continue; }   // (a cave's mouth: its rock frame stands here, Caves.h)
 						const int32 A = (i - CI) * W + (j - CJ), B = A + W, C = A + 1, D = B + 1;
 						Tri.Append({ A, C, B, B, C, D });
 						++Cells;
@@ -408,6 +411,7 @@ void AWorldTerrain::BuildFine()
 						const FVector C0 = FVector::CrossProduct(V[Tri[t + 1]] - V[Tri[t]], V[Tri[t + 2]] - V[Tri[t]]);
 						FVector Fn = C0.GetSafeNormal();
 						if (Fn.Z < 0.f) Fn = -Fn;
+						if (Fn.Z >= 0.5f && JeebCaves::CutsAt((V[Tri[t]] + V[Tri[t + 1]] + V[Tri[t + 2]]) / 3.f)) { ++CaveCut; continue; }
 						if (Fn.Z >= 0.5f) { for (int32 k = 0; k < 3; ++k) { Acc[Tri[t + k]] += Fn; Kept.Add(Tri[t + k]); } continue; }
 						int32 Ix[3] = { Tri[t], Tri[t + 1], Tri[t + 2] };
 						for (int32 k = 0; k < 3; ++k) Touch[Ix[k]] = 1;
@@ -428,6 +432,7 @@ void AWorldTerrain::BuildFine()
 							if (bLeft) ++Li; else ++Ri;
 							if (Q0 == Q1 || Q1 == Q2 || Q0 == Q2) continue;
 							const int32 R1 = bSame ? Q1 : Q2, R2 = bSame ? Q2 : Q1;
+							if (JeebCaves::CutsAt((V[Q0] + V[R1] + V[R2]) / 3.f)) { ++CaveCut; continue; }
 							Kept.Append({ Q0, R1, R2 });
 							const FVector Wn = -FVector::CrossProduct(V[R1] - V[Q0], V[R2] - V[Q0]);   // (the ground's triangles are wound with their cross product down)
 							N[Q0] += Wn; N[R1] += Wn; N[R2] += Wn;
@@ -454,7 +459,7 @@ void AWorldTerrain::BuildFine()
 			}
 	}
 	for (const JeebTerrain::FFinePatch& Fp : JeebTerrain::FinePatches()) UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine patch X %.0f..%.0f Y %.0f..%.0f"), Fp.X0, Fp.X1, Fp.Y0, Fp.Y1);
-	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m (%d points on the sea cliffs' walls), built in %.0f ms"), JeebTerrain::FinePatches().Num(), Cells, WallPoints, (FPlatformTime::Seconds() - T0) * 1000.0);
+	UE_LOG(LogTemp, Log, TEXT("JEEBWATER fine ground: %d patches, %d cells of 2 m (%d points on the sea cliffs' walls), built in %.0f ms; %d cells left out at cave mouths"), JeebTerrain::FinePatches().Num(), Cells, WallPoints, (FPlatformTime::Seconds() - T0) * 1000.0, CaveCut);
 	// (2026-11-25, the map rework: where the sea cliffs and Anchorage's bay lie, for placing test views and for comparing machines)
 	{
 		uint32 Hash = 0;

@@ -11,6 +11,8 @@
 
 // The forest's roads round Oak Hill (OakForest.cpp), made paths below
 namespace JeebOakForest { const TArray<TArray<FVector2D>>& RoadLines(); }
+// The mountain caves' 2 m ground patches (Caves.cpp, 2026-11-26)
+namespace JeebCaves { const TArray<FBox2D>& FineBoxes(); }
 
 // Shared description of the land, so the ground mesh, trees, rocks, huts, paths and walls all agree.
 namespace JeebTerrain
@@ -408,6 +410,9 @@ namespace JeebTerrain
 			}
 			// the Needles (MapRework.h): pillars of rock, the same stepped walls
 			if (JeebRework::On()) { Add(JeebRework::NeedlesX - JeebRework::NeedlesHalf, JeebRework::NeedlesX + JeebRework::NeedlesHalf, JeebRework::NeedlesY - JeebRework::NeedlesHalf, JeebRework::NeedlesY + JeebRework::NeedlesHalf); A.Last().bWalls = true; }
+			// (2026-11-26) the mountain caves' mouths (Caves.h): a 48 m square of 2 m ground each, so the cells at the mouth can be left out
+			for (const FBox2D& B : JeebCaves::FineBoxes()) Add(B.Min.X, B.Max.X, B.Min.Y, B.Max.Y);
+			UE_LOG(LogTemp, Log, TEXT("JEEBCAVE the ground's 2 m patches: %d (%d at cave mouths)"), A.Num(), JeebCaves::FineBoxes().Num());
 			return A;
 		}();
 		return All;
