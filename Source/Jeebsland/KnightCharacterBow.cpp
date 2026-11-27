@@ -619,7 +619,25 @@ void AKnightCharacter::UpdateQuiver()
 	{
 		QuiverArrowId = Id;
 		if (QuiverBody)
-			for (int32 i = 1; i < QuiverParts.Num(); ++i) JeebProps::TintArrow(QuiverParts[i], Id);
+		{
+			// (2026-11-26) the arrows standing in it are the picked kind's own model (its fletching size and colours; the head lies inside the tube),
+			// the length trimmed to 80% so the head stays inside the body instead of poking out of its bottom
+			UStaticMesh* Mm = JeebProps::ArrowMesh(Id);
+			for (int32 i = 1; i < QuiverParts.Num(); ++i)
+			{
+				UStaticMeshComponent* A = QuiverParts[i];
+				if (!A) continue;
+				if (Mm && A->GetStaticMesh() != Mm)
+				{
+					A->SetMaterial(0, nullptr);
+					A->SetStaticMesh(Mm);
+					const float NockZ = 6.f + 1.5f * ((i - 1) % 3) + 29.5f;   // (where the shared back's nock stood)
+					FVector L = A->GetRelativeLocation(); L.Z = NockZ - 0.8f * JeebProps::ArrowLen; A->SetRelativeLocation(L);
+					A->SetRelativeScale3D(FVector(0.8f, 1.f, 1.f));
+				}
+				JeebProps::TintArrow(A, Id);
+			}
+		}
 		else
 		for (int32 i = 4; i < QuiverParts.Num(); i += 2)
 			if (QuiverParts[i])
