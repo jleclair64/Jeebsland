@@ -133,6 +133,8 @@ namespace JeebOakHill
 			{ TEXT("OakHillTownHall"),    0.85f, 17.85f, 10.29f, false, 90.f, -989.1f, 985.8f, -580.0f, 562.0f },
 			{ TEXT("OakHillChurch"),      0.85f, 11.31f, 12.84f, true,  90.f, -591.5f, 573.5f, -709.2f, 723.0f },   // (its door is on a short end)
 			{ TEXT("OakHillWell"),        0.85f, 2.89f,  2.89f,  false, 90.f, -151.8f, 121.5f, -117.9f, 117.6f },
+			// Silver Point's first wizard building (2026-11-26, a trial): the community "Enchanted Crooked Cottage", 8 m across, 16 m to its hat's tip
+			{ TEXT("SilverWizardHouse"),  1.0f,  8.0f,   9.64f,  false, 90.f, -375.2f, 299.4f, -281.3f, 215.0f },
 			// The open-air stalls (owner, 2026-11-12), all three with their open front on their -Y in Blender, which is +Y here
 			// (Unreal mirrors Blender's Y). The general store ("Market Stall", candidate B, a timber trading post), the bank (Bank_A
 			// repainted to the town) and the potion shop (PotionShop_A, stretched deeper and lower by building_clean.py, its back open).

@@ -58,6 +58,9 @@ BUILDINGS = {
     "OakHillFort_300k":        dict(file="OakHillFort_300k.glb",        length=1450.0, sink=40.0),
     "OakHillWatchtower_300k":  dict(file="OakHillWatchtower_300k.glb",  length=530.0,  sink=35.0),
     "OakHillRuins_300k":       dict(file="OakHillRuins_300k.glb",       length=1900.0, sink=60.0),
+    # Silver Point trial (2026-11-26): "The Enchanted Crooked Cottage", Meshy community library, CC0,
+    # https://www.meshy.ai/posts/019f48d4-039d-7cd4-9770-27612c3103d2 (892k faces downloaded, reduced to 300k). Door to -Y.
+    "SilverWizardHouse_300k":  dict(file="SilverWizardHouse_300k.glb",  length=800.0,  sink=20.0),
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them

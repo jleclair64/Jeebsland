@@ -111,34 +111,50 @@ void AOpenWorld::BeginPlay()
 // same pair), on the site's level ground, its door toward the middle of the site
 void AOpenWorld::BuildHouses()
 {
-	const JeebOakHill::FModel* Model = JeebOakHill::FindModel(TEXT("OakHillHouse"));
+	const JeebOakHill::FModel* HouseModel = JeebOakHill::FindModel(TEXT("OakHillHouse"));
 	const TCHAR* MeshPath = nullptr;
 	for (const JeebTownLab::FLabSwap& S : JeebTownLab::ModelSwaps) if (FCString::Strcmp(S.Model, TEXT("OakHillHouse")) == 0) MeshPath = S.Mesh;
-	if (!Model || !MeshPath) { UE_LOG(LogTemp, Warning, TEXT("JEEBOPEN no house model: the town sites stay empty")); return; }
+	if (!HouseModel || !MeshPath) { UE_LOG(LogTemp, Warning, TEXT("JEEBOPEN no house model: the town sites stay empty")); return; }
 	const bool bServer = IsNetMode(NM_DedicatedServer);
-	const FString Path(MeshPath), Name = FPaths::GetBaseFilename(Path);
-	UStaticMesh* Mesh = bServer ? nullptr : LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), *Path, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
-	UStaticMesh* Col = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s_Col.%s_Col"), *Path, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
-	UInstancedStaticMeshComponent* Solid = nullptr;
-	if (Col)
+	struct FKit { const JeebOakHill::FModel* Model = nullptr; UStaticMesh* Mesh = nullptr; UInstancedStaticMeshComponent* Solid = nullptr; };
+	auto Load = [&](const JeebOakHill::FModel* M, const FString& Path) -> FKit
 	{
-		Solid = NewObject<UInstancedStaticMeshComponent>(this);
-		Solid->SetStaticMesh(Col);
-		Solid->SetupAttachment(GetRootComponent());
-		Solid->SetMobility(EComponentMobility::Static);
-		Solid->SetVisibility(false);
-		Solid->SetHiddenInGame(true);
-		Solid->SetCastShadow(false);
-		Solid->SetCollisionProfileName(TEXT("BlockAll"));
-		Solid->SetCanEverAffectNavigation(false);
-		Solid->RegisterComponent();
-	}
+		FKit K; K.Model = M;
+		const FString Name = FPaths::GetBaseFilename(Path);
+		K.Mesh = bServer ? nullptr : LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s.%s"), *Path, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
+		UStaticMesh* Col = LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("%s_Col.%s_Col"), *Path, *Name), nullptr, LOAD_Quiet | LOAD_NoWarn);
+		if (Col)
+		{
+			K.Solid = NewObject<UInstancedStaticMeshComponent>(this);
+			K.Solid->SetStaticMesh(Col);
+			K.Solid->SetupAttachment(GetRootComponent());
+			K.Solid->SetMobility(EComponentMobility::Static);
+			K.Solid->SetVisibility(false);
+			K.Solid->SetHiddenInGame(true);
+			K.Solid->SetCastShadow(false);
+			K.Solid->SetCollisionProfileName(TEXT("BlockAll"));
+			K.Solid->SetCanEverAffectNavigation(false);
+			K.Solid->RegisterComponent();
+		}
+		return K;
+	};
+	const FKit House = Load(HouseModel, FString(MeshPath));
+	// (2026-11-26, a trial for the owner: Silver Point gets the first wizard building, the community "Enchanted Crooked Cottage",
+	// /Game/TownLab/Silver by Tools/BuildSilverPoint.ps1, in place of the placeholder house. Docs/SilverPointPlan.md)
+	FKit Wizard;
+	if (const JeebOakHill::FModel* WM = JeebOakHill::FindModel(TEXT("SilverWizardHouse")))
+		if (LoadObject<UStaticMesh>(nullptr, TEXT("/Game/TownLab/Silver/SM_TL_WizardHouse_Col.SM_TL_WizardHouse_Col"), nullptr, LOAD_Quiet | LOAD_NoWarn))
+			Wizard = Load(WM, TEXT("/Game/TownLab/Silver/SM_TL_WizardHouse"));
 	uint32 Hash = 2166136261u;
 	auto HashIn = [&](float V) { const int32 Q = FMath::RoundToInt(V * 10.f); for (int32 b = 0; b < 4; ++b) { Hash ^= uint32((Q >> (8 * b)) & 0xFF); Hash *= 16777619u; } };
-	const float ScaleZ = Model->ScaleZ > 0.f ? Model->ScaleZ : Model->Scale;
 	int32 Placed = 0;
 	for (const JeebOpen::FSite& S : JeebOpen::Sites())
 	{
+		const FKit& K = (Wizard.Model && FCString::Strcmp(S.Name, TEXT("Silver Point")) == 0) ? Wizard : House;
+		const JeebOakHill::FModel* Model = K.Model;
+		UStaticMesh* Mesh = K.Mesh;
+		UInstancedStaticMeshComponent* Solid = K.Solid;
+		const float ScaleZ = Model->ScaleZ > 0.f ? Model->ScaleZ : Model->Scale;
 		const float Z = JeebTerrain::HeightAt(S.House.X, S.House.Y);
 		const float Yaw = FRotator::NormalizeAxis(S.HouseYaw - Model->DoorYaw);
 		const FTransform Xf(FRotator(0.f, Yaw, 0.f), FVector(S.House.X, S.House.Y, Z), FVector(Model->Scale, Model->Scale, ScaleZ));
@@ -170,7 +186,7 @@ void AOpenWorld::BuildHouses()
 		}
 		HashIn(S.House.X); HashIn(S.House.Y); HashIn(Z); HashIn(Yaw);
 		++Placed;
-		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN house for %s at %.0f %.0f %.0f yaw %.0f (%s)"), S.Name, S.House.X, S.House.Y, Z, Yaw, Solid ? TEXT("its collision model") : TEXT("a box over the walls"));
+		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN house for %s at %.0f %.0f %.0f yaw %.0f (%s, %s)"), S.Name, S.House.X, S.House.Y, Z, Yaw, Model->Name, Solid ? TEXT("its collision model") : TEXT("a box over the walls"));
 	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN houses: %d placeholder houses; hash=%08x%s"), Placed, Hash, bServer ? TEXT(" (server: solids only)") : TEXT(""));
 }
