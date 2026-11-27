@@ -126,3 +126,11 @@ Animals (stag, rabbit, fox, boar, wolf, moose, bear, eagle, frog) and the three 
 4. Spear, katana, battle axe, rod: rebuild from the code shapes in Blender, or leave code-built (they count as one version each).
 5. Food: a cooking fire plus three cooked meals in code, if wanted.
 6. Trims (potions, rings, amulets): data changes only. Never delete rows (saves use row numbers); mark them retired as the arrows do.
+
+## Owner answers (2026-11-26)
+1. Three per specific weapon (three swords, three spears, three axes...), not per family.
+2. Third knight set and all new item designs: designed together with the owner; build nothing without their design input.
+3. Food/cooking: later.
+4. Kinds over three (potions, rings, amulets, fish, arrows): keep them.
+5. Third spell: later.
+Skill cap idea: cap skills at 29 with unlocks at 1/10/20 (owner proposal; suggestions given: perks or a mastery cape 21-29, keep counting XP, retune the curve, rescale "at 99" numbers, three armour tiers tied to the metals rework).
