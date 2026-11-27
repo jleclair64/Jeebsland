@@ -408,3 +408,6 @@ Seven caves: four in the mountains (Storm Peak by the snowstorm peaks, West Rang
 - **Tests:** pictures `bash Tools/stone_lab.sh 18500 75500 stills|wake|film|cost` (`CIRCLE=1` and `96500 69000` for the north);
   online `bash Tools/stone_net.sh` (JEEBSTONETEST PASS lines on the server; JEEBSTONE hud lines on both players at the same server times).
   `-JeebStoneSearch` logs how the spots were chosen. Log `JEEBSTONE`.
+- **Pine woods at the Frostmere Stones (2026-11-26, agent pines):** snow-dusted spruces (about 800) in seven woods 65-175 m out round the circle,
+  the 48 m round the stones clear. Try the paler/bluer needle colour live: console `jeeb.Trees.SpruceSnow "1.15 1.5 1.75"` (r g b; bigger =
+  paler). Picture: `bash Tools/stone_lab.sh 96500 69000 stills`. Log `JEEBFOREST pines`. Docs/StoneCirclePlan.md.

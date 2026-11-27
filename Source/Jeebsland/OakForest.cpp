@@ -183,6 +183,28 @@ namespace
 	// The spruces' needle colour (owner, 2026-11-16: the LOOK tab's jeeb.Trees.Spruce sliders must reach the forest's and the town's spruces too).
 	// The same variable and parameters as TreeGroves.cpp's TintSpruce: "Leaf Tint" (_leaf materials), "Branch Tint" (_branch), the imposters' "Tint".
 	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GSpruceMids;   // (one per distinct spruce material, shared by every spruce of the forest)
+	TArray<TWeakObjectPtr<UMaterialInstanceDynamic>> GSnowMids;     // (2026-11-26, the Frostmere pines: the same, in the frosted tint; Col 1 of a spruce kind)
+	TAutoConsoleVariable<FString> CVarSpruceSnow(TEXT("jeeb.Trees.SpruceSnow"), TEXT("1.4 2.0 2.8"),
+		TEXT("The snow-dusted spruces round the Frostmere Stones: their needle colour multiplier \"r g b\" (a frosty blue cast; jeeb.Trees.SpruceSnowLook does the paling; live; looks only)."), ECVF_Default);
+	TAutoConsoleVariable<FString> CVarSpruceSnowLook(TEXT("jeeb.Trees.SpruceSnowLook"), TEXT("0.12 1.2"),
+		TEXT("The snow-dusted spruces: \"saturation brightness\" times the pack's own (1 1 = ordinary spruce; less saturation and more brightness read as frost; live; looks only)."), ECVF_Default);
+	void ApplySnowLook(UMaterialInstanceDynamic* M)
+	{
+		if (!M || !M->Parent) return;
+		const FString N = M->Parent->GetName();
+		const TCHAR* Names[2] = { TEXT("Saturation"), TEXT("Brightness") };
+		FString Prefix = N.Contains(TEXT("imposter")) ? FString() : N.Contains(TEXT("_leaf")) ? FString(TEXT("Leaf ")) : N.Contains(TEXT("_branch")) ? FString(TEXT("Branch ")) : FString(TEXT("-"));
+		if (Prefix == TEXT("-")) return;
+		const FLinearColor K = JeebTreeLook::ParseRGB(CVarSpruceSnowLook.GetValueOnGameThread(), FLinearColor(0.12f, 1.2f, 1.f));
+		const float Ks[2] = { K.R, K.G };
+		for (int32 i = 0; i < 2; ++i)
+		{
+			const FName Nm(*(Prefix + Names[i]));
+			float V0 = 0.f;
+			if (M->Parent->GetScalarParameterValue(Nm, V0)) M->SetScalarParameterValue(Nm, V0 * Ks[i]);
+		}
+	}
+	FLinearColor SnowTint() { FLinearColor C = JeebTreeLook::ParseRGB(CVarSpruceSnow.GetValueOnGameThread(), FLinearColor(1.4f, 2.0f, 2.8f, 0.f)); C.A = 0.f; return C; }   // (not clamped: above 1 brightens the needles)
 	IConsoleVariable* SpruceVar()
 	{
 		IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("jeeb.Trees.Spruce"));
@@ -218,20 +240,24 @@ namespace
 		const FLinearColor Sp = SpruceTint();
 		for (const TWeakObjectPtr<UMaterialInstanceDynamic>& M : GSpruceMids)
 			if (M.IsValid() && M->Parent) if (const TCHAR* Param = SpruceParam(M->Parent->GetName())) { M->SetVectorParameterValue(Param, Sp); ApplySpruceFar(M.Get()); }
+		const FLinearColor Sn = SnowTint();
+		for (const TWeakObjectPtr<UMaterialInstanceDynamic>& M : GSnowMids)
+			if (M.IsValid() && M->Parent) if (const TCHAR* Param = SpruceParam(M->Parent->GetName())) { M->SetVectorParameterValue(Param, Sn); ApplySpruceFar(M.Get()); ApplySnowLook(M.Get()); }
 	}
 	// every needle slot of a spruce set gets the shared dynamic instance of its material, in the spruce tint
-	int32 TintSpruceSet(UMeshComponent* C, UObject* Outer)
+	int32 TintSpruceSet(UMeshComponent* C, UObject* Outer, bool bSnow = false)
 	{
 		int32 Done = 0;
-		const FLinearColor Sp = SpruceTint();
+		const FLinearColor Sp = bSnow ? SnowTint() : SpruceTint();
+		TArray<TWeakObjectPtr<UMaterialInstanceDynamic>>& Mids = bSnow ? GSnowMids : GSpruceMids;
 		for (int32 i = 0; i < C->GetNumMaterials(); ++i)
 		{
 			UMaterialInterface* M = JeebTreeLook::ConeLeaf(C->GetMaterial(i));   // (a needle material: its copy with the dark cones)
 			const TCHAR* Param = M ? SpruceParam(M->GetName()) : nullptr;
 			if (!Param) { if (M && M != C->GetMaterial(i)) C->SetMaterial(i, M); continue; }   // (the trunk: its copy on the dithered master, no tint)
 			UMaterialInstanceDynamic* D = nullptr;
-			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : GSpruceMids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
-			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); ApplySpruceFar(D); GSpruceMids.Add(D); }
+			for (const TWeakObjectPtr<UMaterialInstanceDynamic>& Old : Mids) if (Old.IsValid() && Old->Parent == M) { D = Old.Get(); break; }
+			if (!D) { D = UMaterialInstanceDynamic::Create(M, Outer); D->SetVectorParameterValue(Param, Sp); JeebTreeLook::DarkCones(D); ApplySpruceFar(D); if (bSnow) ApplySnowLook(D); Mids.Add(D); }
 			C->SetMaterial(i, D);
 			++Done;
 		}
@@ -951,6 +977,56 @@ struct FOakForestBuild
 			}
 			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST moor: %d outcrops (%d stones) on the moor"), Tors, TorStones);
 		}
+		// ---- the snow-dusted pine woods round a frost circle (2026-11-26, owner: "add some pine woods near the Frostmere Stones"). The circle's
+		// field stands above the treeline, so the passes above leave it bare. Round each frost circle (StoneCircles.csv, Frost yes): eight
+		// directions, each with a wood (most of them) 65 to 175 m out, a ragged clump of spruces in the frosted needle tint (Col 1,
+		// jeeb.Trees.SpruceSnow), the open field of 48 m kept clear. Their own stream, last, so nothing placed above moves; solid trunks and
+		// choppable like every forest tree (same Puts), the same on every machine.
+		{
+			FRandomStream F(9797);
+			const float FieldClear = 4800.f;
+			int32 Pines = 0, Woods = 0, RjEdge = 0, RjSlope = 0, RjRoad = 0, RjSpace = 0, RjThin = 0;
+			for (const JeebStones::FCircle& Circ : JeebStones::Circles())
+			{
+				if (!Circ.bFrost) continue;
+				const float Turn = F.FRandRange(0.f, 36.f);
+				for (int32 Dir = 0; Dir < 10; ++Dir)
+				{
+					const float Ang = FMath::DegreesToRadians(Turn + Dir * 36.f + F.FRandRange(-10.f, 10.f));
+					const float Dist = F.FRandRange(6500.f, 14500.f), RadW = F.FRandRange(2400.f, 4200.f), Present = F.FRand();
+					const int32 Tries = 520;
+					const FVector2D Ctr = Circ.Pos + FVector2D(FMath::Cos(Ang), FMath::Sin(Ang)) * Dist;
+					const FVector2D Stretch(-FMath::Sin(Ang), FMath::Cos(Ang));   // (a wood is longer round the circle than out from it)
+					const float Long = F.FRandRange(1.0f, 1.6f);
+					bool bAny = false;
+					for (int32 n = 0; n < Tries; ++n)
+					{
+						const float Rr = FMath::Sqrt(F.FRand()) , Th = F.FRandRange(0.f, 2.f * PI), Keep = F.FRand(), Pick = F.FRand(), Sc = F.FRand(), Yaw = F.FRandRange(0.f, 360.f), Rag = F.FRand();
+						if (Present > 0.85f) continue;   // (one direction in seven stays open)
+						const FVector2D P = Ctr + FVector2D(FMath::Cos(Th), FMath::Sin(Th)) * RadW * Rr
+							+ Stretch * (FMath::Cos(Th) * RadW * Rr * (Long - 1.f));
+						if (Keep > 1.25f - Rr * (0.6f + 0.4f * Rag)) { ++RjThin; continue; }   // (thinner and ragged toward the edge)
+						if (FVector2D::DistSquared(P, Circ.Pos) < FMath::Square(FieldClear) || FVector2D::Distance(P, Circ.Pos) > 17800.f) continue;
+						if (Edge(P.X, P.Y) <= 0.f) { ++RjEdge; continue; }
+						float Slope;
+						const float Z = Hs.At(P.X, P.Y, &Slope);
+						if (Slope > 0.72f) { ++RjSlope; continue; }
+						if (OnForestRoadBox(P.X, P.Y, 600.f) && JeebTerrain::PathClearance(P.X, P.Y) < 400.f) { ++RjRoad; continue; }
+						int32 Kind; float Scale;
+						if (Pick < 0.58f) { Kind = K_Full1 + FMath::Min(int32(Pick / 0.1933f), 2); Scale = FMath::Lerp(0.95f, 1.45f, Sc); }
+						else if (Pick < 0.82f) { Kind = K_Half2; Scale = FMath::Lerp(0.9f, 1.25f, Sc); }
+						else { Kind = K_Full1 + int32((Pick - 0.82f) / 0.06f) % 3; Scale = FMath::Lerp(0.45f, 0.75f, Sc); }   // young ones
+						const float Crown = Kinds[Kind].Crown * Scale;
+						if (!Space.Clear(P, Crown, 0.45f, 150.f)) { ++RjSpace; continue; }
+						Space.Add(P, Crown, true);
+						Puts.Add({ uint8(Kind), uint8(1), FVector(P.X, P.Y, Z - 6.f - Slope * 45.f * Scale), Yaw, FVector(Scale), false });
+						++Count[Kind]; ++Trees; ++Pines; bAny = true;
+					}
+					Woods += bAny;
+				}
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST pines: %d snow-dusted spruces in %d woods round the frost circles (turned away: %d thin, %d off the forest land, %d steep, %d road, %d crowded)"), Pines, Woods, RjThin, RjEdge, RjSlope, RjRoad, RjSpace);
+		}
 		ForestTrees += Trees;
 		FString List;
 		for (int32 k = 0; k < K_Num; ++k) if (Count[k]) List += FString::Printf(TEXT(" %s x%d"), *FPaths::GetBaseFilename(Kinds[k].Path), Count[k]);
@@ -1063,7 +1139,7 @@ struct FOakForestBuild
 		if (!bServer)
 		{
 			for (int32 F = 0; F < 4; ++F) GTintMids[F].Reset();
-			GSpruceMids.Reset();
+			GSpruceMids.Reset(); GSnowMids.Reset();
 			for (TPair<int32, TArray<FTransform>>& V : Visual)
 			{
 				const int32 Kd = V.Key / 4, Col = V.Key % 4;
@@ -1081,7 +1157,7 @@ struct FOakForestBuild
 				C->bCastFarShadow = false;
 				C->SetWorldPositionOffsetDisableDistance(bTree ? 6000 : 3000);   // (the wind stops swaying them beyond 60 m)
 				if (K.bTint) Swapped += TintLeaves(C, Col);
-				if (IsSpruce(Kd) || Kd == K_Sapling) Swapped += TintSpruceSet(C, Self);
+				if (IsSpruce(Kd) || Kd == K_Sapling) Swapped += TintSpruceSet(C, Self, Col == 1);
 				DrawnOfKey.Add(V.Key, Self->Drawn.Num());
 				Self->Drawn.Add(C); Self->DrawnReach.Add(K.Reach); Self->DrawnIsTree.Add(bTree); Self->DrawnShadow.Add(K.bShadow && !bTree);
 				C->RegisterComponent();
@@ -1219,6 +1295,8 @@ void AOakForest::BeginPlay()
 		for (int32 F = 0; F < 4; ++F) if (IConsoleVariable* V = TintVar(F)) V->OnChangedDelegate().AddStatic(&ApplyTints);
 		if (IConsoleVariable* V = SpruceVar()) V->OnChangedDelegate().AddStatic(&ApplySpruce);
 		CVarSpruceFar.AsVariable()->OnChangedDelegate().AddStatic(&ApplySpruce);
+		CVarSpruceSnow.AsVariable()->OnChangedDelegate().AddStatic(&ApplySpruce);
+		CVarSpruceSnowLook.AsVariable()->OnChangedDelegate().AddStatic(&ApplySpruce);
 		JeebTreeLook::OnChanged().AddLambda([]() { ApplyTints(); ApplySpruce(); });
 		CVarReach->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
 		CVarShadows->SetOnChangedCallback(FConsoleVariableDelegate::CreateLambda([](IConsoleVariable*) { if (GForest.IsValid()) GForest->ApplyReach(); }));
