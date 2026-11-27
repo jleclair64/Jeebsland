@@ -116,6 +116,14 @@ namespace JeebRework
 		for (float C : CoveX) K *= Ramp(1500.f, 8000.f, FMath::Abs(X - C));
 		return K;
 	}
+	// (2026-11-26, the walking test: the first cove's way down was the old 35 m beach ramp squeezing a 28 m hill, with a 55 degree band and
+	// an 11.7 m fall in it.) The first cove is now a real glen: within GlenHalf of its middle line the land may stand no higher than a ramp
+	// that rises GlenSlope from the beach (about 19 degrees, well under the 45 he can walk), easing out to the cliffs either side.
+	constexpr float GlenSlope = 0.34f, GlenCore = 1500.f, GlenHalf = 4200.f, GlenReach = 16000.f;
+	inline float CoveGlen(float X) { return On() ? Ramp(GlenHalf, GlenCore, FMath::Abs(X - CoveX[0])) : 0.f; }
+	// (2026-11-26, the walking test: a swimmer could not climb out at X 56,000 and X 60,000, where the roughened face bulged over him.)
+	// The most a wall's face may gain outward per cm of height (about 7 degrees of overhang; he climbs up to 15): AWorldTerrain::BuildFine.
+	constexpr float WallLean = 0.12f;
 	// Along the coast at X: Top the wall's height over the sea (cm), A 0 .. 1 how much of a cliff it is (0 the old beach), Beach 0 .. 1 a
 	// rocky beach at its foot, Ledge 0 sheer .. 1 stepped, Run the wall's width in plan (cm)
 	// (Pale 1: the Pale Cove in the south-east, below: pale rock, a sand beach at the foot and a shallow shelf of light water)

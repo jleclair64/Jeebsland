@@ -22,6 +22,17 @@ namespace
 	// (2026-11-17, owner: the ground past the grass "looks brighter than the tree trunks and up close grass". Its multiplier there only, M_Ground and
 	// M_TL_Ground's FarTint, grass_field.under_grass_floor; SkyFill's default also went 0.2 to 0.1, the low sun's glow on that same far ground)
 	TAutoConsoleVariable<FString> FarTintVar(TEXT("jeeb.Ground.FarTint"), TEXT("0.6857 0.7197 0.6214"), TEXT("The flat ground's colour past the grass blades, \"r g b\" multiplier (live; 1 1 1 the old look)"));
+	// (2026-11-26, the cliff lip view's frame cost: the sea cliffs' 2 m ground chunks as shadow casters; live)
+	TAutoConsoleVariable<int32> CVarCliffWallShadows(TEXT("jeeb.Cliff.WallShadows"), 1, TEXT("1: the sea cliffs' ground chunks cast shadows (onto the sea, the beaches and the ledges); 0: they cast none (live)"));
+	void CliffWallShadowsChanged()
+	{
+		static int32 Was = -1;
+		const int32 Now = CVarCliffWallShadows.GetValueOnGameThread();
+		if (Now == Was) return;
+		Was = Now;
+		for (TObjectIterator<UProceduralMeshComponent> It; It; ++It) if (It->ComponentHasTag(FName(TEXT("JeebCliffWall"))) && It->CastShadow != (Now != 0)) It->SetCastShadow(Now != 0);
+	}
+	FAutoConsoleVariableSink GCliffWallShadowsSink(FConsoleCommandDelegate::CreateStatic(&CliffWallShadowsChanged));
 	TWeakObjectPtr<UMaterialInstanceDynamic> GSharedGround;
 	TWeakObjectPtr<UWorld> GSharedWorld;
 	struct FUnderGrass { float Fill = -1.f, From = 0.f, To = 0.f, Under = 0.f, Floor = 0.f; FString Far; };
@@ -364,7 +375,19 @@ void AWorldTerrain::BuildFine()
 						if (T > 0.f && T < 1.f)
 						{
 							const FVector2D O = FMath::Lerp(OutOf(Lo), OutOf(Hi), T).GetSafeNormal();
-							Pd += FVector(O.X, O.Y, 0.f) * (JeebRework::WallRough(Q) * JeebRework::Ramp(0.f, 220.f, FMath::Min(Z - A.Z, B.Z - Z)));
+							// (2026-11-26: a face never gains more than WallLean outward per cm of height, measured up this edge from its foot and
+							// down from its top, so no bulge hangs over a climber or a swimmer at its foot: he could not climb out of the sea at
+							// X 56,000, stuck under a bulge, nor at X 60,000, under a rock lip)
+							auto Raw = [&](float Zq) { return JeebRework::WallRough(A + (B - A) * ((Zq - A.Z) / (B.Z - A.Z))) * JeebRework::Ramp(0.f, 220.f, FMath::Min(Zq - A.Z, B.Z - Zq)); };
+							float Push = Raw(Z);
+							for (int32 k = 1; k <= 24; ++k)
+							{
+								const float Zq = Z - 50.f * k;
+								if (Zq <= A.Z) { Push = FMath::Min(Push, JeebRework::WallLean * (Z - A.Z)); break; }
+								Push = FMath::Min(Push, Raw(Zq) + JeebRework::WallLean * 50.f * k);
+							}
+							Push = FMath::Max(Push, -JeebRework::WallLean * (B.Z - Z));
+							Pd += FVector(O.X, O.Y, 0.f) * Push;
 						}
 						const int32 New = V.Add(Pd);
 						N.Add(FVector::ZeroVector);
@@ -424,6 +447,7 @@ void AWorldTerrain::BuildFine()
 				if (!bServer) AddUnderside(V, Back, N, UV, UV1, Col, Mat);   // (casts no shadow: see BuildLand)
 				PM->SetCollisionProfileName(TEXT("BlockAll"));
 				PM->ComponentTags.Add(FName(TEXT("JeebClimb")));
+				if (P.bWalls) { PM->ComponentTags.Add(FName(TEXT("JeebCliffWall"))); PM->SetCastShadow(CVarCliffWallShadows.GetValueOnGameThread() != 0); }
 				if (!bServer) { if (Mat) PM->SetMaterial(0, Mat); }
 				else PM->SetVisibility(false);
 				Chunks.Add(PM);

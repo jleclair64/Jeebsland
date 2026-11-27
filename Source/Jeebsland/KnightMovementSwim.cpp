@@ -161,8 +161,12 @@ void UKnightMovement::PhysSwim(float Dt)
 	{
 		// swimming into a rock face he can climb: onto it (as on land: square on, pushing at it, with climbing stamina)
 		const FVector NF = FlatV(Hit.ImpactNormal).GetSafeNormal();
+		FHitResult ChestHit;
 		if (Climbable(Hit) && K && !bWantsLetGo && !bClimbExhausted && ClimbStamina > 0.02f && M > 0.2f && !NF.IsNearlyZero()
-			&& FVector::DotProduct(-NF, A.GetSafeNormal()) > 0.643f)
+			&& FVector::DotProduct(-NF, A.GetSafeNormal()) > 0.643f
+			// (2026-11-26, the sea cliffs at X 56,000: his feet touched a sunken foot of the rock 2 m short of the wall and he grabbed it, with
+			// nothing at his chest to climb, and hung there till the bar ran out. The rock must be there at his chest, as the climb itself asks.)
+			&& ProbeWall(UpdatedComponent->GetComponentLocation(), -Hit.ImpactNormal, CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + 40.f, ChestHit) && Climbable(ChestHit))
 		{
 			bClimbFromWater = true;
 			StartClimb(Hit.ImpactNormal);
