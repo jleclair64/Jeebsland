@@ -52,8 +52,8 @@ USkillComponent::USkillComponent()
 	ResetToStartingKit();
 }
 
-// The kit you begin with (and wake up with after dying): a sword in hand and a bow on the weapon bar; an axe, pickaxe and fishing pole, iron and
-// fire arrows in the pack, a
+// The kit you begin with (and wake up with after dying): a sword in hand and a bow on the weapon bar; an axe, pickaxe and fishing pole, 99
+// wooden arrows in the pack (2026-11-26; broadheads and fire arrows are bought or made), a
 // shield, a tin cape and a full suit of light tin armour
 void USkillComponent::ResetToStartingKit()
 {
@@ -64,8 +64,8 @@ void USkillComponent::ResetToStartingKit()
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
 	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword; the knight keeps it, owner 2026-11-22: bows go from the wizard and troll only)
-	AddInvItem(JeebItems::ArrowId(JeebItems::A_Broadhead), StartIronArrows);
-	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
+	AddInvItem(JeebItems::ArrowId(JeebItems::A_Wooden), StartIronArrows);   // (2026-11-26: wooden arrows to start; broadheads and fire are bought or made)
+	UE_LOG(LogTemp, Log, TEXT("JEEBSTARTKIT arrows: wooden %d, broadhead %d, fire %d"), CountItem(JeebItems::ArrowId(JeebItems::A_Wooden)), CountItem(JeebItems::ArrowId(JeebItems::A_Broadhead)), CountItem(JeebItems::IdFireArrow));
 	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
 	for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K)   // a light tin suit, the tunic (2026-11-03; tin since the 2026-10-30 tier redo); no shoulders: the tunic has its own sleeves
@@ -850,7 +850,7 @@ void USkillComponent::FitToClass()
 			Hand(0, K_Sword); Hand(1, K_Bow);
 			bool bArrows = false;
 			for (const FInvSlot& S : Slots) if (IsArrow(S.Id)) bArrows = true;
-			if (!bArrows) { AddInvItem(ArrowId(A_Broadhead), StartIronArrows); AddInvItem(IdFireArrow, StartFireArrows); }
+			if (!bArrows) AddInvItem(ArrowId(A_Wooden), StartIronArrows);
 			if (Worn[K_Shield] == 0) Worn[K_Shield] = TakeFor(K_Shield, GearId(K_Shield, 0));
 			for (int32 K = K_Helmet; K <= K_Boots; ++K) Wear(K, AS_Light);
 		}

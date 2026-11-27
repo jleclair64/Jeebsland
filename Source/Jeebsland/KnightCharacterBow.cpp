@@ -338,7 +338,7 @@ void AKnightCharacter::TickBow(float Dt)
 	}
 	BowT += Dt;
 	if (HasAuthority() && Skills && UnlimitedArrows())   // (testing: topped up to a full stack of each)
-		for (const int32 Id : { JeebItems::ArrowId(JeebItems::A_Broadhead), JeebItems::IdFireArrow })
+		for (const int32 Id : { JeebItems::ArrowId(JeebItems::A_Wooden) })
 			if (const int32 Have = Skills->CountItem(Id); Have < USkillComponent::StartIronArrows) Skills->AddInvItem(Id, USkillComponent::StartIronArrows - Have);
 	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
 	if (bShotFace && bShotWalk) AddMovementInput(FRotator(0.f, ShotFaceYaw, 0.f).Vector(), 1.f);

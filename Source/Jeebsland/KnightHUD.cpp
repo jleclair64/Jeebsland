@@ -892,10 +892,12 @@ void AKnightHUD::DrawMinimap(APawn* Pawn)
 	// Invisibility potion: the seconds left, under the minimap
 	if (MapKnight && MapKnight->GetInvisLeft() > 0.f)
 	{
+const double InvT0 = FPlatformTime::Seconds();   // (test: how long the first draw of this text takes, JEEBINVISHUD)
 		const FString L = FString::Printf(TEXT("Invisible  %d s"), FMath::CeilToInt(MapKnight->GetInvisLeft()));
 		float TW = 0.f, TH = 0.f; HDTextSize(L, TW, TH, nullptr, 1.f);
 		HDText(L, FLinearColor(0.f, 0.f, 0.f, 0.8f), Cx - TW * 0.5f + 1.5f, Cy + Half + 10.f + 1.5f, nullptr, 1.f);
 		HDText(L, FLinearColor(0.75f, 0.88f, 1.f, 0.95f), Cx - TW * 0.5f, Cy + Half + 10.f, nullptr, 1.f);
+{ static bool bLogged = false; const double Ms = (FPlatformTime::Seconds() - InvT0) * 1000.0; if (!bLogged) { bLogged = true; UE_LOG(LogTemp, Log, TEXT("JEEBINVISHUD first draw of the seconds-left text took %.1f ms"), Ms); } }
 	}
 
 	// You: a filled arrow pointing the way you face (relative to the camera)

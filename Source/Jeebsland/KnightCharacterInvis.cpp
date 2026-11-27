@@ -17,6 +17,9 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Terrain.h"
+#include "UObject/StrongObjectPtr.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -26,6 +29,8 @@ static TAutoConsoleVariable<int32> CVarInvisAsOther(TEXT("jeeb.Invis.AsOther"), 
 	TEXT("Test pictures: 1 = show your own invisible knight as other players see him (fainter), not the drinker's own view"));
 static TAutoConsoleVariable<float> CVarTestInvis(TEXT("jeeb.Test.Invis"), -1.f,
 	TEXT("Single player test pictures (-ShotEyesSet): N > 0 turns your knight invisible for N seconds, 0 ends it, -1 leaves it"));
+static TAutoConsoleVariable<int32> CVarInvisCrowd(TEXT("jeeb.Test.InvisCrowd"), 0,
+	TEXT("Single player test pictures (-ShotEyesSet): N extra invisible knights without a player, in a row 5 m ahead of the camera"));
 #endif
 
 float AKnightCharacter::GetInvisLeft() const
@@ -62,6 +67,7 @@ void AKnightCharacter::OnRep_Invisible()
 	InvisScanT = 0.f;   // (the look follows at once in TickInvisible)
 }
 
+static float GWarmSince = -1.f, GWarmMax = 0.f;   // (test: the frames just after the warm-up swap)
 void AKnightCharacter::TickInvisible(float Dt)
 {
 	UWorld* W = GetWorld();
@@ -71,6 +77,37 @@ void AKnightCharacter::TickInvisible(float Dt)
 	TickInvisTest(Dt);
 #endif
 	if (IsNetMode(NM_DedicatedServer)) return;
+	// (2026-11-26, precache: the first drink hitched about 0.2 s while the translucent material's shaders and pipeline states were first used.
+	// So 3 s after a local knight has been standing about, ShowInvisible(true) runs once and the next tick puts everything back, which
+	// makes the renderer build them then, not in a fight; the material is also kept loaded. -NoInvisPrecache turns both off for the test.)
+	if (IsLocallyControlled() && !bInvisible && !bInvisShown)
+	{
+		static TStrongObjectPtr<UMaterialInterface> Kept; static float Alive = 0.f; static bool bWarmed = false;
+		Alive += Dt;
+		if (!bWarmed && Alive > 3.f)
+		{
+			bWarmed = true;
+#if !UE_BUILD_SHIPPING
+			if (!FParse::Param(FCommandLine::Get(), TEXT("NoInvisPrecache")))
+#endif
+			{
+				Kept.Reset(LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/M_Invisible.M_Invisible")));
+				if (Kept.IsValid()) { GWarmSince = 0.f; ShowInvisible(true); UE_LOG(LogTemp, Log, TEXT("JEEBINVISWARM the invisible material shown for one frame to warm it up")); return; }
+			}
+		}
+	}
+#if !UE_BUILD_SHIPPING
+	if (GWarmSince >= 0.f) { GWarmSince += Dt; GWarmMax = FMath::Max(GWarmMax, Dt * 1000.f); if (GWarmSince > 2.f) { UE_LOG(LogTemp, Log, TEXT("JEEBINVISWARM longest frame in the 2 s of the warm-up: %.1f ms"), GWarmMax); GWarmSince = -2.f; } }
+	{	// (test: the longest frame in the 2 s after a knight first turns invisible on this machine, JEEBINVISHITCH; Dt is the last frame's)
+		static float Since = -1.f, Max = 0.f; static bool bDone = false;
+		if (bInvisible && bInvisShown && !bDone)
+		{
+			if (Since < 0.f) { Since = 0.f; Max = 0.f; }
+			Since += Dt; Max = FMath::Max(Max, Dt * 1000.f);
+			if (Since > 2.f) { bDone = true; UE_LOG(LogTemp, Log, TEXT("JEEBINVISHITCH longest frame in the 2 s after the first drink: %.1f ms"), Max); }
+		}
+	}
+#endif
 	if (bInvisible != bInvisShown) ShowInvisible(bInvisible);
 	else if (bInvisShown)
 	{
@@ -83,6 +120,9 @@ void AKnightCharacter::TickInvisible(float Dt)
 // built or repainted meanwhile is caught; a slot the game repainted is remembered anew.
 void AKnightCharacter::ShowInvisible(bool bOn)
 {
+#if !UE_BUILD_SHIPPING
+	struct FTimed { double T0 = FPlatformTime::Seconds(); bool bOn; ~FTimed() { const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0; if (Ms > 4.0) UE_LOG(LogTemp, Log, TEXT("JEEBINVISSLOW ShowInvisible(%d) took %.1f ms"), bOn ? 1 : 0, Ms); } } Timed; Timed.bOn = bOn;   // (test: any slow swap)#endif
+#endif
 	InvisScanT = 0.1f;
 	const auto& T = JeebTune::V();
 	TArray<AActor*> Actors{ this };
@@ -175,6 +215,28 @@ void AKnightCharacter::TickInvisTest(float Dt)
 {
 	if (HasAuthority() && IsLocallyControlled())
 	{
+		// (frame-cost test, -ShotEyesSet=<eye>:jeeb.Test.InvisCrowd=N: N invisible knights without a player stand in a row 5 m ahead of the view)
+		static int32 LastCrowd = 0; static TArray<TWeakObjectPtr<AKnightCharacter>> Crowd;
+		const int32 WantCrowd = CVarInvisCrowd.GetValueOnGameThread();
+		if (WantCrowd != LastCrowd)
+		{
+			LastCrowd = WantCrowd;
+			for (const TWeakObjectPtr<AKnightCharacter>& C : Crowd) if (C.IsValid()) C->Destroy();
+			Crowd.Reset();
+			AActor* VT = GetWorld()->GetFirstPlayerController() ? GetWorld()->GetFirstPlayerController()->GetViewTarget() : nullptr;
+			if (VT && WantCrowd > 0)
+			{
+				const FRotator Yaw(0.f, VT->GetActorRotation().Yaw, 0.f);
+				for (int32 i = 0; i < WantCrowd; ++i)
+				{
+					FVector At = VT->GetActorLocation() + Yaw.Vector() * 500.f + FRotator(0.f, Yaw.Yaw + 90.f, 0.f).Vector() * (i - (WantCrowd - 1) * 0.5f) * 120.f;
+					At.Z = JeebTerrain::DrawnHeight(At.X, At.Y) + 100.f;
+					FActorSpawnParameters SP; SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					if (AKnightCharacter* C = GetWorld()->SpawnActor<AKnightCharacter>(GetClass(), At, Yaw + FRotator(0.f, 180.f, 0.f), SP)) { C->StartInvisible(600.f); Crowd.Add(C); }
+				}
+				UE_LOG(LogTemp, Log, TEXT("JEEBINVISCROWD %d invisible knights spawned ahead of the view"), Crowd.Num());
+			}
+		}
 		static float LastSet = -1.f;
 		const float Want = CVarTestInvis.GetValueOnGameThread();
 		if (Want != LastSet) { LastSet = Want; if (Want > 0.f) StartInvisible(Want); else if (Want == 0.f) EndInvisible(TEXT("test switch")); }
