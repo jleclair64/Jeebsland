@@ -3,6 +3,7 @@
 #include "Terrain.h"
 #include "OakHill.h"
 #include "SteeleCreek.h"
+#include "SilverPoint.h"
 #include "TownLab.h"
 #include "JeebWater.h"
 #include "Cottage.h"
@@ -205,7 +206,7 @@ namespace
 		}
 		static bool OnBuildings(const FVector2D& P)
 		{
-			return JeebOakHill::OnBuilding(P.X, P.Y, 0.45f) || JeebSteele::OnBuilding(P.X, P.Y, 0.45f);
+			return JeebOakHill::OnBuilding(P.X, P.Y, 0.45f) || JeebSteele::OnBuilding(P.X, P.Y, 0.45f) || JeebSilver::OnBuilding(P.X, P.Y, 0.45f);
 		}
 		static bool Wet(const FVector2D& P)
 		{
@@ -420,18 +421,20 @@ namespace
 		return H.IsValidIndex(N - 1) ? H[N - 1] : nullptr;
 	}
 
-	enum class ETown : uint8 { None, OakHill, Steele };
+	enum class ETown : uint8 { None, OakHill, Steele, Silver };
 	ETown TownOf(const FString& S)
 	{
 		const FString T = Squash(S);
 		if (T == TEXT("oakhill")) return ETown::OakHill;
 		if (T == TEXT("steelecreek") || T == TEXT("steele")) return ETown::Steele;
+		if (T == TEXT("silverpoint")) return ETown::Silver;
 		return ETown::None;
 	}
 	bool TownOn(ETown T)
 	{
 		if (T == ETown::OakHill) return JeebTownLab::RealTown();
 		if (T == ETown::Steele) return JeebSteele::Enabled();
+		if (T == ETown::Silver) return JeebSilver::Plots().Num() > 0;   // (the wizard village, 2026-11-26)
 		return false;   // (Blackrock was taken out of the game, 2026-11-22: its rows in Townsfolk.csv went with it)
 	}
 
@@ -462,7 +465,42 @@ namespace
 			JeebOakHill::EShop Sh; if (JeebOakHill::ShopOf(P->Def.Model, Sh)) R.Shop = uint8(Sh);
 			R.bOk = true;
 		}
+		else if (Town == ETown::Silver)
+		{
+			// (Silver Point's buildings by plot Id, SilverPoint.h; no shop here: what they sell is the shops' own business)
+			const JeebSilver::FPlot* P = JeebSilver::FindPlot(Name);
+			if (!P) return R;
+			R.At = JeebSilver::DoorSpot(*P, Out, &R.Yaw);
+			R.bOk = true;
+		}
 		return R;
+	}
+	// Silver Point's open spots (2026-11-26): "plaza" round the middle, "street" out along the high street, by a seed; facing the middle
+	// or the street. Never on a building or within 1 m of one.
+	bool SilverSpot(const FString& N, uint32 Seed, FVector2D& OutAt, float& OutYaw)
+	{
+		const JeebOpen::FSite* S = JeebSilver::Site();
+		if (!S) return false;
+		const float H = JeebSilver::RoadHeading(S->Pos);
+		for (int32 k = 0; k < 24; ++k)
+		{
+			const uint32 Q = Seed * 2654435761u + uint32(k) * 40503u;
+			const float U = float(Q % 1000u) / 1000.f, V = float((Q >> 10) % 1000u) / 1000.f;
+			if (N == TEXT("street"))
+			{
+				const float Side = (V < 0.5f ? -1.f : 1.f) * (250.f + 200.f * V);
+				OutAt = S->Pos + JeebSilver::Dir(H) * (1800.f + 4000.f * U) + JeebSilver::Dir(H + 90.f) * Side;
+				OutYaw = H + (Side > 0.f ? -90.f : 90.f);
+			}
+			else
+			{
+				const float A = 360.f * U;
+				OutAt = S->Pos + JeebSilver::Dir(A) * (700.f + 900.f * V);
+				OutYaw = A + 180.f;
+			}
+			if (!JeebSilver::OnBuilding(OutAt.X, OutAt.Y, 1.f) && FVector2D::Distance(OutAt, S->Pos) > 400.f) return true;
+		}
+		return false;
 	}
 
 	// An errand's spot (where to stand, facing what they came for), by name, in a town
@@ -518,6 +556,15 @@ namespace
 			R.Yaw += 180.f;
 			return R;
 		}
+		if (Town == ETown::Silver)
+		{
+			if (N == TEXT("plaza") || N == TEXT("street")) { R.bOk = SilverSpot(N, Seed + GetTypeHash(N), R.At, R.Yaw); return R; }
+			R = Front(Town, Name, 260.f);
+			if (!R.bOk) return R;
+			R.At += Dir2(R.Yaw + 90.f) * ((Seed & 1) ? 150.f : -150.f);
+			R.Yaw += 180.f;
+			return R;
+		}
 		return R;
 	}
 
@@ -541,6 +588,15 @@ namespace
 			const JeebSteele::FPlot* P = JeebSteele::FindPlot(*FString::Printf(TEXT("House%d"), Idx));
 			if (!P) return false;
 			OutAt = JeebSteele::DoorSpot(*P, 150.f, &OutYaw);
+			return true;
+		}
+		if (Town == ETown::Silver)
+		{
+			// (a house plot Id, "Home3"; or "goblin N": a goblin's nook somewhere round the plaza)
+			if (Kind.Equals(TEXT("goblin"), ESearchCase::IgnoreCase)) return SilverSpot(TEXT("plaza"), 7919u * uint32(Idx + 1), OutAt, OutYaw);
+			const JeebSilver::FPlot* P = JeebSilver::FindPlot(Spec.TrimStartAndEnd());
+			if (!P) return false;
+			OutAt = JeebSilver::DoorSpot(*P, 150.f, &OutYaw);
 			return true;
 		}
 		return false;
@@ -696,7 +752,7 @@ void ATownLife::Build()
 	};
 
 	// ------------------------------------------------------------------ Townsfolk.csv: keepers and the people with homes
-	struct FFolk { ANpc* N; ETown Town; FVector2D Door; float DoorYaw; TArray<FPlace> Errands; TSharedPtr<FRound> R; float ArriveT = 0.f; int32 Pair = -1; int32 Side = 0; };
+	struct FFolk { ANpc* N; ETown Town; FVector2D Door; float DoorYaw; TArray<FPlace> Errands; TSharedPtr<FRound> R; float ArriveT = 0.f; int32 Pair = -1; int32 Side = 0; bool bGoblin = false; };
 	TArray<FFolk> Folk;
 	FSheet Sheet;
 	if (Sheet.Load(TEXT("Townsfolk.csv")))
@@ -732,7 +788,8 @@ void ATownLife::Build()
 				}
 				if (!N)
 				{
-					const ENpcRole KRole = K.Shop == uint8(JeebOakHill::EShop::Smith) ? ENpcRole::Blacksmith : K.Shop == uint8(JeebOakHill::EShop::Bank) ? ENpcRole::Banker : ENpcRole::Shopkeeper;
+					// (Silver Point's keepers, 2026-11-26: they mind their shops and talk; what the shops sell is set up elsewhere)
+					const ENpcRole KRole = Town == ETown::Silver ? ENpcRole::Townsfolk : K.Shop == uint8(JeebOakHill::EShop::Smith) ? ENpcRole::Blacksmith : K.Shop == uint8(JeebOakHill::EShop::Bank) ? ENpcRole::Banker : ENpcRole::Shopkeeper;
 					N = W->SpawnActor<ANpc>(FVector(K.At.X, K.At.Y, DrawnGround(K.At.X, K.At.Y) + 92.f), FRotator(0.f, K.Yaw, 0.f), SP);
 					if (!N) continue;
 					N->SetFolk(FolkK, Name, Hello);
@@ -756,10 +813,12 @@ void ATownLife::Build()
 			}
 			else if (!Model.IsEmpty()) { N->SetLookHint(Model, Tint); N->RebuildBody(); }
 			F.N = N;
+			F.bGoblin = Model.Equals(TEXT("Goblin"), ESearchCase::IgnoreCase);   // (Silver Point's goblins scurry: 2026-11-26)
 			TArray<FString> Es; Sheet.S(r, TEXT("Errands")).ParseIntoArrayWS(Es);
-			for (const FString& E : Es)
+			for (int32 k = 0; k < Es.Num(); ++k)
 			{
-				const FPlace P = Errand(Town, E, Seed(Name), W);
+				const FString& E = Es[k];
+				const FPlace P = Errand(Town, E, Town == ETown::Silver ? Seed(Name) + 7919u * uint32(k) : Seed(Name), W);   // (Silver Point: each errand its own spot, 2026-11-26)
 				if (P.bOk) F.Errands.Add(P);
 				else UE_LOG(LogTemp, Warning, TEXT("JEEBLIFE Townsfolk.csv: %s has no errand %s here"), *Name, *E);
 			}
@@ -784,7 +843,7 @@ void ATownLife::Build()
 	for (FFolk& F : Folk)
 	{
 		TSharedPtr<FRound> R = MakeShared<FRound>();
-		R->Speed = 95.f; R->bNightHome = true; R->Label = F.N->GetNpcName(); R->Anchor = F.Door;
+		R->Speed = F.bGoblin ? 330.f : 95.f; R->bNightHome = true; R->Label = F.N->GetNpcName(); R->Anchor = F.Door;
 		const uint32 S = Seed(R->Label);
 		FBuilder B(*R, F.Door, F.DoorYaw);
 		TArray<FVector2D> Way;
@@ -802,7 +861,7 @@ void ATownLife::Build()
 			++Yards;
 		}
 		if (Yards > 0) { Map.Route(B.Pos, F.Door, Way); B.Path(Way); B.Stay(3.f, F.DoorYaw); }
-		for (int32 e = 0; e < F.Errands.Num() && e < 2; ++e)
+		for (int32 e = 0; e < F.Errands.Num() && e < (F.bGoblin ? 10 : 2); ++e)   // (goblins dash about: up to ten stops, 2026-11-26)
 		{
 			FPlace E = F.Errands[e];
 			const bool bMeet = e == 0 && F.Pair >= 0;
@@ -810,7 +869,7 @@ void ATownLife::Build()
 			Map.Route(B.Pos, E.At, Way);
 			B.Path(Way);
 			if (bMeet) F.ArriveT = B.T;
-			B.Stay(bMeet ? 38.f : 16.f + 10.f * Hash01(S, 8 + e), E.Yaw, bMeet);
+			B.Stay(bMeet ? 38.f : F.bGoblin ? 2.f + 4.f * Hash01(S, 8 + e) : 16.f + 10.f * Hash01(S, 8 + e), E.Yaw, bMeet);
 		}
 		Map.Route(B.Pos, F.Door, Way);
 		B.Path(Way);
@@ -969,13 +1028,13 @@ void ATownLife::Build()
 			for (const FSeg& S : R->Segs)
 			{
 				if (S.Kind != ESeg::Walk) continue;
-				auto In = [](const FVector2D& P) { return JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f); };
+				auto In = [](const FVector2D& P) { return JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f) || JeebSilver::OnBuilding(P.X, P.Y, 0.f); };
 				if (In(S.A) || In(S.B)) continue;   // (a keeper's step along the counter, inside their stall)
 				const int32 Steps = FMath::Max(1, FMath::CeilToInt(FVector2D::Distance(S.A, S.B) / 50.f));
 				for (int32 k = 0; k <= Steps; ++k)
 				{
 					const FVector2D P = FMath::Lerp(S.A, S.B, float(k) / Steps);
-					if (JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f))
+					if (JeebOakHill::OnBuilding(P.X, P.Y, 0.f) || JeebSteele::OnBuilding(P.X, P.Y, 0.f) || JeebSilver::OnBuilding(P.X, P.Y, 0.f))
 					{
 						++Inside;
 						UE_LOG(LogTemp, Warning, TEXT("JEEBLIFE walk inside a building: %s at %.0f,%.0f"), *N->GetNpcName(), P.X, P.Y);

@@ -58,3 +58,9 @@ Art/Props/Originals/
 Art/WorldProps/Originals/
 Art/Bridge/*Detailed*
 Art/Fish/*.glb
+Art/SilverPoint/*.glb
+Art/SilverPoint/*_base_color.png
+Art/SilverPoint/*_metallic.png
+Art/SilverPoint/*_roughness.png
+Art/SilverPoint/*_normal.png
+Art/SilverPoint/*.log

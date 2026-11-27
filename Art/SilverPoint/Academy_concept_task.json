@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-511c-712a-8887-30f94460c908",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a grand wizard academy: a tall round grey stone tower five storeys high with tall arched windows, joined to a two-storey stone hall with a large arched doorway, several slim pointed purple spires with twisted tips. Castle-like but cosy, stylized. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757724639,
+ "started_at": 1795757724650,
+ "finished_at": 1795757748382,
+ "expires_at": 1796016948382,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-511c-712a-8887-30f94460c908_0.png?Expires=1796016948&Signature=lC2Kifu3llFTfAuoSFnba6~4azDnc~-RxvUN6voUTpf4fRMA8~JR23j~iXRIY~ttYsVO-lWCqyBNiJpNFMGzw73xef9VrcABQyvbxcEIsVJ8wN63yQEJlSCIuywRLjUee4GQi90Uei3qIu1bDkIwdxe4OdFtCOkx~rKYEKhgqGA37eNMe0jf~TpLqYiaOvXPSmf~mIYgOsggcC~z87kh6vLO9lmoZKw8gZf975gvjv60o7nrRsM~6v4TW6cbvKSzbz7u9lIXLTXGBP7ucBpmIPI884Mk7ZOBmOKmo51Ssl~uXZsdbseEldjIeXPgFMudStAMCYosqOPg5zPoE3UohQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

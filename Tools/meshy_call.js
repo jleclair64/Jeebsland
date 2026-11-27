@@ -41,6 +41,7 @@ async function save(url, file) {
       if (t.image_urls) for (let i = 0; i < t.image_urls.length; ++i) await save(t.image_urls[i], out + (i ? "_" + i : "") + ".png");
       if (t.model_urls && t.model_urls.glb) await save(t.model_urls.glb, out + ".glb");
       if (t.result && t.result.rigged_character_glb_url) await save(t.result.rigged_character_glb_url, out + "_rigged.glb");
+      if (t.result && t.result.animation_glb_url) await save(t.result.animation_glb_url, out + ".glb");   // (v1/animations, 2026-11-26)
       if (t.texture_urls) for (const tu of t.texture_urls) for (const k in tu) await save(tu[k], out + "_" + k + ".png");
       return;
     }

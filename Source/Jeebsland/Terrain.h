@@ -118,6 +118,7 @@ namespace JeebTerrain
 	}
 
 		// Places where grass and fallen leaves must not grow: under every roof, in the courtyard and moat, on the water
+	bool JeebSilverOnBuilding(float X, float Y);   // (SilverPoint.cpp: SilverPoint.h includes this file)
 	inline bool NoGroundCover(float X, float Y)
 	{
 		const FVector2D P(X, Y);
@@ -129,6 +130,7 @@ namespace JeebTerrain
 		if (JeebWorld::InWater(X, Y)) return true;   // the river (it runs through the east side of the square)
 		if (JeebOakHill::OnBuilding(X, Y)) return true;   // Oak Hill's buildings
 		if (JeebSteele::OnBuilding(X, Y)) return true;    // Steele Creek's (SteeleCreek.h)
+		if (JeebSilverOnBuilding(X, Y)) return true;      // Silver Point's (SilverPoint.h, 2026-11-26)
 
 		return false;
 	}

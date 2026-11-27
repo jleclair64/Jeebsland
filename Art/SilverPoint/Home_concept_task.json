@@ -1,0 +1,16 @@
+{
+ "id": "01a21b7f-441e-7140-96b3-bd17418f3c36",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a tall narrow two-and-a-half storey wizard townhouse with an overhanging jettied upper floor, a front door with stone steps, one bay window. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757655823,
+ "started_at": 1795757655841,
+ "finished_at": 1795757670917,
+ "expires_at": 1796016870917,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b7f-441e-7140-96b3-bd17418f3c36_0.png?Expires=1796016870&Signature=CyvuB5zlX16U49jj5kTgFN1uLfifgxb-DGpMuZBYc8zjzrkX3E~18EAFmTkWsog6sSGd1FXejUhO7zJ32NP27oOXluSZyiIkK4pNOOD4~dZIbIMNm2e-LzDdK1~pXD3no-lyXtv43Sz28psflIeGmy6P3U4dtuddDh8xcBqLk-68IQdTQDwgUrrP5dxBShhzxX98f82NlTt5yPQonzl2zaMqJZ3VCoazUgkTt0rZcxMsD9K-MBVP5z42RdTXHNfCsHpKz51cNduUYTSaEtkuyrywnTKO1OcWYF~PMPK50xlbJpx-IkXuFgN~-FM2emjDWXVzfCpQHrOvTWQo-MJlqQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

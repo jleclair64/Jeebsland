@@ -1,0 +1,20 @@
+{
+ "id": "01a21b8a-2d61-73fb-9070-c2e598a8ae95",
+ "type": "animate",
+ "name": "",
+ "status": "SUCCEEDED",
+ "created_at": 1795758370298,
+ "progress": 100,
+ "started_at": 1795758370309,
+ "finished_at": 1795758374837,
+ "expires_at": 1796017574837,
+ "task_error": null,
+ "result": {
+  "animation_glb_url": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b8a-2d61-73fb-9070-c2e598a8ae95/output/Animation_Walking_Woman_withSkin.glb?Expires=1796017574&Signature=f2D7K9gNLDldw6Y6R4qWwr28B7d5L0~s-FfTiUF6QwufGZ0zCb3qDF1aQZARarZ0tzxiJOoMrrYFGW1TqDGj6LWa1pSLnmAa8n83CrVgOhiL~cysd93AXwrcLEyk9f3G14jqmKSLr1CR-UpVhQtYU7xVSPRj3YDLWblbVYNk2lZ01entP-RnaUveMI929FNaVIC15nsZYGyzsr9DPlTm7pKasP23gzOiBwORlWktTaFki-4Bs~hnAymf7L992EcJIpl7ufGG8QKpiQ5dWpS~3gDJjZRsadcDkpgp246PoBsz49oGUnGZr4yuZkRhvSdiOexehqGPDexPY7ywFkBz1w__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "animation_fbx_url": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b8a-2d61-73fb-9070-c2e598a8ae95/output/Animation_Walking_Woman_withSkin.fbx?Expires=1796017574&Signature=CZRAKY92wXPAubQdZXgwmKLhA5GBvBRHb7TXg6ZeZNopo7gU1SVn8rab7Xh1WeZllRqiFA5MCNDr7WFVL2s~Mb-kAnCieP387Gf6VzeD7qnvwkiLiEFC~c3I~H2PhVe5CFUOQ6rBCS3EndSrPEF4qouxJrlQSeCVDpkr~D24AklPjwRpVAnhgwNrTO1mR8KQZEUfParKsOlL9yeh1GAOOSdYUsM3FUC2Rhar4d23edA6w8DobrgktTe8tpZ3vjH-YNFvvd5Ie0RgHa~bG7qCSICb245mM6nmIa2yJhO7ekk-ie7HTaFcX6IuIfmOLn~KylONUss7FeCoFWaF45BtZQ__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "processed_usdz_url": "",
+  "processed_armature_fbx_url": "",
+  "processed_animation_fps_fbx_url": ""
+ },
+ "consumed_credits": 3
+}

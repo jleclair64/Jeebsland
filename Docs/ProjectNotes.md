@@ -1010,3 +1010,22 @@ Owner's list (pictures pt 6-10): hand too close to his face when aiming a rock, 
 ## Fish sizes in the pack (2026-11-26, agent fishsize; FishSizeTest.cpp, Docs/FishingPlan.md)
 
 `FInvSlot::Size` (tenths of an inch, 0 = none) rides with a trout, salmon or bass through `AddInvItem(Id, Count, Size)`, `CanAdd`, `PutInto` (bank), `TakeEverything`, `ALootDrop` (drops, sacks, `TakeOne`/`TakeAll`) and `UJeebSave` (`SlotSizes`, `BankSizes`, `FJeebClassPack::SlotSizes`; no version bump, old saves read as zero). A sized slot never stacks (Count 1) and never merges; `RemoveItems` takes plain stacks first. `AResourceNode::YieldSizeTenths` (fishing overrides) hands the size to `FinishGathering`. Tooltip: `ItemTip(Id, Size)`; helpers `JeebProps::FishSpecies/FishSizeText/IsBoardFish`. Server decides all; the client only reads the replicated slot. Test: `Tools/fishsize_net.sh` (`-FishSizeNetTest` server, `-FishSizeDo` client; the client's bite clicks the reel for itself).
+## Silver Point wizard village (2026-11-26/27, agent wizvillage)
+
+- **Buildings:** 12 Meshy designs (style reference: the free trial cottage) on 19 plots.
+  - Layout and plots are in `Source/Jeebsland/SilverPoint.h` (JeebSilver: ring plots round the middle with doors facing it, and a high street along the road heading). They are placed in `OpenWorldActor.cpp` BuildHouses.
+  - Models are `/Game/TownLab/Silver/SM_TL_SP<Kind>` with `_Col`. FModel rows are in OakHill.h.
+  - Rebuild them with `Tools/BuildSilverPoint.ps1 [-Only A,B] [-ImportOnly]`.
+  - Grass, snow and candles skip buildings through `JeebTerrain::JeebSilverOnBuilding`. The WorldMap Silver Point flat disc is 6600 cm.
+- **Windows:** the town hall, academy and wand shop have painted windows (their glow pictures held too few lit texels). `townlab_panes.py` now skips a building that fails instead of stopping.
+- **People:** Wizard, Witch and Goblin bodies (Meshy, rigged, with Meshy idle/walk/talk clips) in `Art/People`. Import with `Tools/ImportPeople.ps1`; its "FAILED" line is a false alarm if PEOPLEDIAG done is in the log.
+  - In `Townsfolk.csv`, the Silver Point keepers are talk-only (shops are for the economy agent).
+  - Goblins: `FFolk::bGoblin` gives speed 330, up to 10 errands, and 2-6 s stays.
+  - Silver Point errands use a per-errand seed, so Oak Hill's rounds are unchanged.
+- **Meshy credits:** 627 spent (1013 to 386).
+- **Open:**
+  - No cobbles on the plaza or streets.
+  - The layout is more spread out than narrow lanes.
+  - The broom stall still stands for the economy agent.
+  - Pets that follow you come later.
+  - Skipped: observatory, library, graveyard, greenhouse and wishing well.

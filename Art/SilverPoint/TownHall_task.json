@@ -1,0 +1,39 @@
+{
+ "id": "01a21b82-5a0b-7106-acc5-1406a38a5bfa",
+ "type": "image-to-3d",
+ "name": "",
+ "art_style": "",
+ "object_prompt": "",
+ "style_prompt": "",
+ "negative_prompt": "",
+ "texture_prompt": "",
+ "texture_image_url": "",
+ "text_style_prompt": "",
+ "image_style_url": "",
+ "status": "SUCCEEDED",
+ "created_at": 1795757859476,
+ "progress": 100,
+ "started_at": 1795757859487,
+ "finished_at": 1795757995317,
+ "expires_at": 1796017195317,
+ "task_error": null,
+ "model_url": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.glb?Expires=1796017195&Signature=l-NxpAyZavxS6LEMT-6hwtRNM6SKDVPvGf9wvkXDVCPoeKJhbs0jyyzhZXa39IPPZmBuRFwofi04iMuRaYls28OQRQnyDE0NkjPbfLhrbQ7ksib0oYMjnNSJkz3ZjY-XMXkrP8dWTMBFn3lVUzaz0FlrCSQsDPSiRPz5Z6TDzl7NfJfkysr5rq5Z8mMv3AtBlZW8z6EdyqD3pbYWYhZA0Q-3KxMS66cBjT9xYuLZMViKwZc5ETCSp5p8rzDZ3Jd9f15yaYB3q8AqFSNscDLUJ34qz1Xmn6-cXEJQSBq-fLOdyYAITbeEqE5-VztLkQiIrzA0Vav7AiYyDNXZkRSLjw__&Key-Pair-Id=K1VGYTHIYLM9UM",
+ "model_urls": {
+  "glb": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.glb?Expires=1796017195&Signature=l-NxpAyZavxS6LEMT-6hwtRNM6SKDVPvGf9wvkXDVCPoeKJhbs0jyyzhZXa39IPPZmBuRFwofi04iMuRaYls28OQRQnyDE0NkjPbfLhrbQ7ksib0oYMjnNSJkz3ZjY-XMXkrP8dWTMBFn3lVUzaz0FlrCSQsDPSiRPz5Z6TDzl7NfJfkysr5rq5Z8mMv3AtBlZW8z6EdyqD3pbYWYhZA0Q-3KxMS66cBjT9xYuLZMViKwZc5ETCSp5p8rzDZ3Jd9f15yaYB3q8AqFSNscDLUJ34qz1Xmn6-cXEJQSBq-fLOdyYAITbeEqE5-VztLkQiIrzA0Vav7AiYyDNXZkRSLjw__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "fbx": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.fbx?Expires=1796017195&Signature=qv8lS68VxZBsWBy1qh50Hx4DC37fg2hN6w7OsLgUO9661tVqddiPT~6c5VaQuUB7yJcsGY7Pj9EBFTiIacTX8qZqQN-fw2i5RwD96OyuEWHyR-8fMl7S5Rj6RRghB2wQt7ZL0htEhR1edGmOnfu28sfx8lG75iIK9oRn7FQ33YrAH-I1naCFoxHtvbG6mEp-U9kJXFZ~x950nh9o8MOsO~Bf7BraiLQtqXfX4dfG7n3MezzKbBuy3zgiC6i5V5YitubVuKXhzn2mJuHjvMa3uE6k8zZ1s~bjQcdHFYueXAjTZa~OLA7tjY7aEOBCtgm1Y~ZkVjjHinNUQiVyL66hbw__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "usdz": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.usdz?Expires=1796017195&Signature=pwPyMg0UqIBdNSc8x5FSXEWbv4HvzgtGUl7zGwKasmMvJoGV8xaDYTlmnGrNFSMyjnIttF1e7QNHForplgkiu9Wn1QiZ1ENl82gj4hxjjykEX6WgMx~tOIy1fNffbh7Ni~RQCX95aIOAPd5YJfSyNYGUTy8Jb-e6oojVMMalEUd9ujyzZRSAGfpuzpFIg-OhzBUMpg-ZWROh4jggwtr1KSoSB8t4OPMhbo48SLW6zl4519l9obLKD97WM-CPZOcjVTl6CGwmvowkIOUqEv0WfF6bQLjsTpiL5STVowXWzB2eDzKppzV2DvoNMV-xeKREFgMIKZ9Bqr58pYnvJfjaSw__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "obj": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.obj?Expires=1796017195&Signature=PI9Ia3OgAbqkJv~KEcqZoYFLBUQsLvmKAxleY7mlztgVkNHF3blFOYdL1oedptW6xEuYbfdNXRHY7HgzjkB8URqY0lBfWWE9ikGgWHurw~HBa~p9ct~J~KfDTjuB6ojhyqmrTzcUzPfzxIE6YCm7m808~mcwTu5snETM6DvL1fYGYd-UpMb3tsxTX6YXUI9aDc9vniaKtvqOX7dqwTbfOypUogO45~XOcGDIqhRfZV-XLfDLc1oTl0TVqtKVf5bZ3~GC-HQA8eLaun2coUvkmnKiHDAPwGOF4V7cqvgE-u0IH8vE5-F5iFXjAEdysGHWPbrfZqH3WPwVZg43mvx4ig__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "mtl": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.mtl?Expires=1796017195&Signature=gI2jBp3Hv1Itd16EkiM3xjBZLeXczGRp~rM4~VQ86MxPdgFtJvlFTRbObZLFZ3IaSPnU9cIj2CzwVLNrN121xcKE5BFmMvEJXDCNUNqbq2qEUHo9it~52GmyuQqP~xlrF0XrecIoyg7zv4lvSbmFV7qkGEAfyZgZRLBeEaLdpiGLkVj4epVGQ4ain6X~2Sl~2hZD~qaTvxKo33HgJklw53OrP-20-geUySayOLTVtI3dAVOuyahYBOOh~Zvy8vmJ1sg~mjNVann4Oq7dSp0bkVL4ExIutzmJnAronEXpH-K-1pO2lZ2B~Q0YDahJS8jxz2aIGuDjGVrlQJLBp~OO0A__&Key-Pair-Id=K1VGYTHIYLM9UM",
+  "stl": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/model.stl?Expires=1796017195&Signature=O9JbqDo4oR-jZthEwtpn2eYvdPdonyfyp9qr6Mws7R9GT4aOF308dbcqZPmTL0HC48BER3f88T85XOVc0OczmoV03rWQBv3YU-HXKZkLm5bXW4tJAJgC14tsoYB39dAIjctPTpW6McpB0JFPex77Ynob~gMHUlzaAy0PsCXAzP8xs~5tRQMw~66426FzWDdkFjq0UKBwhPYm8qM68nhG2TLt91me0JI09wOpBkPnZnqDk3lt1cMOWDCWmoEphq6V2O-8nHxRyTAMT5n2e5hkN-C0ul39hPSNH-hHYGWgjiA9j6nFKOztcreBsVSMbgOZRxusAlM~vcSU8tbrUkxR-g__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ },
+ "thumbnail_url": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/preview.png?Expires=1796017195&Signature=Ex9L4DoBQGO4~gNjGkvpn414ICtwovS4M9xR860AcocLdYLIVVLGcN0DWRYf3gjLBmmMrBI5HueeaUjxs7Fs3B2Y7tqQoMjzDcWbB9GJ8XKXTlD3WR5~oGc~6PMyhq6yrZwIig3U-WhP6xANoJoJ9S7LJniDfs5ugEBx18Rk0oVY4eFAd1oqQ3TmfPonn4l-9x6u6v99bIZyYj2QI9iSUBN85vW2xM5hjCKBWlrbo-SYZik7y9JUFRs-xxMctApHzq7VuoFoiMr~p2FwSLkm17WmQtbmMaIBcpvX1qHFmlu91TngX5NOkrJJa849kiTkrP8-rBDjmpiLe3EP-jhmeQ__&Key-Pair-Id=K1VGYTHIYLM9UM",
+ "texture_urls": [
+  {
+   "base_color": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/texture_0.png?Expires=1796017195&Signature=gXR2~guVD~NzqL8qur1-mcfYOnAgeAtMhhxx2GSoUOTJZKo~0HWjQfVZqSo34HG7r0XVnjkOHRBf~XqqklEGaVNk4GUa~n-ApveDPn4m4EEKByXsGzrK8963V4ZKivJ77t2aonniBTX4sTRx-dlatziwes333mJmy02j3~fW6i3Br5tzidcuOMqu02BJneCZxuVjaskWQRLkF4vFs9g-WuxkGvkuqJcy90b1bM5wjkXKe3ql0I2Y8X4M6W5oVISh2IComrIvziNZ2MXOEBd8OQISngHlGS3Z9Frp2v7zZwQxG2MYIgmzuErjTeOKfUUeJQv1MW4xhQKShTLqrqiiPw__&Key-Pair-Id=K1VGYTHIYLM9UM",
+   "metallic": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/texture_0_metallic.png?Expires=1796017195&Signature=PxIf3~lvds72u1llywhocpMWM9RusnJ894Dm~endnvCb23ABZPnHfdJ~cwcA9X33GTPNGabkea530envw-tcQZwikMRn185JsGWOiQex6ZRYtGzYTfK6T9S2WD4SZumADVuiEkW~5uppR~6-mhpRP0sNNLzADeckird9bsx0u-8DkxzPai5sPto-ljhEMK7vdS2pm9mUSikD7bgsYtrr4MdCqndP8~p9RVaRZn0YZL7mogMML94OEHU~9GD4hzJt7NB5WeazvZdtBs7al-uQcWzoJ-eiHPs7OxQdZqxNC6uLMMGMJflLe71uXmx0bWhpaOsXVYB8-OigV~TWqeY-tA__&Key-Pair-Id=K1VGYTHIYLM9UM",
+   "roughness": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/texture_0_roughness.png?Expires=1796017195&Signature=bCq4YPEk-yKupWpc3DRLfnckUM7rH~X2JiF8YSZJm-aiPpREUWd0q2GnFgiuuM0UmcROfcAgaliWzLejC5V87xEHOe-7DbHbMaRTkk3QdbY1B88wLx5IQfs4ZSh32kwZ-MoHJVXugXWA7p9P-rNttpKy~G33So0YaptcyHN0fpfmP3QUZ01BCkVTJ4TZ3xeq6yPb~2DXMyXkjrR8Qo60K6cccdXfYhTuk4tf2nEpOTAWuqSByAddwUI08IPYDtnusV92f2XeAZ1m67Vitu9kn1xXdScDcv-8f3eocUUYKYHK0NhQei~FW0bvO0GIRCmT5ubbIRLyHxPHVRg4BIF59Q__&Key-Pair-Id=K1VGYTHIYLM9UM",
+   "normal": "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/tasks/01a21b82-5a0b-7106-acc5-1406a38a5bfa/output/texture_0_normal.png?Expires=1796017195&Signature=aXSY5nw1hS2JocMR2aMzDVlHqSdAIlNGgkzkJ9Wv-lSDaCSUUb6cCLM5gMTJJSTzvj-enyJ3rHmcgw0ETWS3Nua6yj98wzsu6OQJ7Zgklfmggsgzn3DCahKlqFoUM4bmSCqajxDIpatzk0Vt-EvFbcJbepmzaR0ftKrMY2cteV0tifddEqrsbYQGj~bNyVZvyQD5iHRLo7haTU-p8wLKUhZPVvsuWKmvhUrkVBR1Fq7qkBuq8QiImtExy7y-UcT7KQBGV5XwN~2wUeoqtx9gWZhcb9CIIJ4lC4mqx6xCC~wbH4DV2TdNMmO1DZ3qnxh1es0ataJNBwg0C5aBxVbb0w__&Key-Pair-Id=K1VGYTHIYLM9UM"
+  }
+ ],
+ "consumed_credits": 30
+}

@@ -74,7 +74,7 @@ Field map, Play. Fast travel to Silver Point (Tab map), then walk east to the co
 
 Field map, Play (single player). Console commands (test builds only):
 - `jeeb.Test.GoPeak` puts you on the highest ground of the northern range, looking south over the map. The range is about 100 m tall now (it was 48 m), in two masses either side of the river's valley, with snow from about 45 m up and bare rock on its steep faces. Walk down toward the river: the trees come back at about 64 m, spruces first, smaller near the top.
-- `jeeb.Test.GoTown 1` (Silver Point), `2` (Anchorage), `3` (Birch Grove), `4` (Palmer Square) puts you just outside a town site still to be built. Walk in: the town's name fades in. Each site has one placeholder house. Oak Hill and Steele Creek show their names the same way when you walk in.
+- `jeeb.Test.GoTown 1` (Silver Point), `2` (Anchorage), `3` (Birch Grove), `4` (Palmer Square) puts you just outside a town site still to be built. Walk in: the town's name fades in. Each site still to be built has one placeholder house. Oak Hill and Steele Creek show their names the same way when you walk in.
 - **Mountain snowstorms (2026-11-26):** on the mountain tops only (your camera above 60 m of world height, whole at 80 m: `[Weather] AltFromM/AltToM` in Tuning.ini; the range reaches 100 m, `jeeb.Test.GoPeak` is in it) the weather is one of two for a whole game day (midnight to midnight on the server's clock, 20 real minutes, a coin flip per day by the day's number, so every player sees the same; the sun-speed slider doesn't change it): a **snowstorm** (solid grey cloud, grey fog so nothing is clear past about 30-50 m, flakes falling, colours a little greyer and darker) or **blue skies** (no snow at all). It changes over about 2 minutes at midnight, and eases in over 20 m of height as you climb. Below 60 m there is no snow and no storm. Test switch: console `jeeb.Weather.Force 1` (storm), `0` (blue skies), `-1` (the shared weather); `jeeb.Snow.Amount` and `jeeb.Snow.Size` (1.8) change the flakes. All numbers (`StormChance`, `BlendSeconds`, heights, `FogDensity` 1.0, `FogFalloff`, `FogGrey`) are in Tuning.ini `[Weather]`, live. Test pictures: `bash Tools/storm_lab.sh storm|clear|film|cost`.
 - Roads: follow Oak Hill's north road past the forest's edge and it carries on to Silver Point; its east road goes on to Anchorage. Steele Creek's long road north has a fork to Birch Grove, and from Birch Grove one road runs south-east to Palmer Square and one north to the river's east branch. There is no bridge or ford there yet: Oak Hill's south-east road ends on the other bank.
 - Trees: thick woods, open plains with the odd large lone tree, and bands of small copses between. Mostly aspens round Birch Grove, more spruces to the north, open grassland in the north-east.
@@ -425,3 +425,16 @@ Seven caves: four in the mountains (Storm Peak by the snowstorm peaks, West Rang
 - **The Market:** at any bank, the MARKET tab. BROWSE (categories down the left, a search box: click, type, Enter; cheapest first; BUY), MY LISTINGS (CANCEL gives it back), SELL (click a pack item, type a price, LIST; up to 10 at once, 5% tax when it sells). Every world on the host shares it (`Saved/Market/`); a seller who is away is paid when they next log in (the message says what sold). Log: `Saved/Market/Log/market_<port>.log`.
 - **Shops by town:** Oak Hill's trading post sells everyone's goods and knight goods (no wands, staffs, wizard or troll gear). Silver Point's stall is now THE WIZARD'S SHOP: brooms, wizard goods (wands, staffs, books, crystal balls, pipes, hats, robes, boots) and everyone's goods, and it buys too. Steele Creek's trader sells everyone's goods and troll goods (clubs, broadswords, troll armour, throwing rocks). Wooden arrows, pickaxes, axes, rods, potions sell everywhere.
 - **Test:** `bash Tools/economy_net.sh` (phases 1 2 3, about 20 min; or e.g. `bash Tools/economy_net.sh 2`): JEEBECONTEST PASS/FAIL lines, JEEBECONRACE (two worlds racing for the same 400 listings: every one to exactly one world).
+## Silver Point wizard village (2026-11-27)
+
+Field map, Play, `jeeb.Test.GoTown 1` or fast travel to Silver Point. You should find:
+- Purple-roofed timber buildings round a plaza: broom shop, store, bank, town hall with a clock tower, a round academy tower, smithy, tavern, potion shop and homes.
+- A high street down the road with the wand shop, the crystal ball shop and the pet shop facing each other.
+- Wizards and witches on their rounds, a keeper at every shop who talks but sells nothing yet, and seven green goblins dashing between the plaza and the street.
+- Floating candles that never stand inside a building.
+
+Things to check:
+- You stop at every wall.
+- No grass or snow comes through floors.
+- Goblins scurry while folk stroll.
+- Lit windows at dusk.

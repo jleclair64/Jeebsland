@@ -1,6 +1,9 @@
 Kind,Town,Name,Place,Errands,Model,Tint,Folk,Greeting
 # The townsfolk's homes, errands and counters (2026-11-18; NpcLife.h). Read on every machine when the world is built: change it and restart.
 # Kind: keeper (stands behind a counter or in a shop's doorway, facing the customers) or folk (lives in a house and goes on errands).
+# Town: Oak Hill, Steele Creek or Silver Point (2026-11-26: the wizard village, SilverPoint.h; Place there is a plot Id: BroomShop, Store, Bank,
+# TownHall, Academy, Smith, Tavern, PotionShop, WandShop, CrystalShop, PetShop, Home1..Home8, or "goblin N" for a goblin's nook; Errands: those Ids,
+# plaza or street. Its keepers only talk: what the shops sell is set up with the shops. Model Wizard, Witch or Goblin; goblins scurry).
 # Town: Oak Hill or Steele Creek. Name: as shown over their head. Someone who already exists (Steele Creek's people,
 # matched by name) only gets their place here; anyone else is made new (a keeper sells what their shop sells; folk just talk).
 # Place: for a keeper, the building (Oak Hill, by plot Id: Store, MarketStall, PotionShop, PotionStall, Bank, BankStall, Smithy; Steele Creek: Store,
@@ -33,3 +36,31 @@ folk,Steele Creek,Thessaly the Seer,house 9,well stall,,,,
 folk,Steele Creek,Old Marg,house 10,well landing,,,,
 folk,Steele Creek,Brug the Miner,house 11,smithy quarry,,,,
 folk,Steele Creek,Hruk,house 6,smithy stall,,,,
+keeper,Silver Point,"Quillon Ashgrove, Broom Maker",BroomShop,,Wizard,0.30 0.16 0.06,,"Every broom balanced by hand. Mind the bristles, they're still settling."
+keeper,Silver Point,"Mirabel Thistle, Grocer",Store,,Witch,0.20 0.30 0.10,,"Newt-free bread, honest scales and the odd talking turnip. Don't feed it."
+keeper,Silver Point,"Barnaby Coinwhistle, Banker",Bank,,Wizard,0.06 0.08 0.30,,"Your gold sleeps under three enchantments and one very grumpy lock."
+keeper,Silver Point,"Mayor Oswin Fairweather",TownHall,,Wizard,0.35 0.06 0.08,,"Welcome to Silver Point! Please keep your spells pointed at the sky."
+keeper,Silver Point,"Archmage Elowen Starling",Academy,,Witch,0.10 0.08 0.40,,"The Academy's doors are open to the curious. Mind the moving staircases."
+keeper,Silver Point,"Torvald Emberhand, Smith",Smith,,Wizard,0.20 0.20 0.22,,"Enchanted steel holds an edge forever. Ordinary steel just needs me more."
+keeper,Silver Point,"Gilda Merriwick, Innkeeper",Tavern,,Witch,0.40 0.20 0.06,,"Warm cider, cold pie and a fire that never goes out. Literally. We've tried."
+keeper,Silver Point,"Hesper Nightshade, Apothecary",PotionShop,,Witch,0.06 0.30 0.16,,"Green bottles heal, red ones burn. Purple ones... we don't talk about purple."
+keeper,Silver Point,"Alder Wyncroft, Wandwright",WandShop,,Wizard,0.18 0.10 0.04,,"The wand chooses the wizard. The staff, I'm told, chooses lunch."
+keeper,Silver Point,"Madame Orla Vey, Seer",CrystalShop,,Witch,0.24 0.04 0.30,,"Crystal balls, fine pipes and spellbooks. I knew you'd come in today."
+keeper,Silver Point,"Pip Tumblewick, Pet Keeper",PetShop,,Wizard,0.08 0.28 0.26,,"Dogs, cats and owls, all well behaved. Mostly the owls."
+folk,Silver Point,Old Fennick Moonbarrow,Home1,plaza Academy,Wizard,0.14 0.10 0.32,,"The candles have floated over that square for three hundred years.|My beard was black once. Then I sneezed during a frost charm.|The Academy's tower leans a little more every winter."
+folk,Silver Point,Tansy Larkspur,Home2,WandShop plaza,Witch,0.30 0.06 0.20,,"I'm saving up for a willow wand. Alder says I'm not ready.|Have you seen my cat? Grey, sulky, answers to nothing.|The goblins took my sock again. Just the one."
+folk,Silver Point,Ambrose Quill,Home3,CrystalShop street,Wizard,0.06 0.24 0.10,,"Madame Vey says I'll meet a tall stranger. You're about right.|A good pipe and a quiet evening, that's all I ask.|Spellbooks don't bite. Most of them."
+folk,Silver Point,Wren Hollowmere,Home4,PotionShop plaza,Witch,0.12 0.20 0.36,,"Nightshade's potions are strong. Hold your nose and drink fast.|The herbs grow best by moonlight. So do the weeds.|Lovely evening for a broom ride."
+folk,Silver Point,Cedric Brambleworth,Home5,Tavern TownHall,Wizard,0.36 0.24 0.06,,"Gilda's cider would make a troll sing.|The Mayor's speeches run long. I bring a cushion.|Watch the sky at dusk. The candles light themselves."
+folk,Silver Point,Isolde Fernbriar,Home6,Store plaza,Witch,0.08 0.26 0.08,,"Mirabel's turnip told me a joke. I didn't laugh.|My grandmother flew to the coast and back before breakfast.|The north wind smells of snow already."
+folk,Silver Point,Thaddeus Wicklow,Home7,Smith street,Wizard,0.22 0.06 0.06,,"Torvald fixed my cauldron. It hums now. Is that normal?|Mind the cobbles, they shift about on their own.|I used to be a knight, you know. Then I read a book."
+folk,Silver Point,Marigold Featherstone,Home8,PetShop Bank,Witch,0.36 0.14 0.24,,"Pip's owls are the cleverest in the land. One does my sums.|I keep my savings at Barnaby's. And a little under the bed.|Have you met the goblins? Cheeky things, harmless though."
+folk,Silver Point,Bartholomew Pennyroyal,Home1,TownHall Bank,Wizard,0.30 0.30 0.34,,"I'm on the town council. We mostly argue about candles.|Two hundred years old and still learning new hexes.|Good day, young one."
+folk,Silver Point,Rosalind Ashby,Home3,Academy plaza,Witch,0.06 0.06 0.20,,"I teach charms at the Academy. Second years are the worst.|If you hear singing from the tower, don't go up.|Lovely to see a new face."
+folk,Silver Point,Snik,goblin 1,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Snik not take anything! Snik just looking!|Shiny? You got shiny?|Hehehe!"
+folk,Silver Point,Grubble,goblin 2,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Grubble fastest goblin! Watch!|No time, no time, busy busy!|Hehe, big hat person."
+folk,Silver Point,Nettle,goblin 3,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Nettle smell pie. Where pie?|Wizard chase Nettle with broom. Nettle faster.|Hee hee hee!"
+folk,Silver Point,Skwee,goblin 4,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Owls scary. Skwee not scared. Little bit scared.|You got sock? Skwee collect socks.|Busy busy busy!"
+folk,Silver Point,Mogwort,goblin 5,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Mogwort help smith! Smith say go away.|Sparkly sparks! Ooooh.|Heh heh. Hello tall one."
+folk,Silver Point,Fizzik,goblin 6,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Fizzik count turnips. One, two, many!|Fizzik not goblin. Fizzik very short wizard.|Wheee!"
+folk,Silver Point,Blort,goblin 7,plaza street plaza Tavern street plaza street plaza,Goblin,,,"Blort ride broom one day! Broom man say no.|Blort run round square ten times! Eleven!|Hehehe, bye bye!"

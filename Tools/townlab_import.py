@@ -29,6 +29,9 @@ COL_FROM.update({"TL_MarketStall": "GeneralStore_300k", "TL_PotionStall": "Potio
 # the war buildings (2026-11-18): the fort, the watchtower and the castle ruins, into /Game/TownLab/War (Tools/BuildWarBuildings.ps1)
 NANITE |= {"TL_Fort", "TL_Watchtower", "TL_Ruins"}
 COL_FROM.update({"TL_Fort": "OakHillFort_300k", "TL_Watchtower": "OakHillWatchtower_300k", "TL_Ruins": "OakHillRuins_300k"})
+# Silver Point (2026-11-26): into /Game/TownLab/Silver (Tools/BuildSilverPoint.ps1)
+NANITE |= {"TL_SP" + n for n in ("Home", "PetShop", "CrystalShop", "BroomShop", "WandShop", "Store", "Bank", "TownHall", "Smith", "PotionShop", "Tavern", "Academy")}
+COL_FROM.update({"TL_SP" + n: "Silver" + n + "_300k" for n in ("Home", "PetShop", "CrystalShop", "BroomShop", "WandShop", "Store", "Bank", "TownHall", "Smith", "PotionShop", "Tavern", "Academy")})
 # TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just those buildings onto the existing M_TL_Building, leaving it, the other
 # buildings and the shared decor untouched (several agents rebuild their own designs at once)
 ONLY = [n for n in os.environ.get("TL_ONLY", "").split(",") if n]

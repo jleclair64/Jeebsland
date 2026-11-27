@@ -1,0 +1,16 @@
+{
+ "id": "01a21b7f-ee19-712e-b05e-90f8822b73e8",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a long low crooked wizard broom workshop: two storeys, wide open-fronted ground-floor workshop bay with a timber arch and a shop window, a steep long roof with a curling tip at one end. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757699914,
+ "started_at": 1795757699926,
+ "finished_at": 1795757717155,
+ "expires_at": 1796016917155,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b7f-ee19-712e-b05e-90f8822b73e8_0.png?Expires=1796016917&Signature=Nw7ob3THHT7EhvMxIXHuW-84~J1ErmokUnU8Wu1XY0ivwMJxlVuPC1Uiufl3RydMnZn-ISfqJIGdffRobmo93uPlWPzaZhZOXQFlR1hm0u6mqg3MmII2UOyraMbhK7AHCZhybUmxQcwbG-7pqabDs3iApO0O5H8YKMp72IvVkZEUUJXDbxlfbRaV8AtB5jTT3CIbWYduvPCYbYydwxzRt4POVgfQKlu2eiuUXynLqxL4Aa062s8ZbO5MBzGaf3~ieRvfKeQHrkKjR-Lhlro5lR5G2WV2jFt~9prCOdWWTpNS4K7hIrQtaz60PGLtGgKKVHZTf2KKQF09gaA2odfrog__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

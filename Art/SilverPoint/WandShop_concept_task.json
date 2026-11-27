@@ -1,0 +1,16 @@
+{
+ "id": "01a21b7f-fa5b-7543-80c8-cd5f8c8b936a",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a narrow very tall crooked wizard wand and staff shop: three and a half storeys, upper floors jettied out over a dark-wood shop front with a tall narrow display window, pointed roof twisting at the top. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757702566,
+ "started_at": 1795757702577,
+ "finished_at": 1795757719717,
+ "expires_at": 1796016919717,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b7f-fa5b-7543-80c8-cd5f8c8b936a_0.png?Expires=1796016919&Signature=UV9G9bifCipnhxZ4nD~M1mP5DgqyvUMrYCnCdl2Jnu4KpIf2fiPNgSaTwuRkBCjlrfYCUck9lFgXBwxRtebRR7nNpsRGD9GWANhN1gOpW7kWiAFwtHpYT7kYVnEc9t6M1R2z2gXY0pEXS8~9JbMqVb45oqgrxJeVH4KQ0X35loHf4-SiWDAfitfNvV5jhbseI3~pd7aY8j6a8ekKPQOcG3INbvKmgVJSY69~6wZ4zC2ybyIfS5Q12N5~hiwA8FlgCwYrlzsipzvCJZaWaWeLpaKtY~D3k7KF7LY3igq6MUFKmpv192K1MHUviRqtwJb3iptNe3Js9eXskGCnboYhQA__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

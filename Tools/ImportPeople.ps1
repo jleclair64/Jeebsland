@@ -17,7 +17,11 @@ $people = @(
   @('Smith',      'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
   @('Banker',     'clips:Idle_3', 'clips:Casual_Walk',   'clips:Talk_with_Hands_Open'),
   @('Guard',      'clips:Idle_3', 'clips:Quick_Walk',    'clips:Talk_with_Hands_Open'),
-  @('Troll',      'idle:Idle_3',  'walk:Slow_Orc_Walk',  'talk:Talk_with_Hands_Open')   # (2026-11-18: one file per clip, Meshy actions 243, 119, 313; rigged at 2.2 m)
+  @('Troll',      'idle:Idle_3',  'walk:Slow_Orc_Walk',  'talk:Talk_with_Hands_Open'),   # (2026-11-18: one file per clip, Meshy actions 243, 119, 313; rigged at 2.2 m)
+  # Silver Point's people (2026-11-26, agent wizvillage): Meshy actions; the goblin runs (Run_02) where the others walk
+  @('Wizard',     'idle:Idle_3',  'walk:Casual_Walk',    'talk:Talk_with_Hands_Open'),
+  @('Witch',      'idle:Idle_4',  'walk:Walking_Woman',  'talk:Talk_with_Right_Hand_Open'),
+  @('Goblin',     'idle:Idle_3',  'walk:Run_02',         'talk:Talk_with_Left_Hand_Raised')
 )
 foreach ($p in $people) {
   $n = $p[0]; $dir = Join-Path $art $n

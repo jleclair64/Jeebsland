@@ -1,0 +1,16 @@
+{
+ "id": "01a21b84-56ac-7402-96a3-273bd797d74c",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "The same wizard character, same pose, proportions and framing as the reference, but with a shorter grey beard that ends at the chest, and wearing a tall pointed wizard hat with a wide floppy brim and a slight bend at the tip, the same royal-blue as the robe with a gold band. Robe a single plain rich colour with gold trim. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757988592,
+ "started_at": 1795757988601,
+ "finished_at": 1795758018282,
+ "expires_at": 1796017218282,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b84-56ac-7402-96a3-273bd797d74c_0.png?Expires=1796017218&Signature=TDwgtue7C4IG60ydq7yugt4ylw4r723CXeev5AXhjItvTfeWqXurIQTZDNEPFxvpyeZhqFcov8EzWQzlv2i6XDAQKmMlCvz6VtkXRbsMx9M3oXYFiJTMD08YTjWaXjfxIjx~bu9SyujuTSyzUj-2ZA0qgvN2hhQgRBo~Md3yPqdmgS7hIy4L3uVkZA-hzLhbO6QtYuWUFnY9QghAJU5XHferJ-y5fsc9v8B2EMaEyyUAqnVhMVFikBsTipo~zS06hYK9upLJ8qHHNtIIF~IB~Xv~jkQnc~BokLSTI4t0mF0Br1HmuSrPyaPAOj8~0hDNUC-oOsY5CzF9esXQQ9zvzw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}
