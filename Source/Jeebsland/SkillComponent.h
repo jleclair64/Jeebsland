@@ -191,6 +191,11 @@ public:
 	void StowRetiredGear();             // (server, after a save is read) bows off the bar into the pack or bank; a wizard's missing wand
 	void FitToClass();                   // (server, after a save is read) gear this class cannot use goes into the pack, and the class gets back its own or a starter piece (class switches)
 	int32 BankUsed() const;
+	// (2026-11-26, Docs/EconomyPlan.md) puts Count of Id into any slot array (topping up stacks first; a sized fish one to a slot); returns how many did not fit
+	static int32 PutIntoArr(TArray<FInvSlot>& Arr, int32 Id, int32 Count, int32 Size = 0);
+	// (server) Market mail already delivered to this account (JeebMarket::DeliverMail; saved, so a crash before the file goes never pays twice)
+	TArray<FString> MailDone;
+	bool bMailFullSaid = false;
 
 	// The 16 inventory slots (drawn by the HUD, changed by the shops and equipping)
 	UPROPERTY(Replicated) TArray<FInvSlot> Slots;

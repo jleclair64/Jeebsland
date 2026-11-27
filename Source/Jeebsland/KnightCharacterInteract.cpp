@@ -1,4 +1,5 @@
 #include "KnightCharacter.h"
+#include "GameFramework/PlayerState.h"
 #include "JeebBroomData.h"
 #include "Messages.h"
 #include "KnightAnimator.h"
@@ -342,6 +343,8 @@ bool AKnightCharacter::GetInteractPrompt(FString& OutText) const
 			}
 		}
 	}
+	// (2026-11-26, Docs/EconomyPlan.md) facing another player: ask them to trade
+	if (const AKnightCharacter* O = TradeTargetInReach()) { OutText = FString::Printf(TEXT("Press E to trade with %s"), O->GetPlayerState() ? *O->GetPlayerState()->GetPlayerName() : TEXT("them")); return true; }
 	return false;
 }
 
@@ -421,6 +424,7 @@ bool AKnightCharacter::GetInteractAnchor(FVector& Out, bool& bOutE) const
 			}
 		}
 	}
+	if (const AKnightCharacter* O = TradeTargetInReach()) { Float(O->GetActorLocation(), 90.f); return true; }   // (a player to trade with)
 	return false;
 }
 
@@ -502,6 +506,7 @@ void AKnightCharacter::OnInteractKey()
 			else if (C->Shop == JeebOakHill::EShop::Bank) OpenBank();
 			else OpenShop();
 		}
+		else if (AKnightCharacter* O = TradeTargetInReach()) AskTrade(O);   // (another player: ask to trade, KnightCharacterTrade.cpp)
 		break;
 	}
 }

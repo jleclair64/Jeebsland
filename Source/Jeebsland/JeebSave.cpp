@@ -83,6 +83,7 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 	S->LoreFound = Skills->LoreFound;
 	S->Explored = Skills->Explored;
 	S->LastGambleHour = Skills->LastGambleHour;
+	S->MailDone = Skills->MailDone;
 	{
 		const AKnightCharacter* KC = Cast<AKnightCharacter>(Skills->GetOwner());
 		S->SavedClass = Skills->PackClass >= 0 ? Skills->PackClass : (KC ? KC->ClassIndex() : 0);
@@ -173,6 +174,7 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	for (int32 L : LoreFound) if (L >= 0 && L < JeebLore::Entries().Num()) Skills->LoreFound.AddUnique(L);
 	Skills->Explored = Explored.Num() == USkillComponent::FogN * USkillComponent::FogN / 8 ? Explored : TArray<uint8>();
 	Skills->LastGambleHour = LastGambleHour;
+	Skills->MailDone = MailDone;
 	if (UQuestComponent* Q = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UQuestComponent>() : nullptr) Q->Restore(QuestKeys, QuestSteps, QuestCounts, QuestDone);
 	if (UTravelComponent* Tr = Skills->GetOwner() ? Skills->GetOwner()->FindComponentByClass<UTravelComponent>() : nullptr) Tr->Restore(TownsVisited, TownsVisited.Num() == 0);
 	Skills->SpellLevels = SpellLevels;
@@ -197,7 +199,9 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 		int64 Sum = 0; int32 Items = 0;
 		for (const FInvSlot& Sl : Skills->Slots) if (Sl.Id) { ++Items; Sum += int64(Sl.Id) * Sl.Count; }
 		int64 WornSum = 0; for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) WornSum += Skills->Worn[i];
-		UE_LOG(LogTemp, Log, TEXT("JEEBPACK applied for class %d (file's pack was class %d): %d pack items, id sum %lld, worn sum %lld, bar %d/%d"), Cls, From, Items, Sum, WornSum, Skills->Hotbar[0], Skills->Hotbar[1]);
+		int64 BankSum = 0; int32 BankItems = 0;
+		for (const FInvSlot& Sl : Skills->Bank) if (Sl.Id) { ++BankItems; BankSum += int64(Sl.Id) * Sl.Count + Sl.Size; }
+		UE_LOG(LogTemp, Log, TEXT("JEEBPACK applied for class %d (file's pack was class %d): %d pack items, id sum %lld, worn sum %lld, bar %d/%d; account: ingots %d, bank %d items, sum %lld"), Cls, From, Items, Sum, WornSum, Skills->Hotbar[0], Skills->Hotbar[1], Skills->GetIngots(), BankItems, BankSum);
 	}   // (2026-11-22: bows off knights' and wizards' bars, into the pack or bank)
 	return true;
 }

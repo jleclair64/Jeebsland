@@ -34,6 +34,7 @@ namespace JeebStore
 		W.Stock = 5;
 		return W;
 	}
+	constexpr int32 RockBundle = 20, RockBundlePrice = 15;   // (the troll's throwing rocks, Steele Creek)
 	inline FWare ArrowWare(int32 Row)
 	{
 		FWare W;
@@ -97,6 +98,20 @@ namespace JeebStore
 				W.Id = ArmourId(KindOf(W.Id), R.RandRange(0, NumRolledArmourStyles - 1), VariantOf(W.Id));
 				W.Price = FMath::Max(1, FMath::RoundToInt(BuyPrice(KindOf(W.Id), FullVariant(W.Id)) * Mul));
 			}
+		// (2026-11-26, Docs/EconomyPlan.md) Shops by town: the wizard's wares (sold only at Silver Point) and the troll's (only at Steele Creek), after
+		// everything above so the older wares keep their places and prices. Each shop shows only what its town sells (JeebShops::Sells).
+		auto ById = [&](int32 Id, int32 MinStock, int32 MaxStock) { FWare W; W.Id = Id; W.Price = FMath::Max(1, BuyPrice(KindOf(Id), FullVariant(Id))); Push(W, MinStock, MaxStock); };
+		ById(GearId(K_Wand, R.RandRange(T_Tin, T_Iron)), 2, 3);
+		ById(GearId(K_Staff, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		ById(WizOffId(R.RandRange(WO_Book, WO_Pipe), R.RandRange(T_Tin, T_Iron)), 1, 2);
+		ById(ArmourId(K_Helmet, AS_Wizard, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		ById(ArmourId(K_Chest, AS_Wizard, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		ById(ArmourId(K_Boots, AS_Wizard, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		ById(GearId(K_Club, R.RandRange(T_Tin, T_Iron)), 2, 3);
+		ById(GearId(K_Broadsword, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		{ static const int32 TP[] = { K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots }; ById(ArmourId(TP[R.RandRange(0, 4)], AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2); }
+		ById(ArmourId(K_Chest, AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2);
+		{ FWare W; W.Id = IdRocks; W.Count = RockBundle; W.Price = RockBundlePrice; W.Stock = 5; Push(W, 5, 5); }
 		return Out;
 	}
 

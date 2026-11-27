@@ -38,6 +38,7 @@ public:
 	// plain stacks. No version bump needed: a missing array reads as all zero.
 	UPROPERTY() TArray<int32> SlotSizes;
 	UPROPERTY() TArray<int32> BankSizes;
+	UPROPERTY() TArray<FString> MailDone;   // (2026-11-26) Market mail ids already delivered (JeebMarket::DeliverMail); a new field, no version bump
 	UPROPERTY() TArray<int32> Hotbar;
 	UPROPERTY() int32 Selected = 0;
 	UPROPERTY() TArray<int32> Worn;

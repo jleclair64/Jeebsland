@@ -62,6 +62,7 @@ void AKnightCharacter::RefreshUIMode()
 
 void AKnightCharacter::ToggleSettings()
 {
+	if (TradeView.bOpen) { ServerTradeCancel(); return; }   // (Escape during a trade cancels it: KnightCharacterTrade.cpp)
 	bSettingsOpen = !bSettingsOpen;
 	if (bSettingsOpen) { bInventoryOpen = false; bBankOpen = false; bSkillsOpen = false; bShopOpen = false; bSmithOpen = false; CloseDialogue(); }
 	RefreshUIMode();

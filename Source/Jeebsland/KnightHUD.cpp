@@ -78,8 +78,9 @@ void AKnightHUD::DrawHUD()
 	AKnightCharacter* Knight = Cast<AKnightCharacter>(Pawn);
 	if (bLevelTyping && !(Knight && Knight->IsPanelCursor() && !Knight->IsUIOpen())) bLevelTyping = false;   // (the test kit's level box: only while the Tab windows are up)
 	if (bLookTyping && !(Knight && Knight->IsSettingsOpen() && SettingsTab == 5)) bLookTyping = false;   // (the look tab's preset name box)
-	if (!bChatOpen && !bLevelTyping && !bLookTyping) HideTyping();
-	else if ((bLevelTyping || bLookTyping) && !bChatOpen) EnsureTyping();   // (while typing a level, the keys go to the box, not to the knight)
+	if (MktField && !(Knight && (Knight->IsTradeOpen() || (Knight->IsBankOpen() && BankTab == 1)))) MktField = 0;   // (the Market's and the trade's boxes: only while their window is up)
+	if (!bChatOpen && !bLevelTyping && !bLookTyping && !MktField) HideTyping();
+	else if ((bLevelTyping || bLookTyping || MktField) && !bChatOpen) EnsureTyping();   // (while typing a level, the keys go to the box, not to the knight)
 	USkillComponent* Skills = Pawn->FindComponentByClass<USkillComponent>();
 	if (!Skills || !Knight) return;
 	InvCellCount = 0; bHotCells = false; RectCount = 0; WornCellCount = 0; LootCellCount = 0; bPotionCell = false; bDefCell = false;
@@ -543,11 +544,13 @@ void AKnightHUD::DrawHUD()
 	if (Knight->IsSettingsOpen()) DrawSettingsScreen(Knight);
 	else if (Knight->IsInventoryOpen()) DrawInventoryScreen(Knight);
 	else if (Knight->IsSkillsOpen()) DrawSkillsScreen(Knight);
+	else if (Knight->IsTradeOpen()) DrawTradeScreen(Knight);   // (2026-11-26: KnightHUDTrade.cpp)
 	else if (Knight->IsBankOpen()) DrawBankScreen(Knight);
 	else if (Knight->IsShopOpen()) DrawShopScreen(Knight);
 	else if (Knight->IsSmithOpen()) DrawSmithScreen(Knight);
 	else if (Knight->IsDialogueOpen()) DrawDialogue(Knight);
 
+	TradeRightClick(Knight, PC);   // (right-click another player with the cursor out: ask to trade)
 	DrawSwapPopup(Knight);   // (before ProcessDrag: a click on it is not also a click on what is underneath)
 	if (!bDropOpen) ProcessDrag(Knight);
 	DrawDropBox(Knight);

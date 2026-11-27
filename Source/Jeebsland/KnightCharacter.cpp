@@ -198,6 +198,7 @@ void AKnightCharacter::BeginPlay()
 
 void AKnightCharacter::EndPlay(const EEndPlayReason::Type Reason)
 {
+	if (HasAuthority() && TradeWith.IsValid()) TradeEnd(TEXT("The other player left."));
 	Autosave();
 	Super::EndPlay(Reason);
 }
@@ -481,6 +482,8 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	if (bIsWizard) TickWizard(Dt);   // (the orb and the teleport's puffs: KnightCharacterWizard.cpp)
 	TickBroom(Dt);   // (the wizard's flying broom: KnightCharacterBroom.cpp)
 	TickFishSizeTest(Dt);   // (the online test of fish sizes in the pack: FishSizeTest.cpp)
+	if (HasAuthority()) TickTrade(Dt);   // (trades and Market mail: KnightCharacterTrade.cpp)
+	TickEconomyTest(Dt);   // (the online economy test: EconomyTest.cpp)
 	TickHorseMagic(Dt);   // (a wizard on a horse drains magic: KnightCharacterInteract.cpp)
 	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);

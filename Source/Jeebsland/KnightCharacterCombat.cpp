@@ -448,6 +448,7 @@ void AKnightCharacter::StopBlock()
 void AKnightCharacter::Die()
 {
 	if (!Skills || !HasAuthority()) return;
+	if (TradeWith.IsValid()) TradeEnd(TEXT("The trade was cancelled."));
 	if (bMounted) ServerSideDismount();
 	if (bClimbing) ExitClimb(false, false);
 	DropFromWall(true);
