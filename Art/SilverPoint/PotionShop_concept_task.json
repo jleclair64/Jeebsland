@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-38c3-7174-9a54-4819ce46e6ba",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a wizard potion and herb shop: a two-storey crooked building with a round-topped green-glass bay window at the front, a small glass herb greenhouse roof bay on one side, a crooked chimney. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757718793,
+ "started_at": 1795757718802,
+ "finished_at": 1795757741684,
+ "expires_at": 1796016941684,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-38c3-7174-9a54-4819ce46e6ba_0.png?Expires=1796016941&Signature=TkZ8klnlBOw0uVOk8ccSqSCAqPi9NfnVKY8Xk8kh8qITN1Emkzaq8fPV5j4FcMSvweh8aeerV8v9ObY4CEwwdCEyyI-1tjn39srWCXo48Fs92Zqo7RG5grhxifTmfWMDwJmH6UXcSPnOquK8IGFYVMuRWw0xMHF~KmIJ7zMCeusSAqzSuy-eLJNCa2UcFwuIH-JsAuen5di8fGVub4Hqrm2wSA-jZL5M3lQY8Q3QHk4epLYP64p2EYGuuG2JiGFUmyb~6p5z9iH2d6soQQlHSwBWCVaeQw58wFEFYMrPzuNIrrzfAE0bvzQ8ERt7uPgffGRE2yyjSh9d-nDq0t~kqg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

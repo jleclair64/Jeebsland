@@ -1,0 +1,16 @@
+{
+ "id": "01a21b7f-d5d8-7088-ab4d-1c025b891c04",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a cosy crooked wizard pet shop: two storeys, a wide ground-floor shop front with big many-paned bay windows either side of the door, a round owl window high in the gable, a small turret perch on the roof. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757693415,
+ "started_at": 1795757693425,
+ "finished_at": 1795757709753,
+ "expires_at": 1796016909753,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b7f-d5d8-7088-ab4d-1c025b891c04_0.png?Expires=1796016909&Signature=Kc01CJxddkpHds5-R1vi-M35DeEqPxbYGLTFnI8khSkH0yT7L0rTP0X8eFaOqxXv-KWAX4drXByrIBfLGXrHt0cMHzbl0moZUDAXG5sHB9s6HN-moB786g2Iwo3PHXenS0VnhM9TMk3Qw-Pj6DPUkK0yHJH0QFL716GH8PCCFbM6Ut7MkuXbN74ixhZxn7ui43cM-AEk4bHgKx8IdCAe3~purBYZuAALK~wRWFhFbIsbjMmvQs32RIPgyX8h45DDBzyJrCc99kxF~vzFKvmRFc6NoS52kGScC1Up8CT4RNgCXZ2F1XvhvBIzQpwBN0ksNcRtBUfKRgPZs8pPwqvBpA__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

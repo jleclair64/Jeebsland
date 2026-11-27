@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-1319-7159-b34b-e03cbf7cb9f6",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a grand wizard bank: a tall narrow leaning building of pale cream stone with white stone columns either side of a tall double door, tall arched windows, a steep purple roof with a slim spire. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757708899,
+ "started_at": 1795757708911,
+ "finished_at": 1795757723979,
+ "expires_at": 1796016923979,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-1319-7159-b34b-e03cbf7cb9f6_0.png?Expires=1796016923&Signature=VB3Vjtem1Xn~h~pP7dvo-mVxXXt2BFM3ZemXgRH5yneGq9fJK5~Ac0fllmTIMNskJTUREJJ16HNHm5CXNG1gCjkKd3TexOedpLTuq7IFLV6Z0E155QEfA54X~cUcIO9q8gvB~6yj4vQfIEwA3Uts7TbSZ6LX9X-sqmBTMlsPXTCfiU9pxHdt3eqdldqBVUJfH3Re4IkRKZj9kCaqww6T3STMkY5Auogzv31Chqgue3cZVSpybmipFqTuRblRam-~u0~p7s0A2EhJ7CaU0kQM8OaZvu9E9RThy8oz4GVoVs-Iu7KW2AU6nHxoF7vNQovvNHSdLpbQtdjMdAFO7RUhBg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

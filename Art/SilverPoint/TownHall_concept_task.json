@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-208b-73d6-97f1-f0a3039bbb85",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a wizard town hall: a wide three-storey timber and stone hall with a central clock tower topped by a twisted purple spire, a big arched double door, rows of arched windows. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757712220,
+ "started_at": 1795757712232,
+ "finished_at": 1795757729335,
+ "expires_at": 1796016929335,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-208b-73d6-97f1-f0a3039bbb85_0.png?Expires=1796016929&Signature=NLWy42NdlFxfH34GXizn6szdAbka9H7MlzpKx867QpuG2jTzJSDE-FixmxvSKglQHphQARccHZuUSiwhGTwdj4BuuKPr8zAzdc-q9BPLjvEQ5k0DFKSw~VzIj1d-pr97n-imehwJqCGIm7RpZw0FSObzAQ1lKJmgUuwa1FjfEoPxV-0qc0lpSKzRqEthW008RmTrZwJ1GaZtfvd3h1kQ9JEi6MnkdHgMc60~H7AOBE1mMKUoQBIVAhrVzue1FEja~vQflqEKCk0RSVNz63Jae4c-XntDkerEqVx0PFDC8SCnF9qBBjmDkfC6hOyUP~-Uz2rGrZ8QGR21F6w-Q3V3SQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

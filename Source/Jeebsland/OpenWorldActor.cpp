@@ -2,6 +2,7 @@
 #include "Caves.h"
 #include "Broom.h"
 #include "OpenWorld.h"
+#include "SilverPoint.h"
 #include "Terrain.h"
 #include "TownLabSwaps.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -48,6 +49,7 @@ namespace
 		const FVector2D P(X, Y);
 		if (JeebOakHill::Enabled() && JeebOakHill::InBox(X, Y) && JeebOakHill::OnBuilding(X, Y)) return true;
 		if (JeebSteele::InBox(X, Y) && JeebSteele::OnBuilding(X, Y)) return true;
+		if (JeebSilver::OnBuilding(X, Y)) return true;   // (Silver Point, 2026-11-26)
 		if (FMath::Abs(X) < 9000.f && FMath::Abs(Y) < 9000.f)
 		{
 			for (const FVector2D& S : JeebTerrain::HutSites()) if (FVector2D::DistSquared(P, S) < 480.f * 480.f) return true;
@@ -139,25 +141,17 @@ void AOpenWorld::BuildHouses()
 		return K;
 	};
 	const FKit House = Load(HouseModel, FString(MeshPath));
-	// (2026-11-26, a trial for the owner: Silver Point gets the first wizard building, the community "Enchanted Crooked Cottage",
-	// /Game/TownLab/Silver by Tools/BuildSilverPoint.ps1, in place of the placeholder house. Docs/SilverPointPlan.md)
-	FKit Wizard;
-	if (const JeebOakHill::FModel* WM = JeebOakHill::FindModel(TEXT("SilverWizardHouse")))
-		if (LoadObject<UStaticMesh>(nullptr, TEXT("/Game/TownLab/Silver/SM_TL_WizardHouse_Col.SM_TL_WizardHouse_Col"), nullptr, LOAD_Quiet | LOAD_NoWarn))
-			Wizard = Load(WM, TEXT("/Game/TownLab/Silver/SM_TL_WizardHouse"));
 	uint32 Hash = 2166136261u;
 	auto HashIn = [&](float V) { const int32 Q = FMath::RoundToInt(V * 10.f); for (int32 b = 0; b < 4; ++b) { Hash ^= uint32((Q >> (8 * b)) & 0xFF); Hash *= 16777619u; } };
 	int32 Placed = 0;
-	for (const JeebOpen::FSite& S : JeebOpen::Sites())
+	auto Put = [&](const FKit& K, const FVector2D& At, float Yaw, const TCHAR* What)
 	{
-		const FKit& K = (Wizard.Model && FCString::Strcmp(S.Name, TEXT("Silver Point")) == 0) ? Wizard : House;
 		const JeebOakHill::FModel* Model = K.Model;
 		UStaticMesh* Mesh = K.Mesh;
 		UInstancedStaticMeshComponent* Solid = K.Solid;
 		const float ScaleZ = Model->ScaleZ > 0.f ? Model->ScaleZ : Model->Scale;
-		const float Z = JeebTerrain::HeightAt(S.House.X, S.House.Y);
-		const float Yaw = FRotator::NormalizeAxis(S.HouseYaw - Model->DoorYaw);
-		const FTransform Xf(FRotator(0.f, Yaw, 0.f), FVector(S.House.X, S.House.Y, Z), FVector(Model->Scale, Model->Scale, ScaleZ));
+		const float Z = JeebTerrain::HeightAt(At.X, At.Y);
+		const FTransform Xf(FRotator(0.f, Yaw, 0.f), FVector(At.X, At.Y, Z), FVector(Model->Scale, Model->Scale, ScaleZ));
 		if (Mesh)
 		{
 			UStaticMeshComponent* B = NewObject<UStaticMeshComponent>(this);
@@ -184,11 +178,44 @@ void AOpenWorld::BuildHouses()
 			Walls->SetCanEverAffectNavigation(false);
 			Walls->RegisterComponent();
 		}
-		HashIn(S.House.X); HashIn(S.House.Y); HashIn(Z); HashIn(Yaw);
+		HashIn(At.X); HashIn(At.Y); HashIn(Z); HashIn(Yaw);
 		++Placed;
-		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN house for %s at %.0f %.0f %.0f yaw %.0f (%s, %s)"), S.Name, S.House.X, S.House.Y, Z, Yaw, Model->Name, Solid ? TEXT("its collision model") : TEXT("a box over the walls"));
+		UE_LOG(LogTemp, Log, TEXT("JEEBOPEN %s at %.0f %.0f %.0f yaw %.0f (%s, %s%s)"), What, At.X, At.Y, Z, Yaw, Model->Name, Solid ? TEXT("its collision model") : TEXT("a box over the walls"), Mesh || bServer ? TEXT("") : TEXT(", NO MESH"));
+	};
+	// Silver Point (2026-11-26): the wizard village (SilverPoint.h) in place of the placeholder house
+	TMap<FString, FKit> SilverKits;
+	for (const JeebSilver::FPlot& P : JeebSilver::Plots())
+	{
+		FKit* K = SilverKits.Find(P.Kind);
+		if (!K) K = &SilverKits.Add(P.Kind, Load(JeebOakHill::FindModel(P.Model), FString::Printf(TEXT("/Game/TownLab/Silver/SM_TL_SP%s"), P.Kind)));
+		Put(*K, P.Centre, P.Yaw, *FString::Printf(TEXT("Silver Point %s"), P.Id));
 	}
-	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN houses: %d placeholder houses; hash=%08x%s"), Placed, Hash, bServer ? TEXT(" (server: solids only)") : TEXT(""));
+	{
+		// (a check: walls of two buildings within 1.5 m of each other, a building on a road, a building off the level ground)
+		const TArray<JeebSilver::FPlot>& Ps = JeebSilver::Plots();
+		const JeebOpen::FSite* Site = JeebSilver::Site();
+		for (int32 i = 0; i < Ps.Num(); ++i)
+		{
+			const FVector2D Ax = JeebSilver::Dir(Ps[i].Yaw), Ay = JeebSilver::Dir(Ps[i].Yaw + 90.f);
+			float Road = 1.0e9f, Far = 0.f;
+			for (int32 a = 0; a <= 8; ++a) for (int32 b = 0; b <= 8; ++b)
+			{
+				const FVector2D L(FMath::Lerp(Ps[i].WallLo.X, Ps[i].WallHi.X, a / 8.f), FMath::Lerp(Ps[i].WallLo.Y, Ps[i].WallHi.Y, b / 8.f));
+				const FVector2D W = Ps[i].Centre + Ax * L.X + Ay * L.Y;
+				Road = FMath::Min(Road, JeebTerrain::PathClearance(W.X, W.Y));
+				if (Site) Far = FMath::Max(Far, float(FVector2D::Distance(W, Site->Pos)));
+				for (int32 j = 0; j < Ps.Num(); ++j)
+					if (j != i && JeebSilver::WallSD(Ps[j], W.X, W.Y) < 150.f) { UE_LOG(LogTemp, Warning, TEXT("JEEBSILVER %s is within 1.5 m of %s"), Ps[i].Id, Ps[j].Id); a = b = 99; break; }
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBSILVER plot %s (%s) at %.0f %.0f yaw %.0f door %.0f: road %.0f cm off, walls reach %.0f m from the middle"), Ps[i].Id, Ps[i].Kind, Ps[i].Centre.X, Ps[i].Centre.Y, Ps[i].Yaw, Ps[i].DoorYaw, Road, Far / 100.f);
+		}
+	}
+	for (const JeebOpen::FSite& S : JeebOpen::Sites())
+	{
+		if (FCString::Strcmp(S.Name, TEXT("Silver Point")) == 0 && JeebSilver::Plots().Num() > 0) continue;
+		Put(House, S.House, FRotator::NormalizeAxis(S.HouseYaw - HouseModel->DoorYaw), *FString::Printf(TEXT("house for %s"), S.Name));
+	}
+	UE_LOG(LogTemp, Log, TEXT("JEEBOPEN houses: %d buildings (Silver Point's village and the placeholder houses); hash=%08x%s"), Placed, Hash, bServer ? TEXT(" (server: solids only)") : TEXT(""));
 }
 
 // The candles: laid out from a fixed seed on the first site (Silver Point), over the open ground round the middle and round the
@@ -200,13 +227,14 @@ void AOpenWorld::BuildCandles()
 	const JeebOpen::FSite& S = Sites[0];
 	CandleSite = S.Pos;
 	FRandomStream R(51515);
-	const float Reach = S.Radius * 0.7f + 300.f;   // (over the middle and the green round it; the edge stays open)
+	const float Reach = JeebSilver::Plots().Num() > 0 ? 2300.f : S.Radius * 0.7f + 300.f;   // (2026-11-26: over the wizard village's plaza)   // (over the middle and the green round it; the edge stays open)
 	int32 Tries = 0;
 	while (Candle.Num() < NumCandles && Tries++ < 2000)
 	{
 		const float A = R.FRandRange(0.f, 6.2832f), D = Reach * FMath::Sqrt(R.FRand());
 		const FVector2D P = S.Pos + FVector2D(FMath::Cos(A), FMath::Sin(A)) * D;
 		if (FVector2D::Distance(P, S.House) < 1100.f) continue;   // (the house is about 9 m across; keep clear of it and its eaves)
+		if (JeebSilver::OnBuilding(P.X, P.Y, 1.5f)) continue;   // (and the village's buildings and eaves, 2026-11-26)
 		const float Z = JeebTerrain::HeightAt(P.X, P.Y);
 		FCandle C;
 		C.Height = R.FRandRange(250.f, 600.f);

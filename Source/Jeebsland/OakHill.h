@@ -133,8 +133,19 @@ namespace JeebOakHill
 			{ TEXT("OakHillTownHall"),    0.85f, 17.85f, 10.29f, false, 90.f, -989.1f, 985.8f, -580.0f, 562.0f },
 			{ TEXT("OakHillChurch"),      0.85f, 11.31f, 12.84f, true,  90.f, -591.5f, 573.5f, -709.2f, 723.0f },   // (its door is on a short end)
 			{ TEXT("OakHillWell"),        0.85f, 2.89f,  2.89f,  false, 90.f, -151.8f, 121.5f, -117.9f, 117.6f },
-			// Silver Point's first wizard building (2026-11-26, a trial): the community "Enchanted Crooked Cottage", 8 m across, 16 m to its hat's tip
-			{ TEXT("SilverWizardHouse"),  1.0f,  8.0f,   9.64f,  false, 90.f, -375.2f, 299.4f, -281.3f, 215.0f },
+			// Silver Point's wizard village (2026-11-26, SilverPoint.h; building_clean.py sizes and walls; door to -Y in Blender, +Y here)
+			{ TEXT("SilverHome"),        1.0f, 7.2f,  9.82f, false, 90.f, -210.6f, 212.0f, -361.5f, 339.1f },
+			{ TEXT("SilverPetShop"),     1.0f, 11.0f, 8.88f, false, 90.f, -424.6f, 485.9f, -227.5f, 372.0f },
+			{ TEXT("SilverCrystalShop"), 1.0f, 9.0f,  6.73f, false, 90.f, -281.5f, 337.2f, -239.0f, 238.2f },
+			{ TEXT("SilverBroomShop"),   1.0f, 13.0f, 5.56f, false, 90.f, -581.3f, 600.8f, -209.1f, 210.5f },
+			{ TEXT("SilverWandShop"),    1.0f, 5.6f,  6.24f, false, 90.f, -188.1f, 191.5f, -158.4f, 162.8f },
+			{ TEXT("SilverStore"),       1.0f, 13.0f, 9.46f, false, 90.f, -605.8f, 604.7f, -433.1f, 407.8f },
+			{ TEXT("SilverBank"),        1.0f, 9.0f,  7.32f, false, 90.f, -251.1f, 315.5f, -312.7f, 315.9f },
+			{ TEXT("SilverTownHall"),    1.0f, 17.0f, 13.6f, false, 90.f, -727.0f, 694.3f, -452.9f, 452.6f },
+			{ TEXT("SilverSmith"),       1.0f, 11.0f, 11.8f, false, 90.f, -508.3f, 544.9f, -311.7f, 486.3f },
+			{ TEXT("SilverPotionShop"),  1.0f, 9.0f,  8.64f, false, 90.f, -443.7f, 267.8f, -383.6f, 416.3f },
+			{ TEXT("SilverTavern"),      1.0f, 15.0f, 9.38f, false, 90.f, -513.3f, 549.5f, -188.1f, 331.4f },
+			{ TEXT("SilverAcademy"),     1.0f, 24.0f, 15.4f, false, 90.f, -1148.9f, 1073.5f, -582.8f, 659.0f },
 			// The open-air stalls (owner, 2026-11-12), all three with their open front on their -Y in Blender, which is +Y here
 			// (Unreal mirrors Blender's Y). The general store ("Market Stall", candidate B, a timber trading post), the bank (Bank_A
 			// repainted to the town) and the potion shop (PotionShop_A, stretched deeper and lower by building_clean.py, its back open).

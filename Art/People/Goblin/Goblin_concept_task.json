@@ -1,0 +1,16 @@
+{
+ "id": "01a21b84-57dc-75ea-a2a4-faea42ed13fb",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "A small cheeky green goblin, about one metre tall, big pointed ears, a big grin, large yellow eyes, wiry limbs, bright green skin, wearing a patched brown sleeveless tunic with a rope belt and short trousers, bare big feet. Friendly and mischievous, not scary. Same A-pose and framing as the reference. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757988926,
+ "started_at": 1795757988937,
+ "finished_at": 1795758018973,
+ "expires_at": 1796017218973,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b84-57dc-75ea-a2a4-faea42ed13fb_0.png?Expires=1796017218&Signature=OrQUme9EEh82aqivXXVBMUm9KNYk-bq-6Nir1d4oilTEjYbfL~jKHKTz8k~eNERodjtOgOnTy9ltiqNJw4rf-uttJaI6HEBjUXwtclB7K3XPWg~9k9siWR0qymcwRVhb7JzBXVhZdvgcjAJh~~v5krASF3QhxbEeMuygoIYOaU4HrHiobq8VwoqTXAdBASWoGndG6oDyJkdtiCnTt84sQh6ZkigRyMFpRA6GoeOtQvkOIb3MrPm~kxwqykQGmjpshQIMv04JTVO--sNPe~oPv~kXxSHISrLqiRbpq4LqLxFiY15VUkRD93LJb5y~kapEd9bqbFskq6zfjFriuGTGgQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -1,0 +1,16 @@
+{
+ "id": "01a21b84-5702-7341-9e11-22a673913f4b",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a friendly middle-aged village witch woman with the same pose, proportions and framing as the reference: long dark auburn hair, a tall pointed black witch hat with a wide brim and a bent tip and a purple band, a fitted long plum-purple dress reaching her ankles with a laced bodice, a short dark-green shawl over her shoulders, pointed brown boots. No beard. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757988705,
+ "started_at": 1795757988717,
+ "finished_at": 1795758007474,
+ "expires_at": 1796017207474,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b84-5702-7341-9e11-22a673913f4b_0.png?Expires=1796017207&Signature=fLE18H~zcfQ-2XTfLeQ9I76kNmER0pS~GLXHS1baZ3M8YHbgp75McbCBYYK7~~An7xtyq6nNvw7vKRZxZ91KvjS3GzbLpU4cJkIBMfCN6mJxDLszFHEC-YnUZUZsXwa7oUwiYBwaS3RuFxndKdIEqLCW29SmA-aB33sQQiwYoy5tq5Gvxq7MH4Z0Ve3RNqL39jx8MXSV7NjLxpSQbNPyiK42j0YByc10jzaJ-uSOLVKeeQKaGHw9Pnb5gJKScsmcrtjEbG0vqWTyjehseo1ykdgAtrr6~gfGabaWl5kAB~HPLzRbNU61OCF9yf~bgYTdL4wUPNsOBfqDvWhiFhfzQg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

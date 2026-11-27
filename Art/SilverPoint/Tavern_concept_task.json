@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-44f6-70db-a76f-daeb824b3963",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a big cosy wizard tavern inn: three storeys wide, crooked timber frame, many warm windows, a wide arched double front door, two tall chimneys, dormer windows in a big curling purple roof. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757721625,
+ "started_at": 1795757721637,
+ "finished_at": 1795757743787,
+ "expires_at": 1796016943787,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-44f6-70db-a76f-daeb824b3963_0.png?Expires=1796016943&Signature=LbPOMxcYd7uAJGmlfUYc-bxOFb3KFvGO6poRsWxqjDNcMvo4-2MV2P8Kyr3AlpOCet~k4M44DRY9kofBBr1T7M2FxE5TOcV~1IuuZtskyQPPZjabnjB5bA4PaQg1wMzQKdBrgOQlsJzX49Fid8rF7-QR6rorc-WNxkX0kVcNdyda0GD3HqgUExws3rzqpyR~sh2PoeKIlNLEqoXaDPnTIAknmcNzl0FUjV8iCuGiqemtJNAwRFwzIZUs0MYuG8aJcAhQOHuoRrX1iF4AB4xed2FArR3Gr7uEwgkIHE9mya0hjH9BYNPV1STTi2GxSQSSgMYhjnFTOWHv0~Y5Z-FHNg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

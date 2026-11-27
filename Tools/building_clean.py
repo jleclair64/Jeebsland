@@ -58,9 +58,20 @@ BUILDINGS = {
     "OakHillFort_300k":        dict(file="OakHillFort_300k.glb",        length=1450.0, sink=40.0),
     "OakHillWatchtower_300k":  dict(file="OakHillWatchtower_300k.glb",  length=530.0,  sink=35.0),
     "OakHillRuins_300k":       dict(file="OakHillRuins_300k.glb",       length=1900.0, sink=60.0),
-    # Silver Point trial (2026-11-26): "The Enchanted Crooked Cottage", Meshy community library, CC0,
-    # https://www.meshy.ai/posts/019f48d4-039d-7cd4-9770-27612c3103d2 (892k faces downloaded, reduced to 300k). Door to -Y.
-    "SilverWizardHouse_300k":  dict(file="SilverWizardHouse_300k.glb",  length=800.0,  sink=20.0),
+    # Silver Point's wizard village (2026-11-26, agent wizvillage; Docs/SilverPointPlan.md): Meshy image-to-image (nano-banana-pro, the
+    # community "Enchanted Crooked Cottage" as the style picture) then image-to-3d; Art/SilverPoint holds the pictures and tasks. Door to -Y.
+    "SilverHome_300k":        dict(file="SilverHome_300k.glb",        length=720.0,  sink=20.0),
+    "SilverPetShop_300k":     dict(file="SilverPetShop_300k.glb",     length=1100.0, sink=20.0),
+    "SilverCrystalShop_300k": dict(file="SilverCrystalShop_300k.glb", length=900.0,  sink=20.0),
+    "SilverBroomShop_300k":   dict(file="SilverBroomShop_300k.glb",   length=1300.0, sink=20.0),
+    "SilverWandShop_300k":    dict(file="SilverWandShop_300k.glb",    length=560.0,  sink=20.0),
+    "SilverStore_300k":       dict(file="SilverStore_300k.glb",       length=1300.0, sink=20.0),
+    "SilverBank_300k":        dict(file="SilverBank_300k.glb",        length=900.0,  sink=20.0),
+    "SilverTownHall_300k":    dict(file="SilverTownHall_300k.glb",    length=1700.0, sink=20.0),
+    "SilverSmith_300k":       dict(file="SilverSmith_300k.glb",       length=1100.0, sink=20.0),
+    "SilverPotionShop_300k":  dict(file="SilverPotionShop_300k.glb",  length=900.0,  sink=20.0),
+    "SilverTavern_300k":      dict(file="SilverTavern_300k.glb",      length=1500.0, sink=20.0),
+    "SilverAcademy_300k":     dict(file="SilverAcademy_300k.glb",     length=2400.0, sink=25.0),
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them

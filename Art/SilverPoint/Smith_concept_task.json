@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-2ca9-779e-8004-b9fce17ae655",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a wizard blacksmith forge: a sturdy one-and-a-half storey grey stone building with a wide open forge arch on the front, a big stone chimney, a steep purple shingle roof. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757715266,
+ "started_at": 1795757715277,
+ "finished_at": 1795757737638,
+ "expires_at": 1796016937638,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-2ca9-779e-8004-b9fce17ae655_0.png?Expires=1796016937&Signature=PRqKcBj36wBfeAFT8WjxCmnhn35o1Huj5-IW4j25jwBgKXBuehTKcPcfMpusrigraHDPV4ZL4b9ZnmTC4iOcq4UjlaJA2ovdNoRVdm-BLZi0OEjeGr7CmAmRvlCDgS2MAh9JS-JUfQdyetIc9DTXQSh32jnoEZYtfjfGZ7-PoR4Wad-zjpsnAZ3kvzkv1KPIZ6rfBV9DKkEqPS2WRVYUDWA1O2RG8BYGMVGtRim0we5gIqNfRmlAFUyx1wO7rsQ1NIs8iNmfOAhusxOj0ApO17WEt~IqzfTxbXFYNyVMux6ig2oXcGP122TtLtJYXBpKonqJ~kTUg~Ie7Otp7WMcUQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

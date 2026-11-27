@@ -1,0 +1,16 @@
+{
+ "id": "01a21b80-070a-7102-86d6-856c56d8cca3",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a wizard general store: a wide two-storey crooked timber building with a double door in the middle and two broad many-paned shop windows, a covered porch roof over the shop front. Same art style, materials and colours as the reference wizard cottage: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, crooked leaning timber frame over pale cream plaster and grey stone base, steep curling purple and slate-blue shingle roofs with a twisted tip, stone chimneys, warm glowing windows with small panes. CLEAN freshly painted plaster, no dirt, no grime, no cracks, no stains. The building shell ONLY: NO brooms, NO lanterns, NO cauldrons, NO barrels, NO crates, NO plants, NO signs, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795757705820,
+ "started_at": 1795757705832,
+ "finished_at": 1795757719185,
+ "expires_at": 1796016919185,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a21b80-070a-7102-86d6-856c56d8cca3_0.png?Expires=1796016919&Signature=WhGOO4KQU846BVCjWMKZY4ppjb24vkQYgffohdxzhE1mJT0ns0LiHv3QQo~k4roaFfaUTJvG7zdlyFe61mCg0iSsWKDQeF~PMyV7MOJrhPW5M8aB7Gm~UMqcit5KR44mtkOH3BnSTOJu-i3nu3EMmOJS9r8Gsok1mmhjeVZikPVM-mXWpiKR7r8uSTIvKkn7R~P4BT2CcqnJ13kMpaPLAoSHoFlFhAzDaumKS2dpsw0cwpOJUSJCu8BAj4UjKhY1IIYNu9DKVEVmDS2k2F20KVEwzv3CHMO-xOqAddSKQVCXV-PuMtjqeG4OSr1Y3lrVsRAweBef96YC8q6ud0C2Kg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}
