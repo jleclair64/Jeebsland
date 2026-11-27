@@ -98,10 +98,52 @@ void UDeerAnimInstance::SetClips(UAnimSequence* const* In, float StartAt)
 FAnimInstanceProxy* UDeerAnimInstance::CreateAnimInstanceProxy() { return new FDeerAnimProxy(this); }
 void UDeerAnimInstance::DestroyAnimInstanceProxy(FAnimInstanceProxy* InProxy) { delete static_cast<FDeerAnimProxy*>(InProxy); }
 
+static TAutoConsoleVariable<int32> CVarFootIK(TEXT("jeeb.Horse.FootIK"), 1, TEXT("1: each horse hoof is bent onto the ground under it (foot IK, looks only); 0: the clip's legs as they are."), ECVF_Default);
+
+void UDeerAnimInstance::SetLegs(const FReferenceSkeleton& RS, const FName (&InLegs)[4][4])
+{
+	bFootIK = true;
+	for (int32 l = 0; l < 4; ++l)
+	{
+		for (int32 k = 0; k < 4; ++k) { Legs[l][k] = InLegs[l][k]; if (RS.FindBoneIndex(InLegs[l][k]) == INDEX_NONE) bFootIK = false; }
+		FTransform T = FTransform::Identity;
+		for (int32 i = RS.FindBoneIndex(InLegs[l][3]); i != INDEX_NONE; i = RS.GetParentIndex(i)) T = T * RS.GetRefBonePose()[i];
+		HoofRefZ[l] = T.GetLocation().Z;
+	}
+	bNewClips = true;   // (the proxy copies the legs with the clips)
+}
+
 void FDeerAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds)
 {
 	FAnimInstanceProxy::PreUpdate(InAnimInstance, DeltaSeconds);
 	UDeerAnimInstance* A = CastChecked<UDeerAnimInstance>(InAnimInstance);
+	Owner = A;
+	Dt = DeltaSeconds;
+	if (A->bFootIK)
+	{
+		// the ground under each hoof where it stood last frame (game thread; the heights are this machine's own drawn ground)
+		bool bOn = CVarFootIK.GetValueOnGameThread() != 0;
+#if !UE_BUILD_SHIPPING
+		static float IKAt = -1.f; static const bool bAt = FParse::Value(FCommandLine::Get(), TEXT("HoofIKAt="), IKAt);   // (test: IK off until then)
+		if (bAt && InAnimInstance->GetWorld() && InAnimInstance->GetWorld()->GetTimeSeconds() < IKAt) bOn = false;
+#endif
+		const float WantA = bOn ? A->IKWant : 0.f;
+		IKAlpha = FMath::FInterpConstantTo(IKAlpha, WantA, DeltaSeconds, 5.f);
+		bIK = true;   // (at alpha 0 FootIK only measures: the test log)
+		bGround = false;
+		if (USkeletalMeshComponent* C = InAnimInstance->GetSkelMeshComponent(); C && C->GetComponentSpaceTransforms().Num() > 0)
+		{
+			bGround = true;
+			for (int32 l = 0; l < 4; ++l)
+			{
+				for (int32 k = 0; k < 4; ++k) Legs[l][k] = A->Legs[l][k];
+				if (!bSole) RefZ[l] = A->HoofRefZ[l];
+				const FVector H = C->GetBoneLocation(Legs[l][3]);
+				GroundZ[l] = JeebFoes::Ground(H.X, H.Y);
+			}
+		}
+	}
+	else bIK = false;
 	const int32 N = JeebDeer::C_Count;
 	if (A->bNewClips)
 	{
@@ -161,7 +203,95 @@ bool FDeerAnimProxy::Evaluate(FPoseContext& Output)
 		FAnimationPoseData Out(Output);
 		FAnimationRuntime::BlendPosesTogether(Poses, Curves, Attrs, W, Out);
 	}
+	if (bIK && bGround) FootIK(Output);
 	return true;
+}
+
+// Each hoof onto the ground under it: the clip's lift over its own floor is kept (a swinging hoof still swings), planted hooves stand on the
+// drawn ground, the whole body drops when a planted hoof can't reach (down a slope), and each leg bends at its two upper joints to get there.
+void FDeerAnimProxy::FootIK(FPoseContext& Output)
+{
+	const FBoneContainer& BC = Output.Pose.GetBoneContainer();
+	FCompactPoseBoneIndex Ix[4][4] = {};
+	for (int32 l = 0; l < 4; ++l) for (int32 k = 0; k < 4; ++k)
+	{
+		const int32 Mi = BC.GetPoseBoneIndexForBoneName(Legs[l][k]);
+		if (Mi == INDEX_NONE) return;
+		Ix[l][k] = BC.MakeCompactPoseIndex(FMeshPoseBoneIndex(Mi));
+		if (Ix[l][k] == INDEX_NONE) return;
+	}
+	const FTransform Ct = GetComponentTransform();
+	const float S = Ct.GetScale3D().Z;
+	FCSPose<FCompactPose> CS;
+	CS.InitPose(Output.Pose);
+	float Delta[4], Plant[4];
+	// each hoof's standing height: where it is in the idle clip, which stands on level ground (the rest pose doesn't: its hind hooves sit
+	// about 28 cm lower than the clips' standing hooves, measured 2026-11-26). Taken once, the first time the idle clip plays alone.
+	if (!bSole)
+	{
+		if (Weight[JeebDeer::C_Idle] < 0.999f) return;
+		for (int32 l = 0; l < 4; ++l) { RefZ[l] = CS.GetComponentSpaceTransform(Ix[l][3]).GetLocation().Z; if (Owner) Owner->HoofRefZ[l] = RefZ[l]; }
+		bSole = true;
+	}
+	float Short = 0.f; bool bAny = false;
+	for (int32 l = 0; l < 4; ++l)
+	{
+		const FVector Hc = CS.GetComponentSpaceTransform(Ix[l][3]).GetLocation();
+		// the clip's floor for this hoof: the lowest it has been lately (rising 15 cm/s), so a clip that plants a hoof a little higher or lower
+		// than the idle clip still plants it on the ground, and its lift over that is kept while it swings
+		const float Raw = (Hc.Z - RefZ[l]) * S;
+		Floor[l] = bFloor ? FMath::Min(Raw, Floor[l] + 15.f * Dt) : Raw;
+		const float Lift = FMath::Max(0.f, Raw - Floor[l]);
+		Plant[l] = 1.f - FMath::SmoothStep(3.f, 14.f, Lift);
+		Delta[l] = FMath::Clamp(GroundZ[l] + RefZ[l] * S + Lift - Ct.TransformPosition(Hc).Z, -60.f, 60.f);
+		if (Owner) Owner->DebugLift[l] = Lift;
+		if (Plant[l] > 0.5f)
+		{
+			// how far short a fully stretched leg would fall: the body comes down that much
+			const FVector A = CS.GetComponentSpaceTransform(Ix[l][0]).GetLocation(), B = CS.GetComponentSpaceTransform(Ix[l][1]).GetLocation(), C = CS.GetComponentSpaceTransform(Ix[l][2]).GetLocation();
+			const FVector T = C + Ct.InverseTransformVector(FVector(0.f, 0.f, Delta[l]));
+			Short = FMath::Max(Short, ((T - A).Size() - 0.97f * ((B - A).Size() + (C - B).Size())) * S);
+			bAny = true;
+		}
+	}
+	bFloor = true;
+	// the body: down as far as the planted leg that can't reach needs (never more than 35 cm)
+	if (bAny) BodyOff = FMath::FInterpTo(BodyOff, -FMath::Clamp(Short, 0.f, 35.f), Dt, 10.f);
+	if (Owner) Owner->DebugBody = BodyOff * IKAlpha;
+	if (IKAlpha <= 0.f) return;
+	const float Off = BodyOff * IKAlpha;
+	if (FMath::Abs(Off) > 0.01f)
+	{
+		Output.Pose[FCompactPoseBoneIndex(0)].AddToTranslation(Ct.InverseTransformVector(FVector(0.f, 0.f, Off)));
+		CS.InitPose(Output.Pose);
+	}
+	for (int32 l = 0; l < 4; ++l)
+	{
+		const float D = (Delta[l] - Off) * IKAlpha * FMath::Lerp(0.5f, 1.f, Plant[l]);
+		if (FMath::Abs(D) < 0.05f) continue;
+		FTransform TA = CS.GetComponentSpaceTransform(Ix[l][0]), TB = CS.GetComponentSpaceTransform(Ix[l][1]), TC = CS.GetComponentSpaceTransform(Ix[l][2]);
+		const FVector A = TA.GetLocation(), B = TB.GetLocation(), C = TC.GetLocation();
+		const FVector T = C + Ct.InverseTransformVector(FVector(0.f, 0.f, D));
+		const float La = (B - A).Size(), Lb = (C - B).Size();
+		if (La < 0.1f || Lb < 0.1f) continue;
+		const FVector AT = T - A;
+		const float Dd = FMath::Clamp(AT.Size(), FMath::Abs(La - Lb) + 0.1f, (La + Lb) * 0.999f);
+		const FVector U = AT.GetSafeNormal();
+		FVector Pole = (B - A) - U * FVector::DotProduct(B - A, U);
+		if (Pole.SizeSquared() < 1e-4f) continue;
+		Pole.Normalize();
+		const float CosA = FMath::Clamp((La * La + Dd * Dd - Lb * Lb) / (2.f * La * Dd), -1.f, 1.f);
+		const FVector NB = A + U * (La * CosA) + Pole * (La * FMath::Sqrt(1.f - CosA * CosA));
+		const FVector NC = A + U * Dd;
+		TA.SetRotation(FQuat::FindBetweenNormals((B - A).GetSafeNormal(), (NB - A).GetSafeNormal()) * TA.GetRotation());
+		TB.SetLocation(NB);
+		TB.SetRotation(FQuat::FindBetweenNormals((C - B).GetSafeNormal(), (NC - NB).GetSafeNormal()) * TB.GetRotation());
+		TC.SetLocation(NC);
+		TArray<FBoneTransform> Out; Out.Reserve(3);
+		Out.Add(FBoneTransform(Ix[l][0], TA)); Out.Add(FBoneTransform(Ix[l][1], TB)); Out.Add(FBoneTransform(Ix[l][2], TC));
+		CS.LocalBlendCSBoneTransforms(Out, 1.f);
+	}
+	FCSPose<FCompactPose>::ConvertComponentPosesToLocalPoses(MoveTemp(CS), Output.Pose);
 }
 
 // ---------------------------------------------------------------------------------------------- one animal
