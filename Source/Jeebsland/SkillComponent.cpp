@@ -627,6 +627,8 @@ namespace
 	}
 }
 
+int32 USkillComponent::PutIntoArr(TArray<FInvSlot>& Arr, int32 Id, int32 Count, int32 Size) { return PutInto(Arr, Id, Count, Size); }
+
 bool USkillComponent::BankDeposit(int32 PackIdx)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack

@@ -57,10 +57,13 @@ int32 AKnightGameMode::PlayersOnline() const
 	return OnlineKeys.Num();
 }
 
+namespace JeebEconTest { void StartRace(AKnightGameMode* GM); }   // (EconomyTest.cpp: -EconRace, two servers racing for the same Market listings)
+
 void AKnightGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	if (!IsOnline()) return;
+	JeebEconTest::StartRace(this);
 	GetWorldTimerManager().SetTimer(AutosaveTimer, this, &AKnightGameMode::AutosaveAll, 60.f, true);
 	StartStatus();
 	UE_LOG(LogTemp, Log, TEXT("Jeebsland world up on port %d (status on %d)"), WorldPort(), WorldPort() + UJeebGameInstance::StatusPortOffset);

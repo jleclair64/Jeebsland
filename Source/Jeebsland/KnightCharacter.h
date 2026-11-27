@@ -7,6 +7,7 @@
 #include "Inventory.h"
 #include "HitBoxes.h"
 #include "JeebTuning.h"
+#include "JeebEconomy.h"
 namespace JeebAnim { struct FInput; }
 class FKnightAnimator;
 #include "KnightCharacter.generated.h"
@@ -207,7 +208,7 @@ public:
 	void EndGathering();
 
 	// Screens: Tab = side-panel cursor (or close a screen), K = skills board, E at the store / smithy = trade, O = settings
-	bool IsUIOpen() const { return bSettingsOpen || bSkillsOpen || bBankOpen || bInventoryOpen || bShopOpen || bSmithOpen || bDialogueOpen; }
+	bool IsUIOpen() const { return bSettingsOpen || bSkillsOpen || bBankOpen || bInventoryOpen || bShopOpen || bSmithOpen || bDialogueOpen || TradeView.bOpen; }
 	bool IsInventoryOpen() const { return bInventoryOpen; }
 	bool IsSkillsOpen() const { return bSkillsOpen; }
 	bool IsBankOpen() const { return bBankOpen; }
@@ -289,6 +290,52 @@ public:
 	FString RecordsText;
 	double RecordsAskedAt = -100.0;
 	double LastRecordsServe = -100.0;   // (server)
+
+	// ---- Player-to-player trade and the Market (2026-11-26, Docs/EconomyPlan.md; KnightCharacterTrade.cpp). The server decides; the player's machine asks.
+	// Trade: E facing another player (or right-click them with the cursor out) asks; they do the same back to open the window. ACCEPT the offer, then
+	// CONFIRM the summary; the server swaps both packs and ingots at once (TradeTry) after checking every offered slot, the room and the distance.
+	AKnightCharacter* TradeTargetInReach() const;          // (this machine) the player in front of us within reach, or null
+	void AskTrade(AKnightCharacter* Other);                 // (this machine)
+	bool IsTradeOpen() const { return TradeView.bOpen; }
+	FTradeView TradeView;                                   // (this machine) what the trade window shows
+	UFUNCTION(Server, Reliable) void ServerTradeAsk(AKnightCharacter* Other);
+	UFUNCTION(Server, Reliable) void ServerTradeOffer(int32 PackSlot, bool bAdd);   // offer a pack slot's whole stack, or take it back
+	UFUNCTION(Server, Reliable) void ServerTradeIngots(int32 Amount);
+	UFUNCTION(Server, Reliable) void ServerTradeAccept(int32 Version);              // ACCEPT (stage 0) or CONFIRM (stage 1) the version shown
+	UFUNCTION(Server, Reliable) void ServerTradeCancel();
+	UFUNCTION(Client, Reliable) void ClientTradeView(const FTradeView& V);
+	// (server) trade state: each side keeps its own offer; TradeWith links the two
+	TWeakObjectPtr<AKnightCharacter> TradeWith, TradeAskTo;
+	double TradeAskAt = -100.0, LastTradeOp = -10.0;
+	TArray<int32> TradeSlots;        // the pack slots offered
+	TArray<FInvSlot> TradeItems;     // what was in each when offered (the swap checks they still hold it)
+	int32 TradeIngots = 0;
+	bool bTradeAccepted = false;
+	uint8 TradeStage = 0;
+	int32 TradeVersion = 0;
+	bool TradeRate();                // (server) at most ten trade requests a second
+	void TradeBump();                // (server) an offer changed: new version, both accepts cleared, both windows redrawn
+	void TradeSend();                // (server) sends both windows
+	void TradeEnd(const FString& Why);   // (server) closes the trade for both sides
+	bool TradeTry();                 // (server) the swap, all or nothing
+	void TickTrade(float Dt);        // (server) distance, partner gone; Market mail every few seconds
+	float MailCheckT = 0.f;
+	void SaveEconomy();              // (server) writes this character now (after any trade or Market change)
+	// Market (a tab at every bank): the server answers a query with one page of rows
+	UFUNCTION(Server, Reliable) void ServerMarketQuery(int32 Category, const FString& Search, int32 Page, bool bMine);
+	UFUNCTION(Server, Reliable) void ServerMarketList(int32 PackSlot, int32 ItemId, int32 Price);
+	UFUNCTION(Server, Reliable) void ServerMarketBuy(const FString& Id, int32 Price);
+	UFUNCTION(Server, Reliable) void ServerMarketCancel(const FString& Id);
+	UFUNCTION(Client, Reliable) void ClientMarketRows(const TArray<FMarketRow>& Rows, int32 Total, int32 Page, bool bMine);
+	TArray<FMarketRow> MarketRows;   // (this machine) the page shown
+	int32 MarketTotal = 0, MarketPage = 0;
+	bool bMarketMine = false;
+	int32 MarketCategory = 0;
+	FString MarketSearch;
+	double LastMarketOp = -10.0;     // (server)
+	void MarketAnswer(bool bFresh);  // (server) sends this player the page they last asked for
+	void TickEconomyTest(float Dt);  // (non-Shipping, EconomyTest.cpp: -EconTest on the server, -EconDo=<role> on the players' machines)
+	float EconTestT = 0.f;
 	// Drinking takes time (owner, 2026-11-05): the server starts it and ends it, every machine plays it. The potion is used and works only at the end.
 	UFUNCTION(NetMulticast, Reliable) void MulticastDrink(uint8 Type, bool bStart);
 	bool bDrinking = false;

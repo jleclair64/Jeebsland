@@ -233,14 +233,14 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// ---- the trading post (beside the shopkeeper) ----
 	case EInvOp::SellAll:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || A < 0 || A > static_cast<int32>(EItemType::Bass)) break;   // (the last material: before 2026-11-22 this stopped at Bones, so the newer ores could not be sold in one go)
+		if (!(NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || NearBroomStall()) || A < 0 || A > static_cast<int32>(EItemType::Bass)) break;   // (2026-11-26: Silver Point's shop buys too)   // (the last material: before 2026-11-22 this stopped at Bones, so the newer ores could not be sold in one go)
 		const int32 Pay = Sk->SellAll(static_cast<EItemType>(A));
 		ShopNote(FString::Printf(TEXT("Sold for %d ingots."), Pay));
 		break;
 	}
 	case EInvOp::SellSlot:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || !Sk->Slots.IsValidIndex(A)) break;
+		if (!(NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || NearBroomStall()) || !Sk->Slots.IsValidIndex(A)) break;
 		FInvSlot& S = Sk->Slots[A];
 		if (S.Id == 0 || S.Id != B || !(IsGear(S.Id) || IsArrow(S.Id) || (S.IsSized() && JeebProps::IsFishItem(S.Id)))) break;   // (the slot changed since the player clicked)
 		const int32 Pay = IsArrow(S.Id) ? S.Count : IsMaterial(S.Id) ? SellValue(MaterialType(S.Id)) * S.Count : GearSellPrice(S.Id) * S.Count;
@@ -252,10 +252,14 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	}
 	case EInvOp::Buy:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper))) break;
+		const bool bStall = NearBroomStall();
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) && !bStall) break;
 		TArray<JeebStore::FWare>& Wares = JeebStore::Stock();
 		if (!Wares.IsValidIndex(A) || Wares[A].Id != B) { ShopNote(TEXT("The stock has just changed. Have another look.")); break; }
 		JeebStore::FWare& W = Wares[A];
+		// (2026-11-26, Docs/EconomyPlan.md) shops by town: wizard goods only at Silver Point, knight goods only at Oak Hill and Blackrock, troll goods at Steele Creek
+		const JeebShops::ETown Town = bStall ? JeebShops::T_SilverPoint : JeebShops::TownAt(GetActorLocation().X, GetActorLocation().Y);
+		if (!JeebShops::Sells(Town, W.Id)) { ShopNote(FString::Printf(TEXT("That isn't sold in %s."), JeebShops::TownName(Town))); UE_LOG(LogTemp, Log, TEXT("JEEBSHOP %s refused %s in %s"), *GetName(), *ItemName(W.Id), JeebShops::TownName(Town)); break; }
 		if (W.Stock <= 0) ShopNote(TEXT("Sold out."));
 		else if (Sk->GetIngots() < W.Price) ShopNote(TEXT("Not enough ingots."));
 		else if (!Sk->CanAdd(W.Id, W.Count)) ShopNote(TEXT("Your pack is full."));

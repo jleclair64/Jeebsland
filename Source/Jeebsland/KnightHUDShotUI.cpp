@@ -34,7 +34,11 @@ namespace
 		{ TEXT("shop"), 1 }, { TEXT("smith"), 1 }, { TEXT("bank"), 1 }, { TEXT("inventory"), 1 }, { TEXT("skills"), 1 },
 		{ TEXT("emotes"), 1 }, { TEXT("drop"), 1 }, { TEXT("chat"), 1 },
 	};
-	constexpr int32 NumStages = UE_ARRAY_COUNT(Stages);
+	// (2026-11-26, -ShotUIEcon: only the economy's screens, Docs/EconomyPlan.md)
+	const FStage EconStages[] = { { TEXT("shop"), 1 }, { TEXT("market"), 1 }, { TEXT("marketsell"), 1 }, { TEXT("trade"), 1 }, { TEXT("trade2"), 1 } };
+	bool EconOnly() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("ShotUIEcon")); return b; }
+	const FStage* StageList() { return EconOnly() ? EconStages : Stages; }
+	const int32 NumStages = EconOnly() ? UE_ARRAY_COUNT(EconStages) : UE_ARRAY_COUNT(Stages);
 }
 #endif
 
@@ -64,13 +68,13 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 			return;
 		}
 		// leave the last screen, open the next
-		const FString Prev = ShotUIStage >= 0 ? Stages[ShotUIStage].Name : TEXT("");
+		const FString Prev = ShotUIStage >= 0 ? StageList()[ShotUIStage].Name : TEXT("");
 		if (Prev == TEXT("inventory") || Prev == TEXT("skills")) { if (Prev == TEXT("inventory")) Knight->ToggleInventory(); else Knight->ToggleSkills(); }
 		ShotUIStage = Want;
 		bShotUITaken = false;
-		const FString N = Stages[Want].Name;
-		SetStyle(Stages[Want].Style);
-		UE_LOG(LogTemp, Log, TEXT("JEEBUI stage %s style %d"), *N, Stages[Want].Style);
+		const FString N = StageList()[Want].Name;
+		SetStyle(StageList()[Want].Style);
+		UE_LOG(LogTemp, Log, TEXT("JEEBUI stage %s style %d"), *N, StageList()[Want].Style);
 		if (N.StartsWith(TEXT("esc_")))
 		{
 			if (!Knight->IsSettingsOpen()) { CloseAll(); Knight->ToggleSettings(); }
@@ -99,11 +103,32 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 			OpenChat();
 		}
 	}
-	const FString N = Stages[ShotUIStage].Name;
+	const FString N = StageList()[ShotUIStage].Name;
 	// screens drawn by the sequence itself, every frame of their stage
 	if (N == TEXT("shop")) DrawShopScreen(Knight);   // (no shopkeeper beside him: the window is drawn here, not opened)
 	else if (N == TEXT("smith")) DrawSmithScreen(Knight);
 	else if (N == TEXT("bank")) DrawBankScreen(Knight);
+	else if (N == TEXT("market") || N == TEXT("marketsell"))
+	{
+		BankTab = 1; MktMode = N == TEXT("market") ? 0 : 2; MktAskAt = FPlatformTime::Seconds();
+		if (MktMode == 2) { MktSellSlot = 0; MktPriceText = TEXT("120"); }
+		if (Knight->GetSkills()->Slots.Num() > 2 && Knight->GetSkills()->Slots[0].Id == 0) { Knight->GetSkills()->Slots[0] = FInvSlot(GearId(K_Sword, 2), 1); Knight->GetSkills()->Slots[1] = FInvSlot(MaterialId(EItemType::Trout), 1, 334); }
+		Knight->MarketRows.Reset(); Knight->bMarketMine = false; Knight->MarketTotal = 17;
+		const int32 Ids[] = { GearId(K_Sword, 1), MaterialId(EItemType::Salmon), ArmourId(K_Chest, AS_Heavy, 2), PotionId(0), GearId(K_Wand, 2), ArrowId(A_Broadhead), MaterialId(EItemType::IronOre) };
+		const int32 Prices[] = { 60, 85, 410, 25, 300, 18, 40 };
+		for (int32 i = 0; i < UE_ARRAY_COUNT(Ids); ++i) { FMarketRow R; R.Id = FString::FromInt(i); R.ItemId = Ids[i]; R.Count = IsArrow(Ids[i]) ? 10 : Ids[i] == MaterialId(EItemType::IronOre) ? 20 : 1; R.Size = i == 1 ? 371 : 0; R.Price = Prices[i]; R.Seller = i == 3 ? TEXT("Hazel") : TEXT("Sir Jeeb"); R.bMine = i == 4; Knight->MarketRows.Add(R); }
+		DrawBankScreen(Knight);
+	}
+	else if (N == TEXT("trade") || N == TEXT("trade2"))
+	{
+		FTradeView& V = Knight->TradeView;
+		V.bOpen = false; V.Partner = TEXT("Hazel"); V.Stage = N == TEXT("trade") ? 0 : 1; V.bTheyAccepted = true; V.bIAccepted = false;
+		USkillComponent* Sk = Knight->GetSkills();
+		if (Sk->Slots[0].Id == 0) { Sk->Slots[0] = FInvSlot(GearId(K_Sword, 2), 1); Sk->Slots[1] = FInvSlot(MaterialId(EItemType::Trout), 1, 334); }
+		V.Mine = { Sk->Slots[0], Sk->Slots[1] }; V.MineSlots = { 0, 1 }; V.MyIngots = 50;
+		V.Theirs = { FInvSlot(GearId(K_Wand, 2), 1), FInvSlot(PotionId(0), 3) }; V.TheirIngots = 0;
+		DrawTradeScreen(Knight);
+	}
 	else if (N == TEXT("icons"))
 	{
 		UFont* Font = GEngine->GetMediumFont();

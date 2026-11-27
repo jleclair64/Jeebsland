@@ -315,6 +315,20 @@ private:
 	FString TestLevelText = TEXT("99");
 	void SubmitLevel();
 	int32 BankPage = 0;
+	// Trade and the Market (2026-11-26, Docs/EconomyPlan.md; KnightHUDTrade.cpp)
+	void DrawTradeScreen(AKnightCharacter* Knight);
+	void DrawMarketTab(AKnightCharacter* Knight, float PX, float PY, float PW, float PH);
+	void TradeRightClick(AKnightCharacter* Knight, APlayerController* PC);
+	void MarketAsk(AKnightCharacter* Knight);
+	void MktBox(float X, float Y, float W, int32 Field, const FString& Text, const TCHAR* Empty);
+	void MktTypeChar(TCHAR C);
+	bool MktTypeKey(const FKey& Key);
+	int32 BankTab = 0;        // 0 the vault, 1 the Market
+	int32 MktMode = 0;        // 0 browse, 1 my listings, 2 sell
+	int32 MktCategory = 0, MktPage = 0, MktSellSlot = -1;
+	int32 MktField = 0;       // typing into: 0 nothing, 1 the search, 2 a price, 3 the trade's ingots
+	FString MktSearchText, MktPriceText, TradeIngotText;
+	double MktAskAt = -100.0;
 	int32 BankDragHot = -1;   // a weapon being dragged from the weapon bar onto the bank
 	int32 LoreCat = 0;
 	int32 LoreSel = -1;

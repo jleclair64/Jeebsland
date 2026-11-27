@@ -44,6 +44,7 @@ private:
 void AKnightHUD::TypeChar(TCHAR C)
 {
 	if (bChatOpen) { ChatChar(C); return; }
+	if (MktField) { MktTypeChar(C); return; }   // (a price, a Market search, a trade's ingots: KnightHUDTrade.cpp)
 	if (bLookTyping) { LookTypeChar(C); return; }
 	if (bLevelTyping) { if (C >= '0' && C <= '9' && TestLevelText.Len() < 2) TestLevelText.AppendChar(C); return; }   // (the test kit's level box: digits only)
 	if (C < 32 || C == 127) return;   // (control characters: Backspace, Tab and Enter come through TypeKey)
@@ -56,6 +57,7 @@ void AKnightHUD::TypeChar(TCHAR C)
 bool AKnightHUD::TypeKey(const FKey& Key)
 {
 	if (bChatOpen) return ChatKey(Key);
+	if (MktField) return MktTypeKey(Key);
 	if (bLookTyping) { LookTypeKey(Key); return true; }
 	if (bLevelTyping)   // (the test kit's level box: Backspace, Enter sets the levels, Escape or Tab leaves it)
 	{

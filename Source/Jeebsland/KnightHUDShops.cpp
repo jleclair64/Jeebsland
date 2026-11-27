@@ -40,7 +40,9 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	const float Now = GetWorld()->GetTimeSeconds();
 	Panel(PX, PY, PW, PH);
-	WindowTitle(Knight->IsBroomShopOpen() ? TEXT("THE BROOM STALL") : TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
+	// (2026-11-26, Docs/EconomyPlan.md) what a shop sells depends on its town: JeebShops::Sells (the server checks the same)
+	const JeebShops::ETown Town = JeebShops::TownAt(Knight->GetActorLocation().X, Knight->GetActorLocation().Y);
+	WindowTitle(Knight->IsBroomShopOpen() ? TEXT("THE WIZARD'S SHOP") : TEXT("THE TRADING POST"), PX + 30.f, PY + 14.f, 1.8f);
 	{
 		const FString Bal = FString::Printf(TEXT("%d"), Skills->GetIngots());
 		float TW = 0.f, TH = 0.f;
@@ -54,12 +56,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
 		static const EItemType Sellable[] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
 			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather, EItemType::Salmon, EItemType::Bass };
-	if (Knight->IsBroomShopOpen())
 	{
-		HDText(TEXT("The broom seller only sells brooms and buys nothing."), FLinearColor(0.85f, 0.85f, 0.85f), PX + 30.f, PY + 100.f, Font, 1.0f);
-		HDText(TEXT("Sell your goods at the trading post in town."), FLinearColor(0.75f, 0.75f, 0.75f), PX + 30.f, PY + 130.f, Font, 0.95f);
-	}
-	else {
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
 	int32 Row = 0;
 	for (int32 m = 0; m < UE_ARRAY_COUNT(Sellable) && Row < 10; ++m)
@@ -114,11 +111,18 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 
 		AKnightGameState::ApplyStore(GetWorld());   // online: what is left is the server's count
 		// (2026-11-22) at Silver Point's broom stall the same screen sells brooms (Brooms.csv, every one with a price; the server sells them: EInvOp::BuyBroom)
-		TArray<JeebStore::FWare> BroomWares;
+		// (2026-11-26) Silver Point's shop (the old broom stall): its brooms first, then the hour's wares its town sells (wizard goods and everyone's)
+		TArray<JeebStore::FWare> Wares;
+		TArray<int32> WareIdx;   // the stock index of each card (-1: a broom)
 		const bool bBrooms = Knight->IsBroomShopOpen();
-		if (bBrooms) for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) if (JeebBroom::Row(b).Price > 0) { JeebStore::FWare W; W.Id = BroomId(b); W.Price = JeebBroom::Row(b).Price; W.Stock = 99; BroomWares.Add(W); }
-		TArray<JeebStore::FWare>& Wares = bBrooms ? BroomWares : JeebStore::Stock();
-		const float CW = (RW - 3 * 8.f) / 4.f, CH = 142.f;
+		if (bBrooms) for (int32 b = 0; b < JeebBroom::NumBrooms(); ++b) if (JeebBroom::Row(b).Price > 0) { JeebStore::FWare W; W.Id = BroomId(b); W.Price = JeebBroom::Row(b).Price; W.Stock = 99; Wares.Add(W); WareIdx.Add(-1); }
+		{
+			const TArray<JeebStore::FWare>& All = JeebStore::Stock();
+			for (int32 s = 0; s < All.Num(); ++s) if (JeebShops::Sells(bBrooms ? JeebShops::T_SilverPoint : Town, All[s].Id)) { Wares.Add(All[s]); WareIdx.Add(s); }
+		}
+		const int32 CardRows = FMath::Max(1, (Wares.Num() + 3) / 4);
+		const float CardSpace = bBrooms ? PH - 96.f - 60.f : 3 * 150.f;   // (no satchel at Silver Point: the cards may use its room)
+		const float CW = (RW - 3 * 8.f) / 4.f, CH = FMath::Min(142.f, CardSpace / CardRows - 8.f);
 		for (int32 i = 0; i < Wares.Num(); ++i)
 		{
 			JeebStore::FWare& W = Wares[i];
@@ -127,7 +131,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			const bool bAfford = Skills->GetIngots() >= W.Price;
 			const bool bOver = !bSoldOut && Over(CX, CY, CW, CH);
 			Tile(CX, CY, CW, CH, bOver ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver ? 0.34f : 0.18f);
-			if (i >= 8) DrawRect(FLinearColor(0.75f, 0.55f, 0.15f, 0.9f), CX, CY, CW, 3.f);       // the valuable row gets a gold edge
+			if (WareIdx[i] >= 8) DrawRect(FLinearColor(0.75f, 0.55f, 0.15f, 0.9f), CX, CY, CW, 3.f);       // the valuable row gets a gold edge
 			DrawIconIn(W.Id, CX + 6.f, CY + 6.f, 58.f, CX, CY, CW, CH);
 			FString Name = W.Count > 1 ? FString::Printf(TEXT("%d %s"), W.Count, *ItemName(W.Id)) : ItemName(W.Id);
 			Wrapped(Name, CX + 70.f, CY + 8.f, CW - 76.f, 0.85f, bSoldOut ? FLinearColor(0.45f, 0.45f, 0.45f) : FLinearColor::White);
@@ -143,7 +147,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 			else if (IsArrow(W.Id)) { int32 A, B; WeaponDamage(K_Bow, T_Tin, A, B, ArrowRowOf(W.Id)); Stat = FString::Printf(TEXT("Bow damage %d-%d"), A, B); }
 			else if (IsPotion(W.Id)) { Stat = *PotionRow(PotionType(W.Id)).Shop; }
 			else if (IsBroom(W.Id)) Stat = FString::Printf(TEXT("Speed x%.1f, %.1f magic a second"), JeebBroom::Row(BroomRowOf(W.Id)).SpeedMul, JeebBroom::Row(BroomRowOf(W.Id)).Drain);
-			if (!Stat.IsEmpty()) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
+			if (!Stat.IsEmpty() && CH >= 120.f) Wrapped(Stat, CX + 8.f, CY + 70.f, CW - 16.f, 0.78f, FLinearColor(0.75f, 0.8f, 0.95f));
 			DrawIngot(CX + 8.f, CY + CH - 30.f, 22.f);
 			HDText(FString::Printf(TEXT("%d"), W.Price), bAfford ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.9f, 0.3f, 0.25f), CX + 36.f, CY + CH - 28.f, Font, 1.1f);
 			const FString Left = bSoldOut ? FString(TEXT("Sold out")) : FString::Printf(TEXT("%d left"), W.Stock);
@@ -157,8 +161,8 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 				{
 					if (!bAfford) ShopMsg = TEXT("Not enough ingots.");
 					else if (!Skills->CanAdd(W.Id, W.Count)) ShopMsg = TEXT("Your pack is full.");
-					else if (bBrooms) Knight->Inv(EInvOp::BuyBroom, BroomRowOf(W.Id), W.Id);
-					else Knight->Inv(EInvOp::Buy, i, W.Id);   // the server says how it went
+					else if (WareIdx[i] < 0) Knight->Inv(EInvOp::BuyBroom, BroomRowOf(W.Id), W.Id);
+					else Knight->Inv(EInvOp::Buy, WareIdx[i], W.Id);   // the server says how it went (and whether this town sells it)
 					ShopMsgUntil = Now + 3.f;
 				}
 			}
@@ -332,11 +336,15 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 {
 	USkillComponent* Sk = Knight->GetSkills();
 	UFont* Font = GEngine->GetMediumFont();
-	const float PW = 1090.f, PH = 640.f;
+	const float PW = 1090.f, PH = BankTab == 1 ? 730.f : 640.f;   // (the Market tab is a little taller)
 	const float PX = FMath::Max(0.f, Canvas->ClipX - PW - 30.f), PY = (Canvas->ClipY - PH) * 0.5f;   // right side, so the keeper the shop camera frames stands clear on the left (owner 2026-11-20)
 	Panel(PX, PY, PW, PH);
-	WindowTitle(TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
+	WindowTitle(BankTab == 1 ? TEXT("THE MARKET") : TEXT("THE VAULT"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseBank(); return; }
+	// (2026-11-26, Docs/EconomyPlan.md) two tabs: the vault (the account's, shared by the knight, troll and wizard) and the game-wide Market
+	if (Btn(PX + PW - 380.f, PY + 16.f, 140.f, 34.f, TEXT("VAULT"), true, BankTab == 0, 1.0f)) BankTab = 0;
+	if (Btn(PX + PW - 230.f, PY + 16.f, 140.f, 34.f, TEXT("MARKET"), true, BankTab == 1, 1.0f) && BankTab != 1) { BankTab = 1; MktAskAt = -100.0; }
+	if (BankTab == 1) { DrawMarketTab(Knight, PX, PY, PW, PH); return; }
 
 	auto SlotBox = [&](float X, float Y, float S, bool bOver)
 	{
