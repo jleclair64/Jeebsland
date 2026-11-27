@@ -569,7 +569,7 @@ void ASteeleCreekTown::PlaceProps()
 void ASteeleCreekTown::SpawnRocks()
 {
 	UWorld* World = GetWorld();
-	const EItemType Ores[5] = { EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond };
+	const EItemType Ores[6] = { EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Coal };
 	int32 Count = 0;
 	for (const JeebSteele::FRockDef& Rk : JeebSteele::RockDefs)
 	{
@@ -577,7 +577,7 @@ void ASteeleCreekTown::SpawnRocks()
 		const FTransform Xf(FRotator(0.f, FRandomStream(FMath::RoundToInt(P.X) * 7919 + FMath::RoundToInt(P.Y) * 104729).FRandRange(0.f, 360.f), 0.f), FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) - 8.f));
 		if (AMiningRock* Rock = World->SpawnActorDeferred<AMiningRock>(AMiningRock::StaticClass(), Xf))
 		{
-			Rock->SetOre(Ores[FMath::Clamp(Rk.Ore, 0, 4)]);
+			Rock->SetOre(Ores[FMath::Clamp(Rk.Ore, 0, 5)]);
 			Rock->FinishSpawning(Xf);
 			HashIn(Hash, P.X); HashIn(Hash, P.Y);
 			++Count;

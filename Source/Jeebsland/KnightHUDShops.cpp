@@ -55,7 +55,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	// ----- Sell (left) -----
 	WindowTitle(TEXT("SELL"), PX + 30.f, PY + 62.f, 1.3f);
 		static const EItemType Sellable[] = { EItemType::Logs, EItemType::PineLogs, EItemType::RedwoodLogs, EItemType::TinOre, EItemType::IronOre,
-			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather, EItemType::Salmon, EItemType::Bass };
+			EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond, EItemType::Bacon, EItemType::Perch, EItemType::Trout, EItemType::GoldenCarp, EItemType::Hide, EItemType::Bones, EItemType::Venison, EItemType::Antlers, EItemType::GameMeat, EItemType::EagleFeather, EItemType::Salmon, EItemType::Bass, EItemType::CopperOre, EItemType::Coal, EItemType::BronzeBar, EItemType::SteelBar, EItemType::SilverBar };
 	{
 	// (only what you carry, up to ten rows: there are more kinds of material than fit since the new ores)
 	int32 Row = 0;
@@ -214,61 +214,101 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 	WindowTitle(TEXT("THE SMITHY"), PX + 30.f, PY + 14.f, 1.8f);
 	if (CloseBtn(PX, PY, PW)) { Knight->CloseSmith(); return; }
 
-	// Materials you carry (every ore and gem a knight smiths with), and your smithing level
+	// Materials you carry (the ores and the bars a smith works with), and your smithing level
 	{
-		static const EItemType Mats[6] = { EItemType::TinOre, EItemType::IronOre, EItemType::SilverOre, EItemType::GoldOre, EItemType::Emerald, EItemType::Diamond };
-		for (int32 m = 0; m < 6; ++m)
+		TArray<EItemType> Mats = { EItemType::CopperOre, EItemType::TinOre, EItemType::Coal, EItemType::IronOre, EItemType::SilverOre };
+		Mats.Append(Bars());   // (2026-11-27, the metals rework: bronze, steel and silver bars)
+		for (int32 m = 0; m < Mats.Num(); ++m)
 		{
-			const float X = PX + 30.f + m * 128.f;
+			const float X = PX + 30.f + m * 104.f;
 			DrawIcon(MaterialId(Mats[m]), X, PY + 58.f, 32.f);
 			HDText(FString::Printf(TEXT("%d"), Skills->GetItemCount(Mats[m])), FLinearColor::White, X + 38.f, PY + 64.f, Font, 1.1f);
-			if (Over(X, PY + 58.f, 110.f, 34.f)) TipLines = { MaterialName(Mats[m]) };
+			if (Over(X, PY + 58.f, 96.f, 34.f)) TipLines = { MaterialName(Mats[m]) };
 		}
 		int32 Lv, Into, Need;
 		Skills->GetProgress(ESkillType::Smithing, Lv, Into, Need);
 		HDText(FString::Printf(TEXT("Smithing  Lv %d"), Lv), FLinearColor(1.f, 0.7f, 0.4f), PX + PW - 330.f, PY + 56.f, Font, 1.2f);
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
-	// Kind list (two columns)
-	static const int32 Kinds[19] = { K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, -1 };
-	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 18);
-	for (int32 i = 0; i < 19; ++i)
+	// Kind list (two columns): the furnace's bars first (-2), then every kind of gear, then arrows (-1)
+	static const int32 Kinds[20] = { -2, K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, -1 };
+	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 19);
+	for (int32 i = 0; i < 20; ++i)
 	{
 		const float X = PX + 30.f + (i / 10) * 160.f, Y = PY + 118.f + (i % 10) * 40.f;
-		const FString Nm = Kinds[i] < 0 ? FString(TEXT("Arrows")) : FString(KindName(Kinds[i]));
+		const FString Nm = Kinds[i] == -2 ? FString(TEXT("Bars (furnace)")) : Kinds[i] < 0 ? FString(TEXT("Arrows")) : FString(KindName(Kinds[i]));
 		if (Btn(X, Y, 150.f, 35.f, Nm, true, SmithKindIdx == i, 1.0f)) SmithKindIdx = i;
 	}
 	const int32 Kind = Kinds[SmithKindIdx];
-	const bool bArrows = Kind < 0;
+	const bool bBars = Kind == -2;
+	const bool bArrows = Kind == -1;
 	const int32 BKind = bArrows ? K_Bow : Kind;
-	// the style picker under the kinds (2026-11-03): armour classic / light / heavy, shields kite / round / tower
-	const bool bStyled = IsArmorKind(Kind) || Kind == K_Shield;
+	// the style picker under the kinds: shields kite / round / tower. (Armour has one style since 2026-11-26: Knight's Armor.)
+	const bool bStyled = Kind == K_Shield;
 	if (bStyled)
 	{
 		SmithStyle = FMath::Clamp(SmithStyle, 0, 2);
-		if (Kind != K_Shield && !StyleHasPiece(Kind, SmithStyle)) SmithStyle = AS_Classic;
 		for (int32 s = 0; s < 3; ++s)
 		{
-			const FString Nm = Kind == K_Shield ? FString(ShieldStyleName(s)).Replace(TEXT(" Shield"), TEXT("")) : ArmourStyleRow(s).Name;
-			const bool bMade = Kind == K_Shield || StyleHasPiece(Kind, s);   // (no Light shoulders)
-			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, bMade, SmithStyle == s, 1.0f) && bMade) SmithStyle = s;
+			const FString Nm = FString(ShieldStyleName(s)).Replace(TEXT(" Shield"), TEXT(""));
+			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, true, SmithStyle == s, 1.0f)) SmithStyle = s;
 		}
 	}
 	const int32 Style = bStyled ? SmithStyle : 0;
 
+	// The columns: a bar each (the furnace), an arrow each, Knight's Armor's one piece, or each rank in the game (Bronze, Steel, Silver; vaulted ranks are left out)
+	TArray<int32> Cols;
+	if (bBars) for (EItemType B : Bars()) Cols.Add(static_cast<int32>(B));
+	else if (bArrows) { for (int32 i = 0; i < NumArrowKinds(); ++i) Cols.Add(i); }
+	else if (IsArmorKind(Kind)) Cols.Add(T_Silver);
+	else Cols = GameTiers();
+	const int32 NC = FMath::Max(1, Cols.Num());
 	const float CGap = 6.f, CH = 500.f;
 	const float CX0 = PX + 370.f, CY = PY + 112.f;
-	const float CW = (PW - 370.f - 24.f - CGap * (NumTiersKnight - 1)) / NumTiersKnight;   // (all six tiers)
-	for (int32 t = 0; t < NumTiersKnight; ++t)
+	const float CW = FMath::Min(300.f, (PW - 370.f - 24.f - CGap * (NC - 1)) / NC);
+	const int32 Lv = Skills->GetLevel(ESkillType::Smithing);
+	for (int32 c = 0; c < Cols.Num(); ++c)
 	{
-		const float CX = CX0 + t * (CW + CGap);
-		// (2026-11-26) arrows: one column per arrow (ArrowKindId), its own recipe in Arrows.csv; gear: one column per tier
+		const float CX = CX0 + c * (CW + CGap);
+		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
+		if (bBars)
+		{
+			// ---- a bar: one of each of its two ores, at its Smithing level (the server checks it all: EInvOp::Smelt) ----
+			const EItemType Bar = static_cast<EItemType>(Cols[c]);
+			const FMaterialRow& M = MaterialRow(Bar);
+			const int32 Id = MaterialId(Bar);
+			DrawRect(M.Color, CX, CY, CW, 5.f);
+			DrawIcon(Id, CX + (CW - 90.f) * 0.5f, CY + 14.f, 90.f);
+			float Y = CY + 120.f;
+			Y += Wrapped(M.Name, CX + 8.f, Y, CW - 14.f, 0.9f, FLinearColor(1.f, 0.9f, 0.6f));
+			HDText(TEXT("Smelt one bar from"), FLinearColor(0.9f, 0.9f, 0.9f), CX + 8.f, Y, Font, 0.9f); Y += 26.f;
+			const int32 H0 = Skills->GetItemCount(M.Smelt[0]), H1 = Skills->GetItemCount(M.Smelt[1]);
+			for (int32 i = 0; i < 2; ++i)
+			{
+				const int32 Have = i == 0 ? H0 : H1;
+				DrawIcon(MaterialId(M.Smelt[i]), CX + 6.f, Y - 3.f, 24.f);
+				HDText(FString::Printf(TEXT("%s %d/1"), MaterialName(M.Smelt[i]), Have), Have >= 1 ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.85f);
+				Y += 26.f;
+			}
+			const bool bLevelOk = Lv >= M.SmeltLevel;
+			Y += 6.f;
+			HDText(FString::Printf(TEXT("Needs Smithing %d"), M.SmeltLevel), bLevelOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 8.f, Y, Font, 0.95f); Y += 24.f;
+			HDText(FString::Printf(TEXT("+%d XP a bar"), M.SmeltXP), FLinearColor(0.5f, 0.85f, 1.f), CX + 8.f, Y, Font, 0.95f);
+			const int32 Most = FMath::Min(H0, H1);
+			const bool bCan = bLevelOk && Most > 0;
+			const float BW = (CW - 30.f) * 0.5f;
+			if (Btn(CX + 10.f, CY + CH - 50.f, BW, 38.f, TEXT("SMELT 1"), bCan, false, 1.0f)) Knight->Inv(EInvOp::Smelt, Cols[c], 1);
+			if (Btn(CX + 20.f + BW, CY + CH - 50.f, BW, 38.f, TEXT("ALL"), bCan && Most > 1, false, 1.0f)) Knight->Inv(EInvOp::Smelt, Cols[c], 28);
+			if (Over(CX, CY, CW, CH - 56.f)) ItemTip(Id);
+			continue;
+		}
+		const int32 t = Cols[c];
+		// (2026-11-26) arrows: one column per arrow (ArrowKindId), its own recipe in Arrows.csv; gear: one column per rank
 		const int32 ARow = bArrows ? ArrowRowOf(ArrowKindId(t)) : 0;
 		FArrowRecipe R;
 		if (bArrows) R = ArrowRecipe(ARow);
-		else { const FRecipe G = SmithRecipe(BKind, t, false, IsArmorKind(Kind) ? Style : 0); for (int32 i = 0; i < 2; ++i) { R.Mat[i] = G.Mat[i]; R.Num[i] = G.Num[i]; } R.Level = G.Level; R.XP = G.XP; }
-		const int32 Id = bArrows ? ArrowId(ARow) : IsArmorKind(Kind) ? ArmourId(Kind, Style, t) : Kind == K_Shield ? ShieldId(Style, t) : GearId(Kind, t);
-		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
+		else { const FRecipe G = SmithRecipe(BKind, t, false, 0); for (int32 i = 0; i < 2; ++i) { R.Mat[i] = G.Mat[i]; R.Num[i] = G.Num[i]; } R.Level = G.Level; R.XP = G.XP; }
+		const int32 Id = bArrows ? ArrowId(ARow) : IsArmorKind(Kind) ? ArmourId(Kind, AS_Classic, t) : Kind == K_Shield ? ShieldId(Style, t) : GearId(Kind, t);
 		DrawRect(bArrows ? ArrowFeatherColor(Id) : Palette(t, 0), CX, CY, CW, 5.f);
 		DrawIcon(Id, CX + (CW - 90.f) * 0.5f, CY + 14.f, 90.f);
 		float Y = CY + 120.f;
@@ -309,7 +349,6 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 			Y += 26.f;
 		}
 
-		const int32 Lv = Skills->GetLevel(ESkillType::Smithing);
 		const bool bLevelOk = Lv >= R.Level;
 		Y += 6.f;
 		HDText(FString::Printf(TEXT("Needs Smithing %d"), R.Level), bLevelOk ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 8.f, Y, Font, 0.95f); Y += 24.f;
@@ -325,7 +364,10 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		if (Over(CX, CY, CW, CH - 56.f)) ItemTip(Id);
 	}
 	if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
-	HDText(bArrows ? FString(TEXT("Arrows: wood for the shaft, iron or silver for the head; eagle arrows need Eagle Feathers. Anyone can shoot any arrow.   E or X to leave.")) : FString(TEXT("Tin, iron, silver and gold: their ores. Emerald and diamond: the gem and gold ore.   E or X to leave.")), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+	HDText(bBars ? FString(TEXT("The furnace: bronze is copper and tin ore, steel iron ore and coal, silver silver ore and coal.   E or X to leave."))
+		: bArrows ? FString(TEXT("Arrows: wood for the shaft, iron or silver for the head; eagle arrows need Eagle Feathers. Anyone can shoot any arrow.   E or X to leave."))
+		: IsArmorKind(Kind) ? FString(TEXT("Knight's Armor: one silver look, smithed from silver bars and worn from level 1.   E or X to leave."))
+		: FString(TEXT("Bronze, steel and silver gear: smithed from bars (smelt them first, top of the list).   E or X to leave.")), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
 }
 
 

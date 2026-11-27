@@ -476,12 +476,12 @@ bool AKnightCharacter::TickRollSlide(float Dt, bool bFalling, float& OutSpecialS
 float AKnightCharacter::AgilitySprintSecs(int32 L)
 {
 	const JeebTune::FValues& T = JeebTune::V();
-	return FMath::Lerp(T.AgilitySprintAt1, T.AgilitySprintAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+	return FMath::Lerp(T.AgilitySprintAt1, T.AgilitySprintAt99, USkillComponent::PowerBlend(L));
 }
 float AKnightCharacter::AgilityRefillSecs(int32 L)
 {
 	const JeebTune::FValues& T = JeebTune::V();
-	return FMath::Lerp(T.AgilityRefillAt1, T.AgilityRefillAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+	return FMath::Lerp(T.AgilityRefillAt1, T.AgilityRefillAt99, USkillComponent::PowerBlend(L));
 }
 
 // Sprint stamina. Returns whether the knight is trying to sprint (and may).

@@ -319,6 +319,8 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		if (!bArrows && (!(IsWeaponKind(A) || IsArmorKind(A) || A == K_Shield) || IsRetiredKind(A))) break;   // (no katanas: taken out of the game)
 		const bool bStyled = !bArrows && (IsArmorKind(A) || A == K_Shield);
 		if (C < 0 || C >= (bStyled ? (A == K_Shield ? NumShieldStyles : NumArmourStyles) : 1)) break;   // (never trust the style sent)
+		if (IsArmorKind(A) && IsKnightStyle(C)) { C = AS_Classic; B = T_Silver; }   // (Knight's Armor, 2026-11-26: one piece, made of silver bars)
+		if (IsVaulted(IsArmorKind(A) ? ArmourId(A, C, B) : A == K_Shield ? ShieldId(C, B) : GearId(A, B))) { ShopNote(TEXT("The smith doesn't make that any more.")); break; }   // (vaulted, 2026-11-27)
 		const FRecipe R = SmithRecipe(bArrows ? K_Bow : A, B, bArrows, IsArmorKind(A) ? C : 0);
 		const int32 Id = bArrows ? ArrowId(B) : IsArmorKind(A) ? ArmourId(A, C, B) : A == K_Shield ? ShieldId(C, B) : GearId(A, B);
 		const int32 Count = bArrows ? ArrowBundle : 1;
@@ -332,6 +334,31 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		Sk->AddInvItem(Id, Count);
 		Sk->AddXP(ESkillType::Smithing, R.XP);
 		ShopNote(FString::Printf(TEXT("Smithed %s. It is in your pack (Tab)."), bArrows ? *FString::Printf(TEXT("%d %s arrows"), ArrowBundle, TierName(B)) : *ItemName(Id)));
+		break;
+	}
+	// ---- the furnace at the smithy (2026-11-27, the metals rework): A the bar's material, B how many. One of each of its two ores per bar (Materials.csv
+	// Smelt1, Smelt2), at its Smithing level; Smithing XP per bar. The server makes as many as the ores and the pack allow (at most B, at most 28). ----
+	case EInvOp::Smelt:
+	{
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith))) break;
+		if (A < 0 || A >= Tables().Materials.Num()) break;
+		const EItemType Bar = static_cast<EItemType>(A);
+		const FMaterialRow& M = MaterialRow(Bar);
+		if (!M.bSmelted || M.bVaulted) break;   // (never trust the bar sent)
+		const int32 Lv = Sk->GetLevel(ESkillType::Smithing);
+		if (Lv < M.SmeltLevel) { ShopNote(FString::Printf(TEXT("You need Smithing level %d to smelt %s."), M.SmeltLevel, *M.Name)); UE_LOG(LogTemp, Log, TEXT("JEEBSMELT %s refused %s: Smithing %d of %d"), *GetName(), *M.Name, Lv, M.SmeltLevel); break; }
+		const int32 Have0 = Sk->GetItemCount(M.Smelt[0]), Have1 = Sk->GetItemCount(M.Smelt[1]);
+		int32 N = FMath::Min3(FMath::Clamp(B, 1, 28), Have0, Have1);
+		if (M.Smelt[0] == M.Smelt[1]) N = FMath::Min(N, Have0 / 2);
+		if (N <= 0) { ShopNote(FString::Printf(TEXT("Each %s takes one %s and one %s."), *M.Name, MaterialName(M.Smelt[0]), MaterialName(M.Smelt[1]))); break; }
+		while (N > 0 && !Sk->CanAdd(MaterialId(Bar), N)) --N;
+		if (N <= 0) { ShopNote(TEXT("Your pack is full.")); break; }
+		Sk->RemoveItems(MaterialId(M.Smelt[0]), N);
+		Sk->RemoveItems(MaterialId(M.Smelt[1]), N);
+		Sk->AddInvItem(MaterialId(Bar), N);
+		Sk->AddXP(ESkillType::Smithing, M.SmeltXP * N);
+		ShopNote(FString::Printf(TEXT("Smelted %d %s%s. They are in your pack (Tab)."), N, *M.Name, N > 1 ? TEXT("s") : TEXT("")));
+		UE_LOG(LogTemp, Log, TEXT("JEEBSMELT %s smelted %d %s (Smithing %d, +%d XP): now %d bars, %d %s, %d %s"), *GetName(), N, *M.Name, Lv, M.SmeltXP * N, Sk->GetItemCount(Bar), Sk->GetItemCount(M.Smelt[0]), MaterialName(M.Smelt[0]), Sk->GetItemCount(M.Smelt[1]), MaterialName(M.Smelt[1]));
 		break;
 	}
 

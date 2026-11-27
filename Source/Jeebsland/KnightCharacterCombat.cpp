@@ -495,7 +495,7 @@ void AKnightCharacter::Die()
 	if (bOak) WakeAt = AKnightGameMode::OakWakeSpot(GetWorld(), this, WakeYaw);   // (a free spot on the plaza, facing the big oak)
 	SetActorLocation(WakeAt);
 	SetActorRotation(FRotator(0.f, WakeYaw, 0.f));
-	MaxHealth = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3;
+	MaxHealth = 100 + FMath::RoundToInt((Skills->GetPower(ESkillType::Defense) - 1.f) * 3.f);
 	Health = (float)MaxHealth;
 	LastHurtTime = -100.f;
 	if (!IsLocallyControlled() && GetNetMode() != NM_Standalone) ClientDied(WakeAt, WakeYaw);   // the player's machine wakes up too
@@ -1505,7 +1505,7 @@ void AKnightCharacter::TickHealth(float Dt)
 	// Health: your maximum grows with Defence and the Vitality amulet; you heal when left alone for 10 s (the server's job online)
 	if (Skills && HasAuthority())
 	{
-		int32 NewMax = 100 + (Skills->GetLevel(ESkillType::Defense) - 1) * 3 + JeebItems::CombinedMods(Skills).MaxHealthBonus;
+		int32 NewMax = 100 + FMath::RoundToInt((Skills->GetPower(ESkillType::Defense) - 1.f) * 3.f) + JeebItems::CombinedMods(Skills).MaxHealthBonus;
 		if (GetWorld()->GetTimeSeconds() < VigourUntil) NewMax = FMath::RoundToInt(NewMax * VigourMul);   // vigour potion: a bigger bar for a while
 		if (NewMax != MaxHealth)
 		{

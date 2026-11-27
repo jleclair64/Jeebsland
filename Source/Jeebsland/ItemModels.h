@@ -127,6 +127,16 @@ namespace JeebItemModel
 				Ellipsoid(C, 2.8, 2.4, 2.2, 0.8, 0.8, 7, 5, Xf(V3(-4.5, 4.0, -0.8), V3(5, -20, 70)), true);
 				break;
 			}
+			case EItemType::BronzeBar:
+			case EItemType::SteelBar:
+			case EItemType::SilverBar:
+			{
+				// (2026-11-27) two cast bars of the metal, one across the other, with soft bevels (a stopgap shape: no model yet)
+				FMD& B = NewPart(Out, JeebItems::OreColor(MaterialType(Id)), true).Mesh;
+				RBox(B, 7.0, 3.0, 1.6, 0.6, Xf(V3(0, -1.8, 0)), true);
+				RBox(B, 7.0, 3.0, 1.6, 0.6, Xf(V3(0.6, 1.6, 2.9), V3(0, 0, 8)), true);
+				break;
+			}
 			case EItemType::Diamond:
 			case EItemType::Onyx:
 			case EItemType::Emerald:

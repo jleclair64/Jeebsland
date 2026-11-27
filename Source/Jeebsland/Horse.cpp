@@ -102,12 +102,12 @@ namespace JeebHorse
 	}
 	float SpeedMul(int32 Level)
 	{
-		const float A = FMath::Clamp((Level - 1) / 98.f, 0.f, 1.f);
+		const float A = USkillComponent::PowerBlend(Level);
 		return FMath::Lerp(1.f, JeebTune::V().RideSpeedAt99, A);
 	}
 	float GallopSecs(int32 Level)
 	{
-		const float A = FMath::Clamp((Level - 1) / 98.f, 0.f, 1.f);
+		const float A = USkillComponent::PowerBlend(Level);
 		return FMath::Lerp(JeebTune::V().GallopAt1, JeebTune::V().GallopAt99, A);
 	}
 }

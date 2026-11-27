@@ -52,13 +52,13 @@ const TArray<TWeakObjectPtr<UStealthSense>>& UStealthSense::All() { return Regis
 float UStealthSense::CrouchShare(int32 Level)
 {
 	const auto& T = JeebTune::V();
-	return FMath::Max(0.f, FMath::Lerp(T.StealthCrouchAt1, T.StealthCrouchAt99, FMath::Clamp((Level - 1) / 98.f, 0.f, 1.f)));
+	return FMath::Max(0.f, FMath::Lerp(T.StealthCrouchAt1, T.StealthCrouchAt99, USkillComponent::PowerBlend(Level)));
 }
 
 float UStealthSense::ConeShare(int32 Level)
 {
 	const auto& T = JeebTune::V();
-	return FMath::Max(0.f, FMath::Lerp(1.f, T.StealthConeAt99, FMath::Clamp((Level - 1) / 98.f, 0.f, 1.f)));
+	return FMath::Max(0.f, FMath::Lerp(1.f, T.StealthConeAt99, USkillComponent::PowerBlend(Level)));
 }
 
 void UStealthSense::Clear()

@@ -12,21 +12,27 @@
 
 namespace
 {
-	// Levels run 1 to 99 (2026-10-30) on RuneScape's curve shape: reaching level L takes the sum over l = 1 .. L-1 of
+	// Levels ran 1 to 99 (2026-10-30) on RuneScape's curve shape: reaching level L takes the sum over l = 1 .. L-1 of
 	// floor(l + 300 x 2^(l / 7)), divided by 4 (83 XP for level 2, about 13 million for 99), scaled so level 2 costs this
 	// skill's Base XP (level 99 is then about 4.7 million XP for Attack). (The old curve, 20% more per level, could not reach 99.)
-	double RSTotal(int32 L)
+	// Since the cap of 29 (owner, 2026-11-26: "retune the XP curve for 29"), level L costs what that curve asked for its PowerLevel: the same as
+	// before up to 10, then each level about two and a half old ones, so 29 takes what the old 60 took (Attack about 25,000 XP).
+	double OldTotal(int32 L)
 	{
-		static double T[USkillComponent::MaxLevel + 1] = {};
+		static double T[100] = {};
 		static bool bMade = false;
 		if (!bMade)
 		{
 			bMade = true;
 			double Acc = 0.0;
 			T[1] = 0.0;
-			for (int32 l = 1; l < USkillComponent::MaxLevel; ++l) { Acc += FMath::FloorToDouble(l + 300.0 * FMath::Pow(2.0, l / 7.0)); T[l + 1] = FMath::FloorToDouble(Acc / 4.0); }
+			for (int32 l = 1; l < 99; ++l) { Acc += FMath::FloorToDouble(l + 300.0 * FMath::Pow(2.0, l / 7.0)); T[l + 1] = FMath::FloorToDouble(Acc / 4.0); }
 		}
-		return T[FMath::Clamp(L, 1, USkillComponent::MaxLevel)];
+		return T[FMath::Clamp(L, 1, 99)];
+	}
+	double RSTotal(int32 L)
+	{
+		return OldTotal(FMath::RoundToInt(USkillComponent::PowerLevel(FMath::Clamp(L, 1, USkillComponent::MaxLevel))));
 	}
 	void ComputeLevel(float Base, int32 XP, int32& Level, float& IntoLevel, float& Needed)
 	{
@@ -152,14 +158,14 @@ int32 USkillComponent::XPForLevel(ESkillType Skill, int32 Level)
 	return int32(FMath::CeilToDouble(RSTotal(Level) * BaseXP(Skill) / 83.0));
 }
 
-// Testing only (accounts listed under MaxLevelAccounts in DefaultGame.ini): every skill at level 99
+// Testing only (accounts listed under MaxLevelAccounts in DefaultGame.ini): every skill at the cap (29)
 void USkillComponent::SetAllMaxLevel()
 {
 	if (!HasAuth()) return;
 	for (int32 i = 0; i < NumSkills; ++i) { XP[i] = XPForLevel(static_cast<ESkillType>(i), MaxLevel); Known[i] = true; }
 }
 
-// TEMPORARY test kit (owner, 2026-11-13): every skill at the start of this level (1 to 99; the server checks who may ask)
+// TEMPORARY test kit (owner, 2026-11-13): every skill at the start of this level (1 to 29; the server checks who may ask)
 void USkillComponent::SetAllLevels(int32 Level)
 {
 	if (!HasAuth()) return;
@@ -186,7 +192,11 @@ void USkillComponent::AddXP(ESkillType Skill, int32 Amount)
 {
 	if (!HasAuth()) return;   // only the server changes the pack
 	const int32 OldLevel = GetLevel(Skill);
-	XP[static_cast<int32>(Skill)] += Amount;
+	// (the hard cap, owner 2026-11-26: XP stops counting at 29; what would pass it is not earned, and a maxed skill shows no pop-up)
+	int32& Mine = XP[static_cast<int32>(Skill)];
+	Amount = FMath::Clamp(Amount, 0, FMath::Max(0, MaxXP(Skill) - Mine));
+	if (Amount <= 0) { Known[static_cast<int32>(Skill)] = true; return; }
+	Mine += Amount;
 	const int32 NewLevel = GetLevel(Skill);
 	if (!Known[static_cast<int32>(Skill)])
 	{
@@ -745,7 +755,7 @@ void USkillComponent::FillPracticePack()
 	{
 		if (Slots[i].Id != 0) continue;
 		const int32 K = Kinds[R.RandRange(0, UE_ARRAY_COUNT(Kinds) - 1)];
-		Slots[i].Id = IsArmorKind(K) ? ArmourId(K, R.RandRange(0, NumRolledArmourStyles - 1), R.RandRange(T_Tin, T_Diamond)) : GearId(K, R.RandRange(T_Tin, T_Diamond));   // (some will need higher levels to use: the level gates; armour in any style)
+		Slots[i].Id = IsArmorKind(K) ? ArmourId(K, R.RandRange(0, NumRolledArmourStyles - 1), R.RandRange(T_Tin, TopGameTier())) : GearId(K, R.RandRange(T_Tin, TopGameTier()));   // (vaulted ranks left out, 2026-11-27)   // (some will need higher levels to use: the level gates; armour in any style)
 		Slots[i].Count = 1;
 	}
 }
@@ -792,7 +802,7 @@ void USkillComponent::RestoreSkills(const TArray<int32>& InXP, const TArray<uint
 	if (!HasAuth()) return;   // only the server changes the pack
 	for (int32 i = 0; i < NumSkills; ++i)
 	{
-		XP[i] = InXP.IsValidIndex(i) ? FMath::Max(0, InXP[i]) : 0;
+		XP[i] = InXP.IsValidIndex(i) ? FMath::Clamp(InXP[i], 0, MaxXP(static_cast<ESkillType>(i))) : 0;   // (a save from before the cap of 29 loads at 29)
 		Known[i] = (InKnown.IsValidIndex(i) && InKnown[i] != 0) || i == static_cast<int32>(ESkillType::Attack) || i == static_cast<int32>(ESkillType::Defense);
 	}
 	Ingots = InIngots;

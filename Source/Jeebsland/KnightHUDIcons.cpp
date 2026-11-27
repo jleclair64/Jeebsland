@@ -597,6 +597,22 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		}
 		break;
 	}
+	case EItemType::BronzeBar:
+	case EItemType::SteelBar:
+	case EItemType::SilverBar:
+	{
+		// (2026-11-27, the metals rework) cast bars in their metal's colour: long trapezoids, lit on top, two stacked
+		const FLinearColor M = OreColor(MaterialType(Id));
+		auto Sh = [&](float K) { return FLinearColor(FMath::Min(M.R * K, 1.f), FMath::Min(M.G * K, 1.f), FMath::Min(M.B * K, 1.f)); };
+		for (int32 b = 0; b < 2; ++b)
+		{
+			const float Oy = b == 0 ? 14.f : 0.f, Ox = b == 0 ? 0.f : 6.f;
+			Poly({ P(6 + Ox, 38 + Oy), P(50 + Ox, 38 + Oy), P(56 + Ox, 48 + Oy), P(0 + Ox, 48 + Oy) }, Sh(0.62f));    // the front face
+			Poly({ P(10 + Ox, 30 + Oy), P(46 + Ox, 30 + Oy), P(50 + Ox, 38 + Oy), P(6 + Ox, 38 + Oy) }, Sh(1.25f));    // the top, catching the light
+			Quad(14 + Ox, 32 + Oy, 30 + Ox, 34 + Oy, Sh(1.6f));
+		}
+		break;
+	}
 	case EItemType::Diamond:
 	case EItemType::Onyx:
 	case EItemType::Emerald:

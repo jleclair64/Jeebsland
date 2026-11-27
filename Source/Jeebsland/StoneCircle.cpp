@@ -146,6 +146,7 @@ namespace JeebStones
 				{
 					R.Id = JeebQuests::ItemFromName(Name);
 					if (R.Id <= 0 || JeebItems::ItemName(R.Id).IsEmpty()) { UE_LOG(LogJeebStone, Error, TEXT("Jeebsland stone circles: StoneCircleLoot.csv line %d: no item called \"%s\""), n + 1, *Name); continue; }
+					if (JeebItems::IsVaulted(R.Id)) { UE_LOG(LogJeebStone, Log, TEXT("StoneCircleLoot.csv line %d: %s is vaulted (off in the game), left out"), n + 1, *Name); continue; }
 				}
 				R.Min = FMath::Max(1, FCString::Atoi(*C[1]));
 				R.Max = FMath::Max(R.Min, FCString::Atoi(*C[2]));

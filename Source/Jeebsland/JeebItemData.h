@@ -47,6 +47,7 @@ namespace JeebItems
 		float ShieldHealth = 100.f;   // a kite shield of this tier's health
 		float WeightMult = 1.f;    // x an armour piece's Weight: how heavy this material is
 		float Metal = 1.f, Rough = 0.3f;   // how shiny it is: 1 metal or 0 none; how polished, 0 a mirror to 1 dull
+		bool bVaulted = false;      // (2026-11-27, owner) kept in the files but off in the game: no shop, drop, loot or recipe makes gear of this tier
 	};
 	struct FKindRow
 	{
@@ -57,8 +58,9 @@ namespace JeebItems
 		float Weight = 0.f;   // an armour piece's weight in kg before its material (x the tier's WeightMult)
 		bool bTwoHanded = false;
 		int32 Class = 0;      // who may wield it (Kinds.csv Class): 0 all, 1 knights, 2 trolls, 3 wizards. Shown on the icon and tooltip only; nothing enforces it yet
+		bool bVaulted = false;   // (2026-11-27) kept in the files but off in the game
 	};
-	enum EMaterialGroup : int32 { MG_Ore, MG_Gem, MG_Wood, MG_Fish, MG_Animal };
+	enum EMaterialGroup : int32 { MG_Ore, MG_Gem, MG_Wood, MG_Fish, MG_Animal, MG_Bar };   // (MG_Bar: smelted metal bars, 2026-11-27)
 	struct FMaterialRow
 	{
 		FString Name;
@@ -66,6 +68,11 @@ namespace JeebItems
 		int32 StackSize = 5, SellValue = 1;
 		FLinearColor Color = FLinearColor(0.5f, 0.5f, 0.5f);
 		int32 GatherLevel = 1, FishXP = 8;
+		// (2026-11-27) a bar: smelted from one each of Smelt[0] and Smelt[1] at Smithing SmeltLevel for SmeltXP (bSmelted false: not a bar)
+		bool bSmelted = false;
+		EItemType Smelt[2] = { EItemType::CopperOre, EItemType::TinOre };
+		int32 SmeltLevel = 1, SmeltXP = 0;
+		bool bVaulted = false;   // kept in the file but off in the game (no rocks, loot, drops or recipes)
 	};
 	enum EPotionEffect : int32 { PE_None, PE_Speed, PE_Heal, PE_Vigour, PE_Radar, PE_Invis };
 	struct FPotionRow
@@ -84,7 +91,7 @@ namespace JeebItems
 		FLinearColor Band = FLinearColor::White, Gem = FLinearColor::White;
 	};
 	struct FShieldStyleRow { FString Name, Note; float GuardMul = 1.f, MoveMul = 1.f, RecoverDelay = 6.25f, HealMul = 1.f, Weight = 5.f; };
-	struct FArmourStyleRow { FString Name, Note; float StopMul = 1.f, WeightMul = 1.f, PriceMul = 1.f; };
+	struct FArmourStyleRow { FString Name, Note; float StopMul = 1.f, WeightMul = 1.f, PriceMul = 1.f; bool bVaulted = false; };
 	// An arrow (Arrows.csv, 2026-11-26): one row per arrow id (900 + row), in the file's order
 	constexpr int32 NumArrowRows = 7;
 	struct FArrowRow
@@ -96,6 +103,7 @@ namespace JeebItems
 		int32 Num[3] = { 0, 0, 0 };
 		FLinearColor Head = FLinearColor(0.4f, 0.4f, 0.4f), Feather = FLinearColor(0.8f, 0.8f, 0.8f);
 		bool bShop = false;
+		bool bVaulted = false;   // (2026-11-27) off in the game: never made, sold or dropped
 	};
 
 	struct FItemTables

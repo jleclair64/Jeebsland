@@ -32,7 +32,7 @@ namespace
 	FVector FlatV(const FVector& V) { return FVector(V.X, V.Y, 0.f); }
 	float Lines(int32 L, float A1, float A10, float A30, float A99)
 	{
-		const float X = float(FMath::Clamp(L, 1, 99));
+		const float X = USkillComponent::PowerLevel(L);   // (the cap of 29: the old 1-99 points, PowerLevel says where a level stands)
 		return X <= 10.f ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(A1, A10), X)
 			: X <= 30.f ? FMath::GetMappedRangeValueClamped(FVector2f(10.f, 30.f), FVector2f(A10, A30), X)
 			: FMath::GetMappedRangeValueClamped(FVector2f(30.f, 99.f), FVector2f(A30, A99), X);
@@ -50,7 +50,7 @@ float AKnightCharacter::SwimSeconds(int32 L)
 float AKnightCharacter::BreathSeconds(int32 L)
 {
 	const JeebTune::FValues& T = JeebTune::V();
-	return FMath::GetMappedRangeValueClamped(FVector2f(1.f, 99.f), FVector2f(T.BreathAt1, T.BreathAt99), float(FMath::Clamp(L, 1, 99)));
+	return FMath::GetMappedRangeValueClamped(FVector2f(1.f, 99.f), FVector2f(T.BreathAt1, T.BreathAt99), USkillComponent::PowerLevel(L));
 }
 
 float UKnightMovement::WadeMul(float Depth)

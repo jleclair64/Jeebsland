@@ -64,7 +64,7 @@ namespace JeebStore
 			return true;
 		};
 
-		// Cheap: always a bundle of plain arrows, then tin and iron bits 
+		// Cheap: always a bundle of plain arrows, then bronze and steel bits 
 		// Every potion is always in stock (Potions.csv)
 		for (int32 T = 0; T < NumPotions(); ++T) Push(PotionWare(T), 5, 5);
 		Push(ArrowWare(R.RandRange(A_Wooden, A_Broadhead)), 5, 5);
@@ -112,7 +112,15 @@ namespace JeebStore
 		{ static const int32 TP[] = { K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots }; ById(ArmourId(TP[R.RandRange(0, 4)], AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2); }
 		ById(ArmourId(K_Chest, AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2);
 		{ FWare W; W.Id = IdRocks; W.Count = RockBundle; W.Price = RockBundlePrice; W.Stock = 5; Push(W, 5, 5); }
-		return Out;
+		// (2026-11-26/27, owner) vaulted things are never sold, and every knight armour piece is now the one Knight's Armor piece: one ware per item
+		TArray<FWare> Kept;
+		for (const FWare& W : Out)
+		{
+			if (IsVaulted(W.Id)) continue;
+			if (FWare* Same = Kept.FindByPredicate([&](const FWare& K) { return K.Id == W.Id; })) { Same->Stock += W.Stock; continue; }
+			Kept.Add(W);
+		}
+		return Kept;
 	}
 
 	// This hour's wares, with whatever has been bought so far taken off the stock
@@ -133,14 +141,14 @@ namespace JeebStore
 	{
 		static const TArray<FOdds> T = {
 			{ TEXT("10 broadhead arrows"),               28.0f },
-			{ TEXT("A tin or iron tool or weapon"), 22.0f },
+			{ TEXT("A bronze or steel tool or weapon"), 22.0f },
 			{ TEXT("40 ingots"),                    15.0f },
 			{ TEXT("25 ingots"),                    12.0f },   // (was a cape, until capes became the PvP rank)
-			{ TEXT("An iron piece of gear"),       10.0f },
+			{ TEXT("A steel piece of gear"),       10.0f },
 			{ TEXT("A ring"),                        7.0f },
 			{ TEXT("An amulet"),                     4.0f },
 			{ TEXT("A silver piece of gear"),         1.5f },
-			{ TEXT("A gold piece of gear"),          0.5f },
+			{ TEXT("A silver piece (lucky)"),         0.5f },
 		};
 		return T;
 	}
@@ -173,6 +181,7 @@ namespace JeebStore
 		default: OutId = GearId(Pick(AnyGear, UE_ARRAY_COUNT(AnyGear)), T_Gold); break;
 		}
 		if (IsGear(OutId) && IsArmorKind(KindOf(OutId))) OutId = ArmourId(KindOf(OutId), R.RandRange(0, NumRolledArmourStyles - 1), VariantOf(OutId));   // (armour in any style, 2026-11-03)
+		if (IsGear(OutId) && IsVaulted(OutId)) OutId = IsArmorKind(KindOf(OutId)) ? ArmourId(KindOf(OutId), AS_Classic, TopGameTier()) : GearId(KindOf(OutId), TopGameTier());   // (vaulted ranks, 2026-11-27: the best rank in the game instead)
 		return Row;
 	}
 }

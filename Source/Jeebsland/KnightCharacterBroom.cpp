@@ -40,7 +40,7 @@ float AKnightCharacter::MagicCap() const
 {
 	const auto& T = JeebTune::V();
 	const int32 Level = Skills ? Skills->GetLevel(ESkillType::Magic) : 1;
-	return FMath::Max(1.f, T.MagicMax + T.MagicPerLevel * FMath::Max(0, Level - 1));
+	return FMath::Max(1.f, T.MagicMax + T.MagicPerLevel * (USkillComponent::PowerLevel(Level) - 1.f));
 }
 
 float AKnightCharacter::SpellCostMul(int32 Kind, int32 Tier) const

@@ -32,17 +32,22 @@ void AKnightHUD::DrawTestKit(AKnightCharacter* Knight, float X, float Y, float M
 	const JeebTestKit::FPage& Page = Pages[TestPage];
 
 	// ---- the layout: tabs, a tier header, rows of items (wrapping), the level box. The cell size is set by the longest page, so the window keeps its width ----
-	int32 Cols = NumTiers;
+	int32 Cols = 3;
 	for (const JeebTestKit::FPage& Pg : Pages) for (const JeebTestKit::FRow& R : Pg.Rows) Cols = FMath::Max(Cols, R.Ids.Num());
 	Cols = FMath::Min(Cols, 8);
-	const float Pad = 10.f, Gap = 4.f, LabelW = 96.f, TitleH = 30.f, TabH = 28.f, TabGap = 5.f, HeadH = 30.f, FootH = 84.f;
-	const int32 TabsPerRow = 3, TabRows = (Pages.Num() + TabsPerRow - 1) / TabsPerRow;
+	const float Pad = 10.f, Gap = 4.f, LabelW = 96.f, TitleH = 30.f, TabH = 28.f, TabGap = 5.f, HeadH = 30.f, FootH = 84.f, SecH = 20.f;
+	// (owner, 2026-11-26) the pages in two sections: "In game" and "Vaulted" (kept in the files, off in the game)
+	const int32 TabsPerRow = 3;
+	int32 SecCount[2] = { 0, 0 };
+	for (const JeebTestKit::FPage& Pg : Pages) ++SecCount[Pg.bVaulted ? 1 : 0];
+	const int32 TabRows = (SecCount[0] + TabsPerRow - 1) / TabsPerRow + (SecCount[1] + TabsPerRow - 1) / TabsPerRow;
+	const int32 Secs = (SecCount[0] > 0 ? 1 : 0) + (SecCount[1] > 0 ? 1 : 0);
 	auto LinesOf = [&](const JeebTestKit::FPage& Pg) { int32 L = 0; for (const JeebTestKit::FRow& R : Pg.Rows) L += FMath::Max(1, (R.Ids.Num() + Cols - 1) / Cols); return L; };
 	int32 MostLines = 1;
 	for (const JeebTestKit::FPage& Pg : Pages) MostLines = FMath::Max(MostLines, LinesOf(Pg));
 	const int32 Lines = LinesOf(Page);
-	const bool bTierHead = TestPage != Pages.Num() - 1;   // (every page but the last runs tier by tier)
-	const float Fixed = Pad + TitleH + TabRows * (TabH + TabGap) + 4.f + HeadH + FootH + Pad;
+	const bool bTierHead = Page.Heads.Num() > 0;   // (pages that run rank by rank name the ranks over the columns)
+	const float Fixed = Pad + TitleH + Secs * SecH + TabRows * (TabH + TabGap) + 4.f + HeadH + FootH + Pad;
 	const float FitH = (MaxH - Fixed) / MostLines - Gap, FitW = (MaxW - Pad * 2.f - LabelW + Gap) / Cols - Gap;
 	const float CS = FMath::Clamp(FMath::Min(FitH, FitW), 26.f, 42.f);   // the cell: smaller on a short screen
 	const float W = Pad * 2.f + LabelW + Cols * (CS + Gap) - Gap;
@@ -63,25 +68,36 @@ void AKnightHUD::DrawTestKit(AKnightCharacter* Knight, float X, float Y, float M
 		HDText(Note, FLinearColor(1.f, 0.74f, 0.3f), X + W - Pad - NW - 34.f, CY + 4.f, Font, 0.8f);
 	}
 	CY += TitleH;
-	// ---- the pages ----
+	// ---- the pages, by section ----
 	const float TabW = (W - Pad * 2.f - (TabsPerRow - 1) * TabGap) / TabsPerRow;
-	for (int32 p = 0; p < Pages.Num(); ++p)
+	for (int32 Sec = 0; Sec < 2; ++Sec)
 	{
-		const float TX = X + Pad + (p % TabsPerRow) * (TabW + TabGap), TY = CY + (p / TabsPerRow) * (TabH + TabGap);
-		if (Btn(TX, TY, TabW, TabH, Pages[p].Name, true, p == TestPage, 0.82f)) { TestPage = p; bUIClick = false; }
+		if (SecCount[Sec] == 0) continue;
+		const TCHAR* SecName = Sec == 0 ? TEXT("IN GAME") : TEXT("VAULTED  (kept in the files, off in the game)");
+		HDText(SecName, Sec == 0 ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.7f, 0.45f), X + Pad, CY, Font, 0.8f);
+		CY += SecH;
+		int32 n = 0;
+		for (int32 p = 0; p < Pages.Num(); ++p)
+		{
+			if (Pages[p].bVaulted != (Sec == 1)) continue;
+			const float TX = X + Pad + (n % TabsPerRow) * (TabW + TabGap), TY = CY + (n / TabsPerRow) * (TabH + TabGap);
+			if (Btn(TX, TY, TabW, TabH, Pages[p].Name, true, p == TestPage, 0.82f)) { TestPage = p; bUIClick = false; }
+			++n;
+		}
+		CY += ((n + TabsPerRow - 1) / TabsPerRow) * (TabH + TabGap);
 	}
-	CY += TabRows * (TabH + TabGap) + 4.f;
+	CY += 4.f;
 
-	// ---- the tiers across the top ----
+	// ---- the ranks across the top ----
 	const float GridX = X + Pad + LabelW;
 	if (bTierHead)
 	{
-		for (int32 T = 0; T < NumTiers && T < Cols; ++T)
+		for (int32 T = 0; T < Page.Heads.Num() && T < Cols; ++T)
 		{
-			const FString Tn = TierName(T);
+			const FString Tn = Page.Heads[T];
 			float TW = 0.f, TH = 0.f;
 			HDTextSize(Tn, TW, TH, Font, 0.75f);
-			// (two lines, every other tier lower, so long names never run into each other over narrow cells)
+			// (two lines, every other rank lower, so long names never run into each other over narrow cells)
 			HDText(Tn, FLinearColor(0.f, 0.f, 0.f, 0.6f), GridX + T * (CS + Gap) + (CS - TW) * 0.5f + 1.f, CY + (T % 2) * 13.f + 1.f, Font, 0.75f);
 			HDText(Tn, FLinearColor(0.88f, 0.9f, 0.94f), GridX + T * (CS + Gap) + (CS - TW) * 0.5f, CY + (T % 2) * 13.f, Font, 0.75f);
 		}
@@ -144,7 +160,7 @@ void AKnightHUD::DrawTestKit(AKnightCharacter* Knight, float X, float Y, float M
 		float TW = 0.f, TH = 0.f;
 		HDTextSize(Shown, TW, TH, Font, 1.25f);
 		HDText(Shown, FLinearColor::White, BX + (BoxW - TW) * 0.5f, CY + (BoxH - TH) * 0.5f, Font, 1.25f);
-		if (bOverBox) SetTip({ TEXT("Set every skill"), TEXT("Click, type a level from 1 to 99 and press Enter (or Set)"), TEXT("Testing only") });
+		if (bOverBox) SetTip({ TEXT("Set every skill"), TEXT("Click, type a level from 1 to 29 and press Enter (or Set)"), TEXT("Testing only") });
 		const bool bSet = Btn(BX + BoxW + 8.f, CY, SetW, BoxH, TEXT("Set"), TestLevelText.Len() > 0, false, 0.95f);
 		if (bSet) { SubmitLevel(); bUIClick = false; }
 		else if (bUIClick && bOverBox) { bLevelTyping = true; TestLevelText.Reset(); bUIClick = false; }   // (a click on the box: type a new number)
@@ -156,12 +172,12 @@ void AKnightHUD::DrawTestKit(AKnightCharacter* Knight, float X, float Y, float M
 	}
 }
 
-// The level box: the number typed, 1 to 99, to the server (which checks this player may)
+// The level box: the number typed, 1 to 29 (the cap), to the server (which checks this player may)
 void AKnightHUD::SubmitLevel()
 {
 	bLevelTyping = false;
 	const int32 Level = FCString::Atoi(*TestLevelText);
 	if (Level < 1) { TestLevelText = TEXT("1"); return; }
-	TestLevelText = FString::FromInt(FMath::Min(Level, 99));
-	if (AKnightPlayerController* KPC = Cast<AKnightPlayerController>(GetOwningPlayerController())) KPC->ServerTestLevels(FMath::Min(Level, 99));
+	TestLevelText = FString::FromInt(FMath::Min(Level, USkillComponent::MaxLevel));
+	if (AKnightPlayerController* KPC = Cast<AKnightPlayerController>(GetOwningPlayerController())) KPC->ServerTestLevels(FMath::Min(Level, USkillComponent::MaxLevel));
 }
