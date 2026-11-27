@@ -1158,7 +1158,8 @@ void AHorse::BuildLab(UWorld* World)
 	// a fallen log (90 cm) across the canterer's lap, and with -HorseLabRide a fourth horse carrying the player over a second one (the jump)
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	const bool bRide = FParse::Param(FCommandLine::Get(), TEXT("HorseLabRide"));
-	for (int32 i = 0; i < (bRide ? 2 : 1) && Cyl; ++i)
+	const bool bNoLog = FParse::Param(FCommandLine::Get(), TEXT("HoofNoLog"));   // (the hoof test: no jumps in the gallop laps)
+	for (int32 i = 0; i < (bRide ? 2 : 1) && Cyl && !bNoLog; ++i)
 	{
 		const FVector2D C = At + Rt * (i == 0 ? 600.f : -600.f) - Fw * 300.f;
 		AStaticMeshActor* Log = World->SpawnActor<AStaticMeshActor>(FVector(C.X, C.Y, JeebFoes::Ground(C.X, C.Y) + 40.f), FRotator(0.f, Yaw, 90.f));
