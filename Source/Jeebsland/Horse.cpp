@@ -31,6 +31,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PawnMovementComponent.h"
 
+static TAutoConsoleVariable<float> CVarRunRateCap(TEXT("jeeb.Horse.RunRateCap"), 3.2f, TEXT("Fastest the canter clip plays (x its own speed); past it the hooves slide at a full gallop."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarHorseMeshYaw(TEXT("jeeb.Horse.MeshYaw"), -90.f, TEXT("Degrees the horse's model is turned to face the way it walks (looks only)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarSaddle(TEXT("jeeb.Horse.Saddle"), TEXT("50 116 -90 0"),
 	TEXT("Where the saddle sits on the horse's model (looks only): forward, up (cm in the unscaled model), yaw and pitch (degrees). Live."), ECVF_Default);
@@ -253,7 +254,18 @@ void AHorse::BuildBody()
 	C->SetAnimInstanceClass(UDeerAnimInstance::StaticClass());
 	C->RegisterComponent();
 	Anim = Cast<UDeerAnimInstance>(C->GetAnimInstance());
-	if (Anim) { Anim->SetClips(M->Clips, Rand.FRandRange(0.f, 4.f)); Anim->Drive(JeebDeer::C_Idle, 1.f); }
+	if (Anim)
+	{
+		Anim->SetClips(M->Clips, Rand.FRandRange(0.f, 4.f)); Anim->Drive(JeebDeer::C_Idle, 1.f);
+		// the four legs for the foot IK (horse_retarget.py's chains): upper, middle and lower joint of the bend, then the hoof
+		static const FName Legs[4][4] = {
+			{ TEXT("joint_41"), TEXT("joint_40"), TEXT("joint_39"), TEXT("joint_37") },    // front left
+			{ TEXT("joint_48"), TEXT("joint_47"), TEXT("joint_46"), TEXT("joint_44") },    // front right
+			{ TEXT("joint_27"), TEXT("joint_26"), TEXT("joint_25"), TEXT("joint_23") },    // rear left
+			{ TEXT("joint_20"), TEXT("joint_19"), TEXT("joint_18"), TEXT("joint_16") } };  // rear right
+		Anim->SetLegs(M->Mesh->GetRefSkeleton(), Legs);
+		UE_LOG(LogTemp, Log, TEXT("JEEBHOOF legs %d, rest heights %.1f %.1f %.1f %.1f"), Anim->bFootIK ? 1 : 0, Anim->HoofRefZ[0], Anim->HoofRefZ[1], Anim->HoofRefZ[2], Anim->HoofRefZ[3]);
+	}
 	Body = C;
 	AddTickPrerequisiteComponent(C);
 	if (M->Saddle)
@@ -725,9 +737,11 @@ void AHorse::Tick(float DeltaSeconds)
 		{
 			const FVector2D Me(GetActorLocation());
 			if (FVector2D::Distance(Me, LabB) < 200.f) Swap(LabA, LabB);
-			StepToward(LabB, LabRole == 1 ? TrotSpeed * 1.2f : WalkSpeed * 1.5f, Dt);
+			static const bool bGallop = FParse::Param(FCommandLine::Get(), TEXT("HoofGallop"));   // (the hoof test: the canterer at a full ridden gallop)
+			StepToward(LabB, LabRole == 1 ? (bGallop ? 2346.f : TrotSpeed * 1.2f) : WalkSpeed * 1.5f, Dt);
 			SetState(LabRole == 1 ? EHorseState::Run : EHorseState::Walk);
 		}
+		else if (LabRole == 4) { Speed = 0.f; SetState(EHorseState::Idle); }
 		else if (LabRole == 0)
 		{
 			StateT += Dt;
@@ -774,7 +788,7 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 	{
 		const bool bRun = MoveSpeed > 380.f;
 		Clip = bRun ? JeebDeer::C_Run : JeebDeer::C_Walk;
-		Rate = FMath::Clamp(MoveSpeed / ((bRun ? RunHoof : WalkHoof) * S), 0.5f, bRun ? 3.2f : 2.6f);
+		Rate = FMath::Clamp(MoveSpeed / ((bRun ? RunHoof : WalkHoof) * S), 0.5f, bRun ? CVarRunRateCap.GetValueOnGameThread() : 2.6f);
 	}
 	if (Anim) Anim->Drive(Clip, Rate);
 	if (SaddleMesh)
@@ -828,6 +842,28 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 		const bool bShadow = FVector::DistSquared(CamL, L) < FMath::Square(7000.f);
 		if (Body->CastShadow != bShadow) Body->SetCastShadow(bShadow);
 	}
+	if (Anim) Anim->IKWant = (JumpT >= 0.f || St == EHorseState::Dead) ? 0.f : 1.f;   // (the foot IK lets go in the air and in the fall)
+#if !UE_BUILD_SHIPPING
+	// (-HoofLog, test only) every lab horse each frame: each hoof's gap to the ground (cm, + floats, - sinks), its clip lift and how fast it slides
+	static const bool bHoofLog = FParse::Param(FCommandLine::Get(), TEXT("HoofLog"));
+	if (bHoofLog && LabRole >= 0 && Anim && Anim->bFootIK)
+	{
+		Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;   // (unseen lab horses too)
+		Body->bEnableUpdateRateOptimizations = false; Body->SetForcedLOD(1);
+		FString Line;
+		const double Now = GetWorld()->GetTimeSeconds();
+		for (int32 l = 0; l < 4; ++l)
+		{
+			const FVector H = Body->GetBoneLocation(Anim->Legs[l][3]);
+			const float Gap = H.Z - JeebFoes::Ground(H.X, H.Y) - Anim->HoofRefZ[l] * S;
+			const float Slide = (HoofPrevT > 0.0 && Now > HoofPrevT) ? float(FVector::Dist2D(H, HoofPrev[l]) / (Now - HoofPrevT)) : 0.f;
+			HoofPrev[l] = H;
+			Line += FString::Printf(TEXT(" %.1f %.1f %.0f"), Gap, Anim->DebugLift[l], Slide);
+		}
+		HoofPrevT = Now;
+		UE_LOG(LogTemp, Log, TEXT("JEEBHOOF %d %.2f st=%d spd=%.0f rate=%.2f pitch=%.1f roll=%.1f body=%.1f |%s"), LabRole, Now, int32(St), MoveSpeed, Rate, SlopePitch, SlopeRoll, Anim->DebugBody, *Line);
+	}
+#endif
 }
 
 // ---------------------------------------------------------------------------------------------- the stable
@@ -1067,8 +1103,46 @@ void AHorse::BuildLab(UWorld* World)
 	TArray<FString> P;
 	V.ParseIntoArray(P, TEXT("_"));
 	if (P.Num() < 2) return;
-	const FVector2D At(FCString::Atof(*P[0]), FCString::Atof(*P[1]));
-	const float Yaw = P.Num() > 2 ? FCString::Atof(*P[2]) : 0.f;
+	FVector2D At(FCString::Atof(*P[0]), FCString::Atof(*P[1]));
+	float Yaw = P.Num() > 2 ? FCString::Atof(*P[2]) : 0.f;
+	// (-HorseLab=X_Y_Yaw_slope, the hoof test: the nearest even hillside within 400 m, about 14 degrees up the laps, the laps' yaw)
+	if (P.Num() > 3 && P[3] == TEXT("slope"))
+	{
+		float Best = 1e9f; FVector2D BestAt = At; float BestYaw = Yaw;
+		for (float Dx = -40000.f; Dx <= 40000.f; Dx += 1000.f) for (float Dy = -40000.f; Dy <= 40000.f; Dy += 1000.f) for (int32 a = 0; a < 8; ++a)
+		{
+			const FVector2D C = At + FVector2D(Dx, Dy);
+			const float Yw = a * 45.f;
+			const FVector2D F(FMath::Cos(FMath::DegreesToRadians(Yw)), FMath::Sin(FMath::DegreesToRadians(Yw))), R(-F.Y, F.X);
+			const float H0 = JeebFoes::Ground(C.X, C.Y), G = (JeebFoes::Ground(C.X + F.X * 2000.f, C.Y + F.Y * 2000.f) - JeebFoes::Ground(C.X - F.X * 2000.f, C.Y - F.Y * 2000.f)) / 4000.f;
+			if (G < 0.f) continue;   // (up the laps' way)
+			float Res = 0.f; bool bWet = false;
+			for (float f = -2000.f; f <= 2000.f; f += 400.f) for (float r = -1200.f; r <= 1200.f; r += 600.f)
+			{
+				const FVector2D Q = C + F * f + R * r;
+				Res = FMath::Max(Res, FMath::Abs(JeebFoes::Ground(Q.X, Q.Y) - (H0 + G * f)));
+				bWet |= JeebWorld::InWater(Q.X, Q.Y);
+			}
+			if (bWet) continue;
+			const float Score = FMath::Abs(FMath::RadiansToDegrees(FMath::Atan(G)) - 14.f) + Res / 15.f + FVector2D::Distance(C, At) / 20000.f;
+			if (Score < Best) { Best = Score; BestAt = C; BestYaw = Yw; }
+		}
+		At = BestAt; Yaw = BestYaw;
+		UE_LOG(LogTemp, Log, TEXT("JEEBHOOF slope lab at %.0f_%.0f_%.0f (score %.1f)"), At.X, At.Y, Yaw, Best);
+	}
+	// (the hoof test) a fifth horse standing facing up the laps' way, 7 m ahead of the first
+	if (P.Num() > 3)
+	{
+		const FVector2D Fw5(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw)));
+		const FVector2D S5 = At + Fw5 * 700.f;
+		const FTransform Xf(FRotator(0.f, Yaw, 0.f), FVector(S5.X, S5.Y, JeebFoes::Ground(S5.X, S5.Y)));
+		if (AHorse* H = World->SpawnActorDeferred<AHorse>(AHorse::StaticClass(), Xf, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn))
+		{
+			H->SetupHorse(nullptr, false, nullptr, false, 904);
+			H->LabRole = 4;
+			H->FinishSpawning(Xf);
+		}
+	}
 	const FVector2D Fw(FMath::Cos(FMath::DegreesToRadians(Yaw)), FMath::Sin(FMath::DegreesToRadians(Yaw))), Rt(-Fw.Y, Fw.X);
 	const FVector2D Spots[3] = { At, At + Rt * 600.f - Fw * 1800.f, At + Rt * 1000.f - Fw * 900.f };
 	for (int32 i = 0; i < 3; ++i)
@@ -1084,7 +1158,8 @@ void AHorse::BuildLab(UWorld* World)
 	// a fallen log (90 cm) across the canterer's lap, and with -HorseLabRide a fourth horse carrying the player over a second one (the jump)
 	UStaticMesh* Cyl = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	const bool bRide = FParse::Param(FCommandLine::Get(), TEXT("HorseLabRide"));
-	for (int32 i = 0; i < (bRide ? 2 : 1) && Cyl; ++i)
+	const bool bNoLog = FParse::Param(FCommandLine::Get(), TEXT("HoofNoLog"));   // (the hoof test: no jumps in the gallop laps)
+	for (int32 i = 0; i < (bRide ? 2 : 1) && Cyl && !bNoLog; ++i)
 	{
 		const FVector2D C = At + Rt * (i == 0 ? 600.f : -600.f) - Fw * 300.f;
 		AStaticMeshActor* Log = World->SpawnActor<AStaticMeshActor>(FVector(C.X, C.Y, JeebFoes::Ground(C.X, C.Y) + 40.f), FRotator(0.f, Yaw, 90.f));

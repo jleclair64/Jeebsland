@@ -46,6 +46,17 @@ public:
 	float Rate = 1.f, Start = 0.f;
 	bool bNewClips = false;
 
+	// Foot IK (2026-11-26, the horse; Docs/Horse/): each leg is bent so its hoof stands on this machine's ground under it, keeping the clip's
+	// lift for a swinging hoof, and the body drops so the lowest planted hoof reaches. Looks only (no server state). Off unless SetLegs is called.
+	// Each leg: Upper, Mid, End (the two-bone chain) and the Hoof point that stands on the ground.
+	void SetLegs(const FReferenceSkeleton& RS, const FName (&InLegs)[4][4]);
+	bool bFootIK = false;
+	float IKWant = 1.f;                            // 0 while jumping or fallen: the hooves are the clip's
+	FName Legs[4][4];
+	float HoofRefZ[4] = { 0.f, 0.f, 0.f, 0.f };   // each hoof point's standing height (model units): the rest pose's, then the idle clip's once it plays
+	float DebugLift[4] = { 0.f, 0.f, 0.f, 0.f };  // (test log) each hoof's clip lift over the clip's floor, cm
+	float DebugBody = 0.f;
+
 protected:
 	virtual FAnimInstanceProxy* CreateAnimInstanceProxy() override;
 	virtual void DestroyAnimInstanceProxy(FAnimInstanceProxy* InProxy) override;
@@ -65,6 +76,14 @@ struct FDeerAnimProxy : public FAnimInstanceProxy
 	float Time[8] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 	int32 LastWant = 0;
 	float Weight[8] = { 1.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
+	// foot IK (UDeerAnimInstance::SetLegs)
+	UDeerAnimInstance* Owner = nullptr;
+	bool bIK = false, bGround = false, bFloor = false, bSole = false;
+	float Floor[4] = { 0.f, 0.f, 0.f, 0.f };
+	float IKAlpha = 0.f, Dt = 0.f, BodyOff = 0.f;
+	FName Legs[4][4];
+	float RefZ[4] = { 0.f, 0.f, 0.f, 0.f }, GroundZ[4] = { 0.f, 0.f, 0.f, 0.f };
+	void FootIK(FPoseContext& Output);
 };
 
 // Where it is, as the server sends it (players' machines put it on their own ground: the height is the same everywhere)

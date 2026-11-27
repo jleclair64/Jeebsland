@@ -92,6 +92,7 @@ public:
 	UPROPERTY() UHealthComponent* Hp = nullptr;
 
 #if !UE_BUILD_SHIPPING
+	FVector HoofPrev[4]; double HoofPrevT = 0.0;   // (-HoofLog)
 	int32 LabRole = -1;   // (-HorseLab test pictures) 0 stands and cycles its clips, 1 canters laps, 2 walks laps, 3 carries the player at a gallop (-HorseLabRide)
 	FVector2D LabA = FVector2D::ZeroVector, LabB = FVector2D::ZeroVector;
 	static void BuildLab(UWorld* World);
