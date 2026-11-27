@@ -290,6 +290,42 @@ namespace JeebItems
 				Row.PriceMul = FMath::Max(0.f, Tab.F(s, TEXT("PriceMul"), 1.f));
 			}
 		}
+
+		void LoadArrows(FItemTables& T)
+		{
+			T.Arrows.SetNum(NumArrowRows);
+			FTable Tab;
+			if (!Tab.Load(TEXT("Arrows.csv"))) return;
+			if (Tab.Rows.Num() < NumArrowRows) Problem(TEXT("Arrows.csv needs seven rows: wooden, broadhead, bodkin, heavy, retired emerald, eagle, fire"));
+			for (int32 r = 0; r < NumArrowRows && r < Tab.Rows.Num(); ++r)
+			{
+				FArrowRow& Row = T.Arrows[r];
+				Row.Key = Tab.S(r, TEXT("Key"));
+				Row.Name = Tab.S(r, TEXT("Name"));
+				Row.Model = Tab.S(r, TEXT("Model"));
+				Row.Text = Tab.S(r, TEXT("Text"));
+				Row.Steps = Tab.F(r, TEXT("Steps"), 0.f);
+				Row.AnimalMul = FMath::Max(0.f, Tab.F(r, TEXT("AnimalMul"), 1.f));
+				Row.Pierce = FMath::Clamp(Tab.F(r, TEXT("Pierce"), 0.f), 0.f, 1.f);
+				Row.Knock = FMath::Max(0.f, Tab.F(r, TEXT("Knock"), 0.f));
+				Row.Burn = FMath::Max(0.f, Tab.F(r, TEXT("Burn"), 0.f));
+				Row.SpeedMul = FMath::Clamp(Tab.F(r, TEXT("SpeedMul"), 1.f), 0.3f, 2.f);
+				Row.Level = Tab.I(r, TEXT("Level"), 1);
+				Row.XP = Tab.I(r, TEXT("XP"), 0);
+				Row.Price = Tab.I(r, TEXT("Price"), 8);
+				Row.bShop = Tab.B(r, TEXT("Shop"));
+				Row.Head = Tab.Color(r, TEXT("Head"), Row.Head);
+				Row.Feather = Tab.Color(r, TEXT("Feather"), Row.Feather);
+				const TCHAR* MC[3] = { TEXT("Mat1"), TEXT("Mat2"), TEXT("Mat3") };
+				const TCHAR* NC[3] = { TEXT("Num1"), TEXT("Num2"), TEXT("Num3") };
+				for (int32 i = 0; i < 3; ++i)
+				{
+					Row.Num[i] = FMath::Max(0, Tab.I(r, NC[i], 0));
+					const FString M = Tab.S(r, MC[i]);
+					if (Row.Num[i] > 0 && !MaterialFromKey(M, Row.Mat[i])) { Problem(FString::Printf(TEXT("Arrows.csv, %s: unknown material \"%s\""), *Row.Name, *M)); Row.Num[i] = 0; }
+				}
+			}
+		}
 	}
 
 	const FItemTables& Tables()
@@ -306,6 +342,7 @@ namespace JeebItems
 			LoadAccessories(T);
 			LoadShieldStyles(T);
 			LoadArmourStyles(T);
+			LoadArrows(T);
 			UE_LOG(LogJeebItems, Log, TEXT("Jeebsland items: read %d potions, %d rings, %d amulets from Content/Data"), T.Potions.Num(), T.Rings.Num(), T.Amulets.Num());
 		}
 		return T;

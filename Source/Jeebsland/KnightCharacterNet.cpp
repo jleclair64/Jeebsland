@@ -304,8 +304,10 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	// kite/round/tower; 0 for everything else) ----
 	case EInvOp::Smith:
 	{
-		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith)) || B < 0 || B >= NumTiers) break;
+		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith))) break;
 		const bool bArrows = A < 0;
+		if (bArrows) { SmithArrowsNow(B); break; }   // (2026-11-26) B is the arrow's row in Arrows.csv: its own recipe and Smithing level
+		if (B < 0 || B >= NumTiers) break;
 		if (!bArrows && (!(IsWeaponKind(A) || IsArmorKind(A) || A == K_Shield) || IsRetiredKind(A))) break;   // (no katanas: taken out of the game)
 		const bool bStyled = !bArrows && (IsArmorKind(A) || A == K_Shield);
 		if (C < 0 || C >= (bStyled ? (A == K_Shield ? NumShieldStyles : NumArmourStyles) : 1)) break;   // (never trust the style sent)

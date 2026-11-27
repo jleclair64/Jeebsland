@@ -100,7 +100,7 @@ private:
 	void ApplyStuck();    // put it where Stuck says (every machine)
 	void StickAt(const FVector& Tip, AActor* On, USceneComponent* Comp, FName CompName, uint8 Index, bool bPickable);   // (server)
 	void Deflect(const FVector& At, const FVector& Away);   // (server) glanced off the edge of a raised shield
-	void Burn(AActor* Target);   // (server) a fire arrow's hit keeps burning
+	void Burn(AActor* Target, float Total = float(BurnTicks * BurnDamage));   // (fire arrows: Total points over BurnTicks ticks; Arrows.csv Burn)   // (server) a fire arrow's hit keeps burning
 	USceneComponent* FindPart(AActor* On, FName CompName, uint8 Index) const;
 	uint8 SeenSeq = 255;
 	bool bFlying = false;

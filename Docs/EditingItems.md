@@ -9,6 +9,7 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 | `Materials.csv` | Ores, gems, logs, fish, animal drops: name, stack size, sell price, colour, gathering level, fishing XP |
 | `Potions.csv` | Potions: effect (speed, heal, vigour, radar), strength, seconds, cooldown, price, colour, store line, description |
 | `Accessories.csv` | Rings, amulets and the helm brush: attack/defence multipliers, crits, damage floor/ceiling, wild, speed, health, icon colours |
+| `Arrows.csv` | The arrows (2026-11-26): name, model, damage steps, x damage against animals (AnimalMul), how much armour it goes through (Pierce 0-1), knockback (Knock, cm/s), fire damage over a few seconds (Burn), flight speed (SpeedMul), the Smithing level to make a bundle of 10 (Level), up to three materials (Mat1-3, Num1-3), Smithing XP, store price, whether the store sells it (Shop), head and feather colours, description. **Seven rows, never reorder or delete them** (a save stores arrows as 900 + the row; the fifth row, the old emerald arrows, is retired and turns into Eagle arrows when a save loads). Anyone can shoot any arrow: only the making is gated |
 | `ShieldStyles.csv` | Kite, round, tower: GuardMul (its health x this), stance speed, recovery delay, HealMul (how fast it heals x this), Weight (kg, x the tier's WeightMult) |
 | `ArmourStyles.csv` | Classic (the gold model), Light (the tunic), Heavy (the original knight): StopMul (how much more or less of a blow it stops than its tier says), WeightMul, PriceMul. Rows are found by position: never reorder them; a fourth style goes at the end (and needs its own model) |
 | `Foes.csv` | The open world's enemies (the forest bandits): name, Group (what a quest's kill step can name, e.g. `Bandit`), tier, shield (-1 none, 0 kite, 1 round, 2 tower), health, hit, how much of a blow gets through (Takes, blank = the tier's), chase speed, sight and how far behind him he notices you, leash from his camp, windup, cooldown, block chance, respawn seconds, XP, helmet and body colours, loot. Rows are found by Key: add new ones at the end. Mistakes log `Jeebsland foes: ...` |
@@ -16,7 +17,7 @@ All item numbers and text live in spreadsheet files in `Content/Data/` (CSV: ope
 | `Tuning.ini` | Not items: how fast, far, strong and long the moves are (walking, jumping, the bow, every sword move, knockdowns, the guard, the armour cap, headshots, how much heavy armour slows you). Each line is explained in the file. Saved while the game runs, it takes effect within half a second: no restart needed. |
 
 **Rules** (each file repeats its own at the top):
-- Saves remember items by number. **Never delete or reorder rows** in Potions and Accessories: add new ones at the end.
+- Saves remember items by number. **Never delete or reorder rows** in Potions and Accessories: add new ones at the end. Arrows has exactly seven rows: change their numbers freely, never their order.
 - In Tiers, Kinds and Materials keep the `Key` column as it is (the code finds rows by it); everything else can change.
 - A new potion can use any existing effect (for example a stronger swiftness potion: `speed`, Amount 1.75, Seconds 15). A brand-new kind of effect needs code.
 - Colours are three numbers from 0 to 1 (red green blue), e.g. `0.80 0.07 0.07`.

@@ -184,7 +184,8 @@ void AGearWall::Build()
 		for (int32 t = 0; t < NT; ++t)
 		{
 			if (bFire && t > 0) break;
-			const int32 Id = bFire ? IdFireArrow : bArrows ? ArrowId(t) : bCapes ? GearId(K_Cape, t) : GearId(WeaponOf(col), t);
+			if (bArrows && t > 4) break;   // (2026-11-26: the five arrows besides fire, one a row)
+			const int32 Id = bFire ? IdFireArrow : bArrows ? (t < 4 ? ArrowKindId(t) : t == 4 ? ArrowId(A_Eagle) : 0) : bCapes ? GearId(K_Cape, t) : GearId(WeaponOf(col), t);
 			if (bCrossbow) { AddItem(Id, 1, FVector(WeaponX - 14.f, Y + (t % 2 ? WeaponColW : 0.f), WeaponZ0 + 10.f + t * WeaponRowH), WeaponSize * 0.75f, true); continue; }
 			AddItem(Id, (bFire || bArrows) ? ArrowCount : 1, FVector(WeaponX - 14.f, Y, WeaponZ0 + t * WeaponRowH), (bArrows || bFire) ? WeaponSize * 0.7f : bCapes ? WeaponSize * 0.4f : WeaponSize, !bCapes);
 		}

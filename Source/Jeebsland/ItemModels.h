@@ -257,13 +257,17 @@ namespace JeebItemModel
 		// ---------------- arrows: a bundle of three ----------------
 		if (IsArrow(Id))
 		{
-			const int32 T = ArrowTier(Id);
+			const int32 R = ArrowRowOf(Id);
+			const FLinearColor HeadC = R == A_Wooden ? FLinearColor(0.5f, 0.34f, 0.17f) : ArrowTipColor(Id) * (R == A_Fire ? 0.3f : 1.f);
+			const bool bMetal = R != A_Wooden && R != A_Fire;
+			// (each head its own shape: long and slim, wide, blunt; 2026-11-26)
+			const float HL = R == A_Bodkin ? 6.0f : R == A_Heavy ? 3.2f : R == A_Eagle ? 5.0f : 4.0f, HR = R == A_Bodkin ? 0.55f : R == A_Heavy ? 1.5f : R == A_Wooden ? 0.5f : 1.1f;
 			for (int32 k = -1; k <= 1; ++k)
 			{
 				const FVector At(0, k * 1.6, 0);
 				Lathe(NewPart(Out, FLinearColor(0.5f, 0.34f, 0.17f)).Mesh, Prof({ 0, 20, 0.45, 19.5, 0.45, -19.5, 0, -20 }), 8, 1.0, 1.0, Xf(At, V3(0, 90, k * 4.0)));
-				Lathe(NewPart(Out, IsFireArrow(Id) ? FLinearColor(1.f, 0.45f, 0.08f) : Palette(T, 0), TierIsMetal(T) && !IsFireArrow(Id)).Mesh, Prof({ 0, 4.0, 1.1, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
-				FMD& F = NewPart(Out, FLinearColor(0.92f, 0.9f, 0.86f)).Mesh;
+				Lathe(NewPart(Out, HeadC, bMetal).Mesh, Prof({ 0, HL, HR, 0, 0, -0.3 }), 6, 1.0, 1.0, Xf(At + RotateEuler(V3(20, 0, 0), V3(0, 0, k * 4.0)), V3(0, 90, k * 4.0)), false, true);
+				FMD& F = NewPart(Out, ArrowFeatherColor(Id)).Mesh;
 				const FVector Back = At + RotateEuler(V3(-17, 0, 0), V3(0, 0, k * 4.0));
 				TArray<FVector> Fl = { Back + V3(-2.5, 0, 0), Back + V3(2.5, 0, 0), Back + V3(-3.0, 0, 1.6) };
 				Prism(F, Fl, V3(0, 0.2, 0));

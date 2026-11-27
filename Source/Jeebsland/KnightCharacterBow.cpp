@@ -33,9 +33,8 @@ int32 AKnightCharacter::ArrowSlotId() const
 {
 	if (!Skills) return 0;
 	if (JeebItems::IsArrow(ArrowPick) && Skills->CountItem(ArrowPick) > 0) return ArrowPick;
-	const int32 T = Skills->BestArrowTier();   // (nothing picked, or the picked ones ran out: the best you have, then fire arrows)
-	if (T >= 0) return JeebItems::ArrowId(T);
-	return Skills->CountItem(JeebItems::IdFireArrow) > 0 ? JeebItems::IdFireArrow : 0;
+	const int32 R = Skills->BestArrowRow();   // (nothing picked, or the picked ones ran out: the hardest-hitting you have)
+	return R >= 0 ? JeebItems::ArrowId(R) : 0;
 }
 
 void AKnightCharacter::CycleArrows()
@@ -198,7 +197,7 @@ void AKnightCharacter::RightUp()
 
 void AKnightCharacter::StartDraw()
 {
-	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::T_Iron)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
+	if (bShotFace) UE_LOG(LogTemp, Log, TEXT("JEEBBOW start: steel %d fire %d kind %d bow %d arrows %d atk %d bar %d %d %d %d %d sel %d"), Skills ? Skills->CountItem(JeebItems::ArrowId(JeebItems::A_Broadhead)) : -1, Skills ? Skills->CountItem(JeebItems::IdFireArrow) : -1, SelectedKind(), int32(Bow), ArrowSlotId(), bAttacking ? 1 : 0, Skills ? Skills->Hotbar[0] : -1, Skills ? Skills->Hotbar[1] : -1, Skills ? Skills->Hotbar[2] : -1, Skills ? Skills->Hotbar[3] : -1, Skills ? Skills->Hotbar[4] : -1, Skills ? Skills->Selected : -1);
 	if (!Skills || !JeebItems::IsShooter(SelectedKind()) || Bow != EBow::None) return;
 	if (SelectedKind() == JeebItems::K_Crossbow && CrossReloadLeft > 0.f) return;   // (not loaded yet)
 	if (bAttacking || bKnockedDown || StunLeft > 0.f || bRolling || bSliding || bClimbing || InClimbMove() || bSitting || bMounted || bDrinking) return;   // (InClimbMove: a rock face, a mantle or the water)
@@ -294,14 +293,23 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	const int32 Kind = JeebItems::IsShooter(SelectedKind()) ? SelectedKind() : int32(JeebItems::K_Bow);
 	const bool bCross = Kind == JeebItems::K_Crossbow;
 	const float SpeedMul = Kind == JeebItems::K_Longbow ? JeebTune::V().LongSpeed / FMath::Max(float(BowSpeedMax), 1.f) : 1.f;
-	const int32 Dmg = JeebItems::RollDamage(Skills, Kind, BowTier, JeebItems::ArrowTier(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, FMath::Pow(C, 1.5f)));
+	const int32 Dmg = JeebItems::RollDamage(Skills, Kind, BowTier, JeebItems::ArrowRowOf(Id), bCrit, FMath::Lerp(BowDamageMin, BowDamageMax, FMath::Pow(C, 1.5f)));
+	// (2026-11-26) the Archery level softly steadies every shot: a small random stray at low levels, none from SpreadGoneAt (Tuning.ini [Archery]); a full draw half as much
+	FVector ShotDir = Dir;
+	{
+		const int32 Lv = Skills->GetLevel(ESkillType::Archery);
+		const float Gone = FMath::Max(2.f, JeebTune::V().SpreadGoneAt);
+		const float Deg = FMath::Max(0.f, JeebTune::V().SpreadAt1) * FMath::Clamp((Gone - Lv) / (Gone - 1.f), 0.f, 1.f) * (C >= 1.f ? 0.5f : 1.f);
+		if (Deg > 0.f) ShotDir = FMath::VRandCone(Dir, FMath::DegreesToRadians(Deg) * FMath::Sqrt(FMath::FRand()));
+	}
+	const float ArrowSpeedMul = JeebItems::ArrowRowFor(Id).SpeedMul;   // (a heavy arrow flies slower, an eagle arrow faster)
 	auto ByDraw = [C](float Min, float Mid, float Max) { return C < 0.5f ? FMath::Lerp(Min, Mid, C * 2.f) : FMath::Lerp(Mid, Max, C * 2.f - 1.f); };
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	if (AProjectile* P = GetWorld()->SpawnActor<AProjectile>(AProjectile::StaticClass(), From, Dir.Rotation(), SP))
 	{
 		const bool bFull = C >= 1.f;
-		P->Launch(this, Dir, bCross ? JeebTune::V().CrossSpeed : ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax) * SpeedMul, 0.f, Dmg, bCrit, ESkillType::Archery, false, JeebItems::ArrowTier(Id), Id,
+		P->Launch(this, ShotDir, (bCross ? JeebTune::V().CrossSpeed : ByDraw(BowSpeedMin, BowSpeedMid, BowSpeedMax) * SpeedMul) * ArrowSpeedMul, 0.f, Dmg, bCrit, ESkillType::Archery, false, 0, Id,
 			bCross ? JeebTune::V().CrossSag : bFull ? BowSagFull : ByDraw(BowSagMin, BowSagMid, BowSagMax), bFull ? BowStraight : 0.f);
 		if (bCross) P->GuardMul = JeebTune::V().CrossGuardMul;
 	}
@@ -329,7 +337,7 @@ void AKnightCharacter::TickBow(float Dt)
 	}
 	BowT += Dt;
 	if (HasAuthority() && Skills && UnlimitedArrows())   // (testing: topped up to a full stack of each)
-		for (const int32 Id : { JeebItems::ArrowId(JeebItems::T_Iron), JeebItems::IdFireArrow })
+		for (const int32 Id : { JeebItems::ArrowId(JeebItems::A_Broadhead), JeebItems::IdFireArrow })
 			if (const int32 Have = Skills->CountItem(Id); Have < USkillComponent::StartIronArrows) Skills->AddInvItem(Id, USkillComponent::StartIronArrows - Have);
 	if (bShotFace && ShotStrafe != 0.f) AddMovementInput(GetActorRightVector(), ShotStrafe);   // (test pictures)
 	if (bShotFace && bShotWalk) AddMovementInput(FRotator(0.f, ShotFaceYaw, 0.f).Vector(), 1.f);
@@ -493,7 +501,7 @@ void AKnightCharacter::UpdateBowBits()
 			// (the model: the tip at its origin, the shaft back along -X; a bolt is the same arrow drawn shorter along its length)
 			BowBits[2]->SetWorldLocationAndRotation(Nock + Along * Long, FRotationMatrix::MakeFromX(Along).Rotator());
 			BowBits[2]->SetWorldScale3D(FVector(Long / JeebProps::ArrowLen, 1.f, 1.f));
-			if (NockArrowId != ShowId) { NockArrowId = ShowId; JeebProps::TintArrow(BowBits[2], ShowId); }
+			if (NockArrowId != ShowId) { NockArrowId = ShowId; if (UStaticMesh* Mm = JeebProps::ArrowMesh(ShowId)) BowBits[2]->SetStaticMesh(Mm); JeebProps::TintArrow(BowBits[2], ShowId); }
 			return;
 		}
 		for (int32 i = 2; i < 6; ++i) BowBits[i]->SetVisibility(bShown);
@@ -616,4 +624,34 @@ void AKnightCharacter::UpdateQuiver()
 			if (QuiverParts[i])
 				if (UMaterialInstanceDynamic* M = Cast<UMaterialInstanceDynamic>(QuiverParts[i]->GetMaterial(0))) M->SetVectorParameterValue(TEXT("Color"), JeebItems::ArrowFeatherColor(Id));
 	}
+}
+
+// (server, 2026-11-26) A bundle of arrows at the smithy (the Smith op, beside the blacksmith; the online test calls it directly). The making is gated,
+// never the using: the row's Smithing level and its materials (Arrows.csv), refused for a retired row.
+bool AKnightCharacter::SmithArrowsNow(int32 Row)
+{
+	using namespace JeebItems;
+	if (!HasAuthority() || !Skills || !CanSmithArrow(Row)) return false;
+	const FArrowRecipe R = ArrowRecipe(Row);
+	const int32 Id = ArrowId(Row);
+	if (Skills->GetLevel(ESkillType::Smithing) < R.Level)
+	{
+		ShopNote(FString::Printf(TEXT("You need Smithing level %d to make %s."), R.Level, *ItemName(Id)));
+		UE_LOG(LogTemp, Log, TEXT("JEEBARROWSMITH %s refused %s: Smithing %d of %d"), *GetName(), *ItemName(Id), Skills->GetLevel(ESkillType::Smithing), R.Level);
+		return false;
+	}
+	for (int32 i = 0; i < 3; ++i)
+		if (R.Num[i] > 0 && Skills->GetItemCount(R.Mat[i]) < R.Num[i])
+		{
+			ShopNote(TEXT("You don't have the materials."));
+			UE_LOG(LogTemp, Log, TEXT("JEEBARROWSMITH %s refused %s: materials (%s %d of %d)"), *GetName(), *ItemName(Id), *ItemName(MaterialId(R.Mat[i])), Skills->GetItemCount(R.Mat[i]), R.Num[i]);
+			return false;
+		}
+	if (!Skills->CanAdd(Id, ArrowBundle)) { ShopNote(TEXT("Your pack is full.")); return false; }
+	for (int32 i = 0; i < 3; ++i) if (R.Num[i] > 0) Skills->RemoveItems(MaterialId(R.Mat[i]), R.Num[i]);
+	Skills->AddInvItem(Id, ArrowBundle);
+	Skills->AddXP(ESkillType::Smithing, R.XP);
+	ShopNote(FString::Printf(TEXT("Made %d %s. They are in your pack (Tab)."), ArrowBundle, *ItemName(Id)));
+	UE_LOG(LogTemp, Log, TEXT("JEEBARROWSMITH %s made %d %s"), *GetName(), ArrowBundle, *ItemName(Id));
+	return true;
 }

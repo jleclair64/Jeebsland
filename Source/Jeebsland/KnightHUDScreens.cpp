@@ -301,21 +301,22 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 
 	if (E.Kind == -2)
 	{
-		Y += Wrapped(TEXT("Arrows are limited: every shot uses one, and the bow uses the best arrows you carry. Better arrows hit harder. Buy bundles of ten at the store (tin and iron) or smith any rank."), CX, Y, CW, 1.05f, FLinearColor::White) + 12.f;
-		const TCHAR* Heads[] = { TEXT("RANK"), TEXT("BOW DAMAGE"), TEXT("SMITH LV"), TEXT("MATERIALS (10)"), TEXT("STORE (10)") };
+		Y += Wrapped(TEXT("Arrows are limited: every shot uses one (F picks which). Each arrow has a job: wooden ones are cheap, broadheads hunt, bodkins pierce armour, heavy arrows knock back, fire arrows burn, eagle arrows hit hardest. Anyone can shoot any arrow; making them needs the Smithing level shown. Your Archery level steadies your aim, draws faster and adds damage with every arrow."), CX, Y, CW, 1.05f, FLinearColor::White) + 12.f;
+		const TCHAR* Heads[] = { TEXT("ARROW"), TEXT("BOW DAMAGE"), TEXT("SMITH LV"), TEXT("MATERIALS (10)"), TEXT("STORE (10)") };
 		const float Xs[] = { 0.f, 110.f, 250.f, 360.f, 580.f };
 		for (int32 c = 0; c < 5; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
 		Y += 28.f;
-		for (int32 t = 0; t < NumTiersKnight; ++t)
+		for (int32 t = 0; t < NumArrowKinds(); ++t)
 		{
-			int32 A, B; WeaponDamage(K_Bow, t, A, B, t);
-			const FRecipe R = SmithRecipe(K_Bow, t, true);
-			DrawIcon(ArrowId(t), CX - 4.f, Y - 4.f, 28.f);
-			HDText(TierName(t), FLinearColor::White, CX + 30.f, Y, Font, 1.0f);
+			const int32 Row = ArrowRowOf(ArrowKindId(t));
+			int32 A, B; WeaponDamage(K_Bow, T_Tin, A, B, Row);
+			const FArrowRecipe R = ArrowRecipe(Row);
+			DrawIcon(ArrowId(Row), CX - 4.f, Y - 4.f, 28.f);
+			HDText(FString(ArrowRow(Row).Name).Replace(TEXT(" Arrows"), TEXT("")), FLinearColor::White, CX + 30.f, Y, Font, 1.0f);
 			HDText(FString::Printf(TEXT("%d-%d"), A, B), FLinearColor(1.f, 0.6f, 0.5f), CX + Xs[1], Y, Font, 1.0f);
 			HDText(FString::Printf(TEXT("%d"), R.Level), FLinearColor::White, CX + Xs[2], Y, Font, 1.0f);
 			HDText(RecipeText(R), FLinearColor(0.9f, 0.9f, 0.8f), CX + Xs[3], Y, Font, 1.0f);
-			HDText(t <= StoreMaxTier ? FString::Printf(TEXT("%d ingots"), ArrowBundlePrice(t)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
+			HDText(ArrowRow(Row).bShop ? FString::Printf(TEXT("%d ingots"), ArrowBundlePrice(Row)) : FString(TEXT("smith only")), FLinearColor(1.f, 0.85f, 0.3f), CX + Xs[4], Y, Font, 1.0f);
 			Y += 34.f;
 		}
 		return;

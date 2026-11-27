@@ -64,7 +64,7 @@ void USkillComponent::ResetToStartingKit()
 	SetSelected(0);
 	Hotbar[0] = JeebItems::GearId(JeebItems::K_Sword, 0);
 	Hotbar[1] = JeebItems::GearId(JeebItems::K_Bow, 0);   // (the bow right of the sword; the knight keeps it, owner 2026-11-22: bows go from the wizard and troll only)
-	AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), StartIronArrows);
+	AddInvItem(JeebItems::ArrowId(JeebItems::A_Broadhead), StartIronArrows);
 	AddInvItem(JeebItems::IdFireArrow, StartFireArrows);
 	for (int32 K : { JeebItems::K_Axe, JeebItems::K_Pickaxe, JeebItems::K_Rod }) AddInvItem(JeebItems::GearId(K, 0), 1);   // (tools in the pack since 2026-11-03: equip one to gather)
 	Worn[JeebItems::K_Shield] = JeebItems::GearId(JeebItems::K_Shield, 0);
@@ -487,20 +487,18 @@ bool USkillComponent::TakeWood(int32 Count)
 	return true;
 }
 
-int32 USkillComponent::BestArrowTier() const
+int32 USkillComponent::BestArrowRow() const
 {
-	for (int32 T = JeebItems::NumTiers - 1; T >= 0; --T)
-		if (CountItem(JeebItems::ArrowId(T)) > 0) return T;
-	return -1;
-}
-
-int32 USkillComponent::TakeBestArrow()
-{
-	if (!HasAuth()) return -1;   // only the server changes the pack
-	const int32 T = BestArrowTier();
-	if (T < 0) return -1;
-	RemoveItems(JeebItems::ArrowId(T), 1);
-	return T;
+	// the hardest-hitting arrow carried (Arrows.csv Steps), or -1
+	int32 Best = -1;
+	for (int32 i = 0; i < JeebItems::NumArrowKinds(); ++i)
+	{
+		const int32 Id = JeebItems::ArrowKindId(i);
+		if (CountItem(Id) <= 0) continue;
+		const int32 R = JeebItems::ArrowRowOf(Id);
+		if (Best < 0 || JeebItems::ArrowRow(R).Steps > JeebItems::ArrowRow(Best).Steps) Best = R;
+	}
+	return Best;
 }
 
 bool USkillComponent::EquipFromSlot(int32 Idx)
@@ -729,7 +727,7 @@ void USkillComponent::FillPracticePack()
 	TArray<int32> KeepGear;
 	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; }
 	// a full stack of iron and fire arrows first (this used to write over the starting kit's arrows)
-	Slots[0].Id = JeebItems::ArrowId(JeebItems::T_Iron); Slots[0].Count = StartIronArrows;
+	Slots[0].Id = JeebItems::ArrowId(JeebItems::A_Broadhead); Slots[0].Count = StartIronArrows;
 	Slots[1].Id = JeebItems::IdFireArrow; Slots[1].Count = StartFireArrows;
 	for (int32 i = 2; i < Slots.Num(); ++i) if (JeebItems::IsArrow(Slots[i].Id)) { Slots[i].Id = 0; Slots[i].Count = 0; }
 	// three of each potion: swiftness and vigour in the pack, healing in the potion slot
@@ -852,7 +850,7 @@ void USkillComponent::FitToClass()
 			Hand(0, K_Sword); Hand(1, K_Bow);
 			bool bArrows = false;
 			for (const FInvSlot& S : Slots) if (IsArrow(S.Id)) bArrows = true;
-			if (!bArrows) { AddInvItem(ArrowId(T_Iron), StartIronArrows); AddInvItem(IdFireArrow, StartFireArrows); }
+			if (!bArrows) { AddInvItem(ArrowId(A_Broadhead), StartIronArrows); AddInvItem(IdFireArrow, StartFireArrows); }
 			if (Worn[K_Shield] == 0) Worn[K_Shield] = TakeFor(K_Shield, GearId(K_Shield, 0));
 			for (int32 K = K_Helmet; K <= K_Boots; ++K) Wear(K, AS_Light);
 		}

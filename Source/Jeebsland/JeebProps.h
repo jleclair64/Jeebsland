@@ -61,6 +61,22 @@ namespace JeebProps
 		return Load(TEXT("/Game/Props/SM_PotionGreen.SM_PotionGreen"));
 	}
 	inline UStaticMesh* ArrowMesh() { return Load(TEXT("/Game/Props/SM_Arrow.SM_Arrow")); }
+	// (2026-11-26) each arrow its own head on the shared shaft (Arrows.csv Model: /Game/Props/SM_<Model>, Tools/BuildArrows.ps1); the plain arrow when it has none
+	inline UStaticMesh* ArrowMesh(int32 ArrowId)
+	{
+		if (!JeebItems::IsArrow(ArrowId)) return ArrowMesh();
+		static UStaticMesh* Cache[JeebItems::NumArrowRows] = {};   // (kept loaded: AddToRoot)
+		static bool bTried[JeebItems::NumArrowRows] = {};
+		const int32 R = JeebItems::ArrowRowOf(ArrowId);
+		if (!bTried[R])
+		{
+			bTried[R] = true;
+			const FString M = JeebItems::ArrowRow(R).Model;
+			if (!M.IsEmpty()) Cache[R] = Load(*FString::Printf(TEXT("/Game/Props/SM_%s.SM_%s"), *M, *M));
+			if (Cache[R]) Cache[R]->AddToRoot();
+		}
+		return Cache[R] ? Cache[R] : ArrowMesh();
+	}
 	inline UStaticMesh* ArrowBackMesh() { return Load(TEXT("/Game/Props/SM_ArrowBack.SM_ArrowBack")); }   // (only the back 30 cm: what shows out of the quiver)
 	inline UStaticMesh* QuiverMesh() { return Load(TEXT("/Game/Props/SM_Quiver.SM_Quiver")); }
 	// Amulets by their row among the amulets in Accessories.csv

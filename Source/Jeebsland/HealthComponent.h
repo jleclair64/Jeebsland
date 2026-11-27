@@ -61,6 +61,7 @@ public:
 	// bHitBoxes: it came through hit boxes, which have already dealt with the shield (ModifyDamage is skipped)
 	// Zone: the body part it landed on (armour, ZoneTake). bHeadshot: a projectile to the head (its number is drawn gold and pops)
 	int32 ApplyDamage(int32 Amount, AActor* From, bool bCrit, bool bHitBoxes = false, uint8 Zone = 0, bool bHeadshot = false);
+	float PierceNext = 0.f;   // (server, 2026-11-26) set just before an armour-piercing arrow's ApplyDamage: the share of ZoneTake's armour it goes through; used once
 	// Bars show for 15 seconds after a hit, and whenever health is under half
 	bool ShowBar(float Now) const;
 	FVector HitCentre() const;

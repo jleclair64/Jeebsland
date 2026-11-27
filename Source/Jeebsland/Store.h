@@ -34,12 +34,12 @@ namespace JeebStore
 		W.Stock = 5;
 		return W;
 	}
-	inline FWare ArrowWare(int32 Tier)
+	inline FWare ArrowWare(int32 Row)
 	{
 		FWare W;
-		W.Id = ArrowId(Tier);
+		W.Id = ArrowId(Row);
 		W.Count = ArrowBundle;
-		W.Price = ArrowBundlePrice(Tier);
+		W.Price = ArrowBundlePrice(Row);
 		W.Stock = 5;
 		return W;
 	}
@@ -66,7 +66,7 @@ namespace JeebStore
 		// Cheap: always a bundle of plain arrows, then tin and iron bits 
 		// Every potion is always in stock (Potions.csv)
 		for (int32 T = 0; T < NumPotions(); ++T) Push(PotionWare(T), 5, 5);
-		Push(ArrowWare(R.RandRange(T_Tin, T_Iron)), 5, 5);
+		Push(ArrowWare(R.RandRange(A_Wooden, A_Broadhead)), 5, 5);
 		for (int32 Guard = 0; Out.Num() < 6 && Guard < 50; ++Guard)
 		{
 			Push(GearWare(AnyKind(false), R.RandRange(T_Tin, T_Iron)), 2, 3);
@@ -76,7 +76,7 @@ namespace JeebStore
 		{
 			const float P = R.FRand();
 			if (P < 0.30f) Push(GearWare(K_Ring, R.RandRange(0, FMath::Max(1, NumRings()) - 1)), 1, 2);
-			else if (P < 0.42f) Push(ArrowWare(T_Iron), 3, 3);
+			else if (P < 0.42f) { static const int32 Mid[] = { A_Broadhead, A_Bodkin, A_Heavy, A_Fire }; const int32 Rw = Mid[R.RandRange(0, 3)]; if (ArrowRow(Rw).bShop) Push(ArrowWare(Rw), 3, 3); }   // (2026-11-26: one of the bought arrows, Arrows.csv Shop)
 			else if (P < 0.52f) { const int32 T = R.RandRange(T_Tin, T_Iron); FWare W = GearWare(K_Shield, T); W.Id = ShieldId(R.RandRange(1, 2), T); Push(W, 1, 2); }   // a round or a tower shield
 			else if (P < 0.70f) Push(GearWare(AnyKind(false), T_Iron), 1, 2);
 			else Push(GearWare(AnyKind(true), T_Iron), 1, 2);
@@ -117,7 +117,7 @@ namespace JeebStore
 	inline const TArray<FOdds>& GambleTable()
 	{
 		static const TArray<FOdds> T = {
-			{ TEXT("10 iron arrows"),               28.0f },
+			{ TEXT("10 broadhead arrows"),               28.0f },
 			{ TEXT("A tin or iron tool or weapon"), 22.0f },
 			{ TEXT("40 ingots"),                    15.0f },
 			{ TEXT("25 ingots"),                    12.0f },   // (was a cape, until capes became the PvP rank)
@@ -147,7 +147,7 @@ namespace JeebStore
 		OutCount = 1;
 		switch (Row)
 		{
-		case 0: OutId = ArrowId(T_Iron); OutCount = ArrowBundle; break;
+		case 0: OutId = ArrowId(A_Broadhead); OutCount = ArrowBundle; break;
 		case 1: OutId = GearId(Pick(Tools, UE_ARRAY_COUNT(Tools)), R.RandRange(T_Tin, T_Iron)); break;
 		case 2: OutId = 0; OutCount = 40; break;
 		case 3: OutId = 0; OutCount = 25; break;

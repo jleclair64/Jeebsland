@@ -220,7 +220,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	if (Move == TEXT("kickcombo")) { StartAttack(EAtkStyle::Kick, 1, 0.f); QueuedSweep = GetWorld()->GetTimeSeconds() + 0.1f; }   // a kick with the wheel-down buffered: the sweep cuts in when it lands
 	int32 TestBow = JeebItems::K_Bow;   // (-ShotBowKind=21 longbow, 22 crossbow)
 	FParse::Value(FCommandLine::Get(), TEXT("ShotBowKind="), TestBow);
-	int32 TestArrowTier = -1;   // (-ShotArrow=4: he carries that tier's arrows, for the quiver and the feathers)
+	int32 TestArrowTier = -1;   // (-ShotArrow=5: he carries the arrows of that Arrows.csv row, for the quiver, the nocked head and the feathers)
 	if (FParse::Value(FCommandLine::Get(), TEXT("ShotArrow="), TestArrowTier) && Skills->AddInvItem(JeebItems::ArrowId(TestArrowTier), 10)) ArrowPick = JeebItems::ArrowId(TestArrowTier);
 	if (Move.StartsWith(TEXT("bow")) && TestBow != JeebItems::K_Bow) Skills->Hotbar[1] = JeebItems::GearId(TestBow, 0);
 	if (Move == TEXT("bowidle") || Move == TEXT("bowwalk"))   // the bow in hand, not drawn: standing, or walking ahead
@@ -233,8 +233,8 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 	{
 		for (int32 h = 0; h < 5; ++h)
 			if (JeebItems::IsGear(Skills->Hotbar[h]) && JeebItems::KindOf(Skills->Hotbar[h]) == TestBow) { SelectHotbar(h); break; }
-		if (ArrowSlotId() == 0 && !Skills->AddInvItem(JeebItems::ArrowId(JeebItems::T_Iron), 10) && Skills->Slots.Num() > 0)   // (test pictures are never saved)
-		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::T_Iron); Skills->Slots.Last().Count = 10; }
+		if (ArrowSlotId() == 0 && !Skills->AddInvItem(JeebItems::ArrowId(JeebItems::A_Broadhead), 10) && Skills->Slots.Num() > 0)   // (test pictures are never saved)
+		{ Skills->Slots.Last().Id = JeebItems::ArrowId(JeebItems::A_Broadhead); Skills->Slots.Last().Count = 10; }
 		FParse::Value(FCommandLine::Get(), TEXT("ShotStrafe="), ShotStrafe);
 		StartDraw();
 		ShotBowAt = GetWorld()->GetTimeSeconds() + ((Move.Len() > 3) ? FCString::Atoi(*Move.Mid(3)) / 100.f : DrawTimeNow() + 2.f);
@@ -372,7 +372,7 @@ void AKnightCharacter::AttackLands()
 	}
 }
 
-void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 Zone, bool bHeadshot)
+void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 Zone, bool bHeadshot, float Pierce)
 {
 	if (Health <= 0.f || Raw <= 0 || !Skills || !HasAuthority()) return;   // (only the server hurts anyone)
 	// (2026-11-23, owner) another player's blow, arrow, spell or fire hurts only where both stand in a PvP zone (PvpZones.h): the one place
@@ -408,7 +408,7 @@ void AKnightCharacter::Hurt(int32 Raw, AActor* From, bool bEnvironmental, uint8 
 	const int32 Through = Raw - ShieldStop;
 	// Armour by body part (owner, 2026-11-02): the piece covering where it landed lets only part of it through (smoke seeps
 	// through armour). The Defence level no longer softens blows: it sizes the shield's guard.
-	const float Take = bEnvironmental ? 1.f : JeebItems::ZoneTake(Skills, Zone);
+	const float Take = bEnvironmental ? 1.f : FMath::Lerp(JeebItems::ZoneTake(Skills, Zone), 1.f, FMath::Clamp(Pierce, 0.f, 1.f));   // (an armour-piercing arrow: part of the blow skips the armour; 2026-11-26)
 	const int32 Taken = (Through <= 0) ? 0 : FMath::Max(1, FMath::RoundToInt(Through * Take));
 
 	const FVector Head = GetActorLocation() + FVector(0.f, 0.f, 120.f);
