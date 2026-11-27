@@ -71,3 +71,4 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
    - "Vaulting": only items with no use in the game now (not all potions; potions with a use stay) can be kept in the files but switched off in game (no shops, drops or recipes), to return in a later version; or kept as a stated exception.
    - Build order: economy batch (running) -> skill cap 29 + metals + Knight's Armor + vaulting in one batch.
    - Test kit menu (owner, 2026-11-26): show in-game items and vaulted items in separate sections.
+38. **Overnight 2026-11-26/27 (owner asleep, "implement everything we talked about"; Meshy API 1013 credits):** Silver Point village resumed (agent wizvillage). Next once the economy batch lands: skill cap 29 (hard) + metals + Knight's Armor + vaulting unused items + Test kit split. NOT started without the owner: new item designs (third knight set, the rule-of-three items), pets that follow you, Enchanted Map art, quests, food.
