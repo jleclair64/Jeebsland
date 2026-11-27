@@ -48,7 +48,7 @@ namespace
 			M.Mesh = LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("%sSK_%s.SK_%s"), *Base, *Name, *Name));
 			static const TCHAR* Keys[JeebDeer::C_Count] = { TEXT("Idle"), TEXT("Idle2"), TEXT("Walk"), TEXT("Run"), TEXT("Graze"), TEXT("Alert"), TEXT("Death"), TEXT("Attack") };
 			int32 Got = 0;
-			for (int32 i = 0; i < JeebDeer::C_Count; ++i)
+			for (int32 i = 0; i < JeebDeer::C_Gallop; ++i)   // (no gallop clip: only the horse has one)
 			{
 				M.Clips[i] = LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("%sA_%s_%s.A_%s_%s"), *Base, *Name, Keys[i], *Name, Keys[i]));
 				if (M.Clips[i]) { M.Clips[i]->AddToRoot(); ++Got; }
@@ -154,10 +154,23 @@ void FDeerAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds
 			Time[i] = Clip[i] ? FMath::Fmod(A->Start, FMath::Max(Clip[i]->GetPlayLength(), 0.01f)) : 0.f;
 			Weight[i] = (i == A->Want) ? 1.f : 0.f;
 		}
+		bSync = A->bGaitSync;
+		for (int32 i = 0; i < N; ++i) GOff[i] = A->GaitOff[i];
+		if (bSync && Clip[A->Want]) GaitPhase = FMath::Frac(Time[A->Want] / FMath::Max(Clip[A->Want]->GetPlayLength(), 0.01f) - GOff[A->Want]);
 	}
 	// Cross-fade toward the wanted clip (0.3 s; into a run 0.18 s, it bolts; into the fall 0.5 s), and run every clip that shows
 	const float Fade = A->Want == JeebDeer::C_Run ? 0.18f : A->Want == JeebDeer::C_Death ? 0.5f : A->Want == JeebDeer::C_Attack ? 0.12f : 0.3f;
 	const float Step = DeltaSeconds / Fade;
+	// gait sync (the horse): walk, canter and gallop all follow one stride phase, advanced by the wanted gait's own rate and length, so a
+	// cross-fade between two gaits blends their matching foot positions (each clip's GaitOff: where its leading forefoot lands)
+	auto IsGait = [](int32 i) { return i == JeebDeer::C_Walk || i == JeebDeer::C_Run || i == JeebDeer::C_Gallop; };
+	const bool bGait = bSync && IsGait(A->Want) && Clip[A->Want];
+	if (bGait)
+	{
+		const float LenW = FMath::Max(Clip[A->Want]->GetPlayLength(), 0.01f);
+		if (!IsGait(LastWant)) GaitPhase = FMath::Frac(Time[A->Want] / LenW - GOff[A->Want]);   // (from a stand: carry on where the clip is)
+		GaitPhase = FMath::Frac(GaitPhase + DeltaSeconds * A->Rate / LenW);
+	}
 	if (A->Want != LastWant && A->Want == JeebDeer::C_Attack) Time[JeebDeer::C_Attack] = 0.f;   // (every strike from its start)
 	LastWant = A->Want;
 	for (int32 i = 0; i < N; ++i)
@@ -165,9 +178,10 @@ void FDeerAnimProxy::PreUpdate(UAnimInstance* InAnimInstance, float DeltaSeconds
 		Weight[i] = (i == A->Want) ? FMath::Min(1.f, Weight[i] + Step) : FMath::Max(0.f, Weight[i] - Step);
 		if (!Clip[i]) continue;
 		const float Len = FMath::Max(Clip[i]->GetPlayLength(), 0.01f);
+		if (bGait && IsGait(i) && (Weight[i] > 0.f || i == A->Want)) { Time[i] = FMath::Frac(GaitPhase + GOff[i]) * Len; continue; }
 		if (Weight[i] > 0.f || i == A->Want)
 		{
-			const float R = (i == JeebDeer::C_Walk || i == JeebDeer::C_Run || i == JeebDeer::C_Attack) ? A->Rate : 1.f;
+			const float R = (i == JeebDeer::C_Walk || i == JeebDeer::C_Run || i == JeebDeer::C_Gallop || i == JeebDeer::C_Attack) ? A->Rate : 1.f;
 			Time[i] = (i == JeebDeer::C_Attack) ? FMath::Min(Time[i] + DeltaSeconds * R, Len - 0.01f) : (i == JeebDeer::C_Death) ?FMath::Min(Time[i] + DeltaSeconds, Len - 0.01f) : FMath::Fmod(Time[i] + DeltaSeconds * R, Len);
 		}
 		else if (i == JeebDeer::C_Death || i == JeebDeer::C_Graze || i == JeebDeer::C_Alert) Time[i] = 0.f;   // (these start from their beginning)

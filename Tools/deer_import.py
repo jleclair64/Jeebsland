@@ -10,7 +10,7 @@ mel = unreal.MaterialEditingLibrary
 proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(proj, "Saved", "DeerBuild")
 FOLDER = "/Game/Animals"
-CLIPS = ("Idle", "Idle2", "Walk", "Run", "Graze", "Alert", "Death", "Back", "Attack")
+CLIPS = ("Idle", "Idle2", "Walk", "Run", "Graze", "Alert", "Death", "Back", "Attack", "Gallop")
 # (per animal: how much grey and what tint M_Animal puts on its coat; the stag's are M_Animal's defaults. The horse's bay coat is already
 # a rich brown, so it keeps nearly all of it)
 LOOK = {"Horse": (0.08, (0.95, 0.93, 0.91)), "Rabbit": (0.05, (0.95, 0.93, 0.91)), "Fox": (0.10, (0.92, 0.88, 0.86)),

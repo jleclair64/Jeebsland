@@ -31,7 +31,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/PawnMovementComponent.h"
 
-static TAutoConsoleVariable<float> CVarRunRateCap(TEXT("jeeb.Horse.RunRateCap"), 3.2f, TEXT("Fastest the canter clip plays (x its own speed); past it the hooves slide at a full gallop."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarRunRateCap(TEXT("jeeb.Horse.RunRateCap"), 3.2f, TEXT("Fastest the canter and gallop clips play (x their own speed); past it the hooves slide."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarGallopFrom(TEXT("jeeb.Horse.GallopFrom"), 1300.f, TEXT("Ground speed (cm/s) from which the horse's legs gallop instead of canter (0: never gallop, the old sped-up canter)."), ECVF_Default);
+static TAutoConsoleVariable<float> CVarGallopHoof(TEXT("jeeb.Horse.GallopHoof"), 850.f, TEXT("The gallop clip's planted-hoof speed at scale 1 (cm/s): the clip plays at ground speed / (this x 1.25). Lower: faster legs."), ECVF_Default);
 static TAutoConsoleVariable<float> CVarHorseMeshYaw(TEXT("jeeb.Horse.MeshYaw"), -90.f, TEXT("Degrees the horse's model is turned to face the way it walks (looks only)."), ECVF_Default);
 static TAutoConsoleVariable<FString> CVarSaddle(TEXT("jeeb.Horse.Saddle"), TEXT("50 116 -90 0"),
 	TEXT("Where the saddle sits on the horse's model (looks only): forward, up (cm in the unscaled model), yaw and pitch (degrees). Live."), ECVF_Default);
@@ -130,6 +132,7 @@ namespace
 			M.Clips[JeebDeer::C_Look] = Clip(TEXT("Idle2"));
 			M.Clips[JeebDeer::C_Walk] = Clip(TEXT("Walk"));
 			M.Clips[JeebDeer::C_Run] = Clip(TEXT("Run"));
+			M.Clips[JeebDeer::C_Gallop] = Clip(TEXT("Gallop"));   // (2026-11-26: Meshy's horse sprint, a 4-beat gallop)
 			M.Clips[JeebDeer::C_Graze] = M.Clips[JeebDeer::C_Look];
 			M.Clips[JeebDeer::C_Alert] = Clip(TEXT("Back"));
 			M.Clips[JeebDeer::C_Death] = Clip(TEXT("Death"));
@@ -137,13 +140,16 @@ namespace
 			if (M.Saddle) M.Saddle->AddToRoot();
 			int32 Got = 0;
 			for (UAnimSequence* A : M.Clips) Got += A ? 1 : 0;
-			UE_LOG(LogTemp, Log, TEXT("JEEBHORSE model: mesh %s, saddle %s, %d of 7 clip slots"), M.Mesh ? TEXT("ok") : TEXT("MISSING"), M.Saddle ? TEXT("ok") : TEXT("MISSING"), Got);
+			UE_LOG(LogTemp, Log, TEXT("JEEBHORSE model: mesh %s, saddle %s, %d of 8 clip slots"), M.Mesh ? TEXT("ok") : TEXT("MISSING"), M.Saddle ? TEXT("ok") : TEXT("MISSING"), Got);
 		}
 		return (M.Mesh && M.Clips[JeebDeer::C_Idle]) ? &M : nullptr;
 	}
 	// the planted hoof's speed in each moving clip at scale 1 (deer_export.py's DEER lines for the horse): the clips are played at the
 	// speed the horse really goes / this, so the hooves don't slide (until the riding speeds outrun the canter: the rate is capped)
-	constexpr float WalkHoof = 106.f, RunHoof = 397.f;
+	constexpr float WalkHoof = 106.f, RunHoof = 397.f;   // (the gallop's: jeeb.Horse.GallopHoof)
+	// gait sync: where each clip's leading (right) forefoot lands, 0-1 of the clip (Saved footfall measure in Blender, 2026-11-26), so walk,
+	// canter and gallop cross-fade with their feet in step
+	constexpr float WalkFR = 0.604f, CanterFR = 0.417f, GallopFR = 0.583f;
 	constexpr float CallSpeed = 1700.f, TrotSpeed = 650.f, WalkSpeed = 160.f;
 
 	UStaticMesh* YardMesh(const TCHAR* Name)
@@ -257,6 +263,8 @@ void AHorse::BuildBody()
 	if (Anim)
 	{
 		Anim->SetClips(M->Clips, Rand.FRandRange(0.f, 4.f)); Anim->Drive(JeebDeer::C_Idle, 1.f);
+		Anim->GaitOff[JeebDeer::C_Walk] = WalkFR; Anim->GaitOff[JeebDeer::C_Run] = CanterFR; Anim->GaitOff[JeebDeer::C_Gallop] = GallopFR;
+		Anim->bGaitSync = M->Clips[JeebDeer::C_Gallop] != nullptr;
 		// the four legs for the foot IK (horse_retarget.py's chains): upper, middle and lower joint of the bend, then the hoof
 		static const FName Legs[4][4] = {
 			{ TEXT("joint_41"), TEXT("joint_40"), TEXT("joint_39"), TEXT("joint_37") },    // front left
@@ -787,8 +795,12 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 	else if (MoveSpeed > 25.f)
 	{
 		const bool bRun = MoveSpeed > 380.f;
-		Clip = bRun ? JeebDeer::C_Run : JeebDeer::C_Walk;
-		Rate = FMath::Clamp(MoveSpeed / ((bRun ? RunHoof : WalkHoof) * S), 0.5f, bRun ? CVarRunRateCap.GetValueOnGameThread() : 2.6f);
+		// the gallop (2026-11-26) from jeeb.Horse.GallopFrom up, back to the canter below it less 150 cm/s (no flicker at the edge)
+		const float GFrom = CVarGallopFrom.GetValueOnGameThread();
+		bGallopLegs = bRun && GFrom > 0.f && Anim && Anim->bGaitSync && MoveSpeed > (bGallopLegs ? GFrom - 150.f : GFrom);
+		Clip = bGallopLegs ? JeebDeer::C_Gallop : bRun ? JeebDeer::C_Run : JeebDeer::C_Walk;
+		const float Hoof = bGallopLegs ? FMath::Max(100.f, CVarGallopHoof.GetValueOnGameThread()) : bRun ? RunHoof : WalkHoof;
+		Rate = FMath::Clamp(MoveSpeed / (Hoof * S), 0.5f, bRun ? CVarRunRateCap.GetValueOnGameThread() : 2.6f);
 	}
 	if (Anim) Anim->Drive(Clip, Rate);
 	if (SaddleMesh)
@@ -851,17 +863,21 @@ void AHorse::TickLook(float Dt, float MoveSpeed, bool bBack)
 		Body->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;   // (unseen lab horses too)
 		Body->bEnableUpdateRateOptimizations = false; Body->SetForcedLOD(1);
 		FString Line;
+		FString LocLine;   // (each hoof's speed against the horse itself: a planted hoof should move back at the horse's speed)
 		const double Now = GetWorld()->GetTimeSeconds();
 		for (int32 l = 0; l < 4; ++l)
 		{
 			const FVector H = Body->GetBoneLocation(Anim->Legs[l][3]);
 			const float Gap = H.Z - JeebFoes::Ground(H.X, H.Y) - Anim->HoofRefZ[l] * S;
 			const float Slide = (HoofPrevT > 0.0 && Now > HoofPrevT) ? float(FVector::Dist2D(H, HoofPrev[l]) / (Now - HoofPrevT)) : 0.f;
+			const FVector Hl = GetActorTransform().InverseTransformPosition(H);
+			const float LocV = (HoofPrevT > 0.0 && Now > HoofPrevT) ? float(FVector::Dist2D(Hl, HoofPrevL[l]) / (Now - HoofPrevT)) : 0.f;
+			HoofPrevL[l] = Hl; LocLine += FString::Printf(TEXT(" %.0f"), LocV);
 			HoofPrev[l] = H;
 			Line += FString::Printf(TEXT(" %.1f %.1f %.0f"), Gap, Anim->DebugLift[l], Slide);
 		}
 		HoofPrevT = Now;
-		UE_LOG(LogTemp, Log, TEXT("JEEBHOOF %d %.2f st=%d spd=%.0f rate=%.2f pitch=%.1f roll=%.1f body=%.1f |%s"), LabRole, Now, int32(St), MoveSpeed, Rate, SlopePitch, SlopeRoll, Anim->DebugBody, *Line);
+		UE_LOG(LogTemp, Log, TEXT("JEEBHOOF %d %.2f st=%d spd=%.0f rate=%.2f pitch=%.1f roll=%.1f body=%.1f |%s | local%s"), LabRole, Now, int32(St), MoveSpeed, Rate, SlopePitch, SlopeRoll, Anim->DebugBody, *Line, *LocLine);
 	}
 #endif
 }
