@@ -80,9 +80,19 @@ public:
 	TArray<FString> MakeConversation(int32* OutLore = nullptr);   // OutLore: the fragment of lore told this time (or untouched)
 	void SetTalking(bool bOn) { bTalking = bOn; }
 
+	// The alarm (2026-11-26, Guards.h; players' machines, looks only): stop, turn to LookAt for Seconds; bShout: the one who heard the
+	// thief, with Line in a speech bubble for BubbleSeconds and a red "!", else a yellow "!" (they noticed)
+	void Alarm(const FVector& LookAt, float Seconds, float BubbleSeconds, const FString& Line, bool bShout);
+	// (HUD) false when calm; else the bubble's line ("" none), whether they shouted, and the bubble's and the mark's fade (0..1)
+	bool AlarmShown(FString& OutLine, bool& bOutShout, float& OutBubble, float& OutMark) const;
+
 	virtual void Tick(float DeltaSeconds) override;
 
 private:
+	double AlarmUntil = -1.0, BubbleUntil = -1.0;
+	FVector AlarmLook = FVector::ZeroVector;
+	FString AlarmLine;
+	bool bAlarmShout = false;
 	UPROPERTY() UCapsuleComponent* Capsule = nullptr;
 	UPROPERTY() USceneComponent* BodyRoot = nullptr;
 	UPROPERTY() USceneComponent* HeadPivot = nullptr;

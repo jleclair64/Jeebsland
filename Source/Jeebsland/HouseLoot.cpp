@@ -6,6 +6,7 @@
 #include "QuestData.h"
 #include "Npc.h"
 #include "Stealth.h"
+#include "Guards.h"
 #include "JeebTuning.h"
 #include "EngineUtils.h"
 #include "TimerManager.h"
@@ -139,6 +140,7 @@ namespace JeebHouseLoot
 			TArray<FInvSlot> Items;
 			int32 Ingots = 0;
 			Roll(B.Tier, Items, Ingots);
+			JeebGuards::NoteStolen(K, Items, Ingots);   // (a guard who catches him takes it back: Guards.h)
 			B.RefillAt = K->GetWorld()->GetTimeSeconds() + JeebTune::V().LootRefillSeconds;
 			TArray<FString> Got, Left;
 			if (Ingots > 0) { Sk->AddIngots(Ingots); Got.Add(FString::Printf(TEXT("%d ingots"), Ingots)); }
@@ -440,6 +442,7 @@ void AKnightCharacter::FinishBoxPick()
 		for (const TWeakObjectPtr<UStealthSense>& S : UStealthSense::All())
 			if (S.IsValid() && S->GetOwner() && FVector::Dist(S->GetOwner()->GetActorLocation(), Me) < JeebTune::V().LootAlertRange) S->ForceAlert(this);
 		UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOT %s pick %s: failed, heard by %s"), *PlayerName(this), *B->Key, *Heard->GetNpcName());
+		JeebGuards::RaiseAlarm(this, Heard);   // (they shout, the townsfolk near them look, a guard comes: Guards.h)
 	}
 	else
 	{

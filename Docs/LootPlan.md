@@ -41,3 +41,32 @@ and add a duplicate row to every save.)
 - `Tools/loot_net.sh`: server + two clients. A picks a chest (retries until it opens) and the items arrive; B tries the same chest (refused:
   empty); B asks for a chest across the room from 10 m away (refused: too far).
 - Pictures of containers in Oak Hill houses with the prompt, and the pick bar.
+
+## Town guards and the alarm (2026-11-26, agent guards)
+Owner: a heard pick should make the town react: the townsperson shouts and looks, others notice, a town guard chases the thief; caught in
+town there is a price, escaping or hiding loses the guard. Guards must never be abusable and never fight players outside a theft.
+
+- **The shout.** When a slip is heard (above), the server tells every machine (`ATownGuard::MulticastAlarm`, sent by any guard; guards are
+  always relevant): the townsperson who heard it (named, with their spot) stops, turns to the thief and shouts a line in a speech bubble
+  with a red "!" over them for `GuardShoutSeconds`; every townsperson within `GuardNoticeRange` of them stops and turns too, with a yellow
+  "!" for `GuardNoticeSeconds`. Looks only: townsfolk are built on every machine from the clock (NpcLife.h), so this holds them still on
+  players' machines (their Lag) and never moves them on the server.
+- **Guards.** `GuardCount` (3) town guards in Oak Hill, server-run replicated actors (`ATownGuard`, Guards.cpp), the knight's own body and
+  clips (FKnightAnimator, as the bandits) in iron with the town's blue tunic, a sword at rest. One walks the plaza's ring road, the others
+  walk Oak Hill's longest lanes back and forth (`JeebOakHill::Roads()`), at a walk.
+- **The chase.** The alarm sends the nearest guard not already chasing (if the thief is in Oak Hill). He shouts "Stop, thief!", gets a
+  red "!" and runs (`GuardChaseSpeed` 6.2 m/s: faster than a run, slower than a sprint) to where he last saw the thief.
+- **Caught:** within `GuardCatchReach` of the thief while the thief is still in Oak Hill. The server: takes back everything that thief took
+  from house containers in the last `GuardStolenMemory` s that is still in his pack (items and ingots), then a fine of `GuardFine` ingots
+  (or what is left), and knocks him down (the kick's knock-down). Messages say what was taken. The thief then has `GuardGraceSeconds` in
+  which no new alarm sends a guard. (RuneScape's pickpocket stun, plus the thieving chest's lesson: stolen goods back.)
+- **Lost:** the thief is outside Oak Hill (`JeebOakHill::InBox`) for `GuardLoseOutside` s; or hidden for `GuardLoseHidden` s (the
+  invisibility potion, or no line of sight while crouched or more than `GuardSightClose` away); or `GuardChaseMax` s pass; or the thief dies,
+  logs out or travels. He says "Where did they go?" and walks back to his beat.
+- **Never abusable.** Guards have no health and no hurt boxes (blows, arrows and spells pass them by), drop nothing and give no XP; they never
+  attack (a catch is the only thing they do to a player, and only to a thief they are chasing); no pawn collision (nobody can body-block
+  or trap one); a guard that cannot step forward for 1 s steps through what is in the way; they never leave Oak Hill's box (plus 5 m).
+- Numbers in Tuning.ini `[Guards]`; `jeeb.Guards 0` (server, at world build) leaves them out.
+- **Test:** `Tools/guards_net.sh`: server + two clients. A is put on the plaza with ingots and marked as having stolen, the alarm is
+  raised; the guard runs to A and catches him (server JEEBGUARDTEST PASS caught, ingots taken); B's machine logs the shout and the running
+  guard and takes pictures (`Saved/Shots/guard_*.png`). Then a second alarm and A is put outside the town: the guard loses him.
