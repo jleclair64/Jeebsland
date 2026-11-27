@@ -3,6 +3,7 @@
 #include "Broom.h"
 #include "OpenWorld.h"
 #include "SilverPoint.h"
+#include "SilverClock.h"
 #include "Terrain.h"
 #include "TownLabSwaps.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -189,6 +190,8 @@ void AOpenWorld::BuildHouses()
 		FKit* K = SilverKits.Find(P.Kind);
 		if (!K) K = &SilverKits.Add(P.Kind, Load(JeebOakHill::FindModel(P.Model), FString::Printf(TEXT("/Game/TownLab/Silver/SM_TL_SP%s"), P.Kind)));
 		Put(*K, P.Centre, P.Yaw, *FString::Printf(TEXT("Silver Point %s"), P.Id));
+		if (!bServer && FCString::Strcmp(P.Kind, TEXT("TownHall")) == 0)   // (its working clock on Central time: SilverClock.h, 2026-11-27)
+			ASilverClock::PlaceOn(GetWorld(), FVector(P.Centre.X, P.Centre.Y, JeebTerrain::HeightAt(P.Centre.X, P.Centre.Y)), P.Yaw);
 	}
 	{
 		// (a check: walls of two buildings within 1.5 m of each other, a building on a road, a building off the level ground)

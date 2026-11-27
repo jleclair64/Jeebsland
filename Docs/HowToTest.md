@@ -447,3 +447,4 @@ Things to check:
 - No grass or snow comes through floors.
 - Goblins scurry while folk stroll.
 - Lit windows at dusk.
+- **Town hall clock (2026-11-27):** both faces of the tower (front over the door, and the back) show the real US Central time (CST/CDT, worked out from UTC, so every PC and server shows the same whatever its own time zone). The minute hand creeps once a second. Look close from the plaza and from the side: the dial sits flush in the wooden ring, no flicker, none of the old painted hands showing. Log: `JEEBCLOCK` (Central time next to UTC). Picture: `Docs/SilverPoint/clock.jpg`.

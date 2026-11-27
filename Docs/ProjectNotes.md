@@ -1023,6 +1023,7 @@ Owner's list (pictures pt 6-10): hand too close to his face when aiming a rock, 
   - Goblins: `FFolk::bGoblin` gives speed 330, up to 10 errands, and 2-6 s stays.
   - Silver Point errands use a per-errand seed, so Oak Hill's rounds are unchanged.
 - **Meshy credits:** 627 spent (1013 to 386).
+- **Town hall clock (2026-11-27, agent clock; owner: "set to US central time on all servers"):** `ASilverClock` (SilverClock.h/.cpp), placed by `AOpenWorld::BuildHouses` on clients only (never a dedicated server, no replication). The model's painted clock is on both tower faces at model frame (29.6, +-180.8, 1283) cm, ring inner edge about 118-124 cm radius (found by Blender ray casts on `SilverTownHall_300k.glb` at game size). The painted hands are raised about 5 cm, so the new dial is an 8.5 cm gilt drum (radius 117) with a cream face (111) on it, dark markers and hands (engine cube/cylinder with `M_Color`, no shadows). `JeebClock::CentralFromUtc` applies the US DST rule (second Sunday of March 08:00 UTC to first Sunday of November 07:00 UTC) to `FDateTime::UtcNow()`. Tick interval 1 s, two rotations per face. If the model is rebuilt or rescaled, re-measure the face numbers.
 - **Open:**
   - No cobbles on the plaza or streets.
   - The layout is more spread out than narrow lanes.
