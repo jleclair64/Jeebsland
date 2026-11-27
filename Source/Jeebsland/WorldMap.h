@@ -660,6 +660,20 @@ namespace JeebWorld
 		if (JeebRework::NearNeedles(X, Y, 0.f))   // (2026-11-25: the Needles, pillars of rock standing on the land as it is)
 			for (const JeebRework::FStack& S : JeebRework::Needles()) { const float Hs = JeebRework::StackHeight(S, X - S.X, Y - S.Off); if (Hs > -1.0e8f) H += Hs; }
 		const float D = Y - CoastY(X);   // > 0 out at sea
+		// (2026-11-26) the first cove's glen (MapRework.h CoveGlen): the land kept under a walkable ramp up from the beach, with a soft corner
+		if (D < 0.f && D > -JeebRework::GlenReach)
+		{
+			const float Gl = JeebRework::CoveGlen(X);
+			if (Gl > 0.f)
+			{
+				const float Cap = SeaLevel + 30.f - JeebRework::GlenSlope * D + 70.f * Noise(P + FVector2D(310.f, -1270.f), 2100.f) * Smooth(0.f, -2500.f, D);
+				const float K = 250.f, Df = Cap - H;
+				float Hg = H;
+				if (Df <= -K) Hg = Cap;
+				else if (Df < K) { const float Hh = (K - FMath::Abs(Df)) / K; Hg = FMath::Min(H, Cap) - Hh * Hh * K * 0.25f; }
+				H = FMath::Lerp(H, Hg, Gl);
+			}
+		}
 		// (2026-11-25, the map rework) the north-east's sea cliffs (MapRework.h): along that coast the land is lifted in a wedge that rises
 		// toward the sea and ends in a wall, in place of the beach
 		const JeebRework::FSeaCliff Cl = D > -JeebRework::CliffWedge ? JeebRework::SeaCliffAt(X) : JeebRework::FSeaCliff();

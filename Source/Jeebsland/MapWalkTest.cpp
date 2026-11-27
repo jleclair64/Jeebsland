@@ -1,8 +1,10 @@
 // Map rework walking test (2026-11-26, agent checks; test builds only, standalone). Drives the local knight along a list of waypoints and
 // logs where he is every second, so falling through the ground, sticking and invisible walls show up in the log (JEEBMAPWALK).
 //   -MapWalk="x_y[_flags];x,y[,flags];..."   centimetres, X north, Y east. The first point is a teleport. Flags: J jump while walking this
-//        leg, C climb (hold W; on a rock face the keys follow the rock up), S sprint. A leg ends within 1.5 m of its point or after 40 s.
-//   -MapProbe="X:Y0:Y1:step[;...]"           logs the ground's height (JEEBMAPPROBE) along a line of Y at that X, once at start.
+//        leg, C climb (hold W; on a rock face the keys follow the rock up), S sprint, T stand him there (no walking), F the climbing bar
+//        stays full on this leg (a high-level climber: is the whole face climbable?). A leg ends within 1.5 m of its point or after 40 s.
+//   -MapProbe="X:Y0:Y1:step[;...]"           logs the ground's height (JEEBMAPPROBE) along a line of Y at that X, once at start, and the
+//        steepest stretch of that line (JEEBMAPSLOPE, degrees over one step).
 #include "CoreMinimal.h"
 #if !UE_BUILD_SHIPPING
 #include "Engine/Engine.h"
@@ -19,7 +21,7 @@
 
 namespace
 {
-	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false; };
+	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false, bFullBar = false; };
 	TArray<FLeg> Legs;
 	int32 LegIdx = -1;
 	double LegStart = 0.0, LastLog = 0.0, LastMoveT = 0.0;
@@ -50,7 +52,7 @@ namespace
 				TArray<FString> P; S.ParseIntoArray(P, TEXT("_"));
 				if (P.Num() < 2) continue;
 				FLeg L; L.P = FVector2D(FCString::Atof(*P[0]), FCString::Atof(*P[1]));
-				if (P.Num() > 2) { L.bJump = P[2].Contains(TEXT("J")); L.bClimb = P[2].Contains(TEXT("C")); L.bSprint = P[2].Contains(TEXT("S")); L.bTele = P[2].Contains(TEXT("T")); }
+				if (P.Num() > 2) { L.bJump = P[2].Contains(TEXT("J")); L.bClimb = P[2].Contains(TEXT("C")); L.bSprint = P[2].Contains(TEXT("S")); L.bTele = P[2].Contains(TEXT("T")); L.bFullBar = P[2].Contains(TEXT("F")); }
 				Legs.Add(L);
 			}
 		}
@@ -80,6 +82,9 @@ namespace
 				FString Line;
 				for (float Y = Y0; Y <= Y1; Y += St) Line += FString::Printf(TEXT(" %.0f:%.1f"), Y, JeebTerrain::HeightAt(X, Y) / 100.f);
 				UE_LOG(LogTemp, Log, TEXT("JEEBMAPPROBE X %.0f Y:height(m)%s (coast Y %.0f)"), X, *Line, JeebWorld::CoastY(X));
+				float Worst = 0.f, WorstY = Y0;
+				for (float Y = Y0; Y + St <= Y1; Y += St) { const float Sl = FMath::Abs(JeebTerrain::HeightAt(X, Y + St) - JeebTerrain::HeightAt(X, Y)) / St; if (Sl > Worst) { Worst = Sl; WorstY = Y; } }
+				UE_LOG(LogTemp, Log, TEXT("JEEBMAPSLOPE X %.0f Y %.0f..%.0f: steepest %.1f degrees over %.0f cm at Y %.0f"), X, Y0, Y1, FMath::RadiansToDegrees(FMath::Atan(Worst)), St, WorstY);
 			}
 		}
 		if (Legs.Num() == 0) { if (bProbed) bDone = true; return true; }
@@ -124,6 +129,7 @@ namespace
 				LegStart = LastMoveT = Now; LastMoveP = Me->GetActorLocation(); return true;
 		}
 		To /= Dist;
+		if (L.bFullBar && KM) { KM->ClimbStamina = 1.f; KM->bClimbExhausted = false; }
 		const FRotator Face(0.f, FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)), 0.f);
 		if (PC) PC->SetControlRotation(Face);
 		if (KM && KM->OnWall() && L.bClimb) Me->AddMovementInput(UKnightMovement::WallUp(KM->WallNormal), 1.f);

@@ -59,6 +59,15 @@ Field map, Play (single player works; online the server runs them). Stags live i
 - Numbers: `Content/Data/Animals.csv` (health, speeds, senses, respawn, loot) and `AnimalHerds.csv` (where the herds are, how many wild ones). Restart after changing them. `jeeb.Deer 0` before the map loads: no deer.
 - Test runs (in a project copy, all off screen): `bash Tools/deer_net.sh` runs a world server and two players through the online test (`-JeebDeerTest`; log JEEBDEERTEST PASS / FAIL per step, JEEBDEERCLIENT for what reached each player). `bash Tools/deer_lab.sh 29736 25455 stills` (or `film`, `cost`) takes pictures, the 120 fps smear film or frame timing of four stags with fixed parts (`-DeerLab=X_Y_Yaw`). Pictures from the first run are in `Docs/Deer/`.
 
+## Map rework: the sea cliffs, the first cove, the moor's heather (2026-11-26; Docs/MapRework.md)
+
+Field map, Play. Fast travel to Silver Point (Tab map), then walk east to the coast: the first cove is about 475 m north of the origin (X 47,500, Y 88,000 to 93,300).
+- **The first cove's glen:** from the cliff top walk east down the grassy glen to the sand. You should walk the whole way (no fall, no sliding); the cliffs stand either side.
+- **Climbing out of the sea:** swim north from the cove along the foot of the cliffs (about 85 m and 125 m north of it are the two spots that failed) and swim straight at the wall holding W: he should grab it at the waterline and climb. A new character's climbing bar lasts about 3.7 m of wall, so he drops back in; a higher Climbing level tops the first ledge (10 m).
+- **The lip's grass:** stand on a cliff top by the edge: the grass is taller with a thick fringe in the last 2 to 3 m. Console: `jeeb.Cliff.LipClumps 0..3` (extra clumps beside each one; 1 is the default, 3 the old look, 0 the cheapest; the grass regrows at once), `jeeb.Cliff.WallShadows 0` (the cliffs cast no shadow; saves about 0.1 ms).
+- **Heather:** on the moor between Oak Hill's forest and the coast (a deep drift is at X 7,250, Y 90,750, about 730 m east of the plaza and 110 m north): soft pink-mauve mounds, some olive-brown, no sharp tips. Console: `jeeb.Moor.HeatherColour 0.095 0.052 0.068` ("r g b", low numbers: 0.14 0.065 0.095 is brighter and pinker; regrows at once), `jeeb.Moor.Heather` (cushions per square metre).
+- Test runs (off screen, test builds): `-MapWalk="x_y;x_y_flags;..."` walks the knight along points and logs JEEBMAPWALK (flags: T stand him there, C climb, F keep the climbing bar full, J jump, S sprint); `-MapProbe="X:Y0:Y1:step;..."` logs heights and the steepest stretch (JEEBMAPSLOPE); `-MapHeather` logs spots deep in heather; `-BankClimb` logs why a climb stopped. Pictures: `Tools\MapBoard.ps1 -Stage fixes -Tag after`, then `-Compose`. Online hash check: `bash Tools/map_net.sh`.
+
 ## The open world: mountains, snow, roads, trees, town sites (2026-11-22)
 
 Field map, Play (single player). Console commands (test builds only):

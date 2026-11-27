@@ -156,3 +156,46 @@ not timed, no server-plus-client run, not walked in play, Shipping not compiled)
 - **Walking** (`-MapWalk`, `-MapProbe`, `-MapHeather`; `MapWalkTest.cpp`, test builds only): lip, ledges, the arch's top, swimming under the arch, the cove beach 2 and a beach under a sheer wall all pass, no fall through the ground and no invisible wall. Found and fixed: a swimmer who grabbed a wall was thrown back into the swim every move by the deep water at his feet (`bClimbFromWater`, carried in the move response). Left: cove 1 (X 47,500) has a 55 degree band about 8 m tall on its way down, not walkable (a fall of 11.7 m); climbing out of the sea stalls at X 56,000 (no movement at all) and X 60,000 (stops under a rock lip 1.5 m up); a sheer wall is more than a level-1 climber's bar can climb.
 - **Shipping**: compiles.
 - **Smear**: 120 fps film, moving camera, over the moor grass, the lip grass and the heather cushions: no ghost copies. The heather's pale pink sprig tips stand out as sharp shards close up.
+
+## Follow-ups fixed 2026-11-26 (agent `mapfix`, Thursday list item 22)
+
+Board: `Docs/MapRework/fixes.jpg` (the first four rows are before and after; the rest are new views, after only). Remake:
+`MapBoard.ps1 -Stage fixes -Tag after`, then `-Stage fixes -Compose` (the views are in `Tools/MapBoardViews.ps1`).
+
+- **Cove 1 is a real glen now** (`JeebRework::CoveGlen`, applied in `JeebWorld::SeaAndRivers`). The way down was the old 35 m beach ramp
+  squeezing a 28 m hill (a 55 degree band, an 11.7 m fall). Within 15 m either side of the cove's middle line (X 47,500) the land may
+  stand no higher than a ramp rising 19 degrees from the beach, easing out to the cliffs over the next 27 m each side; the glen is about
+  85 m across at its top and runs some 80 m inland. Measured down three lines (X 46,500, 47,500, 48,500): nothing steeper than 36 degrees,
+  and that is the old hill's far side at Y 84,500, not the glen; the knight walks all three from the top to the sand with no fall.
+  The cliffs either side, the beach and cove 2 are as they were. The open world's and the forest's hashes changed (the land did);
+  roads f5c5483c, Oak Hill, Steele Creek, houses and camps did not.
+- **Climbing out of the sea.** Two causes, both general: (1) at X 56,000 his feet touched a sunken foot of the rock 2 m short of the
+  wall, he grabbed it with nothing at his chest to climb, and hung there until the bar ran out: a swimmer now grabs only rock that
+  reaches his chest (`KnightMovementSwim.cpp`), the same probe the climb itself uses, and otherwise slides on over it to the wall;
+  (2) at X 60,000 the roughened face bulged into a lip over him: a wall's face may now gain no more than 12 cm outward per metre of
+  height (`JeebRework::WallLean`, about 7 degrees; he climbs up to 15), measured up each edge from its foot and down from its top
+  (`AWorldTerrain::BuildFine`). This applies to every wall, stack and the Needles; the faces keep their beds, bulges and hollows but
+  no longer overhang (board rows 3 and 4). Walking test: at both spots he grabs the wall from the water and climbs; with a full bar
+  he tops the first step (10.9 m at X 56,000, 8.3 m at X 60,000). A level-1 bar lasts 5 s, about 3.7 m of wall, so a new character
+  still cannot top a 10 m step and has to swim to a cove or a beach: that is the Climbing skill's numbers, not the rock.
+- **Lip view frame cost** (one `solo` window, HIGH, 1280x720, medians over 7 s, the same view; old map 5.16 ms):
+  three extra clumps (as it was) 6.56 to 6.73 (+1.4 to +1.5); two 6.29 (+1.1); **one, now the default, 5.98 (+0.8)**; none 5.80 (+0.6).
+  Wall chunks casting no shadow saves a further 0.05 to 0.1. **The +0.5 target is not met.** The extra clumps were only about a
+  third of the cost: the rest is the cliff country itself in that view (6,700 more ordinary grass clumps on land that used to be beach
+  and sea, 28 more ground chunks, 0.36 million more triangles), which no lip setting touches. The one extra clump stands 25% bigger and
+  keeps to the last 2 to 3 m by the edge, and the fringe still hides the lip (board row 2). Live: `jeeb.Cliff.LipClumps` 0 to 3
+  (regrows round you), `jeeb.Cliff.WallShadows` 0/1 (left on: the cliffs' shadow on the sea, beaches and ledges is worth 0.1 ms).
+- **Heather.** Found on the way: the cushion's triangles were wound backwards, and a two-sided material turns a back face's normal
+  over, so every cushion was lit from underneath; that was the dark, flat "tiles" look, and the colour had been pushed bright to
+  compensate. Fixed, and the model rebuilt (third one): no dome and no flat sprigs, only fifteen blunt rounded knobs packed into a
+  mound 70 cm across (51 triangles; it was 34), each shaded round its own middle. Colour: a muted heather pink-mauve
+  (`jeeb.Moor.HeatherColour` 0.095 0.052 0.068, now live: a change regrows the grass; it also reads `r_g_b`), with about a third of
+  the cushions drifting toward olive green-brown. Cushions a little smaller (65 to 100 cm), still six per square metre. The far
+  ground's heather colour (M_Ground) was left alone and the two join without a visible ring at 30 to 60 m. Heather view (HIGH,
+  solo): 7.31 ms against 7.17 on the old map. 120 fps film with a moving camera over the heather and the lip grass: no ghost copies.
+- **Online** (`Tools/map_net.sh`): server and client joined; all 14 hash lines match (open world b91a53ac, forest 30bae682, roads f5c5483c).
+
+**Left:** the lip view is +0.8 ms, not +0.5 (the owner's call: `jeeb.Cliff.LipClumps 0` gives +0.6; getting lower means cheaper
+cliff ground, e.g. no underside copy for the cliff chunks, about half of the 0.36 million extra triangles). The heather is still low-poly
+mounds: soft at 3 m and beyond, plainly faceted at your feet; a painted card model would be the next step if the owner wants finer.
+The glen's north wall shows a broad smooth slab of grey rock from inland. Shipping was not compiled with these changes. Not played by hand.

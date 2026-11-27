@@ -469,6 +469,13 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 		if (bRockEnds)
 		{
 			if (TryLedge()) return false;
+#if !UE_BUILD_SHIPPING
+			{
+				static const bool bTest = FParse::Param(FCommandLine::Get(), TEXT("BankClimb"));
+				static double LastLog = 0.0;
+				if (bTest && FPlatformTime::Seconds() - LastLog > 1.0) { LastLog = FPlatformTime::Seconds(); UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB stopped at the hands: dir %.2f %.2f %.2f | hand hit %d pen %d n %.2f %.2f %.2f dist %.0f"), Dir.X, Dir.Y, Dir.Z, bHit ? 1 : 0, Hand.bStartPenetrating ? 1 : 0, Hand.ImpactNormal.X, Hand.ImpactNormal.Y, Hand.ImpactNormal.Z, Hand.Distance); }
+			}
+#endif
 			// no room over the top: no further up (along the wall and down still work)
 			FHitResult Back;
 			SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
@@ -493,6 +500,20 @@ bool UKnightMovement::HugWall(float Dt, float InUp, const FVector& OldLoc)
 			return false;
 		}
 		// the climbable part ends this way: undo the step
+#if !UE_BUILD_SHIPPING
+		{
+			static const bool bTest = FParse::Param(FCommandLine::Get(), TEXT("BankClimb"));
+			static double LastLog = 0.0;
+			if (bTest && FPlatformTime::Seconds() - LastLog > 1.0)
+			{
+				LastLog = FPlatformTime::Seconds();
+				FHitResult D1, D2;
+				const bool b1 = ProbeWall(C, Dir, R + 40.f, D1), b2 = ProbeWall(C + FVector(0.f, 0.f, -55.f), Dir, R + 40.f, D2);
+				UE_LOG(LogTemp, Log, TEXT("JEEBCLIMB stopped: up %.2f dir %.2f %.2f %.2f | chest hit %d pen %d n %.2f %.2f %.2f dist %.0f | knee hit %d pen %d n %.2f %.2f %.2f dist %.0f"), InUp, Dir.X, Dir.Y, Dir.Z,
+					b1 ? 1 : 0, D1.bStartPenetrating ? 1 : 0, D1.ImpactNormal.X, D1.ImpactNormal.Y, D1.ImpactNormal.Z, D1.Distance, b2 ? 1 : 0, D2.bStartPenetrating ? 1 : 0, D2.ImpactNormal.X, D2.ImpactNormal.Y, D2.ImpactNormal.Z, D2.Distance);
+			}
+		}
+#endif
 		FHitResult Back;
 		SafeMoveUpdatedComponent(OldLoc - C, UpdatedComponent->GetComponentQuat(), true, Back);
 		Velocity = FVector::ZeroVector;
