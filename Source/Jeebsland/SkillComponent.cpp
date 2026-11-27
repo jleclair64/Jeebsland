@@ -79,7 +79,7 @@ void USkillComponent::ResetToStartingKit()
 		for (int32 i = 0; i < 5; ++i) if (Hotbar[i] && !JeebItems::CanEquip(this, Hotbar[i])) Hotbar[i] = 0;
 		for (int32 i = 0; i < NumWornKinds; ++i) if (Worn[i] && !JeebItems::CanEquip(this, Worn[i])) Worn[i] = 0;
 		// (2026-11-22, owner: no bow or arrows for the troll; a sack of throwing rocks instead, and his own tin armour)
-		for (FInvSlot& S : Slots) if (JeebItems::IsArrow(S.Id)) { S.Id = 0; S.Count = 0; }
+		for (FInvSlot& S : Slots) if (JeebItems::IsArrow(S.Id)) { S.Id = 0; S.Count = 0; S.Size = 0; }
 		AddInvItem(JeebItems::IdRocks, StartRocks);
 		for (int32 K = JeebItems::K_Helmet; K <= JeebItems::K_Boots; ++K) Worn[K] = JeebItems::ArmourId(K, JeebItems::AS_Troll, JeebItems::T_Tin);
 	}
@@ -99,8 +99,8 @@ void USkillComponent::ResetToStartingKit()
 void USkillComponent::TakeEverything(TArray<FInvSlot>& Out, TArray<uint8>& OutWhere, int32& OutIngots)
 {
 	if (!HasAuth()) return;   // only the server changes the pack
-	auto Put = [&](int32 Id, int32 Count, uint8 W) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; Out.Add(D); OutWhere.Add(W); } };
-	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0); S.Id = 0; S.Count = 0; }
+	auto Put = [&](int32 Id, int32 Count, uint8 W, int32 Size = 0) { if (Id != 0 && Count > 0) { FInvSlot D; D.Id = Id; D.Count = Count; D.Size = Size; Out.Add(D); OutWhere.Add(W); } };
+	for (FInvSlot& S : Slots) { Put(S.Id, S.Count, 0, S.Size); S.Id = 0; S.Count = 0; S.Size = 0; }
 	for (int32 i = 0; i < 5; ++i) { Put(Hotbar[i], 1, 1); Hotbar[i] = 0; }
 	for (int32 i = 0; i < NumWornKinds; ++i) { Put(Worn[i], 1, 2); Worn[i] = 0; }
 	Put(RingB, 1, 2); RingB = 0;
@@ -370,27 +370,27 @@ bool USkillComponent::PickSpellRow(int32 Row)
 	return true;
 }
 
-bool USkillComponent::CanAdd(int32 Id, int32 Amount) const
+bool USkillComponent::CanAdd(int32 Id, int32 Amount, int32 Size) const
 {
-	const int32 Stack = JeebItems::StackSize(Id);
+	const int32 Stack = Size > 0 ? 1 : JeebItems::StackSize(Id);   // (a sized fish never stacks)
 	int32 Room = 0;
 	for (const FInvSlot& S : Slots)
 	{
 		if (S.Id == 0) Room += Stack;
-		else if (S.Id == Id) Room += Stack - S.Count;
+		else if (S.Id == Id && Size <= 0 && S.Size <= 0) Room += Stack - S.Count;
 	}
 	return Room >= Amount;
 }
 
-bool USkillComponent::AddInvItem(int32 Id, int32 Amount)
+bool USkillComponent::AddInvItem(int32 Id, int32 Amount, int32 Size)
 {
 	if (!HasAuth()) return false;   // only the server changes the pack
-	if (!CanAdd(Id, Amount)) return false;
-	const int32 Stack = JeebItems::StackSize(Id);
+	if (!CanAdd(Id, Amount, Size)) return false;
+	const int32 Stack = Size > 0 ? 1 : JeebItems::StackSize(Id);
 	for (FInvSlot& S : Slots) // top up existing stacks first
 	{
 		if (Amount <= 0) break;
-		if (S.Id == Id && S.Count < Stack)
+		if (S.Id == Id && Size <= 0 && S.Size <= 0 && S.Count < Stack)
 		{
 			const int32 N = FMath::Min(Stack - S.Count, Amount);
 			S.Count += N; Amount -= N;
@@ -402,7 +402,7 @@ bool USkillComponent::AddInvItem(int32 Id, int32 Amount)
 		if (S.Id == 0)
 		{
 			const int32 N = FMath::Min(Stack, Amount);
-			S.Id = Id; S.Count = N; Amount -= N;
+			S.Id = Id; S.Count = N; S.Size = Size > 0 ? Size : 0; Amount -= N;
 		}
 	}
 	return true;
@@ -420,7 +420,7 @@ int32 USkillComponent::SellAll(EItemType Item)
 	int32 Total = 0;
 	for (FInvSlot& S : Slots)
 	{
-		if (S.Id == Id) { Total += S.Count; S.Id = 0; S.Count = 0; }
+		if (S.Id == Id) { Total += S.Count; S.Id = 0; S.Count = 0; S.Size = 0; }
 	}
 	const int32 Pay = Total * JeebItems::SellValue(Item);
 	Ingots += Pay;
@@ -457,12 +457,12 @@ bool USkillComponent::RemoveItems(int32 Id, int32 Count)
 		FInvSlot* Pick = nullptr;
 		for (FInvSlot& S : Slots)
 		{
-			if (S.Id == Id && S.Count > 0 && (!Pick || S.Count < Pick->Count)) Pick = &S;
+			if (S.Id == Id && S.Count > 0 && (!Pick || (S.Size > 0) < (Pick->Size > 0) || ((S.Size > 0) == (Pick->Size > 0) && (S.Count < Pick->Count || (S.Count == Pick->Count && S.Size < Pick->Size))))) Pick = &S;   // (plain stacks first; the smallest sized fish go last)
 		}
 		if (!Pick) return false;
 		const int32 N = FMath::Min(Pick->Count, Count);
 		Pick->Count -= N; Count -= N;
-		if (Pick->Count <= 0) { Pick->Id = 0; Pick->Count = 0; }
+		if (Pick->Count <= 0) { Pick->Id = 0; Pick->Count = 0; Pick->Size = 0; }
 	}
 	return true;
 }
@@ -610,18 +610,18 @@ bool USkillComponent::IsExplored(float X, float Y) const
 namespace
 {
 	// Puts Count of Id into the slots (topping up stacks first). Returns how many did not fit.
-	int32 PutInto(TArray<FInvSlot>& Arr, int32 Id, int32 Count)
+	int32 PutInto(TArray<FInvSlot>& Arr, int32 Id, int32 Count, int32 Size = 0)
 	{
-		const int32 Stack = JeebItems::StackSize(Id);
+		const int32 Stack = Size > 0 ? 1 : JeebItems::StackSize(Id);   // (a sized fish never stacks)
 		for (FInvSlot& S : Arr)
 		{
 			if (Count <= 0) return 0;
-			if (S.Id == Id && S.Count < Stack) { const int32 N = FMath::Min(Stack - S.Count, Count); S.Count += N; Count -= N; }
+			if (S.Id == Id && Size <= 0 && S.Size <= 0 && S.Count < Stack) { const int32 N = FMath::Min(Stack - S.Count, Count); S.Count += N; Count -= N; }
 		}
 		for (FInvSlot& S : Arr)
 		{
 			if (Count <= 0) return 0;
-			if (S.Id == 0) { const int32 N = FMath::Min(Stack, Count); S.Id = Id; S.Count = N; Count -= N; }
+			if (S.Id == 0) { const int32 N = FMath::Min(Stack, Count); S.Id = Id; S.Count = N; S.Size = Size > 0 ? Size : 0; Count -= N; }
 		}
 		return Count;
 	}
@@ -632,10 +632,10 @@ bool USkillComponent::BankDeposit(int32 PackIdx)
 	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Slots.IsValidIndex(PackIdx) || Slots[PackIdx].Id == 0) return false;
 	FInvSlot& S = Slots[PackIdx];
-	const int32 Left = PutInto(Bank, S.Id, S.Count);
+	const int32 Left = PutInto(Bank, S.Id, S.Count, S.Size);
 	if (Left == S.Count) return false;
 	S.Count = Left;
-	if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
+	if (S.Count <= 0) { S.Id = 0; S.Count = 0; S.Size = 0; }
 	return true;
 }
 
@@ -670,10 +670,10 @@ bool USkillComponent::BankWithdraw(int32 BankIdx)
 	if (!HasAuth()) return false;   // only the server changes the pack
 	if (!Bank.IsValidIndex(BankIdx) || Bank[BankIdx].Id == 0) return false;
 	FInvSlot& S = Bank[BankIdx];
-	const int32 Left = PutInto(Slots, S.Id, S.Count);
+	const int32 Left = PutInto(Slots, S.Id, S.Count, S.Size);
 	if (Left == S.Count) return false;
 	S.Count = Left;
-	if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
+	if (S.Count <= 0) { S.Id = 0; S.Count = 0; S.Size = 0; }
 	return true;
 }
 
@@ -725,11 +725,11 @@ void USkillComponent::FillPracticePack()
 		K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, K_Ring, K_Amulet };
 	// (the starting kit's tools are in the pack since 2026-11-03: kept, and put back after the fixed slots below)
 	TArray<int32> KeepGear;
-	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; }
+	for (FInvSlot& S : Slots) if (IsGear(S.Id)) { KeepGear.Add(S.Id); S.Id = 0; S.Count = 0; S.Size = 0; }
 	// a full stack of iron and fire arrows first (this used to write over the starting kit's arrows)
 	Slots[0].Id = JeebItems::ArrowId(JeebItems::A_Broadhead); Slots[0].Count = StartIronArrows;
 	Slots[1].Id = JeebItems::IdFireArrow; Slots[1].Count = StartFireArrows;
-	for (int32 i = 2; i < Slots.Num(); ++i) if (JeebItems::IsArrow(Slots[i].Id)) { Slots[i].Id = 0; Slots[i].Count = 0; }
+	for (int32 i = 2; i < Slots.Num(); ++i) if (JeebItems::IsArrow(Slots[i].Id)) { Slots[i].Id = 0; Slots[i].Count = 0; Slots[i].Size = 0; }
 	// three of each potion: swiftness and vigour in the pack, healing in the potion slot
 	Slots[2].Id = JeebItems::PotionId(JeebItems::P_Speed); Slots[2].Count = 3;
 	Slots[3].Id = JeebItems::PotionId(JeebItems::P_Vigour); Slots[3].Count = 3;
@@ -825,7 +825,7 @@ void USkillComponent::FitToClass()
 				if (!IsGear(Id) || KindOf(Id) != Kind || !CanEquip(this, Id)) continue;
 				if (Best < 0 || VariantOf(Id) > VariantOf(Slots[Best].Id)) Best = i;
 			}
-			if (Best >= 0) { const int32 Id = Slots[Best].Id; Slots[Best].Id = 0; Slots[Best].Count = 0; return Id; }
+			if (Best >= 0) { const int32 Id = Slots[Best].Id; Slots[Best].Id = 0; Slots[Best].Count = 0; Slots[Best].Size = 0; return Id; }
 			return Starter;
 		};
 		const bool bTroll = OwnerIsTroll(this), bWiz = OwnerIsWizard(this);

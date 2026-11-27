@@ -55,6 +55,8 @@ protected:
 	virtual void RollYield(USkillComponent* Skills, EItemType& OutItem, int32& OutXP) {}
 	// (2026-11-26) after a yield went into the pack (fishing records the catch)
 	virtual void OnYield(AActor* Gatherer, EItemType Item) {}
+	// (2026-11-26) the size the yielded item keeps in the pack, tenths of an inch (fishing: the fish just rolled); 0 = none, it stacks as before
+	virtual int32 YieldSizeTenths(EItemType Item) { return 0; }
 	// (2026-11-26) a node that runs its own clock (fishing: wait for a bite, then a click): return true and call FinishGathering yourself
 	virtual bool BeginOwnGather(class AKnightCharacter* Knight) { return false; }
 	int32 RequiredLevel() const;   // skill level needed (coal, diamond, pine and redwood need more than 1)

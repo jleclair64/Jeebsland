@@ -34,6 +34,10 @@ public:
 	UPROPERTY() TArray<int32> SlotCounts;
 	UPROPERTY() TArray<int32> BankIds;
 	UPROPERTY() TArray<int32> BankCounts;
+	// (2026-11-26, Docs/FishingPlan.md) a caught fish keeps its length, tenths of an inch, one per slot (0 = none). Older saves have none: their fish load as
+	// plain stacks. No version bump needed: a missing array reads as all zero.
+	UPROPERTY() TArray<int32> SlotSizes;
+	UPROPERTY() TArray<int32> BankSizes;
 	UPROPERTY() TArray<int32> Hotbar;
 	UPROPERTY() int32 Selected = 0;
 	UPROPERTY() TArray<int32> Worn;

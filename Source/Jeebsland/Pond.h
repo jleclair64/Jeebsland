@@ -27,6 +27,7 @@ public:
 	void ShowBite();                                           // (players' machines) the float goes under
 	void ShowCatch(AActor* Knight, EItemType Item, float Size); // (players' machines) the fish comes up flopping on the line, then hangs limp
 	bool bRiver = false;                                       // a river spot: trout, salmon and bass (the pond keeps perch, trout and carp)
+	bool IsRiverSpot() const { return bRiver; }
 	// The river spots, the same on every machine (called where the pond is made)
 	static void SpawnRiverSpots(UWorld* World);
 
@@ -34,6 +35,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void RollYield(USkillComponent* Skills, EItemType& OutItem, int32& OutXP) override;
 	virtual void OnYield(AActor* Gatherer, EItemType Item) override;
+	virtual int32 YieldSizeTenths(EItemType Item) override;   // (the fish just rolled keeps its length in the pack)
 	virtual bool BeginOwnGather(class AKnightCharacter* Knight) override;
 
 private:

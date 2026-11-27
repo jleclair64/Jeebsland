@@ -71,6 +71,7 @@ struct FJeebClassPack
 	UPROPERTY() bool bUsed = false;   // false: this class has never been played (it gets its starter kit)
 	UPROPERTY() TArray<int32> SlotIds;
 	UPROPERTY() TArray<int32> SlotCounts;
+	UPROPERTY() TArray<int32> SlotSizes;   // (2026-11-26) fish lengths, tenths of an inch, one per slot; older saves have none
 	UPROPERTY() TArray<int32> Hotbar;
 	UPROPERTY() int32 Selected = 0;
 	UPROPERTY() TArray<int32> Worn;
@@ -79,16 +80,20 @@ struct FJeebClassPack
 	UPROPERTY() int32 PotionCount = 0;
 };
 
-// One inventory slot: what is in it (see Inventory.h for ids) and how many
+// One inventory slot: what is in it (see Inventory.h for ids), how many, and (2026-11-26, Docs/FishingPlan.md) a size.
+// Size: a caught trout, salmon or bass keeps its length, in TENTHS of an inch (0 = none: every other item, and fish caught before sizes). A sized fish
+// never stacks (its own slot, Count 1); an unsized one stacks as before. It travels with the fish through the pack, the bank, drops, sacks and saves.
 USTRUCT()
 struct FInvSlot
 {
 	GENERATED_BODY()
 	FInvSlot() {}
-	FInvSlot(int32 InId, int32 InCount) : Id(InId), Count(InCount) {}
+	FInvSlot(int32 InId, int32 InCount, int32 InSize = 0) : Id(InId), Count(InCount), Size(InSize) {}
 	UPROPERTY() int32 Id = 0;
 	UPROPERTY() int32 Count = 0;
-	bool operator==(const FInvSlot& O) const { return Id == O.Id && Count == O.Count; }
+	UPROPERTY() int32 Size = 0;
+	bool operator==(const FInvSlot& O) const { return Id == O.Id && Count == O.Count && Size == O.Size; }
+	bool IsSized() const { return Id != 0 && Size > 0; }
 };
 
 // Tracks skill XP, the inventory and what you wear / hold. Lives on the character.
@@ -128,8 +133,8 @@ public:
 	// The store's mystery satchel can be opened once per real-world hour (hours since 1970)
 	UPROPERTY(Replicated) int64 LastGambleHour = -1;
 	bool AddItem(EItemType Item, int32 Amount = 1);   // false (and nothing added) if it does not fit
-	bool CanAdd(int32 Id, int32 Amount) const;
-	bool AddInvItem(int32 Id, int32 Amount = 1);
+	bool CanAdd(int32 Id, int32 Amount, int32 Size = 0) const;   // Size > 0: a sized fish, one to a slot
+	bool AddInvItem(int32 Id, int32 Amount = 1, int32 Size = 0);
 	int32 SellAll(EItemType Item);                    // removes every unit, pays ingots, returns the payment
 	// Skills are discovered by doing: only Attack and Defence are known at the start; the rest appear in the skills window the
 	// first time you earn XP in them.

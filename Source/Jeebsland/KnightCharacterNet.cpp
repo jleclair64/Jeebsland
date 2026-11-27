@@ -5,6 +5,7 @@
 #include "Inventory.h"
 #include "Store.h"
 #include "Loot.h"
+#include "JeebProps.h"
 #include "Projectile.h"
 #include "GearWall.h"
 #include "EngineUtils.h"
@@ -191,9 +192,9 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 		if (S.Id == 0 || S.Count <= 0) break;
 		const int32 N = FMath::Clamp(B, 1, S.Count);
 		TArray<FInvSlot> Items;
-		Items.Add(FInvSlot(S.Id, N));
+		Items.Add(FInvSlot(S.Id, N, S.Size));
 		S.Count -= N;
-		if (S.Count <= 0) { S.Id = 0; S.Count = 0; }
+		if (S.Count <= 0) { S.Id = 0; S.Count = 0; S.Size = 0; }
 		DropBag(Items, 0);
 		break;
 	}
@@ -241,11 +242,12 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	{
 		if (!NearTrader(static_cast<uint8>(ENpcRole::Shopkeeper)) || !Sk->Slots.IsValidIndex(A)) break;
 		FInvSlot& S = Sk->Slots[A];
-		if (S.Id == 0 || S.Id != B || !(IsGear(S.Id) || IsArrow(S.Id))) break;   // (the slot changed since the player clicked)
-		const int32 Pay = IsArrow(S.Id) ? S.Count : GearSellPrice(S.Id) * S.Count;
+		if (S.Id == 0 || S.Id != B || !(IsGear(S.Id) || IsArrow(S.Id) || (S.IsSized() && JeebProps::IsFishItem(S.Id)))) break;   // (the slot changed since the player clicked)
+		const int32 Pay = IsArrow(S.Id) ? S.Count : IsMaterial(S.Id) ? SellValue(MaterialType(S.Id)) * S.Count : GearSellPrice(S.Id) * S.Count;
 		Sk->AddIngots(Pay);
-		ShopNote(FString::Printf(TEXT("Sold %s for %d ingots."), *ItemName(S.Id), Pay));
-		S.Id = 0; S.Count = 0;
+		ShopNote(FString::Printf(TEXT("Sold %s%s for %d ingots."), *ItemName(S.Id), S.IsSized() ? *FString::Printf(TEXT(" (%s)"), *JeebProps::FishSizeText(S.Id, S.Size)) : TEXT(""), Pay));
+		UE_LOG(LogTemp, Log, TEXT("JEEBFISHSIZE sold %s size %d for %d"), *ItemName(S.Id), S.Size, Pay);
+		S.Id = 0; S.Count = 0; S.Size = 0;
 		break;
 	}
 	case EInvOp::Buy:
@@ -676,6 +678,9 @@ void AKnightCharacter::FishCaught(AFishingSpot* Spot, EItemType Item, float Size
 void AKnightCharacter::ClientFishBite_Implementation(FVector_NetQuantize At)
 {
 	if (AFishingSpot* S = SpotAt(GetWorld(), At)) S->ShowBite();
+#if !UE_BUILD_SHIPPING
+	if (FParse::Param(FCommandLine::Get(), TEXT("FishSizeDo"))) Inv(EInvOp::Reel);   // (the fish-size test clicks the moment the float goes under)
+#endif
 }
 
 void AKnightCharacter::ClientFishCatch_Implementation(FVector_NetQuantize At, uint8 Item, float Size)

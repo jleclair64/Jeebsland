@@ -7,6 +7,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "KnightMesh.h"
 #include "KnightDesign.h"
+#include "JeebRecords.h"
 
 // Models brought in by Tools\BuildProps.ps1 (/Game/Props), in place of the code-built ones (2026-11-05; since 2026-11-12 the sword, axe, bow, pickaxe, longbow,
 // crossbow, arrows, quiver, potions and amulets come from Meshy's community library: Docs/MeshyCommunityLibrary.md). Each is built around its grip, in the same
@@ -126,6 +127,10 @@ namespace JeebProps
 		default: return nullptr;
 		}
 	}
+	// (2026-11-26) a caught trout, salmon or bass keeps its length in the pack (FInvSlot::Size, tenths of an inch). Species for the records (-1: perch and golden carp have no size).
+	inline int32 FishSpecies(int32 Id) { if (!IsFishItem(Id)) return -1; const EItemType T = JeebItems::MaterialType(Id); return T == EItemType::Trout ? JeebRecords::S_Trout : T == EItemType::Salmon ? JeebRecords::S_Salmon : T == EItemType::Bass ? JeebRecords::S_Bass : -1; }
+	inline FString FishSizeText(int32 Id, int32 SizeTenths) { const int32 S = FishSpecies(Id); return (S >= 0 && SizeTenths > 0) ? JeebRecords::SizeText(S, SizeTenths / 10.f) : FString(); }   // "27.3 in"
+	inline bool IsBoardFish(int32 Id, int32 SizeTenths) { const int32 S = FishSpecies(Id); return S >= 0 && SizeTenths > 0 && SizeTenths / 10.f + 0.001f >= JeebRecords::BoardAt(S); }
 	inline float FishLen(EItemType T) { return T == EItemType::Salmon ? 40.f : T == EItemType::Trout ? 36.f : T == EItemType::Bass ? 34.f : T == EItemType::GoldenCarp ? 30.f : 26.f; }
 	inline UStaticMesh* FishMesh(EItemType T)
 	{
