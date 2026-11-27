@@ -1,29 +1,34 @@
-Key,Name,Group,StackSize,SellValue,Color,GatherLevel,FishXP
+Key,Name,Group,StackSize,SellValue,Color,GatherLevel,FishXP,Smelt1,Smelt2,SmeltLevel,SmeltXP,Vaulted
 # Ores, gems, logs, fish and animal drops. Keep the Key values (saves store these by number); every other column can be changed.
-# Group: ore / gem / wood / fish / animal. StackSize: how many fit in one pack slot. SellValue: ingots the store pays for one.
-# CopperOre, Coal and Onyx are retired (2026-11-04: no rocks hold them, no recipe uses them) but stay listed in case they return.
+# Group: ore / gem / bar / wood / fish / animal. StackSize: how many fit in one pack slot. SellValue: ingots the store pays for one.
+# Bars (2026-11-27, owner: the metals rework): smelted at the smithy from one of each of Smelt1 and Smelt2 (material Keys), at Smithing SmeltLevel, giving SmeltXP. Smiths make bronze, steel and silver gear from them. Ingots stay the money.
+# Copper ore and coal are back (2026-11-27) for bronze and steel. Gold ore, emerald and diamond stay for jewellery later; the meteorite is the one rare metal. Onyx is vaulted.
+# Vaulted: yes = kept in the files but off in the game (no rocks, loot, drops or recipes give it). Rows must stay in this order (saves store materials by number): add new ones at the END.
 # Color: red green blue (0 to 1) for the rock lumps, icons and dropped stacks. GatherLevel: the Mining, Woodcutting or Fishing level needed. FishXP: Fishing XP per catch.
-CopperOre,Copper Ore,ore,99,3,0.80 0.40 0.12,1,0
-Coal,Coal,ore,99,5,0.02 0.02 0.02,6,0
-Logs,Logs,wood,99,2,0.5 0.5 0.5,1,0
-Diamond,Diamond,gem,5,90,0.68 0.88 1.00,50,0
-Bacon,Raw Pork,animal,5,6,0.5 0.5 0.5,1,0
-PineLogs,Pine Logs,wood,99,4,0.5 0.5 0.5,6,0
-RedwoodLogs,Redwood Logs,wood,99,8,0.5 0.5 0.5,15,0
-Perch,Perch,fish,10,4,0.5 0.5 0.5,1,8
-Trout,Trout,fish,10,10,0.5 0.5 0.5,5,20
-GoldenCarp,Golden Carp,fish,5,35,0.5 0.5 0.5,12,60
-Hide,Beast Hide,animal,5,9,0.5 0.5 0.5,1,0
-Bones,Bones,animal,5,4,0.5 0.5 0.5,1,0
-TinOre,Tin Ore,ore,99,2,0.62 0.64 0.62,1,0
-IronOre,Iron Ore,ore,99,6,0.12 0.11 0.12,10,0
-SilverOre,Silver Ore,ore,99,15,0.86 0.88 0.92,20,0
-GoldOre,Gold Ore,ore,99,25,0.98 0.74 0.20,30,0
-Onyx,Onyx,gem,5,60,0.05 0.04 0.06,45,0
-Emerald,Emerald,gem,5,60,0.08 0.80 0.32,40,0
-Venison,Deer Meat,animal,5,10,0.5 0.5 0.5,1,0
-Antlers,Stag Antlers,animal,5,28,0.5 0.5 0.5,1,0
-GameMeat,Raw Game Meat,animal,5,8,0.5 0.5 0.5,1,0
-EagleFeather,Eagle Feather,animal,20,24,0.5 0.5 0.5,1,0
-Salmon,Salmon,fish,10,16,0.5 0.5 0.5,15,30
-Bass,Bass,fish,10,8,0.5 0.5 0.5,1,14
+CopperOre,Copper Ore,ore,99,3,0.80 0.40 0.12,1,0,,,,,no
+Coal,Coal,ore,99,5,0.02 0.02 0.02,10,0,,,,,no
+Logs,Logs,wood,99,2,0.5 0.5 0.5,1,0,,,,,no
+Diamond,Diamond,gem,5,90,0.68 0.88 1.00,20,0,,,,,no
+Bacon,Raw Pork,animal,5,6,0.5 0.5 0.5,1,0,,,,,no
+PineLogs,Pine Logs,wood,99,4,0.5 0.5 0.5,6,0,,,,,no
+RedwoodLogs,Redwood Logs,wood,99,8,0.5 0.5 0.5,15,0,,,,,no
+Perch,Perch,fish,10,4,0.5 0.5 0.5,1,8,,,,,no
+Trout,Trout,fish,10,10,0.5 0.5 0.5,5,20,,,,,no
+GoldenCarp,Golden Carp,fish,5,35,0.5 0.5 0.5,12,60,,,,,no
+Hide,Beast Hide,animal,5,9,0.5 0.5 0.5,1,0,,,,,no
+Bones,Bones,animal,5,4,0.5 0.5 0.5,1,0,,,,,no
+TinOre,Tin Ore,ore,99,2,0.62 0.64 0.62,1,0,,,,,no
+IronOre,Iron Ore,ore,99,6,0.12 0.11 0.12,10,0,,,,,no
+SilverOre,Silver Ore,ore,99,15,0.86 0.88 0.92,20,0,,,,,no
+GoldOre,Gold Ore,ore,99,25,0.98 0.74 0.20,10,0,,,,,no
+Onyx,Onyx,gem,5,60,0.05 0.04 0.06,20,0,,,,,yes
+Emerald,Emerald,gem,5,60,0.08 0.80 0.32,20,0,,,,,no
+Venison,Deer Meat,animal,5,10,0.5 0.5 0.5,1,0,,,,,no
+Antlers,Stag Antlers,animal,5,28,0.5 0.5 0.5,1,0,,,,,no
+GameMeat,Raw Game Meat,animal,5,8,0.5 0.5 0.5,1,0,,,,,no
+EagleFeather,Eagle Feather,animal,20,24,0.5 0.5 0.5,1,0,,,,,no
+Salmon,Salmon,fish,10,16,0.5 0.5 0.5,15,30,,,,,no
+Bass,Bass,fish,10,8,0.5 0.5 0.5,1,14,,,,,no
+BronzeBar,Bronze Bar,bar,99,8,0.80 0.50 0.22,1,0,CopperOre,TinOre,1,6,no
+SteelBar,Steel Bar,bar,99,18,0.45 0.47 0.52,10,0,IronOre,Coal,10,14,no
+SilverBar,Silver Bar,bar,99,40,0.86 0.88 0.92,20,0,SilverOre,Coal,20,25,no

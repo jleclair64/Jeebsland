@@ -312,7 +312,7 @@ private:
 	int32 TestPage = 0;
 	bool bTestKitOpen = false;
 	bool bLevelTyping = false;
-	FString TestLevelText = TEXT("99");
+	FString TestLevelText = TEXT("29");
 	void SubmitLevel();
 	int32 BankPage = 0;
 	// Trade and the Market (2026-11-26, Docs/EconomyPlan.md; KnightHUDTrade.cpp)

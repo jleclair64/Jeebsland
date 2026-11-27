@@ -161,7 +161,7 @@ float AKnightCharacter::DrawTimeNow() const
 float AKnightCharacter::BowDrawSeconds(int32 Level)
 {
 	const auto& T = JeebTune::V();
-	const float L = float(Level);
+	const float L = USkillComponent::PowerLevel(Level);   // (the cap of 29: Tuning.ini keeps the old 1-99 points, PowerLevel says where a level stands)
 	return L <= 10.f ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.DrawAt1, T.DrawAt10), L)
 	                 : L <= 30.f ? FMath::GetMappedRangeValueClamped(FVector2f(10.f, 30.f), FVector2f(T.DrawAt10, T.DrawAt30), L)
 	                             : FMath::GetMappedRangeValueClamped(FVector2f(30.f, 99.f), FVector2f(T.DrawAt30, T.DrawAt99), L);
@@ -298,7 +298,7 @@ void AKnightCharacter::FireArrow(const FVector& Dir, float Charge, int32 ArrowId
 	// (2026-11-26) the Archery level softly steadies every shot: a small random stray at low levels, none from SpreadGoneAt (Tuning.ini [Archery]); a full draw half as much
 	FVector ShotDir = Dir;
 	{
-		const int32 Lv = Skills->GetLevel(ESkillType::Archery);
+		const float Lv = Skills->GetPower(ESkillType::Archery);
 		const float Gone = FMath::Max(2.f, JeebTune::V().SpreadGoneAt);
 		const float Deg = FMath::Max(0.f, JeebTune::V().SpreadAt1) * FMath::Clamp((Gone - Lv) / (Gone - 1.f), 0.f, 1.f) * (C >= 1.f ? 0.5f : 1.f);
 		if (Deg > 0.f) ShotDir = FMath::VRandCone(Dir, FMath::DegreesToRadians(Deg) * FMath::Sqrt(FMath::FRand()));

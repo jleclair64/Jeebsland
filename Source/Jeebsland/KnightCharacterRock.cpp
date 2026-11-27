@@ -184,7 +184,7 @@ void AKnightCharacter::ThrowRock(const FVector& Dir, float Charge, const FVector
 	const auto& T = JeebTune::V();
 	const float C = FMath::Clamp(Charge, 0.f, 1.f);
 	const int32 Level = Skills->GetLevel(ESkillType::Archery);
-	const float Base = FMath::Lerp(T.RockDamageLow, T.RockDamageFull, FMath::Pow(C, 1.5f)) * (1.f + T.RockDamagePerLevel * float(Level - 1));
+	const float Base = FMath::Lerp(T.RockDamageLow, T.RockDamageFull, FMath::Pow(C, 1.5f)) * (1.f + T.RockDamagePerLevel * (USkillComponent::PowerLevel(Level) - 1.f));
 	const int32 Dmg = FMath::Max(1, FMath::RoundToInt(Base * FMath::FRandRange(0.85f, 1.15f)));
 	FActorSpawnParameters SP;
 	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;

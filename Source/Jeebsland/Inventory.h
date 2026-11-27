@@ -100,7 +100,6 @@ namespace JeebItems
 	inline int32 VariantOf(int32 Id) { return (Id - IdGearBase) % 10; }   // the tier (or cape colour, or which ring)
 	// Kinds taken out of the game (owner): never sold, smithed or handed out; any already owned turn into a sword of the same tier when a save loads. The katana since 2026-11-12.
 	inline bool IsRetiredKind(int32 K) { return K == 6; }   // (K_Katana; the number, since EKind is declared below)
-	inline int32 ReplaceRetired(int32 Id) { if (IsRetiredArrow(Id)) return ArrowId(A_Eagle); return (IsGear(Id) && IsRetiredKind(KindOf(Id))) ? GearId(0, VariantOf(Id)) : Id; }   // (0 = K_Sword)
 	// Shields come in three styles: 0 kite (the all-rounder), 1 round (a smaller guard that recovers twice as fast, and you move
 	// quicker behind it), 2 tower (a guard half as big again, but slower to move behind)
 	constexpr int32 NumShieldStyles = 3;
@@ -131,7 +130,16 @@ namespace JeebItems
 	// Light (the tunic) has no shoulder piece (owner, 2026-11-03: its sleeves are part of the chest): a style that has no piece
 	// for a slot is never made; asked for anyway (an old save, a random roll), the Classic piece is made instead.
 	inline bool StyleHasPiece(int32 Kind, int32 Style) { return !(Kind == K_Shoulders && Style == AS_Light) && !(Style == AS_Wizard && (Kind == K_Shoulders || Kind == K_Gauntlets)); }
-	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { Style = FMath::Clamp(Style, 0, NumArmourStyles - 1); if (!StyleHasPiece(Kind, Style)) Style = AS_Classic; return IdGearBase + Kind * 100 + Style * 10 + Tier; }
+	// KNIGHT'S ARMOR (owner, 2026-11-26): the knight's coloured armour tiers are gone. Every knight piece (Classic, Light or Heavy, any tier) is one
+	// Knight's Armor piece: Classic style, the Silver tier's look (ArmourStyles.csv row 0 scales its numbers to about the old steel rank's), worn from
+	// level 1. Dark Plate, the wizard's and the troll's sets keep their own styles and tiers. KnightArmourId is that one piece for a slot.
+	inline bool IsKnightStyle(int32 Style) { return Style == AS_Classic || Style == AS_Light || Style == AS_Heavy; }
+	inline int32 KnightArmourId(int32 Kind) { return IdGearBase + Kind * 100 + AS_Classic * 10 + T_Silver; }
+	inline int32 ArmourId(int32 Kind, int32 Style, int32 Tier) { Style = FMath::Clamp(Style, 0, NumArmourStyles - 1); if (IsKnightStyle(Style)) return KnightArmourId(Kind); if (!StyleHasPiece(Kind, Style)) Style = AS_Classic; return IdGearBase + Kind * 100 + Style * 10 + Tier; }
+	inline bool IsKnightArmour(int32 Id) { return IsGear(Id) && KindOf(Id) >= K_Helmet && KindOf(Id) <= K_Boots && IsKnightStyle(((Id - IdGearBase) % 100) / 10); }
+	// Kinds and pieces taken out of the game (owner): any already owned change when a save loads. The katana (since 2026-11-12) becomes a sword of its tier;
+	// the retired emerald arrows eagle arrows; every old knight armour piece (2026-11-26) Knight's Armor.
+	inline int32 ReplaceRetired(int32 Id) { if (IsRetiredArrow(Id)) return ArrowId(A_Eagle); if (IsKnightArmour(Id)) return KnightArmourId(KindOf(Id)); return (IsGear(Id) && IsRetiredKind(KindOf(Id))) ? GearId(0, VariantOf(Id)) : Id; }   // (0 = K_Sword)
 	inline const FArmourStyleRow& ArmourStyleRow(int32 Style) { return Tables().ArmourStyles[FMath::Clamp(Style, 0, NumArmourStyles - 1)]; }
 	inline int32 FullVariant(int32 Id) { return (Id - IdGearBase) % 100; }   // style x 10 + tier (what the price, weight and protection of a piece need)
 
@@ -170,6 +178,32 @@ namespace JeebItems
 	// The colour of an ore's lumps or a gem's crystals (rocks, icons, dropped stacks)
 	inline FLinearColor OreColor(EItemType T) { return MaterialRow(T).Color; }
 
+	// ---------------------------------------------------------------- vaulted (owner, 2026-11-26/27)
+	// "Vaulted" items stay in the files (and in saves: what a player owns keeps working) but are off in the game: no shop sells them, no drop, loot,
+	// satchel, rock or recipe makes them. The Vaulted column of Kinds.csv, Tiers.csv, ArmourStyles.csv, Materials.csv and Arrows.csv says which.
+	// Gear is vaulted when its kind, its tier or (armour) its style is. Potions are never vaulted (Docs/PotionVault.md lists them for the owner).
+	inline bool IsVaulted(int32 Id)
+	{
+		if (Id <= 0) return false;
+		if (IsMaterial(Id)) return Tables().Materials.IsValidIndex(Id - 1) && MaterialRow(MaterialType(Id)).bVaulted;
+		if (IsArrow(Id)) return IsRetiredArrow(Id) || ArrowRowFor(Id).bVaulted;
+		if (!IsGear(Id)) return false;
+		const int32 K = KindOf(Id);
+		if (K < 0 || K >= K_Count) return true;
+		if (IsRetiredKind(K) || KindRow(K).bVaulted) return true;
+		if (IsAccessoryKind(K)) return false;
+		if (IsArmorKind(K) && ArmourStyleRow(StyleOf(Id)).bVaulted) return true;
+		return TierRow(VariantOf(Id)).bVaulted;
+	}
+	inline bool InGame(int32 Id) { return !IsVaulted(Id); }
+	inline bool IsTierInGame(int32 T) { return !TierRow(T).bVaulted; }
+	// The tiers in the game, weakest first (Bronze, Steel, Silver since the metals rework)
+	inline TArray<int32> GameTiers() { TArray<int32> A; for (int32 T = 0; T < NumTiers; ++T) if (IsTierInGame(T)) A.Add(T); if (A.Num() == 0) A.Add(0); return A; }
+	inline int32 TopGameTier() { return GameTiers().Last(); }
+	// Bars (2026-11-27, the metals rework): smelted at the smithy (EInvOp::Smelt), one each of two ores (Materials.csv Smelt1, Smelt2)
+	inline bool IsBar(EItemType T) { return MaterialRow(T).bSmelted; }
+	inline TArray<EItemType> Bars() { TArray<EItemType> A; for (int32 m = 0; m < Tables().Materials.Num(); ++m) { const EItemType T = static_cast<EItemType>(m); if (IsBar(T) && !MaterialRow(T).bVaulted) A.Add(T); } return A; }
+
 	// ---------------------------------------------------------------- names
 	inline const TCHAR* TierName(int32 T) { return *TierRow(T).Name; }
 	inline const TCHAR* KindName(int32 K) { return *KindRow(K).Name; }
@@ -205,6 +239,7 @@ namespace JeebItems
 		if (K == K_Book) return FString::Printf(TEXT("%s %s"), TierName(V), WizOffName(StyleOf(Id)));   // (spell book, crystal ball or pipe)
 		if (IsAccessoryKind(K)) return AccessoryName(K, V);
 		if (IsArmorKind(K) && StyleOf(Id) == AS_Wizard) return FString::Printf(TEXT("%s Wizard %s"), TierName(V), K == K_Helmet ? TEXT("Hat") : K == K_Chest ? TEXT("Robe") : TEXT("Boots"));
+		if (IsArmorKind(K) && StyleOf(Id) == AS_Classic) return FString::Printf(TEXT("%s %s"), *ArmourStyleRow(AS_Classic).Name, KindName(K));   // "Knight's Armor Helmet" (one look, 2026-11-26)
 		if (IsArmorKind(K) && StyleOf(Id) != AS_Classic) return FString::Printf(TEXT("%s %s %s"), TierName(V), *ArmourStyleRow(StyleOf(Id)).Name, KindName(K));   // "Iron Light Helmet"
 		return FString::Printf(TEXT("%s %s"), TierName(V), KindName(K));
 	}
@@ -265,7 +300,7 @@ namespace JeebItems
 	inline int32 ShieldGuard(int32 ShieldItemId) { return FMath::RoundToInt(ShieldHealth(ShieldItemId)); }
 	static_assert(K_Shield == 11, "ShieldId assumes the shield is kind 11");
 	// Health a second it heals, lowered: by the Defence level (the two ends: Tuning.ini [Guard]) x the style's HealMul
-	inline float ShieldHeal(int32 DefenceLevel, int32 Style) { return FMath::Lerp(JeebTune::V().ShieldHealAtLevel1, JeebTune::V().ShieldHealAtLevel99, FMath::Clamp((DefenceLevel - 1) / 98.f, 0.f, 1.f)) * ShieldStyleRow(Style).HealMul; }
+	inline float ShieldHeal(int32 DefenceLevel, int32 Style) { return FMath::Lerp(JeebTune::V().ShieldHealAtLevel1, JeebTune::V().ShieldHealAtLevel99, USkillComponent::PowerBlend(DefenceLevel)) * ShieldStyleRow(Style).HealMul; }
 	inline float ShieldWeight(int32 ShieldItemId) { return ShieldStyleRow(StyleOf(ShieldItemId)).Weight * TierRow(VariantOf(ShieldItemId)).WeightMult; }
 	// Boots: stamina comes back faster and drains slower
 	inline float BootStaminaMult(int32 T) { return TierRow(T).BootStamina; }
@@ -462,7 +497,7 @@ namespace JeebItems
 			return false;
 		}
 		const ESkillType Sk = EquipSkill(K);
-		const int32 Need = EquipLevel(T);
+		const int32 Need = (IsArmorKind(K) && StyleOf(Id) == AS_Classic) ? 1 : EquipLevel(T);   // (Knight's Armor: worn from level 1, owner 2026-11-26)
 		if (S && S->GetLevel(Sk) < Need)
 		{
 			if (OutWhy) *OutWhy = FString::Printf(TEXT("You need %s level %d to use %s."), SkillNameOf(Sk), Need, *ItemName(Id));
@@ -578,7 +613,7 @@ namespace JeebItems
 		if (Kind < 0) { Min = 1; Max = 3; }
 		else WeaponDamage(Kind, Tier, Min, Max, ArrowTier);
 		ApplyAttackMods(CombinedMods(S), Min, Max);
-		const int32 Bonus = S ? S->GetLevel(CombatSkillFor(Kind < 0 ? K_Sword : Kind)) / 5 : 0;
+		const int32 Bonus = S ? FMath::FloorToInt(S->GetPower(CombatSkillFor(Kind < 0 ? K_Sword : Kind)) / 5.f) : 0;   // (the cap of 29: by PowerLevel)
 		Min += Bonus;
 		Max += Bonus;
 	}

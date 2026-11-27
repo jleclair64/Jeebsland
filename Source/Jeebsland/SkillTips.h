@@ -25,10 +25,10 @@ namespace JeebSkillTip
 	{
 		using namespace JeebItems;
 		int32 Best = -1;
-		for (int32 t = 0; t < NumTiers; ++t) if (TierRow(t).EquipLevel <= Level) Best = t;
+		for (int32 t = 0; t < NumTiers; ++t) if (!TierRow(t).bVaulted && TierRow(t).EquipLevel <= Level) Best = t;
 		if (Best >= 0) L.Add(FString::Printf(TEXT("Can use: %s %s"), TierName(Best), What));
 		for (int32 t = 0; t < NumTiers; ++t)
-			if (TierRow(t).EquipLevel > Level) { L.Add(FString::Printf(TEXT("Next: %s at level %d"), TierName(t), TierRow(t).EquipLevel)); break; }
+			if (!TierRow(t).bVaulted && TierRow(t).EquipLevel > Level) { L.Add(FString::Printf(TEXT("Next: %s at level %d"), TierName(t), TierRow(t).EquipLevel)); break; }
 	}
 	// What this skill gathers now, and the next thing it unlocks
 	inline void GatherLines(TArray<FString>& L, int32 Level, int32 GroupA, int32 GroupB)
@@ -38,7 +38,7 @@ namespace JeebSkillTip
 		for (int32 i = 0; i < Tables().Materials.Num(); ++i)
 		{
 			const EItemType T = static_cast<EItemType>(i);
-			if (T == EItemType::CopperOre || T == EItemType::Coal || T == EItemType::Onyx) continue;   // (retired: nothing holds them)
+			if (MaterialRow(T).bVaulted) continue;   // (vaulted: nothing holds them)
 			const FMaterialRow& R = MaterialRow(T);
 			if (R.Group != GroupA && R.Group != GroupB) continue;
 			if (R.GatherLevel <= Level) { if (!Can.IsEmpty()) Can += TEXT(", "); Can += R.Name; }
@@ -52,8 +52,8 @@ namespace JeebSkillTip
 inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int32 Need)
 {
 	using namespace JeebSkillTip;
-	TArray<FString> L = { USkillComponent::SkillName(T), FString::Printf(TEXT("Level %d"), Level) };
-	const int32 DamageBonus = Level / 5;   // (JeebItems::DamageRange: +1 damage per 5 levels of the weapon's skill)
+	TArray<FString> L = { USkillComponent::SkillName(T), Level >= USkillComponent::MaxLevel ? FString::Printf(TEXT("Level %d (the top level)"), Level) : FString::Printf(TEXT("Level %d"), Level) };
+	const int32 DamageBonus = FMath::FloorToInt(USkillComponent::PowerLevel(Level) / 5.f);   // (JeebItems::DamageRange: +1 damage per 5 power levels of the weapon's skill)
 	switch (T)
 	{
 	case ESkillType::Attack:
@@ -61,7 +61,7 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 		TierLines(L, Level, TEXT("weapons"));
 		break;
 	case ESkillType::Defense:
-		L.Add(FString::Printf(TEXT("Health: %d"), 100 + (Level - 1) * 3));
+		L.Add(FString::Printf(TEXT("Health: %d"), 100 + FMath::RoundToInt((USkillComponent::PowerLevel(Level) - 1.f) * 3.f)));
 		L.Add(FString::Printf(TEXT("Shield heals: %s per second"), *Secs(JeebItems::ShieldHeal(Level, 0))));
 		TierLines(L, Level, TEXT("armour and shields"));
 		break;
@@ -91,10 +91,10 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 	{
 		using namespace JeebItems;
 		int32 Best = -1;
-		for (int32 t = 0; t < NumTiers; ++t) if (TierRow(t).SmithLevel <= Level) Best = t;
+		for (int32 t = 0; t < NumTiers; ++t) if (!TierRow(t).bVaulted && TierRow(t).SmithLevel <= Level) Best = t;
 		if (Best >= 0) L.Add(FString::Printf(TEXT("Can smith: up to %s"), TierName(Best)));
 		for (int32 t = 0; t < NumTiers; ++t)
-			if (TierRow(t).SmithLevel > Level) { L.Add(FString::Printf(TEXT("Next: %s at level %d"), TierName(t), TierRow(t).SmithLevel)); break; }
+			if (!TierRow(t).bVaulted && TierRow(t).SmithLevel > Level) { L.Add(FString::Printf(TEXT("Next: %s at level %d"), TierName(t), TierRow(t).SmithLevel)); break; }
 		break;
 	}
 	case ESkillType::Climbing:
@@ -113,7 +113,7 @@ inline TArray<FString> SkillTipLines(ESkillType T, int32 Level, int32 Into, int3
 		break;
 	case ESkillType::Hunting:
 		L.Add(TEXT("More meat and bones from every animal you bring down"));
-		L.Add(TEXT("Level 1: always 1 of each; level 99: usually 3 to 5"));
+		L.Add(TEXT("Level 1: always 1 of each; more as you level (29 is the top)"));
 		break;
 	case ESkillType::Stealth:
 		L.Add(FString::Printf(TEXT("Crouched, animals and bandits notice you at %d%% of their usual range"), FMath::RoundToInt(UStealthSense::CrouchShare(Level) * 100.f)));

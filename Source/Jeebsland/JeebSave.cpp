@@ -25,7 +25,7 @@ bool UJeebSave::Exists()
 bool UJeebSave::ValidId(int32 Id)
 {
 	if (Id == 0) return true;
-	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::Bass;   // (the last material; new ones go after it)
+	if (IsMaterial(Id)) return MaterialType(Id) <= EItemType::SilverBar;   // (the last material; new ones go after it)
 	if (IsArrow(Id) || IsRock(Id) || IsPotionRange(Id) || JeebBroom::IsBroomRange(Id)) return true;   // (brooms: any broom number; any potion number: a shorter Potions.csv never loses saved potions)
 	return IsGear(Id) && KindOf(Id) < K_Count;
 }
@@ -40,6 +40,10 @@ void UJeebSave::Migrate()
 		if (IsGear(Id) && IsArmorKind(KindOf(Id)) && !StyleHasPiece(KindOf(Id), StyleOf(Id))) Id = ArmourId(KindOf(Id), AS_Classic, VariantOf(Id));
 	};
 	for (TArray<int32>* A : { &SlotIds, &BankIds, &Hotbar, &Worn }) for (int32& Id : *A) FixPiece(Id);
+	// (2026-11-26, owner: Knight's Armor) every old knight armour piece and every retired item turns into what replaced it, in the other classes' packs too
+	for (TArray<int32>* A : { &SlotIds, &BankIds, &Hotbar, &Worn }) for (int32& Id : *A) Id = ReplaceRetired(Id);
+	for (FJeebClassPack& P : Packs) for (TArray<int32>* A : { &P.SlotIds, &P.Hotbar, &P.Worn }) for (int32& Id : *A) Id = ReplaceRetired(Id);
+	for (FJeebClassPack& P : Packs) if (P.RingB) P.RingB = ReplaceRetired(P.RingB);
 	if (SaveVersion == 11)
 	{
 		// Once (owner, 2026-11-05): characters made while Light had no shoulders get a pair on, and the cape comes off into the pack, or the bank if that is full

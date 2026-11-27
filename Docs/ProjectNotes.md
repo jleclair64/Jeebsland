@@ -1029,3 +1029,11 @@ Owner's list (pictures pt 6-10): hand too close to his face when aiming a rock, 
   - The broom stall still stands for the economy agent.
   - Pets that follow you come later.
   - Skipped: observatory, library, graveyard, greenhouse and wishing well.
+
+## Skill cap 29, metals, Knight's Armor, vaulting (2026-11-27, agent fishsize)
+
+- **Cap:** `USkillComponent::MaxLevel = 29`; XP clamped to `MaxXP()` in AddXP and RestoreSkills (old saves load at 29). Unlocks 1/10/20. Abilities tuned for 1-99 go through `PowerLevel(L)` (= L to 10, then 10 + (L-10)*50/19, so 29 acts as old 60) and `PowerBlend(L)` (replaces `(L-1)/98`). XP curve `RSTotal(L) = OldTotal(round(PowerLevel(L)))`. Gathering, lock (HouseLoot) and arrow levels rescaled under 29. Test accounts 29.
+- **Metals:** tier keys unchanged (Tin, Iron, Silver, Gold, Emerald, Diamond); Tin shows as Bronze, Iron as Steel (Tiers.csv names/colours, Mat1 = the bar). Bars are materials (`MG_Bar`; EItemType BronzeBar/SteelBar/SilverBar appended) with Smelt1/Smelt2/SmeltLevel/SmeltXP columns in Materials.csv. Smelting is `EInvOp::Smelt` (server: near the blacksmith, level, ores, logs JEEBSMELT). Ore spots: copper/coal in `OreMix` and the start rocks (KnightGameState), coal at Steele Creek. Bar/tier looks are tints of existing meshes; real models wait for the owner. Ingots stay the money.
+- **Knight's Armor:** `KnightArmourId(Kind)` = Classic style at T_Silver; any Classic/Light/Heavy id maps to it in `ArmourId` and `ReplaceRetired` (JeebSave Migrate runs it over slots, bank, hotbar, worn, other class packs). Wearable at level 1; ArmourStyles row 0 StopMul 0.8 PriceMul 0.4. The Smith op forces it. Market listings holding old ids are not remapped (open).
+- **Vaulted:** `Vaulted` column in Kinds/Tiers/ArmourStyles/Materials/Arrows; `JeebItems::IsVaulted`. Stores filter it (satchel rolls remap to `TopGameTier()`), loot loaders (FoeData, HouseLoot, StoneCircle) skip it, Smith refuses it. Vaulted: Gold/Emerald/Diamond, katana, onyx, Light/Heavy/Dark Plate, RetiredEmerald arrows. No potions (`Docs/PotionVault.md`).
+- **Test kit:** IN GAME / VAULTED sections (`JeebTestKit.h` FPage.bVaulted, Heads). Test: `Tools/metals_net.sh` + `MetalsTest.cpp` (-MetalsTest / -MetalsDo).

@@ -33,7 +33,7 @@ namespace
 float AKnightCharacter::ClimbSeconds(int32 L)
 {
 	const JeebTune::FValues& T = JeebTune::V();
-	const float X = float(FMath::Clamp(L, 1, 99));
+	const float X = USkillComponent::PowerLevel(L);   // (the cap of 29: the old 1-99 points, PowerLevel says where a level stands)
 	return X <= 10.f ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.ClimbAt1, T.ClimbAt10), X)
 		: X <= 30.f ? FMath::GetMappedRangeValueClamped(FVector2f(10.f, 30.f), FVector2f(T.ClimbAt10, T.ClimbAt30), X)
 		: FMath::GetMappedRangeValueClamped(FVector2f(30.f, 99.f), FVector2f(T.ClimbAt30, T.ClimbAt99), X);

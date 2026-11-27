@@ -111,6 +111,7 @@ namespace JeebFoes
 					}
 					if (A.Equals(TEXT("Ingots"), ESearchCase::IgnoreCase) || A.Equals(TEXT("Ingot"), ESearchCase::IgnoreCase)) { L.Ids.Add(0); continue; }
 					const int32 Id = JeebQuests::ItemFromName(A);
+					if (Id > 0 && JeebItems::IsVaulted(Id)) { UE_LOG(LogTemp, Log, TEXT("Foes.csv, %s: %s is vaulted (off in the game), left out of its loot"), *Key, *A); continue; }
 					if (Id > 0 && !JeebItems::ItemName(Id).IsEmpty()) L.Ids.Add(Id);
 					else Problem(FString::Printf(TEXT("Foes.csv, %s: no item called \"%s\" in its loot"), *Key, *A));
 				}
@@ -368,7 +369,7 @@ namespace JeebFoes
 
 	int32 HuntCount(FName Table, int32 HuntingLevel, FRandomStream& R)
 	{
-		const float B = FMath::Clamp((HuntingLevel - 1) / 98.f, 0.f, 1.f);
+		const float B = USkillComponent::PowerBlend(HuntingLevel);
 		float Total = 0.f;
 		for (const FHuntRow& W : HuntRows()) if (W.Table == Table) Total += FMath::Lerp(W.P1, W.P99, B);
 		if (Total <= 0.f) return 1;

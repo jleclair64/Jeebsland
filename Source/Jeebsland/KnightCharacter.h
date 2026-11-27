@@ -92,6 +92,7 @@ enum class EInvOp : uint8
 	Reel,           // (2026-11-26) the click while fishing: reel in (the server judges the 0.5 s window, Pond.cpp)
 	BoxSearch,      // (2026-11-26, HouseLoot.h) At: an unlocked house container's spot: search it
 	BoxPick,        // At: a locked house container's spot: start picking its lock (the server finishes it, FinishBoxPick)
+	Smelt,          // (2026-11-27, the metals rework) A: the bar (its EItemType), B: how many to smelt (the server makes as many as the ores and the pack allow)
 };
 
 // Knight built from basic shapes. Also creates its own keyboard/mouse
@@ -337,6 +338,7 @@ public:
 	void MarketAnswer(bool bFresh);  // (server) sends this player the page they last asked for
 	void TickEconomyTest(float Dt);  // (non-Shipping, EconomyTest.cpp: -EconTest on the server, -EconDo=<role> on the players' machines)
 	float EconTestT = 0.f;
+	void TickMetalsTest(float Dt);   // (non-Shipping, MetalsTest.cpp: -MetalsTest on the server, -MetalsDo on the players' machines)
 	// Drinking takes time (owner, 2026-11-05): the server starts it and ends it, every machine plays it. The potion is used and works only at the end.
 	UFUNCTION(NetMulticast, Reliable) void MulticastDrink(uint8 Type, bool bStart);
 	bool bDrinking = false;

@@ -490,9 +490,9 @@ bool AKnightCharacter::TrollSuitTest(const FString& Do)
 float AKnightCharacter::RushSeconds(int32 L)
 {
 	const auto& T = JeebTune::V();
-	L = FMath::Clamp(L, 1, 99);
-	return L <= 10 ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.TrollRushAt1, T.TrollRushAt10), float(L))
-	               : FMath::GetMappedRangeValueClamped(FVector2f(10.f, 99.f), FVector2f(T.TrollRushAt10, T.TrollRushAt99), float(L));
+	const float P = USkillComponent::PowerLevel(L);   // (the cap of 29: the old 1-99 points)
+	return P <= 10.f ? FMath::GetMappedRangeValueClamped(FVector2f(1.f, 10.f), FVector2f(T.TrollRushAt1, T.TrollRushAt10), P)
+	               : FMath::GetMappedRangeValueClamped(FVector2f(10.f, 99.f), FVector2f(T.TrollRushAt10, T.TrollRushAt99), P);
 }
 
 void AKnightCharacter::TickRush(float Dt)

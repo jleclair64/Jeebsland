@@ -329,7 +329,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	if (K == K_Cape)
 	{
 		// a cape in every tier's colour (Tiers.csv CapeColor)
-		for (int32 c = 0; c < NumTiersKnight; ++c)
+		for (int32 c : GameTiers())   // (the ranks in the game; vaulted ones left out, 2026-11-27)
 		{
 			DrawIcon(GearId(K_Cape, c), CX, Y - 4.f, 30.f);
 			HDText(FString::Printf(TEXT("%s cape"), TierName(c)), FLinearColor::White, CX + 40.f, Y, Font, 1.0f);
@@ -358,7 +358,7 @@ void AKnightHUD::DrawDictionary(float PX, float PY, float PW, float PH)
 	const float Xs[] = { 44.f, 140.f, 225.f, 330.f, 420.f, 660.f };
 	for (int32 c = 0; c < 6; ++c) HDText(Heads[c], FLinearColor(0.7f, 0.7f, 0.7f), CX + Xs[c], Y, Font, 0.95f);
 	Y += 28.f;
-	for (int32 t = 0; t < NumTiersKnight; ++t)   // (all six ranks)
+	for (int32 t : (IsArmorKind(K) ? TArray<int32>{ T_Silver } : GameTiers()))   // (the ranks in the game: Bronze, Steel, Silver; vaulted ones left out; armour is the one Knight's Armor, 2026-11-27)
 	{
 		const FRecipe R = SmithRecipe(K, t);
 		DrawIcon(GearId(K, t), CX - 2.f, Y - 6.f, 36.f);

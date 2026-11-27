@@ -55,7 +55,11 @@ enum class EItemType : uint8
 	EagleFeather,
 	// (2026-11-26, the fishing redo: Docs/FishingPlan.md)
 	Salmon,
-	Bass
+	Bass,
+	// (2026-11-27, the metals rework: smelted at the smithy from two ores; smiths make bronze, steel and silver gear from them. Ingots stay the money)
+	BronzeBar,
+	SteelBar,
+	SilverBar
 };
 
 // Sizes of the skill and worn-gear arrays (outside the class so the replication code generator can see them)
@@ -246,9 +250,17 @@ public:
 	int32 BestArrowRow() const;                       // the hardest-hitting arrow you carry (its Arrows.csv row); -1 if none
 
 	int32 GetItemCount(EItemType Item) const;
-	static constexpr int32 MaxLevel = 99;
+	// Skills cap at 29 (owner, 2026-11-26: a HARD cap; XP stops counting at 29). Unlocks come at levels 1, 10 and 20; 29 is only each level's small gain.
+	static constexpr int32 MaxLevel = 29;
+	// What a level is worth to the abilities written for the old 1-99 scale (Tuning.ini At1 / At10 / At30 / At99 numbers, the old (Level - 1) / 98
+	// blends): the same up to 10, then 10 + (Level - 10) x 50 / 19, so 29 counts as the old 60. Good, but well short of the old 99 numbers (no power creep).
+	static float PowerLevel(int32 Level) { Level = FMath::Clamp(Level, 1, MaxLevel); return Level <= 10 ? float(Level) : 10.f + (Level - 10) * 50.f / 19.f; }
+	float GetPower(ESkillType Skill) const { return PowerLevel(GetLevel(Skill)); }
+	// The 0..1 blend the old (Level - 1) / 98 code used, from PowerLevel (29: 0.6)
+	static float PowerBlend(int32 Level) { return FMath::Clamp((PowerLevel(Level) - 1.f) / 98.f, 0.f, 1.f); }
 	static int32 XPForLevel(ESkillType Skill, int32 Level);   // total XP needed to reach a level
-	void SetAllMaxLevel();   // testing only: every skill at 99 (see MaxLevelAccounts in DefaultGame.ini)
+	static int32 MaxXP(ESkillType Skill) { return XPForLevel(Skill, MaxLevel); }   // XP stops counting here
+	void SetAllMaxLevel();   // testing only: every skill at the cap, 29 (see MaxLevelAccounts in DefaultGame.ini)
 	void SetAllLevels(int32 Level);   // TEMPORARY test kit (AKnightPlayerController::ServerTestLevels): every skill at exactly this level
 	int32 GetLevel(ESkillType Skill) const;
 	// XPIntoLevel / XPNeeded describe progress through the current level

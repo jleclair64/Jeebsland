@@ -1,10 +1,12 @@
-Name,StopMul,WeightMul,PriceMul,Note
-# Armour styles (2026-11-03). Every armour piece (helmet, chestplate, shoulders, gauntlets, boots) comes in each style at every tier; the tier is only its colour. Each style has its own model, so keep these three rows in this order (classic, light, heavy); every column can be changed.
+Name,StopMul,WeightMul,PriceMul,Note,Vaulted
+# Armour styles (2026-11-03). Keep these six rows in this order (saves store the style as a number: 0 classic, 1 light, 2 heavy, 3 dark plate, 4 wizard, 5 troll); every column can be changed.
 # StopMul: how much of a blow the piece stops, x this (the tier's stop in Tiers.csv ArmourTakes; 0.75 = three quarters as much). WeightMul: its weight x this (Kinds.csv Weight x Tiers.csv WeightMult). PriceMul: store and selling price x this.
-# All three look the same for now: one knight model, different numbers (Docs/ToRecreate.md has their old looks). Name is what goes in front of the kind ("Iron Light Helmet"); the classic piece is just "Iron Helmet".
-Classic,1,1,1,"Classic plate: the all-rounder"
-Light,0.75,0.55,0.8,"Light: stops a quarter less, but weighs about half as much"
-Heavy,1.2,1.45,1.3,"Heavy plate: stops a fifth more, but weighs half as much again"
-Dark Plate,1.1,1.3,1.5,"Dark Plate: blackened steel, one look at every tier; stops a tenth more, weighs a third more"
-Wizard,0.6,0.35,1,"Wizard: the hat, robe and boots only wizards wear; cloth, so it stops less and weighs little"
-Troll,1.05,1.2,1.2,"Troll: the troll's own dark iron, leather and fur armour with horned shoulders; only trolls wear it, and they wear nothing else"
+# KNIGHT'S ARMOR (owner, 2026-11-26): the knight's coloured tiers are gone. Every knight piece (the old Classic, Light and Heavy, any tier) is now one Knight's Armor piece: row 0 in the silver look (Tiers.csv Silver),
+#   wearable from level 1. Its numbers are row 0's x the Silver tier's: StopMul 0.8 and PriceMul 0.4 bring it to about the old Steel (Iron) rank's protection and price. Old saves turn into it when they load.
+# Vaulted (2026-11-27): yes = kept in the files but off in the game. Light and Heavy fold into Knight's Armor (an old piece of either loads as Knight's Armor); Dark Plate was only ever in the Test kit.
+Knight's Armor,0.8,1,0.4,"Knight's Armor: the knight's silver plate, one look at every level",no
+Light,0.75,0.55,0.8,"Light: stops a quarter less, but weighs about half as much",yes
+Heavy,1.2,1.45,1.3,"Heavy plate: stops a fifth more, but weighs half as much again",yes
+Dark Plate,1.1,1.3,1.5,"Dark Plate: blackened steel, one look at every tier; stops a tenth more, weighs a third more",yes
+Wizard,0.6,0.35,1,"Wizard: the hat, robe and boots only wizards wear; cloth, so it stops less and weighs little",no
+Troll,1.05,1.2,1.2,"Troll: the troll's own dark iron, leather and fur armour with horned shoulders; only trolls wear it, and they wear nothing else",no

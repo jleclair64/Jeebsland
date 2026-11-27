@@ -49,6 +49,7 @@ namespace JeebHouseLoot
 					{
 						R.Id = JeebQuests::ItemFromName(Name);
 						if (R.Id <= 0 || JeebItems::ItemName(R.Id).IsEmpty()) { UE_LOG(LogJeebLoot, Error, TEXT("Jeebsland loot: HouseLoot.csv line %d: no item called \"%s\""), n + 1, *Name); continue; }
+						if (JeebItems::IsVaulted(R.Id)) { UE_LOG(LogJeebLoot, Log, TEXT("HouseLoot.csv line %d: %s is vaulted (off in the game), left out"), n + 1, *Name); continue; }
 					}
 					R.Min = FMath::Max(1, FCString::Atoi(*C[2]));
 					R.Max = FMath::Max(R.Min, FCString::Atoi(*C[3]));
@@ -181,10 +182,10 @@ namespace JeebHouseLoot
 		const int32 LockedPct = Kind == EBoxKind::Chest ? 75 : Kind == EBoxKind::Cupboard ? 40 : 15;
 		if (int32(H % 100u) < LockedPct)
 		{
-			static const int32 Levels[] = { 1, 1, 1, 5, 5, 10, 10, 20, 20, 30, 45, 60 };   // (the low ones commoner)
+			static const int32 Levels[] = { 1, 1, 1, 5, 5, 10, 10, 15, 20, 20, 25, 29 };   // (the low ones commoner; the skill cap is 29 since 2026-11-26)
 			B.Lock = Levels[(H / 100u) % UE_ARRAY_COUNT(Levels)];
 		}
-		B.Tier = B.Lock == 0 ? 0 : B.Lock < 15 ? 1 : B.Lock < 40 ? 2 : 3;
+		B.Tier = B.Lock == 0 ? 0 : B.Lock < 10 ? 1 : B.Lock < 20 ? 2 : 3;
 		Boxes().Add(B);
 		UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOT box %s %s at %.0f %.0f %.0f: lock %d, tier %d"), *B.Key, KindName(Kind), B.At.X, B.At.Y, B.At.Z, B.Lock, B.Tier);
 	}
@@ -320,7 +321,7 @@ namespace JeebHouseLoot
 				Me->SetActorRotation(FRotator(0.f, Yaw, 0.f));
 				Pc->SetControlRotation(FRotator(-35.f, Yaw + 30.f, 0.f));   // (a little to the side, so the knight does not hide it)
 				UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOTSHOT %s (%s, lock %d)"), *B->Key, KindName(B->Kind), B->Lock);
-				if (S == N && Me->GetSkills()) { Me->GetSkills()->SetAllLevels(99); }
+				if (S == N && Me->GetSkills()) { Me->GetSkills()->SetAllLevels(USkillComponent::MaxLevel); }
 			}
 			static int32 Took = -1, Picked = -1;
 			if (S == N && In > 3.f && Picked != S) { Picked = S; Me->Inv(EInvOp::BoxPick, 0, 0, 0, nullptr, B->At); }
@@ -347,8 +348,8 @@ namespace JeebHouseLoot
 			for (TActorIterator<AKnightCharacter> It(W); It; ++It)
 			{
 				if (!It->GetController() || !It->GetSkills()) continue;
-				if (!GT.A.IsValid() && GT.B.Get() != *It) { GT.A = *It; GT.AAt = GT.Clock; It->GetSkills()->SetAllLevels(99); UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOTTEST player A is %s"), *PlayerName(*It)); }
-				else if (!GT.B.IsValid() && GT.A.Get() != *It) { GT.B = *It; GT.BAt = GT.Clock; It->GetSkills()->SetAllLevels(99); UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOTTEST player B is %s"), *PlayerName(*It)); }
+				if (!GT.A.IsValid() && GT.B.Get() != *It) { GT.A = *It; GT.AAt = GT.Clock; It->GetSkills()->SetAllLevels(USkillComponent::MaxLevel); UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOTTEST player A is %s"), *PlayerName(*It)); }
+				else if (!GT.B.IsValid() && GT.A.Get() != *It) { GT.B = *It; GT.BAt = GT.Clock; It->GetSkills()->SetAllLevels(USkillComponent::MaxLevel); UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOTTEST player B is %s"), *PlayerName(*It)); }
 			}
 			auto Put = [&](AKnightCharacter* K)
 			{
@@ -424,7 +425,7 @@ void AKnightCharacter::FinishBoxPick()
 	}
 	Sk->AddXP(ESkillType::Lockpicking, 3);
 	// Heard? Halved while crouched, and Stealth takes it down to a quarter at 99
-	const float Hear = JeebTune::V().LootAlertChance * (IsCrouchedNow() ? 0.5f : 1.f) * FMath::Lerp(1.f, 0.25f, FMath::Clamp((Sk->GetLevel(ESkillType::Stealth) - 1) / 98.f, 0.f, 1.f));
+	const float Hear = JeebTune::V().LootAlertChance * (IsCrouchedNow() ? 0.5f : 1.f) * FMath::Lerp(1.f, 0.25f, USkillComponent::PowerBlend(Sk->GetLevel(ESkillType::Stealth)));
 	ANpc* Heard = nullptr;
 	if (FMath::FRand() < Hear)
 	{

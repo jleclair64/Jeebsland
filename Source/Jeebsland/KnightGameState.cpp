@@ -221,7 +221,7 @@ void AKnightGameState::BuildWorld()
 	TArray<EItemType> OreMix;
 	{
 		auto Put = [&](EItemType T, int32 N) { for (int32 i = 0; i < N; ++i) OreMix.Add(T); };
-		Put(EItemType::TinOre, 13); Put(EItemType::IronOre, 11);
+		Put(EItemType::CopperOre, 12); Put(EItemType::TinOre, 12); Put(EItemType::Coal, 10); Put(EItemType::IronOre, 10);   // (copper and coal, 2026-11-27: bronze is copper + tin, steel iron + coal, silver silver + coal)
 		Put(EItemType::SilverOre, 5); Put(EItemType::GoldOre, 3); Put(EItemType::Emerald, 2); Put(EItemType::Diamond, 1);
 		FRandomStream Shuffle(777);
 		for (int32 i = OreMix.Num() - 1; i > 0; --i) OreMix.Swap(i, Shuffle.RandRange(0, i));
@@ -241,14 +241,14 @@ void AKnightGameState::BuildWorld()
 		}
 	};
 
-	// A few tin rocks near the starting point (what the starting kit's level needs)...
+	// A few tin and copper rocks near the starting point (what the starting kit's level needs)...
 	SpawnRock(650.f, -100.f, EItemType::TinOre);
-	SpawnRock(900.f, -300.f, EItemType::TinOre);
+	SpawnRock(900.f, -300.f, EItemType::CopperOre);   // (a copper rock among them: bronze bars are copper + tin, 2026-11-27)
 	SpawnRock(1150.f, 100.f, EItemType::TinOre);
 
 	// ...and plenty more scattered around the hills
 	FRandomStream Rand(4242);
-	for (int32 i = 0; i < 35; ++i)
+	for (int32 i = 0; i < 50; ++i)   // (50 since 2026-11-27: two more ores share the spots)
 	{
 		const float Angle = Rand.FRandRange(0.f, 2.f * PI);
 		const float Dist = FMath::Lerp(900.f, 8500.f, FMath::Sqrt(Rand.FRand()));

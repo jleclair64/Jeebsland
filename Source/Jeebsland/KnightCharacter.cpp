@@ -126,7 +126,7 @@ void AKnightCharacter::BeginPlay()
 		Skills->AddInvItem(JeebItems::GearId(JeebItems::K_Crest, 0), 1);   // the Red Helm Brush, ready to wear
 		Skills->EnsureStarterSpells();   // TEMPORARY (test setup): both spells learned and in the F cycle
 	}
-	// TESTING ONLY: editor Play in single player on the owner's PC gets every skill at 99 while MaxLevelInEditor is on
+	// TESTING ONLY: editor Play in single player on the owner's PC gets every skill at the cap (29) while MaxLevelInEditor is on
 	// ([Jeebsland.Testing] in DefaultGame.ini; online logins are handled by AKnightGameMode). Never in a packaged game.
 	if (Skills && HasAuthority() && UsesLocalSave() && GetWorld() && GetWorld()->IsPlayInEditor())
 	{
@@ -484,6 +484,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickFishSizeTest(Dt);   // (the online test of fish sizes in the pack: FishSizeTest.cpp)
 	if (HasAuthority()) TickTrade(Dt);   // (trades and Market mail: KnightCharacterTrade.cpp)
 	TickEconomyTest(Dt);   // (the online economy test: EconomyTest.cpp)
+	TickMetalsTest(Dt);   // (the skill cap, metals, Knight's Armor and vaulting test: MetalsTest.cpp)
 	TickHorseMagic(Dt);   // (a wizard on a horse drains magic: KnightCharacterInteract.cpp)
 	//   // (the charged jump and the hop: KnightCharacterTroll.cpp)
 	const bool bFaceCam = TickGroundSpeed(Dt, Speed, bFalling, bSpecial, SpecialSpeed, bWantSprint);

@@ -16,9 +16,9 @@ namespace JeebItems
 			TEXT("Cape"), TEXT("Ring"), TEXT("Amulet"), TEXT("Crest"), TEXT("Longbow"), TEXT("Crossbow"), TEXT("Club"), TEXT("Book") };
 		const TCHAR* const MaterialKeys[] = { TEXT("CopperOre"), TEXT("Coal"), TEXT("Logs"), TEXT("Diamond"), TEXT("Bacon"), TEXT("PineLogs"), TEXT("RedwoodLogs"),
 			TEXT("Perch"), TEXT("Trout"), TEXT("GoldenCarp"), TEXT("Hide"), TEXT("Bones"), TEXT("TinOre"), TEXT("IronOre"), TEXT("SilverOre"), TEXT("GoldOre"),
-			TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers"), TEXT("GameMeat"), TEXT("EagleFeather"), TEXT("Salmon"), TEXT("Bass") };
+			TEXT("Onyx"), TEXT("Emerald"), TEXT("Venison"), TEXT("Antlers"), TEXT("GameMeat"), TEXT("EagleFeather"), TEXT("Salmon"), TEXT("Bass"), TEXT("BronzeBar"), TEXT("SteelBar"), TEXT("SilverBar") };
 		constexpr int32 NumMaterials = UE_ARRAY_COUNT(MaterialKeys);
-		static_assert(NumMaterials == int32(EItemType::Bass) + 1, "MaterialKeys must list every EItemType, in order");
+		static_assert(NumMaterials == int32(EItemType::SilverBar) + 1, "MaterialKeys must list every EItemType, in order");
 
 		void Problem(const FString& What) { UE_LOG(LogJeebItems, Error, TEXT("Jeebsland items: %s"), *What); }
 
@@ -145,6 +145,7 @@ namespace JeebItems
 				Row.WeightMult = FMath::Clamp(Tab.F(r, TEXT("WeightMult"), 1.f), 0.f, 10.f);
 				Row.Metal = FMath::Clamp(Tab.F(r, TEXT("Metal"), 1.f), 0.f, 1.f);
 				Row.Rough = FMath::Clamp(Tab.F(r, TEXT("Rough"), 0.3f), 0.f, 1.f);
+				Row.bVaulted = Tab.B(r, TEXT("Vaulted"));
 			}
 		}
 
@@ -173,6 +174,7 @@ namespace JeebItems
 				Row.bTwoHanded = Tab.B(r, TEXT("TwoHanded"));
 				const FString Cls = Tab.S(r, TEXT("Class")).ToLower();
 				Row.Class = Cls == TEXT("knight") ? 1 : Cls == TEXT("troll") ? 2 : Cls == TEXT("wizard") ? 3 : 0;   // (all / everyone / blank: anyone)
+				Row.bVaulted = Tab.B(r, TEXT("Vaulted"));
 			}
 		}
 
@@ -195,6 +197,16 @@ namespace JeebItems
 				Row.Color = Tab.Color(r, TEXT("Color"), Row.Color);
 				Row.GatherLevel = Tab.I(r, TEXT("GatherLevel"), 1);
 				Row.FishXP = Tab.I(r, TEXT("FishXP"), 8);
+				Row.bVaulted = Tab.B(r, TEXT("Vaulted"));
+				if (G == TEXT("bar")) Row.Group = MG_Bar;
+				const FString S1 = Tab.S(r, TEXT("Smelt1")), S2 = Tab.S(r, TEXT("Smelt2"));
+				if (!S1.IsEmpty() && !S2.IsEmpty())
+				{
+					if (MaterialFromKey(S1, Row.Smelt[0]) && MaterialFromKey(S2, Row.Smelt[1])) Row.bSmelted = true;
+					else Problem(FString::Printf(TEXT("Materials.csv, %s: Smelt1 / Smelt2 name no material (\"%s\", \"%s\")"), MaterialKeys[m], *S1, *S2));
+					Row.SmeltLevel = FMath::Clamp(Tab.I(r, TEXT("SmeltLevel"), 1), 1, USkillComponent::MaxLevel);
+					Row.SmeltXP = FMath::Max(0, Tab.I(r, TEXT("SmeltXP"), 0));
+				}
 			}
 		}
 
@@ -288,6 +300,7 @@ namespace JeebItems
 				Row.StopMul = FMath::Max(0.f, Tab.F(s, TEXT("StopMul"), 1.f));
 				Row.WeightMul = FMath::Max(0.f, Tab.F(s, TEXT("WeightMul"), 1.f));
 				Row.PriceMul = FMath::Max(0.f, Tab.F(s, TEXT("PriceMul"), 1.f));
+				Row.bVaulted = Tab.B(s, TEXT("Vaulted"));
 			}
 		}
 
@@ -314,6 +327,7 @@ namespace JeebItems
 				Row.XP = Tab.I(r, TEXT("XP"), 0);
 				Row.Price = Tab.I(r, TEXT("Price"), 8);
 				Row.bShop = Tab.B(r, TEXT("Shop"));
+				Row.bVaulted = Tab.B(r, TEXT("Vaulted"));
 				Row.Head = Tab.Color(r, TEXT("Head"), Row.Head);
 				Row.Feather = Tab.Color(r, TEXT("Feather"), Row.Feather);
 				const TCHAR* MC[3] = { TEXT("Mat1"), TEXT("Mat2"), TEXT("Mat3") };

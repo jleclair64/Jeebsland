@@ -76,8 +76,9 @@ namespace JeebSteele
 
 	// ------------------------------------------------------------------ the quarry's rocks (high-tier ores) and the town's people
 	struct FRockDef { float E, N; int32 Ore; };   // Ore: 0 iron, 1 silver, 2 gold, 3 emerald, 4 diamond
+	// (ore 5 = coal, 2026-11-27: steel is iron + coal and silver bars silver + coal, so the mine has coal beside its iron and silver)
 	inline const FRockDef RockDefs[] = {
-		{ 58.f, 68.f, 0 }, { 66.f, 62.f, 1 }, { 52.f, 74.f, 1 }, { 72.f, 70.f, 2 }, { 62.f, 78.f, 0 }, { 70.f, 54.f, 1 },
+		{ 58.f, 68.f, 0 }, { 66.f, 62.f, 1 }, { 52.f, 74.f, 1 }, { 72.f, 70.f, 5 }, { 62.f, 78.f, 5 }, { 70.f, 54.f, 1 },
 		{ 78.f, 62.f, 2 }, { 56.f, 84.f, 3 }, { 76.f, 78.f, 0 }, { 84.f, 70.f, 3 }, { 68.f, 86.f, 2 }, { 82.f, 84.f, 4 },
 	};
 

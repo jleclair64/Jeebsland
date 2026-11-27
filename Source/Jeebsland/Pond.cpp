@@ -281,7 +281,7 @@ void AFishingSpot::ScheduleBite()
 	USkillComponent* Sk = GetCurrentGatherer() ? GetCurrentGatherer()->FindComponentByClass<USkillComponent>() : nullptr;
 	const int32 L = Sk ? Sk->GetLevel(ESkillType::Fishing) : 1;
 	const JeebTune::FValues& V = JeebTune::V();
-	const float MaxWait = FMath::Lerp(V.FishBiteMaxAt1, V.FishBiteMaxAt99, FMath::Clamp((L - 1) / 98.f, 0.f, 1.f));
+	const float MaxWait = FMath::Lerp(V.FishBiteMaxAt1, V.FishBiteMaxAt99, USkillComponent::PowerBlend(L));
 	const float PoleMul = FMath::Clamp(EffectiveSeconds / FMath::Max(GatherSeconds, 0.01f), 0.3f, 2.f);   // (a better pole bites sooner)
 	const float Wait = FMath::FRandRange(V.FishBiteMin, FMath::Max(V.FishBiteMin, MaxWait)) * PoleMul;
 	UE_LOG(LogTemp, Log, TEXT("JEEBFISH cast %d: Fishing %d, a bite in %.1f s (longest at this level %.1f, pole x%.2f)"), Id, L, Wait, MaxWait, PoleMul);

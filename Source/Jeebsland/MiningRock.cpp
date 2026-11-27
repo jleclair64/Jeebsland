@@ -201,11 +201,13 @@ float AMiningRock::SurfaceAlong(const FVector& From, float Z) const
 
 void AMiningRock::RollOre()
 {
-	// Which ore the rock holds (six kinds since 2026-11-04). Normally fixed by the world builder (SetOre), the same
+	// Which ore the rock holds (eight kinds since 2026-11-27: copper, tin, coal, iron, silver, gold, emerald, diamond). Normally fixed by the world builder (SetOre), the same
 	// on every machine; a rock placed without one picks by where it stands, which every machine also agrees on.
 	struct FOreChance { EItemType T; float Weight; int32 XP; const TCHAR* Text; };
 	static const FOreChance Table[] = {
+		{ EItemType::CopperOre, 24.f,  5, TEXT("You mine some copper ore.") },   // (copper and coal are back, 2026-11-27: bronze and steel bars)
 		{ EItemType::TinOre,    24.f,  5, TEXT("You mine some tin ore.") },
+		{ EItemType::Coal,      14.f, 12, TEXT("You mine some coal.") },
 		{ EItemType::IronOre,   16.f, 12, TEXT("You mine some iron ore.") },
 		{ EItemType::SilverOre, 10.f, 20, TEXT("You mine some silver ore.") },
 		{ EItemType::GoldOre,    7.f, 30, TEXT("You mine some gold ore!") },
