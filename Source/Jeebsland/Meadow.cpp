@@ -1,4 +1,5 @@
 #include "Meadow.h"
+#include "StoneCircle.h"
 #include "Fill.h"
 #include "EngineUtils.h"
 #include "Palette.h"
@@ -868,7 +869,7 @@ void AMeadow::StepJob(double BudgetSeconds)
 		SampleJob(X, Y, Amount, Wear);
 		const float Keep = JobRand.FRand();
 		if (Keep >= Amount || !GrowsHere(X, Y)) continue;   // thinning out over rock, mud and sand
-		if (JeebFill::Covered(X, Y)) continue;   // (under a filler wagon, stall or well: Fill.h)
+		if (JeebFill::Covered(X, Y) || JeebStones::UnderCentre(X, Y)) continue;   // (under a filler wagon, stall or well: Fill.h)
 		const float Pc = bJobNearRoad ? Clearance(X, Y) : 1.0e6f;
 		if (bJobExactWear) Wear = WearAt(X, Y, Pc);
 		if (Keep < Amount * (1.f - 0.5f * JeebWorld::Smooth(0.3f, 0.7f, Wear)))   // and over trampled ground: sparser and short at walls and doors, never cleared (bare ground in a building's shadow reads black)

@@ -48,6 +48,10 @@ public:
 	// or (pack full) takes the item's place in the sack. False if the item does not belong in that slot.
 	bool EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool bSecond);
 	void TakeEverythingFits(AActor* Taker) { TakeAll(Taker); }
+	// (2026-11-26, the stone circles: StoneCircle.h) a prize stack belongs to the first player who takes from it; the server refuses everyone
+	// else, even if his pack was too full for all of it. Server only.
+	bool bOneTaker = false;
+	TWeakObjectPtr<AActor> ClaimedBy;
 
 	static ALootDrop* SpawnPork(UWorld* World, const FVector& Where);                     // 2 raw pork
 	static ALootDrop* SpawnBeast(UWorld* World, const FVector& Where);                    // hide and bones, for wolves, bears and the like

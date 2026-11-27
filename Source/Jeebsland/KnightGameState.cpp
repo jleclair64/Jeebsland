@@ -41,6 +41,7 @@
 #include "OpenWorldActor.h"
 #include "PvpSigns.h"
 #include "Fill.h"
+#include "StoneCircle.h"
 #include "QuestPeople.h"
 #include "NpcLife.h"
 #include "Paths.h"
@@ -319,6 +320,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AAutumnDecor>(FVector::ZeroVector, FRotator::ZeroRotator);
 	World->SpawnActor<AOpenWorld>(FVector::ZeroVector, FRotator::ZeroRotator);   // the placeholder houses of the towns still to be built (every machine: they are solid) and the snowfall (players only); OpenWorldActor.h
 	World->SpawnActor<APvpSigns>(FVector::ZeroVector, FRotator::ZeroRotator);   // the warning signs along the PvP zones' edges (PvpSigns.h; players only)
+	World->SpawnActor<AStoneCircles>(FVector::ZeroVector, FRotator::ZeroRotator);   // the standing-stone circles and their noon loot event (StoneCircle.h; on every machine: the server builds their solids and lays the loot)
 	World->SpawnActor<AWorldFill>(FVector::ZeroVector, FRotator::ZeroRotator);   // the filler props (Fill.h; after everything they keep clear of, on every machine: the server builds their solids)
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
@@ -746,6 +748,8 @@ void AKnightGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AKnightGameState, Doors);
 	DOREPLIFETIME(AKnightGameState, StoreHour);
 	DOREPLIFETIME(AKnightGameState, StoreLeft);
+	DOREPLIFETIME(AKnightGameState, StoneTestNoon);
+	DOREPLIFETIME(AKnightGameState, StoneTestCircle);
 }
 
 void AKnightGameState::SetNodeCharges(const FVector& Loc, int32 Charges, int32 Max)
@@ -1306,7 +1310,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						EyeCam->GetCameraComponent()->SetFieldOfView(Fov);
 						EyeCam->GetCameraComponent()->bConstrainAspectRatio = false;
 						PC->SetViewTarget(EyeCam);
-						if (PC->GetHUD()) PC->GetHUD()->bShowHUD = false;
+						if (PC->GetHUD() && !FParse::Param(FCommandLine::Get(), TEXT("ShotEyesHud"))) PC->GetHUD()->bShowHUD = false;   // (-ShotEyesHud: keep the HUD, for HUD pictures)
 					}
 				}
 			}

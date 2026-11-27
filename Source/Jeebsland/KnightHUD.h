@@ -172,6 +172,9 @@ private:
 	// PvP zones (owner 2026-11-23): the red title on walking in and the small icon at the top of the screen while inside (KnightHUDPvp.cpp)
 	int32 PvpIn = -1; float PvpBannerT = -100.f; FString PvpTitle;
 	void DrawPvp(const FVector& Where, float Now);
+	// The stone circles' event (StoneCircle.h): the dawn announcement, the countdown before high noon and the wake (KnightHUDStones.cpp)
+	void DrawStones();
+	double StoneToldNoon = -1.0, StoneWokeNoon = -1.0; float StoneToldT = -100.f, StoneWokeT = -100.f; int32 StoneCountLog = -1;
 #if !UE_BUILD_SHIPPING
 	friend struct FPvpTestDriver;   // (PvpTest.cpp)
 #endif
