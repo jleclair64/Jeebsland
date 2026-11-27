@@ -70,3 +70,4 @@ The owner's list from 2026-11-23, sorted. The easy group was started that day; e
    - Metals approved: smelted metal is "bars" (ingots stay the money). Bronze (copper ore + tin ore, Mining/Smithing 1), Steel (iron ore + coal, 10), Silver (silver ore + coal, 20). Gold, emerald, diamond stay for jewellery; sapphire later; lead dropped; meteorite stays the one rare metal. Each weapon/tool kind's three versions are bronze/steel/silver at 1/10/20 (model designs with the owner).
    - "Vaulting": only items with no use in the game now (not all potions; potions with a use stay) can be kept in the files but switched off in game (no shops, drops or recipes), to return in a later version; or kept as a stated exception.
    - Build order: economy batch (running) -> skill cap 29 + metals + Knight's Armor + vaulting in one batch.
+   - Test kit menu (owner, 2026-11-26): show in-game items and vaulted items in separate sections.
