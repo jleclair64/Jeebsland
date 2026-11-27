@@ -82,7 +82,7 @@ private:
 	bool Btn(float X, float Y, float W, float H, const FString& Label, bool bEnabled = true, bool bActive = false, float Scale = 1.05f);
 	bool CloseBtn(float PX, float PY, float PW);
 	void SetTip(const TArray<FString>& Lines) { TipLines = Lines; }
-	void ItemTip(int32 Id);
+	void ItemTip(int32 Id, int32 Size = 0);   // Size: a caught fish's length, tenths of an inch
 	void DrawTip();
 	// Place names and the game's name (owner, 2026-11-06, after Skyrim's): the game's own font in widely spaced capitals, warm ivory with a soft shadow, a thin fading rule either side. Centred; its capitals' top at Y, H tall.
 	void TitleBanner(const FString& Text, float Y, float H, float Alpha);

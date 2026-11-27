@@ -131,7 +131,7 @@ void AResourceNode::FinishGathering()
 		EItemType Item = ItemType;
 		int32 XP = XPReward;
 		RollYield(Skills, Item, XP);
-		if (!Skills->AddItem(Item, ItemsPerGather))
+		if (!Skills->AddInvItem(JeebItems::MaterialId(Item), ItemsPerGather, YieldSizeTenths(Item)))
 		{
 			// (owner 2026-11-07: he goes on swinging until he moves or the click's work is over. Nothing is won meanwhile, and the node keeps its charge.)
 			Tell(Gatherer, 3.f, FColor::Red, TEXT("Your inventory is full! Sell or drop something at the store."));

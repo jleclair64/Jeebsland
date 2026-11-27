@@ -6,6 +6,7 @@
 #include "Pig.h"
 #include "FoeKnight.h"
 #include "Loot.h"
+#include "JeebProps.h"
 #include "Npc.h"
 #include "HealthComponent.h"
 #include "Combat.h"
@@ -80,7 +81,7 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 	{
 		const float X = PX + 30.f + (i % 8) * 64.f, Y = PY + 94.f + 10 * 38.f + 32.f + (i / 8) * 62.f;
 		const FInvSlot S = Skills->Slots[i];
-		const bool bSellable = S.Id != 0 && (IsGear(S.Id) || IsArrow(S.Id));
+		const bool bSellable = S.Id != 0 && (IsGear(S.Id) || IsArrow(S.Id) || (S.IsSized() && JeebProps::IsFishItem(S.Id)));   // (a sized fish sells on its own, one click)
 		const bool bOver = Over(X, Y, 58.f, 58.f);
 		Tile(X, Y, 58.f, 58.f, bOver && bSellable ? FLinearColor(0.85f, 0.93f, 1.f) : FLinearColor(0.6f, 0.72f, 0.88f), bOver && bSellable ? 0.38f : 0.2f);
 		if (S.Id == 0) continue;
@@ -88,9 +89,10 @@ void AKnightHUD::DrawShopScreen(AKnightCharacter* Knight)
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + 36.f, Y + 38.f, Font, 0.85f);
 		if (bOver && bSellable)
 		{
-			const int32 Pay = IsArrow(S.Id) ? S.Count : GearSellPrice(S.Id) * S.Count;
+			const int32 Pay = IsArrow(S.Id) ? S.Count : IsMaterial(S.Id) ? SellValue(MaterialType(S.Id)) * S.Count : GearSellPrice(S.Id) * S.Count;
 			TArray<FString> Tip;
 			Tip.Add(ItemName(S.Id));
+			if (S.IsSized()) Tip.Last() += FString::Printf(TEXT(" (%s)"), *JeebProps::FishSizeText(S.Id, S.Size));
 			Tip.Add(FString::Printf(TEXT("Click to sell for %d ingots"), Pay));
 			SetTip(Tip);
 			if (bUIClick) Knight->Inv(EInvOp::SellSlot, i, S.Id);
@@ -356,7 +358,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 28.f, Y + SS - 22.f, Font, 1.0f);
 		if (bOver)
 		{
-			ItemTip(S.Id);
+			ItemTip(S.Id, S.Size);
 			if (bUIClick) Knight->Inv(EInvOp::BankDeposit, i);
 		}
 	}
@@ -389,7 +391,7 @@ void AKnightHUD::DrawBankScreen(AKnightCharacter* Knight)
 		if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + BS - 26.f, Y + BS - 20.f, Font, 0.85f);
 		if (bOver)
 		{
-			ItemTip(S.Id);
+			ItemTip(S.Id, S.Size);
 			if (bUIClick) Knight->Inv(EInvOp::BankWithdraw, Idx);
 		}
 	}

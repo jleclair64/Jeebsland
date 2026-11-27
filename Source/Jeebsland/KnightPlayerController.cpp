@@ -196,7 +196,7 @@ void AKnightPlayerController::ServerTestEmptyPack_Implementation()
 	AKnightCharacter* Knight = Cast<AKnightCharacter>(GetPawn());
 	if (USkillComponent* Sk = Knight ? Knight->GetSkills() : nullptr)
 	{
-		for (FInvSlot& S : Sk->Slots) { S.Id = 0; S.Count = 0; }
+		for (FInvSlot& S : Sk->Slots) { S.Id = 0; S.Count = 0; S.Size = 0; }
 		Sk->Say(2.f, FColor(255, 215, 90), TEXT("Test kit: pack emptied."));
 	}
 }

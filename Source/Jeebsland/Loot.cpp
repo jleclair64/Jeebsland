@@ -146,6 +146,7 @@ FString ALootDrop::Describe() const
 		if (S.Id == 0 || S.Count <= 0) continue;
 		const FString Nm = JeebItems::IsMaterial(S.Id) ? FString(JeebItems::MaterialName(JeebItems::MaterialType(S.Id))) : JeebItems::ItemName(S.Id);
 		if (!Out.IsEmpty()) Out += TEXT(", ");
+		if (S.IsSized() && JeebProps::IsFishItem(S.Id)) { Out += FString::Printf(TEXT("%s (%s%s)"), *Nm, *JeebProps::FishSizeText(S.Id, S.Size), JeebProps::IsBoardFish(S.Id, S.Size) ? TEXT(", Board fish") : TEXT("")); continue; }
 		Out += FString::Printf(TEXT("%s x%d"), *Nm, S.Count);
 	}
 	if (Ingots > 0)
@@ -167,12 +168,14 @@ void ALootDrop::TakeAll(AActor* Taker)
 	for (FInvSlot& S : Items)
 	{
 		if (S.Id == 0 || S.Count <= 0) continue;
-		if (Sk->CanAdd(S.Id, S.Count) && Sk->AddInvItem(S.Id, S.Count))
+		if (Sk->CanAdd(S.Id, S.Count, S.Size) && Sk->AddInvItem(S.Id, S.Count, S.Size))
 		{
 			const FString Nm = JeebItems::IsMaterial(S.Id) ? FString(JeebItems::MaterialName(JeebItems::MaterialType(S.Id))) : JeebItems::ItemName(S.Id);
 			if (!Got.IsEmpty()) Got += TEXT(", ");
+			if (S.IsSized() && JeebProps::IsFishItem(S.Id)) Got += FString::Printf(TEXT("%s (%s)"), *Nm, *JeebProps::FishSizeText(S.Id, S.Size));
+			else
 			Got += FString::Printf(TEXT("%s x%d"), *Nm, S.Count);
-			S.Id = 0; S.Count = 0;
+			S.Id = 0; S.Count = 0; S.Size = 0;
 		}
 		else bLeft = true;
 	}
@@ -221,7 +224,7 @@ ALootDrop* ALootDrop::SpawnPack(UWorld* World, const FVector& Where, USkillCompo
 	TArray<FInvSlot> L;
 	for (FInvSlot& S : From->Slots)
 	{
-		if (S.Id != 0 && S.Count > 0) { L.Add(S); S.Id = 0; S.Count = 0; }
+		if (S.Id != 0 && S.Count > 0) { L.Add(S); S.Id = 0; S.Count = 0; S.Size = 0; }
 	}
 	const int32 Gold = From->GetIngots();
 	if (Gold > 0) From->SpendIngots(Gold);
@@ -241,12 +244,12 @@ bool ALootDrop::TakeOne(int32 Index, AActor* Taker)
 	USkillComponent* Sk = Taker ? Taker->FindComponentByClass<USkillComponent>() : nullptr;
 	if (!Sk || !HasAuthority() || !Items.IsValidIndex(Index) || Items[Index].Id == 0) return false;
 	FInvSlot& S = Items[Index];
-	if (!Sk->CanAdd(S.Id, S.Count) || !Sk->AddInvItem(S.Id, S.Count))
+	if (!Sk->CanAdd(S.Id, S.Count, S.Size) || !Sk->AddInvItem(S.Id, S.Count, S.Size))
 	{
 		Tell(Taker, 2.5f, FColor::Orange, TEXT("Your pack is full."));
 		return false;
 	}
-	S.Id = 0; S.Count = 0;
+	S.Id = 0; S.Count = 0; S.Size = 0;
 	EmptyCheck();
 	return true;
 }
@@ -262,7 +265,7 @@ bool ALootDrop::EquipTo(int32 Index, AActor* Taker, int32 Hot, int32 Kind, bool 
 	if (!Target) return false;
 	const int32 Old = *Target;
 	*Target = Id;
-	if (Old == 0 || (Sk->CanAdd(Old, 1) && Sk->AddInvItem(Old, 1))) { Items[Index].Id = 0; Items[Index].Count = 0; }
+	if (Old == 0 || (Sk->CanAdd(Old, 1) && Sk->AddInvItem(Old, 1))) { Items[Index].Id = 0; Items[Index].Count = 0; Items[Index].Size = 0; }
 	else { Items[Index].Id = Old; Items[Index].Count = 1; }   // pack full: they trade places
 	EmptyCheck();
 	return true;
@@ -294,11 +297,12 @@ void ALootDrop::BuildItemLook()
 	else if (Ingots > 0) JeebItemModel::BuildIngots(Ingots, Parts);
 	// (a model from /Game/Props: it floats the same way)
 	const bool bFish = First && JeebProps::IsFishItem(First->Id);   // (2026-11-26: the fish models, at their pack length; a stack shows up to three, scattered)
+	const float FishCm = (bFish && First->Size > 0) ? FMath::Clamp(First->Size / 10.f * 2.54f, 12.f, 150.f) : 0.f;   // (a sized fish lies at its real length)
 	if (First && (JeebItems::IsGear(First->Id) || bFish))
 		if (UStaticMesh* Prop = JeebProps::MeshForItem(First->Id))
 		{
 			const FBox PB = Prop->GetBoundingBox();
-			const float PGrow = bFish ? JeebProps::FishLen(JeebItems::MaterialType(First->Id)) / FMath::Max((float)PB.GetSize().GetMax(), 1.f) : FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
+			const float PGrow = bFish ? (FishCm > 0.f ? FishCm : JeebProps::FishLen(JeebItems::MaterialType(First->Id))) / FMath::Max((float)PB.GetSize().GetMax(), 1.f) : FMath::Clamp(22.f / FMath::Max((float)PB.GetSize().GetMax(), 1.f), 1.f, 3.f);
 			Hover = NewObject<USceneComponent>(this);
 			Hover->SetupAttachment(Origin);
 			Hover->RegisterComponent();

@@ -1186,6 +1186,7 @@ protected:
 	void EndBroomSrv(const TCHAR* Why);
 	void ApplyBroomMovement();
 	void TickBroom(float Dt);
+	void TickFishSizeTest(float Dt);   // (non-Shipping, FishSizeTest.cpp: -FishSizeNetTest on the server, -FishSizeDo on the player's machine)
 	void TickHorseMagic(float Dt);   // (server) a wizard riding a horse drains magic; with none left he is put down
 	void UpdateBroomModel();
 	float WizardGuardDrain() const;
@@ -1194,6 +1195,7 @@ protected:
 	bool bGuardMagicOut = false;   // (the server: the orb guard dropped for want of magic until the bar is back to BroomMinMagic)
 	bool bBroomApplied = false;    // (this machine has put the movement into flight)
 	float BroomTestT = 0.f; int32 BroomTestStep = 0;
+	float FishTestT = 0.f;
 	float BroomPitchNow = 6.f;   // (the broom model's eased pitch)
 };
 

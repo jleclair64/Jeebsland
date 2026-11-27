@@ -1,6 +1,7 @@
 #include "JeebSave.h"
 #include "SkillComponent.h"
 #include "Inventory.h"
+#include "JeebProps.h"
 #include "Lore.h"
 #include "JeebSpells.h"
 #include "QuestComponent.h"
@@ -71,8 +72,8 @@ UJeebSave* UJeebSave::Capture(const USkillComponent* Skills, const AActor* Body)
 		S->Known.Add(Skills->Known[i] ? 1 : 0);
 	}
 	S->Ingots = Skills->GetIngots();
-	for (const FInvSlot& Sl : Skills->Slots) { S->SlotIds.Add(Sl.Id); S->SlotCounts.Add(Sl.Count); }
-	for (const FInvSlot& Sl : Skills->Bank)  { S->BankIds.Add(Sl.Id);  S->BankCounts.Add(Sl.Count); }
+	for (const FInvSlot& Sl : Skills->Slots) { S->SlotIds.Add(Sl.Id); S->SlotCounts.Add(Sl.Count); S->SlotSizes.Add(Sl.Size); }
+	for (const FInvSlot& Sl : Skills->Bank)  { S->BankIds.Add(Sl.Id);  S->BankCounts.Add(Sl.Count); S->BankSizes.Add(Sl.Size); }
 	for (int32 i = 0; i < 5; ++i) S->Hotbar.Add(Skills->Hotbar[i]);
 	S->Selected = Skills->Selected;
 	for (int32 i = 0; i < USkillComponent::NumWornKinds; ++i) S->Worn.Add(Skills->Worn[i]);
@@ -128,19 +129,19 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 	{
 		FJeebClassPack& Away = Others[From];
 		Away = FJeebClassPack();
-		Away.bUsed = true; Away.SlotIds = SlotIds; Away.SlotCounts = SlotCounts; Away.Hotbar = Hotbar; Away.Selected = Selected; Away.Worn = Worn;
+		Away.bUsed = true; Away.SlotIds = SlotIds; Away.SlotCounts = SlotCounts; Away.SlotSizes = SlotSizes; Away.Hotbar = Hotbar; Away.Selected = Selected; Away.Worn = Worn;
 		Away.RingB = RingB; Away.PotionId = PotionId; Away.PotionCount = PotionCount;
 		const FJeebClassPack Mine = Others[Cls];
 		Others[Cls] = FJeebClassPack();
 		bFreshClass = !Mine.bUsed;
-		SlotIds = Mine.SlotIds; SlotCounts = Mine.SlotCounts; Hotbar = Mine.Hotbar; Selected = Mine.Selected; Worn = Mine.Worn;
+		SlotIds = Mine.SlotIds; SlotCounts = Mine.SlotCounts; SlotSizes = Mine.SlotSizes; Hotbar = Mine.Hotbar; Selected = Mine.Selected; Worn = Mine.Worn;
 		RingB = Mine.RingB; PotionId = Mine.PotionId; PotionCount = Mine.PotionCount;
 		UE_LOG(LogTemp, Log, TEXT("JEEBPACK class %d -> %d: %s"), From, Cls, bFreshClass ? TEXT("starter kit (never played)") : TEXT("its own pack comes out"));
 	}
 	else Others[Cls] = FJeebClassPack();
 
 	// Everything is checked on the way in: unknown ids vanish, counts are held to the stack size
-	auto Fill = [](TArray<FInvSlot>& Dest, const TArray<int32>& Ids, const TArray<int32>& Counts)
+	auto Fill = [](TArray<FInvSlot>& Dest, const TArray<int32>& Ids, const TArray<int32>& Counts, const TArray<int32>& Sizes)
 	{
 		for (int32 i = 0; i < Dest.Num(); ++i)
 		{
@@ -149,14 +150,16 @@ bool UJeebSave::ApplyTo(USkillComponent* Skills)
 			{
 				Sl.Id = JeebItems::ReplaceRetired(Ids[i]);   // (a katana becomes a sword of its tier)
 				Sl.Count = FMath::Clamp(Counts[i], 1, StackSize(Sl.Id));
+				// (a fish length, tenths of an inch: only on a trout, salmon or bass, one to a slot; an older save has none and its fish stay a stack)
+				if (Sizes.IsValidIndex(i) && Sizes[i] > 0 && JeebProps::FishSpecies(Sl.Id) >= 0) { Sl.Size = FMath::Clamp(Sizes[i], 1, 2500); Sl.Count = 1; }
 			}
 			Dest[i] = Sl;
 		}
 	};
 	Skills->Slots.SetNum(NumSlots);
 	Skills->Bank.SetNum(USkillComponent::NumBankSlots);
-	Fill(Skills->Slots, SlotIds, SlotCounts);
-	Fill(Skills->Bank, BankIds, BankCounts);
+	Fill(Skills->Slots, SlotIds, SlotCounts, SlotSizes);
+	Fill(Skills->Bank, BankIds, BankCounts, BankSizes);
 
 	for (int32 i = 0; i < 5; ++i) Skills->Hotbar[i] = (Hotbar.IsValidIndex(i) && ValidId(Hotbar[i])) ? JeebItems::ReplaceRetired(Hotbar[i]) : 0;
 	Skills->SetSelected(Selected);

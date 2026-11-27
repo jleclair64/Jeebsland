@@ -1,4 +1,5 @@
 #include "KnightHUD.h"
+#include "JeebProps.h"
 #include "SkillTips.h"
 #include "SkillComponent.h"
 #include "Engine/Canvas.h"
@@ -74,7 +75,7 @@ void AKnightHUD::DrawInventoryScreen(AKnightCharacter* Knight)
 			HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, SX + SS - 30.f, SY + SS - 24.f, Font, 1.1f);
 		if (bOver)
 		{
-			ItemTip(S.Id);
+			ItemTip(S.Id, S.Size);
 			if (bUIClick && IsGear(S.Id)) { Knight->EquipFromInventory(i); }
 		}
 	}
@@ -260,8 +261,9 @@ void AKnightHUD::DrawSidePanel(AKnightCharacter* Knight)
 			if (S.Id == 0) continue;
 			if (!(DragKind == 1 && bDragging && DragIdx == i)) DrawIconIn(S.Id, X + 4.f, Y + 3.f, SS - 8.f, X, Y, SS, SS);   // the picked-up item leaves its cell
 			if (StackSize(S.Id) > 1) HDText(FString::Printf(TEXT("%d"), S.Count), FLinearColor::White, X + SS - 22.f, Y + 2.f, Font, 0.75f);
+			if (S.IsSized() && JeebProps::IsFishItem(S.Id)) HDText(FString::Printf(TEXT("%.1f\""), S.Size / 10.f), JeebProps::IsBoardFish(S.Id, S.Size) ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor::White, X + 4.f, Y + SS - 16.f, Font, 0.7f);   // (a caught fish shows its length)
 			ItemBadges(S.Id, X, Y, SS);
-			if (bOver) ItemTip(S.Id);
+			if (bOver) ItemTip(S.Id, S.Size);
 		}
 	}
 	if (!bCursor) { bGreyGlass = false; return; }
@@ -816,7 +818,7 @@ void AKnightHUD::DrawLootWindows(AKnightCharacter* Knight, float IX, float IY, f
 		if (!bLifted) DrawIconIn(It.Id, X + 4.f, Y + 3.f, S - 8.f, X, Y, S, S);
 		if (StackSize(It.Id) > 1 || It.Count > 1) HDText(FString::FromInt(It.Count), FLinearColor::White, X + S - 22.f, Y + 2.f, Font, 0.75f);
 		ItemBadges(It.Id, X, Y, S);
-		if (bOver) ItemTip(It.Id);
+		if (bOver) ItemTip(It.Id, It.Size);
 	};
 
 	// ---- The sack's pack, beside your inventory (bottoms lined up) ----

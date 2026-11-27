@@ -408,3 +408,8 @@ Seven caves: four in the mountains (Storm Peak by the snowstorm peaks, West Rang
 - **Tests:** pictures `bash Tools/stone_lab.sh 18500 75500 stills|wake|film|cost` (`CIRCLE=1` and `96500 69000` for the north);
   online `bash Tools/stone_net.sh` (JEEBSTONETEST PASS lines on the server; JEEBSTONE hud lines on both players at the same server times).
   `-JeebStoneSearch` logs how the spots were chosen. Log `JEEBSTONE`.
+
+## Fish keep their size in the pack (2026-11-26, agent fishsize)
+
+- Fish in the river: a trout, salmon or bass now takes its own pack slot and shows its length (hover it in the pack: "Length 27.3 in", plus "Board fish" at 36 in or more for trout and salmon, 21 in or more for bass; the side-panel cell prints the length, gold for a board fish). Perch and golden carp stack as before. Drop one (it lies at its real length), pick it up, bank it, take it out, or sell it by clicking it in the store window: the length stays. A full pack now refuses a river fish even if you already carry that kind (each needs an empty slot). Old saves load with their fish as plain stacks.
+- Test: `bash Tools/fishsize_net.sh` (a server and one off-screen knight on port 7803; real casts and bites at a river, then sell one fish, bank and take out the other, drop and pick it up, and an old-format save; read the JEEBFISHSIZETEST PASS lines). `-OldSavePath=<file.sav>` adds a real old save to the check. Details: Docs/FishingPlan.md.

@@ -1,4 +1,5 @@
 #include "KnightHUD.h"
+#include "JeebProps.h"
 #include "SkillComponent.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -333,13 +334,18 @@ void AKnightHUD::DrawTip()
 }
 
 // Tooltip for any item id
-void AKnightHUD::ItemTip(int32 Id)
+void AKnightHUD::ItemTip(int32 Id, int32 Size)
 {
 	TArray<FString> L;
 	if (IsMaterial(Id))
 	{
 				const EItemType T = MaterialType(Id);
 		L.Add(MaterialName(T));
+		if (Size > 0 && JeebProps::FishSpecies(Id) >= 0)   // (2026-11-26: a caught fish keeps its length; a record-size one is a board fish)
+		{
+			L.Add(FString::Printf(TEXT("Length %s"), *JeebProps::FishSizeText(Id, Size)));
+			if (JeebProps::IsBoardFish(Id, Size)) L.Add(TEXT("Board fish"));
+		}
 		L.Add(FString::Printf(TEXT("Sells for %d ingots"), SellValue(T)));
 		SetTip(L);
 		return;

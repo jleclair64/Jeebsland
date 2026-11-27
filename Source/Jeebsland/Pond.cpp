@@ -359,6 +359,11 @@ void AFishingSpot::RollYield(USkillComponent* Skills, EItemType& OutItem, int32&
 		: FString::Printf(TEXT("You caught a %s! (+%d XP)"), *Name, OutXP);
 }
 
+int32 AFishingSpot::YieldSizeTenths(EItemType Item)
+{
+	return SpeciesOf(Item) >= 0 ? FMath::Max(1, FMath::RoundToInt(LastSize * 10.f)) : 0;   // (trout, salmon, bass; perch and golden carp keep stacking)
+}
+
 void AFishingSpot::OnYield(AActor* Gatherer, EItemType Item)
 {
 	const int32 S = SpeciesOf(Item);
