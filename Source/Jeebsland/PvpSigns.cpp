@@ -4,6 +4,7 @@
 #include "WorldMap.h"
 #include "JeebWater.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/World.h"
@@ -43,9 +44,14 @@ void APvpSigns::BeginPlay()
 		if (UMaterialInstanceDynamic* M = C->CreateDynamicMaterialInstance(0, ColorMat)) M->SetVectorParameterValue(TEXT("Color"), Col);
 		return C;
 	};
-	UInstancedStaticMeshComponent* Wood = Make(FLinearColor(0.07f, 0.045f, 0.03f));
-	UInstancedStaticMeshComponent* Red = Make(FLinearColor(0.55f, 0.03f, 0.03f));
-	UInstancedStaticMeshComponent* White = Make(FLinearColor(0.9f, 0.88f, 0.82f));
+	// (2026-11-27, "plain PvP signs": now a painted wooden board on two posts, a dark trim round it, a red diamond with two crossed swords
+	// in steel and gold on each face, and the zone's name painted in cream under them, read from both sides)
+	UInstancedStaticMeshComponent* Wood = Make(FLinearColor(0.21f, 0.11f, 0.05f));      // (rich brown, the board)
+	UInstancedStaticMeshComponent* Dark = Make(FLinearColor(0.06f, 0.035f, 0.02f));      // (posts and trim)
+	UInstancedStaticMeshComponent* Red = Make(FLinearColor(0.50f, 0.05f, 0.04f));
+	UInstancedStaticMeshComponent* Steel = Make(FLinearColor(0.55f, 0.58f, 0.63f));
+	UInstancedStaticMeshComponent* Gold = Make(FLinearColor(0.75f, 0.52f, 0.14f));
+	Steel->SetCullDistances(0, 20000); Gold->SetCullDistances(0, 20000);
 	int32 Count = 0;
 	const TArray<JeebPvp::FZone>& Zones = JeebPvp::Zones();
 	for (int32 zi = 0; zi < Zones.Num(); ++zi)
@@ -74,12 +80,47 @@ void APvpSigns::BeginPlay()
 				const FVector At(P.X, P.Y, G);
 				auto Put = [&](UInstancedStaticMeshComponent* C, const FVector& Local, const FRotator& Rot, const FVector& Scale)
 				{ C->AddInstance(FTransform(Yaw.Quaternion() * Rot.Quaternion(), At + Yaw.RotateVector(Local), Scale), true); };
-				Put(Wood, FVector(0.f, 0.f, 140.f), FRotator::ZeroRotator, FVector(0.14f, 0.14f, 2.9f));       // the post
-				Put(Wood, FVector(0.f, 0.f, 255.f), FRotator::ZeroRotator, FVector(0.10f, 1.75f, 0.12f));     // a frame bar above the board
-				Put(Red, FVector(0.f, 0.f, 215.f), FRotator::ZeroRotator, FVector(0.08f, 1.6f, 0.9f));        // the board, 160 x 90
-				Put(White, FVector(0.f, 0.f, 215.f), FRotator(0.f, 0.f, 45.f), FVector(0.13f, 0.95f, 0.09f)); // the cross
-				Put(White, FVector(0.f, 0.f, 215.f), FRotator(0.f, 0.f, -45.f), FVector(0.13f, 0.95f, 0.09f));
-				Put(White, FVector(0.f, 0.f, 183.f), FRotator::ZeroRotator, FVector(0.13f, 1.45f, 0.06f));    // a stripe along the foot of the board
+				// (sign's own frame: +X out of the zone, +Y along the line, +Z up; the board 200 x 110 cm, its middle 185 cm up)
+				const float BZ = 185.f;
+				for (const float y : { -90.f, 90.f })
+				{
+					Put(Dark, FVector(0.f, y, 135.f), FRotator(0.f, 0.f, y > 0.f ? 1.5f : -1.f), FVector(0.13f, 0.13f, 2.7f));   // the posts, a hair off true
+					Put(Dark, FVector(0.f, y, 272.f), FRotator::ZeroRotator, FVector(0.16f, 0.16f, 0.06f));                       // their caps
+				}
+				Put(Wood, FVector(0.f, 0.f, BZ), FRotator::ZeroRotator, FVector(0.07f, 2.0f, 1.1f));          // the board
+				Put(Dark, FVector(0.f, 0.f, BZ + 57.f), FRotator::ZeroRotator, FVector(0.10f, 2.12f, 0.07f)); // trim, top and bottom
+				Put(Dark, FVector(0.f, 0.f, BZ - 57.f), FRotator::ZeroRotator, FVector(0.10f, 2.12f, 0.07f));
+				Put(Dark, FVector(0.f, -103.f, BZ), FRotator::ZeroRotator, FVector(0.10f, 0.07f, 1.1f));     // and the ends
+				Put(Dark, FVector(0.f, 103.f, BZ), FRotator::ZeroRotator, FVector(0.10f, 0.07f, 1.1f));
+				for (const float Fc : { 1.f, -1.f })   // (both faces)
+				{
+					const FVector Mark(Fc * 4.f, 0.f, BZ + 20.f);
+					Put(Red, Mark, FRotator(0.f, 0.f, 45.f), FVector(0.02f, 0.46f, 0.46f));   // the red diamond behind the swords
+					for (const float Tilt : { 38.f, -38.f })
+					{
+						const FQuat RQ = FRotator(0.f, 0.f, Tilt).Quaternion();
+						auto Bit = [&](UInstancedStaticMeshComponent* C, float Along, float Across, const FVector& Size)
+						{ Put(C, Mark + FVector(Fc * 1.5f, 0.f, 0.f) + RQ.RotateVector(FVector(0.f, Across, Along)), RQ.Rotator(), Size); };
+						Bit(Steel, 6.f, 0.f, FVector(0.02f, 0.055f, 0.50f));    // the blade, point up
+						Bit(Steel, 31.5f, 0.f, FVector(0.02f, 0.03f, 0.03f));  // (a narrower tip)
+						Bit(Gold, -19.f, 0.f, FVector(0.025f, 0.20f, 0.035f)); // the cross-guard
+						Bit(Dark, -25.f, 0.f, FVector(0.025f, 0.035f, 0.10f)); // the grip
+						Bit(Gold, -31.f, 0.f, FVector(0.03f, 0.055f, 0.045f)); // the pommel
+					}
+					UTextRenderComponent* T = NewObject<UTextRenderComponent>(this);
+					T->SetupAttachment(GetRootComponent());
+					T->SetMobility(EComponentMobility::Static);
+					T->SetWorldLocationAndRotation(At + Yaw.RotateVector(FVector(Fc * 4.5f, 0.f, BZ - 33.f)), (Yaw.Quaternion() * FRotator(0.f, Fc > 0.f ? 0.f : 180.f, 0.f).Quaternion()).Rotator());
+					T->SetHorizontalAlignment(EHTA_Center);
+					T->SetVerticalAlignment(EVRTA_TextCenter);
+					T->SetWorldSize(Z.Title.Len() > 14 ? 13.f : 16.f);
+					T->SetTextRenderColor(FColor(240, 222, 178));
+					T->SetText(FText::FromString(Z.Title));
+					T->SetCastShadow(false);
+					T->LDMaxDrawDistance = 6000.f;
+					T->CachedMaxDrawDistance = 6000.f;
+					T->RegisterComponent();
+				}
 				++Count;
 			}
 		}
