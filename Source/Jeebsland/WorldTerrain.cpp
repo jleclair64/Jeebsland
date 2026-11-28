@@ -412,7 +412,7 @@ void AWorldTerrain::BuildFine()
 						FVector Fn = C0.GetSafeNormal();
 						if (Fn.Z < 0.f) Fn = -Fn;
 						if (Fn.Z >= 0.5f && JeebCaves::CutsAt((V[Tri[t]] + V[Tri[t + 1]] + V[Tri[t + 2]]) / 3.f)) { ++CaveCut; continue; }
-						if (Fn.Z >= 0.5f) { for (int32 k = 0; k < 3; ++k) { Acc[Tri[t + k]] += Fn; Kept.Add(Tri[t + k]); } continue; }
+						if (Fn.Z >= 0.5f || !JeebOpen::SilverWallsAt(float(V[Tri[t]].X), float(V[Tri[t]].Y))) { for (int32 k = 0; k < 3; ++k) { Acc[Tri[t + k]] += Fn; Kept.Add(Tri[t + k]); } continue; }   // (2026-11-28: no stone walls on Silver Point's mountain away from its cliff)
 						int32 Ix[3] = { Tri[t], Tri[t + 1], Tri[t + 2] };
 						for (int32 k = 0; k < 3; ++k) Touch[Ix[k]] = 1;
 						auto Lower = [&](int32 A, int32 B) { return V[A].Z < V[B].Z || (V[A].Z == V[B].Z && A < B); };

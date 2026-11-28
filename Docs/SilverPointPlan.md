@@ -74,3 +74,4 @@ The trial cottage is gone from the site; the owner liked its look, so every buil
 
 ## The mountain (2026-11-28, agent mountain)
 The village now sits on a 125 m peak (ProjectNotes "Silver Point's mountain"): sheer cliff with pine ledges to the east, a four-leg switchback road from the Oak Hill road on the west, snowy top with grey cobbles, fog and snowfall that take turns. Layout, plots and lanes unchanged.
+Round 2 (2026-11-28): 175 m with ridges, two snowy knolls on the rim, wooded green lower slopes, a six-leg road, a taller four-ledge cliff with 331 pines, and the fog as cloud banks round the top that thicken the air when you are in them.

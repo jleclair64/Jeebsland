@@ -55,16 +55,17 @@ namespace JeebOpen
 
 	// ---- Silver Point's mountain (2026-11-27, agent mountain; owner: "up on a mountain ... unusually high for that area ... one side of the
 	// mountain to have a steep cliff drop off, and the other side to have a winding road leading to the top"). OpenWorld.cpp, log JEEBMOUNT.
-	// A peak about 125 m high (the northern range tops out near 100 m) round the village, laid over the ground last (Terrain.h HeightAt):
+	// A peak 175 m high (the land round it tops out near 90 m) round the village, laid over the ground last (Terrain.h HeightAt):
 	// a broad top with gentle rolls (level under the buildings, the plaza and every door), steep natural slopes, a sheer stepped cliff with
 	// two ledges on the side away from the road (the 2 m walled ground, as the sea cliffs), and a road of four legs and three hairpins from
 	// the Oak Hill road's foot up to the high street. The grid (Offset) does not see it, so every older shape and hash stays.
 	FVector2D SilverMid();
-	constexpr float SilverTop = 12500.f;   // cm: the summit's level (the village)
-	constexpr float SilverReach = 33000.f; // cm from the middle: nothing changes further out
+	constexpr float SilverTop = 17500.f;   // cm: the summit's level (the village; 125 m until round 2, 2026-11-28)
+	constexpr float SilverReach = 36500.f; // cm from the middle: nothing changes further out
 	float SilverMount(float X, float Y, float H);   // the ground H with the mountain
 	float SilverMountW(float X, float Y);           // 0 .. 1: how much of the ground there is the mountain's
 	bool SilverOnLedge(float X, float Y);           // on one of the cliff's ledges, 1.5 m or more from both edges (pines grow there)
+	bool SilverWallsAt(float X, float Y);           // the fine ground may draw stone walls here (off the mountain, or on its cliff side)
 	const TArray<FVector2D>& SilverRoadLine();      // the mountain road's centre line (60 cm), foot to the village; empty if none
 	void SilverPrepare();                           // works it out now (from Prepare), with the summit's rolls
 	void SilverLogStats();

@@ -1341,5 +1341,5 @@ void AKnightGameState::Tick(float DeltaSeconds)
 	const float Grave = 1.f - FMath::Clamp(FVector2D::Distance(FVector2D(L.X, L.Y), FVector2D(JeebTerrain::GraveyardPos())) / 1100.f, 0.f, 1.f);
 	const float Target = 0.010f + 0.007f * Woods + 0.016f * Grave;
 	FogNow = FMath::FInterpTo(FogNow, Target, DeltaSeconds, 0.6f);
-	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, ADayNight::Storm));   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
+	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, FMath::Max(ADayNight::Storm, 0.7f * AOpenWorld::SilverMistNow)));   // (and Silver Point's summit fog, 2026-11-28)   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
 }

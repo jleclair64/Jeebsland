@@ -578,8 +578,8 @@ namespace
 		constexpr float Rs = 7400.f;        // the level top's radius (the cobbles reach 64 m, the walls 60 m)
 		constexpr float Re = 7700.f;        // where the road meets the village (on the Oak Hill road's old line)
 		constexpr float Hb = 200.f;         // the slopes' foot (the land round it wins where it is higher)
-		constexpr float RoadRun = 20000.f, SideRun = 16500.f, RoadExp = 1.15f, SideExp = 1.3f;   // the slopes: run from the top's edge to the foot, and the profile's curve
-		constexpr float LegDeg = 65.f, Hairpin = 800.f, Bench = 300.f, Bank = 0.9f;   // the road: its legs' ends either side of the way in, hairpin radius, level half width, steepest bank (42 deg)
+		constexpr float RoadRun = 20000.f, SideRun = 24000.f, RoadExp = 1.0f, SideExp = 1.6f;   // (round 2: the road side can reach no further than the old road's start, the far side no further than the caves)   // the slopes: run from the top's edge to the foot, and the profile's curve
+		constexpr float LegDeg = 65.f, Hairpin = 800.f, Bench = 300.f, Bank = 1.3f;   // the road: its legs' ends either side of the way in, hairpin radius, level half width, steepest bank (52 deg: round 2, the legs stacked closer on the steeper peak; the cuts between them are rock)
 		constexpr float CliffFull = 42.f, CliffNone = 78.f;   // degrees from the cliff's middle (opposite the way in)
 		constexpr float Lip = 8400.f;        // cm from the middle to the cliff's lip, on average
 		thread_local bool tBuilding = false;
@@ -637,6 +637,7 @@ namespace
 			const FEntry& En = Entry();
 			const FVector2D D = P - Mid();
 			const float R = D.Size(), Phi = FMath::Atan2(D.Y, D.X);
+			const FVector2D Dn = D / FMath::Max(R, 1.f);
 			float Exp, RoadW;
 			const float Run = RunAt(Phi, En.PhiE, &Exp, &RoadW);
 			OutW = 1.f - Smooth(Rs + Run - 2500.f, Rs + Run + 1500.f, R);
@@ -647,36 +648,71 @@ namespace
 				const float T = (R - Rs) / Run;
 				const float Tp = FMath::Sqrt(T * T + 0.0025f) - 0.05f;   // (the top's edge rounded over, about 8 m)
 				H = Hb + (SilverTop - Hb) * FMath::Pow(FMath::Max(0.f, 1.f - Tp), Exp);
-				// spurs and gullies at two unrelated sizes (the smaller turned), strongest half way down, and a little roughness
+				// (round 2, 2026-11-28: "a craggy, natural BotW-mountain silhouette") ridges and buttresses running down from the top at three
+				// unrelated sizes (ridged noise round the peak, twisting a little with height), gullies between them, and small crags; strongest
+				// half way down and gentle on the road's side
 				const float Tc = FMath::Clamp(T, 0.f, 1.f), Bell = 4.f * Tc * (1.f - Tc);
 				const FVector2D Q(P.X * 0.799f - P.Y * 0.602f, P.X * 0.602f + P.Y * 0.799f);
 				const float N = 0.6f * Perlin(P, 4800.f, 1.3f, 7.7f) + 0.4f * Perlin(Q, 1900.f, -4.2f, 2.6f);
-				H += Bell * FMath::Lerp(1100.f, 450.f, RoadW) * N + 70.f * Perlin(P, 650.f, 5.5f, -3.1f) * FMath::Min(T * 8.f, 1.f);
-				Hollow = -N * Bell;
+				const float Rg1 = 1.f - FMath::Abs(FMath::PerlinNoise2D(Dn * 2.4f + FVector2D(1.7f + 0.6f * Tc, -3.3f)));
+				const float Rg2 = 1.f - FMath::Abs(FMath::PerlinNoise2D(Dn * 6.1f + FVector2D(-4.6f, 2.2f + 1.1f * Tc)));
+				const float Rg3 = 1.f - FMath::Abs(Perlin(Q, 1400.f, 7.3f, 0.6f));
+				const float Crag = 1.f - 0.7f * RoadW;
+				const float Ridge = 2600.f * (Rg1 * Rg1 - 0.45f) + 1100.f * (Rg2 * Rg2 - 0.45f) + 350.f * (Rg3 * Rg3 - 0.45f);
+				H += Bell * (FMath::Lerp(1600.f, 450.f, RoadW) * N + Crag * Ridge) + 90.f * Perlin(P, 650.f, 5.5f, -3.1f) * FMath::Min(T * 8.f, 1.f);
+				Hollow = -N * Bell - Bell * Crag * (Rg1 * Rg1 - 0.45f);
 			}
-			// the cliff, opposite the way in: the top runs level to a ragged lip, then two drops with ledges between that come and go, a
-			// lower wall, and a scree apron at its foot
-			const float Dc = FMath::RadiansToDegrees(FMath::Abs(Ang(Phi - En.PhiE - PI)));
+			// the peak's own crown: two broad snowy knolls on the rim either side, 22 m and 15 m over the village (a peak, not a table top),
+			// rounded (an S-curve, never steeper than about 35 degrees, so no stone walls)
+			for (int32 k = 0; k < 2; ++k)
+			{
+				const float Pk = En.PhiE + (k ? 1.f : -1.f) * FMath::DegreesToRadians(88.f + 4.f * k);
+				const FVector2D Kc = Mid() + FVector2D(FMath::Cos(Pk), FMath::Sin(Pk)) * (12500.f + 300.f * k);
+				const float Rk = 5000.f - 700.f * k, Dk = float(FVector2D::Distance(P, Kc)) * (1.f + 0.15f * Perlin(P, 1500.f, 2.4f + k, -1.1f));
+				if (Dk < Rk) { const float U = 1.f - Dk / Rk; H = FMath::Max(H, SilverTop - 1500.f + (3700.f - 700.f * k) * U * U * (3.f - 2.f * U) + 120.f * Perlin(P, 600.f, 4.f, 9.f + k) * U); }
+			}
+			// the cliff, opposite the way in: the top runs level to a ragged lip, then four drops with ledges between (3 to 14 m deep), a lower
+			// wall, and a scree apron at its foot; its sides end raggedly (the fade's bearing broken by noise) with rubble, not in a straight cut
+			const float Dc = FMath::RadiansToDegrees(FMath::Abs(Ang(Phi - En.PhiE - PI))) + 14.f * Perlin(P, 2600.f, 1.1f, 6.2f) + 6.f * Perlin(P, 800.f, -3.4f, 2.2f);
 			const float A = 1.f - Smooth(CliffFull, CliffNone, Dc);
 			if (A > 0.f)
 			{
-				const float Lp = Lip + 420.f * Perlin(P, 2600.f, 8.1f, -0.7f) + 230.f * Perlin(P, 900.f, -2.6f, 4.9f);
+				// (round 2: toward its sides the lip steps out down the slope and every drop shrinks with it, so the cliff tapers into the slopes
+				// instead of standing as a square block)
+				const float Lp = Lip + 420.f * Perlin(P, 2600.f, 8.1f, -0.7f) + 230.f * Perlin(P, 900.f, -2.6f, 4.9f) + 7000.f * (1.f - A);
+				const float Tl = FMath::Max(Lp - Rs, 0.f) / Run, Tpl = FMath::Sqrt(Tl * Tl + 0.0025f) - 0.05f;
+				const float Ztop = FMath::Lerp(Hb + (SilverTop - Hb) * FMath::Pow(FMath::Max(0.f, 1.f - Tpl), Exp), SilverTop, Smooth(0.45f, 0.95f, A));
+				const float Sc = FMath::Clamp((Ztop - Hb) / (SilverTop - Hb), 0.15f, 1.f);
 				const float E = R - Lp;
-				const float W1 = 650.f * Smooth(-0.25f, 0.35f, Perlin(P, 3400.f, 2.2f, 9.9f));   // (the upper ledge, pinching out here and there)
-				const float W2 = 750.f * Smooth(-0.3f, 0.3f, Perlin(P, 4100.f, -6.6f, 3.4f));
-				const float Z1 = SilverTop - 2600.f - 500.f * Perlin(P, 5200.f, 4.4f, 1.1f);
-				const float Z2 = Z1 - 2700.f - 500.f * Perlin(P, 4700.f, -1.9f, -5.3f);
-				float Hc;
-				if (E < 0.f) Hc = SilverTop;
-				else if (E < W1) { Hc = Z1 + 60.f * Perlin(P, 500.f, 1.f, 2.f); if (OutLedge) *OutLedge = E > 150.f && E < W1 - 150.f && A > 0.9f; }
-				else if (E < W1 + W2) { Hc = Z2 + 60.f * Perlin(P, 500.f, 3.f, 4.f); if (OutLedge) *OutLedge = E > W1 + 150.f && E < W1 + W2 - 150.f && A > 0.9f; }
+				float Wl[4], Zl[4];
+				const float Seeds[4] = { 2.2f, -6.6f, 4.1f, -1.3f };
+				float Z = Ztop;
+				for (int32 k = 0; k < 4; ++k)
+				{
+					Wl[k] = 300.f + 1100.f * Smooth(-0.35f, 0.25f, Perlin(P, 3400.f + 500.f * k, Seeds[k], 9.9f - 3.f * k));
+					Z -= Sc * ((k == 0 ? 3200.f : 3100.f) + 550.f * Perlin(P, 5200.f - 300.f * k, 4.4f - k, 1.1f + k));
+					Zl[k] = Z;
+				}
+				float Hc = 0.f, E0 = 0.f;
+				int32 k = 0;
+				if (E < 0.f) Hc = FMath::Lerp(H, SilverTop, Smooth(0.45f, 0.95f, A));   // (the level top runs to the lip only in the middle: toward its sides the slopes round off first, so it never stands as a square block)
 				else
 				{
-					const float S = FMath::Clamp((E - W1 - W2) / 7500.f, 0.f, 1.f);
-					const float Tal = 2600.f + 900.f * Perlin(P, 3300.f, 0.4f, -8.8f);
-					Hc = Hb + Tal * FMath::Square(1.f - S) + 150.f * Perlin(P, 1200.f, 6.6f, 6.6f) * (1.f - S);
+					for (; k < 4; ++k) { if (E < E0 + Wl[k]) break; E0 += Wl[k]; }
+					if (k < 4)
+					{
+						Hc = Zl[k] + 60.f * Perlin(P, 500.f, 1.f + k, 2.f);
+						if (OutLedge) *OutLedge = E > E0 + 150.f && E < E0 + Wl[k] - 150.f && A > 0.85f;
+					}
+					else
+					{
+						const float S = FMath::Clamp((E - E0) / 9000.f, 0.f, 1.f);
+						const float Tal = Sc * (3200.f + 1000.f * Perlin(P, 3300.f, 0.4f, -8.8f));
+						Hc = Hb + Tal * FMath::Square(1.f - S) + 180.f * Perlin(P, 1200.f, 6.6f, 6.6f) * (1.f - S);
+					}
 				}
-				H = FMath::Lerp(H, Hc, A);
+				const float Flank = 4.f * A * (1.f - A);   // (rubble and crags where the cliff gives way to the slopes)
+				H = FMath::Lerp(H, Hc, A) + Flank * (260.f * Perlin(P, 700.f, -5.1f, 3.9f) + 140.f * Perlin(P, 260.f, 2.8f, -7.7f));
 			}
 			if (OutHollow) *OutHollow = FMath::Clamp(Hollow + 0.35f * FMath::Cos(Phi), -1.f, 1.f);   // (+X is north: the shady side keeps more)
 			return H;
@@ -719,7 +755,9 @@ namespace
 				const float PhiF = FMath::Atan2(Df.Y, Df.X);
 				const float S1 = Ang(PhiF - En.PhiE) <= 0.f ? 1.f : -1.f;
 				const float Leg = FMath::DegreesToRadians(LegDeg), EndOff = 1200.f / Re;
-				const float Targets[4] = { En.PhiE + S1 * Leg, En.PhiE - S1 * Leg, En.PhiE + S1 * Leg, En.PhiE - S1 * EndOff };
+				constexpr int32 NL = 6;   // (round 2: six legs and five hairpins, the peak being 175 m)
+				float Targets[NL];
+				for (int32 k = 0; k < NL; ++k) Targets[k] = k == NL - 1 ? En.PhiE - S1 * EndOff : En.PhiE + ((k & 1) ? -S1 : S1) * Leg;
 				// one trace of the road at grade G: returns its height at the end and fills the points (every 4 m)
 				auto Trace = [&](float G, TArray<FVector2D>& Pts) -> float
 				{
@@ -728,7 +766,7 @@ namespace
 					FVector2D P = F; float Z = M.Z0, S = 0.f;
 					float Phi = PhiF, Off = Df.Size() - Rinv(Z, Phi);
 					int32 StepN = 0;
-					for (int32 Lg = 0; Lg < 4; ++Lg)
+					for (int32 Lg = 0; Lg < NL; ++Lg)
 					{
 						const float Sign = Ang(Targets[Lg] - Phi) >= 0.f ? 1.f : -1.f;
 						for (int32 k = 0; k < 40000; ++k)
@@ -737,7 +775,7 @@ namespace
 							const float R = D.Size();
 							Phi = FMath::Atan2(D.Y, D.X);
 							float Rstar = Rinv(Z, Phi) + Off;
-							if (Lg == 3) Rstar = FMath::Lerp(Rstar, Re + 150.f, 1.f - Smooth(0.f, 0.35f, FMath::Abs(Ang(Targets[3] - Phi))));
+							if (Lg == NL - 1) Rstar = FMath::Lerp(Rstar, Re + 150.f, 1.f - Smooth(0.f, 0.35f, FMath::Abs(Ang(Targets[NL - 1] - Phi))));
 							const float Dr = FMath::Clamp(Rstar - R, -0.6f * Ds, 0.6f * Ds);
 							const FVector2D Rad = D / FMath::Max(R, 1.f), Tan(-Rad.Y * Sign, Rad.X * Sign);
 							FVector2D V = Rad * Dr + Tan * FMath::Sqrt(FMath::Max(Ds * Ds - Dr * Dr, 0.f));
@@ -748,7 +786,7 @@ namespace
 							const FVector2D D2 = P - C;
 							if (Sign * Ang(Targets[Lg] - FMath::Atan2(D2.Y, D2.X)) <= 0.f) break;
 						}
-						if (Lg == 3) break;
+						if (Lg == NL - 1) break;
 						// a hairpin: a half circle turning in toward the top
 						const FVector2D D = P - C;
 						const FVector2D Rad = D.GetSafeNormal(), Tan(-Rad.Y * Sign, Rad.X * Sign), In = -Rad;
@@ -839,6 +877,8 @@ namespace
 		// the summit's gentle rolls (OpenWorld.h): a 2 m grid, level under the buildings, round the plaza and at every door
 		struct FRolls { bool bReady = false; FVector2D O = FVector2D::ZeroVector; int32 N = 0; TArray<float> V; };
 		FRolls GRolls;
+		// (round 2, 2026-11-28) the mountain gives way to the ground near a river, so its foot never stands as a wall over the water
+		float RiverKeep(float X, float Y) { float Half; const float Dr = JeebWorld::RiverDistance(X, Y, Half); return Smooth(Half + 200.f, Half + 1400.f, Dr); }
 		float RollAt(const FVector2D& P)
 		{
 			if (!GRolls.bReady) return 0.f;
@@ -859,7 +899,7 @@ float JeebOpen::SilverMountW(float X, float Y)
 	const FVector2D P(X, Y);
 	if (FVector2D::DistSquared(P, SM::Mid()) > FMath::Square(SilverReach) || SM::tBuilding || SM::Entry().Road < 0) return 0.f;
 	float W; SM::Shape(P, W);
-	return W;
+	return W * SM::RiverKeep(X, Y);
 }
 
 float JeebOpen::SilverMount(float X, float Y, float H)
@@ -869,6 +909,7 @@ float JeebOpen::SilverMount(float X, float Y, float H)
 	if (D2 > FMath::Square(SilverReach) || SM::tBuilding || SM::Entry().Road < 0) return H;
 	float W;
 	float Hm = SM::Shape(P, W);
+	W *= SM::RiverKeep(X, Y);   // (round 2: the foot never fills a river: it eases down to the bank)
 	if (D2 < FMath::Square(SM::Rs + 200.f)) Hm += SM::RollAt(P);
 	float Out = FMath::Lerp(H, FMath::Max(H, Hm), W);
 	if (SM::Road().Chunks.Num()) Out = FMath::Lerp(Out, SM::RoadBanks(P, Out), 1.f - Smooth(SilverReach - 3000.f, SilverReach, FMath::Sqrt(D2)));
@@ -884,6 +925,17 @@ bool JeebOpen::SilverOnLedge(float X, float Y)
 	return bLedge;
 }
 
+
+bool JeebOpen::SilverWallsAt(float X, float Y)
+{
+	// (round 2, 2026-11-28) the fine ground draws stone walls only on the cliff's side: elsewhere on the mountain (the road's cut banks,
+	// the crags) its steep faces stay ordinary ground, so no rows of little stepped stone faces show along the road
+	const FVector2D P(X, Y);
+	if (FVector2D::DistSquared(P, SM::Mid()) > FMath::Square(SilverReach) || SM::Entry().Road < 0) return true;
+	const FVector2D D = P - SM::Mid();
+	const float Dc = FMath::RadiansToDegrees(FMath::Abs(SM::Ang(FMath::Atan2(D.Y, D.X) - SM::Entry().PhiE - PI))) + 14.f * Perlin(P, 2600.f, 1.1f, 6.2f) + 6.f * Perlin(P, 800.f, -3.4f, 2.2f);
+	return Dc < SM::CliffNone + 25.f;   // (well past the cliff's fade: its ends need their walls, or their faces stretch)
+}
 const TArray<FVector2D>& JeebOpen::SilverRoadLine() { return SM::Road().Line; }
 
 void JeebOpen::SilverPrepare()
@@ -943,20 +995,20 @@ void JeebOpen::SilverLogStats()
 	const FVector2D Dir(FMath::Cos(PhiC), FMath::Sin(PhiC));
 	float Drop = 0.f, Prev = JeebTerrain::HeightAt(C.X + Dir.X * 6000.f, C.Y + Dir.Y * 6000.f);
 	float Foot = Prev;
-	for (float R = 6100.f; R < 20000.f; R += 100.f) { const float Z = JeebTerrain::HeightAt(C.X + Dir.X * R, C.Y + Dir.Y * R); Drop = FMath::Max(Drop, Prev - Z); Prev = Z; Foot = FMath::Min(Foot, Z); }
+	for (float R = 6100.f; R < 30000.f; R += 100.f) { const float Z = JeebTerrain::HeightAt(C.X + Dir.X * R, C.Y + Dir.Y * R); Drop = FMath::Max(Drop, Prev - Z); Prev = Z; Foot = FMath::Min(Foot, Z); }
 	float Around = 0.f;
-	for (int32 a = 0; a < 16; ++a) { const FVector2D Q = C + FVector2D(FMath::Cos(a * PI / 8.f), FMath::Sin(a * PI / 8.f)) * 40000.f; Around = FMath::Max(Around, JeebTerrain::HeightAt(Q.X, Q.Y)); }
+	for (int32 a = 0; a < 16; ++a) { const FVector2D Q = C + FVector2D(FMath::Cos(a * PI / 8.f), FMath::Sin(a * PI / 8.f)) * 45000.f; Around = FMath::Max(Around, JeebTerrain::HeightAt(Q.X, Q.Y)); }
 	// the slopes away from the cliff: steepest over 4 m
 	float Steep = 0.f; FVector2D SteepAt = C;
-	for (float X = C.X - 30000.f; X < C.X + 30000.f; X += 400.f)
-		for (float Y = C.Y - 30000.f; Y < C.Y + 30000.f; Y += 400.f)
+	for (float X = C.X - 36000.f; X < C.X + 36000.f; X += 400.f)
+		for (float Y = C.Y - 36000.f; Y < C.Y + 36000.f; Y += 400.f)
 		{
 			const FVector2D D = FVector2D(X, Y) - C;
 			if (FMath::RadiansToDegrees(FMath::Abs(SM::Ang(FMath::Atan2(D.Y, D.X) - PhiC))) < 90.f) continue;
 			const float G = FMath::Abs(JeebTerrain::HeightAt(X + 200.f, Y) - JeebTerrain::HeightAt(X - 200.f, Y)) / 400.f;
 			if (G > Steep) { Steep = G; SteepAt = FVector2D(X, Y); }
 		}
-	UE_LOG(LogTemp, Log, TEXT("JEEBMOUNT stats: summit %.1f m (middle %.1f m), highest ground 400 m round it %.1f m; road %.0f m from %.1f m to %.1f m, steepest %.1f deg (15 m) at %.0f %.0f, tilt across at most %.1f deg, ground off the road's height at most %.0f cm; cliff: biggest drop in 1 m %.1f m, foot %.1f m; steepest slope away from the cliff %.0f deg at %.0f %.0f"),
+	UE_LOG(LogTemp, Log, TEXT("JEEBMOUNT stats: summit %.1f m (middle %.1f m), highest ground 450 m round it %.1f m; road %.0f m from %.1f m to %.1f m, steepest %.1f deg (15 m) at %.0f %.0f, tilt across at most %.1f deg, ground off the road's height at most %.0f cm; cliff: biggest drop in 1 m %.1f m, foot %.1f m; steepest slope away from the cliff %.0f deg at %.0f %.0f"),
 		SilverTop / 100.f, JeebTerrain::HeightAt(C.X, C.Y) / 100.f, Around / 100.f, M.Len / 100.f, M.Z0 / 100.f, SilverTop / 100.f, Worst, WorstAt.X, WorstAt.Y, Tilt, Off, Drop / 100.f, Foot / 100.f,
 		FMath::RadiansToDegrees(FMath::Atan(Steep)), SteepAt.X, SteepAt.Y);
 	// eyes for test pictures (-ShotEyes X_Y_A<z>_yaw_pitch): far (the peak over the land), the cliff, the road, the top
@@ -970,10 +1022,12 @@ void JeebOpen::SilverLogStats()
 		const float Pitch = FMath::RadiansToDegrees(FMath::Atan2(LookAtZ - Zg, To.Size()));
 		UE_LOG(LogTemp, Log, TEXT("JEEBMOUNT eye %s: %.0f_%.0f_A%.0f_%.0f_%.0f"), Name, Q.X, Q.Y, Zg, Yaw, Pitch);
 	};
-	Eye(TEXT("far"), PhiE - 0.5f, 90000.f, 2500.f, 7000.f);
-	Eye(TEXT("cliff"), PhiC + 0.3f, 32000.f, 1500.f, 7500.f);
-	Eye(TEXT("road"), PhiE + 0.25f, 42000.f, 9000.f, 4000.f);
-	Eye(TEXT("top"), PhiE, 9000.f, 400.f, SilverTop + 600.f);
+	Eye(TEXT("far"), PhiE - 0.5f, 120000.f, 2500.f, 10000.f);
+	Eye(TEXT("cliff"), PhiC + 0.3f, 46000.f, 1500.f, 11000.f);
+	Eye(TEXT("cliffnear"), PhiC - 0.15f, 30000.f, 6000.f, 13000.f);
+	Eye(TEXT("road"), PhiE + 0.25f, 58000.f, 12000.f, 7000.f);
+	Eye(TEXT("fog"), PhiE + 0.6f, 26000.f, 2500.f, SilverTop + 1500.f);
+	Eye(TEXT("top"), PhiE, 6500.f, 1400.f, SilverTop + 300.f);
 }
 
 void JeebOpen::SilverWeather(double ServerSeconds, float& OutFog, float& OutSnow)
@@ -1105,9 +1159,9 @@ float JeebOpen::SnowRaw(float X, float Y, float Z, float Up)
 	// north-east stay green)
 	const float Base = (Z - SnowFrom) / (SnowTo - SnowFrom) + 0.5f * Nz - 0.8f * Smooth(0.9f, 0.72f, Up) - 1.5f * Smooth(55000.f, 35000.f, X);
 	// (2026-11-27, Silver Point's mountain; owner: "I want the snow to start and grass to end roughly 2/3rds of the way up the mountain ...
-	// don't just add a line where the snow starts") its own snow line about 83 m up (two thirds of 125), in a wide band broken by noise at
+	// don't just add a line where the snow starts") its own snow line about 117 m up (two thirds of 175; round 2), in a wide band broken by noise at
 	// three unrelated sizes (one turned): drifts first in the gullies and on the shady north side, steep and sunny ground bare longest,
-	// solid from about 100 m and over the whole top. The grass thins out through the same band (GroundMask GrassAmount).
+	// solid from about 145 m and over the whole top. The grass thins out through the same band (GroundMask GrassAmount).
 	if (FVector2D::DistSquared(P, SM::Mid()) < FMath::Square(SilverReach) && !SM::tBuilding && SM::Entry().Road >= 0)
 	{
 		float W, Hollow;
@@ -1116,7 +1170,7 @@ float JeebOpen::SnowRaw(float X, float Y, float Z, float Up)
 		{
 			const FVector2D Q(X * 0.766f - Y * 0.643f, X * 0.643f + Y * 0.766f);
 			const float Nm = 0.35f * Perlin(P, 5200.f, -3.7f, 8.2f) + 0.25f * Perlin(Q, 1700.f, 6.1f, -1.4f) + 0.15f * Perlin(P, 450.f, 2.9f, 5.3f);
-			const float Mine = (Z - 8300.f) / 2200.f + Nm + 0.35f * Hollow - 0.8f * Smooth(0.9f, 0.72f, Up);
+			const float Mine = (Z - 11700.f) / 3000.f + Nm + 0.35f * Hollow - 0.8f * Smooth(0.9f, 0.72f, Up);
 			return FMath::Lerp(Base, Mine, W);
 		}
 	}

@@ -127,6 +127,11 @@ namespace JeebGround
 			const float High = JeebWorld::Smooth(3400.f, 4800.f, Z + 700.f * (N1 - 0.5f)) * JeebWorld::Smooth(0.4f, 0.7f, N2) * JeebWorld::Smooth(0.96f, 0.86f, Up) * 0.8f;   // (only where the crest slopes too: never a blob on a flat top)
 			M.Rock = FMath::Clamp(FMath::Max3(Steep, Rocky, High), 0.f, 1.f);
 			M.Rock *= 1.f - JeebSteele::Settled(X, Y);   // (Steele Creek's streets and yards are trodden earth and grass, not the rocky southwest's patches)
+			// (2026-11-28, Silver Point's mountain, round 2: "rock should show only on steep crags") on the mountain the height rule and the
+			// 28-40 degree rule give way to bare rock only past about 46 degrees (broken by the same noises), so its slopes and the road's
+			// cut banks are grass up to the snow
+			if (const float Wm = JeebOpen::SilverMountW(X, Y); Wm > 0.f)
+				M.Rock = FMath::Lerp(M.Rock, JeebWorld::Smooth(0.7f, 0.56f, Up + 0.05f * (N1 - 0.5f) + 0.03f * (N2 - 0.5f)) * JeebWorld::Smooth(500.f, 1400.f + 600.f * N1, JeebTerrain::PathClearance(X, Y)), Wm);   // (the road's cut banks grassed over, not pale bands)
 		}
 		// Mud: the river beds (under the water) and a wet, ragged strip along their banks; the pond's edge
 		{
