@@ -15,6 +15,9 @@ case "$MODE" in
     SET="0:jeeb.Test.Light=1;3:jeeb.Test.Light=0"
     [ "$MODE" = wizard ] && { EYES="$EYES+${E0}_180_240+${E0}_120_200"; SET="0:jeeb.Test.Light=1;3:jeeb.Test.Light=0;4:jeeb.Test.Light=2"; }
     ARGS="-ShotName=light$MODE $CLASS -ShotEyes=$EYES -ShotEyesSet=$SET -ShotEyesStart=12 -ShotEyesGap=4 -ResX=1280 -ResY=720"; SECS=200; NAME=light$MODE; Q=run ;;
+  close)
+    EYES="${E0}_200_110+${E0}_250_100+${E0}_300_110+${E0}_20_120+${E0}_110_120"
+    ARGS="-ShotName=lightclose -ShotEyes=$EYES -ShotEyesSet=*:jeeb.Test.Light=1 -ShotEyesStart=12 -ShotEyesGap=4 -ResX=1280 -ResY=720"; SECS=180; NAME=lightclose; Q=run ;;
   film)
     [ "$2" = wizard ] && { CLASS="-PlayAs=Wizard -ShotKind=8"; L=2; } || L=1
     ARGS="-ShotName=lightfilm$2 $CLASS -ShotEyes=${E0}_150_300 -ShotEyesSet=*:jeeb.Test.Light=$L;*:jeeb.Test.Walk=0.4 -ShotEyesStart=12 -ShotEyesGap=10 -ShotEyesMove=3_40_0 -ShotEyesFilm=2.2_24 -benchmark -fps=120 -ResX=1280 -ResY=720"; SECS=200; NAME=lightfilm$2; Q=run ;;
