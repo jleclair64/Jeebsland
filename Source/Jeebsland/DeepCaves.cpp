@@ -85,10 +85,13 @@ namespace
 	{
 		const FVector2D A = XY(S.A), AB = XY(S.B) - A;
 		const float L2 = AB.SizeSquared();
-		const float T = L2 > 1.f ? FMath::Clamp(float(FVector2D::DotProduct(XY(P) - A, AB)) / L2, 0.f, 1.f) : 0.f;
+		const float Tu = L2 > 1.f ? float(FVector2D::DotProduct(XY(P) - A, AB)) / L2 : 0.f;
+		const float T = FMath::Clamp(Tu, 0.f, 1.f);
 		const FVector Q = S.A + (S.B - S.A) * T;
 		const float Dl = FVector2D::Distance(XY(P), XY(Q));
-		Dz = P.Z - Q.Z;
+		// (2026-11-28: past either end the floor keeps the segment's slope; held flat there, each end's round cap made a flat
+		// landing and a ramp became stairs the knight could not climb, found by the walk test)
+		Dz = P.Z - FMath::Max(Q.Z, S.A.Z + (S.B.Z - S.A.Z) * FMath::Clamp(Tu, -1.f, 2.f));   // (only ever raised: lowered, the cap dug a pit past a mouth passage's outer end)
 		const float Hm = 0.45f * S.Ht;
 		float E;
 		if (Dz <= Hm) E = Dl - S.W;
@@ -675,6 +678,15 @@ namespace
 		GSolids.Reset();
 		auto Add = [&](uint8 T, const FVector& C, const FVector& R)
 		{
+			// (2026-11-28: never in a passage's way: the walk test stuck on a cone where a ramp leaves the Great cavern)
+			const float Keep = FMath::Max(R.X, R.Y) + 180.f;
+			if (T != 3) for (const FTunnel& Tn : GTun)
+				for (int32 i = 0; i + 1 < Tn.P.Num(); ++i)
+				{
+					const FVector A = Tn.P[i], B = Tn.P[i + 1];
+					if (FMath::Min(A.Z, B.Z) - 300.f > C.Z + R.Z + 100.f || FMath::Max(A.Z, B.Z) + Tn.Ht < C.Z - R.Z - 100.f) continue;
+					if (FMath::PointDistToSegment(FVector(C.X, C.Y, 0.f), FVector(A.X, A.Y, 0.f), FVector(B.X, B.Y, 0.f)) < Tn.W + Keep) return;
+				}
 			FSolid S; S.T = T; S.C = C; S.R = R;
 			const float Rm = FMath::Max3(R.X, R.Y, R.Z) + 120.f;
 			S.Box = T == 3 ? FBox(C - FVector(R.X + 150.f, R.X + 150.f, 300.f), C + FVector(R.X + 150.f, R.X + 150.f, 2500.f)) : FBox(C - FVector(Rm), C + FVector(Rm));
@@ -1360,7 +1372,7 @@ void ADeepCaves::BuildRock(bool bServer)
 		{
 			const FVector P = O.V[v];
 			const float Cf = CaveField(P), Hd = HoodIn(P);
-			const bool bCave = Cf < 150.f;
+			const bool bCave = Cf < 400.f;   // (wide: the wall noise put some surface vertices past 150 and single triangles went missing)
 			const bool bHood = !bCave && Hd > -400.f;   // (wide: the shelf where the frame meets the ground under the grass stays whole)
 			Kind[v] = bCave ? 1 : bHood ? 2 : 0;
 			if (bHood) O.bHood = true;
