@@ -5,6 +5,8 @@
 #include "SilverPoint.h"
 #include "SilverClock.h"
 #include "Terrain.h"
+#include "WorldTerrain.h"
+#include "ProceduralMeshComponent.h"
 #include "TownLabSwaps.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -84,7 +86,8 @@ void AOpenWorld::BeginPlay()
 	Super::BeginPlay();
 	SetActorLocation(FVector::ZeroVector);
 	BuildHouses();
-	ABroomStall::PlaceIn(GetWorld());   // (Silver Point's broom stall, 2026-11-22: Broom.cpp)
+	// (the broom stall on the plaza went 2026-11-27: the wizard's shop is at the broom shop now, JeebBroom::StallSpot)
+	BuildSilverGround();
 	if (IsNetMode(NM_DedicatedServer)) return;   // (no snow to draw on a server)
 	BuildCandles();
 	UMaterialInterface* FlakeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Snowflake.M_Snowflake"), nullptr, LOAD_Quiet | LOAD_NoWarn);
@@ -162,6 +165,14 @@ void AOpenWorld::BuildHouses()
 			B->SetWorldTransform(Xf);
 			B->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			B->SetCustomPrimitiveDataFloat(0, FMath::Frac(0.37f * (Placed + 1)));
+			// (2026-11-27: the windows light at dusk, as Oak Hill's: one dynamic copy per building material, its Night set from ADayNight::Dusk in Tick)
+			if (!bServer) for (int32 i = 0; i < B->GetNumMaterials(); ++i)
+				if (UMaterialInterface* M = B->GetMaterial(i))
+				{
+					int32 Got = GlowMats.Find(M);
+					if (Got == INDEX_NONE) { GlowMats.Add(M); UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(M, this); GlowMids.Add(Mid); GlowBase.Add(Mid->K2_GetScalarParameterValue(TEXT("GlowStrength"))); Got = GlowMids.Num() - 1; }
+					B->SetMaterial(i, GlowMids[Got]);
+				}
 			B->RegisterComponent();
 		}
 		if (Solid) Solid->AddInstance(Xf, true);
@@ -230,7 +241,7 @@ void AOpenWorld::BuildCandles()
 	const JeebOpen::FSite& S = Sites[0];
 	CandleSite = S.Pos;
 	FRandomStream R(51515);
-	const float Reach = JeebSilver::Plots().Num() > 0 ? 2300.f : S.Radius * 0.7f + 300.f;   // (2026-11-26: over the wizard village's plaza)   // (over the middle and the green round it; the edge stays open)
+	const float Reach = JeebSilver::Plots().Num() > 0 ? JeebSilver::PlazaR - 150.f : S.Radius * 0.7f + 300.f;   // (2026-11-26: over the wizard village's plaza)   // (over the middle and the green round it; the edge stays open)
 	int32 Tries = 0;
 	while (Candle.Num() < NumCandles && Tries++ < 2000)
 	{
@@ -374,6 +385,16 @@ void AOpenWorld::Tick(float DeltaSeconds)
 	if (!PC || !PC->PlayerCameraManager || !Flakes || Flake.Num() == 0) return;
 	Time += DeltaSeconds;
 	TickCandles(DeltaSeconds, PC->PlayerCameraManager->GetCameraLocation());
+	if (SilverGroundMid) AWorldTerrain::SetUnderGrass(SilverGroundMid, AWorldTerrain::LowSunFill());   // (the cobbles' dusk fill, as Oak Hill's ground)
+	if (FMath::Abs(ADayNight::Dusk - LastDusk) > 0.005f)   // (the village's windows: dark by day, amber at dusk, as ATownLabTown::Tick)
+	{
+		LastDusk = ADayNight::Dusk;
+		for (int32 i = 0; i < GlowMids.Num(); ++i)
+		{
+			if (GlowBase[i] > 0.f) GlowMids[i]->SetScalarParameterValue(TEXT("GlowStrength"), GlowBase[i] * FMath::Lerp(0.9f, 1.35f, LastDusk));
+			GlowMids[i]->SetScalarParameterValue(TEXT("Night"), LastDusk);
+		}
+	}
 	const AGameStateBase* GS = W->GetGameState();
 	const double Clock = GS ? GS->GetServerWorldTimeSeconds() : double(W->GetTimeSeconds());
 	const float Force = CVarSnowForce.GetValueOnGameThread();
@@ -473,3 +494,77 @@ namespace
 		}));
 }
 #endif
+
+// Silver Point's cobbles (2026-11-27, agent silverpt; owner: "cobbled plaza and streets ... no visible tiling"): one 1 m grid over the
+// village (64 m round the middle) drawn with Oak Hill's own ground material, M_TL_Ground, which paints mossy flagstone cobbles, worn
+// earth, moss at the walls' feet and grass from the vertex colours (R the street, G worn earth, B a wall's foot; ATownLabTown::BuildGround):
+// two samplings of the cobbles at unrelated sizes swapped in 10 m patches, fading to their average far off, so no repeat lines up.
+// The grid sits 8 cm over the world's own ground (above the dirt road's ribbon, which it covers in the village) and has no collision:
+// players and people walk on the world's ground as before. Grass, flowers and snow keep off the cobbles (JeebSilverOnBuilding).
+// Clients only; the same on every machine (fixed numbers).
+void AOpenWorld::BuildSilverGround()
+{
+	const JeebOpen::FSite* S = JeebSilver::Site();
+	if (!S || JeebSilver::Plots().Num() == 0 || IsNetMode(NM_DedicatedServer)) return;
+	const float Step = 100.f, Half = 6400.f, Lift = 8.f;
+	const int32 N = FMath::RoundToInt(2.f * Half / Step);
+	const FVector2D O = S->Pos - FVector2D(Half, Half);
+	TArray<FVector> V, Nrm; TArray<FVector2D> UV; TArray<FLinearColor> Col; TArray<int32> Tri;
+	const int32 W = N + 1;
+	V.Reserve(W * W); Nrm.Reserve(W * W); UV.Reserve(W * W); Col.Reserve(W * W);
+	TArray<FVector2D> Doors;
+	for (const JeebSilver::FPlot& P : JeebSilver::Plots()) Doors.Add(JeebSilver::DoorSpot(P, 60.f));
+	for (int32 i = 0; i <= N; ++i)
+		for (int32 j = 0; j <= N; ++j)
+		{
+			const float X = O.X + i * Step, Y = O.Y + j * Step;
+			const float Z = JeebTerrain::DrawnHeight(X, Y);
+			V.Add(FVector(X, Y, Z + Lift));
+			const float DX = (JeebTerrain::DrawnHeight(X + 50.f, Y) - JeebTerrain::DrawnHeight(X - 50.f, Y)) / 100.f;
+			const float DY = (JeebTerrain::DrawnHeight(X, Y + 50.f) - JeebTerrain::DrawnHeight(X, Y - 50.f)) / 100.f;
+			Nrm.Add(FVector(-DX, -DY, 1.f).GetSafeNormal());
+			UV.Add(FVector2D(X / 1000.f, Y / 1000.f));
+			const float Clear = JeebSilver::StreetClearance(X, Y);
+			const float Street = FMath::Clamp((120.f - Clear) / 295.f, 0.f, 1.f);   // (as Oak Hill's: 1 down the middle, ~0.4 at the edge)
+			float Worn = 0.55f * (1.f - JeebWorld::Smooth(-20.f, 140.f, Clear));    // (a fringe of packed earth along the cobbles)
+			for (const FVector2D& D : Doors) Worn = FMath::Max(Worn, 1.f - JeebWorld::Smooth(60.f, 220.f, float(FVector2D::Distance(D, FVector2D(X, Y)))));
+			Worn = FMath::Max(Worn, 1.f - JeebWorld::Smooth(-60.f, 120.f, JeebTerrain::PathClearance(X, Y)));   // (the dirt road, where it runs on past the cobbles)
+			float WallD = 1.0e9f;
+			for (const JeebSilver::FPlot& P : JeebSilver::Plots())
+				if (FVector2D::DistSquared(P.Centre, FVector2D(X, Y)) < FMath::Square(P.Reach + 400.f)) WallD = FMath::Min(WallD, JeebSilver::WallSD(P, X, Y));
+			const float Wall = 1.f - JeebWorld::Smooth(0.f, 260.f, FMath::Max(WallD, 0.f));
+			Col.Add(FLinearColor(Street, FMath::Clamp(Worn, 0.f, 1.f), Wall, 0.f));
+		}
+	int32 Cells = 0;
+	for (int32 i = 0; i < N; ++i)
+		for (int32 j = 0; j < N; ++j)
+		{
+			const float CX = O.X + (i + 0.5f) * Step, CY = O.Y + (j + 0.5f) * Step;
+			if (FVector2D::DistSquared(S->Pos, FVector2D(CX, CY)) > FMath::Square(Half)) continue;   // (a disc: its rim is grass on grass)
+			bool bInside = true;   // (a cell wholly inside a building's walls is never seen)
+			for (const FVector2D& Q : { FVector2D(CX - 50.f, CY - 50.f), FVector2D(CX + 50.f, CY + 50.f), FVector2D(CX - 50.f, CY + 50.f), FVector2D(CX + 50.f, CY - 50.f) })
+				if (!JeebSilver::OnBuilding(Q.X, Q.Y, -0.6f)) { bInside = false; break; }
+			if (bInside) continue;
+			const int32 A = i * W + j, B = A + W, C = A + 1, D = B + 1;
+			Tri.Append({ A, C, B, B, C, D });
+			++Cells;
+		}
+	if (Tri.Num() >= 3)   // (face up as Unreal counts it, as ATownLabTown::BuildGround)
+	{
+		const FVector Fn = FVector::CrossProduct(V[Tri[1]] - V[Tri[0]], V[Tri[2]] - V[Tri[0]]);
+		if (Fn.Z > 0.f) for (int32 t = 0; t < Tri.Num(); t += 3) Swap(Tri[t + 1], Tri[t + 2]);
+	}
+	SilverGround = NewObject<UProceduralMeshComponent>(this, TEXT("SilverGround"));
+	SilverGround->SetupAttachment(GetRootComponent());
+	SilverGround->RegisterComponent();
+	SilverGround->CreateMeshSection_LinearColor(0, V, Tri, Nrm, UV, Col, TArray<FProcMeshTangent>(), false);
+	SilverGround->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SilverGround->SetCastShadow(false);
+	if (UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/TownLab/M_TL_Ground.M_TL_Ground")))
+	{
+		SilverGroundMid = UMaterialInstanceDynamic::Create(Mat, this);
+		SilverGround->SetMaterial(0, SilverGroundMid);
+	}
+	else UE_LOG(LogTemp, Warning, TEXT("JEEBSILVER missing /Game/TownLab/M_TL_Ground: no cobbles"));
+	UE_LOG(LogTemp, Log, TEXT("JEEBSILVER cobbles: %d cells, %d triangles"), Cells, Tri.Num() / 3);
+}

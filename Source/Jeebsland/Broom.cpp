@@ -1,4 +1,5 @@
 #include "Broom.h"
+#include "SilverPoint.h"
 #include "OpenWorld.h"
 #include "Terrain.h"
 #include "Inventory.h"
@@ -114,9 +115,15 @@ namespace JeebBroom
 	float CastMul(const TCHAR* Item, int32 Tier) { const FCost* K = Tab().Find(Item, Tier); return K ? K->CastMul : 1.f; }
 	float GuardDrain(const TCHAR* Item, int32 Tier) { const FCost* K = Tab().Find(Item, Tier); return K ? K->Guard : 0.f; }
 
-	// On Silver Point's green, 6 m from its middle on the side away from the placeholder house, facing the middle
+	// (2026-11-27) the wizard's shop is the broom shop's counter: 2.5 m out of its door (Quillon Ashgrove, its keeper, stands there;
+	// Townsfolk.csv). The old stall on the plaza is gone. Without the village, Silver Point's green as before.
 	FVector StallSpot()
 	{
+		if (const JeebSilver::FPlot* P = JeebSilver::FindPlot(TEXT("BroomShop")))
+		{
+			const FVector2D D = JeebSilver::DoorSpot(*P, 250.f);
+			return FVector(D.X, D.Y, JeebTerrain::HeightAt(D.X, D.Y));
+		}
 		const TArray<JeebOpen::FSite>& S = JeebOpen::Sites();
 		if (S.Num() == 0) return FVector(0.f, 0.f, -100000.f);
 		const FVector2D Away = (S[0].Pos - S[0].House).GetSafeNormal();
@@ -125,6 +132,7 @@ namespace JeebBroom
 	}
 	float StallYaw()
 	{
+		if (const JeebSilver::FPlot* P = JeebSilver::FindPlot(TEXT("BroomShop"))) return P->DoorYaw + 180.f;
 		const TArray<JeebOpen::FSite>& S = JeebOpen::Sites();
 		if (S.Num() == 0) return 0.f;
 		const FVector2D To = S[0].Pos - FVector2D(StallSpot());

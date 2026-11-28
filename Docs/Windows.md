@@ -57,3 +57,7 @@ Full detail, every setting and the history are in `Docs/TownLab/Buildings.md` ("
 - old paint round the church rose (in the baked texture).
 
 The old church model (`BuildBuildings.ps1`) still uses round 2's `Tools/window_glass.py`.
+
+## Marking windows by hand (2026-11-27, Silver Point)
+
+When the colour finder gives no marks (pale painted panes, as on Silver Point's town hall and academy), list each window in `HAND_MARKS` at the top of `window_inserts.py`: (view yaw in the model frame, h along the view's right, z, width, height, cm). Rays from that view into the box mark the faces they hit as glass, and the usual steps find the real opening from there. Measure them off orthographic views of the 300k model with a 1 m grid.

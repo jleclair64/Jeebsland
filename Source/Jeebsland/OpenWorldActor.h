@@ -37,6 +37,13 @@ private:
 	// from a fixed seed (every machine the same); the bobbing and flicker are local looks only. Three instanced meshes, a handful of
 	// shadowless real lights on the candles nearest the camera, the lot lit by the night (dim flames by day).
 	void BuildCandles();
+	void BuildSilverGround();   // Silver Point's cobbled plaza and lanes (2026-11-27)
+	UPROPERTY() class UProceduralMeshComponent* SilverGround = nullptr;
+	UPROPERTY() class UMaterialInstanceDynamic* SilverGroundMid = nullptr;
+	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;   // the village buildings' windows (2026-11-27)
+	UPROPERTY() TArray<class UMaterialInterface*> GlowMats;
+	TArray<float> GlowBase;
+	float LastDusk = -1.f;
 	void TickCandles(float Dt, const FVector& Cam);
 	struct FCandle { FVector Home; float Bob, BobRate, BobPhase, Drift, DriftRate, DriftPhase, Height, Phase, Lean; };
 	TArray<FCandle> Candle;

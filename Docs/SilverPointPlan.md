@@ -50,7 +50,7 @@ Oak Hill in town is the reference (`Docs/TownLab/FrameBudget.md`, memory oak-hil
 ## Checks planned
 Shattering close-ups of every building and NPC; high street, plaza and academy at noon and dusk; smear film of walking NPCs and goblins; one solo frame-time window vs Oak Hill; server + two clients; `map_net.sh` hashes; Shipping compile.
 
-## Status
+## Status (2026-11-27: finished pass, see ProjectNotes "Silver Point wizard village")
 Stopped at the plan: waiting for the owner's choice of option 1, 2 or 3 for the buildings.
 
 ## Owner's choices (2026-11-26)
