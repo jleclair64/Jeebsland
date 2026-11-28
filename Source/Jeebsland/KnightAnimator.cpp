@@ -530,7 +530,9 @@ void FKnightAnimator::Locomotion(float Dt, const FInput& In, FPose& Out)
 	float CycleLen = 0.f;
 	for (int32 i = 0; i < 9; ++i) if (Use[i]) CycleLen += W[i] * Use[i]->Len;
 	CycleLen = FMath::Max(CycleLen / FMath::Max(TotalW, 0.01f), 0.1f);
-	float Rate = FMath::Clamp(Speed / FMath::Max(Stride, 1.f), 0.45f / CycleLen, 1.45f / CycleLen);
+	// (the troll's rush is 3x the knight's sprint, 2199 cm/s: at the 1.45x cap his feet slid about half the ground speed, so his cap lets the
+	// cycle keep pace with the ground; 2026-11-27)
+	float Rate = FMath::Clamp(Speed / FMath::Max(Stride, 1.f), 0.45f / CycleLen, (L.bTroll ? 3.2f : 1.45f) / CycleLen);
 	// The run plays 10% slower than the distance it covers asks for (owner, 2026-11-15); the run's ground speed is unchanged, so its
 	// feet glide about 10% of the foot speed (log JEEBRUNRATE). The sprint and the walk keep their distance-timed rate.
 	{
