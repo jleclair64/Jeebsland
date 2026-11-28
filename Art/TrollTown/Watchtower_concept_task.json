@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0dc0-73c9-bad7-8cdebeb6caed",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll watchtower: a tall lookout of huge lashed logs, about four times as tall as it is wide, braced with leather lashings, on a dry-stone boulder base, a covered lookout platform at the top with a hide roof, two giant war horns mounted at the top, bone spikes, a big log ladder stair up the side, a wide open doorway at the base. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844084003,
+ "started_at": 1795844084014,
+ "finished_at": 1795844150990,
+ "expires_at": 1796103350990,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0dc0-73c9-bad7-8cdebeb6caed_0.png?Expires=1796103350&Signature=YHGEsbKQ5FIM~4UHpf3huHl5oxM2XIWy-aPZd9sY8InHkrJ1eI7gsQ-vzYOTs0Q0SSmdSSn2lvcD83Cy-Rq~RLtiUIiNr43LBNyKK-NrYaJ1oXByJeXNNVAOV0~oVCo1HcA-nkGlVMax2Hhu8g7QURXRFudozQuYMzG0-NyMr8XgN~c5MaSax98lqSNVbza3QrPPQhicvYkwytO8PE-KABKmjN~FBvzwogpcKLH74spobGKrEuOx31IpkJFYEE3g3S2ujDNFHwDy4VsfzogY0e9UO~QzGLdu8PNIrHhJGM0NzB~H4UU81u~g8l6u0H43a1oRgpTeHLR3vBlkLYTcVA__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

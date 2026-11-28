@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0565-77e3-9bfc-3cfcd88257ec",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll camp's bone gate: a giant gateway made of an enormous beast's ribcage, the curved rib bones arching over a wide open road passage at least 6 metres wide and 6 metres tall, a horned skull mounted at the top, short sections of sharpened log palisade wall on both sides, dry-stone bases, red leather banners. The passage is completely open, no door, no gate leaves. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844082206,
+ "started_at": 1795844082219,
+ "finished_at": 1795844125103,
+ "expires_at": 1796103325103,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0565-77e3-9bfc-3cfcd88257ec_0.png?Expires=1796103325&Signature=n1CyM62NYpptEi5eMq~BLl99w4GwY6BRTVBWmW2Mcf5b9M~KjSAQzi2DoXhhGhBHzuJXPBldBjqgumODaoc-8FaI2AuA6C4h1A-LYwppRpIdCr8lOjU0dTgf1BUpr6FH8NtXcl5tyZkHCitQiVXOElflzoHCF~MjVP8VL09Gw~niFxV96cG~S1dgiiUP2pWrc0ftiwfBKnEwHKG7sc2biAnoyOH237IQPj1qzs3hg5BQ23AuGnYXx-qomXGOXwd47ez43lHB93PNg5tspDI2FVdO8b2RrEOZ4VTiZC8FDKkXodqYBNMl8vh-IRsM-H-Mpoe~52JYbRgoE9FCVVrTqw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

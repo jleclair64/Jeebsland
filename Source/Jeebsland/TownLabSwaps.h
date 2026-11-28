@@ -30,6 +30,21 @@ namespace JeebTownLab
 		{ TEXT("OakHillFort"), TEXT("/Game/TownLab/War/SM_TL_Fort"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillWatchtower"), TEXT("/Game/TownLab/War/SM_TL_Watchtower"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillRuins"), TEXT("/Game/TownLab/War/SM_TL_Ruins"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollHall"), TEXT("/Game/TownLab/Troll/SM_TL_TRHall"), 0.f, 0.f, 0.f },   // Steele Creek's Great Hall (2026-11-27, Tools/BuildTrollTown.ps1)
+		{ TEXT("TrollBoneCarver"), TEXT("/Game/TownLab/Troll/SM_TL_TRBoneCarver"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollTanner"), TEXT("/Game/TownLab/Troll/SM_TL_TRTanner"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollGrogHall"), TEXT("/Game/TownLab/Troll/SM_TL_TRGrogHall"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollTradingPost"), TEXT("/Game/TownLab/Troll/SM_TL_TRTradingPost"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollBrewHut"), TEXT("/Game/TownLab/Troll/SM_TL_TRBrewHut"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollWarForge"), TEXT("/Game/TownLab/Troll/SM_TL_TRWarForge"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollFightPit"), TEXT("/Game/TownLab/Troll/SM_TL_TRFightPit"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollWatchtower"), TEXT("/Game/TownLab/Troll/SM_TL_TRWatchtower"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollGate"), TEXT("/Game/TownLab/Troll/SM_TL_TRGate"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollPalisade"), TEXT("/Game/TownLab/Troll/SM_TL_TRPalisade"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollCairn"), TEXT("/Game/TownLab/Troll/SM_TL_TRCairn"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollHut"), TEXT("/Game/TownLab/Troll/SM_TL_TRHut"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollCaves"), TEXT("/Game/TownLab/Troll/SM_TL_TRCaves"), 0.f, 0.f, 0.f },   // the rest of the troll town (2026-11-28)
+		{ TEXT("TrollVault"), TEXT("/Game/TownLab/Troll/SM_TL_TRVault"), 0.f, 0.f, 0.f },   // the troll town's bank (2026-11-28)
 	};
 
 	// The rebuilt model's short name for an Oak Hill building model ("OakHillHouse" -> "TL_House", the name TownLabDecor.h files its

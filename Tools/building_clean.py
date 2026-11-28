@@ -72,6 +72,24 @@ BUILDINGS = {
     "SilverPotionShop_300k":  dict(file="SilverPotionShop_300k.glb",  length=900.0,  sink=20.0),
     "SilverTavern_300k":      dict(file="SilverTavern_300k.glb",      length=1500.0, sink=20.0),
     "SilverAcademy_300k":     dict(file="SilverAcademy_300k.glb",     length=2400.0, sink=25.0),
+    # Steele Creek troll town (2026-11-27, agent trolltown; Docs/TrollTownPlan.md): the Chieftain's Great Hall, Meshy image-to-image then image-to-3d
+    # (Art/TrollTown). Door to -Y on its gable end; X is its width (10 m), so it runs about 15.5 m deep and 10 m tall.
+    "TrollHall_300k":         dict(file="TrollHall_300k.glb",         length=1000.0, sink=25.0),
+    # The rest of the troll town (2026-11-28, agent trolltown): the same way, each sized by its width along X
+    "TrollBoneCarver_300k": dict(file="TrollBoneCarver_300k.glb", length=1200.0, sink=25.0),
+    "TrollTanner_300k": dict(file="TrollTanner_300k.glb", length=1300.0, sink=25.0),
+    "TrollGrogHall_300k": dict(file="TrollGrogHall_300k.glb", length=1500.0, sink=25.0),
+    "TrollTradingPost_300k": dict(file="TrollTradingPost_300k.glb", length=1200.0, sink=25.0),
+    "TrollBrewHut_300k": dict(file="TrollBrewHut_300k.glb", length=900.0, sink=25.0),
+    "TrollWarForge_300k": dict(file="TrollWarForge_300k.glb", length=1400.0, sink=25.0),
+    "TrollFightPit_300k": dict(file="TrollFightPit_300k.glb", length=2400.0, sink=25.0),
+    "TrollWatchtower_300k": dict(file="TrollWatchtower_300k.glb", length=700.0, sink=25.0),
+    "TrollGate_300k": dict(file="TrollGate_300k.glb", length=1600.0, sink=25.0),
+    "TrollPalisade_300k": dict(file="TrollPalisade_300k.glb", length=1000.0, sink=25.0),
+    "TrollCairn_300k": dict(file="TrollCairn_300k.glb", length=700.0, sink=25.0),
+    "TrollHut_300k": dict(file="TrollHut_300k.glb", length=900.0, sink=25.0),
+    "TrollCaves_300k": dict(file="TrollCaves_300k.glb", length=1600.0, sink=25.0),
+    "TrollVault_300k": dict(file="TrollVault_300k.glb", length=1000.0, sink=25.0),   # (the troll bank, Steele Creek's vault)
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them

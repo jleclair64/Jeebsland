@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0b1f-7012-934d-fa44ba9d8c58",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "A small scrappy troll runt, about 1.2 metres tall, wiry, grey-green skin, big ears, one small tusk, a cheeky grin, wearing a ragged short leather tunic with a rope belt, a big empty leather carrying sack strapped on his back, wrapped feet. Quick and mischievous, friendly, an original design. Same A-pose and framing as the reference. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt, no blood. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands, no weapon.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844083434,
+ "started_at": 1795844083454,
+ "finished_at": 1795844125346,
+ "expires_at": 1796103325346,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0b1f-7012-934d-fa44ba9d8c58_0.png?Expires=1796103325&Signature=o4uWZB2rAt7EWaTqkghmPUyZcQ63P3NIkobMJ883BB35WFhWKBKI7aFst2RRxMg1OdfY9Dl-84M7MWS7-VRgtTSSh0pEm2SCVla~joRh-EHk2bj3gcQhaOIK2syr8trK2PQlEup5wRsdravABcF80YVQ6sA2C0HJR3cO3IUfox1plRUtnEg7BxRjlL-dZmIhmf9DGPYMvM~1p653ZwyiO5pACZ0Z3Cs8xARheHw2sxSepDvKdWyQrko2DhIBnvtdj-8awR0OwQqjGATUvNEaMjPDomhEPBbZR54nB-60933zGwDDAEt8jvNQVyJxQok9EsJEk8eee2KVHWBfyNGmrw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

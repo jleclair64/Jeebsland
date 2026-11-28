@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-05bf-7494-8e43-bc97447bd0d1",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll tavern grog hall: a broad two-level timber hall on a heavy boulder base, a big round hide roof with a stone chimney, giant curved horns over the wide double doorway, a covered porch on thick log posts, a huge carved wooden tankard hanging as a sign built onto the gable, warm firelight in small windows. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844082125,
+ "started_at": 1795844082144,
+ "finished_at": 1795844148824,
+ "expires_at": 1796103348824,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-05bf-7494-8e43-bc97447bd0d1_0.png?Expires=1796103348&Signature=KdjNPE9tY2eXLfeZPX0EgHrfV23owyeLGuKxIJJugLAOii3zJIBzoWTT5mO4ikPDbgxbu5SPLmMw5g~HtY3-MmtqeGmDTyatPqBO~6C7MPfQShn39iojsnISLdCIR3tJIYicSdp~DL33FRjFRk0uwZkmNTfLLoh1oXjq4QywVfWdlO5BLKeWwN0pguo1l~cq6vyvmTEt2M5t165EP2AFlx~R~~dPhEdkl2GWmGlXeguTy5OdtwKQXYdeQBxyc7xHmzCyeGiuwOg8ShF5MKGh37B22PTRzgY0Orv0SfEztV63YDvVKxWV8m0htVpaZGC66R-ELRpGozI3Xb~huMLXcg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

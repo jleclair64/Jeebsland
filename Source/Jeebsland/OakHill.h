@@ -146,6 +146,23 @@ namespace JeebOakHill
 			{ TEXT("SilverPotionShop"),  1.0f, 9.0f,  8.64f, false, 90.f, -443.7f, 267.8f, -383.6f, 416.3f },
 			{ TEXT("SilverTavern"),      1.0f, 15.0f, 9.38f, false, 90.f, -513.3f, 549.5f, -188.1f, 331.4f },
 			{ TEXT("SilverAcademy"),     1.0f, 24.0f, 15.4f, false, 90.f, -1148.9f, 1073.5f, -582.8f, 659.0f },
+			// Steele Creek's troll town (2026-11-27, Docs/TrollTownPlan.md; building_clean.py: door to -Y in Blender, +Y here)
+			{ TEXT("TrollHall"),         1.0f, 10.0f, 15.52f, false, 90.f, -464.2f, 465.1f, -770.9f, 711.6f },
+			// the rest of the troll town (2026-11-28, agent trolltown; building_clean.py, door to -Y in Blender)
+			{ TEXT("TrollBoneCarver"), 1.0f, 12.00f, 15.15f, false, 90.f, -552.2f, 585.9f, -718.1f, 749.2f },
+			{ TEXT("TrollTanner"), 1.0f, 13.00f, 20.40f, false, 90.f, -615.4f, 615.0f, -1015.5f, 961.4f },
+			{ TEXT("TrollGrogHall"), 1.0f, 15.00f, 17.64f, false, 90.f, -730.9f, 735.6f, -721.4f, 872.0f },
+			{ TEXT("TrollTradingPost"), 1.0f, 12.00f, 18.95f, false, 90.f, -560.1f, 562.1f, -941.9f, 912.4f },
+			{ TEXT("TrollBrewHut"), 1.0f, 9.00f, 8.56f, false, 90.f, -397.5f, 397.4f, -329.6f, 411.5f },
+			{ TEXT("TrollWarForge"), 1.0f, 14.00f, 13.37f, false, 90.f, -651.8f, 664.3f, -580.8f, 582.6f },
+			{ TEXT("TrollFightPit"), 1.0f, 24.00f, 26.63f, false, 90.f, -1163.5f, 1161.4f, -1267.0f, 1285.2f },
+			{ TEXT("TrollWatchtower"), 1.0f, 7.00f, 7.19f, false, 90.f, -291.1f, 338.3f, -341.0f, 270.0f },
+			{ TEXT("TrollGate"), 1.0f, 16.00f, 10.38f, false, 90.f, -770.5f, 762.3f, -433.6f, 151.5f },
+			{ TEXT("TrollPalisade"), 1.0f, 10.00f, 1.57f, false, 90.f, -487.4f, 489.1f, -52.4f, 63.0f },
+			{ TEXT("TrollCairn"), 1.0f, 7.00f, 7.16f, false, 90.f, -331.1f, 327.6f, -353.0f, 315.5f },
+			{ TEXT("TrollHut"), 1.0f, 9.00f, 13.66f, false, 90.f, -427.7f, 428.1f, -672.5f, 671.4f },
+			{ TEXT("TrollCaves"), 1.0f, 16.00f, 16.36f, false, 90.f, -756.4f, 755.7f, -802.8f, 766.2f },
+			{ TEXT("TrollVault"), 1.0f, 10.00f, 10.53f, false, 90.f, -496.7f, 496.2f, -509.4f, 509.3f },   // (the troll town's bank)
 			// The open-air stalls (owner, 2026-11-12), all three with their open front on their -Y in Blender, which is +Y here
 			// (Unreal mirrors Blender's Y). The general store ("Market Stall", candidate B, a timber trading post), the bank (Bank_A
 			// repainted to the town) and the potion shop (PotionShop_A, stretched deeper and lower by building_clean.py, its back open).
@@ -652,9 +669,10 @@ namespace JeebOakHill
 	{
 		if (!Model) return false;
 		auto Is = [Model](const TCHAR* N) { return FCString::Strcmp(Model, N) == 0; };
-		if (Is(TEXT("OakHillSmith"))) { Out = EShop::Smith; return true; }
-		if (Is(TEXT("OakHillBank")) || Is(TEXT("BankStall"))) { Out = EShop::Bank; return true; }
-		if (Is(TEXT("OakHillStore")) || Is(TEXT("GeneralStore")) || Is(TEXT("OakHillPotionShop")) || Is(TEXT("PotionStall"))) { Out = EShop::Store; return true; }
+		if (Is(TEXT("OakHillSmith")) || Is(TEXT("TrollWarForge"))) { Out = EShop::Smith; return true; }
+		if (Is(TEXT("OakHillBank")) || Is(TEXT("BankStall")) || Is(TEXT("TrollVault"))) { Out = EShop::Bank; return true; }
+		if (Is(TEXT("OakHillStore")) || Is(TEXT("GeneralStore")) || Is(TEXT("OakHillPotionShop")) || Is(TEXT("PotionStall"))
+			|| Is(TEXT("TrollTradingPost")) || Is(TEXT("TrollBoneCarver")) || Is(TEXT("TrollTanner")) || Is(TEXT("TrollBrewHut"))) { Out = EShop::Store; return true; }   // (the troll town's shops, 2026-11-28: their keepers sell the town's goods)
 		return false;
 	}
 	inline const TArray<FCounter>& Counters()

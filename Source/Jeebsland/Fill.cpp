@@ -1535,6 +1535,7 @@ struct FFillBuilder
 				FStats& St = Stats.FindOrAdd(Key);
 				++Rows;
 				FVector2D At = bSteele ? JeebSteele::ToWorld(R.E, R.N) : bSq ? FVector2D(R.N * 100.f, R.E * 100.f) : FVector2D(JeebOakHill::PosX + R.N * 100.f, JeebOakHill::PosY + R.E * 100.f);
+				if (bSteele && JeebSteele::OnBuilding(At.X, At.Y, 0.6f)) continue;   // (2026-11-28: the troll town's new buildings and palisade stand where some of the old props were)
 				float RowYaw = R.Yaw;
 				if (R.bRel && Pass == 0)
 				{

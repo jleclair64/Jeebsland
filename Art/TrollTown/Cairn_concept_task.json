@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-02bc-75c0-bf7a-b18370301350",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll ancestor cairn: a tall pointed mound of big stacked rounded stones, about twice a troll's height, with carved stone horned skulls set into it, a ring of standing stones around its foot, bone offerings and tied red leather strips, a small carved stone slab altar at the front, no building, no door. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844081336,
+ "started_at": 1795844081357,
+ "finished_at": 1795844132975,
+ "expires_at": 1796103332975,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-02bc-75c0-bf7a-b18370301350_0.png?Expires=1796103332&Signature=m1CcVd~VAhwkh1h4oosObW1HUO14l5321MqGgMSiS4v-WIGWK2RB2TpA2F8AMSiX3AYcIOkXTpB8g0F9hyToRnd6bhgXSw9MwZjkpl-xnembRlbcJngYP-upfX6QbFRhKKASOz1gagrkCaS6RLQ8RL0EUCtSVKkNp5HtiA3WHzUeBQ0OccxUrBfrOd-255HjhBvZMzuCgbc~C9lfHfDe0h6fmtFiFM-xHRTzA8yGYV~lQUjltKFU6YsYyHpJeViDR2cxkhB1mv24tcGU5DYk7ZWmiW5Cc4wn6JqrHuLiKXfP19jNBHbjrg0EOPrFTnxsWcaFeG2s-n3JQPgZNvhu3A__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

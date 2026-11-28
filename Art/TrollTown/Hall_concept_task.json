@@ -1,0 +1,16 @@
+{
+ "id": "01a22060-dbab-7028-afd0-cf43072e1976",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll chieftain's great hall: a long, low, massive building on a heavy dry-stone base of big rough rounded boulders stacked without mortar, thick dark timber posts and beams lashed with leather straps, a steep heavy roof of stretched tan and brown animal hides sewn over timber ribs, with a smoke hole and a short stone-and-timber smoke chimney at the ridge. The front door is a huge dark wooden double door framed by two enormous curved ivory tusks crossing above it and a row of giant rib bones along the porch. Large horned beast skulls mounted on the gable and over the door as trophies, bone spikes along the ridge, long deep-red and dark-brown leather banners hanging from the eaves either side of the door, painted with simple bold tribal stripes. Brutal, rough, tribal orc-like war-hall mood but an original design. Same art style as the reference: hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone, warm firelight glowing in small windows. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole building centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795839549113,
+ "started_at": 1795839549131,
+ "finished_at": 1795839584246,
+ "expires_at": 1796098784246,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a22060-dbab-7028-afd0-cf43072e1976_0.png?Expires=1796098784&Signature=E1Z90BNI60V9I3-z4iEOQNqx~XVkiT57592g-0lB-s1fn9GaGvhMDD82jIux5CItSewAZ2qiITUz9bFlm33yQkv0MxrOuwvO-Yo2xA88RAIkD6uFSwkAw3jhrR-hzBnEsaoYNQNMblfWsnoS5pw9TM2BWqSiX-VZdMORdIHxXlv5GwdBEjworK48SJ8UoNNaQ7k294QP72CyCDp3ZZJmh1qZr2DqPbMHHcG1rJggTTFAtfvotZsmoTNN469PrxzQKXLOG-HN5YG1QkGeuaMUSWQk1oH4cfxUOHDnUECKEnfUrUchXMwhQBIB6~Q5gin149TOEneQkWpr~hLoHw2slQ__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -1,0 +1,16 @@
+{
+ "id": "01a220dd-d8d6-7306-a6d5-4913fabcc865",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll camp bank vault: a squat, massive square strongroom of huge dry-stone boulders with very thick walls, a short heavy hide roof on big timber beams with bone spikes, a huge dark iron-banded timber door set deep in a stone arch flanked by two giant tusks, a big horned skull above the door, heavy chains and a big carved stone lock-slab beside the door built into the wall, tiny barred windows, red leather banners. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795847740683,
+ "started_at": 1795847740702,
+ "finished_at": 1795847785023,
+ "expires_at": 1796106985023,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220dd-d8d6-7306-a6d5-4913fabcc865_0.png?Expires=1796106985&Signature=GAWvCif8a0ToGGDxwUDGBtFTqtPnmlyXe0wfby5xonMMXH2OYOKul6M0fW69XKJoGcMUZux8i47Tq~CVOShdnTxOGX5nS4kFJl~EQVnMy0kilnsQsEiEL6vjjfBIL192fIy6RkW0m-map5Yf8cC-pf8pczq61Eqmk8bUmQDJkN2aAYPeehxX0Itd8RB9YwgS4vB44GG6T4eTBRPvQiOSLqQljNoeN1Q9opWe8m-RdDP1v7hvp~qmh1TLKIWAT3N7LdOqUrQorh9cNUMMEm0X2BADaWOTBF6JZnrp~uUEHXI0tC2hqKAkgeY~5iy1SSltEb44tQLbGnff1soRa30Qlw__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}
