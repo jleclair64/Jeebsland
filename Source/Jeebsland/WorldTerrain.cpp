@@ -395,7 +395,7 @@ void AWorldTerrain::BuildFine()
 						const int32 New = V.Add(Pd);
 						N.Add(FVector::ZeroVector);
 						UV.Add(FVector2D(Pd.X / 1000.f, Pd.Y / 1000.f));
-						UV1.Add(FVector2D(FMath::Lerp(UV1[Lo].X, UV1[Hi].X, T), 1.f + JeebRework::PaleAt(Q.X, Q.Y)));   // (V from 1: a wall, and how pale its stone is: the Pale Cove, the Needles)
+						UV1.Add(FVector2D(JeebOpen::SilverMountW(Q.X, Q.Y) > 0.f ? FMath::Min(FMath::Lerp(UV1[Lo].X, UV1[Hi].X, T), 0.9f) : FMath::Lerp(UV1[Lo].X, UV1[Hi].X, T), 1.f + JeebRework::PaleAt(Q.X, Q.Y)));   // (V from 1: a wall, and how pale its stone is: the Pale Cove, the Needles)
 						Col.Add(FLinearColor(0.f, 1.f, 0.f, 0.f));
 						Weld.Add(Key, New);
 						++WallPoints;

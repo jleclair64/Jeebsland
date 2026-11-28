@@ -412,6 +412,15 @@ namespace JeebTerrain
 			}
 			// the Needles (MapRework.h): pillars of rock, the same stepped walls
 			if (JeebRework::On()) { Add(JeebRework::NeedlesX - JeebRework::NeedlesHalf, JeebRework::NeedlesX + JeebRework::NeedlesHalf, JeebRework::NeedlesY - JeebRework::NeedlesHalf, JeebRework::NeedlesY + JeebRework::NeedlesHalf); A.Last().bWalls = true; }
+			// (2026-11-27) Silver Point's mountain (OpenWorld.h): its road's bench and the cliff with its ledges need the 2 m ground; one walled
+			// patch over the whole peak, so the cliff is drawn as stone faces like the sea cliffs
+			for (const JeebWorld::FTown& T : JeebWorld::Towns())
+				if (FCString::Strcmp(T.Name, TEXT("Silver Point")) == 0)
+				{
+					const float R = JeebOpen::SilverReach - 2400.f;
+					Add(T.Pos.X - R, T.Pos.X + R, T.Pos.Y - R, T.Pos.Y + R);
+					A.Last().bWalls = true;
+				}
 			// (2026-11-26) the mountain caves' mouths (Caves.h): a 48 m square of 2 m ground each, so the cells at the mouth can be left out
 			for (const FBox2D& B : JeebCaves::FineBoxes()) Add(B.Min.X, B.Max.X, B.Min.Y, B.Max.Y);
 			UE_LOG(LogTemp, Log, TEXT("JEEBCAVE the ground's 2 m patches: %d (%d at cave mouths)"), A.Num(), JeebCaves::FineBoxes().Num());
@@ -523,6 +532,7 @@ namespace JeebTerrain
 		if (bPads && Hills == 2) H = ApplyPads(X, Y, H);   // every building's level pad and doorstep (2026-11-18)
 		if (JeebBridge::InBox(X, Y)) H = JeebBridge::ApplyGround(X, Y, H);   // the bridge's embankments and pier footings (Bridge.cpp)
 		if (bCap && bPads && Hills == 2 && JeebOakHill::Covers(X, Y)) H += RoadEaseDelta(X, Y);   // no road in Oak Hill steeper than a walk (RoadSlope.cpp, 2026-11-20)
+		if (Hills == 2 && bOpen) H = JeebOpen::SilverMount(X, Y, H);   // Silver Point's mountain, laid over everything (OpenWorld.h, 2026-11-27)
 		return JeebTownLab::Active() ? JeebTownLab::Apply(X, Y, H) : H;   // (the TownLab map only: the rebuilt Oak Hill 300 m east, TownLab.h)
 	}
 

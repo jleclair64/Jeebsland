@@ -40,6 +40,11 @@ private:
 	void BuildSilverGround();   // Silver Point's cobbled plaza and lanes (2026-11-27)
 	UPROPERTY() class UProceduralMeshComponent* SilverGround = nullptr;
 	UPROPERTY() class UMaterialInstanceDynamic* SilverGroundMid = nullptr;
+	// (2026-11-27) the summit's own fog, coming and going on JeebOpen::SilverWeather's schedule (its snowfall uses the flakes below)
+	UPROPERTY() class ULocalFogVolumeComponent* SilverFog = nullptr;
+	float SilverFogNow = -1.f, SilverSnowNow = 0.f;
+	void TickSilverWeather(float Dt, double Clock, const FVector& Cam);
+	void TickRoadWalk(float Dt);   // -SilverRoadWalk test (not in Shipping)
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;   // the village buildings' windows (2026-11-27)
 	UPROPERTY() TArray<class UMaterialInterface*> GlowMats;
 	TArray<float> GlowBase;

@@ -1027,6 +1027,30 @@ struct FOakForestBuild
 			}
 			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST pines: %d snow-dusted spruces in %d woods round the frost circles (turned away: %d thin, %d off the forest land, %d steep, %d road, %d crowded)"), Pines, Woods, RjThin, RjEdge, RjSlope, RjRoad, RjSpace);
 		}
+		// ---- (2026-11-27, owner: "The very steep cliff on one side of the silver point mountain can have some ledges on it with pine trees")
+		// the Frostmere pines (frosted tint, Col 1) on the mountain cliff's two ledges (JeebOpen::SilverOnLedge), in ragged clumps, young
+		// and half grown ones mostly (a ledge is 3-7 m deep); their own stream, last
+		{
+			FRandomStream F(9898);
+			const FVector2D C = JeebOpen::SilverMid();
+			int32 Ledge = 0, Tries = 0;
+			for (int32 n = 0; n < 2600; ++n)
+			{
+				const float Th = F.FRandRange(0.f, 2.f * PI), Rr = F.FRandRange(8000.f, 11500.f), Pick = F.FRand(), Sc = F.FRand(), Yaw = F.FRandRange(0.f, 360.f), Clump = F.FRand();
+				const FVector2D P = C + FVector2D(FMath::Cos(Th), FMath::Sin(Th)) * Rr;
+				if (!JeebOpen::SilverOnLedge(P.X, P.Y)) continue;
+				++Tries;
+				if (FMath::PerlinNoise2D(P / 1500.f + FVector2D(2.2f, 7.1f)) + 0.6f * Clump < 0.25f) continue;   // (clumps with gaps between)
+				const int32 Kind = Pick < 0.45f ? K_Half2 : K_Full1 + int32(Pick * 7.f) % 3;
+				const float Scale = Pick < 0.45f ? FMath::Lerp(0.8f, 1.1f, Sc) : FMath::Lerp(0.5f, 0.85f, Sc);
+				const float Crown = Kinds[Kind].Crown * Scale;
+				if (!Space.Clear(P, Crown, 0.5f, 150.f)) continue;
+				Space.Add(P, Crown, true);
+				Puts.Add({ uint8(Kind), uint8(1), FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) - 8.f), Yaw, FVector(Scale), false });
+				++Count[Kind]; ++Trees; ++Ledge;
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST ledge pines: %d snow-dusted spruces on Silver Point's cliff ledges (%d spots on a ledge tried)"), Ledge, Tries);
+		}
 		ForestTrees += Trees;
 		FString List;
 		for (int32 k = 0; k < K_Num; ++k) if (Count[k]) List += FString::Printf(TEXT(" %s x%d"), *FPaths::GetBaseFilename(Kinds[k].Path), Count[k]);
