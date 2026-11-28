@@ -72,6 +72,7 @@ bool AKnightCharacter::ShieldActive() const
 	// can still have one worn: the knight's fixed shield-arm pose then put the troll's big forearm against his head. A troll never holds a
 	// shield: not drawn, no guard bonus, his left arm swings free. bIsTroll is the same on every machine, so the server agrees.)
 	if (bIsTroll) return false;
+	if (IsTorchLit()) return false;   // (2026-11-27: the torch is in his shield hand; the shield is on his back, KnightCharacterLight.cpp. LightBits replicate, so every machine agrees)
 	const int32 K = SelectedKind();
 	return K < 0 || JeebItems::AllowsShield(K);
 }
@@ -318,6 +319,7 @@ void AKnightCharacter::AttackLands()
 		const int32 SpellRow = bBow ? 0 : Skills->SpellAt(Skills->CastSlot);   // (the server's grid, active row and slot)
 		if (!bBow && SpellRow < 0) { UE_LOG(LogTemp, Log, TEXT("JEEBSPELL slot %d of row %d is empty: no cast"), Skills->CastSlot, Skills->SpellPick); return; }
 		const JeebSpells::FSpell& Spell = JeebSpells::Get(SpellRow);
+		if (!bBow && Spell.Look == JeebSpells::Look_Light) { ToggleGlimmer(); return; }   // (2026-11-27, Glimmer: no bolt, the tip's glow on or off; KnightCharacterLight.cpp)
 		const float SpellDmg = bBow ? 1.f : JeebSpells::DamageMul(SpellRow, Skills->SpellLevel(SpellRow));
 		const float Cost = (bBow ? 1.f : Spell.CostMul) * FMath::Lerp(TW.MagicTapCost, TW.MagicFullCost, FMath::Clamp(AtkCharge, 0.f, 1.f)) * SpellCostMul(K, Tier);   // (spell, item in MagicCosts.csv, dearer on a broom)
 		const float Power = bBow || Cost <= 0.f ? 1.f : FMath::Clamp(Magic / Cost, FMath::Clamp(TW.MagicMinPower, 0.f, 1.f), 1.f);

@@ -131,6 +131,9 @@ PROPS = {
     "CrystalBall": dict(file="CrystalBall.glb", axes=("X", "Y", "Z"), length=11.0, grip=("Z", 0.5), mask="none"),
     # The wizard's flying broom (2026-11-22, agent broom): Meshy meshy-6-lite image-to-3d (15 credits) from the CC0 community "Broomstick" cover picture
     # (meshy.ai/posts/019c98ca-e57f-7240-8dbb-4dbed40d4b35). Handle tip along game +X, bristles -X, up +Z; the origin at the seat (AKnightCharacter::UpdateBroomModel).
+    # The hand torch (2026-11-27, agent light; Meshy meshy-t2.5 from a picture, 19 credits; Saved/Torch in the light copy): head up (+Z), the fist round the
+    # leather wrap near the foot; placed in the off hand by AKnightCharacter::PlaceLights, the flame on top from code (M_TorchFire).
+    "Torch":       dict(file="Torch.glb", axes=("X", "Y", "Z"), length=58.0, grip=("Z", 0.17), mask="none", wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=4000, bake=True),
     "Broom":       dict(file="Broom.glb", axes=("X", "Y", "Z"), length=175.0, grip=("X", 0.55), mask="none", reduce=8000, bake=True),
     "AmuletRune":       dict(AMULET, file="AmuletRune.glb",       axes=("-Y", "X", "Z")),
     "AmuletEmberHeart": dict(AMULET, file="AmuletEmberHeart.glb", axes=("-Y", "X", "Z")),

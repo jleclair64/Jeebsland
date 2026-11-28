@@ -76,6 +76,10 @@ namespace JeebItems
 	// (KnightCharacterRock.cpp). One kind, stacks to 99 like arrows.
 	constexpr int32 IdRocks = 940;
 	inline bool IsRock(int32 Id) { return Id == IdRocks; }
+	// The torch (2026-11-27, owner: "hold a torch (smithed from coal and wood) ... a general item that lights the way"): any class, smithed at the
+	// smithy from coal and logs (Tuning.ini [Light]). L (or Equip on it in the pack) lights one in the free hand; it burns TorchBurnSeconds, then is used up.
+	constexpr int32 IdTorch = 941;
+	inline bool IsTorch(int32 Id) { return Id == IdTorch; }
 	// Flying brooms (2026-11-22, owner): 930 + the row in Brooms.csv (JeebBroomData.h). One to a slot; T calls the best one you carry (wizards only).
 	inline bool IsBroom(int32 Id) { return JeebBroom::IsBroomRange(Id) && Id - JeebBroom::IdBase < JeebBroom::NumBrooms(); }
 	inline int32 BroomId(int32 Row) { return JeebBroom::IdBase + Row; }
@@ -167,6 +171,7 @@ namespace JeebItems
 	inline int32 StackSize(int32 Id)
 	{
 		if (IsArrow(Id) || IsRock(Id)) return 99;   // (owner, 2026-11-01; was 30)
+		if (IsTorch(Id)) return 10;
 		if (IsPotionRange(Id)) return IsPotion(Id) ? PotionRow(PotionType(Id)).StackSize : 10;
 		if (!IsMaterial(Id)) return 1;
 		return MaterialRow(MaterialType(Id)).StackSize;
@@ -230,6 +235,7 @@ namespace JeebItems
 	{
 		if (IsFireArrow(Id)) return TEXT("Fire Arrows");
 		if (IsRock(Id)) return TEXT("Throwing Rocks");
+		if (IsTorch(Id)) return TEXT("Torch");
 		if (IsBroom(Id)) return JeebBroom::Row(BroomRowOf(Id)).Name;
 		if (IsArrow(Id)) return ArrowRowFor(Id).Name;
 		if (IsPotion(Id)) return PotionName(PotionType(Id));
@@ -511,6 +517,7 @@ namespace JeebItems
 	inline int32 GearSellPrice(int32 Id)
 	{
 		if (IsArrow(Id) || IsRock(Id)) return 1;
+		if (IsTorch(Id)) return 3;
 		if (IsBroom(Id)) return FMath::Max(1, JeebBroom::Row(BroomRowOf(Id)).Price / 2);
 		if (!IsGear(Id)) return 0;
 		return FMath::Max(1, BuyPrice(KindOf(Id), IsArmorKind(KindOf(Id)) ? FullVariant(Id) : VariantOf(Id)) / 2);

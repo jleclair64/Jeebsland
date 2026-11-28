@@ -39,7 +39,7 @@ namespace
 				Sp.LevelNeeded = FMath::Clamp(int32(Num(TEXT("levelneeded"), 1.f)), 1, 99);
 				Sp.MaxLevel = FMath::Clamp(int32(Num(TEXT("maxlevel"), 5.f)), 1, 20);
 				Sp.PerLevel = FMath::Max(0.f, Num(TEXT("perlevel"), 0.1f));
-				Sp.Look = Str(TEXT("look")).Equals(TEXT("fire"), ESearchCase::IgnoreCase) ? Look_Fire : Look_Bolt;
+				{ const FString Lk = Str(TEXT("look")); Sp.Look = Lk.Equals(TEXT("fire"), ESearchCase::IgnoreCase) ? Look_Fire : Lk.Equals(TEXT("light"), ESearchCase::IgnoreCase) ? Look_Light : Look_Bolt; }
 				if (Sp.Name.IsEmpty()) Sp.Name = Sp.Key;
 				Out.Add(Sp);
 			}

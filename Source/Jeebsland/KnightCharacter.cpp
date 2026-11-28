@@ -219,6 +219,7 @@ void AKnightCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepLook, COND_SkipOwner);   // the owner already wears it
 	DOREPLIFETIME_CONDITION(AKnightCharacter, RepMoveFlags, COND_SkipOwner);
+	DOREPLIFETIME(AKnightCharacter, LightBits);   // (2026-11-27: the torch and Glimmer, everyone)
 	DOREPLIFETIME(AKnightCharacter, bInvisible);   // (2026-11-26: the invisibility potion, everyone)
 	DOREPLIFETIME(AKnightCharacter, RepEmote);   // (the owner too: it waits for the server's word)
 	DOREPLIFETIME_CONDITION(AKnightCharacter, bCastChargingRep, COND_SkipOwner);   // (2026-11-22: the charging glow, for everyone else)
@@ -359,6 +360,8 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	KnightContext->MapKey(SkillsAction, EKeys::K);
 	CallHorseAction = MakeBool(TEXT("KnightCallHorse"));
 	KnightContext->MapKey(CallHorseAction, EKeys::T);
+	TorchAction = MakeBool(TEXT("KnightTorch"));
+	KnightContext->MapKey(TorchAction, EKeys::L);   // (2026-11-27: light or put out a torch)
 
 	SettingsAction = NewObject<UInputAction>(this, TEXT("KnightSettings"));
 	SettingsAction->ValueType = EInputActionValueType::Boolean;
@@ -419,6 +422,7 @@ void AKnightCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(PotionAction, ETriggerEvent::Started, this, &AKnightCharacter::DrinkPotion);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Started, this, &AKnightCharacter::CallHorse);
 		EIC->BindAction(CallHorseAction, ETriggerEvent::Completed, this, &AKnightCharacter::CallHorseUp);
+		EIC->BindAction(TorchAction, ETriggerEvent::Started, this, &AKnightCharacter::TorchKey);
 		EIC->BindAction(SkillsAction, ETriggerEvent::Started, this, &AKnightCharacter::OnSkillsKey);
 		EIC->BindAction(ScrollUpAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollUp);
 		EIC->BindAction(ScrollDownAction, ETriggerEvent::Started, this, &AKnightCharacter::ScrollDown);
@@ -494,6 +498,7 @@ void AKnightCharacter::Tick(float DeltaSeconds)
 	TickDust(Dt, bFalling, bSpecial, S, C);
 	TickSwordTrail(Dt);
 	TickInvisible(Dt);   // (the invisibility potion: KnightCharacterInvis.cpp)
+	TickLights(Dt);   // (the torch and Glimmer: KnightCharacterLight.cpp)
 }
 
 // Online messages, graphics once our knight is ours, camera limits, and walking away from a trader

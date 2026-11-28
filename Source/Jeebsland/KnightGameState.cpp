@@ -1290,8 +1290,14 @@ void AKnightGameState::Tick(float DeltaSeconds)
 						const FVector Fw = FRotator(0.f, R.Yaw, 0.f).Vector();
 						const float Ax = bShow ? Ex + Fw.X * Ahead : Ex, Ay = bShow ? Ey + Fw.Y * Ahead : Ey;
 						Me->SetActorHiddenInGame(!bShow);
-						const float Gz = GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? L.Z - FCString::Atof(*P[2]) : JeebTerrain::HeightAt(Ax, Ay);
-						if (bShow && P.Num() >= 10) L.Z = Gz + FCString::Atof(*P[2]);   // (a close-up: the eye's height is above his ground, not its own)
+						float Gz = GetWorld()->GetMapName().Contains(TEXT("MoveLab")) ? L.Z - FCString::Atof(*P[2]) : JeebTerrain::HeightAt(Ax, Ay);
+						const bool bAbs = P[2].StartsWith(TEXT("A"));
+						if (bAbs)   // (2026-11-27, agent light: an absolute eye inside a cave: he stands on the floor under it, found by a trace, not on the hill above)
+						{
+							FHitResult Hit; FCollisionQueryParams Q(SCENE_QUERY_STAT(EyeFloor), false, Me);
+							Gz = GetWorld()->LineTraceSingleByChannel(Hit, FVector(Ax, Ay, L.Z + 30.f), FVector(Ax, Ay, L.Z - 2000.f), ECC_Visibility, Q) ? Hit.ImpactPoint.Z : L.Z - 170.f;
+						}
+						if (bShow && P.Num() >= 10 && !bAbs) L.Z = Gz + FCString::Atof(*P[2]);   // (a close-up: the eye's height is above his ground, not its own)
 						Me->SetActorLocation(FVector(Ax, Ay, Gz + 100.f), false, nullptr, ETeleportType::TeleportPhysics);
 						EyeFollowOn = bShow && P.Num() >= 10;
 						EyeFollowOffset = L - Me->GetActorLocation();
