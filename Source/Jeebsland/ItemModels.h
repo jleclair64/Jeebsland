@@ -256,6 +256,14 @@ namespace JeebItemModel
 			Settle(Out);
 			return;
 		}
+		// ---------------- a torch (2026-11-27): a slim handle and a dark wrapped head ----------------
+		if (IsTorch(Id))
+		{
+			Lathe(NewPart(Out, FLinearColor(0.30f, 0.15f, 0.07f)).Mesh, Prof({ 0, 22, 1.4, 21.5, 1.6, -22, 0, -22.5 }), 8, 1.0, 1.0, Xf(V3(0, 0, 0), V3(0, 90, 0)));
+			Lathe(NewPart(Out, FLinearColor(0.15f, 0.11f, 0.09f)).Mesh, Prof({ 1.6, 22, 3.4, 25, 3.4, 33, 0, 35 }), 10, 1.0, 1.0, Xf(V3(0, 0, 0), V3(0, 90, 0)), false, true);
+			Settle(Out);
+			return;
+		}
 		// ---------------- a flying broom: a handle and a straw bundle (2026-11-22) ----------------
 		if (IsBroom(Id))
 		{

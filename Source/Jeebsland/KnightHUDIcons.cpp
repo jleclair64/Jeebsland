@@ -250,6 +250,19 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 		DiscP(32, 25, 14, 11.5f, Dark); DiscP(31, 23, 12.5f, 10, Mid); DiscP(27, 19, 4.5f, 3, Hi);
 		return;
 	}
+	// ---------------- a torch: a slanted brown handle, a dark wrapped head in an iron cage, a small flame (2026-11-27) ----------------
+	if (IsTorch(Id))
+	{
+		const FLinearColor Wood(0.34f, 0.17f, 0.08f), Wrap(0.22f, 0.12f, 0.07f), Iron(0.3f, 0.31f, 0.34f), Cloth(0.16f, 0.12f, 0.1f);
+		Poly({ P(36.f, 22.f), P(41.f, 25.f), P(20.f, 60.f), P(15.f, 57.f) }, Wood);
+		Poly({ P(22.f, 46.f), P(27.f, 49.f), P(20.f, 60.f), P(15.f, 57.f) }, Wrap);
+		DiscP(41, 20, 8, 9, Cloth);
+		Poly({ P(33.f, 23.f), P(36.f, 25.f), P(44.f, 12.f), P(41.f, 11.f) }, Iron);
+		Poly({ P(43.f, 28.f), P(46.f, 28.f), P(50.f, 13.f), P(47.f, 12.f) }, Iron);
+		DiscP(43, 11, 7, 9, FLinearColor(1.f, 0.42f, 0.08f));
+		DiscP(43, 13, 4, 5.5f, FLinearColor(1.f, 0.85f, 0.45f));
+		return;
+	}
 	// ---------------- a flying broom: a handle across the slot and a straw bundle (2026-11-22) ----------------
 	if (IsBroom(Id))
 	{

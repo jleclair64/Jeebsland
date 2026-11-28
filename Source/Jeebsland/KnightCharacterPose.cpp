@@ -66,6 +66,7 @@ void AKnightCharacter::FillAnimInput(JeebAnim::FInput& In) const
 	In.bShieldArm = !bIsWizard && ShieldActive() && !bShieldBack && !bStowed;
 	In.bWizHold = bIsWizard && WizardBookHeld && !bStowed && !bSwinging && !bFishing && !bDrinking;   // (2026-11-22: his book, ball or pipe held out on his left palm)
 	if (bOnBroom || bSmithOpen) In.bWizHold = false;   // (2026-11-24: his off hand is on the broom, the item is hidden)
+	if (TorchInHand()) In.bWizHold = true;   // (2026-11-27: a lit torch, any class: the same forearm-forward hold as the wizard's book, so walking never swings it; KnightCharacterLight.cpp)
 	static IConsoleVariable* LeanTest = IConsoleManager::Get().RegisterConsoleVariable(TEXT("jeeb.Test.BroomLean"), 0, TEXT("Test pictures: show the broom sprint lean while hovering (looks only)."), ECVF_Default);
 	In.bBroomSprint = BroomSprinting() || (bOnBroom && LeanTest->GetInt() != 0);
 	In.BroomPitch = BroomPitchNow;
@@ -223,8 +224,9 @@ void AKnightCharacter::PlaceGear()
 	if (WristR) WristR->SetWorldTransform(Anim->RightGripWorld());
 	if (ElbowL) ElbowL->SetWorldTransform(Anim->LeftGripWorld());
 	PlaceWizardOffHand();
+	PlaceLights();   // (2026-11-27: the held torch and Glimmer's orb, KnightCharacterLight.cpp)
 	if (UpperPivot) UpperPivot->SetWorldTransform(Anim->ChestWorld());
-	const bool bWantBack = bStowed || ((bSwinging || bFishing) && !bBlocking);   // (both hands on a tool, or fishing: the shield goes on his back, unless he raises it)
+	const bool bWantBack = bStowed || ((bSwinging || bFishing) && !bBlocking) || IsTorchLit();   // (a lit torch: the shield on his back)   // (both hands on a tool, or fishing: the shield goes on his back, unless he raises it)
 	if (bWantBack != bShieldBack) { bShieldBack = bWantBack; PlaceShield(bShieldBack); }
 	if (bStowed) PullStowed(Anim->StowPull());   // (bent flat over a ledge: in toward his back)
 	if (!bShieldBack)

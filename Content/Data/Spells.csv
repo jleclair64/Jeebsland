@@ -1,6 +1,7 @@
 # The wizard's spells (JeebSpells.h). Never reorder or delete rows: saves and bolts name spells by row. Add new spells at the end.
 # Colour: R G B (linear, 0-1). DamageMul / SpeedMul / CostMul: shares of the wand's or staff's own damage, bolt speed and magic cost.
-# LevelNeeded: Magic level to equip it. MaxLevel: upgrade levels; each level past 1 adds PerLevel to DamageMul. Look: bolt or fire. Size: the bolt's size.
+# LevelNeeded: Magic level to equip it. MaxLevel: upgrade levels; each level past 1 adds PerLevel to DamageMul. Look: bolt, fire, or light (no bolt: casting toggles a glow at the tip, Tuning.ini [Light]). Size: the bolt's size.
 Key,Name,Colour,DamageMul,SpeedMul,CostMul,LevelNeeded,MaxLevel,PerLevel,Look,Size,Blurb
 arcane_bolt,Arcane Bolt,0.1 0.45 1.0,1.0,1.0,1.0,1,5,0.1,bolt,1.0,A quick blue bolt that bursts into lightning
 fire_bolt,Fire Bolt,1.0 0.32 0.04,1.3,0.65,1.5,1,5,0.1,fire,1.35,A slower heavier ball of fire that bursts into flames
+glimmer,Glimmer,0.8 0.9 1.0,0.05,1.0,0,1,1,0,light,1.0,Cast to make your wand or staff tip glow with a soft cool-white light; cast again to put it out. Drains a little magic while lit

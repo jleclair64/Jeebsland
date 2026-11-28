@@ -164,7 +164,8 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	{
 	// ---- the pack, the weapon bar and worn gear ----
 	// (2026-11-03: armour can be taken off, so changing it is refused while stunned or knocked down: no mid-combo gear tricks)
-	case EInvOp::Equip:         if (ArmourBusy(Sk->Slots.IsValidIndex(A) && IsGear(Sk->Slots[A].Id) && IsArmorKind(KindOf(Sk->Slots[A].Id)))) break; bGear = Sk->EquipFromSlot(A); break;
+	case EInvOp::Equip:         if (Sk->Slots.IsValidIndex(A) && IsTorch(Sk->Slots[A].Id)) { ToggleTorch(); break; }   // (2026-11-27: equipping a torch lights it, KnightCharacterLight.cpp)
+	                            if (ArmourBusy(Sk->Slots.IsValidIndex(A) && IsGear(Sk->Slots[A].Id) && IsArmorKind(KindOf(Sk->Slots[A].Id)))) break; bGear = Sk->EquipFromSlot(A); break;
 	case EInvOp::UnequipHot:    if (Sk->UnequipHotbar(A)) bGear = true; else Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
 	case EInvOp::UnequipWorn:   if (ArmourBusy(IsArmorKind(A))) break; if (Sk->UnequipWorn(A, B != 0)) bGear = true; else Sk->Say(2.f, Warn, TEXT("No room in your inventory.")); break;
 	case EInvOp::SwapInvHot:    bGear = Sk->SwapInvHotbar(A, B); break;
@@ -313,6 +314,7 @@ void AKnightCharacter::DoInv(EInvOp Op, int32 A, int32 B, int32 C, AActor* Targe
 	case EInvOp::Smith:
 	{
 		if (!NearTrader(static_cast<uint8>(ENpcRole::Blacksmith))) break;
+		if (A == -3) { SmithTorchNow(); break; }   // (2026-11-27) torches: Tuning.ini [Light], KnightCharacterLight.cpp
 		const bool bArrows = A < 0;
 		if (bArrows) { SmithArrowsNow(B); break; }   // (2026-11-26) B is the arrow's row in Arrows.csv: its own recipe and Smithing level
 		if (B < 0 || B >= NumTiers) break;

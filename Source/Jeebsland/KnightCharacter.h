@@ -831,6 +831,43 @@ private:
 	void TickInvisTest(float Dt);
 #endif
 
+public:
+	// Light in the dark (2026-11-27, owner: a torch anyone can hold, smithed from coal and logs, and the wizard's Glimmer spell; KnightCharacterLight.cpp).
+	// The server decides both and replicates LightBits to everyone, so every player sees every lit torch and glowing tip.
+	bool IsTorchLit() const { return (LightBits & 1) != 0; }
+	bool IsGlimmerOn() const { return (LightBits & 2) != 0; }
+	bool TorchInHand() const;          // lit and in the hand (not while climbing, swinging a tool, fishing, drinking or on a broom: then hidden, the light stays)
+	bool ToggleTorch();                // (server) light one (from the pack, or the partly burnt one) or put it out
+	bool ToggleGlimmer();              // (server) Glimmer on or off (the cast of a Look "light" spell, KnightCharacterCombat.cpp AttackLands)
+	bool SmithTorchNow();              // (server) the smithy's torch recipe (Tuning.ini [Light]); the caller checks the smith is near
+	float TorchBurnLeft = 0.f;         // (server) seconds the torch in hand has left (0: none started)
+	UFUNCTION(Server, Reliable) void ServerToggleTorch();
+private:
+	UPROPERTY(ReplicatedUsing = OnRep_Lights) uint8 LightBits = 0;   // 1 a torch lit, 2 Glimmer on
+	UFUNCTION() void OnRep_Lights();
+	void SetLightBits(uint8 B);
+	void TickLights(float Dt);         // (server) the torch burns, Glimmer drains magic; (every machine) the flame and the light flicker
+	void PlaceLights();                // (rendering machines, from PlaceGear) the torch in the hand, the orb at the tip, the light with them
+	void UpdateLightComps();           // make or hide the torch, flame, embers, smoke, orb and the one light
+	void TorchKey();                   // L
+	UPROPERTY() UInputAction* TorchAction = nullptr;
+	UPROPERTY() class UStaticMeshComponent* TorchModel = nullptr;
+	UPROPERTY() TArray<class UStaticMeshComponent*> FlameCards;
+	UPROPERTY() TArray<class UMaterialInstanceDynamic*> FlameMids;
+	UPROPERTY() class UInstancedStaticMeshComponent* TorchEmbers = nullptr;
+	UPROPERTY() class UInstancedStaticMeshComponent* TorchSmoke = nullptr;
+	UPROPERTY() class UStaticMeshComponent* GlimmerOrb = nullptr;
+	UPROPERTY() class UStaticMeshComponent* GlimmerCore = nullptr;
+	UPROPERTY() class UPointLightComponent* CarryLight = nullptr;
+	float LightFlick = 1.f;            // this frame's flicker (the flame's height and the light, in step)
+	float LightPhase = 0.f;
+	float TorchShownBurn = 0.f;        // (looks only) how burnt down the flame looks
+	bool bTorchMeshFallback = false;
+#if !UE_BUILD_SHIPPING
+	float LightTestT = 0.f; int32 LightTestStep = 0;
+	void TickLightTest(float Dt);      // -LightNetTest (Tools/light_net.sh): the server smiths, lights, sees it replicate and burns it out
+#endif
+
 	// The steps of Tick, in order (see AKnightCharacter::Tick for which file each lives in)
 	void TickHousekeeping();
 	void TickGatherReach();

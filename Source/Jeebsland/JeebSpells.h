@@ -14,7 +14,7 @@ class USkillComponent;
 // the first adds PerLevel to DamageMul (level 3 of a 0.1 spell: +20%).
 namespace JeebSpells
 {
-	enum ELook : uint8 { Look_Bolt = 0, Look_Fire = 1 };
+	enum ELook : uint8 { Look_Bolt = 0, Look_Fire = 1, Look_Light = 2 };   // (Look_Light, 2026-11-27: Glimmer, no bolt: casting toggles a glow at the tip, KnightCharacterLight.cpp)
 
 	struct FSpell
 	{

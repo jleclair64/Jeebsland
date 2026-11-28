@@ -1,5 +1,6 @@
 #include "KnightHUD.h"
 #include "SkillComponent.h"
+#include "JeebTuning.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "KnightCharacter.h"
@@ -231,15 +232,55 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		Gauge(PX + PW - 330.f, PY + 86.f, 290.f, 9.f, Need > 0 ? float(Into) / float(Need) : 0.f, FLinearColor(0.9f, 0.4f, 0.2f));
 	}
 	// Kind list (two columns): the furnace's bars first (-2), then every kind of gear, then arrows (-1)
-	static const int32 Kinds[20] = { -2, K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, -1 };
-	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 19);
-	for (int32 i = 0; i < 20; ++i)
+	static const int32 Kinds[21] = { -2, K_Sword, K_Axe, K_Pickaxe, K_Spear, K_Broadsword, K_BattleAxe, K_Wand, K_Staff, K_Bow, K_Longbow, K_Crossbow, K_Rod, K_Shield, K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots, -1, -3 };   // (-3: torches, 2026-11-27)
+	SmithKindIdx = FMath::Clamp(SmithKindIdx, 0, 20);
+	for (int32 i = 0; i < 21; ++i)
 	{
-		const float X = PX + 30.f + (i / 10) * 160.f, Y = PY + 118.f + (i % 10) * 40.f;
-		const FString Nm = Kinds[i] == -2 ? FString(TEXT("Bars (furnace)")) : Kinds[i] < 0 ? FString(TEXT("Arrows")) : FString(KindName(Kinds[i]));
-		if (Btn(X, Y, 150.f, 35.f, Nm, true, SmithKindIdx == i, 1.0f)) SmithKindIdx = i;
+		const float X = PX + 30.f + (i / 11) * 160.f, Y = PY + 118.f + (i % 11) * 37.f;
+		const FString Nm = Kinds[i] == -3 ? FString(TEXT("Torches")) : Kinds[i] == -2 ? FString(TEXT("Bars (furnace)")) : Kinds[i] < 0 ? FString(TEXT("Arrows")) : FString(KindName(Kinds[i]));
+		if (Btn(X, Y, 150.f, 33.f, Nm, true, SmithKindIdx == i, 1.0f)) SmithKindIdx = i;
 	}
 	const int32 Kind = Kinds[SmithKindIdx];
+	if (Kind == -3)
+	{
+		// ---- torches (2026-11-27): coal and logs, Tuning.ini [Light]; the server checks it all (EInvOp::Smith with A -3, SmithTorchNow) ----
+		const auto& TW = JeebTune::V();
+		const int32 NCoal = FMath::Max(0, FMath::RoundToInt(TW.TorchCoal)), NLogs = FMath::Max(0, FMath::RoundToInt(TW.TorchLogs)), Makes = FMath::Max(1, FMath::RoundToInt(TW.TorchMakes));
+		const int32 NeedLv = FMath::Max(1, FMath::RoundToInt(TW.TorchSmithLevel));
+		const float CX = PX + 370.f, CY = PY + 112.f, CW = 300.f, CH = 500.f;
+		Tile(CX, CY, CW, CH, FLinearColor(0.6f, 0.72f, 0.88f), 0.18f);
+		DrawRect(FLinearColor(1.f, 0.5f, 0.12f), CX, CY, CW, 5.f);
+		DrawIcon(IdTorch, CX + (CW - 90.f) * 0.5f, CY + 14.f, 90.f);
+		float Y = CY + 120.f;
+		Y += Wrapped(TEXT("Torch"), CX + 8.f, Y, CW - 14.f, 0.9f, FLinearColor(1.f, 0.9f, 0.6f));
+		HDText(FString::Printf(TEXT("Makes %d torches"), Makes), FLinearColor(0.9f, 0.9f, 0.9f), CX + 8.f, Y, Font, 0.95f); Y += 20.f;
+		HDText(FString::Printf(TEXT("Each burns %d minutes (L to light)"), FMath::Max(1, FMath::RoundToInt(TW.TorchBurnSeconds / 60.f))), FLinearColor(1.f, 0.75f, 0.45f), CX + 8.f, Y, Font, 0.85f); Y += 28.f;
+		HDText(TEXT("MATERIALS"), FLinearColor(0.65f, 0.65f, 0.65f), CX + 8.f, Y, Font, 0.85f); Y += 20.f;
+		bool bHaveAll = true;
+		const EItemType M[2] = { EItemType::Coal, EItemType::Logs }; const int32 N[2] = { NCoal, NLogs };
+		for (int32 i = 0; i < 2; ++i)
+		{
+			if (N[i] <= 0) continue;
+			const int32 Have = Skills->GetItemCount(M[i]);
+			if (Have < N[i]) bHaveAll = false;
+			DrawIcon(MaterialId(M[i]), CX + 6.f, Y - 3.f, 24.f);
+			HDText(FString::Printf(TEXT("%s %d/%d"), MaterialName(M[i]), Have, N[i]), Have >= N[i] ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 34.f, Y, Font, 0.85f);
+			Y += 26.f;
+		}
+		const int32 SLv = Skills->GetLevel(ESkillType::Smithing);
+		Y += 6.f;
+		HDText(FString::Printf(TEXT("Needs Smithing %d"), NeedLv), SLv >= NeedLv ? FLinearColor(0.7f, 1.f, 0.7f) : FLinearColor(1.f, 0.45f, 0.4f), CX + 8.f, Y, Font, 0.95f); Y += 24.f;
+		HDText(FString::Printf(TEXT("+%d XP"), FMath::RoundToInt(TW.TorchSmithXP)), FLinearColor(0.5f, 0.85f, 1.f), CX + 8.f, Y, Font, 0.95f);
+		if (Btn(CX + 10.f, CY + CH - 50.f, CW - 20.f, 38.f, TEXT("SMITH"), bHaveAll && SLv >= NeedLv, false, 1.1f))
+		{
+			if (!Skills->CanAdd(IdTorch, Makes)) { ShopMsg = TEXT("Your pack is full."); ShopMsgUntil = Now + 3.f; }
+			else Knight->Inv(EInvOp::Smith, -3, 0, 0);
+		}
+		if (Over(CX, CY, CW, CH - 56.f)) ItemTip(IdTorch);
+		if (Now < ShopMsgUntil) HDText(ShopMsg, FLinearColor(0.6f, 1.f, 0.6f), PX + 370.f, PY + PH - 64.f, Font, 1.1f);
+		HDText(TEXT("Torches: a stick of wood and a coal-pitch head. Anyone can carry one; L lights it in your free hand.   E or X to leave."), FLinearColor(0.7f, 0.7f, 0.7f), PX + 30.f, PY + PH - 30.f, Font, 0.95f);
+		return;
+	}
 	const bool bBars = Kind == -2;
 	const bool bArrows = Kind == -1;
 	const int32 BKind = bArrows ? K_Bow : Kind;
@@ -251,7 +292,7 @@ void AKnightHUD::DrawSmithScreen(AKnightCharacter* Knight)
 		for (int32 s = 0; s < 3; ++s)
 		{
 			const FString Nm = FString(ShieldStyleName(s)).Replace(TEXT(" Shield"), TEXT(""));
-			if (Btn(PX + 30.f + s * 106.f, PY + 520.f, 100.f, 38.f, Nm, true, SmithStyle == s, 1.0f)) SmithStyle = s;
+			if (Btn(PX + 30.f + s * 106.f, PY + 540.f, 100.f, 38.f, Nm, true, SmithStyle == s, 1.0f)) SmithStyle = s;
 		}
 	}
 	const int32 Style = bStyled ? SmithStyle : 0;

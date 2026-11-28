@@ -1,6 +1,7 @@
 #include "KnightHUD.h"
 #include "JeebProps.h"
 #include "SkillComponent.h"
+#include "JeebTuning.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "KnightCharacter.h"
@@ -364,6 +365,14 @@ void AKnightHUD::ItemTip(int32 Id, int32 Size)
 		L.Add(ItemName(Id));
 		if (!R.Blurb.IsEmpty()) L.Add(R.Blurb);
 		L.Add(FString::Printf(TEXT("Speed x%.1f, %.1f magic a second while flying. T to call it (wizards only)"), R.SpeedMul, R.Drain));
+		SetTip(L);
+		return;
+	}
+	if (IsTorch(Id))
+	{
+		L.Add(ItemName(Id));
+		L.Add(FString::Printf(TEXT("A pitch-soaked torch: press L (or equip it) to light it in your free hand. It burns about %d minutes, then it is used up; L again puts it out and keeps the rest"), FMath::Max(1, FMath::RoundToInt(JeebTune::V().TorchBurnSeconds / 60.f))));
+		L.Add(TEXT("A knight's shield goes on his back while he holds one; not with a bow or a two-handed sword. Smithed at the smithy from coal and logs"));
 		SetTip(L);
 		return;
 	}
