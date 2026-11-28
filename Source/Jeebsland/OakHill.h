@@ -146,6 +146,8 @@ namespace JeebOakHill
 			{ TEXT("SilverPotionShop"),  1.0f, 9.0f,  8.64f, false, 90.f, -443.7f, 267.8f, -383.6f, 416.3f },
 			{ TEXT("SilverTavern"),      1.0f, 15.0f, 9.38f, false, 90.f, -513.3f, 549.5f, -188.1f, 331.4f },
 			{ TEXT("SilverAcademy"),     1.0f, 24.0f, 15.4f, false, 90.f, -1148.9f, 1073.5f, -582.8f, 659.0f },
+			// Steele Creek's troll town (2026-11-27, Docs/TrollTownPlan.md; building_clean.py: door to -Y in Blender, +Y here)
+			{ TEXT("TrollHall"),         1.0f, 10.0f, 15.52f, false, 90.f, -464.2f, 465.1f, -770.9f, 711.6f },
 			// The open-air stalls (owner, 2026-11-12), all three with their open front on their -Y in Blender, which is +Y here
 			// (Unreal mirrors Blender's Y). The general store ("Market Stall", candidate B, a timber trading post), the bank (Bank_A
 			// repainted to the town) and the potion shop (PotionShop_A, stretched deeper and lower by building_clean.py, its back open).

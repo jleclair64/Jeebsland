@@ -30,6 +30,7 @@ namespace JeebTownLab
 		{ TEXT("OakHillFort"), TEXT("/Game/TownLab/War/SM_TL_Fort"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillWatchtower"), TEXT("/Game/TownLab/War/SM_TL_Watchtower"), 0.f, 0.f, 0.f },
 		{ TEXT("OakHillRuins"), TEXT("/Game/TownLab/War/SM_TL_Ruins"), 0.f, 0.f, 0.f },
+		{ TEXT("TrollHall"), TEXT("/Game/TownLab/Troll/SM_TL_TRHall"), 0.f, 0.f, 0.f },   // Steele Creek's Great Hall (2026-11-27, Tools/BuildTrollTown.ps1)
 	};
 
 	// The rebuilt model's short name for an Oak Hill building model ("OakHillHouse" -> "TL_House", the name TownLabDecor.h files its

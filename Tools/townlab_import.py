@@ -32,6 +32,9 @@ COL_FROM.update({"TL_Fort": "OakHillFort_300k", "TL_Watchtower": "OakHillWatchto
 # Silver Point (2026-11-26): into /Game/TownLab/Silver (Tools/BuildSilverPoint.ps1)
 NANITE |= {"TL_SP" + n for n in ("Home", "PetShop", "CrystalShop", "BroomShop", "WandShop", "Store", "Bank", "TownHall", "Smith", "PotionShop", "Tavern", "Academy")}
 COL_FROM.update({"TL_SP" + n: "Silver" + n + "_300k" for n in ("Home", "PetShop", "CrystalShop", "BroomShop", "WandShop", "Store", "Bank", "TownHall", "Smith", "PotionShop", "Tavern", "Academy")})
+# Steele Creek troll town (2026-11-27): into /Game/TownLab/Troll (Tools/BuildTrollTown.ps1)
+NANITE |= {"TL_TRHall"}
+COL_FROM.update({"TL_TRHall": "TrollHall_300k"})
 # TL_ONLY (BuildTownLabBuildings.ps1 -Only): import just those buildings onto the existing M_TL_Building, leaving it, the other
 # buildings and the shared decor untouched (several agents rebuild their own designs at once)
 ONLY = [n for n in os.environ.get("TL_ONLY", "").split(",") if n]

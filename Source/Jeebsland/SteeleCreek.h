@@ -59,6 +59,7 @@ namespace JeebSteele
 		{ TEXT("House9"),     TEXT("OakHillHouse"),      -28.0f, -15.0f, 132.0f, 0.95f, 0.0f },
 		{ TEXT("House10"),    TEXT("OakHillCornerHouse"),-22.0f, -38.0f, 312.0f, 1.00f, 0.0f },
 		{ TEXT("House11"),    TEXT("OakHillHouse"),       12.0f,  34.0f, 160.0f, 0.95f, 0.0f },
+		{ TEXT("GreatHall"),  TEXT("TrollHall"),          -8.0f,  50.0f, 200.0f, 1.35f, 0.0f },   // the troll chieftain's Great Hall (2026-11-27, Docs/TrollTownPlan.md; 13.5 x 21 m, troll-sized door): behind the bank, its door looking down past the bank to the high street
 		// PLOTS_END
 	};
 

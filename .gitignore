@@ -64,3 +64,8 @@ Art/SilverPoint/*_metallic.png
 Art/SilverPoint/*_roughness.png
 Art/SilverPoint/*_normal.png
 Art/SilverPoint/*.log
+Art/TrollTown/*.glb
+Art/TrollTown/*_base_color.png
+Art/TrollTown/*_metallic.png
+Art/TrollTown/*_roughness.png
+Art/TrollTown/*_normal.png

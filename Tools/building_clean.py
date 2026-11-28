@@ -72,6 +72,9 @@ BUILDINGS = {
     "SilverPotionShop_300k":  dict(file="SilverPotionShop_300k.glb",  length=900.0,  sink=20.0),
     "SilverTavern_300k":      dict(file="SilverTavern_300k.glb",      length=1500.0, sink=20.0),
     "SilverAcademy_300k":     dict(file="SilverAcademy_300k.glb",     length=2400.0, sink=25.0),
+    # Steele Creek troll town (2026-11-27, agent trolltown; Docs/TrollTownPlan.md): the Chieftain's Great Hall, Meshy image-to-image then image-to-3d
+    # (Art/TrollTown). Door to -Y on its gable end; X is its width (10 m), so it runs about 15.5 m deep and 10 m tall.
+    "TrollHall_300k":         dict(file="TrollHall_300k.glb",         length=1000.0, sink=25.0),
 }
 names = a[2:] or list(BUILDINGS)
 TEST_HOUSES = {"OakHillHouse_Standard", "OakHillHouse_Detailed"}   # MoveLab's side-by-side of triangle counts: left as Meshy made them
