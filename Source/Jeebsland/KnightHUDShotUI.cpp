@@ -35,12 +35,23 @@ namespace
 		{ TEXT("emotes"), 1 }, { TEXT("drop"), 1 }, { TEXT("chat"), 1 },
 	};
 	// (2026-11-26, -ShotUIEcon: only the economy's screens, Docs/EconomyPlan.md)
-	const FStage EconStages[] = { { TEXT("shop"), 1 }, { TEXT("market"), 1 }, { TEXT("marketsell"), 1 }, { TEXT("trade"), 1 }, { TEXT("trade2"), 1 } };
+	const FStage EconStages[] = { { TEXT("shop"), 1 }, { TEXT("market"), 1 }, { TEXT("marketsell"), 1 }, { TEXT("trade"), 1 }, { TEXT("trade2"), 1 }, { TEXT("smelt"), 1 } };
 	bool EconOnly() { static const bool b = FParse::Param(FCommandLine::Get(), TEXT("ShotUIEcon")); return b; }
 	const FStage* StageList() { return EconOnly() ? EconStages : Stages; }
 	const int32 NumStages = EconOnly() ? UE_ARRAY_COUNT(EconStages) : UE_ARRAY_COUNT(Stages);
 }
 #endif
+
+bool AKnightHUD::ShotUIBigWindow() const
+{
+#if !UE_BUILD_SHIPPING
+	if (ShotUIStage < 0 || ShotUIStage >= NumStages) return false;
+	const FString N = StageList()[ShotUIStage].Name;
+	return N.StartsWith(TEXT("market")) || N.StartsWith(TEXT("trade")) || N == TEXT("shop") || N == TEXT("smith") || N == TEXT("smelt") || N == TEXT("bank");   // (the shop-like stages are drawn here, before the HUD, so in a picture the HUD would show over them; in play the window covers it)
+#else
+	return false;
+#endif
+}
 
 void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 {
@@ -90,7 +101,7 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 			for (int32 p = 0; p < Pages.Num(); ++p) if (Pages[p].Name == (N == TEXT("kit_weapons") ? TEXT("Weapons") : TEXT("Shields"))) TestPage = p;
 		}
 		else if (N == TEXT("icons") || N == TEXT("tip")) CloseAll();
-		else if (N == TEXT("shop") || N == TEXT("smith") || N == TEXT("bank")) CloseAll();
+		else if (N == TEXT("shop") || N == TEXT("smith") || N == TEXT("bank") || N == TEXT("smelt")) CloseAll();
 		else if (N == TEXT("inventory")) { CloseAll(); Knight->ToggleInventory(); }
 		else if (N == TEXT("skills")) { CloseAll(); Knight->ToggleSkills(); }
 		else if (N == TEXT("emotes")) { CloseAll(); Knight->SetPanelCursor(true); bEmoteWheel = true; bEmoteCursor = true; }
@@ -107,6 +118,13 @@ void AKnightHUD::ShotUISequence(AKnightCharacter* Knight)
 	// screens drawn by the sequence itself, every frame of their stage
 	if (N == TEXT("shop")) DrawShopScreen(Knight);   // (no shopkeeper beside him: the window is drawn here, not opened)
 	else if (N == TEXT("smith")) DrawSmithScreen(Knight);
+	else if (N == TEXT("smelt"))
+	{
+		SmithKindIdx = 0;   // (Bars (furnace))
+		USkillComponent* Sk = Knight->GetSkills();
+		Sk->AddItem(EItemType::CopperOre, 3); Sk->AddItem(EItemType::TinOre, 3); Sk->AddItem(EItemType::Coal, 4); Sk->AddItem(EItemType::IronOre, 2);
+		DrawSmithScreen(Knight);
+	}
 	else if (N == TEXT("bank")) DrawBankScreen(Knight);
 	else if (N == TEXT("market") || N == TEXT("marketsell"))
 	{

@@ -323,6 +323,7 @@ private:
 	void MktBox(float X, float Y, float W, int32 Field, const FString& Text, const TCHAR* Empty);
 	void MktTypeChar(TCHAR C);
 	bool MktTypeKey(const FKey& Key);
+	bool ShotUIBigWindow() const;   // (test pictures: the trade and market stages count as open windows)
 	int32 BankTab = 0;        // 0 the vault, 1 the Market
 	int32 MktMode = 0;        // 0 browse, 1 my listings, 2 sell
 	int32 MktCategory = 0, MktPage = 0, MktSellSlot = -1;

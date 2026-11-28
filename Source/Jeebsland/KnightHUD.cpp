@@ -280,12 +280,17 @@ void AKnightHUD::DrawHUD()
 
 	DrawPvp(Pawn->GetActorLocation(), GetWorld()->GetTimeSeconds());   // (PvP zones: the red title on entering and the icon while inside: KnightHUDPvp.cpp)
 	DrawStones();   // (the stone circles' noon event: KnightHUDStones.cpp)
-	DrawMinimap(Pawn);
+	// (2026-11-27: the trade window and the Market tab fill the middle of the screen: no minimap or hotbar over their CONFIRM and rows)
+	bool bBigWindow = Knight->IsTradeOpen() || (Knight->IsBankOpen() && BankTab == 1);
+#if !UE_BUILD_SHIPPING
+	bBigWindow = bBigWindow || ShotUIBigWindow();
+#endif
+	if (!bBigWindow) DrawMinimap(Pawn);
 	DrawChat(Knight, PC);   // (before the side panel: its drop box also uses Enter)
-	DrawWeaponBar(Knight);
+	if (!bBigWindow) DrawWeaponBar(Knight);
 	DrawReticle(Knight);
 	DrawCastReticle(Knight);   // (the wand and staff: KnightHUDReticle.cpp)
-	if (!Knight->IsUIOpen() && !bEmoteWheel && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);   // (not under the emote wheel)
+	if (!Knight->IsUIOpen() && !bBigWindow && !bEmoteWheel && (Knight->GetPanelAlways() || Knight->IsPanelCursor())) DrawSidePanel(Knight);   // (not under the emote wheel)
 	if (!Knight->IsUIOpen()) DrawSkillPopup(Skills);
 	DrawEmoteWheel(Knight, PC);   // (B: KnightHUDEmotes.cpp; on top)
 
