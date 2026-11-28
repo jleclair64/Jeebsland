@@ -97,6 +97,7 @@
 #include "Bridge.h"
 #include "FoeCamps.h"
 #include "Guards.h"
+#include "Goblins.h"
 #include "Deer.h"
 #include "FoeData.h"
 #include "Bushes.h"
@@ -326,6 +327,7 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AQuestPeople>(FVector::ZeroVector, FRotator::ZeroRotator);   // Oak Hill's quest givers (QuestPeople.h; after the props, so they step around them the same way on every machine)
 	World->SpawnActor<ATownLife>(FVector::ZeroVector, FRotator::ZeroRotator);   // the townsfolk's days: keepers at their counters, homes and errands, everyone on the clock (NpcLife.h; last of the towns, after the quest givers; on every machine)
 	JeebGuards::SpawnAll(World);   // Oak Hill's town guards (Guards.h; the server only, replicated; after the town's people)
+	JeebGoblins::SpawnBand(World);   // Steele Creek's goblin pickpockets (Goblins.h; the server only)
 	World->SpawnActor<AFoeCamps>(FVector::ZeroVector, FRotator::ZeroRotator);   // the bandits' camps in the forest (FoeCamps.h, FoeCamps.csv / Foes.csv; after the forest and its ruins, which they keep off; on every machine: the server places the bandits)
 	for (const JeebHorse::FStableDef& D : JeebHorse::Stables())   // the stables and their wild horses (Horse.h, Stables.csv; after everything solid, which the yard keeps off; every machine builds the yard, the server keeps the horses)
 		if (AStable* S = World->SpawnActorDeferred<AStable>(AStable::StaticClass(), FTransform::Identity)) { S->SetupStable(D); const FVector2D P = S->GetDef().Pos; S->FinishSpawning(FTransform(FRotator(0.f, S->GetDef().Yaw, 0.f), FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)))); }

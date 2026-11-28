@@ -445,6 +445,8 @@ public:
 	void TakeReact(AActor* From, const JeebHit::FReact& R);
 	// Your sword is coming (a jab, smash or sweep before the end of its hit frames): a kick into you loses
 	bool BladeComing() const;
+	bool IsSwingingNow() const { return bAttacking && AtkStyle != EAtkStyle::Cast; }   // (2026-11-27: goblins run from a swing near them, Goblins.cpp)
+	void SwingForTest() { StartAttack(EAtkStyle::Slash, 1, 0.f); }                     // (server, tests: Tools/goblin_net.sh)
 	bool IsKicking() const { return bAttacking && AtkStyle == EAtkStyle::Kick; }
 	// The raised shield's own mesh parts (arrows stick in them), in the same order on every machine
 	void GetShieldParts(TArray<UPrimitiveComponent*>& Out) const;

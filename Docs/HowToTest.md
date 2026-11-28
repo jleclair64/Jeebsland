@@ -9,6 +9,13 @@
 | The full game: starting screen, accounts, both worlds | Close the editor. `Tools\HostWorlds.bat`, wait for "Jeebsland world up", then `Tools\RunClient.bat` (twice for 2 players). Address `127.0.0.1`. Account names use only letters, numbers and spaces. |
 | See exactly what friends get | Same as above, but open `Packaged\Windows\Jeebsland.exe` instead of RunClient (only right after repackaging). |
 
+## Goblin pickpockets at Steele Creek (2026-11-27, agent `goblins`; Goblins.h)
+- Five wild goblins live in the ring round Steele Creek: outside a safe circle over the big central buildings (75 m, `GoblinSafeRadius`) and inside 150 m (`GoblinOuterRadius`). They crouch behind trees and bushes, creep up behind a player who has ingots, dash in at 1.5x your sprint (1100 cm/s) and take 5-20 ingots. About a second later you read "A goblin picked your pocket! -N ingots". Then it runs and hides again.
+- They run the moment you swing near one (6 m), an arrow or bolt passes within 4 m, or you hit one. 1 hp: any arrow kills. The killer gets half of what that goblin stole since it last died ("You caught a goblin! +N ingots"). A dead goblin comes back after 150 s at a hiding spot nobody is near.
+- To try: go to Steele Creek (`-StartAtSteele`), walk 80-140 m out from the forge yard into the woods with ingots, and stand facing away from the trees. Turn round now and then: a goblin you spot while it is creeping goes back to hiding.
+- Numbers: Tuning.ini `[Goblins]` (live). `jeeb.Goblins 0` (server, at world build) leaves them out.
+- Tests: `bash Tools/goblin_net.sh` (server + 2 clients; JEEBGOBLINTEST PASS/FAIL lines: steal, flee and speed, swing, shot, one-shot and the 50% pay, five in the band; JEEBGOBLINMSG shows who got the message). `bash Tools/goblin_lab.sh X Y stills|film` (X Y from a "JEEBGOBLIN spot" log line): the hider and a 120 fps dash film.
+
 ## Skill cap 29, metal bars, Knight's Armor, vaulted items (2026-11-27, agent `fishsize`)
 
 - **Skill cap 29.** Every skill stops at level 29 and XP stops counting there (Tab > Skills: hover a skill, it says "the top level"). Unlocks are at 1, 10 and 20. Old saves with more XP load at 29. The Test kit's level box takes 1 to 29; the test accounts get 29. Abilities written for 1 to 99 (bow draw, climb, swim, rush, gallop, shield heal, health, stealth, fish bites, hunting drops) now treat 29 as the old level 60: good, well short of the old 99 numbers (`USkillComponent::PowerLevel`; Tuning.ini keeps its At1/At10/At30/At99 points). The XP curve: level 10 costs what it did, 29 what the old 60 did (Attack about 25,000 XP).
