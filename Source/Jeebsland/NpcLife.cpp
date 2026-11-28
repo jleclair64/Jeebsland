@@ -218,6 +218,7 @@ namespace
 			if (JeebOakHill::Enabled() && JeebOakHill::InBox(P.X, P.Y) && JeebOakHill::RoadClearanceM(JeebOakHill::EastM(P.Y), JeebOakHill::NorthM(P.X)) < -0.3f) return true;
 			for (const JeebSteele::FStreet& St : JeebSteele::Streets())
 				for (const FVector2D& Q : St.Pts) if (FVector2D::DistSquared(Q, P) < FMath::Square(St.Width * 0.5f - 30.f)) return true;
+			if (JeebSilver::Near(P.X, P.Y) && JeebSilver::StreetClearance(P.X, P.Y) < -30.f) return true;   // (Silver Point's cobbles, 2026-11-27)
 			return JeebTerrain::PathClearance(P.X, P.Y) < -30.f;
 		}
 		float CostOf(const FIntPoint& C)
@@ -475,27 +476,29 @@ namespace
 		}
 		return R;
 	}
-	// Silver Point's open spots (2026-11-26): "plaza" round the middle, "street" out along the high street, by a seed; facing the middle
+	// Silver Point's open spots (2026-11-26): "plaza" round the middle, "street" along the lanes (2026-11-27), by a seed; facing the middle
 	// or the street. Never on a building or within 1 m of one.
 	bool SilverSpot(const FString& N, uint32 Seed, FVector2D& OutAt, float& OutYaw)
 	{
 		const JeebOpen::FSite* S = JeebSilver::Site();
 		if (!S) return false;
-		const float H = JeebSilver::RoadHeading(S->Pos);
 		for (int32 k = 0; k < 24; ++k)
 		{
 			const uint32 Q = Seed * 2654435761u + uint32(k) * 40503u;
 			const float U = float(Q % 1000u) / 1000.f, V = float((Q >> 10) % 1000u) / 1000.f;
-			if (N == TEXT("street"))
+			if (N == TEXT("street"))   // (2026-11-27: along one of the lanes, the high street most, a little to one side)
 			{
-				const float Side = (V < 0.5f ? -1.f : 1.f) * (250.f + 200.f * V);
-				OutAt = S->Pos + JeebSilver::Dir(H) * (1800.f + 4000.f * U) + JeebSilver::Dir(H + 90.f) * Side;
-				OutYaw = H + (Side > 0.f ? -90.f : 90.f);
+				const int32 Lane = U < 0.5f ? 0 : 1 + int32((U - 0.5f) * 6.f) % 3;
+				float LaneYaw = 0.f;
+				const FVector2D On = JeebSilver::LaneSpot(Lane, 0.15f + 0.8f * V, &LaneYaw);
+				const float Side = (((Q >> 20) & 1u) ? 1.f : -1.f) * (Lane == 0 ? 120.f : 60.f);
+				OutAt = On + JeebSilver::Dir(LaneYaw + 90.f) * Side;
+				OutYaw = LaneYaw + (Side > 0.f ? -90.f : 90.f);
 			}
 			else
 			{
 				const float A = 360.f * U;
-				OutAt = S->Pos + JeebSilver::Dir(A) * (700.f + 900.f * V);
+				OutAt = S->Pos + JeebSilver::Dir(A) * (400.f + (JeebSilver::PlazaR - 650.f) * V);   // (on the plaza, 2026-11-27)
 				OutYaw = A + 180.f;
 			}
 			if (!JeebSilver::OnBuilding(OutAt.X, OutAt.Y, 1.f) && FVector2D::Distance(OutAt, S->Pos) > 400.f) return true;
