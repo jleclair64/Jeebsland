@@ -108,6 +108,7 @@ namespace
 		if (M.X < JeebWorld::MinX + 9000.f || M.X > JeebWorld::MaxX - 9000.f || M.Y < JeebWorld::MinY + 9000.f || M.Y > JeebWorld::MaxY - 9000.f) return false;   // (well inside the map's edge walls)
 		if (JeebWorld::WaterEdge(M.X, M.Y) < 2500.f) return false;
 		for (const JeebOpen::FSite& S : JeebOpen::Sites()) if (FVector2D::Distance(M, S.Pos) < S.Radius + 6000.f) return false;
+		if (FVector2D::Distance(M, JeebOpen::SilverMid()) < 36000.f) return false;   // (never on Silver Point's mountain, 2026-11-27)
 		return RoadDist(M) > 4000.f;
 	}
 

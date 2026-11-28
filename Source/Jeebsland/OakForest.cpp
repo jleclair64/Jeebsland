@@ -1027,6 +1027,68 @@ struct FOakForestBuild
 			}
 			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST pines: %d snow-dusted spruces in %d woods round the frost circles (turned away: %d thin, %d off the forest land, %d steep, %d road, %d crowded)"), Pines, Woods, RjThin, RjEdge, RjSlope, RjRoad, RjSpace);
 		}
+		// ---- (2026-11-27, owner: "The very steep cliff on one side of the silver point mountain can have some ledges on it with pine trees")
+		// the Frostmere pines (frosted tint, Col 1) on the mountain cliff's two ledges (JeebOpen::SilverOnLedge), in ragged clumps, young
+		// and half grown ones mostly (a ledge is 3-7 m deep); their own stream, last
+		{
+			FRandomStream F(9898);
+			const FVector2D C = JeebOpen::SilverMid();
+			int32 Ledge = 0, Tries = 0;
+			for (int32 n = 0; n < 9000; ++n)
+			{
+				const float Th = F.FRandRange(0.f, 2.f * PI), Rr = F.FRandRange(8000.f, 15000.f), Pick = F.FRand(), Sc = F.FRand(), Yaw = F.FRandRange(0.f, 360.f), Clump = F.FRand();
+				const FVector2D P = C + FVector2D(FMath::Cos(Th), FMath::Sin(Th)) * Rr;
+				if (!JeebOpen::SilverOnLedge(P.X, P.Y)) continue;
+				++Tries;
+				if (FMath::PerlinNoise2D(P / 1500.f + FVector2D(2.2f, 7.1f)) + 0.6f * Clump < 0.05f) continue;   // (clumps with gaps between)
+				const int32 Kind = Pick < 0.45f ? K_Half2 : K_Full1 + int32(Pick * 7.f) % 3;
+				const float Scale = Pick < 0.45f ? FMath::Lerp(0.8f, 1.1f, Sc) : FMath::Lerp(0.5f, 0.85f, Sc);
+				const float Crown = Kinds[Kind].Crown * Scale;
+				if (!Space.Clear(P, Crown, 0.5f, 150.f)) continue;
+				Space.Add(P, Crown, true);
+				Puts.Add({ uint8(Kind), uint8(1), FVector(P.X, P.Y, JeebTerrain::HeightAt(P.X, P.Y) - 8.f), Yaw, FVector(Scale), false });
+				++Count[Kind]; ++Trees; ++Ledge;
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST ledge pines: %d snow-dusted spruces on Silver Point's cliff ledges (%d spots on a ledge tried)"), Ledge, Tries);
+		}
+		// ---- (2026-11-28, round 2: "grass, and trees where they fit, up to about two-thirds of the height") woods on the mountain's lower and
+		// middle slopes: ragged stands (noise at two sizes) of spruces with a few oaks low down, thinning out toward the snow band, frosted
+		// where snow lies; never on the road, on the cliff or on slopes past about 42 degrees. Their own stream, after the ledges.
+		{
+			FRandomStream F(9899);
+			const FVector2D C = JeebOpen::SilverMid();
+			int32 Slope = 0;
+			for (int32 n = 0; n < 16000; ++n)
+			{
+				const float Th = F.FRandRange(0.f, 2.f * PI), Rr = FMath::Sqrt(F.FRandRange(FMath::Square(10500.f), FMath::Square(JeebOpen::SilverReach - 1500.f))), Pick = F.FRand(), Sc = F.FRand(), Yaw = F.FRandRange(0.f, 360.f), Keep = F.FRand();
+				const FVector2D P = C + FVector2D(FMath::Cos(Th), FMath::Sin(Th)) * Rr;
+				if (JeebOpen::SilverMountW(P.X, P.Y) < 0.5f || JeebOpen::SilverOnLedge(P.X, P.Y)) continue;
+				const float Z = JeebTerrain::HeightAt(P.X, P.Y);
+				const float Gx = (JeebTerrain::HeightAt(P.X + 200.f, P.Y) - JeebTerrain::HeightAt(P.X - 200.f, P.Y)) / 400.f, Gy = (JeebTerrain::HeightAt(P.X, P.Y + 200.f) - JeebTerrain::HeightAt(P.X, P.Y - 200.f)) / 400.f;
+				const float Up = 1.f / FMath::Sqrt(1.f + Gx * Gx + Gy * Gy);
+				if (Up < 0.74f) continue;
+				const float Fr = Z / JeebOpen::SilverTop;
+				const float Wood = FMath::PerlinNoise2D(P / 5200.f + FVector2D(-3.7f, 1.4f)) + 0.5f * FMath::PerlinNoise2D(P / 1600.f + FVector2D(6.2f, -2.9f));
+				if (Fr > 0.68f + 0.12f * Wood) continue;   // (the treeline: ragged, about two thirds up)
+				const float Thin = JeebWorld::Smooth(0.45f, 0.7f, Fr);   // (fewer toward it)
+				if (Wood + 0.9f * Keep - 0.2f < 0.35f + 0.6f * Thin) continue;
+				if (JeebTerrain::PathClearance(P.X, P.Y) < 500.f) continue;
+				const float Sn = JeebOpen::Snow(P.X, P.Y, Z, Up);
+				if (Sn > 0.6f) continue;
+				int32 Kind; float Scale;
+				if (Fr < 0.3f && Pick < 0.18f) { Kind = K_Oak; Scale = FMath::Lerp(0.8f, 1.15f, Sc); }
+				else if (Pick < 0.6f) { Kind = K_Full1 + int32(Pick * 17.f) % 3; Scale = FMath::Lerp(0.85f, 1.35f, Sc) * FMath::Lerp(1.f, 0.75f, Thin); }
+				else if (Pick < 0.85f) { Kind = K_Half2; Scale = FMath::Lerp(0.85f, 1.2f, Sc); }
+				else { Kind = K_Full1 + int32(Pick * 31.f) % 3; Scale = FMath::Lerp(0.45f, 0.75f, Sc); }
+				const float Crown = Kinds[Kind].Crown * Scale;
+				if (!Space.Clear(P, Crown, 0.5f, 150.f)) continue;
+				Space.Add(P, Crown, true);
+				const float Sl = FMath::Sqrt(Gx * Gx + Gy * Gy);
+				Puts.Add({ uint8(Kind), uint8(Kind != K_Oak && Sn > 0.08f ? 1 : 0), FVector(P.X, P.Y, Z - 6.f - Sl * 45.f * Scale), Yaw, FVector(Scale), false });
+				++Count[Kind]; ++Trees; ++Slope;
+			}
+			UE_LOG(LogTemp, Log, TEXT("JEEBFOREST mountain woods: %d trees on Silver Point's slopes"), Slope);
+		}
 		ForestTrees += Trees;
 		FString List;
 		for (int32 k = 0; k < K_Num; ++k) if (Count[k]) List += FString::Printf(TEXT(" %s x%d"), *FPaths::GetBaseFilename(Kinds[k].Path), Count[k]);

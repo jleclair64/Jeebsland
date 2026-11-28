@@ -12,6 +12,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/LocalFogVolumeComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
 #include "DayNight.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/StaticMesh.h"
@@ -26,10 +29,13 @@
 
 float AOpenWorld::SnowNow = 0.f;
 float AOpenWorld::StormNow = 0.f;
+float AOpenWorld::SilverMistNow = 0.f;
 
 namespace
 {
 	TAutoConsoleVariable<float> CVarSnowForce(TEXT("jeeb.Weather.Force"), -1.f, TEXT("The mountain-top weather on this machine: -1 the shared weather (one per game day: a snowstorm or blue skies), 0 always blue skies, 1 always a snowstorm (anything between: that share). Looks only; the storm shows only above the storm height (Tuning.ini [Weather])."));
+	TAutoConsoleVariable<float> CVarSilverFog(TEXT("jeeb.Silver.Fog"), 1.f, TEXT("Silver Point summit fog strength when its fog comes (1 as built, 0 none; live, looks only)"));
+	TAutoConsoleVariable<float> CVarSilverForce(TEXT("jeeb.Silver.Weather"), -1.f, TEXT("Test: Silver Point summit weather, -1 the shared schedule, 0 clear, 1 fog, 2 snowfall"));
 	TAutoConsoleVariable<float> CVarSnowAmount(TEXT("jeeb.Snow.Amount"), 1.f, TEXT("How many flakes fall when it snows (1 as built: about 3000 round the camera on the peaks; 0 none, 1.4 at most)"));
 	TAutoConsoleVariable<float> CVarSnowSize(TEXT("jeeb.Snow.Size"), 1.8f, TEXT("Flake size (1.8 as built: 2.3 to 5 cm)"));
 
@@ -380,6 +386,7 @@ void AOpenWorld::TickCandles(float Dt, const FVector& Cam)
 void AOpenWorld::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	TickRoadWalk(DeltaSeconds);
 	UWorld* W = GetWorld();
 	APlayerController* PC = W ? W->GetFirstPlayerController() : nullptr;   // (this machine's own view: looks only)
 	if (!PC || !PC->PlayerCameraManager || !Flakes || Flake.Num() == 0) return;
@@ -414,7 +421,8 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		CoverWant = JeebWorld::Smooth(0.05f, 0.45f, Sum / 5.f) * (1.f - ACaves::CameraInside);   // (no snow falls in a cave, Caves.h)
 	}
 	CoverNow = FMath::FInterpConstantTo(CoverNow, CoverWant, DeltaSeconds, ACaves::CameraInside > 0.05f ? 3.f : 0.25f);   // (2026-11-26: gone at once on stepping into a cave; flakes hung in the Storm Peak passage)
-	const float Amount = CoverNow * SnowNow * JeebOpen::StormAlt(Cam.Z) * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
+	TickSilverWeather(DeltaSeconds, Clock, Cam);
+	const float Amount = FMath::Max(CoverNow * SnowNow * JeebOpen::StormAlt(Cam.Z), SilverSnowNow) * FMath::Clamp(CVarSnowAmount.GetValueOnGameThread(), 0.f, 2.f);
 	const int32 Want = FMath::Clamp(FMath::RoundToInt(NumFlakes * Amount), 0, NumFlakes);
 	if (Want == 0 && Shown == 0) return;
 	const float SizeK = FMath::Clamp(CVarSnowSize.GetValueOnGameThread(), 0.2f, 4.f);
@@ -452,6 +460,184 @@ void AOpenWorld::Tick(float DeltaSeconds)
 		Flakes->BatchUpdateInstancesTransforms(0, N, P, true, false, true);
 	}
 	Shown = Want;
+}
+
+// (2026-11-27, owner: "some fog near the top of the mountain that comes and goes, and snow that comes and goes but not at the same time as
+// the fog") Silver Point's summit weather from JeebOpen::SilverWeather (the shared clock, so every player sees the same): a local fog
+// volume round the top, and the flakes (Tick) falling round the camera while it is up there. The day's storm, when it reaches the top,
+// keeps the fog away too. Looks only, this machine's own view.
+void AOpenWorld::TickSilverWeather(float Dt, double Clock, const FVector& Cam)
+{
+	float Fog = 0.f, Snow = 0.f;
+	JeebOpen::SilverWeather(Clock, Fog, Snow);
+	if (const float Fw = CVarSilverForce.GetValueOnGameThread(); Fw >= 0.f) { Fog = FMath::IsNearlyEqual(Fw, 1.f) ? 1.f : 0.f; Snow = FMath::IsNearlyEqual(Fw, 2.f) ? 1.f : 0.f; }
+	const FVector2D Mid = JeebOpen::SilverMid();
+	const float D = float(FVector2D::Distance(FVector2D(Cam.X, Cam.Y), Mid));
+	Fog *= 1.f - FMath::Clamp(SnowNow * JeebOpen::StormAlt(JeebOpen::SilverTop), 0.f, 1.f);
+	// the snowfall: only with the camera on the top or its upper slopes
+	const float Near = JeebWorld::Smooth(17000.f, 10000.f, D) * JeebWorld::Smooth(JeebOpen::SilverTop - 4500.f, JeebOpen::SilverTop - 1500.f, Cam.Z) * (1.f - ACaves::CameraInside);
+	SilverSnowNow = FMath::FInterpConstantTo(SilverSnowNow, Snow * Near * 0.85f, Dt, 0.3f);
+	if (Mid.X > 1.0e8f) return;
+	// (round 2) the mist banks, and the height fog thickened while the camera is in the fog on the top or its upper slopes
+	TickSilverMist(Fog * FMath::Clamp(CVarSilverFog.GetValueOnGameThread(), 0.f, 2.f), Cam);
+	SilverMistNow = Fog * JeebWorld::Smooth(20000.f, 12000.f, D) * JeebWorld::Smooth(JeebOpen::SilverTop - 6000.f, JeebOpen::SilverTop - 2000.f, Cam.Z) * (1.f - ACaves::CameraInside) * FMath::Clamp(CVarSilverFog.GetValueOnGameThread(), 0.f, 1.5f);
+	if (!SilverFog)
+	{
+		SilverFog = NewObject<ULocalFogVolumeComponent>(this, TEXT("SilverFog"));
+		SilverFog->SetupAttachment(GetRootComponent());
+		SilverFog->RegisterComponent();
+		SilverFog->SetWorldLocation(FVector(Mid.X, Mid.Y, JeebOpen::SilverTop + 1500.f));
+		SilverFog->SetWorldScale3D(FVector(26.f, 26.f, 12.f));   // (a unit sphere of 5 m: about 130 m across the top, 60 m high)
+		SilverFog->SetHeightFogExtinction(0.f);
+		SilverFog->SetFogAlbedo(FLinearColor(0.86f, 0.88f, 0.92f));
+		SilverFog->SetFogPhaseG(0.2f);
+		SilverFog->SetRadialFogExtinction(0.f);
+		SilverFog->SetVisibility(false);
+	}
+	const float Want = Fog * FMath::Clamp(CVarSilverFog.GetValueOnGameThread(), 0.f, 4.f);
+	if (FMath::Abs(Want - SilverFogNow) > 0.002f)
+	{
+		SilverFogNow = Want;
+		SilverFog->SetRadialFogExtinction(1.6f * Want);
+		SilverFog->SetVisibility(Want > 0.002f);
+	}
+}
+
+
+// (round 2, 2026-11-28) the summit fog's banks of mist: 40 soft cloud cards from a fixed seed (the same on every machine; the fog's
+// coming and going is the shared schedule), lying round the upper slopes from just under the top to 25 m over it and a few drifting over
+// the village. Each turns to face the camera every frame and drifts slowly round the peak; a card the camera comes close to shrinks away
+// so none is seen edge on or from inside. Lit like LOW's cloud ring (ADayNight::TrailLight: white at noon, warm and dim at the low sun).
+// One mesh, one draw; it is rebuilt only while the fog shows. Looks only.
+void AOpenWorld::TickSilverMist(float Fog, const FVector& Cam)
+{
+	const FVector2D Mid = JeebOpen::SilverMid();
+	if (!SilverMist)
+	{
+		UMaterialInterface* Mat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/M_Cumulus.M_Cumulus"));
+		if (!Mat) { UE_LOG(LogTemp, Warning, TEXT("JEEBMOUNT M_Cumulus is missing: no summit mist")); MistShown = 0.f; return; }
+		SilverMist = NewObject<UProceduralMeshComponent>(this, TEXT("SilverMist"));
+		SilverMist->SetupAttachment(GetRootComponent());
+		SilverMist->SetUsingAbsoluteLocation(true);
+		SilverMist->SetUsingAbsoluteRotation(true);
+		SilverMist->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		SilverMist->SetCastShadow(false);
+		SilverMist->bAffectDistanceFieldLighting = false;
+		SilverMist->SetVisibleInRayTracing(false);
+		SilverMist->RegisterComponent();
+		SilverMist->SetWorldLocation(FVector::ZeroVector);
+		SilverMistMid = UMaterialInstanceDynamic::Create(Mat, this);
+		SilverMist->SetMaterial(0, SilverMistMid);
+		FRandomStream R(6161);
+		for (int32 i = 0; i < 40; ++i)
+		{
+			FMistCard M;
+			M.Phi = R.FRandRange(0.f, 2.f * PI);
+			const bool bOver = i < 6;   // (a few over the village itself)
+			M.R = bOver ? R.FRandRange(1000.f, 6500.f) : R.FRandRange(8000.f, 19000.f);
+			const FVector2D P = Mid + FVector2D(FMath::Cos(M.Phi), FMath::Sin(M.Phi)) * M.R;
+			M.Z = FMath::Max(JeebTerrain::HeightAt(P.X, P.Y), JeebOpen::SilverTop - 4500.f) + R.FRandRange(bOver ? 600.f : -300.f, bOver ? 2500.f : 1500.f);
+			M.Size = bOver ? R.FRandRange(2500.f, 4000.f) : R.FRandRange(5000.f, 9500.f);   // (round 2: big and soft, a cloud cap round the top, not stickers)
+			M.Speed = R.FRandRange(0.004f, 0.011f) * (R.FRand() < 0.5f ? -1.f : 1.f);
+			M.Phase = R.FRandRange(0.f, 2.f * PI);
+			M.Tile = R.RandRange(0, 3);
+			M.bFlip = R.FRand() < 0.5f;
+			MistCards.Add(M);
+		}
+		TArray<FVector> V; TArray<int32> T; TArray<FVector> N; TArray<FVector2D> UV; TArray<FLinearColor> C; TArray<FProcMeshTangent> Tg;
+		for (int32 i = 0; i < MistCards.Num(); ++i)
+		{
+			const FMistCard& M = MistCards[i];
+			const float U0 = (M.Tile % 2) * 0.5f, V0 = (M.Tile / 2) * 0.5f, Ul = M.bFlip ? U0 + 0.5f : U0, Ur = M.bFlip ? U0 : U0 + 0.5f;
+			for (int32 k = 0; k < 4; ++k) { V.Add(FVector::ZeroVector); N.Add(FVector::UpVector); C.Add(FLinearColor::White); }
+			UV.Append({ FVector2D(Ul, V0 + 0.5f), FVector2D(Ur, V0 + 0.5f), FVector2D(Ur, V0), FVector2D(Ul, V0) });
+			const int32 F = i * 4;
+			T.Append({ F, F + 2, F + 1, F, F + 3, F + 2 });
+		}
+		SilverMist->CreateMeshSection_LinearColor(0, V, T, N, UV, C, Tg, false);
+		SilverMist->SetVisibility(false);
+		MistShown = 0.f;
+	}
+	const float Show = Fog > 0.01f && FVector2D::Distance(FVector2D(Cam.X, Cam.Y), Mid) < 260000.f ? Fog : 0.f;
+	if (Show <= 0.f) { if (MistShown > 0.f) { SilverMist->SetVisibility(false); MistShown = 0.f; } return; }
+	if (MistShown <= 0.f) SilverMist->SetVisibility(true);
+	MistShown = Show;
+	const float Tm = Time;
+	TArray<FVector> V; V.Reserve(MistCards.Num() * 4);
+	TArray<FVector> N; N.Reserve(MistCards.Num() * 4);
+	for (const FMistCard& M : MistCards)
+	{
+		const float Phi = M.Phi + M.Speed * Tm * 0.25f + 0.05f * FMath::Sin(Tm * 0.02f + M.Phase);
+		const FVector Ctr(Mid.X + FMath::Cos(Phi) * M.R, Mid.Y + FMath::Sin(Phi) * M.R, M.Z + 250.f * FMath::Sin(Tm * 0.031f + M.Phase));
+		FVector To = Cam - Ctr; const float Dist = To.Size(); To /= FMath::Max(Dist, 1.f);
+		FVector Side = FVector::CrossProduct(FVector::UpVector, To).GetSafeNormal();
+		if (Side.IsNearlyZero()) Side = FVector::ForwardVector;
+		const FVector Upv = FVector::CrossProduct(To, Side);
+		const float S = M.Size * JeebWorld::Smooth(M.Size * 0.5f, M.Size * 1.4f, Dist) * (1.f + 0.06f * FMath::Sin(Tm * 0.05f + M.Phase * 3.f));
+		const FVector Base = Ctr - Upv * S * 0.79f;   // (the heap's flat base, as LOW's ring)
+		V.Append({ Base - Side * S * 0.5f, Base + Side * S * 0.5f, Base + Side * S * 0.5f + Upv * S, Base - Side * S * 0.5f + Upv * S });
+		for (int32 k = 0; k < 4; ++k) N.Add(To);
+	}
+	SilverMist->UpdateMeshSection(0, V, N, TArray<FVector2D>(), TArray<FColor>(), TArray<FProcMeshTangent>());
+	const FLinearColor L = ADayNight::TrailLight;
+	SilverMistMid->SetVectorParameterValue(TEXT("Lit"), FMath::Lerp(L, FLinearColor(0.95f, 0.96f, 1.f), 0.35f));
+	SilverMistMid->SetVectorParameterValue(TEXT("Shade"), FMath::Lerp(L, FLinearColor(0.62f, 0.68f, 0.8f), 0.55f));
+	SilverMistMid->SetScalarParameterValue(TEXT("Bright"), 1.5f * FMath::Lerp(1.f, 0.2f, ADayNight::Night));
+	SilverMistMid->SetScalarParameterValue(TEXT("Opacity"), 0.6f * FMath::Clamp(Show, 0.f, 1.f));
+}
+// -SilverRoadWalk (test builds, single player): the knight is stood at the mountain road's foot and runs it to the village, steering a
+// few metres ahead along its line; -SilverRoadWalkShare=0.4 walks. Logs JEEBROADWALK once a second (along, height, speed) and quits at
+// the top or after 12 minutes.
+void AOpenWorld::TickRoadWalk(float Dt)
+{
+#if !UE_BUILD_SHIPPING
+	static const bool bOn = FParse::Param(FCommandLine::Get(), TEXT("SilverRoadWalk"));
+	if (!bOn) return;
+	static float Clock = 0.f, Acc = 0.f, Share = -1.f, Along = 0.f, MaxV = 0.f, MinRun = 1.0e9f;
+	static int32 I = 0, Stuck = 0;
+	static FVector Last = FVector::ZeroVector;
+	if (Share < 0.f) { Share = 1.f; FParse::Value(FCommandLine::Get(), TEXT("SilverRoadWalkShare="), Share); }
+	Clock += Dt;
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	ACharacter* P = PC ? Cast<ACharacter>(PC->GetPawn()) : nullptr;
+	const TArray<FVector2D>& L = JeebOpen::SilverRoadLine();
+	if (!P || L.Num() < 20) return;
+	if (Clock < 4.f) return;
+	const float Half = P->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	if (I == 0)
+	{
+		I = 1;
+		const FVector2D S = L[0], Dir = (L[10] - L[0]).GetSafeNormal();
+		P->SetActorLocationAndRotation(FVector(S.X, S.Y, JeebTerrain::HeightAt(S.X, S.Y) + Half + 5.f), FRotator(0.f, FMath::RadiansToDegrees(FMath::Atan2(Dir.Y, Dir.X)), 0.f), false, nullptr, ETeleportType::TeleportPhysics);
+		Last = P->GetActorLocation();
+		UE_LOG(LogTemp, Display, TEXT("JEEBROADWALK start at %.0f %.0f, %d points, share %.2f"), S.X, S.Y, L.Num(), Share);
+		return;
+	}
+	const FVector Loc = P->GetActorLocation();
+	const FVector2D Me(Loc.X, Loc.Y);
+	for (int32 k = I; k < FMath::Min(I + 60, L.Num()); ++k) if (FVector2D::DistSquared(L[k], Me) < FVector2D::DistSquared(L[I], Me)) I = k;
+	const int32 T = FMath::Min(I + 8, L.Num() - 1);
+	const FVector2D To = (L[T] - Me).GetSafeNormal();
+	P->AddMovementInput(FVector(To.X, To.Y, 0.f), Share);
+	PC->SetControlRotation(FRotator(-10.f, FMath::RadiansToDegrees(FMath::Atan2(To.Y, To.X)), 0.f));
+	Acc += Dt;
+	if (Acc < 1.f) return;
+	const float Moved = FVector::Dist2D(Loc, Last) / Acc;
+	Along += FVector::Dist2D(Loc, Last);
+	Last = Loc; Acc = 0.f;
+	const FVector V = P->GetVelocity();
+	MaxV = FMath::Max(MaxV, V.Z); if (Clock > 8.f) MinRun = FMath::Min(MinRun, Moved);
+	Stuck = Moved < 100.f ? Stuck + 1 : 0;
+	const float Off = FVector2D::Distance(Me, L[I]);
+	const float Top = FVector2D::Distance(Me, JeebOpen::SilverMid());
+	UE_LOG(LogTemp, Display, TEXT("JEEBROADWALK t %.0f point %d/%d along %.0f m feet %.1f m ground %.1f m speed %.0f cm/s vz %.0f off the line %.0f cm, %.0f m from the middle"),
+		Clock, I, L.Num(), Along / 100.f, (Loc.Z - Half) / 100.f, JeebTerrain::HeightAt(Loc.X, Loc.Y) / 100.f, Moved, V.Z, Off, Top / 100.f);
+	if (Top < 4000.f || Clock > 720.f || Stuck > 8)
+	{
+		UE_LOG(LogTemp, Display, TEXT("JEEBROADWALK %s after %.0f s, %.0f m; slowest second %.0f cm/s"), Top < 4000.f ? TEXT("PASS reached the village") : (Stuck > 8 ? TEXT("FAIL stuck") : TEXT("FAIL out of time")), Clock, Along / 100.f, MinRun);
+		PC->ConsoleCommand(TEXT("quit"));
+	}
+#endif
 }
 
 #if !UE_BUILD_SHIPPING
@@ -533,7 +719,17 @@ void AOpenWorld::BuildSilverGround()
 			for (const JeebSilver::FPlot& P : JeebSilver::Plots())
 				if (FVector2D::DistSquared(P.Centre, FVector2D(X, Y)) < FMath::Square(P.Reach + 400.f)) WallD = FMath::Min(WallD, JeebSilver::WallSD(P, X, Y));
 			const float Wall = 1.f - JeebWorld::Smooth(0.f, 260.f, FMath::Max(WallD, 0.f));
-			Col.Add(FLinearColor(Street, FMath::Clamp(Worn, 0.f, 1.f), Wall, 0.f));
+			// (2026-11-27, the mountain; owner: "the summit to be mostly grey cobblestone and snow", "snow between the cobbles") grey stones
+			// (CobbleGrey) paved over most of the top between the lanes too, with a few ragged gaps, easing into the snow at the rim; the
+			// alpha is the snow: whole off the stones, in the joints and patches over the stones on the lanes, thinner where feet wear it
+			const FVector2D Pq(X, Y);
+			const float Dm = float(FVector2D::Distance(Pq, S->Pos));
+			const float Fill = JeebWorld::Smooth(-0.55f, -0.2f, FMath::PerlinNoise2D(Pq / 1700.f + FVector2D(3.3f, 1.2f)) + 0.4f * FMath::PerlinNoise2D(Pq / 600.f + FVector2D(-2.1f, 5.7f))) * JeebWorld::Smooth(6300.f, 5400.f, Dm);
+			const float Lane = FMath::Clamp(Street * 2.f, 0.f, 1.f);
+			const float Paved = FMath::Max(Street, 0.9f * Fill);
+			float Snow = FMath::Min(FMath::Lerp(1.f, 0.6f, Fill), FMath::Lerp(1.f, 0.42f, Lane)) - 0.15f * Worn + 0.12f * FMath::PerlinNoise2D(Pq / 350.f + FVector2D(8.8f, -4.4f));
+			Snow = FMath::Clamp(Snow, 0.05f, 1.f);
+			Col.Add(FLinearColor(Paved, FMath::Clamp(Worn, 0.f, 1.f), Wall, Snow));
 		}
 	int32 Cells = 0;
 	for (int32 i = 0; i < N; ++i)
@@ -541,6 +737,13 @@ void AOpenWorld::BuildSilverGround()
 		{
 			const float CX = O.X + (i + 0.5f) * Step, CY = O.Y + (j + 0.5f) * Step;
 			if (FVector2D::DistSquared(S->Pos, FVector2D(CX, CY)) > FMath::Square(Half)) continue;   // (a disc: its rim is grass on grass)
+			{
+				// (round 2, 2026-11-28: the disc's square-stepped rim showed its own snow against the world's) only cells that hold stones, wear
+				// or a wall's fringe are drawn; elsewhere the world's own snow shows, so the edge follows the stones' ragged outline
+				float Mx = 0.f;
+				for (const int32 K : { i * W + j, (i + 1) * W + j, i * W + j + 1, (i + 1) * W + j + 1 }) Mx = FMath::Max(Mx, FMath::Max3(Col[K].R * 1.f, Col[K].G * 0.5f, Col[K].B * 0.8f));
+				if (Mx < 0.04f) continue;
+			}
 			bool bInside = true;   // (a cell wholly inside a building's walls is never seen)
 			for (const FVector2D& Q : { FVector2D(CX - 50.f, CY - 50.f), FVector2D(CX + 50.f, CY + 50.f), FVector2D(CX - 50.f, CY + 50.f), FVector2D(CX + 50.f, CY - 50.f) })
 				if (!JeebSilver::OnBuilding(Q.X, Q.Y, -0.6f)) { bInside = false; break; }
@@ -564,6 +767,7 @@ void AOpenWorld::BuildSilverGround()
 	{
 		SilverGroundMid = UMaterialInstanceDynamic::Create(Mat, this);
 		SilverGround->SetMaterial(0, SilverGroundMid);
+		SilverGroundMid->SetScalarParameterValue(TEXT("CobbleGrey"), 1.f);   // (2026-11-27: grey stones on the summit, Tools/townlab_build.py)
 	}
 	else UE_LOG(LogTemp, Warning, TEXT("JEEBSILVER missing /Game/TownLab/M_TL_Ground: no cobbles"));
 	UE_LOG(LogTemp, Log, TEXT("JEEBSILVER cobbles: %d cells, %d triangles"), Cells, Tri.Num() / 3);

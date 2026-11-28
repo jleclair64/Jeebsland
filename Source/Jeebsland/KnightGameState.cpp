@@ -142,7 +142,9 @@ void AKnightGameState::BuildWorld()
 	JeebTerrain::ExtraLadders().Reset();   // (MoveLab adds its own below; none in the real world)
 	JeebHills::Prepare();    // the forested hills round Oak Hill (Hills.h): worked out once, here on the game thread before anything asks for a height; logs JEEBHILLS
 	JeebOpen::Prepare();     // the open world outside those hills (OpenWorld.h): the tall northern range, rolling country, the roads between the towns; logs JEEBOPEN
-	JeebCaves::Prepare(World);   // the caves in the mountains and the sea cliffs (Caves.h, 2026-11-26): placed from the finished height; before anything asks for the ground's 2 m patches
+	JeebCaves::Prepare(World);   // (2026-11-27: then Silver Point's mountain road and summit rolls, OpenWorld.h, before any ground is built)
+	JeebOpen::SilverPrepare();
+	// the caves in the mountains and the sea cliffs (Caves.h, 2026-11-26): placed from the finished height; before anything asks for the ground's 2 m patches
 #if !UE_BUILD_SHIPPING
 	JeebHills::LogStats();   // (about 30 ms of checks: slopes, heights, the finished ground's hash)
 	JeebOpen::LogStats();
@@ -1347,5 +1349,5 @@ void AKnightGameState::Tick(float DeltaSeconds)
 	const float Grave = 1.f - FMath::Clamp(FVector2D::Distance(FVector2D(L.X, L.Y), FVector2D(JeebTerrain::GraveyardPos())) / 1100.f, 0.f, 1.f);
 	const float Target = 0.010f + 0.007f * Woods + 0.016f * Grave;
 	FogNow = FMath::FInterpTo(FogNow, Target, DeltaSeconds, 0.6f);
-	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, ADayNight::Storm));   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
+	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, FMath::Max(ADayNight::Storm, 0.7f * AOpenWorld::SilverMistNow)));   // (and Silver Point's summit fog, 2026-11-28)   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
 }

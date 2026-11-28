@@ -195,8 +195,12 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     height = g.lerp(g.mul(ca, 1.0, "A"), g.mul(cb, 1.0, "A"), swap)
     stones = g.muln(g.mask(ctex, True, True, True), palette.colour(mat, "Cobble"))
     stones = g.desat(stones, 0.25)
+    # (2026-11-27, Silver Point's summit; owner: "mostly grey cobblestone and snow") CobbleGrey 1 turns the stones a cool grey and keeps
+    # the grass out of their joints; 0 (Oak Hill) as before
+    grey_k = g.scalar("CobbleGrey", 0.0)
+    stones = g.lerp(stones, g.muln(g.mul(g.desat(stones, 1.0), 1.08), g.c3((0.93, 0.97, 1.04))), grey_k)
     joint = g.one(unreal.MaterialExpressionOneMinus, g.ramp(height, 0.34, 0.46))
-    stones = g.lerp(stones, g.muln(grass, g.c3((0.85, 1.0, 0.8))), g.mul(joint, 0.3))   # a little more of the meadow's green in the joints (the picture has grass in them already), the meadow's own green
+    stones = g.lerp(stones, g.muln(grass, g.c3((0.85, 1.0, 0.8))), g.muln(g.mul(joint, 0.3), g.one(unreal.MaterialExpressionOneMinus, grey_k)))   # a little more of the meadow's green in the joints (the picture has grass in them already), the meadow's own green
     stones = g.lerp(stones, g.muln(g.c3(COBBLE_PICTURE_AVERAGE), palette.colour(mat, "Cobble")), g.ramp(depth, 3000.0, 9000.0))
     street = g.mask(vc, True, False)
     # the outer stones drop out into earth at a worn kerb: each stone's height and brightness pick when it goes
@@ -205,6 +209,12 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     cob = g.sat(g.mul(g.add(g.addn(t, g.mul(pick, 0.6)), -1.05), 5.0))
     col = g.lerp(col, soil, g.mul(g.ramp(street, 0.1, 0.45), 0.35))   # packed earth under where the stones thin out
     col = g.lerp(col, stones, cob)
+    # (2026-11-27) snow from the vertex colour's alpha (0 everywhere in Oak Hill: none): it fills the joints first, then covers the
+    # stones, and lies whole off the cobbles; broken by the ground's own ragged noise
+    snow_v = g.mul(vc, 1.0, "A")
+    s_raw = g.addn(g.addn(g.mul(snow_v, 2.0), g.mul(g.muln(joint, cob), 0.9)), g.addn(g.mul(g.add(rag, -0.5), 0.6), g.mul(g.one(unreal.MaterialExpressionOneMinus, cob), 0.5)))
+    snow = g.muln(g.sat(g.add(s_raw, -1.0)), g.ramp(snow_v, 0.02, 0.1))
+    col = g.lerp(col, g.c3((0.78, 0.81, 0.86)), snow)
     col = palette.grade_world(mat, col)   # the palette's Warmth, Saturation and Brightness (identity at the defaults)
 
     flat = g.c3((0.0, 0.0, 1.0))
@@ -213,8 +223,8 @@ def build_ground(cobble, cobble_n, grass_tex, dirt_tex, patches):
     bumps = g.lerp(na, nb, swap)
     bumps = g.lerp(bumps, flat, g.ramp(depth, 2500.0, 6000.0))
     g.out(col, unreal.MaterialProperty.MP_BASE_COLOR)
-    g.out(g.lerp(flat, bumps, cob), unreal.MaterialProperty.MP_NORMAL)
-    g.out(g.lerp(g.c(0.95), g.lerp(g.c(0.72), g.c(0.92), joint), cob), unreal.MaterialProperty.MP_ROUGHNESS)
+    g.out(g.lerp(flat, bumps, g.muln(cob, g.one(unreal.MaterialExpressionOneMinus, g.mul(snow, 0.7)))), unreal.MaterialProperty.MP_NORMAL)
+    g.out(g.lerp(g.lerp(g.c(0.95), g.lerp(g.c(0.72), g.c(0.92), joint), cob), g.c(0.8), snow), unreal.MaterialProperty.MP_ROUGHNESS)
     g.out(g.c(0.18), unreal.MaterialProperty.MP_SPECULAR)
     # the grass blades are lit through (two-sided foliage) and stay bright at the low sun; flat ground goes dark. SkyFill (set by
     # ATownLabTown from ADayNight::Dusk, jeeb.TownLab.GroundFill) adds that light back where the blades stop, so no dark plain

@@ -26,6 +26,7 @@ public:
 
 	static float SnowNow;   // 0 clear .. 1 snowing: the weather this frame (for anything else that wants to follow it)
 	static float StormNow;   // 0 .. 1: the storm at this machine's camera (the day's weather x the mountain-top height gate)
+	static float SilverMistNow;   // (2026-11-28) 0 .. 1: Silver Point's summit fog round this machine's camera (KnightGameState thickens the height fog with it)
 
 protected:
 	virtual void BeginPlay() override;
@@ -40,6 +41,19 @@ private:
 	void BuildSilverGround();   // Silver Point's cobbled plaza and lanes (2026-11-27)
 	UPROPERTY() class UProceduralMeshComponent* SilverGround = nullptr;
 	UPROPERTY() class UMaterialInstanceDynamic* SilverGroundMid = nullptr;
+	// (2026-11-27) the summit's own fog, coming and going on JeebOpen::SilverWeather's schedule (its snowfall uses the flakes below)
+	UPROPERTY() class ULocalFogVolumeComponent* SilverFog = nullptr;
+	float SilverFogNow = -1.f, SilverSnowNow = 0.f;
+	// (round 2, 2026-11-28: the local fog volume never showed) the fog as banks of mist: soft cloud cards (M_Cumulus) hugging the upper
+	// slopes and drifting over the top, turned to face the camera every frame, one mesh
+	UPROPERTY() class UProceduralMeshComponent* SilverMist = nullptr;
+	UPROPERTY() class UMaterialInstanceDynamic* SilverMistMid = nullptr;
+	struct FMistCard { float Phi, R, Z, Size, Speed, Phase; int32 Tile; bool bFlip; };
+	TArray<FMistCard> MistCards;
+	float MistShown = -1.f;
+	void TickSilverMist(float Fog, const FVector& Cam);
+	void TickSilverWeather(float Dt, double Clock, const FVector& Cam);
+	void TickRoadWalk(float Dt);   // -SilverRoadWalk test (not in Shipping)
 	UPROPERTY() TArray<class UMaterialInstanceDynamic*> GlowMids;   // the village buildings' windows (2026-11-27)
 	UPROPERTY() TArray<class UMaterialInterface*> GlowMats;
 	TArray<float> GlowBase;

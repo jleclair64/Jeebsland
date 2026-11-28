@@ -71,3 +71,7 @@ The trial cottage is gone from the site; the owner liked its look, so every buil
 - **Candles:** over the plaza only (23 m), never over a building.
 - **People:** three new Meshy bodies (`Art/People/Wizard|Witch|Goblin`, `Tools/ImportPeople.ps1`): wizard (robe dyed per person), witch (plum dress dyed per person), goblin (1 m, runs, no dye). Townsfolk.csv: 11 keepers at the shops (they only talk; what the shops sell is the shops agent's work), 10 wizard and witch townsfolk with homes and errands, 7 goblins running between plaza spots and shops at 3.3 m/s. All on the server's clock (NpcLife), the same on every machine.
 - **Credits:** 12 building pictures 108 + 12 models 360 + 3 character pictures 27 + 3 models 90 + 3 rigs 15 + 9 clips 27 = 627 (balance 1013 -> 386).
+
+## The mountain (2026-11-28, agent mountain)
+The village now sits on a 125 m peak (ProjectNotes "Silver Point's mountain"): sheer cliff with pine ledges to the east, a four-leg switchback road from the Oak Hill road on the west, snowy top with grey cobbles, fog and snowfall that take turns. Layout, plots and lanes unchanged.
+Round 2 (2026-11-28): 175 m with ridges, two snowy knolls on the rim, wooded green lower slopes, a six-leg road, a taller four-ledge cliff with 331 pines, and the fog as cloud banks round the top that thicken the air when you are in them.

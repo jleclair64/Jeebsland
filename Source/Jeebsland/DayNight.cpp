@@ -478,8 +478,9 @@ void ADayNight::TickLook(float High)
 			const float L = Haze.GetLuminance();
 			Haze = FMath::Lerp(Haze, FLinearColor(L * 0.95f, L, L * 1.06f), Storm * FMath::Clamp(JeebTune::V().FogGrey, 0.f, 1.f));
 			FC->SetFogInscatteringColor(Haze * (1.f - 0.85f * ACaves::CameraInside));   // (inside a cave the air between is dark, Caves.h)
-			FC->SetFogHeightFalloff(FMath::Lerp(OldFalloff, JeebTune::V().FogFalloff, Storm));
-			FC->SetStartDistance(FMath::Lerp(HazeStart.GetValueOnGameThread(), 0.f, Storm));
+			const float Mist = FMath::Max(Storm, 0.7f * AOpenWorld::SilverMistNow);   // (2026-11-28: Silver Point's summit fog, the same air, a little thinner)
+			FC->SetFogHeightFalloff(FMath::Lerp(OldFalloff, JeebTune::V().FogFalloff, Mist));
+			FC->SetStartDistance(FMath::Lerp(HazeStart.GetValueOnGameThread(), 0.f, Mist));
 		}
 		// Looking toward the sun the haze takes on its colour, most at the low sun (the golden hour)
 		const FLinearColor SunCol = SunNow;

@@ -295,6 +295,10 @@ def build_ground(grass_tex, dirt_tex, rock_tex, patches):
     gully_a = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, 1201.0), 1.0 / 2300.0), g.mul(wz, 1.0 / 9000.0))), True, False)
     gully_b = g.mask(g.tex(patches, g.append(g.mul(g.add(wall_d, -777.0), 1.0 / 870.0), g.mul(g.add(wz, 500.0), 1.0 / 6100.0))), True, False)
     gully = g.addn(g.mul(gully_a, 0.6), g.mul(gully_b, 0.4))
+    # (2026-11-28, Silver Point's 170 m cliff: the gullies ran its whole height as long vertical stripes. A third sampling, 11 m along and
+    # 14 m up, and a turned one, fill them in here and there, so each gully runs 10 to 30 m and ends)
+    gully_c = g.mask(g.tex(patches, g.append(g.mul(g.add(g.addn(wall_d, g.mul(wz, 0.35)), 4321.0), 1.0 / 1100.0), g.mul(g.add(wz, -2600.0), 1.0 / 1400.0))), True, False)
+    gully = g.lerp(g.c(0.75), gully, g.ramp(gully_c, 0.3, 0.6))
     tone = g.mask(g.tex(patches, g.mul(g.add(xy, -6131.0), 1.0 / 6500.0)), True, False)
     strata = g.lerpc(0.68, 1.3, g.ramp(g.addn(g.addn(g.mul(band1, 0.45), g.mul(band2, 0.35)), g.mul(band3, 0.2)), 0.36, 0.64))
     beds = g.lerp(g.c3((1.2, 1.06, 0.86)), g.c3((0.96, 1.0, 1.06)), g.ramp(band2, 0.35, 0.65))   # warm ochre beds between cooler grey ones (the Cliffs of Moher)
