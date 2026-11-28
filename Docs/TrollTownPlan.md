@@ -36,3 +36,13 @@ Every structure on the owner's list, in the Great Hall's style (its concept `Art
 
 ## Pictures
 `Docs/TrollTown/board_noon.jpg`, `board_dusk.jpg` (from the south-west air, the gate road, across the forge yard, over the pit), `doors_fit.jpg`.
+
+### Checks done (2026-11-28)
+- Server + 2 clients (off screen, 130 s): both joined, Steele hash 72cf96fc and life hash f7a82d70 match on all three, no errors.
+- Shipping compile: Succeeded.
+- Frame time in town vs Oak Hill: not measured yet (open).
+
+### Open
+- Ore stall and well are still Oak Hill models; the fight pit is a model on flat ground (not dug); the watchtower has no ground doorway.
+- Shells only: closed doors, no interiors. Bone carver, tanner and brew hut keepers sell the general store stock.
+- Palisade on slopes and one hut 1 m from the pit wall need a live look.
