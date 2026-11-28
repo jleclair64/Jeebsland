@@ -452,6 +452,22 @@ void AKnightHUD::DrawIconBody(int32 Id, float X, float Y, float S)
 			Quad(22, 3, 42, 7, Pl);
 			Quad(25, 0, 28, 3, Tr); Quad(30.5f, 0, 33.5f, 3, Tr); Quad(36, 0, 39, 3, Tr);
 			break;
+		case K_BoneClub:   // (the troll's bone club, 2026-11-27: an ivory thigh bone, a leather grip, a knobbly joint head with a toothed jaw and two dark horns)
+		{
+			const FLinearColor Bone(0.86f, 0.80f, 0.66f), Leather(0.42f, 0.22f, 0.10f), Horn(0.22f, 0.21f, 0.20f);
+			DiscP(29, 60, 3.5f, 3.5f, Bone); DiscP(35, 60, 3.5f, 3.5f, Bone);   // the bone's foot knobs
+			Quad(29, 43, 35, 58, Leather);
+			for (int32 w = 0; w < 4; ++w) Quad(28.8f, 44.f + w * 3.6f, 35.2f, 45.f + w * 3.6f, Lift(Leather, 0.7f));
+			Poly({ P(29.5f, 43), P(28, 20), P(36, 20), P(34.5f, 43) }, Bone);   // the shaft
+			Quad(30, 22, 31.2f, 42, Lift(Bone, 1.12f));
+			Poly({ P(22, 10), P(15, 2), P(21, 12) }, Horn); Poly({ P(42, 10), P(49, 2), P(43, 12) }, Horn);
+			DiscP(26, 12, 8, 8, Bone); DiscP(38, 12, 8, 8, Bone);              // the knobbly joint
+			DiscP(25, 10, 4, 4, Lift(Bone, 1.12f));
+			Quad(21, 19, 43, 23, Lift(Bone, 0.85f));                             // the jaw across it
+			for (int32 t = 0; t < 5; ++t) Poly({ P(23.f + t * 4.f, 23), P(26.f + t * 4.f, 23), P(24.5f + t * 4.f, 27) }, FLinearColor(0.95f, 0.92f, 0.84f));
+			Quad(22, 15, 42, 17, Leather);                                       // the sinew lashing
+			break;
+		}
 		case K_Rod:
 			Poly({ P(8, 58), P(12, 62), P(56, 8), P(52, 4) }, Wd);
 			DiscP(20, 48, 6, 6, Tr);

@@ -851,7 +851,7 @@ void AKnightCharacter::RebuildHeld()
 	// (2026-11-24, owner: "the way he holds a sword makes no sense".) A knight-sized sword in the troll's 50 cm hand had its whole grip hidden inside
 	// his fist and a blade no longer than his forearm. In his hand every knight-sized weapon and tool is drawn bigger about its grip (Tuning.ini
 	// TrollWeaponScale; his own club is already his size). Looks only: the hit boxes and reach stay the weapon's own.
-	const float TrollScale = (bIsTroll && K != JeebItems::K_Club) ? FMath::Clamp(JeebTune::V().TrollWeaponScale, 0.5f, 3.f) : 1.f;
+	const float TrollScale = (bIsTroll && !JeebItems::IsClubKind(K)) ? FMath::Clamp(JeebTune::V().TrollWeaponScale, 0.5f, 3.f) : 1.f;
 	if (TrollScale != 1.f)
 		for (int32 i = FirstHeld; i < HeldComps.Num(); ++i)
 			if (HeldComps[i] && HeldComps[i]->GetAttachParent() == WristR)

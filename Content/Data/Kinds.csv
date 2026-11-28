@@ -30,3 +30,4 @@ Amulet,Amulet,1,2,200,1,0,0,0,0,0,no,all,"Wears in one of your three miscellaneo
 Crest,Helm Brush,1,2,200,1,0,0,0,0,0,no,all,,no
 Club,Troll Club,14,20,240,0.95,0,0,95,8,2,yes,troll,"A troll's heavy wooden club, banded with steel. Slow, crushing swings. Two-handed, no shield.",no
 Book,Spell Book,1,2,200,1,0,1,80,3,1,no,wizard,"A wizard's spell book, worn on the belt where a knight wears gauntlets. The orb a wizard guards with is as strong as his book: a better book, a stronger orb.",no
+BoneClub,Bone Club,15,22,240,1.0,0,0,140,9,4,yes,troll,"A troll's club made from a giant's thigh bone, a toothed jaw and two horns lashed to its knobbly end. Heavier and harder-hitting than the wooden club. Two-handed, no shield.",no

@@ -99,6 +99,7 @@ PROPS = {
     # The troll's club (2026-11-19, Meshy meshy-t2.5 from a picture; Art/Props/Originals/Club_Meshy.glb): head along game -Z, the troll's fist near the pommel end of the
     # leather wrap; the steel bands, studded cap and pommel cap take the tier, the leather wrap (grey too) is left out of the mask.
     "Club":     dict(file="Club.glb", axes=("X", "-Y", "-Z"), length=125.0, grip=("Z", 0.86), rg=lambda co, c: (1.0 if (_grey(c) and not -24.0 < co.z < 7.0) else 0.0, 0.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=6000, bake=True),
+    "BoneClub": dict(file="BoneClub.glb", axes=("X", "-Y", "-Z"), length=125.0, grip=("Z", 0.84), rg=lambda co, c: (1.0 if (_grey(c) and max(c) < 0.30) else 0.0, 0.0), clean=True, reduce=6000, bake=True),   # (2026-11-27: the Meshy bone club; held like the Club. Only the two dark horns take the tier; bone and leather keep their colours, no wood evening)
     "Sword":    dict(file="Sword.glb", axes=("Y", "X", "-Z"), length=92.0, grip=("Z", 0.890), mask="grey", clean=True, reduce=8000, stretch=("Z", 1.0, 6.0),
                      marks={"Guard": ((-0.2, -0.06, -0.545), (0.2, 0.06, -0.52)), "Tip": ((-0.02, -0.06, 0.93), (0.02, 0.06, 0.95))}),
     "Axe":      dict(file="Axe.glb", axes=("X", "-Y", "-Z"), length=87.0, grip=("Z", 0.816), mask="grey", below=("Z", -58.0), wood=(25.0, 0.74, 0.28, 60.0), clean=True, reduce=8000, bake=True,

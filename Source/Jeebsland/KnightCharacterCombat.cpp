@@ -180,7 +180,7 @@ void AKnightCharacter::ShotPlayMove(const FString& Move, float FaceYaw)
 		if (FParse::Value(FCommandLine::Get(), TEXT("ShotFov="), Fov) && GetFollowCamera()) GetFollowCamera()->SetFieldOfView(Fov);
 	}
 	for (int32 h = 0; h < 5; ++h)   // a sword in hand
-		if (JeebItems::IsGear(Skills->Hotbar[h]) && (JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword || JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Club)) { SelectHotbar(h); break; }   // (a troll: his club)
+		if (JeebItems::IsGear(Skills->Hotbar[h]) && (JeebItems::KindOf(Skills->Hotbar[h]) == JeebItems::K_Sword || JeebItems::IsClubKind(JeebItems::KindOf(Skills->Hotbar[h])))) { SelectHotbar(h); break; }   // (a troll: his club)
 	{
 		int32 ShotKind = -1;   // (-ShotKind=<number>: that weapon in the first bar slot instead)
 		int32 ShotKindTier = 0;   // (-ShotKindTier=<tier>: that weapon in that tier, to see its metal take the colour)

@@ -112,6 +112,7 @@ namespace JeebStore
 		{ static const int32 TP[] = { K_Helmet, K_Chest, K_Shoulders, K_Gauntlets, K_Boots }; ById(ArmourId(TP[R.RandRange(0, 4)], AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2); }
 		ById(ArmourId(K_Chest, AS_Troll, R.RandRange(T_Tin, T_Iron)), 1, 2);
 		{ FWare W; W.Id = IdRocks; W.Count = RockBundle; W.Price = RockBundlePrice; W.Stock = 5; Push(W, 5, 5); }
+		ById(GearId(K_BoneClub, R.RandRange(T_Tin, T_Iron)), 1, 2);   // (2026-11-27: the bone club, Steele Creek only by its Class troll; after the rocks so older wares keep their places)
 		// (2026-11-26/27, owner) vaulted things are never sold, and every knight armour piece is now the one Knight's Armor piece: one ware per item
 		TArray<FWare> Kept;
 		for (const FWare& W : Out)

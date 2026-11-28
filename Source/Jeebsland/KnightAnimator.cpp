@@ -1651,10 +1651,10 @@ int32 FKnightAnimator::ChooseAction(float Dt, const FInput& In, FPose& B, float&
 		const bool b2 = Key == 31;
 		// (2026-11-22, owner: "I want the swing to be a one-handed swing like the knight": the troll swings the club with the knight's own sword
 		// cuts, and TrollClubClear keeps the long club off his belly. -TrollOldSwing (test builds): his own two-handed blows of 2026-11-21.)
-		if (L.bTroll && In.Kind == JeebItems::K_Club && bTrollOldSwing) { TrollClubSwing(In, B, OutBlend, b2); break; }
+		if (L.bTroll && JeebItems::IsClubKind(In.Kind) && bTrollOldSwing) { TrollClubSwing(In, B, OutBlend, b2); break; }
 		// (2026-11-24, owner: "his club swings need review (natural path, weight, follow-through)": on his body the knight's cuts doubled him over to the
 		// floor. His own one-handed blows now, standing up: KnightAnimatorTroll.cpp TrollSwingOneHand. The broadsword, a one-hand sword in his fist, swings the same.)
-		if (L.bTroll && (In.Kind == JeebItems::K_Club || In.Kind == JeebItems::K_Broadsword) && !bTrollKnightSwing) { TrollSwingOneHand(In, B, OutBlend, b2); break; }
+		if (L.bTroll && (JeebItems::IsClubKind(In.Kind) || In.Kind == JeebItems::K_Broadsword) && !bTrollKnightSwing) { TrollSwingOneHand(In, B, OutBlend, b2); break; }
 		const bool bGreat = In.Kind == JeebItems::K_Broadsword && !L.bTroll;   // (the big sword has its own two-handed rows; it has no shield to keep still)
 		const TCHAR* Nm = b2 ? (bGreat ? TEXT("Great_Jab2") : TEXT("Jab2")) : (bGreat ? TEXT("Great_Jab1") : TEXT("Jab1"));
 		if (const FMove* M = Moves.Find(Nm))

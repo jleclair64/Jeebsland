@@ -395,7 +395,7 @@ void AKnightCharacter::SwapTestStep()
 				K->ClassIndex() == 1 ? TEXT("troll") : K->ClassIndex() == 2 ? TEXT("wizard") : TEXT("knight"), SeqAt, *Bar, *Wn, Arrows, Rocks, Bows, bBow, bSword, bStaff, bClub, bBook, K->SelectedKind(), K->ArrowSlotId());
 			// the pack's own weapons, put in hand the way the player does (EquipFromSlot): each class equips what it may and is refused the rest
 			for (int32 i = 0; i < Sk->Slots.Num(); ++i)
-				if (IsGear(Sk->Slots[i].Id) && IsWeaponKind(KindOf(Sk->Slots[i].Id)) && (KindOf(Sk->Slots[i].Id) == K_Bow || KindOf(Sk->Slots[i].Id) == K_Staff || KindOf(Sk->Slots[i].Id) == K_Sword || KindOf(Sk->Slots[i].Id) == K_Club))
+				if (IsGear(Sk->Slots[i].Id) && IsWeaponKind(KindOf(Sk->Slots[i].Id)) && (KindOf(Sk->Slots[i].Id) == K_Bow || KindOf(Sk->Slots[i].Id) == K_Staff || KindOf(Sk->Slots[i].Id) == K_Sword || IsClubKind(KindOf(Sk->Slots[i].Id))))
 				{ const FString N = ItemName(Sk->Slots[i].Id); const bool bOk = Sk->EquipFromSlot(i); UE_LOG(LogTemp, Log, TEXT("JEEBCLASS equip from the pack %s: %s"), *N, bOk ? TEXT("equipped") : TEXT("refused")); break; }
 			if (SwapsLeft == 1 && K->ClassIndex() == 0)
 			{
