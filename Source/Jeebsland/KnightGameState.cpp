@@ -106,6 +106,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Caves.h"
+#include "DeepCaves.h"
 
 
 AKnightGameState::AKnightGameState()
@@ -144,6 +145,7 @@ void AKnightGameState::BuildWorld()
 	JeebOpen::Prepare();     // the open world outside those hills (OpenWorld.h): the tall northern range, rolling country, the roads between the towns; logs JEEBOPEN
 	JeebCaves::Prepare(World);   // (2026-11-27: then Silver Point's mountain road and summit rolls, OpenWorld.h, before any ground is built)
 	JeebOpen::SilverPrepare();
+	JeebDeep::Prepare(World);   // (the Deeps, the cave maze inside Silver Point's mountain, DeepCaves.h: from the finished height, before any ground is built)
 	// the caves in the mountains and the sea cliffs (Caves.h, 2026-11-26): placed from the finished height; before anything asks for the ground's 2 m patches
 #if !UE_BUILD_SHIPPING
 	JeebHills::LogStats();   // (about 30 ms of checks: slopes, heights, the finished ground's hash)
@@ -194,7 +196,8 @@ void AKnightGameState::BuildWorld()
 	World->SpawnActor<AMeadow>(FVector::ZeroVector, FRotator::ZeroRotator);   // the storybook-grass test plot
 	World->SpawnActor<AWorldEdge>(FVector::ZeroVector, FRotator::ZeroRotator);   // invisible pawn-only walls inside the map edge + server put-back for stray pawns (WorldEdge.h)
 	World->SpawnActor<AWorldTerrain>(FVector::ZeroVector, FRotator::ZeroRotator);   // the whole world round it (WorldMap.h): mountains, rivers, coast, sea
-	World->SpawnActor<ACaves>(FVector::ZeroVector, FRotator::ZeroRotator);   // the caves' crystals and lights, and this machine's camera inside one (Caves.h; the shells are the terrain's)
+	World->SpawnActor<ACaves>(FVector::ZeroVector, FRotator::ZeroRotator);
+	World->SpawnActor<ADeepCaves>(FVector::ZeroVector, FRotator::ZeroRotator);   // the Deeps' rock, torches, rooms and chests (DeepCaves.h)   // the caves' crystals and lights, and this machine's camera inside one (Caves.h; the shells are the terrain's)
 	World->SpawnActor<AOakHillTown>(FVector::ZeroVector, FRotator::ZeroRotator);    // Oak Hill's plan checks (JEEBOAK), and the old town itself only with -OldOakHill or in TownLab (OakHill.h)
 	if (JeebTownLab::RealTown())   // Oak Hill (2026-11-14): the rebuilt town at the real plaza (TownLab.h, TownLabTown.cpp)
 		if (ATownLabTown* Town = World->SpawnActorDeferred<ATownLabTown>(ATownLabTown::StaticClass(), FTransform::Identity))
@@ -1333,7 +1336,7 @@ void AKnightGameState::Tick(float DeltaSeconds)
 			bShotTaken = true;
 			FScreenshotRequest::RequestScreenshot(FPaths::ProjectSavedDir() / TEXT("Shots") / (ShotName + TEXT(".png")), true, false);
 		}
-		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("JeebStealthTest")) && !FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk")) && !FParse::Param(FCommandLine::Get(), TEXT("LootShot")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
+		if (ShotMove.IsEmpty() && ShotClock > 11.f && PC && !bEyes && !FParse::Param(FCommandLine::Get(), TEXT("BridgeWalkTest")) && !FParse::Param(FCommandLine::Get(), TEXT("JeebStealthTest")) && !FParse::Param(FCommandLine::Get(), TEXT("OpenHouseWalk")) && !FParse::Param(FCommandLine::Get(), TEXT("LootShot")) && !FParse::Param(FCommandLine::Get(), TEXT("ShotUI")) && !FCString::Strifind(FCommandLine::Get(), TEXT("LabTour")) && !FCString::Strifind(FCommandLine::Get(), TEXT("DeepWalk=")))   // (TownLab's tour quits by itself)   // (a film quits by its own clock, above, so a long -ShotSeconds is not cut off)
 		{
 			UE_LOG(LogTemp, Log, TEXT("JEEBSUN phase %.3f after %.1f s"), ADayNight::Phase, ShotClock);   // (how far the sun went: phase 1 is a whole loop)
 			if (const APawn* Me = PC->GetPawn()) UE_LOG(LogTemp, Log, TEXT("JEEBSHOT knight at %.1f %.1f %.1f"), Me->GetActorLocation().X, Me->GetActorLocation().Y, Me->GetActorLocation().Z);   // (where -ShotAt left him, e.g. how close walls let him stand)
@@ -1349,5 +1352,5 @@ void AKnightGameState::Tick(float DeltaSeconds)
 	const float Grave = 1.f - FMath::Clamp(FVector2D::Distance(FVector2D(L.X, L.Y), FVector2D(JeebTerrain::GraveyardPos())) / 1100.f, 0.f, 1.f);
 	const float Target = 0.010f + 0.007f * Woods + 0.016f * Grave;
 	FogNow = FMath::FInterpTo(FogNow, Target, DeltaSeconds, 0.6f);
-	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, FMath::Max(ADayNight::Storm, 0.7f * AOpenWorld::SilverMistNow)));   // (and Silver Point's summit fog, 2026-11-28)   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
+	FogActor->GetComponent()->SetFogDensity(FMath::Lerp(FogNow * FogScale, JeebTune::V().FogDensity, FMath::Max(ADayNight::Storm, 0.7f * AOpenWorld::SilverMistNow)) * (1.f - 0.92f * ACaves::CameraInside));   // (2026-11-28: almost none inside a cave: the Deeps showed the storm's haze down their passages)   // (and Silver Point's summit fog, 2026-11-28)   // (a mountain-top snowstorm: thick fog, ADayNight::Storm)
 }

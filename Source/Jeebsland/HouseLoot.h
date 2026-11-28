@@ -21,7 +21,7 @@ namespace JeebHouseLoot
 
 	struct FLootBox
 	{
-		TWeakObjectPtr<AHouseInterior> House;
+		TWeakObjectPtr<AActor> House;     // (its house; or the Deeps, DeepCaves.h, 2026-11-28)
 		FString Key;                       // "<PlotId>#<n>": its house and its number among that house's containers
 		FVector At = FVector::ZeroVector;  // its foot in the world (the request names it by this)
 		FVector Top = FVector::ZeroVector; // where the E prompt hangs
@@ -37,8 +37,8 @@ namespace JeebHouseLoot
 	// Whether a room-list mesh is a container, and which kind
 	bool IsContainerMesh(const FString& Mesh, EBoxKind& OutKind);
 	// AHouseInterior::Build: one container (Nth of its house), its world transform, and the room's middle in the world
-	void AddBox(AHouseInterior* House, const FString& PlotId, int32 N, EBoxKind Kind, const FTransform& Xf, const FVector& RoomMid, float FloorWorldZ);
-	void RemoveHouse(const AHouseInterior* House);
+	void AddBox(AActor* House, const FString& PlotId, int32 N, EBoxKind Kind, const FTransform& Xf, const FVector& RoomMid, float FloorWorldZ);
+	void RemoveHouse(const AActor* House);
 	// The container this knight can use now (nearest in reach, roughly in front of him), or null
 	FLootBox* InReach(const AActor* Knight);
 	FLootBox* FindAt(const UWorld* World, const FVector& At);

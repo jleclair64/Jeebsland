@@ -167,7 +167,7 @@ namespace JeebHouseLoot
 
 	const TCHAR* KindName(EBoxKind K) { return K == EBoxKind::Chest ? TEXT("chest") : K == EBoxKind::Cupboard ? TEXT("cupboard") : TEXT("crate"); }
 
-	void AddBox(AHouseInterior* House, const FString& PlotId, int32 N, EBoxKind Kind, const FTransform& Xf, const FVector& RoomMid, float FloorWorldZ)
+	void AddBox(AActor* House, const FString& PlotId, int32 N, EBoxKind Kind, const FTransform& Xf, const FVector& RoomMid, float FloorWorldZ)
 	{
 		FLootBox B;
 		B.House = House;
@@ -190,7 +190,7 @@ namespace JeebHouseLoot
 		UE_LOG(LogJeebLoot, Log, TEXT("JEEBLOOT box %s %s at %.0f %.0f %.0f: lock %d, tier %d"), *B.Key, KindName(Kind), B.At.X, B.At.Y, B.At.Z, B.Lock, B.Tier);
 	}
 
-	void RemoveHouse(const AHouseInterior* House)
+	void RemoveHouse(const AActor* House)
 	{
 		Boxes().RemoveAll([House](const FLootBox& B) { return !B.House.IsValid() || B.House.Get() == House; });
 	}

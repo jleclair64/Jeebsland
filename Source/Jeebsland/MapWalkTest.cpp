@@ -19,10 +19,11 @@
 #include "WorldMap.h"
 #include "MapRework.h"
 #include "Caves.h"
+#include "DeepCaves.h"
 
 namespace
 {
-	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false, bFullBar = false; FString Tag; };
+	struct FLeg { FVector2D P; bool bJump = false, bClimb = false, bSprint = false, bTele = false, bFullBar = false; FString Tag; float Z = -1.0e9f; };   // (Z: a teleport's own height, inside the Deeps)
 	TArray<FLeg> Legs;
 	int32 LegIdx = -1;
 	double LegStart = 0.0, LastLog = 0.0, LastMoveT = 0.0;
@@ -57,7 +58,7 @@ namespace
 				Legs.Add(L);
 			}
 		}
-		if (Walk.IsEmpty() && Probe.IsEmpty() && !FParse::Param(FCommandLine::Get(), TEXT("MapHeather")) && !FCString::Strifind(FCommandLine::Get(), TEXT("CaveWalk"))) { bDone = true; return true; }
+		if (Walk.IsEmpty() && Probe.IsEmpty() && !FParse::Param(FCommandLine::Get(), TEXT("MapHeather")) && !FCString::Strifind(FCommandLine::Get(), TEXT("CaveWalk")) && !FCString::Strifind(FCommandLine::Get(), TEXT("DeepWalk"))) { bDone = true; return true; }
 		UWorld* W = nullptr;
 		for (const FWorldContext& C : GEngine->GetWorldContexts()) if (C.World() && (C.WorldType == EWorldType::Game || C.WorldType == EWorldType::PIE) && C.World()->GetNetMode() == NM_Standalone) W = C.World();
 		if (!W) return true;
@@ -110,6 +111,33 @@ namespace
 			if (Legs.Num() > 0) Legs[0].bTele = false;   // (the first point is the start's teleport anyway)
 			UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK caves: %d legs"), Legs.Num());
 		}
+		// (-DeepWalk=A_B+C_D..., 2026-11-28: from just outside mouth A of the Deeps (DeepCaves.h) along the maze's floor to mouth B and out; each
+		// route starts with a teleport. The mouths' numbers are the order of the JEEBDEEP mouth lines.)
+		static bool bDeepLegs = false;
+		if (!bDeepLegs && JeebDeep::Ready())
+		{
+			bDeepLegs = true;
+			FString Dw;
+			if (FParse::Value(FCommandLine::Get(), TEXT("DeepWalk="), Dw))
+			{
+				TArray<FString> Rs; Dw.ParseIntoArray(Rs, TEXT("+"));
+				for (const FString& R : Rs)
+				{
+					FString A, B; if (!R.Split(TEXT("_"), &A, &B)) continue;
+					TArray<FVector> Pts;
+					if (!JeebDeep::Route(FCString::Atoi(*A), FCString::Atoi(*B), Pts)) { UE_LOG(LogTemp, Warning, TEXT("JEEBMAPWALK deep %s: no route"), *R); continue; }
+					float Len = 0.f; for (int32 i = 1; i < Pts.Num(); ++i) Len += FVector::Dist(Pts[i], Pts[i - 1]);
+					UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK deep %s: %d points, %.0f m"), *R, Pts.Num(), Len / 100.f);
+					FLeg T; T.P = FVector2D(Pts[0].X, Pts[0].Y); T.Z = Pts[0].Z; T.bTele = true; T.Tag = FString::Printf(TEXT("deep %s start"), *R); Legs.Add(T);
+					for (int32 i = 1; i < Pts.Num(); ++i)
+					{
+						if (i + 1 < Pts.Num() && FVector::Dist2D(Pts[i], Legs.Last().bTele ? Pts[0] : FVector(Legs.Last().P.X, Legs.Last().P.Y, 0.f)) < 200.f) continue;
+						FLeg L; L.P = FVector2D(Pts[i].X, Pts[i].Y); L.Tag = FString::Printf(TEXT("deep %s %d/%d z %.0f"), *R, i, Pts.Num() - 1, Pts[i].Z); Legs.Add(L);
+					}
+				}
+				UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK deep: %d legs"), Legs.Num());
+			}
+		}
 		if (Legs.Num() == 0) { if (bProbed) bDone = true; return true; }
 		APlayerController* PC = W->GetFirstPlayerController();
 		AKnightCharacter* Me = PC ? Cast<AKnightCharacter>(PC->GetPawn()) : nullptr;
@@ -124,7 +152,7 @@ namespace
 		{
 			LegIdx = 0;
 			const FLeg& L = Legs[0];
-			const float Z = FMath::Max(TraceDown(W, L.P.X, L.P.Y, 30000.f, 40000.f, Me), JeebTerrain::HeightAt(L.P.X, L.P.Y));
+			const float Z = L.Z > -1.0e8f ? L.Z : FMath::Max(TraceDown(W, L.P.X, L.P.Y, 30000.f, 40000.f, Me), JeebTerrain::HeightAt(L.P.X, L.P.Y));
 			Me->TeleportTo(FVector(L.P.X, L.P.Y, Z + HH + 10.f), Me->GetActorRotation());
 			UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK start at %.0f %.0f z %.0f (%d legs)"), L.P.X, L.P.Y, Z, Legs.Num());
 			LegIdx = 1; LegStart = LastLog = LastMoveT = Now; LastMoveP = Me->GetActorLocation();
@@ -142,13 +170,13 @@ namespace
 				while (LegIdx < Legs.Num() && Legs[LegIdx].bTele)   // (a T leg: stand him there)
 				{
 					const FLeg& T = Legs[LegIdx];
-					const float Z = FMath::Max(TraceDown(W, T.P.X, T.P.Y, 30000.f, 40000.f, Me), JeebTerrain::HeightAt(T.P.X, T.P.Y));
+					const float Z = T.Z > -1.0e8f ? T.Z : FMath::Max(TraceDown(W, T.P.X, T.P.Y, 30000.f, 40000.f, Me), JeebTerrain::HeightAt(T.P.X, T.P.Y));
 					Me->TeleportTo(FVector(T.P.X, T.P.Y, Z + HH + 10.f), Me->GetActorRotation());
 					if (KM) { KM->SwimStamina = 1.f; KM->Breath = 1.f; KM->ClimbStamina = 1.f; KM->bClimbExhausted = false; KM->bNoRegrab = false; }   // (every leg starts with full bars)
 					UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK teleport to %.0f %.0f z %.0f"), T.P.X, T.P.Y, Z);
 					++LegIdx;
 				}
-				if (LegIdx >= Legs.Num()) { bDone = true; UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK finished")); return true; }
+				if (LegIdx >= Legs.Num()) { bDone = true; UE_LOG(LogTemp, Log, TEXT("JEEBMAPWALK finished")); if (FCString::Strifind(FCommandLine::Get(), TEXT("DeepWalk="))) PC->ConsoleCommand(TEXT("quit")); return true; }
 				LegStart = LastMoveT = Now; LastMoveP = Me->GetActorLocation(); return true;
 		}
 		To /= Dist;

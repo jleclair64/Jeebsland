@@ -1,4 +1,5 @@
 #include "WorldEdge.h"
+#include "DeepCaves.h"
 #include "WorldMap.h"
 #include "Terrain.h"
 #include "Components/BoxComponent.h"
@@ -66,6 +67,7 @@ bool AWorldEdge::IsOutOfBounds(const FVector& P)
 {
 	const FBox2D B = Inner();
 	if (P.X < B.Min.X || P.X > B.Max.X || P.Y < B.Min.Y || P.Y > B.Max.Y) return true;
+	if (JeebDeep::Field(P) < 500.f) return false;   // (in the Deeps, the cave maze under Silver Point's mountain, up to 150 m under its slopes, 2026-11-28)
 	return P.Z < JeebTerrain::HeightAt(P.X, P.Y) - UnderGround;
 }
 

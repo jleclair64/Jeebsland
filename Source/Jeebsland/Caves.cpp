@@ -1,4 +1,5 @@
 #include "Caves.h"
+#include "DeepCaves.h"
 #include "Terrain.h"
 #include "WorldMap.h"
 #include "MapRework.h"
@@ -366,6 +367,7 @@ bool JeebCaves::CutsAt(const FVector& P)
 }
 bool JeebCaves::Covered(float X, float Y)
 {
+	if (JeebDeep::Covered(X, Y)) return true;   // (a mouth of the Deeps, 2026-11-28)
 	const FVector2D P(X, Y);
 	for (const FCave& C : GCaves)
 	{
@@ -379,7 +381,7 @@ bool JeebCaves::Covered(float X, float Y)
 
 float JeebCaves::InsideAt(const FVector& P)
 {
-	float Best = 0.f;
+	float Best = JeebDeep::InsideAt(P);   // (the Deeps, 2026-11-28)
 	const FVector2D P2(P.X, P.Y);
 	for (const FCave& C : GCaves)
 	{

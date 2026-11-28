@@ -1,0 +1,28 @@
+Room,Kind,U,V,Yaw,Note
+# Spots in the rooms of the Deeps, the cave maze inside Silver Point's mountain (2026-11-28, Source/Jeebsland/DeepCaves.cpp, Docs/CavePlan.md). Read when the game starts.
+# Room: Crystal, Crystal2, Lake, Collapsed, Mine, Mushroom, Shrine, Lair, Library, Great (each room's kind; one room of each).
+# Kind: chest (a real chest is put there, with the house-loot locks and loot of Content/Data/HouseLoot.csv), or any word for a spot kept for later:
+#   quest (a quest giver could stand here), item (something to find), boss (a big foe's spot). Only chest rows put anything in the game now;
+#   the others are logged (JEEBDEEP spot ... with the world position) for the quests and items still to come.
+# U, V: where in the room, as shares of its radii: U along its long way, V across (-1 .. 1; 0 0 the middle). A spot too near a wall is moved in.
+# Yaw: degrees, turned from the room's long way (a chest's front). Note: anything (shown in the log).
+Library,chest,0.05,0.72,180,an old reader's chest under the shelves
+Library,item,-0.35,-0.45,0,a book or a scroll to find
+Library,quest,0.4,-0.1,0,a hermit scholar
+Shrine,chest,0.72,0.0,180,offerings behind the altar
+Shrine,item,0.62,0.0,0,on the altar
+Shrine,boss,-0.2,0.0,0,the shrine's guardian
+Lair,boss,0.0,0.0,0,the beast whose bones these are
+Lair,chest,-0.6,0.45,90,what its victims carried
+Mine,chest,-0.55,-0.4,30,a miner's strongbox
+Mine,quest,0.4,0.35,0,an old miner
+Lake,item,0.0,0.0,0,in the pool
+Lake,chest,0.78,-0.35,200,on the far shore
+Collapsed,chest,-0.6,0.55,160,half buried by the fall
+Collapsed,item,0.3,-0.2,0,under the rubble
+Crystal,item,0.0,0.0,0,a crystal to take
+Crystal2,item,0.0,0.0,0,a crystal to take
+Mushroom,quest,0.5,0.3,0,a herbalist gathering caps
+Mushroom,item,-0.4,-0.4,0,a rare mushroom
+Great,quest,0.0,-0.5,0,someone camped here
+Great,item,-0.45,0.4,0,by the old camp
