@@ -527,11 +527,11 @@ void FKnightAnimator::TrollSwingOneHand(const FInput& In, FPose& B, float& OutBl
 	static const FOneKey Wind1 = { FVector(-0.44f, -0.20f, 0.70f), FVector(-0.25f, -0.62f, 0.74f),  32.f,   7.f, FVector(0.05f, 0.62f, -0.08f), -0.25f };   // over the right shoulder, the head tipped back, his weight back
 	// (hit check, log JEEBTROLLTIP: aimed straight ahead of his right shoulder the head came down half a metre to the right of a knight stood in
 	// front of him; the hand and the club are angled in so the head crosses his middle line at a knight's chest height, 1.75 m out)
-	static const FOneKey Hit1  = { FVector(0.15f, 0.96f, -0.12f), FVector(0.37f, 0.90f, -0.30f), -26.f, -20.f, FVector(0.42f, -0.02f, -0.50f), 1.f };  // the arm out across his front, the head at a knight's chest on his middle line
-	static const FOneKey End1  = { FVector(0.34f, 0.62f, -0.50f),  FVector(0.52f, 0.52f, -0.68f), -40.f, -22.f, FVector(0.48f, -0.20f, -0.48f), 0.8f };  // run on low to his front left, the head clear of his left leg
+	static const FOneKey Hit1  = { FVector(0.15f, 0.96f, -0.12f), FVector(0.37f, 0.90f, -0.30f), -26.f, -9.f, FVector(0.42f, -0.02f, -0.50f), 1.f };  // the arm out across his front, the head at a knight's chest on his middle line
+	static const FOneKey End1  = { FVector(0.34f, 0.62f, -0.50f),  FVector(0.52f, 0.52f, -0.68f), -40.f, -10.f, FVector(0.48f, -0.20f, -0.48f), 0.8f };  // run on low to his front left, the head clear of his left leg
 	// (blow 2 is swept at his own chest height, about 1.3 m: a knight's chest and head; at his shoulder height it passed over a knight)
 	static const FOneKey Wind2 = { FVector(0.50f, 0.42f, -0.12f),  FVector(0.62f, -0.55f, 0.55f), -46.f,  -4.f, FVector(0.50f, -0.20f, -0.45f), 0.2f };  // carried up across to the left side of his chest, the head behind it
-	static const FOneKey Hit2  = { FVector(-0.30f, 0.90f, -0.40f), FVector(-0.35f, 0.93f, -0.04f),  8.f, -14.f, FVector(0.50f, 0.05f, -0.45f), 1.f };   // level across his front at arm's length
+	static const FOneKey Hit2  = { FVector(-0.30f, 0.90f, -0.40f), FVector(-0.35f, 0.93f, -0.04f),  8.f,  -6.f, FVector(0.50f, 0.05f, -0.45f), 1.f };   // level across his front at arm's length
 	static const FOneKey End2  = { FVector(-0.98f, 0.25f, -0.30f), FVector(-0.80f, -0.55f, 0.16f),  40.f,  -3.f, FVector(0.30f, 0.50f, -0.30f), 0.4f };   // out wide on his right, the head run on behind
 	const FOneKey& K0 = b2 ? Wind2 : Wind1, &K1 = b2 ? Hit2 : Hit1, &K2 = b2 ? End2 : End1;
 	FOneKey Now;
@@ -552,7 +552,7 @@ void FKnightAnimator::TrollSwingOneHand(const FInput& In, FPose& B, float& OutBl
 	{
 		FQuat LQ, RQ;
 		const FVector LF = BonePos(B, LFoot, &LQ), RF = BonePos(B, RFoot, &RQ);
-		B.Hip += FVector(0.f, 36.f * Now.Lunge, -10.f * FMath::Abs(Now.Lunge));
+		B.Hip += FVector(0.f, 36.f * Now.Lunge, -6.f * FMath::Abs(Now.Lunge));   // (2026-11-27: 6 down, was 10, and the forward leans in the keys about halved: "remove the hunch")
 		L.ReachTo(B, LUp, LLeg, LFoot, LF, FVector(0.2f, 1.f, 0.2f));
 		L.ReachTo(B, RUp, RLeg, RFoot, RF, FVector(-0.2f, 1.f, 0.2f));
 		FQuat Q;
@@ -560,12 +560,14 @@ void FKnightAnimator::TrollSwingOneHand(const FInput& In, FPose& B, float& OutBl
 		BonePos(B, RFoot, &Q); TurnInMesh(B, RFoot, RQ * Q.Inverse());
 	}
 	// the trunk: the coil shared up the spine, the head turned back by most of it so he keeps his eyes on what he hits
-	const float Yaw = FMath::DegreesToRadians(Now.Twist), Lean = FMath::DegreesToRadians(Now.Lean);
+	// (2026-11-27, "remove the hunch": his body pose bends him well forward, so the whole blow is carried 14 degrees more upright up the spine,
+	// the head tipped back down by half of it so his eyes stay on what he hits)
+	const float Yaw = FMath::DegreesToRadians(Now.Twist), Lean = FMath::DegreesToRadians(Now.Lean + 14.f);
 	static const float Share[3] = { 0.22f, 0.36f, 0.42f };
 	const int32 SpineB[3] = { Spine, Spine1, Spine2 };
 	for (int32 i = 0; i < 3; ++i) TurnInMesh(B, SpineB[i], FQuat(FVector::UpVector, Yaw * Share[i]) * FQuat(FVector::XAxisVector, Lean * Share[i]));
 	TurnInMesh(B, Neck, FQuat(FVector::UpVector, -Yaw * 0.35f));
-	TurnInMesh(B, Head, FQuat(FVector::UpVector, -Yaw * 0.35f));
+	TurnInMesh(B, Head, FQuat(FVector::UpVector, -Yaw * 0.35f) * FQuat(FVector::XAxisVector, FMath::DegreesToRadians(-7.f)));
 	// the right hand, then the club turned onto its line
 	const float Arm = float(RefPos[Bone[RFore]].Size() + RefPos[Bone[RHand]].Size());
 	const FVector Sh = BonePos(B, RArm);
@@ -624,4 +626,15 @@ void FKnightAnimator::TrollBareGuard(const FInput& In, FPose& B)
 	const FQuat CurFrame = FRotationMatrix::MakeFromXZ(Cur.RotateVector(FingL), Cur.RotateVector(PalmL)).ToQuat();
 	const FQuat WantFrame = FRotationMatrix::MakeFromXZ(FingWant, PalmWant).ToQuat();
 	TurnInMesh(B, LHand, FQuat::Slerp(FQuat::Identity, WantFrame * CurFrame.Inverse(), W));
+	// (2026-11-27, "club across the chest in the block") the right hand no longer keeps the block overlay's sword guard, which laid the
+	// club across his chest: it holds the weapon in a clean guard out at his right side, fist at belt height a little ahead, the club up
+	// and leaning forward past his shoulder, ready to swing (near the club blows' own rest key, a touch further out)
+	const float ArmR = float(RefPos[Bone[RFore]].Size() + RefPos[Bone[RHand]].Size());
+	const FVector ShR = BonePos(B, RArm), NowR = BonePos(B, RHand);
+	L.ReachTo(B, RArm, RFore, RHand, FMath::Lerp(NowR, ShR + FVector(-0.35f, 0.45f, -0.30f) * ArmR, W), FVector(-0.8f, -0.4f, -0.5f));
+	FQuat HandRot;
+	BonePos(B, RHand, &HandRot);
+	const FVector ClubNow = HandRot.RotateVector(L.BladeInHand).GetSafeNormal();
+	TurnInMesh(B, RHand, FQuat::Slerp(FQuat::Identity, FQuat::FindBetweenNormals(ClubNow, FVector(-0.18f, 0.40f, 0.90f).GetSafeNormal()), W));
+	TrollClubClear(B);
 }

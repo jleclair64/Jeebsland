@@ -993,6 +993,43 @@ void AStable::BuildYard()
 	Put(TEXT("Pail"), -280.f, 230.f, 30.f);
 	Put(TEXT("HayWagon"), 150.f, HalfW + 320.f, 90.f);
 	Put(TEXT("Signpost"), HalfL + 120.f, -330.f, 180.f);
+	// (2026-11-27, "the stable is props only") two stalls along the right-hand fence, each with a horse of the stable's own standing in it,
+	// head to the fence, idling: looks only, built the same on every machine (no actor, nothing replicated, nothing to ride; the owned
+	// horses still wait in the middle of the yard at StallSpot). Fence dividers either side of each stall, a hay bale at each manger.
+	for (const float f : { -20.f, 240.f }) Put(TEXT("FencePicket"), f, HalfW - 130.f, 90.f, 0.8f);
+	Put(TEXT("HayBale"), -150.f, HalfW - 60.f, 90.f, 0.6f);
+	Put(TEXT("HayBale"), 110.f, HalfW - 60.f, 84.f, 0.6f);
+	if (const FHorseModel* HM = HorseModel())
+	{
+		const FVector2D Fw(FMath::Cos(FMath::DegreesToRadians(Def.Yaw)), FMath::Sin(FMath::DegreesToRadians(Def.Yaw)));
+		const FVector2D Rt(-Fw.Y, Fw.X);
+		int32 hi = 0;
+		for (const float f : { -150.f, 110.f })
+		{
+			const FVector2D P = Def.Pos + Fw * f + Rt * (HalfW - 200.f);
+			USkeletalMeshComponent* H = NewObject<USkeletalMeshComponent>(this, *FString::Printf(TEXT("StallHorse%d"), hi));
+			H->SetupAttachment(GetRootComponent());
+			H->SetSkeletalMesh(HM->Mesh);
+			H->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			H->SetGenerateOverlapEvents(false);
+			H->SetCanEverAffectNavigation(false);
+			H->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+			H->bEnableUpdateRateOptimizations = true;
+			H->LDMaxDrawDistance = 20000.f;
+			H->CachedMaxDrawDistance = 20000.f;
+			H->bAffectDynamicIndirectLighting = false;
+			H->SetWorldLocationAndRotation(FVector(P.X, P.Y, JeebFoes::Ground(P.X, P.Y)), FRotator(0.f, Def.Yaw - 90.f + CVarHorseMeshYaw.GetValueOnGameThread() + (hi ? -4.f : 5.f), 0.f));
+			H->SetWorldScale3D(FVector(JeebHorse::Scale));
+			H->SetAnimInstanceClass(UDeerAnimInstance::StaticClass());
+			H->RegisterComponent();
+			if (UDeerAnimInstance* A = Cast<UDeerAnimInstance>(H->GetAnimInstance()))
+			{
+				A->SetClips(HM->Clips, hi ? 2.3f : 0.4f);
+				A->Drive(hi ? JeebDeer::C_Graze : JeebDeer::C_Idle, 1.f);   // (one idles, one has its head down at the hay)
+			}
+			++hi;
+		}
+	}
 	UE_LOG(LogTemp, Log, TEXT("JEEBHORSE stable %s built at %.0f %.0f (%d props), wild meadow %.0f %.0f"), *Def.Key.ToString(), Def.Pos.X, Def.Pos.Y, N, Def.Wild.X, Def.Wild.Y);
 }
 

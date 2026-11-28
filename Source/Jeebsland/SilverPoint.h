@@ -65,40 +65,111 @@ namespace JeebSilver
 				P.Reach = FMath::Max(P.WallLo.Size(), P.WallHi.Size()) + FMath::Max(FVector2D(P.WallLo.X, P.WallHi.Y).Size(), FVector2D(P.WallHi.X, P.WallLo.Y).Size());
 				A.Add(P);
 			};
-			// round the plaza (angle from the road's heading, distance in m), door toward the middle
-			auto Ring = [&](const TCHAR* Id, const TCHAR* Kind, float Ang, float DistM)
+			// (2026-11-27, agent silverpt; owner: narrower, winding lanes) every plot by the middle of its front wall in the plan frame (m: U out
+			// along the road, V to its right) and the way its door faces (degrees from the road's heading); laid out with Saved/sp/layout.js-style
+			// checks: 1.5 m or more between any two buildings, every door on the plaza or a lane (Lanes below)
+			auto At = [&](const TCHAR* Id, const TCHAR* Kind, float U, float V, float DoorDeg)
 			{
-				const FVector2D C = Mid + Dir(H + Ang) * (DistM * 100.f);
-				Add(Id, Kind, C, H + Ang + 180.f);
+				const JeebOakHill::FModel* M = JeebOakHill::FindModel(*FString::Printf(TEXT("Silver%s"), Kind));
+				if (!M) return;
+				const float DoorYaw = H + DoorDeg;
+				const FVector2D Front = Mid + Dir(H) * (U * 100.f) + Dir(H + 90.f) * (V * 100.f);
+				const FVector2D Ax = Dir(DoorYaw - 90.f), Ay = Dir(DoorYaw);   // (the model's own X and Y once turned)
+				const float MidX = (M->WX0 + M->WX1) * 0.5f * M->Scale, FrontY = -M->WY0 * M->Scale;
+				Add(Id, Kind, Front - Ax * MidX - Ay * FrontY, DoorYaw);
 			};
-			// along the high street (m out along the road, m to its side: + is to the right looking out), door toward the street
-			auto Street = [&](const TCHAR* Id, const TCHAR* Kind, float AlongM, float SideM)
-			{
-				const FVector2D C = Mid + Dir(H) * (AlongM * 100.f) + Dir(H + 90.f) * (SideM * 100.f);
-				Add(Id, Kind, C, SideM > 0.f ? H - 90.f : H + 90.f);
-			};
-			Ring(TEXT("BroomShop"), TEXT("BroomShop"), 42.f, 26.f);
-			Ring(TEXT("Store"), TEXT("Store"), 80.f, 26.f);
-			Ring(TEXT("Bank"), TEXT("Bank"), 118.f, 26.f);
-			Ring(TEXT("TownHall"), TEXT("TownHall"), 156.f, 30.f);
-			Ring(TEXT("Academy"), TEXT("Academy"), 190.f, 52.f);
-			Ring(TEXT("Smith"), TEXT("Smith"), -150.f, 29.f);
-			Ring(TEXT("Tavern"), TEXT("Tavern"), -114.f, 28.f);
-			Ring(TEXT("PotionShop"), TEXT("PotionShop"), -78.f, 26.f);
-			Ring(TEXT("Home1"), TEXT("Home"), -44.f, 26.f);
-			Street(TEXT("WandShop"), TEXT("WandShop"), 30.f, 10.f);
-			Street(TEXT("CrystalShop"), TEXT("CrystalShop"), 30.f, -10.5f);
-			Street(TEXT("PetShop"), TEXT("PetShop"), 45.f, 11.5f);
-			Street(TEXT("Home2"), TEXT("Home"), 45.f, -11.f);
-			Street(TEXT("Home3"), TEXT("Home"), 58.f, 11.f);
-			Street(TEXT("Home4"), TEXT("Home"), 58.f, -11.f);
-			Ring(TEXT("Home5"), TEXT("Home"), 62.f, 47.f);
-			Ring(TEXT("Home6"), TEXT("Home"), 100.f, 47.f);
-			Ring(TEXT("Home7"), TEXT("Home"), -98.f, 48.f);
-			Ring(TEXT("Home8"), TEXT("Home"), -62.f, 47.f);
+			At(TEXT("PotionShop"), TEXT("PotionShop"), 11.06f, 7.74f, -145.0f);
+			At(TEXT("Tavern"), TEXT("Tavern"), 0.47f, 13.49f, -92.0f);
+			At(TEXT("Bank"), TEXT("Bank"), -8.12f, 10.78f, -53.0f);
+			At(TEXT("TownHall"), TEXT("TownHall"), -13.50f, 0.00f, 0.0f);
+			At(TEXT("Smith"), TEXT("Smith"), -7.74f, -11.06f, 55.0f);
+			At(TEXT("CrystalShop"), TEXT("CrystalShop"), 3.49f, -13.04f, 105.0f);
+			At(TEXT("WandShop"), TEXT("WandShop"), 10.34f, -8.68f, 140.0f);
+			At(TEXT("Store"), TEXT("Store"), 31.84f, 3.04f, -94.9f);
+			At(TEXT("BroomShop"), TEXT("BroomShop"), 28.38f, -2.89f, 85.1f);
+			At(TEXT("PetShop"), TEXT("PetShop"), 46.13f, 2.87f, -87.4f);
+			At(TEXT("Home2"), TEXT("Home"), 41.51f, -3.54f, 92.6f);
+			At(TEXT("Home3"), TEXT("Home"), 57.41f, 3.39f, -87.4f);
+			At(TEXT("Home4"), TEXT("Home"), 52.29f, -3.05f, 92.6f);
+			At(TEXT("Home5"), TEXT("Home"), 12.30f, 22.89f, -172.9f);
+			At(TEXT("Home6"), TEXT("Home"), 4.21f, 33.11f, 26.6f);
+			At(TEXT("Academy"), TEXT("Academy"), -30.00f, 8.00f, 0.0f);
+			At(TEXT("Home7"), TEXT("Home"), 0.36f, -23.56f, -159.4f);
+			At(TEXT("Home8"), TEXT("Home"), -3.39f, -34.52f, -12.5f);
+			At(TEXT("Home1"), TEXT("Home"), 7.38f, 25.88f, 26.6f);
 			return A;
 		}();
 		return All;
+	}
+
+	// The cobbled ground (2026-11-27): the plaza (PlazaR round the middle) and the lanes, as polylines in the plan frame (m) with a width
+	constexpr float PlazaR = 1250.f;
+	struct FLane { float W; TArray<FVector2D> Pts; };
+	inline const TArray<FLane>& LanesPlan()
+	{
+		static const TArray<FLane> L = {
+			{ 5.0f, { {11.f, 0.f}, {24.f, 0.6f}, {38.f, -0.6f}, {60.f, 0.4f} } },        // the high street, out along the road
+			{ 3.4f, { {7.2f, 11.4f}, {11.f, 18.f}, {10.f, 26.f}, {6.f, 34.f} } },     // past the potion shop to the houses on the right
+			{ 3.4f, { {-8.8f, 6.6f}, {-16.f, 11.f}, {-24.f, 11.f}, {-29.f, 8.f} } },  // round the town hall up to the academy
+			{ 3.4f, { {-1.f, -11.5f}, {-3.f, -20.f}, {0.f, -28.f}, {-2.f, -37.f} } }, // past the smith to the houses on the left
+		};
+		return L;
+	}
+	// The lanes in game cm, on every machine
+	inline const TArray<FLane>& Lanes()
+	{
+		static const TArray<FLane> All = []()
+		{
+			TArray<FLane> Out;
+			const JeebOpen::FSite* S = Site();
+			if (!S) return Out;
+			const float H = RoadHeading(S->Pos);
+			for (const FLane& L : LanesPlan())
+			{
+				FLane W; W.W = L.W * 100.f;
+				for (const FVector2D& P : L.Pts) W.Pts.Add(S->Pos + Dir(H) * (P.X * 100.f) + Dir(H + 90.f) * (P.Y * 100.f));
+				Out.Add(W);
+			}
+			return Out;
+		}();
+		return All;
+	}
+	// Distance (cm) from a spot to the cobbles' edge (negative on them): the plaza or a lane
+	inline float StreetClearance(float X, float Y)
+	{
+		const JeebOpen::FSite* S = Site();
+		if (!S) return 1.0e9f;
+		const FVector2D P(X, Y);
+		if (FVector2D::DistSquared(P, S->Pos) > FMath::Square(8000.f)) return 1.0e9f;
+		float Best = float(FVector2D::Distance(P, S->Pos)) - PlazaR;
+		for (const FLane& L : Lanes())
+			for (int32 i = 0; i + 1 < L.Pts.Num(); ++i)
+			{
+				const FVector2D A = L.Pts[i], AB = L.Pts[i + 1] - A;
+				const float T = FMath::Clamp(FVector2D::DotProduct(P - A, AB) / FMath::Max(AB.SizeSquared(), 1.f), 0.f, 1.f);
+				Best = FMath::Min(Best, float(FVector2D::Distance(P, A + AB * T)) - L.W * 0.5f);
+			}
+		return Best;
+	}
+	// A spot along one lane (Lane 0 the high street), T 0..1 from the plaza out, and the lane's heading there
+	inline FVector2D LaneSpot(int32 Lane, float T, float* OutYaw = nullptr)
+	{
+		const TArray<FLane>& L = Lanes();
+		if (!L.IsValidIndex(Lane) || L[Lane].Pts.Num() < 2) return FVector2D::ZeroVector;
+		const TArray<FVector2D>& P = L[Lane].Pts;
+		float Total = 0.f; for (int32 i = 0; i + 1 < P.Num(); ++i) Total += FVector2D::Distance(P[i], P[i + 1]);
+		float S = FMath::Clamp(T, 0.f, 1.f) * Total;
+		for (int32 i = 0; i + 1 < P.Num(); ++i)
+		{
+			const float Seg = FVector2D::Distance(P[i], P[i + 1]);
+			if (S <= Seg || i + 2 == P.Num())
+			{
+				if (OutYaw) *OutYaw = FMath::RadiansToDegrees(FMath::Atan2(P[i + 1].Y - P[i].Y, P[i + 1].X - P[i].X));
+				return FMath::Lerp(P[i], P[i + 1], FMath::Clamp(S / FMath::Max(Seg, 1.f), 0.f, 1.f));
+			}
+			S -= Seg;
+		}
+		return P.Last();
 	}
 
 	inline const FPlot* FindPlot(const FString& Id)

@@ -132,7 +132,7 @@ namespace JeebMarket
 			L.Id = O->GetStringField(TEXT("id"));
 			L.SellerKey = O->GetStringField(TEXT("seller"));
 			L.SellerName = O->GetStringField(TEXT("name"));
-			L.ItemId = int32(O->GetNumberField(TEXT("item")));
+			L.ItemId = ReplaceRetired(int32(O->GetNumberField(TEXT("item"))));   // (2026-11-27: old armour ids in listings become Knight's Armor like saves; the files stay as written)
 			L.Count = int32(O->GetNumberField(TEXT("count")));
 			L.Size = int32(O->GetNumberField(TEXT("size")));
 			L.Price = int32(O->GetNumberField(TEXT("price")));

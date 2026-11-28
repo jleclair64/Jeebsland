@@ -74,7 +74,34 @@ GROW_BY = {"TL_Church": 3.0}   #   the old glass paint (a strip of pane colour a
 SHAPE_BY_HAND = {   # (x, y, z, radius cm, shape, width, height cm, which side of the box found stays: L or R; its foot always does):
     # three windows whose marks cover only part of the opening, measured off the WINS_DEBUG sheet
     "TL_CornerHouse": [(-367, 276, 489, 45, "arch", 69, 80, "L"), (43, -337, 138, 45, "arch", 40, 70, "R")],
-    "TL_Church": [(-263, -75, 899, 45, "arch", 52, 76, "R")]}
+    "TL_Church": [(-263, -75, 899, 45, "arch", 52, 76, "R")],
+    "TL_SPTownHall": [(-330, 411, 261, 45, "pointed", 68, 146, "R")]}   # (Silver Point: a lower back window found 30 cm too wide)
+
+HAND_MARKS = {   # (view yaw deg in the model frame, h cm along the view's right, z cm, width, height): window glass marked by hand (Silver Point, 2026-11-27; their pale painted panes fail building_glow)
+    "TL_SPTownHall": [(270, -441, 945, 60, 100), (270, -553, 616, 60, 100), (270, -329, 616, 60, 100), (270, -28, 616, 60, 100), (270, 252, 616, 60, 100), (270, 518, 616, 60, 100), (270, -532, 223, 60, 100), (270, -350, 223, 60, 100), (270, 511, 230, 60, 100), (90, 448, 945, 60, 100), (90, -518, 609, 60, 100), (90, -196, 609, 60, 100), (90, 14, 609, 60, 100), (90, 329, 609, 60, 100), (90, 546, 616, 60, 100), (90, -504, 244, 60, 100), (90, 343, 223, 60, 100), (90, 532, 223, 60, 100), (0, -154, 609, 60, 100), (0, 154, 609, 60, 100), (0, -140, 230, 60, 100), (0, 140, 230, 60, 100), (180, -266, 602, 40, 100), (180, -147, 602, 40, 100), (180, 161, 602, 40, 100), (180, 266, 602, 40, 100), (180, -238, 230, 40, 100), (180, -126, 230, 40, 100), (180, 119, 230, 40, 100), (180, 231, 230, 40, 100)],
+    "TL_SPAcademy": [(270, -695, 1342, 30, 110), (270, -442, 1342, 30, 110), (270, -695, 863, 30, 110), (270, -442, 863, 30, 110), (270, -695, 356, 30, 110), (270, -442, 356, 30, 110), (270, -592, 1869, 30, 110), (270, 141, 713, 30, 110), (270, 291, 741, 30, 110), (270, 451, 741, 30, 110), (270, 611, 713, 30, 110), (270, 376, 1211, 30, 110), (270, -9, 319, 30, 110), (270, 798, 319, 30, 110), (270, 1052, 910, 30, 110), (90, -376, 1249, 25, 60), (90, -1052, 910, 25, 60), (0, 0, 732, 30, 100), (0, 263, 732, 30, 100), (0, -47, 319, 30, 100), (0, 357, 319, 30, 100), (180, 272, 1878, 30, 110), (180, 244, 1352, 30, 110), (180, 404, 1352, 30, 110), (180, 103, 873, 30, 110), (180, 404, 873, 30, 110)],
+}
+
+def hand_marks(src, fc, name):   # (HAND_MARKS: rays from the view into each box; the faces they hit that face the view are glass marks)
+    if name not in HAND_MARKS: return fc
+    me = src.data; nf = len(me.polygons)
+    if fc is None: fc = np.tile(np.array(NOT, np.float32), (nf, 1))
+    vs = [v.co.copy() for v in me.vertices]; ps = [tuple(p.vertices) for p in me.polygons]
+    tree = BVHTree.FromPolygons(vs, ps)
+    n0 = 0
+    for k, (ang, h, z, w, ht) in enumerate(HAND_MARKS[name]):
+        D = Vector((math.cos(math.radians(ang)), math.sin(math.radians(ang)), 0.0)); R = Vector((-D.y, D.x, 0.0))
+        hit = set()
+        for i in range(int(w // 3) + 1):
+            for j in range(int(ht // 3) + 1):
+                o = (D * 5000.0 + R * (h - w / 2 + 3 * i) + Vector((0, 0, z - ht / 2 + 3 * j))) / 100.0
+                loc, nrm, fi, dist = tree.ray_cast(o, -D, 100.0)
+                if fi is not None and me.polygons[fi].normal.dot(D) > 0.3: hit.add(fi)
+        for fi in hit: fc[fi] = ((k * 37 % 100) / 100.0, 1.0, 0.0)
+        n0 += len(hit)
+        if not hit: log(name, 'hand mark', k, 'hit nothing')
+    log(name, 'hand marks', len(HAND_MARKS[name]), 'faces', n0)
+    return fc
 
 def log(*x): print("WINS", *x, flush=True)
 TAG = ""
@@ -919,6 +946,7 @@ for pr in pairs:
         ours = os.path.exists(pre + ".glass") and open(pre + ".glass").read().strip() == "%.3f" % os.path.getmtime(src_path)
         src = load(pre if ours else src_path)   # (an old model window_glass.py gave its own glass: its own marks are in the copy)
         fc = marks(src.data, np.array([p.loop_start for p in src.data.polygons], np.int64))
+        fc = hand_marks(src, fc, new)
         if fc is not None:
             found = find_openings(src, fc)
             fi_ = np.nonzero((fc[:, 0] < 0.5) & (fc[:, 1] < 0.5) & (fc[:, 2] < 0.5))[0]
