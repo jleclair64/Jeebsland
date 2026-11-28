@@ -387,7 +387,8 @@ void ASteeleCreekTown::BuildBuildings()
 		const TCHAR* MeshPath = RebuiltMesh(P.Def.Model);
 		if (!MeshPath) { UE_LOG(LogTemp, Warning, TEXT("JEEBSTEELE %s: no rebuilt model for %s"), P.Def.Name, P.Def.Model); continue; }
 		const FString Path(MeshPath), ColPath = Path + TEXT("_Col");
-		const FVector At(P.Centre.X, P.Centre.Y, P.Level + P.Def.Lift);
+		// (a palisade piece, 2026-11-28: no pad; it stands on the lower ground of its two ends and middle, its stone footing sunk 40 cm)
+		const FVector At(P.Centre.X, P.Centre.Y, P.Def.bNoPad ? FMath::Min3(JeebTerrain::HeightAt(P.EndA.X, P.EndA.Y), JeebTerrain::HeightAt(P.EndB.X, P.EndB.Y), JeebTerrain::HeightAt(P.Centre.X, P.Centre.Y)) - 40.f : P.Level + P.Def.Lift);
 		const FTransform Xf(FRotator(0.f, P.Yaw, 0.f), At, FVector(P.Scale, P.Scale, P.ScaleZ));
 		UE_LOG(LogTemp, Log, TEXT("JEEBSTEELE PLOT %s (%s) at %.0f %.0f %.0f yaw %.0f scale %.2f; ground there %.0f"), P.Def.Name, *FPaths::GetBaseFilename(Path), At.X, At.Y, At.Z, P.Yaw, P.Scale, JeebTerrain::HeightAt(At.X, At.Y));
 		if (!bServer)

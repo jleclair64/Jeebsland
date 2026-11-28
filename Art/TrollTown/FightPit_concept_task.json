@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0504-72a6-b69a-b84154892479",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "Redraw as a troll fighting pit: a round sunken stone arena, a ring of low dry-stone boulder walls with three tiers of rough stone benches around a flat sandy floor, tall carved wooden totem poles with horned skulls and red leather banners standing evenly around the rim, one wide open entrance gap with a ramp down, seen from above at three-quarter view, no building roof. Same troll-town style and materials as the reference great hall: heavy dry-stone boulders stacked without mortar, thick dark timber lashed with leather straps, stretched tan and brown hides sewn over timber ribs, cream bone, big tusks and horned skulls as trophies, deep-red leather banners with bold tribal stripes. Brutal, rough, tribal orc-like war-camp mood but an original design. The door opening is HUGE, built for a giant 2.4 metre tall troll: at least 3.5 metres tall and 2.5 metres wide, a clear dark open doorway or a big plain wooden door, its top well above head height, nothing hanging across it. Hand-painted stylized fantasy game building, Breath of the Wild meets Overwatch, a tiny bit cartoonish, rich clean colours, warm grey stone, rich brown wood, cream bone. CLEAN, no dirt, no grime, no blood, no gore. The building shell ONLY: NO loose props, NO barrels, NO crates, NO weapons on the ground, NO torches on poles, NO fences, NO people, NO ground or base plate. Whole structure centred, front three-quarter view, plain light grey background, nothing cut off.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844081851,
+ "started_at": 1795844081862,
+ "finished_at": 1795844100935,
+ "expires_at": 1796103300935,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0504-72a6-b69a-b84154892479_0.png?Expires=1796103300&Signature=hA7LTzJYSZK5WFuyMGLmcXrMc1n2Xws9jRI59yYZhRggnE0hm69jyuG2DHaJXAwXr9h1y6S2Ey8EE6fvqwkdWyJ4tvvVHlAqe5KzHQUp-DhwZ5ojivCXTd6uUvDZI7w3e75KApD8ECLCtUeqQBQi6Os2NP-SfIxleFMP4Z9uA6Q3jNiqadNJ~hgR2zHgXe4tAnvo9dEnjvxPGdu~~XOYXRYAszXzGH2brYEiAPzs-BQCMi7r07xkoYBtQAY1gzyD-mIpzvhBL8K-NR5C8UPtVKgcoVq1qYGRZzVmUOTOiZ1B~NOK~4-YReHfp9NnUqn9fH5ICode5x37nlIMAj4mJg__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -506,6 +506,23 @@ namespace
 		return false;
 	}
 
+	// Steele Creek's open ground (2026-11-28, the troll town's runts): "camp", a spot by a seed somewhere 6-42 m from the forge yard, on the
+	// town's own ground, never on or within 1.5 m of a building or the palisade, facing the yard
+	bool SteeleSpot(uint32 Seed, FVector2D& OutAt, float& OutYaw)
+	{
+		const FVector2D Yard = JeebSteele::ToWorld(0.f, 0.f);
+		for (int32 k = 0; k < 32; ++k)
+		{
+			const uint32 Q = Seed * 2654435761u + uint32(k) * 40503u;
+			const float U = float(Q % 1000u) / 1000.f, V = float((Q >> 10) % 1000u) / 1000.f;
+			const float A = 360.f * U;
+			OutAt = Yard + Dir2(A) * (600.f + 3600.f * V);
+			OutYaw = A + 180.f;
+			if (!JeebSteele::OnBuilding(OutAt.X, OutAt.Y, 1.5f) && !JeebWorld::NearRiver(OutAt.X, OutAt.Y, 500.f)) return true;
+		}
+		return false;
+	}
+
 	// An errand's spot (where to stand, facing what they came for), by name, in a town
 	FPlace Errand(ETown Town, const FString& Name, uint32 Seed, UWorld* W)
 	{
@@ -551,6 +568,7 @@ namespace
 				R.At = Pts[Pts.Num() - 6]; R.Yaw = YawOf(Pts.Last() - Pts[Pts.Num() - 6]); R.bOk = true;
 				return R;
 			}
+			if (N == TEXT("camp")) { R.bOk = SteeleSpot(Seed + GetTypeHash(N), R.At, R.Yaw); return R; }   // (the runts, 2026-11-28)
 			const bool bSmithy = N == TEXT("smithy") || N == TEXT("forge");
 			const bool bWell = N == TEXT("well");
 			R = Front(Town, bSmithy ? FString(TEXT("Smithy")) : Name, bSmithy ? 700.f : bWell ? 110.f : 260.f);
@@ -588,6 +606,7 @@ namespace
 		}
 		if (Town == ETown::Steele)
 		{
+			if (Kind.Equals(TEXT("runt"), ESearchCase::IgnoreCase)) return SteeleSpot(7919u * uint32(Idx + 1) + 101u, OutAt, OutYaw);   // (a runt's nook about the camp, 2026-11-28)
 			const JeebSteele::FPlot* P = JeebSteele::FindPlot(*FString::Printf(TEXT("House%d"), Idx));
 			if (!P) return false;
 			OutAt = JeebSteele::DoorSpot(*P, 150.f, &OutYaw);
@@ -792,7 +811,7 @@ void ATownLife::Build()
 				if (!N)
 				{
 					// (Silver Point's keepers, 2026-11-26: they mind their shops and talk; what the shops sell is set up elsewhere)
-					const ENpcRole KRole = Town == ETown::Silver ? ENpcRole::Townsfolk : K.Shop == uint8(JeebOakHill::EShop::Smith) ? ENpcRole::Blacksmith : K.Shop == uint8(JeebOakHill::EShop::Bank) ? ENpcRole::Banker : ENpcRole::Shopkeeper;
+					const ENpcRole KRole = Town == ETown::Silver || (Town == ETown::Steele && K.Shop == 255) ? ENpcRole::Townsfolk : K.Shop == uint8(JeebOakHill::EShop::Smith) ? ENpcRole::Blacksmith : K.Shop == uint8(JeebOakHill::EShop::Bank) ? ENpcRole::Banker : ENpcRole::Shopkeeper;
 					N = W->SpawnActor<ANpc>(FVector(K.At.X, K.At.Y, DrawnGround(K.At.X, K.At.Y) + 92.f), FRotator(0.f, K.Yaw, 0.f), SP);
 					if (!N) continue;
 					N->SetFolk(FolkK, Name, Hello);
@@ -816,12 +835,12 @@ void ATownLife::Build()
 			}
 			else if (!Model.IsEmpty()) { N->SetLookHint(Model, Tint); N->RebuildBody(); }
 			F.N = N;
-			F.bGoblin = Model.Equals(TEXT("Goblin"), ESearchCase::IgnoreCase);   // (Silver Point's goblins scurry: 2026-11-26)
+			F.bGoblin = Model.Equals(TEXT("Goblin"), ESearchCase::IgnoreCase) || Model.Equals(TEXT("TrollRunt"), ESearchCase::IgnoreCase);   // (and the troll town's runts, 2026-11-28)   // (Silver Point's goblins scurry: 2026-11-26)
 			TArray<FString> Es; Sheet.S(r, TEXT("Errands")).ParseIntoArrayWS(Es);
 			for (int32 k = 0; k < Es.Num(); ++k)
 			{
 				const FString& E = Es[k];
-				const FPlace P = Errand(Town, E, Town == ETown::Silver ? Seed(Name) + 7919u * uint32(k) : Seed(Name), W);   // (Silver Point: each errand its own spot, 2026-11-26)
+				const FPlace P = Errand(Town, E, Town == ETown::Silver || F.bGoblin ? Seed(Name) + 7919u * uint32(k) : Seed(Name), W);   // (Silver Point: each errand its own spot, 2026-11-26)
 				if (P.bOk) F.Errands.Add(P);
 				else UE_LOG(LogTemp, Warning, TEXT("JEEBLIFE Townsfolk.csv: %s has no errand %s here"), *Name, *E);
 			}

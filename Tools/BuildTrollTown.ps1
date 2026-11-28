@@ -10,7 +10,7 @@ $art = Join-Path $proj 'Art\Buildings'
 $work = Join-Path $proj 'Saved\KnightBuild\Buildings'; $out = Join-Path $proj 'Saved\KnightBuild\TownLabTroll'
 New-Item -ItemType Directory -Force $out | Out-Null
 # name, low-model triangles
-$all = @(,@('Hall', 60000))   # (the leading comma keeps a one-building list a list of pairs)
+$all = @(@('Hall', 60000), @('BoneCarver', 50000), @('Tanner', 50000), @('GrogHall', 60000), @('TradingPost', 50000), @('BrewHut', 50000), @('WarForge', 60000), @('FightPit', 70000), @('Watchtower', 50000), @('Gate', 50000), @('Palisade', 30000), @('Cairn', 40000), @('Hut', 40000), @('Caves', 60000), @('Vault', 50000))
 $designs = @($all | Where-Object { -not $Only -or (($Only -split ',') -contains $_[0]) } | ForEach-Object { ,$_ })
 if ($designs.Count -gt 0 -and $designs[0] -isnot [array]) { $designs = @(,$designs) }   # (PowerShell unwraps a one-pair list)
 $src = @($designs | ForEach-Object { "Troll$($_[0])_300k" })

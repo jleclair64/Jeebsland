@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0ba0-7534-8add-030658688192",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "An old hunched troll shaman, about 2 metres tall even when stooped, wrinkled grey-green skin, small tusks, long white beard braided with beads, wearing a long patched hide cloak with a horned beast skull worn as a hood, bone necklaces and charms, a rope belt with little pouches, wrapped feet. Wise and a little spooky, kind eyes, an original design. Same A-pose and framing as the reference. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt, no blood. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands, no weapon.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844083705,
+ "started_at": 1795844083715,
+ "finished_at": 1795844122941,
+ "expires_at": 1796103322941,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0ba0-7534-8add-030658688192_0.png?Expires=1796103322&Signature=GpUzqaXPaJFt8oSBdf40oBHCSE~zG0l8x4U~3c3ztdVCBHRiw0v669cfQDx2nAfqesbrr4q8LYWrJRrfSNGL5DynPQGoIV1hpo2aJeLWmBhM9jfVE4ALEcfEy5X4k12H7ltpc34enXMVpVzmI2lB2tUlBOLC38VPNHRl21zFcFhXMUVGTHCfpLX~C57ZdM4D6M-ak5brbPjQxzyjDqBBr0sAtvxLv7aFf6wVAgWjcDRLduJQK~H2FowZ02Xd0MFl2hA0Nc6M-Gl0V2iwJY6pDy0SmX5DOruKXMDkLyddackWiyTfO40chSz9U8UJ4JsbzVRKtXK8T2jA2mdMobWTng__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

@@ -1,0 +1,16 @@
+{
+ "id": "01a220a6-0bc3-724a-b281-adb795c16369",
+ "type": "image-to-image",
+ "ai_model": "nano-banana-pro",
+ "prompt": "A big muscular troll warrior, about 2.4 metres tall, broad shoulders, grey-green skin, small tusks, heavy brow, long black hair in a topknot, wearing rough leather and bone armour: a bone-plated leather chest harness, big bone shoulder pads with spikes, a fur kilt with a wide leather belt, leather bracers, bare big feet with wraps. Fierce but heroic, an original design. Same A-pose and framing as the reference. Stylised 3D game character, Breath of the Wild meets Overwatch, slightly stylised and a tiny bit cartoonish, sleek natural proportions, hand-painted textures, rich clean colours, no dirt, no blood. Full body, front view, standing in a relaxed A-pose with arms held a little away from the body, legs slightly apart, plain light grey background, nothing held in the hands, no weapon.",
+ "status": "SUCCEEDED",
+ "progress": 100,
+ "created_at": 1795844083710,
+ "started_at": 1795844083721,
+ "finished_at": 1795844108567,
+ "expires_at": 1796103308567,
+ "image_urls": [
+  "https://assets.meshy.ai/9599298c-8d3b-4a6e-af20-4d0e0dffef18/uploads/image_01a220a6-0bc3-724a-b281-adb795c16369_0.png?Expires=1796103308&Signature=HjhOBhMIpSS2scCqi-4VAT4xRYD8PeDKsGvkYjGQsQO2Im4SYDb6rBcSQkkHnrwBVtES1ZWYinEopeY~gER1C7ijUpKIN~XMM7r5BxVtE86xvPy9xjvt5dyrNQ-FMxg19YlT0lGgaxH8IjkYDf3vvHWEJOkFKn5l6nyVePKjygoVxaE5mKPzyCcBuXiDTHoa4YrXsMQDNv9mxnbmhhi~D3SJZhJEV8uiDBQd0Q6bbo-kTa0S-wJLT1wvgIIz66R0GjmBYxU92XH-txqGS77bu1DE3aJrVMGRa9fwIeIdMh1Fq0sbZClcUt5asRBrmudBKR0FpSs0xpaVXkY7bR45ug__&Key-Pair-Id=K1VGYTHIYLM9UM"
+ ],
+ "consumed_credits": 9
+}

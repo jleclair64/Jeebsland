@@ -21,7 +21,11 @@ $people = @(
   # Silver Point's people (2026-11-26, agent wizvillage): Meshy actions; the goblin runs (Run_02) where the others walk
   @('Wizard',     'idle:Idle_3',  'walk:Casual_Walk',    'talk:Talk_with_Hands_Open'),
   @('Witch',      'idle:Idle_4',  'walk:Walking_Woman',  'talk:Talk_with_Right_Hand_Open'),
-  @('Goblin',     'idle:Idle_3',  'walk:Run_02',         'talk:Talk_with_Left_Hand_Raised')
+  @('Goblin',     'idle:Idle_3',  'walk:Run_02',         'talk:Talk_with_Left_Hand_Raised'),
+  # Steele Creek's troll town (2026-11-28, agent trolltown): warriors and the shaman walk like the troll, the runts run like the goblins
+  @('TrollWarrior', 'idle:Idle_3', 'walk:Slow_Orc_Walk', 'talk:Talk_with_Hands_Open'),
+  @('TrollShaman',  'idle:Idle_3', 'walk:Slow_Orc_Walk', 'talk:Talk_with_Hands_Open'),
+  @('TrollRunt',    'idle:Idle_3', 'walk:Run_02',        'talk:Talk_with_Left_Hand_Raised')
 )
 foreach ($p in $people) {
   $n = $p[0]; $dir = Join-Path $art $n
